@@ -1,99 +1,75 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 15 Mar 2012 16:32:11 +0000
-Subject: [PATCH 3/4] ARM: opcodes: Add helpers for emitting custom opcodes
+Date: Thu, 15 Mar 2012 16:32:12 +0000
+Subject: [PATCH 4/4] ARM: opcodes: Opcode definitions for the Virtualization
+ Extensions
 In-Reply-To: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
 References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1331829132-9762-4-git-send-email-dave.martin@linaro.org>
+Message-ID: <1331829132-9762-5-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some __inst_() macros for injecting custom opcodes
-in assembler (both inline and in .S files).  They should make it
-easier and cleaner to get things right in little-/big-
-endian/ARM/Thumb-2 kernels without a lot of #ifdefs.
+For now, this patch just adds a definition for the HVC instruction.
+More can be added here later, as needed.
+
+Now that we have a real example of how to use the opcode injection
+macros properly, this patch also adds a cross-reference from the
+explanation in opcodes.h (since without an example, figuring out
+how to use the macros is not that easy).
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/include/asm/opcodes.h |   69 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 69 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/opcodes-virt.h |   29 +++++++++++++++++++++++++++++
+ arch/arm/include/asm/opcodes.h      |    2 ++
+ 2 files changed, 31 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/opcodes-virt.h
 
+diff --git a/arch/arm/include/asm/opcodes-virt.h b/arch/arm/include/asm/opcodes-virt.h
+new file mode 100644
+index 0000000..b85665a
+--- /dev/null
++++ b/arch/arm/include/asm/opcodes-virt.h
+@@ -0,0 +1,29 @@
++/*
++ * opcodes-virt.h: Opcode definitions for the ARM virtualization extensions
++ * Copyright (C) 2012  Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++#ifndef __ASM_ARM_OPCODES_VIRT_H
++#define __ASM_ARM_OPCODES_VIRT_H
++
++#include <asm/opcodes.h>
++
++#define __HVC(imm16) __inst_arm_thumb32(				\
++	0xE1400070 | (((imm16) & 0xFFF0) << 4) | ((imm16) & 0x000F),	\
++	0xF7E08000 | (((imm16) & 0xF000) << 4) | ((imm16) & 0x0FFF)	\
++)
++
++#endif /* ! __ASM_ARM_OPCODES_VIRT_H */
 diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-index 32730a8..50ef0be 100644
+index 50ef0be..89ff5b9 100644
 --- a/arch/arm/include/asm/opcodes.h
 +++ b/arch/arm/include/asm/opcodes.h
-@@ -156,4 +156,73 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
- 	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
- )
+@@ -193,6 +193,8 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+  * specify the ARM and Thumb alternatives at the same time.  This ensures
+  * that the correct opcode gets emitted depending on the instruction set
+  * used for the kernel build.
++ *
++ * Look@opcodes-virt.h for an example of how to use these macros.
+  */
+ #include <linux/stringify.h>
  
-+/*
-+ * Opcode injection helpers
-+ *
-+ * In rare cases it is necessary to assemble an opcode which the
-+ * assembler does not support directly, or which would normally be
-+ * rejected because of the CFLAGS or AFLAGS used to build the affected
-+ * file.
-+ *
-+ * Before using these macros, consider carefully whether it is feasible
-+ * instead to change the build flags for your file, or whether it really
-+ * makes sense to support old assembler versions when building that
-+ * particular kernel feature.
-+ *
-+ * The macros defined here should only be used where there is no viable
-+ * alternative.
-+ *
-+ *
-+ * __inst_arm(x): emit the specified ARM opcode
-+ * __inst_thumb16(x): emit the specified 16-bit Thumb opcode
-+ * __inst_thumb32(x): emit the specified 32-bit Thumb opcode
-+ *
-+ * __inst_arm_thumb16(arm, thumb): emit either the specified arm or
-+ *	16-bit Thumb opcode, depending on whether an ARM or Thumb-2
-+ *	kernel is being built
-+ *
-+ * __inst_arm_thumb32(arm, thumb): emit either the specified arm or
-+ *	32-bit Thumb opcode, depending on whether an ARM or Thumb-2
-+ *	kernel is being built
-+ *
-+ *
-+ * Note that using these macros directly is poor practice.  Instead, you
-+ * should use them to define human-readable wrapper macros to encode the
-+ * instructions that you care about.  In code which might run on ARMv7 or
-+ * above, you can usually use the __inst_arm_thumb{16,32} macros to
-+ * specify the ARM and Thumb alternatives at the same time.  This ensures
-+ * that the correct opcode gets emitted depending on the instruction set
-+ * used for the kernel build.
-+ */
-+#include <linux/stringify.h>
-+
-+#define __inst_arm(x) ___inst_arm(___asm_opcode_to_mem_arm(x))
-+#define __inst_thumb32(x) ___inst_thumb32(				\
-+	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_first(x)),	\
-+	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_second(x))	\
-+)
-+#define __inst_thumb16(x) ___inst_thumb16(___asm_opcode_to_mem_thumb16(x))
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define __inst_arm_thumb16(arm_opcode, thumb_opcode) \
-+	__inst_thumb16(thumb_opcode)
-+#define __inst_arm_thumb32(arm_opcode, thumb_opcode) \
-+	__inst_thumb32(thumb_opcode)
-+#else
-+#define __inst_arm_thumb16(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
-+#define __inst_arm_thumb32(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
-+#endif
-+
-+/* Helpers for the helpers.  Don't use these directly. */
-+#ifdef __ASSEMBLY__
-+#define ___inst_arm(x) .long x
-+#define ___inst_thumb16(x) .short x
-+#define ___inst_thumb32(first, second) .short first, second
-+#else
-+#define ___inst_arm(x) ".long " __stringify(x) "\n\t"
-+#define ___inst_thumb16(x) ".short " __stringify(x) "\n\t"
-+#define ___inst_thumb32(first, second) \
-+	".short " __stringify(first) ", " __stringify(second) "\n\t"
-+#endif
-+
- #endif /* __ASM_ARM_OPCODES_H */
 -- 
 1.7.4.1
