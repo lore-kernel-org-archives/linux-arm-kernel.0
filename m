@@ -1,54 +1,28 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Thu, 15 Mar 2012 19:10:42 +0530
-Subject: [PATCH v3 6/6] mfd: mc13xxx: Add i2c driver
-In-Reply-To: <1331757790-10583-7-git-send-email-marc@cpdesign.com.au>
-References: <1331757790-10583-1-git-send-email-marc@cpdesign.com.au>
- <1331757790-10583-7-git-send-email-marc@cpdesign.com.au>
-Message-ID: <CAM=Q2cssNF2TSWHjcbG4wsABBXhquYoKq_scC6bDcq8kdoosyQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 13:47:11 +0000
+Subject: [PATCH -next] ARM: ux500: fix compilation after local timer rework
+In-Reply-To: <1331812046-21062-1-git-send-email-marc.zyngier@arm.com>
+References: <1331812046-21062-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <201203151347.11511.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Thu, Mar 15, 2012 at 2:13 AM, Marc Reilly <marc@cpdesign.com.au> wrote:
-> Adds support for mc13xxx family ICs connected via i2c.
->
-> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
+On Thursday 15 March 2012, Marc Zyngier wrote:
+> mach-ux500/timer.c lacked the inclusion of mach/irqs.h, and thus
+> failed to compile. Fix it and also remove an unused variable.
+> 
+> Test compiled only.
+> 
+> Reported-by: Lee Jones <lee.jones@linaro.org>
+> Cc: Arnd Bergman <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-<snip>
+> Arnd,
+> 
+> I've pushed this patch to my local_timers-for-arm-soc. If you can pull
+> it one more time, that would be great.
 
-> +static int mc13xxx_i2c_probe(struct i2c_client *client,
-> + ? ? ? ? ? ? ? const struct i2c_device_id *id)
-> +{
-> + ? ? ? const struct of_device_id *of_id;
-> + ? ? ? struct i2c_driver *idrv = to_i2c_driver(client->dev.driver);
-> + ? ? ? struct mc13xxx *mc13xxx;
-> + ? ? ? struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-> + ? ? ? int ret;
-> +
-> + ? ? ? of_id = of_match_device(mc13xxx_dt_ids, &client->dev);
-> + ? ? ? if (of_id)
-> + ? ? ? ? ? ? ? idrv->id_table =
-> + ? ? ? ? ? ? ? ? ? ? ? &mc13xxx_i2c_device_id[(enum mc13xxx_id) of_id->data];
-> +
-> + ? ? ? mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-> + ? ? ? if (!mc13xxx)
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> +
-> + ? ? ? dev_set_drvdata(&client->dev, mc13xxx);
-> +
-> + ? ? ? mc13xxx->dev = &client->dev;
-> + ? ? ? mutex_init(&mc13xxx->lock);
-> +
-> + ? ? ? mc13xxx->regmap = regmap_init_i2c(client, &mc13xxx_regmap_i2c_config);
-> + ? ? ? if (IS_ERR(mc13xxx->regmap)) {
-> + ? ? ? ? ? ? ? ret = PTR_ERR(mc13xxx->regmap);
-> + ? ? ? ? ? ? ? dev_err(mc13xxx->dev, "Failed to initialize register map: %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
-> + ? ? ? ? ? ? ? dev_set_drvdata(&client->dev, NULL);
-Are we  leaking mc13xxx here
-May be you can consider using devm* functions ?
+Thanks for the quick update, pulled into next/timers now.
 
->  + ? ? ? ? ? ? ? return ret;
-> + ? ? ? }
-> +
+	Arnd
