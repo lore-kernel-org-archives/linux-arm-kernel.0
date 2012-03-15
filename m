@@ -1,43 +1,85 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 15 Mar 2012 10:21:29 -0500
-Subject: [PATCH v2 5/8] ARM: OMAP2+: hwmod: ensure that SYSCONFIG bits are
- reprogrammed after a reset
-In-Reply-To: <alpine.DEB.2.00.1203150024260.7269@utopia.booyaka.com>
-References: <20120228053524.16278.59430.stgit@dusk>
- <20120228053657.16278.76132.stgit@dusk>
- <CAB-zwWhAa3PprwDLzWLkBFUHPeJO3HN3M9mAZF=ohGTvP43jYA@mail.gmail.com>
- <alpine.DEB.2.00.1203150024260.7269@utopia.booyaka.com>
-Message-ID: <CAB-zwWh3tcz5xUkzthH_AAsmeXfMieUW-SCQnAaXyfSg8khqvg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 15 Mar 2012 15:25:05 +0000
+Subject: [PATCH 3/5] MMC: mmci: Add generic Device Tree bindings to mmci
+ core code
+In-Reply-To: <CAFEEs1mQr4hDC6RuvchfWe7HNq67Eh2bPtwyWN-tukw32-V0rg@mail.gmail.com>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <1331734803-17954-4-git-send-email-lee.jones@linaro.org>
+ <CAFEEs1mQr4hDC6RuvchfWe7HNq67Eh2bPtwyWN-tukw32-V0rg@mail.gmail.com>
+Message-ID: <4F6209D1.9070805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 1:25 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hola Omar,
+On 15/03/12 15:12, Per Forlin wrote:
+> On Wed, Mar 14, 2012 at 3:20 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> This adds the necessary bindings for collection of shared
+>> attributes used in the mmci driver.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>  drivers/mmc/host/mmci.c |   43 +++++++++++++++++++++++++++++++++++++++++++
+>>  1 files changed, 43 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+>> index 23b41a5..9132ca8 100644
+>> --- a/drivers/mmc/host/mmci.c
+>> +++ b/drivers/mmc/host/mmci.c
+>> @@ -30,6 +30,7 @@
+>>  #include <linux/dma-mapping.h>
+>>  #include <linux/amba/mmci.h>
+>>  #include <linux/pm_runtime.h>
+>> +#include <linux/of_gpio.h>
+>>
+>>  #include <asm/div64.h>
+>>  #include <asm/io.h>
+>> @@ -1056,11 +1057,47 @@ static const struct mmc_host_ops mmci_ops = {
+>>        .get_cd         = mmci_get_cd,
+>>  };
+>>
+>> +#ifdef CONFIG_OF
+>> +static void mmci_dt_populate_generic_pdata(struct device_node *np,
+>> +                                       struct mmci_platform_data *pdata)
+>> +{
+>> +       const void *prop;
+>> +       int len;
+>> +
+>> +       of_property_read_u32(np, "wp-gpios", &pdata->gpio_wp);
+>> +       if (!pdata->gpio_wp)
+>> +               pdata->gpio_wp = -1;
+>> +
+>> +       of_property_read_u32(np, "cd-gpios", &pdata->gpio_cd);
+>> +       if (!pdata->gpio_cd)
+>> +               pdata->gpio_cd = -1;
+>> +
+>> +       if (of_get_property(np, "cd-invert", NULL))
+>> +               pdata->cd_invert = true;
+>> +       else
+>> +               pdata->cd_invert = false;
+>> +
+>> +       of_property_read_u32(np, "clock_frequency", &pdata->f_max);
+>> +       if (!pdata->f_max)
+>> +               pr_warning("%s has no 'clock_frequency' property\n", np->full_name);
+>> +
+>> +       if (of_get_property(np, "mmc_cap_4_bit_data", NULL))
+> I have no previous experience with DT. Could you please bring some
+> light on this.
+> Is it really necessary to represent each bit in the CAP with a string?
 
-Hola :)
+No, you can use a straight integer in the DT blob, but this makes it
+much easier to read.
 
-> On Wed, 14 Mar 2012, Ramirez Luna, Omar wrote:
->
->> If we reached here the reset lines will be asserted, and then the code
->> below touches sysc registers on a module under reset.
->
-> Do you know of any case where this would be a problem? ?Seems like it
-> would only affect IP blocks that have both hard reset lines and SYSCONFIG
-> registers, and as far as I know, we don't have any of those defined?
+> To add CAP_ERASE for instance I need to change the code here and
+> update the DT, right?
 
-MMU (not yet mainlined) has both, a reset line and a sysconfig.
+That's right, but no MMCI user makes use of it, so it would just be
+unnecessary/unused code clogging up the core driver.
 
-I have been holding the hwmod for some time, but now that
-rpmsg/remoteproc is going to mainline it could make use of it along
-with omap3isp, however now I need to define functions to handle the
-reset lines (although I was fine with hwmod handling it).
+Kind regards,
+Lee
 
-AFAIKnew, hwmod handling the reset line was fine (IMHO), the only 2 things were:
-- For the drivers to somehow make use of shutdown/enable if they
-needed they hwmod under reset and out.
-- The annoying: hwmod XX failed to hardreset because of the wrong
-reset sequence but causing no functional issues.
-
-Regards,
-
-Omar
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
