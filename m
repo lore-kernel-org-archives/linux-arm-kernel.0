@@ -1,64 +1,81 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 15 Mar 2012 10:21:34 +0100
-Subject: [PATCH v4 09/10] pwm: Add PXA support
-In-Reply-To: <20120315090540.GW3852@pengutronix.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
- <4F61343A.80103@gmail.com>
- <20120315065631.GB20502@avionic-0098.mockup.avionic-design.de>
- <20120315090540.GW3852@pengutronix.de>
-Message-ID: <20120315092134.GA29841@avionic-0098.adnet.avionic-design.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 09:22:06 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201203150922.06379.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sascha Hauer wrote:
-> On Thu, Mar 15, 2012 at 07:56:31AM +0100, Thierry Reding wrote:
-> > Actually I wasn't planning on keeping this patch at all. Sascha already has
-> > the existing PWM providers converted to his original framework and offered to
-> > rebase them onto this series once the dust settles. I only used them as
-> > testbed to see how the driver interface works out for different hardware. But
-> > I also think that if Sascha hasn't cleaned the driver up yet it should either
-> > be done in his conversion patches or as follow ups.
+On Thursday 15 March 2012, Nicolas Ferre wrote:
+> Add some basic helpers to retrieve a DMA controller device_node and the
+> DMA request specifications. By making DMA controllers register a generic
+> translation function, we allow the management of any type of DMA requests
+> specification.
+> The void * output of an of_dma_xlate() function that will be implemented
+> by the DMA controller can carry any type of "dma-request" argument.
 > 
-> All I have is a simple conversion to the new framework, nothing more.  I
-> rebased my patches yesterday onto this series (unfortunately due to the
-> additional argument pwm_device the patches do not look like just moving
-> the drivers anymore). I also skipped the PXA patch since I saw that you
-> already have this one. I just posted the patches to the list.
-
-Okay, I'll keep my Blackfin and PXA converted drivers then and will fix the
-issues with the PXA driver brought up by Ryan. Would you be okay if I took
-your conversion patches and added them to my series? I was trying to avoid
-the additional work but I think it might make things easier if they are part
-of the same series.
-
-> > Sascha: how do you plan on going forward with this? It seems like the driver
-> > interface is pretty much done now and I expect the next round to be the last,
-> > unless I forget to properly work through the TODO list again. If you are busy
-> > with other stuff I can probably find some time to help with porting your
-> > converted drivers.
+> The DMA client will search its associated DMA controller in the list and
+> call the registered of_dam_xlate() function to retrieve the request values.
 > 
-> I haven't done drivers/mfd/twl6030-pwm.c. This one needs a bit more work
-> as it currently does not register itself as a subdriver to the twl6030
-> but just uses a globally available twl_i2c_write_u8() function. So if
-> you have some time to spare it would be great if you could do this.
-
-Okay, I'll have a look. I guess the next round won't be the last after all.
-:-)
-
-> > I'm also wondering which tree this will go in through. Does it make sense to
-> > have an extra tree just for the PWM framework or can it go in via some other
-> > general purpose tree? Who do I need to prod?
+> One simple xlate function is provided for the "single number" type of
+> request binding.
 > 
-> Good question, I don't know.
+> This implementation is independent from dmaengine so it can also be used
+> by legacy drivers.
+> 
+> For legacy reason another API will export the DMA request number into a
+> Linux resource of type IORESOURCE_DMA.
 
-Okay, maybe Arnd can comment on it.
+This looks very good. I missed the first version of this patch, but was
+thinking of very similar bindings.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/d0cf8fb3/attachment.sig>
+> +Client drivers should specify the DMA request property using a phandle to
+> +the controller. If needed, the DMA request identity on that controller is then
+> +added followed by optional request specifications.
+> +
+> +Required property:
+> +    - dma-request: List of phandle + dma-request + request specifications,
+> +      one group per request "line".
+> +Optional property:
+> +    - dma-request-names: list of strings in the same order as the dma-request
+> +      in the dma-request property.
+> +
+> +
+> +Example:
+> +
+> +	i2c1: i2c at 1 {
+> +		...
+> +		dma-request = <&sdma 2 &sdma 3>;
+> +		dma-request-names = "tx", "rx";
+> +		...
+> +	};
+
+This is slightly different from how the proposed pwm binding works that
+Thierry is working on, which uses an arbitrary property name instead of
+requiring the use of a specific property but then allowing to give names
+in another property.
+
+I don't care much which way it's done, but please try to agree on one
+approach that is used for both.
+
+The one you have here is already used by reg and irq, while the other
+one is used in gpio.
+
+> +/**
+> + * of_get_dma_request() - Get the associated DMA request data
+> + * @np:		device node to get DMA request from
+> + * @index:	index of the DMA request
+> + * @out_data:	a output that can be filled in by the of_dma_xlate() function
+> + *
+> + * Returns return value of of_dma_xlate() and fills out_data (if provided).
+> + * On error returns the appropriate errno value.
+> + */
+
+I would suggest provinding a helper function around this one that directly
+calls __dma_request_channel(). AFAICT, you should be able to let the dma
+controller provide a generic filter function in struct of_dma that the
+driver can use by default.
+
+	Arnd
