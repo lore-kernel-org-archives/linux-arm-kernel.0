@@ -1,64 +1,110 @@
-From: per.forlin@stericsson.com (Per Forlin)
-Date: Thu, 15 Mar 2012 20:12:49 +0100
-Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
-In-Reply-To: <201203151532.44363.arnd@arndb.de>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <CAFEEs1kz+QT_4Yc6byS4se0EMZvqA5hp5CvLvvtNgC++AJboxA@mail.gmail.com>
- <4F6209DA.1080809@linaro.org> <201203151532.44363.arnd@arndb.de>
-Message-ID: <CAFEEs1=TJaCYmaWd7zd28NsV8ubZBpBn7p=Mi7vGtmV_vpfh1w@mail.gmail.com>
+From: aneesh@ti.com (Aneesh V)
+Date: Fri, 16 Mar 2012 01:26:47 +0530
+Subject: [PATCH v2 1/7] misc: ddr: add LPDDR2 data from JESD209-2
+In-Reply-To: <20120315190238.GD11142@kroah.com>
+References: <1331835457-5390-1-git-send-email-aneesh@ti.com>
+ <1331835457-5390-2-git-send-email-aneesh@ti.com>
+ <20120315190238.GD11142@kroah.com>
+Message-ID: <4F62497F.1020907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 4:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 15 March 2012, Lee Jones wrote:
->> > I would like to see what the minimal required change is to support DT
->> > for mmci without factorization.
->> > 1. Minimal change in mmci.
->> > 2. Add mmci_dt.c which contains the DT-populate code.
->> >
->> > The factorization could be done as step 2 I think.
->> >
->> > What do you say?
+On Friday 16 March 2012 12:32 AM, Greg KH wrote:
+> On Thu, Mar 15, 2012 at 11:47:31PM +0530, Aneesh V wrote:
+>> add LPDDR2 data from the JEDEC spec JESD209-2. The data
+>> includes:
 >>
->> I'm wondering what the difference is as the work has already been done.
+>> 1. Addressing information for LPDDR2 memories of different
+>>     densities and types(S2/S4)
+>> 2. AC timing data.
 >>
->> It was Arnd's suggestion to separate out the two types of variants, and
->> I'm quite fond of the new (fully featured) layout.
+>> This data will useful for memory controller device drivers
 >
-> Right, I usually prefer cleanups or other refactoring to be done first, and
-> then features added on top.
+> Right now, only one driver, right?
+
+Yes, should that be documented?
+
 >
-> You could in theory add have just patches 3/4/5 all applied without
-> the refactoring, but that I would be worried that this causes dependencies
-> between the mmci driver and ux500 specific functionality like the
-> stedma40_filter function.
+>> +#ifndef __ASSEMBLY__
 >
-About DT
-I think I need to catch up on the DT-design a bit. I will try to catch
-up on the DT-implementation and maybe then the refactorization will
-make sense to me :)
+> Why is this needed?
 
-Board specific data in mmci-driver
-The stedma40 filter function is not really specific for ux500. ux500
-use stedma40 but it should be possible to replace this DMA.IP with
-some other DMA-controller. This is board specific configuration. You
-should not need to change the mmci-driver just because the dma-driver
-has changed, right?
-Or will the board-configuration now be placed in mmci-ux500?
+IIRC, this header file was getting included in an omap specific header
+file that was in turn included from an assembly file. I will check if
+this is still the case. If not, I will remove it.
 
-Common DT populate code for all mmc host drivers
-Some parts of the DT-population is common for all the host driver, for
-instance setting the CAP and CAP2. This code should be moved to a
-common place to be used by other host drivers as well.
+>
+>> +/* Structure for DDR addressing info from the JEDEC spec */
+>> +struct lpddr2_addressing {
+>> +	u32 num_banks;
+>> +	u32 tREFI_ns;
+>> +	u32 tRFCab_ps;
+>> +};
+>
+> Do these structures cross the user/kernel boundry somehow?  If so,
+> please use the proper kernel types for this.
 
-About refactoring
-There are numbers of patches stashed up for MMCI waiting for verdict
-here http://git.kernel.org/?p=linux/kernel/git/linusw/linux-stericsson.git;a=shortlog;h=refs/heads/mmci.
-If doing a refactorization please rebase it on top of these patches.
-This needs to be done carefully, there may be more to considerations
-than just DT. Maybe the timing is better to do this for 4.5, just
-after 4.4 is closed. Then we can make sure that all new patches are
-made on top of the refactorized base.
+No. These structures are meant for use by device drivers.
 
-BR
-Per
+>
+>> --- a/lib/Makefile
+>> +++ b/lib/Makefile
+>> @@ -123,6 +123,9 @@ obj-$(CONFIG_SIGNATURE) += digsig.o
+>>
+>>   obj-$(CONFIG_CLZ_TAB) += clz_tab.o
+>>
+>> +obj-$(CONFIG_DDR) += jedec_ddr_data.o
+>> +
+>> +
+>
+> Why the extra line?
+
+Un-intentional. Will remove.
+
+>
+>>   hostprogs-y	:= gen_crc32table
+>>   clean-files	:= crc32table.h
+>>
+>> diff --git a/lib/jedec_ddr_data.c b/lib/jedec_ddr_data.c
+>> new file mode 100644
+>> index 0000000..fc223d6
+>> --- /dev/null
+>> +++ b/lib/jedec_ddr_data.c
+>> @@ -0,0 +1,135 @@
+>> +/*
+>> + * DDR addressing details and AC timing parameters from JEDEC specs
+>> + *
+>> + * Copyright (C) 2012 Texas Instruments, Inc.
+>> + *
+>> + * Aneesh V<aneesh@ti.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include<misc/jedec_ddr.h>
+>> +#include<linux/module.h>
+>> +
+>> +/* LPDDR2 addressing details from JESD209-2 section 2.4 */
+>> +const struct lpddr2_addressing
+>> +	lpddr2_jedec_addressing_table[NUM_DDR_ADDR_TABLE_ENTRIES] = {
+>> +	{B4, T_REFI_15_6, T_RFC_90}, /* 64M */
+>> +	{B4, T_REFI_15_6, T_RFC_90}, /* 128M */
+>> +	{B4, T_REFI_7_8,  T_RFC_90}, /* 256M */
+>> +	{B4, T_REFI_7_8,  T_RFC_90}, /* 512M */
+>> +	{B8, T_REFI_7_8, T_RFC_130}, /* 1GS4 */
+>> +	{B8, T_REFI_3_9, T_RFC_130}, /* 2GS4 */
+>> +	{B8, T_REFI_3_9, T_RFC_130}, /* 4G */
+>> +	{B8, T_REFI_3_9, T_RFC_210}, /* 8G */
+>> +	{B4, T_REFI_7_8, T_RFC_130}, /* 1GS2 */
+>> +	{B4, T_REFI_3_9, T_RFC_130}, /* 2GS2 */
+>> +};
+>> +EXPORT_SYMBOL(lpddr2_jedec_addressing_table);
+>
+> EXPORT_SYMBOL_GPL for these and the others?
+
+Will fix all.
+
+Thanks,
+Aneesh
