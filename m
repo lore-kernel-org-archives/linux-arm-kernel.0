@@ -1,105 +1,51 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 15 Mar 2012 13:49:54 +0530
-Subject: [PATCH v2] ARM: SPEAr600: Add device-tree support to SPEAr600
- boards
-In-Reply-To: <1331737232-25477-1-git-send-email-sr@denx.de>
-References: <1331737232-25477-1-git-send-email-sr@denx.de>
-Message-ID: <4F61A62A.3040501@st.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Thu, 15 Mar 2012 10:26:50 +0200
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <002a01cd0283$1f61b200$5e251600$%han@samsung.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com>
+ <4F60E5C8.3040804@gmail.com>
+ <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+ <CAEYLNCp5e=86rpRi2C-5OJptTyEeXAn8JHhbWw_BqGzSaDD9wQ@mail.gmail.com>
+ <002a01cd0283$1f61b200$5e251600$%han@samsung.com>
+Message-ID: <CAEYLNCrprPE60ZS=_OWuck0JCJMhCxzVErZwuwGpEDYkQq-hXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 15, 2012 at 10:10 AM, Jingoo Han <jg1.han@samsung.com> wrote:
 
-Hi Stefan,
+>> There is single board - mini6410 (or real6410) and it's name doesn't
+>> depend on connected LCD size.
+>> We know, that this board is available with different sizes of LCD and
+>> currently we have in kernel support for both sizes.
+>> It might be so, that it's implemented not in perfect way, but it was
+>> accepted and at least it's working.
+>
+>
+> I don't think so.
+> You argues that the wrong code should not be removed because it was accepted and at least it's working.
+> It is just wrong usage, which can just work.
+> Moreover, your code will make the problem, when 2~5 windows of FIMD IP are used.
 
-Thanks for your patch. :)
+Could please explain that? How does LCD feature selection for mini6410
+and real6410 break that?
+Timing for different sizes of LCD is located in two statically
+allocated structures which are used at board init time depending on
+kernel param line.
+Data from one of these structures is copied to s3c-fb platform data
+dynamically by board init code. Why it's a problem? What changes if
+platform data isn't rewritten dynamically?
 
-I have looked carefully at the patch, regarding addresses and irq numbers,
-and they look fine. Just few minor comments below:
+> So, your code can be removed.
 
-On 3/14/2012 8:30 PM, Stefan Roese wrote:
+I don't think so. It does not break anything yet. One who make
+changes, should ensure backwards compatibility, at least talking about
+functionality and hardware (LCD) support, which was added few months
+ago. Remember, we talk about kernel parameters line - now it lets
+bootloader to select correct LCD size. After your changes, board with
+7" LCD wont show anything.
 
-> diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
-
-> +       soc {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "simple-bus";
-> +               ranges;
-> +
-
-> +
-> +               gmac0: ethernet at e0800000 {
-
-There is no gmac1, so can name it gmac only.
-
-> +                       compatible = "st,spear600-gmac";
-> +                       reg = <0xe0800000 0x8000>;
-> +                       interrupt-parent = <&vic1>;
-> +                       interrupts = <24 23>;
-> +                       interrupt-names = "macirq", "eth_wake_irq";
-> +                       mac-address = [000000000000]; /* Filled in by U-Boot */
-> +               };
-> +
-
-> +               fsmc0: flash at d1800000 {
-
-same.
-
-> +                       status = "disabled";
-> +                       compatible = "st,spear600-fsmc-nand";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       reg = <0xd1800000 0x1000        /* FSMC Register */
-> +                              0xd2000000 0x4000>;      /* NAND Base */
-> +                       reg-names = "fsmc_regs", "nand_data";
-> +               };
-> +
-> +               smi0: flash at fc000000 {
-
-same
-
-> +                       status = "disabled";
-> +                       compatible = "st,spear600-smi";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       reg = <0xfc000000 0x1000>;
-> +                       interrupt-parent = <&vic1>;
-> +                       interrupts = <12>;
-> +               };
-> +
-
-> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
-> index c6e4254..c4949aa 100644
-> --- a/arch/arm/mach-spear6xx/spear600_evb.c
-> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
-> @@ -32,9 +32,6 @@ static void __init spear600_evb_init(void)
->  {
->         unsigned int i;
-> 
-
-Why don't we remove the devices from arrays above, which are now
-supported by DT?
-
-> -       /* call spear600 machine init function */
-> -       spear600_init();
-> -
->         /* Add Platform Devices */
->         platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-> 
-> diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-
-> +static const struct of_device_id vic_of_match[] __initconst = {
-> +       { .compatible = "arm,pl190-vic", .data = vic_of_init, },
-> +       { /* Sentinel */ }
-> +};
-> +
-> +static void __init spear6xx_dt_init_irq(void)
-> +{
-> +       of_irq_init(vic_of_match);
-> +}
-> +
-
-Did you checked this out?
-
--- 
-viresh
+Darius A.
