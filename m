@@ -1,33 +1,75 @@
 From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Thu, 15 Mar 2012 17:44:01 +0100
-Subject: [PATCH 06/10] ARM: OMAP2+: SmartReflex: use the platform header file
- for voltage functions
+Date: Thu, 15 Mar 2012 17:44:00 +0100
+Subject: [PATCH 05/10] ARM: OMAP3: hwmod: rename the smartreflex entries
 In-Reply-To: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
 References: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1331829845-9526-7-git-send-email-j-pihet@ti.com>
+Message-ID: <1331829845-9526-6-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean Pihet <j-pihet@ti.com>
 
+Change the name field value to better reflect the smartreflex
+integration in the system
+
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.h |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 ++++----
+ arch/arm/mach-omap2/smartreflex.c          |    2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
-index f12ebde..8d3e3c2 100644
---- a/arch/arm/mach-omap2/smartreflex.h
-+++ b/arch/arm/mach-omap2/smartreflex.h
-@@ -22,7 +22,8 @@
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 1f681e8..728740d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -2750,7 +2750,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr1_slaves[] = {
+ };
  
- #include <linux/platform_device.h>
+ static struct omap_hwmod omap34xx_sr1_hwmod = {
+-	.name		= "sr1",
++	.name		= "mpu_iva",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr1_fck",
+ 	.prcm		= {
+@@ -2774,7 +2774,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr1_slaves[] = {
+ };
  
--#include "voltage.h"
-+#include <plat/smartreflex.h>
-+#include <plat/voltage.h>
+ static struct omap_hwmod omap36xx_sr1_hwmod = {
+-	.name		= "sr1",
++	.name		= "mpu_iva",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr1_fck",
+ 	.prcm		= {
+@@ -2802,7 +2802,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr2_slaves[] = {
+ };
  
- /*
-  * Different Smartreflex IPs version. The v1 is the 65nm version used in
+ static struct omap_hwmod omap34xx_sr2_hwmod = {
+-	.name		= "sr2",
++	.name		= "core",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr2_fck",
+ 	.prcm		= {
+@@ -2826,7 +2826,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr2_slaves[] = {
+ };
+ 
+ static struct omap_hwmod omap36xx_sr2_hwmod = {
+-	.name		= "sr2",
++	.name		= "core",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr2_fck",
+ 	.prcm		= {
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index 8e3ef66..dd80fde 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -184,7 +184,7 @@ static void sr_set_regfields(struct omap_sr *sr)
+ 		sr->err_weight = OMAP3430_SR_ERRWEIGHT;
+ 		sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
+ 		sr->accum_data = OMAP3430_SR_ACCUMDATA;
+-		if (!(strcmp(sr->name, "sr1"))) {
++		if (!(strcmp(sr->name, "sr_mpu_iva"))) {
+ 			sr->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
+ 			sr->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
+ 		} else {
 -- 
 1.7.5.4
