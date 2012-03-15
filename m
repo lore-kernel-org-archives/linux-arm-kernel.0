@@ -1,30 +1,19 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 15 Mar 2012 11:32:30 -0600 (MDT)
-Subject: [PATCH 1/2] ARM: OMAP: powerdomain: Wait for powerdomain
- transition in pwrdm_state_switch()
-In-Reply-To: <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
- <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1203151129160.26218@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Mar 2012 17:32:56 +0000
+Subject: [PATCH 2/5] MMC: mmci: Seperate ARM variants from generic code
+In-Reply-To: <1331734803-17954-3-git-send-email-lee.jones@linaro.org>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <1331734803-17954-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120315173256.GD15988@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Mar 2012, Santosh Shilimkar wrote:
+On Wed, Mar 14, 2012 at 02:20:00PM +0000, Lee Jones wrote:
+> This is a step in the right direction for future Device
+> Tree support. It will allow variant specific attributes
+> to be collected from a Device Tree without overloading
+> the MMCI core. It will also provide additional future
+> variants a cleaner way to add support.
 
-> Commit b1cbdb00d{OMAP: clockdomain: Wait for powerdomain to be ON
-> when using clockdomain force wakeup} was assuming that pwrdm_state_switch()
-> does wait for the powerdomain transition which is not the case.
-> 
-> Fix this API by adding the pwrdm_wait_transition().
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> CC: Rajendra Nayak <rnayak@ti.com>
-> CC: Paul Walmsley <paul@pwsan.com>
-
-Acked-by: Paul Walmsley <paul@pwsan.com>
-
-Sounds like this fixes a major kernel oops bug for Tony so this should go 
-in ASAP to v3.3-rc series.
-
-
-- Paul
+NAK.  You can't have two driver structures with the same name.  The names
+are sysfs object names.
