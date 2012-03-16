@@ -1,47 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 08:26:36 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the s5p tree
-In-Reply-To: <20120316174546.5121be30a86c2937579bd3f5@canb.auug.org.au>
-References: <20120316174546.5121be30a86c2937579bd3f5@canb.auug.org.au>
-Message-ID: <201203160826.36287.arnd@arndb.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 16 Mar 2012 09:29:34 +0100
+Subject: [PATCH v4 09/10] pwm: Add PXA support
+In-Reply-To: <20120316081222.GE7758@S2101-09.ap.freescale.net>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
+ <20120316081222.GE7758@S2101-09.ap.freescale.net>
+Message-ID: <20120316082934.GC6458@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012, Stephen Rothwell wrote:
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-exynos/common.c between commit 1d7233ac478a ("Merge branch
-> 'next/soc-exynos5250-arch-gpio' into for-next") from the s5p tree and
-> commit 853a0231e057 ("Merge branch 'samsung/soc' into next/soc2") from
-> the arm-soc tree.
+* Shawn Guo wrote:
+> On Wed, Mar 14, 2012 at 04:56:32PM +0100, Thierry Reding wrote:
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > ---
+> > Changes in v3:
+> >   - update PWM ops for changes in patch 2
+> > 
+> >  arch/arm/plat-pxa/Makefile |    1 -
+> >  arch/arm/plat-pxa/pwm.c    |  304 --------------------------------------------
+> >  drivers/pwm/Kconfig        |    9 ++
+> >  drivers/pwm/Makefile       |    1 +
+> >  drivers/pwm/pwm-pxa.c      |  244 +++++++++++++++++++++++++++++++++++
+> >  5 files changed, 254 insertions(+), 305 deletions(-)
+> >  delete mode 100644 arch/arm/plat-pxa/pwm.c
+> >  create mode 100644 drivers/pwm/pwm-pxa.c
+> > 
+> The patch should be generated with "git format-patch -M", so that we
+> can see the diff like below. 
 > 
-> These merge commits both looks suspect, but I fixed it up as best I could
-> (see below).
+> --- a/arch/arm/plat-pxa/pwm.c
+> +++ b/drivers/pwm/pwm-pxa.c
 
-Right, both the arm-soc and the s5p tree merge the same commits and
-come to different results. Kgene, please have a look and let me know
-which of the three solutions is correct.
+Yes, Arnd already mentioned that in the last round but I forgot. It usually
+takes me a couple of weeks to prepare the next version and I try to keep a
+list of TODOs but that doesn't seem to be efficient enough yet.
 
-	Arnd
-
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
+> -int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+> +static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +                         int duty_ns, int period_ns)
+>  {
+> +       struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
+>         unsigned long long c;
+>         unsigned long period_cycles, prescale, pv, dc;
+> +       unsigned long offset;
 > 
-> diff --cc arch/arm/mach-exynos/common.c
-> index 4e1d0b7,e6cc50e..0000000
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@@ -593,6 -586,14 +593,13 @@@ static int __init exynos4_l2x0_cache_in
->         if (soc_is_exynos5250())
->                 return 0;
->   
->  -      int ret;
-> +       ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
-> +       if (!ret) {
-> +               l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
-> +               clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
-> +               return 0;
-> +       }
-> + 
->         if (!(__raw_readl(S5P_VA_L2CC + L2X0_CTRL) & 0x1)) {
->                 l2x0_saved_regs.phy_base = EXYNOS4_PA_L2CC;
->                 /* TAG, Data Latency Control: 2 cycles */
+> -       if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
+> +       if (period_ns == 0 || duty_ns > period_ns)
+>                 return -EINVAL;
+> 
+> Then I will have a question why "pwm == NULL" check is removed?
+
+Actually, as I mentioned in another mail the idea was to put these kinds of
+checks into the core. They are still missing from the core, though.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120316/208f5b30/attachment-0001.sig>
