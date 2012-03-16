@@ -1,45 +1,69 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Fri, 16 Mar 2012 06:16:13 -0400
-Subject: [alsa-devel] [PATCH v5 8/8] ASoC: fsl: add imx-sgtl5000 machine
- driver
-In-Reply-To: <1331888204-27058-9-git-send-email-shawn.guo@linaro.org>
-References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
- <1331888204-27058-9-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CA+7tXihmfBQCgvuY0rx5v4w-bcwYK+7kP9v29w36N-Rc9KSQ+A@mail.gmail.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Fri, 16 Mar 2012 12:18:30 +0200
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <002f01cd0359$eb718330$c2548990$%han@samsung.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com>
+ <4F60E5C8.3040804@gmail.com>
+ <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+ <CAEYLNCp5e=86rpRi2C-5OJptTyEeXAn8JHhbWw_BqGzSaDD9wQ@mail.gmail.com>
+ <002a01cd0283$1f61b200$5e251600$%han@samsung.com>
+ <CAEYLNCrprPE60ZS=_OWuck0JCJMhCxzVErZwuwGpEDYkQq-hXg@mail.gmail.com>
+ <001d01cd0315$935cc720$ba165560$%han@samsung.com>
+ <CAEYLNCrGCmb5EJjURLY=EGfM=4N54MirNkCCyQRxqKEN3Eka8Q@mail.gmail.com>
+ <002d01cd034b$c56f2b00$504d8100$%han@samsung.com>
+ <CAEYLNCpfQ0cYb4efw6PZNnKjQ2rF25rj5Ed=i884LJXHAwigBw@mail.gmail.com>
+ <002f01cd0359$eb718330$c2548990$%han@samsung.com>
+Message-ID: <CAEYLNCpJU_5uVa-jo5HUNY8Av6eYaiow1gEZtHCiQZ5oKkGoMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 4:56 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> +Required properties:
-> +- compatible : "fsl,imx-audio-sgtl5000"
-> +- model : The user-visible name of this sound complex
-> +- ssi-controller : The phandle of the i.MX SSI controller
-> +- audio-codec : The phandle of the SGTL5000 audio codec
-> +- mux-int-port : The internal port of the i.MX audio muxer (AUDMUX)
-> +- mux-ext-port : The external port of the i.MX audio muxer
-> +
-> +Note: The AUDMUX port numbering should start at 1, which is consistent with
-> +hardware manual.
-> +
-> +Example:
-> +
-> +sound {
-> + ? ? ? compatible = "fsl,imx51-babbage-sgtl5000",
-> + ? ? ? ? ? ? ? ? ? ?"fsl,imx-audio-sgtl5000";
-> + ? ? ? model = "imx51-babbage-sgtl5000";
-> + ? ? ? ssi-controller = <&ssi1>;
-> + ? ? ? audio-codec = <&sgtl5000>;
-> + ? ? ? mux-int-port = <1>;
-> + ? ? ? mux-ext-port = <3>;
-> +};
+On Fri, Mar 16, 2012 at 11:48 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+>> > It's just bug.
+>> >
+>> > struct s3c_fb_pd_win should be used for windows of FIMD IP.
+>> > It should not be used for selecting multi-LCDs.
+>>
+>> why not? s3c_fb_pd_win contains timing values which depend directly on
+>> LCD size and resolution.
+>> Please look into the code again - mini6410 doesn't use platform data
+>> so select different LCD sizes.
+>> It has only single window in platform data - exactly what you want.
+>> Now tell my, why you are arguing, that this platform data cannot be
+>> rewritten dynamically by board setup routines at kernel startup time?
+>> Many ARM architectures are doing the same - takes kernel command line
+>> argument to select LCD and passes necessary data for its fb drivers
+>> via platform data structures. It not a bug, it's correct approach to
+>> support different sizes of LCD display for the same board.
+>
+>
+> Hey, it is not my point.
+> To take kernel command line is not problem to support multiple LCDs.
+>
+> My point is that s3c_fb_pd_win should not include variable LCD option.
+> So, if you want to support multiple LCDs, you should use another variable,
+> instead of using s3c_fb_pd_win[0] and s3c_fb_pd_win[1] as 4.3" LCD, 7.0" LCD.
 
-What would the device node look like for the ESAI controller?  I've
-got a board here based on an iMX53 with two of three SSI controllers
-and the ESAI controller in use.  It used the nullcodec codec driver
-for SSI and ESAI.  The ESAI driver was since replaced with an entirely
-new custom driver that doesn't use ASoC at all.  But ignoring that
-detail, what would the sound node(s) look like for some hardware that
-isn't so simple?  It seems like there would be three sound nodes, but
-what would compatible and model be set to?  I'm having a hard time
-seeing how "fsl,imx-audio-sgtl5000" would be changed into something
-for either SSI or ESAI.
+But I use s3c_fb_pd_win only as container to hold timing values in
+board setup code.
+s3c-fb platform data has only single window and does not perform any
+LCD selection.
+What is wrong here? You suggest to declare some custom structure to
+hold these timing values? What's the point?
+
+>
+> You use s3c_fb_pd_win[0], s3c_fb_pd_win[1] as 4.3" LCD, 7.0" LCD.
+> However, s3c_fb_pd_win[0], s3c_fb_pd_win[1] means the windows of FIMD IP.
+
+There is no multiple windows in platform data! driver sees only single
+window. And this wont change in any way if you drop LCD selection from
+board setup code.
+Driver will see the same single window. So - your are arguing, that
+board setup code sets platform data in bad way. I don't accept your
+opinion, because tens of boards are doing the same and nobody call it
+bug.
+
+>
