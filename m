@@ -1,106 +1,59 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Mar 2012 16:21:17 -0600 (MDT)
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 16 Mar 2012 15:33:04 -0700
 Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <201203162057.58706.arnd@arndb.de>
+In-Reply-To: <alpine.DEB.2.00.1203161509470.4395@utopia.booyaka.com>
 References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
  <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
  <201203161218.05125.arnd.bergmann@linaro.org>
  <201203162057.58706.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.00.1203161509470.4395@utopia.booyaka.com>
+ <alpine.DEB.2.00.1203161509470.4395@utopia.booyaka.com>
+Message-ID: <CAJOA=zPmy7Dwzw8EOCW_+cvy2Dv=w0TPUq7Zg_s=Y0rs+v+u2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Fri, Mar 16, 2012 at 3:21 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Fri, 16 Mar 2012 16:06:30 -0600
+> Subject: [PATCH] clk: mark the common clk code as EXPERIMENTAL for now
+>
+> Mark the common clk code as depending on CONFIG_EXPERIMENTAL. ?The API
+> is not well-defined and both it and the underlying mechanics are likely
+> to need significant changes to support non-trivial uses of the rate
+> changing code, such as DVFS with external I/O devices. ?So any platforms
+> that switch their implementation over to this may need to revise much
+> of their driver code and revalidate their implementations until the
+> behavior of the code is better-defined.
+>
+> A good time for removing this EXPERIMENTAL designation would be after at
+> least two platforms that do DVFS on groups of external I/O devices have
+> ported their clock implementations over to the common clk code.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Mike Turquette <mturquette@ti.com>
 
-On Fri, 16 Mar 2012, Arnd Bergmann wrote:
+ACK.  This will set some reasonable expectations while things are in flux.
 
-> On Friday 16 March 2012, Arnd Bergmann wrote:
-> > > 
-> > > Can we shoe-horn this thing into 3.4 (it is a bit late, i know) so
-> > > that platform ports can gather speed? Several people are waiting for a
-> > > somewhat stable version before starting their ports.
-> > > 
-> > > And what is the path into mainline - will Russell carry it or Arnd
-> > > (with Russell's blessing)?
-> > 
-> > I would suggest putting it into a late/* branch of arm-soc so it finally
-> > gets some linux-next exposure, and then sending it in the second week of the
-> > merge window.
-> > 
-> > Russell, please let me know if you want to carry it instead or if you
-> > have found any last-minute show stoppers in the code.
-> 
-> FWIW, it's in arm-soc now [...]
+Arnd are you willing to take this in?
 
-If the common clock code is to go upstream now, it should be marked as 
-experimental.  This is because we know the API is not well-defined, and 
-that both the API and the underlying mechanics will almost certainly need 
-to change for non-trivial uses of the rate changing code (e.g., DVFS with 
-external I/O devices).
+Thanks,
+Mike
 
-While I understand and accept the motivation to get the common clk code 
-upstream now, if platforms start to use it, they need to be aware that the 
-behavior of the code can change significantly.  These platforms may need 
-to revalidate their implementations or change the way that many of their 
-drivers use the clock functions.
-
-It also seems important to recognize that significant changes are still 
-coming into the common clk code (e.g., the clk_set_rate() changes that 
-came in just a few days ago).
-
-So, the following is a patch to mark it as experimental.  It applies on 
-the current head of arm-soc/next/clk 
-(9d9f78ed9af0e465d2fd15550471956e7f559b9f).  This should be a good 
-compromise: it allows simple platforms or platforms with maintainers with 
-lots of time to start converting over to the common clk code, while still 
-clearly indicating that the API and underlying code is likely to change in 
-significant ways.
-
-Once at least two major SoC ports have DVFS with external I/O devices 
-safely up and running on their mainline kernels with the common clk code, 
-I'd suggest removing the experimental designation.
-
-...
-
-None of this is meant to reflect on Mike, by the way, who is doing a good 
-job in a difficult situation.
-
- 
-- Paul
-
-From: Paul Walmsley <paul@pwsan.com>
-Date: Fri, 16 Mar 2012 16:06:30 -0600
-Subject: [PATCH] clk: mark the common clk code as EXPERIMENTAL for now
-
-Mark the common clk code as depending on CONFIG_EXPERIMENTAL.  The API
-is not well-defined and both it and the underlying mechanics are likely
-to need significant changes to support non-trivial uses of the rate
-changing code, such as DVFS with external I/O devices.  So any platforms
-that switch their implementation over to this may need to revise much
-of their driver code and revalidate their implementations until the
-behavior of the code is better-defined.
-
-A good time for removing this EXPERIMENTAL designation would be after at
-least two platforms that do DVFS on groups of external I/O devices have
-ported their clock implementations over to the common clk code.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Mike Turquette <mturquette@ti.com>
----
- drivers/clk/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 2eaf17e..a0a83de 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -12,6 +12,7 @@ config HAVE_MACH_CLKDEV
- menuconfig COMMON_CLK
- 	bool "Common Clock Framework"
- 	select HAVE_CLK_PREPARE
-+	depends on EXPERIMENTAL
- 	---help---
- 	  The common clock framework is a single definition of struct
- 	  clk, useful across many platforms, as well as an
--- 
-1.7.9.1
+> ---
+> ?drivers/clk/Kconfig | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 2eaf17e..a0a83de 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -12,6 +12,7 @@ config HAVE_MACH_CLKDEV
+> ?menuconfig COMMON_CLK
+> ? ? ? ?bool "Common Clock Framework"
+> ? ? ? ?select HAVE_CLK_PREPARE
+> + ? ? ? depends on EXPERIMENTAL
+> ? ? ? ?---help---
+> ? ? ? ? ?The common clock framework is a single definition of struct
+> ? ? ? ? ?clk, useful across many platforms, as well as an
+> --
+> 1.7.9.1
+>
