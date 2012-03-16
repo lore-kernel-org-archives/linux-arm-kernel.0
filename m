@@ -1,40 +1,28 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 16 Mar 2012 14:40:11 -0700
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <201203162057.58706.arnd@arndb.de>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
- <201203161218.05125.arnd.bergmann@linaro.org>
- <201203162057.58706.arnd@arndb.de>
-Message-ID: <CAJOA=zNL2WeMzrEBRw_2OeYRfwHjxUjSJLgHzrWzFXR9Yvsvug@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 16 Mar 2012 14:43:34 -0700
+Subject: [PATCH v4] misc: ddr: add LPDDR2 data from JESD209-2
+In-Reply-To: <1331931007-584-1-git-send-email-aneesh@ti.com>
+References: <1331929177-11694-1-git-send-email-aneesh@ti.com>
+ <1331931007-584-1-git-send-email-aneesh@ti.com>
+Message-ID: <20120316214334.GA24925@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 1:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 16 March 2012, Arnd Bergmann wrote:
->> >
->> > Can we shoe-horn this thing into 3.4 (it is a bit late, i know) so
->> > that platform ports can gather speed? Several people are waiting for a
->> > somewhat stable version before starting their ports.
->> >
->> > And what is the path into mainline - will Russell carry it or Arnd
->> > (with Russell's blessing)?
->>
->> I would suggest putting it into a late/* branch of arm-soc so it finally
->> gets some linux-next exposure, and then sending it in the second week of the
->> merge window.
->>
->> Russell, please let me know if you want to carry it instead or if you
->> have found any last-minute show stoppers in the code.
->
-> FWIW, it's in arm-soc now, and it's the last thing I ?put in there
-> for v3.4. From now on until v3.4-rc1, feature patches can only get
-> removed from arm-soc, not added.
+On Sat, Mar 17, 2012 at 02:20:07AM +0530, Aneesh V wrote:
+> add LPDDR2 data from the JEDEC spec JESD209-2. The data
+> includes:
+> 
+> 1. Addressing information for LPDDR2 memories of different
+>    densities and types(S2/S4)
+> 2. AC timing data.
+> 
+> This data will useful for memory controller device drivers.
+> Right now this is used by the TI EMIF SDRAM controller
+> driver.
+> 
+> Cc: Greg KH <greg@kroah.com>
+> Signed-off-by: Aneesh V <aneesh@ti.com>
 
-Thanks Arnd.
+What happened to the other patches that depended on this one?
 
-Regards,
-Mike
-
->
-> ? ? ? ?Arnd
+greg k-h
