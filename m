@@ -1,100 +1,47 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 15 Mar 2012 23:22:00 -0700
-Subject: [PATCH v6 2/3] clk: introduce the common clock framework
-In-Reply-To: <20120315094357.GX3852@pengutronix.de>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-3-git-send-email-mturquette@linaro.org>
- <20120311113414.GM3852@pengutronix.de>
- <CAJOA=zMdkLB-DCPOk=kz5mn6BK6A_swocyCHJHeGE6H7FxBbmQ@mail.gmail.com>
- <20120312115117.GN3852@pengutronix.de>
- <CAJOA=zPx0ARsoO4ueSTMe_z2Gs4xG4P2qn1=-vHFf7_k=+K6hQ@mail.gmail.com>
- <20120313120507.GS3852@pengutronix.de>
- <CAJOA=zMT4vK7WPF7iEH9kN6GHHAv-LChHoadzieqV-Wd3Qj=WQ@mail.gmail.com>
- <20120315094357.GX3852@pengutronix.de>
-Message-ID: <CAJOA=zOLaFJ3xoaL2EtX=rkA1XM2gEzyns6meiiGLrbX8HFujQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 16 Mar 2012 17:45:46 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the s5p tree
+Message-ID: <20120316174546.5121be30a86c2937579bd3f5@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 2:43 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Mar 14, 2012 at 05:51:48PM -0700, Turquette, Mike wrote:
->> @@ -84,9 +78,9 @@ static int clk_divider_bestdiv(struct clk_hw *hw,
->> unsigned long rate,
->>
->> ? ? ? for (i = 1; i <= maxdiv; i++) {
->> ? ? ? ? ? ? ? parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? MULT_ROUND_UP(rate, i));
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (rate * i));
->
-> I think MULT_ROUND_UP is the right thing to use here (not sure if this
-> is a good name though)
-> Consider we want to have an output rate of 33Hz. Now acceptable input
-> rates for a divider value of 3 would be 99, 100 and 101Hz, so we have
-> to call round_rate for the parent with 101Hz which includes 100 and
-> 99Hz.
+Hi all,
 
-We're back to the point Rob brought up about .round_rate rounding up
-or down.  We really need a least-upper-bounds or greatest-lower-bounds
-flag, similar to how CPUfreq selects target frequencies today.  I'm
-freezing features for this patchset now, so I'll keep your
-MULT_ROUND_UP approach and some day I'll fix .round_rate for good.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-exynos/common.c between commit 1d7233ac478a ("Merge branch
+'next/soc-exynos5250-arch-gpio' into for-next") from the s5p tree and
+commit 853a0231e057 ("Merge branch 'samsung/soc' into next/soc2") from
+the arm-soc tree.
 
-> If you have problems with your PLL than most likely because it does
-> something different on clk_round_rate than it does in clk_set_rate,
-> for example clk_round_rate(10000) returns 10000, but clk_set_rate then
-> sets the rate 9999 due to some rounding error. Being consistent between
-> round_rate and set_rate is very important for this mechanism to work
-> properly. It did cost me some nerves to get it right for the divider
-> (and even more nerves to figure out why it is correct the way it works)
+These merge commits both looks suspect, but I fixed it up as best I could
+(see below).
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-What I'd like to do is request the *exact* frequency I want when
-passing in a rate to my PLLs .round_rate.  Due to the way that my MN
-dividers are calculated, and due to some jitter avoidance code, it is
-bad for me to request 600000001 Hz when I really want 600MHz exactly.
-Anyways I fixed this up on my end enough to work with MULT_ROUND_UP,
-so that can stay for the immediate future.
-
->
->> ? ? ? ? ? ? ? now = parent_rate / i;
->> - ? ? ? ? ? ? if (now <= rate && now >= best) {
->> + ? ? ? ? ? ? if (now <= rate && now > best) {
->
-> This change is an optimization, but should be unrelated to your PLL
-> problem, right?
-
-MULT_ROUND_UP yields multiples of 'rate' plus an incrementing value (m
-- 1).  Without that incrementing value added to the rate passed into
-__clk_round_rate the for loop above will always max out the divider.
-To illustrate:
-
-The rate we want is 300MHz.  Without MULT_ROUND_UP the for loop will
-start yielding these combinations:
-
-__clk_round_rate(parent, 300MHz), divide-by-1
-__clk_round_rate(parent, 600MHz), divide-by-2
-__clk_round_rate(parent, 900MHz), divide-by-3
-__clk_round_rate(parent, 1200MHz), divide-by-4
-...etc...
-
-These all yield the desired 300MHz for our divider so it just keeps
-going until you max out the divider and requests some crazy rate for
-the parent.  On most hardware that I am aware of it is desirable to
-keep the divider as low as possible so the change to the conditional
-prevents us from overwriting best every single time while keeping the
-divider low.  So yes, it is an optimization, but it is also quite
-necessary without MULT_ROUND_UP.
-
-Anyways I've kept MULT_ROUND_UP exactly as-is with the exception that
-I've added that small optimization to keep dividers low.  I hope there
-are no objections to that.
-
-Regards,
-Mike
-
->
-> Sascha
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+diff --cc arch/arm/mach-exynos/common.c
+index 4e1d0b7,e6cc50e..0000000
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@@ -593,6 -586,14 +593,13 @@@ static int __init exynos4_l2x0_cache_in
+  	if (soc_is_exynos5250())
+  		return 0;
+  
+ -	int ret;
++ 	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
++ 	if (!ret) {
++ 		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
++ 		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
++ 		return 0;
++ 	}
++ 
+  	if (!(__raw_readl(S5P_VA_L2CC + L2X0_CTRL) & 0x1)) {
+  		l2x0_saved_regs.phy_base = EXYNOS4_PA_L2CC;
+  		/* TAG, Data Latency Control: 2 cycles */
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120316/83d2ab85/attachment.sig>
