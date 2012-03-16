@@ -1,83 +1,448 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Fri, 16 Mar 2012 17:18:00 -0400
-Subject: ARM: fix build failure on ux500 in linux-next
-Message-ID: <20120316211759.GA18829@windriver.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Fri, 16 Mar 2012 16:21:43 -0500
+Subject: [PATCH v5 2/8] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
+In-Reply-To: <1331888204-27058-3-git-send-email-shawn.guo@linaro.org>
+References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
+ <1331888204-27058-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F63AEE7.4030505@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When I 1st saw this build failure, I thought it was me, because of the
-BUG() stuff.  But git bisect claims it comes from the arm-soc tree?
+Shawn Guo wrote:
+> Freescale PowerPC and ARM/IMX families share the same SSI IP block.
+> The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
+> code sharing and consolidation can happen.
+> 
+> This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
+> in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
+> IMX platform.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
 
-In any case, the fix is trivial and self evident, regardless of where
-it came from.  I can carry it in my bug-3.4 cleanup tree if need be.
-Let me know if you want me to do that.
+I'm okay with this patch, but you will need an Ack from Kumar Gala to
+carry the defconfig portions through the ASoC tree.  Or, he might want you
+to split the patch up.
 
-Thanks,
-Paul.
----
+>  arch/powerpc/configs/86xx/mpc8610_hpcd_defconfig |    1 +
+>  arch/powerpc/configs/mpc85xx_defconfig           |    1 +
+>  arch/powerpc/configs/mpc85xx_smp_defconfig       |    1 +
+>  sound/soc/Kconfig                                |    1 -
+>  sound/soc/Makefile                               |    1 -
+>  sound/soc/fsl/Kconfig                            |   92 ++++++++++++++++++++++
+>  sound/soc/fsl/Makefile                           |   22 +++++
+>  sound/soc/{imx => fsl}/eukrea-tlv320.c           |    2 +-
+>  sound/soc/{imx => fsl}/imx-audmux.c              |    0
+>  sound/soc/{imx => fsl}/imx-audmux.h              |    0
+>  sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c         |    0
+>  sound/soc/{imx => fsl}/imx-pcm-fiq.c             |    0
+>  sound/soc/{imx => fsl}/imx-pcm.c                 |    0
+>  sound/soc/{imx => fsl}/imx-pcm.h                 |    0
+>  sound/soc/{imx => fsl}/imx-ssi.c                 |    2 +-
+>  sound/soc/{imx => fsl}/imx-ssi.h                 |    0
+>  sound/soc/{imx => fsl}/mx27vis-aic32x4.c         |    0
+>  sound/soc/{imx => fsl}/phycore-ac97.c            |    0
+>  sound/soc/{imx => fsl}/wm1133-ev1.c              |    0
+>  sound/soc/imx/Kconfig                            |   79 -------------------
+>  sound/soc/imx/Makefile                           |   22 -----
+>  21 files changed, 119 insertions(+), 105 deletions(-)
+>  rename sound/soc/{imx => fsl}/eukrea-tlv320.c (99%)
+>  rename sound/soc/{imx => fsl}/imx-audmux.c (100%)
+>  rename sound/soc/{imx => fsl}/imx-audmux.h (100%)
+>  rename sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c (100%)
+>  rename sound/soc/{imx => fsl}/imx-pcm-fiq.c (100%)
+>  rename sound/soc/{imx => fsl}/imx-pcm.c (100%)
+>  rename sound/soc/{imx => fsl}/imx-pcm.h (100%)
+>  rename sound/soc/{imx => fsl}/imx-ssi.c (99%)
+>  rename sound/soc/{imx => fsl}/imx-ssi.h (100%)
+>  rename sound/soc/{imx => fsl}/mx27vis-aic32x4.c (100%)
+>  rename sound/soc/{imx => fsl}/phycore-ac97.c (100%)
+>  rename sound/soc/{imx => fsl}/wm1133-ev1.c (100%)
+>  delete mode 100644 sound/soc/imx/Kconfig
+>  delete mode 100644 sound/soc/imx/Makefile
+> 
+> diff --git a/arch/powerpc/configs/86xx/mpc8610_hpcd_defconfig b/arch/powerpc/configs/86xx/mpc8610_hpcd_defconfig
+> index 0db9ba0..c09598b 100644
+> --- a/arch/powerpc/configs/86xx/mpc8610_hpcd_defconfig
+> +++ b/arch/powerpc/configs/86xx/mpc8610_hpcd_defconfig
+> @@ -100,6 +100,7 @@ CONFIG_SND_MIXER_OSS=y
+>  CONFIG_SND_PCM_OSS=y
+>  # CONFIG_SND_SUPPORT_OLD_API is not set
+>  CONFIG_SND_SOC=y
+> +CONFIG_SND_POWERPC_SOC=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_CMOS=y
+>  CONFIG_EXT2_FS=y
+> diff --git a/arch/powerpc/configs/mpc85xx_defconfig b/arch/powerpc/configs/mpc85xx_defconfig
+> index f37a2ab..44605f8 100644
+> --- a/arch/powerpc/configs/mpc85xx_defconfig
+> +++ b/arch/powerpc/configs/mpc85xx_defconfig
+> @@ -139,6 +139,7 @@ CONFIG_SND_INTEL8X0=y
+>  # CONFIG_SND_PPC is not set
+>  # CONFIG_SND_USB is not set
+>  CONFIG_SND_SOC=y
+> +CONFIG_SND_POWERPC_SOC=y
+>  CONFIG_HID_A4TECH=y
+>  CONFIG_HID_APPLE=y
+>  CONFIG_HID_BELKIN=y
+> diff --git a/arch/powerpc/configs/mpc85xx_smp_defconfig b/arch/powerpc/configs/mpc85xx_smp_defconfig
+> index abdcd31..98e227e 100644
+> --- a/arch/powerpc/configs/mpc85xx_smp_defconfig
+> +++ b/arch/powerpc/configs/mpc85xx_smp_defconfig
+> @@ -141,6 +141,7 @@ CONFIG_SND_INTEL8X0=y
+>  # CONFIG_SND_PPC is not set
+>  # CONFIG_SND_USB is not set
+>  CONFIG_SND_SOC=y
+> +CONFIG_SND_POWERPC_SOC=y
+>  CONFIG_HID_A4TECH=y
+>  CONFIG_HID_APPLE=y
+>  CONFIG_HID_BELKIN=y
+> diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+> index 91c9855..0f85f6d 100644
+> --- a/sound/soc/Kconfig
+> +++ b/sound/soc/Kconfig
+> @@ -35,7 +35,6 @@ source "sound/soc/blackfin/Kconfig"
+>  source "sound/soc/davinci/Kconfig"
+>  source "sound/soc/ep93xx/Kconfig"
+>  source "sound/soc/fsl/Kconfig"
+> -source "sound/soc/imx/Kconfig"
+>  source "sound/soc/jz4740/Kconfig"
+>  source "sound/soc/nuc900/Kconfig"
+>  source "sound/soc/omap/Kconfig"
+> diff --git a/sound/soc/Makefile b/sound/soc/Makefile
+> index 2feaf37..363dfd6 100644
+> --- a/sound/soc/Makefile
+> +++ b/sound/soc/Makefile
+> @@ -12,7 +12,6 @@ obj-$(CONFIG_SND_SOC)	+= blackfin/
+>  obj-$(CONFIG_SND_SOC)	+= davinci/
+>  obj-$(CONFIG_SND_SOC)	+= ep93xx/
+>  obj-$(CONFIG_SND_SOC)	+= fsl/
+> -obj-$(CONFIG_SND_SOC)   += imx/
+>  obj-$(CONFIG_SND_SOC)	+= jz4740/
+>  obj-$(CONFIG_SND_SOC)	+= mid-x86/
+>  obj-$(CONFIG_SND_SOC)	+= mxs/
+> diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+> index ca693b2..19856a0 100644
+> --- a/sound/soc/fsl/Kconfig
+> +++ b/sound/soc/fsl/Kconfig
+> @@ -1,3 +1,15 @@
+> +config SND_SOC_FSL_SSI
+> +	tristate
+> +
+> +menuconfig SND_POWERPC_SOC
+> +	tristate "SoC Audio for Freescale PowerPC CPUs"
+> +	depends on FSL_SOC
+> +	help
+> +	  Say Y or M if you want to add support for codecs attached to
+> +	  the PowerPC CPUs.
+> +
+> +if SND_POWERPC_SOC
+> +
+>  config SND_MPC52xx_DMA
+>  	tristate
+>  
+> @@ -68,3 +80,83 @@ config SND_MPC52xx_SOC_EFIKA
+>  	help
+>  	  Say Y if you want to add support for sound on the Efika.
+>  
+> +endif # SND_POWERPC_SOC
+> +
+> +menuconfig SND_IMX_SOC
+> +	tristate "SoC Audio for Freescale i.MX CPUs"
+> +	depends on ARCH_MXC
+> +	help
+> +	  Say Y or M if you want to add support for codecs attached to
+> +	  the i.MX CPUs.
+> +
+> +if SND_IMX_SOC
+> +
+> +config SND_SOC_IMX_SSI
+> +	tristate
+> +
+> +config SND_SOC_IMX_PCM
+> +	tristate
+> +
+> +config SND_MXC_SOC_FIQ
+> +	tristate
+> +	select FIQ
+> +	select SND_SOC_IMX_PCM
+> +
+> +config SND_MXC_SOC_MX2
+> +	tristate
+> +	select SND_SOC_DMAENGINE_PCM
+> +	select SND_SOC_IMX_PCM
+> +
+> +config SND_SOC_IMX_AUDMUX
+> +	tristate
+> +
+> +config SND_MXC_SOC_WM1133_EV1
+> +	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
+> +	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
+> +	select SND_SOC_WM8350
+> +	select SND_MXC_SOC_FIQ
+> +	select SND_SOC_IMX_AUDMUX
+> +	select SND_SOC_IMX_SSI
+> +	help
+> +	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
+> +	  PMIC board with WM8835x fitted.
+> +
+> +config SND_SOC_MX27VIS_AIC32X4
+> +	tristate "SoC audio support for Visstrim M10 boards"
+> +	depends on MACH_IMX27_VISSTRIM_M10 && I2C
+> +	select SND_SOC_TLV320AIC32X4
+> +	select SND_MXC_SOC_MX2
+> +	select SND_SOC_IMX_AUDMUX
+> +	select SND_SOC_IMX_SSI
+> +	help
+> +	  Say Y if you want to add support for SoC audio on Visstrim SM10
+> +	  board with TLV320AIC32X4 codec.
+> +
+> +config SND_SOC_PHYCORE_AC97
+> +	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
+> +	depends on MACH_PCM043 || MACH_PCA100
+> +	select SND_SOC_AC97_BUS
+> +	select SND_SOC_WM9712
+> +	select SND_MXC_SOC_FIQ
+> +	select SND_SOC_IMX_AUDMUX
+> +	select SND_SOC_IMX_SSI
+> +	help
+> +	  Say Y if you want to add support for SoC audio on Phytec phyCORE
+> +	  and phyCARD boards in AC97 mode
+> +
+> +config SND_SOC_EUKREA_TLV320
+> +	tristate "Eukrea TLV320"
+> +	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
+> +		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
+> +		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
+> +		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
+> +	depends on I2C
+> +	select SND_SOC_TLV320AIC23
+> +	select SND_MXC_SOC_FIQ
+> +	select SND_SOC_IMX_AUDMUX
+> +	select SND_SOC_IMX_SSI
+> +	help
+> +	  Enable I2S based access to the TLV320AIC23B codec attached
+> +	  to the SSI interface
+> +
+> +endif # SND_IMX_SOC
+> diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
+> index 95d483f..36c257f 100644
+> --- a/sound/soc/fsl/Makefile
+> +++ b/sound/soc/fsl/Makefile
+> @@ -21,3 +21,25 @@ obj-$(CONFIG_SND_SOC_MPC5200_AC97) += mpc5200_psc_ac97.o
+>  obj-$(CONFIG_SND_MPC52xx_SOC_PCM030) += pcm030-audio-fabric.o
+>  obj-$(CONFIG_SND_MPC52xx_SOC_EFIKA) += efika-audio-fabric.o
+>  
+> +# i.MX Platform Support
+> +snd-soc-imx-ssi-objs := imx-ssi.o
+> +snd-soc-imx-audmux-objs := imx-audmux.o
+> +
+> +obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
+> +obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
+> +
+> +obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
+> +snd-soc-imx-pcm-y := imx-pcm.o
+> +snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_FIQ) += imx-pcm-fiq.o
+> +snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_MX2) += imx-pcm-dma-mx2.o
+> +
+> +# i.MX Machine Support
+> +snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
+> +snd-soc-phycore-ac97-objs := phycore-ac97.o
+> +snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
+> +snd-soc-wm1133-ev1-objs := wm1133-ev1.o
+> +
+> +obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
+> +obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
+> +obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
+> +obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
+> diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/fsl/eukrea-tlv320.c
+> similarity index 99%
+> rename from sound/soc/imx/eukrea-tlv320.c
+> rename to sound/soc/fsl/eukrea-tlv320.c
+> index 7d4475c..efb9ede 100644
+> --- a/sound/soc/imx/eukrea-tlv320.c
+> +++ b/sound/soc/fsl/eukrea-tlv320.c
+> @@ -7,7 +7,7 @@
+>   * which is Copyright 2009 Simtec Electronics
+>   * and on sound/soc/imx/phycore-ac97.c which is
+>   * Copyright 2009 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+> - * 
+> + *
+>   *  This program is free software; you can redistribute  it and/or modify it
+>   *  under  the terms of  the GNU General  Public License as published by the
+>   *  Free Software Foundation;  either version 2 of the  License, or (at your
+> diff --git a/sound/soc/imx/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
+> similarity index 100%
+> rename from sound/soc/imx/imx-audmux.c
+> rename to sound/soc/fsl/imx-audmux.c
+> diff --git a/sound/soc/imx/imx-audmux.h b/sound/soc/fsl/imx-audmux.h
+> similarity index 100%
+> rename from sound/soc/imx/imx-audmux.h
+> rename to sound/soc/fsl/imx-audmux.h
+> diff --git a/sound/soc/imx/imx-pcm-dma-mx2.c b/sound/soc/fsl/imx-pcm-dma-mx2.c
+> similarity index 100%
+> rename from sound/soc/imx/imx-pcm-dma-mx2.c
+> rename to sound/soc/fsl/imx-pcm-dma-mx2.c
+> diff --git a/sound/soc/imx/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
+> similarity index 100%
+> rename from sound/soc/imx/imx-pcm-fiq.c
+> rename to sound/soc/fsl/imx-pcm-fiq.c
+> diff --git a/sound/soc/imx/imx-pcm.c b/sound/soc/fsl/imx-pcm.c
+> similarity index 100%
+> rename from sound/soc/imx/imx-pcm.c
+> rename to sound/soc/fsl/imx-pcm.c
+> diff --git a/sound/soc/imx/imx-pcm.h b/sound/soc/fsl/imx-pcm.h
+> similarity index 100%
+> rename from sound/soc/imx/imx-pcm.h
+> rename to sound/soc/fsl/imx-pcm.h
+> diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
+> similarity index 99%
+> rename from sound/soc/imx/imx-ssi.c
+> rename to sound/soc/fsl/imx-ssi.c
+> index 9203cdd..3e0dac5a 100644
+> --- a/sound/soc/imx/imx-ssi.c
+> +++ b/sound/soc/fsl/imx-ssi.c
+> @@ -28,7 +28,7 @@
+>   * value. When we read the same register two times (and the register still
+>   * contains the same value) these status bits are not set. We work
+>   * around this by not polling these bits but only wait a fixed delay.
+> - * 
+> + *
+>   */
+>  
+>  #include <linux/clk.h>
+> diff --git a/sound/soc/imx/imx-ssi.h b/sound/soc/fsl/imx-ssi.h
+> similarity index 100%
+> rename from sound/soc/imx/imx-ssi.h
+> rename to sound/soc/fsl/imx-ssi.h
+> diff --git a/sound/soc/imx/mx27vis-aic32x4.c b/sound/soc/fsl/mx27vis-aic32x4.c
+> similarity index 100%
+> rename from sound/soc/imx/mx27vis-aic32x4.c
+> rename to sound/soc/fsl/mx27vis-aic32x4.c
+> diff --git a/sound/soc/imx/phycore-ac97.c b/sound/soc/fsl/phycore-ac97.c
+> similarity index 100%
+> rename from sound/soc/imx/phycore-ac97.c
+> rename to sound/soc/fsl/phycore-ac97.c
+> diff --git a/sound/soc/imx/wm1133-ev1.c b/sound/soc/fsl/wm1133-ev1.c
+> similarity index 100%
+> rename from sound/soc/imx/wm1133-ev1.c
+> rename to sound/soc/fsl/wm1133-ev1.c
+> diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+> deleted file mode 100644
+> index 810acaa..0000000
+> --- a/sound/soc/imx/Kconfig
+> +++ /dev/null
+> @@ -1,79 +0,0 @@
+> -menuconfig SND_IMX_SOC
+> -	tristate "SoC Audio for Freescale i.MX CPUs"
+> -	depends on ARCH_MXC
+> -	help
+> -	  Say Y or M if you want to add support for codecs attached to
+> -	  the i.MX SSI interface.
+> -
+> -
+> -if SND_IMX_SOC
+> -
+> -config SND_SOC_IMX_SSI
+> -	tristate
+> -
+> -config SND_SOC_IMX_PCM
+> -	tristate
+> -
+> -config SND_MXC_SOC_FIQ
+> -	tristate
+> -	select FIQ
+> -	select SND_SOC_IMX_PCM
+> -
+> -config SND_MXC_SOC_MX2
+> -	select SND_SOC_DMAENGINE_PCM
+> -	tristate
+> -	select SND_SOC_IMX_PCM
+> -
+> -config SND_SOC_IMX_AUDMUX
+> -	tristate
+> -
+> -config SND_MXC_SOC_WM1133_EV1
+> -	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
+> -	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
+> -	select SND_SOC_WM8350
+> -	select SND_MXC_SOC_FIQ
+> -	select SND_SOC_IMX_AUDMUX
+> -	select SND_SOC_IMX_SSI
+> -	help
+> -	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
+> -	  PMIC board with WM8835x fitted.
+> -
+> -config SND_SOC_MX27VIS_AIC32X4
+> -	tristate "SoC audio support for Visstrim M10 boards"
+> -	depends on MACH_IMX27_VISSTRIM_M10 && I2C
+> -	select SND_SOC_TLV320AIC32X4
+> -	select SND_MXC_SOC_MX2
+> -	select SND_SOC_IMX_AUDMUX
+> -	select SND_SOC_IMX_SSI
+> -	help
+> -	  Say Y if you want to add support for SoC audio on Visstrim SM10
+> -	  board with TLV320AIC32X4 codec.
+> -
+> -config SND_SOC_PHYCORE_AC97
+> -	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
+> -	depends on MACH_PCM043 || MACH_PCA100
+> -	select SND_SOC_AC97_BUS
+> -	select SND_SOC_WM9712
+> -	select SND_MXC_SOC_FIQ
+> -	select SND_SOC_IMX_AUDMUX
+> -	select SND_SOC_IMX_SSI
+> -	help
+> -	  Say Y if you want to add support for SoC audio on Phytec phyCORE
+> -	  and phyCARD boards in AC97 mode
+> -
+> -config SND_SOC_EUKREA_TLV320
+> -	tristate "Eukrea TLV320"
+> -	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
+> -		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
+> -		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
+> -		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
+> -	depends on I2C
+> -	select SND_SOC_TLV320AIC23
+> -	select SND_MXC_SOC_FIQ
+> -	select SND_SOC_IMX_AUDMUX
+> -	select SND_SOC_IMX_SSI
+> -	help
+> -	  Enable I2S based access to the TLV320AIC23B codec attached
+> -	  to the SSI interface
+> -
+> -endif	# SND_IMX_SOC
+> diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
+> deleted file mode 100644
+> index f5db3e9..0000000
+> --- a/sound/soc/imx/Makefile
+> +++ /dev/null
+> @@ -1,22 +0,0 @@
+> -# i.MX Platform Support
+> -snd-soc-imx-ssi-objs := imx-ssi.o
+> -snd-soc-imx-audmux-objs := imx-audmux.o
+> -
+> -obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
+> -obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
+> -
+> -obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
+> -snd-soc-imx-pcm-y := imx-pcm.o
+> -snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_FIQ) += imx-pcm-fiq.o
+> -snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_MX2) += imx-pcm-dma-mx2.o
+> -
+> -# i.MX Machine Support
+> -snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
+> -snd-soc-phycore-ac97-objs := phycore-ac97.o
+> -snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
+> -snd-soc-wm1133-ev1-objs := wm1133-ev1.o
+> -
+> -obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
+> -obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
+> -obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
+> -obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
 
-git bisect start
-# good: [fde7d9049e55ab85a390be7f415d74c9f62dd0f9] Linux 3.3-rc7
-git bisect good fde7d9049e55ab85a390be7f415d74c9f62dd0f9
-# bad: [e9ae4cb7dce90c006b25783f431100c1aebe8249] Add linux-next specific files for 20120316
-git bisect bad e9ae4cb7dce90c006b25783f431100c1aebe8249
-# good: [04e2934e35128af6772c6e7582a2a70e9bfa6e39] Merge remote-tracking branch 'sound/for-next'
-git bisect good 04e2934e35128af6772c6e7582a2a70e9bfa6e39
-# good: [83e256edcb2f8886786b1bba59992c90391e162a] Merge remote-tracking branch 'tip/auto-latest'
-git bisect good 83e256edcb2f8886786b1bba59992c90391e162a
-# good: [e047bb4623cb69a162fe3b6dffb6b6719e5ed36b] Merge remote-tracking branch 'tmem/linux-next'
-git bisect good e047bb4623cb69a162fe3b6dffb6b6719e5ed36b
-# good: [4d879eaf577c4f1a84a9cad4445e388f3fa3751b] Merge branch 'next/timer' into for-next
-git bisect good 4d879eaf577c4f1a84a9cad4445e388f3fa3751b
-# bad: [11f98c49d6bbedf80ebd3b477cf9283c6a3e9b1a] xtensa: use set_current_blocked() and block_sigmask()
-git bisect bad 11f98c49d6bbedf80ebd3b477cf9283c6a3e9b1a
-# good: [50cfadc1b7ae56c5062401018df8fe16114de29a] Merge remote-tracking branch 'gpio/gpio/next'
-git bisect good 50cfadc1b7ae56c5062401018df8fe16114de29a
-# bad: [befe1aab92393bd4106d78f5610958dc37dce074] Merge remote-tracking branch 'dma-mapping/dma-mapping-next'
-git bisect bad befe1aab92393bd4106d78f5610958dc37dce074
-# good: [7ae1cd4e9625311fbada74513a69044f66b5eff9] Merge branch 'next/boards' into for-next
-git bisect good 7ae1cd4e9625311fbada74513a69044f66b5eff9
-# good: [268b190b02965250cb5080beb755f25a2631cceb] Merge branch 'next/drivers' into for-next
-git bisect good 268b190b02965250cb5080beb755f25a2631cceb
-# good: [b908eddffb98f4106068e132b6a05888cea59fd0] Hexagon: adapt for dma_map_ops changes
-git bisect good b908eddffb98f4106068e132b6a05888cea59fd0
-# good: [62d02641854bc02534c32e2c20f0d403cde32f24] Merge branch 'next/soc2' into for-next
-git bisect good 62d02641854bc02534c32e2c20f0d403cde32f24
-# good: [c4715f1e814e05beb5f99ec18ddb0e2e934a8b3d] common: DMA-mapping: add WRITE_COMBINE attribute
-git bisect good c4715f1e814e05beb5f99ec18ddb0e2e934a8b3d
-# good: [6cc2bf1ab405a7085c92fefbad610b35ec60d3e0] common: DMA-mapping: add NON-CONSISTENT attribute
-git bisect good 6cc2bf1ab405a7085c92fefbad610b35ec60d3e0
-# bad: [c4aa47a2a1665e8d5ea62dcbfba9a54a86003190] Merge remote-tracking branch 'arm-soc/for-next'
-git bisect bad c4aa47a2a1665e8d5ea62dcbfba9a54a86003190
 
----
-
->From 79a97eb612706ee3428ae7909503079c6fd3cf68 Mon Sep 17 00:00:00 2001
-From: Paul Gortmaker <paul.gortmaker@windriver.com>
-Date: Fri, 16 Mar 2012 16:45:32 -0400
-Subject: [PATCH] ARM: fix trivial build failures on ux500
-
-Seen in linux-next builds:
-
-arch/arm/mach-ux500/timer.c: In function 'ux500_twd_init':
-arch/arm/mach-ux500/timer.c:35: error: implicit declaration of function 'pr_err'
-arch/arm/mach-ux500/timer.c: In function 'ux500_timer_init':
-arch/arm/mach-ux500/timer.c:53: error: implicit declaration of function 'BUG'
-
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index e9d5807..90cf3f0 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -5,6 +5,8 @@
-  * Author: Mattias Wallin <mattias.wallin@stericsson.com> for ST-Ericsson
-  */
- #include <linux/io.h>
-+#include <linux/bug.h>
-+#include <linux/kernel.h>
- #include <linux/errno.h>
- #include <linux/clksrc-dbx500-prcmu.h>
- 
 -- 
-1.7.9.1
+Timur Tabi
+Linux kernel developer at Freescale
