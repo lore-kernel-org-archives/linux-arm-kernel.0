@@ -1,36 +1,89 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 16 Mar 2012 18:14:46 +0100
-Subject: [PATCH] mfd: pcap: depend on arch-pxa
-In-Reply-To: <1331011808-28307-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1331011808-28307-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <20120316171446.GF20524@sortiz-mobl>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 16 Mar 2012 10:21:02 -0700
+Subject: [PATCH] arm: Add unwinding support for memset and memzero.
+In-Reply-To: <20120314111504.GA2033@linaro.org>
+References: <1331574027-28542-1-git-send-email-lauraa@codeaurora.org>
+ <20120314111504.GA2033@linaro.org>
+Message-ID: <4F63767E.3020706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+On 3/14/2012 4:15 AM, Dave Martin wrote:
+>
+> For functions like this, the unwinding requirements are different
+> depending on where we are in the function.  But the unwinder annotations
+> don't remember exact instruction locations; only the extent of the
+> whole unwind block is recorded, along with the sequence (but not
+> location) of unwinder directives.
+>
+> As is, the unwinding may be wrong depending on which part of the function
+> is executing when the fault occurs.
+>
 
-On Tue, Mar 06, 2012 at 01:30:08PM +0800, Haojian Zhuang wrote:
-> drivers/mfd/ezx-pcap.c: In function ?pcap_isr_work?:
-> drivers/mfd/ezx-pcap.c:206:2: error: implicit declaration of function
-> ?pxa_irq_to_gpio?
-> make[2]: *** [drivers/mfd/ezx-pcap.o] Error 1
-You get that error once you replace irq_to_gpio() with pxa_irq_to_gpio().
+Hmmmm, I thought I could get away with only one annotation based on the 
+structure of memset/memzero but looking again you are right, it really 
+requires multiple annotations to be correct.
 
+> It may be possible to split the function into multiple unwind blocks,
+> e.g.:
+>
+> ENTRY(somefunc)
+> UNWIND(.fnstart)
+>
+> UNWIND(.save {r4,lr})
+> 	stfmd	sp!, {r4,lr}
+>
+> 	/* check something */
+>
+> 	blt	_the_other_way
+> 	/* maybe carry out our job this way */
+>
+> 	ldmfd	sp!, {r4,lr}
+> UNWIND(.fnend)
+>
+> _the_other_way:
+> UNWIND(.fnstart)
+> UNWIND(.save {r4,lr})
+> UNWIND(.save {r5-r8})
+> 	stmfd	sp!, {r5-r8}	/* !! */
+>
+> 	/* carry out our job the other way */
+>
+> 	ldmfd	sp!, {r5-r8}
+> 	ldmfd	sp!, {r4,pc}	/* !! */
+> UNWIND(.fnend)
+>
+>
+> This is still not exactly right (it's hard to be exactly right,
+> since the unwind tables are not meant for handling asynchronous
+> unwinding), but unwinding should be correct for the main bits of code
+> where most time is spent and/or faults are most likely (the "carry out
+> our job" comments).
+>
 
-> PCAP driver invokes irq_to_gpio() directly. This function isn't common
-> function in most silicons. PCAP driver is enabled for EZX machine with
-> arch-pxa. Now use pxa_irq_to_gpio() instead.
-> 
-> It's only a workaround for this issue. Acutally the best solution is
-> using thread irq to fix this issue.
-How would that fix the problem ? Defining irq_to_gpio for the PXA arch sounds
-like a better option. I don't particularily like this patch as it restricts
-the pcap driver quite a lot.
-Would you be able to look at fixing the PXA gpio.h instead ?
+Would a compiler be able to generate code such as this and still 
+generate correct completely unwinding annotations? Or if the compiler 
+knows unwinding is necessary, is the only option to generate code in 
+'unwindable blocks'? (alternatively, no compiler is smart/stupid enough 
+to generate this code?)
 
-Cheers,
-Samuel.
+> You'd have to experiment to see whether the backtracer does something
+> sensible with unwind tables like this.  It might need tweaking to
+> find the correct function symbol if a fault occurs in the second
+> unwind block for example ... that perhaps it will already do the
+> right thing.
+>
+
+Yes, I'll look into this. memcpy is missing annotations as well but that 
+code is significantly more convoluted.
+
+> Cheers
+> ---Dave
+>
+
+Thanks,
+Laura
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
