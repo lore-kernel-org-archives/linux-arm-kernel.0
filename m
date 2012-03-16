@@ -1,20 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 08:24:05 +0000
-Subject: [PATCH v10] mfd: Add anatop mfd driver
-In-Reply-To: <1331885816-26902-1-git-send-email-paul.liu@linaro.org>
-References: <1331885816-26902-1-git-send-email-paul.liu@linaro.org>
-Message-ID: <201203160824.05384.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Mar 2012 09:25:12 +0100
+Subject: [PATCH v7 1/3] Documentation: common clk API
+In-Reply-To: <1331878280-2758-2-git-send-email-mturquette@linaro.org>
+References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
+ <1331878280-2758-2-git-send-email-mturquette@linaro.org>
+Message-ID: <CACRpkdbXq7zX_XrvAOJc7U6=T0Aaoq+U9_GmZS4fVmVd_arC7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012, Ying-Chun Liu (PaulLiu) wrote:
-> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
-> 
-> Anatop is a mfd chip embedded in Freescale i.MX6Q SoC.
-> Anatop provides regulators and thermal.
-> This driver handles the address space and the operation of the mfd device.
-> 
-> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On Fri, Mar 16, 2012 at 7:11 AM, Mike Turquette <mturquette@linaro.org> wrote:
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> Provide documentation for the common clk structures and APIs. ?This code
+> can be found in drivers/clk/ and include/linux/clk*.h.
+
+Acked-by: Linus Wallej <linus.walleij@linaro.org>
+For this three-piece v7 patchset.
+
+It already does magnitudes more advanced stuff than what I need
+so I'm pretty pleased, any remaining details can surely be ironed out
+in-tree.
+
+Thanks,
+Linus Walleij
