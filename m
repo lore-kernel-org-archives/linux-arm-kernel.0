@@ -1,32 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 20:57:58 +0000
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <201203161218.05125.arnd.bergmann@linaro.org>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
- <201203161218.05125.arnd.bergmann@linaro.org>
-Message-ID: <201203162057.58706.arnd@arndb.de>
+From: aneesh@ti.com (Aneesh V)
+Date: Sat, 17 Mar 2012 02:28:47 +0530
+Subject: [PATCH v2 1/7] misc: ddr: add LPDDR2 data from JESD209-2
+In-Reply-To: <20120315190238.GD11142@kroah.com>
+References: <1331835457-5390-1-git-send-email-aneesh@ti.com>
+ <1331835457-5390-2-git-send-email-aneesh@ti.com>
+ <20120315190238.GD11142@kroah.com>
+Message-ID: <4F63A987.3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012, Arnd Bergmann wrote:
-> > 
-> > Can we shoe-horn this thing into 3.4 (it is a bit late, i know) so
-> > that platform ports can gather speed? Several people are waiting for a
-> > somewhat stable version before starting their ports.
-> > 
-> > And what is the path into mainline - will Russell carry it or Arnd
-> > (with Russell's blessing)?
-> 
-> I would suggest putting it into a late/* branch of arm-soc so it finally
-> gets some linux-next exposure, and then sending it in the second week of the
-> merge window.
-> 
-> Russell, please let me know if you want to carry it instead or if you
-> have found any last-minute show stoppers in the code.
+Hi Greg,
 
-FWIW, it's in arm-soc now, and it's the last thing I  put in there
-for v3.4. From now on until v3.4-rc1, feature patches can only get
-removed from arm-soc, not added.
+On Friday 16 March 2012 12:32 AM, Greg KH wrote:
+> On Thu, Mar 15, 2012 at 11:47:31PM +0530, Aneesh V wrote:
+>> add LPDDR2 data from the JEDEC spec JESD209-2. The data
+>> includes:
+>>
+>> 1. Addressing information for LPDDR2 memories of different
+>>     densities and types(S2/S4)
+>> 2. AC timing data.
+>>
+>> This data will useful for memory controller device drivers
+>
+> Right now, only one driver, right?
+>
+>> +#ifndef __ASSEMBLY__
+>
+> Why is this needed?
+>
+>> +/* Structure for DDR addressing info from the JEDEC spec */
+>> +struct lpddr2_addressing {
+>> +	u32 num_banks;
+>> +	u32 tREFI_ns;
+>> +	u32 tRFCab_ps;
+>> +};
+>
+> Do these structures cross the user/kernel boundry somehow?  If so,
+> please use the proper kernel types for this.
+>
+>> --- a/lib/Makefile
+>> +++ b/lib/Makefile
+>> @@ -123,6 +123,9 @@ obj-$(CONFIG_SIGNATURE) += digsig.o
+>>
+>>   obj-$(CONFIG_CLZ_TAB) += clz_tab.o
+>>
+>> +obj-$(CONFIG_DDR) += jedec_ddr_data.o
+>> +
+>> +
+>
+> Why the extra line?
+>
+>>   hostprogs-y	:= gen_crc32table
+>>   clean-files	:= crc32table.h
+>>
+>> diff --git a/lib/jedec_ddr_data.c b/lib/jedec_ddr_data.c
+>> new file mode 100644
+>> index 0000000..fc223d6
+>> --- /dev/null
+>> +++ b/lib/jedec_ddr_data.c
+>> @@ -0,0 +1,135 @@
+>> +/*
+>> + * DDR addressing details and AC timing parameters from JEDEC specs
+>> + *
+>> + * Copyright (C) 2012 Texas Instruments, Inc.
+>> + *
+>> + * Aneesh V<aneesh@ti.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include<misc/jedec_ddr.h>
+>> +#include<linux/module.h>
+>> +
+>> +/* LPDDR2 addressing details from JESD209-2 section 2.4 */
+>> +const struct lpddr2_addressing
+>> +	lpddr2_jedec_addressing_table[NUM_DDR_ADDR_TABLE_ENTRIES] = {
+>> +	{B4, T_REFI_15_6, T_RFC_90}, /* 64M */
+>> +	{B4, T_REFI_15_6, T_RFC_90}, /* 128M */
+>> +	{B4, T_REFI_7_8,  T_RFC_90}, /* 256M */
+>> +	{B4, T_REFI_7_8,  T_RFC_90}, /* 512M */
+>> +	{B8, T_REFI_7_8, T_RFC_130}, /* 1GS4 */
+>> +	{B8, T_REFI_3_9, T_RFC_130}, /* 2GS4 */
+>> +	{B8, T_REFI_3_9, T_RFC_130}, /* 4G */
+>> +	{B8, T_REFI_3_9, T_RFC_210}, /* 8G */
+>> +	{B4, T_REFI_7_8, T_RFC_130}, /* 1GS2 */
+>> +	{B4, T_REFI_3_9, T_RFC_130}, /* 2GS2 */
+>> +};
+>> +EXPORT_SYMBOL(lpddr2_jedec_addressing_table);
+>
+> EXPORT_SYMBOL_GPL for these and the others?
 
-	Arnd
+I have fixed these comments and pushed my latest patches at:
+git://github.com/aneeshv/linux.git
+branch: emif-upstream-v4
+
+thanks,
+Aneesh
