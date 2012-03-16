@@ -1,120 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Mar 2012 14:36:05 +0100
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <4F634000.8010408@ti.com>
-References: <4F22DEF2.5000807@ti.com> <201203161003.02163.arnd@arndb.de>
- <4F6321DB.50600@ti.com> <201203161204.19800.arnd@arndb.de>
- <4F634000.8010408@ti.com>
-Message-ID: <4F6341C5.4060009@atmel.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Fri, 16 Mar 2012 19:09:17 +0530
+Subject: [PATCH 0/2] Omap keypad cleanup and omap5 support
+Message-ID: <1331905159-11255-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2012 02:28 PM, Cousson, Benoit :
-> On 3/16/2012 1:04 PM, Arnd Bergmann wrote:
->> On Friday 16 March 2012, Cousson, Benoit wrote:
->>> And it seems that other ARM SoCs are using it for the same purpose.
->>> There are at least 230+ IORESOURCE_DMA instances in the kernel today.
->>
->> These tend to be the ones that don't use dmaengine but either the
->> ISA dma api or a platform specific variant of that, right?
->>
->> Also, I think that most of those definitions are for the same few
->> devices. The number that I see is much lower:
->>
->> $ git grep -l IORESOURCE_DMA drivers/ sound/ | wc -l
->>       51
-> 
-> Gosh, good point... I've just done a dumb grep, but most of them are in
-> the device creation inside arch code:-(
-> 
-> Assuming OMAP driver does contains omap in the name, the result is
-> indeed way smaller.
-> 
-> git grep -l IORESOURCE_DMA drivers/ sound/ | grep omap
-> 
-> drivers/crypto/omap-aes.c
-> drivers/crypto/omap-sham.c
-> drivers/spi/spi-omap2-mcspi.c
-> drivers/tty/serial/omap-serial.c
-> sound/soc/omap/omap-dmic.c
-> sound/soc/omap/omap-hdmi.c
-> 
-> We do have 127 DMA requests and only 6 drivers are using them, that's a
-> pity...
-> 
->> Out of those, a quite number are mips or blackfin or xtensa based, or are
->> for legacy ISA devices, which leaves 29 drivers for ARM.
->>
->>> For the moment it is still used in a lot of places, and without any
->>> other better API yet, it is still useful. As written it is there only
->>> for simple single DMA controller case.
->>>
->>> By maintaining that IORESOURCE_DMA for the moment we can adapt some
->>> driver to DT without having to change the way they are retrieving
->>> information. By using IORESOURCE_IRQ and IORESOURCE_MEM, we had the same
->>> advantage.
->>
->> The main difference to IORESOURCE_IRQ and IORESOURCE_MEM that I see
->> is that those are going to start for any forseeable time and are actually
->> helpful in a lot of ways. We are not going to remove the single number
->> space for interrupts in the next few years. For DMA, the dmaengine API
->> has already moved away from the flat number space of the ISA API.
->>
->>> Otherwise how are we supposed to get the DMA channel for non-DT boot
->>> until we have migrated everything to DT? A bunch of ARM SoC are using
->>> IORESOURCE_DMA for the same purpose.
->>>
->>> The goal here is really to maintain that during the transition phase
->>> only. As soon as the full DT support is there, we can switch to the
->>> of_ API.
->>>
->>> Ideally, we should define and use a generic API non dependent of DT.
->>> AFAIK, that does not exist so far.
->>> And since most drivers are not using dmaengine, we do not even have a
->>> common DMA fmwk to define an API on top.
->>>
->>> I fully agree that this IORESOURCE_DMA is not scalable for multiple
->>> controller, ugly, and must be avoided like the plague.
->>> But what other options do we have during the transition?
->>
->> We could use the same binding for the nonstandard controllers, but
->> keep the dma channel number lookup separate for those, and let them
->> call of_get_dma_request directly.
->>
->> Since there are not too many drivers using those controllers with
->> dma resources today, it's fairly easy to go through those as we write
->> the driver bindings and just do
->>
->>     err = of_get_dma_request(pdev->dev.of_node, 0,&dma);
->>     if (err) {
->>         struct resource *r = platform_get_resource(pdev,
->> IORESOURCE_DMA, 0);
->>         if (r)
->>             dma = r->start;
->>     }
->>
->> For the drivers that we convert to DT before we convert them to
->> dmaengine,
->> and not do anything if we convert them to dmaengine first.
-> 
-> Considering the small amount of OMAP drivers really using
-> IORESOURCE_DMA, I guess this is fair enough.
-> 
-> Bottom-line, I do not have any more issue removing this of_dma_to_resource.
-> 
-> 
-> Nico,
-> Is that OK for you to repost the patch without this function?
+The series consists of two patches.
+Patch1 of the series makes omap4 keypad independent of the
+architecture by moving platform_data to <linux/platform_data>
 
-Yes sure, I will repost a V2 soon.
+Patch2 add support for omap5 onchip keypad.
 
-I also try to have an integration in DT selftest.c:
-- that will show some possibilities of the API
-- that will give some examples of usage (1 or 2 xlate() functions)
-- that made me review my code and find a weakness
-- that will allow to monitor non-regression (obviously)
-=> WIP...
+Tested on omap4430sdp using 3.3-rc6.
+Tested on omap5 board using 3.1 custom kernel. 
 
-Bye,
--- 
-Nicolas Ferre
+Felipe Balbi (1):
+  input: keypad: move platform_data to <linux/platform_data>
+
+G, Manjunath Kondaiah (1):
+  Input: omap-keypad: dynamically handle register offsets
+
+ arch/arm/mach-omap2/board-4430sdp.c            |    1 +
+ arch/arm/mach-omap2/devices.c                  |    1 +
+ arch/arm/plat-omap/include/plat/omap4-keypad.h |    9 --
+ drivers/input/keyboard/Kconfig                 |    7 +-
+ drivers/input/keyboard/omap4-keypad.c          |  124 +++++++++++++++++++-----
+ include/linux/platform_data/omap4-keypad.h     |   13 +++
+ 6 files changed, 118 insertions(+), 37 deletions(-)
+ create mode 100644 include/linux/platform_data/omap4-keypad.h
