@@ -1,35 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 20:31:55 +0000
-Subject: [PATCH v5] ARM: SPEAr600: Add device-tree support to SPEAr600
- boards
-In-Reply-To: <20120316131129.GH7757@game.jcrosoft.org>
-References: <1331903003-14045-1-git-send-email-sr@denx.de>
- <20120316131129.GH7757@game.jcrosoft.org>
-Message-ID: <201203162031.56051.arnd@arndb.de>
+Date: Fri, 16 Mar 2012 20:41:12 +0000
+Subject: [PATCH 0/9 v5] ARM: kirkwood: fdt: convert kirkwood to fdt
+In-Reply-To: <20120316202815.GI20243@titan.lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <201203162018.27957.arnd@arndb.de>
+ <20120316202815.GI20243@titan.lakedaemon.net>
+Message-ID: <201203162041.12831.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > 
-> > Signed-off-by: Stefan Roese <sr@denx.de>
-> > Acked-by: Viresh Kumar <viresh.kumar@st.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> 
-> I'm not a fan to have non Documented DT binding butthey are basic so ok
-> 
+On Friday 16 March 2012, Jason Cooper wrote:
+> I was going to give it a day or two more, and if no one brought up
+> anything earth-shattering, I was going to submit the pull-request for
+> this series on Sunday.  I can do it now if you think it's ok.
 
-I've applied the patch to the next/dt2 branch now, which means it
-will get sent later than the first batch of dt conversions and
-we have some time to let this get tested in linux-next, but the
-plan is still to have it in v3.4.
+I've already pulled it now, and I'm not going to take any new patches
+for v3.4 any more. I expect Linus to open up the merge window
+any time now, and he does not like to see patches sent to him
+that have not been in linux-next before the merge window opened.
 
-With this, it seems that SPEAr600 will be the surprise winner in the
-race to have the first platform that removes all of its board files
-and replaces them with DT probing ;-)
+So the deal is that anything that is in now stays in unless someone
+reports a serious problem and in that case it gets removed.
+Any simple bugs can be fixed by sending follow-up patches of
+course.
 
-Thanks everyone!
+> > I'm willing to take it and have put it into next/dt2 for now so it
+> > makes it into linux-next. I'm not taking a newer version for v3.4 any
+> > more, so if anyone has concerns over some of your patches in the
+> > series, it all gets removed again and we will have to postpone them
+> > until v3.5.
+> 
+> The problematic patch (sata_mv) has been removed.  So, there should be
+> no issue.
+
+Ok, thanks for the confirmation.
 
 	Arnd
