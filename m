@@ -1,48 +1,98 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 16:12:26 +0800
-Subject: [PATCH v4 09/10] pwm: Add PXA support
-In-Reply-To: <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120316081222.GE7758@S2101-09.ap.freescale.net>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 16 Mar 2012 09:14:00 +0100
+Subject: [PATCH 1/2] watchdog: Add support for WDIOC_GETTIMELEFT IOCTL in
+ watchdog core
+Message-ID: <1331885640-21661-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 04:56:32PM +0100, Thierry Reding wrote:
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
-> Changes in v3:
->   - update PWM ops for changes in patch 2
-> 
->  arch/arm/plat-pxa/Makefile |    1 -
->  arch/arm/plat-pxa/pwm.c    |  304 --------------------------------------------
->  drivers/pwm/Kconfig        |    9 ++
->  drivers/pwm/Makefile       |    1 +
->  drivers/pwm/pwm-pxa.c      |  244 +++++++++++++++++++++++++++++++++++
->  5 files changed, 254 insertions(+), 305 deletions(-)
->  delete mode 100644 arch/arm/plat-pxa/pwm.c
->  create mode 100644 drivers/pwm/pwm-pxa.c
-> 
-The patch should be generated with "git format-patch -M", so that we
-can see the diff like below. 
+From: Viresh Kumar <viresh.kumar@st.com>
 
---- a/arch/arm/plat-pxa/pwm.c
-+++ b/drivers/pwm/pwm-pxa.c
+This patch adds support for WDIOC_GETTIMELEFT IOCTL in watchdog core. So, there
+is another function pointer added to struct watchdog_ops, which can be passed by
+drivers to support this IOCTL.
 
--int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-+static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+                         int duty_ns, int period_ns)
- {
-+       struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
-        unsigned long long c;
-        unsigned long period_cycles, prescale, pv, dc;
-+       unsigned long offset;
+Related documentation is updated too.
 
--       if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
-+       if (period_ns == 0 || duty_ns > period_ns)
-                return -EINVAL;
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ .../watchdog/convert_drivers_to_kernel_api.txt     |    4 ++++
+ Documentation/watchdog/watchdog-kernel-api.txt     |    2 ++
+ drivers/watchdog/watchdog_dev.c                    |    5 +++++
+ include/linux/watchdog.h                           |    2 ++
+ 4 files changed, 13 insertions(+)
 
-Then I will have a question why "pwm == NULL" check is removed?
-
-Regards,
-Shawn
+diff --git a/Documentation/watchdog/convert_drivers_to_kernel_api.txt b/Documentation/watchdog/convert_drivers_to_kernel_api.txt
+index be8119b..271b885 100644
+--- a/Documentation/watchdog/convert_drivers_to_kernel_api.txt
++++ b/Documentation/watchdog/convert_drivers_to_kernel_api.txt
+@@ -59,6 +59,10 @@ Here is a overview of the functions and probably needed actions:
+ 	WDIOC_GETTIMEOUT:
+ 		No preparations needed
+ 
++	WDIOC_GETTIMELEFT:
++		It needs get_timeleft() callback to be defined. Otherwise it
++		will return EOPNOTSUPP
++
+   Other IOCTLs can be served using the ioctl-callback. Note that this is mainly
+   intended for porting old drivers; new drivers should not invent private IOCTLs.
+   Private IOCTLs are processed first. When the callback returns with
+diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
+index 4b93c28..e4c4d1c 100644
+--- a/Documentation/watchdog/watchdog-kernel-api.txt
++++ b/Documentation/watchdog/watchdog-kernel-api.txt
+@@ -77,6 +77,7 @@ struct watchdog_ops {
+ 	int (*ping)(struct watchdog_device *);
+ 	unsigned int (*status)(struct watchdog_device *);
+ 	int (*set_timeout)(struct watchdog_device *, unsigned int);
++	unsigned int (*get_timeleft)(struct watchdog_device *);
+ 	long (*ioctl)(struct watchdog_device *, unsigned int, unsigned long);
+ };
+ 
+@@ -122,6 +123,7 @@ they are supported. These optional routines/operations are:
+   to re-program the watchdog timer device.
+   (Note: the WDIOF_SETTIMEOUT needs to be set in the options field of the
+   watchdog's info structure).
++* get_timeleft: this routines returns the time left for reset.
+ * ioctl: if this routine is present then it will be called first before we do
+   our own internal ioctl call handling. This routine should return -ENOIOCTLCMD
+   if a command is not supported. The parameters that are passed to the ioctl
+diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
+index 1199da0..fa64fb8 100644
+--- a/drivers/watchdog/watchdog_dev.c
++++ b/drivers/watchdog/watchdog_dev.c
+@@ -237,6 +237,11 @@ static long watchdog_ioctl(struct file *file, unsigned int cmd,
+ 		if (wdd->timeout == 0)
+ 			return -EOPNOTSUPP;
+ 		return put_user(wdd->timeout, p);
++	case WDIOC_GETTIMELEFT:
++		if (!wdd->ops->get_timeleft)
++			return -EOPNOTSUPP;
++
++		return put_user(wdd->ops->get_timeleft(wdd), p);
+ 	default:
+ 		return -ENOTTY;
+ 	}
+diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+index 43ba5b3..58bc9a1 100644
+--- a/include/linux/watchdog.h
++++ b/include/linux/watchdog.h
+@@ -66,6 +66,7 @@ struct watchdog_device;
+  * @ping:	The routine that sends a keepalive ping to the watchdog device.
+  * @status:	The routine that shows the status of the watchdog device.
+  * @set_timeout:The routine for setting the watchdog devices timeout value.
++ * @get_timeleft:The routine for getting the watchdog device's timeleft value.
+  * @ioctl:	The routines that handles extra ioctl calls.
+  *
+  * The watchdog_ops structure contains a list of low-level operations
+@@ -82,6 +83,7 @@ struct watchdog_ops {
+ 	int (*ping)(struct watchdog_device *);
+ 	unsigned int (*status)(struct watchdog_device *);
+ 	int (*set_timeout)(struct watchdog_device *, unsigned int);
++	unsigned int (*get_timeleft)(struct watchdog_device *);
+ 	long (*ioctl)(struct watchdog_device *, unsigned int, unsigned long);
+ };
+ 
+-- 
+1.7.9.2
