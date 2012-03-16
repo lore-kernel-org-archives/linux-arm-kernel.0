@@ -1,203 +1,95 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 16 Mar 2012 10:59:41 +0000
-Subject: [PATCH 2/4] ARM: opcodes: Make opcode byteswapping macros
- assembly-compatible
-In-Reply-To: <alpine.LFD.2.02.1203151351180.24151@xanadu.home>
+Date: Fri, 16 Mar 2012 11:04:23 +0000
+Subject: [PATCH 4/4] ARM: opcodes: Opcode definitions for the
+ Virtualization Extensions
+In-Reply-To: <alpine.LFD.2.02.1203151355570.24151@xanadu.home>
 References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
- <1331829132-9762-3-git-send-email-dave.martin@linaro.org>
- <alpine.LFD.2.02.1203151351180.24151@xanadu.home>
-Message-ID: <20120316105928.GA2017@linaro.org>
+ <1331829132-9762-5-git-send-email-dave.martin@linaro.org>
+ <alpine.LFD.2.02.1203151355570.24151@xanadu.home>
+Message-ID: <20120316110423.GB2017@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 01:53:20PM -0400, Nicolas Pitre wrote:
+On Thu, Mar 15, 2012 at 01:58:28PM -0400, Nicolas Pitre wrote:
 > On Thu, 15 Mar 2012, Dave Martin wrote:
 > 
-> > Most of the existing macros don't work with assembler, due to the
-> > use of type casts and C functions from <linux/swab.h>.
+> > For now, this patch just adds a definition for the HVC instruction.
+> > More can be added here later, as needed.
 > > 
-> > This patch abstracts out those operations and provides simple
-> > explicit versions for use in assembly code.
-> > 
-> > __opcode_is_thumb32() and __opcode_is_thumb16() are also converted
-> > to do bitmask-based testing to avoid confusion if these are used in
-> > assembly code (the assembler typically treats all arithmetic values
-> > as signed).
+> > Now that we have a real example of how to use the opcode injection
+> > macros properly, this patch also adds a cross-reference from the
+> > explanation in opcodes.h (since without an example, figuring out
+> > how to use the macros is not that easy).
 > > 
 > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
 > 
-> OK.  One really has to read through the whole series to see the point of 
-> this.
-
-That's a fair comment -- I'll try to add a bit more clarification with
-reference to the other patches.
-
-The real reason for this is that the C preprocessor doesn't resolve
-arithmetic expressions, so if we stringify them into inline asm, the
-whole expressions just get dumped out to the assembler without getting
-evaluated first.  Which means that we need the expressions in a form
-which the assembler can evaluate too.
-
-I see you understood that -- but as you say, it's non-obvious.
- 
-(This can be avoided by using an "i" constraint to pass those numbers
-to the inline asm.  I had a local series which did things that way, but
-it makes the macros very awkward to use, since you need some macros
-to show where in the inline asm to insert the instructions, and different
-macros to pass the correct constraints.)
-
 > Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+> Maybe this would be a good idea to document in one of the patch logs why 
+> you didn't go with the assembler macro route like it is done in 
+> unified.h for the various it instructions.
 
-Thanks
+Yes, that's a good idea.  I'll add a brief note somewhere -- probably on
+the previous patch.
+
+Cheers
 ---Dave
 
 > 
-> 
-> 
 > > ---
-> >  arch/arm/include/asm/opcodes.h |   97 +++++++++++++++++++++++++++++++++------
-> >  1 files changed, 82 insertions(+), 15 deletions(-)
+> >  arch/arm/include/asm/opcodes-virt.h |   29 +++++++++++++++++++++++++++++
+> >  arch/arm/include/asm/opcodes.h      |    2 ++
+> >  2 files changed, 31 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/include/asm/opcodes-virt.h
 > > 
+> > diff --git a/arch/arm/include/asm/opcodes-virt.h b/arch/arm/include/asm/opcodes-virt.h
+> > new file mode 100644
+> > index 0000000..b85665a
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/opcodes-virt.h
+> > @@ -0,0 +1,29 @@
+> > +/*
+> > + * opcodes-virt.h: Opcode definitions for the ARM virtualization extensions
+> > + * Copyright (C) 2012  Linaro Limited
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License along
+> > + * with this program; if not, write to the Free Software Foundation, Inc.,
+> > + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> > + */
+> > +#ifndef __ASM_ARM_OPCODES_VIRT_H
+> > +#define __ASM_ARM_OPCODES_VIRT_H
+> > +
+> > +#include <asm/opcodes.h>
+> > +
+> > +#define __HVC(imm16) __inst_arm_thumb32(				\
+> > +	0xE1400070 | (((imm16) & 0xFFF0) << 4) | ((imm16) & 0x000F),	\
+> > +	0xF7E08000 | (((imm16) & 0xF000) << 4) | ((imm16) & 0x0FFF)	\
+> > +)
+> > +
+> > +#endif /* ! __ASM_ARM_OPCODES_VIRT_H */
 > > diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-> > index cf877c8..32730a8 100644
+> > index 50ef0be..89ff5b9 100644
 > > --- a/arch/arm/include/asm/opcodes.h
 > > +++ b/arch/arm/include/asm/opcodes.h
-> > @@ -19,6 +19,33 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
-> >  
-> >  
-> >  /*
-> > + * Assembler opcode byteswap helpers.
-> > + * These are only intended for use by this header: don't use them directly,
-> > + * because they will be suboptimal in most cases.
-> > + */
-> > +#define ___asm_opcode_swab32(x) (	\
-> > +	  (((x) << 24) & 0xFF000000)	\
-> > +	| (((x) <<  8) & 0x00FF0000)	\
-> > +	| (((x) >>  8) & 0x0000FF00)	\
-> > +	| (((x) >> 24) & 0x000000FF)	\
-> > +)
-> > +#define ___asm_opcode_swab16(x) (	\
-> > +	  (((x) << 8) & 0xFF00)		\
-> > +	| (((x) >> 8) & 0x00FF)		\
-> > +)
-> > +#define ___asm_opcode_swahb32(x) (	\
-> > +	  (((x) << 8) & 0xFF00FF00)	\
-> > +	| (((x) >> 8) & 0x00FF00FF)	\
-> > +)
-> > +#define ___asm_opcode_swahw32(x) (	\
-> > +	  (((x) << 16) & 0xFFFF0000)	\
-> > +	| (((x) >> 16) & 0x0000FFFF)	\
-> > +)
-> > +#define ___asm_opcode_identity32(x) ((x) & 0xFFFFFFFF)
-> > +#define ___asm_opcode_identity16(x) ((x) & 0xFFFF)
-> > +
-> > +
-> > +/*
-> >   * Opcode byteswap helpers
-> >   *
-> >   * These macros help with converting instructions between a canonical integer
-> > @@ -41,30 +68,58 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
-> >   * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
-> >   * represent any valid Thumb-2 instruction.  For this range,
-> >   * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
+> > @@ -193,6 +193,8 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+> >   * specify the ARM and Thumb alternatives at the same time.  This ensures
+> >   * that the correct opcode gets emitted depending on the instruction set
+> >   * used for the kernel build.
 > > + *
-> > + * The ___asm variants are intended only for use by this header, in situations
-> > + * involving inline assembler.  For .S files, the normal __opcode_*() macros
-> > + * should do the right thing.
+> > + * Look at opcodes-virt.h for an example of how to use these macros.
 > >   */
-> > +#ifdef __ASSEMBLY__
+> >  #include <linux/stringify.h>
 > >  
-> > -#ifndef __ASSEMBLY__
-> > +#define ___opcode_swab32(x) ___asm_opcode_swab32(x)
-> > +#define ___opcode_swab16(x) ___asm_opcode_swab16(x)
-> > +#define ___opcode_swahb32(x) ___asm_opcode_swahb32(x)
-> > +#define ___opcode_swahw32(x) ___asm_opcode_swahw32(x)
-> > +#define ___opcode_identity32(x) ___asm_opcode_identity32(x)
-> > +#define ___opcode_identity16(x) ___asm_opcode_identity16(x)
-> > +
-> > +#else /* ! __ASSEMBLY__ */
-> >  
-> >  #include <linux/types.h>
-> >  #include <linux/swab.h>
-> >  
-> > +#define ___opcode_swab32(x) swab32(x)
-> > +#define ___opcode_swab16(x) swab16(x)
-> > +#define ___opcode_swahb32(x) swahb32(x)
-> > +#define ___opcode_swahw32(x) swahw32(x)
-> > +#define ___opcode_identity32(x) ((u32)(x))
-> > +#define ___opcode_identity16(x) ((u16)(x))
-> > +
-> > +#endif /* ! __ASSEMBLY__ */
-> > +
-> > +
-> >  #ifdef CONFIG_CPU_ENDIAN_BE8
-> >  
-> > -#define __opcode_to_mem_arm(x) swab32(x)
-> > -#define __opcode_to_mem_thumb16(x) swab16(x)
-> > -#define __opcode_to_mem_thumb32(x) swahb32(x)
-> > +#define __opcode_to_mem_arm(x) ___opcode_swab32(x)
-> > +#define __opcode_to_mem_thumb16(x) ___opcode_swab16(x)
-> > +#define __opcode_to_mem_thumb32(x) ___opcode_swahb32(x)
-> > +#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_swab32(x)
-> > +#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_swab16(x)
-> > +#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahb32(x)
-> >  
-> >  #else /* ! CONFIG_CPU_ENDIAN_BE8 */
-> >  
-> > -#define __opcode_to_mem_arm(x) ((u32)(x))
-> > -#define __opcode_to_mem_thumb16(x) ((u16)(x))
-> > +#define __opcode_to_mem_arm(x) ___opcode_identity32(x)
-> > +#define __opcode_to_mem_thumb16(x) ___opcode_identity16(x)
-> > +#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_identity32(x)
-> > +#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_identity16(x)
-> >  #ifndef CONFIG_CPU_ENDIAN_BE32
-> >  /*
-> >   * On BE32 systems, using 32-bit accesses to store Thumb instructions will not
-> >   * work in all cases, due to alignment constraints.  For now, a correct
-> >   * version is not proivided for BE32.
-> >   */
-> > -#define __opcode_to_mem_thumb32(x) swahw32(x)
-> > +#define __opcode_to_mem_thumb32(x) ___opcode_swahw32(x)
-> > +#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahw32(x)
-> >  #endif
-> >  
-> >  #endif /* ! CONFIG_CPU_ENDIAN_BE8 */
-> > @@ -78,15 +133,27 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
-> >  /* Operations specific to Thumb opcodes */
-> >  
-> >  /* Instruction size checks: */
-> > -#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
-> > -#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-> > +#define __opcode_is_thumb32(x) (		\
-> > +	   ((x) & 0xF8000000) == 0xE8000000	\
-> > +	|| ((x) & 0xF0000000) == 0xF0000000	\
-> > +)
-> > +#define __opcode_is_thumb16(x) (					\
-> > +	   ((x) & 0xFFFF0000) == 0					\
-> > +	&& !(((x) & 0xF800) == 0xE800 || ((x) & 0xF000) == 0xF000)	\
-> > +)
-> >  
-> >  /* Operations to construct or split 32-bit Thumb instructions: */
-> > -#define __opcode_thumb32_first(x) ((u16)((x) >> 16))
-> > -#define __opcode_thumb32_second(x) ((u16)(x))
-> > -#define __opcode_thumb32_compose(first, second) \
-> > -	(((u32)(u16)(first) << 16) | (u32)(u16)(second))
-> > -
-> > -#endif /* __ASSEMBLY__ */
-> > +#define __opcode_thumb32_first(x) (___opcode_identity16((x) >> 16))
-> > +#define __opcode_thumb32_second(x) (___opcode_identity16(x))
-> > +#define __opcode_thumb32_compose(first, second) (			\
-> > +	  (___opcode_identity32(___opcode_identity16(first)) << 16)	\
-> > +	| ___opcode_identity32(___opcode_identity16(second))		\
-> > +)
-> > +#define ___asm_opcode_thumb32_first(x) (___asm_opcode_identity16((x) >> 16))
-> > +#define ___asm_opcode_thumb32_second(x) (___asm_opcode_identity16(x))
-> > +#define ___asm_opcode_thumb32_compose(first, second) (			    \
-> > +	  (___asm_opcode_identity32(___asm_opcode_identity16(first)) << 16) \
-> > +	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
-> > +)
-> >  
-> >  #endif /* __ASM_ARM_OPCODES_H */
 > > -- 
 > > 1.7.4.1
 > > 
