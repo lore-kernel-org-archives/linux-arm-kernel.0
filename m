@@ -1,38 +1,29 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 16 Mar 2012 16:19:31 +0100
-Subject: [PATCH 02/10] ARM: OMAP2+: SmartReflex: move the platform
- specific macros in plat-omap
-In-Reply-To: <20120315171359.GA7276@atomide.com>
-References: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
- <1331829845-9526-3-git-send-email-j-pihet@ti.com>
- <20120315171359.GA7276@atomide.com>
-Message-ID: <CAORVsuUp9VBX1XbkQkcq91XsbRSut1RC6KCNPFHrX+RfWv7hQA@mail.gmail.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Fri, 16 Mar 2012 15:24:35 +0000 (GMT)
+Subject: [PATCH] pxa/hx4700: Add standard UART to hx4700_pin_config[]
+Message-ID: <1331911475.54244.YahooMailClassic@web29012.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Add the two standard UART signals (GPIO46_STUART_RXD, GPIO47_STUART_TXD) to the
+initial mfp config table hx4700_pin_config[] passed to pxa2xx_mfp_config().
+Although pxa2xx_transceiver_mode() can subsequently set these two signals via
+its own call to pxa2xx_mfp_config(), pxa2xx_transceiver_mode() is only present
+when CONFIG_PXA_FICP=y. Hence this patch provides a default mfp config.
 
-On Thu, Mar 15, 2012 at 6:14 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [120315 09:47]:
->> From: Jean Pihet <j-pihet@ti.com>
->>
->> Move the platform specific macros from the smartreflex header file
->> (arch/arm/mach-omap2/smartreflex.h) in a new header file in plat-omap
->> (arch/arm/plat-omap/include/plat/smartreflex.h).
->>
->> This change makes the SmartReflex implementation ready for the move
->> to drivers/.
->
-> Glad to see this happening!
->
-> This would be better located in linux/power/smartreflex.h rather than
-> plat/smartreflex.h.
-Ok. Is the file name still Ok in that case? Should it mention OMAP?
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+---
 
-Thanks,
-Jean
-
->
-> Regards,
->
-> Tony
+--- a/arch/arm/mach-pxa/hx4700.c	2012-03-16 15:18:29.636709575 +0000
++++ b/arch/arm/mach-pxa/hx4700.c	2012-03-16 15:19:35.401070040 +0000
+@@ -101,6 +101,10 @@ static unsigned long hx4700_pin_config[]
+ 	GPIO44_BTUART_CTS,
+ 	GPIO45_BTUART_RTS_LPM_LOW,
+ 
++	/* STUART (IRDA) */
++	GPIO46_STUART_RXD,
++	GPIO47_STUART_TXD,
++
+ 	/* PWM 1 (Backlight) */
+ 	GPIO17_PWM1_OUT,
+ 
