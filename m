@@ -1,46 +1,34 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 16 Mar 2012 11:19:09 -0500
-Subject: [PATCH] OMAP2+: OPP: allow OPP enumeration to continue if device is
- not present
-Message-ID: <1331914749-23171-1-git-send-email-nm@ti.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 16 Mar 2012 09:36:19 -0700
+Subject: [PATCH 1/2] input: keypad: move platform_data to
+ <linux/platform_data>
+In-Reply-To: <1331907989-11891-2-git-send-email-sourav.poddar@ti.com>
+References: <1331907989-11891-1-git-send-email-sourav.poddar@ti.com>
+ <1331907989-11891-2-git-send-email-sourav.poddar@ti.com>
+Message-ID: <1357514.ox9yZWgqO9@dtor-d630.eng.vmware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms such as OMAP3, certain variants may not have IVA, SGX
-or some specific component. We currently have a check to aid fixing
-wrong population of OPP entries for issues such as typos. This however
-causes a conflict with valid requirement where the SoC variant does
-not actually have the module present.
+On Friday, March 16, 2012 07:56:28 PM Sourav Poddar wrote:
+> From: Felipe Balbi <balbi@ti.com>
+> 
+> This patch allows us to drop the OMAP depencendy
+> from the OMAP4 keypad driver.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-4430sdp.c            |    1 +
+>  arch/arm/mach-omap2/devices.c                  |    1 +
+>  arch/arm/plat-omap/include/plat/omap4-keypad.h |    9 ---------
+>  drivers/input/keyboard/Kconfig                 |    1 -
+>  drivers/input/keyboard/omap4-keypad.c          |    2 +-
+>  include/linux/platform_data/omap4-keypad.h     |   13 +++++++++++++
 
-So, reduce the severity of the print to a debug statement and skip
-registering that specific OPP, but continue down the list.
+Instead of creating platform_data directory why not move to
+include/linux/input/omap4-keypad.h?
 
-Reported-by: Steve Sakoman <steve@sakoman.com>
-Reported-by: Maximilian Schwerin <mvs@tigris.de>
-Acked-by: Steve Sakoman <steve@sakoman.com>
-Tested-by: Maximilian Schwerin <mvs@tigris.de>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Discussion: http://marc.info/?t=133174689300002&r=1&w=2
- arch/arm/mach-omap2/opp.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
-index 9262a6b..de6d464 100644
---- a/arch/arm/mach-omap2/opp.c
-+++ b/arch/arm/mach-omap2/opp.c
-@@ -64,10 +64,10 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
- 		}
- 		oh = omap_hwmod_lookup(opp_def->hwmod_name);
- 		if (!oh || !oh->od) {
--			pr_warn("%s: no hwmod or odev for %s, [%d] "
-+			pr_debug("%s: no hwmod or odev for %s, [%d] "
- 				"cannot add OPPs.\n", __func__,
- 				opp_def->hwmod_name, i);
--			return -EINVAL;
-+			continue;
- 		}
- 		dev = &oh->od->pdev->dev;
- 
 -- 
-1.7.0.4
+Dmitry
