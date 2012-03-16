@@ -1,28 +1,35 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 16 Mar 2012 14:43:34 -0700
-Subject: [PATCH v4] misc: ddr: add LPDDR2 data from JESD209-2
-In-Reply-To: <1331931007-584-1-git-send-email-aneesh@ti.com>
-References: <1331929177-11694-1-git-send-email-aneesh@ti.com>
- <1331931007-584-1-git-send-email-aneesh@ti.com>
-Message-ID: <20120316214334.GA24925@kroah.com>
+From: tpiepho@gmail.com (Trent Piepho)
+Date: Fri, 16 Mar 2012 17:45:09 -0400
+Subject: [alsa-devel] [PATCH v5 8/8] ASoC: fsl: add imx-sgtl5000 machine
+ driver
+In-Reply-To: <4F63B128.7040705@freescale.com>
+References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
+ <1331888204-27058-9-git-send-email-shawn.guo@linaro.org>
+ <CA+7tXihmfBQCgvuY0rx5v4w-bcwYK+7kP9v29w36N-Rc9KSQ+A@mail.gmail.com>
+ <20120316111814.GA7860@S2101-09.ap.freescale.net>
+ <20120316192110.GH3158@opensource.wolfsonmicro.com>
+ <CA+7tXih-omxaDq6dSKBeOaZ7YRWDVSQnMY=eJZ0-YumOBG=oCA@mail.gmail.com>
+ <4F63B128.7040705@freescale.com>
+Message-ID: <CA+7tXijxUpnoBfrjOEyBeLPF9T9qhBiy6B+8LPVnyNc99mYVQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 17, 2012 at 02:20:07AM +0530, Aneesh V wrote:
-> add LPDDR2 data from the JEDEC spec JESD209-2. The data
-> includes:
-> 
-> 1. Addressing information for LPDDR2 memories of different
->    densities and types(S2/S4)
-> 2. AC timing data.
-> 
-> This data will useful for memory controller device drivers.
-> Right now this is used by the TI EMIF SDRAM controller
-> driver.
-> 
-> Cc: Greg KH <greg@kroah.com>
-> Signed-off-by: Aneesh V <aneesh@ti.com>
+On Fri, Mar 16, 2012 at 5:31 PM, Timur Tabi <timur@freescale.com> wrote:
+> Trent Piepho wrote:
+>> The ESAI and SSI hardware are totally different. ?SSI gives you a
+>> playback and a record stream in an I2S, or I2S like, interface. ?A
+>> stream is mono or stereo. ESAI has IIRC up to six output and four
+>> inputs streams. ?Each stream is in parallel on the same clock, and can
+>> have one or more channels.
+>
+> Are these channels on the same wire in a time-division multiplexing, or on
+> six different wires? ?If it's a TDM, then the SSI can actually do this
+> using "network mode", but I don't enable that in the driver, since it's
+> not really I2S compliant.
 
-What happened to the other patches that depended on this one?
-
-greg k-h
+Six different wires.  Each wire can have multiple channels, or
+"slots", to do mono, stereo, 5.1, etc.  Each wire needs the same
+number of slots, since there is only one frame sync.  And only one bit
+clock too.  RX and TX can be synchronous or async.  I know it has
+network mode too, but our hardware is I2S so I never bothered to look
+into exactly what network mode is.
