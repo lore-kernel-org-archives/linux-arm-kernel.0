@@ -1,47 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 Mar 2012 13:30:22 -0700
-Subject: [GIT PULL] Samsung SoC EXYNOS5250 arch for v3.4
-In-Reply-To: <201203161250.11353.arnd@arndb.de>
-References: <4F61FA0D.1050007@samsung.com> <201203161250.11353.arnd@arndb.de>
-Message-ID: <4F63A2DE.7070705@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Mar 2012 20:31:55 +0000
+Subject: [PATCH v5] ARM: SPEAr600: Add device-tree support to SPEAr600
+ boards
+In-Reply-To: <20120316131129.GH7757@game.jcrosoft.org>
+References: <1331903003-14045-1-git-send-email-sr@denx.de>
+ <20120316131129.GH7757@game.jcrosoft.org>
+Message-ID: <201203162031.56051.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On Friday 16 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > 
+> > Signed-off-by: Stefan Roese <sr@denx.de>
+> > Acked-by: Viresh Kumar <viresh.kumar@st.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> 
+> 
+> I'm not a fan to have non Documented DT binding butthey are basic so ok
+> 
 
-[...]
+I've applied the patch to the next/dt2 branch now, which means it
+will get sent later than the first batch of dt conversions and
+we have some time to let this get tested in linux-next, but the
+plan is still to have it in v3.4.
 
->
-> As you may have noticed from Stephen's notification about the merge
-> conflict, I have put this into the next/soc2 branch now.
->
-Yes, thanks.
+With this, it seems that SPEAr600 will be the surprise winner in the
+race to have the first platform that removes all of its board files
+and replaces them with DT probing ;-)
 
-> I'm not too happy with the resolution of my comments, but in the
+Thanks everyone!
 
-Hmm, sorry about that.
-
-> end I think it's better to have it in the tree than not have it.
-> While you did reply with explanations for why some of the patches
-> were necessary, you did not actually put the explanations into
-> the changeset descriptions but only sent a reply to my emails.
-
-Oh, I see. If similar case will happen next time, let me expand its 
-descritpions.
-
->
-> I don't think that the merge conflict is problematic, especially
-> since Linus won't see the same thing that Stephen did, but as I
-> wrote in the other mail, please check that my resolution was correct.
->
-Yes, as I replied, I think your resolution and Stehpehn's one, both are 
-correct to me and just different postion of 'int ret'. As a note, I just 
-fixed it up with yours.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+	Arnd
