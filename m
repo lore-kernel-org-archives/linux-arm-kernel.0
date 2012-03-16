@@ -1,47 +1,81 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Mar 2012 04:21:22 +0000
-Subject: [PATCH 2/9] ARM: Kirkwood: Remove tclk from
- kirkwood_asoc_platform_data.
+Date: Fri, 16 Mar 2012 04:21:27 +0000
+Subject: [PATCH 7/9] ARM: kirkwood: fdt: define uart[01] as disabled,
+ enable uart0
 In-Reply-To: <cover.1331868507.git.jason@lakedaemon.net>
 References: <cover.1331868507.git.jason@lakedaemon.net>
-Message-ID: <720cc8b963308aed15d80bd9ccd479bb0d91185f.1331868507.git.jason@lakedaemon.net>
+Message-ID: <df6c6160b649e0f4bbf032be5428691378eda244.1331868507.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
+Define both uarts in kirkwood.dtsi as they are common to all kirkwood
+SoCs.  Each board may enable all or none of them, so they are disabled
+by default.  uart0 is enabled for the dreamplug.
 
-It is not used anywhere in the sound driver.
+tclk can vary for each board, so we leave it undefined in the kirkwood
+dtsi.  Each board can then set it as appropriate when enabling the uart.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/mach-kirkwood/common.c          |    1 -
- arch/arm/plat-orion/include/plat/audio.h |    1 -
- 2 files changed, 0 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   11 +++++------
+ arch/arm/boot/dts/kirkwood.dtsi          |   26 +++++++++++++++++++++++++-
+ 2 files changed, 30 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 77d4852..79a9fe7 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -450,7 +450,6 @@ void __init kirkwood_init(void)
- {
- 	printk(KERN_INFO "Kirkwood: %s, TCLK=%d.\n",
- 		kirkwood_id(), kirkwood_tclk);
--	kirkwood_i2s_data.tclk = kirkwood_tclk;
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 333f11b..a5376b8 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -15,11 +15,10 @@
+ 		bootargs = "console=ttyS0,115200n8 earlyprintk";
+ 	};
  
- 	/*
- 	 * Disable propagation of mbus errors to the CPU local bus,
-diff --git a/arch/arm/plat-orion/include/plat/audio.h b/arch/arm/plat-orion/include/plat/audio.h
-index 885f8ab..d6a55bd 100644
---- a/arch/arm/plat-orion/include/plat/audio.h
-+++ b/arch/arm/plat-orion/include/plat/audio.h
-@@ -2,7 +2,6 @@
- #define __PLAT_AUDIO_H
- 
- struct kirkwood_asoc_platform_data {
--	u32 tclk;
- 	int burst;
+-	serial at f1012000 {
+-		compatible = "ns16550a";
+-		reg = <0xf1012000 0x100>;
+-		reg-shift = <2>;
+-		interrupts = <33>;
+-		clock-frequency = <200000000>;
++	ocp at f1000000 {
++		serial at 12000 {
++			clock-frequency = <200000000>;
++			status = "ok";
++		};
+ 	};
  };
- #endif
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 702b955..825310b 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -2,5 +2,29 @@
+ 
+ / {
+ 	compatible = "mrvl,kirkwood";
+-};
+ 
++	ocp at f1000000 {
++		compatible = "simple-bus";
++		ranges = <0 0xf1000000 0x1000000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		serial at 12000 {
++			compatible = "ns16550a";
++			reg = <0x12000 0x100>;
++			reg-shift = <2>;
++			interrupts = <33>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
++
++		serial at 12100 {
++			compatible = "ns16550a";
++			reg = <0x12100 0x100>;
++			reg-shift = <2>;
++			interrupts = <34>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
++	};
++};
 -- 
 1.7.3.4
