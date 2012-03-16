@@ -1,38 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 20:41:12 +0000
-Subject: [PATCH 0/9 v5] ARM: kirkwood: fdt: convert kirkwood to fdt
-In-Reply-To: <20120316202815.GI20243@titan.lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <201203162018.27957.arnd@arndb.de>
- <20120316202815.GI20243@titan.lakedaemon.net>
-Message-ID: <201203162041.12831.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 16 Mar 2012 13:47:50 -0700
+Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
+ definitions
+In-Reply-To: <4F630841.2070307@linaro.org>
+References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
+ <20120315111227.GA2384@amd.com> <4F61FF1D.5000502@samsung.com>
+ <4F630841.2070307@linaro.org>
+Message-ID: <4F63A6F6.9050506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012, Jason Cooper wrote:
-> I was going to give it a day or two more, and if no one brought up
-> anything earth-shattering, I was going to submit the pull-request for
-> this series on Sunday.  I can do it now if you think it's ok.
+Subash Patel wrote:
+> Hi KyongHo, Kukjin,
+>
+> On 03/15/2012 08:09 PM, Kukjin Kim wrote:
+>> On 03/15/12 04:12, Joerg Roedel wrote:
+>>> On Thu, Mar 15, 2012 at 05:32:39PM +0900, Cho KyongHo wrote:
+>>
+>> KyongHo, I looked at 'Cho KyongHo <pullip.cho ...>' and 'KyongHo Cho
+>> <pullip.cho ...>' in this series, which one do you want to use?
+>>
+>>>> Handling System MMUs with an identifier is not flexible to manage
+>>>> System MMU platform devices because of the following reasons:
+>>>> 1. A device driver which needs to handle System MMU must know the ID.
+>>>> 2. A System MMU may not present in some implementations of Exynos
+>>>> family.
+>>>> 3. Handling System MMU with IOMMU API does not require an ID.
+>>>>
+>>>> This patch is the result of removing ID of System MMUs.
+>>>> Instead, a device driver that needs to handle its System MMU must
+>>>> use IOMMU API while its descriptor of platform device is given.
+>>>>
+>>>> This patch also includes the following enhancements:
+>>>> - A System MMU device becomes a child if its power domain device.
+>>>> - clkdev
+>>>>
+>>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>>>> Signed-off-by: KyongHo Cho<pullip.cho@samsung.com>
+>>>> ---
+>>>> arch/arm/mach-exynos/Kconfig | 10 +-
+>>>> arch/arm/mach-exynos/Makefile | 2 +-
+>>>> arch/arm/mach-exynos/clock-exynos4.c | 79 ++--
+>>>> arch/arm/mach-exynos/clock-exynos4.h | 2 +
+>>>> arch/arm/mach-exynos/clock-exynos4210.c | 11 +
+>>>> arch/arm/mach-exynos/clock-exynos4212.c | 28 ++-
+>>>> arch/arm/mach-exynos/clock-exynos5.c | 90 +++++
+>>>> arch/arm/mach-exynos/dev-sysmmu.c | 457 ++++++++++++----------
+>>>> arch/arm/mach-exynos/include/mach/irqs.h | 25 +-
+>>>> arch/arm/mach-exynos/include/mach/map.h | 38 ++
+>>>> arch/arm/mach-exynos/include/mach/regs-clock.h | 5 +
+>>>> arch/arm/mach-exynos/include/mach/regs-sysmmu.h | 28 --
+>>>> arch/arm/mach-exynos/include/mach/sysmmu.h | 88 +++--
+>>>> arch/arm/mach-exynos/mach-armlex4210.c | 1 -
+>>>> arch/arm/mach-exynos/mach-smdkv310.c | 1 -
+>>>> 15 files changed, 529 insertions(+), 336 deletions(-)
+>>>> delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
+>>>
+>>> This patch doesn't apply cleanly against upstream Linux (v3.3-rcX).
+>>> Please rebase to upstream and resend. The other 2 patches apply fine.
+>>>
+>>
+>> Yes, as KyoungHo said, this has been created on top of Samsung tree
+>> for-next because this touches many exynos stuff which has been changed
+>> from Samsung tree for upcoming merge window. So if you're ok on this,
+>> 1st patch and this should be sent to upstream via samsung tree even
+>> though I can't find any topic branch for this yet. And if you want
+>> topic branch for your tree, let me know, I can provide it.
+>>
+>> Thanks.
+> Wouldn't it be good to send exynos4 SYSMMU patches now, and send only
+> the exynos5 delta when your for-next(exynos5) changes
 
-I've already pulled it now, and I'm not going to take any new patches
-for v3.4 any more. I expect Linus to open up the merge window
-any time now, and he does not like to see patches sent to him
-that have not been in linux-next before the merge window opened.
+Hmm, it can be a solution for this, but I'm not sure exynos4 and exynos5 
+can be splitted.
 
-So the deal is that anything that is in now stays in unless someone
-reports a serious problem and in that case it gets removed.
-Any simple bugs can be fixed by sending follow-up patches of
-course.
+> get merged to mainline? Manually editing the patches is really pain-some
 
-> > I'm willing to take it and have put it into next/dt2 for now so it
-> > makes it into linux-next. I'm not taking a newer version for v3.4 any
-> > more, so if anyone has concerns over some of your patches in the
-> > series, it all gets removed again and we will have to postpone them
-> > until v3.5.
-> 
-> The problematic patch (sata_mv) has been removed.  So, there should be
-> no issue.
+YES, absolutely. Nobody like it.
 
-Ok, thanks for the confirmation.
+> and sometimes error-some :( Can this patch in particular
+> be split?
 
-	Arnd
+Hmm...
+
+Now we don't have much time for upcoming merge window, and this should 
+be in linux-next before open merge window.
+
+Anyway Joerg, how do you want to handle this? Do you want to pick up 
+1/2/3 all of them in your tree? If so, 2nd patch should be on top of 
+some samsung topic stuff.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
