@@ -1,45 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Mar 2012 10:01:34 +0100
-Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
-In-Reply-To: <201203152058.31398.arnd@arndb.de>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <201203151532.44363.arnd@arndb.de>
- <CAFEEs1=TJaCYmaWd7zd28NsV8ubZBpBn7p=Mi7vGtmV_vpfh1w@mail.gmail.com>
- <201203152058.31398.arnd@arndb.de>
-Message-ID: <CACRpkdbyVXA+GxRtVL+JGPorp0ULJmeUEUZPxVxOT8W1-WmeMw@mail.gmail.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Fri, 16 Mar 2012 11:15:46 +0200
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <002d01cd034b$c56f2b00$504d8100$%han@samsung.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com>
+ <4F60E5C8.3040804@gmail.com>
+ <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+ <CAEYLNCp5e=86rpRi2C-5OJptTyEeXAn8JHhbWw_BqGzSaDD9wQ@mail.gmail.com>
+ <002a01cd0283$1f61b200$5e251600$%han@samsung.com>
+ <CAEYLNCrprPE60ZS=_OWuck0JCJMhCxzVErZwuwGpEDYkQq-hXg@mail.gmail.com>
+ <001d01cd0315$935cc720$ba165560$%han@samsung.com>
+ <CAEYLNCrGCmb5EJjURLY=EGfM=4N54MirNkCCyQRxqKEN3Eka8Q@mail.gmail.com>
+ <002d01cd034b$c56f2b00$504d8100$%han@samsung.com>
+Message-ID: <CAEYLNCpfQ0cYb4efw6PZNnKjQ2rF25rj5Ed=i884LJXHAwigBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 9:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> [Per]
->> The stedma40 filter function is not really specific for ux500. ux500
->> use stedma40 but it should be possible to replace this DMA.IP with
->> some other DMA-controller. This is board specific configuration. You
->> should not need to change the mmci-driver just because the dma-driver
->> has changed, right?
->> Or will the board-configuration now be placed in mmci-ux500?
+On Fri, Mar 16, 2012 at 10:07 AM, Jingoo Han <jg1.han@samsung.com> wrote:
 >
-> Right, the DMA configuration does not really belong in there, but
-> the voltage setup might (unless we convert that to the regulator
-> setup).
+>
+>> -----Original Message-----
+>> From: Darius Augulis [mailto:augulis.darius at gmail.com]
+>> Sent: Friday, March 16, 2012 4:47 PM
+>> To: Jingoo Han
+>> Cc: Thomas Abraham; linux-fbdev at vger.kernel.org; FlorianSchandinat at gmx.de; linux-arm-
+>> kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; ben-linux at fluff.org; patches at linaro.org;
+>> kgene.kim at samsung.com; Kyungmin Park; JeongHyeon Kim; Heiko Stuebner; Kwangwoo Lee; Mark Brown; Peter
+>> Korsgaard; Maurus Cuelenaere; Tushar Behera
+>> Subject: Re: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+>>
+>> On Fri, Mar 16, 2012 at 3:39 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+>>
+>> it's not a bug, because it's working like it was intended to. it was
+>> reviewed and accepted by maintainers before merging to main line.
+>> you do not have rights to drop it because you don't like it.
+>> You are doing changes - please do it correctly and do not break
+>> existing functionality.
+>> btw, you still not answered my question: why these two s3c_fb_pd_win
+>> structures in mach-mini6410.c is a problem? They are declared on the
+>> stack, but platform data uses only single one. mini6410 rewrites its
+>> s3c-fb platform data with data from one of these two structures
+>> dynamically. Why it's a bug? You want to remove this dynamic selection
+>> which could be leaved there with reworked framework too.
+>
+>
+> It's just bug.
+>
+> struct s3c_fb_pd_win should be used for windows of FIMD IP.
+> It should not be used for selecting multi-LCDs.
 
-The voltage to power the card is already using the regulator
-framework with the MMC-specific helpers in the MMCI driver.
+why not? s3c_fb_pd_win contains timing values which depend directly on
+LCD size and resolution.
+Please look into the code again - mini6410 doesn't use platform data
+so select different LCD sizes.
+It has only single window in platform data - exactly what you want.
+Now tell my, why you are arguing, that this platform data cannot be
+rewritten dynamically by board setup routines at kernel startup time?
+Many ARM architectures are doing the same - takes kernel command line
+argument to select LCD and passes necessary data for its fb drivers
+via platform data structures. It not a bug, it's correct approach to
+support different sizes of LCD display for the same board.
+You are simply lazy to deal with little bit different code of mini6410
+and real6410 because they have support for multiple LCDs and other
+s3c-fb boards doesn't.
+This is a reason why you want to drop it and not because it's a bug.
+Hope other maintainers and code reviewers understand this situation correctly.
 
-But I guess you're after modelling the levelshifter as a regulator?
-
-Basically the level shifter is a separate device has two voltage
-inputs A and B (from other regulators) that is controlled by a
-simple GPIO to select voltage A or B to drive the signals to
-the card.
-
-That could probably be modelled as a regulator with two
-volategs for sure, but then we should maybe create a more
-generic "struct level_shifter_regulator" (or whatever) for the
-concept as a whole.
-
-Let's page Mark about what to do with levelshifters and whether
-they are regulators of sorts in his book.
-
-Yours,
-Linus Walleij
+>
+> struct s3c_fb_pd_win should include information of windows of FIMD IP, s3c_fb_pd_win[0], s3c_fb_pd_win[1] represents window 0,
+> window 1 of FIMD IP. However, your code includes information of LCD, it means that struct s3c_fb_pd_win represents 4.3" LCD, 7.0"
+> LCD. It is wrong usage.
+>
+>
+>>
+>> > 'struct s3c_fb_pd_win' is used not for LCD, but for windows of FIMD IP. So, 'struct s3c_fb_pd_win'
+>> should not be used to select LCD.
+>> > The mach-aquila.c uses two 'struct s3c_fb_pd_win' like you, however 'struct s3c_fb_pd_win' don't make
+>> problem with Thomas's
+>> > patchset. It is because mach-aquila.c use 'struct s3c_fb_pd_win' for only windows of FIMD IP.
+>> > We don't have to responsibility to keep wrong code. If you have kept the rule, Thomas's patch would
+>> not make the compatibility
+>> > problem with your code. Why we should keep aberration such as your code? If you want to select two
+>> LCDs, please find other way.
+>> >
+>> >
+>> >>
+>> >> Darius A.
+>> >
+>
