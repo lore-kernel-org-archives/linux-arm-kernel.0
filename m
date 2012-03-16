@@ -1,70 +1,43 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 16 Mar 2012 20:25:45 +0800
-Subject: [PATCH v7 3/3] clk: basic clock hardware types
-In-Reply-To: <1331878280-2758-4-git-send-email-mturquette@linaro.org>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <1331878280-2758-4-git-send-email-mturquette@linaro.org>
-Message-ID: <20120316122542.GA1774@richard-laptop>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 16 Mar 2012 13:33:22 +0100
+Subject: [PATCH v4] ARM: SPEAr600: Add device-tree support to SPEAr600
+ boards
+In-Reply-To: <201203161209.18292.arnd@arndb.de>
+References: <1331890216-8361-1-git-send-email-sr@denx.de>
+ <20120316115022.GF7757@game.jcrosoft.org> <201203161209.18292.arnd@arndb.de>
+Message-ID: <201203161333.22524.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-> +static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-> +		unsigned long *best_parent_rate)
-> +{
-> +	struct clk_divider *divider = to_clk_divider(hw);
-> +	int i, bestdiv = 0;
-> +	unsigned long parent_rate, best = 0, now, maxdiv;
-> +
-> +	if (!rate)
-> +		rate = 1;
-> +
-> +	maxdiv = (1 << divider->width);
-> +
-> +	if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> +		maxdiv--;
-> +
-> +	if (!best_parent_rate) {
-> +		parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
-> +		bestdiv = DIV_ROUND_UP(parent_rate, rate);
-> +		bestdiv = bestdiv == 0 ? 1 : bestdiv;
-> +		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
-> +		return bestdiv;
-> +	}
-> +
-> +	/*
-> +	 * The maximum divider we can use without overflowing
-> +	 * unsigned long in rate * i below
-> +	 */
-> +	maxdiv = min(ULONG_MAX / rate, maxdiv);
-> +
-> +	for (i = 1; i <= maxdiv; i++) {
-> +		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-> +				MULT_ROUND_UP(rate, i));
-> +		now = parent_rate / i;
-> +		if (now <= rate && now > best) {
-> +			bestdiv = i;
-> +			best = now;
-> +			*best_parent_rate = parent_rate;
-Better add		if (now == rate)
-				break;
-There may be more than one hit for (now == rate). We'd better select
-smallest div, thus smallest parent_rate.
+On Friday 16 March 2012 13:09:18 Arnd Bergmann wrote:
+> On Friday 16 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 10:30 Fri 16 Mar     , Stefan Roese wrote:
+> > > This patch adds a generic target for SPEAr600 board that can be
+> > > configured via the device-tree. Currently the following devices
+> > > are supported via the devicetree:
+> > > 
+> > > - VIC interrupts
+> > > - PL011 UART
+> > > - PL061 GPIO
+> > > - Synopsys DW I2C
+> > > - Synopsys DW ethernet
+> > > 
+> > > Other peripheral devices (e.g. SMI flash, FSMC NAND flash etc) will
+> > > follow in later patches.
+> > 
+> > so drop USB, nand & co from the dtsi
+> > 
+> > this will be add later when the binding will documentated and Acked
+> 
+> I actually like to see the devices in there, and it already helped
+> figure out that there are two buses instead of just one. Maybe we
+> can agree on putting them in the file but commenting them out using
+> /* */ with an added notice that they will get enabled once we have
+> bindings?
 
-It's the same comment for v6, but not show stopper.
+It would be great to have a decision on this. I'm leaving for a short vacation 
+in a few hours and would like to have the new (hopefully final) patch out 
+before that.
 
-Thanks
-Richard
-> +		}
-> +	}
-> +
-> +	if (!bestdiv) {
-> +		bestdiv = (1 << divider->width);
-> +		if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> +			bestdiv--;
-> +		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
-> +	}
-> +
-> +	return bestdiv;
-> +}
- 
+Thanks for all your comments,
+Stefan
