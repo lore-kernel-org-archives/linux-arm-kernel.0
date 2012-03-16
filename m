@@ -1,52 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 12:36:35 +0000
-Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
-In-Reply-To: <CACRpkdbyVXA+GxRtVL+JGPorp0ULJmeUEUZPxVxOT8W1-WmeMw@mail.gmail.com>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <201203152058.31398.arnd@arndb.de>
- <CACRpkdbyVXA+GxRtVL+JGPorp0ULJmeUEUZPxVxOT8W1-WmeMw@mail.gmail.com>
-Message-ID: <201203161236.36088.arnd@arndb.de>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Fri, 16 Mar 2012 16:42:16 +0400
+Subject: [PATCH 2/2] arm: omap3: pm34xx.c: Replace printk() with
+ appropriate pr_*()
+In-Reply-To: <1331852833-4357-3-git-send-email-mgreer@animalcreek.com>
+References: <1331852833-4357-1-git-send-email-mgreer@animalcreek.com>
+ <1331852833-4357-3-git-send-email-mgreer@animalcreek.com>
+Message-ID: <4F633528.1040305@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012, Linus Walleij wrote:
-> On Thu, Mar 15, 2012 at 9:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > [Per]
-> >> The stedma40 filter function is not really specific for ux500. ux500
-> >> use stedma40 but it should be possible to replace this DMA.IP with
-> >> some other DMA-controller. This is board specific configuration. You
-> >> should not need to change the mmci-driver just because the dma-driver
-> >> has changed, right?
-> >> Or will the board-configuration now be placed in mmci-ux500?
-> >
-> > Right, the DMA configuration does not really belong in there, but
-> > the voltage setup might (unless we convert that to the regulator
-> > setup).
-> 
-> The voltage to power the card is already using the regulator
-> framework with the MMC-specific helpers in the MMCI driver.
-> 
-> But I guess you're after modelling the levelshifter as a regulator?
-> 
-> Basically the level shifter is a separate device has two voltage
-> inputs A and B (from other regulators) that is controlled by a
-> simple GPIO to select voltage A or B to drive the signals to
-> the card.
-> 
-> That could probably be modelled as a regulator with two
-> volategs for sure, but then we should maybe create a more
-> generic "struct level_shifter_regulator" (or whatever) for the
-> concept as a whole.
+Hello.
 
-Ok, thanks for the explanation.
+On 16-03-2012 3:07, Mark A. Greer wrote:
 
-> Let's page Mark about what to do with levelshifters and whether
-> they are regulators of sorts in his book.
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-It does sound appealing, especially because this one could be
-done completely generically by defining a regulator that has
-a bunch of other regulators as well as a set of gpio lines as
-inputs and one output that can be used in other devices. We
-would probably only use this one together with device tree then.
+> Currently, pm34xx.c has a mix of printk() and pr_*() statements
+> so replace the printk() statements with the equivalent pr_*()
+> statements.
 
-	Arnd
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> ---
+>   arch/arm/mach-omap2/pm34xx.c |   17 ++++++++---------
+>   1 file changed, 8 insertions(+), 9 deletions(-)
+
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index af8d741..495e509 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+[...]
+> @@ -463,7 +462,7 @@ restore:
+>   	list_for_each_entry(pwrst,&pwrst_list, node) {
+>   		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
+>   		if (state>  pwrst->next_state) {
+> -			printk(KERN_INFO "Powerdomain (%s) didn't enter "
+> +			pr_info("Powerdomain (%s) didn't enter "
+>   			       "target state %d\n",
+
+    Last line should have been realigned I think.
+
+>   			       pwrst->pwrdm->name, pwrst->next_state);
+>   			ret = -1;
+> @@ -471,9 +470,9 @@ restore:
+>   		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
+>   	}
+>   	if (ret)
+> -		printk(KERN_ERR "Could not enter target state in pm_suspend\n");
+> +		pr_err("Could not enter target state in pm_suspend\n");
+>   	else
+> -		printk(KERN_INFO "Successfully put all powerdomains "
+> +		pr_info("Successfully put all powerdomains "
+>   		       "to target state\n");
+
+    Last line should have been realigned I think.
+
+>
+>   	return ret;
+> @@ -865,7 +864,7 @@ static int __init omap3_pm_init(void)
+>   		omap3_secure_ram_storage =
+>   			kmalloc(0x803F, GFP_KERNEL);
+>   		if (!omap3_secure_ram_storage)
+> -			printk(KERN_ERR "Memory allocation failed when"
+> +			pr_err("Memory allocation failed when"
+
+    BTW, space after "when" is missing here.
+
+>   					"allocating for secure sram context\n");
+
+    Should have been realigned I think.
+
+WBR, Sergei
