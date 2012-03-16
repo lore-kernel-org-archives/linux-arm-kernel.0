@@ -1,67 +1,93 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 10:52:21 +0800
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <4F62A06C.5000304@freescale.com>
-References: <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
- <4F6008FA.3040805@freescale.com>
- <20120314122723.GC3133@opensource.wolfsonmicro.com>
- <4F612319.50302@freescale.com>
- <20120315142702.GL3138@opensource.wolfsonmicro.com>
- <4F621C60.5090700@freescale.com>
- <20120316020111.GE6065@S2101-09.ap.freescale.net>
- <4F62A06C.5000304@freescale.com>
-Message-ID: <20120316025219.GB7632@S2101-09.ap.freescale.net>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Fri, 16 Mar 2012 11:01:35 +0800
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
+In-Reply-To: <20321.53468.310199.875966@ipc1.ka-ro>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-2-git-send-email-b29396@freescale.com>
+ <20120313172351.97C5E3E053B@localhost>
+ <20120314124512.GG1180@shlinux2.ap.freescale.net>
+ <20120314141643.GP3852@pengutronix.de>
+ <20120315030206.GB13022@shlinux2.ap.freescale.net>
+ <20321.37353.63115.664975@ipc1.ka-ro>
+ <20120315105927.GE13022@shlinux2.ap.freescale.net>
+ <20321.53468.310199.875966@ipc1.ka-ro>
+Message-ID: <20120316030134.GA5161@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 02:07:42AM +0000, Tabi Timur-B04825 wrote:
-> Shawn Guo wrote:
+On Thu, Mar 15, 2012 at 07:22:04PM +0800, Lothar Wa?mann wrote:
+> Hi,
 > 
-> > This could probably change to check whether property codec-handle is
-> > present under SSI node to decide if it runs with "old binding" or
-> > "new binding".
+> Dong Aisheng writes:
+> > On Thu, Mar 15, 2012 at 02:53:29PM +0800, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Dong Aisheng writes:
+> > > > On Wed, Mar 14, 2012 at 10:16:43PM +0800, s.hauer at pengutronix.de wrote:
+> > > > > On Wed, Mar 14, 2012 at 08:45:23PM +0800, Dong Aisheng wrote:
+> > > > > > On Wed, Mar 14, 2012 at 01:23:51AM +0800, Grant Likely wrote:
+> > > [...]
+> > > > > > But it seems this needs pass mac address to fec driver via platforom data which is
+> > > > > > not friendly to dt.
+> > > > > > 
+> > > > > > Another way may be changing fec driver to get the fixed part of mac address(first
+> > > > > > two bytes) from device tree and read the left dynamical part from otp which i'm not
+> > > > > > sure is better enough.
+> > > > > > 
+> > > > > > BTW, filling with zeros seems not work since it's invalid mac address.
+> > > > > 
+> > > > > Yes, that's the idea of using this value...
+> > > > > 
+> > > > But comparing to use an invalid value, why not just do not define that
+> > > > local-mac-address property?
+> > > > 
+> > > Because a MAC address is by definition a GLOBALLY UNIQUE IDENTIFIER
+> > > which is contrary to coding a "valid" default value for it somewhere!
+> > > The owner of a certain MAC address range (OUI) is responsible for
+> > > ensuring the uniqueness. Thus only they may assign a specific MAC
+> > > address to a specific device.
+> > > 
+> > Yes, you're correct.
+> > So i propose to read the MAC address from MX28 OTP in fec driver instead of
+> > define it in device tree in my last mail.
+> > http://www.spinics.net/lists/arm-kernel/msg165040.html
+> > Do you have any comment on that way?
+> > 
+> That patch sets the OUI to the Freescale owned MAC range. Thus only
+> Freescale products may be able to use the driver.
 > 
-> I guess that's how we need to do it.  The SSI driver should not be looking 
-> for /sound node, but that's the most reliable way to know if we have a new 
-> or old binding.
-> 
-...
-> >> This prohibits me from using the new binding on any future PowerPC parts,
-> >> because it clearly says "iMX" on everything.
-> >
-> > I think we can change it later when the future PowerPC parts come to
-> > use the new binding.  In any case, I do not see this is an issue that
-> > should block the whole series.
-> 
-> At least get rid of any unnecessary references to "imx".
-> 
-So something like this?
+No.
+My proposal is only set the fixed part(first two octets) in board dts file,
+each board knows it's value, and read the left 4 octets from OCOTP dynamically.
+Obviously the freeescale board dts file is only for FSL platforms.
+Other platforms can define their fix part of MAC address in their dts file.
 
-        /*
-         * If codec-handle property is missing from SSI node, we assume
-         * that the machine driver uses new binding which does not require
-         * SSI driver to trigger machine driver's probe.
-         */
-        if (!of_get_property(np, "codec-handle", NULL)) {
-                if (ssi_private->ssi_on_imx) {
-                        ssi_private->imx_pcm_pdev =
-                                platform_device_register_simple("imx-pcm-audio",
-                                                                -1, NULL, 0);
-                        if (IS_ERR(ssi_private->imx_pcm_pdev)) {
-                                ret = PTR_ERR(ssi_private->imx_pcm_pdev);
-                                goto error_dev;
-                        }
-                }
-                /* success for new binding case */
-                return 0;
-        }
+> Anyway there is no definite spec how the MAC address(es) are stored
+> in the fuse map. Thus reading the MAC from there is more or less
+> platform specific.
+> 
+It's just provide one more option since there are customers storing the MAC
+in the fuse map.
 
-It does not reduce any reference to "imx" actually.  If you think it's
-worth another iteration of the series, I will post v5 for it.
+> Currently I'm setting up the MAC address for our TX28 from the fuses
+> in the platform code passed via platform_data, but that will obviously
+> not work with DT.
+> 
+Non-dt can also use my proposal, then you only need to pass the fixed part of
+MAC via platfrom data, the left will be read by fec driver.
 
--- 
-Regards,
-Shawn
+> The correct way would probably be to pass the MAC from the bootloader
+> via a DT blob. But that would require all bootloaders to be updated
+> first to support DTS. :(
+> 
+But uboot will face the same problem that can not define a valid MAC
+in dts, did i undertand correctly?
+
+> An intermediate solution could be using OF_DEV_AUXDATA to pass a
+> platform_data struct that may contain a MAC address set up by the
+> platform code.
+> 
+Yes, it's a way but i'm afraid will not get accepted by dt people.
+
+Regards
+Dong Aisheng
