@@ -1,151 +1,157 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Mar 2012 04:21:25 +0000
-Subject: [PATCH 5/9] ARM: kirkwood: fdt: absorb kirkwood_init()
+Date: Fri, 16 Mar 2012 04:21:23 +0000
+Subject: [PATCH 3/9 v3] ARM: orion: wdt: use resource vice direct access
 In-Reply-To: <cover.1331868507.git.jason@lakedaemon.net>
 References: <cover.1331868507.git.jason@lakedaemon.net>
-Message-ID: <3e7f2d60b6c828d98de65c996c66728d5838f7e4.1331868507.git.jason@lakedaemon.net>
+Message-ID: <04a5c4c305df36619b1cf12a3e2bb21de9378b15.1331868507.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to absorb kirkwood_init() into kirkwood_dt_init() so that as we
-convert drivers, we can remove the platform call, eg
-kirkwood_rtc_init().  This maintains compatibility with non-fdt
-configurations because they still call kirkwood_init() in common.c.
-
-As drivers are converted, we will reinstate the 'static' qualifier in
-common.c.
-
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-kirkwood/board-dt.c |   29 ++++++++++++++++++++++++++++-
- arch/arm/mach-kirkwood/common.c   |   12 ++++++------
- arch/arm/mach-kirkwood/common.h   |    8 ++++++++
- 3 files changed, 42 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index fbe6405..9bd35ac 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -29,7 +29,9 @@
- #include <linux/spi/orion_spi.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
- #include <mach/kirkwood.h>
+Changes from v2:
+
+    - Corrected authorship to myself.  The author was inadvertently changed to
+      Andrew Lunn with a wayward 'commit --amend' during a 'rebase -i' to split
+      the wdt patch.  Andrew brought it to my attention.  Thanks, Andrew!
+
+Notes from v2:
+Note: This code is the exact same as that originally Acked by Grant.  I've
+simply removed the fdt bindings, as I need to hold off until common clock is
+added.  If it's not appropriate to retain his Ack here, please let me know.
+
+ arch/arm/plat-orion/common.c |    7 ++++++-
+ drivers/watchdog/orion_wdt.c |   24 +++++++++++++++---------
+ 2 files changed, 21 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 089899a..74daf5e 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -21,6 +21,7 @@
+ #include <plat/orion_wdt.h>
+ #include <plat/mv_xor.h>
+ #include <plat/ehci-orion.h>
 +#include <mach/bridge-regs.h>
- #include <plat/mvsdio.h>
- #include "common.h"
- #include "mpp.h"
-@@ -155,7 +157,32 @@ static void __init dreamplug_init(void)
  
- static void __init kirkwood_dt_init(void)
- {
--	kirkwood_init();
-+	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-+
-+	/*
-+	 * Disable propagation of mbus errors to the CPU local bus,
-+	 * as this causes mbus errors (which can occur for example
-+	 * for PCI aborts) to throw CPU aborts, which we're not set
-+	 * up to deal with.
-+	 */
-+	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
-+
-+	kirkwood_setup_cpu_mbus();
-+
-+#ifdef CONFIG_CACHE_FEROCEON_L2
-+	kirkwood_l2_init();
-+#endif
-+
-+	/* internal devices that every board has */
-+	kirkwood_rtc_init();
-+	kirkwood_wdt_init();
-+	kirkwood_xor0_init();
-+	kirkwood_xor1_init();
-+	kirkwood_crypto_init();
-+
-+#ifdef CONFIG_KEXEC
-+	kexec_reinit = kirkwood_enable_pcie;
-+#endif
+ /* Fill in the resources structure and link it into the platform
+    device structure. There is always a memory region, and nearly
+@@ -568,13 +569,17 @@ void __init orion_spi_1_init(unsigned long mapbase,
+  ****************************************************************************/
+ static struct orion_wdt_platform_data orion_wdt_data;
  
- 	if (of_machine_is_compatible("globalscale,dreamplug"))
- 		dreamplug_init();
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 79a9fe7..04a7eb9 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -163,7 +163,7 @@ void __init kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
- /*****************************************************************************
-  * SoC RTC
-  ****************************************************************************/
--static void __init kirkwood_rtc_init(void)
-+void __init kirkwood_rtc_init(void)
- {
- 	orion_rtc_init(RTC_PHYS_BASE, IRQ_KIRKWOOD_RTC);
- }
-@@ -279,7 +279,7 @@ void __init kirkwood_crypto_init(void)
- /*****************************************************************************
-  * XOR0
-  ****************************************************************************/
--static void __init kirkwood_xor0_init(void)
-+void __init kirkwood_xor0_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_XOR0;
++static struct resource orion_wdt_resource =
++		DEFINE_RES_MEM(TIMER_VIRT_BASE, 0x28);
++
+ static struct platform_device orion_wdt_device = {
+ 	.name		= "orion_wdt",
+ 	.id		= -1,
+ 	.dev		= {
+ 		.platform_data	= &orion_wdt_data,
+ 	},
+-	.num_resources	= 0,
++	.resource	= &orion_wdt_resource,
++	.num_resources	= 1,
+ };
  
-@@ -291,7 +291,7 @@ static void __init kirkwood_xor0_init(void)
- /*****************************************************************************
-  * XOR1
-  ****************************************************************************/
--static void __init kirkwood_xor1_init(void)
-+void __init kirkwood_xor1_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_XOR1;
- 
-@@ -303,7 +303,7 @@ static void __init kirkwood_xor1_init(void)
- /*****************************************************************************
-  * Watchdog
-  ****************************************************************************/
--static void __init kirkwood_wdt_init(void)
-+void __init kirkwood_wdt_init(void)
- {
- 	orion_wdt_init(kirkwood_tclk);
- }
-@@ -392,7 +392,7 @@ void __init kirkwood_audio_init(void)
+ void __init orion_wdt_init(unsigned long tclk)
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 4ad78f8..1368e4c 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -28,9 +28,9 @@
  /*
-  * Identify device ID and revision.
+  * Watchdog timer block registers.
   */
--static char * __init kirkwood_id(void)
-+char * __init kirkwood_id(void)
- {
- 	u32 dev, rev;
+-#define TIMER_CTRL		(TIMER_VIRT_BASE + 0x0000)
++#define TIMER_CTRL		0x0000
+ #define  WDT_EN			0x0010
+-#define WDT_VAL			(TIMER_VIRT_BASE + 0x0024)
++#define WDT_VAL			0x0024
  
-@@ -435,7 +435,7 @@ static char * __init kirkwood_id(void)
- 	}
+ #define WDT_MAX_CYCLE_COUNT	0xffffffff
+ #define WDT_IN_USE		0
+@@ -40,6 +40,7 @@ static int nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+ static unsigned int wdt_max_duration;	/* (seconds) */
+ static unsigned int wdt_tclk;
++static void __iomem *wdt_reg;
+ static unsigned long wdt_status;
+ static DEFINE_SPINLOCK(wdt_lock);
+ 
+@@ -48,7 +49,7 @@ static void orion_wdt_ping(void)
+ 	spin_lock(&wdt_lock);
+ 
+ 	/* Reload watchdog duration */
+-	writel(wdt_tclk * heartbeat, WDT_VAL);
++	writel(wdt_tclk * heartbeat, wdt_reg + WDT_VAL);
+ 
+ 	spin_unlock(&wdt_lock);
  }
+@@ -60,7 +61,7 @@ static void orion_wdt_enable(void)
+ 	spin_lock(&wdt_lock);
  
--static void __init kirkwood_l2_init(void)
-+void __init kirkwood_l2_init(void)
+ 	/* Set watchdog duration */
+-	writel(wdt_tclk * heartbeat, WDT_VAL);
++	writel(wdt_tclk * heartbeat, wdt_reg + WDT_VAL);
+ 
+ 	/* Clear watchdog timer interrupt */
+ 	reg = readl(BRIDGE_CAUSE);
+@@ -68,9 +69,9 @@ static void orion_wdt_enable(void)
+ 	writel(reg, BRIDGE_CAUSE);
+ 
+ 	/* Enable watchdog timer */
+-	reg = readl(TIMER_CTRL);
++	reg = readl(wdt_reg + TIMER_CTRL);
+ 	reg |= WDT_EN;
+-	writel(reg, TIMER_CTRL);
++	writel(reg, wdt_reg + TIMER_CTRL);
+ 
+ 	/* Enable reset on watchdog */
+ 	reg = readl(RSTOUTn_MASK);
+@@ -92,9 +93,9 @@ static void orion_wdt_disable(void)
+ 	writel(reg, RSTOUTn_MASK);
+ 
+ 	/* Disable watchdog timer */
+-	reg = readl(TIMER_CTRL);
++	reg = readl(wdt_reg + TIMER_CTRL);
+ 	reg &= ~WDT_EN;
+-	writel(reg, TIMER_CTRL);
++	writel(reg, wdt_reg + TIMER_CTRL);
+ 
+ 	spin_unlock(&wdt_lock);
+ }
+@@ -102,7 +103,7 @@ static void orion_wdt_disable(void)
+ static int orion_wdt_get_timeleft(int *time_left)
  {
- #ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
- 	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 9071a39..c382447 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -51,6 +51,14 @@ void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts, int (*dev
- void kirkwood_audio_init(void);
- void kirkwood_restart(char, const char *);
+ 	spin_lock(&wdt_lock);
+-	*time_left = readl(WDT_VAL) / wdt_tclk;
++	*time_left = readl(wdt_reg + WDT_VAL) / wdt_tclk;
+ 	spin_unlock(&wdt_lock);
+ 	return 0;
+ }
+@@ -236,6 +237,7 @@ static struct miscdevice orion_wdt_miscdev = {
+ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+ {
+ 	struct orion_wdt_platform_data *pdata = pdev->dev.platform_data;
++	struct resource *res;
+ 	int ret;
  
-+char *kirkwood_id(void);
-+void kirkwood_l2_init(void);
-+void kirkwood_rtc_init(void);
-+void kirkwood_wdt_init(void);
-+void kirkwood_xor0_init(void);
-+void kirkwood_xor1_init(void);
-+void kirkwood_crypto_init(void);
+ 	if (pdata) {
+@@ -245,6 +247,10 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +
- extern int kirkwood_tclk;
- extern struct sys_timer kirkwood_timer;
- 
++	wdt_reg = ioremap(res->start, resource_size(res));
++
+ 	if (orion_wdt_miscdev.parent)
+ 		return -EBUSY;
+ 	orion_wdt_miscdev.parent = &pdev->dev;
 -- 
 1.7.3.4
