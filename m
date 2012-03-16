@@ -1,39 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 Mar 2012 03:00:09 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the s5p tree
-In-Reply-To: <201203160826.36287.arnd@arndb.de>
-References: <20120316174546.5121be30a86c2937579bd3f5@canb.auug.org.au>
- <201203160826.36287.arnd@arndb.de>
-Message-ID: <4F630F29.6020101@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Mar 2012 10:03:01 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201203161003.02163.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/12 01:26, Arnd Bergmann wrote:
-> On Friday 16 March 2012, Stephen Rothwell wrote:
->> Today's linux-next merge of the arm-soc tree got a conflict in
->> arch/arm/mach-exynos/common.c between commit 1d7233ac478a ("Merge branch
->> 'next/soc-exynos5250-arch-gpio' into for-next") from the s5p tree and
->> commit 853a0231e057 ("Merge branch 'samsung/soc' into next/soc2") from
->> the arm-soc tree.
->>
->> These merge commits both looks suspect, but I fixed it up as best I could
->> (see below).
->
-Thank you, Stehpen.
+On Thursday 15 March 2012, Nicolas Ferre wrote:
+> For legacy reason another API will export the DMA request number into a
+> Linux resource of type IORESOURCE_DMA.
 
-> Right, both the arm-soc and the s5p tree merge the same commits and
-> come to different results. Kgene, please have a look and let me know
-> which of the three solutions is correct.
->
+Can you explain which legacy scenarios you think this is going to help with?
 
-Yeah, my resolution is missing and both looks OK to me, actually it's 
-just different the position of declaration for 'int ret' and I'm not 
-sure which one is better even though I fixed with Arnd's resolution.
+> +/**
+> + * of_dma_to_resource - Decode a node's DMA and return it as a resource
+> + * @dev: pointer to device tree node
+> + * @index: zero-based index of the DMA request
+> + * @r: pointer to resource structure to return result into.
+> + *
+> + * Using a resource to export a DMA request number to a driver should
+> + * be used only for legacy purpose and on system when only one DMA controller
+> + * is present.
+> + * The proper and only scalable way is to use the native of_get_dma_request API
+> + * in order retrieve both the DMA controller device node and the DMA request
+> + * line for that controller.
+> + */
+> +int of_dma_to_resource(struct device_node *dev, int index, struct resource *r)
+> +{
 
-Arnd, Stephen, thanks :)
+I think a better way to discourage the use of IORESOURCE_DMA is to not provide
+this function at all, especially given that it's not really well-defined what
+it will do when you have more than one cell for the dma channel identifier or
+when you have multiple DMA engines, so any driver relying on it is inherently
+nonportable.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+	Arnd
