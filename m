@@ -1,7 +1,7 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 16 Mar 2012 11:01:35 +0800
+Date: Fri, 16 Mar 2012 11:05:21 +0800
 Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20321.53468.310199.875966@ipc1.ka-ro>
+In-Reply-To: <20120315112419.GA3852@pengutronix.de>
 References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
  <1331628428-24017-2-git-send-email-b29396@freescale.com>
  <20120313172351.97C5E3E053B@localhost>
@@ -10,15 +10,13 @@ References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
  <20120315030206.GB13022@shlinux2.ap.freescale.net>
  <20321.37353.63115.664975@ipc1.ka-ro>
  <20120315105927.GE13022@shlinux2.ap.freescale.net>
- <20321.53468.310199.875966@ipc1.ka-ro>
-Message-ID: <20120316030134.GA5161@shlinux2.ap.freescale.net>
+ <20120315112419.GA3852@pengutronix.de>
+Message-ID: <20120316030521.GB5161@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 07:22:04PM +0800, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Dong Aisheng writes:
+On Thu, Mar 15, 2012 at 07:24:19PM +0800, s.hauer at pengutronix.de wrote:
+> On Thu, Mar 15, 2012 at 06:59:28PM +0800, Dong Aisheng wrote:
 > > On Thu, Mar 15, 2012 at 02:53:29PM +0800, Lothar Wa?mann wrote:
 > > > Hi,
 > > > 
@@ -52,42 +50,19 @@ On Thu, Mar 15, 2012 at 07:22:04PM +0800, Lothar Wa?mann wrote:
 > > define it in device tree in my last mail.
 > > http://www.spinics.net/lists/arm-kernel/msg165040.html
 > > Do you have any comment on that way?
-> > 
-> That patch sets the OUI to the Freescale owned MAC range. Thus only
-> Freescale products may be able to use the driver.
 > 
-No.
-My proposal is only set the fixed part(first two octets) in board dts file,
-each board knows it's value, and read the left 4 octets from OCOTP dynamically.
-Obviously the freeescale board dts file is only for FSL platforms.
-Other platforms can define their fix part of MAC address in their dts file.
+> Yes, you could do that. Otherwise it's perfectly fine to pass the MAC
+> address in the device tree, it's just not ok to put specific values
+> into the kernel source. You could leave the values blank and let the
+Yes, correct.
 
-> Anyway there is no definite spec how the MAC address(es) are stored
-> in the fuse map. Thus reading the MAC from there is more or less
-> platform specific.
+> bootloader fill them in. Or you could fill in valid values before you
+> compile the devicetree, but be prepared for surprises once you have
+> two boards in your network and use the devicetree for both.
 > 
-It's just provide one more option since there are customers storing the MAC
-in the fuse map.
 
-> Currently I'm setting up the MAC address for our TX28 from the fuses
-> in the platform code passed via platform_data, but that will obviously
-> not work with DT.
-> 
-Non-dt can also use my proposal, then you only need to pass the fixed part of
-MAC via platfrom data, the left will be read by fec driver.
-
-> The correct way would probably be to pass the MAC from the bootloader
-> via a DT blob. But that would require all bootloaders to be updated
-> first to support DTS. :(
-> 
-But uboot will face the same problem that can not define a valid MAC
-in dts, did i undertand correctly?
-
-> An intermediate solution could be using OF_DEV_AUXDATA to pass a
-> platform_data struct that may contain a MAC address set up by the
-> platform code.
-> 
-Yes, it's a way but i'm afraid will not get accepted by dt people.
+Thanks for the info.
+I will submit that patch for discussion.
 
 Regards
 Dong Aisheng
