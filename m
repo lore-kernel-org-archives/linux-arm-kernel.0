@@ -1,157 +1,195 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 16:56:41 +0800
-Subject: [PATCH v5 5/8] ASoC: fsl: remove helper fsl_asoc_get_codec_dev_name
+Date: Fri, 16 Mar 2012 16:56:42 +0800
+Subject: [PATCH v5 6/8] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
 In-Reply-To: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
 References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331888204-27058-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1331888204-27058-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ASoC core now can support matching codec with device node besides
-name, so we can save helper function fsl_asoc_get_codec_dev_name.
+Provide different pair of accessors for accessing SSI registers on
+PowerPC and ARM/IMX, so that fsl_ssi driver can be built on both
+architectures.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- sound/soc/fsl/fsl_utils.c    |   44 ------------------------------------------
- sound/soc/fsl/fsl_utils.h    |    1 -
- sound/soc/fsl/mpc8610_hpcd.c |   13 +----------
- sound/soc/fsl/p1022_ds.c     |   13 +----------
- 4 files changed, 4 insertions(+), 67 deletions(-)
+ sound/soc/fsl/fsl_ssi.c |   64 ++++++++++++++++++++++++++++++----------------
+ 1 files changed, 42 insertions(+), 22 deletions(-)
 
-diff --git a/sound/soc/fsl/fsl_utils.c b/sound/soc/fsl/fsl_utils.c
-index 4370c28..b9e42b5 100644
---- a/sound/soc/fsl/fsl_utils.c
-+++ b/sound/soc/fsl/fsl_utils.c
-@@ -12,55 +12,11 @@
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 2eb407f..db9a734 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -11,11 +11,14 @@
+  */
  
+ #include <linux/init.h>
++#include <linux/io.h>
  #include <linux/module.h>
- #include <linux/of_address.h>
--#include <linux/of_i2c.h>
- #include <sound/soc.h>
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
  
- #include "fsl_utils.h"
+ #include <sound/core.h>
+@@ -26,6 +29,25 @@
  
+ #include "fsl_ssi.h"
+ 
++#ifdef PPC
++#define read_ssi(addr)			 in_be32(addr)
++#define write_ssi(val, addr)		 out_be32(addr, val)
++#define write_ssi_mask(addr, clear, set) clrsetbits_be32(addr, clear, set)
++#elif defined ARM
++#define read_ssi(addr)			 readl(addr)
++#define write_ssi(val, addr)		 writel(val, addr)
++/*
++ * FIXME: Proper locking should be added at write_ssi_mask caller level
++ * to ensure this register read/modify/write sequence is race free.
++ */
++static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
++{
++	u32 val = readl(addr);
++	val = (val & ~clear) | set;
++	writel(val, addr);
++}
++#endif
++
  /**
-- * fsl_asoc_get_codec_dev_name - determine the dev_name for a codec node
-- *
-- * @np: pointer to the I2C device tree node
-- * @buf: buffer to be filled with the dev_name of the I2C device
-- * @len: the length of the buffer
-- *
-- * This function determines the dev_name for an I2C node.  This is the name
-- * that would be returned by dev_name() if this device_node were part of a
-- * 'struct device'  It's ugly and hackish, but it works.
-- *
-- * The dev_name for such devices include the bus number and I2C address. For
-- * example, "cs4270.0-004f".
-- */
--int fsl_asoc_get_codec_dev_name(struct device_node *np, char *buf, size_t len)
--{
--	const u32 *iprop;
--	u32 addr;
--	char temp[DAI_NAME_SIZE];
--	struct i2c_client *i2c;
--
--	of_modalias_node(np, temp, DAI_NAME_SIZE);
--
--	iprop = of_get_property(np, "reg", NULL);
--	if (!iprop)
--		return -EINVAL;
--
--	addr = be32_to_cpup(iprop);
--
--	/* We need the adapter number */
--	i2c = of_find_i2c_device_by_node(np);
--	if (!i2c) {
--		put_device(&i2c->dev);
--		return -ENODEV;
--	}
--
--	snprintf(buf, len, "%s.%u-%04x", temp, i2c->adapter->nr, addr);
--	put_device(&i2c->dev);
--
--	return 0;
--}
--EXPORT_SYMBOL(fsl_asoc_get_codec_dev_name);
--
--/**
-  * fsl_asoc_get_dma_channel - determine the dma channel for a SSI node
+  * FSLSSI_I2S_RATES: sample rates supported by the I2S
   *
-  * @ssi_np: pointer to the SSI device tree node
-diff --git a/sound/soc/fsl/fsl_utils.h b/sound/soc/fsl/fsl_utils.h
-index 44d1436..b295112 100644
---- a/sound/soc/fsl/fsl_utils.h
-+++ b/sound/soc/fsl/fsl_utils.h
-@@ -18,7 +18,6 @@
- struct snd_soc_dai_link;
- struct device_node;
+@@ -145,7 +167,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	   were interrupted for.  We mask it with the Interrupt Enable register
+ 	   so that we only check for events that we're interested in.
+ 	 */
+-	sisr = in_be32(&ssi->sisr) & SIER_FLAGS;
++	sisr = read_ssi(&ssi->sisr) & SIER_FLAGS;
  
--int fsl_asoc_get_codec_dev_name(struct device_node *np, char *buf, size_t len);
- int fsl_asoc_get_dma_channel(struct device_node *ssi_np, const char *name,
- 			     struct snd_soc_dai_link *dai,
- 			     unsigned int *dma_channel_id,
-diff --git a/sound/soc/fsl/mpc8610_hpcd.c b/sound/soc/fsl/mpc8610_hpcd.c
-index 4195182..8fdc430 100644
---- a/sound/soc/fsl/mpc8610_hpcd.c
-+++ b/sound/soc/fsl/mpc8610_hpcd.c
-@@ -41,7 +41,6 @@ struct mpc8610_hpcd_data {
- 	unsigned int dma_id[2];		/* 0 = DMA1, 1 = DMA2, etc */
- 	unsigned int dma_channel_id[2]; /* 0 = ch 0, 1 = ch 1, etc*/
- 	char codec_dai_name[DAI_NAME_SIZE];
--	char codec_name[DAI_NAME_SIZE];
- 	char platform_name[2][DAI_NAME_SIZE]; /* One for each DMA channel */
- };
+ 	if (sisr & CCSR_SSI_SISR_RFRC) {
+ 		ssi_private->stats.rfrc++;
+@@ -260,7 +282,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
  
-@@ -215,16 +214,8 @@ static int mpc8610_hpcd_probe(struct platform_device *pdev)
- 	machine_data->dai[0].cpu_dai_name = dev_name(&ssi_pdev->dev);
- 	machine_data->dai[0].ops = &mpc8610_hpcd_ops;
+ 	/* Clear the bits that we set */
+ 	if (sisr2)
+-		out_be32(&ssi->sisr, sisr2);
++		write_ssi(sisr2, &ssi->sisr);
  
--	/* Determine the codec name, it will be used as the codec DAI name */
--	ret = fsl_asoc_get_codec_dev_name(codec_np, machine_data->codec_name,
--					  DAI_NAME_SIZE);
--	if (ret) {
--		dev_err(&pdev->dev, "invalid codec node %s\n",
--			codec_np->full_name);
--		ret = -EINVAL;
--		goto error;
--	}
--	machine_data->dai[0].codec_name = machine_data->codec_name;
-+	/* ASoC core can match codec with device node */
-+	machine_data->dai[0].codec_of_node = codec_np;
+ 	return ret;
+ }
+@@ -295,7 +317,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 * SSI needs to be disabled before updating the registers we set
+ 		 * here.
+ 		 */
+-		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
++		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
  
- 	/* The DAI name from the codec (snd_soc_dai_driver.name) */
- 	machine_data->dai[0].codec_dai_name = "cs4270-hifi";
-diff --git a/sound/soc/fsl/p1022_ds.c b/sound/soc/fsl/p1022_ds.c
-index e3680ce..0f42f31 100644
---- a/sound/soc/fsl/p1022_ds.c
-+++ b/sound/soc/fsl/p1022_ds.c
-@@ -73,7 +73,6 @@ struct machine_data {
- 	unsigned int ssi_id;		/* 0 = SSI1, 1 = SSI2, etc */
- 	unsigned int dma_id[2];		/* 0 = DMA1, 1 = DMA2, etc */
- 	unsigned int dma_channel_id[2]; /* 0 = ch 0, 1 = ch 1, etc*/
--	char codec_name[DAI_NAME_SIZE];
- 	char platform_name[2][DAI_NAME_SIZE]; /* One for each DMA channel */
- };
+ 		/*
+ 		 * Program the SSI into I2S Slave Non-Network Synchronous mode.
+@@ -303,20 +325,18 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 *
+ 		 * FIXME: Little-endian samples require a different shift dir
+ 		 */
+-		clrsetbits_be32(&ssi->scr,
++		write_ssi_mask(&ssi->scr,
+ 			CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN,
+ 			CCSR_SSI_SCR_TFR_CLK_DIS | CCSR_SSI_SCR_I2S_MODE_SLAVE
+ 			| (synchronous ? CCSR_SSI_SCR_SYN : 0));
  
-@@ -225,16 +224,8 @@ static int p1022_ds_probe(struct platform_device *pdev)
- 	mdata->dai[0].cpu_dai_name = dev_name(&ssi_pdev->dev);
- 	mdata->dai[0].ops = &p1022_ds_ops;
+-		out_be32(&ssi->stcr,
+-			 CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
++		write_ssi(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
+ 			 CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TEFS |
+-			 CCSR_SSI_STCR_TSCKP);
++			 CCSR_SSI_STCR_TSCKP, &ssi->stcr);
  
--	/* Determine the codec name, it will be used as the codec DAI name */
--	ret = fsl_asoc_get_codec_dev_name(codec_np, mdata->codec_name,
--					  DAI_NAME_SIZE);
--	if (ret) {
--		dev_err(&pdev->dev, "invalid codec node %s\n",
--			codec_np->full_name);
--		ret = -EINVAL;
--		goto error;
--	}
--	mdata->dai[0].codec_name = mdata->codec_name;
-+	/* ASoC core can match codec with device node */
-+	mdata->dai[0].codec_of_node = codec_np;
+-		out_be32(&ssi->srcr,
+-			 CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
++		write_ssi(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
+ 			 CCSR_SSI_SRCR_RFSI | CCSR_SSI_SRCR_REFS |
+-			 CCSR_SSI_SRCR_RSCKP);
++			 CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
  
- 	/* We register two DAIs per SSI, one for playback and the other for
- 	 * capture.  We support codecs that have separate DAIs for both playback
+ 		/*
+ 		 * The DC and PM bits are only used if the SSI is the clock
+@@ -324,7 +344,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 */
+ 
+ 		/* Enable the interrupts and DMA requests */
+-		out_be32(&ssi->sier, SIER_FLAGS);
++		write_ssi(SIER_FLAGS, &ssi->sier);
+ 
+ 		/*
+ 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
+@@ -339,9 +359,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 * make this value larger (and maybe we should), but this way
+ 		 * data will be written to memory as soon as it's available.
+ 		 */
+-		out_be32(&ssi->sfcsr,
+-			CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
+-			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2));
++		write_ssi(CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
++			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2),
++			&ssi->sfcsr);
+ 
+ 		/*
+ 		 * We keep the SSI disabled because if we enable it, then the
+@@ -417,7 +437,7 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 	unsigned int sample_size =
+ 		snd_pcm_format_width(params_format(hw_params));
+ 	u32 wl = CCSR_SSI_SxCCR_WL(sample_size);
+-	int enabled = in_be32(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
++	int enabled = read_ssi(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
+ 
+ 	/*
+ 	 * If we're in synchronous mode, and the SSI is already enabled,
+@@ -439,9 +459,9 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 	/* In synchronous mode, the SSI uses STCCR for capture */
+ 	if ((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ||
+ 	    ssi_private->cpu_dai_drv.symmetric_rates)
+-		clrsetbits_be32(&ssi->stccr, CCSR_SSI_SxCCR_WL_MASK, wl);
++		write_ssi_mask(&ssi->stccr, CCSR_SSI_SxCCR_WL_MASK, wl);
+ 	else
+-		clrsetbits_be32(&ssi->srccr, CCSR_SSI_SxCCR_WL_MASK, wl);
++		write_ssi_mask(&ssi->srccr, CCSR_SSI_SxCCR_WL_MASK, wl);
+ 
+ 	return 0;
+ }
+@@ -466,19 +486,19 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	case SNDRV_PCM_TRIGGER_START:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+ 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-			setbits32(&ssi->scr,
++			write_ssi_mask(&ssi->scr, 0,
+ 				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE);
+ 		else
+-			setbits32(&ssi->scr,
++			write_ssi_mask(&ssi->scr, 0,
+ 				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE);
+ 		break;
+ 
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+ 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-			clrbits32(&ssi->scr, CCSR_SSI_SCR_TE);
++			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TE, 0);
+ 		else
+-			clrbits32(&ssi->scr, CCSR_SSI_SCR_RE);
++			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_RE, 0);
+ 		break;
+ 
+ 	default:
+@@ -510,7 +530,7 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
+ 	if (!ssi_private->first_stream) {
+ 		struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+ 
+-		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
++		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
+ 	}
+ }
+ 
 -- 
 1.7.5.4
