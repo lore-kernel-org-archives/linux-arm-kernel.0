@@ -1,33 +1,24 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 16 Mar 2012 10:40:06 -0400
-Subject: [PATCH 05/38] Disintegrate asm/system.h for ARM [ver #3]
-In-Reply-To: <20120315205603.28759.91855.stgit@warthog.procyon.org.uk>
-References: <20120315205514.28759.58969.stgit@warthog.procyon.org.uk>
- <20120315205603.28759.91855.stgit@warthog.procyon.org.uk>
-Message-ID: <1331908808.12353.2.camel@deneb.redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Mar 2012 14:40:01 +0000
+Subject: spinlock_t and tagged memory block size
+In-Reply-To: <CABcrWnUQ_4-nrZkt_zw5VC=cYJBfmaPsU7ktjMf2=xk7+=PArQ@mail.gmail.com>
+References: <CABcrWnUQ_4-nrZkt_zw5VC=cYJBfmaPsU7ktjMf2=xk7+=PArQ@mail.gmail.com>
+Message-ID: <CAHkRjk4mu-LCEscGN_mN0R1J7LHsTUFNx519qnjt1tNuL4dnfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-03-15 at 20:56 +0000, David Howells wrote:
-> Signed-off-by: David Howells <dhowells@redhat.com>
-> cc: linux-arm-kernel at lists.infradead.org
-> ---
+On 16 March 2012 11:44, Rui Sousa <rui.p.m.sousa@gmail.com> wrote:
+> Cortex-A9 architecture defines the minimum size of tagged memory block
+> (used on load/store exclusives) to be 2^3 = 8bytes (Cortex A9 r2p2,
+> Technical Reference Manual, page 4-8).
+> However, the spinlock_t structure size (if preemption and spinlock
+> debug options are all disabled) is only 4bytes.
+> AFAICS, this will break spinlocks if two spinlocks are linked next to
+> each other. Am I right, or did I miss something?
 
-<snip>
+It won't break, only that if two CPUs try to acquire the different
+locks at the same time, only one will succeed the first time, the
+other will need to go through the LDREX/STREX loop once more.
 
-> diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-> index 94e924e..d9072d9 100644
-> --- a/include/linux/mtd/map.h
-> +++ b/include/linux/mtd/map.h
-> @@ -1,4 +1,4 @@
-> -/*
-> + r/*
->   * Copyright ? 2000-2010 David Woodhouse <dwmw2@infradead.org> et al.
->   *
->   * This program is free software; you can redistribute it and/or modify
-> 
-
-Looks like this hunk was unintended. It is causing a build failure for
-me.
-
---Mark
+-- 
+Catalin
