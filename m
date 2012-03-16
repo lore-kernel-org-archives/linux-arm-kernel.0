@@ -1,81 +1,48 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 16 Mar 2012 09:08:32 +0100
-Subject: [PATCH 1/3] ARM i.MX: Move i.MX pwm driver to pwm framework
-In-Reply-To: <20120316074902.GC7758@S2101-09.ap.freescale.net>
-References: <1331802277-12477-1-git-send-email-s.hauer@pengutronix.de>
- <1331802277-12477-2-git-send-email-s.hauer@pengutronix.de>
- <20120316074902.GC7758@S2101-09.ap.freescale.net>
-Message-ID: <20120316080832.GA6458@avionic-0098.mockup.avionic-design.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 16 Mar 2012 16:12:26 +0800
+Subject: [PATCH v4 09/10] pwm: Add PXA support
+In-Reply-To: <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20120316081222.GE7758@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shawn Guo wrote:
-> On Thu, Mar 15, 2012 at 10:04:35AM +0100, Sascha Hauer wrote:
-> > diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> > index e859c51..fc7571e 100644
-> > --- a/drivers/pwm/Makefile
-> > +++ b/drivers/pwm/Makefile
-> > @@ -1,4 +1,5 @@
-> >  obj-$(CONFIG_PWM)		+= core.o
-> >  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
-> > +obj-$(CONFIG_PWM_IMX)		+= imx-pwm.o
+On Wed, Mar 14, 2012 at 04:56:32PM +0100, Thierry Reding wrote:
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+> Changes in v3:
+>   - update PWM ops for changes in patch 2
 > 
-> s/imx-pwm.o/pwm-imx.o
-
-Yes, I'll make that change when I integrate the patch in my series.
-
-> > @@ -98,7 +98,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-> >  		else
-> >  			cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
-> >  
-> > -		writel(cr, pwm->mmio_base + MX3_PWMCR);
-> > +		writel(cr, imxpwm->mmio_base + MX3_PWMCR);
-> >  	} else if (cpu_is_mx1() || cpu_is_mx21()) {
+>  arch/arm/plat-pxa/Makefile |    1 -
+>  arch/arm/plat-pxa/pwm.c    |  304 --------------------------------------------
+>  drivers/pwm/Kconfig        |    9 ++
+>  drivers/pwm/Makefile       |    1 +
+>  drivers/pwm/pwm-pxa.c      |  244 +++++++++++++++++++++++++++++++++++
+>  5 files changed, 254 insertions(+), 305 deletions(-)
+>  delete mode 100644 arch/arm/plat-pxa/pwm.c
+>  create mode 100644 drivers/pwm/pwm-pxa.c
 > 
-> Since we are here, can we move one step further to get rid of these
-> cpu_is_xxx()?  Then, we can remove <mach/hardware.h> inclusion from
-> the driver.
+The patch should be generated with "git format-patch -M", so that we
+can see the diff like below. 
 
-I guess this could be handled by using several names for the driver and
-handling the differences using a table of platform_device_id:s. Perhaps
-you had something different in mind?
+--- a/arch/arm/plat-pxa/pwm.c
++++ b/drivers/pwm/pwm-pxa.c
 
-> >  static int __devinit mxc_pwm_probe(struct platform_device *pdev)
-> 
-> Should we take this opportunity to rename the driver from mxc_pwm to
-> imx_pwm?
+-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++                         int duty_ns, int period_ns)
+ {
++       struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
+        unsigned long long c;
+        unsigned long period_cycles, prescale, pv, dc;
++       unsigned long offset;
 
-If we decide to rename maybe it should be done in two steps. First it can be
-renamed internally and in the second step the name could be changed along
-with all users. I just want to avoid too much churn in this series, which is
-already growing way larger than I had hoped.
+-       if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
++       if (period_ns == 0 || duty_ns > period_ns)
+                return -EINVAL;
 
-> Also, does mxc_pwm_init need necessarily to be an arch_initcall?
-> Otherwise, we can have the following change.
-> 
-> -static int __init mxc_pwm_init(void)
-> -{
-> -       return platform_driver_register(&mxc_pwm_driver);
-> -}
-> -arch_initcall(mxc_pwm_init);
-> -
-> -static void __exit mxc_pwm_exit(void)
-> -{
-> -       platform_driver_unregister(&mxc_pwm_driver);
-> -}
-> -module_exit(mxc_pwm_exit);
-> +module_platform_driver(imx_pwm_driver);
+Then I will have a question why "pwm == NULL" check is removed?
 
-I assume that some platforms may require it to be initialized early because
-other drivers may depend on the PWMs being present. However this can probably
-be solved in a much better way by using deferred driver probing, which should
-be available in 3.4.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120316/12a171b8/attachment.sig>
+Regards,
+Shawn
