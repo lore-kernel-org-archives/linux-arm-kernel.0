@@ -1,54 +1,73 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 19:18:18 +0800
-Subject: [alsa-devel] [PATCH v5 8/8] ASoC: fsl: add imx-sgtl5000 machine
- driver
-In-Reply-To: <CA+7tXihmfBQCgvuY0rx5v4w-bcwYK+7kP9v29w36N-Rc9KSQ+A@mail.gmail.com>
-References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
- <1331888204-27058-9-git-send-email-shawn.guo@linaro.org>
- <CA+7tXihmfBQCgvuY0rx5v4w-bcwYK+7kP9v29w36N-Rc9KSQ+A@mail.gmail.com>
-Message-ID: <20120316111814.GA7860@S2101-09.ap.freescale.net>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 16 Mar 2012 12:19:55 +0100
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <201203161003.02163.arnd@arndb.de>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <201203161003.02163.arnd@arndb.de>
+Message-ID: <4F6321DB.50600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 06:16:13AM -0400, Trent Piepho wrote:
-> On Fri, Mar 16, 2012 at 4:56 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > +Required properties:
-> > +- compatible : "fsl,imx-audio-sgtl5000"
-> > +- model : The user-visible name of this sound complex
-> > +- ssi-controller : The phandle of the i.MX SSI controller
-> > +- audio-codec : The phandle of the SGTL5000 audio codec
-> > +- mux-int-port : The internal port of the i.MX audio muxer (AUDMUX)
-> > +- mux-ext-port : The external port of the i.MX audio muxer
-> > +
-> > +Note: The AUDMUX port numbering should start at 1, which is consistent with
-> > +hardware manual.
-> > +
-> > +Example:
-> > +
-> > +sound {
-> > + ? ? ? compatible = "fsl,imx51-babbage-sgtl5000",
-> > + ? ? ? ? ? ? ? ? ? ?"fsl,imx-audio-sgtl5000";
-> > + ? ? ? model = "imx51-babbage-sgtl5000";
-> > + ? ? ? ssi-controller = <&ssi1>;
-> > + ? ? ? audio-codec = <&sgtl5000>;
-> > + ? ? ? mux-int-port = <1>;
-> > + ? ? ? mux-ext-port = <3>;
-> > +};
-> 
-> What would the device node look like for the ESAI controller?  I've
-> got a board here based on an iMX53 with two of three SSI controllers
-> and the ESAI controller in use.  It used the nullcodec codec driver
-> for SSI and ESAI.  The ESAI driver was since replaced with an entirely
-> new custom driver that doesn't use ASoC at all.  But ignoring that
-> detail, what would the sound node(s) look like for some hardware that
-> isn't so simple?  It seems like there would be three sound nodes, but
-> what would compatible and model be set to?  I'm having a hard time
-> seeing how "fsl,imx-audio-sgtl5000" would be changed into something
-> for either SSI or ESAI.
+On 3/16/2012 11:03 AM, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Nicolas Ferre wrote:
+>> For legacy reason another API will export the DMA request number into a
+>> Linux resource of type IORESOURCE_DMA.
+>
+> Can you explain which legacy scenarios you think this is going to help with?
 
-Maybe having "fsl,imx-audio-xxx" for machine drivers backed by SSI,
-and "fsl,imx-esai-audio-xxx" for the ones backed by ESAI?
+We do have a bunch of drivers that are using IORESOURCE_DMA today to 
+retrieve the DMA request. Since we do have an unique DMA controller it 
+was easy and convenient.
+And it seems that other ARM SoCs are using it for the same purpose. 
+There are at least 230+ IORESOURCE_DMA instances in the kernel today.
 
--- 
+>> +/**
+>> + * of_dma_to_resource - Decode a node's DMA and return it as a resource
+>> + * @dev: pointer to device tree node
+>> + * @index: zero-based index of the DMA request
+>> + * @r: pointer to resource structure to return result into.
+>> + *
+>> + * Using a resource to export a DMA request number to a driver should
+>> + * be used only for legacy purpose and on system when only one DMA controller
+>> + * is present.
+>> + * The proper and only scalable way is to use the native of_get_dma_request API
+>> + * in order retrieve both the DMA controller device node and the DMA request
+>> + * line for that controller.
+>> + */
+>> +int of_dma_to_resource(struct device_node *dev, int index, struct resource *r)
+>> +{
+>
+> I think a better way to discourage the use of IORESOURCE_DMA is to not provide
+> this function at all, especially given that it's not really well-defined what
+> it will do when you have more than one cell for the dma channel identifier or
+> when you have multiple DMA engines, so any driver relying on it is inherently
+> nonportable.
+
+For the moment it is still used in a lot of places, and without any 
+other better API yet, it is still useful. As written it is there only 
+for simple single DMA controller case.
+
+By maintaining that IORESOURCE_DMA for the moment we can adapt some 
+driver to DT without having to change the way they are retrieving 
+information. By using IORESOURCE_IRQ and IORESOURCE_MEM, we had the same 
+advantage.
+
+Otherwise how are we supposed to get the DMA channel for non-DT boot 
+until we have migrated everything to DT? A bunch of ARM SoC are using 
+IORESOURCE_DMA for the same purpose.
+
+The goal here is really to maintain that during the transition phase 
+only. As soon as the full DT support is there, we can switch to the of_ API.
+
+Ideally, we should define and use a generic API non dependent of DT. 
+AFAIK, that does not exist so far.
+And since most drivers are not using dmaengine, we do not even have a 
+common DMA fmwk to define an API on top.
+
+I fully agree that this IORESOURCE_DMA is not scalable for multiple 
+controller, ugly, and must be avoided like the plague.
+But what other options do we have during the transition?
+
 Regards,
-Shawn
+Benoit
