@@ -1,32 +1,105 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Fri, 16 Mar 2012 16:31:20 -0500
-Subject: [alsa-devel] [PATCH v5 8/8] ASoC: fsl: add imx-sgtl5000 machine
- driver
-In-Reply-To: <CA+7tXih-omxaDq6dSKBeOaZ7YRWDVSQnMY=eJZ0-YumOBG=oCA@mail.gmail.com>
-References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
- <1331888204-27058-9-git-send-email-shawn.guo@linaro.org>
- <CA+7tXihmfBQCgvuY0rx5v4w-bcwYK+7kP9v29w36N-Rc9KSQ+A@mail.gmail.com>
- <20120316111814.GA7860@S2101-09.ap.freescale.net>
- <20120316192110.GH3158@opensource.wolfsonmicro.com>
- <CA+7tXih-omxaDq6dSKBeOaZ7YRWDVSQnMY=eJZ0-YumOBG=oCA@mail.gmail.com>
-Message-ID: <4F63B128.7040705@freescale.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 16 Mar 2012 14:33:17 -0700
+Subject: [PATCH v2 1/7] misc: ddr: add LPDDR2 data from JESD209-2
+In-Reply-To: <4F63A987.3@ti.com>
+References: <1331835457-5390-1-git-send-email-aneesh@ti.com>
+ <1331835457-5390-2-git-send-email-aneesh@ti.com>
+ <20120315190238.GD11142@kroah.com> <4F63A987.3@ti.com>
+Message-ID: <20120316213316.GC24556@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trent Piepho wrote:
-> The ESAI and SSI hardware are totally different.  SSI gives you a
-> playback and a record stream in an I2S, or I2S like, interface.  A
-> stream is mono or stereo. ESAI has IIRC up to six output and four
-> inputs streams.  Each stream is in parallel on the same clock, and can
-> have one or more channels. 
+On Sat, Mar 17, 2012 at 02:28:47AM +0530, Aneesh V wrote:
+> Hi Greg,
+> 
+> On Friday 16 March 2012 12:32 AM, Greg KH wrote:
+> >On Thu, Mar 15, 2012 at 11:47:31PM +0530, Aneesh V wrote:
+> >>add LPDDR2 data from the JEDEC spec JESD209-2. The data
+> >>includes:
+> >>
+> >>1. Addressing information for LPDDR2 memories of different
+> >>    densities and types(S2/S4)
+> >>2. AC timing data.
+> >>
+> >>This data will useful for memory controller device drivers
+> >
+> >Right now, only one driver, right?
+> >
+> >>+#ifndef __ASSEMBLY__
+> >
+> >Why is this needed?
+> >
+> >>+/* Structure for DDR addressing info from the JEDEC spec */
+> >>+struct lpddr2_addressing {
+> >>+	u32 num_banks;
+> >>+	u32 tREFI_ns;
+> >>+	u32 tRFCab_ps;
+> >>+};
+> >
+> >Do these structures cross the user/kernel boundry somehow?  If so,
+> >please use the proper kernel types for this.
+> >
+> >>--- a/lib/Makefile
+> >>+++ b/lib/Makefile
+> >>@@ -123,6 +123,9 @@ obj-$(CONFIG_SIGNATURE) += digsig.o
+> >>
+> >>  obj-$(CONFIG_CLZ_TAB) += clz_tab.o
+> >>
+> >>+obj-$(CONFIG_DDR) += jedec_ddr_data.o
+> >>+
+> >>+
+> >
+> >Why the extra line?
+> >
+> >>  hostprogs-y	:= gen_crc32table
+> >>  clean-files	:= crc32table.h
+> >>
+> >>diff --git a/lib/jedec_ddr_data.c b/lib/jedec_ddr_data.c
+> >>new file mode 100644
+> >>index 0000000..fc223d6
+> >>--- /dev/null
+> >>+++ b/lib/jedec_ddr_data.c
+> >>@@ -0,0 +1,135 @@
+> >>+/*
+> >>+ * DDR addressing details and AC timing parameters from JEDEC specs
+> >>+ *
+> >>+ * Copyright (C) 2012 Texas Instruments, Inc.
+> >>+ *
+> >>+ * Aneesh V<aneesh@ti.com>
+> >>+ *
+> >>+ * This program is free software; you can redistribute it and/or modify
+> >>+ * it under the terms of the GNU General Public License version 2 as
+> >>+ * published by the Free Software Foundation.
+> >>+ */
+> >>+
+> >>+#include<misc/jedec_ddr.h>
+> >>+#include<linux/module.h>
+> >>+
+> >>+/* LPDDR2 addressing details from JESD209-2 section 2.4 */
+> >>+const struct lpddr2_addressing
+> >>+	lpddr2_jedec_addressing_table[NUM_DDR_ADDR_TABLE_ENTRIES] = {
+> >>+	{B4, T_REFI_15_6, T_RFC_90}, /* 64M */
+> >>+	{B4, T_REFI_15_6, T_RFC_90}, /* 128M */
+> >>+	{B4, T_REFI_7_8,  T_RFC_90}, /* 256M */
+> >>+	{B4, T_REFI_7_8,  T_RFC_90}, /* 512M */
+> >>+	{B8, T_REFI_7_8, T_RFC_130}, /* 1GS4 */
+> >>+	{B8, T_REFI_3_9, T_RFC_130}, /* 2GS4 */
+> >>+	{B8, T_REFI_3_9, T_RFC_130}, /* 4G */
+> >>+	{B8, T_REFI_3_9, T_RFC_210}, /* 8G */
+> >>+	{B4, T_REFI_7_8, T_RFC_130}, /* 1GS2 */
+> >>+	{B4, T_REFI_3_9, T_RFC_130}, /* 2GS2 */
+> >>+};
+> >>+EXPORT_SYMBOL(lpddr2_jedec_addressing_table);
+> >
+> >EXPORT_SYMBOL_GPL for these and the others?
+> 
+> I have fixed these comments and pushed my latest patches at:
+> git://github.com/aneeshv/linux.git
+> branch: emif-upstream-v4
 
-Are these channels on the same wire in a time-division multiplexing, or on
-six different wires?  If it's a TDM, then the SSI can actually do this
-using "network mode", but I don't enable that in the driver, since it's
-not really I2S compliant.
+Sorry, but I don't take git pulls for stuff like this, please send all
+of the patches in email so it can be reviewed properly.
 
-Well, this point is not really relevant to the discussion.
+thanks,
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+greg k-h
