@@ -1,356 +1,84 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 16:00:27 +0800
-Subject: [PATCH v4 06/10] pwm: Add NVIDIA Tegra SoC support
-In-Reply-To: <1331740593-10807-7-git-send-email-thierry.reding@avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-7-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120316080025.GD7758@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 16 Mar 2012 17:07:03 +0900
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <CAEYLNCrGCmb5EJjURLY=EGfM=4N54MirNkCCyQRxqKEN3Eka8Q@mail.gmail.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com> <4F60E5C8.3040804@gmail.com>
+ <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+ <CAEYLNCp5e=86rpRi2C-5OJptTyEeXAn8JHhbWw_BqGzSaDD9wQ@mail.gmail.com>
+ <002a01cd0283$1f61b200$5e251600$%han@samsung.com>
+ <CAEYLNCrprPE60ZS=_OWuck0JCJMhCxzVErZwuwGpEDYkQq-hXg@mail.gmail.com>
+ <001d01cd0315$935cc720$ba165560$%han@samsung.com>
+ <CAEYLNCrGCmb5EJjURLY=EGfM=4N54MirNkCCyQRxqKEN3Eka8Q@mail.gmail.com>
+Message-ID: <002d01cd034b$c56f2b00$504d8100$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 04:56:29PM +0100, Thierry Reding wrote:
-> This commit adds a generic PWM framework driver for the PWFM controller
-> found on NVIDIA Tegra SoCs. The driver is based on code from the
-> Chromium kernel tree and was originally written by Gary King (NVIDIA)
-> and later modified by Simon Que (Chromium).
+
+
+> -----Original Message-----
+> From: Darius Augulis [mailto:augulis.darius at gmail.com]
+> Sent: Friday, March 16, 2012 4:47 PM
+> To: Jingoo Han
+> Cc: Thomas Abraham; linux-fbdev at vger.kernel.org; FlorianSchandinat at gmx.de; linux-arm-
+> kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; ben-linux at fluff.org; patches at linaro.org;
+> kgene.kim at samsung.com; Kyungmin Park; JeongHyeon Kim; Heiko Stuebner; Kwangwoo Lee; Mark Brown; Peter
+> Korsgaard; Maurus Cuelenaere; Tushar Behera
+> Subject: Re: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
-> Changes in v4:
->   - merge patch from ChromiumOS kernel to fix a rounding issue
->   - move DT code to patch 7
+> On Fri, Mar 16, 2012 at 3:39 AM, Jingoo Han <jg1.han@samsung.com> wrote:
 > 
-> Changes in v3:
->   - use pwm_device.hwpwm instead of recomputing it
->   - update pwm_ops for changes in patch 2
+> >> > So, your code can be removed.
+> >>
+> >> I don't think so. It does not break anything yet. One who make
+> >> changes, should ensure backwards compatibility, at least talking about
+> >> functionality and hardware (LCD) support, which was added few months
+> >> ago. Remember, we talk about kernel parameters line - now it lets
+> >> bootloader to select correct LCD size. After your changes, board with
+> >> 7" LCD wont show anything.
+> >
+> > [CC'ed Tushar Behera]
+> >
+> > Yes, your code is working. However, your code is bug.
 > 
-> Changes in v2:
->   - set pwm_chip.dev field
->   - rename clk_enb to enable
->   - introduce NUM_PWM macro instead of hard-coding the number of PWM
->     devices
->   - update comment in tegra_pwm_config
->   - fix coding-style for multi-line comments
->   - use module_platform_driver
->   - change license to GPL
+> it's not a bug, because it's working like it was intended to. it was
+> reviewed and accepted by maintainers before merging to main line.
+> you do not have rights to drop it because you don't like it.
+> You are doing changes - please do it correctly and do not break
+> existing functionality.
+> btw, you still not answered my question: why these two s3c_fb_pd_win
+> structures in mach-mini6410.c is a problem? They are declared on the
+> stack, but platform data uses only single one. mini6410 rewrites its
+> s3c-fb platform data with data from one of these two structures
+> dynamically. Why it's a bug? You want to remove this dynamic selection
+> which could be leaved there with reworked framework too.
+
+
+It's just bug.
+
+struct s3c_fb_pd_win should be used for windows of FIMD IP.
+It should not be used for selecting multi-LCDs.
+
+struct s3c_fb_pd_win should include information of windows of FIMD IP, s3c_fb_pd_win[0], s3c_fb_pd_win[1] represents window 0,
+window 1 of FIMD IP. However, your code includes information of LCD, it means that struct s3c_fb_pd_win represents 4.3" LCD, 7.0"
+LCD. It is wrong usage.
+
+
 > 
->  drivers/pwm/Kconfig     |   10 ++
->  drivers/pwm/Makefile    |    1 +
->  drivers/pwm/pwm-tegra.c |  256 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 267 insertions(+)
->  create mode 100644 drivers/pwm/pwm-tegra.c
-> 
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 93c1052..bda6f23 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -9,4 +9,14 @@ menuconfig PWM
->  
->  if PWM
->  
-> +config PWM_TEGRA
-> +	tristate "NVIDIA Tegra PWM support"
-> +	depends on ARCH_TEGRA
-> +	help
-> +	  Generic PWM framework driver for the PWFM controller found on NVIDIA
-> +	  Tegra SoCs.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-tegra.
-> +
->  endif
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index 3469c3d..12300f5 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -1 +1,2 @@
->  obj-$(CONFIG_PWM)		+= core.o
-> +obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-> diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
-> new file mode 100644
-> index 0000000..19540fc
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-tegra.c
-> @@ -0,0 +1,256 @@
-> +/*
-> + * drivers/pwm/pwm-tegra.c
-> + *
-> + * Tegra pulse-width-modulation controller driver
-> + *
-> + * Copyright (c) 2010, NVIDIA Corporation.
-> + * Based on arch/arm/plat-mxc/pwm.c by Sascha Hauer <s.hauer@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/pwm.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +#define PWM_ENABLE	(1 << 31)
-> +#define PWM_DUTY_WIDTH	8
-> +#define PWM_DUTY_SHIFT	16
-> +#define PWM_SCALE_WIDTH	13
-> +#define PWM_SCALE_SHIFT	0
-> +
-> +#define NUM_PWM 4
-> +
-> +struct tegra_pwm_chip {
-> +	struct pwm_chip		chip;
-> +	struct device		*dev;
-> +
-> +	struct clk		*clk;
-> +
-> +	int			enable[NUM_PWM];
-> +	void __iomem		*mmio_base;
-> +};
-> +
-> +static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
-> +{
-> +	return container_of(chip, struct tegra_pwm_chip, chip);
-> +}
-> +
-> +static inline int pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
-> +		unsigned long val)
-> +{
-> +	unsigned long offset = num << 4;
-> +	int rc;
-> +
-> +	rc = clk_enable(chip->clk);
-> +	if (WARN_ON(rc))
-> +		return rc;
-> +
-> +	writel(val, chip->mmio_base + offset);
-> +	clk_disable(chip->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		int duty_ns, int period_ns)
-> +{
-> +	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-> +	unsigned long long c;
-> +	unsigned long rate, hz;
-> +	u32 val = 0;
-> +
-
-Every pwm driver I have been looking at has some validation on
-parameters here, something like:
-
-	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
-		return -EINVAL;
-
-It's not needed for tegra, or the check on those platforms is
-unnecessary?
-
-> +	/*
-> +	 * Convert from duty_ns / period_ns to a fixed number of duty ticks
-> +	 * per (1 << PWM_DUTY_WIDTH) cycles and make sure to round to the
-> +	 * nearest integer during division.
-> +	 */
-> +	c = duty_ns * ((1 << PWM_DUTY_WIDTH) - 1) + period_ns / 2;
-> +	do_div(c, period_ns);
-> +
-> +	val = (u32)c << PWM_DUTY_SHIFT;
-> +
-> +	/*
-> +	 * Compute the prescaler value for which (1 << PWM_DUTY_WIDTH)
-> +	 * cycles at the PWM clock rate will take period_ns nanoseconds.
-> +	 */
-> +	rate = clk_get_rate(pc->clk) >> PWM_DUTY_WIDTH;
-> +	hz = 1000000000ul / period_ns;
-> +
-> +	rate = (rate + (hz / 2)) / hz;
-> +
-> +	/*
-> +	 * Since the actual PWM divider is the register's frequency divider
-> +	 * field minus 1, we need to decrement to get the correct value to
-> +	 * write to the register.
-> +	 */
-> +	if (rate > 0)
-> +		rate--;
-> +
-> +	/*
-> +	 * Make sure that the rate will fit in the register's frequency
-> +	 * divider field.
-> +	 */
-> +	if (rate >> PWM_SCALE_WIDTH)
-> +		return -EINVAL;
-> +
-> +	val |= (rate << PWM_SCALE_SHIFT);
-> +
-> +	/* If the PWM channel is enabled, keep it enabled */
-> +	if (pc->enable[pwm->hwpwm])
-> +		val |= PWM_ENABLE;
-> +
-> +	return pwm_writel(pc, pwm->hwpwm, val);
-> +}
-> +
-> +static int tegra_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-> +	int rc = 0;
-> +
-> +	if (!pc->enable[pwm->hwpwm]) {
-> +		rc = clk_enable(pc->clk);
-> +		if (!rc) {
-> +			unsigned long offset = pwm->hwpwm << 4;
-> +			u32 val;
-> +
-> +			val = readl(pc->mmio_base + offset);
-> +			val |= PWM_ENABLE;
-> +			writel(val, pc->mmio_base + offset);
-> +
-> +			pc->enable[pwm->hwpwm] = 1;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void tegra_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-> +
-> +	if (pc->enable[pwm->hwpwm]) {
-> +		unsigned long offset = pwm->hwpwm << 4;
-> +		u32 val;
-> +
-> +		val = readl(pc->mmio_base + offset);
-> +		val &= ~PWM_ENABLE;
-> +		writel(val, pc->mmio_base + offset);
-> +
-> +		clk_disable(pc->clk);
-> +		pc->enable[pwm->hwpwm] = 0;
-> +	}
-> +}
-> +
-> +static struct pwm_ops tegra_pwm_ops = {
-> +	.config = tegra_pwm_config,
-> +	.enable = tegra_pwm_enable,
-> +	.disable = tegra_pwm_disable,
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +static int tegra_pwm_probe(struct platform_device *pdev)
-> +{
-> +	struct tegra_pwm_chip *pwm;
-> +	struct resource *r;
-> +	int ret;
-> +
-> +	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-> +	if (!pwm) {
-> +		dev_err(&pdev->dev, "failed to allocate memory\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	pwm->dev = &pdev->dev;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!r) {
-> +		dev_err(&pdev->dev, "no memory resources defined\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	r = devm_request_mem_region(&pdev->dev, r->start, resource_size(r),
-> +			pdev->name);
-> +	if (!r) {
-> +		dev_err(&pdev->dev, "failed to request memory\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	pwm->mmio_base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +	if (!pwm->mmio_base) {
-> +		dev_err(&pdev->dev, "failed to ioremap() region\n");
-> +		return -ENODEV;
-> +	}
-> +
-
-The helper devm_request_and_ioremap() can help here?
-
-> +	platform_set_drvdata(pdev, pwm);
-> +
-> +	pwm->clk = clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(pwm->clk))
-> +		return PTR_ERR(pwm->clk);
-> +
-> +	pwm->chip.dev = &pdev->dev;
-> +	pwm->chip.ops = &tegra_pwm_ops;
-> +	pwm->chip.base = -1;
-> +	pwm->chip.npwm = NUM_PWM;
-> +
-> +	ret = pwmchip_add(&pwm->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
-> +		clk_put(pwm->clk);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __devexit tegra_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct tegra_pwm_chip *pwm = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	if (WARN_ON(!pwm))
-> +		return -ENODEV;
-> +
-> +	pwmchip_remove(&pwm->chip);
-> +
-> +	for (i = 0; i < NUM_PWM; i++) {
-> +		pwm_writel(pwm, i, 0);
-> +
-> +		if (pwm->enable[i])
-> +			clk_disable(pwm->clk);
-> +	}
-> +
-> +	clk_put(pwm->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver tegra_pwm_driver = {
-> +	.driver = {
-> +		.name = "tegra-pwm",
-> +	},
-> +	.probe = tegra_pwm_probe,
-> +	.remove = __devexit_p(tegra_pwm_remove),
-> +};
-> +
-I would remove this blank line.
-
-> +module_platform_driver(tegra_pwm_driver);
-
-Regards,
-Shawn
-
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("NVIDIA Corporation");
-> -- 
-> 1.7.9.4
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> > 'struct s3c_fb_pd_win' is used not for LCD, but for windows of FIMD IP. So, 'struct s3c_fb_pd_win'
+> should not be used to select LCD.
+> > The mach-aquila.c uses two 'struct s3c_fb_pd_win' like you, however 'struct s3c_fb_pd_win' don't make
+> problem with Thomas's
+> > patchset. It is because mach-aquila.c use 'struct s3c_fb_pd_win' for only windows of FIMD IP.
+> > We don't have to responsibility to keep wrong code. If you have kept the rule, Thomas's patch would
+> not make the compatibility
+> > problem with your code. Why we should keep aberration such as your code? If you want to select two
+> LCDs, please find other way.
+> >
+> >
+> >>
+> >> Darius A.
+> >
