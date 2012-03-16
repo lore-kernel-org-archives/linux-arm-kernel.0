@@ -1,33 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 13:12:47 +0000
-Subject: [PULL 01/02 v2] AT91 DT2 pull request
-In-Reply-To: <20120315164129.GD7757@game.jcrosoft.org>
-References: <20120315155443.GB7757@game.jcrosoft.org>
- <20120315164129.GD7757@game.jcrosoft.org>
-Message-ID: <201203161312.47925.arnd@arndb.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 16 Mar 2012 14:11:29 +0100
+Subject: [PATCH v5] ARM: SPEAr600: Add device-tree support to SPEAr600
+ boards
+In-Reply-To: <1331903003-14045-1-git-send-email-sr@denx.de>
+References: <1331903003-14045-1-git-send-email-sr@denx.de>
+Message-ID: <20120316131129.GH7757@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
->         please find a pull with DT update for AT91
->         based on cleanup2 + DT previously pull
+On 14:03 Fri 16 Mar     , Stefan Roese wrote:
+> This patch adds a generic target for SPEAr600 board that can be
+> configured via the device-tree. Currently the following devices
+> are supported via the devicetree:
 > 
->         with :
+> - VIC interrupts
+> - PL011 UART
+> - PL061 GPIO
+> - Synopsys DW I2C
+> - Synopsys DW ethernet
 > 
->          - OF: boolean
->          - NAND (with generic bining and at91 fixed)
->          - RAM Controller
->          - i2c/gpio (binding + soc)
->          - PMC
->          - Reset Controller
->          - Shutdown Controller
->          - USB OHCI & ECHO (Acked)
+> Other peripheral devices (e.g. SMI flash, FSMC NAND flash etc) will
+> follow in later patches.
 > 
->          v2: missing usb host
+> Only the spear600-evb is currently supported. Other SPEAr600
+> based boards will follow later.
+> 
+> Since the current mainline SPEAr600 code only supports the SPEAr600
+> evaluation board, with nearly zero peripheral devices (only UART
+> and GPIO), it makes sense to switch over to DT based configuration
+> completely now. So this patch also removes all non-DT stuff, mainly
+> platform device data. The files spear600.c and spear600_evb.c are
+> removed completely.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Acked-by: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Pulled both 01 and 02 into the next/dt branch now, this is all
-very good stuff!
 
-Thanks,
+I'm not a fan to have non Documented DT binding butthey are basic so ok
 
-	Arnd
+Best Regards,
+J.
