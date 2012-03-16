@@ -1,83 +1,73 @@
-From: Maximilian.Schwerin@tigris.de (Maximilian Schwerin)
-Date: Fri, 16 Mar 2012 10:26:49 +0100
-Subject: AW: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to
- add IVA OPP
-In-Reply-To: <8762e6et1u.fsf@ti.com>
-Message-ID: <5448984682E7954C9BFF27F747A9C6CA56D6A8@dolphin.TIGRIS.local>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 Mar 2012 10:27:39 +0100
+Subject: [PATCH 1/3] ARM i.MX: Move i.MX pwm driver to pwm framework
+In-Reply-To: <20120316081748.GF7758@S2101-09.ap.freescale.net>
+References: <1331802277-12477-1-git-send-email-s.hauer@pengutronix.de>
+ <1331802277-12477-2-git-send-email-s.hauer@pengutronix.de>
+ <20120316074902.GC7758@S2101-09.ap.freescale.net>
+ <20120316080832.GA6458@avionic-0098.mockup.avionic-design.de>
+ <20120316081748.GF7758@S2101-09.ap.freescale.net>
+Message-ID: <20120316092739.GH3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Von: Kevin Hilman [mailto:khilman at ti.com] 
+On Fri, Mar 16, 2012 at 04:17:51PM +0800, Shawn Guo wrote:
+> On Fri, Mar 16, 2012 at 09:08:32AM +0100, Thierry Reding wrote:
+> > * Shawn Guo wrote:
+> > > On Thu, Mar 15, 2012 at 10:04:35AM +0100, Sascha Hauer wrote:
+> > > > diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> > > > index e859c51..fc7571e 100644
+> > > > --- a/drivers/pwm/Makefile
+> > > > +++ b/drivers/pwm/Makefile
+> > > > @@ -1,4 +1,5 @@
+> > > >  obj-$(CONFIG_PWM)		+= core.o
+> > > >  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
+> > > > +obj-$(CONFIG_PWM_IMX)		+= imx-pwm.o
+> > > 
+> > > s/imx-pwm.o/pwm-imx.o
+> > 
+> > Yes, I'll make that change when I integrate the patch in my series.
+> > 
+> Thanks for taking this on.
 > 
-> "Menon, Nishanth" <nm@ti.com> writes:
+> > > > @@ -98,7 +98,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+> > > >  		else
+> > > >  			cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
+> > > >  
+> > > > -		writel(cr, pwm->mmio_base + MX3_PWMCR);
+> > > > +		writel(cr, imxpwm->mmio_base + MX3_PWMCR);
+> > > >  	} else if (cpu_is_mx1() || cpu_is_mx21()) {
+> > > 
+> > > Since we are here, can we move one step further to get rid of these
+> > > cpu_is_xxx()?  Then, we can remove <mach/hardware.h> inclusion from
+> > > the driver.
+> > 
+> > I guess this could be handled by using several names for the driver and
+> > handling the differences using a table of platform_device_id:s. Perhaps
+> > you had something different in mind?
+> > 
+> Same thing on my mind.
 > 
-> > On Wed, Mar 14, 2012 at 16:15, Kevin Hilman <khilman@ti.com> wrote:
-> >> Maximilian Schwerin <mvs@tigris.de> writes:
-> >>
-> >>> From: Steve Sakoman <steve@sakoman.com>
-> >>>
-> >>> Don't try to add IVA OPPs for OMAP3 versions not containing an IVA
-> >>> subsystem, as this would make omap_init_opp_table fail.
-> >>>
-> >>> Signed-off-by: Steve Sakoman <steve@sakoman.com>
-> >>> Signed-off-by: Maximilian Schwerin <mvs@tigris.de>
-> >>
-> >> Minor: patch subjects for arch/arm/* core code need to 
-> have the ARM:
-> >> prefix also.
-> >>
-> >> Also, please run scripts/checkpatch.pl on your patch and fix the
-> >> warnings.
-> >>
-> >>> ---
-> >>> ?arch/arm/mach-omap2/opp.c | ? ?4 ++++
-> >>> ?1 files changed, 4 insertions(+), 0 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
-> >>> index 9262a6b..414f2ec 100644
-> >>> --- a/arch/arm/mach-omap2/opp.c
-> >>> +++ b/arch/arm/mach-omap2/opp.c
-> >>> @@ -62,6 +62,10 @@ int __init omap_init_opp_table(struct 
-> omap_opp_def *opp_def,
-> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, i);
-> >>> ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
-> >>> ? ? ? ? ? ? ? }
-> >>> +
-> >>> + ? ? ? ? ? ? if ((strcmp(opp_def->hwmod_name,"iva") == 
-> 0) && !omap3_has_iva())
-> >>> + ? ? ? ? ? ? ? ? ? ? continue;
-> >>> +
-> >>> ? ? ? ? ? ? ? oh = omap_hwmod_lookup(opp_def->hwmod_name);
-> >>> ? ? ? ? ? ? ? if (!oh || !oh->od) {
-> >>> ? ? ? ? ? ? ? ? ? ? ? pr_warn("%s: no hwmod or odev for %s, [%d] "
-> >>
-> >> Wouldn't the one-liner below do the same thing?
-> >>
-> >> Actually, your patch makes it less noisy at boot time, avoiding the
-> >> pr_warn(), so is probably better.
-> >
-> > The only issue i have with current patch is that it 
-> focusses to solve
-> > a specific device IVA.
-> > we could have similar variances if we had SGX/AESS device etc
-> > registered in the common
-> > table. a generic solution might be preferable - could we reduce the
-> > severity of pr_warn to pr_debug and do a continue instead?
-> 
-> I agree, that would be a better generic solution.
-> 
-> Kevin
->
+> > > >  static int __devinit mxc_pwm_probe(struct platform_device *pdev)
+> > > 
+> > > Should we take this opportunity to rename the driver from mxc_pwm to
+> > > imx_pwm?
+> > 
+> > If we decide to rename maybe it should be done in two steps. First it can be
+> > renamed internally and in the second step the name could be changed along
+> > with all users. I just want to avoid too much churn in this series, which is
+> > already growing way larger than I had hoped.
+> > 
+> It seems I'm asking too much.  Okay, we can do that after it gets moved.
 
-This is a pragmatic and simple solution for a well understood problem with no side effects. Why not fix the problem now and do the generic solution later on? 
+Indeed. The pwm driver became a horrible piece of code over time, it's
+time to refactor it. I just wanted to make the move first, then look for
+further cleanups.
 
-I'm not a fulltime kernel dev. I have about two weeks to get my new board out to my customer... Every time I set up a new board, I have to fix problems using known patches that are sometimes years old. Every patch I have to find costs me hours of time I really don't have. 
+Sascha
 
-Just my two cents (euro cents of course :-), Maximilian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120316/16737b2b/attachment.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
