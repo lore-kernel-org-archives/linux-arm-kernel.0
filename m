@@ -1,73 +1,151 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Mar 2012 04:21:29 +0000
-Subject: [PATCH 9/9] ARM: kirkwood: use devicetree for rtc-mv
+Date: Fri, 16 Mar 2012 04:21:25 +0000
+Subject: [PATCH 5/9] ARM: kirkwood: fdt: absorb kirkwood_init()
 In-Reply-To: <cover.1331868507.git.jason@lakedaemon.net>
 References: <cover.1331868507.git.jason@lakedaemon.net>
-Message-ID: <ed16b33e93ffe131e6cfd1d2baab6168a0b6bdbd.1331868507.git.jason@lakedaemon.net>
+Message-ID: <3e7f2d60b6c828d98de65c996c66728d5838f7e4.1331868507.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/boot/dts/kirkwood.dtsi   |    6 ++++++
- arch/arm/mach-kirkwood/board-dt.c |    1 -
- arch/arm/mach-kirkwood/common.c   |    2 +-
- arch/arm/mach-kirkwood/common.h   |    1 -
- 4 files changed, 7 insertions(+), 3 deletions(-)
+We need to absorb kirkwood_init() into kirkwood_dt_init() so that as we
+convert drivers, we can remove the platform call, eg
+kirkwood_rtc_init().  This maintains compatibility with non-fdt
+configurations because they still call kirkwood_init() in common.c.
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 825310b..3474ef8 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -26,5 +26,11 @@
- 			/* set clock-frequency in board dts */
- 			status = "disabled";
- 		};
-+
-+		rtc at 10300 {
-+			compatible = "mrvl,kirkwood-rtc", "mrvl,orion-rtc";
-+			reg = <0x10300 0x20>;
-+			interrupts = <53>;
-+		};
- 	};
- };
+As drivers are converted, we will reinstate the 'static' qualifier in
+common.c.
+
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ arch/arm/mach-kirkwood/board-dt.c |   29 ++++++++++++++++++++++++++++-
+ arch/arm/mach-kirkwood/common.c   |   12 ++++++------
+ arch/arm/mach-kirkwood/common.h   |    8 ++++++++
+ 3 files changed, 42 insertions(+), 7 deletions(-)
+
 diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 975ad01..1c672d9 100644
+index fbe6405..9bd35ac 100644
 --- a/arch/arm/mach-kirkwood/board-dt.c
 +++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -43,7 +43,6 @@ static void __init kirkwood_dt_init(void)
- #endif
+@@ -29,7 +29,9 @@
+ #include <linux/spi/orion_spi.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ #include <mach/kirkwood.h>
++#include <mach/bridge-regs.h>
+ #include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+@@ -155,7 +157,32 @@ static void __init dreamplug_init(void)
  
- 	/* internal devices that every board has */
--	kirkwood_rtc_init();
- 	kirkwood_wdt_init();
- 	kirkwood_xor0_init();
- 	kirkwood_xor1_init();
+ static void __init kirkwood_dt_init(void)
+ {
+-	kirkwood_init();
++	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
++
++	/*
++	 * Disable propagation of mbus errors to the CPU local bus,
++	 * as this causes mbus errors (which can occur for example
++	 * for PCI aborts) to throw CPU aborts, which we're not set
++	 * up to deal with.
++	 */
++	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
++
++	kirkwood_setup_cpu_mbus();
++
++#ifdef CONFIG_CACHE_FEROCEON_L2
++	kirkwood_l2_init();
++#endif
++
++	/* internal devices that every board has */
++	kirkwood_rtc_init();
++	kirkwood_wdt_init();
++	kirkwood_xor0_init();
++	kirkwood_xor1_init();
++	kirkwood_crypto_init();
++
++#ifdef CONFIG_KEXEC
++	kexec_reinit = kirkwood_enable_pcie;
++#endif
+ 
+ 	if (of_machine_is_compatible("globalscale,dreamplug"))
+ 		dreamplug_init();
 diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 04a7eb9..a02cae8 100644
+index 79a9fe7..04a7eb9 100644
 --- a/arch/arm/mach-kirkwood/common.c
 +++ b/arch/arm/mach-kirkwood/common.c
 @@ -163,7 +163,7 @@ void __init kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
  /*****************************************************************************
   * SoC RTC
   ****************************************************************************/
--void __init kirkwood_rtc_init(void)
-+static void __init kirkwood_rtc_init(void)
+-static void __init kirkwood_rtc_init(void)
++void __init kirkwood_rtc_init(void)
  {
  	orion_rtc_init(RTC_PHYS_BASE, IRQ_KIRKWOOD_RTC);
  }
+@@ -279,7 +279,7 @@ void __init kirkwood_crypto_init(void)
+ /*****************************************************************************
+  * XOR0
+  ****************************************************************************/
+-static void __init kirkwood_xor0_init(void)
++void __init kirkwood_xor0_init(void)
+ {
+ 	kirkwood_clk_ctrl |= CGC_XOR0;
+ 
+@@ -291,7 +291,7 @@ static void __init kirkwood_xor0_init(void)
+ /*****************************************************************************
+  * XOR1
+  ****************************************************************************/
+-static void __init kirkwood_xor1_init(void)
++void __init kirkwood_xor1_init(void)
+ {
+ 	kirkwood_clk_ctrl |= CGC_XOR1;
+ 
+@@ -303,7 +303,7 @@ static void __init kirkwood_xor1_init(void)
+ /*****************************************************************************
+  * Watchdog
+  ****************************************************************************/
+-static void __init kirkwood_wdt_init(void)
++void __init kirkwood_wdt_init(void)
+ {
+ 	orion_wdt_init(kirkwood_tclk);
+ }
+@@ -392,7 +392,7 @@ void __init kirkwood_audio_init(void)
+ /*
+  * Identify device ID and revision.
+  */
+-static char * __init kirkwood_id(void)
++char * __init kirkwood_id(void)
+ {
+ 	u32 dev, rev;
+ 
+@@ -435,7 +435,7 @@ static char * __init kirkwood_id(void)
+ 	}
+ }
+ 
+-static void __init kirkwood_l2_init(void)
++void __init kirkwood_l2_init(void)
+ {
+ #ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+ 	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
 diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 4737578..fa8e768 100644
+index 9071a39..c382447 100644
 --- a/arch/arm/mach-kirkwood/common.h
 +++ b/arch/arm/mach-kirkwood/common.h
-@@ -61,7 +61,6 @@ static inline void dreamplug_init(void) {};
- /* early init functions not converted to fdt yet */
- char *kirkwood_id(void);
- void kirkwood_l2_init(void);
--void kirkwood_rtc_init(void);
- void kirkwood_wdt_init(void);
- void kirkwood_xor0_init(void);
- void kirkwood_xor1_init(void);
+@@ -51,6 +51,14 @@ void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts, int (*dev
+ void kirkwood_audio_init(void);
+ void kirkwood_restart(char, const char *);
+ 
++char *kirkwood_id(void);
++void kirkwood_l2_init(void);
++void kirkwood_rtc_init(void);
++void kirkwood_wdt_init(void);
++void kirkwood_xor0_init(void);
++void kirkwood_xor1_init(void);
++void kirkwood_crypto_init(void);
++
+ extern int kirkwood_tclk;
+ extern struct sys_timer kirkwood_timer;
+ 
 -- 
 1.7.3.4
