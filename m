@@ -1,35 +1,66 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Fri, 16 Mar 2012 14:40:13 +0100
-Subject: [PATCH] pxa/hx4700: fix the LCD initialization
-Message-ID: <1331905213.29979.1.camel@flow>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 16 Mar 2012 14:46:28 +0100
+Subject: [PATCH 0/2] omap: board file changes to support dynamic irq alloc
+In-Reply-To: <1331900647-3508-1-git-send-email-tarun.kanti@ti.com>
+References: <1331900647-3508-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4F634434.3080707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common sense and the SDG bootldr code reference dictate that
-N2.7V/7.3V be disabled here, and not LVDD, which already was
-disabled 10 ms earlier.
-This should only have an effect if the LCD was enabled in the
-bootloader.
+Hi Tarun,
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Paul Parsons <lost.distance@yahoo.com>
----
- arch/arm/mach-pxa/hx4700.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On 3/16/2012 1:24 PM, Tarun Kanti DebBarma wrote:
+> These two patches incorporate changes to OMAP1 and OMAP2 platforms
+> board files whereby older references to OMAP_GPIO_IRQ macro are
+> now replaced with gpio_to_irq(), thereby getting rid of static
+> irq references.
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 61bb967..31c6dd1 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -399,7 +399,7 @@ static void sony_lcd_init(void)
- 	gpio_set_value(GPIO62_HX4700_LCD_nRESET, 0);
- 	mdelay(10);
- 	gpio_set_value(GPIO59_HX4700_LCD_PC1, 0);
--	gpio_set_value(GPIO110_HX4700_LCD_LVDD_3V3_ON, 0);
-+	gpio_set_value(GPIO112_HX4700_LCD_N2V7_7V3_ON, 0);
- 	mdelay(20);
+Thanks for the board fix / cleanup.
+
+...
+
+>   arch/arm/mach-omap1/board-h2.c               |    8 ++++----
+>   arch/arm/mach-omap1/board-h3.c               |    8 ++++----
+>   arch/arm/mach-omap1/board-htcherald.c        |    6 +++---
+>   arch/arm/mach-omap1/board-innovator.c        |    4 ++--
+>   arch/arm/mach-omap1/board-nokia770.c         |    1 +
+>   arch/arm/mach-omap1/board-osk.c              |   12 ++++++------
+>   arch/arm/mach-omap1/board-palmte.c           |    2 +-
+>   arch/arm/mach-omap1/board-palmtt.c           |    2 +-
+>   arch/arm/mach-omap1/board-palmz71.c          |    2 +-
+>   arch/arm/mach-omap1/board-voiceblue.c        |   16 +++++++---------
+>   arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
+>   arch/arm/mach-omap2/board-4430sdp.c          |    2 +-
+>   arch/arm/mach-omap2/board-apollon.c          |    6 ++++--
+>   arch/arm/mach-omap2/board-devkit8000.c       |    3 ++-
+>   arch/arm/mach-omap2/board-h4.c               |    2 +-
+>   arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+>   arch/arm/mach-omap2/board-omap4panda.c       |    2 +-
+>   arch/arm/mach-omap2/board-rx51-peripherals.c |    3 ++-
+>   arch/arm/mach-omap2/board-zoom-debugboard.c  |    3 ++-
+>   arch/arm/mach-omap2/board-zoom-peripherals.c |    6 ++++--
+>   arch/arm/mach-omap2/common-board-devices.c   |    2 +-
+
+I guess, you should be able to remove even the MACRO definition? 
+
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index 9e86ee0..d4df414 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -158,10 +158,6 @@
+ #define OMAP_MPUIO(nr)         (OMAP_MAX_GPIO_LINES + (nr))
+ #define OMAP_GPIO_IS_MPUIO(nr) ((nr) >= OMAP_MAX_GPIO_LINES)
  
- 	gpio_set_value(GPIO110_HX4700_LCD_LVDD_3V3_ON, 1);
--- 
-1.7.9.1
+-#define OMAP_GPIO_IRQ(nr)      (OMAP_GPIO_IS_MPUIO(nr) ? \
+-                                IH_MPUIO_BASE + ((nr) & 0x0f) : \
+-                                IH_GPIO_BASE + (nr))
+-
+ #define METHOD_MPUIO           0
+ #define METHOD_GPIO_1510       1
+ #define METHOD_GPIO_1610       2
+
+
+It will avoid that people use it going forward.
+
+Regards,
+Benoit
