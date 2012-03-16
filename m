@@ -1,63 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 12:14:35 +0000
-Subject: [PATCH v4] ARM: SPEAr600: Add device-tree support to SPEAr600
- boards
-In-Reply-To: <1331890216-8361-1-git-send-email-sr@denx.de>
-References: <1331890216-8361-1-git-send-email-sr@denx.de>
-Message-ID: <201203161214.35929.arnd@arndb.de>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Fri, 16 Mar 2012 12:18:05 +0000
+Subject: [PATCH v7 1/3] Documentation: common clk API
+In-Reply-To: <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
+References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
+ <alpine.LFD.2.02.1203161129010.2466@ionos>
+ <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
+Message-ID: <201203161218.05125.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012, Stefan Roese wrote:
+On Friday 16 March 2012, Amit Kucheria wrote:
+> On Fri, Mar 16, 2012 at 12:29 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> > On Fri, 16 Mar 2012, Linus Walleij wrote:
+> >
+> >> On Fri, Mar 16, 2012 at 7:11 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> >>
+> >> > Provide documentation for the common clk structures and APIs.  This code
+> >> > can be found in drivers/clk/ and include/linux/clk*.h.
+> >>
+> >> Acked-by: Linus Wallej <linus.walleij@linaro.org>
+> >> For this three-piece v7 patchset.
+> >>
+> >> It already does magnitudes more advanced stuff than what I need
+> >> so I'm pretty pleased, any remaining details can surely be ironed out
+> >> in-tree.
+> >
+> > Ack. We really need to get that in now and sort out the details in
+> > tree otherwise we will never finish that thing.
+> >
+> 
+> Thomas, Russell, Arnd,
+> 
+> Can we shoe-horn this thing into 3.4 (it is a bit late, i know) so
+> that platform ports can gather speed? Several people are waiting for a
+> somewhat stable version before starting their ports.
+> 
+> And what is the path into mainline - will Russell carry it or Arnd
+> (with Russell's blessing)?
 
-> v4:
-> - Added memory node to all dts/dtsi files
-> - Reorganizes bus topology in the dtsi file, to match the
->   real SoC layout
+I would suggest putting it into a late/* branch of arm-soc so it finally
+gets some linux-next exposure, and then sending it in the second week of the
+merge window.
 
-Looks good.
-
-> +
-> +	ahb {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		ranges;
-> +
-> +		vic0: interrupt-controller at f1100000 {
-> +			compatible = "arm,pl190-vic";
-> +			interrupt-controller;
-> +			reg = <0xf1100000 0x1000>;
-> +			#interrupt-cells = <1>;
-> +		};
-> +
-> ...
-> +		apb {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			compatible = "simple-bus";
-> +			ranges;
-> +
-> +			serial at d0000000 {
-> +				compatible = "arm,pl011", "arm,primecell";
-> +				reg = <0xd0000000 0x1000>;
-> +				interrupt-parent = <&vic0>;
-> +				interrupts = <24>;
-> +			};
-> ...
-> +		};
-> +	};
-> +};
-
-I would prefer to see non-empty ranges properties here. I expected the
-buses to be contiguous address ranges per bus, but apparently that
-is not the case -- you have 0xd... and 0xf... on both of them.
-
-The simplest ranges property would be to have in the ahb node:
-
-	ranges = <0xd0000000 0xd0000000 0x30000000>;
-
-Which just means that the bus is limited to those addresses (if that is
-indeed the case -- I don't know much about ahb and apb).
+Russell, please let me know if you want to carry it instead or if you
+have found any last-minute show stoppers in the code.
 
 	Arnd
