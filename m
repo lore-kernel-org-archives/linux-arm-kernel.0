@@ -1,21 +1,41 @@
-From: arjan@linux.intel.com (Arjan van de Ven)
-Date: Thu, 15 Mar 2012 18:52:05 -0700
-Subject: [PATCHv2 3/5] cpuidle: add support for states that affect multiple
- cpus
-In-Reply-To: <CAMbhsRS3J2vruru8i4r1-cB9aJLYW9y1bP0vv7=L3q1JP77ttg@mail.gmail.com>
-References: <1331749794-8056-1-git-send-email-ccross@android.com>
- <1331749794-8056-4-git-send-email-ccross@android.com> <87lin18l7o.fsf@ti.com>
- <CAMbhsRS3J2vruru8i4r1-cB9aJLYW9y1bP0vv7=L3q1JP77ttg@mail.gmail.com>
-Message-ID: <4F629CC5.60402@linux.intel.com>
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Fri, 16 Mar 2012 01:55:01 +0000
+Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
+ codec-handle
+In-Reply-To: <20120316012711.GD6065@S2101-09.ap.freescale.net>
+References: <20120309013216.GH2499@S2101-09.ap.freescale.net>
+ <4F5FD706.8040209@freescale.com>
+ <20120313234638.GY3177@opensource.wolfsonmicro.com>
+ <4F6008FA.3040805@freescale.com>
+ <20120314122723.GC3133@opensource.wolfsonmicro.com>
+ <4F612319.50302@freescale.com>
+ <20120315130253.GA6065@S2101-09.ap.freescale.net>
+ <4F61F080.4090800@freescale.com>
+ <20120315142115.GB6065@S2101-09.ap.freescale.net>
+ <4F621D09.2080806@freescale.com>
+ <20120316012711.GD6065@S2101-09.ap.freescale.net>
+Message-ID: <4F629D71.3050102@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2012 5:20 PM, Colin Cross wrote:
-> Oops, dropped the atomic_dec when I merged from two separate functions
-> for up and down to a single function that takes a bool.
+Shawn Guo wrote:
+> Hmm, Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
+> is the binding document specifically for imx-sgtl5000 driver rather
+> than for all fsl_ssi based machine drivers.  Since I have never seen
+> and doubt will ever see the setup that two SSIs connect to two
+> sgtl5000 codecs on any imx board, I do not see much point to update
+> the documentation for that.
+>
+> If this is indeed a practical setup for PowerPC, it can be documented
+> in the binding for PowerPC machine driver when there is future PowerPC
+> machine drivers adopting the new binding.
 
-generally in Linux we tend to not like "multiplexer" common functions
-like this.
+Ok.  I was going to say that I'd like to see a template that applies to 
+all SOCs with an SSI, but I guess that won't be that useful.
 
-my suggestion: make your current function a __ prefixed one, then
-provide 2 small inlines that call the __ one...
+I'm just concerned that if there's no standard way to create bindings for 
+machine drivers, we're going to end up with some kind of mess down the road.
+
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
