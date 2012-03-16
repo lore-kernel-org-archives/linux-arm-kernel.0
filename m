@@ -1,31 +1,36 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 16 Mar 2012 11:29:49 +0100 (CET)
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <CACRpkdbXq7zX_XrvAOJc7U6=T0Aaoq+U9_GmZS4fVmVd_arC7A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 Mar 2012 11:57:09 +0100
+Subject: [PATCH v7 0/3] common clk framework
+In-Reply-To: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
 References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <1331878280-2758-2-git-send-email-mturquette@linaro.org>
- <CACRpkdbXq7zX_XrvAOJc7U6=T0Aaoq+U9_GmZS4fVmVd_arC7A@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1203161129010.2466@ionos>
+Message-ID: <20120316105709.GC29317@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Mar 2012, Linus Walleij wrote:
-
-> On Fri, Mar 16, 2012 at 7:11 AM, Mike Turquette <mturquette@linaro.org> wrote:
+On Thu, Mar 15, 2012 at 11:11:17PM -0700, Mike Turquette wrote:
+> The common clock framework defines a common struct clk as well as an
+> implementation of the clk api that unifies clock operations on various
+> platforms and devices.
 > 
-> > Provide documentation for the common clk structures and APIs. ?This code
-> > can be found in drivers/clk/ and include/linux/clk*.h.
+> The net result is consolidation of many different struct clk definitions
+> and platform-specific clock framework implementations.
 > 
-> Acked-by: Linus Wallej <linus.walleij@linaro.org>
-> For this three-piece v7 patchset.
-> 
-> It already does magnitudes more advanced stuff than what I need
-> so I'm pretty pleased, any remaining details can surely be ironed out
-> in-tree.
+> This series is the feature freeze for the common clock framework.
+> Unless any major bugs are reported this should be the final version of
+> this patchset.  Now is the time to add any acked-by's, reviewed-by's or
+> tested-by's.  I've carried over the *-by's from v6; I hope everyone is
+> OK with that.
 
-Ack. We really need to get that in now and sort out the details in
-tree otherwise we will never finish that thing.
+Nice work, thanks again Mike. I gave it a test on various i.MX SoCs and
+I can give you my:
 
-Thanks,
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-	tglx
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
