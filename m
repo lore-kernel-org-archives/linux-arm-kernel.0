@@ -1,8 +1,8 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 12:05:11 +0800
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Fri, 16 Mar 2012 04:08:32 +0000
 Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
  codec-handle
-In-Reply-To: <4F62B941.5010306@freescale.com>
+In-Reply-To: <20120316035254.GF6065@S2101-09.ap.freescale.net>
 References: <20120313234638.GY3177@opensource.wolfsonmicro.com>
  <4F6008FA.3040805@freescale.com>
  <20120314122723.GC3133@opensource.wolfsonmicro.com>
@@ -11,74 +11,22 @@ References: <20120313234638.GY3177@opensource.wolfsonmicro.com>
  <4F621C60.5090700@freescale.com>
  <20120316020111.GE6065@S2101-09.ap.freescale.net>
  <4F62A06C.5000304@freescale.com>
- <20120316025219.GB7632@S2101-09.ap.freescale.net>
- <4F62B941.5010306@freescale.com>
-Message-ID: <20120316040509.GA7758@S2101-09.ap.freescale.net>
+ <20120316022345.GA7632@S2101-09.ap.freescale.net>
+ <4F62B729.2090902@freescale.com>
+ <20120316035254.GF6065@S2101-09.ap.freescale.net>
+Message-ID: <4F62BCBE.7030806@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 03:53:39AM +0000, Tabi Timur-B04825 wrote:
-> Shawn Guo wrote:
-> > So something like this?
-> >
-> >          /*
-> >           * If codec-handle property is missing from SSI node, we assume
-> >           * that the machine driver uses new binding which does not require
-> >           * SSI driver to trigger machine driver's probe.
-> >           */
-> >          if (!of_get_property(np, "codec-handle", NULL)) {
-> >                  if (ssi_private->ssi_on_imx) {
-> >                          ssi_private->imx_pcm_pdev =
-> >                                  platform_device_register_simple("imx-pcm-audio",
-> >                                                                  -1, NULL, 0);
-> >                          if (IS_ERR(ssi_private->imx_pcm_pdev)) {
-> >                                  ret = PTR_ERR(ssi_private->imx_pcm_pdev);
-> >                                  goto error_dev;
-> >                          }
-> >                  }
-> >                  /* success for new binding case */
-> >                  return 0;
-> >          }
-> >
-> > It does not reduce any reference to "imx" actually.  If you think it's
-> > worth another iteration of the series, I will post v5 for it.
-> 
-> I had something more like this in mind:
-> 
->          /*
->           * If codec-handle property is missing from SSI node, we assume
->           * that the machine driver uses new binding which does not require
->           * SSI driver to trigger machine driver's probe.
->           */
->          if (!of_get_property(np, "codec-handle", NULL))
-> 		ssi_private->new_binding = true;
-> 
-> 
-> 	if (ssi_private->ssi_on_imx) {
->                  ssi_private->imx_pcm_pdev =
->                  	platform_device_register_simple("imx-pcm-audio",
->                                                                  -1, NULL, 0);
->                          if (IS_ERR(ssi_private->imx_pcm_pdev)) {
->                                  ret = PTR_ERR(ssi_private->imx_pcm_pdev);
->                                  goto error_dev;
->                          }
->                  }
->                  /* success for new binding case */
->                  return 0;
->          }
-> 
-> Well, it's not perfect, but the idea is that we keep track of new vs. old 
-> binding separately from imx vs. powerpc.
+Shawn Guo wrote:
+> But it's instantiated as a dmaengine device backed by dmaengine driver
+> drivers/dma/imx-dma.c.  "imx-pcm-audio" will just be an ASoC dmaengine
+> client using dmaengine API.
 
-Fine with me.
-
-> Although I'm thinking there 
-> might be a way to general the call to platform_device_register_simple. 
-> Maybe we could put "imx-pcm-audio" in the device tree?
-> 
-It seems a little bit abuse of device tree to me.  My first choice was
-to do that in imx-sgtl5000 machine driver.  But Mark disagrees.
+So you don't have the equivalent of sound/soc/fsl_dma.c?  Don't you need 
+to program the DMA controller specifically for audio?  There's no way I 
+could use drivers/dma/fsldma.c for audio.
 
 -- 
-Regards,
-Shawn
+Timur Tabi
+Linux kernel developer at Freescale
