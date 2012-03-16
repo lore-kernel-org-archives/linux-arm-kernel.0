@@ -1,81 +1,55 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Mar 2012 04:21:27 +0000
-Subject: [PATCH 7/9] ARM: kirkwood: fdt: define uart[01] as disabled,
- enable uart0
+Date: Fri, 16 Mar 2012 04:21:28 +0000
+Subject: [PATCH 8/9 v2] ARM: kirkwood: rtc-mv devicetree bindings
 In-Reply-To: <cover.1331868507.git.jason@lakedaemon.net>
 References: <cover.1331868507.git.jason@lakedaemon.net>
-Message-ID: <df6c6160b649e0f4bbf032be5428691378eda244.1331868507.git.jason@lakedaemon.net>
+Message-ID: <45356e7e743479397bb661225beb68df5dd0947d.1331868507.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define both uarts in kirkwood.dtsi as they are common to all kirkwood
-SoCs.  Each board may enable all or none of them, so they are disabled
-by default.  uart0 is enabled for the dreamplug.
-
-tclk can vary for each board, so we leave it undefined in the kirkwood
-dtsi.  Each board can then set it as appropriate when enabling the uart.
+Trivial conversion to devicetree.
 
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/boot/dts/kirkwood-dreamplug.dts |   11 +++++------
- arch/arm/boot/dts/kirkwood.dtsi          |   26 +++++++++++++++++++++++++-
- 2 files changed, 30 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 333f11b..a5376b8 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -15,11 +15,10 @@
- 		bootargs = "console=ttyS0,115200n8 earlyprintk";
- 	};
+Changes from v1:
+
+    - added 'trivial conversion' patch description.
+
+ drivers/rtc/rtc-mv.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+index 768e2ed..0dd8421 100644
+--- a/drivers/rtc/rtc-mv.c
++++ b/drivers/rtc/rtc-mv.c
+@@ -12,6 +12,7 @@
+ #include <linux/bcd.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ #include <linux/delay.h>
+ #include <linux/gfp.h>
+ #include <linux/module.h>
+@@ -294,11 +295,19 @@ static int __exit mv_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
--	serial at f1012000 {
--		compatible = "ns16550a";
--		reg = <0xf1012000 0x100>;
--		reg-shift = <2>;
--		interrupts = <33>;
--		clock-frequency = <200000000>;
-+	ocp at f1000000 {
-+		serial at 12000 {
-+			clock-frequency = <200000000>;
-+			status = "ok";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 702b955..825310b 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -2,5 +2,29 @@
- 
- / {
- 	compatible = "mrvl,kirkwood";
--};
- 
-+	ocp at f1000000 {
-+		compatible = "simple-bus";
-+		ranges = <0 0xf1000000 0x1000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		serial at 12000 {
-+			compatible = "ns16550a";
-+			reg = <0x12000 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <33>;
-+			/* set clock-frequency in board dts */
-+			status = "disabled";
-+		};
-+
-+		serial at 12100 {
-+			compatible = "ns16550a";
-+			reg = <0x12100 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <34>;
-+			/* set clock-frequency in board dts */
-+			status = "disabled";
-+		};
-+	};
++#ifdef CONFIG_OF
++static struct of_device_id rtc_mv_of_match_table[] = {
++	{ .compatible = "mrvl,orion-rtc", },
++	{}
 +};
++#endif
++
+ static struct platform_driver mv_rtc_driver = {
+ 	.remove		= __exit_p(mv_rtc_remove),
+ 	.driver		= {
+ 		.name	= "rtc-mv",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(rtc_mv_of_match_table),
+ 	},
+ };
+ 
 -- 
 1.7.3.4
