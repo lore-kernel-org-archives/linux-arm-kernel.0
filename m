@@ -1,74 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 09:27:13 +0800
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <4F621D09.2080806@freescale.com>
-References: <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
- <4F6008FA.3040805@freescale.com>
- <20120314122723.GC3133@opensource.wolfsonmicro.com>
- <4F612319.50302@freescale.com>
- <20120315130253.GA6065@S2101-09.ap.freescale.net>
- <4F61F080.4090800@freescale.com>
- <20120315142115.GB6065@S2101-09.ap.freescale.net>
- <4F621D09.2080806@freescale.com>
-Message-ID: <20120316012711.GD6065@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 16 Mar 2012 10:39:06 +0900
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <CAEYLNCrprPE60ZS=_OWuck0JCJMhCxzVErZwuwGpEDYkQq-hXg@mail.gmail.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com> <4F60E5C8.3040804@gmail.com>
+ <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+ <CAEYLNCp5e=86rpRi2C-5OJptTyEeXAn8JHhbWw_BqGzSaDD9wQ@mail.gmail.com>
+ <002a01cd0283$1f61b200$5e251600$%han@samsung.com>
+ <CAEYLNCrprPE60ZS=_OWuck0JCJMhCxzVErZwuwGpEDYkQq-hXg@mail.gmail.com>
+Message-ID: <001d01cd0315$935cc720$ba165560$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 11:47:05AM -0500, Timur Tabi wrote:
-> Shawn Guo wrote:
-> > sound {
-> >       compatible = "fsl,imx51-babbage-sgtl5000",
-> >                    "fsl,imx-audio-sgtl5000";
-> >       model = "imx51-babbage-sgtl5000";
-> >       ssi-controller = <&ssi1, &ssi2>;
-> >       audio-codec = <&sgtl5000_1, &sgtl5000_2>;
-> >       mux-int-port = <1>;
-> >       mux-ext-port = <3>;
-> > };
-> 
-> Based on Mark's other email, I would rather see this:
-> 
-> sound1 {
->       compatible = "fsl,imx51-babbage-sgtl5000",
->                    "fsl,imx-audio-sgtl5000";
->       model = "imx51-babbage-sgtl5000";
->       ssi-controller = <&ssi1>;
->       audio-codec = <&sgtl5000_1>;
->       mux-int-port = <1>;
->       mux-ext-port = <3>;
-> };
-> 
-> sound2 {
->       compatible = "fsl,imx51-babbage-sgtl5000",
->                    "fsl,imx-audio-sgtl5000";
->       model = "imx51-babbage-sgtl5000";
->       ssi-controller = <&ssi2>;
->       audio-codec = <&sgtl5000_2>;
->       mux-int-port = <1>;
->       mux-ext-port = <3>;
-> };
-> 
-> (ignoring for the moment that I have no idea what the mux-xxx-port values
-> in sound2 should be)
-> 
-> This makes it clear that ssi1 connects only to sgtl5000_1.
-> 
-> If you're okay with this, then please update the documentation accordingly.
-> 
-Hmm, Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
-is the binding document specifically for imx-sgtl5000 driver rather
-than for all fsl_ssi based machine drivers.  Since I have never seen
-and doubt will ever see the setup that two SSIs connect to two
-sgtl5000 codecs on any imx board, I do not see much point to update
-the documentation for that.
 
-If this is indeed a practical setup for PowerPC, it can be documented
-in the binding for PowerPC machine driver when there is future PowerPC
-machine drivers adopting the new binding.
 
--- 
-Regards,
-Shawn
+> -----Original Message-----
+> From: Darius Augulis [mailto:augulis.darius at gmail.com]
+> Sent: Thursday, March 15, 2012 5:27 PM
+> To: Jingoo Han
+> Cc: Thomas Abraham; linux-fbdev at vger.kernel.org; FlorianSchandinat at gmx.de; linux-arm-
+> kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; kgene.kim at samsung.com; ben-
+> linux at fluff.org; patches at linaro.org; Kyungmin Park; JeongHyeon Kim; Heiko Stuebner; Kwangwoo Lee; Mark
+> Brown; Peter Korsgaard; Maurus Cuelenaere
+> Subject: Re: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+> 
+> On Thu, Mar 15, 2012 at 10:10 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> 
+> >> There is single board - mini6410 (or real6410) and it's name doesn't
+> >> depend on connected LCD size.
+> >> We know, that this board is available with different sizes of LCD and
+> >> currently we have in kernel support for both sizes.
+> >> It might be so, that it's implemented not in perfect way, but it was
+> >> accepted and at least it's working.
+> >
+> >
+> > I don't think so.
+> > You argues that the wrong code should not be removed because it was accepted and at least it's working.
+> > It is just wrong usage, which can just work.
+> > Moreover, your code will make the problem, when 2~5 windows of FIMD IP are used.
+> 
+> Could please explain that? How does LCD feature selection for mini6410
+> and real6410 break that?
+> Timing for different sizes of LCD is located in two statically
+> allocated structures which are used at board init time depending on
+> kernel param line.
+> Data from one of these structures is copied to s3c-fb platform data
+> dynamically by board init code. Why it's a problem? What changes if
+> platform data isn't rewritten dynamically?
+> 
+> > So, your code can be removed.
+> 
+> I don't think so. It does not break anything yet. One who make
+> changes, should ensure backwards compatibility, at least talking about
+> functionality and hardware (LCD) support, which was added few months
+> ago. Remember, we talk about kernel parameters line - now it lets
+> bootloader to select correct LCD size. After your changes, board with
+> 7" LCD wont show anything.
+
+[CC'ed Tushar Behera]
+
+Yes, your code is working. However, your code is bug.
+'struct s3c_fb_pd_win' is used not for LCD, but for windows of FIMD IP. So, 'struct s3c_fb_pd_win' should not be used to select LCD.
+The mach-aquila.c uses two 'struct s3c_fb_pd_win' like you, however 'struct s3c_fb_pd_win' don't make problem with Thomas's
+patchset. It is because mach-aquila.c use 'struct s3c_fb_pd_win' for only windows of FIMD IP.
+We don't have to responsibility to keep wrong code. If you have kept the rule, Thomas's patch would not make the compatibility
+problem with your code. Why we should keep aberration such as your code? If you want to select two LCDs, please find other way.
+
+
+> 
+> Darius A.
