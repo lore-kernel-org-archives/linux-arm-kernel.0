@@ -1,88 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Mar 2012 12:48:15 +0000
-Subject: [PATCH 2/5] MMC: mmci: Seperate ARM variants from generic code
-In-Reply-To: <20120315203037.GA2311@n2100.arm.linux.org.uk>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <201203151823.32882.arnd@arndb.de>
- <20120315203037.GA2311@n2100.arm.linux.org.uk>
-Message-ID: <201203161248.15490.arnd@arndb.de>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Fri, 16 Mar 2012 14:49:54 +0200
+Subject: [PATCH] OMAP: HSMMC: avoid erratum workaround when transceiver is
+ attached
+Message-ID: <1331902194-4679-1-git-send-email-notasas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2012, Russell King - ARM Linux wrote:
-> On Thu, Mar 15, 2012 at 06:23:32PM +0000, Arnd Bergmann wrote:
-> > 
-> > * we want to get rid of arch/arm/mach-ux500/board-mop500-sdi.c
-> > * the sdi0_configure() and mop500_sdi0_vdd_handler() functions
-> >   need to be moved somewhere in order to do that, so they should
-> >   be with the driver.
-> 
-> I don't believe they should.  MMCI _is_ the peripheral itself.  All the
-> stuff that's in board-mop500-sdi.c seems to be doing is configuration
-> type stuff for the SoC that its been integrated into.  Are you seriously
-> advocating having multiple drivers for essentially the same hardware?
+If transceiver is attached to a MMC host of ES2.1 OMAP, it seems
+2.1.1.128 erratum doesn't apply and there is no data corruption,
+probably because of different signal timing. The workaround for this
+erratum disables multiblock reads, which causes dramatic loss of
+performance (over 75% slower), so avoid it when transceiver is present.
 
-It's basically the same we have for sdhci or ohci, or even the various
-8250 versions. There is usually an identical core used in a number of
-chips with slight variantions. In some cases it's better to describe
-them as quirks of one driver, in other cases it's better abstract
-them as separate driver files. The debate is just over which of these
-two cases mmci fits into.
+Cc: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+---
+ arch/arm/mach-omap2/hsmmc.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-> > * if we want to have a separate probe function, we also need to
-> >   have a separate amba_driver structure
-> > * the variant_data in mmci.c belongs with the amba_id, so that
-> >   also gets moved to the ux500 file.
-> > 
-> > If you have a better solution for one or more of these, I'm
-> > all ears.
-> 
-> Are you really advocating having mmci_foo.c where foo is an ever
-> increasing number of SoCs with the MMCI integrated because you want
-> to integrate SoC specific details into the MMCI peripheral driver?
-
-Only when they are significantly different from the common one.
-According to your arguments above, the ux500 one might not be
-different enough, but if something comes along that needs something
-wildly different while still sharing a lot of the other code,
-I would certainly use the same model.
-
-> > The alternatives that I can see are:
-> > a) keep using auxdata to supply a platform_data pointer and
-> >    do everything in the main driver. Problem: we want to
-> >    avoid auxdata if possible
-> > b) move the code from patch 4 into mmci.c using #ifdef.
-> >    Problem: it's ugly code that has nothing to do with mmci
-> >    in general.
-> > c) use the regulator framework to do the voltage selection
-> >    here, and have only generic code in mmci.c. This may
-> >    be the best solution, but I have no idea if this is
-> >    actually possible, or how to do it.
-> 
-> Let's ignore the DMA stuff for the time being - that's a separate problem
-> which needs to be addressed once we work out how to deal with how DMA
-> engine stuff gets resolved with DT based systems.
-
-Agreed.
-
-> The remainder of it (mmci_platform_data) looks like it can be easily
-> represented as DT properties, the exception to that is the ios_handler.
-> I think the right solution for that is to move to the regulator framework,
-> but allow the driver to continue having the ios callback if there is
-> no attached regulator.  It needs that because of the four integrated
-> regulator control bits (which are entirely undefined.)
-
-Yes, that's what I was not sure about whether it's worth it. If we do this,
-I absolutely agree that there is no need to split mmci.c.
-
-> We _do_ need a solution for GPIO-controlled voltage regulators, as these
-> are actually quite common - see the various soc-common using PCMCIA
-> drivers.
-> 
-> So I think actually a bit more thought is required here, and there's a
-> need to use some of the facilities such as regulator which are now present
-> that weren't when the driver was originally written some 9 years ago.
-
-Ok. Let's see what Mark has to say about this.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index 100db62..b0268ea 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -506,6 +506,13 @@ static void __init omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
+ 	if (oh->dev_attr != NULL) {
+ 		mmc_dev_attr = oh->dev_attr;
+ 		mmc_data->controller_flags = mmc_dev_attr->flags;
++		/*
++		 * erratum 2.1.1.128 doesn't apply if board has
++		 * a transceiver is attached
++		 */
++		if (hsmmcinfo->transceiver)
++			mmc_data->controller_flags &=
++				~OMAP_HSMMC_BROKEN_MULTIBLOCK_READ;
+ 	}
+ 
+ 	pdev = platform_device_alloc(name, ctrl_nr - 1);
+-- 
+1.7.0.4
