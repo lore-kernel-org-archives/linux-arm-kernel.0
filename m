@@ -1,46 +1,52 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 16 Mar 2012 18:29:08 +0100
-Subject: [PATCH v5 2/3] arm:davinci: move emif driver to mfd framework
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC317702E9@DBDE01.ent.ti.com>
-References: <y> <1330005504-25321-3-git-send-email-prakash.pm@ti.com>
- <20120227142638.GN27687@sortiz-mobl>
- <A73F36158E33644199EB82C5EC81C7BC3176D103@DBDE01.ent.ti.com>
- <20120301112329.GI9008@sortiz-mobl>
- <A73F36158E33644199EB82C5EC81C7BC317702E9@DBDE01.ent.ti.com>
-Message-ID: <20120316172908.GG20524@sortiz-mobl>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Fri, 16 Mar 2012 18:35:43 +0100
+Subject: [RFC/PATCH 0/4] pxa: attempt at switch to common clock framework
+Message-ID: <1331919343.31118.19.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prakash,
+Hi,
 
-On Tue, Mar 06, 2012 at 01:12:25PM +0000, Manjunathappa, Prakash wrote:
-> Hi Samuel,
-> 
-> May be I did not do a good job giving complete information on this earlier.
-> So I have replied on top of my mail with below information (seems you missed it)
-> 
-I did get it, sorry for not being able to reply earlier.
+I have made an attempt at an initial conversion of PXA clocks to the
+common clock framework (http://lkml.org/lkml/2012/3/16/25), and I'd
+like to know if somebody is already working on this, or if I am
+heading in the general right direction.
 
+Unfortunately, this set still hangs during boot on hx4700 (pxa270),
+unless I also disable the calls to __clk_lookup in drivers/clk/clk.c
+completely (or apply the patch below). I'll investigate once I get
+access to my serial cable and hx4700 charger, but I'd be grateful if
+somebody could spot any embarassingly obvious errors.
+For pxa25x and pxa3xx, it's compile-tested only.
 
-> Taking above points into consideration Arnd Bergmann suggested to move AEMIF driver to
-> MFD framework [1], relevant portion of his mail as follows,
-> 
-> " If you want it to provide endpoint devices that are handled by
-> distinct subsystems in Linux, I would make it an mfd multifunction
-> device and make the common... "
-You're missing that part of the quote:
+regards
+Philipp
 
-"...code a driver that scans the connected memories in order to register
-its child devices for each of the subsystems."
+---
+ drivers/clk/clk.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-If you can do that, then I'd take that patch to the MFD subsystem. Otherwise,
-the only incentive for me to take it would be to be able to share the 2
-functions currently in this driver between several archs. But MFD would just
-be a placeholder for this driver right now.
-
-Cheers,
-Samuel.
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index c7c3bc5..79b46af 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -336,14 +336,15 @@ static struct clk *__clk_lookup_subtree(const char *name, struct clk *clk)
+ 	struct hlist_node *tmp;
+ 
+ 	if (!strcmp(clk->name, name))
+-		return clk;
++		return NULL;
+ 
++#if 0
+ 	hlist_for_each_entry(child, tmp, &clk->children, child_node) {
+ 		ret = __clk_lookup_subtree(name, child);
+ 		if (ret)
+ 			return ret;
+ 	}
+-
++#endif
+ 	return NULL;
+ }
+ 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.7.9.1
