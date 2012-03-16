@@ -1,115 +1,85 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Fri, 16 Mar 2012 19:35:56 +0530
-Subject: [PATCH v4 08/12] gpio/omap: remove redundant decoding of gpio offset
+Date: Fri, 16 Mar 2012 19:36:00 +0530
+Subject: [PATCH v4 12/12] gpio/omap: fix incorrect update to context.irqenable1
 In-Reply-To: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
 References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1331906760-5259-9-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1331906760-5259-13-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In gpio_get(), _get_gpio_datain() and _get_gpio_dataout() get rid of
-un-necessary operation to compute gpio mask. The gpio offset passed
-to gpio_get() is sufficient to do that.
+In _enable_gpio_irqbank() when bank->regs->set_irqenable is valid,
+gpio_mask can be directly set by writing to set_irqenable register
+without overwriting current value. In order to ensure the same is
+stored in context.irqenable1, we must read from regs->irqenable
+instead of overwriting it with gpio_mask.
+The overwriting makes sense only in the second case where irqenable
+is explicitly read and updated with new gpio_mask before writing it
+back. However, for consistency reading regs->irqenable into the
+bank->context.irqenable1 takes care of both the scenarios.
 
-Here is Russell's original comment:
-Can someone explain to me this:
-#define GPIO_INDEX(bank, gpio) (gpio % bank->width)
-#define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
+        if (bank->regs->set_irqenable) {
+                reg += bank->regs->set_irqenable;
+                l = gpio_mask;
+        } else {
+                reg += bank->regs->irqenable;
+                l = __raw_readl(reg);
+                if (bank->regs->irqenable_inv)
+                        l &= ~gpio_mask;
+                else
+                        l |= gpio_mask;
+        }
 
-static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
-{
-       void __iomem *reg = bank->base + bank->regs->datain;
+Make the same change for _disable_gpio_irqbank().
 
-       return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
-}
-
-static int gpio_get(struct gpio_chip *chip, unsigned offset)
-{
-       struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
-       void __iomem *reg = bank->base;
-       int gpio = chip->base + offset;
-       u32 mask = GPIO_BIT(bank, gpio);
-
-       if (gpio_is_input(bank, mask))
-               return _get_gpio_datain(bank, gpio);
-       else
-               return _get_gpio_dataout(bank, gpio);
-}
-
-Given that bank->width on OMAP is either 32 or 16, and GPIO numbers for
-any GPIO chip are always aligned to 32 or 16, why does this code bother
-adding the chips base gpio number and then modulo the width?
-
-Surely this means if - for argument sake - you registered a GPIO chip
-with 8 lines followed by one with 16 lines, GPIO0..7 would be chip 0
-bit 0..7, GPIO8..15 would be chip 1 bit 8..15, GPIO16..23 would be
-chip 1 bit 0..7.
-
-However, if you registered a GPIO chip with 16 lines first, it would
-mean GPIO0..15 would be chip 0 bit 0..15, and GPIO16..31 would be
-chip 1 bit 0..15.
-
-Surely this kind of behaviour is not intended?
-
-Is there a reason why the bitmask can't just be (1 << offset) where
-offset is passed into these functions as GPIO number - chip->base ?
-
-Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   18 +++++++-----------
- 1 files changed, 7 insertions(+), 11 deletions(-)
+ drivers/gpio/gpio-omap.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 8b453dd..cce2c73 100644
+index c5aff7c..ae62c62 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -140,18 +140,18 @@ static void _set_gpio_dataout_mask(struct gpio_bank *bank, int gpio, int enable)
- 	bank->context.dataout = l;
+@@ -447,6 +447,7 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+ 	if (bank->regs->set_irqenable) {
+ 		reg += bank->regs->set_irqenable;
+ 		l = gpio_mask;
++		bank->context.irqenable1 |= gpio_mask;
+ 	} else {
+ 		reg += bank->regs->irqenable;
+ 		l = __raw_readl(reg);
+@@ -454,10 +455,10 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+ 			l &= ~gpio_mask;
+ 		else
+ 			l |= gpio_mask;
++		bank->context.irqenable1 = l;
+ 	}
+ 
+ 	__raw_writel(l, reg);
+-	bank->context.irqenable1 = l;
  }
  
--static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
-+static int _get_gpio_datain(struct gpio_bank *bank, int offset)
- {
- 	void __iomem *reg = bank->base + bank->regs->datain;
+ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+@@ -468,6 +469,7 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+ 	if (bank->regs->clr_irqenable) {
+ 		reg += bank->regs->clr_irqenable;
+ 		l = gpio_mask;
++		bank->context.irqenable1 &= ~gpio_mask;
+ 	} else {
+ 		reg += bank->regs->irqenable;
+ 		l = __raw_readl(reg);
+@@ -475,10 +477,10 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+ 			l |= gpio_mask;
+ 		else
+ 			l &= ~gpio_mask;
++		bank->context.irqenable1 = l;
+ 	}
  
--	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
-+	return (__raw_readl(reg) & (1 << offset)) != 0;
+ 	__raw_writel(l, reg);
+-	bank->context.irqenable1 = l;
  }
  
--static int _get_gpio_dataout(struct gpio_bank *bank, int gpio)
-+static int _get_gpio_dataout(struct gpio_bank *bank, int offset)
- {
- 	void __iomem *reg = bank->base + bank->regs->dataout;
- 
--	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
-+	return (__raw_readl(reg) & (1 << offset)) != 0;
- }
- 
- static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
-@@ -852,19 +852,15 @@ static int gpio_is_input(struct gpio_bank *bank, int mask)
- static int gpio_get(struct gpio_chip *chip, unsigned offset)
- {
- 	struct gpio_bank *bank;
--	void __iomem *reg;
--	int gpio;
- 	u32 mask;
- 
--	gpio = chip->base + offset;
- 	bank = container_of(chip, struct gpio_bank, chip);
--	reg = bank->base;
--	mask = GPIO_BIT(bank, gpio);
-+	mask = (1 << offset);
- 
- 	if (gpio_is_input(bank, mask))
--		return _get_gpio_datain(bank, gpio);
-+		return _get_gpio_datain(bank, offset);
- 	else
--		return _get_gpio_dataout(bank, gpio);
-+		return _get_gpio_dataout(bank, offset);
- }
- 
- static int gpio_output(struct gpio_chip *chip, unsigned offset, int value)
+ static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
 -- 
 1.7.0.4
