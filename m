@@ -1,86 +1,249 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Mar 2012 16:17:51 +0800
-Subject: [PATCH 1/3] ARM i.MX: Move i.MX pwm driver to pwm framework
-In-Reply-To: <20120316080832.GA6458@avionic-0098.mockup.avionic-design.de>
-References: <1331802277-12477-1-git-send-email-s.hauer@pengutronix.de>
- <1331802277-12477-2-git-send-email-s.hauer@pengutronix.de>
- <20120316074902.GC7758@S2101-09.ap.freescale.net>
- <20120316080832.GA6458@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120316081748.GF7758@S2101-09.ap.freescale.net>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Fri, 16 Mar 2012 16:16:56 +0800
+Subject: [PATCH v10] mfd: Add anatop mfd driver
+Message-ID: <1331885816-26902-1-git-send-email-paul.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 09:08:32AM +0100, Thierry Reding wrote:
-> * Shawn Guo wrote:
-> > On Thu, Mar 15, 2012 at 10:04:35AM +0100, Sascha Hauer wrote:
-> > > diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> > > index e859c51..fc7571e 100644
-> > > --- a/drivers/pwm/Makefile
-> > > +++ b/drivers/pwm/Makefile
-> > > @@ -1,4 +1,5 @@
-> > >  obj-$(CONFIG_PWM)		+= core.o
-> > >  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
-> > > +obj-$(CONFIG_PWM_IMX)		+= imx-pwm.o
-> > 
-> > s/imx-pwm.o/pwm-imx.o
-> 
-> Yes, I'll make that change when I integrate the patch in my series.
-> 
-Thanks for taking this on.
+From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 
-> > > @@ -98,7 +98,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-> > >  		else
-> > >  			cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
-> > >  
-> > > -		writel(cr, pwm->mmio_base + MX3_PWMCR);
-> > > +		writel(cr, imxpwm->mmio_base + MX3_PWMCR);
-> > >  	} else if (cpu_is_mx1() || cpu_is_mx21()) {
-> > 
-> > Since we are here, can we move one step further to get rid of these
-> > cpu_is_xxx()?  Then, we can remove <mach/hardware.h> inclusion from
-> > the driver.
-> 
-> I guess this could be handled by using several names for the driver and
-> handling the differences using a table of platform_device_id:s. Perhaps
-> you had something different in mind?
-> 
-Same thing on my mind.
+Anatop is a mfd chip embedded in Freescale i.MX6Q SoC.
+Anatop provides regulators and thermal.
+This driver handles the address space and the operation of the mfd device.
 
-> > >  static int __devinit mxc_pwm_probe(struct platform_device *pdev)
-> > 
-> > Should we take this opportunity to rename the driver from mxc_pwm to
-> > imx_pwm?
-> 
-> If we decide to rename maybe it should be done in two steps. First it can be
-> renamed internally and in the second step the name could be changed along
-> with all users. I just want to avoid too much churn in this series, which is
-> already growing way larger than I had hoped.
-> 
-It seems I'm asking too much.  Okay, we can do that after it gets moved.
+Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Venu Byravarasu <vbyravarasu@nvidia.com>
+Cc: Peter Korsgaard <jacmet@sunsite.dk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Lee <rob.lee@linaro.org>
+---
+ drivers/mfd/Kconfig        |    8 +++
+ drivers/mfd/Makefile       |    1 +
+ drivers/mfd/anatop-mfd.c   |  137 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/anatop.h |   40 +++++++++++++
+ 4 files changed, 186 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mfd/anatop-mfd.c
+ create mode 100644 include/linux/mfd/anatop.h
 
-> > Also, does mxc_pwm_init need necessarily to be an arch_initcall?
-> > Otherwise, we can have the following change.
-> > 
-> > -static int __init mxc_pwm_init(void)
-> > -{
-> > -       return platform_driver_register(&mxc_pwm_driver);
-> > -}
-> > -arch_initcall(mxc_pwm_init);
-> > -
-> > -static void __exit mxc_pwm_exit(void)
-> > -{
-> > -       platform_driver_unregister(&mxc_pwm_driver);
-> > -}
-> > -module_exit(mxc_pwm_exit);
-> > +module_platform_driver(imx_pwm_driver);
-> 
-> I assume that some platforms may require it to be initialized early because
-> other drivers may depend on the PWMs being present. However this can probably
-> be solved in a much better way by using deferred driver probing, which should
-> be available in 3.4.
-> 
-Ditto.
-
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 82da448..c3a9f31 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -846,6 +846,14 @@ config MFD_INTEL_MSIC
+ 	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
+ 	  devices used in Intel Medfield platforms.
+ 
++config MFD_ANATOP
++	bool "Support for Freescale i.MX on-chip ANATOP controller"
++	depends on SOC_IMX6Q
++	help
++	  Select this option to enable Freescale i.MX on-chip ANATOP
++	  MFD controller. This controller embeds regulator and
++	  thermal devices for Freescale i.MX platforms.
++
+ endmenu
+ endif
+ 
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 27430d3..42c8bf6 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -113,3 +113,4 @@ obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+ obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+ obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+ obj-$(CONFIG_MFD_S5M_CORE)	+= s5m-core.o s5m-irq.o
++obj-$(CONFIG_MFD_ANATOP)	+= anatop-mfd.o
+diff --git a/drivers/mfd/anatop-mfd.c b/drivers/mfd/anatop-mfd.c
+new file mode 100644
+index 0000000..2af4248
+--- /dev/null
++++ b/drivers/mfd/anatop-mfd.c
+@@ -0,0 +1,137 @@
++/*
++ * Anatop MFD driver
++ *
++ * Copyright (C) 2012 Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
++ * Copyright (C) 2012 Linaro
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *   (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License along
++ *  with this program; if not, write to the Free Software Foundation, Inc.,
++ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License along
++ *  with this program; if not, write to the Free Software Foundation, Inc.,
++ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ */
++
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/mfd/anatop.h>
++
++u32 anatop_get_bits(struct anatop *adata, u32 addr, int bit_shift,
++		    int bit_width)
++{
++	u32 val, mask;
++
++	if (bit_width == 32)
++		mask = ~0;
++	else
++		mask = (1 << bit_width) - 1;
++
++	val = readl(adata->ioreg + addr);
++	val = (val >> bit_shift) & mask;
++
++	return val;
++}
++EXPORT_SYMBOL_GPL(anatop_get_bits);
++
++void anatop_set_bits(struct anatop *adata, u32 addr, int bit_shift,
++		     int bit_width, u32 data)
++{
++	u32 val, mask;
++
++	if (bit_width == 32)
++		mask = ~0;
++	else
++		mask = (1 << bit_width) - 1;
++
++	spin_lock(&adata->reglock);
++	val = readl(adata->ioreg + addr) & ~(mask << bit_shift);
++	writel((data << bit_shift) | val, adata->ioreg + addr);
++	spin_unlock(&adata->reglock);
++}
++EXPORT_SYMBOL_GPL(anatop_set_bits);
++
++static const struct of_device_id of_anatop_match[] = {
++	{ .compatible = "fsl,imx6q-anatop", },
++	{ },
++};
++
++static int __devinit of_anatop_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	void *ioreg;
++	struct anatop *drvdata;
++
++	ioreg = of_iomap(np, 0);
++	if (!ioreg)
++		return -EADDRNOTAVAIL;
++	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
++	if (!drvdata)
++		return -ENOMEM;
++	drvdata->ioreg = ioreg;
++	spin_lock_init(&drvdata->reglock);
++	platform_set_drvdata(pdev, drvdata);
++	of_platform_populate(np, of_anatop_match, NULL, dev);
++
++	return 0;
++}
++
++static int __devexit of_anatop_remove(struct platform_device *pdev)
++{
++	struct anatop *drvdata;
++	drvdata = platform_get_drvdata(pdev);
++	iounmap(drvdata->ioreg);
++
++	return 0;
++}
++
++static struct platform_driver anatop_of_driver = {
++	.driver = {
++		.name = "anatop-mfd",
++		.owner = THIS_MODULE,
++		.of_match_table = of_anatop_match,
++	},
++	.probe		= of_anatop_probe,
++	.remove		= of_anatop_remove,
++};
++
++static int __init anatop_init(void)
++{
++	return platform_driver_register(&anatop_of_driver);
++}
++postcore_initcall(anatop_init);
++
++static void __exit anatop_exit(void)
++{
++	platform_driver_unregister(&anatop_of_driver);
++}
++module_exit(anatop_exit);
++
++MODULE_AUTHOR("Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>");
++MODULE_DESCRIPTION("ANATOP MFD driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/mfd/anatop.h b/include/linux/mfd/anatop.h
+new file mode 100644
+index 0000000..22c1007
+--- /dev/null
++++ b/include/linux/mfd/anatop.h
+@@ -0,0 +1,40 @@
++/*
++ * anatop.h - Anatop MFD driver
++ *
++ *  Copyright (C) 2012 Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
++ *  Copyright (C) 2012 Linaro
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __LINUX_MFD_ANATOP_H
++#define __LINUX_MFD_ANATOP_H
++
++#include <linux/spinlock.h>
++
++/**
++ * anatop - MFD data
++ * @ioreg: ioremap register
++ * @reglock: spinlock for register read/write
++ */
++struct anatop {
++	void *ioreg;
++	spinlock_t reglock;
++};
++
++extern u32 anatop_get_bits(struct anatop *, u32, int, int);
++extern void anatop_set_bits(struct anatop *, u32, int, int, u32);
++
++#endif /*  __LINUX_MFD_ANATOP_H */
 -- 
-Regards,
-Shawn
+1.7.9.1
