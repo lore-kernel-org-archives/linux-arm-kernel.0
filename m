@@ -1,21 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 16 Mar 2012 17:50:41 -0400 (EDT)
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <201203162057.58706.arnd@arndb.de>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
- <201203161218.05125.arnd.bergmann@linaro.org>
- <201203162057.58706.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1203161748280.24151@xanadu.home>
+From: aneesh@ti.com (Aneesh V)
+Date: Sat, 17 Mar 2012 03:20:36 +0530
+Subject: [PATCH v4] misc: ddr: add LPDDR2 data from JESD209-2
+In-Reply-To: <20120316214334.GA24925@kroah.com>
+References: <1331929177-11694-1-git-send-email-aneesh@ti.com>
+ <1331931007-584-1-git-send-email-aneesh@ti.com>
+ <20120316214334.GA24925@kroah.com>
+Message-ID: <4F63B5AC.5080808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Mar 2012, Arnd Bergmann wrote:
+On Saturday 17 March 2012 03:13 AM, Greg KH wrote:
+> On Sat, Mar 17, 2012 at 02:20:07AM +0530, Aneesh V wrote:
+>> add LPDDR2 data from the JEDEC spec JESD209-2. The data
+>> includes:
+>>
+>> 1. Addressing information for LPDDR2 memories of different
+>>     densities and types(S2/S4)
+>> 2. AC timing data.
+>>
+>> This data will useful for memory controller device drivers.
+>> Right now this is used by the TI EMIF SDRAM controller
+>> driver.
+>>
+>> Cc: Greg KH<greg@kroah.com>
+>> Signed-off-by: Aneesh V<aneesh@ti.com>
+>
+> What happened to the other patches that depended on this one?
 
-> FWIW, it's in arm-soc now, and it's the last thing I  put in there
-> for v3.4.
+I was not sure what was the convention regarding re-submitting just one
+patch in a series. I realize that you prefer having the whole series
+again. I will send it shortly.
 
-Amen!
-
-
-Nicolas
+thanks,
+Aneesh
