@@ -1,73 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 Mar 2012 10:27:39 +0100
-Subject: [PATCH 1/3] ARM i.MX: Move i.MX pwm driver to pwm framework
-In-Reply-To: <20120316081748.GF7758@S2101-09.ap.freescale.net>
-References: <1331802277-12477-1-git-send-email-s.hauer@pengutronix.de>
- <1331802277-12477-2-git-send-email-s.hauer@pengutronix.de>
- <20120316074902.GC7758@S2101-09.ap.freescale.net>
- <20120316080832.GA6458@avionic-0098.mockup.avionic-design.de>
- <20120316081748.GF7758@S2101-09.ap.freescale.net>
-Message-ID: <20120316092739.GH3852@pengutronix.de>
+From: subash.ramaswamy@linaro.org (Subash Patel)
+Date: Fri, 16 Mar 2012 15:00:41 +0530
+Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
+ definitions
+In-Reply-To: <4F61FF1D.5000502@samsung.com>
+References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
+ <20120315111227.GA2384@amd.com> <4F61FF1D.5000502@samsung.com>
+Message-ID: <4F630841.2070307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 04:17:51PM +0800, Shawn Guo wrote:
-> On Fri, Mar 16, 2012 at 09:08:32AM +0100, Thierry Reding wrote:
-> > * Shawn Guo wrote:
-> > > On Thu, Mar 15, 2012 at 10:04:35AM +0100, Sascha Hauer wrote:
-> > > > diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> > > > index e859c51..fc7571e 100644
-> > > > --- a/drivers/pwm/Makefile
-> > > > +++ b/drivers/pwm/Makefile
-> > > > @@ -1,4 +1,5 @@
-> > > >  obj-$(CONFIG_PWM)		+= core.o
-> > > >  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
-> > > > +obj-$(CONFIG_PWM_IMX)		+= imx-pwm.o
-> > > 
-> > > s/imx-pwm.o/pwm-imx.o
-> > 
-> > Yes, I'll make that change when I integrate the patch in my series.
-> > 
-> Thanks for taking this on.
-> 
-> > > > @@ -98,7 +98,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-> > > >  		else
-> > > >  			cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
-> > > >  
-> > > > -		writel(cr, pwm->mmio_base + MX3_PWMCR);
-> > > > +		writel(cr, imxpwm->mmio_base + MX3_PWMCR);
-> > > >  	} else if (cpu_is_mx1() || cpu_is_mx21()) {
-> > > 
-> > > Since we are here, can we move one step further to get rid of these
-> > > cpu_is_xxx()?  Then, we can remove <mach/hardware.h> inclusion from
-> > > the driver.
-> > 
-> > I guess this could be handled by using several names for the driver and
-> > handling the differences using a table of platform_device_id:s. Perhaps
-> > you had something different in mind?
-> > 
-> Same thing on my mind.
-> 
-> > > >  static int __devinit mxc_pwm_probe(struct platform_device *pdev)
-> > > 
-> > > Should we take this opportunity to rename the driver from mxc_pwm to
-> > > imx_pwm?
-> > 
-> > If we decide to rename maybe it should be done in two steps. First it can be
-> > renamed internally and in the second step the name could be changed along
-> > with all users. I just want to avoid too much churn in this series, which is
-> > already growing way larger than I had hoped.
-> > 
-> It seems I'm asking too much.  Okay, we can do that after it gets moved.
+Hi KyongHo, Kukjin,
 
-Indeed. The pwm driver became a horrible piece of code over time, it's
-time to refactor it. I just wanted to make the move first, then look for
-further cleanups.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On 03/15/2012 08:09 PM, Kukjin Kim wrote:
+> On 03/15/12 04:12, Joerg Roedel wrote:
+>> On Thu, Mar 15, 2012 at 05:32:39PM +0900, Cho KyongHo wrote:
+>
+> KyongHo, I looked at 'Cho KyongHo <pullip.cho ...>' and 'KyongHo Cho 
+> <pullip.cho ...>' in this series, which one do you want to use?
+>
+>>> Handling System MMUs with an identifier is not flexible to manage
+>>> System MMU platform devices because of the following reasons:
+>>> 1. A device driver which needs to handle System MMU must know the ID.
+>>> 2. A System MMU may not present in some implementations of Exynos 
+>>> family.
+>>> 3. Handling System MMU with IOMMU API does not require an ID.
+>>>
+>>> This patch is the result of removing ID of System MMUs.
+>>> Instead, a device driver that needs to handle its System MMU must
+>>> use IOMMU API while its descriptor of platform device is given.
+>>>
+>>> This patch also includes the following enhancements:
+>>> - A System MMU device becomes a child if its power domain device.
+>>> - clkdev
+>>>
+>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>>> Signed-off-by: KyongHo Cho<pullip.cho@samsung.com>
+>>> ---
+>>>   arch/arm/mach-exynos/Kconfig                    |   10 +-
+>>>   arch/arm/mach-exynos/Makefile                   |    2 +-
+>>>   arch/arm/mach-exynos/clock-exynos4.c            |   79 ++--
+>>>   arch/arm/mach-exynos/clock-exynos4.h            |    2 +
+>>>   arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
+>>>   arch/arm/mach-exynos/clock-exynos4212.c         |   28 ++-
+>>>   arch/arm/mach-exynos/clock-exynos5.c            |   90 +++++
+>>>   arch/arm/mach-exynos/dev-sysmmu.c               |  457 
+>>> ++++++++++++----------
+>>>   arch/arm/mach-exynos/include/mach/irqs.h        |   25 +-
+>>>   arch/arm/mach-exynos/include/mach/map.h         |   38 ++
+>>>   arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
+>>>   arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 --
+>>>   arch/arm/mach-exynos/include/mach/sysmmu.h      |   88 +++--
+>>>   arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
+>>>   arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
+>>>   15 files changed, 529 insertions(+), 336 deletions(-)
+>>>   delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
+>>
+>> This patch doesn't apply cleanly against upstream Linux (v3.3-rcX).
+>> Please rebase to upstream and resend. The other 2 patches apply fine.
+>>
+>
+> Yes, as KyoungHo said, this has been created on top of Samsung tree 
+> for-next because this touches many exynos stuff which has been changed 
+> from Samsung tree for upcoming merge window. So if you're ok on this, 
+> 1st patch and this should be sent to upstream via samsung tree even 
+> though I can't find any topic branch for this yet. And if you want 
+> topic branch for your tree, let me know, I can provide it.
+>
+> Thanks.
+Wouldn't it be good to send exynos4 SYSMMU patches now, and send only 
+the exynos5 delta when your for-next(exynos5) changes
+get merged to mainline? Manually editing the patches is really pain-some 
+and sometimes error-some :( Can this patch in particular
+be split?
+>
+> Best regards,
+> Kgene.
+> -- 
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards,
+Subash
