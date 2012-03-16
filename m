@@ -1,37 +1,42 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Fri, 16 Mar 2012 19:35:50 +0530
-Subject: [PATCH v4 02/12] gpio/omap: fix wakeup_en register update in
- _set_gpio_wakeup()
+Date: Fri, 16 Mar 2012 19:35:58 +0530
+Subject: [PATCH v4 10/12] gpio/omap: fix missing dataout context save in
+ _set_gpio_dataout_reg
 In-Reply-To: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
 References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1331906760-5259-3-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1331906760-5259-11-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two ways through which wakeup_en register can be programmed
-using gpiolib APIs as shown below. It is seen that in the second case
-in _set_gpio_wakeup(), even though bank->suspend_wakeup is updated
-correctly, its value is not programmed in wakeup_en register. Fix this.
-
-chip.irq_set_type()->gpio_irq_type()->_set_gpio_triggering()->set_gpio_trigger()
-chip.irq_set_wake()->gpio_wake_enable()->_set_gpio_wakeup()
+There are two functions, _set_gpio_dataout_reg() and _set_gpio_dataout_mask()
+which writes to dataout register and the dataout context must be saved.
+It is missing in the first function, _set_gpio_dataout_reg(). Fix this.
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/gpio/gpio-omap.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 0c1c529..171f951 100644
+index dba69b8..072a841 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -509,6 +509,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
- 	else
- 		bank->suspend_wakeup &= ~gpio_bit;
+@@ -116,10 +116,13 @@ static void _set_gpio_dataout_reg(struct gpio_bank *bank, int gpio, int enable)
+ 	void __iomem *reg = bank->base;
+ 	u32 l = GPIO_BIT(bank, gpio);
  
-+	__raw_writel(bank->suspend_wakeup, bank->base + bank->regs->wkup_en);
- 	spin_unlock_irqrestore(&bank->lock, flags);
+-	if (enable)
++	if (enable) {
+ 		reg += bank->regs->set_dataout;
+-	else
++		bank->context.dataout |= l;
++	} else {
+ 		reg += bank->regs->clr_dataout;
++		bank->context.dataout &= ~l;
++	}
  
- 	return 0;
+ 	__raw_writel(l, reg);
+ }
 -- 
 1.7.0.4
