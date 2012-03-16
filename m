@@ -1,72 +1,88 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Fri, 16 Mar 2012 16:42:16 +0400
-Subject: [PATCH 2/2] arm: omap3: pm34xx.c: Replace printk() with
- appropriate pr_*()
-In-Reply-To: <1331852833-4357-3-git-send-email-mgreer@animalcreek.com>
-References: <1331852833-4357-1-git-send-email-mgreer@animalcreek.com>
- <1331852833-4357-3-git-send-email-mgreer@animalcreek.com>
-Message-ID: <4F633528.1040305@ru.mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Mar 2012 12:48:15 +0000
+Subject: [PATCH 2/5] MMC: mmci: Seperate ARM variants from generic code
+In-Reply-To: <20120315203037.GA2311@n2100.arm.linux.org.uk>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <201203151823.32882.arnd@arndb.de>
+ <20120315203037.GA2311@n2100.arm.linux.org.uk>
+Message-ID: <201203161248.15490.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thursday 15 March 2012, Russell King - ARM Linux wrote:
+> On Thu, Mar 15, 2012 at 06:23:32PM +0000, Arnd Bergmann wrote:
+> > 
+> > * we want to get rid of arch/arm/mach-ux500/board-mop500-sdi.c
+> > * the sdi0_configure() and mop500_sdi0_vdd_handler() functions
+> >   need to be moved somewhere in order to do that, so they should
+> >   be with the driver.
+> 
+> I don't believe they should.  MMCI _is_ the peripheral itself.  All the
+> stuff that's in board-mop500-sdi.c seems to be doing is configuration
+> type stuff for the SoC that its been integrated into.  Are you seriously
+> advocating having multiple drivers for essentially the same hardware?
 
-On 16-03-2012 3:07, Mark A. Greer wrote:
+It's basically the same we have for sdhci or ohci, or even the various
+8250 versions. There is usually an identical core used in a number of
+chips with slight variantions. In some cases it's better to describe
+them as quirks of one driver, in other cases it's better abstract
+them as separate driver files. The debate is just over which of these
+two cases mmci fits into.
 
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> > * if we want to have a separate probe function, we also need to
+> >   have a separate amba_driver structure
+> > * the variant_data in mmci.c belongs with the amba_id, so that
+> >   also gets moved to the ux500 file.
+> > 
+> > If you have a better solution for one or more of these, I'm
+> > all ears.
+> 
+> Are you really advocating having mmci_foo.c where foo is an ever
+> increasing number of SoCs with the MMCI integrated because you want
+> to integrate SoC specific details into the MMCI peripheral driver?
 
-> Currently, pm34xx.c has a mix of printk() and pr_*() statements
-> so replace the printk() statements with the equivalent pr_*()
-> statements.
+Only when they are significantly different from the common one.
+According to your arguments above, the ux500 one might not be
+different enough, but if something comes along that needs something
+wildly different while still sharing a lot of the other code,
+I would certainly use the same model.
 
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->   arch/arm/mach-omap2/pm34xx.c |   17 ++++++++---------
->   1 file changed, 8 insertions(+), 9 deletions(-)
+> > The alternatives that I can see are:
+> > a) keep using auxdata to supply a platform_data pointer and
+> >    do everything in the main driver. Problem: we want to
+> >    avoid auxdata if possible
+> > b) move the code from patch 4 into mmci.c using #ifdef.
+> >    Problem: it's ugly code that has nothing to do with mmci
+> >    in general.
+> > c) use the regulator framework to do the voltage selection
+> >    here, and have only generic code in mmci.c. This may
+> >    be the best solution, but I have no idea if this is
+> >    actually possible, or how to do it.
+> 
+> Let's ignore the DMA stuff for the time being - that's a separate problem
+> which needs to be addressed once we work out how to deal with how DMA
+> engine stuff gets resolved with DT based systems.
 
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index af8d741..495e509 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-[...]
-> @@ -463,7 +462,7 @@ restore:
->   	list_for_each_entry(pwrst,&pwrst_list, node) {
->   		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
->   		if (state>  pwrst->next_state) {
-> -			printk(KERN_INFO "Powerdomain (%s) didn't enter "
-> +			pr_info("Powerdomain (%s) didn't enter "
->   			       "target state %d\n",
+Agreed.
 
-    Last line should have been realigned I think.
+> The remainder of it (mmci_platform_data) looks like it can be easily
+> represented as DT properties, the exception to that is the ios_handler.
+> I think the right solution for that is to move to the regulator framework,
+> but allow the driver to continue having the ios callback if there is
+> no attached regulator.  It needs that because of the four integrated
+> regulator control bits (which are entirely undefined.)
 
->   			       pwrst->pwrdm->name, pwrst->next_state);
->   			ret = -1;
-> @@ -471,9 +470,9 @@ restore:
->   		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
->   	}
->   	if (ret)
-> -		printk(KERN_ERR "Could not enter target state in pm_suspend\n");
-> +		pr_err("Could not enter target state in pm_suspend\n");
->   	else
-> -		printk(KERN_INFO "Successfully put all powerdomains "
-> +		pr_info("Successfully put all powerdomains "
->   		       "to target state\n");
+Yes, that's what I was not sure about whether it's worth it. If we do this,
+I absolutely agree that there is no need to split mmci.c.
 
-    Last line should have been realigned I think.
+> We _do_ need a solution for GPIO-controlled voltage regulators, as these
+> are actually quite common - see the various soc-common using PCMCIA
+> drivers.
+> 
+> So I think actually a bit more thought is required here, and there's a
+> need to use some of the facilities such as regulator which are now present
+> that weren't when the driver was originally written some 9 years ago.
 
->
->   	return ret;
-> @@ -865,7 +864,7 @@ static int __init omap3_pm_init(void)
->   		omap3_secure_ram_storage =
->   			kmalloc(0x803F, GFP_KERNEL);
->   		if (!omap3_secure_ram_storage)
-> -			printk(KERN_ERR "Memory allocation failed when"
-> +			pr_err("Memory allocation failed when"
+Ok. Let's see what Mark has to say about this.
 
-    BTW, space after "when" is missing here.
-
->   					"allocating for secure sram context\n");
-
-    Should have been realigned I think.
-
-WBR, Sergei
+	Arnd
