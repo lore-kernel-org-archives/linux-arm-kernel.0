@@ -1,54 +1,83 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Sat, 17 Mar 2012 11:24:25 +0100
-Subject: [RFC/PATCH 4/4] pxa: convert to common clock framework
-In-Reply-To: <CAJOA=zN2dxgjQ8EZYAwE=OLO1GLdArqy1Xf18F82en9QvFi4cw@mail.gmail.com>
-References: <1331919483.31118.23.camel@flow>
- <CAJOA=zN2dxgjQ8EZYAwE=OLO1GLdArqy1Xf18F82en9QvFi4cw@mail.gmail.com>
-Message-ID: <CA+gwMcdzHpGhLXXh5QTYid+rBtj8cGqFS9Te4QB3rpR9B8hXUw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 17 Mar 2012 13:28:31 +0100
+Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
+In-Reply-To: <20120316011006.GA17459@b20223-02.ap.freescale.net>
+References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
+ <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
+ <20120314085228.GM3852@pengutronix.de>
+ <20120315144601.GA5701@richard-laptop>
+ <20120315150048.GC3852@pengutronix.de>
+ <20120315151521.GB5701@richard-laptop>
+ <20120315185004.GD3852@pengutronix.de>
+ <20120316011006.GA17459@b20223-02.ap.freescale.net>
+Message-ID: <20120317122831.GD29317@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Fri, Mar 16, 2012 at 09:10:07AM +0800, Richard Zhao wrote:
+> Hi Sascha,
+> 
+> On Thu, Mar 15, 2012 at 07:50:04PM +0100, Sascha Hauer wrote:
+> > On Thu, Mar 15, 2012 at 11:15:23PM +0800, Richard Zhao wrote:
+> > > On Thu, Mar 15, 2012 at 04:00:48PM +0100, Sascha Hauer wrote:
+> > > > On Thu, Mar 15, 2012 at 10:46:04PM +0800, Richard Zhao wrote:
+> > > > > On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
+> > > > > > On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
+> > > > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > > > > > ---
+> > > > > > >  
+> > > > > > >  #define DEF_PLL(name)					\
+> > > > > > >  	static struct clk name = {			\
+> > > > > > > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
+> > > > > > >  		.disable	= pll_disable,		\
+> > > > > > >  		.get_rate	= name##_get_rate,	\
+> > > > > > >  		.set_rate	= name##_set_rate,	\
+> > > > > > > +		.round_rate	= name##_round_rate,	\
+> > > > > > 
+> > > > > > I hope this ## stuff is gone soon with the generic clock framework. It
+> > > > > > is so ugly and inefficient.
+> > > > > I hope this doesn't prevent this two patches go in.
+> > > > 
+> > > > Given that we are short from getting a generic clock framework (and I
+> > > > think this time it's for real) and that you are not mention in any words
+> > > > what these patches fix I don't see a reason for merging them.
+> > > I think the cpu clock is a great challenge for generic clock framework.
+> > > When it set_rate, it includes reparent, and change parent's parent's rate.
+> > > I don't see any upstream code like that till now. and it's really what
+> > > we need.
+> > 
+> > Then do a clk_set_parent, clk_set_rate and a clk_set_parent again
+> > in your cpufreq driver.
+> No, it's platform code, and supposed to be in arch/arm. What the cpufre
+> driver know is to get cpu clk, rather not how cpu clk change its rate.
+> And cpu clk/arm_clk is a real clock wires in SoC.
 
-On Fri, Mar 16, 2012 at 11:03 PM, Turquette, Mike <mturquette@ti.com> wrote:
-> On Fri, Mar 16, 2012 at 10:38 AM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
->> ?#define DEFINE_CK(_name, _cken, _ops) ? ? ? ? ? ? ? ? ?\
->> -struct clk clk_##_name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> - ? ? ? ? ? ? ? .ops ? ?= _ops, ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? struct clk clk_##_name; ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? static struct clk_pxa clk_pxa_##_name = { ? ? ? \
->> + ? ? ? ? ? ? ? .hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ? ? ? .clk = &clk_##_name, ? ? ? ? ? ?\
->> + ? ? ? ? ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> ? ? ? ? ? ? ? ?.cken ? = CKEN_##_cken, ? ? ? ? ? ? ? ? \
->> + ? ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? static struct clk clk_##_name = { ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? .name ? = #_name, ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? .ops ? ?= _ops, ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? .hw ? ? = &clk_pxa_##_name.hw, ? ? ? ? ?\
->> ? ? ? ?}
->
-> Hi Philipp,
->
-> It looks like your macros do not initialize the .parent_names,
-> .num_parents or .flags members of struct clk. ?__clk_init expects
-> those to be initialized before being called. ?The kerneldoc for
-> __clk_init states this:
-> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=include/linux/clk-private.h;h=e2cce6fa604686ea3bca0496998322bacaed854d;hb=c5836d8acd9846ec1675b269d994d96a8ee44df4#l49
+The job of the clock framework is to give a consistent view on the
+clocks and to handle parent/rate changes properly. It even the
+CLK_SET_RATE_GATE for ensuring that your PLL can only change its rate
+when it's gated. It's not the job of the clock framework to dynamically
+reorganize the clock tree on a rate change.
 
-Yes, thank you! That was the problem.
+Besides, do you really want to reprogram the PLL with a cpufreq change?
+You have a divider behind that PLL which you apparently can change
+without having to reparent the PLL. Doesn't this give you enough choices
+for the cpu frequency?
 
-> You can use the macros for the basic clocks types as templates. ?The
-> gate and mux macros are good to look at since those show how to handle
-> a single-parent and multi-parent clock, respectively:
-> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=include/linux/clk-private.h;h=5e4312b6f5ccb1072273ce94e235874c74dd852d;hb=2508b44cd5c134691dc5d679f728bbf82af2abe0#l83
-> and
-> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=include/linux/clk-private.h;h=5e4312b6f5ccb1072273ce94e235874c74dd852d;hb=2508b44cd5c134691dc5d679f728bbf82af2abe0#l148
+> > The notifying mechanism even allows you to
+> > block any concurrent change in between these three steps if necessary.
+> > Noone says that these three steps have to be encapsulated in a single
+> > clk_set_rate call like you did in your patch.
+> If you're reviwing the patch, why not take a step advance? :)
 
-If there was a fixed fractional divider clk element, a lot of the
-peripheral clocks could be derived from a fixed clk representing the
-312 MHz PPLL on PXA27x (fixed -> divider -> gate), using just the
-basic clock templates.
+I have prepared the patches for converting i.MX1/21/25/27 and I have
+(older) patches for the i.MX31/51/53 which I want to rebase on the
+current clock framework. That gives me enough to do until the next merge
+window. Additionally I'm not yet very familiar with the i.MX6.
 
-regards
-Philipp
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
