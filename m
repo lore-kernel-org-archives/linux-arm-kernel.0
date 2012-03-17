@@ -1,74 +1,67 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Sat, 17 Mar 2012 11:02:11 -0700
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <201203170905.33191.arnd@arndb.de>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <alpine.DEB.2.00.1203161509470.4395@utopia.booyaka.com>
- <CAJOA=zPmy7Dwzw8EOCW_+cvy2Dv=w0TPUq7Zg_s=Y0rs+v+u2w@mail.gmail.com>
- <201203170905.33191.arnd@arndb.de>
-Message-ID: <CAJOA=zNVSWR6xZEfx4hioB-Q7M6PsrP9gdvJc1t+YN=QVE=83w@mail.gmail.com>
+Date: Sat, 17 Mar 2012 11:06:15 -0700
+Subject: [RFC/PATCH 4/4] pxa: convert to common clock framework
+In-Reply-To: <CA+gwMcdzHpGhLXXh5QTYid+rBtj8cGqFS9Te4QB3rpR9B8hXUw@mail.gmail.com>
+References: <1331919483.31118.23.camel@flow>
+ <CAJOA=zN2dxgjQ8EZYAwE=OLO1GLdArqy1Xf18F82en9QvFi4cw@mail.gmail.com>
+ <CA+gwMcdzHpGhLXXh5QTYid+rBtj8cGqFS9Te4QB3rpR9B8hXUw@mail.gmail.com>
+Message-ID: <CAJOA=zOQ5x-idULPvM9acGNBL2onnT_+aZL9r1xUZ0MZ6jZo9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 17, 2012 at 2:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 16 March 2012, Turquette, Mike wrote:
->> On Fri, Mar 16, 2012 at 3:21 PM, Paul Walmsley <paul@pwsan.com> wrote:
->> > From: Paul Walmsley <paul@pwsan.com>
->> > Date: Fri, 16 Mar 2012 16:06:30 -0600
->> > Subject: [PATCH] clk: mark the common clk code as EXPERIMENTAL for now
->> >
->> > Mark the common clk code as depending on CONFIG_EXPERIMENTAL. ?The API
->> > is not well-defined and both it and the underlying mechanics are likely
->> > to need significant changes to support non-trivial uses of the rate
->> > changing code, such as DVFS with external I/O devices. ?So any platforms
->> > that switch their implementation over to this may need to revise much
->> > of their driver code and revalidate their implementations until the
->> > behavior of the code is better-defined.
->> >
->> > A good time for removing this EXPERIMENTAL designation would be after at
->> > least two platforms that do DVFS on groups of external I/O devices have
->> > ported their clock implementations over to the common clk code.
->> >
->> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
->> > Cc: Mike Turquette <mturquette@ti.com>
+On Sat, Mar 17, 2012 at 3:24 AM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+> Hi Mike,
+>
+> On Fri, Mar 16, 2012 at 11:03 PM, Turquette, Mike <mturquette@ti.com> wrote:
+>> On Fri, Mar 16, 2012 at 10:38 AM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+>>> ?#define DEFINE_CK(_name, _cken, _ops) ? ? ? ? ? ? ? ? ?\
+>>> -struct clk clk_##_name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>>> - ? ? ? ? ? ? ? .ops ? ?= _ops, ? ? ? ? ? ? ? ? ? ? ? ? \
+>>> + ? ? ? struct clk clk_##_name; ? ? ? ? ? ? ? ? ? ? ? ? \
+>>> + ? ? ? static struct clk_pxa clk_pxa_##_name = { ? ? ? \
+>>> + ? ? ? ? ? ? ? .hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>>> + ? ? ? ? ? ? ? ? ? ? ? .clk = &clk_##_name, ? ? ? ? ? ?\
+>>> + ? ? ? ? ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>>> ? ? ? ? ? ? ? ?.cken ? = CKEN_##_cken, ? ? ? ? ? ? ? ? \
+>>> + ? ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>>> + ? ? ? static struct clk clk_##_name = { ? ? ? ? ? ? ? \
+>>> + ? ? ? ? ? ? ? .name ? = #_name, ? ? ? ? ? ? ? ? ? ? ? \
+>>> + ? ? ? ? ? ? ? .ops ? ?= _ops, ? ? ? ? ? ? ? ? ? ? ? ? \
+>>> + ? ? ? ? ? ? ? .hw ? ? = &clk_pxa_##_name.hw, ? ? ? ? ?\
+>>> ? ? ? ?}
 >>
->> ACK. ?This will set some reasonable expectations while things are in flux.
+>> Hi Philipp,
 >>
->> Arnd are you willing to take this in?
+>> It looks like your macros do not initialize the .parent_names,
+>> .num_parents or .flags members of struct clk. ?__clk_init expects
+>> those to be initialized before being called. ?The kerneldoc for
+>> __clk_init states this:
+>> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=include/linux/clk-private.h;h=e2cce6fa604686ea3bca0496998322bacaed854d;hb=c5836d8acd9846ec1675b269d994d96a8ee44df4#l49
 >
-> I think it's rather pointless, because the option is not going to
-> be user selectable but will get selected by the platform unless I'm
-> mistaken. The platform maintainers that care already know the state
-> of the framework. Also, there are no user space interfaces that we
-> have to warn users about not being stable, because the framework
-> is internal to the kernel.
+> Yes, thank you! That was the problem.
 
-The consensus seems to be to not set experimental.
+Awesome!  Glad that it's working for you now without the hacks.
 
-> However, I wonder whether we need the patch below to prevent
-> users from accidentally enabling COMMON_CLK on platforms that
-> already provide their own implementation.
+>> You can use the macros for the basic clocks types as templates. ?The
+>> gate and mux macros are good to look at since those show how to handle
+>> a single-parent and multi-parent clock, respectively:
+>> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=include/linux/clk-private.h;h=5e4312b6f5ccb1072273ce94e235874c74dd852d;hb=2508b44cd5c134691dc5d679f728bbf82af2abe0#l83
+>> and
+>> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=include/linux/clk-private.h;h=5e4312b6f5ccb1072273ce94e235874c74dd852d;hb=2508b44cd5c134691dc5d679f728bbf82af2abe0#l148
 >
-> ? ? ? ?Arnd
->
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 2eaf17e..a0a83de 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -12,7 +12,7 @@ config HAVE_MACH_CLKDEV
->
-> ?menuconfig COMMON_CLK
-> - ? ? ? bool "Common Clock Framework"
-> + ? ? ? bool
-> ? ? ? ?select HAVE_CLK_PREPARE
-> ? ? ? ?---help---
-> ? ? ? ? ?The common clock framework is a single definition of struct
-> ? ? ? ? ?clk, useful across many platforms, as well as an
+> If there was a fixed fractional divider clk element, a lot of the
+> peripheral clocks could be derived from a fixed clk representing the
+> 312 MHz PPLL on PXA27x (fixed -> divider -> gate), using just the
+> basic clock templates.
 
-Much like experimental I'm not sure how needed this change is.  The
-help section does say to leave it disabled by default, if unsure.  If
-you merge it I won't object but this might be fixing an imaginary
-problem.
+We need more common clock types, no question.  I have code for
+fixed-dividers and a standard "dummy" clock which I think will be
+critical for DT clock bindings when wiring up discrete devices.
+Sascha probably has what you need in his tree already.
+
+All of these changes are welcome additions to the framework, but I
+didn't want to slow down the merge process with feature creep.  Happy
+to take any patches from you in the future.
 
 Regards,
 Mike
