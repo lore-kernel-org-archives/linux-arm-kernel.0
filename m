@@ -1,32 +1,31 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 16 Mar 2012 17:48:04 -0600
-Subject: [PATCH v2 2/7] arm/PCI: don't export pci_flags
-In-Reply-To: <20120316234653.6649.59492.stgit@bhelgaas.mtv.corp.google.com>
-References: <20120316234653.6649.59492.stgit@bhelgaas.mtv.corp.google.com>
-Message-ID: <20120316234804.6649.3554.stgit@bhelgaas.mtv.corp.google.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 17 Mar 2012 08:07:59 +0800
+Subject: [alsa-devel] [PATCH v5 8/8] ASoC: fsl: add imx-sgtl5000 machine
+ driver
+In-Reply-To: <CA+7tXih-omxaDq6dSKBeOaZ7YRWDVSQnMY=eJZ0-YumOBG=oCA@mail.gmail.com>
+References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
+ <1331888204-27058-9-git-send-email-shawn.guo@linaro.org>
+ <CA+7tXihmfBQCgvuY0rx5v4w-bcwYK+7kP9v29w36N-Rc9KSQ+A@mail.gmail.com>
+ <20120316111814.GA7860@S2101-09.ap.freescale.net>
+ <20120316192110.GH3158@opensource.wolfsonmicro.com>
+ <CA+7tXih-omxaDq6dSKBeOaZ7YRWDVSQnMY=eJZ0-YumOBG=oCA@mail.gmail.com>
+Message-ID: <20120317000757.GB7860@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to export pci_flags; it's not exported by any other
-architecture, and no modules reference it.
+On Fri, Mar 16, 2012 at 05:28:54PM -0400, Trent Piepho wrote:
+> On Fri, Mar 16, 2012 at 3:21 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Fri, Mar 16, 2012 at 07:18:18PM +0800, Shawn Guo wrote:
+> >
+> >> Maybe having "fsl,imx-audio-xxx" for machine drivers backed by SSI,
+> >> and "fsl,imx-esai-audio-xxx" for the ones backed by ESAI?
+> 
+> It seems non-orthogonal to me that ESAI has esai in the name but SSI
+> does not have ssi.
+> 
+SSI comes first and so takes the "default and shorter" name :)
 
-CC: Rob Herring <rob.herring@calxeda.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm/kernel/bios32.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index be5d3b2..632df9a 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -498,7 +498,6 @@ void __init pci_common_init(struct hw_pci *hw)
- 		pci_bus_add_devices(bus);
- 	}
- }
--EXPORT_SYMBOL(pci_flags);
- 
- #ifndef CONFIG_PCI_HOST_ITE8152
- void pcibios_set_master(struct pci_dev *dev)
+-- 
+Regards,
+Shawn
