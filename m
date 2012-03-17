@@ -1,59 +1,73 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 17 Mar 2012 14:48:37 +0000 (GMT)
-Subject: [PATCH] pxa/hx4700: fix the LCD initialization
-In-Reply-To: <1331905213.29979.1.camel@flow>
-Message-ID: <1331995717.82481.YahooMailClassic@web29016.mail.ird.yahoo.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 17 Mar 2012 10:47:51 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <20120315102736.GA25371@avionic-0098.adnet.avionic-design.de>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <201203150922.06379.arnd@arndb.de>
+ <20120315102736.GA25371@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20120317104751.4F00E3E0910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Philipp
-
---- On Fri, 16/3/12, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> Common sense and the SDG bootldr code
-> reference dictate that
-> N2.7V/7.3V be disabled here, and not LVDD, which already
-> was
-> disabled 10 ms earlier.
-> This should only have an effect if the LCD was enabled in
-> the
-> bootloader.
+On Thu, 15 Mar 2012 11:27:36 +0100, Thierry Reding <thierry.reding@avionic-design.de> wrote:
+> * Arnd Bergmann wrote:
+> > On Thursday 15 March 2012, Nicolas Ferre wrote:
+> [...]
+> > > +	i2c1: i2c at 1 {
+> > > +		...
+> > > +		dma-request = <&sdma 2 &sdma 3>;
+> > > +		dma-request-names = "tx", "rx";
+> > > +		...
+> > > +	};
+> > 
+> > This is slightly different from how the proposed pwm binding works that
+> > Thierry is working on, which uses an arbitrary property name instead of
+> > requiring the use of a specific property but then allowing to give names
+> > in another property.
+> > 
+> > I don't care much which way it's done, but please try to agree on one
+> > approach that is used for both.
+> > 
+> > The one you have here is already used by reg and irq, while the other
+> > one is used in gpio.
 > 
-> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Paul Parsons <lost.distance@yahoo.com>
-> ---
->  arch/arm/mach-pxa/hx4700.c |? ? 2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> I think we can just use pwm as the fixed property name. Or alternatively do
+> something along the lines of the regulator bindings, where we use "-pwm" as
+> the suffix for specifying PWM devices. For instance if a named PWM is
+> requested, the OF support code would look for a <name>-pwm property, while
+> requesting an unnamed PWM would simply look at the pwm property.
 > 
-> diff --git a/arch/arm/mach-pxa/hx4700.c
-> b/arch/arm/mach-pxa/hx4700.c
-> index 61bb967..31c6dd1 100644
-> --- a/arch/arm/mach-pxa/hx4700.c
-> +++ b/arch/arm/mach-pxa/hx4700.c
-> @@ -399,7 +399,7 @@ static void sony_lcd_init(void)
->  ??? gpio_set_value(GPIO62_HX4700_LCD_nRESET,
-> 0);
->  ??? mdelay(10);
->  ??? gpio_set_value(GPIO59_HX4700_LCD_PC1,
-> 0);
-> -???
-> gpio_set_value(GPIO110_HX4700_LCD_LVDD_3V3_ON, 0);
-> +???
-> gpio_set_value(GPIO112_HX4700_LCD_N2V7_7V3_ON, 0);
->  ??? mdelay(20);
->  
->  ???
-> gpio_set_value(GPIO110_HX4700_LCD_LVDD_3V3_ON, 1);
-> -- 
+> When it comes to the labelling of PWM devices, I don't think both variants
+> are exclusive. Currently the PWM framework uses name of the user OF device
+> node for the PWM label. That is, if I have the following in the DTS:
+> 
+> 	pwm {
+> 		..
+> 	};
+> 
+> 	backlight {
+> 		compatible = "pwm-backlight";
+> 		pwm = <&pwm 0 5000000>;
+> 		...
+> 	};
+> 
+> Then the PWM will be labelled "backlight":
+> 
+> 	$ cat cat /sys/kernel/debug/pwm
+> 	platform/tegra-pwm, 4 PWM devices
+> 	pwm-0   (backlight           ): requested enabled
+> 	pwm-1   ((null)              ):
+> 	pwm-2   ((null)              ):
+> 	pwm-3   ((null)              ):
+> 
+> So if we decide to explicitly allow specifying names, then we can always add
+> a pwm-names property (or <name>-pwm-names respectively) to use as label and
+> fallback to the user OF device node name if that property is not present.
 
-After some experimenting it seems that neither GPIO110 "LCD_LVDD_3V3_ON"
-nor GPIO112 "LCD_N2V7_7V3_ON" have any effect on the hx4700 LCD.
-After the hx4700 boots I can turn either one off, or both off together,
-and the LCD and touchscreen will continue to work normally.
+After implementing both schemes (ie. interrupts+interrupt-names && [*-]gpios)
+I definitely prefer the fixed property name plus a separate names property.
+It is easier to use common code with that scheme, and easier to statically
+check for correctness.
 
-Is there an authoritative description of the 7 "LCD" GPIOs (GPIO59,
-GPIO62, GPIO70, GPIO84, GPIO110, GPIO111, GPIO112) that are used by
-the kernel, or the 2 "LCD" GPIOs (GPIO22, GPIO73) that are not used?
-The SDG code provides no enlightenment.
-
-Paul
+g.
