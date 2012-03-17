@@ -1,44 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 17 Mar 2012 16:43:45 +0100
-Subject: Atmel at91x40 ("EB01" eval board) resurected
-In-Reply-To: <CALz2mmXcAk9ZOsAzKMbKVVJ2+Et02+Gxj_z6xSgukC5LjgJTLg@mail.gmail.com>
-References: <CALz2mmXcAk9ZOsAzKMbKVVJ2+Et02+Gxj_z6xSgukC5LjgJTLg@mail.gmail.com>
-Message-ID: <20120317164345.4f20beef@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 17 Mar 2012 16:03:02 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <20120317094217.6BA143E0908@localhost>
+References: <4F22DEF2.5000807@ti.com>
+ <20120315092652.GA16389@n2100.arm.linux.org.uk>
+ <20120317094217.6BA143E0908@localhost>
+Message-ID: <201203171603.02230.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Phil,
+On Saturday 17 March 2012, Grant Likely wrote:
+> On Thu, 15 Mar 2012 09:26:52 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Thu, Mar 15, 2012 at 09:22:06AM +0000, Arnd Bergmann wrote:
+> > > On Thursday 15 March 2012, Nicolas Ferre wrote:
+> > > > Add some basic helpers to retrieve a DMA controller device_node and the
+> > > > DMA request specifications. By making DMA controllers register a generic
+> > > > translation function, we allow the management of any type of DMA requests
+> > > > specification.
+> > > > The void * output of an of_dma_xlate() function that will be implemented
+> > > > by the DMA controller can carry any type of "dma-request" argument.
+> > > > 
+> > > > The DMA client will search its associated DMA controller in the list and
+> > > > call the registered of_dam_xlate() function to retrieve the request values.
+> > > > 
+> > > > One simple xlate function is provided for the "single number" type of
+> > > > request binding.
+> > > > 
+> > > > This implementation is independent from dmaengine so it can also be used
+> > > > by legacy drivers.
+> > > > 
+> > > > For legacy reason another API will export the DMA request number into a
+> > > > Linux resource of type IORESOURCE_DMA.
+> > > 
+> > > This looks very good. I missed the first version of this patch, but was
+> > > thinking of very similar bindings.
+> > 
+> > There's one issue which is concerning me - when we switch OMAP to use
+> > DMA engine, it won't use numeric stuff anymore but the DMA engine way
+> > of requesting a channel (match function + data).
+> > 
+> > How does that fit into this scheme?
+> 
+> Not well as the current patch set stands.  The xlate function doesn't return
+> any context for the dma channel number that it returns, so the driver cannot
+> figure out which DMA controller to use if there are multiple.
 
-Le Thu, 22 Dec 2011 22:18:53 -0500,
-Phil Budne <phil@ultimate.com> a ?crit :
+Shouldn't that be part of the data returned by xlate? I was under the impression
+that this would be the data that you would pass into dma_request_channel, together
+with a filter function that find the instance from the data.
 
-> I decided to see if I could bring up current kernel sources under
-> skyeye  (at91x40 simulation).
+That's why I suggested adding another helper function that would provide a
+generic filter function for the dt binding doing just that.
 
-Very interesting, thanks. Your patches indeed allow the AT91x40 kernel
-to boot under SkyEye, while the unpatched Linux kernel does not,
-apparently.
-
-Greg, it seems you are saying that the mainline kernel, unchanged,
-boots under SkyEye. Could you share your kernel configuration and
-SkyEye configuration?
-
-> Runs on locally modified skyeye
->  based on skyeye-v1.2_Rel.tar (had trouble building latest release)
->  adds interrupt driven UART output
->  tweaked for programmed I/O UART input
->  fix for loading XIP data section (load at physical, not virtual address)
-
-Would you mind publishing your changes to SkyEye? So far, I'm blocked
-because of the lack of interrupt driver UART output.
-
-Do you plan on further pushing those AT91x40 changes?
-
-Thanks for your work,
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
