@@ -1,24 +1,41 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 17 Mar 2012 08:18:14 +0800
-Subject: [GIT PULL] imx irq_domain migration
-In-Reply-To: <20120316122243.GH7758@S2101-09.ap.freescale.net>
-References: <20120216154941.GB11758@r65073-Latitude-D630>
- <4F3D41D2.5090203@gmail.com>
- <20120314050837.GB21337@S2101-09.ap.freescale.net>
- <4F6098C6.7050503@gmail.com>
- <CACxGe6tsHWj+bHcg1uEV8x-KE7B8p1Lj-_DL9mysYn1z+Bex3g@mail.gmail.com>
- <20120316122243.GH7758@S2101-09.ap.freescale.net>
-Message-ID: <20120317001812.GI7758@S2101-09.ap.freescale.net>
+Date: Sat, 17 Mar 2012 08:21:30 +0800
+Subject: [PATCH v5 2/8] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
+In-Reply-To: <4F63AEE7.4030505@freescale.com>
+References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
+ <1331888204-27058-3-git-send-email-shawn.guo@linaro.org>
+ <4F63AEE7.4030505@freescale.com>
+Message-ID: <20120317002128.GC7860@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 08:22:46PM +0800, Shawn Guo wrote:
-...
-> Okay.  Since imx change has a dependency on Rob's change, I have to
-> wait until Rob's change shows up on irqdomain/next.
+On Fri, Mar 16, 2012 at 04:21:43PM -0500, Timur Tabi wrote:
+> Shawn Guo wrote:
+> > Freescale PowerPC and ARM/IMX families share the same SSI IP block.
+> > The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
+> > code sharing and consolidation can happen.
+> > 
+> > This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
+> > in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
+> > IMX platform.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> 
+> I'm okay with this patch, but you will need an Ack from Kumar Gala to
+> carry the defconfig portions through the ASoC tree.  Or, he might want you
+> to split the patch up.
+> 
+Splitting the patch up will introduce a dependency between PowerPC tree
+and sound tree.  Since the change is trivial enough (one line change),
+even if there is a merge conflict (very unlikely, just tried linux-next
+and did not see), Linus will be able to handle it.  So I'd rather not
+split.  What'd you say, Kumar?
 
-It does not matter now.  Arnd announced that arm-soc tree has closed
-for the coming merge window.  I will wait for v3.4-rc1 then.
+> >  arch/powerpc/configs/86xx/mpc8610_hpcd_defconfig |    1 +
+> >  arch/powerpc/configs/mpc85xx_defconfig           |    1 +
+> >  arch/powerpc/configs/mpc85xx_smp_defconfig       |    1 +
 
 -- 
 Regards,
