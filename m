@@ -1,83 +1,212 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 17 Mar 2012 13:28:31 +0100
-Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
-In-Reply-To: <20120316011006.GA17459@b20223-02.ap.freescale.net>
-References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
- <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
- <20120314085228.GM3852@pengutronix.de>
- <20120315144601.GA5701@richard-laptop>
- <20120315150048.GC3852@pengutronix.de>
- <20120315151521.GB5701@richard-laptop>
- <20120315185004.GD3852@pengutronix.de>
- <20120316011006.GA17459@b20223-02.ap.freescale.net>
-Message-ID: <20120317122831.GD29317@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 17 Mar 2012 17:59:46 +0530
+Subject: [PATCHv2 3/5] cpuidle: add support for states that affect multiple
+ cpus
+In-Reply-To: <1331749794-8056-4-git-send-email-ccross@android.com>
+References: <1331749794-8056-1-git-send-email-ccross@android.com>
+ <1331749794-8056-4-git-send-email-ccross@android.com>
+Message-ID: <4F6483BA.8050103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 09:10:07AM +0800, Richard Zhao wrote:
-> Hi Sascha,
+Colin,
+
+On Wednesday 14 March 2012 11:59 PM, Colin Cross wrote:
+> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+> cpus cannot be independently powered down, either due to
+> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+> power down), or due to HW bugs (on OMAP4460, a cpu powering up
+> will corrupt the gic state unless the other cpu runs a work
+> around).  Each cpu has a power state that it can enter without
+> coordinating with the other cpu (usually Wait For Interrupt, or
+> WFI), and one or more "coupled" power states that affect blocks
+> shared between the cpus (L2 cache, interrupt controller, and
+> sometimes the whole SoC).  Entering a coupled power state must
+> be tightly controlled on both cpus.
 > 
-> On Thu, Mar 15, 2012 at 07:50:04PM +0100, Sascha Hauer wrote:
-> > On Thu, Mar 15, 2012 at 11:15:23PM +0800, Richard Zhao wrote:
-> > > On Thu, Mar 15, 2012 at 04:00:48PM +0100, Sascha Hauer wrote:
-> > > > On Thu, Mar 15, 2012 at 10:46:04PM +0800, Richard Zhao wrote:
-> > > > > On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
-> > > > > > On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
-> > > > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > > > > > ---
-> > > > > > >  
-> > > > > > >  #define DEF_PLL(name)					\
-> > > > > > >  	static struct clk name = {			\
-> > > > > > > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
-> > > > > > >  		.disable	= pll_disable,		\
-> > > > > > >  		.get_rate	= name##_get_rate,	\
-> > > > > > >  		.set_rate	= name##_set_rate,	\
-> > > > > > > +		.round_rate	= name##_round_rate,	\
-> > > > > > 
-> > > > > > I hope this ## stuff is gone soon with the generic clock framework. It
-> > > > > > is so ugly and inefficient.
-> > > > > I hope this doesn't prevent this two patches go in.
-> > > > 
-> > > > Given that we are short from getting a generic clock framework (and I
-> > > > think this time it's for real) and that you are not mention in any words
-> > > > what these patches fix I don't see a reason for merging them.
-> > > I think the cpu clock is a great challenge for generic clock framework.
-> > > When it set_rate, it includes reparent, and change parent's parent's rate.
-> > > I don't see any upstream code like that till now. and it's really what
-> > > we need.
-> > 
-> > Then do a clk_set_parent, clk_set_rate and a clk_set_parent again
-> > in your cpufreq driver.
-> No, it's platform code, and supposed to be in arch/arm. What the cpufre
-> driver know is to get cpu clk, rather not how cpu clk change its rate.
-> And cpu clk/arm_clk is a real clock wires in SoC.
+> The easiest solution to implementing coupled cpu power states is
+> to hotplug all but one cpu whenever possible, usually using a
+> cpufreq governor that looks at cpu load to determine when to
+> enable the secondary cpus.  This causes problems, as hotplug is an
+> expensive operation, so the number of hotplug transitions must be
+> minimized, leading to very slow response to loads, often on the
+> order of seconds.
+> 
+> This file implements an alternative solution, where each cpu will
+> wait in the WFI state until all cpus are ready to enter a coupled
+> state, at which point the coupled state function will be called
+> on all cpus at approximately the same time.
+> 
+> Once all cpus are ready to enter idle, they are woken by an smp
+> cross call.  At this point, there is a chance that one of the
+> cpus will find work to do, and choose not to enter idle.  A
+> final pass is needed to guarantee that all cpus will call the
+> power state enter function at the same time.  During this pass,
+> each cpu will increment the ready counter, and continue once the
+> ready counter matches the number of online coupled cpus.  If any
+> cpu exits idle, the other cpus will decrement their counter and
+> retry.
+> 
+> To use coupled cpuidle states, a cpuidle driver must:
+> 
+>    Set struct cpuidle_device.coupled_cpus to the mask of all
+>    coupled cpus, usually the same as cpu_possible_mask if all cpus
+>    are part of the same cluster.  The coupled_cpus mask must be
+>    set in the struct cpuidle_device for each cpu.
+> 
+>    Set struct cpuidle_device.safe_state to a state that is not a
+>    coupled state.  This is usually WFI.
+> 
+>    Set CPUIDLE_FLAG_COUPLED in struct cpuidle_state.flags for each
+>    state that affects multiple cpus.
+> 
+>    Provide a struct cpuidle_state.enter function for each state
+>    that affects multiple cpus.  This function is guaranteed to be
+>    called on all cpus at approximately the same time.  The driver
+>    should ensure that the cpus all abort together if any cpu tries
+>    to abort once the function is called.
+> 
+> Signed-off-by: Colin Cross <ccross@android.com>
+> Cc: Len Brown <len.brown@intel.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Amit Kucheria <amit.kucheria@linaro.org>
+> Cc: Arjan van de Ven <arjan@linux.intel.com>
+> Cc: Trinabh Gupta <g.trinabh@gmail.com>
+> Cc: Deepthi Dharwar <deepthi@linux.vnet.ibm.com>
+> ---
 
-The job of the clock framework is to give a consistent view on the
-clocks and to handle parent/rate changes properly. It even the
-CLK_SET_RATE_GATE for ensuring that your PLL can only change its rate
-when it's gated. It's not the job of the clock framework to dynamically
-reorganize the clock tree on a rate change.
+[..]
 
-Besides, do you really want to reprogram the PLL with a cpufreq change?
-You have a divider behind that PLL which you apparently can change
-without having to reparent the PLL. Doesn't this give you enough choices
-for the cpu frequency?
+> diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+> new file mode 100644
+> index 0000000..046fccb
+> --- /dev/null
+> +++ b/drivers/cpuidle/coupled.c
+> @@ -0,0 +1,568 @@
+> +/*
+> + * coupled.c - helper functions to enter the same idle state on multiple cpus
+> + *
+> + * Copyright (c) 2011 Google, Inc.
+> + *
+> + * Author: Colin Cross <ccross@android.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + */
 
-> > The notifying mechanism even allows you to
-> > block any concurrent change in between these three steps if necessary.
-> > Noone says that these three steps have to be encapsulated in a single
-> > clk_set_rate call like you did in your patch.
-> If you're reviwing the patch, why not take a step advance? :)
+[...]
 
-I have prepared the patches for converting i.MX1/21/25/27 and I have
-(older) patches for the i.MX31/51/53 which I want to rebase on the
-current clock framework. That gives me enough to do until the next merge
-window. Additionally I'm not yet very familiar with the i.MX6.
+> +/**
+> + * cpuidle_coupled_cpu_set_alive - adjust alive_count during hotplug transitions
+> + * @cpu: target cpu number
+> + * @alive: whether the target cpu is going up or down
+> + *
+> + * Run on the cpu that is bringing up the target cpu, before the target cpu
+> + * has been booted, or after the target cpu is completely dead.
+> + */
+> +static void cpuidle_coupled_cpu_set_alive(int cpu, bool alive)
+> +{
+> +	struct cpuidle_device *dev;
+> +	struct cpuidle_coupled *coupled;
+> +
+> +	mutex_lock(&cpuidle_lock);
+> +
+> +	dev = per_cpu(cpuidle_devices, cpu);
+> +	if (!dev->coupled)
+> +		goto out;
+> +
+> +	coupled = dev->coupled;
+> +
+> +	/*
+> +	 * waiting_count must be at least 1 less than alive_count, because
+> +	 * this cpu is not waiting.  Spin until all cpus have noticed this cpu
+> +	 * is not idle and exited the ready loop before changing alive_count.
+> +	 */
+> +	while (atomic_read(&coupled->ready_count))
+> +		cpu_relax();
+> +
+> +	smp_mb__before_atomic_inc();
+> +	atomic_inc(&coupled->alive_count);
+> +	smp_mb__after_atomic_inc();
+> +
+> +	if (alive)
+> +		coupled->requested_state[dev->cpu] = CPUIDLE_COUPLED_NOT_IDLE;
+> +	else
+> +		coupled->requested_state[dev->cpu] = CPUIDLE_COUPLED_DEAD;
+> +
 
-Sascha
+While playing around with this version, I noticed that the
+'alive_count' is ever incrementing which will lead to
+coupled idle state not being attempted after one CPU offline
+attempt.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Fix in end of the email for the same. With it, coupled states
+continue to work with CPU online/offline transitions.
+
+Feel free to fold it into original patch. Attached
+the same in case mailer eat tabs.
+
+Regards
+Santosh
+
+>>
+cpuidle: coupled: Fix the alive_count based on CPU online/offline.
+
+Currently the alive_count is ever incrementing which will lead to
+coupled idle state not being attempted after one CPU offline
+attempt.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/cpuidle/coupled.c |   14 +++++++++-----
+ 1 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+index 3bc8a02..708bcfe 100644
+--- a/drivers/cpuidle/coupled.c
++++ b/drivers/cpuidle/coupled.c
+@@ -595,14 +595,18 @@ static void cpuidle_coupled_cpu_set_alive(int cpu,
+bool alive)
+        while (atomic_read(&coupled->ready_count))
+                cpu_relax();
+
+-       smp_mb__before_atomic_inc();
+-       atomic_inc(&coupled->alive_count);
+-       smp_mb__after_atomic_inc();
+
+-       if (alive)
++       if (alive) {
++               smp_mb__before_atomic_inc();
++               atomic_inc(&coupled->alive_count);
++               smp_mb__after_atomic_inc();
+                coupled->requested_state[dev->cpu] =
+CPUIDLE_COUPLED_NOT_IDLE;
+-       else
++       } else {
++               smp_mb__before_atomic_inc();
++               atomic_dec(&coupled->alive_count);
++               smp_mb__after_atomic_inc();
+                coupled->requested_state[dev->cpu] = CPUIDLE_COUPLED_DEAD;
++       }
+
+<upled-Fix-the-alive_count-based-on-CPU-onl.patch" 45L, 1387C 1,1
+    Top
+
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-cpuidle-coupled-Fix-the-alive_count-based-on-CPU-onl.patch
+Type: text/x-patch
+Size: 1388 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120317/4ef98221/attachment.bin>
