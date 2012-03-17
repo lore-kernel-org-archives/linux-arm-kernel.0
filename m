@@ -1,47 +1,70 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sat, 17 Mar 2012 08:39:08 +0200
-Subject: [PATCH 1/7] remoteproc: resource table overhaul
-In-Reply-To: <4F6354E4.8030704@monstr.eu>
-References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
- <1330589497-4139-2-git-send-email-ohad@wizery.com>
- <4F6354E4.8030704@monstr.eu>
-Message-ID: <CAK=Wgbbbi4GnuHedSh6cR1LhkZr8c9q6i=_TLSL252LpPB8Xsw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sat, 17 Mar 2012 08:49:58 +0000
+Subject: [GIT PULL] [for v3.4] Pull request containing ux500 DT enablement
+In-Reply-To: <201203162009.48239.arnd@arndb.de>
+References: <4F62220D.1090106@linaro.org> <201203162009.48239.arnd@arndb.de>
+Message-ID: <4F645036.2030900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On 16/03/12 20:09, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Lee Jones wrote:
+>> The following changes since commit fff9a13341312c8d0f06e04c1345e855528b03da:
+>>
+>>   ARM: ux500: CONFIG: Enable Device Tree support for future endeavours (2012-03-15 16:33:54 +0000)
+>>
+>> are available in the git repository at:
+>>   git://git.linaro.org/people/ljones/linux-3.0-ux500.git device-tree-snowball-ux500
+>>
+>> Arnd Bergmann (3):
+>>       ARM: ux500: Initial Device Tree support for Snowball
+>>       ARM: ux500: combine the board init functions for DT boot
+>>       ARM: ux500: split dts file for snowball into generic part
+>>
+>> Lee Jones (5):
+>>       ARM: ux500: db8500: list most devices in the snowball device tree
+>>       ARM: ux500: Enable Cortex-A9 GIC (Generic Interrupt Controller) in Device Tree
+>>       ARM: ux500: Enable PL011 AMBA UART Controller for Device Tree
+>>       ARM: ux500: Enable PL310 Level 2 Cache Controller in Device Tree
+>>       ARM: ux500: Enable PL022 SSP Controller in Device Tree
+> 
+> I've pulled this into next/dt2, not next/dt for now. I had to rebase the patches
+> as we discussed and then did some build tests to make sure nothing broke. I found
+> one bug with your patches and CONFIG_OF disabled, which I fixed in the patch itself,
 
-On Fri, Mar 16, 2012 at 4:57 PM, Michal Simek <monstr@monstr.eu> wrote:
-> In previous version I had carverout first which means that code was copyied
-> to physical address 0x0 and then vrigns were allocated. Current code
-> allocate vring first and then RTOS is not able to run from zero address.
+I did test the patch-set with CONFIG_OF disabled, but it looks like I
+wasn't diligent enough to deselect CONFIG_MACH_UX500_DT, which selects
+USE_OF.
 
-In general, depending on specific allocation ordering is error prone
-and you shouldn't do it.
+Thanks for fixing though.
 
-For a given device, we treat memory allocated with
-dma_alloc_coherent() as homogeneous. We care about its utilization and
-alignments of allocations rather than their specific location in the
-total region.
+> and found some build warnings that you should take a look at in the for-next
+> branch. 
 
-If that's not the case, and there's special memory you want assigned
-with a specific purpose, than it's recommended to let the code make
-sure it happens explicitly, and not rely on implicit order of
-allocation.
+Okay, that patch is actually going in via the drivers/base tree. I have
+a patch to fix the compile errors. It's only a single character change.
+Can you apply it through your tree? I'll send it up to the ML and CC
+Greg and yourself.
 
-Today there's no way to assign several memory regions with a specific
-device, but a reasonable workaround that's being used is creating
-several sub-devices with the special memory, and then looking them up
-with stuff like device_for_each_child() or device_find_child().
+> Also the patch "CONFIG: Enable Device Tree support for future endeavours"
+> seems essential for the entire series, so I applied it as well, along with 
+> your localtime patch.
 
-About your specific issue: the current allocation scheme was chosen
-for simplicity, but I do plan to change it back by postponing the
-vring dma allocation until a remote processor is really powered on.
-It's not a lot of memory, but this way we'd only allocate it when
-really needed (so if it's CMA, others could use it).
+Yes it is. It should have been part of the pull-request. That's my error
+for rushing, sorry.
 
-IOW: you can probably just wait a bit until this patch is ready and
-take it into your tree. It will most likely bring back the behavior you
-need :)
+> I still think we can make it for v3.4, but I'll let this sit in linux-next for a
+> few days longer than the other pull requests and if we find more problems it's out
+> and gets postponed till v3.5.
 
-Ohad.
+I'm sure it will be fine now. :)
+
+Kind regards,
+Lee
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
