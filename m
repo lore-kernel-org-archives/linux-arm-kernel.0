@@ -1,112 +1,105 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 18 Mar 2012 18:47:49 +0000
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120316030134.GA5161@shlinux2.ap.freescale.net>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <20120313172351.97C5E3E053B@localhost>
- <20120314124512.GG1180@shlinux2.ap.freescale.net>
- <20120314141643.GP3852@pengutronix.de>
- <20120315030206.GB13022@shlinux2.ap.freescale.net>
- <20321.37353.63115.664975@ipc1.ka-ro>
- <20120315105927.GE13022@shlinux2.ap.freescale.net>
- <20321.53468.310199.875966@ipc1.ka-ro>
- <20120316030134.GA5161@shlinux2.ap.freescale.net>
-Message-ID: <20120318184749.BB15D3E07BF@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 18 Mar 2012 20:13:22 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <20120317094059.7C2333E08E2@localhost>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <20120317094059.7C2333E08E2@localhost>
+Message-ID: <201203182013.22790.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Mar 2012 11:01:35 +0800, Dong Aisheng <aisheng.dong@freescale.com> wrote:
-> On Thu, Mar 15, 2012 at 07:22:04PM +0800, Lothar Wa??mann wrote:
-> > Hi,
-> > 
-> > Dong Aisheng writes:
-> > > On Thu, Mar 15, 2012 at 02:53:29PM +0800, Lothar Wa??mann wrote:
-> > > > Hi,
-> > > > 
-> > > > Dong Aisheng writes:
-> > > > > On Wed, Mar 14, 2012 at 10:16:43PM +0800, s.hauer at pengutronix.de wrote:
-> > > > > > On Wed, Mar 14, 2012 at 08:45:23PM +0800, Dong Aisheng wrote:
-> > > > > > > On Wed, Mar 14, 2012 at 01:23:51AM +0800, Grant Likely wrote:
-> > > > [...]
-> > > > > > > But it seems this needs pass mac address to fec driver via platforom data which is
-> > > > > > > not friendly to dt.
-> > > > > > > 
-> > > > > > > Another way may be changing fec driver to get the fixed part of mac address(first
-> > > > > > > two bytes) from device tree and read the left dynamical part from otp which i'm not
-> > > > > > > sure is better enough.
-> > > > > > > 
-> > > > > > > BTW, filling with zeros seems not work since it's invalid mac address.
-> > > > > > 
-> > > > > > Yes, that's the idea of using this value...
-> > > > > > 
-> > > > > But comparing to use an invalid value, why not just do not define that
-> > > > > local-mac-address property?
-> > > > > 
-> > > > Because a MAC address is by definition a GLOBALLY UNIQUE IDENTIFIER
-> > > > which is contrary to coding a "valid" default value for it somewhere!
-> > > > The owner of a certain MAC address range (OUI) is responsible for
-> > > > ensuring the uniqueness. Thus only they may assign a specific MAC
-> > > > address to a specific device.
-> > > > 
-> > > Yes, you're correct.
-> > > So i propose to read the MAC address from MX28 OTP in fec driver instead of
-> > > define it in device tree in my last mail.
-> > > http://www.spinics.net/lists/arm-kernel/msg165040.html
-> > > Do you have any comment on that way?
-> > > 
-> > That patch sets the OUI to the Freescale owned MAC range. Thus only
-> > Freescale products may be able to use the driver.
-> > 
-> No.
-> My proposal is only set the fixed part(first two octets) in board dts file,
-> each board knows it's value, and read the left 4 octets from OCOTP dynamically.
-> Obviously the freeescale board dts file is only for FSL platforms.
-> Other platforms can define their fix part of MAC address in their dts file.
+On Saturday 17 March 2012, Grant Likely wrote:
+> > +static LIST_HEAD(of_dma_list);
+> > +
+> > +struct of_dma {
+> > +     struct list_head of_dma_controllers;
+> > +     struct device_node *of_node;
+> > +     int of_dma_n_cells;
+> > +     int (*of_dma_xlate)(struct of_phandle_args *dma_spec, void *data);
+> > +};
 > 
-> > Anyway there is no definite spec how the MAC address(es) are stored
-> > in the fuse map. Thus reading the MAC from there is more or less
-> > platform specific.
-> > 
-> It's just provide one more option since there are customers storing the MAC
-> in the fuse map.
-
-That should be straight forward to support; have a property that
-specifies the method used for fetching/calculating the MAC.
-
-> > Currently I'm setting up the MAC address for our TX28 from the fuses
-> > in the platform code passed via platform_data, but that will obviously
-> > not work with DT.
-> > 
-> Non-dt can also use my proposal, then you only need to pass the fixed part of
-> MAC via platfrom data, the left will be read by fec driver.
+> This _xlate is nearly useless as a generic API.  It solves the problem for
+> the specific case where the driver is hard-coded to know which DMA engine
+> to talk to, but since the returned data doesn't provide any context, it
+> isn't useful if there are multiple DMA controllers to choose from.
 > 
-> > The correct way would probably be to pass the MAC from the bootloader
-> > via a DT blob. But that would require all bootloaders to be updated
-> > first to support DTS. :(
-> > 
-> But uboot will face the same problem that can not define a valid MAC
-> in dts, did i undertand correctly?
-> 
-> > An intermediate solution could be using OF_DEV_AUXDATA to pass a
-> > platform_data struct that may contain a MAC address set up by the
-> > platform code.
-> > 
-> Yes, it's a way but i'm afraid will not get accepted by dt people.
+> The void *data pointer must be replaced with a typed structure so that
+> context can be returned.
 
-The problem remains; where does the platform code get the MAC address
-from?  The kernel has to devise it from *somewhere* and the best place
-for that should be in the MAC driver itself.
+I've read up a bit more on how the existing drivers use the filter
+functions, it seems there are multiple classes of them, the classes
+that I've encountered are:
 
-I've got no problem with the idea of only specifying the OUI in the DT
-and the driver extracting the remaining 3 bytes from the hardware.
+1. matches on chan->device pointer and/or chan_id
+   (8 drivers)
+2. will match anything
+   (6 drivers)
+3. requires specific dma engine driver, then behaves like 1 or 2
+   (8 drivers, almost all freescale)
+4. one of a kind, matches resource name string or device->dev_id
+   (two drivers)
+5. filter function and data both provided by platform code,
+   platform picks dmaengine driver.
+   (4 amba pl* drivers, used on ARM, ux500, ...)
 
-In principle, that's the design intent for DT systems anyway; it
-describes things which cannot be probed from the hardware, or tells
-the OS how the data is encoded in the hardware.
+The last category is interesting because here, the dmaengine
+driver (pl330, coh901318, sirf-dma, ste_dma40) provides the filter
+function while in the other cases that is provided by the device
+driver! Out of these, the ste_dma40 is special because it's the
+only one where the data is a complex data structure describing the
+constraints on the driver, while all others just find the right
+channel.
 
-g.
+Some drivers also pass assign driver specific data to chan->private.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+I would hope that we can all make them use something like
+     struct dma_channel *of_dma_request_channel(struct of_node*,
+					int index, void *driver_data);
+with an appropriate common definition behind it. In the cases
+where the driver can just match anything, I'd assume that all
+channels are equal, so #dma-cells would be 0. For the ste_dma40,
+#dma-cells needs to cover all of stedma40_chan_cfg. In most
+other cases, #dma-cells can be 1 and just enumerate the channels,
+unless we want to simplify the cases that Russell mentioned where
+we want to keep a two stage mapping channel identifiers and physical
+channel numbers.
+
+How about an implementation like this:?
+
+typedef bool dma_filter_simple(struct dma_chan *chan, void *filter_param)
+{
+	/* zero #dma-cells, accept anything */
+	return true;
+}
+
+struct dma_channel *of_dma_request_channel(struct of_node*, int index,
+					dma_cap_mask_t *mask,
+					void *driver_data)
+{
+	struct of_phandle_args dma_spec;
+	struct dma_device *device;
+	struct dma_chan *chan = NULL;
+	dma_filter_fn *filter;
+
+	ret = of_parse_phandle_with_args(np, "dma-request", "#dma-cells",
+					 index, &dma_spec);
+
+	device = dma_find_device(dma_spec->np);
+	if (!device)
+		goto out;
+
+	if (dma_spec->args_count == 0)
+		filter = dma_filter_simple;
+	else
+		filter = device->dma_dt_filter; /* new member */
+
+	chan = private_candidate(mask, device, filter, dma_spec->args);
+
+	if (chan && !chan->private)
+		chan->private = driver_data;
+out:
+	return chan;
+}
+
+	Arnd
