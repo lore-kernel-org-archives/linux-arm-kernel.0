@@ -1,10 +1,8 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Sun, 18 Mar 2012 03:43:15 +0100
-Subject: [PATCH 2/2] OMAP3: igep0020: Add support for Micron NAND Flash
+Date: Sun, 18 Mar 2012 04:30:29 +0100
+Subject: [PATCH v2 2/2] OMAP3: igep0020: Add support for Micron NAND Flash
  storage memory
-In-Reply-To: <1332038595-15810-1-git-send-email-javier@dowhile0.org>
-References: <1332038595-15810-1-git-send-email-javier@dowhile0.org>
-Message-ID: <1332038595-15810-2-git-send-email-javier@dowhile0.org>
+Message-ID: <1332041429-23978-1-git-send-email-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,11 +14,15 @@ Also, this patch removes unnecesary code for registering the OneNAND.
 
 Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 ---
- arch/arm/mach-omap2/board-igep0020.c |   81 +++++++++++++++------------------
- 1 files changed, 37 insertions(+), 44 deletions(-)
+
+v2: It's not necessary to guard board_nand_init() and board_onenand_init()
+    with #ifdef since they are defined as empty functions in board-flash.c
+
+ arch/arm/mach-omap2/board-igep0020.c |   75 ++++++++++++++--------------------
+ 1 files changed, 31 insertions(+), 44 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index e558800..59b0164 100644
+index e558800..dbd13b2 100644
 --- a/arch/arm/mach-omap2/board-igep0020.c
 +++ b/arch/arm/mach-omap2/board-igep0020.c
 @@ -24,6 +24,8 @@
@@ -74,7 +76,7 @@ index e558800..59b0164 100644
  	{
  		.name           = "X-Loader",
  		.offset         = 0,
-@@ -151,50 +161,33 @@ static struct mtd_partition igep_onenand_partitions[] = {
+@@ -151,50 +161,27 @@ static struct mtd_partition igep_onenand_partitions[] = {
  	},
  };
  
@@ -130,20 +132,14 @@ index e558800..59b0164 100644
 +	mux = igep_get_sysboot_value();
 +
 +	if (mux == IGEP_SYSBOOT_NAND) {
-+#if defined(CONFIG_MTD_NAND_OMAP2) || \
-+	defined(CONFIG_MTD_NAND_OMAP2_MODULE)
 +		pr_info("IGEP: initializing NAND memory device\n");
 +		board_nand_init(igep_flash_partitions,
 +				ARRAY_SIZE(igep_flash_partitions),
 +				0, NAND_BUSWIDTH_16);
-+#endif
 +	} else if (mux == IGEP_SYSBOOT_ONENAND) {
-+#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
-+	defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
 +		pr_info("IGEP: initializing OneNAND memory device\n");
 +		board_onenand_init(igep_flash_partitions,
 +				   ARRAY_SIZE(igep_flash_partitions), 0);
-+#endif
 +	} else
 +		pr_err("IGEP: Flash: unsupported sysboot sequence found\n");
  }
