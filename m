@@ -1,98 +1,62 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Sat, 17 Mar 2012 18:22:48 -0700
-Subject: [PATCH v3 2/2] arm: omap3: pm34xx.c: Replace printk() with
- appropriate pr_*()
-In-Reply-To: <1332033768-21986-1-git-send-email-mgreer@animalcreek.com>
-References: <1332033768-21986-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1332033768-21986-3-git-send-email-mgreer@animalcreek.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sun, 18 Mar 2012 03:43:14 +0100
+Subject: [PATCH 1/2] omap3: nand: Make board_onenand_init() visible to board
+ code
+Message-ID: <1332038595-15810-1-git-send-email-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+board_onenand_init() and board_nand_init() initialization functions are
+used to initialize OneNAND and NAND memories respectively. But only
+board_nand_init() was visible to be used from board code. This patch makes
+possible to initialize a OneNAND flash memory within platform code.
 
-Currently, pm34xx.c has a mix of printk() and pr_*() statements
-so replace the printk() statements with the equivalent pr_*()
-statements.
-
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 ---
- arch/arm/mach-omap2/pm34xx.c |   22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/board-flash.c |    4 ++--
+ arch/arm/mach-omap2/board-flash.h |   11 +++++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index af8d741..abc2ee0 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -166,8 +166,7 @@ static void omap3_save_secure_ram_context(void)
- 		pwrdm_set_next_pwrst(mpu_pwrdm, mpu_next_state);
- 		/* Following is for error tracking, it should not happen */
- 		if (ret) {
--			printk(KERN_ERR "save_secure_sram() returns %08x\n",
--				ret);
-+			pr_err("save_secure_sram() returns %08x\n", ret);
- 			while (1)
- 				;
- 		}
-@@ -307,7 +306,7 @@ void omap_sram_idle(void)
- 		break;
- 	default:
- 		/* Invalid state */
--		printk(KERN_ERR "Invalid mpu state in sram_idle\n");
-+		pr_err("Invalid mpu state in sram_idle\n");
- 		return;
- 	}
+diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
+index 0349fd2..70a81f9 100644
+--- a/arch/arm/mach-omap2/board-flash.c
++++ b/arch/arm/mach-omap2/board-flash.c
+@@ -87,7 +87,7 @@ static struct omap_onenand_platform_data board_onenand_data = {
+ 	.dma_channel	= -1,   /* disable DMA in OMAP OneNAND driver */
+ };
  
-@@ -463,18 +462,17 @@ restore:
- 	list_for_each_entry(pwrst, &pwrst_list, node) {
- 		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
- 		if (state > pwrst->next_state) {
--			printk(KERN_INFO "Powerdomain (%s) didn't enter "
--			       "target state %d\n",
-+			pr_info("Powerdomain (%s) didn't enter "
-+				"target state %d\n",
- 			       pwrst->pwrdm->name, pwrst->next_state);
- 			ret = -1;
- 		}
- 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
- 	}
- 	if (ret)
--		printk(KERN_ERR "Could not enter target state in pm_suspend\n");
-+		pr_err("Could not enter target state in pm_suspend\n");
- 	else
--		printk(KERN_INFO "Successfully put all powerdomains "
--		       "to target state\n");
-+		pr_info("Successfully put all powerdomains to target state\n");
- 
- 	return ret;
+-static void
++void
+ __init board_onenand_init(struct mtd_partition *onenand_parts,
+ 				u8 nr_parts, u8 cs)
+ {
+@@ -98,7 +98,7 @@ __init board_onenand_init(struct mtd_partition *onenand_parts,
+ 	gpmc_onenand_init(&board_onenand_data);
  }
-@@ -822,7 +820,7 @@ static int __init omap3_pm_init(void)
- 
- 	ret = pwrdm_for_each(pwrdms_setup, NULL);
- 	if (ret) {
--		printk(KERN_ERR "Failed to setup powerdomains\n");
-+		pr_err("Failed to setup powerdomains\n");
- 		goto err3;
- 	}
- 
-@@ -830,7 +828,7 @@ static int __init omap3_pm_init(void)
- 
- 	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
- 	if (mpu_pwrdm == NULL) {
--		printk(KERN_ERR "Failed to get mpu_pwrdm\n");
-+		pr_err("Failed to get mpu_pwrdm\n");
- 		ret = -EINVAL;
- 		goto err3;
- 	}
-@@ -865,8 +863,8 @@ static int __init omap3_pm_init(void)
- 		omap3_secure_ram_storage =
- 			kmalloc(0x803F, GFP_KERNEL);
- 		if (!omap3_secure_ram_storage)
--			printk(KERN_ERR "Memory allocation failed when"
--					"allocating for secure sram context\n");
-+			pr_err("Memory allocation failed when "
-+			       "allocating for secure sram context\n");
- 
- 		local_irq_disable();
- 		local_fiq_disable();
+ #else
+-static void
++void
+ __init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
+ {
+ }
+diff --git a/arch/arm/mach-omap2/board-flash.h b/arch/arm/mach-omap2/board-flash.h
+index d25503a..c44b70d 100644
+--- a/arch/arm/mach-omap2/board-flash.h
++++ b/arch/arm/mach-omap2/board-flash.h
+@@ -47,3 +47,14 @@ static inline void board_nand_init(struct mtd_partition *nand_parts,
+ {
+ }
+ #endif
++
++#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
++		defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
++extern void board_onenand_init(struct mtd_partition *nand_parts,
++					u8 nr_parts, u8 cs);
++#else
++static inline void board_onenand_init(struct mtd_partition *nand_parts,
++					u8 nr_parts, u8 cs)
++{
++}
++#endif
 -- 
-1.7.9.4
+1.7.7.6
