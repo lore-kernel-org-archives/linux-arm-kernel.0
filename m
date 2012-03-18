@@ -1,27 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Mar 2012 10:36:06 -0700
-Subject: [PATCH v3 4/5] ARM: tegra: select USB_ULPI if USB is selected
-In-Reply-To: <1330727160-11242-1-git-send-email-alan@signal11.us>
-References: <1330727075-10974-1-git-send-email-alan@signal11.us>
- <1330727160-11242-1-git-send-email-alan@signal11.us>
-Message-ID: <20120318173606.GA24327@quad.lixom.net>
+Date: Sun, 18 Mar 2012 10:44:11 -0700
+Subject: [PATCH] ARM: tegra: update main repo and add patchwork
+Message-ID: <1332092651-25346-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2012 at 05:26:00PM -0500, Alan Ott wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> Automatically select USB_ULPI if USB is enabled on Tegra.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Alan Ott <alan@signal11.us>
+Stephen is taking over the main tegra repo, so change the entry to point at his tree on kernel.org
 
-Thanks, applied. I think this was the last outstanding patch that I had not yet
-applied. Since there had been some slight confusion with v2 vs v3, please check
-the contents of the tegra for-next branch and make sure it contains what you
-would expect it to.
+Also, document the patchwork URL.
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+
+
+Arnd, I applied the previous Tegra maintainer patch to next/maintainers
+directly, so this should just go on top of there.
+
 
 Thanks!
 
 
 -Olof
+
+
+ MAINTAINERS |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 187d855..a23a635 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6515,7 +6515,8 @@ M:	Colin Cross <ccross@android.com>
+ M:	Olof Johansson <olof@lixom.net>
+ M:	Stephen Warren <swarren@wwwdotorg.org>
+ L:	linux-tegra at vger.kernel.org
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git
++Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+ S:	Supported
+ F:	arch/arm/mach-tegra
+ 
+-- 
+1.7.10.rc1
