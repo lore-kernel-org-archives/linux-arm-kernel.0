@@ -1,34 +1,32 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sun, 18 Mar 2012 10:22:41 +0100
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <20120317104751.4F00E3E0910@localhost>
-References: <4F22DEF2.5000807@ti.com>
- <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
- <201203150922.06379.arnd@arndb.de>
- <20120315102736.GA25371@avionic-0098.adnet.avionic-design.de>
- <20120317104751.4F00E3E0910@localhost>
-Message-ID: <20120318092241.GA23839@avionic-0098.mockup.avionic-design.de>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Sun, 18 Mar 2012 12:06:37 +0000
+Subject: Want to Get Suggestion for MX28 USB Submisson
+In-Reply-To: <CAOMZO5A1D8SLp=UpFK0dfjaaeJK+R4yUjXbRm=xhOjfEPdzEtA@mail.gmail.com>
+References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
+ <201202041117.48190.marek.vasut@gmail.com>
+ <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
+ <201202100447.14248.marek.vasut@gmail.com>
+ <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
+ <F281D0F91ED19E4D8E63A7504E8A6498093839@039-SN2MPN1-021.039d.mgd.msft.net>
+ <CAOMZO5A1D8SLp=UpFK0dfjaaeJK+R4yUjXbRm=xhOjfEPdzEtA@mail.gmail.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498096381@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely wrote:
-> On Thu, 15 Mar 2012 11:27:36 +0100, Thierry Reding <thierry.reding@avionic-design.de> wrote:
-> > So if we decide to explicitly allow specifying names, then we can always add
-> > a pwm-names property (or <name>-pwm-names respectively) to use as label and
-> > fallback to the user OF device node name if that property is not present.
+ 
+> On Wed, Mar 14, 2012 at 12:30 AM, Chen Peter-B29397
+> <B29397@freescale.com> wrote:
 > 
-> After implementing both schemes (ie. interrupts+interrupt-names && [*-]gpios)
-> I definitely prefer the fixed property name plus a separate names property.
-> It is easier to use common code with that scheme, and easier to statically
-> check for correctness.
+> > According to sascha's suggestion, it is better to re-submit after we
+> have
+> > a generic USB PHY Layer in mainline.
+> >
+> > Currently, Heikki's split PHY from OTG structure patches have mainlined,
+> > next step is to submit a generic USB PHY driver.
+> 
+> Just for my understanding: is there someone working on this generic
+> USB PHY driver?
 
-Okay. Would everyone be happy with "pwms" and "pwm-names"?
+Add related people.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120318/eedcc819/attachment.sig>
+I have much internal stuff on hands now, and have not bandwidth to do it right now. 
