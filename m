@@ -1,40 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Mar 2012 10:31:59 -0700
-Subject: [PATCH 00/11] ARM: tegra: Add PCIe device tree support
-In-Reply-To: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120318173159.GB24110@quad.lixom.net>
+Date: Sun, 18 Mar 2012 10:36:06 -0700
+Subject: [PATCH v3 4/5] ARM: tegra: select USB_ULPI if USB is selected
+In-Reply-To: <1330727160-11242-1-git-send-email-alan@signal11.us>
+References: <1330727075-10974-1-git-send-email-alan@signal11.us>
+ <1330727160-11242-1-git-send-email-alan@signal11.us>
+Message-ID: <20120318173606.GA24327@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 03:51:20PM +0100, Thierry Reding wrote:
-> This patch series adds support for device tree based probing of the PCIe
-> controller found on Tegra SoCs.
+On Fri, Mar 02, 2012 at 05:26:00PM -0500, Alan Ott wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
-> Patches 1 and 2 have already been posted by Grant and Mark respectively
-> but I've included them here for reference. Both patches are dependencies
-> for the subsequent patches.
+> Automatically select USB_ULPI if USB is enabled on Tegra.
 > 
-> Patches 3, 4 and 5 add support for obtaining the regulators required to
-> power the PCIe controller from the device tree. Patches 6 and 7 are
-> required to make some common PCI functions available after the init
-> phase because the deferred probing will postpone the probing of the PCIe
-> controller driver until that point.
-> 
-> Patches 8 and 9 make the PCIe controller code available as a driver and
-> add the corresponding platform devices to the boards that enable PCIe
-> (Harmony and TrimSlice). Patch 10 adds MSI support and patch 11 finally
-> adds a device tree binding with documentation.
-> 
-> The code in patch 10 (MSI support) is based on the Vibrante kernel and I
-> wasn't able to get a proper Signed-off-by or even copyright information.
-> Perhaps somebody at NVIDIA can find out?
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Alan Ott <alan@signal11.us>
 
-Hi,
+Thanks, applied. I think this was the last outstanding patch that I had not yet
+applied. Since there had been some slight confusion with v2 vs v3, please check
+the contents of the tegra for-next branch and make sure it contains what you
+would expect it to.
 
-This patch series looks good to me, but I'm out of time to stage it for
-3.4. Stephen is taking over lead maintainership for 3.5 and forward,
-so I'll let him pick it up for that release.
+Thanks!
 
 
 -Olof
