@@ -1,30 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Mar 2012 10:27:10 -0700
-Subject: [PATCH] arm/tegra: pcie: fix return value of function
-In-Reply-To: <4F5FA1BB.5050002@wwwdotorg.org>
-References: <CAOesGMi0aqCjLsJ5wWXwFVQL2T8wtUuE14rFZ9h7NKHXcWAoqQ@mail.gmail.com>
- <1331617587-10714-1-git-send-email-mad_soft@inbox.ru>
- <4F5FA1BB.5050002@wwwdotorg.org>
-Message-ID: <20120318172710.GA24110@quad.lixom.net>
+Date: Sun, 18 Mar 2012 10:31:59 -0700
+Subject: [PATCH 00/11] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20120318173159.GB24110@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 01:36:27PM -0600, Stephen Warren wrote:
-> On 03/12/2012 11:46 PM, Dmitry Artamonow wrote:
-> > In previous patch (arm/tegra: add timeout to PCIe PLL lock detection loop)
-> > tegra_pcie_enable_controller() function type has been changed from
-> > void to int, but the last return statement wasn't converted, so
-> > function returns undefined value. Fix it.
-> > 
-> > Also while at it, address couple of minor concerns raised by reviewers:
-> > use usleep_range for delay, and lower the value of timeout to 300ms
-> > to be consistent with Nvidia Vibrante kernel.
-> > 
-> > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+On Thu, Mar 08, 2012 at 03:51:20PM +0100, Thierry Reding wrote:
+> This patch series adds support for device tree based probing of the PCIe
+> controller found on Tegra SoCs.
 > 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> Patches 1 and 2 have already been posted by Grant and Mark respectively
+> but I've included them here for reference. Both patches are dependencies
+> for the subsequent patches.
+> 
+> Patches 3, 4 and 5 add support for obtaining the regulators required to
+> power the PCIe controller from the device tree. Patches 6 and 7 are
+> required to make some common PCI functions available after the init
+> phase because the deferred probing will postpone the probing of the PCIe
+> controller driver until that point.
+> 
+> Patches 8 and 9 make the PCIe controller code available as a driver and
+> add the corresponding platform devices to the boards that enable PCIe
+> (Harmony and TrimSlice). Patch 10 adds MSI support and patch 11 finally
+> adds a device tree binding with documentation.
+> 
+> The code in patch 10 (MSI support) is based on the Vibrante kernel and I
+> wasn't able to get a proper Signed-off-by or even copyright information.
+> Perhaps somebody at NVIDIA can find out?
 
-Thanks, applied to for-3.4/cleanups-and-fixes
+Hi,
+
+This patch series looks good to me, but I'm out of time to stage it for
+3.4. Stephen is taking over lead maintainership for 3.5 and forward,
+so I'll let him pick it up for that release.
 
 
 -Olof
