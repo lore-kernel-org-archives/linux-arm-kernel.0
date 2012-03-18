@@ -1,33 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Mar 2012 10:50:20 -0700
-Subject: [GIT PULL] Refresh of board branch for tegra
-Message-ID: <CAOesGMh9hp12fwNQ4QwStg3yc-DXnixj4wHNOjO1rHeX8hJnxQ@mail.gmail.com>
+Date: Sun, 18 Mar 2012 10:51:42 -0700
+Subject: [GIT PULL] A few more non-critical fixes for tegra
+Message-ID: <CAOesGMhELxtTnVMzADM01RhsPcGt7ciqLh-h0+xNwUg8MGCo1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-One more patch has been added to the board branch, just a defconfig
-update to mostly include some of the new drivers that have been added
-lately, etc.
+A few more patches have been added to the cleanup-and-fixes branch for
+tegra, see below. Please pull on top of current tegra/cleanups
+contents!
 
 
-The following changes since commit c5444f39620b2b7801eb1997c41befdc8bcf78ea:
+Thanks,
 
-  ARM: tegra: match SoC name not board name in DT board files
-(2012-03-04 10:41:19 -0800)
+-Olof
+
+
+The following changes since commit f6a1ba67362fe78a1ec81c355ee638c70689b5d7:
+
+  ARM: tegra: Enable CPUIdle on Tegra20 (2012-03-04 11:17:17 -0800)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.4/boards
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git
+for-3.4/cleanup-and-fixes
 
-for you to fetch changes up to 0a25893597dfbad08aff833bdefac2fe5b31aabd:
+for you to fetch changes up to 279b658525abd06645938fb607860de42c4cf31e:
 
-  ARM: tegra: update defconfig (2012-03-07 14:38:49 -0800)
+  ARM: tegra: select USB_ULPI if USB is selected (2012-03-18 10:34:32 -0700)
 
 ----------------------------------------------------------------
-Stephen Warren (1):
-      ARM: tegra: update defconfig
+Arnd Bergmann (1):
+      ARM: tegra: select USB_ULPI if USB is selected
 
- arch/arm/configs/tegra_defconfig |   33 ++++++++++++++++++++++-----------
- 1 file changed, 22 insertions(+), 11 deletions(-)
+Dmitry Artamonow (3):
+      arm/tegra: fix harmony pinmux for PCIe
+      arm/tegra: add timeout to PCIe PLL lock detection loop
+      arm/tegra: pcie: fix return value of function
+
+ arch/arm/mach-tegra/Kconfig                |    4 ++--
+ arch/arm/mach-tegra/board-harmony-pinmux.c |    6 +++---
+ arch/arm/mach-tegra/pcie.c                 |   16 ++++++++++++----
+ 3 files changed, 17 insertions(+), 9 deletions(-)
