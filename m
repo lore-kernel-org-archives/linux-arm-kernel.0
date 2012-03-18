@@ -1,44 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Mar 2012 10:44:11 -0700
-Subject: [PATCH] ARM: tegra: update main repo and add patchwork
-Message-ID: <1332092651-25346-1-git-send-email-olof@lixom.net>
+Date: Sun, 18 Mar 2012 10:50:20 -0700
+Subject: [GIT PULL] Refresh of board branch for tegra
+Message-ID: <CAOesGMh9hp12fwNQ4QwStg3yc-DXnixj4wHNOjO1rHeX8hJnxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen is taking over the main tegra repo, so change the entry to point at his tree on kernel.org
+Hi Arnd,
 
-Also, document the patchwork URL.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
-
-
-Arnd, I applied the previous Tegra maintainer patch to next/maintainers
-directly, so this should just go on top of there.
+One more patch has been added to the board branch, just a defconfig
+update to mostly include some of the new drivers that have been added
+lately, etc.
 
 
-Thanks!
+The following changes since commit c5444f39620b2b7801eb1997c41befdc8bcf78ea:
 
+  ARM: tegra: match SoC name not board name in DT board files
+(2012-03-04 10:41:19 -0800)
 
--Olof
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.4/boards
 
- MAINTAINERS |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+for you to fetch changes up to 0a25893597dfbad08aff833bdefac2fe5b31aabd:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 187d855..a23a635 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6515,7 +6515,8 @@ M:	Colin Cross <ccross@android.com>
- M:	Olof Johansson <olof@lixom.net>
- M:	Stephen Warren <swarren@wwwdotorg.org>
- L:	linux-tegra at vger.kernel.org
--T:	git git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git
-+Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
- S:	Supported
- F:	arch/arm/mach-tegra
- 
--- 
-1.7.10.rc1
+  ARM: tegra: update defconfig (2012-03-07 14:38:49 -0800)
+
+----------------------------------------------------------------
+Stephen Warren (1):
+      ARM: tegra: update defconfig
+
+ arch/arm/configs/tegra_defconfig |   33 ++++++++++++++++++++++-----------
+ 1 file changed, 22 insertions(+), 11 deletions(-)
