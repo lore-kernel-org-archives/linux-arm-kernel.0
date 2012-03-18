@@ -1,29 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 18 Mar 2012 15:10:14 +0000
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <20120318092241.GA23839@avionic-0098.mockup.avionic-design.de>
-References: <4F22DEF2.5000807@ti.com> <20120317104751.4F00E3E0910@localhost>
- <20120318092241.GA23839@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201203181510.14428.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 18 Mar 2012 10:27:10 -0700
+Subject: [PATCH] arm/tegra: pcie: fix return value of function
+In-Reply-To: <4F5FA1BB.5050002@wwwdotorg.org>
+References: <CAOesGMi0aqCjLsJ5wWXwFVQL2T8wtUuE14rFZ9h7NKHXcWAoqQ@mail.gmail.com>
+ <1331617587-10714-1-git-send-email-mad_soft@inbox.ru>
+ <4F5FA1BB.5050002@wwwdotorg.org>
+Message-ID: <20120318172710.GA24110@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 March 2012, Thierry Reding wrote:
-> Not enough information to check signature validity.  Show Details
->   * Grant Likely wrote:
-> > On Thu, 15 Mar 2012 11:27:36 +0100, Thierry Reding <thierry.reding@avionic-design.de> wrote:
-> > > So if we decide to explicitly allow specifying names, then we can always add
-> > > a pwm-names property (or <name>-pwm-names respectively) to use as label and
-> > > fallback to the user OF device node name if that property is not present.
+On Tue, Mar 13, 2012 at 01:36:27PM -0600, Stephen Warren wrote:
+> On 03/12/2012 11:46 PM, Dmitry Artamonow wrote:
+> > In previous patch (arm/tegra: add timeout to PCIe PLL lock detection loop)
+> > tegra_pcie_enable_controller() function type has been changed from
+> > void to int, but the last return statement wasn't converted, so
+> > function returns undefined value. Fix it.
 > > 
-> > After implementing both schemes (ie. interrupts+interrupt-names && [*-]gpios)
-> > I definitely prefer the fixed property name plus a separate names property.
-> > It is easier to use common code with that scheme, and easier to statically
-> > check for correctness.
+> > Also while at it, address couple of minor concerns raised by reviewers:
+> > use usleep_range for delay, and lower the value of timeout to 300ms
+> > to be consistent with Nvidia Vibrante kernel.
+> > 
+> > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 > 
-> Okay. Would everyone be happy with "pwms" and "pwm-names"?
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-Sounds good. I would have suggested "pwm", but the plural also works since
-that is used for "interrupts", too.
+Thanks, applied to for-3.4/cleanups-and-fixes
 
-	Arnd
+
+-Olof
