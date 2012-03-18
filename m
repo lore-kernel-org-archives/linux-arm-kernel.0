@@ -1,46 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 18 Mar 2012 21:58:10 +0000
+Date: Sun, 18 Mar 2012 22:12:00 +0000
 Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <20120318204421.759F23E07BF@localhost>
-References: <4F22DEF2.5000807@ti.com> <201203182013.22790.arnd@arndb.de>
- <20120318204421.759F23E07BF@localhost>
-Message-ID: <201203182158.10957.arnd@arndb.de>
+In-Reply-To: <201203182158.10957.arnd@arndb.de>
+References: <4F22DEF2.5000807@ti.com> <20120318204421.759F23E07BF@localhost>
+ <201203182158.10957.arnd@arndb.de>
+Message-ID: <201203182212.00769.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 March 2012, Grant Likely wrote:
-> > struct dma_channel *of_dma_request_channel(struct of_node*, int index,
-> >                                       dma_cap_mask_t *mask,
-> >                                       void *driver_data)
-> > {
-> >       struct of_phandle_args dma_spec;
-> >       struct dma_device *device;
-> >       struct dma_chan *chan = NULL;
-> >       dma_filter_fn *filter;
+On Sunday 18 March 2012, Arnd Bergmann wrote:
 > > 
-> >       ret = of_parse_phandle_with_args(np, "dma-request", "#dma-cells",
-> >                                        index, &dma_spec);
-> > 
-> >       device = dma_find_device(dma_spec->np);
+> > Is dma_find_device() a new function?  How does it look up the dma
+> > device?
 > 
-> Is dma_find_device() a new function?  How does it look up the dma
-> device?
-
-Yes, it would be similar to the proposed function in Benoit's patch
-
-> > 
-> >       if (dma_spec->args_count == 0)
-> >               filter = dma_filter_simple;
-> >       else
-> >               filter = device->dma_dt_filter; /* new member */
+> Yes, it would be similar to the proposed function in Benoit's patch
 > 
-> I'm not thrilled with this if/else hunk; even the case of
-> #dma-cells=<0> should provide a hook; even it if is the stock simple
-> filter.  Leaving filter as NULL is the same as accepting everything
-> anyway.
 
-Right, good point. So a dmaengine driver would either register a trivial
-filter if it wants to do anything here, or it would just leave it as a NULL
-pointer otherwise.
+Well, actually we would not even need a new list with all the devices,
+it can simply become
+
+/* must be called with dma_list_mutex held */
+static struct dma_device *dma_find_device(struct of_node *node)
+{
+	struct dma_device *device;
+	
+	list_for_each_entry(device, &dma_device_list, global_node) {
+		if (device->dev.of_node == node)
+			break;
+	}
+	return device;
+}
+
+Given that dma_device_list is most likely be a very short list, this will
+be a fast operation.
 
 	Arnd
