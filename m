@@ -1,40 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 18 Mar 2012 13:43:32 +0800
-Subject: [RFC/PATCH 4/4] pxa: convert to common clock framework
-In-Reply-To: <1331919483.31118.23.camel@flow>
-References: <1331919483.31118.23.camel@flow>
-Message-ID: <20120318054329.GA29638@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sun, 18 Mar 2012 12:48:22 +0530
+Subject: [PATCHv2 3/5] cpuidle: add support for states that affect
+ multiple cpus
+In-Reply-To: <CAMbhsRQDdXcKVp-_RNe-0i7YYLr4vKDDXqVw_eP4VsmfbFNtYg@mail.gmail.com>
+References: <1331749794-8056-1-git-send-email-ccross@android.com>
+ <1331749794-8056-4-git-send-email-ccross@android.com>
+ <4F6483BA.8050103@ti.com>
+ <CAMbhsRQDdXcKVp-_RNe-0i7YYLr4vKDDXqVw_eP4VsmfbFNtYg@mail.gmail.com>
+Message-ID: <CAMQu2gz11nwDy2nzFDTL7XaLcf4ULqUDWVOEzAQLD9JJ8Y=JYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Your patch #2 is trying to avoid the layering violation by separating
-static clock definitions and from clk_ops implementations into
-different files.  But ...
+On Sun, Mar 18, 2012 at 12:51 AM, Colin Cross <ccross@android.com> wrote:
+> On Sat, Mar 17, 2012 at 5:29 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>
+> <snip>
+>
+>> While playing around with this version, I noticed that the
+>> 'alive_count' is ever incrementing which will lead to
+>> coupled idle state not being attempted after one CPU offline
+>> attempt.
+>>
+>> Fix in end of the email for the same. With it, coupled states
+>> continue to work with CPU online/offline transitions.
+>>
+>> Feel free to fold it into original patch. Attached
+>> the same in case mailer eat tabs.
+>
+> <snip>
+>
+> Thanks, Kevin reported this issue and I'll fix it in the next version.
+ Ahh... I see comments from Kevin now. Some how I missed it
+otherwise would have saved me few minutes of debug.
 
-On Fri, Mar 16, 2012 at 06:38:03PM +0100, Philipp Zabel wrote:
-...
-> diff --git a/arch/arm/mach-pxa/clock.h b/arch/arm/mach-pxa/clock.h
-> index a3585a2..7c04f9b 100644
-> --- a/arch/arm/mach-pxa/clock.h
-> +++ b/arch/arm/mach-pxa/clock.h
-> @@ -1,80 +1,106 @@
->  #include <linux/clkdev.h>
-> +#include <linux/clk-private.h>
-
-... This is what I read from clk-private.h.
-
-/*
- * WARNING: Do not include clk-private.h from any file that implements struct
- * clk_ops.  Doing so is a layering violation!
- *
- * ...
- */
-
-And you include it in arch/arm/mach-pxa/clock.h which in turn is being
-included by the pxa clock files implementing clk_ops.
-
-> +#include <linux/clk-provider.h>
->  #include <linux/syscore_ops.h>
-
-Regards,
-Shawn
+Regards
+Santosh
