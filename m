@@ -1,32 +1,26 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Sun, 18 Mar 2012 12:06:37 +0000
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <CAOMZO5A1D8SLp=UpFK0dfjaaeJK+R4yUjXbRm=xhOjfEPdzEtA@mail.gmail.com>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <201202041117.48190.marek.vasut@gmail.com>
- <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
- <201202100447.14248.marek.vasut@gmail.com>
- <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
- <F281D0F91ED19E4D8E63A7504E8A6498093839@039-SN2MPN1-021.039d.mgd.msft.net>
- <CAOMZO5A1D8SLp=UpFK0dfjaaeJK+R4yUjXbRm=xhOjfEPdzEtA@mail.gmail.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498096381@039-SN2MPN1-021.039d.mgd.msft.net>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Sun, 18 Mar 2012 14:27:46 +0100
+Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
+ definitions
+In-Reply-To: <4F63A6F6.9050506@samsung.com>
+References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
+ <20120315111227.GA2384@amd.com> <4F61FF1D.5000502@samsung.com>
+ <4F630841.2070307@linaro.org> <4F63A6F6.9050506@samsung.com>
+Message-ID: <20120318132746.GL26973@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> On Wed, Mar 14, 2012 at 12:30 AM, Chen Peter-B29397
-> <B29397@freescale.com> wrote:
-> 
-> > According to sascha's suggestion, it is better to re-submit after we
-> have
-> > a generic USB PHY Layer in mainline.
-> >
-> > Currently, Heikki's split PHY from OTG structure patches have mainlined,
-> > next step is to submit a generic USB PHY driver.
-> 
-> Just for my understanding: is there someone working on this generic
-> USB PHY driver?
+On Fri, Mar 16, 2012 at 01:47:50PM -0700, Kukjin Kim wrote:
+> Anyway Joerg, how do you want to handle this? Do you want to pick up  
+> 1/2/3 all of them in your tree? If so, 2nd patch should be on top of  
+> some samsung topic stuff.
 
-Add related people.
+Since patch 2 only applies to the Samsung tree, it is best to carry
+this in your tree for merging. Feel free to add my Acked-by to patch 3.
+But any further patches for the Exynos IOMMU drivers should go through
+my tree after it is merged.
 
-I have much internal stuff on hands now, and have not bandwidth to do it right now. 
+
+Thanks,
+
+	Joerg
