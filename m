@@ -1,26 +1,71 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Sun, 18 Mar 2012 14:27:46 +0100
-Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <4F63A6F6.9050506@samsung.com>
-References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
- <20120315111227.GA2384@amd.com> <4F61FF1D.5000502@samsung.com>
- <4F630841.2070307@linaro.org> <4F63A6F6.9050506@samsung.com>
-Message-ID: <20120318132746.GL26973@8bytes.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 18 Mar 2012 21:46:26 +0800
+Subject: [PATCH v7 2/3] clk: introduce the common clock framework
+In-Reply-To: <1331878280-2758-3-git-send-email-mturquette@linaro.org>
+References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
+ <1331878280-2758-3-git-send-email-mturquette@linaro.org>
+Message-ID: <20120318134623.GB29638@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 01:47:50PM -0700, Kukjin Kim wrote:
-> Anyway Joerg, how do you want to handle this? Do you want to pick up  
-> 1/2/3 all of them in your tree? If so, 2nd patch should be on top of  
-> some samsung topic stuff.
+Reading the documentation of function clk_set_rate(), I'm not sure
+it exactly matches what the code does.
 
-Since patch 2 only applies to the Samsung tree, it is best to carry
-this in your tree for merging. Feel free to add my Acked-by to patch 3.
-But any further patches for the Exynos IOMMU drivers should go through
-my tree after it is merged.
+If there is mismatch, it might be worth sending an incremental patch
+to update the documentation and avoid the confusion?
 
+On Thu, Mar 15, 2012 at 11:11:19PM -0700, Mike Turquette wrote:
+> +/**
+> + * clk_set_rate - specify a new rate for clk
+> + * @clk: the clk whose rate is being changed
+> + * @rate: the new rate for clk
+> + *
+> + * In the simplest case clk_set_rate will only change the rate of clk.
+> + *
+> + * If clk has the CLK_SET_RATE_GATE flag set and it is enabled this call
+> + * will fail; only when the clk is disabled will it be able to change
+> + * its rate.
+> + *
+> + * Setting the CLK_SET_RATE_PARENT flag allows clk_set_rate to
+> + * recursively propagate up to clk's parent; whether or not this happens
+> + * depends on the outcome of clk's .round_rate implementation.  If
+> + * *parent_rate is 0 after calling .round_rate then upstream parent
 
-Thanks,
+Might "*parent_rate is not changed" be more accurate?
 
-	Joerg
+> + * propagation is ignored.  If *parent_rate comes back with a new rate
+> + * for clk's parent then we propagate up to clk's parent and set it's
+> + * rate.  Upward propagation will continue until either a clk does not
+> + * support the CLK_SET_RATE_PARENT flag or .round_rate stops requesting
+> + * changes to clk's parent_rate.
+
+> + * If there is a failure during upstream
+> + * propagation then clk_set_rate will unwind and restore each clk's rate
+> + * that had been successfully changed.  Afterwards a rate change abort
+> + * notification will be propagated downstream, starting from the clk
+> + * that failed.
+
+I'm not sure this part still matches the code.
+
+> + *
+> + * At the end of all of the rate setting, clk_set_rate internally calls
+> + * __clk_recalc_rates and propagates the rate changes downstream,
+
+I do not see __clk_recalc_rates is called by clk_set_rate in any way.
+
+Regards,
+Shawn
+
+> + * starting from the highest clk whose rate was changed.  This has the
+> + * added benefit of propagating post-rate change notifiers.
+> + *
+> + * Note that while post-rate change and rate change abort notifications
+> + * are guaranteed to be sent to a clk only once per call to
+> + * clk_set_rate, pre-change notifications will be sent for every clk
+> + * whose rate is changed.  Stacking pre-change notifications is noisy
+> + * for the drivers subscribed to them, but this allows drivers to react
+> + * to intermediate clk rate changes up until the point where the final
+> + * rate is achieved at the end of upstream propagation.
+> + *
+> + * Returns 0 on success, -EERROR otherwise.
+> + */
