@@ -1,193 +1,66 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Mon, 19 Mar 2012 15:03:58 +1100
-Subject: [PATCH v4 4/4] mfd: mc13xxx: Add i2c driver
-In-Reply-To: <1332129838-7080-1-git-send-email-marc@cpdesign.com.au>
-References: <1332129838-7080-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1332129838-7080-5-git-send-email-marc@cpdesign.com.au>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Mon, 19 Mar 2012 15:01:41 +1000
+Subject: Atmel at91x40 ("EB01" eval board) resurected
+In-Reply-To: <20120317164345.4f20beef@skate>
+References: <CALz2mmXcAk9ZOsAzKMbKVVJ2+Et02+Gxj_z6xSgukC5LjgJTLg@mail.gmail.com>
+ <20120317164345.4f20beef@skate>
+Message-ID: <4F66BDB5.5020600@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for mc13xxx family ICs connected via i2c.
+Hi Thomas,
 
-Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
----
- drivers/mfd/Kconfig       |    8 +++-
- drivers/mfd/Makefile      |    1 +
- drivers/mfd/mc13xxx-i2c.c |  128 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 136 insertions(+), 1 deletions(-)
- create mode 100644 drivers/mfd/mc13xxx-i2c.c
+On 18/03/12 01:43, Thomas Petazzoni wrote:
+> Le Thu, 22 Dec 2011 22:18:53 -0500,
+> Phil Budne<phil@ultimate.com>  a ??crit :
+>
+>> I decided to see if I could bring up current kernel sources under
+>> skyeye  (at91x40 simulation).
+>
+> Very interesting, thanks. Your patches indeed allow the AT91x40 kernel
+> to boot under SkyEye, while the unpatched Linux kernel does not,
+> apparently.
+>
+> Greg, it seems you are saying that the mainline kernel, unchanged,
+> boots under SkyEye.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 501fee5..3a039ff 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -573,7 +573,7 @@ config MFD_MC13783
- 
- config MFD_MC13XXX
- 	tristate "Support Freescale MC13783 and MC13892"
--	depends on SPI_MASTER
-+	depends on SPI_MASTER || I2C
- 	select MFD_CORE
- 	select MFD_MC13783
- 	help
-@@ -590,6 +590,12 @@ config MFD_MC13XXX_SPI
- 	help
- 	  Select this if your MC13xxx is connected via an SPI bus.
- 
-+config MFD_MC13XXX_I2C
-+	tristate "MC13xxx I2C interface" if I2C
-+	default I2C
-+	help
-+	  Select this if your MC13xxx is connected via an I2C bus.
-+
- endif
- 
- config ABX500_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 2dc66ed..6d4566f 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_TWL6040_CORE)	+= twl6040-core.o twl6040-irq.o
- 
- obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
- obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
-+obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
- 
- obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
- 
-diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-new file mode 100644
-index 0000000..d22501d
---- /dev/null
-+++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -0,0 +1,128 @@
-+/*
-+ * Copyright 2009-2010 Creative Product Design
-+ * Marc Reilly marc at cpdesign.com.au
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+#include <linux/mfd/core.h>
-+#include <linux/mfd/mc13xxx.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/i2c.h>
-+#include <linux/err.h>
-+
-+#include "mc13xxx.h"
-+
-+static const struct i2c_device_id mc13xxx_i2c_device_id[] = {
-+	{
-+		.name = "mc13892",
-+		.driver_data = MC13XXX_ID_MC13892,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(i2c, mc13xxx_i2c_device_id);
-+
-+static const struct of_device_id mc13xxx_dt_ids[] = {
-+	{
-+		.compatible = "fsl,mc13892",
-+		.data = (void *) &mc13xxx_i2c_device_id[0],
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
-+
-+static struct regmap_config mc13xxx_regmap_i2c_config = {
-+	.reg_bits = 8,
-+	.val_bits = 24,
-+
-+	.max_register = MC13XXX_NUMREGS,
-+
-+	.cache_type = REGCACHE_NONE,
-+};
-+
-+static int mc13xxx_i2c_probe(struct i2c_client *client,
-+		const struct i2c_device_id *id)
-+{
-+	const struct of_device_id *of_id;
-+	struct i2c_driver *idrv = to_i2c_driver(client->dev.driver);
-+	struct mc13xxx *mc13xxx;
-+	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-+	int ret;
-+
-+	of_id = of_match_device(mc13xxx_dt_ids, &client->dev);
-+	if (of_id)
-+		idrv->id_table = (const struct i2c_device_id*) of_id->data;
-+
-+	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-+	if (!mc13xxx)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&client->dev, mc13xxx);
-+
-+	mc13xxx->dev = &client->dev;
-+	mutex_init(&mc13xxx->lock);
-+
-+	mc13xxx->regmap = regmap_init_i2c(client, &mc13xxx_regmap_i2c_config);
-+	if (IS_ERR(mc13xxx->regmap)) {
-+		ret = PTR_ERR(mc13xxx->regmap);
-+		dev_err(mc13xxx->dev, "Failed to initialize register map: %d\n",
-+				ret);
-+		dev_set_drvdata(&client->dev, NULL);
-+		kfree(mc13xxx);
-+		return ret;
-+	}
-+
-+	ret = mc13xxx_common_init(mc13xxx, pdata, client->irq);
-+
-+	if (ret == 0 && (id->driver_data != mc13xxx->ictype))
-+		dev_warn(mc13xxx->dev,
-+				"device id doesn't match auto detection!\n");
-+
-+	return ret;
-+}
-+
-+static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-+{
-+	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-+
-+	mc13xxx_common_cleanup(mc13xxx);
-+
-+	return 0;
-+}
-+
-+static struct i2c_driver mc13xxx_i2c_driver = {
-+	.id_table = mc13xxx_i2c_device_id,
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "mc13xxx",
-+		.of_match_table = mc13xxx_dt_ids,
-+	},
-+	.probe = mc13xxx_i2c_probe,
-+	.remove = __devexit_p(mc13xxx_i2c_remove),
-+};
-+
-+static int __init mc13xxx_i2c_init(void)
-+{
-+	return i2c_add_driver(&mc13xxx_i2c_driver);
-+}
-+subsys_initcall(mc13xxx_i2c_init);
-+
-+static void __exit mc13xxx_i2c_exit(void)
-+{
-+	i2c_del_driver(&mc13xxx_i2c_driver);
-+}
-+module_exit(mc13xxx_i2c_exit);
-+
-+MODULE_DESCRIPTION("i2c driver for Freescale MC13XXX PMIC");
-+MODULE_AUTHOR("Marc Reilly <marc@cpdesign.com.au");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.3.4
+No, I didn't mean to imply that in my response (
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/078670.html).
+It has worked in the past, but I haven't run it for a few kernel
+versions now.
+
+I was hoping that Phil would respond to the couple of questions I
+had about differences, but he never did.
+
+
+> Could you share your kernel configuration and
+> SkyEye configuration?
+
+Yeah, its in mainline. Its one of the defconfigs:
+
+   arch/arm/configs/at91x40_defconfig
+   
+
+>> Runs on locally modified skyeye
+>>   based on skyeye-v1.2_Rel.tar (had trouble building latest release)
+>>   adds interrupt driven UART output
+>>   tweaked for programmed I/O UART input
+>>   fix for loading XIP data section (load at physical, not virtual address)
+>
+> Would you mind publishing your changes to SkyEye? So far, I'm blocked
+> because of the lack of interrupt driver UART output.
+>
+> Do you plan on further pushing those AT91x40 changes?
+
+It would be really nice to get Phil's changes in a form that can be
+applied to mainline.
+
+Regards
+Greg
+
+
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
