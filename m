@@ -1,46 +1,196 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Mar 2012 22:09:43 +0000
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator for
- first instance
-In-Reply-To: <87mx7c5kzj.fsf@ti.com>
-References: <1331080771-30687-1-git-send-email-khilman@ti.com>
- <201203192118.09286.arnd@arndb.de> <87mx7c5kzj.fsf@ti.com>
-Message-ID: <201203192209.43906.arnd@arndb.de>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Mon, 19 Mar 2012 19:17:27 -0300
+Subject: [PATCH v1] i.MX35-PDK: Add Camera support
+In-Reply-To: <4F67AD31.8030500@redhat.com>
+References: <1331651129-30540-1-git-send-email-alexg@meprolight.com>
+ <4F67AD31.8030500@redhat.com>
+Message-ID: <4F67B077.5050300@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 March 2012, Kevin Hilman wrote:
-> > On Wednesday 07 March 2012, Kevin Hilman wrote:
-> >> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
-> >> regulators) added regulators which are registered during
-> >> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
-> >> than one instance of the SMSC911x and result in attempting to register
-> >> the same regulator more than once which causes a panic().
-> >> 
-> >> Fix this by only registering the regulator when the platform_data id
-> >> field is zero, indicating its the first instance.
-> >> 
-> >> Cc: Matt Porter <mporter@ti.com>
-> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> >
-> > It seems that both Olof and I forgot to forward this one to Linus.
-> >
-> > If it's ok for you, I'll add it to the fixes branch for v3.4 now
-> > and mark it for backporting to v3.3-stable.
+Em 19-03-2012 19:03, Mauro Carvalho Chehab escreveu:
+> Em 13-03-2012 12:05, Alex Gershgorin escreveu:
+>> In i.MX35-PDK, OV2640  camera is populated on the
+>> personality board. This camera is registered as a subdevice via soc-camera interface.
+>>
+>> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
 > 
-> A slightly different version of this is already in linux-next as commit
-> bb60424af517d6e6148505fb5ef256caa91b5b43.
+> Patch doesn't apply over v3.3:
+
+Sorry, the previous version of this patch didn't apply. This compiles OK.
+
+Sorry for the mess.
+
+Anyway, it should be applied via arm subtree.
+
+Regards,
+Mauro
+
 > 
-> It was in your 'fixes' branch, and was merged by Olaf from Tony on 3/13:
-> Merge branch 'fix-smsc911x-regulator' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes
+> patching file arch/arm/mach-imx/mach-mx35_3ds.c
+> Hunk #3 FAILED at 149.
+> Hunk #4 succeeded at 126 with fuzz 1 (offset -55 lines).
+> Hunk #5 FAILED at 323.
+> Hunk #6 succeeded at 277 (offset -57 lines).
+> Hunk #7 succeeded at 293 (offset -57 lines).
+> 2 out of 7 hunks FAILED -- saving rejects to file arch/arm/mach-imx/mach-mx35_3ds.c.rej
+>  arch/arm/mach-imx/mach-mx35_3ds.c |   87 ++++++++++++++++++++++++++++++++++++++
 > 
-
-Yes, I know it's in linux-next because I found it in the fixes branch.
-That is the branch with stuff that should have gone into v3.3 :(
-
-Is the bb60424af version ok? If I add a stable at vger.kernel.org tag in
-there, it will obviously get a new changeset ID but I was not planning
-on changing the contents to the version from the mailing list in case
-that is different.
-
-	Arnd
+> 
+>> ---
+>>  arch/arm/mach-imx/mach-mx35_3ds.c |   96 +++++++++++++++++++++++++++++++++++++
+>>  1 files changed, 96 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+>> index 0af6c9c..a7dd8e6 100644
+>> --- a/arch/arm/mach-imx/mach-mx35_3ds.c
+>> +++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+>> @@ -4,6 +4,11 @@
+>>   *
+>>   * Author: Fabio Estevam <fabio.estevam@freescale.com>
+>>   *
+>> + * Copyright (C) 2011 Meprolight, Ltd.
+>> + * Alex Gershgorin <alexg@meprolight.com>
+>> + *
+>> + * Modified from i.MX31 3-Stack Development System
+>> + *
+>>   * This program is free software; you can redistribute it and/or modify
+>>   * it under the terms of the GNU General Public License as published by
+>>   * the Free Software Foundation; either version 2 of the License, or
+>> @@ -34,6 +39,7 @@
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach/time.h>
+>>  #include <asm/mach/map.h>
+>> +#include <asm/memblock.h>
+>>  
+>>  #include <mach/hardware.h>
+>>  #include <mach/common.h>
+>> @@ -41,6 +47,8 @@
+>>  #include <mach/irqs.h>
+>>  #include <mach/3ds_debugboard.h>
+>>  
+>> +#include <media/soc_camera.h>
+>> +
+>>  #include "devices-imx35.h"
+>>  
+>>  #define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
+>> @@ -120,6 +128,83 @@ static iomux_v3_cfg_t mx35pdk_pads[] = {
+>>  	/* I2C1 */
+>>  	MX35_PAD_I2C1_CLK__I2C1_SCL,
+>>  	MX35_PAD_I2C1_DAT__I2C1_SDA,
+>> +	/* CSI */
+>> +	MX35_PAD_TX1__IPU_CSI_D_6,
+>> +	MX35_PAD_TX0__IPU_CSI_D_7,
+>> +	MX35_PAD_CSI_D8__IPU_CSI_D_8,
+>> +	MX35_PAD_CSI_D9__IPU_CSI_D_9,
+>> +	MX35_PAD_CSI_D10__IPU_CSI_D_10,
+>> +	MX35_PAD_CSI_D11__IPU_CSI_D_11,
+>> +	MX35_PAD_CSI_D12__IPU_CSI_D_12,
+>> +	MX35_PAD_CSI_D13__IPU_CSI_D_13,
+>> +	MX35_PAD_CSI_D14__IPU_CSI_D_14,
+>> +	MX35_PAD_CSI_D15__IPU_CSI_D_15,
+>> +	MX35_PAD_CSI_HSYNC__IPU_CSI_HSYNC,
+>> +	MX35_PAD_CSI_MCLK__IPU_CSI_MCLK,
+>> +	MX35_PAD_CSI_PIXCLK__IPU_CSI_PIXCLK,
+>> +	MX35_PAD_CSI_VSYNC__IPU_CSI_VSYNC,
+>> +};
+>> +
+>> +/*
+>> + * Camera support
+>> +*/
+>> +static phys_addr_t mx3_camera_base __initdata;
+>> +#define MX35_3DS_CAMERA_BUF_SIZE SZ_8M
+>> +
+>> +static const struct mx3_camera_pdata mx35_3ds_camera_pdata __initconst = {
+>> +	.flags = MX3_CAMERA_DATAWIDTH_8,
+>> +	.mclk_10khz = 2000,
+>> +};
+>> +
+>> +static int __init imx35_3ds_init_camera(void)
+>> +{
+>> +	int dma, ret = -ENOMEM;
+>> +	struct platform_device *pdev =
+>> +		imx35_alloc_mx3_camera(&mx35_3ds_camera_pdata);
+>> +
+>> +	if (IS_ERR(pdev))
+>> +		return PTR_ERR(pdev);
+>> +
+>> +	if (!mx3_camera_base)
+>> +		goto err;
+>> +
+>> +	dma = dma_declare_coherent_memory(&pdev->dev,
+>> +					mx3_camera_base, mx3_camera_base,
+>> +					MX35_3DS_CAMERA_BUF_SIZE,
+>> +					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+>> +
+>> +	if (!(dma & DMA_MEMORY_MAP))
+>> +		goto err;
+>> +
+>> +	ret = platform_device_add(pdev);
+>> +	if (ret)
+>> +err:
+>> +		platform_device_put(pdev);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static const struct ipu_platform_data mx35_3ds_ipu_data __initconst = {
+>> +	.irq_base = MXC_IPU_IRQ_START,
+>> +};
+>> +
+>> +static struct i2c_board_info mx35_3ds_i2c_camera = {
+>> +	I2C_BOARD_INFO("ov2640", 0x30),
+>> +};
+>> +
+>> +static struct soc_camera_link iclink_ov2640 = {
+>> +	.bus_id		= 0,
+>> +	.board_info	= &mx35_3ds_i2c_camera,
+>> +	.i2c_adapter_id	= 0,
+>> +	.power		= NULL,
+>> +};
+>> +
+>> +static struct platform_device mx35_3ds_ov2640 = {
+>> +	.name	= "soc-camera-pdrv",
+>> +	.id	= 0,
+>> +	.dev	= {
+>> +		.platform_data = &iclink_ov2640,
+>> +	},
+>>  };
+>>  
+>>  static int mx35_3ds_otg_init(struct platform_device *pdev)
+>> @@ -204,6 +289,9 @@ static void __init mx35_3ds_init(void)
+>>  		pr_warn("Init of the debugboard failed, all "
+>>  				"devices on the debugboard are unusable.\n");
+>>  	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
+>> +	imx35_add_ipu_core(&mx35_3ds_ipu_data);
+>> +	platform_device_register(&mx35_3ds_ov2640);
+>> +	imx35_3ds_init_camera();
+>>  }
+>>  
+>>  static void __init mx35pdk_timer_init(void)
+>> @@ -215,6 +303,13 @@ struct sys_timer mx35pdk_timer = {
+>>  	.init	= mx35pdk_timer_init,
+>>  };
+>>  
+>> +static void __init mx35_3ds_reserve(void)
+>> +{
+>> +	/* reserve MX35_3DS_CAMERA_BUF_SIZE bytes for mx3-camera */
+>> +	mx3_camera_base = arm_memblock_steal(MX35_3DS_CAMERA_BUF_SIZE,
+>> +					 MX35_3DS_CAMERA_BUF_SIZE);
+>> +}
+>> +
+>>  MACHINE_START(MX35_3DS, "Freescale MX35PDK")
+>>  	/* Maintainer: Freescale Semiconductor, Inc */
+>>  	.atag_offset = 0x100,
+>> @@ -224,5 +319,6 @@ MACHINE_START(MX35_3DS, "Freescale MX35PDK")
+>>  	.handle_irq = imx35_handle_irq,
+>>  	.timer = &mx35pdk_timer,
+>>  	.init_machine = mx35_3ds_init,
+>> +	.reserve = mx35_3ds_reserve,
+>>  	.restart	= mxc_restart,
+>>  MACHINE_END
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
