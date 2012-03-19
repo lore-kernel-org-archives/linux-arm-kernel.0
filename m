@@ -1,34 +1,52 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Mon, 19 Mar 2012 19:49:51 -0300
-Subject: [PATCH v1] i.MX35-PDK: Add Camera support
-In-Reply-To: <20120319223729.GC3852@pengutronix.de>
-References: <1331651129-30540-1-git-send-email-alexg@meprolight.com>
- <4F67AD31.8030500@redhat.com> <4F67B077.5050300@redhat.com>
- <20120319223729.GC3852@pengutronix.de>
-Message-ID: <4F67B80F.1040204@redhat.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 19 Mar 2012 23:58:01 +0100
+Subject: [PATCH v2 0/4] ARM: OMAP: boards: changes to support dynamic
+ irq alloc
+In-Reply-To: <20120319191743.GB9859@atomide.com>
+References: <1332158817-26311-1-git-send-email-tarun.kanti@ti.com>
+ <20120319191743.GB9859@atomide.com>
+Message-ID: <4F67B9F9.1030906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em 19-03-2012 19:37, Sascha Hauer escreveu:
-> On Mon, Mar 19, 2012 at 07:17:27PM -0300, Mauro Carvalho Chehab wrote:
->> Em 19-03-2012 19:03, Mauro Carvalho Chehab escreveu:
->>> Em 13-03-2012 12:05, Alex Gershgorin escreveu:
->>>> In i.MX35-PDK, OV2640  camera is populated on the
->>>> personality board. This camera is registered as a subdevice via soc-camera interface.
->>>>
->>>> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
->>>
->>> Patch doesn't apply over v3.3:
->>
->> Sorry, the previous version of this patch didn't apply. This compiles OK.
->>
->> Sorry for the mess.
->>
->> Anyway, it should be applied via arm subtree.
-> 
-> It's scheduled there. I should have responded with an applied message.
+Hi Tony,
 
-Ok, thanks! 
+On 3/19/2012 8:17 PM, Tony Lindgren wrote:
+> * Tarun Kanti DebBarma<tarun.kanti@ti.com>  [120319 05:09]:
+>> These two patches incorporate changes to OMAP1 and OMAP2 platforms
+>> board files whereby older references to OMAP_GPIO_IRQ macro are
+>> now replaced with gpio_to_irq(), thereby getting rid of static
+>> irq references.
+>>
+>> Reference: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git omap/dt
+>> Commit: 9a0cee711448335ec43eae83272495e9334c0098
+>
+> Can you please tell the exact two commits causing this
+> breakage?
+
+Well, this is the GPIO DT + SPARSE_IRQ series I have done. It appears 
+that the boards I have were already using properly gpio_to_irq() and 
+thus were working fine with this series.
+
+But this is unfortunately not the case of most OMAP2 and 3 legacy boards 
+that were still using an old OMAP way of converting GPIO to IRQ and were 
+never modified to take advantage of the gpiolib stuff.
+
+So if these patches are apply before the GPIO DT + SPARSE_IRQ series, 
+there will be no breakage at all.
+
+All the cleanup we have never done before will hurt us at some point 
+when we will start using more extensively newer fmwk (DT, sparse_irq, 
+dmaengine...). It was not done on purpose, but this GPIO series 
+highlighted this remaining static broken mapping inside OMAP boards.
+
+> I'm baffled how despite all the effort for previnting
+> issues like this this still happen. These all seem valid
+> fixes and clean up things, but how come this was not seen
+> earlier?
+
+Maybe because there are much more boards inside mach-omap2 directory 
+than inside my cubicle... :-(
 
 Regards,
-Mauro
+Benoit
