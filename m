@@ -1,107 +1,20 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 19 Mar 2012 12:20:42 +0200
-Subject: [PATCH v2 7/7] ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux
- related functions as __init
-In-Reply-To: <1332148116.2144.1.camel@deskari>
-References: <1329997247-27342-1-git-send-email-rnayak@ti.com>
- <1329997247-27342-8-git-send-email-rnayak@ti.com>
- <1332148116.2144.1.camel@deskari>
-Message-ID: <1332152442.2144.27.camel@deskari>
+From: dhowells@redhat.com (David Howells)
+Date: Mon, 19 Mar 2012 10:45:11 +0000
+Subject: [PATCH 05/38] Disintegrate asm/system.h for ARM [ver #3]
+In-Reply-To: <1331908808.12353.2.camel@deneb.redhat.com>
+References: <1331908808.12353.2.camel@deneb.redhat.com>
+ <20120315205514.28759.58969.stgit@warthog.procyon.org.uk>
+ <20120315205603.28759.91855.stgit@warthog.procyon.org.uk>
+Message-ID: <2349.1332153911@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-03-19 at 11:08 +0200, Tomi Valkeinen wrote:
-> Hi,
-> 
-> On Thu, 2012-02-23 at 17:10 +0530, Rajendra Nayak wrote:
-> > From: Tony Lindgren <tony@atomide.com>
-> > 
-> > Now that omap hsmmc init is split into two functions, it's safe
-> > to mark omap_hsmmc_init and omap_mux related functions to __init.
-> > 
-> > This basically reverts the following fixes for the case where
-> > TWL was compiled as a module:
-> > 
-> > a98f77b (ARM: omap: fix section mismatch warning for sdp3430_twl_gpio_setup())
-> > 8930b4e (ARM: omap: fix section mismatch warnings in mux.c caused by hsmmc.c)
-> > 
-> > Additionally it fixes up the remaining section warnings for
-> > all callers of omap_mux functions.
-> 
-> I only now noticed this patch. This breaks DSI, as the DSI muxing
-> functions are used during runtime and cannot be marked as __init.
-> 
-> Shall I make a new patch for dss tree that fixes this?
+Mark Salter <msalter@redhat.com> wrote:
 
-(too little coffee)
+> Looks like this hunk was unintended. It is causing a build failure for
+> me.
 
-Obviously I can't make a fix in my tree for that, as the problematic
-patch is not present there... So here's a patch to fix it, based on
-arm-soc/for-next
+Yep.  Removed that already and reissued the ARM chunk, though only on the ARM
+list.
 
-
-
->From b00c2464de51ba6f297371b08bb7745c528fde59 Mon Sep 17 00:00:00 2001
-From: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Date: Mon, 19 Mar 2012 11:08:54 +0200
-Subject: [PATCH] ARM: OMAP2+: Remove __init from DSI mux functions
-
-Commit d1589f0912533e6cb2ac8fd6f1feb3d5989fe8cb (ARM: OMAP2+: Mark
-omap_hsmmc_init and omap_mux related functions as __init) changed DSI
-muxing functions to __init. This doesn't work, as the muxing functions
-are used every time a DSI display is enabled or disabled.
-
-This patch removes the __inits from DSI mux functions.
-
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/display.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/display.c
-b/arch/arm/mach-omap2/display.c
-index 9706c64..400fa37 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -125,7 +125,7 @@ static void omap4_hdmi_mux_pads(enum omap_hdmi_flags
-flags)
- 	}
- }
- 
--static int __init omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
-+static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
- {
- 	u32 enable_mask, enable_shift;
- 	u32 pipd_mask, pipd_shift;
-@@ -166,7 +166,7 @@ int __init omap_hdmi_init(enum omap_hdmi_flags
-flags)
- 	return 0;
- }
- 
--static int __init omap_dsi_enable_pads(int dsi_id, unsigned lane_mask)
-+static int omap_dsi_enable_pads(int dsi_id, unsigned lane_mask)
- {
- 	if (cpu_is_omap44xx())
- 		return omap4_dsi_mux_pads(dsi_id, lane_mask);
-@@ -174,7 +174,7 @@ static int __init omap_dsi_enable_pads(int dsi_id,
-unsigned lane_mask)
- 	return 0;
- }
- 
--static void __init omap_dsi_disable_pads(int dsi_id, unsigned
-lane_mask)
-+static void omap_dsi_disable_pads(int dsi_id, unsigned lane_mask)
- {
- 	if (cpu_is_omap44xx())
- 		omap4_dsi_mux_pads(dsi_id, 0);
--- 
-1.7.4.1
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120319/7bcea6e1/attachment.sig>
+David
