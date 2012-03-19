@@ -1,67 +1,33 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 19 Mar 2012 12:49:10 -0700
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 19 Mar 2012 12:53:50 -0700
 Subject: [PATCH v7 2/3] clk: introduce the common clock framework
-In-Reply-To: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+In-Reply-To: <4F6716DD.5090900@ti.com>
 References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
  <1331878280-2758-3-git-send-email-mturquette@linaro.org>
- <4F6404C2.7000506@codeaurora.org>
- <CAJOA=zP1HHqBNS4V2dN=Q9oOcOErQj8W__fB_qRyZeNLBk7VJg@mail.gmail.com>
- <4F678561.3040105@codeaurora.org>
- <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
-Message-ID: <4F678DB6.5090006@codeaurora.org>
+ <4F6716DD.5090900@ti.com>
+Message-ID: <CAJOA=zMPrf-JH_Pmzvkb==1Ew0g4oVS2L=ecJE3WxXsJ4GWkgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2012 12:33 PM, Turquette, Mike wrote:
-> On Mon, Mar 19, 2012 at 12:13 PM, Saravana Kannan
-> <skannan@codeaurora.org>  wrote:
->> I saw some responses from you over the weekend but not to mine. So, I
->> assumed you were busy with other stuff and I started working on a patch on
->> top of v7.
+On Mon, Mar 19, 2012 at 4:22 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> On Friday 16 March 2012 11:41 AM, Mike Turquette wrote:
+>> +/*
+>> + * calculate the new rates returning the topmost clock that has to be
+>> + * changed.
+>> + */
+>> +static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long
+>> rate)
+>> +{
+>> + ? ? ? struct clk *top = clk;
+>> + ? ? ? unsigned long best_parent_rate = clk->parent->rate;
 >
-> I only answer trivial emails on the weekend ;-)
 >
->> I will send that out if I get around to finishing it before you
->> do. Hope that's alright with you.
->
-> I'm happy to for you to take a crack at it.  I don't know what your
-> implementation looks like, but here are a couple concerns I have:
->
-> 1) if you're copying the data from the initializer over to the struct
-> clk then make sure you handle the __init data aspects of it properly
+> Shouldn't you check for a valid parent before dereferencing it? A
+> clk_set_rate() on a root clock might throw up some issues otherwise.
 
-Not copying them into clk again. Just leaving them in clk_hw and using 
-them as is. The only fields moved into clk_hw are:
-+       const char              *name;
-+       const struct clk_ops    *ops;
-+       char                    **parent_names;
-+       u8                      num_parents;
-+       unsigned long           flags;
+Yes, the clk_calc_new_rates code assumes a valid parent pointer in
+several locations.  Thanks for the catch.  Will roll into my fixes
+series.
 
->
-> 2) are the members of struct clk_hw visible to the rest of the world?
-> Are they modifiable (i.e., not const)?  This is undesirable.
-
-I'm leaving the const as is. Some of them you can't mark as const if you 
-want to dynamically create them.
-
-Yes, they are visible to all the platform drivers (not the rest of the 
-world). But these values are provided by the platform drivers anyway, so 
-I don't see a problem with it.
-
-I also don't see any useful hacks a platform driver can do by messing 
-with this fields without crashing the kernel since they don't have 
-access to the locks.
-
-flags might be the one that provides some possibilities since I think 
-you look at them often in the core code. We could just copy it into clk 
-if people really feel strongly about it. At the worst case, we can have 
-a full copy of all these fields inside clk and copy all of them over, 
-but I think that would be overkill for things like names, ops and parent 
-info.
-
-Thanks,
-Saravana
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Mike
