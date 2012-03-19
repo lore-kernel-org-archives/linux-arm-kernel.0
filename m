@@ -1,49 +1,59 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 19 Mar 2012 12:00:13 -0700
+Date: Mon, 19 Mar 2012 12:09:01 -0700
 Subject: [PATCH v7 2/3] clk: introduce the common clock framework
-In-Reply-To: <20120318140707.GC29638@S2101-09.ap.freescale.net>
+In-Reply-To: <20120319112858.GX3852@pengutronix.de>
 References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
  <1331878280-2758-3-git-send-email-mturquette@linaro.org>
- <20120318140707.GC29638@S2101-09.ap.freescale.net>
-Message-ID: <CAJOA=zMQeGL-D-Zk83qhR1zaY-N+HfFufO3uhgConUbLHnab+g@mail.gmail.com>
+ <4F6716DD.5090900@ti.com> <20120319112858.GX3852@pengutronix.de>
+Message-ID: <CAJOA=zOgHXy1_J+LG1LUWwsESwrtqAvrgHKUR22AJdsbRHa+YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 18, 2012 at 7:07 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Another trivial comment. ?But if there is an incremental patch, maybe
-> consider to include it.
+On Mon, Mar 19, 2012 at 4:28 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Mar 19, 2012 at 04:52:05PM +0530, Rajendra Nayak wrote:
+>> Hi Mike,
+>>
+>> >+/*
+>> >+ * calculate the new rates returning the topmost clock that has to be
+>> >+ * changed.
+>> >+ */
+>> >+static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+>> >+{
+>> >+ ? ?struct clk *top = clk;
+>> >+ ? ?unsigned long best_parent_rate = clk->parent->rate;
+>>
+>> Shouldn't you check for a valid parent before dereferencing it? A
+>> clk_set_rate() on a root clock might throw up some issues otherwise.
+>>
 >
-> On Thu, Mar 15, 2012 at 11:11:19PM -0700, Mike Turquette wrote:
-> ...
->> +#ifdef CONFIG_COMMON_CLK_DISABLE_UNUSED
->> +static int clk_disable_unused(void)
->> +{
->> + ? ? struct clk *clk;
->> + ? ? struct hlist_node *tmp;
->> +
->> + ? ? mutex_lock(&prepare_lock);
->> +
->> + ? ? hlist_for_each_entry(clk, tmp, &clk_root_list, child_node)
->> + ? ? ? ? ? ? clk_disable_unused_subtree(clk);
->> +
->> + ? ? hlist_for_each_entry(clk, tmp, &clk_orphan_list, child_node)
->> + ? ? ? ? ? ? clk_disable_unused_subtree(clk);
->> +
->> + ? ? mutex_unlock(&prepare_lock);
->> +
->> + ? ? return 0;
->> +}
->> +late_initcall(clk_disable_unused);
->> +#else
->> +static inline int clk_disable_unused(struct clk *clk) { return 0; }
->
-> This #else block seems completely unnecessary to me.
->
->> +#endif /* CONFIG_COMMON_CLK_DISABLE_UNUSED */
+> Yes, should be checked.
 
-Oops.  This is a leftover from when there was a separate
-drivers/clk/clk-debug.c which implemented this stuff.  I'll make a
-cleanup series and roll all these little things into it.
+The clk_calc_new_rates code assumes a valid parent pointer in several
+locations.  Thanks for the catch Rajendra.  Will roll into my fixes
+series.
+
+>> >+ ? ?unsigned long new_rate;
+>> >+
+>> >+ ? ?if (!clk->ops->round_rate&& ?!(clk->flags& ?CLK_SET_RATE_PARENT)) {
+>> >+ ? ? ? ? ? ?clk->new_rate = clk->rate;
+>> >+ ? ? ? ? ? ?return NULL;
+>>
+>> So does this mean a clk_set_rate() fails for a clk which does not have
+>> a valid .round_rate and does not have a CLK_SET_RATE_PARENT flag set?
+>> I was thinking this could do a..
+>> ? ? ? ? ? ? ? clk->new_rate = rate;
+>> ? ? ? ? ? ? ? top = clk;
+>> ? ? ? ? ? ? ? goto out;
+>> ..instead.
+>
+> The core should make sure that either both set_rate and round_rate are
+> present or none of them.
+
+Agreed.  The documentation covers which clk_ops are hard dependencies
+(based on supported operations), but the code doesn't strictly check
+this.  I'll add a small state machine to __clk_init which validates
+that .round_rate, .recalc_rate and .set_rate are *all* present if any
+one of them are present, and present a WARN if otherwise.
 
 Thanks,
 Mike
