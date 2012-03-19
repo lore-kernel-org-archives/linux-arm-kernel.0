@@ -1,77 +1,107 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Mar 2012 09:40:01 +0000
-Subject: linux-next: build warning after merge of the arm-soc tree
-In-Reply-To: <20120319183911.0cd46df560c714ee71184242@canb.auug.org.au>
-References: <20120319183911.0cd46df560c714ee71184242@canb.auug.org.au>
-Message-ID: <201203190940.02329.arnd@arndb.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 Mar 2012 12:20:42 +0200
+Subject: [PATCH v2 7/7] ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux
+ related functions as __init
+In-Reply-To: <1332148116.2144.1.camel@deskari>
+References: <1329997247-27342-1-git-send-email-rnayak@ti.com>
+ <1329997247-27342-8-git-send-email-rnayak@ti.com>
+ <1332148116.2144.1.camel@deskari>
+Message-ID: <1332152442.2144.27.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 March 2012, Stephen Rothwell wrote:
-> Hi all,
+On Mon, 2012-03-19 at 11:08 +0200, Tomi Valkeinen wrote:
+> Hi,
 > 
-> After merging the arm-soc tree, today's linux-next build (all)
-> produced this warning:
+> On Thu, 2012-02-23 at 17:10 +0530, Rajendra Nayak wrote:
+> > From: Tony Lindgren <tony@atomide.com>
+> > 
+> > Now that omap hsmmc init is split into two functions, it's safe
+> > to mark omap_hsmmc_init and omap_mux related functions to __init.
+> > 
+> > This basically reverts the following fixes for the case where
+> > TWL was compiled as a module:
+> > 
+> > a98f77b (ARM: omap: fix section mismatch warning for sdp3430_twl_gpio_setup())
+> > 8930b4e (ARM: omap: fix section mismatch warnings in mux.c caused by hsmmc.c)
+> > 
+> > Additionally it fixes up the remaining section warnings for
+> > all callers of omap_mux functions.
 > 
-> drivers/clk/Kconfig:22: warning: menuconfig statement without prompt
+> I only now noticed this patch. This breaks DSI, as the DSI muxing
+> functions are used during runtime and cannot be marked as __init.
 > 
-> Introduced by commit c173033d154e ("clk: make CONFIG_COMMON_CLK invisible").
+> Shall I make a new patch for dss tree that fixes this?
 
-Thanks for the report. This is clearly my fault for not testing the last
-minute patch.
-I have now replaced it with the one below and tested that it works
-as intended.
+(too little coffee)
 
-	Arnd
+Obviously I can't make a fix in my tree for that, as the problematic
+patch is not present there... So here's a patch to fix it, based on
+arm-soc/for-next
 
 
-commit 8fb61e33507e5d76b69467b4f96290338e96b733
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Sat Mar 17 21:10:51 2012 +0000
 
-    clk: make CONFIG_COMMON_CLK invisible
-    
-    All platforms that use the common clk infrastructure should select
-    COMMON_CLK from platform code, and on all other platforms, it must
-    not be enabled, so there is no point making the option visible to
-    users, and when it is visible, we break randconfig builds.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>From b00c2464de51ba6f297371b08bb7745c528fde59 Mon Sep 17 00:00:00 2001
+From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Date: Mon, 19 Mar 2012 11:08:54 +0200
+Subject: [PATCH] ARM: OMAP2+: Remove __init from DSI mux functions
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 2eaf17e..165e1fe 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -9,21 +9,18 @@ config HAVE_CLK_PREPARE
- config HAVE_MACH_CLKDEV
- 	bool
+Commit d1589f0912533e6cb2ac8fd6f1feb3d5989fe8cb (ARM: OMAP2+: Mark
+omap_hsmmc_init and omap_mux related functions as __init) changed DSI
+muxing functions to __init. This doesn't work, as the muxing functions
+are used every time a DSI display is enabled or disabled.
+
+This patch removes the __inits from DSI mux functions.
+
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/display.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/display.c
+b/arch/arm/mach-omap2/display.c
+index 9706c64..400fa37 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -125,7 +125,7 @@ static void omap4_hdmi_mux_pads(enum omap_hdmi_flags
+flags)
+ 	}
+ }
  
--menuconfig COMMON_CLK
--	bool "Common Clock Framework"
-+config COMMON_CLK
-+	bool
- 	select HAVE_CLK_PREPARE
- 	---help---
- 	  The common clock framework is a single definition of struct
- 	  clk, useful across many platforms, as well as an
- 	  implementation of the clock API in include/linux/clk.h.
- 	  Architectures utilizing the common struct clk should select
--	  this automatically, but it may be necessary to manually select
--	  this option for loadable modules requiring the common clock
--	  framework.
--
--	  If in doubt, say "N".
-+	  this option.
+-static int __init omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
++static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
+ {
+ 	u32 enable_mask, enable_shift;
+ 	u32 pipd_mask, pipd_shift;
+@@ -166,7 +166,7 @@ int __init omap_hdmi_init(enum omap_hdmi_flags
+flags)
+ 	return 0;
+ }
  
--if COMMON_CLK
-+menu "Common Clock Framework"
-+	depends on COMMON_CLK
+-static int __init omap_dsi_enable_pads(int dsi_id, unsigned lane_mask)
++static int omap_dsi_enable_pads(int dsi_id, unsigned lane_mask)
+ {
+ 	if (cpu_is_omap44xx())
+ 		return omap4_dsi_mux_pads(dsi_id, lane_mask);
+@@ -174,7 +174,7 @@ static int __init omap_dsi_enable_pads(int dsi_id,
+unsigned lane_mask)
+ 	return 0;
+ }
  
- config COMMON_CLK_DISABLE_UNUSED
- 	bool "Disabled unused clocks at boot"
-@@ -47,4 +44,4 @@ config COMMON_CLK_DEBUG
- 	  clk_flags, clk_prepare_count, clk_enable_count &
- 	  clk_notifier_count.
- 
--endif
-+endmenu
+-static void __init omap_dsi_disable_pads(int dsi_id, unsigned
+lane_mask)
++static void omap_dsi_disable_pads(int dsi_id, unsigned lane_mask)
+ {
+ 	if (cpu_is_omap44xx())
+ 		omap4_dsi_mux_pads(dsi_id, 0);
+-- 
+1.7.4.1
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120319/7bcea6e1/attachment.sig>
