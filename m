@@ -1,130 +1,54 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 19 Mar 2012 15:23:14 +0100
-Subject: [PATCH 01/12] mfd: twl-core: don't depend on pdata->irq_base/end
-In-Reply-To: <87k42metna.fsf@ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-2-git-send-email-b-cousson@ti.com> <87pqcegapk.fsf@ti.com>
- <87k42metna.fsf@ti.com>
-Message-ID: <4F674152.5040008@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 19 Mar 2012 20:05:30 +0530
+Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
+In-Reply-To: <1331649534.1727.27.camel@vkoul-udesk3>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+ <1331128466.24656.421.camel@vkoul-udesk3>
+ <20120312161143.GA10830@n2100.arm.linux.org.uk>
+ <1331569438.1727.3.camel@vkoul-udesk3>
+ <1331628036.1727.22.camel@vkoul-udesk3>
+ <20120313123121.GA20133@n2100.arm.linux.org.uk>
+ <1331649534.1727.27.camel@vkoul-udesk3>
+Message-ID: <1332167730.7180.53.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samuel,
+On Tue, 2012-03-13 at 20:08 +0530, Vinod Koul wrote:
+> On Tue, 2012-03-13 at 12:31 +0000, Russell King - ARM Linux wrote:
+> > On Tue, Mar 13, 2012 at 02:10:36PM +0530, Vinod Koul wrote:
+> > > Please see if the below patch is the right fix for build failures in
+> > > addition to one suggested by Jassi.
+> > 
+> > I'm not sure that Jassi's solution is correct - and I'm wondering whether
+> > any of the DMA engine drivers do the right thing when transfers are
+> > terminated.  Is it right for the DMA status function to return IN_PROGRESS
+> > for a previously submitted cookie which has been terminated?
+> > 
+> > I can see two answers to that, both equally valid:
+> > 
+> > 1. It allows you to find out exactly where the DMA engine got to before
+> >    the transfer was terminated, and therefore recover from the termination
+> >    if you wish to.
+> > 
+> > 2. Returning in-progress when a cookie will never be completed is
+> >    misleading, and could be misinterpreted by users of the tx_status
+> >    function, especially if they are waiting for a particular transaction
+> >    to complete.
+> > 
+> > Maybe we need to introduce a DMA_TERMINATED status?
+> I would agree with you that DMA_TERMINATED seems to be correct option.
+> IN_PROGRESS would certainly confuse... 
+> I will drop Jassi's fix from this branch. Care to send the patch? 
 
-On 3/14/2012 10:53 PM, Kevin Hilman wrote:
-> Kevin Hilman<khilman@ti.com>  writes:
->
->> Benoit Cousson<b-cousson@ti.com>  writes:
->>
->>> From: Felipe Balbi<balbi@ti.com>
->>>
->>> With sparse IRQs the driver shouldn't depend at all on
->>> any IRQ values coming from board-file.
->>>
->>> Remove every occurences of pdata->irq_base/end.
->>
->> Well, not quite *every*. :)
->>
->> If the driver isn't going to use those fields anymore, they should also
->> be removed from the pdata struct too[1].  Also, the remaining board/init
->> code that is initializing those fields should be removed as well[2], since
->> it obviously has no effect.
->>
->> The first patch below should probably be folded into this one, and then
->> the 2nd patch removes all the users.
->
-> Below is a correct version of the 2nd patch which removes all the users.
->
-> The previous version wouldn't apply cleanly because I generated it on
-> top of a local branch that also included some other changes to
-> twl-common.c from the SMPS regulator series (which seems to have missed
-> the window for v3.4.)
->
-> This one applies cleanly on your for_3.4/twl_irq_gpio_mmc_fix branch.
+Even after adding such a state in dmaengine for DMA_TERMINATED, it
+doesn't make much sense. In TERMINATE_ALL we do not update the
+chan->complete value. So after client has terminated the channel it can
+easily test to see if cookie is completed (before terminate will return
+SUCCESS) or aborted (will return DMA_IN_PROGRESS)
+So at present I am leaning on 1 :)
 
-After discussing with Kevin, we think it might be better to wait 3.5 for 
-this further cleanup patches.
-These patches will need some patches already queued by Tony to avoid 
-breaking OMAP build.
-In order to reduce dependency, let's push them for 3.5.
+If I don't hear any opposition I will merge this (with Jassi's fix) and
+then send pull to Linus
 
-You can the pull the current branch.
-
-Thanks,
-Benoit
-
->
-> Kevin
->
->  From b59a4754fb66f6f729ebbd0563c4cd2bd2cda56e Mon Sep 17 00:00:00 2001
-> From: Kevin Hilman<khilman@ti.com>
-> Date: Wed, 14 Mar 2012 13:56:01 -0700
-> Subject: [PATCH] ARM: OMAP2+: TWL: remove usage of pdata->irq_base/_end
->
-> The driver has been converted to use SPARSE_IRQ and no longer needs to
-> be passed IRQ base/end.  The driver no longer uses these fields, so
-> remove them from the reamaining users.
->
-> Signed-off-by: Kevin Hilman<khilman@ti.com>
-> ---
->   arch/arm/mach-omap2/board-2430sdp.c    |    3 ---
->   arch/arm/mach-omap2/board-omap3logic.c |    3 ---
->   arch/arm/mach-omap2/twl-common.c       |   10 ----------
->   3 files changed, 16 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-> index 7370983..7dfcb96 100644
-> --- a/arch/arm/mach-omap2/board-2430sdp.c
-> +++ b/arch/arm/mach-omap2/board-2430sdp.c
-> @@ -218,9 +218,6 @@ static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
->   };
->
->   static struct twl4030_platform_data sdp2430_twldata = {
-> -	.irq_base	= TWL4030_IRQ_BASE,
-> -	.irq_end	= TWL4030_IRQ_END,
-> -
->   	/* platform_data for children goes here */
->   	.gpio		=&sdp2430_gpio_data,
->   	.vmmc1		=&sdp2430_vmmc1,
-> diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-> index 4198dd0..0b053b4 100644
-> --- a/arch/arm/mach-omap2/board-omap3logic.c
-> +++ b/arch/arm/mach-omap2/board-omap3logic.c
-> @@ -85,9 +85,6 @@ static struct twl4030_gpio_platform_data omap3logic_gpio_data = {
->   };
->
->   static struct twl4030_platform_data omap3logic_twldata = {
-> -	.irq_base	= TWL4030_IRQ_BASE,
-> -	.irq_end	= TWL4030_IRQ_END,
-> -
->   	/* platform_data for children goes here */
->   	.gpio		=&omap3logic_gpio_data,
->   	.vmmc1		=&omap3logic_vmmc1,
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index 10b20c6..ce349ac 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -129,11 +129,6 @@ static struct regulator_init_data omap3_vpll2_idata = {
->   void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
->   				  u32 pdata_flags, u32 regulators_flags)
->   {
-> -	if (!pmic_data->irq_base)
-> -		pmic_data->irq_base = TWL4030_IRQ_BASE;
-> -	if (!pmic_data->irq_end)
-> -		pmic_data->irq_end = TWL4030_IRQ_END;
-> -
->   	/* Common platform data configurations */
->   	if (pdata_flags&  TWL_COMMON_PDATA_USB&&  !pmic_data->usb)
->   		pmic_data->usb =&omap3_usb_pdata;
-> @@ -287,11 +282,6 @@ static struct regulator_init_data omap4_clk32kg_idata = {
->   void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
->   				  u32 pdata_flags, u32 regulators_flags)
->   {
-> -	if (!pmic_data->irq_base)
-> -		pmic_data->irq_base = TWL6030_IRQ_BASE;
-> -	if (!pmic_data->irq_end)
-> -		pmic_data->irq_end = TWL6030_IRQ_END;
-> -
->   	/* Common platform data configurations */
->   	if (pdata_flags&  TWL_COMMON_PDATA_USB&&  !pmic_data->usb)
->   		pmic_data->usb =&omap4_usb_pdata;
+-- 
+~Vinod
