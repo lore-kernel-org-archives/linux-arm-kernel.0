@@ -1,96 +1,84 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Mar 2012 14:36:02 +0100
-Subject: [PATCH 4/8] ARM i.MX: Add common clock support for pllv1
-In-Reply-To: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
-References: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1332164166-6055-5-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 19 Mar 2012 14:35:58 +0100
+Subject: i.MX: Convert v4/v5 based SoCs to common clock framework
+Message-ID: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/Makefile    |    2 +
- arch/arm/mach-imx/clk-pllv1.c |   59 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-imx/clk-pllv1.c
+Hi All,
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 55db9c4..1f138ae 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -13,6 +13,8 @@ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o
- 
- obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clock-mx51-mx53.o ehci-imx5.o pm-imx5.o cpu_op-mx51.o
- 
-+obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o
-+
- # Support for CMOS sensor interface
- obj-$(CONFIG_MX1_VIDEO) += mx1-camera-fiq.o mx1-camera-fiq-ksym.o
- 
-diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
-new file mode 100644
-index 0000000..afbd95f
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-pllv1.c
-@@ -0,0 +1,59 @@
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/kernel.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/clock.h>
-+#include "clk.h"
-+
-+/**
-+ * pll v1
-+ *
-+ * @clk_hw	clock source
-+ * @parent	the parent clock name
-+ * @base	base address of pll registers
-+ *
-+ * PLL clock version 1, found on i.MX1/21/25/27/31/35
-+ */
-+struct clk_pllv1 {
-+	struct clk_hw	hw;
-+	void __iomem	*base;
-+	char		*parent;
-+};
-+
-+#define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
-+
-+static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
-+{
-+	struct clk_pllv1 *pll = to_clk_pllv1(hw);
-+
-+	return mxc_decode_pll(readl(pll->base), parent_rate);
-+}
-+
-+struct clk_ops clk_pllv1_ops = {
-+	.recalc_rate = clk_pllv1_recalc_rate,
-+};
-+
-+struct clk *imx_clk_pllv1(const char *name, char *parent,
-+		void __iomem *base)
-+{
-+	struct clk_pllv1 *pll;
-+	struct clk *clk;
-+
-+	pll = kmalloc(sizeof(*pll), GFP_KERNEL);
-+	if (!pll)
-+		return NULL;
-+
-+	pll->base = base;
-+	pll->parent = parent;
-+
-+	clk = clk_register(NULL, name, &clk_pllv1_ops, &pll->hw, &pll->parent,
-+			1, 0);
-+	if (!clk)
-+		kfree(pll);
-+
-+	return clk;
-+}
--- 
-1.7.9.1
+The following patches convert the i.MX v4/v5 based SoCs to the common
+clock framework.  They may not be completely ready, I am posting it now
+because I'd like to show that the function based clock initializers are
+indeed usable in real life and that the end result does not look too
+bad.
+
+This series depends on another series not yet posted which convert the
+i.MX drivers to not depend on grouped clocks. I will follow up on this
+after the merge window. My plan for these patches is to put them into
+the arm-soc staging area after the merge window to let them stabilize
+until hopefully before the next merge window there are no regressions
+left.
+
+Except the i.MX21 port all SoCs are runtime tested with the basic
+devices (at least uart and network; I tested more, but not
+systematically). Testers for these patches are very welcome, I will
+happily integrate fixups into this series. A branch containing Mikes
+latest clock patches, the driver fixups and this series can be found
+here:
+
+git://git.pengutronix.de/git/imx/linux-2.6.git work/imx-clk-v4-v5
+
+As a side note, we currently compile all i.MX v4/v5 based SoCs in a
+single defconfig. Since a kernel can only be built with or without the
+common clock framework this series is not fully bisectable, you have to
+disable the not yet converted SoCs in between.
+
+The patch for removing the old clock support is not included in this
+post, but with the removal the overall diffstat looks like this:
+
+ arch/arm/mach-imx/clock-imx1.c           |  636 ---------------
+ arch/arm/mach-imx/clock-imx21.c          | 1239 -------------------------------
+ arch/arm/mach-imx/clock-imx25.c          |  346 --------
+ arch/arm/mach-imx/clock-imx27.c          |  766 -------------------
+ b/arch/arm/mach-imx/Kconfig              |    4 
+ b/arch/arm/mach-imx/Makefile             |   10 
+ b/arch/arm/mach-imx/clk-imx1.c           |  118 ++
+ b/arch/arm/mach-imx/clk-imx21.c          |  177 ++++
+ b/arch/arm/mach-imx/clk-imx25.c          |  242 ++++++
+ b/arch/arm/mach-imx/clk-imx27.c          |  277 ++++++
+ b/arch/arm/mach-imx/clk-pllv1.c          |   59 +
+ b/arch/arm/mach-imx/clk.h                |   44 +
+ b/arch/arm/plat-mxc/clock.c              |   11 
+ b/arch/arm/plat-mxc/include/mach/clock.h |    4 
+ b/arch/arm/plat-mxc/time.c               |    5 
+ 15 files changed, 946 insertions(+), 2992 deletions(-)
+
+----------------------------------------------------------------
+Sascha Hauer (7):
+      ARM i.MX: prepare for common clock framework
+      ARM i.MX timer: request correct clock
+      ARM i.MX: Add common clock support for pllv1
+      ARM i.MX1: implement clocks using common clock framework
+      ARM i.MX21: implement clocks using common clock framework
+      ARM i.MX25: implement clocks using common clock framework
+      ARM i.MX27: implement clocks using common clock framework
+
+ arch/arm/mach-imx/Kconfig              |    4 +
+ arch/arm/mach-imx/Makefile             |   10 +-
+ arch/arm/mach-imx/clk-imx1.c           |  118 ++++++++++++++
+ arch/arm/mach-imx/clk-imx21.c          |  177 ++++++++++++++++++++
+ arch/arm/mach-imx/clk-imx25.c          |  242 ++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk-imx27.c          |  277 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk-pllv1.c          |   59 +++++++
+ arch/arm/mach-imx/clk.h                |   44 +++++
+ arch/arm/plat-mxc/clock.c              |   11 ++
+ arch/arm/plat-mxc/include/mach/clock.h |    4 +
+ arch/arm/plat-mxc/time.c               |    5 +-
+ 11 files changed, 946 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-imx/clk-imx1.c
+ create mode 100644 arch/arm/mach-imx/clk-imx21.c
+ create mode 100644 arch/arm/mach-imx/clk-imx25.c
+ create mode 100644 arch/arm/mach-imx/clk-imx27.c
+ create mode 100644 arch/arm/mach-imx/clk-pllv1.c
+ create mode 100644 arch/arm/mach-imx/clk.h
