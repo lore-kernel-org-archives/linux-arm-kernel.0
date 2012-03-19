@@ -1,99 +1,30 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 19 Mar 2012 12:13:37 -0700
-Subject: [PATCH v7 2/3] clk: introduce the common clock framework
-In-Reply-To: <CAJOA=zP1HHqBNS4V2dN=Q9oOcOErQj8W__fB_qRyZeNLBk7VJg@mail.gmail.com>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <1331878280-2758-3-git-send-email-mturquette@linaro.org>
- <4F6404C2.7000506@codeaurora.org>
- <CAJOA=zP1HHqBNS4V2dN=Q9oOcOErQj8W__fB_qRyZeNLBk7VJg@mail.gmail.com>
-Message-ID: <4F678561.3040105@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Mar 2012 12:17:44 -0700
+Subject: [PATCH v2 0/4] ARM: OMAP: boards: changes to support dynamic
+ irq alloc
+In-Reply-To: <1332158817-26311-1-git-send-email-tarun.kanti@ti.com>
+References: <1332158817-26311-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20120319191743.GB9859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2012 11:56 AM, Turquette, Mike wrote:
-> On Fri, Mar 16, 2012 at 8:28 PM, Saravana Kannan<skannan@codeaurora.org>  wrote:
->> On 03/15/2012 11:11 PM, Mike Turquette wrote:
->>>
->>> The common clock framework defines a common struct clk useful across
->>> most platforms as well as an implementation of the clk api that drivers
->>> can use safely for managing clocks.
->>>
->>> The net result is consolidation of many different struct clk definitions
->>> and platform-specific clock framework implementations.
->>>
->>> This patch introduces the common struct clk, struct clk_ops and an
->>> implementation of the well-known clock api in include/clk/clk.h.
->>> Platforms may define their own hardware-specific clock structure and
->>> their own clock operation callbacks, so long as it wraps an instance of
->>> struct clk_hw.
->>>
->>> See Documentation/clk.txt for more details.
->>>
->>> This patch is based on the work of Jeremy Kerr, which in turn was based
->>> on the work of Ben Herrenschmidt.
->>>
->>> Signed-off-by: Mike Turquette<mturquette@linaro.org>
->>> Signed-off-by: Mike Turquette<mturquette@ti.com>
->>> Reviewed-by: Thomas Gleixner<tglx@linutronix.de>
->>> Tested-by: Andrew Lunn<andrew@lunn.ch>
->>> Reviewed-by: Rob Herring<rob.herring<at>    calxeda.com>
->>> Cc: Russell King<linux@arm.linux.org.uk>
->>> Cc: Jeremy Kerr<jeremy.kerr@canonical.com>
->>> Cc: Arnd Bergman<arnd.bergmann@linaro.org>
->>> Cc: Paul Walmsley<paul@pwsan.com>
->>> Cc: Shawn Guo<shawn.guo@freescale.com>
->>> Cc: Sascha Hauer<s.hauer@pengutronix.de>
->>> Cc: Richard Zhao<richard.zhao@linaro.org>
->>> Cc: Saravana Kannan<skannan@codeaurora.org>
->>> Cc: Magnus Damm<magnus.damm@gmail.com>
->>> Cc: Mark Brown<broonie@opensource.wolfsonmicro.com>
->>> Cc: Linus Walleij<linus.walleij@stericsson.com>
->>> Cc: Stephen Boyd<sboyd@codeaurora.org>
->>> Cc: Amit Kucheria<amit.kucheria@linaro.org>
->>> Cc: Deepak Saxena<dsaxena@linaro.org>
->>> Cc: Grant Likely<grant.likely@secretlab.ca>
->>> ---
->>
->>
->> Mike,
->>
->> Thanks for the patches! Glad to see that it's finally getting in! I sent a
->> request for a minor change as a reply to the v5 series (since it had more
->> context). Can you please take a look at that and let me know if you can send
->> out a v8 or a patch on top of this to do that?
->
-> Hi Saravana,
+* Tarun Kanti DebBarma <tarun.kanti@ti.com> [120319 05:09]:
+> These two patches incorporate changes to OMAP1 and OMAP2 platforms
+> board files whereby older references to OMAP_GPIO_IRQ macro are
+> now replaced with gpio_to_irq(), thereby getting rid of static
+> irq references.
+> 
+> Reference: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git omap/dt
+> Commit: 9a0cee711448335ec43eae83272495e9334c0098
 
-Hi Mike,
+Can you please tell the exact two commits causing this
+breakage?
 
-> I'm not sending a v8 series since Arnd has taken in v7 for the 3.4 merge window.
+I'm baffled how despite all the effort for previnting
+issues like this this still happen. These all seem valid
+fixes and clean up things, but how come this was not seen
+earlier?
 
-Yeah, I later realized it might be better to send patches on top of v7.
+Regards,
 
-> I'm formulating a reply to your v5 queries, but I'm not done looking
-> at the implications of the initializer stuff.  Lets keep the technical
-> discussion in that thread for now.
-
-I saw some responses from you over the weekend but not to mine. So, I 
-assumed you were busy with other stuff and I started working on a patch 
-on top of v7. I will send that out if I get around to finishing it 
-before you do. Hope that's alright with you.
-
-Based on what I have done so far, to me it just looked like a search and 
-replace of clk->name with clk->hw.name and similar changes for the rest 
-of the fields. It looks like we might be able to remove 
-clk_register_mux, clk_register_divider, etc if we go with this. No stong 
-opinion about removing those, but they seemed redundant after the 
-suggester refactor.
-
-I think it would be okay to just move those init fields into clk_hw and 
-not bother with renaming it to clk_initializer (I would prefer, clk_info 
-or clk_common) if it makes the match much less invasive.
-
-
-Thanks,
-Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Tony
