@@ -1,47 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 09:07:48 -0600
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <201203191501.10232.arnd@arndb.de>
-References: <4F22DEF2.5000807@ti.com> <20120317104751.4F00E3E0910@localhost>
- <20120319130222.GC5705@sirena.org.uk> <201203191501.10232.arnd@arndb.de>
-Message-ID: <4F674BC4.2070802@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 19 Mar 2012 17:07:38 +0200
+Subject: [PATCH 01/12] mfd: twl-core: don't depend on pdata->irq_base/end
+In-Reply-To: <87pqcegapk.fsf@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-2-git-send-email-b-cousson@ti.com>
+ <87pqcegapk.fsf@ti.com>
+Message-ID: <20120319150736.GM25935@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2012 09:01 AM, Arnd Bergmann wrote:
-> On Monday 19 March 2012, Mark Brown wrote:
->> On Sat, Mar 17, 2012 at 10:47:51AM +0000, Grant Likely wrote:
->>
->>> After implementing both schemes (ie. interrupts+interrupt-names && [*-]gpios)
->>> I definitely prefer the fixed property name plus a separate names property.
->>> It is easier to use common code with that scheme, and easier to statically
->>> check for correctness.
->>
->> It's not a fantastic experience when using the bindings as the arrays
->> grow large, though - keeping things matched up isn't much fun especially
->> if any of the elements in the array are optional.
-> 
-> Maybe one can use named properties in a new device node in that case,
-> like this:
-> 
-> 	bus {
-> 		dma: dma-controller {
-> 			#dma-cells = <1>;
-> 		};
-> 
-> 		device {
-> 			compatible = "device";
-> 			channel: dma-channel {
-> 				type = <0x1>;
-> 				name = "foo";
-> 				number = <23>;
-> 				direction = <3>;
-> 			};
-> 			dma-requests = <&dma &channel>;
-> 		};
-> 	};
+Hi,
 
-For reference, this is very similar to how the pinctrl bindings work,
-except that they require the "channel" node to be a child of the DMA
-controller, and hence "dma-requests" doesn't contain <&dma &channel>,
-just <&channel>, since "dma" is the parent (or grand-parent) of "channel".
+On Wed, Mar 14, 2012 at 01:59:51PM -0700, Kevin Hilman wrote:
+> Benoit Cousson <b-cousson@ti.com> writes:
+> 
+> > From: Felipe Balbi <balbi@ti.com>
+> >
+> > With sparse IRQs the driver shouldn't depend at all on
+> > any IRQ values coming from board-file.
+> >
+> > Remove every occurences of pdata->irq_base/end.
+> 
+> Well, not quite *every*. :)
+> 
+> If the driver isn't going to use those fields anymore, they should also
+> be removed from the pdata struct too[1].  Also, the remaining board/init
+> code that is initializing those fields should be removed as well[2], since
+> it obviously has no effect.
+
+indeed, but the idea was to decouple driver changes from arch/arm/*omap*
+changes minimizing the oportunity of conflicts. So, e.g. on v3.4 we
+change driver and on v3.5 we change board files.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120319/87cc24ee/attachment.sig>
