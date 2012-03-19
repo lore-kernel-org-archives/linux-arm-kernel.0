@@ -1,46 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 10:54:01 -0600
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <201203191545.40933.arnd@arndb.de>
-References: <4F22DEF2.5000807@ti.com> <201203191501.10232.arnd@arndb.de>
- <4F674BC4.2070802@wwwdotorg.org> <201203191545.40933.arnd@arndb.de>
-Message-ID: <4F6764A9.8090907@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Mar 2012 11:54:14 -0500
+Subject: [PATCH] ARM: tegra: Include assembler.h in sleep.S to fix build
+ break
+In-Reply-To: <1332175831-5900-1-git-send-email-swarren@wwwdotorg.org>
+References: <1332175831-5900-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <4F6764B6.6050109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2012 09:45 AM, Arnd Bergmann wrote:
-> On Monday 19 March 2012, Stephen Warren wrote:
->>> Maybe one can use named properties in a new device node in that case,
->>> like this:
->>>
->>>       bus {
->>>               dma: dma-controller {
->>>                       #dma-cells = <1>;
->>>               };
->>>
->>>               device {
->>>                       compatible = "device";
->>>                       channel: dma-channel {
->>>                               type = <0x1>;
->>>                               name = "foo";
->>>                               number = <23>;
->>>                               direction = <3>;
->>>                       };
->>>                       dma-requests = <&dma &channel>;
->>>               };
->>>       };
->>
->> For reference, this is very similar to how the pinctrl bindings work,
->> except that they require the "channel" node to be a child of the DMA
->> controller, and hence "dma-requests" doesn't contain <&dma &channel>,
->> just <&channel>, since "dma" is the parent (or grand-parent) of "channel".
+On 03/19/2012 11:50 AM, Stephen Warren wrote:
+> Commit 6f6f6a7 "ARM: create a common IOMEM definition" moved macro
+> IOMEM(), and requires users to include <asm/assembler.h>. Fix Tegra's
+> sleep.S to do so.
 > 
-> Right, but the difference beytween the pinctrl binding and what I
-> describe here is that the channel description would be part of the
-> dma engine driver specific binding, not the generic binding that
-> is visible to device drivers.
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+>  arch/arm/mach-tegra/sleep.S |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+> index 8f9fde1..48cc7c6 100644
+> --- a/arch/arm/mach-tegra/sleep.S
+> +++ b/arch/arm/mach-tegra/sleep.S
+> @@ -22,7 +22,10 @@
+>   * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>   */
+>  
+> +#include <asm/assembler.h>
+> +
 
-That's actually true for pinctrl as well: Common pinctrl bindings cover
-the content/format of "dma-requests" and a requirement for a
-"dma-channel" node, whereas the per-pin-controller bindings define the
-content of node "dma-channel".
+Is there some reason you put this before linux/ include?
+
+>  #include <linux/linkage.h>
+> +
+>  #include <mach/io.h>
+>  #include <mach/iomap.h>
+>  
