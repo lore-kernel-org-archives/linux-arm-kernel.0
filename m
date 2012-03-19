@@ -1,25 +1,104 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 19 Mar 2012 13:56:54 +0000
-Subject: [PATCH v5 1/8] ASoC: fsl: separate SSI and DMA Kconfig options
-In-Reply-To: <1331888204-27058-2-git-send-email-shawn.guo@linaro.org>
-References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
- <1331888204-27058-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120319135654.GD3130@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Mar 2012 14:06:34 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <4F6734DD.3020203@atmel.com>
+References: <4F22DEF2.5000807@ti.com> <20120317094059.7C2333E08E2@localhost>
+ <4F6734DD.3020203@atmel.com>
+Message-ID: <201203191406.35064.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 04:56:37PM +0800, Shawn Guo wrote:
-> The fsl_ssi driver will possibly be shared between Freescale PowerPC
-> and ARM/IMX families, so give it a separate Kconfig option.  Then
-> fsl_ssi driver can possibly be selected independently from selecting
-> PowerPC DMA based PCM driver.
+On Monday 19 March 2012, Nicolas Ferre wrote:
+> > This _xlate is nearly useless as a generic API.  It solves the problem for
+> > the specific case where the driver is hard-coded to know which DMA engine
+> > to talk to, but since the returned data doesn't provide any context, it
+> > isn't useful if there are multiple DMA controllers to choose from.
+> 
+> You mean, if there is no DMA controller phandle specified in the
+> property? I think that it is not the purpose of this API to choose a DMA
+> controller, Nor to provide a channel. The only purpose of this API is to
+> give a HW request to be used by a DMA slave driver. This slave should
+> already have a channel to use and a controller to talk to.
 
-Applied all, thanks for doing all this work!  They'll have to wait for
-3.5 at this point sadly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120319/b4421d9d/attachment.sig>
+I don't think there is consensus on this point. I would expect that
+the device driver requests the channel with the same operation as
+passing the request data.
+
+Contrast the two ways this is done in atmel-mci.c and mmci.c:
+
+==== atmel ====
+/* interface between platform and driver */
+struct at_dma_slave {
+        struct device           *dma_dev;
+        dma_addr_t              tx_reg;
+        dma_addr_t              rx_reg;
+        enum at_dma_slave_width reg_width;
+        u32                     cfg;
+        u32                     ctrla;
+};
+struct mci_dma_data {
+        struct at_dma_slave     sdata;
+};
+#define slave_data_ptr(s)       (&(s)->sdata)
+#define find_slave_dev(s)       ((s)->sdata.dma_dev)
+
+/* in atmel-mci.c */
+static bool atmci_filter(struct dma_chan *chan, void *slave)
+{
+        struct mci_dma_data     *sl = slave;
+
+        if (sl && find_slave_dev(sl) == chan->device->dev) {
+                chan->private = slave_data_ptr(sl);
+                return true;
+        } else {
+                return false;
+        }
+}
+static bool atmci_configure_dma(struct atmel_mci *host)
+{
+	...
+	host->dma.chan = dma_request_channel(mask, atmci_filter, pdata->dma_slave);
+	...
+}
+
+==== mmci ====
+/* in drivers/dma/ste_dma40.c, others in pl330.c, coh901318.c, ... */
+bool stedma40_filter(struct dma_chan *chan, void *data)
+{               
+        struct stedma40_chan_cfg *info = data;
+        struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+        int err;                
+        
+        err = d40_validate_conf(d40c, info);
+        if (!err)
+                d40c->dma_cfg = *info;
+        d40c->configured = true;
+        
+        return err == 0;
+}
+EXPORT_SYMBOL(stedma40_filter);
+
+/* in mmci.h */
+struct mmci_platform_data {
+	...
+        bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+        void *dma_rx_param;
+        void *dma_tx_param;
+};
+
+/* in mmci.c */
+static void __devinit mmci_dma_setup(struct mmci_host *host)
+{
+	...
+        host->dma_rx_channel = dma_request_channel(mask, plat->dma_filter, plat->dma_rx_param);
+	...
+}
+
+====
+
+Whatever we come up with obviously needs to work with both drivers.
+I think we will end up with something closer to the second one, except
+that the dma parameters do not come from platform_data but from the
+#dma-request property, which also identifies the controller and channel.
+
+	Arnd
