@@ -1,34 +1,35 @@
 From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Mon, 19 Mar 2012 09:47:19 +0100
+Date: Mon, 19 Mar 2012 09:51:32 +0100
 Subject: [RFC/PATCH 4/4] pxa: convert to common clock framework
-In-Reply-To: <20120317160744.GE29317@pengutronix.de>
+In-Reply-To: <20120318054329.GA29638@S2101-09.ap.freescale.net>
 References: <1331919483.31118.23.camel@flow>
- <CAJOA=zN2dxgjQ8EZYAwE=OLO1GLdArqy1Xf18F82en9QvFi4cw@mail.gmail.com>
- <CA+gwMcdzHpGhLXXh5QTYid+rBtj8cGqFS9Te4QB3rpR9B8hXUw@mail.gmail.com>
- <20120317160744.GE29317@pengutronix.de>
-Message-ID: <CA+gwMceR=iPpt0Ca=nWEDuR3Y3yp=LTVOrRD--qO4QOnUwKUHA@mail.gmail.com>
+ <20120318054329.GA29638@S2101-09.ap.freescale.net>
+Message-ID: <CA+gwMcfcoQEcP4wsnkoy3djoUyih=J+wN-HFKV7ng-zhsaoR9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 17, 2012 at 5:07 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Sat, Mar 17, 2012 at 11:24:25AM +0100, Philipp Zabel wrote:
->> If there was a fixed fractional divider clk element, a lot of the
->> peripheral clocks could be derived from a fixed clk representing the
->> 312 MHz PPLL on PXA27x (fixed -> divider -> gate), using just the
->> basic clock templates.
+On Sun, Mar 18, 2012 at 6:43 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Your patch #2 is trying to avoid the layering violation by separating
+> static clock definitions and from clk_ops implementations into
+> different files. ?But ...
 >
-> You could try the following. It is not thoroughly tested but may be a
-> starting point. I need this aswell for i.MX so I will continue to work
-> on it soon.
+> On Fri, Mar 16, 2012 at 06:38:03PM +0100, Philipp Zabel wrote:
+> ...
+>> diff --git a/arch/arm/mach-pxa/clock.h b/arch/arm/mach-pxa/clock.h
+>> index a3585a2..7c04f9b 100644
+>> --- a/arch/arm/mach-pxa/clock.h
+>> +++ b/arch/arm/mach-pxa/clock.h
+>> @@ -1,80 +1,106 @@
+>> ?#include <linux/clkdev.h>
+>> +#include <linux/clk-private.h>
+>
+> ... This is what I read from clk-private.h.
 
-Thanks, this is exactly what I was looking for.
-
-I'm a bit wary of adding so many clocks that just represent fixed
-hardware, especially with the amount of function calls needed.
-But describing the clock tree correctly appeals to my sense of order.
-
-What is the take of the PXA maintainers on this?
-Are there maybe plans to add device tree support for PXA?
+Thank you.
+I could just remove that include line from clock.h, because it is only
+needed for the static clock definition macros.
+The pxa[23]?x.c, where they are used, already #include <clk-private.h> directly.
+Or, to do it properly, clock.h could also be split in two.
 
 regards
 Philipp
