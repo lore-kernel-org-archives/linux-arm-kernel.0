@@ -1,31 +1,42 @@
-From: gxt@pku.edu.cn (Guan Xueao)
-Date: Mon, 19 Mar 2012 17:05:35 +0800
-Subject: [PATCH] Kbuild: centralize MKIMAGE and cmd_uimage definitions
-In-Reply-To: <1331931835-12346-1-git-send-email-swarren@wwwdotorg.org>
-References: <1331931835-12346-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <4F66F6DF.8010609@pku.edu.cn>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 Mar 2012 11:08:36 +0200
+Subject: [PATCH v2 7/7] ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux
+ related functions as __init
+In-Reply-To: <1329997247-27342-8-git-send-email-rnayak@ti.com>
+References: <1329997247-27342-1-git-send-email-rnayak@ti.com>
+ <1329997247-27342-8-git-send-email-rnayak@ti.com>
+Message-ID: <1332148116.2144.1.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2012 05:03 AM, Stephen Warren wrote:
-> All ARCHs have the same definition of MKIMAGE. Move it to Makefile.lib
-> to avoid duplication.
->
-> All ARCHs have similar definitions of cmd_uimage. Place a sufficiently
-> parameterized version in Makefile.lib to avoid duplication.
->
-> Signed-off-by: Stephen Warren<swarren@wwwdotorg.org>
-> ---
-> v2:
-> * Fix blackfin's UIMAGE_LOADADDR in the ROMKERNEL case.
-> * Fix missing ) on a variable reference in avr32 and sparc.
-> * Only set those UIMAGE_* variables that the arch-specific Makefile hasn't
->    already set.
-> * The patch series is now just this single patch which removes duplication;
->    I've dropped the Kconfig feature to allow use of -T kernel_noload for
->    now, since it looks like U-Boot is gaining direct zImage support.
->
->
-Tested on unicore32.
+Hi,
 
-Tested-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
+On Thu, 2012-02-23 at 17:10 +0530, Rajendra Nayak wrote:
+> From: Tony Lindgren <tony@atomide.com>
+> 
+> Now that omap hsmmc init is split into two functions, it's safe
+> to mark omap_hsmmc_init and omap_mux related functions to __init.
+> 
+> This basically reverts the following fixes for the case where
+> TWL was compiled as a module:
+> 
+> a98f77b (ARM: omap: fix section mismatch warning for sdp3430_twl_gpio_setup())
+> 8930b4e (ARM: omap: fix section mismatch warnings in mux.c caused by hsmmc.c)
+> 
+> Additionally it fixes up the remaining section warnings for
+> all callers of omap_mux functions.
+
+I only now noticed this patch. This breaks DSI, as the DSI muxing
+functions are used during runtime and cannot be marked as __init.
+
+Shall I make a new patch for dss tree that fixes this?
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120319/b22db85d/attachment.sig>
