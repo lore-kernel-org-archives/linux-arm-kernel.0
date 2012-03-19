@@ -1,33 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Mar 2012 08:57:23 +0000
-Subject: ARM: fix build failure on ux500 in linux-next
-In-Reply-To: <CACRpkdYzS=wkfUU4gJLTp7djd6J20zVCC_6XhrjwoVpAoSe8iA@mail.gmail.com>
-References: <20120316211759.GA18829@windriver.com>
- <CACRpkdYzS=wkfUU4gJLTp7djd6J20zVCC_6XhrjwoVpAoSe8iA@mail.gmail.com>
-Message-ID: <201203190857.23489.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Mar 2012 10:00:27 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd tree
+In-Reply-To: <20120319174743.aff001d4f84e82cf4042277a@canb.auug.org.au>
+References: <20120319174743.aff001d4f84e82cf4042277a@canb.auug.org.au>
+Message-ID: <4F66F5AB.7020600@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 March 2012, Linus Walleij wrote:
-> On Fri, Mar 16, 2012 at 10:18 PM, Paul Gortmaker
-> <paul.gortmaker@windriver.com> wrote:
-> 
-> > When I 1st saw this build failure, I thought it was me, because of the
-> > BUG() stuff.  But git bisect claims it comes from the arm-soc tree?
-> 
-> Hm yeah looks like that, but we cannot see which commit
-> I guess, just that it's the merge from ARM SoC?
-> 
-> > In any case, the fix is trivial and self evident, regardless of where
-> > it came from.  I can carry it in my bug-3.4 cleanup tree if need be.
-> > Let me know if you want me to do that.
-> 
-> Any way that solves the issue is fine with me, maybe Arnd/Olof
-> wants to apply it to the ARM SoC tree rather? If they don't say
-> anything, by all means please keep it in cleanup.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-As Lee commented, it should be fixed already with Marc's fixup patch.
-Paul, if you still see it in some configuration on the today's linux-next,
-please let us know.
+On 03/19/2012 07:47 AM, Stephen Rothwell :
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in 
+> drivers/mtd/nand/atmel_nand.c between commit 4331c79c6895 ("mtd: do
+> not use plain 0 as NULL") from the l2-mtd tree and commit
+> d6a016616ba8 ("atmel/nand: add DT support") from the arm-soc tree.
+> 
+> The latter superceded the former, so I used that.
 
-	Arnd
+That is definitively the proper fix. Thanks Stephen.
+
+Best regards,
+- -- 
+Nicolas Ferre
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iQEcBAEBAgAGBQJPZvWlAAoJEAf03oE53VmQd0EIAKV1xC3F+fd6lvu3rKNyzUl0
+yfcvNtc9cFbwuR9A3cbeoCo6FbfdSpsT2eT8v+DZ5LDvPmJ9ln9jgqyldq+QfblU
+2KpyOWSLeLpG6ILky7Hlo4tjm1NA3GNZGLpyQ2Yln5r17zeTHqaCBeL+xHXOdgcM
+Uvrrix67AmnL91nF4QNPdOfKYnv2h+J2OWW6ukFBajQOMBIiVeddVL62qKYOvq0K
+QrgTa5D4cygvD0NUMTrrJ5GXjR+afAL7K5pk0Aab9C6pzgKGVredD5qSu/Zpbn8n
++aHXNyfqLQ9+7++a+hm6VNMTrMZxFo/MZoQZsigu7JkJ8lDTNhsaWkm3QqWl4c4=
+=6Y0V
+-----END PGP SIGNATURE-----
