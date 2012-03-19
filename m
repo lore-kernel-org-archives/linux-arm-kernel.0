@@ -1,45 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 16:06:51 -0600
-Subject: [PATCH 1/4 v7] pinctrl: introduce generic pin config
-In-Reply-To: <1331586859-15619-1-git-send-email-linus.walleij@stericsson.com>
-References: <1331586859-15619-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4F67ADFB.6000608@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Mar 2012 22:09:43 +0000
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator for
+ first instance
+In-Reply-To: <87mx7c5kzj.fsf@ti.com>
+References: <1331080771-30687-1-git-send-email-khilman@ti.com>
+ <201203192118.09286.arnd@arndb.de> <87mx7c5kzj.fsf@ti.com>
+Message-ID: <201203192209.43906.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2012 03:14 PM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Monday 19 March 2012, Kevin Hilman wrote:
+> > On Wednesday 07 March 2012, Kevin Hilman wrote:
+> >> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+> >> regulators) added regulators which are registered during
+> >> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
+> >> than one instance of the SMSC911x and result in attempting to register
+> >> the same regulator more than once which causes a panic().
+> >> 
+> >> Fix this by only registering the regulator when the platform_data id
+> >> field is zero, indicating its the first instance.
+> >> 
+> >> Cc: Matt Porter <mporter@ti.com>
+> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> >
+> > It seems that both Olof and I forgot to forward this one to Linus.
+> >
+> > If it's ok for you, I'll add it to the fixes branch for v3.4 now
+> > and mark it for backporting to v3.3-stable.
 > 
-> This is a split-off from the earlier patch set which adds generic
-> pin configuration for the pin controllers that want it. Since
-> we may have a system with mixed generic and custom pin controllers,
-> we pass a boolean in the pin controller ops vtable to indicate
-> if it is generic.
+> A slightly different version of this is already in linux-next as commit
+> bb60424af517d6e6148505fb5ef256caa91b5b43.
 > 
-> ChangeLog v1->v5:
-> - Follow parent patch versioning number system.
-> - Document the semantic meaning of return values from pin config
->   get functions, so we can iterate over pins and check their
->   properties from debugfs as part of the generic config code.
-> - Use proper cast functions in the generic debugfs pin config
->   file.
-> - Expand generic config to optionally cover groups too.
-> ChangeLog v5->v6:
-> - Update to match underlying changes.
-> ChangeLog v6->v7:
-> - Drop DRIVE_OFF parameter, use bias high impedance for this
-> - Delete argument for drive modes push-pull, od and os. These
->   are now just state transitions.
-> - Delete slew rate rising/falling due to discussions on on
->   proper semantics
-> - Drop config wakeup, struct irq_chip does this for now, add
->   back if need be.
-> - Set PIN_CONFIG_END to 0x7fff making room for custom config
->   parameters from 0x8000 and up.
-> - Prefix accessor functions with pinconf_
+> It was in your 'fixes' branch, and was merged by Olaf from Tony on 3/13:
+> Merge branch 'fix-smsc911x-regulator' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes
+> 
 
-I think this is probably workable. I'm still not totally convinced that
-it'll really turn out to be that "generic", but I guess we may as well
-try it and see, so:
+Yes, I know it's in linux-next because I found it in the fixes branch.
+That is the branch with stuff that should have gone into v3.3 :(
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Is the bb60424af version ok? If I add a stable at vger.kernel.org tag in
+there, it will obviously get a new changeset ID but I was not planning
+on changing the contents to the version from the mailing list in case
+that is different.
+
+	Arnd
