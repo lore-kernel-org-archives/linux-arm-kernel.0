@@ -1,23 +1,36 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Mon, 19 Mar 2012 16:29:40 -0500
-Subject: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to
- add IVA OPP
-In-Reply-To: <87sjh45ljs.fsf@ti.com>
-References: <8762e6et1u.fsf@ti.com>
- <5448984682E7954C9BFF27F747A9C6CA56D6A8@dolphin.TIGRIS.local>
- <20120316142034.GA22234@senorita.am.dhcp.ti.com> <87sjh45ljs.fsf@ti.com>
-Message-ID: <CAOMWX4cXwppGu_P2csWYtHJazpRNDz0W7xQcfyAcwqJ7SJodDA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Mar 2012 21:30:13 +0000
+Subject: [PATCH] USB: gadget driver for LPC32xx
+In-Reply-To: <1332191930-2433-1-git-send-email-stigge@antcom.de>
+References: <1332191930-2433-1-git-send-email-stigge@antcom.de>
+Message-ID: <201203192130.13583.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
-[...]
-> Nishanth, can you collect the acks/tested-bys and repost and official
-> patch.
->
-> I'll queue this up.
-Thanks. This is already done:
-http://marc.info/?l=linux-omap&m=133191481703750&w=2
+On Monday 19 March 2012, Roland Stigge wrote:
+> This patch adds a USB gadget driver.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> ---
+> 
+> Applies to v3.3
+> 
+> 
+>  drivers/usb/gadget/Kconfig        |   10 
+>  drivers/usb/gadget/Makefile       |    1 
+>  drivers/usb/gadget/gadget_chips.h |    3 
+>  drivers/usb/gadget/lpc32xx_udc.c  | 3598 ++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 3612 insertions(+)
 
-Regards,
-Nishanth Menon
+Hi Roland,
+
+There is already a driver for the isp1301 otg part in the kernel, I don't
+think we want to add another one.
+
+>From what I can tell, this shares a common ancestry with the omap version
+but has diverged quite a bit. The best solution would really be to
+bring the two back together and let them share a common base driver,
+with the lpc32xx and omap specific bits in another file.
+
+	Arnd
