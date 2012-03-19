@@ -1,91 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 14:09:52 -0600
-Subject: [PATCH] ARM: tegra: Fix device tree AUXDATA for USB/EHCI
-Message-ID: <1332187792-14651-1-git-send-email-swarren@wwwdotorg.org>
+From: michael.hope@linaro.org (Michael Hope)
+Date: Tue, 20 Mar 2012 09:11:51 +1300
+Subject: [PATCH] ARM: lib: use LDRD/STRD for data copy
+In-Reply-To: <4F6760A5.9040506@gmail.com>
+References: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
+ <20120319085503.GL15988@n2100.arm.linux.org.uk> <4F674479.8090101@gmail.com>
+ <20120319154123.GP15988@n2100.arm.linux.org.uk> <4F6760A5.9040506@gmail.com>
+Message-ID: <CANLjY-mFsDr+cizJWVRxGFpoS2RyGiEZd=UUSeR3_u1DRVpSoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4a53f4e "USB: ehci-tegra: add probing through device tree" added
-AUXDATA for Tegra's USB/EHCI controller. However, it pointed the platform
-data at a location containing the address of the intended platform data,
-rather than the platform data itself. This change fixes that.
+On 20 March 2012 05:36, Rob Herring <robherring2@gmail.com> wrote:
+> On 03/19/2012 10:41 AM, Russell King - ARM Linux wrote:
+>> On Mon, Mar 19, 2012 at 09:36:41AM -0500, Rob Herring wrote:
+>>> On 03/19/2012 03:55 AM, Russell King - ARM Linux wrote:
+>>>> On Mon, Mar 19, 2012 at 04:02:48PM +0900, Boojin Kim wrote:
+>>>>> This patch uses LDRD/STRD that loads and stores data as DWORD unit
+>>>>> for the copy of 8-words data.
+>>>>> It brings better performance than LDRM/STRM that was used originally.
+>>>>
+>>>> And what about CPUs that don't have ldrd/strd ?
+>>>>
+>>>
+>>> And what about CPUs that do have ldrd/strd but is slower than ldm/stm?
+>>> I'm pretty sure that is almost everything currently out there.
+>>
+>> The double-word load/stores were introduced in ARMv6. ?Some Intel based
+>> CPUs prior to this have the support as well. ?Everything else doesn't.
+>>
+>> So taht's nowhere close to 'almost everything'.
+>
+> I meant of all platforms that support both instructions, ldm/stm will be
+> faster than ldrd/strd on almost all of them AFAIK. I don't think the
+> claim about being faster is true for an CortexA9 or anything prior.
+> Linaro folks have done some benchmarking in this area and would be
+> better to comment.
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-Cc: <stable@vger.kernel.org> # 3.3
----
- arch/arm/mach-tegra/board-dt-tegra20.c |    6 +++---
- arch/arm/mach-tegra/devices.c          |    7 +++----
- arch/arm/mach-tegra/devices.h          |    5 +++++
- 3 files changed, 11 insertions(+), 7 deletions(-)
+My understanding is that the A15 does well with LDRD and poorly with
+LDM, all other cores do well with LDM, and the A9 at least does poorly
+with LDRD.  I don't have numbers at hand to back it up.
 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index e20b419..0952494 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -68,11 +68,11 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra-i2s.1", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-das", TEGRA_APB_MISC_DAS_BASE, "tegra-das", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB_BASE, "tegra-ehci.0",
--		       &tegra_ehci1_device.dev.platform_data),
-+		       &tegra_ehci1_pdata),
- 	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB2_BASE, "tegra-ehci.1",
--		       &tegra_ehci2_device.dev.platform_data),
-+		       &tegra_ehci2_pdata),
- 	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB3_BASE, "tegra-ehci.2",
--		       &tegra_ehci3_device.dev.platform_data),
-+		       &tegra_ehci3_pdata),
- 	{}
- };
- 
-diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
-index 7a2a02d..5f6b867 100644
---- a/arch/arm/mach-tegra/devices.c
-+++ b/arch/arm/mach-tegra/devices.c
-@@ -23,7 +23,6 @@
- #include <linux/fsl_devices.h>
- #include <linux/serial_8250.h>
- #include <linux/i2c-tegra.h>
--#include <linux/platform_data/tegra_usb.h>
- #include <asm/pmu.h>
- #include <mach/irqs.h>
- #include <mach/iomap.h>
-@@ -446,18 +445,18 @@ static struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
- 	.clk = "cdev2",
- };
- 
--static struct tegra_ehci_platform_data tegra_ehci1_pdata = {
-+struct tegra_ehci_platform_data tegra_ehci1_pdata = {
- 	.operating_mode = TEGRA_USB_OTG,
- 	.power_down_on_bus_suspend = 1,
- };
- 
--static struct tegra_ehci_platform_data tegra_ehci2_pdata = {
-+struct tegra_ehci_platform_data tegra_ehci2_pdata = {
- 	.phy_config = &tegra_ehci2_ulpi_phy_config,
- 	.operating_mode = TEGRA_USB_HOST,
- 	.power_down_on_bus_suspend = 1,
- };
- 
--static struct tegra_ehci_platform_data tegra_ehci3_pdata = {
-+struct tegra_ehci_platform_data tegra_ehci3_pdata = {
- 	.operating_mode = TEGRA_USB_HOST,
- 	.power_down_on_bus_suspend = 1,
- };
-diff --git a/arch/arm/mach-tegra/devices.h b/arch/arm/mach-tegra/devices.h
-index 873ecb2..ec45567 100644
---- a/arch/arm/mach-tegra/devices.h
-+++ b/arch/arm/mach-tegra/devices.h
-@@ -20,6 +20,11 @@
- #define __MACH_TEGRA_DEVICES_H
- 
- #include <linux/platform_device.h>
-+#include <linux/platform_data/tegra_usb.h>
-+
-+extern struct tegra_ehci_platform_data tegra_ehci1_pdata;
-+extern struct tegra_ehci_platform_data tegra_ehci2_pdata;
-+extern struct tegra_ehci_platform_data tegra_ehci3_pdata;
- 
- extern struct platform_device tegra_gpio_device;
- extern struct platform_device tegra_pinmux_device;
--- 
-1.7.0.4
+FYI, here's ARM's Cortex-A15 LDRD based memcpy implementation:
+ http://sourceware.org/ml/newlib/2011/msg00469.html
+
+-- Michael
