@@ -1,27 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Mar 2012 15:41:23 +0000
-Subject: [PATCH] ARM: lib: use LDRD/STRD for data copy
-In-Reply-To: <4F674479.8090101@gmail.com>
-References: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
- <20120319085503.GL15988@n2100.arm.linux.org.uk> <4F674479.8090101@gmail.com>
-Message-ID: <20120319154123.GP15988@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Mar 2012 15:45:40 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <4F674BC4.2070802@wwwdotorg.org>
+References: <4F22DEF2.5000807@ti.com> <201203191501.10232.arnd@arndb.de>
+ <4F674BC4.2070802@wwwdotorg.org>
+Message-ID: <201203191545.40933.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2012 at 09:36:41AM -0500, Rob Herring wrote:
-> On 03/19/2012 03:55 AM, Russell King - ARM Linux wrote:
-> > On Mon, Mar 19, 2012 at 04:02:48PM +0900, Boojin Kim wrote:
-> >> This patch uses LDRD/STRD that loads and stores data as DWORD unit
-> >> for the copy of 8-words data.
-> >> It brings better performance than LDRM/STRM that was used originally.
+On Monday 19 March 2012, Stephen Warren wrote:
+> > Maybe one can use named properties in a new device node in that case,
+> > like this:
 > > 
-> > And what about CPUs that don't have ldrd/strd ?
+> >       bus {
+> >               dma: dma-controller {
+> >                       #dma-cells = <1>;
+> >               };
 > > 
+> >               device {
+> >                       compatible = "device";
+> >                       channel: dma-channel {
+> >                               type = <0x1>;
+> >                               name = "foo";
+> >                               number = <23>;
+> >                               direction = <3>;
+> >                       };
+> >                       dma-requests = <&dma &channel>;
+> >               };
+> >       };
 > 
-> And what about CPUs that do have ldrd/strd but is slower than ldm/stm?
-> I'm pretty sure that is almost everything currently out there.
+> For reference, this is very similar to how the pinctrl bindings work,
+> except that they require the "channel" node to be a child of the DMA
+> controller, and hence "dma-requests" doesn't contain <&dma &channel>,
+> just <&channel>, since "dma" is the parent (or grand-parent) of "channel".
 
-The double-word load/stores were introduced in ARMv6.  Some Intel based
-CPUs prior to this have the support as well.  Everything else doesn't.
+Right, but the difference beytween the pinctrl binding and what I
+describe here is that the channel description would be part of the
+dma engine driver specific binding, not the generic binding that
+is visible to device drivers.
 
-So taht's nowhere close to 'almost everything'.
+As I said, one dmaengine could use a phandle while another one could
+just use a single number or nothing at all. If it chooses to use
+a phandle (or possible a combination of phandle and number), the
+binding could mandate for the device node to be either a child of the
+dma controller or the device using it. In either case it would be
+sensible to do it the same way for all dmaengine drivers that want
+to have a phandle in the argument.
+
+	Arnd
