@@ -1,31 +1,127 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 11:36:00 -0600
-Subject: [PATCH] gpio: tegra: tegra_gpio_config shouldn't be __init
-Message-ID: <1332178560-15658-1-git-send-email-swarren@wwwdotorg.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 19 Mar 2012 18:49:18 +0100
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <4F675F64.6070306@atmel.com>
+References: <4F22DEF2.5000807@ti.com> <20120317094059.7C2333E08E2@localhost>
+ <4F6734DD.3020203@atmel.com> <201203191406.35064.arnd@arndb.de>
+ <20120319153334.GF16389@n2100.arm.linux.org.uk> <4F675F64.6070306@atmel.com>
+Message-ID: <4F67719E.7040403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is called from non-__init context, just like
-tegra_gpio_enable()/disable(). Remove the __init annotation to avoid
-section mismatch warnings during compile.
+Hi Nico,
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
----
- drivers/gpio/gpio-tegra.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On 3/19/2012 5:31 PM, Nicolas Ferre wrote:
+> On 03/19/2012 04:33 PM, Russell King - ARM Linux :
+>> On Mon, Mar 19, 2012 at 02:06:34PM +0000, Arnd Bergmann wrote:
+>>> ==== mmci ====
+>>> /* in drivers/dma/ste_dma40.c, others in pl330.c, coh901318.c, ... */
+>>> bool stedma40_filter(struct dma_chan *chan, void *data)
+>>> {
+>>>          struct stedma40_chan_cfg *info = data;
+>>>          struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+>>>          int err;
+>>>
+>>>          err = d40_validate_conf(d40c, info);
+>>>          if (!err)
+>>>                  d40c->dma_cfg = *info;
+>>>          d40c->configured = true;
+>>>
+>>>          return err == 0;
+>>> }
+>>> EXPORT_SYMBOL(stedma40_filter);
+>>>
+>>> /* in mmci.h */
+>>> struct mmci_platform_data {
+>>> 	...
+>>>          bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+>>>          void *dma_rx_param;
+>>>          void *dma_tx_param;
+>>> };
+>>>
+>>> /* in mmci.c */
+>>> static void __devinit mmci_dma_setup(struct mmci_host *host)
+>>> {
+>>> 	...
+>>>          host->dma_rx_channel = dma_request_channel(mask, plat->dma_filter, plat->dma_rx_param);
+>>> 	...
+>>> }
+>>>
+>>> ====
+>>>
+>>> Whatever we come up with obviously needs to work with both drivers.
+>>> I think we will end up with something closer to the second one, except
+>>> that the dma parameters do not come from platform_data but from the
+>>> #dma-request property, which also identifies the controller and channel.
+>>
+>> Firstly, define what you mean by "the DMA parameters".  Things like burst
+>> size, register width, register address?  That should all be known by the
+>> peripheral driver and _not_ be encoded into DT in any way - and this
+>> information should be passed to the DMA engine driver for the well defined
+>> API for that purpose.
+>>
+>> Secondly, there are platforms (Samsung) where peripherals are connected
+>> to more than one DMA controller, and either DMA controller can be used -
+>> I'm told by Jassi that there's reasons why you'd want to select one or
+>> other as the target at runtime.
+>>
+>> Whether it's appropriate for DT to know that or not, I'm not certain at
+>> the moment - I suspect the _right_ solution would be a radical DMA engine
+>> redesign which moves _all_ slave DMA to a virtual channel representation,
+>> and for the virtual channels to be scheduled onto a set of physical DMA
+>> channels over a range of DMA devices.  Obviously, there's restrictions on
+>> which virtual channels could be scheduled onto which physical channels of
+>> which DMA devices.
+>
+> OMG! the dmaengine drivers are already not so obvious to understand. I
+> fear that trying to mimic some special behaviors within relatively
+> simple dmaengine drivers will bring confusion and prevent people to
+> read/contribute and fix those simple ones...
+>
+>> It seems to me, therefore, that any attempt to come up with some kind of
+>> DT based representation of the current scheme is doomed to fail, and will
+>> at some point become obsolete.
+>>
+>> I think instead, rather than trying to fix this now, we persist with what
+>> we have, but organize an effort to clean up and restructure the DMA engine
+>> code so that:
+>>
+>> (a) things like the Samsung, and ARM board oddities can be easily dealt
+>>   with in a driver independent manner.
+>> (b) get rid of all the duplicated functionality between each different
+>>   DMA engine implementation, separating this out into core code, and
+>>   simplifying the drivers.
+>>
+>> The _big_ problem I see is that if we try to represent the existing
+>> solution in DT, we're going to get locked into that way of doing things
+>> and then any major restructuring of the DMA engine stuff will become an
+>> impossibility - especially if we start specifying things by DMA request
+>> signal numbers on DMA engines.
+>
+> Even if I understand your point, I wonder what is the solution for us
+> that have a pretty simple representation of *hardware* to code into DT:
+> should we wait for a big rework? Should we go for a private DMA binding
+> for each of us that have just the need for a quite simple representation?
+>
+> I must say that I am puzzled by recent discussion on the topic (mix of
+> "channel" and "request" notions, plan for a complete rework of dmaengine
+> that can delay DT representation of DMA slave-controller relationship,
+> even my own doubts on the "void *" output parameter, etc.). It seems
+> that I am not familiar with all those cases and that I cannot go further
+> with a generic DT representation...
 
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 636be99..32de670 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -461,7 +461,7 @@ static int __init tegra_gpio_init(void)
- }
- postcore_initcall(tegra_gpio_init);
- 
--void __init tegra_gpio_config(struct tegra_gpio_table *table, int num)
-+void tegra_gpio_config(struct tegra_gpio_table *table, int num)
- {
- 	int i;
- 
--- 
-1.7.0.4
+I do agree that it appears that some DMA controllers are way more 
+complex that the one we were trying to support.
+On OMAP, the DMA channels and the DMA requests are completely 
+orthogonal, and thus I do not have to provide any information about the 
+channel in the DT binding since the SW can affect any request to any 
+channel.
+Reading the various points from Russell and Arnd, it seems that this is 
+not always the case :-(
+I guess this is probably the main cause of confusion in this discussion.
+
+So I do not know either how we can progress further on that without a 
+clear understanding of what all these DMA controllers are capable of.
+
+Regards,
+Benoit
