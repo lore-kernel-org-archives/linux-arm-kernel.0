@@ -1,29 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Mar 2012 21:09:00 +0000
-Subject: [PATCH] ARM: tegra: update main repo and add patchwork
-In-Reply-To: <1332092651-25346-1-git-send-email-olof@lixom.net>
-References: <1332092651-25346-1-git-send-email-olof@lixom.net>
-Message-ID: <201203192109.00862.arnd@arndb.de>
+Date: Mon, 19 Mar 2012 21:18:09 +0000
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator for
+ first instance
+In-Reply-To: <1331080771-30687-1-git-send-email-khilman@ti.com>
+References: <1331080771-30687-1-git-send-email-khilman@ti.com>
+Message-ID: <201203192118.09286.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 March 2012, Olof Johansson wrote:
-> Stephen is taking over the main tegra repo, so change the entry to point at his tree on kernel.org
+On Wednesday 07 March 2012, Kevin Hilman wrote:
+> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+> regulators) added regulators which are registered during
+> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
+> than one instance of the SMSC911x and result in attempting to register
+> the same regulator more than once which causes a panic().
 > 
-> Also, document the patchwork URL.
+> Fix this by only registering the regulator when the platform_data id
+> field is zero, indicating its the first instance.
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-> 
-> 
-> Arnd, I applied the previous Tegra maintainer patch to next/maintainers
-> directly, so this should just go on top of there.
+> Cc: Matt Porter <mporter@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
-Hi Olof,
+It seems that both Olof and I forgot to forward this one to Linus.
 
-I've applied all four trivial pull requests now, the dt ones ended up on the next/dt2
-branch and will be sent together with the other late dt patches, which meant that
-I also had to pull in the previous tegra/dt patches into both next/dt2 in addition
-to next/dt.
+If it's ok for you, I'll add it to the fixes branch for v3.4 now
+and mark it for backporting to v3.3-stable.
+
+Sorry for the inconvenience.
+
 
 	Arnd
