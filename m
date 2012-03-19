@@ -1,52 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 19 Mar 2012 13:38:04 +0800
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <4F6403CD.8020509@codeaurora.org>
-References: <1330763341-3437-4-git-send-email-mturquette@linaro.org>
- <20120303133158.GA26882@pengutronix.de>
- <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
- <20120304115201.GB26882@pengutronix.de>
- <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
- <20120305073836.GU3852@pengutronix.de>
- <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
- <20120306190039.GJ3852@pengutronix.de>
- <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
- <4F6403CD.8020509@codeaurora.org>
-Message-ID: <20120319053801.GB31410@S2101-09.ap.freescale.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 19 Mar 2012 07:46:10 +0100
+Subject: [PATCH] Kbuild: centralize MKIMAGE and cmd_uimage definitions
+In-Reply-To: <1331931835-12346-1-git-send-email-swarren@wwwdotorg.org>
+References: <1331931835-12346-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <4F66D632.5070107@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2012 at 08:23:57PM -0700, Saravana Kannan wrote:
-...
-> Hi Mike,
+Stephen Warren wrote:
+> All ARCHs have the same definition of MKIMAGE. Move it to Makefile.lib
+> to avoid duplication.
 > 
-> I already took a quick look at the v7 series, but I thought this
-> thread has more relevant context for my response. So, responding
-> here.
+> All ARCHs have similar definitions of cmd_uimage. Place a sufficiently
+> parameterized version in Makefile.lib to avoid duplication.
 > 
-> I'm with Sascha on creating a clk_internal/clk_initializer and
-> removing clk_hw. You had asked about the benefits of his suggestion
-> in one of the earlier threads. I'm sure I have told some of these
-> reasons I don't like clk_hw, but repeating my points here for others
-> to chime in.
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+> v2:
+> * Fix blackfin's UIMAGE_LOADADDR in the ROMKERNEL case.
+> * Fix missing ) on a variable reference in avr32 and sparc.
+> * Only set those UIMAGE_* variables that the arch-specific Makefile hasn't
+>   already set.
+> * The patch series is now just this single patch which removes duplication;
+>   I've dropped the Kconfig feature to allow use of -T kernel_noload for
+>   now, since it looks like U-Boot is gaining direct zImage support.
 > 
-> I used to be a huge proponent for using macros for clocks in our
-> internal tree. All the clocks were constructed using macros (you
-> will see it in the history of tree we publish in CAF). They quickly
-> became unreadable when you have several hundreds of clocks. The
-> biggest problem is that you can't quickly look at a clock's macro
-> and figure out what the register offset or bit mask or shift value
-> is. Our eyes/brains aren't meant for quickly parsing the commas and
-> finding the n-th field or even remembering what the n-th field of
-> each macro corresponds to. If it's actually broken out as fields in
-> a struct, it's much easier to read. So, long story short, I think
-> the well-intentioned helper macros will make code quite unreadable.
-> 
-While I second the idea of clk_initializer, using macros is not really
-the thing to complain.  You can save using those macro helpers by
-calling APIs clk_register_*().  But that does not solve the problem,
-because those APIs also have a long argument list to fill.
+>  arch/arm/boot/Makefile          |   23 +++++++++--------------
+>  arch/avr32/boot/images/Makefile |    9 +++------
+>  arch/blackfin/boot/Makefile     |   19 ++++++++-----------
+>  arch/microblaze/boot/Makefile   |   10 +++-------
+>  arch/sh/boot/Makefile           |    8 ++------
+>  arch/sparc/boot/Makefile        |    9 +++------
+>  arch/unicore32/boot/Makefile    |   12 ++----------
+>  scripts/Makefile.lib            |   24 ++++++++++++++++++++++++
+>  8 files changed, 54 insertions(+), 60 deletions(-)
+
+No problem for Microblaze.
+
+Tested-by: Michal Simek <monstr@monstr.eu>
+
+Thanks,
+Michal
+
 
 -- 
-Regards,
-Shawn
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
