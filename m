@@ -1,104 +1,82 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 19 Mar 2012 16:58:52 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Mar 2012 16:11:58 +0000
 Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <20120319152059.GE16389@n2100.arm.linux.org.uk>
-References: <4F22DEF2.5000807@ti.com>
- <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
- <20120317094059.7C2333E08E2@localhost> <201203182013.22790.arnd@arndb.de>
- <4F6736B4.4090509@atmel.com> <20120319152059.GE16389@n2100.arm.linux.org.uk>
-Message-ID: <4F6757BC.50408@ti.com>
+In-Reply-To: <20120319153334.GF16389@n2100.arm.linux.org.uk>
+References: <4F22DEF2.5000807@ti.com> <201203191406.35064.arnd@arndb.de>
+ <20120319153334.GF16389@n2100.arm.linux.org.uk>
+Message-ID: <201203191611.59064.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/19/2012 4:20 PM, Russell King - ARM Linux wrote:
-> On Mon, Mar 19, 2012 at 02:37:56PM +0100, Nicolas Ferre wrote:
->> On 03/18/2012 09:13 PM, Arnd Bergmann :
->>> On Saturday 17 March 2012, Grant Likely wrote:
->>>>> +static LIST_HEAD(of_dma_list);
->>>>> +
->>>>> +struct of_dma {
->>>>> +     struct list_head of_dma_controllers;
->>>>> +     struct device_node *of_node;
->>>>> +     int of_dma_n_cells;
->>>>> +     int (*of_dma_xlate)(struct of_phandle_args *dma_spec, void *data);
->>>>> +};
->>>>
->>>> This _xlate is nearly useless as a generic API.  It solves the problem for
->>>> the specific case where the driver is hard-coded to know which DMA engine
->>>> to talk to, but since the returned data doesn't provide any context, it
->>>> isn't useful if there are multiple DMA controllers to choose from.
->>>>
->>>> The void *data pointer must be replaced with a typed structure so that
->>>> context can be returned.
->>>
->>> I've read up a bit more on how the existing drivers use the filter
->>> functions, it seems there are multiple classes of them, the classes
->>> that I've encountered are:
->>>
->>> 1. matches on chan->device pointer and/or chan_id
->>
->> I have the impression that we are now talking about *channel* selection.
->> It is not the purpose of those helper functions. It is just to retrieve
->> a *request line* for a particular slave interface.
->
-> The request line on what though?  The DMA controller, or something
-> else?
+On Monday 19 March 2012, Russell King - ARM Linux wrote:
+> Firstly, define what you mean by "the DMA parameters".  Things like burst
+> size, register width, register address?  That should all be known by the
+> peripheral driver and not be encoded into DT in any way - and this
+> information should be passed to the DMA engine driver for the well defined
+> API for that purpose.
 
-The idea is just to represent the request line from the IP to the DMA 
-controller. This is exactly the same pattern than for the IRQ line 
-toward the IRQ controller.
+This seems to be different for each controller, I tried to use
+a generic term here. In case of stedma40 (which is probably the most
+complex one today), it would be this structure:
 
-> The reason I ask is because on ARM boards, the DMA controller has N
-> request lines.  Three of those request lines are multiplexed in an
-> external FPGA to select between N different peripherals.
->
-> For example, the UART and MMCI may be routed to the FPGA multiplexer,
-> and either could be routed to DMA controller request signal 0, 1, or 2,
-> whereas a different UART might be routed directly to DMA controller
-> request signal 3 and 4.
->
-> At the moment, we handle this via platform data and callbacks passed
-> into the PL080 DMA driver, by matching virtual DMA channels based upon
-> strings looked up in the platform data.  This gives the range of
-> DMA request signal numbers on the controller, and calls a platform
-> provided function to setup the multiplexer.
->
-> Clearly, if your proposal is all about DMA controller request signals
-> only, the above scheme can't be represented in DT...
+struct stedma40_chan_cfg {
+        enum stedma40_xfer_dir                   dir;
+        bool                                     high_priority;
+        bool                                     realtime;
+        enum stedma40_mode                       mode;
+        enum stedma40_mode_opt                   mode_opt;
+        int                                      src_dev_type;
+        int                                      dst_dev_type;
+        struct stedma40_half_channel_info        src_info;
+        struct stedma40_half_channel_info        dst_info;
 
-Yes, this is the goal. I guess in your case you do need some DMA nexus 
-node like DT is already providing for the IRQ. But you still should be 
-able to describe how the HW blocks are interconnected.
+        bool                                     use_fixed_channel; 
+        int                                      phy_channel;
+};
 
-> and that's what
-> worries me - the fact is that the DMA engine API can and does cope
-> with this but it seems that we're building restrictions in with DT on
-> what can be represented.
+All these fields are set up by the platform code today, not by
+the device driver, so it would be logical to have them represented
+in the device tree, though some of the fields might turn out to
+be in the wrong place already.
 
-But then you are mixing the SW representation and the HW one. DMAengine 
-is the Linux way of managing DMA channel. DT is supposed to be OS 
-agnostic and just describe the HW.
-So you cannot take into account some DMAengine specificity to define the 
-DT binding. At least in theory.
+> Secondly, there are platforms (Samsung) where peripherals are connected
+> to more than one DMA controller, and either DMA controller can be used -
+> I'm told by Jassi that there's reasons why you'd want to select one or
+> other as the target at runtime.
 
-> That makes me wonder whether the model that's being chosen is anywhere
-> near correct for the DMA engine API.
+How common is that? If there are only a few drivers that have this
+requirement, we could have this represented in the driver binding, by
+listing multiple channels and giving the device the choice.
 
-That's not the goal. The goal is to describe how the DMA request lines 
-are connected from the IP to the controller.
+A possible way to deal with this is to list all the alternatives
+in the device tree and using the dma-names property to name them,
+giving the same name to those that we need to pick one of.
 
-> Now, as I've said before, I'm trying to work on creating an OMAP DMA engine
-> implementation, and I'd _really_ like to have the freedom to do what's
-> necessary there without having to think one bit about DT getting in the
-> way.  To put it another way, I don't want to be constrained by any weirdo
-> DT representations at the moment, and I really don't want to waste time
-> discussing them at the moment, rather than getting on with that job.
-> Because if I end up discussing this at length, I'm not going to be able
-> to do anything on the OMAP DMA engine stuff.
+> I think instead, rather than trying to fix this now, we persist with what
+> we have, but organize an effort to clean up and restructure the DMA engine
+> code so that:
+> 
+> (a) things like the Samsung, and ARM board oddities can be easily dealt
+>  with in a driver independent manner.
+> (b) get rid of all the duplicated functionality between each different
+>  DMA engine implementation, separating this out into core code, and
+>  simplifying the drivers.
 
-The current way of representing the DMA requests for OMAP SDMA is pretty 
-straightforward and fit well with the current binding. It looks to me 
-that this is the ARM boards that will be tricky to handle.
+At that point, we definitely need to involve the dmaenigne maintainers
+who have unfortunately not been on Cc for the whole discussion so
+far.
 
-Regards,
-Benoit
+I actually hope that a lot of the issues go away if we come up with
+good device tree bindings that can cover the existing corner cases
+while providing a simple interface for device drivers to use.
+
+> The big problem I see is that if we try to represent the existing
+> solution in DT, we're going to get locked into that way of doing things
+> and then any major restructuring of the DMA engine stuff will become an
+> impossibility - especially if we start specifying things by DMA request
+> signal numbers on DMA engines.
+
+Note that Thomas Abraham has already introduced a DT support for
+pl330, which is sadly seems to be anything but generic.
+
+	Arnd
