@@ -1,9 +1,9 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Mar 2012 14:36:05 +0100
-Subject: [PATCH 7/8] ARM i.MX25: implement clocks using common clock framework
+Date: Mon, 19 Mar 2012 14:36:04 +0100
+Subject: [PATCH 6/8] ARM i.MX21: implement clocks using common clock framework
 In-Reply-To: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
 References: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1332164166-6055-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1332164166-6055-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,41 +11,41 @@ Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
  arch/arm/mach-imx/Kconfig     |    1 +
  arch/arm/mach-imx/Makefile    |    2 +-
- arch/arm/mach-imx/clk-imx25.c |  242 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 244 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-imx/clk-imx25.c
+ arch/arm/mach-imx/clk-imx21.c |  177 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 179 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-imx/clk-imx21.c
 
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 8b4b4e3..4623865 100644
+index 4cd86fb..8b4b4e3 100644
 --- a/arch/arm/mach-imx/Kconfig
 +++ b/arch/arm/mach-imx/Kconfig
-@@ -59,6 +59,7 @@ config SOC_IMX25
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V2
- 	select ARCH_MXC_IOMUX_V3
+@@ -46,6 +46,7 @@ config SOC_IMX1
+ config SOC_IMX21
+ 	bool
+ 	select MACH_MX21
 +	select COMMON_CLK
- 	select MXC_AVIC
- 
- config SOC_IMX27
+ 	select CPU_ARM926T
+ 	select ARCH_MXC_AUDMUX_V1
+ 	select IMX_HAVE_DMA_V1
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 0a0bd05..d96e2ce 100644
+index cec4843..0a0bd05 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -3,7 +3,7 @@ obj-$(CONFIG_IMX_HAVE_DMA_V1) += dma-v1.o
+@@ -1,7 +1,7 @@
+ obj-$(CONFIG_IMX_HAVE_DMA_V1) += dma-v1.o
+ 
  obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
- obj-$(CONFIG_SOC_IMX21) += clk-imx21.o mm-imx21.o
+-obj-$(CONFIG_SOC_IMX21) += clock-imx21.o mm-imx21.o
++obj-$(CONFIG_SOC_IMX21) += clk-imx21.o mm-imx21.o
  
--obj-$(CONFIG_SOC_IMX25) += clock-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
-+obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
+ obj-$(CONFIG_SOC_IMX25) += clock-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
  
- obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
- obj-$(CONFIG_SOC_IMX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
 new file mode 100644
-index 0000000..d617b14
+index 0000000..0807965
 --- /dev/null
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -0,0 +1,242 @@
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -0,0 +1,177 @@
 +/*
 + * Copyright 2012 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
 + *
@@ -60,47 +60,40 @@ index 0000000..d617b14
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
++ * Foundation.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/list.h>
 +#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
 +#include <linux/io.h>
++#include <linux/module.h>
 +#include <linux/clkdev.h>
 +
 +#include <mach/hardware.h>
 +#include <mach/common.h>
-+#include <mach/mx25.h>
 +#include "clk.h"
 +
-+#define CRM_BASE	MX25_IO_ADDRESS(MX25_CRM_BASE_ADDR)
++#define IO_ADDR_CCM(off)	(MX21_IO_ADDRESS(MX21_CCM_BASE_ADDR + (off)))
 +
-+#define CCM_MPCTL	0x00
-+#define CCM_UPCTL	0x04
-+#define CCM_CCTL	0x08
-+#define CCM_CGCR0	0x0C
-+#define CCM_CGCR1	0x10
-+#define CCM_CGCR2	0x14
-+#define CCM_PCDR0	0x18
-+#define CCM_PCDR1	0x1C
-+#define CCM_PCDR2	0x20
-+#define CCM_PCDR3	0x24
-+#define CCM_RCSR	0x28
-+#define CCM_CRDR	0x2C
-+#define CCM_DCVR0	0x30
-+#define CCM_DCVR1	0x34
-+#define CCM_DCVR2	0x38
-+#define CCM_DCVR3	0x3c
-+#define CCM_LTR0	0x40
-+#define CCM_LTR1	0x44
-+#define CCM_LTR2	0x48
-+#define CCM_LTR3	0x4c
-+#define CCM_MCR		0x64
++/* Register offsets */
++#define CCM_CSCR		IO_ADDR_CCM(0x0)
++#define CCM_MPCTL0		IO_ADDR_CCM(0x4)
++#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
++#define CCM_SPCTL0		IO_ADDR_CCM(0xc)
++#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
++#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
++#define CCM_PCDR0		IO_ADDR_CCM(0x18)
++#define CCM_PCDR1		IO_ADDR_CCM(0x1c)
++#define CCM_PCCR0		IO_ADDR_CCM(0x20)
++#define CCM_PCCR1		IO_ADDR_CCM(0x24)
++#define CCM_CCSR		IO_ADDR_CCM(0x28)
++#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
++#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
++#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
 +
-+#define ccm(x)	(CRM_BASE + (x))
++static char *mpll_sel_clks[] = { "fpm", "ckih", };
++static char *spll_sel_clks[] = { "fpm", "ckih", };
 +
 +struct clkl {
 +	struct clk_lookup lookup;
@@ -115,169 +108,110 @@ index 0000000..d617b14
 +	},
 +
 +static struct clkl lookups[] = {
-+	/* i.mx25 has the i.mx21 type uart */
-+	clkdev("imx21-uart.0", "ipg", "uart1_ipg")
-+	clkdev("imx21-uart.0", "per", "uart_ipg_per")
-+	clkdev("imx21-uart.1", "ipg", "uart2_ipg")
-+	clkdev("imx21-uart.1", "per", "uart_ipg_per")
-+	clkdev("imx21-uart.2", "ipg", "uart3_ipg")
-+	clkdev("imx21-uart.2", "per", "uart_ipg_per")
-+	clkdev("imx21-uart.3", "ipg", "uart4_ipg")
-+	clkdev("imx21-uart.3", "per", "uart_ipg_per")
-+	clkdev("imx21-uart.4", "ipg", "uart5_ipg")
-+	clkdev("imx21-uart.4", "per", "uart_ipg_per")
-+	clkdev("imx-gpt.0", "ipg", "ipg")
-+	clkdev("imx-gpt.0", "per", "gpt_ipg_per")
-+	clkdev("mxc-ehci.0", NULL, "ipg")
-+	clkdev("mxc-ehci.0", "ahb", "usbotg_ahb")
-+	clkdev("mxc-ehci.0", "per", "usbdiv")
-+	clkdev("mxc-ehci.1", NULL, "ipg")
-+	clkdev("mxc-ehci.1", "ahb", "usbotg_ahb")
-+	clkdev("mxc-ehci.1", "per", "usbdiv")
-+	clkdev("mxc-ehci.2", NULL, "ipg")
-+	clkdev("mxc-ehci.2", "ahb", "usbotg_ahb")
-+	clkdev("mxc-ehci.2", "per", "usbdiv")
-+	clkdev("fsl-usb2-udc", "ahb", "usbotg_ahb")
-+	clkdev("fsl-usb2-udc", "per", "usbdiv")
-+	clkdev("mxc_nand.0", NULL, "nfc_ipg_per")
-+	/* i.mx25 has the i.mx35 type cspi */
-+	clkdev("imx35-cspi.0", NULL, "cspi1_ipg")
-+	clkdev("imx35-cspi.1", NULL, "cspi2_ipg")
-+	clkdev("imx35-cspi.2", NULL, "cspi3_ipg")
-+	clkdev("mxc_pwm.0", "ipg", "pwm1_ipg")
-+	clkdev("mxc_pwm.0", "per", "per10")
-+	clkdev("mxc_pwm.1", "ipg", "pwm1_ipg")
-+	clkdev("mxc_pwm.1", "per", "per10")
-+	clkdev("mxc_pwm.2", "ipg", "pwm1_ipg")
-+	clkdev("mxc_pwm.2", "per", "per10")
-+	clkdev("mxc_pwm.3", "ipg", "pwm1_ipg")
-+	clkdev("mxc_pwm.3", "per", "per10")
-+	clkdev("imx-keypad", NULL, "kpp_ipg")
-+	clkdev("mx25-adc", NULL, "tsc_ipg")
-+	clkdev("imx-i2c.0", NULL, "i2c_ipg_per")
-+	clkdev("imx-i2c.1", NULL, "i2c_ipg_per")
-+	clkdev("imx-i2c.2", NULL, "i2c_ipg_per")
-+	clkdev("imx25-fec.0", "ipg", "fec_ipg")
-+	clkdev("imx25-fec.0", "ahb", "fec_ahb")
-+	clkdev("imxdi_rtc.0", NULL, "dryice_ipg")
-+	clkdev("imx-fb.0", "per", "lcdc_ipg_per")
-+	clkdev("imx-fb.0", "ipg", "lcdc_ipg")
-+	clkdev("imx-fb.0", "ahb", "lcdc_ahb")
-+	clkdev("imx2-wdt.0", NULL, "wdt_ipg")
-+	clkdev("imx-ssi.0", "per", "ssi1_ipg_per")
-+	clkdev("imx-ssi.0", "ipg", "ssi1_ipg")
-+	clkdev("imx-ssi.1", "per", "ssi2_ipg_per")
-+	clkdev("imx-ssi.1", "ipg", "ssi2_ipg")
-+	clkdev("sdhci-esdhc-imx25.0", "per", "esdhc1_ipg_per")
-+	clkdev("sdhci-esdhc-imx25.0", "ipg", "esdhc1_ipg")
-+	clkdev("sdhci-esdhc-imx25.0", "ahb", "esdhc1_ahb")
-+	clkdev("sdhci-esdhc-imx25.1", "per", "esdhc2_ipg_per")
-+	clkdev("sdhci-esdhc-imx25.1", "ipg", "esdhc2_ipg")
-+	clkdev("sdhci-esdhc-imx25.1", "ahb", "esdhc2_ahb")
-+	clkdev("mx2-camera.0", "per", "csi_ipg_per")
-+	clkdev("mx2-camera.0", "ipg", "csi_ipg")
-+	clkdev("mx2-camera.0", "ahb", "csi_ahb")
-+	clkdev(NULL, "audmux", "dummy")
-+	clkdev("flexcan.0", NULL, "can1_ipg")
-+	clkdev("flexcan.1", NULL, "can2_ipg")
-+	/* i.mx25 has the i.mx35 type sdma */
-+	clkdev("imx35-sdma", "ipg", "sdma_ipg")
-+	clkdev("imx35-sdma", "ahb", "sdma_ahb")
-+	clkdev(NULL, "iim", "iim_ipg")
++	clkdev("imx21-uart.0", "per", "per1")
++	clkdev("imx21-uart.0", "ipg", "uart1_ipg_gate")
++	clkdev("imx21-uart.1", "per", "per1")
++	clkdev("imx21-uart.1", "ipg", "uart2_ipg_gate")
++	clkdev("imx21-uart.2", "per", "per1")
++	clkdev("imx21-uart.2", "ipg", "uart3_ipg_gate")
++	clkdev("imx21-uart.3", "per", "per1")
++	clkdev("imx21-uart.3", "ipg", "uart4_ipg_gate")
++	clkdev("imx-gpt.0", "ipg", "gpt1_ipg_gate")
++	clkdev("imx-gpt.0", "per", "per1")
++	clkdev("imx-gpt.1", "ipg", "gpt2_ipg_gate")
++	clkdev("imx-gpt.1", "per", "per1")
++	clkdev("imx-gpt.2", "ipg", "gpt3_ipg_gate")
++	clkdev("imx-gpt.2", "per", "per1")
++	clkdev("mxc_pwm.0", "pwm", "pwm_ipg_gate")
++	clkdev("imx21-cspi.0", "per", "per2")
++	clkdev("imx21-cspi.0", "ipg", "cspi1_ipg_gate")
++	clkdev("imx21-cspi.1", "per", "per2")
++	clkdev("imx21-cspi.1", "ipg", "cspi2_ipg_gate")
++	clkdev("imx21-cspi.2", "per", "per2")
++	clkdev("imx21-cspi.2", "ipg", "cspi3_ipg_gate")
++	clkdev("imx-fb.0", "per", "per3")
++	clkdev("imx-fb.0", "ipg", "lcdc_ipg_gate")
++	clkdev("imx-fb.0", "ahb", "lcdc_hclk_gate")
++	clkdev("imx21-hcd.0", "per", "usb_gate")
++	clkdev("imx21-hcd.0", "ahb", "usb_hclk_gate")
++	clkdev("mxc_nand.0", NULL, "nfc_gate")
++	clkdev("imx-dma", "ahb", "dma_hclk_gate")
++	clkdev("imx-dma", "ipg", "dma_gate")
++	clkdev("imx2-wdt.0", NULL, "wdog_gate")
++	clkdev("imx-i2c.0", NULL, "i2c_gate")
++	clkdev("mxc-keypad", NULL, "kpp_gate")
++	clkdev("mxc_w1.0", NULL, "owire_gate")
++	clkdev(NULL, "brom", "brom_gate")
++	clkdev(NULL, "emma", "emma_gate")
++	clkdev(NULL, "slcdc", "slcdc_gate")
++	clkdev(NULL, "gpio", "gpio_gate")
++	clkdev(NULL, "rtc", "rtc_gate")
++	clkdev(NULL, "csi", "csi")
++	clkdev(NULL, "ssi1", "ssi1_gate")
++	clkdev(NULL, "ssi2", "ssi2_gate")
++	clkdev(NULL, "sdhc1", "sdhc1")
++	clkdev(NULL, "sdhc2", "sdhc2")
 +};
 +
-+static char *cpu_sel_clks[] = { "mpll", "mpll_cpu_3_4", };
-+static char *per_sel_clks[] = { "ahb", "upll", };
-+
-+int __init mx25_clocks_init(void)
++/*
++ * must be called very early to get information about the
++ * available clock rate when the timer framework starts
++ */
++int __init mx21_clocks_init(unsigned long lref, unsigned long href)
 +{
 +	int i;
 +
-+	imx_clk_fixed("dummy", 0);
-+	imx_clk_fixed("osc", 24000000);
-+	imx_clk_pllv1("mpll", "osc", ccm(CCM_MPCTL));
-+	imx_clk_pllv1("upll", "osc", ccm(CCM_UPCTL));
-+	imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
-+	imx_clk_mux("cpu_sel", ccm(CCM_CCTL), 14, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
-+	imx_clk_divider("cpu", "cpu_sel", ccm(CCM_CCTL), 30, 2);
-+	imx_clk_divider("ahb", "cpu", ccm(CCM_CCTL), 28, 2);
-+	imx_clk_fixed_factor("ipg", "ahb", 1, 2);
-+	imx_clk_mux("per0_sel", ccm(CCM_MCR), 0, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per1_sel", ccm(CCM_MCR), 1, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per2_sel", ccm(CCM_MCR), 2, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per3_sel", ccm(CCM_MCR), 3, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per4_sel", ccm(CCM_MCR), 4, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per5_sel", ccm(CCM_MCR), 5, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per6_sel", ccm(CCM_MCR), 6, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per7_sel", ccm(CCM_MCR), 7, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per8_sel", ccm(CCM_MCR), 8, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per9_sel", ccm(CCM_MCR), 9, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per10_sel", ccm(CCM_MCR), 10, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per11_sel", ccm(CCM_MCR), 11, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per12_sel", ccm(CCM_MCR), 12, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per13_sel", ccm(CCM_MCR), 13, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per14_sel", ccm(CCM_MCR), 14, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_mux("per15_sel", ccm(CCM_MCR), 15, 1, per_sel_clks, ARRAY_SIZE(per_sel_clks));
-+	imx_clk_divider("per0", "per0_sel", ccm(CCM_PCDR0), 0, 6);
-+	imx_clk_divider("per1", "per1_sel", ccm(CCM_PCDR0), 8, 6);
-+	imx_clk_divider("per2", "per2_sel", ccm(CCM_PCDR0), 16, 6);
-+	imx_clk_divider("per3", "per3_sel", ccm(CCM_PCDR0), 24, 6);
-+	imx_clk_divider("per4", "per4_sel", ccm(CCM_PCDR1), 0, 6);
-+	imx_clk_divider("per5", "per5_sel", ccm(CCM_PCDR1), 8, 6);
-+	imx_clk_divider("per6", "per6_sel", ccm(CCM_PCDR1), 16, 6);
-+	imx_clk_divider("per7", "per7_sel", ccm(CCM_PCDR1), 24, 6);
-+	imx_clk_divider("per8", "per8_sel", ccm(CCM_PCDR2), 0, 6);
-+	imx_clk_divider("per9", "per9_sel", ccm(CCM_PCDR2), 8, 6);
-+	imx_clk_divider("per10", "per10_sel", ccm(CCM_PCDR2), 16, 6);
-+	imx_clk_divider("per11", "per11_sel", ccm(CCM_PCDR2), 24, 6);
-+	imx_clk_divider("per12", "per12_sel", ccm(CCM_PCDR3), 0, 6);
-+	imx_clk_divider("per13", "per13_sel", ccm(CCM_PCDR3), 8, 6);
-+	imx_clk_divider("per14", "per14_sel", ccm(CCM_PCDR3), 16, 6);
-+	imx_clk_divider("per15", "per15_sel", ccm(CCM_PCDR3), 24, 6);
-+	imx_clk_gate("csi_ipg_per", "per0", ccm(CCM_CGCR0), 0);
-+	imx_clk_gate("esdhc1_ipg_per", "per3", ccm(CCM_CGCR0),  3);
-+	imx_clk_gate("esdhc2_ipg_per", "per4", ccm(CCM_CGCR0),  4);
-+	imx_clk_gate("gpt_ipg_per", "per5", ccm(CCM_CGCR0),  5);
-+	imx_clk_gate("i2c_ipg_per", "per6", ccm(CCM_CGCR0),  6);
-+	imx_clk_gate("lcdc_ipg_per", "per8", ccm(CCM_CGCR0),  7);
-+	imx_clk_gate("nfc_ipg_per", "ipg_per", ccm(CCM_CGCR0),  8);
-+	imx_clk_gate("ssi1_ipg_per", "per13", ccm(CCM_CGCR0), 13);
-+	imx_clk_gate("ssi2_ipg_per", "per14", ccm(CCM_CGCR0), 14);
-+	imx_clk_gate("uart_ipg_per", "per15", ccm(CCM_CGCR0), 15);
-+	imx_clk_gate("csi_ahb", "ahb", ccm(CCM_CGCR0), 18);
-+	imx_clk_gate("esdhc1_ahb", "ahb", ccm(CCM_CGCR0), 21);
-+	imx_clk_gate("esdhc2_ahb", "ahb", ccm(CCM_CGCR0), 22);
-+	imx_clk_gate("fec_ahb", "ahb", ccm(CCM_CGCR0), 23);
-+	imx_clk_gate("lcdc_ahb", "ahb", ccm(CCM_CGCR0), 24);
-+	imx_clk_gate("sdma_ahb", "ahb", ccm(CCM_CGCR0), 26);
-+	imx_clk_gate("usbotg_ahb", "ahb", ccm(CCM_CGCR0), 28);
-+	imx_clk_gate("can1_ipg", "ipg", ccm(CCM_CGCR1),  2);
-+	imx_clk_gate("can2_ipg", "ipg", ccm(CCM_CGCR1),  3);
-+	imx_clk_gate("csi_ipg", "ipg", ccm(CCM_CGCR1),  4);
-+	imx_clk_gate("cspi1_ipg", "ipg", ccm(CCM_CGCR1),  5);
-+	imx_clk_gate("cspi2_ipg", "ipg", ccm(CCM_CGCR1),  6);
-+	imx_clk_gate("cspi3_ipg", "ipg", ccm(CCM_CGCR1),  7);
-+	imx_clk_gate("dryice_ipg", "ipg", ccm(CCM_CGCR1),  8);
-+	imx_clk_gate("esdhc1_ipg", "ipg", ccm(CCM_CGCR1), 13);
-+	imx_clk_gate("esdhc2_ipg", "ipg", ccm(CCM_CGCR1), 14);
-+	imx_clk_gate("fec_ipg", "ipg", ccm(CCM_CGCR1), 15);
-+	imx_clk_gate("iim_ipg", "ipg", ccm(CCM_CGCR1), 26);
-+	imx_clk_gate("kpp_ipg", "ipg", ccm(CCM_CGCR1), 28);
-+	imx_clk_gate("lcdc_ipg", "ipg", ccm(CCM_CGCR1), 29);
-+	imx_clk_gate("pwm1_ipg", "ipg", ccm(CCM_CGCR1), 31);
-+	imx_clk_gate("pwm2_ipg", "ipg", ccm(CCM_CGCR2),  0);
-+	imx_clk_gate("pwm3_ipg", "ipg", ccm(CCM_CGCR2),  1);
-+	imx_clk_gate("pwm4_ipg", "ipg", ccm(CCM_CGCR2),  2);
-+	imx_clk_gate("sdma_ipg", "ipg", ccm(CCM_CGCR2),  6);
-+	imx_clk_gate("ssi1_ipg", "ipg", ccm(CCM_CGCR2), 11);
-+	imx_clk_gate("ssi2_ipg", "ipg", ccm(CCM_CGCR2), 12);
-+	imx_clk_gate("tsc_ipg", "ipg", ccm(CCM_CGCR2), 13);
-+	imx_clk_gate("uart1_ipg", "ipg", ccm(CCM_CGCR2), 14);
-+	imx_clk_gate("uart2_ipg", "ipg", ccm(CCM_CGCR2), 15);
-+	imx_clk_gate("uart3_ipg", "ipg", ccm(CCM_CGCR2), 16);
-+	imx_clk_gate("uart4_ipg", "ipg", ccm(CCM_CGCR2), 17);
-+	imx_clk_gate("uart5_ipg", "ipg", ccm(CCM_CGCR2), 18);
-+	imx_clk_gate("wdt_ipg", "ipg", ccm(CCM_CGCR2), 19);
++	imx_clk_fixed("ckil", lref);
++	imx_clk_fixed("ckih", href);
++	imx_clk_fixed_factor("fpm", "ckil", 512, 1);
++	imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks, ARRAY_SIZE(mpll_sel_clks));
++	imx_clk_mux("spll_sel", CCM_CSCR, 17, 1, spll_sel_clks, ARRAY_SIZE(spll_sel_clks));
++	imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
++	imx_clk_pllv1("spll", "spll_sel", CCM_SPCTL0);
++	imx_clk_divider("fclk", "mpll", CCM_CSCR, 29, 3);
++	imx_clk_divider("hclk", "fclk", CCM_CSCR, 10, 4);
++	imx_clk_divider("ipg", "hclk", CCM_CSCR, 9, 1);
++	imx_clk_divider("per1", "mpll", CCM_PCDR1, 0, 6);
++	imx_clk_divider("per2", "mpll", CCM_PCDR1, 8, 6);
++	imx_clk_divider("per3", "mpll", CCM_PCDR1, 16, 6);
++	imx_clk_divider("per4", "mpll", CCM_PCDR1, 24, 6);
++	imx_clk_gate("uart1_ipg_gate", "ipg", CCM_PCCR0, 0);
++	imx_clk_gate("uart2_ipg_gate", "ipg", CCM_PCCR0, 1);
++	imx_clk_gate("uart3_ipg_gate", "ipg", CCM_PCCR0, 2);
++	imx_clk_gate("uart4_ipg_gate", "ipg", CCM_PCCR0, 3);
++	imx_clk_gate("gpt1_ipg_gate", "ipg", CCM_PCCR1, 25);
++	imx_clk_gate("gpt2_ipg_gate", "ipg", CCM_PCCR1, 26);
++	imx_clk_gate("gpt3_ipg_gate", "ipg", CCM_PCCR1, 27);
++	imx_clk_gate("pwm_ipg_gate", "ipg", CCM_PCCR1, 28);
++	imx_clk_gate("sdhc1_ipg_gate", "ipg", CCM_PCCR0, 9);
++	imx_clk_gate("sdhc2_ipg_gate", "ipg", CCM_PCCR0, 10);
++	imx_clk_gate("lcdc_ipg_gate", "ipg", CCM_PCCR0, 18);
++	imx_clk_gate("lcdc_hclk_gate", "hclk", CCM_PCCR0, 26);
++	imx_clk_gate("cspi3_ipg_gate", "ipg", CCM_PCCR1, 23);
++	imx_clk_gate("cspi2_ipg_gate", "ipg", CCM_PCCR0, 5);
++	imx_clk_gate("cspi1_ipg_gate", "ipg", CCM_PCCR0, 4);
++	imx_clk_gate("per4_gate", "per4", CCM_PCCR0, 22);
++	imx_clk_gate("csi_hclk_gate", "hclk", CCM_PCCR0, 31);
++	imx_clk_divider("usb_div", "spll", CCM_CSCR, 26, 3);
++	imx_clk_gate("usb_gate", "usb_div", CCM_PCCR0, 14);
++	imx_clk_gate("usb_hclk_gate", "hclk", CCM_PCCR0, 24);
++	imx_clk_gate("ssi1_gate", "ipg", CCM_PCCR0, 6);
++	imx_clk_gate("ssi2_gate", "ipg", CCM_PCCR0, 7);
++	imx_clk_divider("nfc_div", "ipg", CCM_PCDR0, 12, 4);
++	imx_clk_gate("nfc_gate", "nfc_div", CCM_PCCR0, 19);
++	imx_clk_gate("dma_gate", "ipg", CCM_PCCR0, 13);
++	imx_clk_gate("dma_hclk_gate", "hclk", CCM_PCCR0, 30);
++	imx_clk_gate("brom_gate", "hclk", CCM_PCCR0, 28);
++	imx_clk_gate("emma_gate", "ipg", CCM_PCCR0, 15);
++	imx_clk_gate("emma_hclk_gate", "hclk", CCM_PCCR0, 27);
++	imx_clk_gate("slcdc_gate", "ipg", CCM_PCCR0, 25);
++	imx_clk_gate("slcdc_hclk_gate", "hclk", CCM_PCCR0, 21);
++	imx_clk_gate("wdog_gate", "ipg", CCM_PCCR1, 24);
++	imx_clk_gate("gpio_gate", "ipg", CCM_PCCR0, 11);
++	imx_clk_gate("i2c_gate", "ipg", CCM_PCCR0, 12);
++	imx_clk_gate("kpp_gate", "ipg", CCM_PCCR1, 30);
++	imx_clk_gate("owire_gate", "ipg", CCM_PCCR1, 31);
++	imx_clk_gate("rtc_gate", "ipg", CCM_PCCR1, 29);
 +
 +	for (i = 0; i < ARRAY_SIZE(lookups); i++) {
 +		struct clkl *l = &lookups[i];
@@ -285,7 +219,8 @@ index 0000000..d617b14
 +		clkdev_add(&l->lookup);
 +	}
 +
-+	mxc_timer_init(NULL, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
++	mxc_timer_init(NULL, MX21_IO_ADDRESS(MX21_GPT1_BASE_ADDR),
++			MX21_INT_GPT1);
 +	return 0;
 +}
 -- 
