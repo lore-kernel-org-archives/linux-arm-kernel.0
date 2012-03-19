@@ -1,54 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Mar 2012 15:48:59 -0700
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator
- for first instance
-In-Reply-To: <201203192209.43906.arnd@arndb.de>
-References: <1331080771-30687-1-git-send-email-khilman@ti.com>
- <201203192118.09286.arnd@arndb.de> <87mx7c5kzj.fsf@ti.com>
- <201203192209.43906.arnd@arndb.de>
-Message-ID: <20120319224858.GD9859@atomide.com>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Mon, 19 Mar 2012 19:49:51 -0300
+Subject: [PATCH v1] i.MX35-PDK: Add Camera support
+In-Reply-To: <20120319223729.GC3852@pengutronix.de>
+References: <1331651129-30540-1-git-send-email-alexg@meprolight.com>
+ <4F67AD31.8030500@redhat.com> <4F67B077.5050300@redhat.com>
+ <20120319223729.GC3852@pengutronix.de>
+Message-ID: <4F67B80F.1040204@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120319 15:12]:
-> On Monday 19 March 2012, Kevin Hilman wrote:
-> > > On Wednesday 07 March 2012, Kevin Hilman wrote:
-> > >> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
-> > >> regulators) added regulators which are registered during
-> > >> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
-> > >> than one instance of the SMSC911x and result in attempting to register
-> > >> the same regulator more than once which causes a panic().
-> > >> 
-> > >> Fix this by only registering the regulator when the platform_data id
-> > >> field is zero, indicating its the first instance.
-> > >> 
-> > >> Cc: Matt Porter <mporter@ti.com>
-> > >> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> > >
-> > > It seems that both Olof and I forgot to forward this one to Linus.
-> > >
-> > > If it's ok for you, I'll add it to the fixes branch for v3.4 now
-> > > and mark it for backporting to v3.3-stable.
-> > 
-> > A slightly different version of this is already in linux-next as commit
-> > bb60424af517d6e6148505fb5ef256caa91b5b43.
-> > 
-> > It was in your 'fixes' branch, and was merged by Olaf from Tony on 3/13:
-> > Merge branch 'fix-smsc911x-regulator' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes
-> > 
+Em 19-03-2012 19:37, Sascha Hauer escreveu:
+> On Mon, Mar 19, 2012 at 07:17:27PM -0300, Mauro Carvalho Chehab wrote:
+>> Em 19-03-2012 19:03, Mauro Carvalho Chehab escreveu:
+>>> Em 13-03-2012 12:05, Alex Gershgorin escreveu:
+>>>> In i.MX35-PDK, OV2640  camera is populated on the
+>>>> personality board. This camera is registered as a subdevice via soc-camera interface.
+>>>>
+>>>> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+>>>
+>>> Patch doesn't apply over v3.3:
+>>
+>> Sorry, the previous version of this patch didn't apply. This compiles OK.
+>>
+>> Sorry for the mess.
+>>
+>> Anyway, it should be applied via arm subtree.
 > 
-> Yes, I know it's in linux-next because I found it in the fixes branch.
-> That is the branch with stuff that should have gone into v3.3 :(
-> 
-> Is the bb60424af version ok? If I add a stable at vger.kernel.org tag in
-> there, it will obviously get a new changeset ID but I was not planning
-> on changing the contents to the version from the mailing list in case
-> that is different.
+> It's scheduled there. I should have responded with an applied message.
 
-Let's just keep bb60424af. There are more patches needed to make
-multiple smsc91x instances work, but we need to hear from people
-with such boards first. Then those can be tagged for stable.
+Ok, thanks! 
 
 Regards,
-
-Tony
+Mauro
