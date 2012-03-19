@@ -1,31 +1,98 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Mon, 19 Mar 2012 09:31:55 +0100
-Subject: [PATCH] pxa/hx4700: fix the LCD initialization
-In-Reply-To: <1331995717.82481.YahooMailClassic@web29016.mail.ird.yahoo.com>
-References: <1331905213.29979.1.camel@flow>
- <1331995717.82481.YahooMailClassic@web29016.mail.ird.yahoo.com>
-Message-ID: <CA+gwMcd14LVxF=pxyewQRDFUfTFxhmnTzHmxSF=_s2kJyxn5EQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 19 Mar 2012 09:31:58 +0100
+Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
+In-Reply-To: <20120319015142.GA2603@b20223-02.ap.freescale.net>
+References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
+ <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
+ <20120314085228.GM3852@pengutronix.de>
+ <20120315144601.GA5701@richard-laptop>
+ <20120315150048.GC3852@pengutronix.de>
+ <20120315151521.GB5701@richard-laptop>
+ <20120315185004.GD3852@pengutronix.de>
+ <20120316011006.GA17459@b20223-02.ap.freescale.net>
+ <20120317122831.GD29317@pengutronix.de>
+ <20120319015142.GA2603@b20223-02.ap.freescale.net>
+Message-ID: <20120319083158.GV3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Mon, Mar 19, 2012 at 09:51:43AM +0800, Richard Zhao wrote:
+> On Sat, Mar 17, 2012 at 01:28:31PM +0100, Sascha Hauer wrote:
+> > On Fri, Mar 16, 2012 at 09:10:07AM +0800, Richard Zhao wrote:
+> > > Hi Sascha,
+> > > 
+> > > On Thu, Mar 15, 2012 at 07:50:04PM +0100, Sascha Hauer wrote:
+> > > > On Thu, Mar 15, 2012 at 11:15:23PM +0800, Richard Zhao wrote:
+> > > > > On Thu, Mar 15, 2012 at 04:00:48PM +0100, Sascha Hauer wrote:
+> > > > > > On Thu, Mar 15, 2012 at 10:46:04PM +0800, Richard Zhao wrote:
+> > > > > > > On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
+> > > > > > > > On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
+> > > > > > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > > > > > > > ---
+> > > > > > > > >  
+> > > > > > > > >  #define DEF_PLL(name)					\
+> > > > > > > > >  	static struct clk name = {			\
+> > > > > > > > > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
+> > > > > > > > >  		.disable	= pll_disable,		\
+> > > > > > > > >  		.get_rate	= name##_get_rate,	\
+> > > > > > > > >  		.set_rate	= name##_set_rate,	\
+> > > > > > > > > +		.round_rate	= name##_round_rate,	\
+> > > > > > > > 
+> > > > > > > > I hope this ## stuff is gone soon with the generic clock framework. It
+> > > > > > > > is so ugly and inefficient.
+> > > > > > > I hope this doesn't prevent this two patches go in.
+> > > > > > 
+> > > > > > Given that we are short from getting a generic clock framework (and I
+> > > > > > think this time it's for real) and that you are not mention in any words
+> > > > > > what these patches fix I don't see a reason for merging them.
+> > > > > I think the cpu clock is a great challenge for generic clock framework.
+> > > > > When it set_rate, it includes reparent, and change parent's parent's rate.
+> > > > > I don't see any upstream code like that till now. and it's really what
+> > > > > we need.
+> > > > 
+> > > > Then do a clk_set_parent, clk_set_rate and a clk_set_parent again
+> > > > in your cpufreq driver.
+> > > No, it's platform code, and supposed to be in arch/arm. What the cpufre
+> > > driver know is to get cpu clk, rather not how cpu clk change its rate.
+> > > And cpu clk/arm_clk is a real clock wires in SoC.
+> > 
+> > The job of the clock framework is to give a consistent view on the
+> > clocks and to handle parent/rate changes properly. It even the
+> > CLK_SET_RATE_GATE for ensuring that your PLL can only change its rate
+> > when it's gated. It's not the job of the clock framework to dynamically
+> > reorganize the clock tree on a rate change.
+> The reparent in set_rate is in mutex lock. Looks like, we only need
+> the unlocked version clk functions.
 
-On Sat, Mar 17, 2012 at 3:48 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> After some experimenting it seems that neither GPIO110 "LCD_LVDD_3V3_ON"
-> nor GPIO112 "LCD_N2V7_7V3_ON" have any effect on the hx4700 LCD.
-> After the hx4700 boots I can turn either one off, or both off together,
-> and the LCD and touchscreen will continue to work normally.
->
-> Is there an authoritative description of the 7 "LCD" GPIOs (GPIO59,
-> GPIO62, GPIO70, GPIO84, GPIO110, GPIO111, GPIO112) that are used by
-> the kernel, or the 2 "LCD" GPIOs (GPIO22, GPIO73) that are not used?
-> The SDG code provides no enlightenment.
+Again, you don't want to drill holes into the clock framework to
+reparent in a set_rate op.
 
-that is a good question. Not having done any of the reverse
-engineering for hx4700 myself, I've always taken the SDG code as
-gospel.
-Unfortunately I am not aware of any hx4700 hardware schematics or even
-a datasheet for the acx523akm lcd panel.
+> > 
+> > Besides, do you really want to reprogram the PLL with a cpufreq change?
+> > You have a divider behind that PLL which you apparently can change
+> > without having to reparent the PLL. Doesn't this give you enough choices
+> > for the cpu frequency?
+> No. The 3bit cpu divider is not enough. For example, if pll is 1G Hz, the
+> next lower freq will be 500M, which is a too large step.
+> > 
+> > > > The notifying mechanism even allows you to
+> > > > block any concurrent change in between these three steps if necessary.
+> > > > Noone says that these three steps have to be encapsulated in a single
+> > > > clk_set_rate call like you did in your patch.
+> > > If you're reviwing the patch, why not take a step advance? :)
+> > 
+> > I have prepared the patches for converting i.MX1/21/25/27 and I have
+> > (older) patches for the i.MX31/51/53 which I want to rebase on the
+> > current clock framework. 
+> You might notice I ever sent out serveral versions of MX5x clock porting
+> patches based on your first version. If you want to take it over, it's ok.
 
-regards
-Philipp
+No, I don't want to use the static initializers.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
