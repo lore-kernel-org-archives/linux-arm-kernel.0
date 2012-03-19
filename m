@@ -1,35 +1,60 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 19 Mar 2012 12:33:05 -0700
-Subject: [PATCH v7 2/3] clk: introduce the common clock framework
-In-Reply-To: <4F678561.3040105@codeaurora.org>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <1331878280-2758-3-git-send-email-mturquette@linaro.org>
- <4F6404C2.7000506@codeaurora.org>
- <CAJOA=zP1HHqBNS4V2dN=Q9oOcOErQj8W__fB_qRyZeNLBk7VJg@mail.gmail.com>
- <4F678561.3040105@codeaurora.org>
-Message-ID: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 19 Mar 2012 21:40:16 +0200
+Subject: [PATCH] ARM: iop: add missing includes
+In-Reply-To: <1329344682-29962-1-git-send-email-olof@lixom.net>
+References: <1329344682-29962-1-git-send-email-olof@lixom.net>
+Message-ID: <20120319194016.GA708@ultra.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2012 at 12:13 PM, Saravana Kannan
-<skannan@codeaurora.org> wrote:
-> I saw some responses from you over the weekend but not to mine. So, I
-> assumed you were busy with other stuff and I started working on a patch on
-> top of v7.
+Hi,
 
-I only answer trivial emails on the weekend ;-)
+On Wed, Feb 15, 2012 at 02:24:42PM -0800, Olof Johansson wrote:
+> Resolves two build breaks. One is a boatload of "unknown type name 'u32'"
+> in iop3xx.h due to missing include of <linux/types.h>.
+> 
+> The other is:
+> arch/arm/plat-iop/restart.c: In function 'iop3xx_restart':
+> arch/arm/plat-iop/restart.c:18:2: error: implicit declaration of function 'soft_restart' [-Werror=implicit-function-declaration]
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-> I will send that out if I get around to finishing it before you
-> do. Hope that's alright with you.
+Any chance to get this patch into 3.3.1 (stable), when and if such is made?
 
-I'm happy to for you to take a crack at it.  I don't know what your
-implementation looks like, but here are a couple concerns I have:
+The v3.3 fails to build for IOP boards without this.
 
-1) if you're copying the data from the initializer over to the struct
-clk then make sure you handle the __init data aspects of it properly
+> ---
+> 
+>  arch/arm/include/asm/hardware/iop3xx.h |    2 ++
+>  arch/arm/plat-iop/restart.c            |    1 +
+>  2 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
+> index 077c323..ec0224d 100644
+> --- a/arch/arm/include/asm/hardware/iop3xx.h
+> +++ b/arch/arm/include/asm/hardware/iop3xx.h
+> @@ -15,6 +15,8 @@
+>  #ifndef __IOP3XX_H
+>  #define __IOP3XX_H
+>  
+> +#include <linux/types.h>
+> +
+>  /*
+>   * IOP3XX GPIO handling
+>   */
+> diff --git a/arch/arm/plat-iop/restart.c b/arch/arm/plat-iop/restart.c
+> index 6a85a0c..a6ee3b6 100644
+> --- a/arch/arm/plat-iop/restart.c
+> +++ b/arch/arm/plat-iop/restart.c
+> @@ -8,6 +8,7 @@
+>   * published by the Free Software Foundation.
+>   */
+>  #include <asm/hardware/iop3xx.h>
+> +#include <asm/system.h>
+>  #include <mach/hardware.h>
+>  
+>  void iop3xx_restart(char mode, const char *cmd)
+> -- 
+> 1.7.9.209.gb6b3b
 
-2) are the members of struct clk_hw visible to the rest of the world?
-Are they modifiable (i.e., not const)?  This is undesirable.
-
-Thanks,
-Mike
+A.
