@@ -1,89 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Mar 2012 15:33:34 +0000
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <201203191406.35064.arnd@arndb.de>
-References: <4F22DEF2.5000807@ti.com> <20120317094059.7C2333E08E2@localhost>
- <4F6734DD.3020203@atmel.com> <201203191406.35064.arnd@arndb.de>
-Message-ID: <20120319153334.GF16389@n2100.arm.linux.org.uk>
+From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
+Date: Mon, 19 Mar 2012 17:36:00 +0200
+Subject: [PATCH v2] mm: module_alloc: check if size is 0
+In-Reply-To: <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+ <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+Message-ID: <4F675260.2010205@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2012 at 02:06:34PM +0000, Arnd Bergmann wrote:
-> ==== mmci ====
-> /* in drivers/dma/ste_dma40.c, others in pl330.c, coh901318.c, ... */
-> bool stedma40_filter(struct dma_chan *chan, void *data)
-> {               
->         struct stedma40_chan_cfg *info = data;
->         struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
->         int err;                
->         
->         err = d40_validate_conf(d40c, info);
->         if (!err)
->                 d40c->dma_cfg = *info;
->         d40c->configured = true;
->         
->         return err == 0;
-> }
-> EXPORT_SYMBOL(stedma40_filter);
-> 
-> /* in mmci.h */
-> struct mmci_platform_data {
-> 	...
->         bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
->         void *dma_rx_param;
->         void *dma_tx_param;
-> };
-> 
-> /* in mmci.c */
-> static void __devinit mmci_dma_setup(struct mmci_host *host)
-> {
-> 	...
->         host->dma_rx_channel = dma_request_channel(mask, plat->dma_filter, plat->dma_rx_param);
-> 	...
-> }
-> 
-> ====
-> 
-> Whatever we come up with obviously needs to work with both drivers.
-> I think we will end up with something closer to the second one, except
-> that the dma parameters do not come from platform_data but from the
-> #dma-request property, which also identifies the controller and channel.
+Hi,
 
-Firstly, define what you mean by "the DMA parameters".  Things like burst
-size, register width, register address?  That should all be known by the
-peripheral driver and _not_ be encoded into DT in any way - and this
-information should be passed to the DMA engine driver for the well defined
-API for that purpose.
+On 03/07/2012 03:09 PM, Veli-Pekka Peltola wrote:
+> After commit de7d2b567d040e3b67fe7121945982f14343213d (mm/vmalloc.c: report
+> more vmalloc failures) users will get a warning if vmalloc_node_range() is
+> called with size 0. This happens if module's init size equals to 0. This
+> patch changes ARM, MIPS and x86 module_alloc() to return NULL before calling
+> vmalloc_node_range() that would also return NULL and print a warning.
+>
+> Signed-off-by: Veli-Pekka Peltola<veli-pekka.peltola@bluegiga.com>
+> Cc: Russell King<linux@arm.linux.org.uk>
+> Cc: Thomas Gleixner<tglx@linutronix.de>
+> Cc: Ingo Molnar<mingo@redhat.com>
+> Cc: "H. Peter Anvin"<hpa@zytor.com>
+> Cc: x86 at kernel.org
+> ---
+> I found this with ARM but after checking out various implementations of
+> module_alloc() I thought it would be better to fix all at once.
+>
+> One way to replicate the warning:
+> compile kernel with CONFIG_KALLSYMS=n
+> insmod a module without init, I used usb-common.ko
+>
+> Changes since v1:
+>   - changed style as hpa suggested
+>
+>   arch/arm/kernel/module.c  |    2 ++
+>   arch/mips/kernel/module.c |    2 ++
+>   arch/x86/kernel/module.c  |    2 +-
+>   3 files changed, 5 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 1e9be5d..17648e2 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -39,6 +39,8 @@
+>   #ifdef CONFIG_MMU
+>   void *module_alloc(unsigned long size)
+>   {
+> +	if (!size)
+> +		return NULL;
+>   	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+>   				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
+>   				__builtin_return_address(0));
+> diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
+> index a5066b1..1a51de1 100644
+> --- a/arch/mips/kernel/module.c
+> +++ b/arch/mips/kernel/module.c
+> @@ -47,6 +47,8 @@ static DEFINE_SPINLOCK(dbe_lock);
+>   #ifdef MODULE_START
+>   void *module_alloc(unsigned long size)
+>   {
+> +	if (!size)
+> +		return NULL;
+>   	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
+>   				GFP_KERNEL, PAGE_KERNEL, -1,
+>   				__builtin_return_address(0));
+> diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
+> index 925179f..fd44d69 100644
+> --- a/arch/x86/kernel/module.c
+> +++ b/arch/x86/kernel/module.c
+> @@ -38,7 +38,7 @@
+>
+>   void *module_alloc(unsigned long size)
+>   {
+> -	if (PAGE_ALIGN(size)>  MODULES_LEN)
+> +	if (!size || PAGE_ALIGN(size)>  MODULES_LEN)
+>   		return NULL;
+>   	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+>   				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
 
-Secondly, there are platforms (Samsung) where peripherals are connected
-to more than one DMA controller, and either DMA controller can be used -
-I'm told by Jassi that there's reasons why you'd want to select one or
-other as the target at runtime.
+Any comments on this? Should I split all architectures to separate patches?
 
-Whether it's appropriate for DT to know that or not, I'm not certain at
-the moment - I suspect the _right_ solution would be a radical DMA engine
-redesign which moves _all_ slave DMA to a virtual channel representation,
-and for the virtual channels to be scheduled onto a set of physical DMA
-channels over a range of DMA devices.  Obviously, there's restrictions on
-which virtual channels could be scheduled onto which physical channels of
-which DMA devices.
+I just tested 3.3 on ARM and x86, both printed a warning and call trace 
+without this patch.
 
-It seems to me, therefore, that any attempt to come up with some kind of
-DT based representation of the current scheme is doomed to fail, and will
-at some point become obsolete.
-
-I think instead, rather than trying to fix this now, we persist with what
-we have, but organize an effort to clean up and restructure the DMA engine
-code so that:
-
-(a) things like the Samsung, and ARM board oddities can be easily dealt
- with in a driver independent manner.
-(b) get rid of all the duplicated functionality between each different
- DMA engine implementation, separating this out into core code, and
- simplifying the drivers.
-
-The _big_ problem I see is that if we try to represent the existing
-solution in DT, we're going to get locked into that way of doing things
-and then any major restructuring of the DMA engine stuff will become an
-impossibility - especially if we start specifying things by DMA request
-signal numbers on DMA engines.
+--
+Veli-Pekka Peltola
