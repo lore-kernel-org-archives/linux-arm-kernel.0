@@ -1,98 +1,253 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Mar 2012 09:31:58 +0100
-Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
-In-Reply-To: <20120319015142.GA2603@b20223-02.ap.freescale.net>
-References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
- <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
- <20120314085228.GM3852@pengutronix.de>
- <20120315144601.GA5701@richard-laptop>
- <20120315150048.GC3852@pengutronix.de>
- <20120315151521.GB5701@richard-laptop>
- <20120315185004.GD3852@pengutronix.de>
- <20120316011006.GA17459@b20223-02.ap.freescale.net>
- <20120317122831.GD29317@pengutronix.de>
- <20120319015142.GA2603@b20223-02.ap.freescale.net>
-Message-ID: <20120319083158.GV3852@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 19 Mar 2012 10:33:39 +0200
+Subject: [PATCH 2/2] Input: omap-keypad: dynamically handle register
+ offsets
+In-Reply-To: <CAKdam54CudK-BoeAfOMrcHk51D9QsUbPhh5=Rqw5_ERCu2BpKA@mail.gmail.com>
+References: <1331907989-11891-1-git-send-email-sourav.poddar@ti.com>
+ <1331907989-11891-3-git-send-email-sourav.poddar@ti.com>
+ <20120317054715.GB20049@core.coreip.homeip.net>
+ <CAKdam54CudK-BoeAfOMrcHk51D9QsUbPhh5=Rqw5_ERCu2BpKA@mail.gmail.com>
+Message-ID: <20120319083338.GB13774@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2012 at 09:51:43AM +0800, Richard Zhao wrote:
-> On Sat, Mar 17, 2012 at 01:28:31PM +0100, Sascha Hauer wrote:
-> > On Fri, Mar 16, 2012 at 09:10:07AM +0800, Richard Zhao wrote:
-> > > Hi Sascha,
-> > > 
-> > > On Thu, Mar 15, 2012 at 07:50:04PM +0100, Sascha Hauer wrote:
-> > > > On Thu, Mar 15, 2012 at 11:15:23PM +0800, Richard Zhao wrote:
-> > > > > On Thu, Mar 15, 2012 at 04:00:48PM +0100, Sascha Hauer wrote:
-> > > > > > On Thu, Mar 15, 2012 at 10:46:04PM +0800, Richard Zhao wrote:
-> > > > > > > On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
-> > > > > > > > On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
-> > > > > > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > > > > > > > ---
-> > > > > > > > >  
-> > > > > > > > >  #define DEF_PLL(name)					\
-> > > > > > > > >  	static struct clk name = {			\
-> > > > > > > > > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
-> > > > > > > > >  		.disable	= pll_disable,		\
-> > > > > > > > >  		.get_rate	= name##_get_rate,	\
-> > > > > > > > >  		.set_rate	= name##_set_rate,	\
-> > > > > > > > > +		.round_rate	= name##_round_rate,	\
-> > > > > > > > 
-> > > > > > > > I hope this ## stuff is gone soon with the generic clock framework. It
-> > > > > > > > is so ugly and inefficient.
-> > > > > > > I hope this doesn't prevent this two patches go in.
-> > > > > > 
-> > > > > > Given that we are short from getting a generic clock framework (and I
-> > > > > > think this time it's for real) and that you are not mention in any words
-> > > > > > what these patches fix I don't see a reason for merging them.
-> > > > > I think the cpu clock is a great challenge for generic clock framework.
-> > > > > When it set_rate, it includes reparent, and change parent's parent's rate.
-> > > > > I don't see any upstream code like that till now. and it's really what
-> > > > > we need.
-> > > > 
-> > > > Then do a clk_set_parent, clk_set_rate and a clk_set_parent again
-> > > > in your cpufreq driver.
-> > > No, it's platform code, and supposed to be in arch/arm. What the cpufre
-> > > driver know is to get cpu clk, rather not how cpu clk change its rate.
-> > > And cpu clk/arm_clk is a real clock wires in SoC.
-> > 
-> > The job of the clock framework is to give a consistent view on the
-> > clocks and to handle parent/rate changes properly. It even the
-> > CLK_SET_RATE_GATE for ensuring that your PLL can only change its rate
-> > when it's gated. It's not the job of the clock framework to dynamically
-> > reorganize the clock tree on a rate change.
-> The reparent in set_rate is in mutex lock. Looks like, we only need
-> the unlocked version clk functions.
+Hi,
 
-Again, you don't want to drill holes into the clock framework to
-reparent in a set_rate op.
+On Mon, Mar 19, 2012 at 01:27:50PM +0530, Poddar, Sourav wrote:
+> 
+> 
+> On Sat, Mar 17, 2012 at 11:17 AM, Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> wrote:
+> 
+>     Hi Sourav,
+> 
+>     On Fri, Mar 16, 2012 at 07:56:29PM +0530, Sourav Poddar wrote:
+>     > From: G, Manjunath Kondaiah <manjugk@ti.com>
+>     >
+>     > Keypad controller register offsets are different for omap4
+>     > and omap5. Handle these offsets through static mapping and
+>     > assign these mappings during run time.
+>     >
+>     > Signed-off-by: Felipe Balbi <balbi@ti.com>
+>     > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+>     > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>     > ---
+>     >  drivers/input/keyboard/Kconfig        |    6 +-
+>     >  drivers/input/keyboard/omap4-keypad.c |  122
+>     ++++++++++++++++++++++++++------
+>     >  2 files changed, 102 insertions(+), 26 deletions(-)
+>     >
+>     > diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/
+>     Kconfig
+>     > index 1379daa..09d7d0b 100644
+>     > --- a/drivers/input/keyboard/Kconfig
+>     > +++ b/drivers/input/keyboard/Kconfig
+>     > @@ -510,10 +510,10 @@ config KEYBOARD_OMAP
+>     >         To compile this driver as a module, choose M here: the
+>     >         module will be called omap-keypad.
+>     >
+>     > -config KEYBOARD_OMAP4
+>     > -     tristate "TI OMAP4 keypad support"
+>     > +config KEYBOARD_OMAP4+
+>     > +     tristate "TI OMAP4+ keypad support"
+>     >       help
+>     > -       Say Y here if you want to use the OMAP4 keypad.
+>     > +       Say Y here if you want to use the OMAP4+ keypad.
+>     >
+>     >         To compile this driver as a module, choose M here: the
+>     >         module will be called omap4-keypad.
+>     > diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/
+>     keyboard/omap4-keypad.c
+>     > index e809ac0..6872495 100644
+>     > --- a/drivers/input/keyboard/omap4-keypad.c
+>     > +++ b/drivers/input/keyboard/omap4-keypad.c
+>     > @@ -68,6 +68,11 @@
+>     >
+>     >  #define OMAP4_MASK_IRQSTATUSDISABLE  0xFFFF
+>     >
+>     > +enum {
+>     > +     KBD_REVISION_OMAP4 = 0,
+>     > +     KBD_REVISION_OMAP5,
+>     > +};
+>     > +
+>     >  struct omap4_keypad {
+>     >       struct input_dev *input;
+>     >
+>     > @@ -76,11 +81,79 @@ struct omap4_keypad {
+>     >
+>     >       unsigned int rows;
+>     >       unsigned int cols;
+>     > +     unsigned int revision;
+>     >       unsigned int row_shift;
+>     >       unsigned char key_state[8];
+>     >       unsigned short keymap[];
+>     >  };
+>     >
+>     > +static int kbd_read_irqstatus(struct omap4_keypad *keypad_data, u32
+>     offset)
+>     > +{
+>     > +     if (keypad_data->revision == KBD_REVISION_OMAP4)
+>     > +             return __raw_readl(keypad_data->base + offset);
+>     > +     else if (keypad_data->revision == KBD_REVISION_OMAP5)
+>     > +             return __raw_readl(keypad_data->base + offset + 0x0c);
+>     > +
+> 
+>     This is called from ISR and doing comparisons seems quite wasteful. Why
+>     don't you stuff register numbers for IRQ manipulations into struct
+>     omap4_keypad at probe time and your function would just do:
+> 
+>            return __raw_readl(keypad_data->base + keypad_data->irqstatus_reg);
+> 
+> 
+> Yes, can do that way . Will make necessary changes and post it again.
+> 
+>     And do the same for irqstatus. FOr the rest of the register store the
+> 
+>      I think you mean "irqenable" here.
+> 
+>     common offset (seems to be 0x10).
+> 
+>     > +     return -ENODEV;
+>     > +}
+>     > +
+>     > +static int kbd_write_irqstatus(struct omap4_keypad *keypad_data,
+>     > +                                             u32 offset, u32 value)
+>     > +{
+>     > +     if (keypad_data->revision == KBD_REVISION_OMAP4)
+>     > +             return __raw_writel(value, keypad_data->base + offset);
+>     > +     else if (keypad_data->revision == KBD_REVISION_OMAP5)
+>     > +             return __raw_writel(value, keypad_data->base + offset +
+>     0x0c);
+>     > +
+>     > +     return -ENODEV;
+>     > +}
+>     > +
+>     > +static int kbd_write_irqenable(struct omap4_keypad *keypad_data,
+>     > +                                             u32 offset, u32 value)
+>     > +{
+>     > +     if (keypad_data->revision == KBD_REVISION_OMAP4)
+>     > +             return __raw_writel(value, keypad_data->base + offset);
+>     > +     else if (keypad_data->revision == KBD_REVISION_OMAP5)
+>     > +             return __raw_writel(value, keypad_data->base + offset +
+>     0x0c);
+>     > +
+>     > +     return -ENODEV;
+>     > +}
+>     > +
+>     > +static int kbd_readl(struct omap4_keypad *keypad_data, u32 offset)
+>     > +{
+>     > +     if (keypad_data->revision == KBD_REVISION_OMAP4)
+>     > +             return __raw_readl(keypad_data->base + offset);
+>     > +     else if (keypad_data->revision == KBD_REVISION_OMAP5)
+>     > +             return __raw_readl(keypad_data->base + offset + 0x10);
+>     > +
+>     > +     return -ENODEV;
+>     > +}
+>     > +
+>     > +static void kbd_writel(struct omap4_keypad *keypad_data, u32 offset, u32
+>     value)
+>     > +{
+>     > +     if (keypad_data->revision == KBD_REVISION_OMAP4)
+>     > +             __raw_writel(value, keypad_data->base + offset);
+>     > +     else if (keypad_data->revision == KBD_REVISION_OMAP5)
+>     > +             __raw_writel(value, keypad_data->base + offset + 0x10);
+>     > +}
+>     > +
+>     > +static int kbd_read_revision(struct omap4_keypad *keypad_data, u32
+>     offset)
+>     > +{
+>     > +     int reg;
+>     > +     reg = __raw_readl(keypad_data->base + offset);
+>     > +     reg &= 0x03 << 30;
+>     > +     reg >>= 30;
+>     > +
+>     > +     switch (reg) {
+>     > +     case 1:
+>     > +             return KBD_REVISION_OMAP5;
+>     > +     case 0:
+>     > +             return KBD_REVISION_OMAP4;
+>     > +     default:
+>     > +             return -ENODEV;
+>     > +     }
+>     > +}
+>     > +
+>     >  /* Interrupt handler */
+>     >  static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+>     >  {
+>     > @@ -91,12 +164,11 @@ static irqreturn_t omap4_keypad_interrupt(int irq,
+>     void *dev_id)
+>     >       u32 *new_state = (u32 *) key_state;
+>     >
+>     >       /* Disable interrupts */
+>     > -     __raw_writel(OMAP4_VAL_IRQDISABLE,
+>     > -                  keypad_data->base + OMAP4_KBD_IRQENABLE);
+>     > +     kbd_write_irqenable(keypad_data, OMAP4_KBD_IRQENABLE,
+>     > +                                             OMAP4_VAL_IRQDISABLE);
+>     >
+>     > -     *new_state = __raw_readl(keypad_data->base +
+>     OMAP4_KBD_FULLCODE31_0);
+>     > -     *(new_state + 1) = __raw_readl(keypad_data->base
+>     > -                                             + OMAP4_KBD_FULLCODE63_32);
+>     > +     *new_state = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE31_0);
+>     > +     *(new_state + 1) = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE63_32);
+>     >
+>     >       for (row = 0; row < keypad_data->rows; row++) {
+>     >               changed = key_state[row] ^ keypad_data->key_state[row];
+>     > @@ -121,12 +193,13 @@ static irqreturn_t omap4_keypad_interrupt(int irq,
+>     void *dev_id)
+>     >               sizeof(keypad_data->key_state));
+>     >
+>     >       /* clear pending interrupts */
+>     > -     __raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+>     > -                     keypad_data->base + OMAP4_KBD_IRQSTATUS);
+>     > +     kbd_write_irqstatus(keypad_data, OMAP4_KBD_IRQSTATUS,
+>     > +                     kbd_read_irqstatus(keypad_data,
+>     OMAP4_KBD_IRQSTATUS));
+>     >
+>     >       /* enable interrupts */
+>     > -     __raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN |
+>     OMAP4_DEF_IRQENABLE_LONGKEY,
+>     > -                     keypad_data->base + OMAP4_KBD_IRQENABLE);
+>     > +     kbd_write_irqenable(keypad_data, OMAP4_KBD_IRQENABLE,
+>     > +                     OMAP4_DEF_IRQENABLE_EVENTEN |
+>     > +                             OMAP4_DEF_IRQENABLE_LONGKEY);
+>     >
+>     >       return IRQ_HANDLED;
+>     >  }
+>     > @@ -139,16 +212,19 @@ static int omap4_keypad_open(struct input_dev
+>     *input)
+>     >
+>     >       disable_irq(keypad_data->irq);
+>     >
+>     > -     __raw_writel(OMAP4_VAL_FUNCTIONALCFG,
+>     > -                     keypad_data->base + OMAP4_KBD_CTRL);
+>     > -     __raw_writel(OMAP4_VAL_DEBOUNCINGTIME,
+>     > -                     keypad_data->base + OMAP4_KBD_DEBOUNCINGTIME);
+>     > -     __raw_writel(OMAP4_VAL_IRQDISABLE,
+>     > -                     keypad_data->base + OMAP4_KBD_IRQSTATUS);
+>     > -     __raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN |
+>     OMAP4_DEF_IRQENABLE_LONGKEY,
+>     > -                     keypad_data->base + OMAP4_KBD_IRQENABLE);
+>     > -     __raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
+>     > -                     keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
+>     > +     keypad_data->revision = kbd_read_revision(keypad_data,
+>     > +                     OMAP4_KBD_REVISION);
+> 
+>     You want to bail out of kbd_read_revision() returns error here.
+> 
+> 
+> Yes, will include a error check.
 
-> > 
-> > Besides, do you really want to reprogram the PLL with a cpufreq change?
-> > You have a divider behind that PLL which you apparently can change
-> > without having to reparent the PLL. Doesn't this give you enough choices
-> > for the cpu frequency?
-> No. The 3bit cpu divider is not enough. For example, if pll is 1G Hz, the
-> next lower freq will be 500M, which is a too large step.
-> > 
-> > > > The notifying mechanism even allows you to
-> > > > block any concurrent change in between these three steps if necessary.
-> > > > Noone says that these three steps have to be encapsulated in a single
-> > > > clk_set_rate call like you did in your patch.
-> > > If you're reviwing the patch, why not take a step advance? :)
-> > 
-> > I have prepared the patches for converting i.MX1/21/25/27 and I have
-> > (older) patches for the i.MX31/51/53 which I want to rebase on the
-> > current clock framework. 
-> You might notice I ever sent out serveral versions of MX5x clock porting
-> patches based on your first version. If you want to take it over, it's ok.
+Please send text/plain emails. You're currently sending multipart:
 
-No, I don't want to use the static initializers.
-
-Sascha
+Content-Type: multipart/alternative;
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120319/8fe3b937/attachment-0001.sig>
