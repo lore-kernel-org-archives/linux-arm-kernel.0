@@ -1,66 +1,52 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Mon, 19 Mar 2012 15:01:41 +1000
-Subject: Atmel at91x40 ("EB01" eval board) resurected
-In-Reply-To: <20120317164345.4f20beef@skate>
-References: <CALz2mmXcAk9ZOsAzKMbKVVJ2+Et02+Gxj_z6xSgukC5LjgJTLg@mail.gmail.com>
- <20120317164345.4f20beef@skate>
-Message-ID: <4F66BDB5.5020600@snapgear.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 19 Mar 2012 13:38:04 +0800
+Subject: [PATCH v5 3/4] clk: introduce the common clock framework
+In-Reply-To: <4F6403CD.8020509@codeaurora.org>
+References: <1330763341-3437-4-git-send-email-mturquette@linaro.org>
+ <20120303133158.GA26882@pengutronix.de>
+ <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
+ <20120304115201.GB26882@pengutronix.de>
+ <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
+ <20120305073836.GU3852@pengutronix.de>
+ <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
+ <20120306190039.GJ3852@pengutronix.de>
+ <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
+ <4F6403CD.8020509@codeaurora.org>
+Message-ID: <20120319053801.GB31410@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Fri, Mar 16, 2012 at 08:23:57PM -0700, Saravana Kannan wrote:
+...
+> Hi Mike,
+> 
+> I already took a quick look at the v7 series, but I thought this
+> thread has more relevant context for my response. So, responding
+> here.
+> 
+> I'm with Sascha on creating a clk_internal/clk_initializer and
+> removing clk_hw. You had asked about the benefits of his suggestion
+> in one of the earlier threads. I'm sure I have told some of these
+> reasons I don't like clk_hw, but repeating my points here for others
+> to chime in.
+> 
+> I used to be a huge proponent for using macros for clocks in our
+> internal tree. All the clocks were constructed using macros (you
+> will see it in the history of tree we publish in CAF). They quickly
+> became unreadable when you have several hundreds of clocks. The
+> biggest problem is that you can't quickly look at a clock's macro
+> and figure out what the register offset or bit mask or shift value
+> is. Our eyes/brains aren't meant for quickly parsing the commas and
+> finding the n-th field or even remembering what the n-th field of
+> each macro corresponds to. If it's actually broken out as fields in
+> a struct, it's much easier to read. So, long story short, I think
+> the well-intentioned helper macros will make code quite unreadable.
+> 
+While I second the idea of clk_initializer, using macros is not really
+the thing to complain.  You can save using those macro helpers by
+calling APIs clk_register_*().  But that does not solve the problem,
+because those APIs also have a long argument list to fill.
 
-On 18/03/12 01:43, Thomas Petazzoni wrote:
-> Le Thu, 22 Dec 2011 22:18:53 -0500,
-> Phil Budne<phil@ultimate.com>  a ??crit :
->
->> I decided to see if I could bring up current kernel sources under
->> skyeye  (at91x40 simulation).
->
-> Very interesting, thanks. Your patches indeed allow the AT91x40 kernel
-> to boot under SkyEye, while the unpatched Linux kernel does not,
-> apparently.
->
-> Greg, it seems you are saying that the mainline kernel, unchanged,
-> boots under SkyEye.
-
-No, I didn't mean to imply that in my response (
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/078670.html).
-It has worked in the past, but I haven't run it for a few kernel
-versions now.
-
-I was hoping that Phil would respond to the couple of questions I
-had about differences, but he never did.
-
-
-> Could you share your kernel configuration and
-> SkyEye configuration?
-
-Yeah, its in mainline. Its one of the defconfigs:
-
-   arch/arm/configs/at91x40_defconfig
-   
-
->> Runs on locally modified skyeye
->>   based on skyeye-v1.2_Rel.tar (had trouble building latest release)
->>   adds interrupt driven UART output
->>   tweaked for programmed I/O UART input
->>   fix for loading XIP data section (load at physical, not virtual address)
->
-> Would you mind publishing your changes to SkyEye? So far, I'm blocked
-> because of the lack of interrupt driver UART output.
->
-> Do you plan on further pushing those AT91x40 changes?
-
-It would be really nice to get Phil's changes in a form that can be
-applied to mainline.
-
-Regards
-Greg
-
-
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+-- 
+Regards,
+Shawn
