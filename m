@@ -1,93 +1,110 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Mar 2012 09:44:41 -0500
-Subject: i.MX: Convert v4/v5 based SoCs to common clock framework
-In-Reply-To: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
-References: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4F674659.40207@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 19 Mar 2012 14:45:17 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <4F6734DD.3020203@atmel.com>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <20120317094059.7C2333E08E2@localhost> <4F6734DD.3020203@atmel.com>
+Message-ID: <20120319144517.C19E93E05A5@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2012 08:35 AM, Sascha Hauer wrote:
-> Hi All,
+On Mon, 19 Mar 2012 14:30:05 +0100, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 03/17/2012 10:40 AM, Grant Likely :
+> > On Thu, 15 Mar 2012 09:38:10 +0100, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> >> +struct of_dma {
+> >> +	struct list_head of_dma_controllers;
+> >> +	struct device_node *of_node;
+> >> +	int of_dma_n_cells;
+> >> +	int (*of_dma_xlate)(struct of_phandle_args *dma_spec, void *data);
+> >> +};
+> > 
+> > This _xlate is nearly useless as a generic API.  It solves the problem for
+> > the specific case where the driver is hard-coded to know which DMA engine
+> > to talk to, but since the returned data doesn't provide any context, it
+> > isn't useful if there are multiple DMA controllers to choose from.
 > 
-> The following patches convert the i.MX v4/v5 based SoCs to the common
-> clock framework.  They may not be completely ready, I am posting it now
-> because I'd like to show that the function based clock initializers are
-> indeed usable in real life and that the end result does not look too
-> bad.
-> 
-> This series depends on another series not yet posted which convert the
-> i.MX drivers to not depend on grouped clocks. I will follow up on this
-> after the merge window. My plan for these patches is to put them into
-> the arm-soc staging area after the merge window to let them stabilize
-> until hopefully before the next merge window there are no regressions
-> left.
-> 
-> Except the i.MX21 port all SoCs are runtime tested with the basic
-> devices (at least uart and network; I tested more, but not
-> systematically). Testers for these patches are very welcome, I will
-> happily integrate fixups into this series. A branch containing Mikes
-> latest clock patches, the driver fixups and this series can be found
-> here:
-> 
-> git://git.pengutronix.de/git/imx/linux-2.6.git work/imx-clk-v4-v5
-> 
-> As a side note, we currently compile all i.MX v4/v5 based SoCs in a
-> single defconfig. Since a kernel can only be built with or without the
-> common clock framework this series is not fully bisectable, you have to
-> disable the not yet converted SoCs in between.
-> 
-> The patch for removing the old clock support is not included in this
-> post, but with the removal the overall diffstat looks like this:
-> 
->  arch/arm/mach-imx/clock-imx1.c           |  636 ---------------
->  arch/arm/mach-imx/clock-imx21.c          | 1239 -------------------------------
->  arch/arm/mach-imx/clock-imx25.c          |  346 --------
->  arch/arm/mach-imx/clock-imx27.c          |  766 -------------------
->  b/arch/arm/mach-imx/Kconfig              |    4 
->  b/arch/arm/mach-imx/Makefile             |   10 
->  b/arch/arm/mach-imx/clk-imx1.c           |  118 ++
->  b/arch/arm/mach-imx/clk-imx21.c          |  177 ++++
->  b/arch/arm/mach-imx/clk-imx25.c          |  242 ++++++
->  b/arch/arm/mach-imx/clk-imx27.c          |  277 ++++++
->  b/arch/arm/mach-imx/clk-pllv1.c          |   59 +
->  b/arch/arm/mach-imx/clk.h                |   44 +
->  b/arch/arm/plat-mxc/clock.c              |   11 
->  b/arch/arm/plat-mxc/include/mach/clock.h |    4 
->  b/arch/arm/plat-mxc/time.c               |    5 
->  15 files changed, 946 insertions(+), 2992 deletions(-)
-> 
-> ----------------------------------------------------------------
-> Sascha Hauer (7):
->       ARM i.MX: prepare for common clock framework
->       ARM i.MX timer: request correct clock
->       ARM i.MX: Add common clock support for pllv1
->       ARM i.MX1: implement clocks using common clock framework
->       ARM i.MX21: implement clocks using common clock framework
->       ARM i.MX25: implement clocks using common clock framework
->       ARM i.MX27: implement clocks using common clock framework
-> 
->  arch/arm/mach-imx/Kconfig              |    4 +
->  arch/arm/mach-imx/Makefile             |   10 +-
->  arch/arm/mach-imx/clk-imx1.c           |  118 ++++++++++++++
->  arch/arm/mach-imx/clk-imx21.c          |  177 ++++++++++++++++++++
->  arch/arm/mach-imx/clk-imx25.c          |  242 ++++++++++++++++++++++++++++
->  arch/arm/mach-imx/clk-imx27.c          |  277 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/clk-pllv1.c          |   59 +++++++
->  arch/arm/mach-imx/clk.h                |   44 +++++
->  arch/arm/plat-mxc/clock.c              |   11 ++
->  arch/arm/plat-mxc/include/mach/clock.h |    4 +
->  arch/arm/plat-mxc/time.c               |    5 +-
->  11 files changed, 946 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/mach-imx/clk-imx1.c
->  create mode 100644 arch/arm/mach-imx/clk-imx21.c
->  create mode 100644 arch/arm/mach-imx/clk-imx25.c
->  create mode 100644 arch/arm/mach-imx/clk-imx27.c
->  create mode 100644 arch/arm/mach-imx/clk-pllv1.c
->  create mode 100644 arch/arm/mach-imx/clk.h
-> 
+> You mean, if there is no DMA controller phandle specified in the
+> property?
 
-Do we want to move all clock code to drivers/clk? I'm not saying it has
-to be done now, but is that a goal?
+No; I'm assuming that dma-channel properties will alwasy have a
+phandle to the dma controller node.
 
-Rob
+> I think that it is not the purpose of this API to choose a DMA
+> controller, Nor to provide a channel. The only purpose of this API is to
+> give a HW request to be used by a DMA slave driver. This slave should
+> already have a channel to use and a controller to talk to.
+
+Then where is the function that finds the reference to the DMA
+controller?  I don't understand why it would be useful to decode that
+separately.
+
+> > The void *data pointer must be replaced with a typed structure so that
+> > context can be returned.
+> 
+> I am not sure to follow you entirely... How do I address the fact that
+> several types of request value can be returned then?
+> 
+> BTW, can we imagine a phandle property with a sting as a argument?
+> should it be written this way?
+> dma-request = <&testdmac1>, "slave-rx", "slave-tx";
+
+No, I'm not suggesting that.  Mixing phandles and strings in a single
+property is possible but ugly.  The phandle-args pattern which uses
+zero or more cells as arguments should be used.
+
+> 
+> If yes, the of_parse_phandle_with_args() is not working on this type...
+
+Right; of_parse_phandle_with_args() should do the job.
+
+> 
+> (I realize that there seems to be no way out for a generic API: maybe we
+> should move to one or two cases to address and concentrate on them).
+
+The way I read this patch, the xlate function returns a single
+integer representing the DMA request number, but it doesn't provide
+any data about *which* dma controller is associated with that channel.
+The result of xlate needs to be something like a dma_chan reference
+that identifies both the DMA engine and the channel/request on that
+dma engine.
+
+[...]
+> >> +/**
+> >> + * of_dma_xlate_onenumbercell() - Generic DMA xlate for direct one cell bindings
+> >> + *
+> >> + * Device Tree DMA translation function which works with one cell bindings
+> >> + * where the cell values map directly to the hardware request number understood
+> >> + * by the DMA controller.
+> >> + */
+> >> +int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec, void *dma_req)
+> >> +{
+> >> +	if (!dma_spec)
+> >> +		return -EINVAL;
+> >> +	if (WARN_ON(dma_spec->args_count != 1))
+> >> +		return -EINVAL;
+> >> +	*(int *)dma_req = dma_spec->args[0];
+> > 
+> > Following on from comment above; the void *dma_req parameter is dangerous.  How
+> > does this function know that it has been passed an int* pointer?
+> 
+> Well, that is a drawback that comes from having to address generic
+> cases.
+
+Not if you do it right.  If a specific data structure is returned,
+then there can be context attached as to what the data means and which
+dma controller knows how to parse it.
+
+> But anyway, if the DMA controller decide to register a .xlate()
+> function that returns an integer, the slave driver that will ask a
+> "request line" to this DMA controller will be aware that an integer has
+> to be passed to of_get_dma_request().
+
+The problem still remains; I don't see how the dma slave can figure
+out *which* dma controller it needs to talk to.
+
+g.
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
