@@ -1,63 +1,119 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 19 Mar 2012 12:37:41 +0530
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <16771402.10791332119314036.JavaMail.weblogic@epv6ml07>
-References: <16771402.10791332119314036.JavaMail.weblogic@epv6ml07>
-Message-ID: <CAMQu2gy6yzawMAnkK+qmijDNo-5618b5SR7Cr+puMLSRM2znUA@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 19 Mar 2012 12:59:31 +0530
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <001501cd0561$57c642b0$0752c810$%han@samsung.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com>
+ <4F60E5C8.3040804@gmail.com>
+ <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+ <CAEYLNCp5e=86rpRi2C-5OJptTyEeXAn8JHhbWw_BqGzSaDD9wQ@mail.gmail.com>
+ <002a01cd0283$1f61b200$5e251600$%han@samsung.com>
+ <CAEYLNCrprPE60ZS=_OWuck0JCJMhCxzVErZwuwGpEDYkQq-hXg@mail.gmail.com>
+ <001d01cd0315$935cc720$ba165560$%han@samsung.com>
+ <CAEYLNCrGCmb5EJjURLY=EGfM=4N54MirNkCCyQRxqKEN3Eka8Q@mail.gmail.com>
+ <002d01cd034b$c56f2b00$504d8100$%han@samsung.com>
+ <CAEYLNCpfQ0cYb4efw6PZNnKjQ2rF25rj5Ed=i884LJXHAwigBw@mail.gmail.com>
+ <002f01cd0359$eb718330$c2548990$%han@samsung.com>
+ <CAEYLNCpJU_5uVa-jo5HUNY8Av6eYaiow1gEZtHCiQZ5oKkGoMQ@mail.gmail.com>
+ <001501cd0561$57c642b0$0752c810$%han@samsung.com>
+Message-ID: <CAJuYYwQmJvx_uGZKbAJ9uds-ciLs2VDqcifhoqB-P0M5uhO-nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/19 ??? <myungjoo.ham@samsung.com>:
->
-> Kyungmin Park<kmpark@infradead.org> 2012-03-17 15:10 (GMT+09:00)
->> Hi,
->> On 3/17/12, Aneesh V wrote:
->> > Add a driver for the EMIF SDRAM controller used in TI SoCs
->> >
->> > EMIF is an SDRAM controller that supports, based on its revision,
->> > one or more of LPDDR2/DDR2/DDR3 protocols.This driver adds support
->> > for LPDDR2.
->> >
->> > The driver supports the following features:
->> > - Calculates the DDR AC timing parameters to be set in EMIF
->> >   registers using data from the device data-sheets and based
->> >   on the DDR frequency. If data from data-sheets is not available
->> >   default timing values from the JEDEC spec are used. These
->> >   will be safe, but not necessarily optimal
->> > - API for changing timings during DVFS or at boot-up
->
-> This means that you alreeady have callbacks to create a devfreq device driver that supports DVFS on the device. This doesn't need to be a misc device driver then.
->
-Nope. The callbacks mentioned above are mainly coming from the clock
-framework. Ofcourse the clock node trigger
-with voltage ramps would be triggered by some upper laver
-governor/framework like CPUFreq/DEVFREQ but as
-such this is not necessary. This is an indepdent driver and just like
-CPUFREQ notifies it's users for the frequency
-change, this driver will be notified to take any action on pre and
-post notification. Note that, the driver will
-be notified by regulator framework for the voltage ramp up/down cases
-too with notifiers.
+Hi Darius,
 
->> > - Temperature alert configuration and handling of temperature
->> >   alerts, if any for LPDDR2 devices
->> >   * temperature alert is based on periodic polling of MR4 mode
->> >     register in DDR devices automatically performed by hardware
->> >   * timings are de-rated and brought back to nominal when
->> >     temperature raises and falls respectively
->
-> This can be a feature overriding "max_freq" inside the Omap EMIF devfreq device driver though it maybe (or not.. I just don't sure) be better to use thermal framework as well.
->
-That's absolute abuse and there is no need to link the temperature
-handling with DVFS. Reducing frequency can be one
-of the cooling techniques but that's not related to the temperature
-alert handling. Temperature handling in the EMIF
-driver is strictly as per the JDEC specs and that is to de-rate the
-timings when temperature threshold is crossed.
+On 19 March 2012 05:16, Jingoo Han <jg1.han@samsung.com> wrote:
+[...]
 
-The idea is drivers should be independent of all the global policy
-governors. Hope this is clear to
-you.
+>
+> Because there are not multiple windows and driver sees only single window as you mentiond,
+> Only 'struct s3c_fb_pd_win mini6410_fb_win[0]' should be used and
+> 'struct s3c_fb_pd_win mini6410_fb_win[1]' should not be used.
+> s3c_fb_pd_win[0] means window 0 of FIMD IP, s3c_fb_pd_win[1] means window 1 of FIMD IP.
+>
+> Therefore, if mini6410_fb_win[0] and mini6410_fb_win[1] are included, it means that
+> 2 windows of FIMD IP are used in single LCD.
+>
+> If you want to support multiple LCDs, you should use struct s3c_fb_platdata[0], struct s3c_fb_platdata[1],
+> because 'struct s3c_fb_platdata' means LCD panel.
+>
+> If you understand the purpose of s3c_fb_platdata and s3c_fb_pd_win, you should do, at least, as below.
+>
+> static struct s3c_fb_pd_win mini6410_fb_lcd0_win[] = {
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.win_mode ? ? ? = { ? ? /* 4.3" 480x272 */
+> ? ? ? ? ? ? ? ? ? ? ? ?.left_margin ? ?= 3,
+> ? ? ? ? ? ? ? ? ? ? ? ?.right_margin ? = 2,
+> ? ? ? ? ? ? ? ? ? ? ? ?.upper_margin ? = 1,
+> ? ? ? ? ? ? ? ? ? ? ? ?.lower_margin ? = 1,
+> ? ? ? ? ? ? ? ? ? ? ? ?.hsync_len ? ? ?= 40,
+> ? ? ? ? ? ? ? ? ? ? ? ?.vsync_len ? ? ?= 1,
+> ? ? ? ? ? ? ? ? ? ? ? ?.xres ? ? ? ? ? = 480,
+> ? ? ? ? ? ? ? ? ? ? ? ?.yres ? ? ? ? ? = 272,
+> ? ? ? ? ? ? ? ?},
+> ? ? ? ? ? ? ? ?.max_bpp ? ? ? ?= 32,
+> ? ? ? ? ? ? ? ?.default_bpp ? ?= 16,
+> ? ? ? ?},
+> };
+>
+> static struct s3c_fb_platdata mini6410_lcd_pdata[0] __initdata = {
+> ? ? ? ?.setup_gpio ? ? = s3c64xx_fb_gpio_setup_24bpp,
+> ? ? ? ?.win[0] ? ? ? ? = &mini6410_fb_lcd0_win[0],
+> ? ? ? ?.vidcon0 ? ? ? ?= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+> ? ? ? ?.vidcon1 ? ? ? ?= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+> };
+>
+> static struct s3c_fb_pd_win mini6410_fb_lcd1_win[] = {
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.win_mode ? ? ? = { ? ? /* 7.0" 800x480 */
+> ? ? ? ? ? ? ? ? ? ? ? ?.left_margin ? ?= 8,
+> ? ? ? ? ? ? ? ? ? ? ? ?.right_margin ? = 13,
+> ? ? ? ? ? ? ? ? ? ? ? ?.upper_margin ? = 7,
+> ? ? ? ? ? ? ? ? ? ? ? ?.lower_margin ? = 5,
+> ? ? ? ? ? ? ? ? ? ? ? ?.hsync_len ? ? ?= 3,
+> ? ? ? ? ? ? ? ? ? ? ? ?.vsync_len ? ? ?= 1,
+> ? ? ? ? ? ? ? ? ? ? ? ?.xres ? ? ? ? ? = 800,
+> ? ? ? ? ? ? ? ? ? ? ? ?.yres ? ? ? ? ? = 480,
+> ? ? ? ? ? ? ? ?},
+> ? ? ? ? ? ? ? ?.max_bpp ? ? ? ?= 32,
+> ? ? ? ? ? ? ? ?.default_bpp ? ?= 16,
+> ? ? ? ?},
+> };
+>
+> static struct s3c_fb_platdata mini6410_lcd_pdata[1] __initdata = {
+> ? ? ? ?.setup_gpio ? ? = s3c64xx_fb_gpio_setup_24bpp,
+> ? ? ? ?.win[0] ? ? ? ? = &mini6410_fb_lcd1_win[0],
+> ? ? ? ?.vidcon0 ? ? ? ?= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+> ? ? ? ?.vidcon1 ? ? ? ?= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+> };
+>
+> Each struct means:
+> ?mini6410_lcd_pdata[0]: 4.3" 480x272 LCD
+> ?mini6410_fb_lcd0_win[0]: window 0 used for 4.3" 480x272 LCD
+>
+> ?mini6410_lcd_pdata[1]: 7.0" 800x480 LCD
+> ?mini6410_fb_lcd1_win[0]: window 0 used for 7.0" 800x480 LCD
+>
+> In this case, 4.3" or 7.0" LCD can be selected using mini6410_lcd_pdata[], instead of selecting mini6410_fb_win[0] or
+> mini6410_fb_win[1].
+>
+> My point is that 's3c_fb_platdata and s3c_fb_pd_win should be used exactly'.
 
-Regards
-Santosh
+I agree with solution which Jingoo Han has proposed. Instead of
+selecting one instance of s3c_fb_pd_win over the other at runtime, the
+features->lcd_index can be used to select one of the instances of
+platform data for s3c-fb driver.
+
+s3c_fb_pd_win is used to describe a window supported by the fimd
+controller. It is not meant to carry lcd timing information. The lcd
+panel timing remains the same irrespective of the window sizes. And
+this patchset is a step towards untangling window information and
+video timing.
+
+(Apologizes for the delayed reply. I was out of office for last 4 days.)
+
+Thanks,
+Thomas.
