@@ -1,45 +1,44 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 20 Mar 2012 10:46:11 -0700 (PDT)
-Subject: [PATCH v7 2/3] clk: introduce the common clock framework
-In-Reply-To: <20120320140220.GE32469@S2101-09.ap.freescale.net>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <1331878280-2758-3-git-send-email-mturquette@linaro.org>
- <20120320140220.GE32469@S2101-09.ap.freescale.net>
-Message-ID: <efca11f1b68186dbf1771c09fe3a2f0a.squirrel@www.codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 20 Mar 2012 10:46:57 -0700
+Subject: [PATCH v4 RESEND 0/7] gpio/omap: Some more driver fixes
+In-Reply-To: <20120320143544.AA6E93E2834@localhost> (Grant Likely's message of
+ "Tue, 20 Mar 2012 14:35:44 +0000")
+References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+ <20120320143544.AA6E93E2834@localhost>
+Message-ID: <87haxj17xq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Grant,
 
-On Tue, March 20, 2012 7:02 am, Shawn Guo wrote:
-> On Thu, Mar 15, 2012 at 11:11:19PM -0700, Mike Turquette wrote:
-> ...
->> +struct clk_ops {
->> +	int		(*prepare)(struct clk_hw *hw);
->> +	void		(*unprepare)(struct clk_hw *hw);
->> +	int		(*enable)(struct clk_hw *hw);
->> +	void		(*disable)(struct clk_hw *hw);
->> +	int		(*is_enabled)(struct clk_hw *hw);
->> +	unsigned long	(*recalc_rate)(struct clk_hw *hw,
->> +					unsigned long parent_rate);
+Grant Likely <grant.likely@secretlab.ca> writes:
+
+> On Tue, 20 Mar 2012 16:23:12 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
+>> This series excludes the cleanup patches as suggested by Kevin from
+>> the previously posted series.
+>> 
+>> The fixes include correction of _set_gpio_irqenable() implementation,
+>> missing wakeup_en register update in set_gpio_wakeup(), type mismatch
+>> of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
+>> register update in set_gpio_dataout_() and few corrections in context
+>> save logic.
+>> 
+>> It is baselined on top of:
+>> git://git.secretlab.ca/git/linux-2.6.git gpio/next
+>> Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
+>> 
+>> Series is available here for reference:
+>> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_fixes
 >
-> I believe I have heard people love the interface with parent_rate
-> passed in.  I love that too.  But I would like to ask the same thing
-> on .round_rate and .set_rate as well for the same reason why we have
-> it for .recalc_rate.
+> Merged; thanks
 
-In my case, for most clocks, set rate involves reparenting. So, what does
-passing parent_rate for these even mean? Passing parent_rate seems more
-apt for recalc_rate since it's called when the parent rate changes -- so,
-the actual parent itself is not expected to change.
+Can you hold off slightly before merging this.
 
-I could ignore the parameter, but just wondering how many of the others
-see value in this. And if we do add this parameter, it shouldn't be made
-mandatory for the platform driver to use it (due to other assumptions the
-clock framework might make).
+I haven't been through v4 yet or tested the fixes alone now that they're
+separated from the other cleanups.
 
--Saravana
+Expect a pull request from me when ready.
 
+Thanks,
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kevin
