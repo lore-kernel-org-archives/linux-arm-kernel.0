@@ -1,67 +1,51 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 20 Mar 2012 15:22:46 -0500
-Subject: [PATCH v8 5/8] ARM: omap: Consolidate OMAP3 time keeping and irq
+Date: Tue, 20 Mar 2012 15:22:47 -0500
+Subject: [PATCH v8 6/8] ARM: omap: Consolidate OMAP4 time keeping and irq
  enable
 In-Reply-To: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
 References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1332274969-15782-6-git-send-email-rob.lee@linaro.org>
+Message-ID: <1332274969-15782-7-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use core cpuidle timekeeping and irqen wrapper and remove that
+Enable core cpuidle timekeeping and irq enabling and remove that
 handling from this code.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Tested-by: Jean Pihet<j-pihet@ti.com>
 Acked-by: Jean Pihet<j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   42 +++++++++++++++----------------------
- 1 file changed, 17 insertions(+), 25 deletions(-)
+ arch/arm/mach-omap2/cpuidle44xx.c |   21 +++------------------
+ 1 file changed, 3 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 464cffd..5358664 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -87,29 +87,14 @@ static int _cpuidle_deny_idle(struct powerdomain *pwrdm,
- 	return 0;
- }
- 
--/**
-- * omap3_enter_idle - Programs OMAP3 to enter the specified state
-- * @dev: cpuidle device
-- * @drv: cpuidle driver
-- * @index: the index of state to be entered
-- *
-- * Called from the CPUidle framework to program the device to the
-- * specified target state selected by the governor.
-- */
--static int omap3_enter_idle(struct cpuidle_device *dev,
-+static int __omap3_enter_idle(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv,
- 				int index)
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 72e018b..f386cbe 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -62,15 +62,9 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
  {
- 	struct omap3_idle_statedata *cx =
+ 	struct omap4_idle_statedata *cx =
  			cpuidle_get_statedata(&dev->states_usage[index]);
 -	struct timespec ts_preidle, ts_postidle, ts_idle;
- 	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
+ 	u32 cpu1_state;
 -	int idle_time;
--
+ 	int cpu_id = smp_processor_id();
+ 
 -	/* Used to keep track of the total time in idle */
 -	getnstimeofday(&ts_preidle);
- 
+-
 -	local_irq_disable();
  	local_fiq_disable();
  
- 	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
-@@ -148,22 +133,29 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
- 	}
+ 	/*
+@@ -128,26 +122,17 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
+ 	if (index > 0)
+ 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
  
- return_sleep_time:
 -	getnstimeofday(&ts_postidle);
 -	ts_idle = timespec_sub(ts_postidle, ts_preidle);
- 
+-
 -	local_irq_enable();
  	local_fiq_enable();
  
@@ -74,25 +58,16 @@ index 464cffd..5358664 100644
  	return index;
  }
  
- /**
-+ * omap3_enter_idle - Programs OMAP3 to enter the specified state
-+ * @dev: cpuidle device
-+ * @drv: cpuidle driver
-+ * @index: the index of state to be entered
-+ *
-+ * Called from the CPUidle framework to program the device to the
-+ * specified target state selected by the governor.
-+ */
-+static inline int omap3_enter_idle(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv,
-+				int index)
-+{
-+	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
-+}
-+
-+/**
-  * next_valid_state - Find next valid C-state
-  * @dev: cpuidle device
-  * @drv: cpuidle driver
+ DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
+ 
+ struct cpuidle_driver omap4_idle_driver = {
+-	.name =		"omap4_idle",
+-	.owner =	THIS_MODULE,
++	.name				= "omap4_idle",
++	.owner				= THIS_MODULE,
++	.en_core_tk_irqen		= 1,
+ };
+ 
+ static inline void _fill_cstate(struct cpuidle_driver *drv,
 -- 
 1.7.9.4
