@@ -1,44 +1,88 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 20 Mar 2012 10:46:57 -0700
-Subject: [PATCH v4 RESEND 0/7] gpio/omap: Some more driver fixes
-In-Reply-To: <20120320143544.AA6E93E2834@localhost> (Grant Likely's message of
- "Tue, 20 Mar 2012 14:35:44 +0000")
-References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
- <20120320143544.AA6E93E2834@localhost>
-Message-ID: <87haxj17xq.fsf@ti.com>
+Date: Tue, 20 Mar 2012 10:49:45 -0700
+Subject: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
+ deeper C-states
+In-Reply-To: <CAHSGOuuexpCDNoP1G1Gyge2DCep0rsPmUwrVyZFDQ1_tH+Du7Q@mail.gmail.com>
+ (melwyn lobo's message of "Tue, 20 Mar 2012 20:19:02 +0530")
+References: <1316475315-5905-1-git-send-email-khilman@ti.com>
+ <87d3d75zo6.fsf@ti.com> <4EBA6046.2060305@linux.vnet.ibm.com>
+ <37CAE120BAE10B42A790DD1418C8021D0136C7@DNCE02.ent.ti.com>
+ <CAHSGOuuexpCDNoP1G1Gyge2DCep0rsPmUwrVyZFDQ1_tH+Du7Q@mail.gmail.com>
+Message-ID: <878viv17t2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+melwyn lobo <linux.melwyn@gmail.com> writes:
 
-Grant Likely <grant.likely@secretlab.ca> writes:
+> Hey Kevin,
+> I would like to try out this patch in my platform see the benefits
+> that you are reporting. But there is one issue in this patch. You have
+> not initialized "hrtimer_timeout" variable.
+> This will always be 0 right ?.
 
-> On Tue, 20 Mar 2012 16:23:12 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
->> This series excludes the cleanup patches as suggested by Kevin from
->> the previously posted series.
->> 
->> The fixes include correction of _set_gpio_irqenable() implementation,
->> missing wakeup_en register update in set_gpio_wakeup(), type mismatch
->> of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
->> register update in set_gpio_dataout_() and few corrections in context
->> save logic.
->> 
->> It is baselined on top of:
->> git://git.secretlab.ca/git/linux-2.6.git gpio/next
->> Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
->> 
->> Series is available here for reference:
->> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_fixes
->
-> Merged; thanks
+Correct.
 
-Can you hold off slightly before merging this.
-
-I haven't been through v4 yet or tested the fixes alone now that they're
-separated from the other cleanups.
-
-Expect a pull request from me when ready.
-
-Thanks,
+The generic code defaults to zero so that the default behavior with this
+patch is unchanged from previous behavior.  In order to use this
+feature, your platform-specific code which creates your C-states sets
+the per-C-state timer values.
 
 Kevin
+
+> Thanks,
+> -M
+>
+> On Wed, Nov 9, 2011 at 11:36 PM, Chalhoub, Nicole <n-chalhoub@ti.com> wrote:
+>> Hi Deepthi,
+>>
+>>>
+>> Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 753.920
+>>
+>> -----Original Message-----
+>>> From: Deepthi Dharwar [mailto:deepthi at linux.vnet.ibm.com]
+>>> Sent: Wednesday, November 09, 2011 12:13 PM
+>>> To: Hilman, Kevin
+>>> Cc: linux-kernel at vger.kernel.org; Arjan van de Ven; linux-arm-
+>>> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-
+>>> pm at lists.linux-foundation.org; Chalhoub, Nicole
+>>> Subject: Re: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
+>>> deeper C-states
+>>
+>> [...]
+>>> By setting timers when we enter non-deepest C-state possible, such that
+>>> when it fires we
+>>> can re-evaluate and try moving into deeper and deeper C-states enhancing
+>>> the
+>>> power savings is a good feature to have.
+>>>
+>>> Looking at the current implementation, is it possible to have it as
+>>> configurable option
+>>> where one can enable/disable this functionality through the backhand
+>>> driver ?
+>>
+>> The timeout values of the c state timers are set in the backhand driver.
+>> By setting the timeout to 0 the timers will not fire so you'll not have this functionality enabled
+>>
+>>> Also I am thinking, instead of having them in governor
+>>> wouldnt it be a good idea to have it implemented in
+>>> the backhand driver itself ?
+>>> --Deepthi
+>>
+>>
+>> In fact each C-state had its own configurable timer, so it is a parameter characterizing a C-state as it is for the exit_latency and target_residency parameters.
+>> And we wanted the timer to fire only when we do not go in deep Cstate due to a high load. This decision is made in the CPU idle governor. So the functionality should be seen from the governor..
+>>
+>> Thanks and Regards
+>> Nicole
+>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at ?http://www.tux.org/lkml/
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
