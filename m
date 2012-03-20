@@ -1,68 +1,60 @@
-From: john@szakmeister.net (John Szakmeister)
-Date: Tue, 20 Mar 2012 14:28:15 -0400
-Subject: No subject
-Message-ID: <CAEBDL5WkFo-W32zTrJ6d_T2RzkocOVr-8aOU-ydApwxAH4fcFw@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 20 Mar 2012 14:34:04 -0400
+Subject: linux-next: "ARM: make mach/io.h include optional" commit breaks
+ cm_x2xx_defconfig
+Message-ID: <4F68CD9C.3090001@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've been running into several issues on the cache flushing front,
-and I'm hoping that someone here can help clarify what should be
-happening from a kernel perspective.
+Hi Rob,
 
-Late last year we discovered a few interesting problems.  One of them
-is definitely our fault: we weren't flushing the cache after we read
-data from a block device a wrote it into the page.  However, there was
-another issue we noticed that made less sense: we had to flush a page
-before writing it to our block device, otherwise we end up writing
-some stale data.  The brd device ran into this issue before, and fixed
-it in commit c2572f2b[1].  In that commit Nick Pidgin says:
-    "brd is missing a flush_dcache_page. On 2nd thoughts, perhaps it is the
-     pagecache's responsibility to flush user virtual aliases (the driver of
-     course should flush kernel virtual mappings)... but anyway, there
-     already exists cache flushing for one direction of transfer, so we
-     should add the other."
+If you have a moment can you check this build failure?
 
-I can't help but to feel he's right.  It was very surprising to me
-that I had to flush the user virtual aliases before writing the data
-to the device.  Is it expected that we (as device driver writers) have
-to do that for block device drivers?  I love Linux, but one of the
-aspects I find most frustrating is that I don't know what I can safely
-assume at interface boundaries.  Even modeling my work after existing
-code yields problems, because a number of drivers in the tree seem to
-be broken in this regard.
+http://kisskb.ellerman.id.au/kisskb/buildresult/5923845/
 
-But it leads to another concern.  Since I do have to flush on writes,
-it got me thinking about whether it's necessary to flush user mode
-aliases before conducting a read.  Consider the fact that a page can
-span multiple blocks.  Is it possible that:
-  * we're asked to read a block of data
-  * a user app has scribbled on the page (so it's dirty, but not flushed)
-  * we read the requested data from the device
-  * load it into the page
-  * do a flush_dcache_page()
-  * then the data read from the device becomes corrupt because cached user data
-    is written to RAM?
+A git bisect seems to want to blame your commit for it.
 
-Or, instead of that, the cached data gets dropped entirely because it
-was on the page, but shouldn't have been because we didn't read new
-data into that area, and now that user data is lost?  I confess this
-may all be my lack of understanding about Linux's block i/o subsystem,
-but I'm thoroughly confused at this point.  What I do know is that
-other device drivers are not flushing the page before writing the data
-to a device.  For instance, the mmc driver for the at91 architecture
-suffers from this problem, and I've been able to see that problem
-using mmap.  My concern is that many other drivers also suffer from
-this problem, so I'm not sure what the fix needs to be: fix the page
-cache, fix the driver, or both.
+Thanks,
+Paul.
 
-Also, is there somewhere that says what's guaranteed on entry into my
-block device driver?  I've scoured everything I could find... the
-Documentation area (including cachetlb.txt), Linux sites, books...
-I've yet to find anything mentioning the need to call
-flush_dcache_page() much less talk about what the assumptions are.
+---
 
-Thanks in advance for the help.
+c334bc150524f833db3c76a0aaf55fb5044444e1 is the first bad commit
+commit c334bc150524f833db3c76a0aaf55fb5044444e1
+Author: Rob Herring <rob.herring@calxeda.com>
+Date:   Sun Mar 4 22:03:33 2012 -0600
 
--John
+    ARM: make mach/io.h include optional
 
-[1]: <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=c2572f2b4ffc27ba79211aceee3bef53a59bb5cd>
+
+git bisect start
+# good: [fde7d9049e55ab85a390be7f415d74c9f62dd0f9] Linux 3.3-rc7
+git bisect good fde7d9049e55ab85a390be7f415d74c9f62dd0f9
+# bad: [f355e8684f7e8e7077ca6d3988f24e01047804b6] Add linux-next specific files for 20120320
+git bisect bad f355e8684f7e8e7077ca6d3988f24e01047804b6
+# good: [5fe35ba6690ea0136d649cb2a07ac3f64a4c3cfb] Merge remote-tracking branch 'sound/for-next'
+git bisect good 5fe35ba6690ea0136d649cb2a07ac3f64a4c3cfb
+# good: [5260d60f170ebd381538dd56f6f6b765cbf9db29] Merge remote-tracking branch 'tip/auto-latest'
+git bisect good 5260d60f170ebd381538dd56f6f6b765cbf9db29
+# good: [2eb0aaa70022cbd3cdac7bdb610ed79a3b0c60a7] Merge remote-tracking branch 'writeback/writeback-for-next'
+git bisect good 2eb0aaa70022cbd3cdac7bdb610ed79a3b0c60a7
+# bad: [da7499ed07635785926c4a12915f54c61dc44170] Merge branch 'next/clk' into for-next
+git bisect bad da7499ed07635785926c4a12915f54c61dc44170
+# good: [eae71abd0e6d466105c66a40115907335a3e20fa] Merge branch 'next/boards' into for-next
+git bisect good eae71abd0e6d466105c66a40115907335a3e20fa
+# good: [cdc3df6f44f72c5924a16a47e1663c3fb0e57820] Merge branch 'dt-part2' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/dt
+git bisect good cdc3df6f44f72c5924a16a47e1663c3fb0e57820
+# good: [f66f9bdf6d2c2b540f73bb57bd24b886b39beb14] Merge branch 'lpc32xx/drivers' into next/drivers
+git bisect good f66f9bdf6d2c2b540f73bb57bd24b886b39beb14
+# good: [e5412a49eceeab5b9ecb761b536ad7ac829e1c45] Merge branch 'next/dt' into for-next
+git bisect good e5412a49eceeab5b9ecb761b536ad7ac829e1c45
+# good: [efa497b9ec8cc534f8883a2d1d42f52174070f38] ARM: dove: add explicit include of dove.h to addr-map.c
+git bisect good efa497b9ec8cc534f8883a2d1d42f52174070f38
+# bad: [accf709b39a9cdbeaf6233000ccb9af966fd691e] Merge branch 'io-cleanup-for-3.4' of git://sources.calxeda.com/kernel/linux into next/cleanup2
+git bisect bad accf709b39a9cdbeaf6233000ccb9af966fd691e
+# bad: [708795cd975579ba7115666f585c428f8cebd572] Merge branch 'io-cleanup-for-3.4' of git://sources.calxeda.com/kernel/linux into next/cleanup2
+git bisect bad 708795cd975579ba7115666f585c428f8cebd572
+# bad: [c334bc150524f833db3c76a0aaf55fb5044444e1] ARM: make mach/io.h include optional
+git bisect bad c334bc150524f833db3c76a0aaf55fb5044444e1
+# good: [41e32c906054be3a600cdeb69eb70350066e0a91] ARM: clps711x: remove unneeded include of mach/io.h
+git bisect good 41e32c906054be3a600cdeb69eb70350066e0a91
