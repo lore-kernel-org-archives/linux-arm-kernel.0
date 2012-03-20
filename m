@@ -1,34 +1,76 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 20 Mar 2012 08:50:59 +0100
-Subject: [PATCH 1/1] net: phylib: remove the length limitation of mii
- bus id
-In-Reply-To: <1332217679-3703-1-git-send-email-b29396@freescale.com>
-References: <1332217679-3703-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120320075059.GA3849@pengutronix.de>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 20 Mar 2012 00:54:55 -0700 (PDT)
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <20120320072018.GC32469@S2101-09.ap.freescale.net>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+ <20120320072018.GC32469@S2101-09.ap.freescale.net>
+Message-ID: <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aisheng,
 
-> So changed to remove the bus id length limitation, a lot of handwork.
+On Tue, March 20, 2012 12:20 am, Shawn Guo wrote:
+> On Mon, Mar 19, 2012 at 08:38:26PM -0700, Saravana Kannan wrote:
+>> This has a couple of advantages:
+>> * Completely hides struct clk from many clock platform drivers and
+>> static
+>>   clock initialization code.
+>> * Simplifies the generic clk_register() function and allows adding
+>> optional
+>>   fields in the future without modifying the function signature.
+>> * Allows for simpler static initialization of clocks on all platforms by
+>>   removing the need for forward delcarations.
+>> * Halves the number of symbols added for each static clock
+>> initialization.
+>>
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>
+> I agree this is a reasonable move.  But while you simplify the interface
+> of clk_register(), why not making a further step to simplify the
+> following interfaces simple too?
+>
+> struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 unsigned long fixed_rate);
+> struct clk *clk_register_gate(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 void __iomem *reg, u8 bit_idx,
+>                 u8 clk_gate_flags, spinlock_t *lock);
+> struct clk *clk_register_divider(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 void __iomem *reg, u8 shift, u8 width,
+>                 u8 clk_divider_flags, spinlock_t *lock);
+> struct clk *clk_register_mux(struct device *dev, const char *name,
+>                 char **parent_names, u8 num_parents, unsigned long flags,
+>                 void __iomem *reg, u8 shift, u8 width,
+>                 u8 clk_mux_flags, spinlock_t *lock);
 
-You might want to try 'coccinelle' [1] next time. This is a tool exactly for
-such kind of work. Already some basic knowledge can help you for a
-number of tasks.
+If you simplify those functions further. They would just become
+clk_register(). I'm not sure I see a value in them in at that point or
+even in their current form. But if others see (I'm guessing since they
+acked or didn't nack it), I'm not going to ask to remove them. If everyone
+agrees that we should just remove them, I would be glad to.
 
-Regards,
+It's arguable that these functions for the common hardware types saves the
+need to deal with the kalloc in every platform driver. But it's not clear
+to me where they would get these parameters in the first place. Most
+likely form some sort of static array. At which point, it might as well be
+a static array of pointers to clk_gated.hw, clk_fixed_rate.hw, etc instead
+of a platform specific  struct to hold these initializers.
 
-   Wolfram
+Btw, I need to fix the macros too. Or may be even delete them. Will see
+the overall response before I send out v2 to do that.
 
-[1] http://en.wikipedia.org/wiki/Coccinelle_%28software%29
+>
+> Otherwise,
+>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Thanks
+
+-Saravana
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120320/ae6ddc62/attachment.sig>
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
