@@ -1,65 +1,113 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 20 Mar 2012 16:23:12 +0530
-Subject: [PATCH v4 RESEND 0/7] gpio/omap: Some more driver fixes
-Message-ID: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+Date: Tue, 20 Mar 2012 16:23:19 +0530
+Subject: [PATCH v4 RESEND 7/7] gpio/omap: fix redundant decoding of gpio offset
+In-Reply-To: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1332240799-6748-8-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series excludes the cleanup patches as suggested by Kevin from
-the previously posted series.
+In gpio_get(), _get_gpio_datain() and _get_gpio_dataout() get rid of
+un-necessary operation to compute gpio mask. The gpio offset passed
+to gpio_get() is sufficient to do that.
 
-The fixes include correction of _set_gpio_irqenable() implementation,
-missing wakeup_en register update in set_gpio_wakeup(), type mismatch
-of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
-register update in set_gpio_dataout_() and few corrections in context
-save logic.
+Here is Russell's original comment:
+Can someone explain to me this:
 
-It is baselined on top of:
-git://git.secretlab.ca/git/linux-2.6.git gpio/next
-Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
+static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
+{
+       void __iomem *reg = bank->base + bank->regs->datain;
 
-Series is available here for reference:
-git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_fixes
+       return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
+}
 
-Power Test:
-Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
-Also confirmed that dataout register content preserved over
-off-mode.
+static int gpio_get(struct gpio_chip *chip, unsigned offset)
+{
+       struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
+       void __iomem *reg = bank->base;
+       int gpio = chip->base + offset;
+       u32 mask = GPIO_BIT(bank, gpio);
 
-Functional Test:
-OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430, OMAP4-BLAZE
+       if (gpio_is_input(bank, mask))
+               return _get_gpio_datain(bank, gpio);
+       else
+               return _get_gpio_dataout(bank, gpio);
+}
 
-v4:
-a) Implemented all comments on v3 which are mostly related to
-avoiding unnecessary register read while updating the context.
+Given that bank->width on OMAP is either 32 or 16, and GPIO numbers for
+any GPIO chip are always aligned to 32 or 16, why does this code bother
+adding the chips base gpio number and then modulo the width?
 
-b) Folded:
-gpio/omap: fix dataout register overwrite in _set_gpio_dataout
-into:
-gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
+Surely this means if - for argument sake - you registered a GPIO chip
+with 8 lines followed by one with 16 lines, GPIO0..7 would be chip 0
+bit 0..7, GPIO8..15 would be chip 1 bit 8..15, GPIO16..23 would be
+chip 1 bit 0..7.
 
-v3:
-- Added 4 more additional patches to the previous series
- which are all bug fixes.
+However, if you registered a GPIO chip with 16 lines first, it would
+mean GPIO0..15 would be chip 0 bit 0..15, and GPIO16..31 would be
+chip 1 bit 0..15.
 
-v2:
-- Added a new patch to update wakeup_en register in _set_gpio_wakeup()
- in addition to updating bank->context.wake_en.
+Surely this kind of behaviour is not intended?
 
-- Added a new patch to remove redundant decoding of gpio offset in
- gpio_get(), _get_gpio_datain() and _get_gpio_dataout().
+Is there a reason why the bitmask can't just be (1 << offset) where
+offset is passed into these functions as GPIO number - chip->base ?
 
-- Added a new patch to remove suspend/resume callbacks because the
- operations performed with the callbacks are redundant.
+Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/gpio/gpio-omap.c |   18 +++++++-----------
+ 1 files changed, 7 insertions(+), 11 deletions(-)
 
-Tarun Kanti DebBarma (7):
-  gpio/omap: fix wakeup_en register update in _set_gpio_wakeup()
-  gpio/omap: fix trigger type to unsigned
-  gpio/omap: fix _set_gpio_irqenable implementation
-  gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
-  gpio/omap: fix incorrect context restore logic in omap_gpio_runtime_*
-  gpio/omap: fix incorrect update to context.irqenable1
-  gpio/omap: fix redundant decoding of gpio offset
-
- drivers/gpio/gpio-omap.c |   47 ++++++++++++++++++++++++---------------------
- 1 files changed, 25 insertions(+), 22 deletions(-)
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 6c17e58..1adc2ec 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -147,18 +147,18 @@ static void _set_gpio_dataout_mask(struct gpio_bank *bank, int gpio, int enable)
+ 	bank->context.dataout = l;
+ }
+ 
+-static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
++static int _get_gpio_datain(struct gpio_bank *bank, int offset)
+ {
+ 	void __iomem *reg = bank->base + bank->regs->datain;
+ 
+-	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
++	return (__raw_readl(reg) & (1 << offset)) != 0;
+ }
+ 
+-static int _get_gpio_dataout(struct gpio_bank *bank, int gpio)
++static int _get_gpio_dataout(struct gpio_bank *bank, int offset)
+ {
+ 	void __iomem *reg = bank->base + bank->regs->dataout;
+ 
+-	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
++	return (__raw_readl(reg) & (1 << offset)) != 0;
+ }
+ 
+ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
+@@ -865,19 +865,15 @@ static int gpio_is_input(struct gpio_bank *bank, int mask)
+ static int gpio_get(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct gpio_bank *bank;
+-	void __iomem *reg;
+-	int gpio;
+ 	u32 mask;
+ 
+-	gpio = chip->base + offset;
+ 	bank = container_of(chip, struct gpio_bank, chip);
+-	reg = bank->base;
+-	mask = GPIO_BIT(bank, gpio);
++	mask = (1 << offset);
+ 
+ 	if (gpio_is_input(bank, mask))
+-		return _get_gpio_datain(bank, gpio);
++		return _get_gpio_datain(bank, offset);
+ 	else
+-		return _get_gpio_dataout(bank, gpio);
++		return _get_gpio_dataout(bank, offset);
+ }
+ 
+ static int gpio_output(struct gpio_chip *chip, unsigned offset, int value)
+-- 
+1.7.0.4
