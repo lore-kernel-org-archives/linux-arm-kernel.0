@@ -1,58 +1,38 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 20 Mar 2012 16:53:56 -0700
-Subject: [PATCH v7 2/3] clk: introduce the common clock framework
-In-Reply-To: <efca11f1b68186dbf1771c09fe3a2f0a.squirrel@www.codeaurora.org>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <1331878280-2758-3-git-send-email-mturquette@linaro.org>
- <20120320140220.GE32469@S2101-09.ap.freescale.net>
- <efca11f1b68186dbf1771c09fe3a2f0a.squirrel@www.codeaurora.org>
-Message-ID: <CAJOA=zNmgSQfYAUZ-vqqTk0w3s3eKz3tjVOpyDgO35Q_Ogkz0g@mail.gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 21 Mar 2012 08:56:51 +0900
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <4F688B2D.20808@gmail.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+ <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
+ <4F688B2D.20808@gmail.com>
+Message-ID: <CAHQjnOMjSPDOymJe356AWnJszQv+X-QWrVrB7ahYDkXBr5HrQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 10:46 AM, Saravana Kannan
-<skannan@codeaurora.org> wrote:
-> On Tue, March 20, 2012 7:02 am, Shawn Guo wrote:
->> On Thu, Mar 15, 2012 at 11:11:19PM -0700, Mike Turquette wrote:
->> ...
->>> +struct clk_ops {
->>> + ? ?int ? ? ? ? ? ? (*prepare)(struct clk_hw *hw);
->>> + ? ?void ? ? ? ? ? ?(*unprepare)(struct clk_hw *hw);
->>> + ? ?int ? ? ? ? ? ? (*enable)(struct clk_hw *hw);
->>> + ? ?void ? ? ? ? ? ?(*disable)(struct clk_hw *hw);
->>> + ? ?int ? ? ? ? ? ? (*is_enabled)(struct clk_hw *hw);
->>> + ? ?unsigned long ? (*recalc_rate)(struct clk_hw *hw,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long parent_rate);
->>
->> I believe I have heard people love the interface with parent_rate
->> passed in. ?I love that too. ?But I would like to ask the same thing
->> on .round_rate and .set_rate as well for the same reason why we have
->> it for .recalc_rate.
+On Tue, Mar 20, 2012 at 10:50 PM, Subash Patel <subashrp@gmail.com> wrote:
+> Sorry for digging this very late. But as part of integrating dma_map v7 &
+> sysmmu v12 on 3.3-rc5, I am facing below issue:
 >
-> In my case, for most clocks, set rate involves reparenting. So, what does
-> passing parent_rate for these even mean? Passing parent_rate seems more
-> apt for recalc_rate since it's called when the parent rate changes -- so,
-> the actual parent itself is not expected to change.
+> a) By un-selecting IOMMU in menu config, I am able to allocate memory in
+> vb2-dma-contig
+>
+> b) When I enable SYSMMU support for the IP's, I am receiving below fault:
+>
+> Unhandled fault: external abort on non-linefetch (0x818) at 0xb6f55000
+>
+> I think this has something to do with the access to the SYSMMU registers for
+> writing the page table. Has anyone of you faced this issue while testing
+> these(dma_map+iommu) patches on kernel mentioned above? This must be
+> something related to recent changes, as I didn't have issues with these
+> patches on 3.2 kernel.
+>
 
->From my conversations with folks across many platforms, I think that
-the way your clock tree expects to change rates is the exception, not
-the rule.  As such you should just ignore the parent_rate parameter as
-it useless to you.
+0xb6f55000 is not an address of SYSMMU register if your kernel starts
+at 0xc0000000.
 
-> I could ignore the parameter, but just wondering how many of the others
-> see value in this. And if we do add this parameter, it shouldn't be made
-> mandatory for the platform driver to use it (due to other assumptions the
-> clock framework might make).
-
->From my rough census of folks that actually need .set_rate support, I
-think that everyone except MSM could benefit from this.  Your concept
-of clk_set_rate is everyone else's clk_set_parent.
-
-Ignoring the new parameter should cause you no harm.  It does make me
-wonder if it would be a good idea to pass in the parent rate for
-.set_parent, which is analogous to .set_rate in many ways.
+Can you tell me any detailed information or situation?
 
 Regards,
-Mike
 
-> -Saravana
+KyongHo.
