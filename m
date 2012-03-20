@@ -1,69 +1,112 @@
-From: linux.melwyn@gmail.com (melwyn lobo)
-Date: Tue, 20 Mar 2012 20:19:02 +0530
-Subject: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
- deeper C-states
-In-Reply-To: <37CAE120BAE10B42A790DD1418C8021D0136C7@DNCE02.ent.ti.com>
-References: <1316475315-5905-1-git-send-email-khilman@ti.com>
- <87d3d75zo6.fsf@ti.com> <4EBA6046.2060305@linux.vnet.ibm.com>
- <37CAE120BAE10B42A790DD1418C8021D0136C7@DNCE02.ent.ti.com>
-Message-ID: <CAHSGOuuexpCDNoP1G1Gyge2DCep0rsPmUwrVyZFDQ1_tH+Du7Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Mar 2012 15:54:45 +0100
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <20120319144517.C19E93E05A5@localhost>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <20120317094059.7C2333E08E2@localhost> <4F6734DD.3020203@atmel.com>
+ <20120319144517.C19E93E05A5@localhost>
+Message-ID: <4F689A35.2080305@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Kevin,
-I would like to try out this patch in my platform see the benefits
-that you are reporting. But there is one issue in this patch. You have
-not initialized "hrtimer_timeout" variable.
-This will always be 0 right ?.
-Thanks,
--M
-
-On Wed, Nov 9, 2011 at 11:36 PM, Chalhoub, Nicole <n-chalhoub@ti.com> wrote:
-> Hi Deepthi,
->
+On 03/19/2012 03:45 PM, Grant Likely :
+> On Mon, 19 Mar 2012 14:30:05 +0100, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> On 03/17/2012 10:40 AM, Grant Likely :
+>>> On Thu, 15 Mar 2012 09:38:10 +0100, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>>> +struct of_dma {
+>>>> +	struct list_head of_dma_controllers;
+>>>> +	struct device_node *of_node;
+>>>> +	int of_dma_n_cells;
+>>>> +	int (*of_dma_xlate)(struct of_phandle_args *dma_spec, void *data);
+>>>> +};
+>>>
+>>> This _xlate is nearly useless as a generic API.  It solves the problem for
+>>> the specific case where the driver is hard-coded to know which DMA engine
+>>> to talk to, but since the returned data doesn't provide any context, it
+>>> isn't useful if there are multiple DMA controllers to choose from.
 >>
-> Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 753.920
->
-> -----Original Message-----
->> From: Deepthi Dharwar [mailto:deepthi at linux.vnet.ibm.com]
->> Sent: Wednesday, November 09, 2011 12:13 PM
->> To: Hilman, Kevin
->> Cc: linux-kernel at vger.kernel.org; Arjan van de Ven; linux-arm-
->> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-
->> pm at lists.linux-foundation.org; Chalhoub, Nicole
->> Subject: Re: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
->> deeper C-states
->
+>> You mean, if there is no DMA controller phandle specified in the
+>> property?
+> 
+> No; I'm assuming that dma-channel properties will alwasy have a
+> phandle to the dma controller node.
+> 
+>> I think that it is not the purpose of this API to choose a DMA
+>> controller, Nor to provide a channel. The only purpose of this API is to
+>> give a HW request to be used by a DMA slave driver. This slave should
+>> already have a channel to use and a controller to talk to.
+> 
+> Then where is the function that finds the reference to the DMA
+> controller?  I don't understand why it would be useful to decode that
+> separately.
+> 
+>>> The void *data pointer must be replaced with a typed structure so that
+>>> context can be returned.
+>>
+>> I am not sure to follow you entirely... How do I address the fact that
+>> several types of request value can be returned then?
+>>
+>> BTW, can we imagine a phandle property with a sting as a argument?
+>> should it be written this way?
+>> dma-request = <&testdmac1>, "slave-rx", "slave-tx";
+> 
+> No, I'm not suggesting that.  Mixing phandles and strings in a single
+> property is possible but ugly.  The phandle-args pattern which uses
+> zero or more cells as arguments should be used.
+> 
+>>
+>> If yes, the of_parse_phandle_with_args() is not working on this type...
+> 
+> Right; of_parse_phandle_with_args() should do the job.
+> 
+>>
+>> (I realize that there seems to be no way out for a generic API: maybe we
+>> should move to one or two cases to address and concentrate on them).
+> 
+> The way I read this patch, the xlate function returns a single
+> integer representing the DMA request number, but it doesn't provide
+> any data about *which* dma controller is associated with that channel.
+> The result of xlate needs to be something like a dma_chan reference
+> that identifies both the DMA engine and the channel/request on that
+> dma engine.
+> 
 > [...]
->> By setting timers when we enter non-deepest C-state possible, such that
->> when it fires we
->> can re-evaluate and try moving into deeper and deeper C-states enhancing
->> the
->> power savings is a good feature to have.
+>>>> +/**
+>>>> + * of_dma_xlate_onenumbercell() - Generic DMA xlate for direct one cell bindings
+>>>> + *
+>>>> + * Device Tree DMA translation function which works with one cell bindings
+>>>> + * where the cell values map directly to the hardware request number understood
+>>>> + * by the DMA controller.
+>>>> + */
+>>>> +int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec, void *dma_req)
+>>>> +{
+>>>> +	if (!dma_spec)
+>>>> +		return -EINVAL;
+>>>> +	if (WARN_ON(dma_spec->args_count != 1))
+>>>> +		return -EINVAL;
+>>>> +	*(int *)dma_req = dma_spec->args[0];
+>>>
+>>> Following on from comment above; the void *dma_req parameter is dangerous.  How
+>>> does this function know that it has been passed an int* pointer?
 >>
->> Looking at the current implementation, is it possible to have it as
->> configurable option
->> where one can enable/disable this functionality through the backhand
->> driver ?
->
-> The timeout values of the c state timers are set in the backhand driver.
-> By setting the timeout to 0 the timers will not fire so you'll not have this functionality enabled
->
->> Also I am thinking, instead of having them in governor
->> wouldnt it be a good idea to have it implemented in
->> the backhand driver itself ?
->> --Deepthi
->
->
-> In fact each C-state had its own configurable timer, so it is a parameter characterizing a C-state as it is for the exit_latency and target_residency parameters.
-> And we wanted the timer to fire only when we do not go in deep Cstate due to a high load. This decision is made in the CPU idle governor. So the functionality should be seen from the governor..
->
-> Thanks and Regards
-> Nicole
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+>> Well, that is a drawback that comes from having to address generic
+>> cases.
+> 
+> Not if you do it right.  If a specific data structure is returned,
+> then there can be context attached as to what the data means and which
+> dma controller knows how to parse it.
+> 
+>> But anyway, if the DMA controller decide to register a .xlate()
+>> function that returns an integer, the slave driver that will ask a
+>> "request line" to this DMA controller will be aware that an integer has
+>> to be passed to of_get_dma_request().
+> 
+> The problem still remains; I don't see how the dma slave can figure
+> out *which* dma controller it needs to talk to.
+
+Is not it what the phandle to the dma controller is made for?
+
+Bye,
+-- 
+Nicolas Ferre
