@@ -1,83 +1,225 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 20 Mar 2012 15:06:57 +0100
-Subject: [PATCH 1/1] net: phylib: remove the length limitation of mii
- bus id
-In-Reply-To: <CAA+hA=Ttc9RDmK1fDPCtqLpf91DYDDFSf3E6zWQ6seyw7sNqTg@mail.gmail.com>
-References: <1332217386-3586-1-git-send-email-b29396@freescale.com>
- <CAAQ0ZWQEoPORMXsf3xV-KPP+hOHk2euj460fORyUALnfPn3Q8g@mail.gmail.com>
- <CAA+hA=Ttc9RDmK1fDPCtqLpf91DYDDFSf3E6zWQ6seyw7sNqTg@mail.gmail.com>
-Message-ID: <4F688F01.40604@openwrt.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Mar 2012 14:16:54 +0000
+Subject: [PATCH 2/2] of: selftest/dma: Add selftest for new DT DMA request
+ helpers
+In-Reply-To: <066e4deaddca8ac368c2c355c3a77daa9e9057cf.1332237596.git.nicolas.ferre@atmel.com>
+References: <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <6b5dc1fadfd03a48093338b6981c0a7ae7662212.1332237596.git.nicolas.ferre@atmel.com>
+ <066e4deaddca8ac368c2c355c3a77daa9e9057cf.1332237596.git.nicolas.ferre@atmel.com>
+Message-ID: <20120320141654.15D943E0A04@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 20 Mar 2012 11:13:32 +0100, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Those selftests are covering the new DT DMA helpers. They will test both
+> error and normal cases.
+> A custom .xlate() function is also provided to show the use of this API in case
+> of a different need than the single cell argument.
 
-Le 03/20/12 11:53, Dong Aisheng a ?crit :
-> On Tue, Mar 20, 2012 at 1:32 AM, Shawn Guo<shawn.guo@linaro.org>  wrote:
->> On 20 March 2012 12:23, Dong Aisheng<b29396@freescale.com>  wrote:
->>> From: Dong Aisheng<dong.aisheng@linaro.org>
->>>
->>> When convert to dt, the length of old mii bus id (17 bytes) is not
->>> sufficent to use.
->>> For example, the bus id could be 800f0000.ethernet-1:00 in DT.
->>>
->>> This patch removes the bus id length limitation by changing the
->>> bus id to a const char pionter and user could dynamically set the
->>> bus id via kasprintf function call.
->>>
->>> Since then no users use MII_BUS_ID_SIZE any more, just remove it.
->>>
->>> Signed-off-by: Dong Aisheng<dong.aisheng@linaro.org>
->>> ---
->>> The simplest way may just change MII_BUS_ID_SIZE to a more bigger size,
->>> but i'm not sure that's gonna be accepted.
->>
->> The simplest fix has been applied on -next tree as below.
->>
-> Oh, i missed it, seems my patch covers that change.
-> But that patch only fixed wrong phy_name buffer length issue.
-> My patch is totally remove the length limitation of bus id and phy_name
-> or the bus id name will be truncated if it's longer than MII_BUS_ID_SIZE
-> which is not a comfortable limitation.
+I'm very happy to see test case code.  Thanks.
 
-Then just increase the bus id size locally for your driver. Drivers that 
-can live with a static allocation are better of using it.
+However, since we both understand that this series doesn't address my
+major concerns, I'm not spending any time reviewing this version.
 
-Your patch completely missed testing the return value of kasprintf(), 
-and its return value can be NULL, please fix this at least.
+g.
 
->
->> commit a7ed07d51c8abdb407be454c6cb6cfad613759d9
->> Author: Richard Zhao<richard.zhao@linaro.org>
->> Date:   Sun Jan 29 22:08:12 2012 +0000
->>
->>     net: fec: correct phy_name buffer length when init phy_name
->>
->>     Fix the bug that we got wrong phy_name on imx6q sabrelite board.
->>     snprintf used wrong length of phy_name.
->>     phy_name length is MII_BUS_ID_SIZE + 3 rather not MII_BUS_ID_SIZE.
->>     I change it to sizeof(phy_name).
->>
->>     Signed-off-by: Richard Zhao<richard.zhao@linaro.org>
->>     Acked-by: Shawn Guo<shawn.guo@linaro.org>
->>     Acked-by: Florian Fainelli<florian@openwrt.org>
->>     Signed-off-by: David S. Miller<davem@davemloft.net>
->>
->> diff --git a/drivers/net/ethernet/freescale/fec.c
->> b/drivers/net/ethernet/freescale/fec.c
->> index 7b25e9c..1c7aad8 100644
->> --- a/drivers/net/ethernet/freescale/fec.c
->> +++ b/drivers/net/ethernet/freescale/fec.c
->> @@ -990,7 +990,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
->>                 phy_id = 0;
->>         }
->>
->> -       snprintf(phy_name, MII_BUS_ID_SIZE, PHY_ID_FMT, mdio_bus_id, phy_id);
->> +       snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
->>         phy_dev = phy_connect(ndev, phy_name,&fec_enet_adjust_link, 0,
->>                               fep->phy_interface);
->>         if (IS_ERR(phy_dev)) {
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts     |    2 +
+>  arch/arm/boot/dts/testcases/tests-dma.dtsi |   24 +++++++
+>  arch/arm/boot/dts/testcases/tests.dtsi     |    1 +
+>  drivers/of/selftest.c                      |  100 ++++++++++++++++++++++++++++
+>  4 files changed, 127 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/testcases/tests-dma.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> index a387e77..18a8f3c 100644
+> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> @@ -38,3 +38,5 @@
+>  		};
+>  	};
+>  };
+> +
+> +/include/ "testcases/tests.dtsi"
+> diff --git a/arch/arm/boot/dts/testcases/tests-dma.dtsi b/arch/arm/boot/dts/testcases/tests-dma.dtsi
+> new file mode 100644
+> index 0000000..5f0ba93
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/testcases/tests-dma.dtsi
+> @@ -0,0 +1,24 @@
+> +
+> +/ {
+> +	testcase-data {
+> +		dma-tests {
+> +			testdmac0: test-dma-controller0 {
+> +				#dma-cells = <1>;
+> +			};
+> +
+> +			testdmac1: test-dma-controller1 {
+> +				#dma-cells = <2>;
+> +			};
+> +
+> +			dma-slave-a {
+> +				dma-request = <&testdmac0 42>;
+> +			};
+> +			dma-slave-b {
+> +				dma-request = <&testdmac1 24>; /* wrong number of values */
+> +			};
+> +			dma-slave-c {
+> +				dma-request = <&testdmac1 24 25>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/testcases/tests.dtsi b/arch/arm/boot/dts/testcases/tests.dtsi
+> index a7c5067..e3afb2b 100644
+> --- a/arch/arm/boot/dts/testcases/tests.dtsi
+> +++ b/arch/arm/boot/dts/testcases/tests.dtsi
+> @@ -1 +1,2 @@
+>  /include/ "tests-phandle.dtsi"
+> +/include/ "tests-dma.dtsi"
+> diff --git a/drivers/of/selftest.c b/drivers/of/selftest.c
+> index f24ffd7..3281bfd 100644
+> --- a/drivers/of/selftest.c
+> +++ b/drivers/of/selftest.c
+> @@ -9,6 +9,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_dma.h>
+>  #include <linux/list.h>
+>  #include <linux/mutex.h>
+>  #include <linux/slab.h>
+> @@ -148,6 +149,104 @@ static void __init of_selftest_property_match_string(void)
+>  	selftest(rc == -EILSEQ, "unterminated string; rc=%i", rc);
+>  }
+>  
+> +struct two_cells {
+> +	int cell1;
+> +	int cell2;
+> +};
+> +
+> +static int of_dma_xlate_twonumbercell(struct of_phandle_args *dma_spec, void *cells)
+> +{
+> +	struct two_cells *tc;
+> +
+> +	if (!dma_spec)
+> +		return -EINVAL;
+> +	if (!cells)
+> +		return -ENOBUFS;
+> +	if (WARN_ON(dma_spec->args_count != 2))
+> +		return -EINVAL;
+> +
+> +	tc = (struct two_cells *)cells;
+> +
+> +	tc->cell1 = dma_spec->args[0];
+> +	tc->cell2 = dma_spec->args[1];
+> +	return 0;
+> +}
+> +
+> +static void __init of_selftest_dma(void)
+> +{
+> +	struct device_node *dma_controller0_np;
+> +	struct device_node *dma_controller1_np;
+> +	struct device_node *dma_slave_np;
+> +	int rc;
+> +	int dma_req;
+> +	struct two_cells tc;
+> +
+> +	pr_info("start\n");
+> +	dma_controller0_np = of_find_node_by_path("/testcase-data/dma-tests/test-dma-controller0");
+> +	dma_slave_np = of_find_node_by_path("/testcase-data/dma-tests/dma-slave-a");
+> +	if (!dma_controller0_np || !dma_slave_np) {
+> +		pr_err("No testcase data in device tree\n");
+> +		return;
+> +	}
+> +
+> +	/* wrong usage: DMA controller not registered yet! */
+> +	rc = of_get_dma_request(dma_slave_np, 0, &dma_req);
+> +	selftest(rc == -ENODEV, "selftest DMA slave request expected:-ENODEV got:%i\n", rc);
+> +
+> +	/* test DMA controller registration */
+> +	rc = of_dma_controller_register(dma_controller0_np, of_dma_xlate_onenumbercell);
+> +	selftest(rc == 0, "selftest DMA controller not found: got:%i\n", rc);
+> +
+> +	/* wrong usage and error code tests */
+> +	rc = of_get_dma_request(dma_slave_np, 1, &dma_req);
+> +	selftest(rc == -EINVAL, "selftest DMA slave request expected:-EINVAL got:%i\n", rc);
+> +
+> +	rc = of_get_dma_request(dma_slave_np, 0, NULL);
+> +	selftest(rc == -ENOBUFS, "selftest DMA slave request expected:-ENOBUFS got:%i\n", rc);
+> +
+> +	/* proper use of the API */
+> +	rc = of_get_dma_request(dma_slave_np, 0, &dma_req);
+> +	selftest(rc == 0, "selftest DMA slave request error: got:%i\n", rc);
+> +	selftest(dma_req == 42, "selftest DMA slave request line expected:42 got:%i\n", dma_req);
+> +
+> +	of_dma_controller_free(dma_controller0_np);
+> +
+> +	/* wrong usage: DMA controller not registered anymore! */
+> +	rc = of_get_dma_request(dma_slave_np, 0, &dma_req);
+> +	selftest(rc == -ENODEV, "selftest DMA slave request expected:-ENODEV got:%i\n", rc);
+> +
+> +	/* use with a two values DMA request specification */
+> +	dma_controller1_np = of_find_node_by_path("/testcase-data/dma-tests/test-dma-controller1");
+> +	dma_slave_np = of_find_node_by_path("/testcase-data/dma-tests/dma-slave-b");
+> +	if (!dma_controller1_np || !dma_slave_np) {
+> +		pr_err("No testcase data in device tree\n");
+> +		return;
+> +	}
+> +
+> +	/* DMA controller registration with custom .xlate() function */
+> +	rc = of_dma_controller_register(dma_controller1_np, of_dma_xlate_twonumbercell);
+> +	selftest(rc == 0, "selftest DMA controller not found: got:%i\n", rc);
+> +
+> +	/* wrong number of cells */
+> +	rc = of_get_dma_request(dma_slave_np, 0, &tc);
+> +	selftest(rc == -EINVAL, "selftest DMA slave request expected:-EINVAL got:%i\n", rc);
+> +
+> +	dma_slave_np = of_find_node_by_path("/testcase-data/dma-tests/dma-slave-c");
+> +	if (!dma_slave_np) {
+> +		pr_err("No dma-slave-c data in device tree\n");
+> +		return;
+> +	}
+> +
+> +	/* proper use of the API */
+> +	rc = of_get_dma_request(dma_slave_np, 0, &tc);
+> +	selftest(rc == 0, "selftest DMA slave request error: got:%i\n", rc);
+> +	selftest(tc.cell1 == 24, "selftest DMA slave request line expected:24 got:%i\n", tc.cell1);
+> +	selftest(tc.cell2 == 25, "selftest DMA slave request line expected:25 got:%i\n", tc.cell2);
+> +
+> +	of_dma_controller_free(dma_controller1_np);
+> +	pr_info("end - %s\n", selftest_passed ? "PASS" : "FAIL");
+> +}
+> +
+>  static int __init of_selftest(void)
+>  {
+>  	struct device_node *np;
+> @@ -162,6 +261,7 @@ static int __init of_selftest(void)
+>  	pr_info("start of selftest - you will see error messages\n");
+>  	of_selftest_parse_phandle_with_args();
+>  	of_selftest_property_match_string();
+> +	of_selftest_dma();
+>  	pr_info("end of selftest - %s\n", selftest_passed ? "PASS" : "FAIL");
+>  	return 0;
+>  }
+> -- 
+> 1.7.9
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
