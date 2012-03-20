@@ -1,43 +1,36 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 20 Mar 2012 06:51:22 +0100
-Subject: [PATCH v4 03/10] pwm: Add device tree support
-In-Reply-To: <4F67E7A3.3090603@wwwdotorg.org>
+Date: Tue, 20 Mar 2012 06:59:30 +0100
+Subject: [PATCH v4 01/10] PWM: add pwm framework support
+In-Reply-To: <4F67E38F.6080300@wwwdotorg.org>
 References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-4-git-send-email-thierry.reding@avionic-design.de>
- <4F67E7A3.3090603@wwwdotorg.org>
-Message-ID: <20120320055122.GA25778@avionic-0098.mockup.avionic-design.de>
+ <1331740593-10807-2-git-send-email-thierry.reding@avionic-design.de>
+ <4F67E38F.6080300@wwwdotorg.org>
+Message-ID: <20120320055930.GB25778@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Stephen Warren wrote:
 > On 03/14/2012 09:56 AM, Thierry Reding wrote:
-> > This patch adds helpers to support device tree bindings for the generic
-> > PWM API. Device tree binding documentation for PWM controllers is also
-> > provided.
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > This patch adds framework support for PWM (pulse width modulation) devices.
 > ...
-> > +static struct pwm_device *of_pwm_simple_xlate(struct pwm_chip *pc,
-> > +					      const struct of_phandle_args *args)
+> > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
 > ...
-> > +	if (args->args_count < pc->of_pwm_n_cells)
-> > +		return ERR_PTR(-EINVAL);
+> > +/**
+> > + * pwmchip_add() - register a new pwm
+> > + * @chip: the pwm
+> > + *
+> > + * register a new pwm. pwm->pwm_id must be initialized. if pwm_id < 0 then
+> > + * a dynamically assigned id will be used, otherwise the id specified,
+> > + */
 > 
-> I think you can drop that error-check given the code quoted below?
-> 
-> (and if not, shouldn't it be != not >= ?)
-> 
-> > +struct pwm_device *of_pwm_request(struct device_node *np,
-> > +				  const char *propname, int index)
-> ...
-> > +	if (args.args_count != pc->of_pwm_n_cells) {
-> > +		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
-> > +			 args.np->full_name);
-> > +		pwm = ERR_PTR(-EINVAL);
-> > +		goto put;
-> > +	}
-> > +
-> > +	pwm = pc->of_xlate(pc, &args);
+> I don't see anywhere in the code that implements "if pwm_id < 0 then a
+> dynamically assigned id will be used".
 
-Yes, you're right. It is completely redundant.
+The second patch in the series fixes up this comment when the functionality
+is properly implemented. I still wanted to go over the first patch and fix up
+some minor things, so maybe I'll fix this up as I go along.
 
 Thierry
 -------------- next part --------------
@@ -46,4 +39,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120320/657e8c0e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120320/f86a1fb5/attachment.sig>
