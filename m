@@ -1,53 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Mar 2012 19:21:50 +0000
-Subject: [PATCH] USB: gadget driver for LPC32xx
-In-Reply-To: <4F68CA5C.2090406@antcom.de>
-References: <1332191930-2433-1-git-send-email-stigge@antcom.de>
- <201203201301.50159.arnd@arndb.de> <4F68CA5C.2090406@antcom.de>
-Message-ID: <201203201921.51253.arnd@arndb.de>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 20 Mar 2012 13:06:34 -0700
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <20120320181050.GN3852@pengutronix.de>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+ <20120320072018.GC32469@S2101-09.ap.freescale.net>
+ <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
+ <20120320094031.GI3852@pengutronix.de>
+ <20120320141811.GF32469@S2101-09.ap.freescale.net>
+ <20120320181050.GN3852@pengutronix.de>
+Message-ID: <4F68E34A.70207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 March 2012, Roland Stigge wrote:
-> The ISP1301 is a relatively simple transceiver where the actual
-> differential USB signals end up being generated/decoded. It contains
-> some registers and is controlled via I2C to manipulate electrical
-> settings (pull up / power etc.).
-> 
-> At a first glance, I found the following drivers to be using it:
-> 
-> ohci-nxp (was: ohci-pnx4008 + ohci-lpc32xx)
-> isp1301_omap
-> lpc32xx_udc (WIP)
-> 
-> The common functions that all of them are using are some low-level
-> functions like read/write byte, read/write word. (For ohci-nxp, I used
-> smbus commands.) I propose exporting just the defines for all the
-> registers and their bits together with some accessor functions.
+On 03/20/2012 11:10 AM, Sascha Hauer wrote:
+> On Tue, Mar 20, 2012 at 10:18:14PM +0800, Shawn Guo wrote:
+>> On Tue, Mar 20, 2012 at 10:40:31AM +0100, Sascha Hauer wrote:
+>> ...
+>>> I am using these functions and don't need a static array, I just call
+>>> the functions with the desired parameters.
+>>>
+>> With this patch getting in, you do not have to use them then.  I feel
+>> a static array will be much more readable than a long list of function
+>> calls with a long list of hardcoded arguments to each.
+>
+> I'm also not a fan of long argument lists; a divider like defined in my
+> tree takes 5 arguments, a gate 4 and a mux 6. While 6 is already at the
+> border I think it's still acceptable.
+>
+> What I like in terms of readability is one line per clock which makes
+> for quite short clock files.
 
-Sounds great. 
+It certainly makes for short clock files, but it's definitely less 
+readable that the expanded struct. For the original author the "one line 
+per clock" looks readable since they wrote it. But for someone looking 
+at the code to modify it, the expanded one would be much easier to read. 
+Also, you can always declare your own macro if you really want to follow 
+the one line approach.
 
-> Would those be the correct places for header and driver:
-> 
-> drivers/usb/misc/isp1301.c
-> include/linux/usb/isp1301.h
+> So when we use structs to initialize the clocks we'll probably have
+> something like this:
+>
+> static struct clk_divider somediv = {
+> 	.reg = CCM_BASE + 0x14,
+> 	.width = 3,
+> 	.shift = 17,
+> 	.lock =&ccm_lock,
+> 	.hw.parent = "someotherdiv",
+> 	.hw.flags = CLK_SET_RATE_PARENT,
+> };
 
-I believe drivers/usb/misc/ is for usb devices, not for usb hots
-(otg or otherwise), but I'm not sure where else it would go.
+Taken from your patches:
 
-> As an example usage, I would let the next update of the lpc32xx_udc use
-> it and separately provide patches to make the other drivers above also
-> use it.
+imx_clk_mux("spll_sel", CCM_CSCR, 17, 1, spll_sel_clks, 
+ARRAY_SIZE(spll_sel_clks));
 
-Ok. One thing I'm not sure about is how you would pair the i2c
-device with the platform specific driver. The easiest solution would
-be to assume that there is always just one of each, so isp1301 binds
-to the i2c device and exports functions to be used by the platform
-driver. This would fail if you ever have more than one isp1301
-in the system, but neither omap nor pnx4008 seem to be doing that.
+Compare the struct to the one line call. Now tell me, what does "1" 
+represent? No clue. But in the struct, I can immediately tell what each 
+one of the parameters are.
 
-I guess we can always add support for that later if needed, using
-a device tree phandle link, or a pointer to the i2c device in
-platform_data.
+Anyway, my patch certainly isn't forcing you to use multiple lines. So, 
+hopefully this won't be a point of contention.
 
-	Arnd
+> This will make a 4000 line file out of a 500 line file. Now when for
+> some reason struct clk_divider changes we end with big patches. If the
+> clk core gets a new fancy CLK_ flag which we want to have then again
+> we end up with big patches. Then there's also the possibility that
+> someone finds out that .lock and .hw.flags are common to all dividers
+> and comes up with a #define DEFINE_CLK_DIVIDER again to share common
+> fields.
+
+This patch won't prevent you from doing any of that. You can still 
+create macros for that (there are already one for that). Also, what you 
+are pointing out is a bigger problem for the current clk_register() 
+function since you might have to change the no. of params of all the 
+callers even if a new field is optional.
+
+> All this can be solved when we introduce a small wrapper function and
+> use it in the clock files:
+>
+> static inline struct clk *imx_clk_divider(const char *name, const char *parent,
+> 		void __iomem *reg, u8 shift, u8 width)
+> {
+> 	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
+> 			reg, shift, width, 0,&imx_ccm_lock);
+> }
+>
+> It decouples us from the structs used by the clock framework, we can
+> add our preferred flags and still can share common fields like the lock.
+>
+> While this was not the intention when I first converted from struct
+> initializers to function initializers I am confident that it will make
+> a good job.
+
+Now I'm confused -- it's not clear if you are leaning towards my patch 
+or away from it?
+
+I also think we are talking about issues orthogonal to my patch. I don't 
+think my patch prevents you from doing any of this as long as you are up 
+for wrapper fns or macros.
+
+-Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
