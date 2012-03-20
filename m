@@ -1,76 +1,250 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 20 Mar 2012 17:40:02 -0600 (MDT)
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <201203170905.33191.arnd@arndb.de>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 20 Mar 2012 16:46:38 -0700
+Subject: [PATCH v7 2/3] clk: introduce the common clock framework
+In-Reply-To: <20120320140220.GE32469@S2101-09.ap.freescale.net>
 References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <alpine.DEB.2.00.1203161509470.4395@utopia.booyaka.com>
- <CAJOA=zPmy7Dwzw8EOCW_+cvy2Dv=w0TPUq7Zg_s=Y0rs+v+u2w@mail.gmail.com>
- <201203170905.33191.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.00.1203201731550.22974@utopia.booyaka.com>
+ <1331878280-2758-3-git-send-email-mturquette@linaro.org>
+ <20120320140220.GE32469@S2101-09.ap.freescale.net>
+Message-ID: <CAJOA=zOZ=XNwhEwUSD34AERi+f8fnMqG9EmS5hxCx+2u8qnkgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Tue, Mar 20, 2012 at 7:02 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Mar 15, 2012 at 11:11:19PM -0700, Mike Turquette wrote:
+> ...
+>> +struct clk_ops {
+>> + ? ? int ? ? ? ? ? ? (*prepare)(struct clk_hw *hw);
+>> + ? ? void ? ? ? ? ? ?(*unprepare)(struct clk_hw *hw);
+>> + ? ? int ? ? ? ? ? ? (*enable)(struct clk_hw *hw);
+>> + ? ? void ? ? ? ? ? ?(*disable)(struct clk_hw *hw);
+>> + ? ? int ? ? ? ? ? ? (*is_enabled)(struct clk_hw *hw);
+>> + ? ? unsigned long ? (*recalc_rate)(struct clk_hw *hw,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long parent_rate);
+>
+> I believe I have heard people love the interface with parent_rate
+> passed in. ?I love that too. ?But I would like to ask the same thing
+> on .round_rate and .set_rate as well for the same reason why we have
+> it for .recalc_rate.
 
-On Sat, 17 Mar 2012, Arnd Bergmann wrote:
+This is something that was discussed on the list but not taken in due
+to rapid flux in code.  I always liked the idea however.
 
-> I think it's rather pointless, because the option is not going to
-> be user selectable but will get selected by the platform unless I'm
-> mistaken. The platform maintainers that care already know the state
-> of the framework.
+>
+>> + ? ? long ? ? ? ? ? ?(*round_rate)(struct clk_hw *hw, unsigned long,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *);
+>
+> Yes, we already have parent_rate passed in .round_rate with an pointer.
+> But I think it'd be better to have it passed in no matter flag
+> CLK_SET_RATE_PARENT is set or not. ?Something like:
 
-This is where we have differing views, I think.  Clearly, Sascha, 
-Saravana, Rob, and I have at least slightly different opinions on the 
-durability of the existing API and code.  So it seems reasonable to assume 
-that others who have not followed the development of the common clock code 
-might mistake the implementation or API as being stable and well-defined.
+This places the burden of checking the flags onto the .round_rate
+implementation with __clk_get_flags, but that's not a problem really.
 
-It sounds like the primary objection is to the use of CONFIG_EXPERIMENTAL.  
-So here is a patch to simply note the status of this code in its Kconfig 
-text.
+>
+> 8<---
+> @@ -584,7 +584,7 @@ EXPORT_SYMBOL_GPL(clk_get_rate);
+> ?*/
+> ?unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> ?{
+> - ? ? ? unsigned long unused;
+> + ? ? ? unsigned long parent_rate = 0;
+>
+> ? ? ? ?if (!clk)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> @@ -592,10 +592,10 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> ? ? ? ?if (!clk->ops->round_rate)
+> ? ? ? ? ? ? ? ?return clk->rate;
+>
+> - ? ? ? if (clk->flags & CLK_SET_RATE_PARENT)
+> - ? ? ? ? ? ? ? return clk->ops->round_rate(clk->hw, rate, &unused);
+> - ? ? ? else
+> - ? ? ? ? ? ? ? return clk->ops->round_rate(clk->hw, rate, NULL);
+> + ? ? ? if (clk->parent)
+> + ? ? ? ? ? ? ? parent_rate = clk->parent->rate;
+> +
+> + ? ? ? return clk->ops->round_rate(clk->hw, rate, &parent_rate);
+> ?}
+>
+> ?/**
+> @@ -765,9 +765,12 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
+> ?static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+> ?{
+> ? ? ? ?struct clk *top = clk;
+> - ? ? ? unsigned long best_parent_rate = clk->parent->rate;
+> + ? ? ? unsigned long best_parent_rate = 0;
+> ? ? ? ?unsigned long new_rate;
+>
+> + ? ? ? if (clk->parent)
+> + ? ? ? ? ? ? ? best_parent_rate = clk->parent->rate;
+> +
+> ? ? ? ?if (!clk->ops->round_rate && !(clk->flags & CLK_SET_RATE_PARENT)) {
+> ? ? ? ? ? ? ? ?clk->new_rate = clk->rate;
+> ? ? ? ? ? ? ? ?return NULL;
+> @@ -780,10 +783,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+> ? ? ? ? ? ? ? ?goto out;
+> ? ? ? ?}
+>
+> - ? ? ? if (clk->flags & CLK_SET_RATE_PARENT)
+> - ? ? ? ? ? ? ? new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
+> - ? ? ? else
+> - ? ? ? ? ? ? ? new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
+> + ? ? ? new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
+>
+> ? ? ? ?if (best_parent_rate != clk->parent->rate) {
+> ? ? ? ? ? ? ? ?top = clk_calc_new_rates(clk->parent, best_parent_rate);
+>
+> --->8
 
+ACK
 
-- Paul
+>
+> The reason behind the change is that any clk implements .round_rate will
+> mostly need to get the parent rate, no matter flag CLK_SET_RATE_PARENT
+> is set or not. ?Instead of expecting every .round_rate implementation
+> to get the parent rate in the way beloe
+>
+> ? ? ? ? parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
+>
+> we can just pass the parent rate into .round_rate.
+>
+>> + ? ? int ? ? ? ? ? ? (*set_parent)(struct clk_hw *hw, u8 index);
+>> + ? ? u8 ? ? ? ? ? ? ?(*get_parent)(struct clk_hw *hw);
+>> + ? ? int ? ? ? ? ? ? (*set_rate)(struct clk_hw *hw, unsigned long);
+>
+> For the same reason, I would change .set_rate interface like below.
+>
+> 8<---
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index d5ac6a7..6bd8037 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -119,7 +119,8 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+> ?}
+> ?EXPORT_SYMBOL_GPL(clk_divider_round_rate);
+>
+> -static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
+> +static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long parent_rate)
+> ?{
+> ? ? ? ?struct clk_divider *divider = to_clk_divider(hw);
+> ? ? ? ?unsigned int div;
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index dbc310a..d74ac4b 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -833,17 +833,18 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
+> ?static void clk_change_rate(struct clk *clk)
+> ?{
+> ? ? ? ?struct clk *child;
+> - ? ? ? unsigned long old_rate;
+> + ? ? ? unsigned long old_rate, parent_rate = 0;
+> ? ? ? ?struct hlist_node *tmp;
+>
+> ? ? ? ?old_rate = clk->rate;
+> + ? ? ? if (clk->parent)
+> + ? ? ? ? ? ? ? parent_rate = clk->parent->rate;
+>
+> ? ? ? ?if (clk->ops->set_rate)
+> - ? ? ? ? ? ? ? clk->ops->set_rate(clk->hw, clk->new_rate);
+> + ? ? ? ? ? ? ? clk->ops->set_rate(clk->hw, clk->new_rate, parent_rate);
+>
+> ? ? ? ?if (clk->ops->recalc_rate)
+> - ? ? ? ? ? ? ? clk->rate = clk->ops->recalc_rate(clk->hw,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? clk->parent->rate);
+> + ? ? ? ? ? ? ? clk->rate = clk->ops->recalc_rate(clk->hw, parent_rate);
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?clk->rate = clk->parent->rate;
+>
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 5508897..1031f1f 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -125,7 +125,8 @@ struct clk_ops {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long *);
+> ? ? ? ?int ? ? ? ? ? ? (*set_parent)(struct clk_hw *hw, u8 index);
+> ? ? ? ?u8 ? ? ? ? ? ? ?(*get_parent)(struct clk_hw *hw);
+> - ? ? ? int ? ? ? ? ? ? (*set_rate)(struct clk_hw *hw, unsigned long);
+> + ? ? ? int ? ? ? ? ? ? (*set_rate)(struct clk_hw *hw, unsigned long,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long);
+> ? ? ? ?void ? ? ? ? ? ?(*init)(struct clk_hw *hw);
+> ?};
+>
+> --->8
 
-From: Paul Walmsley <paul@pwsan.com>
-Date: Tue, 20 Mar 2012 17:19:06 -0600
-Subject: [PATCH] clk: note that the common clk code is still subject to
- significant change
+ACK
 
-Indicate that the common clk code and API is still likely to require
-significant change.  The API is not well-defined and both it and the
-underlying mechanics are likely to need significant changes to support
-non-trivial uses of the rate changing code, such as DVFS with external
-I/O devices.  So any platforms that switch their implementation over
-to this may need to revise much of their driver code and revalidate
-their implementations until the behavior of the code is
-better-defined.
+>
+> Then with parent rate passed into .round_rate and .set_rate like what
+> we do with .recalc_rate right now, we can save particular clk
+> implementation from calling __clk_get_parent() and __clk_get_rate to
+> get parent rate.
+>
+> For example, the following will the be diff we gain on clk-divider.
+>
+> 8<---
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 6bd8037..8a28ffb 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -68,8 +68,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+> ? ? ? ?if (divider->flags & CLK_DIVIDER_ONE_BASED)
+> ? ? ? ? ? ? ? ?maxdiv--;
+>
+> - ? ? ? if (!best_parent_rate) {
+> - ? ? ? ? ? ? ? parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
+> + ? ? ? if (!(divider->flags & CLK_SET_RATE_PARENT)) {
 
-A good time for removing this help text would be after at least two
-platforms that do DVFS on groups of external I/O devices have ported
-their clock implementations over to the common clk code.
+This is wrong.  CLK_SET_RATE_PARENT is a common clock flag applied to
+struct clk's .flags member, not the divider.  This function must still
+use __clk_get_flags(hw->clk) here, but that's OK.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Mike Turquette <mturquette@ti.com>
----
- drivers/clk/Kconfig |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+> + ? ? ? ? ? ? ? parent_rate = *best_parent_rate;
+> ? ? ? ? ? ? ? ?bestdiv = DIV_ROUND_UP(parent_rate, rate);
+> ? ? ? ? ? ? ? ?bestdiv = bestdiv == 0 ? 1 : bestdiv;
+> ? ? ? ? ? ? ? ?bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
+> @@ -109,13 +109,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+> ? ? ? ?int div;
+> ? ? ? ?div = clk_divider_bestdiv(hw, rate, prate);
+>
+> - ? ? ? if (prate)
+> - ? ? ? ? ? ? ? return *prate / div;
+> - ? ? ? else {
+> - ? ? ? ? ? ? ? unsigned long r;
+> - ? ? ? ? ? ? ? r = __clk_get_rate(__clk_get_parent(hw->clk));
+> - ? ? ? ? ? ? ? return r / div;
+> - ? ? ? }
+> + ? ? ? return *prate / div;
+> ?}
+> ?EXPORT_SYMBOL_GPL(clk_divider_round_rate);
+>
+> @@ -127,7 +121,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> ? ? ? ?unsigned long flags = 0;
+> ? ? ? ?u32 val;
+>
+> - ? ? ? div = __clk_get_rate(__clk_get_parent(hw->clk)) / rate;
+> + ? ? ? div = parent_rate / rate;
+>
+> ? ? ? ?if (!(divider->flags & CLK_DIVIDER_ONE_BASED))
+> ? ? ? ? ? ? ? ?div--;
+>
+> --->8
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 2eaf17e..dd2d528 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -21,6 +21,11 @@ menuconfig COMMON_CLK
- 	  this option for loadable modules requiring the common clock
- 	  framework.
- 
-+	  The API and implementation enabled by this option is still
-+	  incomplete.  The API and implementation is expected to be
-+	  fluid and subject to change at any time, potentially
-+	  breaking existing users.
-+
- 	  If in doubt, say "N".
- 
- if COMMON_CLK
--- 
-1.7.9.1
+ACK, besides my comment above.
+
+>
+> I always get a sense of worry in using functions named in __xxx which
+> sounds like something somehow internal. ?With the requested interface
+> change above, I can get all __xxx functions out of my clk_ops
+> implementation.
+
+As mentioned above, you'll still need to check for CLK_SET_RATE_PARENT
+in your .round_rate implementation with __clk_get_flags(hw->clk).
+
+Did you want to send a formal patch or just have me absorb this into
+the fixes I'm brewing already?  I've already fixed the potential null
+ptr dereferences in clk_calc_new_rates, but that's no big deal.
+
+Regards,
+Mike
