@@ -1,75 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 20:59:59 -0600
-Subject: [PATCH v4 10/10] pwm-backlight: Add rudimentary device tree
- support
-In-Reply-To: <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F67F2AF.3020404@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 20 Mar 2012 00:09:58 -0300
+Subject: [PATCH] ARM: mach-mx35_3ds: Fix build warning due to the lack of
+ 'const' annotation
+Message-ID: <1332212998-6234-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2012 09:56 AM, Thierry Reding wrote:
-> This commit adds very basic support for device tree probing. Currently,
-> only a PWM and a list of distinct brightness levels can be specified.
-> Enabling or disabling backlight power via GPIOs is not yet supported.
-> 
-> A pointer to the exit() callback is stored in the driver data to keep it
-> around until the driver is unloaded.
+Fix the following build warning:
 
-> +++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
+arch/arm/mach-imx/mach-mx35_3ds.c: In function 'mx35_3ds_lcd_set_power':
+arch/arm/mach-imx/mach-mx35_3ds.c:112: warning: passing argument 2 of 'gpiochip_find' from incompatible pointer type
+include/asm-generic/gpio.h:145: note: expected 'int (*)(struct gpio_chip *, const void *)' but argument is of type 'int (*)(struct gpio_chip *, void *)'
 
-> +pwm-backlight bindings
-> +
-> +Required properties:
-> +  - compatible: "pwm-backlight"
-> +  - pwm: OF device-tree PWM specification
-> +  - num-brightness-levels: number of distinct brightness levels
-> +  - brightness-levels: array of distinct brightness levels
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-mx35_3ds.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I assume the values in this array are 0 (darkest/off) to 255 (max
-brightness)? The doc should probably specify this.
-
-> +  - default-brightness-level: the default brightness level
-
-Likewise, this is an index into the default-brightness-level? Again,
-it'd be best to explicitly state this.
-
-...
-> +		brightness-levels = <0 4 8 16 32 64 128 255>;
-> +		default-brightness-level = <6>;
-
-
-> +static int pwm_backlight_parse_dt(struct device *dev,
-> +				  struct platform_pwm_backlight_data *data)
-...
-> +		ret = of_property_read_u32(node, "default-brightness-level",
-> +					   &value);
-> +		if (ret < 0)
-> +			goto free;
-
-Range-check that against max_brightness?
-
->  static int pwm_backlight_probe(struct platform_device *pdev)
-...
-> -	pb->pwm = pwm_request(data->pwm_id, "backlight");
-> -	if (IS_ERR(pb->pwm)) {
-> -		dev_err(&pdev->dev, "unable to request PWM for backlight\n");
-> -		ret = PTR_ERR(pb->pwm);
-> -		goto err_alloc;
-> -	} else
-> -		dev_dbg(&pdev->dev, "got pwm for backlight\n");
-> +	if (!pb->pwm) {
-> +		pb->pwm = pwm_request(data->pwm_id, "backlight");
-> +		if (IS_ERR(pb->pwm)) {
-> +			dev_err(&pdev->dev, "unable to request PWM for backlight\n");
-> +			ret = PTR_ERR(pb->pwm);
-> +			goto err_alloc;
-> +		} else
-> +			dev_dbg(&pdev->dev, "got pwm for backlight\n");
-> +	}
-
-Hmmm. It'd be more consistent if pwm_backlight_parse_dt() called
-something like of_pwm_get() instead of of_pwm_request(), so that this
-code could always call pwm_request() on the PWM and hence operate the
-same irrespective of DT vs non-DT. GPIOs work that way at least.
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index e14291d..6ae51c6 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -97,7 +97,7 @@ static struct i2c_board_info __initdata i2c_devices_3ds[] = {
+ static int lcd_power_gpio = -ENXIO;
+ 
+ static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
+-						     void *data)
++						     const void *data)
+ {
+ 	return !strcmp(chip->label, data);
+ }
+-- 
+1.7.1
