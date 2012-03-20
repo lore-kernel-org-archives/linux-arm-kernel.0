@@ -1,31 +1,42 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 20 Mar 2012 10:02:13 -0400
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <4F626180.2010902@ti.com>
-References: <4F22DEF2.5000807@ti.com> <4F621939.9040906@ti.com>
- <20120315195753.GA2842@n2100.arm.linux.org.uk>
- <201203152041.53754.arnd@arndb.de> <4F626180.2010902@ti.com>
-Message-ID: <20120320140213.GG14084@beef>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 20 Mar 2012 07:02:40 -0700
+Subject: [PATCH v3 1/2] arm: omap3: pm34xx.c: Fix omap3_pm_init() error
+ out paths
+In-Reply-To: <alpine.DEB.2.00.1203200316300.22974@utopia.booyaka.com> (Paul
+ Walmsley's message of "Tue, 20 Mar 2012 03:17:16 -0600 (MDT)")
+References: <1332033768-21986-1-git-send-email-mgreer@animalcreek.com>
+ <1332033768-21986-2-git-send-email-mgreer@animalcreek.com>
+ <1332150525.2116.334.camel@sokoban>
+ <alpine.DEB.2.00.1203200316300.22974@utopia.booyaka.com>
+Message-ID: <87sjh32wvz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 10:39:12PM +0100, Cousson, Benoit wrote:
-> On 3/15/2012 9:41 PM, Arnd Bergmann wrote:
-> >The numbers definitely need to become local to each of the controllers, but
-> >that is the case pretty much automatically using the proposed binding,
-> >because each dma request identifier starts with the phandle of the
-> >controller.
-> 
-> Indeed, and in the case of the OMAP SDMA controller, it can handle
-> up to 127 DMA request lines numbered from 0 to 126... So a local
-> number seems to be a good representation... especially for a number.
-> I'm not sure to understand the issue with this binding.
-> 
-> And AFAIK, there is the only one general purpose DMA controller in
-> OMAP so far. The other ones are private to some IPs like MMC or USB,
-> so they do not need necessarily need any DT representation.
+Paul Walmsley <paul@pwsan.com> writes:
 
-AM335x has an EDMA controller instead of SDMA. This is the same EDMA
-found on mach-davinci/ parts.
+> + Kevin
+>
+> On Mon, 19 Mar 2012, Tero Kristo wrote:
+>
+>> On Sat, 2012-03-17 at 18:22 -0700, Mark A. Greer wrote:
+>> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+>> > 
+>> > It appears that the error paths were overlooked when the
+>> > omap3_pm_init() routine had the prcm chain handler code
+>> > added.  Fix this by adding a goto target and reordering
+>> > the error handling code.  Also fix how the irq argument
+>> > for free_irq() is determined.
+>> 
+>> You are right, it looks like the error handling part was accidentally
+>> dropped from version 7 of the prcm patch set.
+>> 
+>> Acked-by: Tero Kristo <t-kristo@ti.com>
+>> 
+>> Paul, you going to grab this?
+>
+> Kevin is the pm34xx.c maintainer, so unless he wants me to queue it, it's 
+> probably best for him to take it.
 
--Matt
+Yeah, I've already queued these for v3.4.  (branch: for_3.4/fixes/pm)
+
+Kevin
