@@ -1,55 +1,68 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 20 Mar 2012 19:20:12 +0100
-Subject: [PATCH] USB: gadget driver for LPC32xx
-In-Reply-To: <201203201301.50159.arnd@arndb.de>
-References: <1332191930-2433-1-git-send-email-stigge@antcom.de>
- <201203192130.13583.arnd@arndb.de> <4F67B28D.3060500@antcom.de>
- <201203201301.50159.arnd@arndb.de>
-Message-ID: <4F68CA5C.2090406@antcom.de>
+From: john@szakmeister.net (John Szakmeister)
+Date: Tue, 20 Mar 2012 14:28:15 -0400
+Subject: No subject
+Message-ID: <CAEBDL5WkFo-W32zTrJ6d_T2RzkocOVr-8aOU-ydApwxAH4fcFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+We've been running into several issues on the cache flushing front,
+and I'm hoping that someone here can help clarify what should be
+happening from a kernel perspective.
 
-On 03/20/2012 02:01 PM, Arnd Bergmann wrote:
->> Maybe the right thing is a common low-level isp1301 interface defining
->> all the registers and providing low-level (I2C) access functions,
->> leaving all the "higher level"/"board specific" functions up to the
->> existing drivers?
->>
->> (I guess you meant drivers/usb/otg/isp1301_omap.c ?)
-> 
-> Yes, that sounds like a very good idea. Can you describe which part of
-> the function isp1301 does? It's not clear how the layering between
-> that and the platform driver should end up.
+Late last year we discovered a few interesting problems.  One of them
+is definitely our fault: we weren't flushing the cache after we read
+data from a block device a wrote it into the page.  However, there was
+another issue we noticed that made less sense: we had to flush a page
+before writing it to our block device, otherwise we end up writing
+some stale data.  The brd device ran into this issue before, and fixed
+it in commit c2572f2b[1].  In that commit Nick Pidgin says:
+    "brd is missing a flush_dcache_page. On 2nd thoughts, perhaps it is the
+     pagecache's responsibility to flush user virtual aliases (the driver of
+     course should flush kernel virtual mappings)... but anyway, there
+     already exists cache flushing for one direction of transfer, so we
+     should add the other."
 
-The ISP1301 is a relatively simple transceiver where the actual
-differential USB signals end up being generated/decoded. It contains
-some registers and is controlled via I2C to manipulate electrical
-settings (pull up / power etc.).
+I can't help but to feel he's right.  It was very surprising to me
+that I had to flush the user virtual aliases before writing the data
+to the device.  Is it expected that we (as device driver writers) have
+to do that for block device drivers?  I love Linux, but one of the
+aspects I find most frustrating is that I don't know what I can safely
+assume at interface boundaries.  Even modeling my work after existing
+code yields problems, because a number of drivers in the tree seem to
+be broken in this regard.
 
-At a first glance, I found the following drivers to be using it:
+But it leads to another concern.  Since I do have to flush on writes,
+it got me thinking about whether it's necessary to flush user mode
+aliases before conducting a read.  Consider the fact that a page can
+span multiple blocks.  Is it possible that:
+  * we're asked to read a block of data
+  * a user app has scribbled on the page (so it's dirty, but not flushed)
+  * we read the requested data from the device
+  * load it into the page
+  * do a flush_dcache_page()
+  * then the data read from the device becomes corrupt because cached user data
+    is written to RAM?
 
-ohci-nxp (was: ohci-pnx4008 + ohci-lpc32xx)
-isp1301_omap
-lpc32xx_udc (WIP)
+Or, instead of that, the cached data gets dropped entirely because it
+was on the page, but shouldn't have been because we didn't read new
+data into that area, and now that user data is lost?  I confess this
+may all be my lack of understanding about Linux's block i/o subsystem,
+but I'm thoroughly confused at this point.  What I do know is that
+other device drivers are not flushing the page before writing the data
+to a device.  For instance, the mmc driver for the at91 architecture
+suffers from this problem, and I've been able to see that problem
+using mmap.  My concern is that many other drivers also suffer from
+this problem, so I'm not sure what the fix needs to be: fix the page
+cache, fix the driver, or both.
 
-The common functions that all of them are using are some low-level
-functions like read/write byte, read/write word. (For ohci-nxp, I used
-smbus commands.) I propose exporting just the defines for all the
-registers and their bits together with some accessor functions.
+Also, is there somewhere that says what's guaranteed on entry into my
+block device driver?  I've scoured everything I could find... the
+Documentation area (including cachetlb.txt), Linux sites, books...
+I've yet to find anything mentioning the need to call
+flush_dcache_page() much less talk about what the assumptions are.
 
-Would those be the correct places for header and driver:
+Thanks in advance for the help.
 
-drivers/usb/misc/isp1301.c
-include/linux/usb/isp1301.h
+-John
 
-?
-
-As an example usage, I would let the next update of the lpc32xx_udc use
-it and separately provide patches to make the other drivers above also
-use it.
-
-Thanks in advance,
-
-Roland
+[1]: <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=c2572f2b4ffc27ba79211aceee3bef53a59bb5cd>
