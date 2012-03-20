@@ -1,57 +1,78 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 20 Mar 2012 14:21:58 +0000
-Subject: [PATCH 01/11] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <4F67BD78.8070202@gmail.com>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-2-git-send-email-thierry.reding@avionic-design.de>
- <4F67BD78.8070202@gmail.com>
-Message-ID: <20120320142158.CCA213E2834@localhost>
+Date: Tue, 20 Mar 2012 14:35:44 +0000
+Subject: [PATCH v4 RESEND 0/7] gpio/omap: Some more driver fixes
+In-Reply-To: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20120320143544.AA6E93E2834@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Mar 2012 00:12:56 +0100, Sylwester Nawrocki <sylvester.nawrocki@gmail.com> wrote:
-> On 03/08/2012 03:51 PM, Thierry Reding wrote:
-> > From: Grant Likely<grant.likely@secretlab.ca>
-> >
-> > Allow drivers to report at probe time that they cannot get all the resources
-> > required by the device, and should be retried at a later time.
-> >
-> > This should completely solve the problem of getting devices
-> > initialized in the right order.  Right now this is mostly handled by
-> > mucking about with initcall ordering which is a complete hack, and
-> > doesn't even remotely handle the case where device drivers are in
-> > modules.  This approach completely sidesteps the issues by allowing
-> > driver registration to occur in any order, and any driver can request
-> > to be retried after a few more other drivers get probed.
-> >
-> > v4: - Integrate Manjunath's addition of a separate workqueue
-> >      - Change -EAGAIN to -EPROBE_DEFER for drivers to trigger deferral
-> >      - Update comment blocks to reflect how the code really works
-> > v3: - Hold off workqueue scheduling until late_initcall so that the bulk
-> >        of driver probes are complete before we start retrying deferred devices.
-> >      - Tested with simple use cases.  Still needs more testing though.
-> >        Using it to get rid of the gpio early_initcall madness, or to replace
-> >        the ASoC internal probe deferral code would be ideal.
-> > v2: - added locking so it should no longer be utterly broken in that regard
-> >      - remove device from deferred list at device_del time.
-> >      - Still completely untested with any real use case, but has been
-> >        boot tested.
-> >
-> > Signed-off-by: Grant Likely<grant.likely@secretlab.ca>
-> > [Cc list stripped in order not to get on people's nerves]
-> > ---
-> >   drivers/base/base.h    |    1 +
-> >   drivers/base/core.c    |    2 +
-> >   drivers/base/dd.c      |  138 +++++++++++++++++++++++++++++++++++++++++++++++-
-> >   include/linux/device.h |    5 ++
-> >   include/linux/errno.h  |    1 +
-> >   5 files changed, 146 insertions(+), 1 deletion(-)
+On Tue, 20 Mar 2012 16:23:12 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
+> This series excludes the cleanup patches as suggested by Kevin from
+> the previously posted series.
 > 
-> Is this patch going to be included in v3.4 ? I can see it's in -next,
-> but not sure where I could check if its really queued for v3.4.
-> It would be nice to have it in v3.4, I've got already one more client
-> of this deferred probe infrastructure.
+> The fixes include correction of _set_gpio_irqenable() implementation,
+> missing wakeup_en register update in set_gpio_wakeup(), type mismatch
+> of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
+> register update in set_gpio_dataout_() and few corrections in context
+> save logic.
+> 
+> It is baselined on top of:
+> git://git.secretlab.ca/git/linux-2.6.git gpio/next
+> Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
+> 
+> Series is available here for reference:
+> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_fixes
 
-Greg has sent it on to Linus for merging, so yes.
+Merged; thanks
 
 g.
+
+> 
+> Power Test:
+> Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
+> Also confirmed that dataout register content preserved over
+> off-mode.
+> 
+> Functional Test:
+> OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430, OMAP4-BLAZE
+> 
+> v4:
+> a) Implemented all comments on v3 which are mostly related to
+> avoiding unnecessary register read while updating the context.
+> 
+> b) Folded:
+> gpio/omap: fix dataout register overwrite in _set_gpio_dataout
+> into:
+> gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
+> 
+> v3:
+> - Added 4 more additional patches to the previous series
+>  which are all bug fixes.
+> 
+> v2:
+> - Added a new patch to update wakeup_en register in _set_gpio_wakeup()
+>  in addition to updating bank->context.wake_en.
+> 
+> - Added a new patch to remove redundant decoding of gpio offset in
+>  gpio_get(), _get_gpio_datain() and _get_gpio_dataout().
+> 
+> - Added a new patch to remove suspend/resume callbacks because the
+>  operations performed with the callbacks are redundant.
+> 
+> Tarun Kanti DebBarma (7):
+>   gpio/omap: fix wakeup_en register update in _set_gpio_wakeup()
+>   gpio/omap: fix trigger type to unsigned
+>   gpio/omap: fix _set_gpio_irqenable implementation
+>   gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
+>   gpio/omap: fix incorrect context restore logic in omap_gpio_runtime_*
+>   gpio/omap: fix incorrect update to context.irqenable1
+>   gpio/omap: fix redundant decoding of gpio offset
+> 
+>  drivers/gpio/gpio-omap.c |   47 ++++++++++++++++++++++++---------------------
+>  1 files changed, 25 insertions(+), 22 deletions(-)
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
