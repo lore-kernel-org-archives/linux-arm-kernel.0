@@ -1,86 +1,37 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 20 Mar 2012 16:23:18 +0530
-Subject: [PATCH v4 RESEND 6/7] gpio/omap: fix incorrect update to
- context.irqenable1
+Date: Tue, 20 Mar 2012 16:23:13 +0530
+Subject: [PATCH v4 RESEND 1/7] gpio/omap: fix wakeup_en register update in
+ _set_gpio_wakeup()
 In-Reply-To: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
 References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1332240799-6748-7-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1332240799-6748-2-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In _enable_gpio_irqbank() when bank->regs->set_irqenable is valid,
-gpio_mask can be directly set by writing to set_irqenable register
-without overwriting current value. In order to ensure the same is
-stored in context.irqenable1, we must read from regs->irqenable
-instead of overwriting it with gpio_mask.
-The overwriting makes sense only in the second case where irqenable
-is explicitly read and updated with new gpio_mask before writing it
-back. However, for consistency reading regs->irqenable into the
-bank->context.irqenable1 takes care of both the scenarios.
+There are two ways through which wakeup_en register can be programmed
+using gpiolib APIs as shown below. It is seen that in the second case
+in _set_gpio_wakeup(), even though bank->suspend_wakeup is updated
+correctly, its value is not programmed in wakeup_en register. Fix this.
 
-        if (bank->regs->set_irqenable) {
-                reg += bank->regs->set_irqenable;
-                l = gpio_mask;
-        } else {
-                reg += bank->regs->irqenable;
-                l = __raw_readl(reg);
-                if (bank->regs->irqenable_inv)
-                        l &= ~gpio_mask;
-                else
-                        l |= gpio_mask;
-        }
-
-Make the same change for _disable_gpio_irqbank().
+irq_set_type()->gpio_irq_type()->_set_gpio_triggering()->set_gpio_trigger()
+irq_set_wake()->gpio_wake_enable()->_set_gpio_wakeup()
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/gpio/gpio-omap.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index bcb1061..6c17e58 100644
+index 7cbad85..1a144ac 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -451,6 +451,7 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
- 	if (bank->regs->set_irqenable) {
- 		reg += bank->regs->set_irqenable;
- 		l = gpio_mask;
-+		bank->context.irqenable1 |= gpio_mask;
- 	} else {
- 		reg += bank->regs->irqenable;
- 		l = __raw_readl(reg);
-@@ -458,10 +459,10 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
- 			l &= ~gpio_mask;
- 		else
- 			l |= gpio_mask;
-+		bank->context.irqenable1 = l;
- 	}
+@@ -511,6 +511,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+ 	else
+ 		bank->suspend_wakeup &= ~gpio_bit;
  
- 	__raw_writel(l, reg);
--	bank->context.irqenable1 = l;
- }
++	__raw_writel(bank->suspend_wakeup, bank->base + bank->regs->wkup_en);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
  
- static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
-@@ -472,6 +473,7 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
- 	if (bank->regs->clr_irqenable) {
- 		reg += bank->regs->clr_irqenable;
- 		l = gpio_mask;
-+		bank->context.irqenable1 &= ~gpio_mask;
- 	} else {
- 		reg += bank->regs->irqenable;
- 		l = __raw_readl(reg);
-@@ -479,10 +481,10 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
- 			l |= gpio_mask;
- 		else
- 			l &= ~gpio_mask;
-+		bank->context.irqenable1 = l;
- 	}
- 
- 	__raw_writel(l, reg);
--	bank->context.irqenable1 = l;
- }
- 
- static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
+ 	return 0;
 -- 
 1.7.0.4
