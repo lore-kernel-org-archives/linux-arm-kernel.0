@@ -1,107 +1,47 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 20 Mar 2012 05:49:06 -0700
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120319220224.ABF5A3E0A04@localhost>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <20120313172351.97C5E3E053B@localhost>
- <20120314124512.GG1180@shlinux2.ap.freescale.net>
- <20120314141643.GP3852@pengutronix.de>
- <20120315030206.GB13022@shlinux2.ap.freescale.net>
- <20321.37353.63115.664975@ipc1.ka-ro>
- <20120315105927.GE13022@shlinux2.ap.freescale.net>
- <20321.53468.310199.875966@ipc1.ka-ro>
- <20120316030134.GA5161@shlinux2.ap.freescale.net>
- <20120318184749.BB15D3E07BF@localhost>
- <20326.55337.249575.289067@ipc1.ka-ro>
- <20120319150601.B783A3E05A5@localhost>
- <20327.25470.723875.916422@ipc1.ka-ro>
- <20120319220224.ABF5A3E0A04@localhost>
-Message-ID: <CAA+hA=R8hLZMyRASRim28MNzX4jyE3nsaJ3DPzgxDtUmqtH62w@mail.gmail.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 20 Mar 2012 12:57:55 +0000
+Subject: [PATCH v5 2/3] arm:davinci: move emif driver to mfd framework
+In-Reply-To: <20120316172908.GG20524@sortiz-mobl>
+References: <y> <1330005504-25321-3-git-send-email-prakash.pm@ti.com>
+ <20120227142638.GN27687@sortiz-mobl>
+ <A73F36158E33644199EB82C5EC81C7BC3176D103@DBDE01.ent.ti.com>
+ <20120301112329.GI9008@sortiz-mobl>
+ <A73F36158E33644199EB82C5EC81C7BC317702E9@DBDE01.ent.ti.com>
+ <20120316172908.GG20524@sortiz-mobl>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3178627F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2012 at 3:02 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Mon, 19 Mar 2012 17:49:02 +0100, Lothar Wa?mann <LW@KARO-electronics.de> wrote:
->> Hi,
->>
->> Grant Likely writes:
->> > On Mon, 19 Mar 2012 07:54:33 +0100, Lothar Wa?mann <LW@KARO-electronics.de> wrote:
->> > > Grant Likely writes:
->> > > > On Fri, 16 Mar 2012 11:01:35 +0800, Dong Aisheng <aisheng.dong@freescale.com> wrote:
->> > > > > On Thu, Mar 15, 2012 at 07:22:04PM +0800, Lothar Wa?mann wrote:
->> > > > > > Dong Aisheng writes:
->> > > > > > > On Thu, Mar 15, 2012 at 02:53:29PM +0800, Lothar Wa?mann wrote:
->> > > > > > Anyway there is no definite spec how the MAC address(es) are stored
->> > > > > > in the fuse map. Thus reading the MAC from there is more or less
->> > > > > > platform specific.
->> > > > > >
->> > > > > It's just provide one more option since there are customers storing the MAC
->> > > > > in the fuse map.
->> > > >
->> > > > That should be straight forward to support; have a property that
->> > > > specifies the method used for fetching/calculating the MAC.
->> > > >
->> > > Executable code stored inside a DT blob? ;)
->> >
->> > I know you're joking here, but I'm going to answer seriously
->> > anyway... Absolutely not. ?What I'm suggesting is a property that
->> > specifies the method used to determine the mac address. ?Something
->> > like (off the top of my head):
->> >
->> > ? ? local-mac-address = [01 02 03 00 00 00];
->> > ? ? local-mac-mask = [0xff 0xff 0xff 0 0 0];
->> > ? ? mac-encoding = "append-serial-number";
->> >
->> That still does not specify where the remaining part of the MAC is
->> stored and how it should be retrieved.
->
-> I'm suggesting that you define a string that means something specific;
-> that hopefully can be shared by multiple platforms. ?For example,
-> "append-serial-number" might mean start with the values selected by
-> AND of local-mac-address and local-mac-mask, and OR in the board's
-> serial number. ?You would need to define something that worked if this
-> was the solution you used.
->
-I'm intend to Grant's this suggestion.
-This can be shared by all other imx platforms which stores mac address in
-fuse map and this is commonly used by customer.
-Then we do not need keep writing repeat code for different platforms
-via platform
-data.
+Hi Samuel,
 
-For Lothar's question, we can add a property fuse_mac_offset to indicate
-read mac from fuse map and where to read it.
-For how many bytes to read, we can calculate it from the local-mac-mask.
-For example, local-mac-mask = [0xff 0xff 0xff 0 0 0], we can get the size
-as 3 bypes.
+On Fri, Mar 16, 2012 at 22:59:08, Samuel Ortiz wrote:
+> Hi Prakash,
+> 
+> On Tue, Mar 06, 2012 at 01:12:25PM +0000, Manjunathappa, Prakash wrote:
+> > Hi Samuel,
+> > 
+> > May be I did not do a good job giving complete information on this earlier.
+> > So I have replied on top of my mail with below information (seems you missed it)
+> > 
+> I did get it, sorry for not being able to reply earlier.
+> 
+> 
+> > Taking above points into consideration Arnd Bergmann suggested to move AEMIF driver to
+> > MFD framework [1], relevant portion of his mail as follows,
+> > 
+> > " If you want it to provide endpoint devices that are handled by
+> > distinct subsystems in Linux, I would make it an mfd multifunction
+> > device and make the common... "
+> You're missing that part of the quote:
+> 
+> "...code a driver that scans the connected memories in order to register
+> its child devices for each of the subsystems."
+> 
 
-Then we have three properties:
-local-mac-address = [01 02 03 00 00 00];
-local-mac-mask = [0xff 0xff 0xff 0 0 0];
-fuse_mac_offset = <1>;
+emif is not discoverable interface, does not support scanning for connected devices.
 
-In fec driver, the final mac address can be got by:
-local-mac-address & local-mac-mask | (read_fuse(1) & 0xffffff)
+Could you please let me know if there is any other way to achieve this? I will be happy
+to incorporate that and submit next version of the patch.
 
-Lathar,
-Do you think if this is ok?
-
->> > Okay, if so then it would be wise to have a reliable function for the
->> > MAC driver to call to lookup it's address as determined by platform
->> > code. ?Alternately, the platform code can write the correct mac
->> > address into the device tree node at init time (see
->> > prom_update_property() and prom_add_property()).
->> >
->> That sounds good. Didn't know about those functions. That could be
->> used to mimic the current behaviour of supplying the MAC via
->> platform_data.
->
-> I'm okay with doing this; but make sure you remove the bogus
-> local-mac-address from the .dts file.
->
-This is a backup solution to me if the above solution you suggested can not
-work.
-
-Regards
-Dong Aisheng
+Thanks,
+Prakash
