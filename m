@@ -1,34 +1,45 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 20 Mar 2012 10:36:41 -0700
-Subject: [PATCH v2 3/4] drivers: input: Fix OMAP_GPIO_IRQ with
- gpio_to_irq() in ams_delta_serio_exit()
-In-Reply-To: <20120320165246.GH9859@atomide.com>
-References: <1332158817-26311-1-git-send-email-tarun.kanti@ti.com>
- <1332158817-26311-4-git-send-email-tarun.kanti@ti.com>
- <20120320165246.GH9859@atomide.com>
-Message-ID: <20120320173641.GA6464@core.coreip.homeip.net>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 20 Mar 2012 10:46:11 -0700 (PDT)
+Subject: [PATCH v7 2/3] clk: introduce the common clock framework
+In-Reply-To: <20120320140220.GE32469@S2101-09.ap.freescale.net>
+References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
+ <1331878280-2758-3-git-send-email-mturquette@linaro.org>
+ <20120320140220.GE32469@S2101-09.ap.freescale.net>
+Message-ID: <efca11f1b68186dbf1771c09fe3a2f0a.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 09:52:46AM -0700, Tony Lindgren wrote:
-> Hi Dmitry,
-> 
-> * Tarun Kanti DebBarma <tarun.kanti@ti.com> [120319 05:09]:
-> > Even though ams-delta-serio input driver uses gpio_to_irq() in all
-> > relevent places to get irq number, the ams_delta_serio_exit() still
-> > uses OMAP_GPIO_IRQ macro. Fix this.
-> > 
-> > Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> 
-> Care to ack this one? I'd like to apply all four as fixes
-> at the end of the merge window so we can drop the old and
-> now broken OMAP_GPIO_IRQ macro.
 
-Sure.
+On Tue, March 20, 2012 7:02 am, Shawn Guo wrote:
+> On Thu, Mar 15, 2012 at 11:11:19PM -0700, Mike Turquette wrote:
+> ...
+>> +struct clk_ops {
+>> +	int		(*prepare)(struct clk_hw *hw);
+>> +	void		(*unprepare)(struct clk_hw *hw);
+>> +	int		(*enable)(struct clk_hw *hw);
+>> +	void		(*disable)(struct clk_hw *hw);
+>> +	int		(*is_enabled)(struct clk_hw *hw);
+>> +	unsigned long	(*recalc_rate)(struct clk_hw *hw,
+>> +					unsigned long parent_rate);
+>
+> I believe I have heard people love the interface with parent_rate
+> passed in.  I love that too.  But I would like to ask the same thing
+> on .round_rate and .set_rate as well for the same reason why we have
+> it for .recalc_rate.
 
-Acked-by: Dmitry Torokhov <dtor@mail.ru>
+In my case, for most clocks, set rate involves reparenting. So, what does
+passing parent_rate for these even mean? Passing parent_rate seems more
+apt for recalc_rate since it's called when the parent rate changes -- so,
+the actual parent itself is not expected to change.
 
-Thanks.
+I could ignore the parameter, but just wondering how many of the others
+see value in this. And if we do add this parameter, it shouldn't be made
+mandatory for the platform driver to use it (due to other assumptions the
+clock framework might make).
+
+-Saravana
+
 
 -- 
-Dmitry
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
