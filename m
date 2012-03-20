@@ -1,88 +1,33 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 20 Mar 2012 10:49:45 -0700
-Subject: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
- deeper C-states
-In-Reply-To: <CAHSGOuuexpCDNoP1G1Gyge2DCep0rsPmUwrVyZFDQ1_tH+Du7Q@mail.gmail.com>
- (melwyn lobo's message of "Tue, 20 Mar 2012 20:19:02 +0530")
-References: <1316475315-5905-1-git-send-email-khilman@ti.com>
- <87d3d75zo6.fsf@ti.com> <4EBA6046.2060305@linux.vnet.ibm.com>
- <37CAE120BAE10B42A790DD1418C8021D0136C7@DNCE02.ent.ti.com>
- <CAHSGOuuexpCDNoP1G1Gyge2DCep0rsPmUwrVyZFDQ1_tH+Du7Q@mail.gmail.com>
-Message-ID: <878viv17t2.fsf@ti.com>
+Date: Tue, 20 Mar 2012 11:01:00 -0700
+Subject: [PATCH v4 RESEND 6/7] gpio/omap: fix incorrect update to
+ context.irqenable1
+In-Reply-To: <1332240799-6748-7-git-send-email-tarun.kanti@ti.com> (Tarun
+ Kanti DebBarma's message of "Tue, 20 Mar 2012 16:23:18 +0530")
+References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+ <1332240799-6748-7-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87zkbbywwz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-melwyn lobo <linux.melwyn@gmail.com> writes:
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-> Hey Kevin,
-> I would like to try out this patch in my platform see the benefits
-> that you are reporting. But there is one issue in this patch. You have
-> not initialized "hrtimer_timeout" variable.
-> This will always be 0 right ?.
+> In _enable_gpio_irqbank() when bank->regs->set_irqenable is valid,
+> gpio_mask can be directly set by writing to set_irqenable register
+> without overwriting current value. In order to ensure the same is
+> stored in context.irqenable1, we must read from regs->irqenable
+> instead of overwriting it with gpio_mask.
 
-Correct.
+> The overwriting makes sense only in the second case where irqenable
+> is explicitly read and updated with new gpio_mask before writing it
+> back. However, for consistency reading regs->irqenable into the
+> bank->context.irqenable1 takes care of both the scenarios.
 
-The generic code defaults to zero so that the default behavior with this
-patch is unchanged from previous behavior.  In order to use this
-feature, your platform-specific code which creates your C-states sets
-the per-C-state timer values.
+...except that the code doesn't do this anymore.
+
+I like the newer version (I hope so, since I suggested it :), but please
+update the changlog to describe what the code is actually doing.
+
+Thanks,
 
 Kevin
-
-> Thanks,
-> -M
->
-> On Wed, Nov 9, 2011 at 11:36 PM, Chalhoub, Nicole <n-chalhoub@ti.com> wrote:
->> Hi Deepthi,
->>
->>>
->> Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 753.920
->>
->> -----Original Message-----
->>> From: Deepthi Dharwar [mailto:deepthi at linux.vnet.ibm.com]
->>> Sent: Wednesday, November 09, 2011 12:13 PM
->>> To: Hilman, Kevin
->>> Cc: linux-kernel at vger.kernel.org; Arjan van de Ven; linux-arm-
->>> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-
->>> pm at lists.linux-foundation.org; Chalhoub, Nicole
->>> Subject: Re: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
->>> deeper C-states
->>
->> [...]
->>> By setting timers when we enter non-deepest C-state possible, such that
->>> when it fires we
->>> can re-evaluate and try moving into deeper and deeper C-states enhancing
->>> the
->>> power savings is a good feature to have.
->>>
->>> Looking at the current implementation, is it possible to have it as
->>> configurable option
->>> where one can enable/disable this functionality through the backhand
->>> driver ?
->>
->> The timeout values of the c state timers are set in the backhand driver.
->> By setting the timeout to 0 the timers will not fire so you'll not have this functionality enabled
->>
->>> Also I am thinking, instead of having them in governor
->>> wouldnt it be a good idea to have it implemented in
->>> the backhand driver itself ?
->>> --Deepthi
->>
->>
->> In fact each C-state had its own configurable timer, so it is a parameter characterizing a C-state as it is for the exit_latency and target_residency parameters.
->> And we wanted the timer to fire only when we do not go in deep Cstate due to a high load. This decision is made in the CPU idle governor. So the functionality should be seen from the governor..
->>
->> Thanks and Regards
->> Nicole
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at ?http://www.tux.org/lkml/
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
