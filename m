@@ -1,27 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 20:15:51 -0600
-Subject: [PATCH v4 04/10] ARM: tegra: Fix PWM clock programming
-In-Reply-To: <1331740593-10807-5-git-send-email-thierry.reding@avionic-design.de>
+Date: Mon, 19 Mar 2012 20:18:12 -0600
+Subject: [PATCH v4 05/10] ARM: tegra: Provide clock for only one PWM
+ controller
+In-Reply-To: <1331740593-10807-6-git-send-email-thierry.reding@avionic-design.de>
 References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-5-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F67E857.9050402@wwwdotorg.org>
+ <1331740593-10807-6-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <4F67E8E4.7000604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/14/2012 09:56 AM, Thierry Reding wrote:
-> From: Simon Que <sque@chromium.org>
-> 
-> PWM clock source registers in Tegra 2 have different clock source selection bit
-> fields than other registers.  PWM clock source bits in CLK_SOURCE_PWM_0 register
-> are located at bit field bit[30:28] while others are at bit field bit[31:30] in
-> their respective clock source register.
-> 
-> This patch updates the clock programming to correctly reflect that, by adding a
-> flag to indicate the alternate bit field format and checking for it when
-> selecting a clock source (parent clock).
+> A subsequent patch will add a generic PWM API driver for the Tegra PWFM
+> controller, supporting all four PWM devices with a single PWM chip. The
+> device will be named tegra-pwm and only one clock needs to be provided.
 > 
 > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
-> Signed-off-by: Simon Que <sque@chromium.org>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+...
+> -	CLK_DUPLICATE("pwm", "tegra_pwm.0", NULL),
+> -	CLK_DUPLICATE("pwm", "tegra_pwm.1", NULL),
+> -	CLK_DUPLICATE("pwm", "tegra_pwm.2", NULL),
+> -	CLK_DUPLICATE("pwm", "tegra_pwm.3", NULL),
+> +	CLK_DUPLICATE("pwm", "tegra-pwm", NULL),
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+I thought harder about this: Why not delete /all/ the CLK_DUPLICATE()s
+for PWM, and change the second parameter to PERIPH_CLK for PWM from
+"pwm" to "tegra-pwm"?
