@@ -1,175 +1,51 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Tue, 20 Mar 2012 09:09:26 +0100
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-Message-ID: <4F683B36.8090101@metasoft.pl>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Mar 2012 16:13:33 +0800
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+ <20120320072018.GC32469@S2101-09.ap.freescale.net>
+ <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
+Message-ID: <20120320081331.GD32469@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement double buffering for M2M DMA channels.
+On Tue, Mar 20, 2012 at 12:54:55AM -0700, Saravana Kannan wrote:
+> 
+> On Tue, March 20, 2012 12:20 am, Shawn Guo wrote:
+...
+> > struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+> >                 const char *parent_name, unsigned long flags,
+> >                 unsigned long fixed_rate);
+> > struct clk *clk_register_gate(struct device *dev, const char *name,
+> >                 const char *parent_name, unsigned long flags,
+> >                 void __iomem *reg, u8 bit_idx,
+> >                 u8 clk_gate_flags, spinlock_t *lock);
+> > struct clk *clk_register_divider(struct device *dev, const char *name,
+> >                 const char *parent_name, unsigned long flags,
+> >                 void __iomem *reg, u8 shift, u8 width,
+> >                 u8 clk_divider_flags, spinlock_t *lock);
+> > struct clk *clk_register_mux(struct device *dev, const char *name,
+> >                 char **parent_names, u8 num_parents, unsigned long flags,
+> >                 void __iomem *reg, u8 shift, u8 width,
+> >                 u8 clk_mux_flags, spinlock_t *lock);
+> 
+> If you simplify those functions further. They would just become
+> clk_register(). I'm not sure I see a value in them in at that point or
+> even in their current form. But if others see (I'm guessing since they
+> acked or didn't nack it), I'm not going to ask to remove them. If everyone
+> agrees that we should just remove them, I would be glad to.
+> 
+> It's arguable that these functions for the common hardware types saves the
+> need to deal with the kalloc in every platform driver. But it's not clear
+> to me where they would get these parameters in the first place. Most
+> likely form some sort of static array. At which point, it might as well be
+> a static array of pointers to clk_gated.hw, clk_fixed_rate.hw, etc instead
+> of a platform specific  struct to hold these initializers.
 
-Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+I share the save view on this, so would vote to remove these
+registration functions for basic clks completely.
 
-Index: slave-dma/drivers/dma/ep93xx_dma.c
-===================================================================
---- slave-dma.orig/drivers/dma/ep93xx_dma.c
-+++ slave-dma/drivers/dma/ep93xx_dma.c
-@@ -69,6 +69,7 @@
- #define M2M_CONTROL_TM_SHIFT		13
- #define M2M_CONTROL_TM_TX		(1 << M2M_CONTROL_TM_SHIFT)
- #define M2M_CONTROL_TM_RX		(2 << M2M_CONTROL_TM_SHIFT)
-+#define M2M_CONTROL_NFBINT		BIT(21)
- #define M2M_CONTROL_RSS_SHIFT		22
- #define M2M_CONTROL_RSS_SSPRX		(1 << M2M_CONTROL_RSS_SHIFT)
- #define M2M_CONTROL_RSS_SSPTX		(2 << M2M_CONTROL_RSS_SHIFT)
-@@ -77,7 +78,23 @@
- #define M2M_CONTROL_PWSC_SHIFT		25
- 
- #define M2M_INTERRUPT			0x0004
--#define M2M_INTERRUPT_DONEINT		BIT(1)
-+#define M2M_INTERRUPT_MASK		6
-+
-+#define M2M_STATUS			0x000c
-+#define M2M_STATUS_CTL_SHIFT		1
-+#define M2M_STATUS_CTL_IDLE		(0 << M2M_STATUS_CTL_SHIFT)
-+#define M2M_STATUS_CTL_STALL		(1 << M2M_STATUS_CTL_SHIFT)
-+#define M2M_STATUS_CTL_MEMRD		(2 << M2M_STATUS_CTL_SHIFT)
-+#define M2M_STATUS_CTL_MEMWR		(3 << M2M_STATUS_CTL_SHIFT)
-+#define M2M_STATUS_CTL_BWCWAIT		(4 << M2M_STATUS_CTL_SHIFT)
-+#define M2M_STATUS_CTL_MASK		(7 << M2M_STATUS_CTL_SHIFT)
-+#define M2M_STATUS_BUF_SHIFT		4
-+#define M2M_STATUS_BUF_NO		(0 << M2M_STATUS_BUF_SHIFT)
-+#define M2M_STATUS_BUF_ON		(1 << M2M_STATUS_BUF_SHIFT)
-+#define M2M_STATUS_BUF_NEXT		(2 << M2M_STATUS_BUF_SHIFT)
-+#define M2M_STATUS_BUF_MASK		(3 << M2M_STATUS_BUF_SHIFT)
-+#define M2M_STATUS_DONE			BIT(6)
-+
- 
- #define M2M_BCR0			0x0010
- #define M2M_BCR1			0x0014
-@@ -426,15 +443,6 @@ static int m2p_hw_interrupt(struct ep93x
- 
- /*
-  * M2M DMA implementation
-- *
-- * For the M2M transfers we don't use NFB at all. This is because it simply
-- * doesn't work well with memcpy transfers. When you submit both buffers it is
-- * extremely unlikely that you get an NFB interrupt, but it instead reports
-- * DONE interrupt and both buffers are already transferred which means that we
-- * weren't able to update the next buffer.
-- *
-- * So for now we "simulate" NFB by just submitting buffer after buffer
-- * without double buffering.
-  */
- 
- static int m2m_hw_setup(struct ep93xx_dma_chan *edmac)
-@@ -543,6 +551,11 @@ static void m2m_hw_submit(struct ep93xx_
- 	m2m_fill_desc(edmac);
- 	control |= M2M_CONTROL_DONEINT;
- 
-+	if (ep93xx_dma_advance_active(edmac)) {
-+		m2m_fill_desc(edmac);
-+		control |= M2M_CONTROL_NFBINT;
-+	}
-+
- 	/*
- 	 * Now we can finally enable the channel. For M2M channel this must be
- 	 * done _after_ the BCRx registers are programmed.
-@@ -560,32 +573,85 @@ static void m2m_hw_submit(struct ep93xx_
- 	}
- }
- 
-+/*
-+ * According to EP93xx User's Guide, we should receive DONE interrupt when all
-+ * M2M DMA controller transactions complete normally. This is not always the
-+ * case - sometimes EP93xx M2M DMA asserts DONE interrupt when the DMA channel
-+ * is still running (channel Buffer FSM in DMA_BUF_ON state, and channel
-+ * Control FSM in DMA_MEM_RD state, observed@least in IDE-DMA operation).
-+ * In effect, disabling the channel when only DONE bit is set could stop
-+ * currently running DMA transfer. To avoid this, we use Buffer FSM and
-+ * Control FSM to check current state of DMA channel.
-+ */
- static int m2m_hw_interrupt(struct ep93xx_dma_chan *edmac)
- {
-+	u32 status = readl(edmac->regs + M2M_STATUS);
-+	u32 ctl_fsm = status & M2M_STATUS_CTL_MASK;
-+	u32 buf_fsm = status & M2M_STATUS_BUF_MASK;
-+	bool done = status & M2M_STATUS_DONE;
-+	bool last;
- 	u32 control;
- 
--	if (!(readl(edmac->regs + M2M_INTERRUPT) & M2M_INTERRUPT_DONEINT))
-+	/* Accept only DONE and NFB interrupts */
-+	if (!(readl(edmac->regs + M2M_INTERRUPT) & M2M_INTERRUPT_MASK))
- 		return INTERRUPT_UNKNOWN;
- 
--	/* Clear the DONE bit */
--	writel(0, edmac->regs + M2M_INTERRUPT);
-+	if (done)
-+		/* Clear the DONE bit */
-+		writel(0, edmac->regs + M2M_INTERRUPT);
- 
--	/* Disable interrupts and the channel */
--	control = readl(edmac->regs + M2M_CONTROL);
--	control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_ENABLE);
--	writel(control, edmac->regs + M2M_CONTROL);
-+	/*
-+	 * Check whether we are done with descriptors or not. This, together
-+	 * with DMA channel state, determines action to take in interrupt.
-+	 */
-+	last = list_first_entry(edmac->active.next,
-+		struct ep93xx_dma_desc, node)->txd.cookie;
- 
- 	/*
--	 * Since we only get DONE interrupt we have to find out ourselves
--	 * whether there still is something to process. So we try to advance
--	 * the chain an see whether it succeeds.
-+	 * Use M2M DMA Buffer FSM and Control FSM to check current state of
-+	 * DMA channel. Using DONE and NFB bits from channel status register
-+	 * or bits from channel interrupt register was proven not to be
-+	 * reliable.
- 	 */
--	if (ep93xx_dma_advance_active(edmac)) {
--		edmac->edma->hw_submit(edmac);
-+	if (!last &&
-+	    (buf_fsm == M2M_STATUS_BUF_NO ||
-+	     buf_fsm == M2M_STATUS_BUF_ON)) {
-+		/*
-+		 * Two buffers are ready for update when Buffer FSM is in
-+		 * DMA_NO_BUF state. Only one buffer can be prepared without
-+		 * disabling the channel, or polling the DONE bit.
-+		 * To simplify things, always prepare only one buffer.
-+		 */
-+		ep93xx_dma_advance_active(edmac);
-+		m2m_fill_desc(edmac);
-+		if (done && !edmac->chan.private) {
-+			/* Software trigger for memcpy channel */
-+			control = readl(edmac->regs + M2M_CONTROL);
-+			control |= M2M_CONTROL_START;
-+			writel(control, edmac->regs + M2M_CONTROL);
-+		}
- 		return INTERRUPT_NEXT_BUFFER;
- 	}
- 
--	return INTERRUPT_DONE;
-+	/*
-+	 * Disable the channel only when Buffer FSM is in DMA_NO_BUF state
-+	 * and Control FSM is in DMA_STALL state.
-+	 */
-+	if (last &&
-+	    buf_fsm == M2M_STATUS_BUF_NO &&
-+	    ctl_fsm == M2M_STATUS_CTL_STALL) {
-+		/* Disable interrupts and the channel */
-+		control = readl(edmac->regs + M2M_CONTROL);
-+		control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_NFBINT
-+			    | M2M_CONTROL_ENABLE);
-+		writel(control, edmac->regs + M2M_CONTROL);
-+		return INTERRUPT_DONE;
-+	}
-+
-+	/*
-+	 * Nothing to do this time.
-+	 */
-+	return INTERRUPT_NEXT_BUFFER;
- }
- 
- /*
+Regards,
+Shawn
