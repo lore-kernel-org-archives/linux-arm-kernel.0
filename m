@@ -1,60 +1,102 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Mar 2012 16:32:12 +0800
-Subject: [PATCH 1/1] net: phylib: remove the length limitation of mii bus
- id
-In-Reply-To: <1332217386-3586-1-git-send-email-b29396@freescale.com>
-References: <1332217386-3586-1-git-send-email-b29396@freescale.com>
-Message-ID: <CAAQ0ZWQEoPORMXsf3xV-KPP+hOHk2euj460fORyUALnfPn3Q8g@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 20 Mar 2012 09:39:44 +0100
+Subject: [PATCH v4 10/10] pwm-backlight: Add rudimentary device tree
+ support
+In-Reply-To: <4F67F2AF.3020404@wwwdotorg.org>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
+ <4F67F2AF.3020404@wwwdotorg.org>
+Message-ID: <20120320083943.GA20249@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2012 12:23, Dong Aisheng <b29396@freescale.com> wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
->
-> When convert to dt, the length of old mii bus id (17 bytes) is not
-> sufficent to use.
-> For example, the bus id could be 800f0000.ethernet-1:00 in DT.
->
-> This patch removes the bus id length limitation by changing the
-> bus id to a const char pionter and user could dynamically set the
-> bus id via kasprintf function call.
->
-> Since then no users use MII_BUS_ID_SIZE any more, just remove it.
->
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> ---
-> The simplest way may just change MII_BUS_ID_SIZE to a more bigger size,
-> but i'm not sure that's gonna be accepted.
+* Stephen Warren wrote:
+> On 03/14/2012 09:56 AM, Thierry Reding wrote:
+> > This commit adds very basic support for device tree probing. Currently,
+> > only a PWM and a list of distinct brightness levels can be specified.
+> > Enabling or disabling backlight power via GPIOs is not yet supported.
+> > 
+> > A pointer to the exit() callback is stored in the driver data to keep it
+> > around until the driver is unloaded.
+> 
+> > +++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
+> 
+> > +pwm-backlight bindings
+> > +
+> > +Required properties:
+> > +  - compatible: "pwm-backlight"
+> > +  - pwm: OF device-tree PWM specification
+> > +  - num-brightness-levels: number of distinct brightness levels
+> > +  - brightness-levels: array of distinct brightness levels
+> 
+> I assume the values in this array are 0 (darkest/off) to 255 (max
+> brightness)? The doc should probably specify this.
 
-The simplest fix has been applied on -next tree as below.
+Typically yes. Although I haven't tested this it should work for pretty much
+any range starting from 0 because the last value will be used to interpolate
+("scale") the PWM duty cycle. So it really is 0 (darkest/off) to <last item>
+(max brightness). I should document this, of course.
 
-commit a7ed07d51c8abdb407be454c6cb6cfad613759d9
-Author: Richard Zhao <richard.zhao@linaro.org>
-Date:   Sun Jan 29 22:08:12 2012 +0000
+> > +  - default-brightness-level: the default brightness level
+> 
+> Likewise, this is an index into the default-brightness-level? Again,
+> it'd be best to explicitly state this.
 
-    net: fec: correct phy_name buffer length when init phy_name
+Yes. Correct.
 
-    Fix the bug that we got wrong phy_name on imx6q sabrelite board.
-    snprintf used wrong length of phy_name.
-    phy_name length is MII_BUS_ID_SIZE + 3 rather not MII_BUS_ID_SIZE.
-    I change it to sizeof(phy_name).
+> ...
+> > +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> > +		default-brightness-level = <6>;
+> 
+> 
+> > +static int pwm_backlight_parse_dt(struct device *dev,
+> > +				  struct platform_pwm_backlight_data *data)
+> ...
+> > +		ret = of_property_read_u32(node, "default-brightness-level",
+> > +					   &value);
+> > +		if (ret < 0)
+> > +			goto free;
+> 
+> Range-check that against max_brightness?
 
-    Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-    Acked-by: Shawn Guo <shawn.guo@linaro.org>
-    Acked-by: Florian Fainelli <florian@openwrt.org>
-    Signed-off-by: David S. Miller <davem@davemloft.net>
+Yes, that would be good. I guess logging a warning and falling back to
+max_brightness would be the proper action?
 
-diff --git a/drivers/net/ethernet/freescale/fec.c
-b/drivers/net/ethernet/freescale/fec.c
-index 7b25e9c..1c7aad8 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -990,7 +990,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
-                phy_id = 0;
-        }
+> >  static int pwm_backlight_probe(struct platform_device *pdev)
+> ...
+> > -	pb->pwm = pwm_request(data->pwm_id, "backlight");
+> > -	if (IS_ERR(pb->pwm)) {
+> > -		dev_err(&pdev->dev, "unable to request PWM for backlight\n");
+> > -		ret = PTR_ERR(pb->pwm);
+> > -		goto err_alloc;
+> > -	} else
+> > -		dev_dbg(&pdev->dev, "got pwm for backlight\n");
+> > +	if (!pb->pwm) {
+> > +		pb->pwm = pwm_request(data->pwm_id, "backlight");
+> > +		if (IS_ERR(pb->pwm)) {
+> > +			dev_err(&pdev->dev, "unable to request PWM for backlight\n");
+> > +			ret = PTR_ERR(pb->pwm);
+> > +			goto err_alloc;
+> > +		} else
+> > +			dev_dbg(&pdev->dev, "got pwm for backlight\n");
+> > +	}
+> 
+> Hmmm. It'd be more consistent if pwm_backlight_parse_dt() called
+> something like of_pwm_get() instead of of_pwm_request(), so that this
+> code could always call pwm_request() on the PWM and hence operate the
+> same irrespective of DT vs non-DT. GPIOs work that way at least.
 
--       snprintf(phy_name, MII_BUS_ID_SIZE, PHY_ID_FMT, mdio_bus_id, phy_id);
-+       snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
-        phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
-                              fep->phy_interface);
-        if (IS_ERR(phy_dev)) {
+That's actually what the initial patch had. Unfortunately that's pretty much
+the opposite direction of where the PWM framework is headed because it would
+involve getting a global index to request the PWM. I think in the long run it
+would be much better to get rid of pwm_request() altogether and unify by
+having the non-DT case request the PWM device on a per-chip basis.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120320/89ee5a2d/attachment.sig>
