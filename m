@@ -1,41 +1,32 @@
-From: consul.kautuk@gmail.com (Kautuk Consul)
-Date: Tue, 20 Mar 2012 12:30:57 -0400
-Subject: [PATCH 1/1] arm: fault.c: correct how the tsk->[maj|min]_flt gets
- incremented
-Message-ID: <1332261057-2399-1-git-send-email-consul.kautuk@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Mar 2012 09:51:10 -0700
+Subject: [PATCH v2 0/4] ARM: OMAP: boards: changes to support dynamic
+ irq alloc
+In-Reply-To: <CAC83ZvLf=fkuvf6VN1gwauFirO2cQsNib3ANWnJrujWGNYS24Q@mail.gmail.com>
+References: <1332158817-26311-1-git-send-email-tarun.kanti@ti.com>
+ <20120319191743.GB9859@atomide.com> <4F67B9F9.1030906@ti.com>
+ <20120319233910.GF9859@atomide.com> <4F68471A.4010502@ti.com>
+ <CAC83ZvLf=fkuvf6VN1gwauFirO2cQsNib3ANWnJrujWGNYS24Q@mail.gmail.com>
+Message-ID: <20120320165109.GG9859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 8878a539ff19a43cf3729e7562cd528f490246ae was done by me
-to make the page fault handler retryable as well as interruptible.
+* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120320 04:02]:
+> On Tue, Mar 20, 2012 at 2:30 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> > On 3/20/2012 12:39 AM, Tony Lindgren wrote:
+> >>
+> >> Yes I understand. But still, which patch(s) cause the issue
+> >> so we can put that in the changelog for the fixes?
+> >
+> > OK, here they are:
+> > 25db711 gpio/omap: Fix IRQ handling for SPARSE_IRQ
+> > 384ebe1 gpio/omap: Add DT support to GPIO driver
 
-Due to this commit, there is a mistake in the way in which
-tsk->[maj|min]_flt counter gets incremented for VM_FAULT_ERROR:
-If VM_FAULT_ERROR is returned in the fault flags by handle_mm_fault,
-then either maj_flt or min_flt will get incremented. This is wrong
-as in the case of a VM_FAULT_ERROR we need to be skip ahead to the
-error handling code in do_page_fault.
+Thanks, I'll update the comments for the first two patches
+for this and apply them.
 
-Added a check after the call to __do_page_fault() to check for
-(fault & VM_FAULT_ERROR).
+If I get an ack from Dmitry for patch 3/4, I'll apply them too.
 
-Signed-off-by: Kautuk Consul <consul.kautuk@gmail.com>
----
- arch/arm/mm/fault.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Regards,
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index bb7eac3..ec8c88b 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -318,7 +318,7 @@ retry:
- 	 */
- 
- 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
--	if (flags & FAULT_FLAG_ALLOW_RETRY) {
-+	if (!(fault & VM_FAULT_ERROR) && (flags & FAULT_FLAG_ALLOW_RETRY)) {
- 		if (fault & VM_FAULT_MAJOR) {
- 			tsk->maj_flt++;
- 			perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1,
--- 
-1.7.5.4
+Tony
