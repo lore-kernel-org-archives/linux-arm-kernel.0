@@ -1,81 +1,101 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Mar 2012 08:19:57 +0100
-Subject: [PATCH 1/2] clk: Fix error handling in fixed clock hardware type
- register fn
-In-Reply-To: <1332214706-675-1-git-send-email-skannan@codeaurora.org>
-References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
- <1332214706-675-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <20120320071957.GH3852@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 20 Mar 2012 08:24:43 +0100
+Subject: [GIT PULL] DMA-mapping framework updates for 3.4
+Message-ID: <1332228283-29077-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2012 at 08:38:25PM -0700, Saravana Kannan wrote:
-> If memory allocation for the parents array or the parent string fails, then
-> fail the registration immediately instead of calling clk_register and
-> hoping it fails there.
-> 
-> Return -ENOMEM on failure.
-> 
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Jamie Iles <jamie@jamieiles.com>
-> Cc: Richard Zhao <richard.zhao@linaro.org>
-> Cc: Saravana Kannan <skannan@codeaurora.org>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Amit Kucheria <amit.kucheria@linaro.org>
-> Cc: Deepak Saxena <dsaxena@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
-> There are still some memory free issues when clk_register() fails, but I will
-> fix it when I fixed the other register() fns to return ENOMEM of alloc
-> failure instead of a NULL.
-> 
->  drivers/clk/clk-fixed-rate.c |   10 +++++++---
->  1 files changed, 7 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-> index 90c79fb..6423ae9 100644
-> --- a/drivers/clk/clk-fixed-rate.c
-> +++ b/drivers/clk/clk-fixed-rate.c
-> @@ -61,22 +61,26 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
->  		parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
->  
->  		if (! parent_names)
-> -			goto out;
-> +			goto fail_ptr;
->  
->  		len = sizeof(char) * strlen(parent_name);
->  
->  		parent_names[0] = kmalloc(len, GFP_KERNEL);
->  
->  		if (!parent_names[0])
-> -			goto out;
-> +			goto fail_str;
->  
->  		strncpy(parent_names[0], parent_name, len);
->  	}
+Hi Linus,
 
-It's easier to add a char *parent to struct clk_fixed and pass it to
-clk_register with &fixed->parent. This saves you a kmalloc call and
-makes the error path simpler. It's the same way already done in the
-divider.
+Please pull the dma-mapping framework updates for v3.4 since commit
+c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
 
-Sascha
+  Linux 3.3
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+with the top-most commit e749a9f707f1102735e02338fa564be86be3bb69
+
+  common: DMA-mapping: add NON-CONSISTENT attribute
+
+from the git repository at:
+
+  git://git.infradead.org/users/kmpark/linux-samsung dma-mapping-next
+
+Those patches introduce a new alloc method (with support for memory
+attributes) in dma_map_ops structure, which will later replace
+dma_alloc_coherent and dma_alloc_writecombine functions.
+
+Thanks!
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+Patch summary:
+
+Andrzej Pietrasiewicz (9):
+      X86: adapt for dma_map_ops changes
+      MIPS: adapt for dma_map_ops changes
+      PowerPC: adapt for dma_map_ops changes
+      IA64: adapt for dma_map_ops changes
+      SPARC: adapt for dma_map_ops changes
+      Alpha: adapt for dma_map_ops changes
+      SH: adapt for dma_map_ops changes
+      Microblaze: adapt for dma_map_ops changes
+      Unicore32: adapt for dma_map_ops changes
+
+Marek Szyprowski (6):
+      common: dma-mapping: introduce alloc_attrs and free_attrs methods
+      Hexagon: adapt for dma_map_ops changes
+      common: dma-mapping: remove old alloc_coherent and free_coherent methods
+      common: dma-mapping: introduce mmap method
+      common: DMA-mapping: add WRITE_COMBINE attribute
+      common: DMA-mapping: add NON-CONSISTENT attribute
+
+ Documentation/DMA-attributes.txt          |   19 +++++++++++++++++++
+ arch/alpha/include/asm/dma-mapping.h      |   18 ++++++++++++------
+ arch/alpha/kernel/pci-noop.c              |   10 ++++++----
+ arch/alpha/kernel/pci_iommu.c             |   10 ++++++----
+ arch/hexagon/include/asm/dma-mapping.h    |   18 ++++++++++++------
+ arch/hexagon/kernel/dma.c                 |    9 +++++----
+ arch/ia64/hp/common/sba_iommu.c           |   11 ++++++-----
+ arch/ia64/include/asm/dma-mapping.h       |   18 ++++++++++++------
+ arch/ia64/kernel/pci-swiotlb.c            |    9 +++++----
+ arch/ia64/sn/pci/pci_dma.c                |    9 +++++----
+ arch/microblaze/include/asm/dma-mapping.h |   18 ++++++++++++------
+ arch/microblaze/kernel/dma.c              |   10 ++++++----
+ arch/mips/cavium-octeon/dma-octeon.c      |   16 ++++++++--------
+ arch/mips/include/asm/dma-mapping.h       |   18 ++++++++++++------
+ arch/mips/mm/dma-default.c                |    8 ++++----
+ arch/powerpc/include/asm/dma-mapping.h    |   24 ++++++++++++++++--------
+ arch/powerpc/kernel/dma-iommu.c           |   10 ++++++----
+ arch/powerpc/kernel/dma-swiotlb.c         |    4 ++--
+ arch/powerpc/kernel/dma.c                 |   10 ++++++----
+ arch/powerpc/kernel/ibmebus.c             |   10 ++++++----
+ arch/powerpc/kernel/vio.c                 |   14 ++++++++------
+ arch/powerpc/platforms/cell/iommu.c       |   16 +++++++++-------
+ arch/powerpc/platforms/ps3/system-bus.c   |   13 +++++++------
+ arch/sh/include/asm/dma-mapping.h         |   28 ++++++++++++++++++----------
+ arch/sh/kernel/dma-nommu.c                |    4 ++--
+ arch/sh/mm/consistent.c                   |    6 ++++--
+ arch/sparc/include/asm/dma-mapping.h      |   18 ++++++++++++------
+ arch/sparc/kernel/iommu.c                 |   10 ++++++----
+ arch/sparc/kernel/ioport.c                |   18 ++++++++++--------
+ arch/sparc/kernel/pci_sun4v.c             |    9 +++++----
+ arch/unicore32/include/asm/dma-mapping.h  |   18 ++++++++++++------
+ arch/unicore32/mm/dma-swiotlb.c           |    4 ++--
+ arch/x86/include/asm/dma-mapping.h        |   26 ++++++++++++++++----------
+ arch/x86/kernel/amd_gart_64.c             |   11 ++++++-----
+ arch/x86/kernel/pci-calgary_64.c          |    9 +++++----
+ arch/x86/kernel/pci-dma.c                 |    3 ++-
+ arch/x86/kernel/pci-nommu.c               |    6 +++---
+ arch/x86/kernel/pci-swiotlb.c             |   12 +++++++-----
+ arch/x86/xen/pci-swiotlb-xen.c            |    4 ++--
+ drivers/iommu/amd_iommu.c                 |   10 ++++++----
+ drivers/iommu/intel-iommu.c               |    9 +++++----
+ drivers/xen/swiotlb-xen.c                 |    5 +++--
+ include/linux/dma-attrs.h                 |    2 ++
+ include/linux/dma-mapping.h               |   13 +++++++++----
+ include/linux/swiotlb.h                   |    6 ++++--
+ include/xen/swiotlb-xen.h                 |    6 ++++--
+ lib/swiotlb.c                             |    5 +++--
+ 47 files changed, 338 insertions(+), 206 deletions(-)
