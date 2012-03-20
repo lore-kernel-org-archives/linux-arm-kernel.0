@@ -1,56 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Mar 2012 13:01:49 +0000
-Subject: [PATCH] USB: gadget driver for LPC32xx
-In-Reply-To: <4F67B28D.3060500@antcom.de>
-References: <1332191930-2433-1-git-send-email-stigge@antcom.de>
- <201203192130.13583.arnd@arndb.de> <4F67B28D.3060500@antcom.de>
-Message-ID: <201203201301.50159.arnd@arndb.de>
+Date: Tue, 20 Mar 2012 13:03:10 +0000
+Subject: [PATCH v2 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <6b5dc1fadfd03a48093338b6981c0a7ae7662212.1332237596.git.nicolas.ferre@atmel.com>
+References: <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <6b5dc1fadfd03a48093338b6981c0a7ae7662212.1332237596.git.nicolas.ferre@atmel.com>
+Message-ID: <201203201303.11175.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 March 2012, Roland Stigge wrote:
-> Hi Arnd,
+On Tuesday 20 March 2012, Nicolas Ferre wrote:
 > 
-> On 19/03/12 22:30, Arnd Bergmann wrote:
-> > There is already a driver for the isp1301 otg part in the kernel, I don't
-> > think we want to add another one.
-> > 
-> > From what I can tell, this shares a common ancestry with the omap version
-> > but has diverged quite a bit. The best solution would really be to
-> > bring the two back together and let them share a common base driver,
-> > with the lpc32xx and omap specific bits in another file.
+> Add some basic helpers to retrieve a DMA controller device_node and the
+> DMA request specifications. By making DMA controllers register a generic
+> translation function, we allow the management of any type of DMA requests
+> specification.
+> The void * output of an of_dma_xlate() function that will be implemented
+> by the DMA controller can carry any type of "dma-request" argument.
 > 
-> Yes, it's a good idea to share code where possible and consolidate into
-> one driver.
+> The DMA client will search its associated DMA controller in the list and
+> call the registered of_dam_xlate() function to retrieve the request values.
 > 
-> Please consider:
+> One simple xlate function is provided for the "single number" type of
+> request binding.
 > 
-> The LPC32xx driver is actually using only 3 functions via isp1301:
-> 
-> isp1301_udc_configure()
-> isp1301_set_powerstate()
-> isp1301_pullup_set()
-> 
-> The first of those is LPC32xx specific. The power setting function is
-> also done differently in isp1301_omap's power_up()/power_down() ("board
-> specific"). For the pullups, there is not (yet?) a dedicated API in the
-> OMAP driver, but it's really only two small I2C commands.
-> 
-> Are you still sure it's worth it to use a common driver when there is
-> hardly shared code?
+> This implementation is independent from dmaengine so it can also be used
+> by legacy drivers.
 
-No, I guess I should have looked closed. I found a few common functions
-and assumed that this would be the same driver.
-
-> Maybe the right thing is a common low-level isp1301 interface defining
-> all the registers and providing low-level (I2C) access functions,
-> leaving all the "higher level"/"board specific" functions up to the
-> existing drivers?
-> 
-> (I guess you meant drivers/usb/otg/isp1301_omap.c ?)
-
-Yes, that sounds like a very good idea. Can you describe which part of
-the function isp1301 does? It's not clear how the layering between
-that and the platform driver should end up.
+Thanks a lot of posting this updated version, I think it will be very
+useful as we proceed. I still hope that in the end we find that the
+differences are not all that big and we can do it all with bindings
+very much like what you have here.
 
 	Arnd
