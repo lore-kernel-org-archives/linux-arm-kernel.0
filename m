@@ -1,40 +1,46 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 20 Mar 2012 16:23:15 +0530
-Subject: [PATCH v4 RESEND 3/7] gpio/omap: fix _set_gpio_irqenable
- implementation
+Date: Tue, 20 Mar 2012 16:23:17 +0530
+Subject: [PATCH v4 RESEND 5/7] gpio/omap: fix incorrect context restore logic
+ in omap_gpio_runtime_*
 In-Reply-To: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
 References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1332240799-6748-4-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1332240799-6748-6-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function should be capable of both enabling and disabling interrupts
-based upon the *enable* parameter. Right now the function only enables
-the interrupt and *enable* is not used at all. So add the interrupt
-disable capability also using the parameter.
+In omap_gpio_runtime_suspend/resume() the context save/restore should
+be independent of bank->enabled_non_wakeup_gpios. This was preventing
+context restore of GPIO lines which are not wakeup enabled.
 
+Reported-by: Govindraj Raja <govindraj.raja@ti.com>
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ drivers/gpio/gpio-omap.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 2042857..8901d57 100644
+index bbe9648..bcb1061 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -484,7 +484,10 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+@@ -1247,9 +1247,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+ 	 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
+ 	 * generated.  See OMAP2420 Errata item 1.101.
+ 	 */
+-	if (!(bank->enabled_non_wakeup_gpios))
+-		goto update_gpio_context_count;
+-
+ 	bank->saved_datain = __raw_readl(bank->base +
+ 						bank->regs->datain);
+ 	l1 = __raw_readl(bank->base + bank->regs->fallingdetect);
+@@ -1298,7 +1295,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
+ 	__raw_writel(bank->context.risingdetect,
+ 		     bank->base + bank->regs->risingdetect);
  
- static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
- {
--	_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
-+	if (enable)
-+		_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
-+	else
-+		_disable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
- }
- 
- /*
+-	if (!bank->enabled_non_wakeup_gpios || !bank->workaround_enabled) {
++	if (!bank->workaround_enabled) {
+ 		spin_unlock_irqrestore(&bank->lock, flags);
+ 		return 0;
+ 	}
 -- 
 1.7.0.4
