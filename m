@@ -1,106 +1,68 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Tue, 20 Mar 2012 12:29:52 +0200
-Subject: [PATCH] ARM: i.MX35: Add set_rate and round_rate calls to csi_clk
-Message-ID: <1332239392-12639-1-git-send-email-alexg@meprolight.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 20 Mar 2012 03:53:19 -0700
+Subject: [PATCH 1/1] net: phylib: remove the length limitation of mii bus
+ id
+In-Reply-To: <CAAQ0ZWQEoPORMXsf3xV-KPP+hOHk2euj460fORyUALnfPn3Q8g@mail.gmail.com>
+References: <1332217386-3586-1-git-send-email-b29396@freescale.com>
+ <CAAQ0ZWQEoPORMXsf3xV-KPP+hOHk2euj460fORyUALnfPn3Q8g@mail.gmail.com>
+Message-ID: <CAA+hA=Ttc9RDmK1fDPCtqLpf91DYDDFSf3E6zWQ6seyw7sNqTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add set_rate and round_rate calls to csi_clk. This is needed
-to give mx3-camera control over master clock rate to camera.
+On Tue, Mar 20, 2012 at 1:32 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On 20 March 2012 12:23, Dong Aisheng <b29396@freescale.com> wrote:
+>> From: Dong Aisheng <dong.aisheng@linaro.org>
+>>
+>> When convert to dt, the length of old mii bus id (17 bytes) is not
+>> sufficent to use.
+>> For example, the bus id could be 800f0000.ethernet-1:00 in DT.
+>>
+>> This patch removes the bus id length limitation by changing the
+>> bus id to a const char pionter and user could dynamically set the
+>> bus id via kasprintf function call.
+>>
+>> Since then no users use MII_BUS_ID_SIZE any more, just remove it.
+>>
+>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>> ---
+>> The simplest way may just change MII_BUS_ID_SIZE to a more bigger size,
+>> but i'm not sure that's gonna be accepted.
+>
+> The simplest fix has been applied on -next tree as below.
+>
+Oh, i missed it, seems my patch covers that change.
+But that patch only fixed wrong phy_name buffer length issue.
+My patch is totally remove the length limitation of bus id and phy_name
+or the bus id name will be truncated if it's longer than MII_BUS_ID_SIZE
+which is not a comfortable limitation.
 
-Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
----
- arch/arm/mach-imx/clock-imx35.c |   57 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 55 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clock-imx35.c b/arch/arm/mach-imx/clock-imx35.c
-index ac8238c..3202b56 100644
---- a/arch/arm/mach-imx/clock-imx35.c
-+++ b/arch/arm/mach-imx/clock-imx35.c
-@@ -254,7 +254,7 @@ static unsigned long get_rate_ssi(struct clk *clk)
- 	return rate / ((div1 + 1) * (div2 + 1));
- }
- 
--static unsigned long get_rate_csi(struct clk *clk)
-+static unsigned long csi_get_rate(struct clk *clk)
- {
- 	unsigned long pdr2 = __raw_readl(CCM_BASE + CCM_PDR2);
- 	unsigned long rate;
-@@ -267,6 +267,45 @@ static unsigned long get_rate_csi(struct clk *clk)
- 	return rate / (((pdr2 >> 16) & 0x3f) + 1);
- }
- 
-+static int csi_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long div;
-+	unsigned long parent_rate;
-+	unsigned long pdr2 = __raw_readl(CCM_BASE + CCM_PDR2);
-+
-+	if (pdr2 & (1 << 7))
-+		parent_rate = get_rate_arm();
-+	else
-+		parent_rate = get_rate_ppll();
-+
-+	div = parent_rate / rate;
-+
-+	/* Set clock divider */
-+	pdr2 |= ((div - 1) & 0x3f) << 16;
-+	__raw_writel(pdr2, CCM_BASE + CCM_PDR2);
-+
-+	return 0;
-+}
-+
-+static unsigned long csi_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long div;
-+	unsigned long parent_rate;
-+	unsigned long pdr2 = __raw_readl(CCM_BASE + CCM_PDR2);
-+
-+	if (pdr2 & (1 << 7))
-+		parent_rate = get_rate_arm();
-+	else
-+		parent_rate = get_rate_ppll();
-+
-+	div = parent_rate / rate;
-+
-+	if (parent_rate % rate)
-+		div++;
-+
-+	return parent_rate / div;
-+}
-+
- static unsigned long get_rate_otg(struct clk *clk)
- {
- 	unsigned long pdr4 = __raw_readl(CCM_BASE + CCM_PDR4);
-@@ -353,6 +392,20 @@ static void clk_cgr_disable(struct clk *clk)
- 		.disable	= clk_cgr_disable,	\
- 	}
- 
-+#define DEFINE_CLOCK1(name, i, er, es, getsetround, s, p)	\
-+	static struct clk name = {                              \
-+		.id             = i,                            \
-+		.enable_reg     = CCM_BASE + er,                \
-+		.enable_shift   = es,                           \
-+		.get_rate       = getsetround##_get_rate,       \
-+		.set_rate       = getsetround##_set_rate,       \
-+		.round_rate     = getsetround##_round_rate,     \
-+		.enable         = clk_cgr_enable,               \
-+		.disable        = clk_cgr_disable,              \
-+		.secondary      = s,                            \
-+		.parent         = p,                            \
-+	}
-+
- DEFINE_CLOCK(asrc_clk,   0, CCM_CGR0,  0, NULL, NULL);
- DEFINE_CLOCK(pata_clk,    0, CCM_CGR0,  2, get_rate_ipg, NULL);
- /* DEFINE_CLOCK(audmux_clk, 0, CCM_CGR0,  4, NULL, NULL); */
-@@ -403,7 +456,7 @@ DEFINE_CLOCK(wdog_clk,   0, CCM_CGR2, 24, NULL, NULL);
- DEFINE_CLOCK(max_clk,    0, CCM_CGR2, 26, NULL, NULL);
- DEFINE_CLOCK(audmux_clk, 0, CCM_CGR2, 30, NULL, NULL);
- 
--DEFINE_CLOCK(csi_clk,    0, CCM_CGR3,  0, get_rate_csi, NULL);
-+DEFINE_CLOCK1(csi_clk,    0, CCM_CGR3,  0, csi, NULL, NULL);
- DEFINE_CLOCK(iim_clk,    0, CCM_CGR3,  2, NULL, NULL);
- DEFINE_CLOCK(gpu2d_clk,  0, CCM_CGR3,  4, NULL, NULL);
- 
--- 
-1.7.0.4
+> commit a7ed07d51c8abdb407be454c6cb6cfad613759d9
+> Author: Richard Zhao <richard.zhao@linaro.org>
+> Date: ? Sun Jan 29 22:08:12 2012 +0000
+>
+> ? ?net: fec: correct phy_name buffer length when init phy_name
+>
+> ? ?Fix the bug that we got wrong phy_name on imx6q sabrelite board.
+> ? ?snprintf used wrong length of phy_name.
+> ? ?phy_name length is MII_BUS_ID_SIZE + 3 rather not MII_BUS_ID_SIZE.
+> ? ?I change it to sizeof(phy_name).
+>
+> ? ?Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ? ?Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> ? ?Acked-by: Florian Fainelli <florian@openwrt.org>
+> ? ?Signed-off-by: David S. Miller <davem@davemloft.net>
+>
+> diff --git a/drivers/net/ethernet/freescale/fec.c
+> b/drivers/net/ethernet/freescale/fec.c
+> index 7b25e9c..1c7aad8 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -990,7 +990,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
+> ? ? ? ? ? ? ? ?phy_id = 0;
+> ? ? ? ?}
+>
+> - ? ? ? snprintf(phy_name, MII_BUS_ID_SIZE, PHY_ID_FMT, mdio_bus_id, phy_id);
+> + ? ? ? snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
+> ? ? ? ?phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?fep->phy_interface);
+> ? ? ? ?if (IS_ERR(phy_dev)) {
