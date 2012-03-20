@@ -1,101 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Mar 2012 08:24:43 +0100
-Subject: [GIT PULL] DMA-mapping framework updates for 3.4
-Message-ID: <1332228283-29077-1-git-send-email-m.szyprowski@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 20 Mar 2012 09:30:51 +0200
+Subject: [PATCH v2 7/7] ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux
+ related functions as __init
+In-Reply-To: <20120319180928.GA9859@atomide.com>
+References: <1329997247-27342-1-git-send-email-rnayak@ti.com>
+ <1329997247-27342-8-git-send-email-rnayak@ti.com>
+ <1332148116.2144.1.camel@deskari> <1332152442.2144.27.camel@deskari>
+ <20120319180928.GA9859@atomide.com>
+Message-ID: <1332228651.2409.5.camel@lappy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, 2012-03-19 at 11:09 -0700, Tony Lindgren wrote:
 
-Please pull the dma-mapping framework updates for v3.4 since commit
-c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
+> I've updated your patch a bit for the comments a bit and marked
+> omap4_hdmi_mux_pads as __init, will apply to fixes. Updated patch
+> below.
 
-  Linux 3.3
+Hmm, is there something funny with these init changes now...
 
-with the top-most commit e749a9f707f1102735e02338fa564be86be3bb69
+Initially the situation was that there were no __inits in display.c's
+mux functions. Then "Mark omap_hsmmc_init..." patch added __inits to all
+of them. My patch removed the __inits from dsi functions, but left them
+to hdmi functions.
 
-  common: DMA-mapping: add NON-CONSISTENT attribute
+But now you modified my patch to add the __inits to hdmi functions.
+Which should already have them from the "Mark omap_hsmmc_init..." patch.
 
-from the git repository at:
-
-  git://git.infradead.org/users/kmpark/linux-samsung dma-mapping-next
-
-Those patches introduce a new alloc method (with support for memory
-attributes) in dma_map_ops structure, which will later replace
-dma_alloc_coherent and dma_alloc_writecombine functions.
-
-Thanks!
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
-
-Patch summary:
-
-Andrzej Pietrasiewicz (9):
-      X86: adapt for dma_map_ops changes
-      MIPS: adapt for dma_map_ops changes
-      PowerPC: adapt for dma_map_ops changes
-      IA64: adapt for dma_map_ops changes
-      SPARC: adapt for dma_map_ops changes
-      Alpha: adapt for dma_map_ops changes
-      SH: adapt for dma_map_ops changes
-      Microblaze: adapt for dma_map_ops changes
-      Unicore32: adapt for dma_map_ops changes
-
-Marek Szyprowski (6):
-      common: dma-mapping: introduce alloc_attrs and free_attrs methods
-      Hexagon: adapt for dma_map_ops changes
-      common: dma-mapping: remove old alloc_coherent and free_coherent methods
-      common: dma-mapping: introduce mmap method
-      common: DMA-mapping: add WRITE_COMBINE attribute
-      common: DMA-mapping: add NON-CONSISTENT attribute
-
- Documentation/DMA-attributes.txt          |   19 +++++++++++++++++++
- arch/alpha/include/asm/dma-mapping.h      |   18 ++++++++++++------
- arch/alpha/kernel/pci-noop.c              |   10 ++++++----
- arch/alpha/kernel/pci_iommu.c             |   10 ++++++----
- arch/hexagon/include/asm/dma-mapping.h    |   18 ++++++++++++------
- arch/hexagon/kernel/dma.c                 |    9 +++++----
- arch/ia64/hp/common/sba_iommu.c           |   11 ++++++-----
- arch/ia64/include/asm/dma-mapping.h       |   18 ++++++++++++------
- arch/ia64/kernel/pci-swiotlb.c            |    9 +++++----
- arch/ia64/sn/pci/pci_dma.c                |    9 +++++----
- arch/microblaze/include/asm/dma-mapping.h |   18 ++++++++++++------
- arch/microblaze/kernel/dma.c              |   10 ++++++----
- arch/mips/cavium-octeon/dma-octeon.c      |   16 ++++++++--------
- arch/mips/include/asm/dma-mapping.h       |   18 ++++++++++++------
- arch/mips/mm/dma-default.c                |    8 ++++----
- arch/powerpc/include/asm/dma-mapping.h    |   24 ++++++++++++++++--------
- arch/powerpc/kernel/dma-iommu.c           |   10 ++++++----
- arch/powerpc/kernel/dma-swiotlb.c         |    4 ++--
- arch/powerpc/kernel/dma.c                 |   10 ++++++----
- arch/powerpc/kernel/ibmebus.c             |   10 ++++++----
- arch/powerpc/kernel/vio.c                 |   14 ++++++++------
- arch/powerpc/platforms/cell/iommu.c       |   16 +++++++++-------
- arch/powerpc/platforms/ps3/system-bus.c   |   13 +++++++------
- arch/sh/include/asm/dma-mapping.h         |   28 ++++++++++++++++++----------
- arch/sh/kernel/dma-nommu.c                |    4 ++--
- arch/sh/mm/consistent.c                   |    6 ++++--
- arch/sparc/include/asm/dma-mapping.h      |   18 ++++++++++++------
- arch/sparc/kernel/iommu.c                 |   10 ++++++----
- arch/sparc/kernel/ioport.c                |   18 ++++++++++--------
- arch/sparc/kernel/pci_sun4v.c             |    9 +++++----
- arch/unicore32/include/asm/dma-mapping.h  |   18 ++++++++++++------
- arch/unicore32/mm/dma-swiotlb.c           |    4 ++--
- arch/x86/include/asm/dma-mapping.h        |   26 ++++++++++++++++----------
- arch/x86/kernel/amd_gart_64.c             |   11 ++++++-----
- arch/x86/kernel/pci-calgary_64.c          |    9 +++++----
- arch/x86/kernel/pci-dma.c                 |    3 ++-
- arch/x86/kernel/pci-nommu.c               |    6 +++---
- arch/x86/kernel/pci-swiotlb.c             |   12 +++++++-----
- arch/x86/xen/pci-swiotlb-xen.c            |    4 ++--
- drivers/iommu/amd_iommu.c                 |   10 ++++++----
- drivers/iommu/intel-iommu.c               |    9 +++++----
- drivers/xen/swiotlb-xen.c                 |    5 +++--
- include/linux/dma-attrs.h                 |    2 ++
- include/linux/dma-mapping.h               |   13 +++++++++----
- include/linux/swiotlb.h                   |    6 ++++--
- include/xen/swiotlb-xen.h                 |    6 ++++--
- lib/swiotlb.c                             |    5 +++--
- 47 files changed, 338 insertions(+), 206 deletions(-)
+ Tomi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120320/9ca92661/attachment.sig>
