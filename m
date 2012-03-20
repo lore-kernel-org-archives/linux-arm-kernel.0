@@ -1,46 +1,34 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 20 Mar 2012 12:52:58 -0400
-Subject: Device tree and IO map_desc.
-Message-ID: <CAKON4OyHRVvdtZGt+HiCnsRT_5zTuDVBVgOx22kFC2xxFLnD+Q@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 20 Mar 2012 10:36:41 -0700
+Subject: [PATCH v2 3/4] drivers: input: Fix OMAP_GPIO_IRQ with
+ gpio_to_irq() in ams_delta_serio_exit()
+In-Reply-To: <20120320165246.GH9859@atomide.com>
+References: <1332158817-26311-1-git-send-email-tarun.kanti@ti.com>
+ <1332158817-26311-4-git-send-email-tarun.kanti@ti.com>
+ <20120320165246.GH9859@atomide.com>
+Message-ID: <20120320173641.GA6464@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is there a helper for building the IO map_desc from the device tree?
+On Tue, Mar 20, 2012 at 09:52:46AM -0700, Tony Lindgren wrote:
+> Hi Dmitry,
+> 
+> * Tarun Kanti DebBarma <tarun.kanti@ti.com> [120319 05:09]:
+> > Even though ams-delta-serio input driver uses gpio_to_irq() in all
+> > relevent places to get irq number, the ams_delta_serio_exit() still
+> > uses OMAP_GPIO_IRQ macro. Fix this.
+> > 
+> > Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> 
+> Care to ack this one? I'd like to apply all four as fixes
+> at the end of the merge window so we can drop the old and
+> now broken OMAP_GPIO_IRQ macro.
 
-For example on Versatile. All of this map_io data is already in the
-device tree, it is just repeated here.
+Sure.
 
+Acked-by: Dmitry Torokhov <dtor@mail.ru>
 
-DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
-	.map_io		= versatile_map_io,
-	.init_early	= versatile_init_early,
-....
-MACHINE_END
-
-void __init versatile_map_io(void)
-{
-	iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
-}
-
-static struct map_desc versatile_io_desc[] __initdata = {
-	{
-		.virtual	=  IO_ADDRESS(VERSATILE_SYS_BASE),
-		.pfn		= __phys_to_pfn(VERSATILE_SYS_BASE),
-		.length		= SZ_4K,
-		.type		= MT_DEVICE
-	}, {
-		.virtual	=  IO_ADDRESS(VERSATILE_SIC_BASE),
-		.pfn		= __phys_to_pfn(VERSATILE_SIC_BASE),
-		.length		= SZ_4K,
-		.type		= MT_DEVICE
-	}, {
-		.virtual	=  IO_ADDRESS(VERSATILE_VIC_BASE),
-		.pfn		= __phys_to_pfn(VERSATILE_VIC_BASE),
-		.length		= SZ_4K,
-		.type		= MT_DEVICE
-	}, {
-...
+Thanks.
 
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+Dmitry
