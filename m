@@ -1,42 +1,50 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 20 Mar 2012 06:59:30 +0100
-Subject: [PATCH v4 01/10] PWM: add pwm framework support
-In-Reply-To: <4F67E38F.6080300@wwwdotorg.org>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-2-git-send-email-thierry.reding@avionic-design.de>
- <4F67E38F.6080300@wwwdotorg.org>
-Message-ID: <20120320055930.GB25778@avionic-0098.mockup.avionic-design.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Mar 2012 15:20:20 +0800
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+Message-ID: <20120320072018.GC32469@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 03/14/2012 09:56 AM, Thierry Reding wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > This patch adds framework support for PWM (pulse width modulation) devices.
-> ...
-> > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> ...
-> > +/**
-> > + * pwmchip_add() - register a new pwm
-> > + * @chip: the pwm
-> > + *
-> > + * register a new pwm. pwm->pwm_id must be initialized. if pwm_id < 0 then
-> > + * a dynamically assigned id will be used, otherwise the id specified,
-> > + */
+On Mon, Mar 19, 2012 at 08:38:26PM -0700, Saravana Kannan wrote:
+> This has a couple of advantages:
+> * Completely hides struct clk from many clock platform drivers and static
+>   clock initialization code.
+> * Simplifies the generic clk_register() function and allows adding optional
+>   fields in the future without modifying the function signature.
+> * Allows for simpler static initialization of clocks on all platforms by
+>   removing the need for forward delcarations.
+> * Halves the number of symbols added for each static clock initialization.
 > 
-> I don't see anywhere in the code that implements "if pwm_id < 0 then a
-> dynamically assigned id will be used".
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 
-The second patch in the series fixes up this comment when the functionality
-is properly implemented. I still wanted to go over the first patch and fix up
-some minor things, so maybe I'll fix this up as I go along.
+I agree this is a reasonable move.  But while you simplify the interface
+of clk_register(), why not making a further step to simplify the
+following interfaces simple too?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120320/f86a1fb5/attachment.sig>
+struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+                const char *parent_name, unsigned long flags,
+                unsigned long fixed_rate);
+struct clk *clk_register_gate(struct device *dev, const char *name,
+                const char *parent_name, unsigned long flags,
+                void __iomem *reg, u8 bit_idx,
+                u8 clk_gate_flags, spinlock_t *lock);
+struct clk *clk_register_divider(struct device *dev, const char *name,
+                const char *parent_name, unsigned long flags,
+                void __iomem *reg, u8 shift, u8 width,
+                u8 clk_divider_flags, spinlock_t *lock);
+struct clk *clk_register_mux(struct device *dev, const char *name,
+                char **parent_names, u8 num_parents, unsigned long flags,
+                void __iomem *reg, u8 shift, u8 width,
+                u8 clk_mux_flags, spinlock_t *lock);
+
+Otherwise,
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+-- 
+Regards,
+Shawn
