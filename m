@@ -1,118 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 21 Mar 2012 00:12:42 +0100
-Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
-In-Reply-To: <4F68E34A.70207@codeaurora.org>
-References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
- <1332214706-675-1-git-send-email-skannan@codeaurora.org>
- <1332214706-675-2-git-send-email-skannan@codeaurora.org>
- <20120320072018.GC32469@S2101-09.ap.freescale.net>
- <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
- <20120320094031.GI3852@pengutronix.de>
- <20120320141811.GF32469@S2101-09.ap.freescale.net>
- <20120320181050.GN3852@pengutronix.de>
- <4F68E34A.70207@codeaurora.org>
-Message-ID: <20120320231242.GP3852@pengutronix.de>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 20 Mar 2012 16:27:28 -0700
+Subject: i.MX: Convert v4/v5 based SoCs to common clock framework
+In-Reply-To: <4F674659.40207@gmail.com>
+References: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
+ <4F674659.40207@gmail.com>
+Message-ID: <CAJOA=zPXJL_ssa0M4SG3iN5xH=6MfWD0N3A29H5Ek26L4VORZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 01:06:34PM -0700, Saravana Kannan wrote:
-> On 03/20/2012 11:10 AM, Sascha Hauer wrote:
-> >On Tue, Mar 20, 2012 at 10:18:14PM +0800, Shawn Guo wrote:
-> >>On Tue, Mar 20, 2012 at 10:40:31AM +0100, Sascha Hauer wrote:
-> >>...
-> >>>I am using these functions and don't need a static array, I just call
-> >>>the functions with the desired parameters.
-> >>>
-> >>With this patch getting in, you do not have to use them then.  I feel
-> >>a static array will be much more readable than a long list of function
-> >>calls with a long list of hardcoded arguments to each.
-> >
-> >I'm also not a fan of long argument lists; a divider like defined in my
-> >tree takes 5 arguments, a gate 4 and a mux 6. While 6 is already at the
-> >border I think it's still acceptable.
-> >
-> >What I like in terms of readability is one line per clock which makes
-> >for quite short clock files.
-> 
-> It certainly makes for short clock files, but it's definitely less
-> readable that the expanded struct. For the original author the "one
-> line per clock" looks readable since they wrote it. But for someone
-> looking at the code to modify it, the expanded one would be much
-> easier to read. Also, you can always declare your own macro if you
-> really want to follow the one line approach.
-> 
-> >So when we use structs to initialize the clocks we'll probably have
-> >something like this:
-> >
-> >static struct clk_divider somediv = {
-> >	.reg = CCM_BASE + 0x14,
-> >	.width = 3,
-> >	.shift = 17,
-> >	.lock =&ccm_lock,
-> >	.hw.parent = "someotherdiv",
-> >	.hw.flags = CLK_SET_RATE_PARENT,
-> >};
-> 
-> Taken from your patches:
-> 
-> imx_clk_mux("spll_sel", CCM_CSCR, 17, 1, spll_sel_clks,
-> ARRAY_SIZE(spll_sel_clks));
-> 
-> Compare the struct to the one line call. Now tell me, what does "1"
-> represent? No clue. But in the struct, I can immediately tell what
-> each one of the parameters are.
-> 
-> Anyway, my patch certainly isn't forcing you to use multiple lines.
-> So, hopefully this won't be a point of contention.
-> 
-> >This will make a 4000 line file out of a 500 line file. Now when for
-> >some reason struct clk_divider changes we end with big patches. If the
-> >clk core gets a new fancy CLK_ flag which we want to have then again
-> >we end up with big patches. Then there's also the possibility that
-> >someone finds out that .lock and .hw.flags are common to all dividers
-> >and comes up with a #define DEFINE_CLK_DIVIDER again to share common
-> >fields.
-> 
-> This patch won't prevent you from doing any of that. You can still
-> create macros for that (there are already one for that). Also, what
-> you are pointing out is a bigger problem for the current
-> clk_register() function since you might have to change the no. of
-> params of all the callers even if a new field is optional.
-> 
-> >All this can be solved when we introduce a small wrapper function and
-> >use it in the clock files:
-> >
-> >static inline struct clk *imx_clk_divider(const char *name, const char *parent,
-> >		void __iomem *reg, u8 shift, u8 width)
-> >{
-> >	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
-> >			reg, shift, width, 0,&imx_ccm_lock);
-> >}
-> >
-> >It decouples us from the structs used by the clock framework, we can
-> >add our preferred flags and still can share common fields like the lock.
-> >
-> >While this was not the intention when I first converted from struct
-> >initializers to function initializers I am confident that it will make
-> >a good job.
-> 
-> Now I'm confused -- it's not clear if you are leaning towards my
-> patch or away from it?
+On Mon, Mar 19, 2012 at 7:44 AM, Rob Herring <robherring2@gmail.com> wrote:
+> Do we want to move all clock code to drivers/clk? I'm not saying it has
+> to be done now, but is that a goal?
 
-There was a tendency to get rid of static initializers and I like the
-idea of not exposing any of the internally used members outside the
-clock framework.
-Now people try their best to make themselves comfortable with the
-static initializers and you even discussed the possibility of removing
-the clk_register_* functions (which make it possible for users not
-to use any of the internal struct members). That's what I don't like
-about your patches. But if we go for static initializers anyway then your
-patches probably change things for the better.
+My knee jerk response is to say "no".  Back in January a similar topic
+came up for the AT91 CPUidle driver migrating to drivers/cpuidle/.
+See Russell's reply here:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/147849
 
-Sascha
+If a platform's clock code lives in a silo and is nicely walled off
+from other platform-specific bits then migration to drivers/clk/ is
+possible.  In practice I think that more complex clock code and data
+will have a hard time doing so.  Even the simple task of sharing a
+header which exposes commonly used register addresses, offsets and
+widths starts to get complicated when some of the code/data that uses
+it lives in arch/* and some of it lives in drivers/*
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Mike
