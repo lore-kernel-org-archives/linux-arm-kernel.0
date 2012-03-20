@@ -1,65 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Mar 2012 20:35:20 -0600
-Subject: [PATCH v4 06/10] pwm: Add NVIDIA Tegra SoC support
-In-Reply-To: <1331740593-10807-7-git-send-email-thierry.reding@avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-7-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F67ECE8.8030307@wwwdotorg.org>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Tue, 20 Mar 2012 08:05:29 +0530
+Subject: [PATCH v4 00/12] gpio/omap: Some more driver cleanup and fixes
+In-Reply-To: <87aa3c3y6k.fsf@ti.com>
+References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
+ <87aa3c3y6k.fsf@ti.com>
+Message-ID: <CAC83ZvJnhnh-=Kwd4cuRvuCEKjgNWAdw2OK0_8GHb7_K6qk4mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2012 09:56 AM, Thierry Reding wrote:
-> This commit adds a generic PWM framework driver for the PWFM controller
-> found on NVIDIA Tegra SoCs. The driver is based on code from the
-> Chromium kernel tree and was originally written by Gary King (NVIDIA)
-...
-> diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
-...
-> +static int tegra_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-> +	int rc = 0;
-> +
-> +	if (!pc->enable[pwm->hwpwm]) {
+On Tue, Mar 20, 2012 at 6:07 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>
+>> The cleanup is mostly getting rid of redundant fields in struct gpio_bank{}
+>> as we already have them as part of bank->context now. Also, remove un-used
+>> variable from gpio_irq_handler. Also, the suspend/resume callbacks are
+>> removed bacause they are not needed any more.
+>
+> OK.
+>
+>> The fixes include correction of _set_gpio_irqenable() implementation,
+>> missing wakeup_en register update in set_gpio_wakeup(), type mismatch
+>> of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
+>> register update in set_gpio_dataout_() and few corrections in context
+>> save logic.
+>
+> These fixes need to be separated out from the cleanups and prepared for
+> v3.4-rc. ?We need these as standlone fixes (indepenent of the cleanups)
+> so they can be applied for 3.4-rc. ?The rest of the cleanups will have
+> to wait until 3.5.
+Sure, I will separate out the fixes and prepare new series.
 
-IIRC, the new PWM core only calls the enable() op for a disabled ->
-enabled transition, so this driver probably doesn't need to check the
-same thing, and you can get rid of tegra_pwm_chip.enable[] and have
-tegra_pwm_config() read the enable flag from the core pwm device instead.
-
-> +		rc = clk_enable(pc->clk);
-> +		if (!rc) {
-> +			unsigned long offset = pwm->hwpwm << 4;
-> +			u32 val;
-> +
-> +			val = readl(pc->mmio_base + offset);
-> +			val |= PWM_ENABLE;
-> +			writel(val, pc->mmio_base + offset);
-
-It seems a little of for the driver to define a pwm_writel() function
-but only use it in some places but not others. I guess it's because in
-some places the code knows the clock is on, so doesn't need the
-clk_enable()/disable() helper in pwm_writel(), but I'd tend towards
-always using pwm_readl()/pwm_writel() throughout the driver, and lifting
-the clock management out of those low-level functions myself.
-
-> +static int __devexit tegra_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct tegra_pwm_chip *pwm = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	if (WARN_ON(!pwm))
-> +		return -ENODEV;
-> +
-> +	pwmchip_remove(&pwm->chip);
-> +
-> +	for (i = 0; i < NUM_PWM; i++) {
-> +		pwm_writel(pwm, i, 0);
-> +
-> +		if (pwm->enable[i])
-> +			clk_disable(pwm->clk);
-
-Should the core call the disable() op before the remove() op so drivers
-don't need to check this? I'm a little in two minds about this; if this
-decision is deferred to drivers (as the code above assumes), then I
-suppose the whole remove() path might be marginally more efficient.
+>
+>> It is baselined on top of:
+>> git://git.secretlab.ca/git/linux-2.6.git gpio/next
+>> Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
+>>
+>> Series is available here for reference:
+>> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_cleanup_fixes
+>>
+>> Power Test:
+>> Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
+>> Also confirmed that dataout register content preserved over
+>> off-mode.
+>
+> I've confirmed these fixes also correct off-mode GPIO ouptut glitches
+> that I was seeing on n900.
+OK, thanks.
+--
+Tarun
+>
+> Kevin
