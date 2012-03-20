@@ -1,29 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 19 Mar 2012 17:15:43 -0700
-Subject: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to
- add IVA OPP
-In-Reply-To: <CAOMWX4cXwppGu_P2csWYtHJazpRNDz0W7xQcfyAcwqJ7SJodDA@mail.gmail.com>
- (Nishanth Menon's message of "Mon, 19 Mar 2012 16:29:40 -0500")
-References: <8762e6et1u.fsf@ti.com>
- <5448984682E7954C9BFF27F747A9C6CA56D6A8@dolphin.TIGRIS.local>
- <20120316142034.GA22234@senorita.am.dhcp.ti.com>
- <87sjh45ljs.fsf@ti.com>
- <CAOMWX4cXwppGu_P2csWYtHJazpRNDz0W7xQcfyAcwqJ7SJodDA@mail.gmail.com>
-Message-ID: <87r4wo3z68.fsf@ti.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Tue, 20 Mar 2012 09:21:01 +0900
+Subject: [PATCH] ARM: lib: use LDRD/STRD for data copy
+In-Reply-To: <4F674479.8090101@gmail.com>
+References: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
+ <20120319085503.GL15988@n2100.arm.linux.org.uk> <4F674479.8090101@gmail.com>
+Message-ID: <005901cd062f$54ad5e50$fe081af0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Menon, Nishanth" <nm@ti.com> writes:
+Rob Herring wrote:
 
-> Kevin,
-> [...]
->> Nishanth, can you collect the acks/tested-bys and repost and official
->> patch.
->>
->> I'll queue this up.
-> Thanks. This is already done:
-> http://marc.info/?l=linux-omap&m=133191481703750&w=2
 
-Yeah, sorry for the noise.  I saw it after I sent this request.
+> On 03/19/2012 03:55 AM, Russell King - ARM Linux wrote:
+> > On Mon, Mar 19, 2012 at 04:02:48PM +0900, Boojin Kim wrote:
+> >> This patch uses LDRD/STRD that loads and stores data as DWORD unit
+> >> for the copy of 8-words data.
+> >> It brings better performance than LDRM/STRM that was used originally.
+> >
+> > And what about CPUs that don't have ldrd/strd ?
+> >
+>
+> And what about CPUs that do have ldrd/strd but is slower than ldm/stm?
+> I'm pretty sure that is almost everything currently out there.
 
-Kevin
+Actually I didn't measure the memcpy performance on all ARM SoCs.
+I just measured it with internal memcpy() benchmark on Cortex-A9 and Cortex-A15.
+ldrd/strd is faster than ldm/stm on cortex-a15.
+And it's similar on cortex-a9.
+I will try again this patch gives meaningful effect to the targeted ARM SoCs
+
+Thank you for your reply.
+>
+> Rob
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
