@@ -1,52 +1,26 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Tue, 20 Mar 2012 08:05:29 +0530
-Subject: [PATCH v4 00/12] gpio/omap: Some more driver cleanup and fixes
-In-Reply-To: <87aa3c3y6k.fsf@ti.com>
-References: <1331906760-5259-1-git-send-email-tarun.kanti@ti.com>
- <87aa3c3y6k.fsf@ti.com>
-Message-ID: <CAC83ZvJnhnh-=Kwd4cuRvuCEKjgNWAdw2OK0_8GHb7_K6qk4mw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Mar 2012 20:42:34 -0600
+Subject: [PATCH v4 07/10] pwm: tegra: Add device tree support
+In-Reply-To: <1331740593-10807-8-git-send-email-thierry.reding@avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-8-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <4F67EE9A.6080101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 6:07 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> The cleanup is mostly getting rid of redundant fields in struct gpio_bank{}
->> as we already have them as part of bank->context now. Also, remove un-used
->> variable from gpio_irq_handler. Also, the suspend/resume callbacks are
->> removed bacause they are not needed any more.
->
-> OK.
->
->> The fixes include correction of _set_gpio_irqenable() implementation,
->> missing wakeup_en register update in set_gpio_wakeup(), type mismatch
->> of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
->> register update in set_gpio_dataout_() and few corrections in context
->> save logic.
->
-> These fixes need to be separated out from the cleanups and prepared for
-> v3.4-rc. ?We need these as standlone fixes (indepenent of the cleanups)
-> so they can be applied for 3.4-rc. ?The rest of the cleanups will have
-> to wait until 3.5.
-Sure, I will separate out the fixes and prepare new series.
+On 03/14/2012 09:56 AM, Thierry Reding wrote:
+> Add auxdata to instantiate the PWFM controller from a device tree,
+> include the corresponding nodes in the dtsi files for Tegra 20 and
+> Tegra 30 and add binding documentation.
+> 
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 
->
->> It is baselined on top of:
->> git://git.secretlab.ca/git/linux-2.6.git gpio/next
->> Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
->>
->> Series is available here for reference:
->> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_cleanup_fixes
->>
->> Power Test:
->> Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
->> Also confirmed that dataout register content preserved over
->> off-mode.
->
-> I've confirmed these fixes also correct off-mode GPIO ouptut glitches
-> that I was seeing on n900.
-OK, thanks.
---
-Tarun
->
-> Kevin
+> +++ b/Documentation/devicetree/bindings/pwm/tegra-pwm.txt
+
+Can this please be named nvidia,tegra20-pwm.txt so that if we need
+different bindings for any future Tegra PWM, we won't have any filename
+conflicts?
+
+Aside from that,
+
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
