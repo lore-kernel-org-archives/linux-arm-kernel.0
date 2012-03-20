@@ -1,52 +1,56 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Mar 2012 16:08:36 +0000
-Subject: [PATCH v4 10/10] pwm-backlight: Add rudimentary device tree
- support
-In-Reply-To: <4F68A899.3030009@wwwdotorg.org>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
- <4F67F2AF.3020404@wwwdotorg.org>
- <20120320083943.GA20249@avionic-0098.adnet.avionic-design.de>
- <4F68A1C8.5080608@wwwdotorg.org>
- <20120320154330.GA8651@avionic-0098.mockup.avionic-design.de>
- <4F68A899.3030009@wwwdotorg.org>
-Message-ID: <20120320160832.GL3445@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Mar 2012 13:01:49 +0000
+Subject: [PATCH] USB: gadget driver for LPC32xx
+In-Reply-To: <4F67B28D.3060500@antcom.de>
+References: <1332191930-2433-1-git-send-email-stigge@antcom.de>
+ <201203192130.13583.arnd@arndb.de> <4F67B28D.3060500@antcom.de>
+Message-ID: <201203201301.50159.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 09:56:09AM -0600, Stephen Warren wrote:
-> On 03/20/2012 09:43 AM, Thierry Reding wrote:
+On Monday 19 March 2012, Roland Stigge wrote:
+> Hi Arnd,
+> 
+> On 19/03/12 22:30, Arnd Bergmann wrote:
+> > There is already a driver for the isp1301 otg part in the kernel, I don't
+> > think we want to add another one.
+> > 
+> > From what I can tell, this shares a common ancestry with the omap version
+> > but has diverged quite a bit. The best solution would really be to
+> > bring the two back together and let them share a common base driver,
+> > with the lpc32xx and omap specific bits in another file.
+> 
+> Yes, it's a good idea to share code where possible and consolidate into
+> one driver.
+> 
+> Please consider:
+> 
+> The LPC32xx driver is actually using only 3 functions via isp1301:
+> 
+> isp1301_udc_configure()
+> isp1301_set_powerstate()
+> isp1301_pullup_set()
+> 
+> The first of those is LPC32xx specific. The power setting function is
+> also done differently in isp1301_omap's power_up()/power_down() ("board
+> specific"). For the pullups, there is not (yet?) a dedicated API in the
+> OMAP driver, but it's really only two small I2C commands.
+> 
+> Are you still sure it's worth it to use a common driver when there is
+> hardly shared code?
 
-> > What would be a good way to represent this in platform data?
+No, I guess I should have looked closed. I found a few common functions
+and assumed that this would be the same driver.
 
-> I think most get subsystems have a get API that works for both DT and
-> non-DT, rather than using platform data:
+> Maybe the right thing is a common low-level isp1301 interface defining
+> all the registers and providing low-level (I2C) access functions,
+> leaving all the "higher level"/"board specific" functions up to the
+> existing drivers?
+> 
+> (I guess you meant drivers/usb/otg/isp1301_omap.c ?)
 
-Yes, please - having to have explict handling in drivers to select a
-mechanism to look up stuff in the subsystem would be very sad.
+Yes, that sounds like a very good idea. Can you describe which part of
+the function isp1301 does? It's not clear how the layering between
+that and the platform driver should end up.
 
-> # works in DT right now IIRC:
-> regulator_get(dev, supply_name)
-
-Yes, that's totally transparent to the device.
-
-> For board files, this would rely on some table which mapped from the get
-> parameters to the returned object. IIRC, most of these tables are
-> indexed by (dev_name(dev), name) and probably return the dev_name() of
-> the providing device (or whatever internally makes sense to identify the
-> device) plus some subsystem-specific data (e.g. PWM index).
-
-That's how regulator and clk do it (I think pinctrl too, and IIO also
-does this though it's in staging) - the consumer works with the struct
-device and the name of the thing it's requesting and the things doing
-the mapping (boards, SoCs, whatever) map this onto the actual device
-with a lookup table which works in terms of dev_name() for the
-requesting device.  We use dev_name() because many buses don't make a
-struct device available until very late in system startup.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120320/ed4944f1/attachment.sig>
+	Arnd
