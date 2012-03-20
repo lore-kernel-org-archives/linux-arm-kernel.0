@@ -1,34 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Mar 2012 13:03:10 +0000
-Subject: [PATCH v2 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <6b5dc1fadfd03a48093338b6981c0a7ae7662212.1332237596.git.nicolas.ferre@atmel.com>
-References: <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
- <6b5dc1fadfd03a48093338b6981c0a7ae7662212.1332237596.git.nicolas.ferre@atmel.com>
-Message-ID: <201203201303.11175.arnd@arndb.de>
+From: consul.kautuk@gmail.com (Kautuk Consul)
+Date: Tue, 20 Mar 2012 12:30:57 -0400
+Subject: [PATCH 1/1] arm: fault.c: correct how the tsk->[maj|min]_flt gets
+ incremented
+Message-ID: <1332261057-2399-1-git-send-email-consul.kautuk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 March 2012, Nicolas Ferre wrote:
-> 
-> Add some basic helpers to retrieve a DMA controller device_node and the
-> DMA request specifications. By making DMA controllers register a generic
-> translation function, we allow the management of any type of DMA requests
-> specification.
-> The void * output of an of_dma_xlate() function that will be implemented
-> by the DMA controller can carry any type of "dma-request" argument.
-> 
-> The DMA client will search its associated DMA controller in the list and
-> call the registered of_dam_xlate() function to retrieve the request values.
-> 
-> One simple xlate function is provided for the "single number" type of
-> request binding.
-> 
-> This implementation is independent from dmaengine so it can also be used
-> by legacy drivers.
+commit 8878a539ff19a43cf3729e7562cd528f490246ae was done by me
+to make the page fault handler retryable as well as interruptible.
 
-Thanks a lot of posting this updated version, I think it will be very
-useful as we proceed. I still hope that in the end we find that the
-differences are not all that big and we can do it all with bindings
-very much like what you have here.
+Due to this commit, there is a mistake in the way in which
+tsk->[maj|min]_flt counter gets incremented for VM_FAULT_ERROR:
+If VM_FAULT_ERROR is returned in the fault flags by handle_mm_fault,
+then either maj_flt or min_flt will get incremented. This is wrong
+as in the case of a VM_FAULT_ERROR we need to be skip ahead to the
+error handling code in do_page_fault.
 
-	Arnd
+Added a check after the call to __do_page_fault() to check for
+(fault & VM_FAULT_ERROR).
+
+Signed-off-by: Kautuk Consul <consul.kautuk@gmail.com>
+---
+ arch/arm/mm/fault.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index bb7eac3..ec8c88b 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -318,7 +318,7 @@ retry:
+ 	 */
+ 
+ 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
+-	if (flags & FAULT_FLAG_ALLOW_RETRY) {
++	if (!(fault & VM_FAULT_ERROR) && (flags & FAULT_FLAG_ALLOW_RETRY)) {
+ 		if (fault & VM_FAULT_MAJOR) {
+ 			tsk->maj_flt++;
+ 			perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1,
+-- 
+1.7.5.4
