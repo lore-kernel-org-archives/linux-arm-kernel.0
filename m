@@ -1,69 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Mar 2012 23:40:21 +0100
-Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
-In-Reply-To: <4F68E53B.7040800@codeaurora.org>
-References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
- <1332214706-675-1-git-send-email-skannan@codeaurora.org>
- <1332214706-675-2-git-send-email-skannan@codeaurora.org>
- <20120320072018.GC32469@S2101-09.ap.freescale.net>
- <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
- <20120320094031.GI3852@pengutronix.de>
- <e22898bc8b69e85f1e6390d7d858f85c.squirrel@www.codeaurora.org>
- <20120320181441.GO3852@pengutronix.de>
- <4F68E53B.7040800@codeaurora.org>
-Message-ID: <20120320224021.GF29317@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Mar 2012 15:17:02 -0700
+Subject: [PATCH v2 7/7] ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux
+ related functions as __init
+In-Reply-To: <1332228651.2409.5.camel@lappy>
+References: <1329997247-27342-1-git-send-email-rnayak@ti.com>
+ <1329997247-27342-8-git-send-email-rnayak@ti.com>
+ <1332148116.2144.1.camel@deskari>
+ <1332152442.2144.27.camel@deskari>
+ <20120319180928.GA9859@atomide.com> <1332228651.2409.5.camel@lappy>
+Message-ID: <20120320221701.GI9859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 01:14:51PM -0700, Saravana Kannan wrote:
-> On 03/20/2012 11:14 AM, Sascha Hauer wrote:
-> >On Tue, Mar 20, 2012 at 03:17:10AM -0700, Saravana Kannan wrote:
-> >>
-> >>On Tue, March 20, 2012 2:40 am, Sascha Hauer wrote:
-> >>>On Tue, Mar 20, 2012 at 12:54:55AM -0700, Saravana Kannan wrote:
-> >>>>
-> >>>I am using these functions and don't need a static array, I just call
-> >>>the functions with the desired parameters.
-> >>
-> >>Sure, then let's leave it in. Curious, where do you get the desired
-> >>parameters from? Is it static date in code or is it from DT? You somehow
-> >>probe it?
-> >
-> >It's not from DT. See this thread:
-> >
-> >http://www.spinics.net/lists/arm-kernel/msg165839.html
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [120320 00:41]:
+> On Mon, 2012-03-19 at 11:09 -0700, Tony Lindgren wrote:
 > 
-> Ah, I see. That's a lot of functions calls. I think it would be much
-> more efficient if you just have an array and loop over it. With my
-> patch, you can just call a single register function for all these
-> clocks.
-
-I was curious and gave it a try. I registered a fixed clock and 100
-gates as child clocks. I tried both DEFINE_CLK_GATE and
-clk_register_gate. It turned out there was no difference in speed.
-
+> > I've updated your patch a bit for the comments a bit and marked
+> > omap4_hdmi_mux_pads as __init, will apply to fixes. Updated patch
+> > below.
 > 
-> >
-> >The difference is that a struct clk_initializer is only used to
-> >initialize a clock and not actively used by the clock framework. But as
-> >you already mentioned using a copy inside the clock framework has the
-> >same effect.
+> Hmm, is there something funny with these init changes now...
 > 
-> My opinion on this is to follow a wait and watch approach on the
-> "flags" field. I really can't think of a safe way anyone can misuse
-> it. If people start doing that, we can just do the copy and let them
-> deal with their broken code. Until that happens, I don't want to
-> waste time/space by copying it. The rest of the fields aren't
-> actively used by the common clock code after init.
+> Initially the situation was that there were no __inits in display.c's
+> mux functions. Then "Mark omap_hsmmc_init..." patch added __inits to all
+> of them. My patch removed the __inits from dsi functions, but left them
+> to hdmi functions.
+> 
+> But now you modified my patch to add the __inits to hdmi functions.
+> Which should already have them from the "Mark omap_hsmmc_init..." patch.
 
-Actually you will save space by copying it because you can put the
-initializers in __initdata and throw the initializers of unused SoCs
-compiled into the kernel away during runtime.
+Looks like the original patch missed making omap4_hdmi_mux_pads __init
+though. I'm just changing omap4_hdmi_mux_pads to make it __init like
+it should be.
 
-Sascha
+Regards,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
