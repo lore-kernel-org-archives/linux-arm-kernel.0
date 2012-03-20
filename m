@@ -1,37 +1,65 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 20 Mar 2012 16:23:13 +0530
-Subject: [PATCH v4 RESEND 1/7] gpio/omap: fix wakeup_en register update in
- _set_gpio_wakeup()
-In-Reply-To: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
-References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1332240799-6748-2-git-send-email-tarun.kanti@ti.com>
+Date: Tue, 20 Mar 2012 16:23:12 +0530
+Subject: [PATCH v4 RESEND 0/7] gpio/omap: Some more driver fixes
+Message-ID: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two ways through which wakeup_en register can be programmed
-using gpiolib APIs as shown below. It is seen that in the second case
-in _set_gpio_wakeup(), even though bank->suspend_wakeup is updated
-correctly, its value is not programmed in wakeup_en register. Fix this.
+This series excludes the cleanup patches as suggested by Kevin from
+the previously posted series.
 
-irq_set_type()->gpio_irq_type()->_set_gpio_triggering()->set_gpio_trigger()
-irq_set_wake()->gpio_wake_enable()->_set_gpio_wakeup()
+The fixes include correction of _set_gpio_irqenable() implementation,
+missing wakeup_en register update in set_gpio_wakeup(), type mismatch
+of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
+register update in set_gpio_dataout_() and few corrections in context
+save logic.
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
----
- drivers/gpio/gpio-omap.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+It is baselined on top of:
+git://git.secretlab.ca/git/linux-2.6.git gpio/next
+Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 7cbad85..1a144ac 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -511,6 +511,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
- 	else
- 		bank->suspend_wakeup &= ~gpio_bit;
- 
-+	__raw_writel(bank->suspend_wakeup, bank->base + bank->regs->wkup_en);
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
- 	return 0;
--- 
-1.7.0.4
+Series is available here for reference:
+git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_fixes
+
+Power Test:
+Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
+Also confirmed that dataout register content preserved over
+off-mode.
+
+Functional Test:
+OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430, OMAP4-BLAZE
+
+v4:
+a) Implemented all comments on v3 which are mostly related to
+avoiding unnecessary register read while updating the context.
+
+b) Folded:
+gpio/omap: fix dataout register overwrite in _set_gpio_dataout
+into:
+gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
+
+v3:
+- Added 4 more additional patches to the previous series
+ which are all bug fixes.
+
+v2:
+- Added a new patch to update wakeup_en register in _set_gpio_wakeup()
+ in addition to updating bank->context.wake_en.
+
+- Added a new patch to remove redundant decoding of gpio offset in
+ gpio_get(), _get_gpio_datain() and _get_gpio_dataout().
+
+- Added a new patch to remove suspend/resume callbacks because the
+ operations performed with the callbacks are redundant.
+
+Tarun Kanti DebBarma (7):
+  gpio/omap: fix wakeup_en register update in _set_gpio_wakeup()
+  gpio/omap: fix trigger type to unsigned
+  gpio/omap: fix _set_gpio_irqenable implementation
+  gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
+  gpio/omap: fix incorrect context restore logic in omap_gpio_runtime_*
+  gpio/omap: fix incorrect update to context.irqenable1
+  gpio/omap: fix redundant decoding of gpio offset
+
+ drivers/gpio/gpio-omap.c |   47 ++++++++++++++++++++++++---------------------
+ 1 files changed, 25 insertions(+), 22 deletions(-)
