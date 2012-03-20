@@ -1,38 +1,46 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 21 Mar 2012 08:56:51 +0900
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <4F688B2D.20808@gmail.com>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
- <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
- <4F688B2D.20808@gmail.com>
-Message-ID: <CAHQjnOMjSPDOymJe356AWnJszQv+X-QWrVrB7ahYDkXBr5HrQw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 20 Mar 2012 16:56:51 -0700
+Subject: [PATCH v8 0/8] Consolidate cpuidle functionality
+In-Reply-To: <201203202305.37952.arnd.bergmann@linaro.org> (Arnd Bergmann's
+ message of "Tue, 20 Mar 2012 23:05:37 +0000")
+References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
+ <201203202158.08042.arnd.bergmann@linaro.org> <873992zy5u.fsf@ti.com>
+ <201203202305.37952.arnd.bergmann@linaro.org>
+Message-ID: <87ty1ix1vg.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 10:50 PM, Subash Patel <subashrp@gmail.com> wrote:
-> Sorry for digging this very late. But as part of integrating dma_map v7 &
-> sysmmu v12 on 3.3-rc5, I am facing below issue:
->
-> a) By un-selecting IOMMU in menu config, I am able to allocate memory in
-> vb2-dma-contig
->
-> b) When I enable SYSMMU support for the IP's, I am receiving below fault:
->
-> Unhandled fault: external abort on non-linefetch (0x818) at 0xb6f55000
->
-> I think this has something to do with the access to the SYSMMU registers for
-> writing the page table. Has anyone of you faced this issue while testing
-> these(dma_map+iommu) patches on kernel mentioned above? This must be
-> something related to recent changes, as I didn't have issues with these
-> patches on 3.2 kernel.
->
+Arnd Bergmann <arnd.bergmann@linaro.org> writes:
 
-0xb6f55000 is not an address of SYSMMU register if your kernel starts
-at 0xc0000000.
+> On Tuesday 20 March 2012, Kevin Hilman wrote:
+>> Maybe it's time that drivers/cpuidle gets a maintainer.  With lots of
+>> discussions of scheduler changes that affect load estimation, I suspect
+>> we're all going to have a bit of CPUidle work to do in the
+>> not-so-distant future.
+>
+> Hmm, according to the script, you are the maintainer ;-)
 
-Can you tell me any detailed information or situation?
+doh, I knew I should've kept quiet :/
 
-Regards,
+> $ scripts/get_maintainer.pl -f drivers/cpuidle/cpuidle.c
+> Kevin Hilman <khilman@ti.com> (commit_signer:8/10=80%)
+> Len Brown <len.brown@intel.com> (commit_signer:7/10=70%)
+> Trinabh Gupta <g.trinabh@gmail.com> (commit_signer:4/10=40%)
+> Arjan van de Ven <arjan@linux.intel.com> (commit_signer:4/10=40%)
+> Deepthi Dharwar <deepthi@linux.vnet.ibm.com> (commit_signer:4/10=40%)
+>
+> While I realize that the get_maintainers.pl is not the final word,
+> you could be the acting cpuidle maintainer for this merge window
+> and send the pull request.
 
-KyongHo.
+Not exactly the outcome I was hoping for (I have enough stuff to look
+after at the moment.) 
+
+However, if you think it would help and won't be seen as a take over
+attempt (I don't want to maintain CPUidle), I can possibly do it for
+this merge window.  
+
+Before doing that though, I'll need give this series a final once over
+before I'm willing to send a potentially flame-attracting pull request.
+
+Kevin
