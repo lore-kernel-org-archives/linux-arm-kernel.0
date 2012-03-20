@@ -1,99 +1,45 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 20 Mar 2012 03:17:10 -0700 (PDT)
-Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
-In-Reply-To: <20120320094031.GI3852@pengutronix.de>
-References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
- <1332214706-675-1-git-send-email-skannan@codeaurora.org>
- <1332214706-675-2-git-send-email-skannan@codeaurora.org>
- <20120320072018.GC32469@S2101-09.ap.freescale.net>
- <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
- <20120320094031.GI3852@pengutronix.de>
-Message-ID: <e22898bc8b69e85f1e6390d7d858f85c.squirrel@www.codeaurora.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Mar 2012 11:17:36 +0100
+Subject: [PATCH] of: dma/fixup
+In-Reply-To: <6b5dc1fadfd03a48093338b6981c0a7ae7662212.1332237596.git.nicolas.ferre@atmel.com>
+References: <6b5dc1fadfd03a48093338b6981c0a7ae7662212.1332237596.git.nicolas.ferre@atmel.com>
+Message-ID: <1332238657-12668-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+---
+ include/linux/of_dma.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-On Tue, March 20, 2012 2:40 am, Sascha Hauer wrote:
-> On Tue, Mar 20, 2012 at 12:54:55AM -0700, Saravana Kannan wrote:
->>
->> On Tue, March 20, 2012 12:20 am, Shawn Guo wrote:
->> > On Mon, Mar 19, 2012 at 08:38:26PM -0700, Saravana Kannan wrote:
->> >> This has a couple of advantages:
->> >> * Completely hides struct clk from many clock platform drivers and
->> >> static
->> >>   clock initialization code.
->> >> * Simplifies the generic clk_register() function and allows adding
->> >> optional
->> >>   fields in the future without modifying the function signature.
->> >> * Allows for simpler static initialization of clocks on all platforms
->> by
->> >>   removing the need for forward delcarations.
->> >> * Halves the number of symbols added for each static clock
->> >> initialization.
->> >>
->> >> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->> >
->> > I agree this is a reasonable move.  But while you simplify the
->> interface
->> > of clk_register(), why not making a further step to simplify the
->> > following interfaces simple too?
->> >
->> > struct clk *clk_register_fixed_rate(struct device *dev, const char
->> *name,
->> >                 const char *parent_name, unsigned long flags,
->> >                 unsigned long fixed_rate);
->> > struct clk *clk_register_gate(struct device *dev, const char *name,
->> >                 const char *parent_name, unsigned long flags,
->> >                 void __iomem *reg, u8 bit_idx,
->> >                 u8 clk_gate_flags, spinlock_t *lock);
->> > struct clk *clk_register_divider(struct device *dev, const char *name,
->> >                 const char *parent_name, unsigned long flags,
->> >                 void __iomem *reg, u8 shift, u8 width,
->> >                 u8 clk_divider_flags, spinlock_t *lock);
->> > struct clk *clk_register_mux(struct device *dev, const char *name,
->> >                 char **parent_names, u8 num_parents, unsigned long
->> flags,
->> >                 void __iomem *reg, u8 shift, u8 width,
->> >                 u8 clk_mux_flags, spinlock_t *lock);
->>
->> If you simplify those functions further. They would just become
->> clk_register(). I'm not sure I see a value in them in at that point or
->> even in their current form. But if others see (I'm guessing since they
->> acked or didn't nack it), I'm not going to ask to remove them. If
->> everyone
->> agrees that we should just remove them, I would be glad to.
->>
->> It's arguable that these functions for the common hardware types saves
->> the
->> need to deal with the kalloc in every platform driver. But it's not
->> clear
->> to me where they would get these parameters in the first place. Most
->> likely form some sort of static array. At which point, it might as well
->> be
->> a static array of pointers to clk_gated.hw, clk_fixed_rate.hw, etc
->> instead
->> of a platform specific  struct to hold these initializers.
->
-> I am using these functions and don't need a static array, I just call
-> the functions with the desired parameters.
-
-Sure, then let's leave it in. Curious, where do you get the desired
-parameters from? Is it static date in code or is it from DT? You somehow
-probe it?
-
-> Overall the clock framework was written in a way that we have to expose
-> as little information about the internally used structs as necessary. It
-> seems your patches are pulling in the opposite direction now.
-
-I'm not exposing anything that you don't already pass from the platform
-driver. Also, you realize that this is very similar to what you suggested
-with clk_initializer right? If there is a strong push, we can make a copy
-of these inside the struct clk, but for these few init fields I don't see
-a point (see earlier email).
-
--Saravana
-
-
+diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+index 2865480..da95e37 100644
+--- a/include/linux/of_dma.h
++++ b/include/linux/of_dma.h
+@@ -18,7 +18,7 @@
+ 
+ struct device_node;
+ 
+-#ifdef CONFIG_OF_DMA
++#ifdef CONFIG_OF
+ 
+ extern int of_dma_controller_register(struct device_node *np,
+ 			int (*of_dma_xlate)(struct of_phandle_args *, void *));
+@@ -29,7 +29,7 @@ extern unsigned int of_dma_count(struct device_node *np);
+ 
+ extern int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec,
+ 				      void *dma_req);
+-#else /* CONFIG_OF_DMA */
++#else /* CONFIG_OF */
+ 
+ static int of_dma_controller_register(struct device_node *np,
+ 			int (*of_dma_xlate)(struct of_phandle_args *, void *))
+@@ -55,6 +55,6 @@ static int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec,
+ {
+ 	return -ENOSYS;
+ }
+-#endif /* CONFIG_OF_DMA */
++#endif /* CONFIG_OF */
+ 
+ #endif /* __LINUX_OF_DMA_H */
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.9
