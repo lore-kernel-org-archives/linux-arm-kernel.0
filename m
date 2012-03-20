@@ -1,54 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Mar 2012 19:14:41 +0100
-Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
-In-Reply-To: <e22898bc8b69e85f1e6390d7d858f85c.squirrel@www.codeaurora.org>
-References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
- <1332214706-675-1-git-send-email-skannan@codeaurora.org>
- <1332214706-675-2-git-send-email-skannan@codeaurora.org>
- <20120320072018.GC32469@S2101-09.ap.freescale.net>
- <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
- <20120320094031.GI3852@pengutronix.de>
- <e22898bc8b69e85f1e6390d7d858f85c.squirrel@www.codeaurora.org>
-Message-ID: <20120320181441.GO3852@pengutronix.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 20 Mar 2012 19:20:12 +0100
+Subject: [PATCH] USB: gadget driver for LPC32xx
+In-Reply-To: <201203201301.50159.arnd@arndb.de>
+References: <1332191930-2433-1-git-send-email-stigge@antcom.de>
+ <201203192130.13583.arnd@arndb.de> <4F67B28D.3060500@antcom.de>
+ <201203201301.50159.arnd@arndb.de>
+Message-ID: <4F68CA5C.2090406@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 03:17:10AM -0700, Saravana Kannan wrote:
+Hi Arnd,
+
+On 03/20/2012 02:01 PM, Arnd Bergmann wrote:
+>> Maybe the right thing is a common low-level isp1301 interface defining
+>> all the registers and providing low-level (I2C) access functions,
+>> leaving all the "higher level"/"board specific" functions up to the
+>> existing drivers?
+>>
+>> (I guess you meant drivers/usb/otg/isp1301_omap.c ?)
 > 
-> On Tue, March 20, 2012 2:40 am, Sascha Hauer wrote:
-> > On Tue, Mar 20, 2012 at 12:54:55AM -0700, Saravana Kannan wrote:
-> >>
-> > I am using these functions and don't need a static array, I just call
-> > the functions with the desired parameters.
-> 
-> Sure, then let's leave it in. Curious, where do you get the desired
-> parameters from? Is it static date in code or is it from DT? You somehow
-> probe it?
+> Yes, that sounds like a very good idea. Can you describe which part of
+> the function isp1301 does? It's not clear how the layering between
+> that and the platform driver should end up.
 
-It's not from DT. See this thread:
+The ISP1301 is a relatively simple transceiver where the actual
+differential USB signals end up being generated/decoded. It contains
+some registers and is controlled via I2C to manipulate electrical
+settings (pull up / power etc.).
 
-http://www.spinics.net/lists/arm-kernel/msg165839.html
+At a first glance, I found the following drivers to be using it:
 
-> 
-> > Overall the clock framework was written in a way that we have to expose
-> > as little information about the internally used structs as necessary. It
-> > seems your patches are pulling in the opposite direction now.
-> 
-> I'm not exposing anything that you don't already pass from the platform
-> driver. Also, you realize that this is very similar to what you suggested
-> with clk_initializer right? If there is a strong push, we can make a copy
-> of these inside the struct clk, but for these few init fields I don't see
-> a point (see earlier email).
+ohci-nxp (was: ohci-pnx4008 + ohci-lpc32xx)
+isp1301_omap
+lpc32xx_udc (WIP)
 
-The difference is that a struct clk_initializer is only used to
-initialize a clock and not actively used by the clock framework. But as
-you already mentioned using a copy inside the clock framework has the
-same effect.
+The common functions that all of them are using are some low-level
+functions like read/write byte, read/write word. (For ohci-nxp, I used
+smbus commands.) I propose exporting just the defines for all the
+registers and their bits together with some accessor functions.
 
-Sascha
+Would those be the correct places for header and driver:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+drivers/usb/misc/isp1301.c
+include/linux/usb/isp1301.h
+
+?
+
+As an example usage, I would let the next update of the lpc32xx_udc use
+it and separately provide patches to make the other drivers above also
+use it.
+
+Thanks in advance,
+
+Roland
