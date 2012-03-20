@@ -1,42 +1,40 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 20 Mar 2012 16:23:16 +0530
-Subject: [PATCH v4 RESEND 4/7] gpio/omap: fix missing dataout context save in
- _set_gpio_dataout_reg
+Date: Tue, 20 Mar 2012 16:23:15 +0530
+Subject: [PATCH v4 RESEND 3/7] gpio/omap: fix _set_gpio_irqenable
+ implementation
 In-Reply-To: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
 References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1332240799-6748-5-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1332240799-6748-4-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two functions, _set_gpio_dataout_reg() and _set_gpio_dataout_mask()
-which writes to dataout register and the dataout context must be saved.
-It is missing in the first function, _set_gpio_dataout_reg(). Fix this.
+This function should be capable of both enabling and disabling interrupts
+based upon the *enable* parameter. Right now the function only enables
+the interrupt and *enable* is not used at all. So add the interrupt
+disable capability also using the parameter.
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+ drivers/gpio/gpio-omap.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 8901d57..bbe9648 100644
+index 2042857..8901d57 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -120,10 +120,13 @@ static void _set_gpio_dataout_reg(struct gpio_bank *bank, int gpio, int enable)
- 	void __iomem *reg = bank->base;
- 	u32 l = GPIO_BIT(bank, gpio);
+@@ -484,7 +484,10 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
  
--	if (enable)
-+	if (enable) {
- 		reg += bank->regs->set_dataout;
--	else
-+		bank->context.dataout |= l;
-+	} else {
- 		reg += bank->regs->clr_dataout;
-+		bank->context.dataout &= ~l;
-+	}
- 
- 	__raw_writel(l, reg);
+ static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
+ {
+-	_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
++	if (enable)
++		_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
++	else
++		_disable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
  }
+ 
+ /*
 -- 
 1.7.0.4
