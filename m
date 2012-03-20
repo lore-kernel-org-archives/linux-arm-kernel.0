@@ -1,110 +1,48 @@
-From: subashrp@gmail.com (Subash Patel)
-Date: Tue, 20 Mar 2012 19:20:37 +0530
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
- <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
-Message-ID: <4F688B2D.20808@gmail.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Tue, 20 Mar 2012 15:57:52 +0200
+Subject: [PATCH] ARM: i.MX35: Add set_rate and round_rate calls to csi_clk
+In-Reply-To: <20120320130805.GK3852@pengutronix.de>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CC34C59E5@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for digging this very late. But as part of integrating dma_map v7 
-& sysmmu v12 on 3.3-rc5, I am facing below issue:
 
-a) By un-selecting IOMMU in menu config, I am able to allocate memory in 
-vb2-dma-contig
+Hi Sascha,
 
-b) When I enable SYSMMU support for the IP's, I am receiving below fault:
+Thanks for you comments.
 
-Unhandled fault: external abort on non-linefetch (0x818) at 0xb6f55000
+On Tue, Mar 20, 2012 at 12:29:52PM +0200, Alex Gershgorin wrote:
+> This patch add set_rate and round_rate calls to csi_clk. This is needed
+> to give mx3-camera control over master clock rate to camera.
 
-I think this has something to do with the access to the SYSMMU registers 
-for writing the page table. Has anyone of you faced this issue while 
-testing these(dma_map+iommu) patches on kernel mentioned above? This 
-must be something related to recent changes, as I didn't have issues 
-with these patches on 3.2 kernel.
+> >The file you are patching is scheduled for removal in favour for the
+> >common clock framework, so you are flogging a dead horse here. I suggest
+> >that you wait some time until I finished the i.MX35 patches for this.
+
+This patch allows me to move forward, without this patch the camera just does not work. I'll use it as a temporary patch and happily wait for you to finish your work on i.MX35 patches :-)
+ 
+> +static int csi_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	unsigned long div;
+> +	unsigned long parent_rate;
+> +	unsigned long pdr2 = __raw_readl(CCM_BASE + CCM_PDR2);
+> +
+> +	if (pdr2 & (1 << 7))
+> +		parent_rate = get_rate_arm();
+> +	else
+> +		parent_rate = get_rate_ppll();
+> +
+> +	div = parent_rate / rate;
+> +
+> +	/* Set clock divider */
+> +	pdr2 |= ((div - 1) & 0x3f) << 16;
+
+> >btw you forget to clear the divider bits in pdr2 before
+> >setting the new values.
+
+ Totally agree with you.
+
+
 
 Regards,
-Subash
-
-
-On 03/02/2012 01:35 PM, KyongHo Cho wrote:
-> On Thu, Mar 1, 2012 at 12:04 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com>  wrote:
->> +/**
->> + * arm_iommu_map_sg - map a set of SG buffers for streaming mode DMA
->> + * @dev: valid struct device pointer
->> + * @sg: list of buffers
->> + * @nents: number of buffers to map
->> + * @dir: DMA transfer direction
->> + *
->> + * Map a set of buffers described by scatterlist in streaming mode for DMA.
->> + * The scatter gather list elements are merged together (if possible) and
->> + * tagged with the appropriate dma address and length. They are obtained via
->> + * sg_dma_{address,length}.
->> + */
->> +int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
->> +                    enum dma_data_direction dir, struct dma_attrs *attrs)
->> +{
->> +       struct scatterlist *s = sg, *dma = sg, *start = sg;
->> +       int i, count = 0;
->> +       unsigned int offset = s->offset;
->> +       unsigned int size = s->offset + s->length;
->> +       unsigned int max = dma_get_max_seg_size(dev);
->> +
->> +       for (i = 1; i<  nents; i++) {
->> +               s->dma_address = ARM_DMA_ERROR;
->> +               s->dma_length = 0;
->> +
->> +               s = sg_next(s);
->> +
->> +               if (s->offset || (size&  ~PAGE_MASK) || size + s->length>  max) {
->> +                       if (__map_sg_chunk(dev, start, size,&dma->dma_address,
->> +                           dir)<  0)
->> +                               goto bad_mapping;
->> +
->> +                       dma->dma_address += offset;
->> +                       dma->dma_length = size - offset;
->> +
->> +                       size = offset = s->offset;
->> +                       start = s;
->> +                       dma = sg_next(dma);
->> +                       count += 1;
->> +               }
->> +               size += s->length;
->> +       }
->> +       if (__map_sg_chunk(dev, start, size,&dma->dma_address, dir)<  0)
->> +               goto bad_mapping;
->> +
->> +       dma->dma_address += offset;
->> +       dma->dma_length = size - offset;
->> +
->> +       return count+1;
->> +
->> +bad_mapping:
->> +       for_each_sg(sg, s, count, i)
->> +               __iommu_remove_mapping(dev, sg_dma_address(s), sg_dma_len(s));
->> +       return 0;
->> +}
->> +
-> This looks that the given sg list specifies the list of physical
-> memory chunks and
-> the list of IO virtual memory chunks at the same time after calling
-> arm_dma_map_sg().
-> It can happen that dma_address and dma_length of a sg entry does not
-> correspond to
-> physical memory information of the sg entry.
->
-> I think it is beneficial for handling IO virtual memory.
->
-> However, I worry about any other problems caused by a single sg entry contains
-> information from 2 different context.
->
-> Regards,
->
-> Cho KyongHo.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Alex Gershgorin
