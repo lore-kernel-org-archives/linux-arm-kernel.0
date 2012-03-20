@@ -1,51 +1,118 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 21 Mar 2012 01:06:46 +0200
-Subject: [PATCH v8 0/8] Consolidate cpuidle functionality
-In-Reply-To: <873992zy5u.fsf@ti.com>
-References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
- <201203202158.08042.arnd.bergmann@linaro.org>
- <873992zy5u.fsf@ti.com>
-Message-ID: <CAP245DXwhCMOJaspW8SY7jtqsA3d5SK4Ctr+JvS+cw4yHfL-mw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 Mar 2012 00:12:42 +0100
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <4F68E34A.70207@codeaurora.org>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+ <20120320072018.GC32469@S2101-09.ap.freescale.net>
+ <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
+ <20120320094031.GI3852@pengutronix.de>
+ <20120320141811.GF32469@S2101-09.ap.freescale.net>
+ <20120320181050.GN3852@pengutronix.de>
+ <4F68E34A.70207@codeaurora.org>
+Message-ID: <20120320231242.GP3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 12:48 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Arnd Bergmann <arnd.bergmann@linaro.org> writes:
->
->> On Tuesday 20 March 2012, Robert Lee wrote:
->>> This patch series moves various functionality duplicated in platform
->>> cpuidle drivers to the core cpuidle driver. Also, the platform irq
->>> disabling was removed as it appears that all calls into
->>> cpuidle_call_idle will have already called local_irq_disable().
->>>
->>> These changes have been pulled into linux-next.
->>>
->>> Len, Andrew, can a request be made for Linus to pull these changes?
->>
->> FWIW, Len seems to be rather inactive on the kernel mailing list right
->> now and generally not very interested in anything outside of x86 and
->> acpi. If he doesn't reply in the next few days and Andrew also isn't
->> interested in handling these patches, I'd suggest you just send the pull
->> request to Linus, with Len on Cc and explain that you tried to send
->> them through him but gave up in the end.
->
-> FWIW, I have not had good luck getting response for proposed core
-> CPUidle changes either:
->
-> ? ? ? ?http://lkml.org/lkml/2011/9/19/374
->
-> Maybe it's time that drivers/cpuidle gets a maintainer. ?With lots of
-> discussions of scheduler changes that affect load estimation, I suspect
-> we're all going to have a bit of CPUidle work to do in the
-> not-so-distant future.
->
+On Tue, Mar 20, 2012 at 01:06:34PM -0700, Saravana Kannan wrote:
+> On 03/20/2012 11:10 AM, Sascha Hauer wrote:
+> >On Tue, Mar 20, 2012 at 10:18:14PM +0800, Shawn Guo wrote:
+> >>On Tue, Mar 20, 2012 at 10:40:31AM +0100, Sascha Hauer wrote:
+> >>...
+> >>>I am using these functions and don't need a static array, I just call
+> >>>the functions with the desired parameters.
+> >>>
+> >>With this patch getting in, you do not have to use them then.  I feel
+> >>a static array will be much more readable than a long list of function
+> >>calls with a long list of hardcoded arguments to each.
+> >
+> >I'm also not a fan of long argument lists; a divider like defined in my
+> >tree takes 5 arguments, a gate 4 and a mux 6. While 6 is already at the
+> >border I think it's still acceptable.
+> >
+> >What I like in terms of readability is one line per clock which makes
+> >for quite short clock files.
+> 
+> It certainly makes for short clock files, but it's definitely less
+> readable that the expanded struct. For the original author the "one
+> line per clock" looks readable since they wrote it. But for someone
+> looking at the code to modify it, the expanded one would be much
+> easier to read. Also, you can always declare your own macro if you
+> really want to follow the one line approach.
+> 
+> >So when we use structs to initialize the clocks we'll probably have
+> >something like this:
+> >
+> >static struct clk_divider somediv = {
+> >	.reg = CCM_BASE + 0x14,
+> >	.width = 3,
+> >	.shift = 17,
+> >	.lock =&ccm_lock,
+> >	.hw.parent = "someotherdiv",
+> >	.hw.flags = CLK_SET_RATE_PARENT,
+> >};
+> 
+> Taken from your patches:
+> 
+> imx_clk_mux("spll_sel", CCM_CSCR, 17, 1, spll_sel_clks,
+> ARRAY_SIZE(spll_sel_clks));
+> 
+> Compare the struct to the one line call. Now tell me, what does "1"
+> represent? No clue. But in the struct, I can immediately tell what
+> each one of the parameters are.
+> 
+> Anyway, my patch certainly isn't forcing you to use multiple lines.
+> So, hopefully this won't be a point of contention.
+> 
+> >This will make a 4000 line file out of a 500 line file. Now when for
+> >some reason struct clk_divider changes we end with big patches. If the
+> >clk core gets a new fancy CLK_ flag which we want to have then again
+> >we end up with big patches. Then there's also the possibility that
+> >someone finds out that .lock and .hw.flags are common to all dividers
+> >and comes up with a #define DEFINE_CLK_DIVIDER again to share common
+> >fields.
+> 
+> This patch won't prevent you from doing any of that. You can still
+> create macros for that (there are already one for that). Also, what
+> you are pointing out is a bigger problem for the current
+> clk_register() function since you might have to change the no. of
+> params of all the callers even if a new field is optional.
+> 
+> >All this can be solved when we introduce a small wrapper function and
+> >use it in the clock files:
+> >
+> >static inline struct clk *imx_clk_divider(const char *name, const char *parent,
+> >		void __iomem *reg, u8 shift, u8 width)
+> >{
+> >	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
+> >			reg, shift, width, 0,&imx_ccm_lock);
+> >}
+> >
+> >It decouples us from the structs used by the clock framework, we can
+> >add our preferred flags and still can share common fields like the lock.
+> >
+> >While this was not the intention when I first converted from struct
+> >initializers to function initializers I am confident that it will make
+> >a good job.
+> 
+> Now I'm confused -- it's not clear if you are leaning towards my
+> patch or away from it?
 
-I don't mean to be piling on to Len here, but Daniel Lezcano too has a
-bunch of clean ups that didn't get any maintainer review for over two
-months. He has now refreshed them for 3.3 and is getting ready to send
-them out again. We (Linaro) expect to be spending a lot of time on
-cpuidle in the future and would be glad to help review, test and
-collect patches into a tree for Linus/Andrew to pull while we wait for
-Len to respond or another maintainer to emerge.
+There was a tendency to get rid of static initializers and I like the
+idea of not exposing any of the internally used members outside the
+clock framework.
+Now people try their best to make themselves comfortable with the
+static initializers and you even discussed the possibility of removing
+the clk_register_* functions (which make it possible for users not
+to use any of the internal struct members). That's what I don't like
+about your patches. But if we go for static initializers anyway then your
+patches probably change things for the better.
 
-/Amit
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
