@@ -1,27 +1,69 @@
-From: arnd.bergmann@linaro.org (Arnd Bergmann)
-Date: Tue, 20 Mar 2012 21:58:07 +0000
-Subject: [PATCH v8 0/8] Consolidate cpuidle functionality
-In-Reply-To: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
-References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <201203202158.08042.arnd.bergmann@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Mar 2012 23:40:21 +0100
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <4F68E53B.7040800@codeaurora.org>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+ <20120320072018.GC32469@S2101-09.ap.freescale.net>
+ <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
+ <20120320094031.GI3852@pengutronix.de>
+ <e22898bc8b69e85f1e6390d7d858f85c.squirrel@www.codeaurora.org>
+ <20120320181441.GO3852@pengutronix.de>
+ <4F68E53B.7040800@codeaurora.org>
+Message-ID: <20120320224021.GF29317@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 March 2012, Robert Lee wrote:
-> This patch series moves various functionality duplicated in platform 
-> cpuidle drivers to the core cpuidle driver. Also, the platform irq
-> disabling was removed as it appears that all calls into 
-> cpuidle_call_idle will have already called local_irq_disable().
+On Tue, Mar 20, 2012 at 01:14:51PM -0700, Saravana Kannan wrote:
+> On 03/20/2012 11:14 AM, Sascha Hauer wrote:
+> >On Tue, Mar 20, 2012 at 03:17:10AM -0700, Saravana Kannan wrote:
+> >>
+> >>On Tue, March 20, 2012 2:40 am, Sascha Hauer wrote:
+> >>>On Tue, Mar 20, 2012 at 12:54:55AM -0700, Saravana Kannan wrote:
+> >>>>
+> >>>I am using these functions and don't need a static array, I just call
+> >>>the functions with the desired parameters.
+> >>
+> >>Sure, then let's leave it in. Curious, where do you get the desired
+> >>parameters from? Is it static date in code or is it from DT? You somehow
+> >>probe it?
+> >
+> >It's not from DT. See this thread:
+> >
+> >http://www.spinics.net/lists/arm-kernel/msg165839.html
 > 
-> These changes have been pulled into linux-next.
+> Ah, I see. That's a lot of functions calls. I think it would be much
+> more efficient if you just have an array and loop over it. With my
+> patch, you can just call a single register function for all these
+> clocks.
+
+I was curious and gave it a try. I registered a fixed clock and 100
+gates as child clocks. I tried both DEFINE_CLK_GATE and
+clk_register_gate. It turned out there was no difference in speed.
+
 > 
-> Len, Andrew, can a request be made for Linus to pull these changes?
+> >
+> >The difference is that a struct clk_initializer is only used to
+> >initialize a clock and not actively used by the clock framework. But as
+> >you already mentioned using a copy inside the clock framework has the
+> >same effect.
+> 
+> My opinion on this is to follow a wait and watch approach on the
+> "flags" field. I really can't think of a safe way anyone can misuse
+> it. If people start doing that, we can just do the copy and let them
+> deal with their broken code. Until that happens, I don't want to
+> waste time/space by copying it. The rest of the fields aren't
+> actively used by the common clock code after init.
 
-FWIW, Len seems to be rather inactive on the kernel mailing list right
-now and generally not very interested in anything outside of x86 and
-acpi. If he doesn't reply in the next few days and Andrew also isn't
-interested in handling these patches, I'd suggest you just send the pull
-request to Linus, with Len on Cc and explain that you tried to send
-them through him but gave up in the end.
+Actually you will save space by copying it because you can put the
+initializers in __initdata and throw the initializers of unused SoCs
+compiled into the kernel away during runtime.
 
-	Arnd
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
