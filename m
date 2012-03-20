@@ -1,112 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 20 Mar 2012 15:54:45 +0100
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <20120319144517.C19E93E05A5@localhost>
-References: <4F22DEF2.5000807@ti.com>
- <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
- <20120317094059.7C2333E08E2@localhost> <4F6734DD.3020203@atmel.com>
- <20120319144517.C19E93E05A5@localhost>
-Message-ID: <4F689A35.2080305@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 20 Mar 2012 09:27:04 -0600
+Subject: [PATCH v4 10/10] pwm-backlight: Add rudimentary device tree
+ support
+In-Reply-To: <20120320083943.GA20249@avionic-0098.adnet.avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
+ <4F67F2AF.3020404@wwwdotorg.org>
+ <20120320083943.GA20249@avionic-0098.adnet.avionic-design.de>
+Message-ID: <4F68A1C8.5080608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2012 03:45 PM, Grant Likely :
-> On Mon, 19 Mar 2012 14:30:05 +0100, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> On 03/17/2012 10:40 AM, Grant Likely :
->>> On Thu, 15 Mar 2012 09:38:10 +0100, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->>>> +struct of_dma {
->>>> +	struct list_head of_dma_controllers;
->>>> +	struct device_node *of_node;
->>>> +	int of_dma_n_cells;
->>>> +	int (*of_dma_xlate)(struct of_phandle_args *dma_spec, void *data);
->>>> +};
+On 03/20/2012 02:39 AM, Thierry Reding wrote:
+> * Stephen Warren wrote:
+>> On 03/14/2012 09:56 AM, Thierry Reding wrote:
+>>> This commit adds very basic support for device tree probing. Currently,
+>>> only a PWM and a list of distinct brightness levels can be specified.
+>>> Enabling or disabling backlight power via GPIOs is not yet supported.
 >>>
->>> This _xlate is nearly useless as a generic API.  It solves the problem for
->>> the specific case where the driver is hard-coded to know which DMA engine
->>> to talk to, but since the returned data doesn't provide any context, it
->>> isn't useful if there are multiple DMA controllers to choose from.
+>>> A pointer to the exit() callback is stored in the driver data to keep it
+>>> around until the driver is unloaded.
+...
+>>>  static int pwm_backlight_probe(struct platform_device *pdev)
+>> ...
+>>> -	pb->pwm = pwm_request(data->pwm_id, "backlight");
+>>> -	if (IS_ERR(pb->pwm)) {
+>>> -		dev_err(&pdev->dev, "unable to request PWM for backlight\n");
+>>> -		ret = PTR_ERR(pb->pwm);
+>>> -		goto err_alloc;
+>>> -	} else
+>>> -		dev_dbg(&pdev->dev, "got pwm for backlight\n");
+>>> +	if (!pb->pwm) {
+>>> +		pb->pwm = pwm_request(data->pwm_id, "backlight");
+>>> +		if (IS_ERR(pb->pwm)) {
+>>> +			dev_err(&pdev->dev, "unable to request PWM for backlight\n");
+>>> +			ret = PTR_ERR(pb->pwm);
+>>> +			goto err_alloc;
+>>> +		} else
+>>> +			dev_dbg(&pdev->dev, "got pwm for backlight\n");
+>>> +	}
 >>
->> You mean, if there is no DMA controller phandle specified in the
->> property?
+>> Hmmm. It'd be more consistent if pwm_backlight_parse_dt() called
+>> something like of_pwm_get() instead of of_pwm_request(), so that this
+>> code could always call pwm_request() on the PWM and hence operate the
+>> same irrespective of DT vs non-DT. GPIOs work that way at least.
 > 
-> No; I'm assuming that dma-channel properties will alwasy have a
-> phandle to the dma controller node.
-> 
->> I think that it is not the purpose of this API to choose a DMA
->> controller, Nor to provide a channel. The only purpose of this API is to
->> give a HW request to be used by a DMA slave driver. This slave should
->> already have a channel to use and a controller to talk to.
-> 
-> Then where is the function that finds the reference to the DMA
-> controller?  I don't understand why it would be useful to decode that
-> separately.
-> 
->>> The void *data pointer must be replaced with a typed structure so that
->>> context can be returned.
->>
->> I am not sure to follow you entirely... How do I address the fact that
->> several types of request value can be returned then?
->>
->> BTW, can we imagine a phandle property with a sting as a argument?
->> should it be written this way?
->> dma-request = <&testdmac1>, "slave-rx", "slave-tx";
-> 
-> No, I'm not suggesting that.  Mixing phandles and strings in a single
-> property is possible but ugly.  The phandle-args pattern which uses
-> zero or more cells as arguments should be used.
-> 
->>
->> If yes, the of_parse_phandle_with_args() is not working on this type...
-> 
-> Right; of_parse_phandle_with_args() should do the job.
-> 
->>
->> (I realize that there seems to be no way out for a generic API: maybe we
->> should move to one or two cases to address and concentrate on them).
-> 
-> The way I read this patch, the xlate function returns a single
-> integer representing the DMA request number, but it doesn't provide
-> any data about *which* dma controller is associated with that channel.
-> The result of xlate needs to be something like a dma_chan reference
-> that identifies both the DMA engine and the channel/request on that
-> dma engine.
-> 
-> [...]
->>>> +/**
->>>> + * of_dma_xlate_onenumbercell() - Generic DMA xlate for direct one cell bindings
->>>> + *
->>>> + * Device Tree DMA translation function which works with one cell bindings
->>>> + * where the cell values map directly to the hardware request number understood
->>>> + * by the DMA controller.
->>>> + */
->>>> +int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec, void *dma_req)
->>>> +{
->>>> +	if (!dma_spec)
->>>> +		return -EINVAL;
->>>> +	if (WARN_ON(dma_spec->args_count != 1))
->>>> +		return -EINVAL;
->>>> +	*(int *)dma_req = dma_spec->args[0];
->>>
->>> Following on from comment above; the void *dma_req parameter is dangerous.  How
->>> does this function know that it has been passed an int* pointer?
->>
->> Well, that is a drawback that comes from having to address generic
->> cases.
-> 
-> Not if you do it right.  If a specific data structure is returned,
-> then there can be context attached as to what the data means and which
-> dma controller knows how to parse it.
-> 
->> But anyway, if the DMA controller decide to register a .xlate()
->> function that returns an integer, the slave driver that will ask a
->> "request line" to this DMA controller will be aware that an integer has
->> to be passed to of_get_dma_request().
-> 
-> The problem still remains; I don't see how the dma slave can figure
-> out *which* dma controller it needs to talk to.
+> That's actually what the initial patch had. Unfortunately that's pretty much
+> the opposite direction of where the PWM framework is headed because it would
+> involve getting a global index to request the PWM.
 
-Is not it what the phandle to the dma controller is made for?
+Not necessarily; get() could return a controller+index pair, which could
+then be passed to request().
 
-Bye,
--- 
-Nicolas Ferre
+> I think in the long run it
+> would be much better to get rid of pwm_request() altogether and unify by
+> having the non-DT case request the PWM device on a per-chip basis.
+
+That might also work.
