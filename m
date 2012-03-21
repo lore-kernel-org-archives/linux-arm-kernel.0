@@ -1,40 +1,49 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 21 Mar 2012 12:12:11 -0500
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <4F683B36.8090101@metasoft.pl>
-References: <4F683B36.8090101@metasoft.pl>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 21 Mar 2012 12:19:21 -0500
+Subject: [PATCH] ARM: tegra: Include assembler.h in sleep.S to fix build
+ break
+In-Reply-To: <4F6A0A44.3010304@wwwdotorg.org>
+References: <1332176863-12537-1-git-send-email-swarren@wwwdotorg.org>
+ <4F677691.8020307@gmail.com> <4F69FEB5.2020901@wwwdotorg.org>
+ <4F6A0999.9020104@gmail.com> <4F6A0A44.3010304@wwwdotorg.org>
+Message-ID: <4F6A0D99.2000309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 20, 2012 1:09 AM, Rafal Prylowski wrote:
->
-> Implement double buffering for M2M DMA channels.
->
-> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+On 03/21/2012 12:05 PM, Stephen Warren wrote:
+> On 03/21/2012 11:02 AM, Rob Herring wrote:
+>> On 03/21/2012 11:15 AM, Stephen Warren wrote:
+>>> On 03/19/2012 12:10 PM, Rob Herring wrote:
+>>>> On 03/19/2012 12:07 PM, Stephen Warren wrote:
+>>>>> Commit 6f6f6a7 "ARM: create a common IOMEM definition" moved macro
+>>>>> IOMEM(), and requires users to include <asm/assembler.h>. Fix Tegra's
+>>>>> sleep.S to do so.
+>>>>>
+>>>>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+>>>>
+>>>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Arnd,
+>>>
+>>> Can you pick up this fix directly into arm-soc, or do you want me to
+>>> generate a pull request for this kind of thing too?
+>>>
+>>> ARM: tegra: Include assembler.h in sleep.S to fix build break
+>>> http://patchwork.ozlabs.org/patch/147587/
+>>>
+>>> The same goes for:
+>>>
+>>> ARM: tegra: Fix device tree AUXDATA for USB/EHCI
+>>> http://patchwork.ozlabs.org/patch/147616/
+>>
+>> I can take it and send the pull request. I've got a couple of other
+>> fixes as well.
+> 
+> That's just for the sleep.S change, right.
 
-Hmm... This isn't working on my ep9307 board...
+Ah, I missed the 2nd one. So it makes less sense now for me to take it.
+I'm still happy to, but it doesn't really save you anything.
 
-When the system boots I get stormed with messages:
+Rob
 
-dma dma1chan0: unknown interrupt!
-dma dma1chan0: unknown interrupt!
-dma dma1chan0: unknown interrupt!
-dma dma1chan1: unknown interrupt!
-dma dma1chan1: unknown interrupt!
-dma dma1chan1: unknown interrupt!
-dma dma1chan0: unknown interrupt!
-dma dma1chan0: unknown interrupt!
-dma dma1chan1: unknown interrupt!
-
-Note, I have use_dma set for the ep93xx_spi driver and am using mmc_spi.
-
-Also note, without your patch I also get a couple messages:
-
-dma dma1chan1: got interrupt while active list is empty
-
-But, the mmc card is working fine. I haven't tracked down why I get these
-yet. Mika, any ideas?
-
-Regards,
-Hartley
+Rob
