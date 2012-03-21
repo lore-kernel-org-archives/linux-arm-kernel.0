@@ -1,48 +1,66 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 21 Mar 2012 15:55:01 +0530
-Subject: [PATCH 3/3] OMAP2+: UART: replace omap34xx/omap4xx cpu checks with
- not omap24xx
-In-Reply-To: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
-References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1332325501-10467-4-git-send-email-govindraj.raja@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 21 Mar 2012 11:43:29 +0100
+Subject: [RFC][PATCH 0/7] OMAP4 cpuidle cleanup
+In-Reply-To: <4F69A5BA.1080804@ti.com>
+References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
+ <CAMQu2gxit11dSbruPLCGx37TRwo9mwNCN9JXn0fZLDTVGu2GcA@mail.gmail.com>
+ <4F69A4A5.5020208@linaro.org> <4F69A5BA.1080804@ti.com>
+Message-ID: <4F69B0D1.6020608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+On 03/21/2012 10:56 AM, Santosh Shilimkar wrote:
+> On Wednesday 21 March 2012 03:21 PM, Daniel Lezcano wrote:
+>> On 03/21/2012 10:36 AM, Shilimkar, Santosh wrote:
+>>> On Wed, Mar 21, 2012 at 2:57 PM, Daniel Lezcano
+>>> <daniel.lezcano@linaro.org>   wrote:
+>>>> This patchset is a proposition to improve a bit the code.
+>>>> The changes are code cleanup and does not change the behavior of the
+>>>> driver itself.
+>>>>
+>>> Thanks. Will have a look at your series.
+>>
+>> Cool, thanks.
+>>
+>>>> A couple a things call my intention. Why the cpuidle device is set
+>>>> for cpu0 only
+>>> Because the mainline code CPUIDLE is supported along with CPUhotplug.
+>>> This is going to change though with Couple CPUIDLE and corresponding
+>>> OMAP updates.
+>>
+>> Ok, thanks for the information. I will look deeper. What happens to cpu1
+>> when it is online and has nothing to do ?
+>>
+>>>> and why the WFI is not used ?
+>>>>
+>>> I didn't get this question. Do you mean the generic WFI?
+>>
+> I execute default idle loop.
 
-Minor cleanup, replace all omap34xx/omap44xx cpu checks with
-cpu is not omap24xx check.
+So is it not possible to add a cpuidle device for cpu1 and define only 
+one state for the 'wfi-for-omap' ?
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Felipe Balbi <balbi at ti.com
-Cc: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/serial.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+>> yes.
+>>
+>>> If yes, then, it's mainly because OMAP need additional
+>>> custom barriers.
+>>
+>> Ah, ok. I am not sure if it is possible but that may be cool if we can
+>> call cpu_do_idle instead with additional barrier.
+>>
+> There is no need. Since code around WFI is customised, it make no sense
+> to call cpu_do_idle(0 ofr only that instruction sake.
 
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 330ee04..83ab5a2 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -377,8 +377,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
- 
- 	oh->dev_attr = uart;
- 
--	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
--			&& !uart_debug)
-+	if ((!cpu_is_omap24xx() && bdata->pads)	&& !uart_debug)
- 		device_init_wakeup(&pdev->dev, true);
- }
- 
-@@ -401,7 +400,7 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
- 		bdata.pads = NULL;
- 		bdata.pads_cnt = 0;
- 
--		if (cpu_is_omap44xx() || cpu_is_omap34xx())
-+		if (!cpu_is_omap24xx())
- 			omap_serial_fill_default_pads(&bdata);
- 
- 		if (!info)
+For my personal information, why the WFI is customised for omap4 ?
+
+Thanks
+   -- Daniel
+
+
+
 -- 
-1.7.5.4
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
