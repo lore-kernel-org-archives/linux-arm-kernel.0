@@ -1,60 +1,91 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 21 Mar 2012 19:45:17 +0800
-Subject: [PATCH 1/1] net: phylib: add error checking if no phy found
-In-Reply-To: <4F5F5ABF.5030103@openwrt.org>
-References: <1331636302-18256-1-git-send-email-b29396@freescale.com>
- <4F5F5ABF.5030103@openwrt.org>
-Message-ID: <20120321114516.GC4905@shlinux2.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 21 Mar 2012 11:42:26 +0000
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <4F672364.3020403@ti.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com>	<87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 10:33:35PM +0800, Florian Fainelli wrote:
-> Hi,
+On Mon, Mar 19, 2012 at 17:45:32, Shilimkar, Santosh wrote:
+> On Monday 19 March 2012 05:14 PM, Ming Lei wrote:
+> > On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> >>
+> >> I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
+> >> It will always use 32k-counter, and never fall back to dmtimer.
+> >>
+> >> Then the only options we have here is,
+> >>
+> >> 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
+> >>   Kernel pick up best rating clocksource out of these two.
+> >>
+> >>   In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
+> >>   Rating. User can choose the 32k-counter clocksource via bootargs.
+> >>
+> >>   Impact: without bootargs for clocksource selection, kernel will choose
+> >>     dmtimer, impacting loss of time during suspend/resume.
+> >>
+> This is the right option. The problem is gptimer clocksource
+> doesn't work across power transitions and hence it is broken.
 > 
-> Le 03/13/12 11:58, Dong Aisheng a ?crit :
-> > From: Dong Aisheng<dong.aisheng@linaro.org>
-> >
-> > Signed-off-by: Dong Aisheng<dong.aisheng@linaro.org>
-> > ---
-> >   drivers/net/phy/mdio_bus.c |   11 ++++++++++-
-> >   1 files changed, 10 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-> > index 88cc5db..d8e044d 100644
-> > --- a/drivers/net/phy/mdio_bus.c
-> > +++ b/drivers/net/phy/mdio_bus.c
-> > @@ -101,6 +101,7 @@ static struct class mdio_bus_class = {
-> >   int mdiobus_register(struct mii_bus *bus)
-> >   {
-> >   	int i, err;
-> > +	u32 phynum = 0;
-> >
-> >   	if (NULL == bus || NULL == bus->name ||
-> >   			NULL == bus->read ||
-> > @@ -134,12 +135,20 @@ int mdiobus_register(struct mii_bus *bus)
-> >   			if (IS_ERR(phydev)) {
-> >   				err = PTR_ERR(phydev);
-> >   				goto error;
-> > +			} else if (phydev != NULL) {
-> > +				phynum++;
-> >   			}
-> >   		}
-> >   	}
-> >
-> > +	if (!phynum) {
-> > +		err = -ENODEV;
-> > +		printk(KERN_ERR "%s: no phys found\n", bus->name);
-> > +		goto error;
-> > +	}
+> Even for the perf, with PM enabled, dmtimer can't be used or it needs
+> to be used with 32KHz clock which makes it no better than sync timer.
 > 
-> I am not sure if this is a good idea to change it, especially if:
-> - the MII bus probing is also done later (quite some drivers do this)
-> - if we want to attach a fixed PHY because we could not probe one at 
-> registration time
+> So here keeping 32K sync timer is default clocksource makes sense since
+> it is the only working and viable option.
 > 
-You're correct.
-It seems keep it as before is the right solution right now.
-Thanks for the info.
+> So what can be done is register both 32K and gptimer together but make
+> gptimer clocksource registration depends on PM enabled.
+> 
+> This should solve all the needs I guess.
+> 
 
-Regards
-Dong Aisheng
+I am not sure this will work on all platforms, for example, AM33XX, where
+We do not have 32ksync timer available, but we need PM support. Also, I 
+personally think, we should not again use compile time option here.
+
+So the only option I have here is, register both the clocksources, let dmtimer be a default clocksource for the kernel (since it has better rating),
+And based on kernel parameter user can change the clocksource, specially 
+for PM use-cases.
+
+
+Implementation point of view, I just need to do something like,
+
+static void __init omap2_gp_clocksource_init(int gptimer_id,
+							const char *fck_source)
+{
+	int res;
+
+	res = omap_init_clocksource_32k();
+	if (!res)
+		pr_err("failed to register 32ksync counter as a clocksource\n");
+
+	/* 
+	 * Continue with dmtimer registration as well, irrespective of
+	 * whether 32ksync timer registration succeeded or not.
+	 */
+}
+
+> >>
+> >> 2) Let the current code be as is, means, the clocksource registration will
+> >>   Happened based on "#ifdef CONFIG_OMAP_32K_TIMER" and this option
+> >>   selection will be Controlled by Kconfig rules.
+> > 
+> We should get rid off CONFIG_OMAP_32K_TIMER.
+> 
+
+Agreed, I will take this activity once I close on this.
+
+Thanks,
+Vaibhav
+
+> Regards
+> Santosh
+> 
+> 
