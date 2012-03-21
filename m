@@ -1,71 +1,45 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 21 Mar 2012 10:05:48 +0200
-Subject: [PATCH] ARM: OMAP3+: fix oops triggered in
- omap_prcm_register_chain_handler
-In-Reply-To: <1332305376-27038-1-git-send-email-tom.leiming@gmail.com>
-References: <1332305376-27038-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <1332317148.2116.366.camel@sokoban>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 21 Mar 2012 16:15:55 +0800
+Subject: [PATCH 1/2] ARM: dma-mapping: convert
+ ARCH_HAS_DMA_SET_COHERENT_MASK to kconfig symbol
+In-Reply-To: <alpine.LFD.2.02.1203202230230.24151@xanadu.home>
+References: <4F68CD9C.3090001@windriver.com>
+ <1332296149-28110-1-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1203202230230.24151@xanadu.home>
+Message-ID: <CAN1soZwXh6DviO5CHcj_ogM1VK23V2c4CKZf+iMmeP43rwtW9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-03-21 at 12:49 +0800, Ming Lei wrote:
-> This patch fixes the oos below:
-> 
-> [    1.790242] Unable to handle kernel NULL pointer dereference at virtual
-> address 00000004
-> [    1.798632] pgd = c0004000
-> [    1.801638] [00000004] *pgd=00000000
-> [    1.805400] Internal error: Oops: 805 [#1] PREEMPT SMP THUMB2
-> [    1.811381] Modules linked in:
-> [    1.814601] CPU: 1    Not tainted  (3.3.0-next-20120320+ #733)
-> [    1.820683] PC is at irq_setup_generic_chip+0x6a/0x84
-> [    1.825951] LR is at irq_get_irq_data+0x7/0x8
-> [    1.830508] pc : [<c006465e>]    lr : [<c0063a03>]    psr: 20000133
-> [    1.830512] sp : ee04ff58  ip : 00000000  fp : 00000000
-> [    1.842461] r10: 00000000  r9 : 00000000  r8 : 00000800
-> [    1.847905] r7 : c064e260  r6 : 000001dc  r5 : 00000001  r4 : ee0accc0
-> [    1.854687] r3 : 00000002  r2 : 00000800  r1 : 000001dc  r0 : 00000000
-> [    1.861472] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment kernel
-> [    1.869234] Control: 50c5387d  Table: 8000404a  DAC: 00000015
-> [    1.875215] Process swapper/0 (pid: 1, stack limit = 0xee04e2f8)
-> [    1.881463] Stack: (0xee04ff58 to 0xee050000)
-> [    1.886017] ff40: c061b668 00000008
-> [    1.894497] ff60: c0682090 ee0accc0 00000003 c001c637 00000000 00000000 00000201 00000000
-> [    1.902976] ff80: 00000004 c0473820 c0473800 c0459e8d c0680ac0 c000866d 00000004 00000004
-> [    1.911455] ffa0: ee04ffa8 00000004 c047381c 00000004 c0473820 c0473800 c0680ac0 00000082
-> [    1.919934] ffc0: c0489694 c045265f 00000004 00000004 c0452135 c000d105 00000033 00000000
-> [    1.928413] ffe0: c04525b5 c000d111 00000033 00000000 00000000 c000d111 aaaaaaaa aaaaaaaa
-> [    1.936912] [<c006465e>] (irq_setup_generic_chip+0x6a/0x84) from [<c001c637>] (omap_prcm_register_chain_handler+0x147/0x1a0)
-> [    1.948516] [<c001c637>] (omap_prcm_register_chain_handler+0x147/0x1a0) from [<c000866d>] (do_one_initcall+0x65/0xf4)
-> [    1.959500] [<c000866d>] (do_one_initcall+0x65/0xf4) from [<c045265f>] (kernel_init+0xab/0x138)
-> [    1.968529] [<c045265f>] (kernel_init+0xab/0x138) from [<c000d111>] (kernel_thread_exit+0x1/0x6)
-> [    1.977632] Code: f7ff f9d1 6b23 1af3 (6043) 086d
-> [    1.982684] ---[ end trace 1b75b31a2719ed1c ]---
-> [    1.987526] Kernel panic - not syncing: Attempted to kill init!
-> exitcode=0x0000000b
-> 
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->  arch/arm/mach-omap2/prm_common.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-> index 873b51d..d28f848 100644
-> --- a/arch/arm/mach-omap2/prm_common.c
-> +++ b/arch/arm/mach-omap2/prm_common.c
-> @@ -290,7 +290,7 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
->  		goto err;
->  	}
->  
-> -	for (i = 0; i <= irq_setup->nr_regs; i++) {
-> +	for (i = 0; i < irq_setup->nr_regs; i++) {
->  		gc = irq_alloc_generic_chip("PRCM", 1,
->  			irq_setup->base_irq + i * 32, prm_base,
->  			handle_level_irq);
+On Wed, Mar 21, 2012 at 10:30 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 20 Mar 2012, Rob Herring wrote:
+>
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> The only users of ARCH_HAS_DMA_SET_COHERENT_MASK are 2 ARM platforms:
+>> ixp4xx and pxa cm_x2xx. We've been getting lucky that the define is
+>> implicitly included before dma-mapping.h, but the removal of io.h broke
+>> things (c334bc1 ARM: make mach/io.h include optional). Since memory.h
+>> is the correct place, but no longer exists, convert the define to a
+>> kconfig entry.
+>>
+>> Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Imre Kaloz <kaloz@openwrt.org>
+>> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Cc: Vinod Koul <vinod.koul@intel.com>
+>> Cc: Dan Williams <dan.j.williams@intel.com>
+>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+>
+Acked.
 
-Wow, I feel ashamed now. Best thing is it is correctly elsewhere in
-code. :) You could probably write a better changelog for this but other
-than that, acked.
+Imre & Krzysztof,
 
--Tero
+Do you mind that I merge these patches into arch-pxa git tree? Since a
+lot of files in arch-pxa are changed.
+
+Best Regards
+Haojian
