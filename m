@@ -1,31 +1,38 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Wed, 21 Mar 2012 16:19:41 +0100
-Subject: [PATCH] MX2: Fix mx2_camera clock regression.
-Message-ID: <1332343181-16968-1-git-send-email-javier.martin@vista-silicon.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 21 Mar 2012 19:26:04 +0300
+Subject: [PATCH 1/3] mmc: atmel-mci: correct data timeout computation
+In-Reply-To: <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1332344483-3915-1-git-send-email-ludovic.desroches@atmel.com>
+ <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <4F6A011C.3000900@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch breaks mx2_camera driver:
-http://git.linuxtv.org/media_tree.git?a=commitdiff;h=52f1a845e25dc0c6435153aca1a170e20b282429
+Hello.
 
-This change fixes the problem.
+On 03/21/2012 06:41 PM, ludovic.desroches at atmel.com wrote:
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- arch/arm/mach-imx/clock-imx27.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> From: Ludovic Desroches<ludovic.desroches@atmel.com>
 
-diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-index b9a95ed..98e04f5 100644
---- a/arch/arm/mach-imx/clock-imx27.c
-+++ b/arch/arm/mach-imx/clock-imx27.c
-@@ -662,6 +662,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "dma", dma_clk)
- 	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
- 	_REGISTER_CLOCK(NULL, "brom", brom_clk)
-+	_REGISTER_CLOCK(NULL, "emma", emma_clk)
- 	_REGISTER_CLOCK("m2m-emmaprp.0", NULL, emma_clk)
- 	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk)
- 	_REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
--- 
-1.7.0.4
+> The HSMCI operates at a rate of up to Master Clock divided by two.
+
+> Signed-off-by: Ludovic Desroches<ludovic.desroches@atmel.com>
+> ---
+>   drivers/mmc/host/atmel-mci.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index e4449a5..e161452 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -480,7 +480,7 @@ err:
+>   static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
+>   					unsigned int ns)
+>   {
+> -	return (ns * (host->bus_hz / 1000000) + 999) / 1000;
+> +	return (ns * ((host->bus_hz/2) / 1000000) + 999) / 1000;
+
+    Why don't you keep the notation by addign spaces around '/'?
+    BTW, could use DIV_ROUND_UP() here.
+
+WBR, Sergei
