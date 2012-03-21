@@ -1,41 +1,55 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 21 Mar 2012 14:43:53 +0530
-Subject: [PATCH v4 05/12] ARM: EXYNOS: add support uart for EXYNOS4 and
- EXYNOS5
-In-Reply-To: <1331736138-28964-6-git-send-email-kgene.kim@samsung.com>
-References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
- <1331736138-28964-6-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CAJuYYwTJsA1M1Qj2P1-1K=pWzi0BPo8YJNDSx4NqGC7NX0030g@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 Mar 2012 10:16:25 +0100
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <alpine.DEB.2.00.1203201740470.22974@utopia.booyaka.com>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+ <20120320072018.GC32469@S2101-09.ap.freescale.net>
+ <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
+ <20120320094031.GI3852@pengutronix.de>
+ <20120320141811.GF32469@S2101-09.ap.freescale.net>
+ <20120320181050.GN3852@pengutronix.de>
+ <alpine.DEB.2.00.1203201740470.22974@utopia.booyaka.com>
+Message-ID: <20120321091625.GR3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 March 2012 20:12, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Actually, the base address of uart is different between EXYNOS4
-> and EXYNOS5 and this patch enables to support uart for EXYNOS4
-> and EXYNOS5 SoCs at runtime.
->
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
+On Tue, Mar 20, 2012 at 05:47:42PM -0600, Paul Walmsley wrote:
+> Hello Sascha
+> 
+> On Tue, 20 Mar 2012, Sascha Hauer wrote:
+> 
+> > [ C99 structure initializer elided ]
+> > 
+> > This will make a 4000 line file out of a 500 line file. Now when for
+> > some reason struct clk_divider changes we end with big patches. If the
+> > clk core gets a new fancy CLK_ flag which we want to have then again
+> > we end up with big patches. Then there's also the possibility that
+> > someone finds out that .lock and .hw.flags are common to all dividers
+> > and comes up with a #define DEFINE_CLK_DIVIDER again to share common
+> > fields.
+> 
+> At least we can understand easily what is being changed.  Readability, 
+> particularly by others not familiar with the clock data, is more important 
+> to me.
+> 
+> So like Saravana, I too prefer C99 structure initializers.  At least there 
+> should be a choice.
+> 
+> Quick quiz: in this line below:
+> 
+> imx_clk_divider("foo_clk", "bar_clk", CCM_BASE + 0x20, 0x5, 0x3);
+> 
+> which field is the bitfield shift and which is the bitfield width? :-)
 
-[...]
+I can't even remember the argument order in memset, but I never voted
+for a struct memset_init ;)
 
-> diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S b/arch/arm/mach-exynos/include/mach/debug-macro.S
-> index 6cacf16..6c857ff 100644
-> --- a/arch/arm/mach-exynos/include/mach/debug-macro.S
-> +++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
-> @@ -21,8 +21,13 @@
-> ? ? ? ? */
->
-> ? ? ? ?.macro addruart, rp, rv, tmp
-> - ? ? ? ? ? ? ? ldr ? ? \rp, = S3C_PA_UART
-> - ? ? ? ? ? ? ? ldr ? ? \rv, = S3C_VA_UART
-> + ? ? ? ? ? ? ? mov ? ? \rp, #0x10000000
+Sascha
 
-This is physical address of Exynos4/5 CPUID register which cannot be
-used here. And virtual address S5P_VA_CPUID also cannot be used here
-since this will be called before paging_init when earlyprintk boot
-param is used. So, with this change, earlyprintk does not work for
-both Exynos4 and Exynos5.
-
-Thanks,
-Thomas.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
