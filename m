@@ -1,27 +1,54 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 21 Mar 2012 15:20:20 +0530
-Subject: [RFC][PATCH 2/7] ARM: OMAP4: cpuidle - Declare the states with
- the driver declaration
-In-Reply-To: <1332322070-24577-3-git-send-email-daniel.lezcano@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 21 Mar 2012 10:51:33 +0100
+Subject: [RFC][PATCH 0/7] OMAP4 cpuidle cleanup
+In-Reply-To: <CAMQu2gxit11dSbruPLCGx37TRwo9mwNCN9JXn0fZLDTVGu2GcA@mail.gmail.com>
 References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
- <1332322070-24577-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <4F69A45C.5050802@ti.com>
+ <CAMQu2gxit11dSbruPLCGx37TRwo9mwNCN9JXn0fZLDTVGu2GcA@mail.gmail.com>
+Message-ID: <4F69A4A5.5020208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Jean,
+On 03/21/2012 10:36 AM, Shilimkar, Santosh wrote:
+> On Wed, Mar 21, 2012 at 2:57 PM, Daniel Lezcano
+> <daniel.lezcano@linaro.org>  wrote:
+>> This patchset is a proposition to improve a bit the code.
+>> The changes are code cleanup and does not change the behavior of the
+>> driver itself.
+>>
+> Thanks. Will have a look at your series.
 
-On Wednesday 21 March 2012 02:57 PM, Daniel Lezcano wrote:
-> The cpuidle API allows to declare statically the states in the driver
-> structure. Let's use it.
-> We do no longer need the fill_cstate function called at runtime and
-> by the way adding more instructions at boot time.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
-Jean added the fill_cstate() kind of helpers o.w in the old
-cpuidle code9OMAP30, static tables were used. Ofcourse those
-tables were not uinsg the cpuidle driver structure.
+Cool, thanks.
 
-Regards
-santosh
+>> A couple a things call my intention. Why the cpuidle device is set for cpu0 only
+> Because the mainline code CPUIDLE is supported along with CPUhotplug.
+> This is going to change though with Couple CPUIDLE and corresponding
+> OMAP updates.
+
+Ok, thanks for the information. I will look deeper. What happens to cpu1 
+when it is online and has nothing to do ?
+
+>> and why the WFI is not used ?
+>>
+> I didn't get this question. Do you mean the generic WFI?
+
+yes.
+
+> If yes, then, it's mainly because OMAP need additional
+> custom barriers.
+
+Ah, ok. I am not sure if it is possible but that may be cool if we can 
+call cpu_do_idle instead with additional barrier.
+
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
