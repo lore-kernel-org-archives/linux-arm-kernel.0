@@ -1,26 +1,25 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 21 Mar 2012 09:36:20 -0500
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Wed, 21 Mar 2012 16:36:29 +0200
 Subject: [PATCH v8 4/8] ARM: davinci: Consolidate time keeping and irq
  enable
 In-Reply-To: <CAMXH7KH5kS=wPFdC8QrtnhE6_sZqmsJ8h=6Gs3kfHOTbeHjacA@mail.gmail.com>
 References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
  <1332274969-15782-5-git-send-email-rob.lee@linaro.org>
  <CAMXH7KH5kS=wPFdC8QrtnhE6_sZqmsJ8h=6Gs3kfHOTbeHjacA@mail.gmail.com>
-Message-ID: <CAMXH7KGCTP0=YGfSgEVYYJoFK22GOLt-KfShpa6CuDi=PQ1-Pw@mail.gmail.com>
+Message-ID: <CAP245DW9SdTYNc8XXwiuHzo5Y-aZrLc2qP0MekKkyAT2TosjbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 9:28 AM, Rob Lee <rob.lee@linaro.org> wrote:
+Rob, you should start a new '3.4-fixes' branch containing such
+bugfixes that can be pushed to Len after -rc1.
+
+On Wed, Mar 21, 2012 at 4:28 PM, Rob Lee <rob.lee@linaro.org> wrote:
 > Sekhar tested this patch on Davinci last night and found a problem. ?I
 > looked at the code again and found a mindless omission on my part (see
 > below). ?Fix is trivial. ?I've check all other platforms and confirmed
 > this problem does not exist for those. ?Will resend a v9 of the
 > patchset shortly.
 >
-
-Kevin just informed me that Len already has v8 patchset queued so I'll
-just send this fix out as a separate patch.
-
 > On Tue, Mar 20, 2012 at 3:22 PM, Robert Lee <rob.lee@linaro.org> wrote:
 >> Enable core cpuidle timekeeping and irq enabling and remove that
 >> handling from this code.
