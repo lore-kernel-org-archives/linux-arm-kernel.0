@@ -1,49 +1,44 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 22 Mar 2012 09:57:37 +0100
-Subject: [PATCH 1/3] mmc: atmel-mci: correct data timeout computation
-In-Reply-To: <4F6A011C.3000900@mvista.com>
-References: <1332344483-3915-1-git-send-email-ludovic.desroches@atmel.com>
- <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
- <4F6A011C.3000900@mvista.com>
-Message-ID: <20120322085736.GM11834@ldesroches-Latitude-E6320>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 21 Mar 2012 14:34:37 +0000
+Subject: [PATCH v4 RESEND 0/7] gpio/omap: Some more driver fixes
+In-Reply-To: <87haxj17xq.fsf@ti.com>
+References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+ <20120320143544.AA6E93E2834@localhost> <87haxj17xq.fsf@ti.com>
+Message-ID: <20120321143437.8AF563E0648@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+On Tue, 20 Mar 2012 10:46:57 -0700, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Grant,
+> 
+> Grant Likely <grant.likely@secretlab.ca> writes:
+> 
+> > On Tue, 20 Mar 2012 16:23:12 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
+> >> This series excludes the cleanup patches as suggested by Kevin from
+> >> the previously posted series.
+> >> 
+> >> The fixes include correction of _set_gpio_irqenable() implementation,
+> >> missing wakeup_en register update in set_gpio_wakeup(), type mismatch
+> >> of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
+> >> register update in set_gpio_dataout_() and few corrections in context
+> >> save logic.
+> >> 
+> >> It is baselined on top of:
+> >> git://git.secretlab.ca/git/linux-2.6.git gpio/next
+> >> Commit: 81b279d80a63628e580c71a31d30a8c3b3047ad4
+> >> 
+> >> Series is available here for reference:
+> >> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_more_fixes
+> >
+> > Merged; thanks
+> 
+> Can you hold off slightly before merging this.
+> 
+> I haven't been through v4 yet or tested the fixes alone now that they're
+> separated from the other cleanups.
+> 
+> Expect a pull request from me when ready.
 
-On Wed, Mar 21, 2012 at 07:26:04PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 03/21/2012 06:41 PM, ludovic.desroches at atmel.com wrote:
-> 
-> >From: Ludovic Desroches<ludovic.desroches@atmel.com>
-> 
-> >The HSMCI operates at a rate of up to Master Clock divided by two.
-> 
-> >Signed-off-by: Ludovic Desroches<ludovic.desroches@atmel.com>
-> >---
-> >  drivers/mmc/host/atmel-mci.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> >diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> >index e4449a5..e161452 100644
-> >--- a/drivers/mmc/host/atmel-mci.c
-> >+++ b/drivers/mmc/host/atmel-mci.c
-> >@@ -480,7 +480,7 @@ err:
-> >  static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
-> >  					unsigned int ns)
-> >  {
-> >-	return (ns * (host->bus_hz / 1000000) + 999) / 1000;
-> >+	return (ns * ((host->bus_hz/2) / 1000000) + 999) / 1000;
-> 
->    Why don't you keep the notation by addign spaces around '/'?
->    BTW, could use DIV_ROUND_UP() here.
-> 
+Okay.  It's in linux-next at the moment, but I'll pull it back out.
 
-Thanks for your comments. BTW I have realized (when testing values return using
-DIV_ROUND_UP) that I may have another issue with this timeout calculation.
-I will send a new patch.
-
-Regards
-
-Ludovic
+g.
