@@ -1,40 +1,44 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 21 Mar 2012 15:33:33 +0000
-Subject: [PATCH v8 4/8] ARM: davinci: Consolidate time keeping and irq
- enable
-In-Reply-To: <1332274969-15782-5-git-send-email-rob.lee@linaro.org>
-References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
- <1332274969-15782-5-git-send-email-rob.lee@linaro.org>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B631800A07@DBDE01.ent.ti.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Wed, 21 Mar 2012 21:09:23 +0530
+Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1332344363.19804.12.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Wed, Mar 21, 2012 at 01:52:45, Robert Lee wrote:
-> Enable core cpuidle timekeeping and irq enabling and remove that
-> handling from this code.
+On Fri, 2012-03-09 at 16:20 +0100, Javier Martin wrote:
+> The following series have to be applied on top of the following patches:
+> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
 > 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
-> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Jean Pihet<j-pihet@ti.com>
+> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+> is deprecated and no new patches are accepted for it.
+> 
+> This series merges this code into the imx-dma.c dmaengine driver.
+> 
+> Notes for v3:
+>  - I send the whole series again despite some patches being the same. I think
+>  this is more comfortable for Vinod than just sending those patches that have
+>  been modified.
+>  - I've generated my series with the following command this time:
+>  'git format-patch -s -13 -M -B --subject-prefix="PATCH v3"' as suggested by
+>  Sascha but still removing two files in 01/13 generates a lot of noisy diffs.
+>  Sorry about that.
+>  - I don't include Sascha's Tested-by since maybe he wants to test this last
+>  version.
+This doesn't apply for me (starting with 6th) on current slave-dma.next
+due to obvious changes which have gone into imx.
 
->  static struct cpuidle_driver davinci_idle_driver = {
-> -	.name	= "cpuidle-davinci",
-> -	.owner	= THIS_MODULE,
-> +	.name		= "cpuidle-davinci",
-> +	.owner		= THIS_MODULE,
-> +	.states[0]	= ARM_CPUIDLE_WFI_STATE,
-> +	.states[1]	= {
-> +		.enter			= davinci_enter_idle,
-> +		.exit_latency		= 10,
-> +		.target_residency	= 100000,
+Can you quickly rebase the series and resend.
 
-Apart from your other fix patch, can you also update the
-target residency of this state to 10000 as is the case
-with current code? With the new value the board is entering
-this state really infrequently.
+Also while at it please fix the checkpatch error
 
-Thanks,
-Sekhar
+ERROR: space required after that ',' (ctx:VxV)
+#4143: FILE: drivers/dma/imx-dma.c:275:
++       dev_dbg(imxdma->dev,"%s channel %d\n", __func__, channel);
+
+
+-- 
+~Vinod
