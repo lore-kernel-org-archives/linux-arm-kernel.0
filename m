@@ -1,37 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Mar 2012 18:26:38 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203211404.35847.arnd@arndb.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
- <201203211404.35847.arnd@arndb.de>
-Message-ID: <201203211826.38993.arnd@arndb.de>
+Date: Wed, 21 Mar 2012 18:30:24 +0000
+Subject: [GIT PULL] USB AUXDATA fix for tegra
+In-Reply-To: <4F6A1AEA.7070505@wwwdotorg.org>
+References: <4F6A1AEA.7070505@wwwdotorg.org>
+Message-ID: <201203211830.25161.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 March 2012, Arnd Bergmann wrote:
+On Wednesday 21 March 2012, Stephen Warren wrote:
+> This is my first pull request for Tegra; hopefully it all works out OK!
 > 
-> On Wednesday 21 March 2012, viresh kumar wrote:
-> > On Wed, Mar 21, 2012 at 6:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > Just let me know how you want to handle
-> > > these things in the future -- the normal way would be to always let you
-> > > forward the patches to me, rather than having them applied to arm-soc
-> > > directly.
-> > 
-> > Hmmm. I don't know how exactly it works, but maybe you can add me as
-> > an custodian for SPEAr, with a git repo somewhere in kernel.org (?).
-> > So that i can apply patches directly to my branch, you pull it.
-> > What do you say?
+> Note: Nobody has ack'd this change. I'm a maintainer for the files that
+> are touched, but I'm not sure if maintainers are supposed to have
+> another maintainer ack the change before committing it and sending a
+> pull request (in particular for their own changes), or if it's up to
+> their discretion?
 > 
-> Yes, that would be the ideal way. You are already listed in the MAINTAINERS
-> file, so nothing would change in theory. If you don't have an account on
-> kernel.org yet, see http://www.kernel.org/faq/#account for how to get
-> one. This will require that you have your gpg keys signed by at least
-> one person in the kernel web of trust, so you may have to find people
-> locally who can sign yours and are already signed.
 
-I just noticed that you have git trees on http://git.stlinux.com/,
-which I would personally prefer you to use actually. git.kernel.org
-is most useful for people that don't have their own git servers.
+Hi Stephen,
+
+The pull request looks good. There is no need for anyone else to ack
+your patches, but you should always post them on the appropriate
+mailing lists so people can weigh in if they see something wrong.
+
+I'm currently trying to get the first set of my v3.4 pull requests
+out to Linus, so I'll apply this when I'm done with that.
 
 	Arnd
