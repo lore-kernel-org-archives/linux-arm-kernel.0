@@ -1,38 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 21 Mar 2012 15:37:46 +0530
-Subject: [RFC][PATCH 0/7] OMAP4 cpuidle cleanup
-In-Reply-To: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <4F69A872.50203@ti.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Wed, 21 Mar 2012 15:54:58 +0530
+Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
+Message-ID: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-On Wednesday 21 March 2012 02:57 PM, Daniel Lezcano wrote:
-> This patchset is a proposition to improve a bit the code.
-> The changes are code cleanup and does not change the behavior of the
-> driver itself.
-> 
-> A couple a things call my intention. Why the cpuidle device is set for cpu0 only
-> and why the WFI is not used ?
-> 
-> Daniel Lezcano (7):
->   ARM: OMAP4: cpuidle - Remove unused valid field
->   ARM: OMAP4: cpuidle - Declare the states with the driver declaration
->   ARM: OMAP4: cpuidle - Remove the cpuidle_params_table table
->   ARM: OMAP4: cpuidle - fix static omap4_idle_data declaration
->   ARM: OMAP4: cpuidle - Initialize omap4_idle_data at compile time
->   ARM: OMAP4: cpuidle - use the omap4_idle_data variable directly
->   ARM: OMAP4: cpuidle - remove omap4_idle_data initialization at boot
->     time
-> 
-The series looks fine to me in general. This clean-up is applicable
-for OMAP3 cpuidle code as well.
+Based on Linux-OMAP tree uart branch.
+(git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+remotes/origin/uart)
 
-I want Jean to look at this series because some of his earlier
-clean up has introduced those custom functions which
-are getting removed in this series.
+* Removes the cpu checks wherever possible and use version reg
+  for populating features and errata's
+* enable tx wakeup available in wer reg for applicable
+  module revision's
 
-Regards
-santosh
+Govindraj.R (3):
+  OMAP2+: UART: Remove cpu checks for populating errata flags
+  OMAP2+: UART: enable tx wakeup bit for wer reg
+  OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
+
+ arch/arm/mach-omap2/serial.c                  |   13 +----
+ arch/arm/plat-omap/include/plat/omap-serial.h |    8 +++-
+ drivers/tty/serial/omap-serial.c              |   71 ++++++++++++++++++++++++-
+ 3 files changed, 78 insertions(+), 14 deletions(-)
+
+-- 
+1.7.5.4
