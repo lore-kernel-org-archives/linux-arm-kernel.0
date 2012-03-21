@@ -1,59 +1,59 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 21 Mar 2012 18:58:41 +0530
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203211236.37891.arnd@arndb.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203151339.36173.arnd@arndb.de> <4F69BC35.4010400@st.com>
- <201203211236.37891.arnd@arndb.de>
-Message-ID: <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 21 Mar 2012 14:28:52 +0100
+Subject: [RFC][PATCH 1/7] ARM: OMAP4: cpuidle - Remove unused valid field
+In-Reply-To: <4F69A762.5070006@ti.com>
+References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
+ <1332322070-24577-2-git-send-email-daniel.lezcano@linaro.org>
+ <CAMQu2gw+GGnpG_s6TCk2fH094Lfmj1zgAZqQ4zdQmpj3ZZhu3w@mail.gmail.com>
+ <4F69A37A.7020606@linaro.org> <4F69A762.5070006@ti.com>
+Message-ID: <CAORVsuUtQ3EYdrBMUkFm=nd-avz0q9D1BVmwKD-06qgaF3wDqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 6:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Let's make sure we're on the same page with the process though. I hope
-> you're aware that I took Stefan's spear6xx v5 patch.
+On Wed, Mar 21, 2012 at 11:03 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Wednesday 21 March 2012 03:16 PM, Daniel Lezcano wrote:
+>> On 03/21/2012 10:41 AM, Shilimkar, Santosh wrote:
+>>> On Wed, Mar 21, 2012 at 2:57 PM, Daniel Lezcano
+>>> <daniel.lezcano@linaro.org> ?wrote:
+>>>> The 'valid' field is never used in the code, let's remove it.
+>>>>
+>>>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>>>> ---
+>>> It is used during the registration. This field has been very useful for
+>>> debug when need to disable a C-state etc.
+>>> So unless and until there is a strong reason, i would like to retain it.
+>>
+>> IMO if it used for debug purpose, it should be moved to the debug code
+>> and if the debug code is not upstream, then that 'valid' should not be
+>> here but in the out-of-tree code.
+>>
+> When I said debug, I mean CPUIDLE debug and not any special debug code.
+>
+>> By the way, this may be a debate for nothing because a patchset is on
+>> the way to disable C-states from sysfs.
+>>
+> I see but sysfs won't solve that because you want to disable certain
+> C-state so that CPUIDLE driver don't use that state.
+This will solve the problem, the only difference is that you need the
+user space to switch the disable knob from sysfs.
+>From the kernel space, for debug, you can set the .disable value to 1
+in the cpuidle_driver->states struct.
 
-Ya. I already know that. :)
+>
+> Let say if the C4 which is OSWR is broken. In such cases, just
+> setting valid flag let you disable it.
+>
+> Again I don't have strong objection to this change.
+>
+> Regards
+> santosh
 
-> Just let me know how you want to handle
-> these things in the future -- the normal way would be to always let you
-> forward the patches to me, rather than having them applied to arm-soc
-> directly.
+Regards,
+Jean
 
-Hmmm. I don't know how exactly it works, but maybe you can add me as
-an custodian for SPEAr, with a git repo somewhere in kernel.org (?).
-So that i can apply patches directly to my branch, you pull it.
-What do you say?
-
-> I think spear is simple and clean enough that it can serve as an example
-> for others doing DT conversion. Do you also plan to unify 3xx and 6xx?
-> I think there is hardly anything left in mach-spear6xx that justifies
-> having a separate platform, especially since with the DT conversion done,
-> we can actually remove most of the header file contents as well.
-
-I issue with us was that we were not able to push stuff mainline in time and
-were too busy supporting customers.
-
-We have lot of patches locally, that we would like to upstream. But it
-can't happen
-without updating it with new expectations of list. I actually wanted
-to ask you few
-things:
-
-- DT: Obviously we would have this in our patches
-- Pinmux: I would remove our padmux and use pinmux, but what about its
-DT support.
-  I know stephen had few patches for it, but don't know there
-progress. I don't want to
-  do stuff twice. First add support for it in board and the *.dts files.
-- Clock Framework: Is common clock framework ready for use or can we update our
-  local clock framework?
-
-I will see if merging 3xx & 6xx is feasible. If yes, then i will
-surely move in that direction.
-I always like cleaning stuff. :)
-
-I would be adding 13xx (cortex-A9) patches again later, once done with 3xx.
-
---
-viresh
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
