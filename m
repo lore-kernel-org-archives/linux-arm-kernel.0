@@ -1,74 +1,70 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 21 Mar 2012 07:13:56 -0700
-Subject: [PATCH] ARM: OMAP3+: fix oops triggered in
- omap_prcm_register_chain_handler
-In-Reply-To: <1332305376-27038-1-git-send-email-tom.leiming@gmail.com> (Ming
- Lei's message of "Wed, 21 Mar 2012 12:49:36 +0800")
-References: <1332305376-27038-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <87r4wmrqhn.fsf@ti.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 21 Mar 2012 19:48:26 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203211404.35847.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203211236.37891.arnd@arndb.de>
+ <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
+ <201203211404.35847.arnd@arndb.de>
+Message-ID: <CAOh2x=mtjvitkhz=BXOZPAaKZ2i3QQuKrYA3HcHNERHhF5xFoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
-
-> This patch fixes the oos below:
-
-As Tero mentioned, please add a bit more description to the changelog
-about why the iterator is wrong and repost.
-
-Thanks for the patch.  After the above changes, I'll queue this up for v3.4-rc.
-
-Kevin
-
-> [    1.790242] Unable to handle kernel NULL pointer dereference at virtual
-> address 00000004
-> [    1.798632] pgd = c0004000
-> [    1.801638] [00000004] *pgd=00000000
-> [    1.805400] Internal error: Oops: 805 [#1] PREEMPT SMP THUMB2
-> [    1.811381] Modules linked in:
-> [    1.814601] CPU: 1    Not tainted  (3.3.0-next-20120320+ #733)
-> [    1.820683] PC is at irq_setup_generic_chip+0x6a/0x84
-> [    1.825951] LR is at irq_get_irq_data+0x7/0x8
-> [    1.830508] pc : [<c006465e>]    lr : [<c0063a03>]    psr: 20000133
-> [    1.830512] sp : ee04ff58  ip : 00000000  fp : 00000000
-> [    1.842461] r10: 00000000  r9 : 00000000  r8 : 00000800
-> [    1.847905] r7 : c064e260  r6 : 000001dc  r5 : 00000001  r4 : ee0accc0
-> [    1.854687] r3 : 00000002  r2 : 00000800  r1 : 000001dc  r0 : 00000000
-> [    1.861472] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment kernel
-> [    1.869234] Control: 50c5387d  Table: 8000404a  DAC: 00000015
-> [    1.875215] Process swapper/0 (pid: 1, stack limit = 0xee04e2f8)
-> [    1.881463] Stack: (0xee04ff58 to 0xee050000)
-> [    1.886017] ff40: c061b668 00000008
-> [    1.894497] ff60: c0682090 ee0accc0 00000003 c001c637 00000000 00000000 00000201 00000000
-> [    1.902976] ff80: 00000004 c0473820 c0473800 c0459e8d c0680ac0 c000866d 00000004 00000004
-> [    1.911455] ffa0: ee04ffa8 00000004 c047381c 00000004 c0473820 c0473800 c0680ac0 00000082
-> [    1.919934] ffc0: c0489694 c045265f 00000004 00000004 c0452135 c000d105 00000033 00000000
-> [    1.928413] ffe0: c04525b5 c000d111 00000033 00000000 00000000 c000d111 aaaaaaaa aaaaaaaa
-> [    1.936912] [<c006465e>] (irq_setup_generic_chip+0x6a/0x84) from [<c001c637>] (omap_prcm_register_chain_handler+0x147/0x1a0)
-> [    1.948516] [<c001c637>] (omap_prcm_register_chain_handler+0x147/0x1a0) from [<c000866d>] (do_one_initcall+0x65/0xf4)
-> [    1.959500] [<c000866d>] (do_one_initcall+0x65/0xf4) from [<c045265f>] (kernel_init+0xab/0x138)
-> [    1.968529] [<c045265f>] (kernel_init+0xab/0x138) from [<c000d111>] (kernel_thread_exit+0x1/0x6)
-> [    1.977632] Code: f7ff f9d1 6b23 1af3 (6043) 086d
-> [    1.982684] ---[ end trace 1b75b31a2719ed1c ]---
-> [    1.987526] Kernel panic - not syncing: Attempted to kill init!
-> exitcode=0x0000000b
+On Wed, Mar 21, 2012 at 7:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 21 March 2012, viresh kumar wrote:
+>> - Pinmux: I would remove our padmux and use pinmux, but what about its
+>> DT support.
+>> ? I know stephen had few patches for it, but don't know there
+>> progress. I don't want to
+>> ? do stuff twice. First add support for it in board and the *.dts files.
 >
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->  arch/arm/mach-omap2/prm_common.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> AFAICT, the pinmux DT binding should be ready for v3.5, I don't think it
+> made it into v3.4.
+
+So, i can add stuff in board file for pinmux for now?
+
+> I've looked at this earlier today out of curiosity and found:
 >
-> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-> index 873b51d..d28f848 100644
-> --- a/arch/arm/mach-omap2/prm_common.c
-> +++ b/arch/arm/mach-omap2/prm_common.c
-> @@ -290,7 +290,7 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
->  		goto err;
->  	}
->  
-> -	for (i = 0; i <= irq_setup->nr_regs; i++) {
-> +	for (i = 0; i < irq_setup->nr_regs; i++) {
->  		gc = irq_alloc_generic_chip("PRCM", 1,
->  			irq_setup->base_irq + i * 32, prm_base,
->  			handle_level_irq);
+> clock.c: almost identical, can be easily merged, or both copies
+> ? ? ? ? kept around during transition.
+
+Would make it very confusing if we merge these two. Some clock
+structures are same, but others are not. Mostly differences are in the
+macros (or bit positions in registers), rather than hierarchy. So, i would
+like to keep them separate. But still have a look again to see if they can
+really be merged.
+
+> misc_regs.h: can be merged into clock.c
+
+it has more than clock stuff. it is used in pinmux and some other places too,
+that may not be in mainline for now.
+
+> Once you have taken care of these, files, you can enable building 3xx
+> and 6xx together, and move the contents of mach-spear3xx, mach-spear6xx
+> and plat-spear into one directory.
+
+plat-spear would be required for 13xx too. So, merging 3xx and 6xx only would
+be possible.
+
+> Ok, excellent. Note that there is no requirement to do it all in the order
+> you line out above. You can always get support for new stuff into the
+> existing platform without cleaning up all of it right away, as long as you
+> have a good balance between cleanups and new functionality.
+
+Ya. I just wanted to get some hands on experience with this new stuff, before
+touching 13xx.
+
+> In particular, you don't have to start using pinctrl and the common clk
+> immediately for spear3xx, although you might find that it helps you.
+
+But, can i update padmux and clock framework of SPEAr platform? Because
+without the latest code for both padmux and clock, other code for SPEAr
+might not be that effective or usable.
+
+> For spear13xx, the platform being completely new, I would however ask
+> you to use those from the start.
+
+Sure.
+
+--
+viresh
