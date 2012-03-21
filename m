@@ -1,117 +1,31 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 20 Mar 2012 17:13:08 -0700
-Subject: [PATCH 1/2] clk: Fix error handling in fixed clock hardware type
- register fn
-In-Reply-To: <348585ed29fb3ff171267c03658e6c0d.squirrel@www.codeaurora.org>
-References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
- <1332214706-675-1-git-send-email-skannan@codeaurora.org>
- <20120320071957.GH3852@pengutronix.de>
- <348585ed29fb3ff171267c03658e6c0d.squirrel@www.codeaurora.org>
-Message-ID: <CAJOA=zO=wp9oyuBZONk2oCRYdWU1c4qanKJik-8-sFg51p27MQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 20 Mar 2012 21:45:49 -0400 (EDT)
+Subject: [PATCH v8 0/8] Consolidate cpuidle functionality
+In-Reply-To: <87wr6evmnn.fsf@ti.com>
+References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
+ <87wr6evmnn.fsf@ti.com>
+Message-ID: <alpine.LFD.2.02.1203202138130.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 12:46 AM, Saravana Kannan
-<skannan@codeaurora.org> wrote:
-> On Tue, March 20, 2012 12:19 am, Sascha Hauer wrote:
->> On Mon, Mar 19, 2012 at 08:38:25PM -0700, Saravana Kannan wrote:
->>> If memory allocation for the parents array or the parent string fails,
->>> then
->>> fail the registration immediately instead of calling clk_register and
->>> hoping it fails there.
->>>
->>> Return -ENOMEM on failure.
->>>
->>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->>> Cc: Mike Turquette <mturquette@linaro.org>
->>> Cc: Andrew Lunn <andrew@lunn.ch>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
->>> Cc: Paul Walmsley <paul@pwsan.com>
->>> Cc: Shawn Guo <shawn.guo@freescale.com>
->>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->>> Cc: Jamie Iles <jamie@jamieiles.com>
->>> Cc: Richard Zhao <richard.zhao@linaro.org>
->>> Cc: Saravana Kannan <skannan@codeaurora.org>
->>> Cc: Magnus Damm <magnus.damm@gmail.com>
->>> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
->>> Cc: Linus Walleij <linus.walleij@stericsson.com>
->>> Cc: Stephen Boyd <sboyd@codeaurora.org>
->>> Cc: Amit Kucheria <amit.kucheria@linaro.org>
->>> Cc: Deepak Saxena <dsaxena@linaro.org>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> ---
->>> There are still some memory free issues when clk_register() fails, but I
->>> will
->>> fix it when I fixed the other register() fns to return ENOMEM of alloc
->>> failure instead of a NULL.
->>>
->>> ?drivers/clk/clk-fixed-rate.c | ? 10 +++++++---
->>> ?1 files changed, 7 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
->>> index 90c79fb..6423ae9 100644
->>> --- a/drivers/clk/clk-fixed-rate.c
->>> +++ b/drivers/clk/clk-fixed-rate.c
->>> @@ -61,22 +61,26 @@ struct clk *clk_register_fixed_rate(struct device
->>> *dev, const char *name,
->>> ? ? ? ? ? ? ?parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
->>>
->>> ? ? ? ? ? ? ?if (! parent_names)
->>> - ? ? ? ? ? ? ? ? ? ?goto out;
->>> + ? ? ? ? ? ? ? ? ? ?goto fail_ptr;
->>>
->>> ? ? ? ? ? ? ?len = sizeof(char) * strlen(parent_name);
->>>
->>> ? ? ? ? ? ? ?parent_names[0] = kmalloc(len, GFP_KERNEL);
->>>
->>> ? ? ? ? ? ? ?if (!parent_names[0])
->>> - ? ? ? ? ? ? ? ? ? ?goto out;
->>> + ? ? ? ? ? ? ? ? ? ?goto fail_str;
->>>
->>> ? ? ? ? ? ? ?strncpy(parent_names[0], parent_name, len);
->>> ? ? ?}
->>
->> It's easier to add a char *parent to struct clk_fixed and pass it to
->> clk_register with &fixed->parent. This saves you a kmalloc call and
->> makes the error path simpler. It's the same way already done in the
->> divider.
+On Tue, 20 Mar 2012, Kevin Hilman wrote:
 
-I thought I had done this for v7... hmm looks like one got left out.
-I'll line up a patch to get it in sync with the others as part of my
-fixes.
+> Looks like you never heard from anyone actively working on at91,
+> shmobile, kirwood or davinci.
+> 
+> I'm not sure we should merge those platform-specific changes without an
+> ack from those platform maintainers.
 
-> I thought about that since I saw the same was done for gated and divider
-> (I think). Here is my guess at Mike's reasoning for this:
->
-> Gated and divider clocks have to have a parent. There's nothing to gate
-> otherwise. But fixed rate clocks might not have a parent. It could be XO's
-> or PLLs running off of always on XOs not controlled by the SoC. So, it's
-> arguable to not have a parent. I don't have a strong opinion on this --
-> since Mike took the time to write it, it left it to his subjective
-> preference.
+Depends.  There is a limit to how long you may be willing to wait after 
+people.  Sometimes the only way to make progress is to merge the thing 
+and hope that someone who cares will test the stuff during the ~2 months 
+-rc period and provide any fix then.  And if that doesn't happen during 
+that time then either the code is just right and no one noticed the 
+change, or no one cares anymore.
 
-I appreciate the thoughtfulness.  Re-using the same type of mechanism
-as the divider and gate clocks will still allow the fixed-rate clock
-to be parentless, and it makes for cleaner code, one less allocation
-and lines up with how the other single-parent basic clocks are done,
-so I'll take that method in instead of your patch.
+IMHO, Rob posted those patches many times now for quite a while (many 
+months) already.  So I'd suggest simply pushing that stuff into mainline 
+as is.
 
-> I sent this patch first since it was around the place I was cleaning up. I
-> didn't want to actually just shuffle around a bug. As I mentioned, this
-> patch still leaves a bug open -- what if clk_register() fails. I plan to
-> fix that once my two patches are picked up (hopefully).
 
-Do you still find it useful to return -ENOMEM from the registration
-function instead of a NULL clock?  I'm always worried that people
-don't check for error codes on pointers in their platform code and
-only check for NULL...
-
-Regards,
-Mike
-
-> Thanks,
-> Saravana
+Nicolas
