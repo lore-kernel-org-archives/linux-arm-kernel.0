@@ -1,61 +1,66 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 21 Mar 2012 13:32:49 -0700
-Subject: [PATCH 1/4] clk: fixed-rate: Don't open code kstrdup()
-In-Reply-To: <1332360082-25092-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Wed, 21 Mar 2012 13:36:36 -0700
+Subject: [PATCH 3/4] clk: Provide dummy clk_unregister()
+In-Reply-To: <1332360082-25092-3-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <1332360082-25092-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <CAJOA=zOCGqUckxXiv5-N6oNXUyMExmEOC6FvdWLJmS_r+QMbTQ@mail.gmail.com>
+ <1332360082-25092-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <CAJOA=zP4fbvZf2LFvV8s1DYqMZbbOrCZfWQxY53GOPqvh=R+KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Mar 21, 2012 at 1:01 PM, Mark Brown
 <broonie@opensource.wolfsonmicro.com> wrote:
-> Save a little code by using the library function.
->
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> While there's no actual implementation behind it having the call to use
+> in drivers makes them feel neater from a driver author point of view. An
+> actual implementation can wait for someone who needs to use the function
+> in a real system.
 
-Hi Mark,
+Thanks for the patch Mark.  I'll include this in my fixes branch.
 
-Thanks for the patch.  I've already solved this in my clk-fixes branch
-(working on it now, not yet on the list).  I'm going to re-use the
-same approach for the fixed-rate clock as is used for the divider and
-gate; the registration functions for those types store the parent_name
-in the struct clk_foo and use kstrdup as your patch does below.
-
-Thanks again,
+Regards,
 Mike
 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
-> ?drivers/clk/clk-fixed-rate.c | ? ?7 +------
-> ?1 files changed, 1 insertions(+), 6 deletions(-)
+> ?drivers/clk/clk.c ? ? ? ? ? ?| ? 12 ++++++++++++
+> ?include/linux/clk-provider.h | ? ?1 +
+> ?2 files changed, 13 insertions(+), 0 deletions(-)
 >
-> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-> index 90c79fb..cf84e41 100644
-> --- a/drivers/clk/clk-fixed-rate.c
-> +++ b/drivers/clk/clk-fixed-rate.c
-> @@ -45,7 +45,6 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
-> ?{
-> ? ? ? ?struct clk_fixed_rate *fixed;
-> ? ? ? ?char **parent_names = NULL;
-> - ? ? ? u8 len;
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 33ef0df..31419ca 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1344,6 +1344,18 @@ struct clk *clk_register(struct device *dev, const char *name,
+> ?}
+> ?EXPORT_SYMBOL_GPL(clk_register);
 >
-> ? ? ? ?fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
+> +/**
+> + * clk_unregister - unregister a currently registered clock
+> + * @clk: clock to unregister
+> + *
+> + * Currently unimplemented.
+> + */
+> +int clk_unregister(struct clk *clk)
+> +{
+> + ? ? ? return -EINVAL;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_unregister);
+> +
+> ?/*** ? ? ? ?clk rate change notifiers ? ? ? ?***/
 >
-> @@ -63,14 +62,10 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?if (! parent_names)
-> ? ? ? ? ? ? ? ? ? ? ? ?goto out;
+> ?/**
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 340acbc..57c0bd1 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -275,6 +275,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+> ?struct clk *clk_register(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?const struct clk_ops *ops, struct clk_hw *hw,
+> ? ? ? ? ? ? ? ?const char **parent_names, u8 num_parents, unsigned long flags);
+> +int clk_unregister(struct clk *clk);
 >
-> - ? ? ? ? ? ? ? len = sizeof(char) * strlen(parent_name);
-> -
-> - ? ? ? ? ? ? ? parent_names[0] = kmalloc(len, GFP_KERNEL);
-> + ? ? ? ? ? ? ? parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
->
-> ? ? ? ? ? ? ? ?if (!parent_names[0])
-> ? ? ? ? ? ? ? ? ? ? ? ?goto out;
-> -
-> - ? ? ? ? ? ? ? strncpy(parent_names[0], parent_name, len);
-> ? ? ? ?}
->
-> ?out:
+> ?/* helper functions */
+> ?const char *__clk_get_name(struct clk *clk);
 > --
 > 1.7.9.1
 >
