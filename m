@@ -1,40 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Mar 2012 12:33:04 -0700
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <20120321190741.GL3226@opensource.wolfsonmicro.com>
-References: <4F6A2042.9030302@codeaurora.org>
- <20120321190741.GL3226@opensource.wolfsonmicro.com>
-Message-ID: <20120321193304.GO9859@atomide.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Wed, 21 Mar 2012 21:32:31 +0200
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
+References: <4F683B36.8090101@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [120321 12:11]:
-> On Wed, Mar 21, 2012 at 11:38:58AM -0700, Saravana Kannan wrote:
+On Wed, Mar 21, 2012 at 12:12:11PM -0500, H Hartley Sweeten wrote:
+> On Tuesday, March 20, 2012 1:09 AM, Rafal Prylowski wrote:
+> >
+> > Implement double buffering for M2M DMA channels.
+> >
+> > Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
 > 
-> > >So it would be interesting to know more about why you (or anyone else)
-> > >perceive that the Kconfig changes would be harmful.
+> Hmm... This isn't working on my ep9307 board...
 > 
-> > But the enthusiasm of the clock driver developers doesn't
-> > necessarily translate to users of the clock APIs (other driver
-> > devs). My worry with marking it as experimental in Kconfig and to a
-> > certain extent in the documentation is that it will discourage the
-> > driver devs from switching to the new APIs. If no one is using the
-> > new APIs, then platforms can't switch to the common clock framework
+> When the system boots I get stormed with messages:
 > 
-> These aren't new APIs, the clock API has been around since forever.
-> For driver authors working on anything that isn't platform specific the
-> issue has been that it's not implemented at all on the overwhelming
-> majority of architectures and those that do all have their own random
-> implementations with their own random quirks and with no ability for
-> anything except the platform to even try to do incredibly basic stuff
-> like register a new clock.
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
 > 
-> Simply having something, anything, in place even if it's going to churn
-> is a massive step forward here for people working with clocks.
+> Note, I have use_dma set for the ep93xx_spi driver and am using mmc_spi.
+> 
+> Also note, without your patch I also get a couple messages:
+> 
+> dma dma1chan1: got interrupt while active list is empty
+> 
+> But, the mmc card is working fine. I haven't tracked down why I get these
+> yet. Mika, any ideas?
 
-Right, and now at least the people reading this thread are pretty
-aware of the yet unsolved issues with clock fwk api :)
+I've noticed the same. But they also happen without this patch applied. I've
+tracked it down to MULTI_IRQ_HANDLER support patches for ARM vic but not sure
+what might be wrong there (or is the ep93xx_dma driver behaving badly). I
+noticed that when we get that 'got interrupt while active list is empty' we
+don't have any interrupts set in the M2M_INTERRUPT register but we still got
+an interrupt.. weird.
 
-Regards,
+Below is a workaround I've been using lately but it certainly is a hack and we
+should figure out what is the root cause for this.
 
-Tony
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index dcb004a..cb6b49a 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -441,11 +441,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+ 	u32 stat, irq;
+ 	int handled = 0;
+ 
+-	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+-	while (stat) {
++	while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
+ 		irq = ffs(stat) - 1;
+ 		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+-		stat &= ~(1 << irq);
+ 		handled = 1;
+ 	}
+ 
