@@ -1,97 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 21 Mar 2012 09:23:44 -0400 (EDT)
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <alpine.DEB.2.00.1203210018260.30543@utopia.booyaka.com>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
- <201203161218.05125.arnd.bergmann@linaro.org>
- <201203162057.58706.arnd@arndb.de>
- <alpine.DEB.2.00.1203161509470.4395@utopia.booyaka.com>
- <20120316234706.GJ3852@pengutronix.de>
- <alpine.DEB.2.00.1203201611330.22974@utopia.booyaka.com>
- <alpine.LFD.2.02.1203202233340.24151@xanadu.home>
- <alpine.DEB.2.00.1203210018260.30543@utopia.booyaka.com>
-Message-ID: <alpine.LFD.2.02.1203210855510.24151@xanadu.home>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 21 Mar 2012 18:58:41 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203211236.37891.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203151339.36173.arnd@arndb.de> <4F69BC35.4010400@st.com>
+ <201203211236.37891.arnd@arndb.de>
+Message-ID: <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Mar 2012, Paul Walmsley wrote:
+On Wed, Mar 21, 2012 at 6:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Let's make sure we're on the same page with the process though. I hope
+> you're aware that I took Stefan's spear6xx v5 patch.
 
-> Hello Nico,
-> 
-> On Tue, 20 Mar 2012, Nicolas Pitre wrote:
-> 
-> > This common clk API has been under development for over *two* years 
-> > already, with several attempts to merge it.  And each previous merge 
-> > attempt aborted because someone came along at the last minute to do 
-> > exactly what you are doing i.e. underline all the flaws and call for a 
-> > redesign.  This is becoming a bad joke.
-> 
-> There is a misunderstanding.  I am not calling for a redesign.  I am 
-> simply stating that the current maturity level of the API and code should 
-> be documented in the Kconfig dependencies or description text before the 
-> code goes upstream.  The objectives are to make future changes easier, set 
-> expectations, and clearly disclose the extent to which the API and code 
-> will need to change.
+Ya. I already know that. :)
 
-Maybe there is no actual consensus on that extent.
+> Just let me know how you want to handle
+> these things in the future -- the normal way would be to always let you
+> forward the patches to me, rather than having them applied to arm-soc
+> directly.
 
-> > The code will be easier to change once it is in mainline, simply due to 
-> > the fact that you can also change all its users at once.  And it is well 
-> > possible that most users won't have to deal with the same magnitude of 
-> > complexity as yours, again reducing the scope for resistance to changes.
-> 
-> I hope you are right.  To me, these conclusions seem unlikely.  It seems 
-> equally likely that these rationales will make it much more difficult to 
-> change the code once it's upstream and platforms are depending on it.  
+Hmmm. I don't know how exactly it works, but maybe you can add me as
+an custodian for SPEAr, with a git repo somewhere in kernel.org (?).
+So that i can apply patches directly to my branch, you pull it.
+What do you say?
 
-No code should go upstream if no one depends on it.  Therefore we change 
-code that many platforms depend on all the time.  What is killing us is 
-the need to synchronize with multiple external code bases scattered 
-around.
+> I think spear is simple and clean enough that it can serve as an example
+> for others doing DT conversion. Do you also plan to unify 3xx and 6xx?
+> I think there is hardly anything left in mach-spear6xx that justifies
+> having a separate platform, especially since with the DT conversion done,
+> we can actually remove most of the header file contents as well.
 
-> Particularly given the ongoing sensitivity to reducing "churn" of mainline 
-> code, so publicly discussed.
+I issue with us was that we were not able to push stuff mainline in time and
+were too busy supporting customers.
 
-Please stop buying into that crap.  We congratulate ourselves every 
-merge cycles with the current process being able to deal with around 
-half a million of lines changed every 3 months or so.  It's pointless 
-churn that is frowned upon, not useful and incremental API changes.  I 
-don't think that "pointless" would apply here.
+We have lot of patches locally, that we would like to upstream. But it
+can't happen
+without updating it with new expectations of list. I actually wanted
+to ask you few
+things:
 
-> So it seems like a good idea to attempt to address these potential 
-> roadblocks and criticisms to major clock framework changes early.
+- DT: Obviously we would have this in our patches
+- Pinmux: I would remove our padmux and use pinmux, but what about its
+DT support.
+  I know stephen had few patches for it, but don't know there
+progress. I don't want to
+  do stuff twice. First add support for it in board and the *.dts files.
+- Clock Framework: Is common clock framework ready for use or can we update our
+  local clock framework?
 
-I understand your concern, however I don't think it is as serious as you 
-are making it.
+I will see if merging 3xx & 6xx is feasible. If yes, then i will
+surely move in that direction.
+I always like cleaning stuff. :)
 
-> One last comment to address which is orthogonal to the technical content 
-> of this discussion.
-> 
-> > Otherwise one might ask where were you during those development years if 
-> > you claim that the behavior and/or API of the common clock code still 
-> > need to change significantly?
-> 
-> One might ask this.  If one were to ask this, another might briefly 
-> outline the participation in public and private clock discussions at 
-> Linaro Connect in Budapest and Redwood Shores, at LPC in Santa Rosa, at 
-> ELCE/KS in Prague, at ELC in Redwood Shores, in conference calls, IRC 
-> sessions, and private E-mails with many of the people included in the 
-> header of this message, not to mention the list posts.
+I would be adding 13xx (cortex-A9) patches again later, once done with 3xx.
 
-Sure.  I was there too and came across you many times.  I just don't 
-understand why some apparent consensus was built around the current 
-submission, that people involved appeared to be highly satisfied at 
-last, given the emphasis you are giving to your present concern which 
-doesn't seem to be widely shared.  This is a bit surprising.
-
-> None of the concerns that have been described are new.  There has been an 
-> endeavour to discuss them with anyone who seemed even remotely interested.
-
-Let's change tactics then.  We've been discussing this code for over two 
-years and no one could really benefit from it during that time.  Maybe 
-future discussion could become more productive and concrete when some 
-code is merged _and_ used at last.
-
-
-Nicolas
+--
+viresh
