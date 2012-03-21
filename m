@@ -1,186 +1,95 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 21 Mar 2012 23:21:57 +0100
-Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
-In-Reply-To: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
-References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 Mar 2012 23:26:22 +0100
+Subject: [PATCH 4/4] clk: wm831x: Add initial WM831x clock driver
+In-Reply-To: <1332360082-25092-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1332360082-25092-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1332360082-25092-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20120321222622.GG29317@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX23/28 use IP cores which follow a register layout I have first seen on
-STMP3xxx SoCs. In this layout, every register actually has four u32:
+On Wed, Mar 21, 2012 at 08:01:22PM +0000, Mark Brown wrote:
+> The WM831x and WM832x series of PMICs contain a flexible clocking
+> subsystem intended to provide always on and system core clocks.  It
+> features:
+> 
+> - A 32.768kHz crystal oscillator which can optionally be used to pass
+>   through an externally generated clock.
+> - A FLL which can be clocked from either the 32.768kHz oscillator or
+>   the CLKIN pin.
+> - A CLKOUT pin which can bring out either the oscillator or the FLL
+>   output.
+> - The 32.768kHz clock can also optionally be brought out on the GPIO
+>   pins of the device.
+> 
+> This driver fully supports the 32.768kHz oscillator and CLKOUT.  The FLL
+> is supported only in AUTO mode, the full flexibility of the FLL cannot
+> currently be used.
+> 
+> Due to a lack of access to systems where the core SoC has been converted
+> to use the generic clock API this driver has been compile tested only.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
 
- 1.) to store a value directly
- 2.) a SET register where every 1-bit sets the corresponding bit,
-     others are unaffected
- 3.) same with a CLR register
- 4.) same with a TOG (toggle) register
+[...]
 
-Also, the 2 MSBs in register 0 are always the same and can be used to reset
-the IP core.
+> +
+> +static unsigned long wm831x_clkout_recalc_rate(struct clk_hw *hw,
+> +					       unsigned long parent_rate)
+> +{
+> +	return parent_rate;
+> +}
 
-All this is strictly speaking not mach-specific (but IP core specific) and,
-thus, doesn't need to be in mach-mxs/include. At least, mx6 and mx50 also
-utilize IP cores following this stmp-style. So:
+You should be able to drop this. The clock framework will use the parent
+rate automatically if recalc_rate is not present.
 
-Introduce a stmp-style device, put the code and defines for that in a public
-place (lib/), and let drivers for stmp-style devices select that code.
-To avoid regressions and ease reviewing, the actual code is simply copied from
-mach-mxs. It definately wants updates, but those need a seperate patch series.
+> +
+> +static int wm831x_clkout_set_parent(struct clk_hw *hw, u8 parent)
+> +{
+> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
+> +						  clkout_hw);
+> +	struct wm831x *wm831x = clkdata->wm831x;
+> +
+> +	if (parent > ARRAY_SIZE(wm831x_clkout_parents))
+> +		return -EINVAL;
 
-Voila, mach dependency gone, reusable code introduced. Note that I didn't
-remove the duplicated code from mach-mxs yet, first the drivers have to be
-converted.
+Unless you mistrust the clock framework isn't necessary. The framework
+checks this already.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
----
- include/linux/stmp_device.h |   20 +++++++++++
- lib/Kconfig                 |    3 ++
- lib/Makefile                |    2 +
- lib/stmp_device.c           |   80 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 105 insertions(+), 0 deletions(-)
- create mode 100644 include/linux/stmp_device.h
- create mode 100644 lib/stmp_device.c
+> +
+> +static __devinit int wm831x_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct wm831x *wm831x = dev_get_drvdata(pdev->dev.parent);
+> +	struct wm831x_clk *clkdata;
+> +	int ret;
+> +
+> +	clkdata = devm_kzalloc(&pdev->dev, sizeof(*clkdata), GFP_KERNEL);
+> +	if (!clkdata)
+> +		return -ENOMEM;
+> +
+> +	/* XTAL_ENA can only be set via OTP/InstantConfig so just read once */
+> +	ret = wm831x_reg_read(wm831x, WM831X_CLOCK_CONTROL_2);
+> +	if (ret < 0) {
+> +		dev_err(wm831x->dev, "Unable to read CLOCK_CONTROL_2: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +	clkdata->xtal_ena = ret & WM831X_XTAL_ENA;
+> +
+> +	if (!clk_register(&pdev->dev, "xtal", &wm831x_xtal_ops,
+> +			  &clkdata->xtal_hw, NULL, 0, CLK_IS_ROOT))
+> +		return -EINVAL;
 
-diff --git a/include/linux/stmp_device.h b/include/linux/stmp_device.h
-new file mode 100644
-index 0000000..6cf7ec9
---- /dev/null
-+++ b/include/linux/stmp_device.h
-@@ -0,0 +1,20 @@
-+/*
-+ * basic functions for devices following the "stmp" style register layout
-+ *
-+ * Copyright (C) 2011 Wolfram Sang, Pengutronix e.K.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __STMP_DEVICE_H__
-+#define __STMP_DEVICE_H__
-+
-+#define STMP_OFFSET_REG_SET	0x4
-+#define STMP_OFFSET_REG_CLR	0x8
-+#define STMP_OFFSET_REG_TOG	0xc
-+
-+extern int stmp_reset_block(void __iomem *);
-+#endif /* __STMP_DEVICE_H__ */
-diff --git a/lib/Kconfig b/lib/Kconfig
-index 028aba9..d4af46f 100644
---- a/lib/Kconfig
-+++ b/lib/Kconfig
-@@ -29,6 +29,9 @@ config GENERIC_IOMAP
- 	bool
- 	select GENERIC_PCI_IOMAP
- 
-+config STMP_DEVICE
-+	bool
-+
- config CRC_CCITT
- 	tristate "CRC-CCITT functions"
- 	help
-diff --git a/lib/Makefile b/lib/Makefile
-index 18515f0..f78dbcd 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -123,6 +123,8 @@ obj-$(CONFIG_SIGNATURE) += digsig.o
- 
- obj-$(CONFIG_CLZ_TAB) += clz_tab.o
- 
-+obj-$(CONFIG_STMP_DEVICE) += stmp_device.o
-+
- hostprogs-y	:= gen_crc32table
- clean-files	:= crc32table.h
- 
-diff --git a/lib/stmp_device.c b/lib/stmp_device.c
-new file mode 100644
-index 0000000..8ac9bcc
---- /dev/null
-+++ b/lib/stmp_device.c
-@@ -0,0 +1,80 @@
-+/*
-+ * Copyright (C) 1999 ARM Limited
-+ * Copyright (C) 2000 Deep Blue Solutions Ltd
-+ * Copyright 2006-2007,2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-+ * Copyright 2009 Ilya Yanok, Emcraft Systems Ltd, yanok at emcraft.com
-+ * Copyright (C) 2011 Wolfram Sang, Pengutronix e.K.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/errno.h>
-+#include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/stmp_device.h>
-+
-+#define STMP_MODULE_CLKGATE	(1 << 30)
-+#define STMP_MODULE_SFTRST	(1 << 31)
-+
-+/*
-+ * Clear the bit and poll it cleared.  This is usually called with
-+ * a reset address and mask being either SFTRST(bit 31) or CLKGATE
-+ * (bit 30).
-+ */
-+static int stmp_clear_poll_bit(void __iomem *addr, u32 mask)
-+{
-+	int timeout = 0x400;
-+
-+	writel(mask, addr + STMP_OFFSET_REG_CLR);
-+	udelay(1);
-+	while ((readl(addr) & mask) && --timeout)
-+		/* nothing */;
-+
-+	return !timeout;
-+}
-+
-+int stmp_reset_block(void __iomem *reset_addr)
-+{
-+	int ret;
-+	int timeout = 0x400;
-+
-+	/* clear and poll SFTRST */
-+	ret = stmp_clear_poll_bit(reset_addr, STMP_MODULE_SFTRST);
-+	if (unlikely(ret))
-+		goto error;
-+
-+	/* clear CLKGATE */
-+	writel(STMP_MODULE_CLKGATE, reset_addr + STMP_OFFSET_REG_CLR);
-+
-+	/* set SFTRST to reset the block */
-+	writel(STMP_MODULE_SFTRST, reset_addr + STMP_OFFSET_REG_SET);
-+	udelay(1);
-+
-+	/* poll CLKGATE becoming set */
-+	while ((!(readl(reset_addr) & STMP_MODULE_CLKGATE)) && --timeout)
-+		/* nothing */;
-+	if (unlikely(!timeout))
-+		goto error;
-+
-+	/* clear and poll SFTRST */
-+	ret = stmp_clear_poll_bit(reset_addr, STMP_MODULE_SFTRST);
-+	if (unlikely(ret))
-+		goto error;
-+
-+	/* clear and poll CLKGATE */
-+	ret = stmp_clear_poll_bit(reset_addr, STMP_MODULE_CLKGATE);
-+	if (unlikely(ret))
-+		goto error;
-+
-+	return 0;
-+
-+error:
-+	pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
-+	return -ETIMEDOUT;
-+}
-+EXPORT_SYMBOL(stmp_reset_block);
+The clock names are unique identifiers for the clock, so clocks in
+drivers should probably have dev_name encoded into them.
+
+You could also use the fixed rate generic clock here.
+
+Sascha
+
 -- 
-1.7.2.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
