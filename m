@@ -1,36 +1,157 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Mar 2012 08:59:11 +0000
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <alpine.DEB.2.00.1203201731550.22974@utopia.booyaka.com>
-References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
- <201203170905.33191.arnd@arndb.de>
- <alpine.DEB.2.00.1203201731550.22974@utopia.booyaka.com>
-Message-ID: <201203210859.11899.arnd@arndb.de>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Wed, 21 Mar 2012 15:32:29 +0530
+Subject: [RESEND PATCH] ARM :OMAP2+: UART: Remove some of uart default pads
+Message-ID: <1332324149-16058-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 March 2012, Paul Walmsley wrote:
-> Hello Arnd,
-> 
-> On Sat, 17 Mar 2012, Arnd Bergmann wrote:
-> 
-> > I think it's rather pointless, because the option is not going to
-> > be user selectable but will get selected by the platform unless I'm
-> > mistaken. The platform maintainers that care already know the state
-> > of the framework.
-> 
-> This is where we have differing views, I think.  Clearly, Sascha, 
-> Saravana, Rob, and I have at least slightly different opinions on the 
-> durability of the existing API and code.  So it seems reasonable to assume 
-> that others who have not followed the development of the common clock code 
-> might mistake the implementation or API as being stable and well-defined.
-> 
-> It sounds like the primary objection is to the use of CONFIG_EXPERIMENTAL.  
-> So here is a patch to simply note the status of this code in its Kconfig 
-> text.
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-Yes, looks good to me. If there are no objections, I'll apply this one.
+The following commit:
+(7496ba3  ARM: OMAP2+: UART: Add default mux for all uarts)
+added default pads for all uarts. But not all boards tend to
+use all uarts and most of unused uart pins are muxed for
+other purpose. This commit breaks the modules which where trying
+to use unused uart pins on their boards.
 
-Thanks,
+So remove all default pads except uart1/3 as most boards
+tend to use either uart1/3 as console port and use only tx/rx
+lines, declare only those pads for uart1/3.
+If any boards tend to use any other uart other uart1/3
+the mux data should to passed from board file and init individual
+uart port using omap_serial_init_port api.
 
-	Arnd
+These pads are needed not only for muxing but are also used to specify
+pad wakeup capability for console uart, prior to commit specified we used
+to do raw_write to mux pin to enable wakeup capability to uart1/2/3 now
+with runtime changes we are using the hwmod/mux framework.
+
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+Based on Linux 3.3
+Tested on Beagle XM and Zoom3 board.
+
+ arch/arm/mach-omap2/serial.c |   78 ------------------------------------------
+ 1 files changed, 0 insertions(+), 78 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 83ab5a2..4dccf14 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -124,14 +124,6 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_device_pad default_uart1_pads[] __initdata = {
+ 	{
+-		.name	= "uart1_cts.uart1_cts",
+-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+-	},
+-	{
+-		.name	= "uart1_rts.uart1_rts",
+-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+-	},
+-	{
+ 		.name	= "uart1_tx.uart1_tx",
+ 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+ 	},
+@@ -143,37 +135,8 @@ static struct omap_device_pad default_uart1_pads[] __initdata = {
+ 	},
+ };
+ 
+-static struct omap_device_pad default_uart2_pads[] __initdata = {
+-	{
+-		.name	= "uart2_cts.uart2_cts",
+-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+-	},
+-	{
+-		.name	= "uart2_rts.uart2_rts",
+-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+-	},
+-	{
+-		.name	= "uart2_tx.uart2_tx",
+-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+-	},
+-	{
+-		.name	= "uart2_rx.uart2_rx",
+-		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+-		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+-	},
+-};
+-
+ static struct omap_device_pad default_uart3_pads[] __initdata = {
+ 	{
+-		.name	= "uart3_cts_rctx.uart3_cts_rctx",
+-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+-	},
+-	{
+-		.name	= "uart3_rts_sd.uart3_rts_sd",
+-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+-	},
+-	{
+ 		.name	= "uart3_tx_irtx.uart3_tx_irtx",
+ 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+ 	},
+@@ -185,32 +148,6 @@ static struct omap_device_pad default_uart3_pads[] __initdata = {
+ 	},
+ };
+ 
+-static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
+-	{
+-		.name   = "gpmc_wait2.uart4_tx",
+-		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+-	},
+-	{
+-		.name	= "gpmc_wait3.uart4_rx",
+-		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+-		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+-		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+-	},
+-};
+-
+-static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
+-	{
+-		.name	= "uart4_tx.uart4_tx",
+-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+-	},
+-	{
+-		.name	= "uart4_rx.uart4_rx",
+-		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+-		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+-		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+-	},
+-};
+-
+ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+ {
+ 	switch (bdata->id) {
+@@ -218,25 +155,10 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+ 		bdata->pads = default_uart1_pads;
+ 		bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
+ 		break;
+-	case 1:
+-		bdata->pads = default_uart2_pads;
+-		bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
+-		break;
+ 	case 2:
+ 		bdata->pads = default_uart3_pads;
+ 		bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
+ 		break;
+-	case 3:
+-		if (cpu_is_omap44xx()) {
+-			bdata->pads = default_omap4_uart4_pads;
+-			bdata->pads_cnt =
+-				ARRAY_SIZE(default_omap4_uart4_pads);
+-		} else if (cpu_is_omap3630()) {
+-			bdata->pads = default_omap36xx_uart4_pads;
+-			bdata->pads_cnt =
+-				ARRAY_SIZE(default_omap36xx_uart4_pads);
+-		}
+-		break;
+ 	default:
+ 		break;
+ 	}
+-- 
+1.7.5.4
