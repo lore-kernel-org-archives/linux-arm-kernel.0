@@ -1,38 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 21 Mar 2012 19:07:42 +0000
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <4F6A2042.9030302@codeaurora.org>
-References: <4F6A2042.9030302@codeaurora.org>
-Message-ID: <20120321190741.GL3226@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Mar 2012 20:08:43 +0100
+Subject: [PATCH v3] serial: PL011: clear pending interrupts
+In-Reply-To: <CAOh2x=nh-aiJ1FQecm=5WsNw=Fph5osNh5C2YU6x9TGrKBoMmA@mail.gmail.com>
+References: <1331641643-25929-1-git-send-email-linus.walleij@stericsson.com>
+ <CAOh2x=nh-aiJ1FQecm=5WsNw=Fph5osNh5C2YU6x9TGrKBoMmA@mail.gmail.com>
+Message-ID: <CACRpkdZ-epTV8dAY4gT9HKgPifRS_wfooy0QqEGsSgCqZ98MYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 11:38:58AM -0700, Saravana Kannan wrote:
+On Wed, Mar 21, 2012 at 12:58 PM, viresh kumar <viresh.linux@gmail.com> wrote:
+> On Tue, Mar 13, 2012 at 5:57 PM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>> @@ -1927,6 +1930,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>> ? ? ? ? ? ? ? ?goto unmap;
+>> ? ? ? ?}
+>>
+>> + ? ? ? /* Ensure interrupts from this UART are masked and cleared */
+>> + ? ? ? writew(0, uap->port.membase + UART011_IMSC);
+>> + ? ? ? writew(0xffff, uap->port.membase + UART011_ICR);
+>> +
+>
+> I was working on v3.3 and found a crash for my SoC. When i checked i got a crash
+> due to above changes.
 
-> >So it would be interesting to know more about why you (or anyone else)
-> >perceive that the Kconfig changes would be harmful.
+Strange, because these changes are not even in 3.3. Did you mean 3.4
+HEAD?
 
-> But the enthusiasm of the clock driver developers doesn't
-> necessarily translate to users of the clock APIs (other driver
-> devs). My worry with marking it as experimental in Kconfig and to a
-> certain extent in the documentation is that it will discourage the
-> driver devs from switching to the new APIs. If no one is using the
-> new APIs, then platforms can't switch to the common clock framework
+> There are two issues here
+> ?- uap->port is uninitialized
+> ?- clk is not enabled.
+>
+> How is this working for you?
 
-These aren't new APIs, the clock API has been around since forever.
-For driver authors working on anything that isn't platform specific the
-issue has been that it's not implemented at all on the overwhelming
-majority of architectures and those that do all have their own random
-implementations with their own random quirks and with no ability for
-anything except the platform to even try to do incredibly basic stuff
-like register a new clock.
+The uap->port is likely the problem. The clock does not need to be
+enabled for this, the clock that need to be enabled is the pclk and that
+should be taken care of by the amba/primecell core.
 
-Simply having something, anything, in place even if it's going to churn
-is a massive step forward here for people working with clocks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120321/b5747b79/attachment-0001.sig>
+It worked because I had some system which didn't scream when it wrote
+into that NULL-address for some reason :-(
+
+I'm sending a fixup patch to sort out my own screwing up.
+
+Yours,
+Linus Walleij
