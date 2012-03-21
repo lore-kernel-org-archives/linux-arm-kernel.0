@@ -1,136 +1,101 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 21 Mar 2012 09:37:25 -0500
-Subject: Device tree and IO map_desc.
-In-Reply-To: <CAKON4OxxmO_Et8FTVp=i7h9uODWAtdjHOmZrFWLtgqYVAjAAGg@mail.gmail.com>
-References: <CAKON4OyHRVvdtZGt+HiCnsRT_5zTuDVBVgOx22kFC2xxFLnD+Q@mail.gmail.com>
- <4F69D325.1000500@gmail.com>
- <CAKON4OxxmO_Et8FTVp=i7h9uODWAtdjHOmZrFWLtgqYVAjAAGg@mail.gmail.com>
-Message-ID: <4F69E7A5.4090101@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Mar 2012 14:42:50 +0000
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <CAOh2x=mtjvitkhz=BXOZPAaKZ2i3QQuKrYA3HcHNERHhF5xFoA@mail.gmail.com>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203211404.35847.arnd@arndb.de>
+ <CAOh2x=mtjvitkhz=BXOZPAaKZ2i3QQuKrYA3HcHNERHhF5xFoA@mail.gmail.com>
+Message-ID: <201203211442.50683.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2012 09:23 AM, jonsmirl at gmail.com wrote:
-> On Wed, Mar 21, 2012 at 9:09 AM, Rob Herring <robherring2@gmail.com> wrote:
->> On 03/20/2012 11:52 AM, jonsmirl at gmail.com wrote:
->>> Is there a helper for building the IO map_desc from the device tree?
->>>
->>
->> No. This is one of those things that device tree cannot have knowledge
->> of what needs to be statically mapped as that's not a h/w description.
+On Wednesday 21 March 2012, viresh kumar wrote:
+> On Wed, Mar 21, 2012 at 7:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 21 March 2012, viresh kumar wrote:
+> >> - Pinmux: I would remove our padmux and use pinmux, but what about its
+> >> DT support.
+> >>   I know stephen had few patches for it, but don't know there
+> >> progress. I don't want to
+> >>   do stuff twice. First add support for it in board and the *.dts files.
+> >
+> > AFAICT, the pinmux DT binding should be ready for v3.5, I don't think it
+> > made it into v3.4.
 > 
-> What's an example of something that is described in the device tree
-> and is dynamically mapped? Things like PCI cards shouldn't be in the
-> device tree since they are discoverable.
-> 
+> So, i can add stuff in board file for pinmux for now?
 
-I mean mapped into cpu virtual memory. Static mapping is map_desc.
-Dynamic mapping is ioremap.
+Probably yes. It depends on the scale though: if you add more code than
+what is needed to convert to the pinctrl framework, we might decide that
+it's not worth it.
 
-> Nodes have 'status' in them, could this be used to control mapping?
-> 
-> 				uart1: uart at 02020000 {
-> 					compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
-> 					reg = <0x02020000 0x4000>;
-> 					interrupts = <0 26 0x04>;
-> 					status = "disabled";
-> 				};
-> 
-> Probably the right solution is that the individual drivers should map
-> themselves by calling into a helper function with address and range.
-> The helper would coalesce and merge ranges to reduce the number of
-> mappings.
+Note that moving to the pinctrl subsystem can be done independent from
+doing the device tree conversion, and it does not depend on the
+pinctrl dt binding even if you already have DT support.
 
-This is what most drivers do. The static mappings in map_desc are often
-special cases where ioremap doesn't work. LL_DEBUG is one example.
+> > I've looked at this earlier today out of curiosity and found:
+> >
+> > clock.c: almost identical, can be easily merged, or both copies
+> >         kept around during transition.
+> 
+> Would make it very confusing if we merge these two. Some clock
+> structures are same, but others are not. Mostly differences are in the
+> macros (or bit positions in registers), rather than hierarchy. So, i would
+> like to keep them separate. But still have a look again to see if they can
+> really be merged.
 
-> 
-> This is a piece of a lpc3131 three I am working on. I could add a tiny
-> driver for the adp node that creates the mapping. Then as the
-> dependent devices ask for mappings they'd be inside the larger node.
-> 
+Ok, I see.
 
-Use ioremap unless there is a reason you can't.
+> > misc_regs.h: can be merged into clock.c
+> 
+> it has more than clock stuff. it is used in pinmux and some other places too,
+> that may not be in mainline for now.
 
-Rob
+Right, I was only looking at the stuff that is actually being used in mainline.
+However I think this file should not be needed at all -- any contents that
+are specific to one driver can just live in that driver, and stuff that is
+shared across multiple drivers generally looks like it is also shared between
+3xx and 6xx.
 
-> 	ahb {
-> 		compatible = "simple-bus";
-> 		#address-cells = <1>;
-> 		#size-cells = <1>;
-> 		ranges;
+> > Once you have taken care of these, files, you can enable building 3xx
+> > and 6xx together, and move the contents of mach-spear3xx, mach-spear6xx
+> > and plat-spear into one directory.
 > 
-> 		isram0: memory at 11028000 {
-> 			reg = <0x11028000 0x18000>;
-> 		};
-> 		isram1: memory at 11040000 {
-> 			reg = <0x11040000 0x18000>;
-> 		};
+> plat-spear would be required for 13xx too. So, merging 3xx and 6xx only would
+> be possible.
+
+There is not all that much that can be shared here:
+
+* clock.c would go into drivers/clk/ for spear13xx and possibly for the others
+  too.
+* padmux.c would go into drivers/pinctrl
+* time.c would go into drivers/clocksource
+* shirq.c is potentially shared, but we've discussed in the past about
+  creating a new drivers/irqchip where this can live.
+* restart.c is very small, there is no harm in duplicating this.
+* The header files will have to go elsewhere, too, as we move towards
+  have a single multiplatform zImage.
+
+> > Ok, excellent. Note that there is no requirement to do it all in the order
+> > you line out above. You can always get support for new stuff into the
+> > existing platform without cleaning up all of it right away, as long as you
+> > have a good balance between cleanups and new functionality.
 > 
-> 		apb0: apb at 13000000 {
-> 			compatible = "simple-bus";
-> 			#address-cells = <1>;
-> 			#size-cells = <1>;
-> 			ranges = <0x13000000 0x13000000 0x8000>;
+> Ya. I just wanted to get some hands on experience with this new stuff, before
+> touching 13xx.
+
+Good idea. As Stefan has shown, it's not really all that hard to get a lot
+done for the older platforms, and spear13xx will likely be much harder
+because of the increased hardware complexity.
+
+> > In particular, you don't have to start using pinctrl and the common clk
+> > immediately for spear3xx, although you might find that it helps you.
 > 
-> 			evtr at 13000000 {
-> 				compatible = "nxp,lpc31xx-evtr";
-> 				reg = <0x13000000 0x800>;
-> 			};
-> 			adc at 13002000 {
-> 				compatible = "nxp,lpc31xx-adc";
-> 				reg = <0x13002000 0x400>;
-> 				interrupts = <1>;
-> 			};
-> 
-> 
->>
->> We could probably have a list of nodes to map and extract the size and
->> physical addresses from the DT. There's lots of register defines
->> typically associated with the static mappings, so you would still have
->> duplicated information.
->>
->>> For example on Versatile. All of this map_io data is already in the
->>> device tree, it is just repeated here.
->>>
->>>
->>> DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
->>>       .map_io         = versatile_map_io,
->>>       .init_early     = versatile_init_early,
->>> ....
->>> MACHINE_END
->>>
->>> void __init versatile_map_io(void)
->>> {
->>>       iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
->>> }
->>>
->>> static struct map_desc versatile_io_desc[] __initdata = {
->>>       {
->>>               .virtual        =  IO_ADDRESS(VERSATILE_SYS_BASE),
->>>               .pfn            = __phys_to_pfn(VERSATILE_SYS_BASE),
->>>               .length         = SZ_4K,
->>>               .type           = MT_DEVICE
->>>       }, {
->>>               .virtual        =  IO_ADDRESS(VERSATILE_SIC_BASE),
->>>               .pfn            = __phys_to_pfn(VERSATILE_SIC_BASE),
->>>               .length         = SZ_4K,
->>>               .type           = MT_DEVICE
->>>       }, {
->>>               .virtual        =  IO_ADDRESS(VERSATILE_VIC_BASE),
->>>               .pfn            = __phys_to_pfn(VERSATILE_VIC_BASE),
->>>               .length         = SZ_4K,
->>>               .type           = MT_DEVICE
->>
->> The SIC and VIC should get converted to ioremap and using of_irq_init.
->> There's already DT init support for the VIC at least, so the conversion
->> should be easy. I think Linus W was working on this.
->>
->> Rob
->>
->>>       }, {
->>> ...
->>>
->>
-> 
-> 
-> 
+> But, can i update padmux and clock framework of SPEAr platform? Because
+> without the latest code for both padmux and clock, other code for SPEAr
+> might not be that effective or usable.
+
+Yes, you can do updates in there that are logical and keep the current
+basic structure or improve it. I would only object if you do a more or
+less complete rewrite of those files but don't use the common infrastructure
+in the process.
+
+	Arnd
