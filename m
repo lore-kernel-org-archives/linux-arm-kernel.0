@@ -1,59 +1,60 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 21 Mar 2012 19:26:56 +0800
-Subject: [PATCH 1/1] net: phylib: remove the length limitation of mii
- bus id
-In-Reply-To: <4F688F01.40604@openwrt.org>
-References: <1332217386-3586-1-git-send-email-b29396@freescale.com>
- <CAAQ0ZWQEoPORMXsf3xV-KPP+hOHk2euj460fORyUALnfPn3Q8g@mail.gmail.com>
- <CAA+hA=Ttc9RDmK1fDPCtqLpf91DYDDFSf3E6zWQ6seyw7sNqTg@mail.gmail.com>
- <4F688F01.40604@openwrt.org>
-Message-ID: <20120321112655.GB4905@shlinux2.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 21 Mar 2012 11:29:24 +0000
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com>	<87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A831823816@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 10:06:57PM +0800, Florian Fainelli wrote:
-> Hi,
+On Mon, Mar 19, 2012 at 17:14:30, Ming Lei wrote:
+> On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> >
+> > I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
+> > It will always use 32k-counter, and never fall back to dmtimer.
+> >
+> > Then the only options we have here is,
+> >
+> > 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
+> > ? Kernel pick up best rating clocksource out of these two.
+> >
+> > ? In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
+> > ? Rating. User can choose the 32k-counter clocksource via bootargs.
+> >
+> > ? Impact: without bootargs for clocksource selection, kernel will choose
+> > ? ? dmtimer, impacting loss of time during suspend/resume.
+> >
+> >
+> > 2) Let the current code be as is, means, the clocksource registration will
+> > ? Happened based on "#ifdef CONFIG_OMAP_32K_TIMER" and this option
+> > ? selection will be Controlled by Kconfig rules.
 > 
-> Le 03/20/12 11:53, Dong Aisheng a ?crit :
-> > On Tue, Mar 20, 2012 at 1:32 AM, Shawn Guo<shawn.guo@linaro.org>  wrote:
-> >> On 20 March 2012 12:23, Dong Aisheng<b29396@freescale.com>  wrote:
-> >>> From: Dong Aisheng<dong.aisheng@linaro.org>
-> >>>
-> >>> When convert to dt, the length of old mii bus id (17 bytes) is not
-> >>> sufficent to use.
-> >>> For example, the bus id could be 800f0000.ethernet-1:00 in DT.
-> >>>
-> >>> This patch removes the bus id length limitation by changing the
-> >>> bus id to a const char pionter and user could dynamically set the
-> >>> bus id via kasprintf function call.
-> >>>
-> >>> Since then no users use MII_BUS_ID_SIZE any more, just remove it.
-> >>>
-> >>> Signed-off-by: Dong Aisheng<dong.aisheng@linaro.org>
-> >>> ---
-> >>> The simplest way may just change MII_BUS_ID_SIZE to a more bigger size,
-> >>> but i'm not sure that's gonna be accepted.
-> >>
-> >> The simplest fix has been applied on -next tree as below.
-> >>
-> > Oh, i missed it, seems my patch covers that change.
-> > But that patch only fixed wrong phy_name buffer length issue.
-> > My patch is totally remove the length limitation of bus id and phy_name
-> > or the bus id name will be truncated if it's longer than MII_BUS_ID_SIZE
-> > which is not a comfortable limitation.
+> How about the 3rd option?
 > 
-> Then just increase the bus id size locally for your driver. Drivers that 
-> can live with a static allocation are better of using it.
+> 3), take the way in your patch 1) at default, but will switch to
+> register dmtimer
+> directly and bypass 32k-counter if user need it via kernel parameter.
 > 
-That's the common part, can not change it locally by driver.
-Or we can change MII_BUS_ID_SIZE to a more big size in common code,
-maybe 30 bytes, but when is the end?
+> As far as I can think of, the situations required for dmtimer are high-frequency
+> perf sample and high precision trace points, so looks it is OK to take
+> 32k-counter
+> at default.
+> 
+But if you register both the timers (dmtimer & 32ksync), then initially kernel will only pick up dmtimer, as this has better rating. And late in
+the boot sequence clocksource switch will happen, base on 
+kernel parameter (clocksource=).
 
-> Your patch completely missed testing the return value of kasprintf(), 
-> and its return value can be NULL, please fix this at least.
-> 
-Yes, thanks for the reminder.
-I will fix it.
+So logically dmtimer will be always used as a default here.
 
-Regards
-Dong Aisheng
+Thanks,
+Vaibhav
+
+> Thanks,
+> -- 
+> Ming Lei
+> 
