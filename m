@@ -1,157 +1,73 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 21 Mar 2012 15:32:29 +0530
-Subject: [RESEND PATCH] ARM :OMAP2+: UART: Remove some of uart default pads
-Message-ID: <1332324149-16058-1-git-send-email-govindraj.raja@ti.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 21 Mar 2012 10:59:07 +0100
+Subject: [PATCH 2/6] mmc: Kconfig: remove choice between at91_mci and
+ atmel-mci
+In-Reply-To: <d86c9743d2434e2c6a2a34cefe6c989e0efa9652.1331826095.git.nicolas.ferre@atmel.com>
+References: <cover.1331826095.git.nicolas.ferre@atmel.com>
+ <d86c9743d2434e2c6a2a34cefe6c989e0efa9652.1331826095.git.nicolas.ferre@atmel.com>
+Message-ID: <20120321095907.GI11834@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+On Thu, Mar 15, 2012 at 04:57:18PM +0100, Nicolas Ferre wrote:
+> This choice is not so important now that atmel-mci supports every
+> Atmel AT91 SoC except AT91RM9200. As this newer driver is better
+> maintained choose this one to avoid confusion.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-The following commit:
-(7496ba3  ARM: OMAP2+: UART: Add default mux for all uarts)
-added default pads for all uarts. But not all boards tend to
-use all uarts and most of unused uart pins are muxed for
-other purpose. This commit breaks the modules which where trying
-to use unused uart pins on their boards.
+Thanks for this patch, it's a new step to have only one mci driver.
 
-So remove all default pads except uart1/3 as most boards
-tend to use either uart1/3 as console port and use only tx/rx
-lines, declare only those pads for uart1/3.
-If any boards tend to use any other uart other uart1/3
-the mux data should to passed from board file and init individual
-uart port using omap_serial_init_port api.
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-These pads are needed not only for muxing but are also used to specify
-pad wakeup capability for console uart, prior to commit specified we used
-to do raw_write to mux pin to enable wakeup capability to uart1/2/3 now
-with runtime changes we are using the hwmod/mux framework.
+Regards
 
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
-Based on Linux 3.3
-Tested on Beagle XM and Zoom3 board.
+Ludovic
 
- arch/arm/mach-omap2/serial.c |   78 ------------------------------------------
- 1 files changed, 0 insertions(+), 78 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 83ab5a2..4dccf14 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -124,14 +124,6 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
- #ifdef CONFIG_OMAP_MUX
- static struct omap_device_pad default_uart1_pads[] __initdata = {
- 	{
--		.name	= "uart1_cts.uart1_cts",
--		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
--	},
--	{
--		.name	= "uart1_rts.uart1_rts",
--		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
--	},
--	{
- 		.name	= "uart1_tx.uart1_tx",
- 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
- 	},
-@@ -143,37 +135,8 @@ static struct omap_device_pad default_uart1_pads[] __initdata = {
- 	},
- };
- 
--static struct omap_device_pad default_uart2_pads[] __initdata = {
--	{
--		.name	= "uart2_cts.uart2_cts",
--		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
--	},
--	{
--		.name	= "uart2_rts.uart2_rts",
--		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
--	},
--	{
--		.name	= "uart2_tx.uart2_tx",
--		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
--	},
--	{
--		.name	= "uart2_rx.uart2_rx",
--		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
--		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
--		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
--	},
--};
--
- static struct omap_device_pad default_uart3_pads[] __initdata = {
- 	{
--		.name	= "uart3_cts_rctx.uart3_cts_rctx",
--		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
--	},
--	{
--		.name	= "uart3_rts_sd.uart3_rts_sd",
--		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
--	},
--	{
- 		.name	= "uart3_tx_irtx.uart3_tx_irtx",
- 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
- 	},
-@@ -185,32 +148,6 @@ static struct omap_device_pad default_uart3_pads[] __initdata = {
- 	},
- };
- 
--static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
--	{
--		.name   = "gpmc_wait2.uart4_tx",
--		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
--	},
--	{
--		.name	= "gpmc_wait3.uart4_rx",
--		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
--		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
--		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
--	},
--};
--
--static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
--	{
--		.name	= "uart4_tx.uart4_tx",
--		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
--	},
--	{
--		.name	= "uart4_rx.uart4_rx",
--		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
--		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
--		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
--	},
--};
--
- static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
- {
- 	switch (bdata->id) {
-@@ -218,25 +155,10 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
- 		bdata->pads = default_uart1_pads;
- 		bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
- 		break;
--	case 1:
--		bdata->pads = default_uart2_pads;
--		bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
--		break;
- 	case 2:
- 		bdata->pads = default_uart3_pads;
- 		bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
- 		break;
--	case 3:
--		if (cpu_is_omap44xx()) {
--			bdata->pads = default_omap4_uart4_pads;
--			bdata->pads_cnt =
--				ARRAY_SIZE(default_omap4_uart4_pads);
--		} else if (cpu_is_omap3630()) {
--			bdata->pads = default_omap36xx_uart4_pads;
--			bdata->pads_cnt =
--				ARRAY_SIZE(default_omap36xx_uart4_pads);
--		}
--		break;
- 	default:
- 		break;
- 	}
--- 
-1.7.5.4
+> ---
+>  drivers/mmc/host/Kconfig |   13 ++-----------
+>  1 files changed, 2 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 00fcbed..455a414 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -270,16 +270,9 @@ config MMC_AU1X
+>  
+>  	  If unsure, say N.
+>  
+> -choice
+> -	prompt "Atmel SD/MMC Driver"
+> -	depends on AVR32 || ARCH_AT91
+> -	default MMC_ATMELMCI if AVR32
+> -	help
+> -	  Choose which driver to use for the Atmel MCI Silicon
+> -
+>  config MMC_AT91
+>  	tristate "AT91 SD/MMC Card Interface support"
+> -	depends on ARCH_AT91
+> +	depends on ARCH_AT91RM9200
+>  	help
+>  	  This selects the AT91 MCI controller.
+>  
+> @@ -287,7 +280,7 @@ config MMC_AT91
+>  
+>  config MMC_ATMELMCI
+>  	tristate "Atmel Multimedia Card Interface support"
+> -	depends on AVR32 || ARCH_AT91
+> +	depends on AVR32 || (ARCH_AT91 && !ARCH_AT91RM9200)
+>  	help
+>  	  This selects the Atmel Multimedia Card Interface driver. If
+>  	  you have an AT32 (AVR32) or AT91 platform with a Multimedia
+> @@ -295,8 +288,6 @@ config MMC_ATMELMCI
+>  
+>  	  If unsure, say N.
+>  
+> -endchoice
+> -
+>  config MMC_ATMELMCI_DMA
+>  	bool "Atmel MCI DMA support"
+>  	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
+> -- 
+> 1.7.9
+> 
