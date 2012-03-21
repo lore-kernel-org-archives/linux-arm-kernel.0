@@ -1,21 +1,33 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 21 Mar 2012 18:05:54 +0000
-Subject: [PATCH] ARM: davinci: Fix for cpuidle consolidation changes
-In-Reply-To: <1332348505-28780-1-git-send-email-rob.lee@linaro.org>
-References: <1332348505-28780-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B631800C76@DBDE01.ent.ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 21 Mar 2012 12:16:10 -0600
+Subject: [GIT PULL] USB AUXDATA fix for tegra
+Message-ID: <4F6A1AEA.7070505@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 22:18:25, Robert Lee wrote:
-> The recent cpuidle consolidation changes erroneously omitted one
-> critical line of code.
-> 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+Arnd,
 
-Tested this on a DA850 EVM.
+This is my first pull request for Tegra; hopefully it all works out OK!
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Note: Nobody has ack'd this change. I'm a maintainer for the files that
+are touched, but I'm not sure if maintainers are supposed to have
+another maintainer ack the change before committing it and sending a
+pull request (in particular for their own changes), or if it's up to
+their discretion?
 
-Thanks,
-Sekhar
+The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
+  Linus Torvalds (1):
+        Linux 3.3
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+for-3.4/fixes-for-rc1-and-v3.3
+
+Stephen Warren (1):
+      ARM: tegra: Fix device tree AUXDATA for USB/EHCI
+
+ arch/arm/mach-tegra/board-dt-tegra20.c |    6 +++---
+ arch/arm/mach-tegra/devices.c          |    7 +++----
+ arch/arm/mach-tegra/devices.h          |    5 +++++
+ 3 files changed, 11 insertions(+), 7 deletions(-)
