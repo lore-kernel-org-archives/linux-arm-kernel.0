@@ -1,59 +1,91 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 21 Mar 2012 14:28:52 +0100
-Subject: [RFC][PATCH 1/7] ARM: OMAP4: cpuidle - Remove unused valid field
-In-Reply-To: <4F69A762.5070006@ti.com>
+Date: Wed, 21 Mar 2012 14:31:46 +0100
+Subject: [RFC][PATCH 2/7] ARM: OMAP4: cpuidle - Declare the states with
+ the driver declaration
+In-Reply-To: <1332322070-24577-3-git-send-email-daniel.lezcano@linaro.org>
 References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
- <1332322070-24577-2-git-send-email-daniel.lezcano@linaro.org>
- <CAMQu2gw+GGnpG_s6TCk2fH094Lfmj1zgAZqQ4zdQmpj3ZZhu3w@mail.gmail.com>
- <4F69A37A.7020606@linaro.org> <4F69A762.5070006@ti.com>
-Message-ID: <CAORVsuUtQ3EYdrBMUkFm=nd-avz0q9D1BVmwKD-06qgaF3wDqA@mail.gmail.com>
+ <1332322070-24577-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CAORVsuV-0xQx6W0iKGO_UduESFwdD-44vsBAcVXD0Yy-VB_eGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 11:03 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Wednesday 21 March 2012 03:16 PM, Daniel Lezcano wrote:
->> On 03/21/2012 10:41 AM, Shilimkar, Santosh wrote:
->>> On Wed, Mar 21, 2012 at 2:57 PM, Daniel Lezcano
->>> <daniel.lezcano@linaro.org> ?wrote:
->>>> The 'valid' field is never used in the code, let's remove it.
->>>>
->>>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->>>> ---
->>> It is used during the registration. This field has been very useful for
->>> debug when need to disable a C-state etc.
->>> So unless and until there is a strong reason, i would like to retain it.
->>
->> IMO if it used for debug purpose, it should be moved to the debug code
->> and if the debug code is not upstream, then that 'valid' should not be
->> here but in the out-of-tree code.
->>
-> When I said debug, I mean CPUIDLE debug and not any special debug code.
+On Wed, Mar 21, 2012 at 10:27 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> The cpuidle API allows to declare statically the states in the driver
+> structure. Let's use it.
+> We do no longer need the fill_cstate function called at runtime and
+> by the way adding more instructions at boot time.
 >
->> By the way, this may be a debate for nothing because a patchset is on
->> the way to disable C-states from sysfs.
->>
-> I see but sysfs won't solve that because you want to disable certain
-> C-state so that CPUIDLE driver don't use that state.
-This will solve the problem, the only difference is that you need the
-user space to switch the disable knob from sysfs.
->From the kernel space, for debug, you can set the .disable value to 1
-in the cpuidle_driver->states struct.
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+> ?arch/arm/mach-omap2/cpuidle44xx.c | ? 56 +++++++++++++++++++++----------------
+> ?1 files changed, 32 insertions(+), 24 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+> index 1210229..cd6bee7 100644
+> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+> @@ -148,21 +148,38 @@ DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
+> ?struct cpuidle_driver omap4_idle_driver = {
+> ? ? ? ?.name = ? ? ? ? "omap4_idle",
+> ? ? ? ?.owner = ? ? ? ?THIS_MODULE,
+> + ? ? ? .states = {
+> + ? ? ? ? ? ? ? {
+> + ? ? ? ? ? ? ? ? ? ? ? /* C1 - CPU0 ON + CPU1 ON + MPU ON */
+> + ? ? ? ? ? ? ? ? ? ? ? .exit_latency = 2 + 2,
+> + ? ? ? ? ? ? ? ? ? ? ? .target_residency = 5,
+> + ? ? ? ? ? ? ? ? ? ? ? .flags = CPUIDLE_FLAG_TIME_VALID,
+> + ? ? ? ? ? ? ? ? ? ? ? .enter = omap4_enter_idle,
+> + ? ? ? ? ? ? ? ? ? ? ? .name = "C1",
+> + ? ? ? ? ? ? ? ? ? ? ? .desc = "MPUSS ON"
+> + ? ? ? ? ? ? ? },
+...
+> + ? ? ? },
+> + ? ? ? .state_count = OMAP4_NUM_STATES,
+> ?};
+>
+> -static inline void _fill_cstate(struct cpuidle_driver *drv,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int idx, const char *descr)
+> -{
+> - ? ? ? struct cpuidle_state *state = &drv->states[idx];
+> -
+> - ? ? ? state->exit_latency ? ? = cpuidle_params_table[idx].exit_latency;
+> - ? ? ? state->target_residency = cpuidle_params_table[idx].target_residency;
+> - ? ? ? state->flags ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID;
+> - ? ? ? state->enter ? ? ? ? ? ?= omap4_enter_idle;
+> - ? ? ? sprintf(state->name, "C%d", idx + 1);
+> - ? ? ? strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
+> -}
+I am OK with this change, which makes the code more readable (and so
+maintainable).
 
+> -
+> ?static inline struct omap4_idle_statedata *_fill_cstate_usage(
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_device *dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int idx)
+> @@ -196,37 +213,28 @@ int __init omap4_idle_init(void)
+> ? ? ? ?if ((!mpu_pd) || (!cpu0_pd) || (!cpu1_pd))
+> ? ? ? ? ? ? ? ?return -ENODEV;
 >
-> Let say if the C4 which is OSWR is broken. In such cases, just
-> setting valid flag let you disable it.
+> -
+> - ? ? ? drv->safe_state_index = -1;
+> ? ? ? ?dev = &per_cpu(omap4_idle_dev, cpu_id);
+> ? ? ? ?dev->cpu = cpu_id;
 >
-> Again I don't have strong objection to this change.
->
-> Regards
-> santosh
+> - ? ? ? /* C1 - CPU0 ON + CPU1 ON + MPU ON */
+> - ? ? ? _fill_cstate(drv, 0, "MPUSS ON");
+> - ? ? ? drv->safe_state_index = 0;
+I would keep this or add a clear comment that C1 is the safe state.
 
-Regards,
+...
+
+Thanks,
 Jean
 
+> --
+> 1.7.5.4
 >
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
