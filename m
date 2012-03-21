@@ -1,43 +1,35 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 21 Mar 2012 19:03:13 +0100
-Subject: [PATCH 3/4] arm: at91: dt: sam9x5 add mci support
-In-Reply-To: <1332352994-20983-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1332352994-20983-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1332352994-20983-4-git-send-email-ludovic.desroches@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 21 Mar 2012 10:15:49 -0600
+Subject: [PATCH] ARM: tegra: Include assembler.h in sleep.S to fix build
+ break
+In-Reply-To: <4F677691.8020307@gmail.com>
+References: <1332176863-12537-1-git-send-email-swarren@wwwdotorg.org>
+ <4F677691.8020307@gmail.com>
+Message-ID: <4F69FEB5.2020901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 03/19/2012 12:10 PM, Rob Herring wrote:
+> On 03/19/2012 12:07 PM, Stephen Warren wrote:
+>> Commit 6f6f6a7 "ARM: create a common IOMEM definition" moved macro
+>> IOMEM(), and requires users to include <asm/assembler.h>. Fix Tegra's
+>> sleep.S to do so.
+>>
+>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> 
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/boot/dts/at91sam9x5.dtsi |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+Arnd,
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index c111001..5846f99 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -191,6 +191,20 @@
- 				interrupts = <27 4>;
- 				status = "disabled";
- 			};
-+
-+			mmc0: mmc at f0008000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xf0008000 0x600>;
-+				interrupts = <12 4>;
-+				status = "disabled";
-+			};
-+
-+			mmc1: mmc at f000c000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xf000c000 0x600>;
-+				interrupts = <26 4>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.5.4
+Can you pick up this fix directly into arm-soc, or do you want me to
+generate a pull request for this kind of thing too?
+
+ARM: tegra: Include assembler.h in sleep.S to fix build break
+http://patchwork.ozlabs.org/patch/147587/
+
+The same goes for:
+
+ARM: tegra: Fix device tree AUXDATA for USB/EHCI
+http://patchwork.ozlabs.org/patch/147616/
+
+Thanks.
