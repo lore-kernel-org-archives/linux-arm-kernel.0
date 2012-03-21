@@ -1,41 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Mar 2012 12:36:37 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <4F69BC35.4010400@st.com>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203151339.36173.arnd@arndb.de> <4F69BC35.4010400@st.com>
-Message-ID: <201203211236.37891.arnd@arndb.de>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Wed, 21 Mar 2012 12:47:46 +0000
+Subject: [PATCH] ARM: fix lcd power build failure in collie_defconfig
+In-Reply-To: <1331051502-22361-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1331051502-22361-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <4F69CDF2.3020609@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 March 2012, Viresh Kumar wrote:
-> > 
-> > What's wrong with one vic_dt_init_irq() function and an array with two entries?
+On 03/06/2012 04:31 PM, Paul Gortmaker wrote:
+> Commit 086ada54abaa4316e8603f02410fe8ebc9ba2de1 (linux-next)
 > 
-> Hey Arnd,
+>   "FB: sa1100: remove global sa1100fb_.*_power function pointers"
 > 
-> Actually i was doing 3xx DT porting and again came to this thing. I believe what
-> you suggested should be fine too as the actual vic model/name is going to be
-> passed from .dts file.
+> got rid of all instances but one in locomolcd.c -- which was
+> conditional on CONFIG_SA1100_COLLIE.  The associated .power
+> field which replaces the global is populated in mach-sa1100/collie.c
+> so move the assignment there, but make it conditional on the
+> locomolcd support, so use CONFIG_BACKLIGHT_LOCOMO in that file.
 > 
-> If this is acceptable to you, i will add patch for both vic & gic in my
-> patchset.
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-Ok, sounds good.
+What about this patch?
+I assumed Russel would pick it up as the commit referenced is also in
+his tree but it looks like this patch is still not in -next. Any reasons
+for this?
 
-Let's make sure we're on the same page with the process though. I hope
-you're aware that I took Stefan's spear6xx v5 patch. I just now saw that
-you were not on Cc on the submission of the patch nor on my reply, but you
-had given your Ack on the patch. Just let me know how you want to handle
-these things in the future -- the normal way would be to always let you
-forward the patches to me, rather than having them applied to arm-soc
-directly.
 
-Regarding the spear3xx patches, I'm looking forward to your patches.
-I think spear is simple and clean enough that it can serve as an example
-for others doing DT conversion. Do you also plan to unify 3xx and 6xx?
-I think there is hardly anything left in mach-spear6xx that justifies
-having a separate platform, especially since with the DT conversion done,
-we can actually remove most of the header file contents as well.
+Best regards,
 
-	Arnd
+Florian Tobias Schandinat
+
+> 
+> diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+> index 48885b7..c7f418b 100644
+> --- a/arch/arm/mach-sa1100/collie.c
+> +++ b/arch/arm/mach-sa1100/collie.c
+> @@ -313,6 +313,10 @@ static struct sa1100fb_mach_info collie_lcd_info = {
+>  
+>  	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+>  	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+> +
+> +#ifdef CONFIG_BACKLIGHT_LOCOMO
+> +	.lcd_power	= locomolcd_power
+> +#endif
+>  };
+>  
+>  static void __init collie_init(void)
+> diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+> index 52acda7..f33679d 100644
+> --- a/arch/arm/mach-sa1100/include/mach/collie.h
+> +++ b/arch/arm/mach-sa1100/include/mach/collie.h
+> @@ -1,7 +1,7 @@
+>  /*
+>   * arch/arm/mach-sa1100/include/mach/collie.h
+>   *
+> - * This file contains the hardware specific definitions for Assabet
+> + * This file contains the hardware specific definitions for Collie
+>   * Only include this file from SA1100-specific files.
+>   *
+>   * ChangeLog:
+> @@ -13,6 +13,7 @@
+>  #ifndef __ASM_ARCH_COLLIE_H
+>  #define __ASM_ARCH_COLLIE_H
+>  
+> +extern void locomolcd_power(int on);
+>  
+>  #define COLLIE_SCOOP_GPIO_BASE	(GPIO_MAX + 1)
+>  #define COLLIE_GPIO_CHARGE_ON	(COLLIE_SCOOP_GPIO_BASE + 0)
+> diff --git a/drivers/video/backlight/locomolcd.c b/drivers/video/backlight/locomolcd.c
+> index be20b5c..3a6d541 100644
+> --- a/drivers/video/backlight/locomolcd.c
+> +++ b/drivers/video/backlight/locomolcd.c
+> @@ -229,14 +229,7 @@ static struct locomo_driver poodle_lcd_driver = {
+>  
+>  static int __init locomolcd_init(void)
+>  {
+> -	int ret = locomo_driver_register(&poodle_lcd_driver);
+> -	if (ret)
+> -		return ret;
+> -
+> -#ifdef CONFIG_SA1100_COLLIE
+> -	sa1100fb_lcd_power = locomolcd_power;
+> -#endif
+> -	return 0;
+> +	return locomo_driver_register(&poodle_lcd_driver);
+>  }
+>  
+>  static void __exit locomolcd_exit(void)
