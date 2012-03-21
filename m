@@ -1,82 +1,88 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Wed, 21 Mar 2012 08:26:32 +0100
-Subject: [PATCH] avr32: fix build failures from mis-naming of atmel_nand.h
-In-Reply-To: <1332296128-16262-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1332296128-16262-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20120321072632.GA15703@samfundet.no>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 21 Mar 2012 01:30:13 -0600 (MDT)
+Subject: [PATCH v7 1/3] Documentation: common clk API
+In-Reply-To: <alpine.LFD.2.02.1203202233340.24151@xanadu.home>
+References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
+ <CAP245DXV5oE+-y+PQCcSM016h-J+UgTi1efmdrcyeQge4k1Cfw@mail.gmail.com>
+ <201203161218.05125.arnd.bergmann@linaro.org>
+ <201203162057.58706.arnd@arndb.de>
+ <alpine.DEB.2.00.1203161509470.4395@utopia.booyaka.com>
+ <20120316234706.GJ3852@pengutronix.de>
+ <alpine.DEB.2.00.1203201611330.22974@utopia.booyaka.com>
+ <alpine.LFD.2.02.1203202233340.24151@xanadu.home>
+Message-ID: <alpine.DEB.2.00.1203210018260.30543@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Tue 20 Mar 2012 22:15:28 -0400 or thereabout, Paul Gortmaker wrote:
-> Commit bf4289cba02b8cf770ecd7959ca70839f0dd9d3c (linux-next)
-> 
->     "ATMEL: fix nand ecc support"
-> 
-> indicated that it wanted to "Move platform data to a common
-> header include/linux/platform_data/atmel_nand.h" and the new
-> header even had re-include protectors with:
-> 
->     #ifndef __ATMEL_NAND_H__
-> 
-> However, the file that was added was simply called atmel.h
-> and this caused avr32 defconfig to fail with:
-> 
->   In file included from arch/avr32/boards/atstk1000/setup.c:22:
->   arch/avr32/mach-at32ap/include/mach/board.h:10:44: error: linux/platform_data/atmel_nand.h: No such file or directory
->   In file included from arch/avr32/boards/atstk1000/setup.c:22:
->   arch/avr32/mach-at32ap/include/mach/board.h:121: warning: 'struct atmel_nand_data' declared inside parameter list
->   arch/avr32/mach-at32ap/include/mach/board.h:121: warning: its scope is only this definition or declaration, which is probably not what you want
->   make[2]: *** [arch/avr32/boards/atstk1000/setup.o] Error 1
-> 
-> Rename the file to match the original intention, and fix up the
-> users who reference the bad name without the _nand suffix.
+Hello Nico,
 
-Thanks fixing this.
+On Tue, 20 Mar 2012, Nicolas Pitre wrote:
 
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> CC: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> CC: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-> CC: David Woodhouse <dwmw2@infradead.org>
+> This common clk API has been under development for over *two* years 
+> already, with several attempts to merge it.  And each previous merge 
+> attempt aborted because someone came along at the last minute to do 
+> exactly what you are doing i.e. underline all the flaws and call for a 
+> redesign.  This is becoming a bad joke.
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+There is a misunderstanding.  I am not calling for a redesign.  I am 
+simply stating that the current maturity level of the API and code should 
+be documented in the Kconfig dependencies or description text before the 
+code goes upstream.  The objectives are to make future changes easier, set 
+expectations, and clearly disclose the extent to which the API and code 
+will need to change.
 
-> ---
->  arch/arm/mach-at91/include/mach/board.h            |    2 +-
->  drivers/mtd/nand/atmel_nand.c                      |    2 +-
->  .../linux/platform_data/{atmel.h => atmel_nand.h}  |    0
->  3 files changed, 2 insertions(+), 2 deletions(-)
->  rename include/linux/platform_data/{atmel.h => atmel_nand.h} (100%)
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-> index 544a5d5..aa0e083 100644
-> --- a/arch/arm/mach-at91/include/mach/board.h
-> +++ b/arch/arm/mach-at91/include/mach/board.h
-> @@ -41,7 +41,7 @@
->  #include <sound/atmel-ac97c.h>
->  #include <linux/serial.h>
->  #include <linux/platform_data/macb.h>
-> -#include <linux/platform_data/atmel.h>
-> +#include <linux/platform_data/atmel_nand.h>
->  
->   /* USB Device */
->  struct at91_udc_data {
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 2165576..7b599a9 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -38,7 +38,7 @@
->  #include <linux/dmaengine.h>
->  #include <linux/gpio.h>
->  #include <linux/io.h>
-> -#include <linux/platform_data/atmel.h>
-> +#include <linux/platform_data/atmel_nand.h>
->  
->  #include <mach/cpu.h>
->  
-> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel_nand.h
-> similarity index 100%
-> rename from include/linux/platform_data/atmel.h
-> rename to include/linux/platform_data/atmel_nand.h
--- 
-mvh
-Hans-Christian Egtvedt
+> The code will be easier to change once it is in mainline, simply due to 
+> the fact that you can also change all its users at once.  And it is well 
+> possible that most users won't have to deal with the same magnitude of 
+> complexity as yours, again reducing the scope for resistance to changes.
+
+I hope you are right.  To me, these conclusions seem unlikely.  It seems 
+equally likely that these rationales will make it much more difficult to 
+change the code once it's upstream and platforms are depending on it.  
+Particularly given the ongoing sensitivity to reducing "churn" of mainline 
+code, so publicly discussed.  So it seems like a good idea to attempt to 
+address these potential roadblocks and criticisms to major clock framework 
+changes early.
+
+> And APIs in the Linux kernel do change all the time.  There is no stable 
+> API in the kernel.  Extensions will come about eventually, and existing 
+> users (simple ones by definition if the current API already meets their 
+> needs) should be converted over easily.
+
+Yes, simple extensions should be straightforward.  Of greater concern are 
+changes to the existing interface that will probably be required.  These 
+could involve significant changes to driver or platform code.  It seems 
+likely that there will be strong inertia to making these changes after 
+platforms and drivers are converted.
+
+However, if we clearly state that these API changes are likely until the 
+API is well-defined, we will hopefully reduce some angst by disclosing
+what some of us know.
+
+...
+
+One last comment to address which is orthogonal to the technical content 
+of this discussion.
+
+> Otherwise one might ask where were you during those development years if 
+> you claim that the behavior and/or API of the common clock code still 
+> need to change significantly?
+
+One might ask this.  If one were to ask this, another might briefly 
+outline the participation in public and private clock discussions at 
+Linaro Connect in Budapest and Redwood Shores, at LPC in Santa Rosa, at 
+ELCE/KS in Prague, at ELC in Redwood Shores, in conference calls, IRC 
+sessions, and private E-mails with many of the people included in the 
+header of this message, not to mention the list posts.
+
+None of the concerns that have been described are new.  There has been an 
+endeavour to discuss them with anyone who seemed even remotely interested.
+
+Of course it is a personal source of regret that the participation could 
+not have been greater, but this regret is hardly limited to the common 
+clock project.
+
+
+regards,
+
+- Paul
