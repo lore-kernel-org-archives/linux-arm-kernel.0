@@ -1,35 +1,27 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 21 Mar 2012 10:46:34 +0100
-Subject: [RFC][PATCH 1/7] ARM: OMAP4: cpuidle - Remove unused valid field
-In-Reply-To: <CAMQu2gw+GGnpG_s6TCk2fH094Lfmj1zgAZqQ4zdQmpj3ZZhu3w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 21 Mar 2012 15:20:20 +0530
+Subject: [RFC][PATCH 2/7] ARM: OMAP4: cpuidle - Declare the states with
+ the driver declaration
+In-Reply-To: <1332322070-24577-3-git-send-email-daniel.lezcano@linaro.org>
 References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
- <1332322070-24577-2-git-send-email-daniel.lezcano@linaro.org>
- <CAMQu2gw+GGnpG_s6TCk2fH094Lfmj1zgAZqQ4zdQmpj3ZZhu3w@mail.gmail.com>
-Message-ID: <4F69A37A.7020606@linaro.org>
+ <1332322070-24577-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <4F69A45C.5050802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2012 10:41 AM, Shilimkar, Santosh wrote:
-> On Wed, Mar 21, 2012 at 2:57 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org>  wrote:
->> The 'valid' field is never used in the code, let's remove it.
->>
->> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->> ---
-> It is used during the registration. This field has been very useful for
-> debug when need to disable a C-state etc.
-> So unless and until there is a strong reason, i would like to retain it.
++ Jean,
 
-IMO if it used for debug purpose, it should be moved to the debug code 
-and if the debug code is not upstream, then that 'valid' should not be 
-here but in the out-of-tree code.
+On Wednesday 21 March 2012 02:57 PM, Daniel Lezcano wrote:
+> The cpuidle API allows to declare statically the states in the driver
+> structure. Let's use it.
+> We do no longer need the fill_cstate function called at runtime and
+> by the way adding more instructions at boot time.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+Jean added the fill_cstate() kind of helpers o.w in the old
+cpuidle code9OMAP30, static tables were used. Ofcourse those
+tables were not uinsg the cpuidle driver structure.
 
-By the way, this may be a debate for nothing because a patchset is on 
-the way to disable C-states from sysfs.
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards
+santosh
