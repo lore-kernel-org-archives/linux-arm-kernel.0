@@ -1,73 +1,35 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 20 Mar 2012 22:15:28 -0400
-Subject: [PATCH] avr32: fix build failures from mis-naming of atmel_nand.h
-Message-ID: <1332296128-16262-1-git-send-email-paul.gortmaker@windriver.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 20 Mar 2012 22:23:53 -0400 (EDT)
+Subject: [PATCH v8 0/8] Consolidate cpuidle functionality
+In-Reply-To: <CAP245DXwhCMOJaspW8SY7jtqsA3d5SK4Ctr+JvS+cw4yHfL-mw@mail.gmail.com>
+References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
+ <201203202158.08042.arnd.bergmann@linaro.org> <873992zy5u.fsf@ti.com>
+ <CAP245DXwhCMOJaspW8SY7jtqsA3d5SK4Ctr+JvS+cw4yHfL-mw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1203202146131.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit bf4289cba02b8cf770ecd7959ca70839f0dd9d3c (linux-next)
+On Wed, 21 Mar 2012, Amit Kucheria wrote:
 
-    "ATMEL: fix nand ecc support"
+> On Wed, Mar 21, 2012 at 12:48 AM, Kevin Hilman <khilman@ti.com> wrote:
+> > Maybe it's time that drivers/cpuidle gets a maintainer. ?With lots of
+> > discussions of scheduler changes that affect load estimation, I suspect
+> > we're all going to have a bit of CPUidle work to do in the
+> > not-so-distant future.
+> >
+> 
+> I don't mean to be piling on to Len here, but Daniel Lezcano too has a
+> bunch of clean ups that didn't get any maintainer review for over two
+> months. He has now refreshed them for 3.3 and is getting ready to send
+> them out again. We (Linaro) expect to be spending a lot of time on
+> cpuidle in the future and would be glad to help review, test and
+> collect patches into a tree for Linus/Andrew to pull while we wait for
+> Len to respond or another maintainer to emerge.
 
-indicated that it wanted to "Move platform data to a common
-header include/linux/platform_data/atmel_nand.h" and the new
-header even had re-include protectors with:
+As I advised recently, it is usually a good idea for the person/group 
+who is working the most on a subsystem to simply take the lead and 
+become the new maintainer.  Waiting for another maintainer to emerge 
+could be compared to cowardice.
 
-    #ifndef __ATMEL_NAND_H__
 
-However, the file that was added was simply called atmel.h
-and this caused avr32 defconfig to fail with:
-
-  In file included from arch/avr32/boards/atstk1000/setup.c:22:
-  arch/avr32/mach-at32ap/include/mach/board.h:10:44: error: linux/platform_data/atmel_nand.h: No such file or directory
-  In file included from arch/avr32/boards/atstk1000/setup.c:22:
-  arch/avr32/mach-at32ap/include/mach/board.h:121: warning: 'struct atmel_nand_data' declared inside parameter list
-  arch/avr32/mach-at32ap/include/mach/board.h:121: warning: its scope is only this definition or declaration, which is probably not what you want
-  make[2]: *** [arch/avr32/boards/atstk1000/setup.o] Error 1
-
-Rename the file to match the original intention, and fix up the
-users who reference the bad name without the _nand suffix.
-
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-CC: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-CC: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-CC: David Woodhouse <dwmw2@infradead.org>
----
- arch/arm/mach-at91/include/mach/board.h            |    2 +-
- drivers/mtd/nand/atmel_nand.c                      |    2 +-
- .../linux/platform_data/{atmel.h => atmel_nand.h}  |    0
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename include/linux/platform_data/{atmel.h => atmel_nand.h} (100%)
-
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index 544a5d5..aa0e083 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -41,7 +41,7 @@
- #include <sound/atmel-ac97c.h>
- #include <linux/serial.h>
- #include <linux/platform_data/macb.h>
--#include <linux/platform_data/atmel.h>
-+#include <linux/platform_data/atmel_nand.h>
- 
-  /* USB Device */
- struct at91_udc_data {
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 2165576..7b599a9 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -38,7 +38,7 @@
- #include <linux/dmaengine.h>
- #include <linux/gpio.h>
- #include <linux/io.h>
--#include <linux/platform_data/atmel.h>
-+#include <linux/platform_data/atmel_nand.h>
- 
- #include <mach/cpu.h>
- 
-diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel_nand.h
-similarity index 100%
-rename from include/linux/platform_data/atmel.h
-rename to include/linux/platform_data/atmel_nand.h
--- 
-1.7.9.1
+Nicolas
