@@ -1,36 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 21 Mar 2012 20:10:16 +0000
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <4F6A3446.9020809@codeaurora.org>
-References: <4F6A2042.9030302@codeaurora.org>
- <20120321190741.GL3226@opensource.wolfsonmicro.com>
- <20120321193304.GO9859@atomide.com>
- <4F6A2EF5.3010008@codeaurora.org>
- <20120321195656.GN3226@opensource.wolfsonmicro.com>
- <4F6A3446.9020809@codeaurora.org>
-Message-ID: <20120321201015.GP3226@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 21 Mar 2012 15:13:49 -0500
+Subject: [PATCH 1/2] ARM: dma-mapping: convert
+ ARCH_HAS_DMA_SET_COHERENT_MASK to kconfig symbol
+In-Reply-To: <CAN1soZwXh6DviO5CHcj_ogM1VK23V2c4CKZf+iMmeP43rwtW9w@mail.gmail.com>
+References: <4F68CD9C.3090001@windriver.com>
+ <1332296149-28110-1-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1203202230230.24151@xanadu.home>
+ <CAN1soZwXh6DviO5CHcj_ogM1VK23V2c4CKZf+iMmeP43rwtW9w@mail.gmail.com>
+Message-ID: <4F6A367D.9090102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 01:04:22PM -0700, Saravana Kannan wrote:
+On 03/21/2012 03:15 AM, Haojian Zhuang wrote:
+> On Wed, Mar 21, 2012 at 10:30 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> On Tue, 20 Mar 2012, Rob Herring wrote:
+>>
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> The only users of ARCH_HAS_DMA_SET_COHERENT_MASK are 2 ARM platforms:
+>>> ixp4xx and pxa cm_x2xx. We've been getting lucky that the define is
+>>> implicitly included before dma-mapping.h, but the removal of io.h broke
+>>> things (c334bc1 ARM: make mach/io.h include optional). Since memory.h
+>>> is the correct place, but no longer exists, convert the define to a
+>>> kconfig entry.
+>>>
+>>> Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Imre Kaloz <kaloz@openwrt.org>
+>>> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+>>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>>> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+>>> Cc: Vinod Koul <vinod.koul@intel.com>
+>>> Cc: Dan Williams <dan.j.williams@intel.com>
+>>
+>> Acked-by: Nicolas Pitre <nico@linaro.org>
+>>
+> Acked.
+> 
+> Imre & Krzysztof,
+> 
+> Do you mind that I merge these patches into arch-pxa git tree? Since a
+> lot of files in arch-pxa are changed.
+> 
 
-> Sure, prepare/unprepare are already there in the .h file. But they
-> are stubs and have no impact till we move to the common clock
-> framework or platforms move to them with their own implementation
-> (certainly not happening in upstream, so let's leave that part out
-> of this discussion).
+I plan to send these 2 along with another fix to arm-soc if that's okay.
 
-> So. IMO, for all practical purposes, common clk fwk forces the move
-> to these new APIs and hence IMO forces the new APIs.
-
-Sure, if you want to look at it from that point of view - anything
-wanting to run on a platform which uses the generic API needs to use
-them, but there's no blocker on the user from this (it can convert with
-or without the platform it runs on) - but it's hardly a tough sell.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120321/698cf6b8/attachment.sig>
+Rob
