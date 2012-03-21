@@ -1,70 +1,69 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 21 Mar 2012 19:48:26 +0530
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203211404.35847.arnd@arndb.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203211236.37891.arnd@arndb.de>
- <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
- <201203211404.35847.arnd@arndb.de>
-Message-ID: <CAOh2x=mtjvitkhz=BXOZPAaKZ2i3QQuKrYA3HcHNERHhF5xFoA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 21 Mar 2012 15:19:15 +0100
+Subject: [RFC][PATCH 0/7] OMAP4 cpuidle cleanup
+In-Reply-To: <CAORVsuUeE046O7YJ_fE49NbW1OjZHZX+GuNiDkF0AnzBnSMbxA@mail.gmail.com>
+References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F69A872.50203@ti.com>
+ <CAORVsuUeE046O7YJ_fE49NbW1OjZHZX+GuNiDkF0AnzBnSMbxA@mail.gmail.com>
+Message-ID: <4F69E363.4020709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 7:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 21 March 2012, viresh kumar wrote:
->> - Pinmux: I would remove our padmux and use pinmux, but what about its
->> DT support.
->> ? I know stephen had few patches for it, but don't know there
->> progress. I don't want to
->> ? do stuff twice. First add support for it in board and the *.dts files.
+On 03/21/2012 02:43 PM, Jean Pihet wrote:
+> On Wed, Mar 21, 2012 at 11:07 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com>  wrote:
+>> Daniel,
+>>
+>> On Wednesday 21 March 2012 02:57 PM, Daniel Lezcano wrote:
+>>> This patchset is a proposition to improve a bit the code.
+>>> The changes are code cleanup and does not change the behavior of the
+>>> driver itself.
+>>>
+>>> A couple a things call my intention. Why the cpuidle device is set for cpu0 only
+>>> and why the WFI is not used ?
+>>>
+>>> Daniel Lezcano (7):
+>>>    ARM: OMAP4: cpuidle - Remove unused valid field
+>>>    ARM: OMAP4: cpuidle - Declare the states with the driver declaration
+>>>    ARM: OMAP4: cpuidle - Remove the cpuidle_params_table table
+>>>    ARM: OMAP4: cpuidle - fix static omap4_idle_data declaration
+>>>    ARM: OMAP4: cpuidle - Initialize omap4_idle_data at compile time
+>>>    ARM: OMAP4: cpuidle - use the omap4_idle_data variable directly
+>>>    ARM: OMAP4: cpuidle - remove omap4_idle_data initialization at boot
+>>>      time
+>>>
+>> The series looks fine to me in general. This clean-up is applicable
+>> for OMAP3 cpuidle code as well.
+> Great!
+> However OMAP3 has a few specific things that cannot be removed as easily:
+> - the 'valid' flag is used because only certain combinations of power
+> domains states are possible,
+> - the latency settings can be overriden by the board code, so the
+> cpuidle_params struct is needed.
+
+Right, I noticed that. I am looking for a way to have a similar cleanup 
+for omap3 but without breaking the rx51 board.
+
+Thanks
+   -- Daniel
+
+
+>> I want Jean to look at this series because some of his earlier
+>> clean up has introduced those custom functions which
+>> are getting removed in this series.
+>>
+>> Regards
+>> santosh
+>>
+>>
 >
-> AFAICT, the pinmux DT binding should be ready for v3.5, I don't think it
-> made it into v3.4.
+> Thanks,
+> Jean
 
-So, i can add stuff in board file for pinmux for now?
 
-> I've looked at this earlier today out of curiosity and found:
->
-> clock.c: almost identical, can be easily merged, or both copies
-> ? ? ? ? kept around during transition.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Would make it very confusing if we merge these two. Some clock
-structures are same, but others are not. Mostly differences are in the
-macros (or bit positions in registers), rather than hierarchy. So, i would
-like to keep them separate. But still have a look again to see if they can
-really be merged.
-
-> misc_regs.h: can be merged into clock.c
-
-it has more than clock stuff. it is used in pinmux and some other places too,
-that may not be in mainline for now.
-
-> Once you have taken care of these, files, you can enable building 3xx
-> and 6xx together, and move the contents of mach-spear3xx, mach-spear6xx
-> and plat-spear into one directory.
-
-plat-spear would be required for 13xx too. So, merging 3xx and 6xx only would
-be possible.
-
-> Ok, excellent. Note that there is no requirement to do it all in the order
-> you line out above. You can always get support for new stuff into the
-> existing platform without cleaning up all of it right away, as long as you
-> have a good balance between cleanups and new functionality.
-
-Ya. I just wanted to get some hands on experience with this new stuff, before
-touching 13xx.
-
-> In particular, you don't have to start using pinctrl and the common clk
-> immediately for spear3xx, although you might find that it helps you.
-
-But, can i update padmux and clock framework of SPEAr platform? Because
-without the latest code for both padmux and clock, other code for SPEAr
-might not be that effective or usable.
-
-> For spear13xx, the platform being completely new, I would however ask
-> you to use those from the start.
-
-Sure.
-
---
-viresh
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
