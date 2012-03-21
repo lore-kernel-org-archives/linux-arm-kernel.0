@@ -1,38 +1,40 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 21 Mar 2012 19:26:04 +0300
-Subject: [PATCH 1/3] mmc: atmel-mci: correct data timeout computation
-In-Reply-To: <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1332344483-3915-1-git-send-email-ludovic.desroches@atmel.com>
- <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <4F6A011C.3000900@mvista.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 21 Mar 2012 15:33:33 +0000
+Subject: [PATCH v8 4/8] ARM: davinci: Consolidate time keeping and irq
+ enable
+In-Reply-To: <1332274969-15782-5-git-send-email-rob.lee@linaro.org>
+References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
+ <1332274969-15782-5-git-send-email-rob.lee@linaro.org>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B631800A07@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Rob,
 
-On 03/21/2012 06:41 PM, ludovic.desroches at atmel.com wrote:
+On Wed, Mar 21, 2012 at 01:52:45, Robert Lee wrote:
+> Enable core cpuidle timekeeping and irq enabling and remove that
+> handling from this code.
+> 
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Acked-by: Jean Pihet<j-pihet@ti.com>
 
-> From: Ludovic Desroches<ludovic.desroches@atmel.com>
+>  static struct cpuidle_driver davinci_idle_driver = {
+> -	.name	= "cpuidle-davinci",
+> -	.owner	= THIS_MODULE,
+> +	.name		= "cpuidle-davinci",
+> +	.owner		= THIS_MODULE,
+> +	.states[0]	= ARM_CPUIDLE_WFI_STATE,
+> +	.states[1]	= {
+> +		.enter			= davinci_enter_idle,
+> +		.exit_latency		= 10,
+> +		.target_residency	= 100000,
 
-> The HSMCI operates at a rate of up to Master Clock divided by two.
+Apart from your other fix patch, can you also update the
+target residency of this state to 10000 as is the case
+with current code? With the new value the board is entering
+this state really infrequently.
 
-> Signed-off-by: Ludovic Desroches<ludovic.desroches@atmel.com>
-> ---
->   drivers/mmc/host/atmel-mci.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
-
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index e4449a5..e161452 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -480,7 +480,7 @@ err:
->   static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
->   					unsigned int ns)
->   {
-> -	return (ns * (host->bus_hz / 1000000) + 999) / 1000;
-> +	return (ns * ((host->bus_hz/2) / 1000000) + 999) / 1000;
-
-    Why don't you keep the notation by addign spaces around '/'?
-    BTW, could use DIV_ROUND_UP() here.
-
-WBR, Sergei
+Thanks,
+Sekhar
