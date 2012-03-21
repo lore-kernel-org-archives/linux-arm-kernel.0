@@ -1,36 +1,44 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 21 Mar 2012 19:56:56 +0000
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <4F6A2EF5.3010008@codeaurora.org>
-References: <4F6A2042.9030302@codeaurora.org>
- <20120321190741.GL3226@opensource.wolfsonmicro.com>
- <20120321193304.GO9859@atomide.com>
- <4F6A2EF5.3010008@codeaurora.org>
-Message-ID: <20120321195656.GN3226@opensource.wolfsonmicro.com>
+Date: Wed, 21 Mar 2012 20:01:19 +0000
+Subject: [PATCH 1/4] clk: fixed-rate: Don't open code kstrdup()
+Message-ID: <1332360082-25092-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 12:41:41PM -0700, Saravana Kannan wrote:
-> On 03/21/2012 12:33 PM, Tony Lindgren wrote:
-> >* Mark Brown<broonie@opensource.wolfsonmicro.com>  [120321 12:11]:
+Save a little code by using the library function.
 
-> >>These aren't new APIs, the clock API has been around since forever.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ drivers/clk/clk-fixed-rate.c |    7 +------
+ 1 files changed, 1 insertions(+), 6 deletions(-)
 
-> I disagree. When I say clock API, I mean the actual functions and
-> their semantics. Not the existence of a header file.
-
-> The meaning of clk_enable/disable has been changed and they won't
-> work without calling clk_prepare/unprepare. So, these are definitely
-> new APIs. If it weren't new APIs, then none of the general drivers
-> would need to change.
-
-clk_prepare() and clk_unprepare() are already there for any clk.h user
-and are stubbed in no matter what, they're really not a meaningful
-barrier here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120321/008e43d2/attachment.sig>
+diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+index 90c79fb..cf84e41 100644
+--- a/drivers/clk/clk-fixed-rate.c
++++ b/drivers/clk/clk-fixed-rate.c
+@@ -45,7 +45,6 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ {
+ 	struct clk_fixed_rate *fixed;
+ 	char **parent_names = NULL;
+-	u8 len;
+ 
+ 	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
+ 
+@@ -63,14 +62,10 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		if (! parent_names)
+ 			goto out;
+ 
+-		len = sizeof(char) * strlen(parent_name);
+-
+-		parent_names[0] = kmalloc(len, GFP_KERNEL);
++		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
+ 
+ 		if (!parent_names[0])
+ 			goto out;
+-
+-		strncpy(parent_names[0], parent_name, len);
+ 	}
+ 
+ out:
+-- 
+1.7.9.1
