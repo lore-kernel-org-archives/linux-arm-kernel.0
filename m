@@ -1,37 +1,40 @@
-From: rob.lee@linaro.org (Robert Lee)
-Date: Wed, 21 Mar 2012 11:48:25 -0500
-Subject: [PATCH] ARM: davinci: Fix for cpuidle consolidation changes
-Message-ID: <1332348505-28780-1-git-send-email-rob.lee@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 21 Mar 2012 12:02:17 -0500
+Subject: [PATCH] ARM: tegra: Include assembler.h in sleep.S to fix build
+ break
+In-Reply-To: <4F69FEB5.2020901@wwwdotorg.org>
+References: <1332176863-12537-1-git-send-email-swarren@wwwdotorg.org>
+ <4F677691.8020307@gmail.com> <4F69FEB5.2020901@wwwdotorg.org>
+Message-ID: <4F6A0999.9020104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent cpuidle consolidation changes erroneously omitted one
-critical line of code.
+On 03/21/2012 11:15 AM, Stephen Warren wrote:
+> On 03/19/2012 12:10 PM, Rob Herring wrote:
+>> On 03/19/2012 12:07 PM, Stephen Warren wrote:
+>>> Commit 6f6f6a7 "ARM: create a common IOMEM definition" moved macro
+>>> IOMEM(), and requires users to include <asm/assembler.h>. Fix Tegra's
+>>> sleep.S to do so.
+>>>
+>>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+>>
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> 
+> Arnd,
+> 
+> Can you pick up this fix directly into arm-soc, or do you want me to
+> generate a pull request for this kind of thing too?
+> 
+> ARM: tegra: Include assembler.h in sleep.S to fix build break
+> http://patchwork.ozlabs.org/patch/147587/
+> 
+> The same goes for:
+> 
+> ARM: tegra: Fix device tree AUXDATA for USB/EHCI
+> http://patchwork.ozlabs.org/patch/147616/
+> 
 
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
----
- arch/arm/mach-davinci/cpuidle.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+I can take it and send the pull request. I've got a couple of other
+fixes as well.
 
-diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
-index 93ae096..9107691 100644
---- a/arch/arm/mach-davinci/cpuidle.c
-+++ b/arch/arm/mach-davinci/cpuidle.c
-@@ -55,10 +55,11 @@ static int davinci_enter_idle(struct cpuidle_device *dev,
- #define DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN	BIT(0)
- 
- static struct cpuidle_driver davinci_idle_driver = {
--	.name		= "cpuidle-davinci",
--	.owner		= THIS_MODULE,
--	.states[0]	= ARM_CPUIDLE_WFI_STATE,
--	.states[1]	= {
-+	.name			= "cpuidle-davinci",
-+	.owner			= THIS_MODULE,
-+	.en_core_tk_irqen	= 1,
-+	.states[0]		= ARM_CPUIDLE_WFI_STATE,
-+	.states[1]		= {
- 		.enter			= davinci_enter_idle,
- 		.exit_latency		= 10,
- 		.target_residency	= 100000,
--- 
-1.7.4.1
+Rob
