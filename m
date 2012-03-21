@@ -1,60 +1,55 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 21 Mar 2012 11:29:24 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com>	<87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831823816@DBDE01.ent.ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 21 Mar 2012 17:02:05 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203151339.36173.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <4F61AFAB.6080301@st.com> <201203151138.51508.sr@denx.de>
+ <201203151339.36173.arnd@arndb.de>
+Message-ID: <4F69BC35.4010400@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2012 at 17:14:30, Ming Lei wrote:
-> On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> >
-> > I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
-> > It will always use 32k-counter, and never fall back to dmtimer.
-> >
-> > Then the only options we have here is,
-> >
-> > 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
-> > ? Kernel pick up best rating clocksource out of these two.
-> >
-> > ? In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
-> > ? Rating. User can choose the 32k-counter clocksource via bootargs.
-> >
-> > ? Impact: without bootargs for clocksource selection, kernel will choose
-> > ? ? dmtimer, impacting loss of time during suspend/resume.
-> >
-> >
-> > 2) Let the current code be as is, means, the clocksource registration will
-> > ? Happened based on "#ifdef CONFIG_OMAP_32K_TIMER" and this option
-> > ? selection will be Controlled by Kconfig rules.
+On 3/15/2012 7:09 PM, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Stefan Roese wrote:
+>> On Thursday 15 March 2012 10:00:27 Viresh Kumar wrote:
+>>> On 3/15/2012 2:18 PM, Stefan Roese wrote:
+>>>>>>>> +static const struct of_device_id vic_of_match[] __initconst = {
+>>>>>>>> +     { .compatible = "arm,pl190-vic", .data = vic_of_init, },
+>>>>>>>> +     { /* Sentinel */ }
+>>>>>>>> +};
+>>>>>>>> +
+>>>>>>>> +static void __init spear6xx_dt_init_irq(void)
+>>>>>>>> +{
+>>>>>>>> +     of_irq_init(vic_of_match);
+>>>>>>>> +}
+>>>>>>>> +
+>>>>>>
+>>>>>> What about adding this routine in vic.c file, which can then be used
+>>>>>> by all platforms, instead of replicating this code.
+>>>>
+>>>> We can't move vic_of_match to the vic.c, since there are differences
+>>>> between the boards using it. And only moving spear6xx_dt_init_irq()
+>>>> (renamed of course) doesn't seem worth it.
+>>>
+>>> I knew this. Actually my thought was, we have two compatible strings for
+>>> vic: pl190 and pl192.
+>>>
+>>> So, create two vic_of_match* arrays and two vic*_dt_init_irq() routines.
+>>> That will solve the issue i believe.
+>>
+>> I still don't think its worth it. But please feel free to send an add-on 
+>> patch, to "clean this up".
 > 
-> How about the 3rd option?
-> 
-> 3), take the way in your patch 1) at default, but will switch to
-> register dmtimer
-> directly and bypass 32k-counter if user need it via kernel parameter.
-> 
-> As far as I can think of, the situations required for dmtimer are high-frequency
-> perf sample and high precision trace points, so looks it is OK to take
-> 32k-counter
-> at default.
-> 
-But if you register both the timers (dmtimer & 32ksync), then initially kernel will only pick up dmtimer, as this has better rating. And late in
-the boot sequence clocksource switch will happen, base on 
-kernel parameter (clocksource=).
+> What's wrong with one vic_dt_init_irq() function and an array with two entries?
 
-So logically dmtimer will be always used as a default here.
+Hey Arnd,
 
-Thanks,
-Vaibhav
+Actually i was doing 3xx DT porting and again came to this thing. I believe what
+you suggested should be fine too as the actual vic model/name is going to be
+passed from .dts file.
 
-> Thanks,
-> -- 
-> Ming Lei
-> 
+If this is acceptable to you, i will add patch for both vic & gic in my
+patchset.
+
+-- 
+viresh
