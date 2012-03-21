@@ -1,94 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Mar 2012 14:04:35 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203211236.37891.arnd@arndb.de>
- <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
-Message-ID: <201203211404.35847.arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 21 Mar 2012 15:12:31 +0100
+Subject: [RFC][PATCH 2/7] ARM: OMAP4: cpuidle - Declare the states with
+ the driver declaration
+In-Reply-To: <CAORVsuV-0xQx6W0iKGO_UduESFwdD-44vsBAcVXD0Yy-VB_eGw@mail.gmail.com>
+References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
+ <1332322070-24577-3-git-send-email-daniel.lezcano@linaro.org>
+ <CAORVsuV-0xQx6W0iKGO_UduESFwdD-44vsBAcVXD0Yy-VB_eGw@mail.gmail.com>
+Message-ID: <4F69E1CF.8030703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 March 2012, viresh kumar wrote:
-> On Wed, Mar 21, 2012 at 6:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > Just let me know how you want to handle
-> > these things in the future -- the normal way would be to always let you
-> > forward the patches to me, rather than having them applied to arm-soc
-> > directly.
-> 
-> Hmmm. I don't know how exactly it works, but maybe you can add me as
-> an custodian for SPEAr, with a git repo somewhere in kernel.org (?).
-> So that i can apply patches directly to my branch, you pull it.
-> What do you say?
+On 03/21/2012 02:31 PM, Jean Pihet wrote:
+> On Wed, Mar 21, 2012 at 10:27 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org>  wrote:
+>> The cpuidle API allows to declare statically the states in the driver
+>> structure. Let's use it.
+>> We do no longer need the fill_cstate function called at runtime and
+>> by the way adding more instructions at boot time.
+>>
+>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> ---
+>>   arch/arm/mach-omap2/cpuidle44xx.c |   56 +++++++++++++++++++++----------------
+>>   1 files changed, 32 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+>> index 1210229..cd6bee7 100644
+>> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+>> @@ -148,21 +148,38 @@ DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
+>>   struct cpuidle_driver omap4_idle_driver = {
+>>         .name =         "omap4_idle",
+>>         .owner =        THIS_MODULE,
+>> +       .states = {
+>> +               {
+>> +                       /* C1 - CPU0 ON + CPU1 ON + MPU ON */
+>> +                       .exit_latency = 2 + 2,
+>> +                       .target_residency = 5,
+>> +                       .flags = CPUIDLE_FLAG_TIME_VALID,
+>> +                       .enter = omap4_enter_idle,
+>> +                       .name = "C1",
+>> +                       .desc = "MPUSS ON"
+>> +               },
+> ...
+>> +       },
+>> +       .state_count = OMAP4_NUM_STATES,
+>>   };
+>>
+>> -static inline void _fill_cstate(struct cpuidle_driver *drv,
+>> -                                       int idx, const char *descr)
+>> -{
+>> -       struct cpuidle_state *state =&drv->states[idx];
+>> -
+>> -       state->exit_latency     = cpuidle_params_table[idx].exit_latency;
+>> -       state->target_residency = cpuidle_params_table[idx].target_residency;
+>> -       state->flags            = CPUIDLE_FLAG_TIME_VALID;
+>> -       state->enter            = omap4_enter_idle;
+>> -       sprintf(state->name, "C%d", idx + 1);
+>> -       strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
+>> -}
+> I am OK with this change, which makes the code more readable (and so
+> maintainable).
+>
+>> -
+>>   static inline struct omap4_idle_statedata *_fill_cstate_usage(
+>>                                         struct cpuidle_device *dev,
+>>                                         int idx)
+>> @@ -196,37 +213,28 @@ int __init omap4_idle_init(void)
+>>         if ((!mpu_pd) || (!cpu0_pd) || (!cpu1_pd))
+>>                 return -ENODEV;
+>>
+>> -
+>> -       drv->safe_state_index = -1;
+>>         dev =&per_cpu(omap4_idle_dev, cpu_id);
+>>         dev->cpu = cpu_id;
+>>
+>> -       /* C1 - CPU0 ON + CPU1 ON + MPU ON */
+>> -       _fill_cstate(drv, 0, "MPUSS ON");
+>> -       drv->safe_state_index = 0;
+> I would keep this or add a clear comment that C1 is the safe state.
 
-Yes, that would be the ideal way. You are already listed in the MAINTAINERS
-file, so nothing would change in theory. If you don't have an account on
-kernel.org yet, see http://www.kernel.org/faq/#account for how to get
-one. This will require that you have your gpg keys signed by at least
-one person in the kernel web of trust, so you may have to find people
-locally who can sign yours and are already signed.
+Actually with the driver's states declaration, the safe_state_index is 
+initialized to zero, which means the default safe_state is always 0 with 
+the new API. But I can add the initialization anyway in the structure 
+declaration if you want.
 
-> > I think spear is simple and clean enough that it can serve as an example
-> > for others doing DT conversion. Do you also plan to unify 3xx and 6xx?
-> > I think there is hardly anything left in mach-spear6xx that justifies
-> > having a separate platform, especially since with the DT conversion done,
-> > we can actually remove most of the header file contents as well.
-> 
-> I issue with us was that we were not able to push stuff mainline in time and
-> were too busy supporting customers.
-> 
-> We have lot of patches locally, that we would like to upstream. But it
-> can't happen
-> without updating it with new expectations of list. I actually wanted
-> to ask you few
-> things:
-> 
-> - DT: Obviously we would have this in our patches
-> - Pinmux: I would remove our padmux and use pinmux, but what about its
-> DT support.
->   I know stephen had few patches for it, but don't know there
-> progress. I don't want to
->   do stuff twice. First add support for it in board and the *.dts files.
+> ...
+>
+> Thanks,
+> Jean
+>
+>> --
+>> 1.7.5.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-AFAICT, the pinmux DT binding should be ready for v3.5, I don't think it
-made it into v3.4.
 
-> - Clock Framework: Is common clock framework ready for use or can we update our
->   local clock framework?
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-I'm sending it to Linus now and you can start using it, but it may still
-change in a number of ways based on the requirements of new platforms that
-start migrate to it.
-
-> I will see if merging 3xx & 6xx is feasible. If yes, then i will
-> surely move in that direction.
-> I always like cleaning stuff. :)
-
-I've looked at this earlier today out of curiosity and found:
-
-debug_macro.h, gpio.h, hardware.h, timex.h, uncompress.h:
-	 identical already
-clock.c: almost identical, can be easily merged, or both copies
-         kept around during transition.
-misc_regs.h: can be merged into clock.c
-spear.h: can merged into spear6xx.c but mostly go away
-generic.h, irqs.h: not needed any more for spear6xx
-
-Once you have taken care of these, files, you can enable building 3xx
-and 6xx together, and move the contents of mach-spear3xx, mach-spear6xx
-and plat-spear into one directory.
-
-> I would be adding 13xx (cortex-A9) patches again later, once done with 3xx.
-
-Ok, excellent. Note that there is no requirement to do it all in the order
-you line out above. You can always get support for new stuff into the
-existing platform without cleaning up all of it right away, as long as you
-have a good balance between cleanups and new functionality.
-
-In particular, you don't have to start using pinctrl and the common clk
-immediately for spear3xx, although you might find that it helps you.
-
-For spear13xx, the platform being completely new, I would however ask
-you to use those from the start.
-
-	Arnd
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
