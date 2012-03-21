@@ -1,106 +1,46 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 21 Mar 2012 10:02:44 -0400
-Subject: [PATCH] ARM: fix lcd power build failure in collie_defconfig
-In-Reply-To: <4F69CDF2.3020609@gmx.de>
-References: <1331051502-22361-1-git-send-email-paul.gortmaker@windriver.com>
- <4F69CDF2.3020609@gmx.de>
-Message-ID: <4F69DF84.8050605@windriver.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 21 Mar 2012 07:06:30 -0700
+Subject: [PATCH v4 RESEND 6/7] gpio/omap: fix incorrect update to
+ context.irqenable1
+In-Reply-To: <CAC83ZvLgPWO2C6cpRBEsoqFdac1rMyo4OvTXB2_y_mCzaFzJXA@mail.gmail.com>
+ (Tarun Kanti DebBarma's message of "Wed, 21 Mar 2012 10:31:48 +0530")
+References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+ <1332240799-6748-7-git-send-email-tarun.kanti@ti.com>
+ <87zkbbywwz.fsf@ti.com>
+ <CAC83ZvKRbvVU5Qa1jwud0E6WT-DBU1Z1XEweiXay9x+eLcn0hg@mail.gmail.com>
+ <CAC83ZvLgPWO2C6cpRBEsoqFdac1rMyo4OvTXB2_y_mCzaFzJXA@mail.gmail.com>
+Message-ID: <87y5qurqu1.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-03-21 08:47 AM, Florian Tobias Schandinat wrote:
-> On 03/06/2012 04:31 PM, Paul Gortmaker wrote:
->> Commit 086ada54abaa4316e8603f02410fe8ebc9ba2de1 (linux-next)
->>
->>   "FB: sa1100: remove global sa1100fb_.*_power function pointers"
->>
->> got rid of all instances but one in locomolcd.c -- which was
->> conditional on CONFIG_SA1100_COLLIE.  The associated .power
->> field which replaces the global is populated in mach-sa1100/collie.c
->> so move the assignment there, but make it conditional on the
->> locomolcd support, so use CONFIG_BACKLIGHT_LOCOMO in that file.
->>
->> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> 
-> What about this patch?
-> I assumed Russel would pick it up as the commit referenced is also in
-> his tree but it looks like this patch is still not in -next. Any reasons
-> for this?
+"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
 
-Not that I'm aware of.  I didn't get any negative feedback or change
-requests asking for a v2.   There are probably about a half dozen
-linux-next build failures in my triage list that I've fixed but
-the commits have not yet looped back around through the various
-maintainers for one reason or another.
+> On Wed, Mar 21, 2012 at 8:10 AM, DebBarma, Tarun Kanti
+> <tarun.kanti@ti.com> wrote:
+>> On Tue, Mar 20, 2012 at 11:31 PM, Kevin Hilman <khilman@ti.com> wrote:
+>>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>>>
+>>>> In _enable_gpio_irqbank() when bank->regs->set_irqenable is valid,
+>>>> gpio_mask can be directly set by writing to set_irqenable register
+>>>> without overwriting current value. In order to ensure the same is
+>>>> stored in context.irqenable1, we must read from regs->irqenable
+>>>> instead of overwriting it with gpio_mask.
+>>>
+>>>> The overwriting makes sense only in the second case where irqenable
+>>>> is explicitly read and updated with new gpio_mask before writing it
+>>>> back. However, for consistency reading regs->irqenable into the
+>>>> bank->context.irqenable1 takes care of both the scenarios.
+>>>
+>>> ...except that the code doesn't do this anymore.
+>> Yes.
+>>>
+>>> I like the newer version (I hope so, since I suggested it :), but please
+>>> update the changlog to describe what the code is actually doing.
+>> Sure.
+> I have updated the change log here:
+> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
+> for_3.4/gpio_more_fixes
 
-http://marc.info/?l=linux-next&m=133227360822405&w=2
+Please also post and updated version of the patch for review.
 
-It would be nice to have them all crossed off...
-
-Paul.
----
-
-> 
-> 
-> Best regards,
-> 
-> Florian Tobias Schandinat
-> 
->>
->> diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
->> index 48885b7..c7f418b 100644
->> --- a/arch/arm/mach-sa1100/collie.c
->> +++ b/arch/arm/mach-sa1100/collie.c
->> @@ -313,6 +313,10 @@ static struct sa1100fb_mach_info collie_lcd_info = {
->>  
->>  	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
->>  	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
->> +
->> +#ifdef CONFIG_BACKLIGHT_LOCOMO
->> +	.lcd_power	= locomolcd_power
->> +#endif
->>  };
->>  
->>  static void __init collie_init(void)
->> diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
->> index 52acda7..f33679d 100644
->> --- a/arch/arm/mach-sa1100/include/mach/collie.h
->> +++ b/arch/arm/mach-sa1100/include/mach/collie.h
->> @@ -1,7 +1,7 @@
->>  /*
->>   * arch/arm/mach-sa1100/include/mach/collie.h
->>   *
->> - * This file contains the hardware specific definitions for Assabet
->> + * This file contains the hardware specific definitions for Collie
->>   * Only include this file from SA1100-specific files.
->>   *
->>   * ChangeLog:
->> @@ -13,6 +13,7 @@
->>  #ifndef __ASM_ARCH_COLLIE_H
->>  #define __ASM_ARCH_COLLIE_H
->>  
->> +extern void locomolcd_power(int on);
->>  
->>  #define COLLIE_SCOOP_GPIO_BASE	(GPIO_MAX + 1)
->>  #define COLLIE_GPIO_CHARGE_ON	(COLLIE_SCOOP_GPIO_BASE + 0)
->> diff --git a/drivers/video/backlight/locomolcd.c b/drivers/video/backlight/locomolcd.c
->> index be20b5c..3a6d541 100644
->> --- a/drivers/video/backlight/locomolcd.c
->> +++ b/drivers/video/backlight/locomolcd.c
->> @@ -229,14 +229,7 @@ static struct locomo_driver poodle_lcd_driver = {
->>  
->>  static int __init locomolcd_init(void)
->>  {
->> -	int ret = locomo_driver_register(&poodle_lcd_driver);
->> -	if (ret)
->> -		return ret;
->> -
->> -#ifdef CONFIG_SA1100_COLLIE
->> -	sa1100fb_lcd_power = locomolcd_power;
->> -#endif
->> -	return 0;
->> +	return locomo_driver_register(&poodle_lcd_driver);
->>  }
->>  
->>  static void __exit locomolcd_exit(void)
-> 
+Kevin
