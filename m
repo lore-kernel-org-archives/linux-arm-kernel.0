@@ -1,69 +1,106 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 21 Mar 2012 19:30:01 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
-Message-ID: <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 21 Mar 2012 10:02:44 -0400
+Subject: [PATCH] ARM: fix lcd power build failure in collie_defconfig
+In-Reply-To: <4F69CDF2.3020609@gmx.de>
+References: <1331051502-22361-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F69CDF2.3020609@gmx.de>
+Message-ID: <4F69DF84.8050605@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 5:12 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> On Mon, Mar 19, 2012 at 17:45:32, Shilimkar, Santosh wrote:
->> On Monday 19 March 2012 05:14 PM, Ming Lei wrote:
->> > On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
->> >>
->> >> I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
->> >> It will always use 32k-counter, and never fall back to dmtimer.
->> >>
->> >> Then the only options we have here is,
->> >>
->> >> 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
->> >> ? Kernel pick up best rating clocksource out of these two.
->> >>
->> >> ? In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
->> >> ? Rating. User can choose the 32k-counter clocksource via bootargs.
->> >>
->> >> ? Impact: without bootargs for clocksource selection, kernel will choose
->> >> ? ? dmtimer, impacting loss of time during suspend/resume.
->> >>
->> This is the right option. The problem is gptimer clocksource
->> doesn't work across power transitions and hence it is broken.
+On 12-03-21 08:47 AM, Florian Tobias Schandinat wrote:
+> On 03/06/2012 04:31 PM, Paul Gortmaker wrote:
+>> Commit 086ada54abaa4316e8603f02410fe8ebc9ba2de1 (linux-next)
 >>
->> Even for the perf, with PM enabled, dmtimer can't be used or it needs
->> to be used with 32KHz clock which makes it no better than sync timer.
+>>   "FB: sa1100: remove global sa1100fb_.*_power function pointers"
 >>
->> So here keeping 32K sync timer is default clocksource makes sense since
->> it is the only working and viable option.
+>> got rid of all instances but one in locomolcd.c -- which was
+>> conditional on CONFIG_SA1100_COLLIE.  The associated .power
+>> field which replaces the global is populated in mach-sa1100/collie.c
+>> so move the assignment there, but make it conditional on the
+>> locomolcd support, so use CONFIG_BACKLIGHT_LOCOMO in that file.
 >>
->> So what can be done is register both 32K and gptimer together but make
->> gptimer clocksource registration depends on PM enabled.
->>
->> This should solve all the needs I guess.
->>
->
-> I am not sure this will work on all platforms, for example, AM33XX, where
-> We do not have 32ksync timer available, but we need PM support. Also, I
-> personally think, we should not again use compile time option here.
->
-Why not ?
-If 32ksync timer is not available, don't register it. Then in AM case
-you just have one clock-source. I am against the idea of making
-gptimer as the default and asking user to choose sync32k from
-command-line.
+>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> 
+> What about this patch?
+> I assumed Russel would pick it up as the commit referenced is also in
+> his tree but it looks like this patch is still not in -next. Any reasons
+> for this?
 
-Btw, if you need PM, how are you going to use GPTIMER
-as a clocksource. Note sys-clock is generally stopped in
-low power states. So that leaves you option with using
-gptimer with 32K clock and in that case, GPTIMER
-is not a better clock-source compare to 32K sync timer
-and so shouldn't be the rating.
+Not that I'm aware of.  I didn't get any negative feedback or change
+requests asking for a v2.   There are probably about a half dozen
+linux-next build failures in my triage list that I've fixed but
+the commits have not yet looped back around through the various
+maintainers for one reason or another.
 
-Regards
-Santosh
+http://marc.info/?l=linux-next&m=133227360822405&w=2
+
+It would be nice to have them all crossed off...
+
+Paul.
+---
+
+> 
+> 
+> Best regards,
+> 
+> Florian Tobias Schandinat
+> 
+>>
+>> diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+>> index 48885b7..c7f418b 100644
+>> --- a/arch/arm/mach-sa1100/collie.c
+>> +++ b/arch/arm/mach-sa1100/collie.c
+>> @@ -313,6 +313,10 @@ static struct sa1100fb_mach_info collie_lcd_info = {
+>>  
+>>  	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+>>  	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+>> +
+>> +#ifdef CONFIG_BACKLIGHT_LOCOMO
+>> +	.lcd_power	= locomolcd_power
+>> +#endif
+>>  };
+>>  
+>>  static void __init collie_init(void)
+>> diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+>> index 52acda7..f33679d 100644
+>> --- a/arch/arm/mach-sa1100/include/mach/collie.h
+>> +++ b/arch/arm/mach-sa1100/include/mach/collie.h
+>> @@ -1,7 +1,7 @@
+>>  /*
+>>   * arch/arm/mach-sa1100/include/mach/collie.h
+>>   *
+>> - * This file contains the hardware specific definitions for Assabet
+>> + * This file contains the hardware specific definitions for Collie
+>>   * Only include this file from SA1100-specific files.
+>>   *
+>>   * ChangeLog:
+>> @@ -13,6 +13,7 @@
+>>  #ifndef __ASM_ARCH_COLLIE_H
+>>  #define __ASM_ARCH_COLLIE_H
+>>  
+>> +extern void locomolcd_power(int on);
+>>  
+>>  #define COLLIE_SCOOP_GPIO_BASE	(GPIO_MAX + 1)
+>>  #define COLLIE_GPIO_CHARGE_ON	(COLLIE_SCOOP_GPIO_BASE + 0)
+>> diff --git a/drivers/video/backlight/locomolcd.c b/drivers/video/backlight/locomolcd.c
+>> index be20b5c..3a6d541 100644
+>> --- a/drivers/video/backlight/locomolcd.c
+>> +++ b/drivers/video/backlight/locomolcd.c
+>> @@ -229,14 +229,7 @@ static struct locomo_driver poodle_lcd_driver = {
+>>  
+>>  static int __init locomolcd_init(void)
+>>  {
+>> -	int ret = locomo_driver_register(&poodle_lcd_driver);
+>> -	if (ret)
+>> -		return ret;
+>> -
+>> -#ifdef CONFIG_SA1100_COLLIE
+>> -	sa1100fb_lcd_power = locomolcd_power;
+>> -#endif
+>> -	return 0;
+>> +	return locomo_driver_register(&poodle_lcd_driver);
+>>  }
+>>  
+>>  static void __exit locomolcd_exit(void)
+> 
