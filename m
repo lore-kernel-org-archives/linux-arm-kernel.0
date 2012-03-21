@@ -1,44 +1,25 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Wed, 21 Mar 2012 21:09:23 +0530
-Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
- dmaengine.
-In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1332344363.19804.12.camel@vkoul-udesk3>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 21 Mar 2012 15:37:57 +0000
+Subject: [PATCH v8 4/8] ARM: davinci: Consolidate time keeping and irq
+ enable
+In-Reply-To: <CAP245DW9SdTYNc8XXwiuHzo5Y-aZrLc2qP0MekKkyAT2TosjbQ@mail.gmail.com>
+References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
+ <1332274969-15782-5-git-send-email-rob.lee@linaro.org>
+ <CAMXH7KH5kS=wPFdC8QrtnhE6_sZqmsJ8h=6Gs3kfHOTbeHjacA@mail.gmail.com>
+ <CAP245DW9SdTYNc8XXwiuHzo5Y-aZrLc2qP0MekKkyAT2TosjbQ@mail.gmail.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B631800A29@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-03-09 at 16:20 +0100, Javier Martin wrote:
-> The following series have to be applied on top of the following patches:
-> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
-> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
-> 
-> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
-> is deprecated and no new patches are accepted for it.
-> 
-> This series merges this code into the imx-dma.c dmaengine driver.
-> 
-> Notes for v3:
->  - I send the whole series again despite some patches being the same. I think
->  this is more comfortable for Vinod than just sending those patches that have
->  been modified.
->  - I've generated my series with the following command this time:
->  'git format-patch -s -13 -M -B --subject-prefix="PATCH v3"' as suggested by
->  Sascha but still removing two files in 01/13 generates a lot of noisy diffs.
->  Sorry about that.
->  - I don't include Sascha's Tested-by since maybe he wants to test this last
->  version.
-This doesn't apply for me (starting with 6th) on current slave-dma.next
-due to obvious changes which have gone into imx.
+Hi Amit,
 
-Can you quickly rebase the series and resend.
+On Wed, Mar 21, 2012 at 20:06:29, Amit Kucheria wrote:
+> Rob, you should start a new '3.4-fixes' branch containing such
+> bugfixes that can be pushed to Len after -rc1.
 
-Also while at it please fix the checkpatch error
+I think it is OK to send the fixes to Len right away so
+he can queue the fixes during merge window if he gets the
+chance. That way we may get a non-broken -rc1.
 
-ERROR: space required after that ',' (ctx:VxV)
-#4143: FILE: drivers/dma/imx-dma.c:275:
-+       dev_dbg(imxdma->dev,"%s channel %d\n", __func__, channel);
-
-
--- 
-~Vinod
+Thanks,
+Sekhar
