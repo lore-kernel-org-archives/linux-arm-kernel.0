@@ -1,118 +1,127 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 20 Mar 2012 22:30:53 -0400 (EDT)
-Subject: [PATCH 1/2] ARM: dma-mapping: convert
- ARCH_HAS_DMA_SET_COHERENT_MASK to kconfig symbol
-In-Reply-To: <1332296149-28110-1-git-send-email-robherring2@gmail.com>
-References: <4F68CD9C.3090001@windriver.com>
- <1332296149-28110-1-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1203202230230.24151@xanadu.home>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 20 Mar 2012 19:32:56 -0700
+Subject: [PATCH 1/2] clk: Fix error handling in fixed clock hardware type
+ register fn
+In-Reply-To: <CAJOA=zO=wp9oyuBZONk2oCRYdWU1c4qanKJik-8-sFg51p27MQ@mail.gmail.com>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <20120320071957.GH3852@pengutronix.de>
+ <348585ed29fb3ff171267c03658e6c0d.squirrel@www.codeaurora.org>
+ <CAJOA=zO=wp9oyuBZONk2oCRYdWU1c4qanKJik-8-sFg51p27MQ@mail.gmail.com>
+Message-ID: <4F693DD8.7070305@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Mar 2012, Rob Herring wrote:
+On 03/20/2012 05:13 PM, Turquette, Mike wrote:
+> On Tue, Mar 20, 2012 at 12:46 AM, Saravana Kannan
+> <skannan@codeaurora.org>  wrote:
+>> On Tue, March 20, 2012 12:19 am, Sascha Hauer wrote:
+>>> On Mon, Mar 19, 2012 at 08:38:25PM -0700, Saravana Kannan wrote:
+>>>> If memory allocation for the parents array or the parent string fails,
+>>>> then
+>>>> fail the registration immediately instead of calling clk_register and
+>>>> hoping it fails there.
+>>>>
+>>>> Return -ENOMEM on failure.
+>>>>
+>>>> Signed-off-by: Saravana Kannan<skannan@codeaurora.org>
+>>>> Cc: Mike Turquette<mturquette@linaro.org>
+>>>> Cc: Andrew Lunn<andrew@lunn.ch>
+>>>> Cc: Rob Herring<rob.herring@calxeda.com>
+>>>> Cc: Russell King<linux@arm.linux.org.uk>
+>>>> Cc: Jeremy Kerr<jeremy.kerr@canonical.com>
+>>>> Cc: Thomas Gleixner<tglx@linutronix.de>
+>>>> Cc: Arnd Bergman<arnd.bergmann@linaro.org>
+>>>> Cc: Paul Walmsley<paul@pwsan.com>
+>>>> Cc: Shawn Guo<shawn.guo@freescale.com>
+>>>> Cc: Sascha Hauer<s.hauer@pengutronix.de>
+>>>> Cc: Jamie Iles<jamie@jamieiles.com>
+>>>> Cc: Richard Zhao<richard.zhao@linaro.org>
+>>>> Cc: Saravana Kannan<skannan@codeaurora.org>
+>>>> Cc: Magnus Damm<magnus.damm@gmail.com>
+>>>> Cc: Mark Brown<broonie@opensource.wolfsonmicro.com>
+>>>> Cc: Linus Walleij<linus.walleij@stericsson.com>
+>>>> Cc: Stephen Boyd<sboyd@codeaurora.org>
+>>>> Cc: Amit Kucheria<amit.kucheria@linaro.org>
+>>>> Cc: Deepak Saxena<dsaxena@linaro.org>
+>>>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>>>> ---
+>>>> There are still some memory free issues when clk_register() fails, but I
+>>>> will
+>>>> fix it when I fixed the other register() fns to return ENOMEM of alloc
+>>>> failure instead of a NULL.
+>>>>
+>>>>   drivers/clk/clk-fixed-rate.c |   10 +++++++---
+>>>>   1 files changed, 7 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+>>>> index 90c79fb..6423ae9 100644
+>>>> --- a/drivers/clk/clk-fixed-rate.c
+>>>> +++ b/drivers/clk/clk-fixed-rate.c
+>>>> @@ -61,22 +61,26 @@ struct clk *clk_register_fixed_rate(struct device
+>>>> *dev, const char *name,
+>>>>               parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
+>>>>
+>>>>               if (! parent_names)
+>>>> -                    goto out;
+>>>> +                    goto fail_ptr;
+>>>>
+>>>>               len = sizeof(char) * strlen(parent_name);
+>>>>
+>>>>               parent_names[0] = kmalloc(len, GFP_KERNEL);
+>>>>
+>>>>               if (!parent_names[0])
+>>>> -                    goto out;
+>>>> +                    goto fail_str;
+>>>>
+>>>>               strncpy(parent_names[0], parent_name, len);
+>>>>       }
+>>>
+>>> It's easier to add a char *parent to struct clk_fixed and pass it to
+>>> clk_register with&fixed->parent. This saves you a kmalloc call and
+>>> makes the error path simpler. It's the same way already done in the
+>>> divider.
+>
+> I thought I had done this for v7... hmm looks like one got left out.
+> I'll line up a patch to get it in sync with the others as part of my
+> fixes.
+>
+>> I thought about that since I saw the same was done for gated and divider
+>> (I think). Here is my guess at Mike's reasoning for this:
+>>
+>> Gated and divider clocks have to have a parent. There's nothing to gate
+>> otherwise. But fixed rate clocks might not have a parent. It could be XO's
+>> or PLLs running off of always on XOs not controlled by the SoC. So, it's
+>> arguable to not have a parent. I don't have a strong opinion on this --
+>> since Mike took the time to write it, it left it to his subjective
+>> preference.
+>
+> I appreciate the thoughtfulness.  Re-using the same type of mechanism
+> as the divider and gate clocks will still allow the fixed-rate clock
+> to be parentless, and it makes for cleaner code, one less allocation
+> and lines up with how the other single-parent basic clocks are done,
+> so I'll take that method in instead of your patch.
 
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> The only users of ARCH_HAS_DMA_SET_COHERENT_MASK are 2 ARM platforms:
-> ixp4xx and pxa cm_x2xx. We've been getting lucky that the define is
-> implicitly included before dma-mapping.h, but the removal of io.h broke
-> things (c334bc1 ARM: make mach/io.h include optional). Since memory.h
-> is the correct place, but no longer exists, convert the define to a
-> kconfig entry.
-> 
-> Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
+No problem, go for it.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+>
+>> I sent this patch first since it was around the place I was cleaning up. I
+>> didn't want to actually just shuffle around a bug. As I mentioned, this
+>> patch still leaves a bug open -- what if clk_register() fails. I plan to
+>> fix that once my two patches are picked up (hopefully).
+>
+> Do you still find it useful to return -ENOMEM from the registration
+> function instead of a NULL clock?  I'm always worried that people
+> don't check for error codes on pointers in their platform code and
+> only check for NULL...
 
-> ---
->  arch/arm/Kconfig                             |    4 ++++
->  arch/arm/mach-ixp4xx/include/mach/hardware.h |    2 --
->  arch/arm/mach-pxa/Kconfig                    |    1 +
->  arch/arm/mach-pxa/include/mach/hardware.h    |    4 ----
->  include/linux/dma-mapping.h                  |    2 +-
->  5 files changed, 6 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 31a2ddc..d3999a5 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -180,6 +180,9 @@ config ZONE_DMA
->  config NEED_DMA_MAP_STATE
->         def_bool y
->  
-> +config ARCH_HAS_DMA_SET_COHERENT_MASK
-> +	bool
-> +
->  config GENERIC_ISA_DMA
->  	bool
->  
-> @@ -547,6 +550,7 @@ config ARCH_IXP2000
->  config ARCH_IXP4XX
->  	bool "IXP4xx-based"
->  	depends on MMU
-> +	select ARCH_HAS_DMA_SET_COHERENT_MASK
->  	select CLKSRC_MMIO
->  	select CPU_XSCALE
->  	select GENERIC_GPIO
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/hardware.h b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-> index c30e7e9..034bb2a 100644
-> --- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-> @@ -23,8 +23,6 @@
->  #define PCIBIOS_MAX_MEM		0x4BFFFFFF
->  #endif
->  
-> -#define ARCH_HAS_DMA_SET_COHERENT_MASK
-> -
->  /* Register locations and bits */
->  #include "ixp4xx-regs.h"
->  
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index 61d3c72..109ccd2 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -108,6 +108,7 @@ config CSB726_CSB701
->  
->  config MACH_ARMCORE
->  	bool "CompuLab CM-X255/CM-X270 modules"
-> +	select ARCH_HAS_DMA_SET_COHERENT_MASK if PCI
->  	select PXA27x
->  	select IWMMXT
->  	select PXA25x
-> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
-> index 8184669..54b64ea 100644
-> --- a/arch/arm/mach-pxa/include/mach/hardware.h
-> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
-> @@ -337,8 +337,4 @@ extern unsigned int get_memclk_frequency_10khz(void);
->  extern unsigned long get_clock_tick_rate(void);
->  #endif
->  
-> -#if defined(CONFIG_MACH_ARMCORE) && defined(CONFIG_PCI)
-> -#define ARCH_HAS_DMA_SET_COHERENT_MASK
-> -#endif
-> -
->  #endif  /* _ASM_ARCH_HARDWARE_H */
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index e13117c..5a736af 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -77,7 +77,7 @@ static inline u64 dma_get_mask(struct device *dev)
->  	return DMA_BIT_MASK(32);
->  }
->  
-> -#ifdef ARCH_HAS_DMA_SET_COHERENT_MASK
-> +#ifdef CONFIG_ARCH_HAS_DMA_SET_COHERENT_MASK
->  int dma_set_coherent_mask(struct device *dev, u64 mask);
->  #else
->  static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
-> -- 
-> 1.7.5.4
-> 
+The last discussion I remember, NULL was considered a valid clock. So, I 
+think on error, we shouldn't ever return NULL when the return type is 
+struct clk *.
+
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
