@@ -1,98 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Mar 2012 09:26:23 +0100
-Subject: [PATCH] avr32: fix build failures from mis-naming of atmel_nand.h
-In-Reply-To: <20120321072632.GA15703@samfundet.no>
-References: <1332296128-16262-1-git-send-email-paul.gortmaker@windriver.com>
- <20120321072632.GA15703@samfundet.no>
-Message-ID: <4F6990AF.2000004@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Mar 2012 09:07:31 +0000
+Subject: [PATCH 1/2] clk: Fix error handling in fixed clock hardware
+ type register fn
+In-Reply-To: <CAJOA=zNteC+24oWpqkQJRnL8oqAJe2NcsjHNLbJb1MGN--VEsw@mail.gmail.com>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <20120320071957.GH3852@pengutronix.de>
+ <348585ed29fb3ff171267c03658e6c0d.squirrel@www.codeaurora.org>
+ <CAJOA=zO=wp9oyuBZONk2oCRYdWU1c4qanKJik-8-sFg51p27MQ@mail.gmail.com>
+ <4F693DD8.7070305@codeaurora.org>
+ <CAJOA=zNteC+24oWpqkQJRnL8oqAJe2NcsjHNLbJb1MGN--VEsw@mail.gmail.com>
+Message-ID: <20120321090730.GR15988@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2012 08:26 AM, Hans-Christian Egtvedt :
-> Around Tue 20 Mar 2012 22:15:28 -0400 or thereabout, Paul Gortmaker wrote:
->> Commit bf4289cba02b8cf770ecd7959ca70839f0dd9d3c (linux-next)
->>
->>     "ATMEL: fix nand ecc support"
->>
->> indicated that it wanted to "Move platform data to a common
->> header include/linux/platform_data/atmel_nand.h" and the new
->> header even had re-include protectors with:
->>
->>     #ifndef __ATMEL_NAND_H__
->>
->> However, the file that was added was simply called atmel.h
->> and this caused avr32 defconfig to fail with:
->>
->>   In file included from arch/avr32/boards/atstk1000/setup.c:22:
->>   arch/avr32/mach-at32ap/include/mach/board.h:10:44: error: linux/platform_data/atmel_nand.h: No such file or directory
->>   In file included from arch/avr32/boards/atstk1000/setup.c:22:
->>   arch/avr32/mach-at32ap/include/mach/board.h:121: warning: 'struct atmel_nand_data' declared inside parameter list
->>   arch/avr32/mach-at32ap/include/mach/board.h:121: warning: its scope is only this definition or declaration, which is probably not what you want
->>   make[2]: *** [arch/avr32/boards/atstk1000/setup.o] Error 1
->>
->> Rename the file to match the original intention, and fix up the
->> users who reference the bad name without the _nand suffix.
-> 
-> Thanks fixing this.
+On Tue, Mar 20, 2012 at 10:45:36PM -0700, Turquette, Mike wrote:
+> IIRC, that discussion was with respect to the .parent member of struct
+> clk.  It was decided that having .parent = NULL does not imply that a
+> clock is a root clock, but instead we rely on the CLK_IS_ROOT flag.  I
+> can't think of any other instance where a NULL clk when returned from
+> a registration function would be useful.
 
+No.  What I've been saying is that in _drivers_ which use clk_get(),
+the error range is defined by IS_ERR(clk).  Every other value of
+clk must be assumed by the driver to be valid, no ifs or buts.
 
-Yes, we need to fix this. But I would not like to see this
-"platform_data/atmel.h" renamed: I think that this file was designed to
-collect several common platform data (ie: not just NAND related).
+What the clk API assumes about struct clk is its own business.  If it
+wishes to interpret the NULL clk in a specific way, that's its business
+to do so.  But it's still not the drivers business to then go and
+interpret NULL as being any different from any other valid clock.
 
-So maybe we should just rename the entry that exists in
-mach-at32ap/include/mach/board.h
-and remove all occurrences of platform_data/atmel_nand.h
-
-
->> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
->> CC: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> CC: Hans-Christian Egtvedt <egtvedt@samfundet.no>
->> CC: David Woodhouse <dwmw2@infradead.org>
-> 
-> Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-> 
->> ---
->>  arch/arm/mach-at91/include/mach/board.h            |    2 +-
->>  drivers/mtd/nand/atmel_nand.c                      |    2 +-
->>  .../linux/platform_data/{atmel.h => atmel_nand.h}  |    0
->>  3 files changed, 2 insertions(+), 2 deletions(-)
->>  rename include/linux/platform_data/{atmel.h => atmel_nand.h} (100%)
-
-No please.
-
->>
->> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
->> index 544a5d5..aa0e083 100644
->> --- a/arch/arm/mach-at91/include/mach/board.h
->> +++ b/arch/arm/mach-at91/include/mach/board.h
->> @@ -41,7 +41,7 @@
->>  #include <sound/atmel-ac97c.h>
->>  #include <linux/serial.h>
->>  #include <linux/platform_data/macb.h>
->> -#include <linux/platform_data/atmel.h>
->> +#include <linux/platform_data/atmel_nand.h>
->>  
->>   /* USB Device */
->>  struct at91_udc_data {
->> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
->> index 2165576..7b599a9 100644
->> --- a/drivers/mtd/nand/atmel_nand.c
->> +++ b/drivers/mtd/nand/atmel_nand.c
->> @@ -38,7 +38,7 @@
->>  #include <linux/dmaengine.h>
->>  #include <linux/gpio.h>
->>  #include <linux/io.h>
->> -#include <linux/platform_data/atmel.h>
->> +#include <linux/platform_data/atmel_nand.h>
->>  
->>  #include <mach/cpu.h>
->>  
->> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel_nand.h
->> similarity index 100%
->> rename from include/linux/platform_data/atmel.h
->> rename to include/linux/platform_data/atmel_nand.h
-
-Best regards,
--- 
-Nicolas Ferre
+This is part of the clk API contract, which is as I said in the first
+paragraph, and I keep on saying.  I'm not sure what's so difficult
+about this.
