@@ -1,84 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 21 Mar 2012 19:15:07 +0000
-Subject: [PATCH] clk: Constify parent name arrays
-Message-ID: <1332357307-10693-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Mar 2012 20:15:18 +0100
+Subject: [PATCH] serial: PL011: move interrupt clearing
+Message-ID: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers should be able to declare their arrays of parent names as const
-so the APIs need to accept const arguments.
+Commit 360f748b204275229f8398cb2f9f53955db1503b
+"serial: PL011: clear pending interrupts"
+attempts to clear interrupts by writing to a
+yet-unassigned memory address. This fixes the issue.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+The breaking patch is marked for stable so should be
+carried along with the other patch.
+
+Cc: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: stable <stable@vger.kernel.org>
+Reported-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ drivers/tty/serial/amba-pl011.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-We should probably have a MAINTAINERS entry for the clk API...
-
- drivers/clk/clk-mux.c        |    2 +-
- drivers/clk/clk.c            |    2 +-
- include/linux/clk-private.h  |    2 +-
- include/linux/clk-provider.h |    4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index c71ad1f..bf9f42e 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -91,7 +91,7 @@ struct clk_ops clk_mux_ops = {
- EXPORT_SYMBOL_GPL(clk_mux_ops);
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 7e01399..4ed35c5 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1930,10 +1930,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto unmap;
+ 	}
  
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		char **parent_names, u8 num_parents, unsigned long flags,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock)
- {
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 9cf6f59..33ef0df 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1322,7 +1322,7 @@ out:
-  */
- struct clk *clk_register(struct device *dev, const char *name,
- 		const struct clk_ops *ops, struct clk_hw *hw,
--		char **parent_names, u8 num_parents, unsigned long flags)
-+		const char **parent_names, u8 num_parents, unsigned long flags)
- {
- 	struct clk *clk;
+-	/* Ensure interrupts from this UART are masked and cleared */
+-	writew(0, uap->port.membase + UART011_IMSC);
+-	writew(0xffff, uap->port.membase + UART011_ICR);
+-
+ 	uap->vendor = vendor;
+ 	uap->lcrh_rx = vendor->lcrh_rx;
+ 	uap->lcrh_tx = vendor->lcrh_tx;
+@@ -1951,6 +1947,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	uap->port.line = i;
+ 	pl011_dma_probe(uap);
  
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 5e4312b..164e115 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -30,7 +30,7 @@ struct clk {
- 	const struct clk_ops	*ops;
- 	struct clk_hw		*hw;
- 	struct clk		*parent;
--	char			**parent_names;
-+	const char		**parent_names;
- 	struct clk		**parents;
- 	u8			num_parents;
- 	unsigned long		rate;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 5508897..1fa0b0d 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -253,7 +253,7 @@ struct clk_mux {
- #define CLK_MUX_INDEX_BIT		BIT(1)
++	/* Ensure interrupts from this UART are masked and cleared */
++	writew(0, uap->port.membase + UART011_IMSC);
++	writew(0xffff, uap->port.membase + UART011_ICR);
++
+ 	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
  
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		char **parent_names, u8 num_parents, unsigned long flags,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock);
- 
-@@ -274,7 +274,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-  */
- struct clk *clk_register(struct device *dev, const char *name,
- 		const struct clk_ops *ops, struct clk_hw *hw,
--		char **parent_names, u8 num_parents, unsigned long flags);
-+		const char **parent_names, u8 num_parents, unsigned long flags);
- 
- /* helper functions */
- const char *__clk_get_name(struct clk *clk);
+ 	amba_ports[i] = uap;
 -- 
-1.7.9.1
+1.7.7.6
