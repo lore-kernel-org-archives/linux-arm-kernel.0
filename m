@@ -1,124 +1,51 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 21 Mar 2012 10:23:15 -0400
-Subject: Device tree and IO map_desc.
-In-Reply-To: <4F69D325.1000500@gmail.com>
-References: <CAKON4OyHRVvdtZGt+HiCnsRT_5zTuDVBVgOx22kFC2xxFLnD+Q@mail.gmail.com>
- <4F69D325.1000500@gmail.com>
-Message-ID: <CAKON4OxxmO_Et8FTVp=i7h9uODWAtdjHOmZrFWLtgqYVAjAAGg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 21 Mar 2012 19:53:07 +0530
+Subject: [RFC][PATCH 0/7] OMAP4 cpuidle cleanup
+In-Reply-To: <CAORVsuUL3Z_vw+n26eWaa8eAJ0yhXB=VRNmuCeSZjStG527Gag@mail.gmail.com>
+References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F69A872.50203@ti.com>
+ <CAORVsuUL3Z_vw+n26eWaa8eAJ0yhXB=VRNmuCeSZjStG527Gag@mail.gmail.com>
+Message-ID: <CAMQu2gxrUycJq07Ngs-TXq+jqqe4uBH4Y_CZjFict=OL9ifb_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 9:09 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 03/20/2012 11:52 AM, jonsmirl at gmail.com wrote:
->> Is there a helper for building the IO map_desc from the device tree?
+On Wed, Mar 21, 2012 at 6:49 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Hi Santosh, Daniel,
+>
+> On Wed, Mar 21, 2012 at 11:07 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Daniel,
 >>
->
-> No. This is one of those things that device tree cannot have knowledge
-> of what needs to be statically mapped as that's not a h/w description.
-
-What's an example of something that is described in the device tree
-and is dynamically mapped? Things like PCI cards shouldn't be in the
-device tree since they are discoverable.
-
-Nodes have 'status' in them, could this be used to control mapping?
-
-				uart1: uart at 02020000 {
-					compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
-					reg = <0x02020000 0x4000>;
-					interrupts = <0 26 0x04>;
-					status = "disabled";
-				};
-
-Probably the right solution is that the individual drivers should map
-themselves by calling into a helper function with address and range.
-The helper would coalesce and merge ranges to reduce the number of
-mappings.
-
-This is a piece of a lpc3131 three I am working on. I could add a tiny
-driver for the adp node that creates the mapping. Then as the
-dependent devices ask for mappings they'd be inside the larger node.
-
-	ahb {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-
-		isram0: memory at 11028000 {
-			reg = <0x11028000 0x18000>;
-		};
-		isram1: memory at 11040000 {
-			reg = <0x11040000 0x18000>;
-		};
-
-		apb0: apb at 13000000 {
-			compatible = "simple-bus";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges = <0x13000000 0x13000000 0x8000>;
-
-			evtr at 13000000 {
-				compatible = "nxp,lpc31xx-evtr";
-				reg = <0x13000000 0x800>;
-			};
-			adc at 13002000 {
-				compatible = "nxp,lpc31xx-adc";
-				reg = <0x13002000 0x400>;
-				interrupts = <1>;
-			};
-
-
->
-> We could probably have a list of nodes to map and extract the size and
-> physical addresses from the DT. There's lots of register defines
-> typically associated with the static mappings, so you would still have
-> duplicated information.
->
->> For example on Versatile. All of this map_io data is already in the
->> device tree, it is just repeated here.
+>> On Wednesday 21 March 2012 02:57 PM, Daniel Lezcano wrote:
+>>> This patchset is a proposition to improve a bit the code.
+>>> The changes are code cleanup and does not change the behavior of the
+>>> driver itself.
+>>>
+>>> A couple a things call my intention. Why the cpuidle device is set for cpu0 only
+>>> and why the WFI is not used ?
+>>>
+>>> Daniel Lezcano (7):
+>>> ? ARM: OMAP4: cpuidle - Remove unused valid field
+>>> ? ARM: OMAP4: cpuidle - Declare the states with the driver declaration
+>>> ? ARM: OMAP4: cpuidle - Remove the cpuidle_params_table table
+>>> ? ARM: OMAP4: cpuidle - fix static omap4_idle_data declaration
+>>> ? ARM: OMAP4: cpuidle - Initialize omap4_idle_data at compile time
+>>> ? ARM: OMAP4: cpuidle - use the omap4_idle_data variable directly
+>>> ? ARM: OMAP4: cpuidle - remove omap4_idle_data initialization at boot
+>>> ? ? time
+>>>
+>> The series looks fine to me in general. This clean-up is applicable
+>> for OMAP3 cpuidle code as well.
 >>
->>
->> DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
->> ? ? ? .map_io ? ? ? ? = versatile_map_io,
->> ? ? ? .init_early ? ? = versatile_init_early,
->> ....
->> MACHINE_END
->>
->> void __init versatile_map_io(void)
->> {
->> ? ? ? iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
->> }
->>
->> static struct map_desc versatile_io_desc[] __initdata = {
->> ? ? ? {
->> ? ? ? ? ? ? ? .virtual ? ? ? ?= ?IO_ADDRESS(VERSATILE_SYS_BASE),
->> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(VERSATILE_SYS_BASE),
->> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
->> ? ? ? }, {
->> ? ? ? ? ? ? ? .virtual ? ? ? ?= ?IO_ADDRESS(VERSATILE_SIC_BASE),
->> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(VERSATILE_SIC_BASE),
->> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
->> ? ? ? }, {
->> ? ? ? ? ? ? ? .virtual ? ? ? ?= ?IO_ADDRESS(VERSATILE_VIC_BASE),
->> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(VERSATILE_VIC_BASE),
->> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
+>> I want Jean to look at this series because some of his earlier
+>> clean up has introduced those custom functions which
+>> are getting removed in this series.
+> I am OK with the patch set, I only have minor remarks to the individual patches.
 >
-> The SIC and VIC should get converted to ioremap and using of_irq_init.
-> There's already DT init support for the VIC at least, so the conversion
-> should be easy. I think Linus W was working on this.
+> Reviewed-by: Jean Pihet <j-pihet@ti.com>
 >
-> Rob
->
->> ? ? ? }, {
->> ...
->>
->
+Thanks Jean for looking at it.
 
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Daniel,
+Feel free to add.
+ Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
