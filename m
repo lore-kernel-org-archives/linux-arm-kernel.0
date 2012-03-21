@@ -1,168 +1,136 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 21 Mar 2012 16:36:29 +0200
-Subject: [PATCH v8 4/8] ARM: davinci: Consolidate time keeping and irq
- enable
-In-Reply-To: <CAMXH7KH5kS=wPFdC8QrtnhE6_sZqmsJ8h=6Gs3kfHOTbeHjacA@mail.gmail.com>
-References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
- <1332274969-15782-5-git-send-email-rob.lee@linaro.org>
- <CAMXH7KH5kS=wPFdC8QrtnhE6_sZqmsJ8h=6Gs3kfHOTbeHjacA@mail.gmail.com>
-Message-ID: <CAP245DW9SdTYNc8XXwiuHzo5Y-aZrLc2qP0MekKkyAT2TosjbQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 21 Mar 2012 09:37:25 -0500
+Subject: Device tree and IO map_desc.
+In-Reply-To: <CAKON4OxxmO_Et8FTVp=i7h9uODWAtdjHOmZrFWLtgqYVAjAAGg@mail.gmail.com>
+References: <CAKON4OyHRVvdtZGt+HiCnsRT_5zTuDVBVgOx22kFC2xxFLnD+Q@mail.gmail.com>
+ <4F69D325.1000500@gmail.com>
+ <CAKON4OxxmO_Et8FTVp=i7h9uODWAtdjHOmZrFWLtgqYVAjAAGg@mail.gmail.com>
+Message-ID: <4F69E7A5.4090101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob, you should start a new '3.4-fixes' branch containing such
-bugfixes that can be pushed to Len after -rc1.
+On 03/21/2012 09:23 AM, jonsmirl at gmail.com wrote:
+> On Wed, Mar 21, 2012 at 9:09 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 03/20/2012 11:52 AM, jonsmirl at gmail.com wrote:
+>>> Is there a helper for building the IO map_desc from the device tree?
+>>>
+>>
+>> No. This is one of those things that device tree cannot have knowledge
+>> of what needs to be statically mapped as that's not a h/w description.
+> 
+> What's an example of something that is described in the device tree
+> and is dynamically mapped? Things like PCI cards shouldn't be in the
+> device tree since they are discoverable.
+> 
 
-On Wed, Mar 21, 2012 at 4:28 PM, Rob Lee <rob.lee@linaro.org> wrote:
-> Sekhar tested this patch on Davinci last night and found a problem. ?I
-> looked at the code again and found a mindless omission on my part (see
-> below). ?Fix is trivial. ?I've check all other platforms and confirmed
-> this problem does not exist for those. ?Will resend a v9 of the
-> patchset shortly.
->
-> On Tue, Mar 20, 2012 at 3:22 PM, Robert Lee <rob.lee@linaro.org> wrote:
->> Enable core cpuidle timekeeping and irq enabling and remove that
->> handling from this code.
+I mean mapped into cpu virtual memory. Static mapping is map_desc.
+Dynamic mapping is ioremap.
+
+> Nodes have 'status' in them, could this be used to control mapping?
+> 
+> 				uart1: uart at 02020000 {
+> 					compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+> 					reg = <0x02020000 0x4000>;
+> 					interrupts = <0 26 0x04>;
+> 					status = "disabled";
+> 				};
+> 
+> Probably the right solution is that the individual drivers should map
+> themselves by calling into a helper function with address and range.
+> The helper would coalesce and merge ranges to reduce the number of
+> mappings.
+
+This is what most drivers do. The static mappings in map_desc are often
+special cases where ioremap doesn't work. LL_DEBUG is one example.
+
+> 
+> This is a piece of a lpc3131 three I am working on. I could add a tiny
+> driver for the adp node that creates the mapping. Then as the
+> dependent devices ask for mappings they'd be inside the larger node.
+> 
+
+Use ioremap unless there is a reason you can't.
+
+Rob
+
+> 	ahb {
+> 		compatible = "simple-bus";
+> 		#address-cells = <1>;
+> 		#size-cells = <1>;
+> 		ranges;
+> 
+> 		isram0: memory at 11028000 {
+> 			reg = <0x11028000 0x18000>;
+> 		};
+> 		isram1: memory at 11040000 {
+> 			reg = <0x11040000 0x18000>;
+> 		};
+> 
+> 		apb0: apb at 13000000 {
+> 			compatible = "simple-bus";
+> 			#address-cells = <1>;
+> 			#size-cells = <1>;
+> 			ranges = <0x13000000 0x13000000 0x8000>;
+> 
+> 			evtr at 13000000 {
+> 				compatible = "nxp,lpc31xx-evtr";
+> 				reg = <0x13000000 0x800>;
+> 			};
+> 			adc at 13002000 {
+> 				compatible = "nxp,lpc31xx-adc";
+> 				reg = <0x13002000 0x400>;
+> 				interrupts = <1>;
+> 			};
+> 
+> 
 >>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> Reviewed-by: Kevin Hilman <khilman@ti.com>
->> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Acked-by: Jean Pihet<j-pihet@ti.com>
->> ---
->> ?arch/arm/mach-davinci/cpuidle.c | ? 82 ++++++++++++++++-----------------------
->> ?1 file changed, 33 insertions(+), 49 deletions(-)
+>> We could probably have a list of nodes to map and extract the size and
+>> physical addresses from the DT. There's lots of register defines
+>> typically associated with the static mappings, so you would still have
+>> duplicated information.
 >>
->> diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
->> index a30c7c5..93ae096 100644
->> --- a/arch/arm/mach-davinci/cpuidle.c
->> +++ b/arch/arm/mach-davinci/cpuidle.c
->> @@ -18,6 +18,7 @@
->> ?#include <linux/io.h>
->> ?#include <linux/export.h>
->> ?#include <asm/proc-fns.h>
->> +#include <asm/cpuidle.h>
+>>> For example on Versatile. All of this map_io data is already in the
+>>> device tree, it is just repeated here.
+>>>
+>>>
+>>> DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
+>>>       .map_io         = versatile_map_io,
+>>>       .init_early     = versatile_init_early,
+>>> ....
+>>> MACHINE_END
+>>>
+>>> void __init versatile_map_io(void)
+>>> {
+>>>       iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
+>>> }
+>>>
+>>> static struct map_desc versatile_io_desc[] __initdata = {
+>>>       {
+>>>               .virtual        =  IO_ADDRESS(VERSATILE_SYS_BASE),
+>>>               .pfn            = __phys_to_pfn(VERSATILE_SYS_BASE),
+>>>               .length         = SZ_4K,
+>>>               .type           = MT_DEVICE
+>>>       }, {
+>>>               .virtual        =  IO_ADDRESS(VERSATILE_SIC_BASE),
+>>>               .pfn            = __phys_to_pfn(VERSATILE_SIC_BASE),
+>>>               .length         = SZ_4K,
+>>>               .type           = MT_DEVICE
+>>>       }, {
+>>>               .virtual        =  IO_ADDRESS(VERSATILE_VIC_BASE),
+>>>               .pfn            = __phys_to_pfn(VERSATILE_VIC_BASE),
+>>>               .length         = SZ_4K,
+>>>               .type           = MT_DEVICE
 >>
->> ?#include <mach/cpuidle.h>
->> ?#include <mach/ddr2.h>
->> @@ -30,12 +31,42 @@ struct davinci_ops {
->> ? ? ? ?u32 flags;
->> ?};
+>> The SIC and VIC should get converted to ioremap and using of_irq_init.
+>> There's already DT init support for the VIC at least, so the conversion
+>> should be easy. I think Linus W was working on this.
 >>
->> +/* Actual code that puts the SoC in different idle states */
->> +static int davinci_enter_idle(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
->> +{
->> + ? ? ? struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
->> + ? ? ? struct davinci_ops *ops = cpuidle_get_statedata(state_usage);
->> +
->> + ? ? ? if (ops && ops->enter)
->> + ? ? ? ? ? ? ? ops->enter(ops->flags);
->> +
->> + ? ? ? index = cpuidle_wrap_enter(dev, drv, index,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? arm_cpuidle_simple_enter);
->> +
->> + ? ? ? if (ops && ops->exit)
->> + ? ? ? ? ? ? ? ops->exit(ops->flags);
->> +
->> + ? ? ? return index;
->> +}
->> +
->> ?/* fields in davinci_ops.flags */
->> ?#define DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN ? ? ? ?BIT(0)
+>> Rob
 >>
->> ?static struct cpuidle_driver davinci_idle_driver = {
->> - ? ? ? .name ? = "cpuidle-davinci",
->> - ? ? ? .owner ?= THIS_MODULE,
->> + ? ? ? .name ? ? ? ? ? = "cpuidle-davinci",
->> + ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
->
-> Argh! I am missing the ".en_core_tk_irqen = 1" here.
->
->
->> + ? ? ? .states[0] ? ? ?= ARM_CPUIDLE_WFI_STATE,
->> + ? ? ? .states[1] ? ? ?= {
->> + ? ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= davinci_enter_idle,
->> + ? ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 10,
->> + ? ? ? ? ? ? ? .target_residency ? ? ? = 100000,
->> + ? ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "DDR SR",
->> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "WFI and DDR Self Refresh",
->> + ? ? ? },
->> + ? ? ? .state_count = DAVINCI_CPUIDLE_MAX_STATES,
->> ?};
+>>>       }, {
+>>> ...
+>>>
 >>
->> ?static DEFINE_PER_CPU(struct cpuidle_device, davinci_cpuidle_device);
->> @@ -77,41 +108,10 @@ static struct davinci_ops davinci_states[DAVINCI_CPUIDLE_MAX_STATES] = {
->> ? ? ? ?},
->> ?};
->>
->> -/* Actual code that puts the SoC in different idle states */
->> -static int davinci_enter_idle(struct cpuidle_device *dev,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
->> -{
->> - ? ? ? struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
->> - ? ? ? struct davinci_ops *ops = cpuidle_get_statedata(state_usage);
->> - ? ? ? struct timeval before, after;
->> - ? ? ? int idle_time;
->> -
->> - ? ? ? local_irq_disable();
->> - ? ? ? do_gettimeofday(&before);
->> -
->> - ? ? ? if (ops && ops->enter)
->> - ? ? ? ? ? ? ? ops->enter(ops->flags);
->> - ? ? ? /* Wait for interrupt state */
->> - ? ? ? cpu_do_idle();
->> - ? ? ? if (ops && ops->exit)
->> - ? ? ? ? ? ? ? ops->exit(ops->flags);
->> -
->> - ? ? ? do_gettimeofday(&after);
->> - ? ? ? local_irq_enable();
->> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
->> - ? ? ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
->> -
->> - ? ? ? dev->last_residency = idle_time;
->> -
->> - ? ? ? return index;
->> -}
->> -
->> ?static int __init davinci_cpuidle_probe(struct platform_device *pdev)
->> ?{
->> ? ? ? ?int ret;
->> ? ? ? ?struct cpuidle_device *device;
->> - ? ? ? struct cpuidle_driver *driver = &davinci_idle_driver;
->> ? ? ? ?struct davinci_cpuidle_config *pdata = pdev->dev.platform_data;
->>
->> ? ? ? ?device = &per_cpu(davinci_cpuidle_device, smp_processor_id());
->> @@ -123,27 +123,11 @@ static int __init davinci_cpuidle_probe(struct platform_device *pdev)
->>
->> ? ? ? ?ddr2_reg_base = pdata->ddr2_ctlr_base;
->>
->> - ? ? ? /* Wait for interrupt state */
->> - ? ? ? driver->states[0].enter = davinci_enter_idle;
->> - ? ? ? driver->states[0].exit_latency = 1;
->> - ? ? ? driver->states[0].target_residency = 10000;
->> - ? ? ? driver->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
->> - ? ? ? strcpy(driver->states[0].name, "WFI");
->> - ? ? ? strcpy(driver->states[0].desc, "Wait for interrupt");
->> -
->> - ? ? ? /* Wait for interrupt and DDR self refresh state */
->> - ? ? ? driver->states[1].enter = davinci_enter_idle;
->> - ? ? ? driver->states[1].exit_latency = 10;
->> - ? ? ? driver->states[1].target_residency = 10000;
->> - ? ? ? driver->states[1].flags = CPUIDLE_FLAG_TIME_VALID;
->> - ? ? ? strcpy(driver->states[1].name, "DDR SR");
->> - ? ? ? strcpy(driver->states[1].desc, "WFI and DDR Self Refresh");
->> ? ? ? ?if (pdata->ddr2_pdown)
->> ? ? ? ? ? ? ? ?davinci_states[1].flags |= DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN;
->> ? ? ? ?cpuidle_set_statedata(&device->states_usage[1], &davinci_states[1]);
->>
->> ? ? ? ?device->state_count = DAVINCI_CPUIDLE_MAX_STATES;
->> - ? ? ? driver->state_count = DAVINCI_CPUIDLE_MAX_STATES;
->>
->> ? ? ? ?ret = cpuidle_register_driver(&davinci_idle_driver);
->> ? ? ? ?if (ret) {
->> --
->> 1.7.9.4
->>
+> 
+> 
+> 
