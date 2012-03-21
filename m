@@ -1,25 +1,44 @@
-From: lenb@kernel.org (Len Brown)
-Date: Wed, 21 Mar 2012 00:53:53 -0400
-Subject: [PATCH v8 0/8] Consolidate cpuidle functionality
-In-Reply-To: <201203210101.08361.rjw@sisk.pl>
-References: <1332274969-15782-1-git-send-email-rob.lee@linaro.org>
- <873992zy5u.fsf@ti.com>
- <CAP245DXwhCMOJaspW8SY7jtqsA3d5SK4Ctr+JvS+cw4yHfL-mw@mail.gmail.com>
- <201203210101.08361.rjw@sisk.pl>
-Message-ID: <4F695EE1.10001@kernel.org>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 21 Mar 2012 10:31:48 +0530
+Subject: [PATCH v4 RESEND 6/7] gpio/omap: fix incorrect update to
+ context.irqenable1
+In-Reply-To: <CAC83ZvKRbvVU5Qa1jwud0E6WT-DBU1Z1XEweiXay9x+eLcn0hg@mail.gmail.com>
+References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
+ <1332240799-6748-7-git-send-email-tarun.kanti@ti.com>
+ <87zkbbywwz.fsf@ti.com>
+ <CAC83ZvKRbvVU5Qa1jwud0E6WT-DBU1Z1XEweiXay9x+eLcn0hg@mail.gmail.com>
+Message-ID: <CAC83ZvLgPWO2C6cpRBEsoqFdac1rMyo4OvTXB2_y_mCzaFzJXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> So, I suggest that if neither Len nor Arjan reappear shortly, people can
-> send CPUidle patches to me.
-
-
-/me reappears
-
-this series is in my tree now, and I'll be poking at it a bit tomorrow.
-If everything is happy I'll send it for 3.4.
-
-
-thanks,
--Len
+On Wed, Mar 21, 2012 at 8:10 AM, DebBarma, Tarun Kanti
+<tarun.kanti@ti.com> wrote:
+> On Tue, Mar 20, 2012 at 11:31 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>>
+>>> In _enable_gpio_irqbank() when bank->regs->set_irqenable is valid,
+>>> gpio_mask can be directly set by writing to set_irqenable register
+>>> without overwriting current value. In order to ensure the same is
+>>> stored in context.irqenable1, we must read from regs->irqenable
+>>> instead of overwriting it with gpio_mask.
+>>
+>>> The overwriting makes sense only in the second case where irqenable
+>>> is explicitly read and updated with new gpio_mask before writing it
+>>> back. However, for consistency reading regs->irqenable into the
+>>> bank->context.irqenable1 takes care of both the scenarios.
+>>
+>> ...except that the code doesn't do this anymore.
+> Yes.
+>>
+>> I like the newer version (I hope so, since I suggested it :), but please
+>> update the changlog to describe what the code is actually doing.
+> Sure.
+I have updated the change log here:
+git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
+for_3.4/gpio_more_fixes
+--
+Tarun
+>>
+>> Thanks,
+>>
+>> Kevin
