@@ -1,73 +1,38 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 21 Mar 2012 10:59:07 +0100
-Subject: [PATCH 2/6] mmc: Kconfig: remove choice between at91_mci and
- atmel-mci
-In-Reply-To: <d86c9743d2434e2c6a2a34cefe6c989e0efa9652.1331826095.git.nicolas.ferre@atmel.com>
-References: <cover.1331826095.git.nicolas.ferre@atmel.com>
- <d86c9743d2434e2c6a2a34cefe6c989e0efa9652.1331826095.git.nicolas.ferre@atmel.com>
-Message-ID: <20120321095907.GI11834@ldesroches-Latitude-E6320>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 21 Mar 2012 15:37:46 +0530
+Subject: [RFC][PATCH 0/7] OMAP4 cpuidle cleanup
+In-Reply-To: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1332322070-24577-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <4F69A872.50203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 04:57:18PM +0100, Nicolas Ferre wrote:
-> This choice is not so important now that atmel-mci supports every
-> Atmel AT91 SoC except AT91RM9200. As this newer driver is better
-> maintained choose this one to avoid confusion.
+Daniel,
+
+On Wednesday 21 March 2012 02:57 PM, Daniel Lezcano wrote:
+> This patchset is a proposition to improve a bit the code.
+> The changes are code cleanup and does not change the behavior of the
+> driver itself.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> A couple a things call my intention. Why the cpuidle device is set for cpu0 only
+> and why the WFI is not used ?
+> 
+> Daniel Lezcano (7):
+>   ARM: OMAP4: cpuidle - Remove unused valid field
+>   ARM: OMAP4: cpuidle - Declare the states with the driver declaration
+>   ARM: OMAP4: cpuidle - Remove the cpuidle_params_table table
+>   ARM: OMAP4: cpuidle - fix static omap4_idle_data declaration
+>   ARM: OMAP4: cpuidle - Initialize omap4_idle_data at compile time
+>   ARM: OMAP4: cpuidle - use the omap4_idle_data variable directly
+>   ARM: OMAP4: cpuidle - remove omap4_idle_data initialization at boot
+>     time
+> 
+The series looks fine to me in general. This clean-up is applicable
+for OMAP3 cpuidle code as well.
 
-Thanks for this patch, it's a new step to have only one mci driver.
-
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+I want Jean to look at this series because some of his earlier
+clean up has introduced those custom functions which
+are getting removed in this series.
 
 Regards
-
-Ludovic
-
-> ---
->  drivers/mmc/host/Kconfig |   13 ++-----------
->  1 files changed, 2 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 00fcbed..455a414 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -270,16 +270,9 @@ config MMC_AU1X
->  
->  	  If unsure, say N.
->  
-> -choice
-> -	prompt "Atmel SD/MMC Driver"
-> -	depends on AVR32 || ARCH_AT91
-> -	default MMC_ATMELMCI if AVR32
-> -	help
-> -	  Choose which driver to use for the Atmel MCI Silicon
-> -
->  config MMC_AT91
->  	tristate "AT91 SD/MMC Card Interface support"
-> -	depends on ARCH_AT91
-> +	depends on ARCH_AT91RM9200
->  	help
->  	  This selects the AT91 MCI controller.
->  
-> @@ -287,7 +280,7 @@ config MMC_AT91
->  
->  config MMC_ATMELMCI
->  	tristate "Atmel Multimedia Card Interface support"
-> -	depends on AVR32 || ARCH_AT91
-> +	depends on AVR32 || (ARCH_AT91 && !ARCH_AT91RM9200)
->  	help
->  	  This selects the Atmel Multimedia Card Interface driver. If
->  	  you have an AT32 (AVR32) or AT91 platform with a Multimedia
-> @@ -295,8 +288,6 @@ config MMC_ATMELMCI
->  
->  	  If unsure, say N.
->  
-> -endchoice
-> -
->  config MMC_ATMELMCI_DMA
->  	bool "Atmel MCI DMA support"
->  	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
-> -- 
-> 1.7.9
-> 
+santosh
