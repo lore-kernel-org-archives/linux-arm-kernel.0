@@ -1,50 +1,37 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 22 Mar 2012 07:40:00 +0530
-Subject: [PATCH v4 RESEND 6/7] gpio/omap: fix incorrect update to
- context.irqenable1
-In-Reply-To: <87y5qurqu1.fsf@ti.com>
-References: <1332240799-6748-1-git-send-email-tarun.kanti@ti.com>
- <1332240799-6748-7-git-send-email-tarun.kanti@ti.com>
- <87zkbbywwz.fsf@ti.com>
- <CAC83ZvKRbvVU5Qa1jwud0E6WT-DBU1Z1XEweiXay9x+eLcn0hg@mail.gmail.com>
- <CAC83ZvLgPWO2C6cpRBEsoqFdac1rMyo4OvTXB2_y_mCzaFzJXA@mail.gmail.com>
- <87y5qurqu1.fsf@ti.com>
-Message-ID: <CAC83ZvJNsFmgABsGd_OPYJwNfDuKBw5iVwqrwZ48HyR05qT8tA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Mar 2012 11:23:26 +0800
+Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
+In-Reply-To: <20120320224021.GF29317@pengutronix.de>
+References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
+ <1332214706-675-1-git-send-email-skannan@codeaurora.org>
+ <1332214706-675-2-git-send-email-skannan@codeaurora.org>
+ <20120320072018.GC32469@S2101-09.ap.freescale.net>
+ <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
+ <20120320094031.GI3852@pengutronix.de>
+ <e22898bc8b69e85f1e6390d7d858f85c.squirrel@www.codeaurora.org>
+ <20120320181441.GO3852@pengutronix.de>
+ <4F68E53B.7040800@codeaurora.org>
+ <20120320224021.GF29317@pengutronix.de>
+Message-ID: <20120322032323.GA2213@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 7:36 PM, Kevin Hilman <khilman@ti.com> wrote:
-> "DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
->
->> On Wed, Mar 21, 2012 at 8:10 AM, DebBarma, Tarun Kanti
->> <tarun.kanti@ti.com> wrote:
->>> On Tue, Mar 20, 2012 at 11:31 PM, Kevin Hilman <khilman@ti.com> wrote:
->>>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->>>>
->>>>> In _enable_gpio_irqbank() when bank->regs->set_irqenable is valid,
->>>>> gpio_mask can be directly set by writing to set_irqenable register
->>>>> without overwriting current value. In order to ensure the same is
->>>>> stored in context.irqenable1, we must read from regs->irqenable
->>>>> instead of overwriting it with gpio_mask.
->>>>
->>>>> The overwriting makes sense only in the second case where irqenable
->>>>> is explicitly read and updated with new gpio_mask before writing it
->>>>> back. However, for consistency reading regs->irqenable into the
->>>>> bank->context.irqenable1 takes care of both the scenarios.
->>>>
->>>> ...except that the code doesn't do this anymore.
->>> Yes.
->>>>
->>>> I like the newer version (I hope so, since I suggested it :), but please
->>>> update the changlog to describe what the code is actually doing.
->>> Sure.
->> I have updated the change log here:
->> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
->> for_3.4/gpio_more_fixes
->
-> Please also post and updated version of the patch for review.
-Sure.
---
-Tarun
->
-> Kevin
+On Tue, Mar 20, 2012 at 11:40:21PM +0100, Sascha Hauer wrote:
+> On Tue, Mar 20, 2012 at 01:14:51PM -0700, Saravana Kannan wrote:
+...
+> > Ah, I see. That's a lot of functions calls. I think it would be much
+> > more efficient if you just have an array and loop over it. With my
+> > patch, you can just call a single register function for all these
+> > clocks.
+> 
+> I was curious and gave it a try. I registered a fixed clock and 100
+> gates as child clocks. I tried both DEFINE_CLK_GATE and
+> clk_register_gate. It turned out there was no difference in speed.
+> 
+While there is no difference in speed efficiency, I think we will
+gain space efficiency if we can have Saravana's patch to copy the
+clk_hw fields and make the static array __initdata as you mentioned.
+
+-- 
+Regards,
+Shawn
