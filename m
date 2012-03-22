@@ -1,47 +1,156 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 22 Mar 2012 09:37:50 +0200
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
-References: <4F683B36.8090101@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
- <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20120322073750.GA637@mwesterb-mobl.ger.corp.intel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Mar 2012 15:45:23 +0800
+Subject: [PATCH] ARM: dts: imx6q: add anatop regulators
+In-Reply-To: <1332214139-6833-1-git-send-email-paul.liu@linaro.org>
+References: <1332214139-6833-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120322074520.GD2213@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 07:47:52PM -0500, H Hartley Sweeten wrote:
-
-> I think you misunderstood my comment above.
+On Tue, Mar 20, 2012 at 11:28:59AM +0800, Ying-Chun Liu (PaulLiu) wrote:
+> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 > 
-> With this patch applied I get the "unknown interrupt!" storm. These messages
-> keep getting spewed until I power off the board.
-
-Ah, right you are. Sorry.
-
-With my Sim.One board, I don't see any interrupt storms at all and I also have
-mmc_spi with DMA enabled.
-
-> Without this patch I get the "got interrupt while active list is empty" messages
-> but only occasionally. Other than the messages the mmc_spi driver seems to
-> be working ok with dma.
+> Add anatop regulators to imx6q.dtsi for all imx6q platforms.
 > 
-> I hacked in a dump of the DMA Global Interrupt register when I get the
-> "got interrupt while active list is empty" messages and get this:
+I would expect all those regulator device nodes be sorted by
+register offset, and for the devices sharing the same register they
+can be sorted by anatop-vol-bit-shift.
+
+I'm looking at the IMX6DQRM Rev. C, and commenting the differences
+I'm seeing from the document below.
+
+> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |   86 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 86 insertions(+), 0 deletions(-)
 > 
-> dma dma1chan1: got interrupt while active list is empty (00000000)
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 263e8f3..dd41514 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -346,6 +346,92 @@
+>  				compatible = "fsl,imx6q-anatop";
+>  				reg = <0x020c8000 0x1000>;
+>  				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				regulator-vddpu at 140 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vddpu";
+> +					regulator-min-microvolt = <725000>;
+> +					regulator-max-microvolt = <1300000>;
+> +					regulator-always-on;
+> +					reg = <0x140>;
+> +					anatop-vol-bit-shift = <9>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <1>;
+> +					anatop-min-voltage = <725000>;
+> +					anatop-max-voltage = <1300000>;
 
-In addition to these messages my board hangs almost every boot.
+1.450V
 
-> So, according to the DMAGlInt register, there are no channels with an
-> active interrupt.
+> +				};
+> +
+> +				regulator-vddcore at 140 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "cpu";
+> +					regulator-min-microvolt = <725000>;
+> +					regulator-max-microvolt = <1300000>;
+> +					regulator-always-on;
+> +					reg = <0x140>;
+> +					anatop-vol-bit-shift = <0>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <1>;
+> +					anatop-min-voltage = <725000>;
+> +					anatop-max-voltage = <1300000>;
+
+Ditto
+
+> +				};
+> +
+> +				regulator-vddsoc at 140 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vddsoc";
+> +					regulator-min-microvolt = <725000>;
+> +					regulator-max-microvolt = <1300000>;
+> +					regulator-always-on;
+> +					reg = <0x140>;
+> +					anatop-vol-bit-shift = <18>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <1>;
+> +					anatop-min-voltage = <725000>;
+> +					anatop-max-voltage = <1300000>;
+
+Ditto
+
+> +				};
+> +
+> +				regulator-2p5 at 130 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vdd2p5";
+> +					regulator-min-microvolt = <2000000>;
+> +					regulator-max-microvolt = <2775000>;
+> +					regulator-always-on;
+> +					reg = <0x130>;
+> +					anatop-vol-bit-shift = <8>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <0>;
+> +					anatop-min-voltage = <2000000>;
+> +					anatop-max-voltage = <2775000>;
+
+2.75V
+
+> +				};
+> +
+> +				regulator-1p1 at 110 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vdd1p1";
+> +					regulator-min-microvolt = <800000>;
+> +					regulator-max-microvolt = <1400000>;
+> +					regulator-always-on;
+> +					reg = <0x110>;
+> +					anatop-vol-bit-shift = <8>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <4>;
+> +					anatop-min-voltage = <800000>;
+> +					anatop-max-voltage = <1400000>;
+
+1.375V
+
+> +				};
+> +
+> +				regulator-3p0 at 120 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vdd3p0";
+> +					regulator-min-microvolt = <2800000>;
+> +					regulator-max-microvolt = <3150000>;
+> +					regulator-always-on;
+> +					reg = <0x120>;
+> +					anatop-vol-bit-shift = <8>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <7>;
+
+0
+
+> +					anatop-min-voltage = <2800000>;
+
+2.625V
+
+> +					anatop-max-voltage = <3150000>;
+
+3.4V
+
+> +				};
+>  			};
+>  
+>  			usbphy at 020c9000 { /* USBPHY1 */
+> -- 
+> 1.7.9.1
 > 
-> Are we missing a write to the INTERRUPT registers somewhere to clear the
-> current interrupt?
 
-In the current code we only enable DONE interrupt and we always clear that at
-the beginning of the ISR.
-
-The VIC code was changed in 3.3. Its behaviour is different now as it tries to
-handle as many IRQs as possible in one go whereas before it only handled one
-IRQ at a time. Could it be that the VIC in ep93xx doesn't cope with that?
+-- 
+Regards,
+Shawn
