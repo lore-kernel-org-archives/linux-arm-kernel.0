@@ -1,90 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 22 Mar 2012 16:31:46 +0100
-Subject: [PATCH v4 05/12] ARM: EXYNOS: add support uart for EXYNOS4 and
- EXYNOS5
-In-Reply-To: <4F6B3256.40304@samsung.com>
-References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
- <1331736138-28964-6-git-send-email-kgene.kim@samsung.com>
- <CAJuYYwTJsA1M1Qj2P1-1K=pWzi0BPo8YJNDSx4NqGC7NX0030g@mail.gmail.com>
- <074401cd074f$c2946b90$47bd42b0$%szyprowski@samsung.com>
- <4F6B3256.40304@samsung.com>
-Message-ID: <084601cd0840$e4a414a0$adec3de0$%szyprowski@samsung.com>
+From: sbabic@denx.de (Stefano Babic)
+Date: Thu, 22 Mar 2012 17:03:22 +0100
+Subject: [PATCH] ARM: OMAP: Add support for AM35xx UART4/ttyO3
+In-Reply-To: <1318963661-27755-1-git-send-email-kyle.manna@fuel7.com>
+References: <1318963661-27755-1-git-send-email-kyle.manna@fuel7.com>
+Message-ID: <4F6B4D4A.2040103@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thursday, March 22, 2012 3:08 PM Kukjin Kim wrote:
-
-> On 03/21/12 03:45, Marek Szyprowski wrote:
-> > Hello,
-> >
-> > On Wednesday, March 21, 2012 10:14 AM Thomas Abraham wrote:
-> >
-> >> On 14 March 2012 20:12, Kukjin Kim<kgene.kim@samsung.com>  wrote:
-> >>> Actually, the base address of uart is different between EXYNOS4
-> >>> and EXYNOS5 and this patch enables to support uart for EXYNOS4
-> >>> and EXYNOS5 SoCs at runtime.
-> >>>
-> >>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> >>> ---
-> >>
-> >> [...]
-> >>
-> >>> diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S b/arch/arm/mach-
-> >> exynos/include/mach/debug-macro.S
-> >>> index 6cacf16..6c857ff 100644
-> >>> --- a/arch/arm/mach-exynos/include/mach/debug-macro.S
-> >>> +++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
-> >>> @@ -21,8 +21,13 @@
-> >>>          */
-> >>>
-> >>>         .macro addruart, rp, rv, tmp
-> >>> -               ldr     \rp, = S3C_PA_UART
-> >>> -               ldr     \rv, = S3C_VA_UART
-> >>> +               mov     \rp, #0x10000000
-> >>
-> >> This is physical address of Exynos4/5 CPUID register which cannot be
-> >> used here. And virtual address S5P_VA_CPUID also cannot be used here
-> >> since this will be called before paging_init when earlyprintk boot
-> >> param is used. So, with this change, earlyprintk does not work for
-> >> both Exynos4 and Exynos5.
-> >
-> > I confirm, printascii freeze the system on EXYNOS4 after that patch,
-> > tested on Exynos4210 Nuri board.
-> >
-> Hi,
+On 18/10/2011 20:47, Kyle Manna wrote:
+> Add hwmod support to enable access to UART4 of the AM35xx series of
+> chips.  The UART4 device referenced from the TRM will show up as ttyO3.
 > 
-> I think, it can be solved with following and if no problems, it will be
-> fixed during v3.4-rcX.
+> This was tested on an AM3505.
 > 
-> diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S
-> b/arch/arm/mach-exynos/in
-> index 6c857ff..a865417 100644
-> --- a/arch/arm/mach-exynos/include/mach/debug-macro.S
-> +++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
-> @@ -21,10 +21,10 @@
->           */
-> 
->          .macro addruart, rp, rv, tmp
-> -               mov     \rp, #0x10000000
-> -               ldr     \rp, [\rp, #0x0]
-> -               and     \rp, \rp, #0xf00000
-> -               teq     \rp, #0x500000          @@ EXYNOS5
-> +               mrc     p15, 0, \tmp, c0, c0, 0
-> +               and     \tmp, \tmp, #0xf0
-> +               teq     \tmp, #0xf0             @@ A15
-> +
->                  ldreq   \rp, =EXYNOS5_PA_UART
->                  movne   \rp, #EXYNOS4_PA_UART   @@ EXYNOS4
->                  ldr     \rv, =S3C_VA_UART
-> 
+> Signed-off-by: Kyle Manna <kyle.manna@fuel7.com>
+> ---
 
-The above patch solved the problem on Exynos4.
+Hi Kyle,
 
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>  arch/arm/mach-omap2/clock3xxx_data.c       |   11 ++++++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   52 ++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm-common.h          |    2 +
+>  arch/arm/plat-omap/include/plat/irqs.h     |    2 +-
+>  arch/arm/plat-omap/include/plat/serial.h   |    1 +
+>  5 files changed, 67 insertions(+), 1 deletions(-)
 
-Best regards
+Can I gently ask you which pinmux setup do you use to test your patch ?
+
+I am trying to make uart4 working on a am3517 with mainline kernel
+(3.3+, your patch is merged). However, on my board the uart4 pins are
+shared with the camera, and not with SD, as maybe is more common. I set
+the pinmux to switch the pins (gpio_95 / gpio_96 / gpio_97 /gpio_98) to
+the uart4, and ttyO3 is registered and available, and thanks your patch
+both clocks iclk and fclk are active. However, I cannot see activity on
+the tx line if I try to send some characters.
+
+Maybe do you use the same pinmux and am I forgetting something else ?
+
+Thanks,
+Stefano Babic
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-53 Fax: +49-8142-66989-80 Email: sbabic at denx.de
+=====================================================================
