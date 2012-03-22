@@ -1,31 +1,74 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 22 Mar 2012 17:14:12 +0400
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <4F6AF845.9070209@metasoft.pl>
-References: <4F683B36.8090101@metasoft.pl> <4F6A78ED.3050403@gmail.com>
- <4F6AF845.9070209@metasoft.pl>
-Message-ID: <4F6B25A4.4090006@mvista.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 22 Mar 2012 13:20:53 +0000
+Subject: Occasional crashes in suspend-resume with MMC transactions
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317FDFBB@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D12143317FDFBB@DBDE01.ent.ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D12143317FF773@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Mar 22, 2012 at 09:53:23, Bedia, Vaibhav wrote:
+> Hi,
+> 
+> I am trying to do suspend-resume test with a file copy on MMC/SD going on
+> in the background. The test involves simply copying a 450MB file on an ext3
+> partition to the same partition under a different name.
+> 
+> This is on an AM335x board which uses the omap_hsmmc driver. 
+> The kernel is v3.2 and I have also applied the following patch 
+> 
 
-On 22-03-2012 14:00, Rafal Prylowski wrote:
+[...]
 
->> I haven't looked through the patch yet, since I'm waiting on more
->> information from Mika and Hartley's testing.
+I found that whenever this issue crops up, mmc_host_suspend() is not able to claim the host
+And returns -EBUSY. omap_hsmmc driver does not pass on this error code to the PM core and
+hence the suspend process continues. When the driver is made to return -EBUSY, the suspend
+process gets aborted and the user can try suspending again. I am not sure whether this sort
+of suspend failure is acceptable or the driver is doing something wrong. The following
+workaround is what I came up with. Do this look a reasonable thing to do?
 
->> However, the commit log doesn't tell me why we want this change. Is it a
->> performance improvement? If so, do you have some numbers that we can
->> paste into the commit log?
+---
 
-> In principle, using double buffering should be faster than using only
-> one buffer and disabling/enabling channel each time. But my measurements
-> doesn't show any significant change.
+>From a4040dd1869b351a5fa29dacd08facf6e24df609 Mon Sep 17 00:00:00 2001
+From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Date: Thu, 22 Mar 2012 17:14:49 +0530
+Subject: [PATCH 1/1] mmc: omap_hsmmc: Pass on the suspend failure to the PM core
 
-> The real reason for this change is that current code is not 100% reliable
-> in IDE-DMA (I'm planning to submit ep93xx ide driver to linux-ide soon).
+In some cases mmc_host_suspend() is not able to claim the
+host and proceed with the suspend process. The core returns
+-EBUSY to the host controller driver. Unfortunately, the
+host controller driver does not pass on this information
+to the PM core and hence the system suspend process continues.
 
-    IDE or libata driver? Asking because IDE drivers are not accepted anymore.
+In these cases the MMC core gets to an unexpected state
+during resume and multiple issues related to MMC crop up.
+1. Host controller driver starts accessing the device registers
+before the clocks are enabled which leads to a prefetch abort.
+2. A file copy thread which was launched before suspend gets
+stuck due to the host not being reclaimed during resume.
 
-WBR, Sergei
+To avoid such problems pass on the -EBUSY status to the PM core
+from the host controller driver. With this change, MMC core
+suspend might still fail but it does not end up making the
+system unusable. Suspend gets aborted and the user can try
+suspending the system again.
+
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 3d8dbbb..1f938d9 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2238,6 +2238,7 @@ static int omap_hsmmc_suspend(struct device *dev)
+                                        dev_dbg(mmc_dev(host->mmc),
+                                                "Unmask interrupt failed\n");
+                        }
++                       ret = -EBUSY;
+                        goto err;
+                }
+
+--
+1.7.0.4
