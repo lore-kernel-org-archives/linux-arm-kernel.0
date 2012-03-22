@@ -1,103 +1,333 @@
 From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 22 Mar 2012 14:54:13 +0100
-Subject: [PATCH v4 13/15] dmaengine: imx-dma: use 'dev_dbg' and 'dev_warn' for
- messages.
+Date: Thu, 22 Mar 2012 14:54:14 +0100
+Subject: [PATCH v4 14/15] dmaengine: i.MX: Add support for interleaved
+ transfers.
 In-Reply-To: <1332424455-15594-1-git-send-email-javier.martin@vista-silicon.com>
 References: <1332424455-15594-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1332424455-15594-14-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1332424455-15594-15-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There were some 'pr_crit' and 'pr_debug' messages due to the
-initial merge. Replace them by 'dev_dbg' and 'dev_warn' to be
-consistent.
+i.MX2 and i.MX1 chips have the possibility to do
+interleaved transfers with two constraints:
+- Only one chunk can be used (i.e. only 2D transfers are allowed).
+- Only 2 interleaved configurations can be applied at the same time
+for all channels.
+
+Since this patch adds a new resource 'slots_2d' which is shared
+by all the DMA channels and to avoid disgustin locking BUGs, the
+'lock' member has been moved to the global 'imxdma_engine' structure.
 
 Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- drivers/dma/imx-dma.c |   23 ++++++++++++-----------
- 1 files changed, 12 insertions(+), 11 deletions(-)
+ drivers/dma/imx-dma.c |  146 ++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 131 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index cdca95a..38c41c4 100644
+index 38c41c4..2155d82 100644
 --- a/drivers/dma/imx-dma.c
 +++ b/drivers/dma/imx-dma.c
-@@ -227,8 +227,8 @@ static inline int imxdma_sg_next(struct imxdma_desc *d)
+@@ -36,6 +36,10 @@
+ #define IMXDMA_MAX_CHAN_DESCRIPTORS	16
+ #define IMX_DMA_CHANNELS  16
  
- 	imx_dmav1_writel(imxdma, now, DMA_CNTR(imxdmac->channel));
++#define IMX_DMA_2D_SLOTS	2
++#define IMX_DMA_2D_SLOT_A	0
++#define IMX_DMA_2D_SLOT_B	1
++
+ #define IMX_DMA_LENGTH_LOOP	((unsigned int)-1)
+ #define IMX_DMA_MEMSIZE_32	(0 << 4)
+ #define IMX_DMA_MEMSIZE_8	(1 << 4)
+@@ -111,6 +115,13 @@ enum  imxdma_prep_type {
+ 	IMXDMA_DESC_CYCLIC,
+ };
  
--	pr_debug("imxdma%d: next sg chunk dst 0x%08x, src 0x%08x, "
--		"size 0x%08x\n", imxdmac->channel,
-+	dev_dbg(imxdma->dev, " %s channel: %d dst 0x%08x, src 0x%08x, "
-+		"size 0x%08x\n", __func__, imxdmac->channel,
- 		 imx_dmav1_readl(imxdma, DMA_DAR(imxdmac->channel)),
- 		 imx_dmav1_readl(imxdma, DMA_SAR(imxdmac->channel)),
- 		 imx_dmav1_readl(imxdma, DMA_CNTR(imxdmac->channel)));
-@@ -243,7 +243,7 @@ static void imxdma_enable_hw(struct imxdma_desc *d)
- 	int channel = imxdmac->channel;
- 	unsigned long flags;
++struct imx_dma_2d_config {
++	u16		xsr;
++	u16		ysr;
++	u16		wsr;
++	int		count;
++};
++
+ struct imxdma_desc {
+ 	struct list_head		node;
+ 	struct dma_async_tx_descriptor	desc;
+@@ -147,13 +158,14 @@ struct imxdma_channel {
+ 	dma_addr_t			per_address;
+ 	u32				watermark_level;
+ 	struct dma_chan			chan;
+-	spinlock_t			lock;
+ 	struct dma_async_tx_descriptor	desc;
+ 	enum dma_status			status;
+ 	int				dma_request;
+ 	struct scatterlist		*sg_list;
+ 	u32				ccr_from_device;
+ 	u32				ccr_to_device;
++	bool				enabled_2d;
++	int				slot_2d;
+ };
  
--	pr_debug("imxdma%d: imx_dma_enable\n", channel);
-+	dev_dbg(imxdma->dev, "%s channel %d\n", __func__, channel);
+ struct imxdma_engine {
+@@ -162,6 +174,8 @@ struct imxdma_engine {
+ 	struct dma_device		dma_device;
+ 	void __iomem			*base;
+ 	struct clk			*dma_clk;
++	spinlock_t			lock;
++	struct imx_dma_2d_config	slots_2d[IMX_DMA_2D_SLOTS];
+ 	struct imxdma_channel		channel[IMX_DMA_CHANNELS];
+ };
  
- 	local_irq_save(flags);
+@@ -361,16 +375,16 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
+ 	int chno = imxdmac->channel;
+ 	struct imxdma_desc *desc;
  
-@@ -274,7 +274,7 @@ static void imxdma_disable_hw(struct imxdma_channel *imxdmac)
- 	int channel = imxdmac->channel;
- 	unsigned long flags;
+-	spin_lock(&imxdmac->lock);
++	spin_lock(&imxdma->lock);
+ 	if (list_empty(&imxdmac->ld_active)) {
+-		spin_unlock(&imxdmac->lock);
++		spin_unlock(&imxdma->lock);
+ 		goto out;
+ 	}
  
--	pr_debug("imxdma%d: imx_dma_disable\n", channel);
-+	dev_dbg(imxdma->dev, "%s channel %d\n", __func__, channel);
+ 	desc = list_first_entry(&imxdmac->ld_active,
+ 				struct imxdma_desc,
+ 				node);
+-	spin_unlock(&imxdmac->lock);
++	spin_unlock(&imxdma->lock);
  
- 	if (imxdma_hw_chain(imxdmac))
- 		del_timer(&imxdmac->watchdog);
-@@ -298,7 +298,8 @@ static void imxdma_watchdog(unsigned long data)
+ 	if (desc->sg) {
+ 		u32 tmp;
+@@ -442,9 +456,53 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
++	unsigned long flags;
++	int slot = -1;
++	int i;
  
- 	/* Tasklet watchdog error handler */
- 	tasklet_schedule(&imxdmac->dma_tasklet);
--	pr_debug("imxdma%d: watchdog timeout!\n", imxdmac->channel);
-+	dev_dbg(imxdma->dev, "channel %d: watchdog timeout!\n",
-+		imxdmac->channel);
+ 	/* Configure and enable */
+ 	switch (d->type) {
++	case IMXDMA_DESC_INTERLEAVED:
++		/* Try to get a free 2D slot */
++		spin_lock_irqsave(&imxdma->lock, flags);
++		for (i = 0; i < IMX_DMA_2D_SLOTS; i++) {
++			if ((imxdma->slots_2d[i].count > 0) &&
++			((imxdma->slots_2d[i].xsr != d->x) ||
++			(imxdma->slots_2d[i].ysr != d->y) ||
++			(imxdma->slots_2d[i].wsr != d->w)))
++				continue;
++			slot = i;
++			break;
++		}
++		if (slot < 0)
++			return -EBUSY;
++
++		imxdma->slots_2d[slot].xsr = d->x;
++		imxdma->slots_2d[slot].ysr = d->y;
++		imxdma->slots_2d[slot].wsr = d->w;
++		imxdma->slots_2d[slot].count++;
++
++		imxdmac->slot_2d = slot;
++		imxdmac->enabled_2d = true;
++		spin_unlock_irqrestore(&imxdma->lock, flags);
++
++		if (slot == IMX_DMA_2D_SLOT_A) {
++			d->config_mem &= ~CCR_MSEL_B;
++			d->config_port &= ~CCR_MSEL_B;
++			imx_dmav1_writel(imxdma, d->x, DMA_XSRA);
++			imx_dmav1_writel(imxdma, d->y, DMA_YSRA);
++			imx_dmav1_writel(imxdma, d->w, DMA_WSRA);
++		} else {
++			d->config_mem |= CCR_MSEL_B;
++			d->config_port |= CCR_MSEL_B;
++			imx_dmav1_writel(imxdma, d->x, DMA_XSRB);
++			imx_dmav1_writel(imxdma, d->y, DMA_YSRB);
++			imx_dmav1_writel(imxdma, d->w, DMA_WSRB);
++		}
++		/*
++		 * We fall-through here intentionally, since a 2D transfer is
++		 * similar to MEMCPY just adding the 2D slot configuration.
++		 */
+ 	case IMXDMA_DESC_MEMCPY:
+ 		imx_dmav1_writel(imxdma, d->src, DMA_SAR(imxdmac->channel));
+ 		imx_dmav1_writel(imxdma, d->dest, DMA_DAR(imxdmac->channel));
+@@ -503,7 +561,7 @@ static void imxdma_tasklet(unsigned long data)
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	struct imxdma_desc *desc;
+ 
+-	spin_lock(&imxdmac->lock);
++	spin_lock(&imxdma->lock);
+ 
+ 	if (list_empty(&imxdmac->ld_active)) {
+ 		/* Someone might have called terminate all */
+@@ -520,6 +578,12 @@ static void imxdma_tasklet(unsigned long data)
+ 	if (imxdma_chan_is_doing_cyclic(imxdmac))
+ 		goto out;
+ 
++	/* Free 2D slot if it was an interleaved transfer */
++	if (imxdmac->enabled_2d) {
++		imxdma->slots_2d[imxdmac->slot_2d].count--;
++		imxdmac->enabled_2d = false;
++	}
++
+ 	list_move_tail(imxdmac->ld_active.next, &imxdmac->ld_free);
+ 
+ 	if (!list_empty(&imxdmac->ld_queue)) {
+@@ -531,7 +595,7 @@ static void imxdma_tasklet(unsigned long data)
+ 				 __func__, imxdmac->channel);
+ 	}
+ out:
+-	spin_unlock(&imxdmac->lock);
++	spin_unlock(&imxdma->lock);
  }
  
- static irqreturn_t imxdma_err_handler(int irq, void *dev_id)
-@@ -426,8 +427,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+@@ -547,10 +611,10 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	case DMA_TERMINATE_ALL:
+ 		imxdma_disable_hw(imxdmac);
  
- 	disr = imx_dmav1_readl(imxdma, DMA_DISR);
+-		spin_lock_irqsave(&imxdmac->lock, flags);
++		spin_lock_irqsave(&imxdma->lock, flags);
+ 		list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
+ 		list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
+-		spin_unlock_irqrestore(&imxdmac->lock, flags);
++		spin_unlock_irqrestore(&imxdma->lock, flags);
+ 		return 0;
+ 	case DMA_SLAVE_CONFIG:
+ 		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
+@@ -610,12 +674,13 @@ static enum dma_status imxdma_tx_status(struct dma_chan *chan,
+ static dma_cookie_t imxdma_tx_submit(struct dma_async_tx_descriptor *tx)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(tx->chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	dma_cookie_t cookie;
+ 	unsigned long flags;
  
--	pr_debug("imxdma: dma_irq_handler called, disr=0x%08x\n",
--		     disr);
-+	dev_dbg(imxdma->dev, "%s called, disr=0x%08x\n", __func__, disr);
+-	spin_lock_irqsave(&imxdmac->lock, flags);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 	cookie = dma_cookie_assign(tx);
+-	spin_unlock_irqrestore(&imxdmac->lock, flags);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
  
- 	imx_dmav1_writel(imxdma, disr, DMA_DISR);
+ 	return cookie;
+ }
+@@ -654,16 +719,17 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
+ static void imxdma_free_chan_resources(struct dma_chan *chan)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	struct imxdma_desc *desc, *_desc;
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&imxdmac->lock, flags);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 
+ 	imxdma_disable_hw(imxdmac);
+ 	list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
+ 	list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
+ 
+-	spin_unlock_irqrestore(&imxdmac->lock, flags);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ 
+ 	list_for_each_entry_safe(desc, _desc, &imxdmac->ld_free, node) {
+ 		kfree(desc);
+@@ -818,6 +884,49 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+ 	return &desc->desc;
+ }
+ 
++static struct dma_async_tx_descriptor *imxdma_prep_dma_interleaved(
++	struct dma_chan *chan, struct dma_interleaved_template *xt,
++	unsigned long flags)
++{
++	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
++	struct imxdma_desc *desc;
++
++	dev_dbg(imxdma->dev, "%s channel: %d src_start=0x%x dst_start=0x%x\n"
++		"   src_sgl=%s dst_sgl=%s numf=%d frame_size=%d\n", __func__,
++		imxdmac->channel, xt->src_start, xt->dst_start,
++		xt->src_sgl ? "true" : "false", xt->dst_sgl ? "true" : "false",
++		xt->numf, xt->frame_size);
++
++	if (list_empty(&imxdmac->ld_free) ||
++	    imxdma_chan_is_doing_cyclic(imxdmac))
++		return NULL;
++
++	if (xt->frame_size != 1 || xt->numf <= 0 || xt->dir != DMA_MEM_TO_MEM)
++		return NULL;
++
++	desc = list_first_entry(&imxdmac->ld_free, struct imxdma_desc, node);
++
++	desc->type = IMXDMA_DESC_INTERLEAVED;
++	desc->src = xt->src_start;
++	desc->dest = xt->dst_start;
++	desc->x = xt->sgl[0].size;
++	desc->y = xt->numf;
++	desc->w = xt->sgl[0].icg + desc->x;
++	desc->len = desc->x * desc->y;
++	desc->direction = DMA_MEM_TO_MEM;
++	desc->config_port = IMX_DMA_MEMSIZE_32;
++	desc->config_mem = IMX_DMA_MEMSIZE_32;
++	if (xt->src_sgl)
++		desc->config_mem |= IMX_DMA_TYPE_2D;
++	if (xt->dst_sgl)
++		desc->config_port |= IMX_DMA_TYPE_2D;
++	desc->desc.callback = NULL;
++	desc->desc.callback_param = NULL;
++
++	return &desc->desc;
++}
++
+ static void imxdma_issue_pending(struct dma_chan *chan)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+@@ -825,7 +934,7 @@ static void imxdma_issue_pending(struct dma_chan *chan)
+ 	struct imxdma_desc *desc;
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&imxdmac->lock, flags);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 	if (list_empty(&imxdmac->ld_active) &&
+ 	    !list_empty(&imxdmac->ld_queue)) {
+ 		desc = list_first_entry(&imxdmac->ld_queue,
+@@ -840,7 +949,7 @@ static void imxdma_issue_pending(struct dma_chan *chan)
+ 				       &imxdmac->ld_active);
+ 		}
+ 	}
+-	spin_unlock_irqrestore(&imxdmac->lock, flags);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ }
+ 
+ static int __init imxdma_probe(struct platform_device *pdev)
+@@ -903,6 +1012,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, imxdma->dma_device.cap_mask);
++	dma_cap_set(DMA_INTERLEAVE, imxdma->dma_device.cap_mask);
++
++	/* Initialize 2D global parameters */
++	for (i = 0; i < IMX_DMA_2D_SLOTS; i++)
++		imxdma->slots_2d[i].count = 0;
++
++	spin_lock_init(&imxdma->lock);
+ 
+ 	/* Initialize channel parameters */
  	for (i = 0; i < IMX_DMA_CHANNELS; i++) {
-@@ -875,14 +875,14 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	if (cpu_is_mx1()) {
- 		ret = request_irq(MX1_DMA_INT, dma_irq_handler, 0, "DMA", imxdma);
- 		if (ret) {
--			pr_crit("Can't register IRQ for DMA\n");
-+			dev_warn(imxdma->dev, "Can't register IRQ for DMA\n");
- 			kfree(imxdma);
- 			return ret;
+@@ -923,7 +1039,6 @@ static int __init imxdma_probe(struct platform_device *pdev)
  		}
  
- 		ret = request_irq(MX1_DMA_ERR, imxdma_err_handler, 0, "DMA", imxdma);
- 		if (ret) {
--			pr_crit("Can't register ERRIRQ for DMA\n");
-+			dev_warn(imxdma->dev, "Can't register ERRIRQ for DMA\n");
- 			free_irq(MX1_DMA_INT, NULL);
- 			kfree(imxdma);
- 			return ret;
-@@ -912,8 +912,9 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 			ret = request_irq(MX2x_INT_DMACH0 + i,
- 					dma_irq_handler, 0, "DMA", imxdma);
- 			if (ret) {
--				pr_crit("Can't register IRQ %d for DMA channel %d\n",
--						MX2x_INT_DMACH0 + i, i);
-+				dev_warn(imxdma->dev, "Can't register IRQ %d "
-+					 "for DMA channel %d\n",
-+					 MX2x_INT_DMACH0 + i, i);
- 				goto err_init;
- 			}
- 			init_timer(&imxdmac->watchdog);
+ 		imxdmac->imxdma = imxdma;
+-		spin_lock_init(&imxdmac->lock);
+ 
+ 		INIT_LIST_HEAD(&imxdmac->ld_queue);
+ 		INIT_LIST_HEAD(&imxdmac->ld_free);
+@@ -949,6 +1064,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	imxdma->dma_device.device_prep_slave_sg = imxdma_prep_slave_sg;
+ 	imxdma->dma_device.device_prep_dma_cyclic = imxdma_prep_dma_cyclic;
+ 	imxdma->dma_device.device_prep_dma_memcpy = imxdma_prep_dma_memcpy;
++	imxdma->dma_device.device_prep_interleaved_dma = imxdma_prep_dma_interleaved;
+ 	imxdma->dma_device.device_control = imxdma_control;
+ 	imxdma->dma_device.device_issue_pending = imxdma_issue_pending;
+ 
 -- 
 1.7.0.4
