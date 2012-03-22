@@ -1,92 +1,191 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 21 Mar 2012 19:47:52 -0500
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 22 Mar 2012 11:57:17 +1100
 Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
+In-Reply-To: <4F683B36.8090101@metasoft.pl>
 References: <4F683B36.8090101@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
- <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F6A78ED.3050403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 21, 2012 12:33 PM, Mika Westerberg wrote:
-> On Wed, Mar 21, 2012 at 12:12:11PM -0500, H Hartley Sweeten wrote:
->> On Tuesday, March 20, 2012 1:09 AM, Rafal Prylowski wrote:
->>>
->>> Implement double buffering for M2M DMA channels.
->>>
->>> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
->> 
->> Hmm... This isn't working on my ep9307 board...
->> 
->> When the system boots I get stormed with messages:
->> 
->> dma dma1chan0: unknown interrupt!
->> dma dma1chan0: unknown interrupt!
->> dma dma1chan0: unknown interrupt!
->> dma dma1chan1: unknown interrupt!
->> dma dma1chan1: unknown interrupt!
->> dma dma1chan1: unknown interrupt!
->> dma dma1chan0: unknown interrupt!
->> dma dma1chan0: unknown interrupt!
->> dma dma1chan1: unknown interrupt!
->> 
->> Note, I have use_dma set for the ep93xx_spi driver and am using mmc_spi.
->> 
->> Also note, without your patch I also get a couple messages:
->> 
->> dma dma1chan1: got interrupt while active list is empty
->> 
->> But, the mmc card is working fine. I haven't tracked down why I get these
->> yet. Mika, any ideas?
->
-> I've noticed the same. But they also happen without this patch applied. I've
-> tracked it down to MULTI_IRQ_HANDLER support patches for ARM vic but not sure
-> what might be wrong there (or is the ep93xx_dma driver behaving badly). I
-> Noticed that when we get that 'got interrupt while active list is empty' we
-> don't have any interrupts set in the M2M_INTERRUPT register but we still got
-> an interrupt.. weird.
+On 20/03/12 19:09, Rafal Prylowski wrote:
 
-I think you misunderstood my comment above.
+> Implement double buffering for M2M DMA channels.
+> 
 
-With this patch applied I get the "unknown interrupt!" storm. These messages
-keep getting spewed until I power off the board.
 
-Without this patch I get the "got interrupt while active list is empty" messages
-but only occasionally. Other than the messages the mmc_spi driver seems to
-be working ok with dma.
+I haven't looked through the patch yet, since I'm waiting on more
+information from Mika and Hartley's testing.
 
-I hacked in a dump of the DMA Global Interrupt register when I get the
-"got interrupt while active list is empty" messages and get this:
+However, the commit log doesn't tell me why we want this change. Is it a
+performance improvement? If so, do you have some numbers that we can
+paste into the commit log?
 
-dma dma1chan1: got interrupt while active list is empty (00000000)
+Thanks,
+~Ryan
 
-So, according to the DMAGlInt register, there are no channels with an
-active interrupt.
-
-Are we missing a write to the INTERRUPT registers somewhere to clear the
-current interrupt?
-
-Regards,
-Hartley
-
-> Below is a workaround I've been using lately but it certainly is a hack and we
-> should figure out what is the root cause for this.
->
-> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> index dcb004a..cb6b49a 100644
-> --- a/arch/arm/common/vic.c
-> +++ b/arch/arm/common/vic.c
-> @@ -441,11 +441,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
->  	u32 stat, irq;
->  	int handled = 0;
+> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+> 
+> Index: slave-dma/drivers/dma/ep93xx_dma.c
+> ===================================================================
+> --- slave-dma.orig/drivers/dma/ep93xx_dma.c
+> +++ slave-dma/drivers/dma/ep93xx_dma.c
+> @@ -69,6 +69,7 @@
+>  #define M2M_CONTROL_TM_SHIFT		13
+>  #define M2M_CONTROL_TM_TX		(1 << M2M_CONTROL_TM_SHIFT)
+>  #define M2M_CONTROL_TM_RX		(2 << M2M_CONTROL_TM_SHIFT)
+> +#define M2M_CONTROL_NFBINT		BIT(21)
+>  #define M2M_CONTROL_RSS_SHIFT		22
+>  #define M2M_CONTROL_RSS_SSPRX		(1 << M2M_CONTROL_RSS_SHIFT)
+>  #define M2M_CONTROL_RSS_SSPTX		(2 << M2M_CONTROL_RSS_SHIFT)
+> @@ -77,7 +78,23 @@
+>  #define M2M_CONTROL_PWSC_SHIFT		25
 >  
-> -	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> -	while (stat) {
-> +	while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
->  		irq = ffs(stat) - 1;
->  		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-> -		stat &= ~(1 << irq);
->  		handled = 1;
+>  #define M2M_INTERRUPT			0x0004
+> -#define M2M_INTERRUPT_DONEINT		BIT(1)
+> +#define M2M_INTERRUPT_MASK		6
+> +
+> +#define M2M_STATUS			0x000c
+> +#define M2M_STATUS_CTL_SHIFT		1
+> +#define M2M_STATUS_CTL_IDLE		(0 << M2M_STATUS_CTL_SHIFT)
+> +#define M2M_STATUS_CTL_STALL		(1 << M2M_STATUS_CTL_SHIFT)
+> +#define M2M_STATUS_CTL_MEMRD		(2 << M2M_STATUS_CTL_SHIFT)
+> +#define M2M_STATUS_CTL_MEMWR		(3 << M2M_STATUS_CTL_SHIFT)
+> +#define M2M_STATUS_CTL_BWCWAIT		(4 << M2M_STATUS_CTL_SHIFT)
+> +#define M2M_STATUS_CTL_MASK		(7 << M2M_STATUS_CTL_SHIFT)
+> +#define M2M_STATUS_BUF_SHIFT		4
+> +#define M2M_STATUS_BUF_NO		(0 << M2M_STATUS_BUF_SHIFT)
+> +#define M2M_STATUS_BUF_ON		(1 << M2M_STATUS_BUF_SHIFT)
+> +#define M2M_STATUS_BUF_NEXT		(2 << M2M_STATUS_BUF_SHIFT)
+> +#define M2M_STATUS_BUF_MASK		(3 << M2M_STATUS_BUF_SHIFT)
+> +#define M2M_STATUS_DONE			BIT(6)
+> +
+>  
+>  #define M2M_BCR0			0x0010
+>  #define M2M_BCR1			0x0014
+> @@ -426,15 +443,6 @@ static int m2p_hw_interrupt(struct ep93x
+>  
+>  /*
+>   * M2M DMA implementation
+> - *
+> - * For the M2M transfers we don't use NFB at all. This is because it simply
+> - * doesn't work well with memcpy transfers. When you submit both buffers it is
+> - * extremely unlikely that you get an NFB interrupt, but it instead reports
+> - * DONE interrupt and both buffers are already transferred which means that we
+> - * weren't able to update the next buffer.
+> - *
+> - * So for now we "simulate" NFB by just submitting buffer after buffer
+> - * without double buffering.
+>   */
+>  
+>  static int m2m_hw_setup(struct ep93xx_dma_chan *edmac)
+> @@ -543,6 +551,11 @@ static void m2m_hw_submit(struct ep93xx_
+>  	m2m_fill_desc(edmac);
+>  	control |= M2M_CONTROL_DONEINT;
+>  
+> +	if (ep93xx_dma_advance_active(edmac)) {
+> +		m2m_fill_desc(edmac);
+> +		control |= M2M_CONTROL_NFBINT;
+> +	}
+> +
+>  	/*
+>  	 * Now we can finally enable the channel. For M2M channel this must be
+>  	 * done _after_ the BCRx registers are programmed.
+> @@ -560,32 +573,85 @@ static void m2m_hw_submit(struct ep93xx_
 >  	}
- 
+>  }
+>  
+> +/*
+> + * According to EP93xx User's Guide, we should receive DONE interrupt when all
+> + * M2M DMA controller transactions complete normally. This is not always the
+> + * case - sometimes EP93xx M2M DMA asserts DONE interrupt when the DMA channel
+> + * is still running (channel Buffer FSM in DMA_BUF_ON state, and channel
+> + * Control FSM in DMA_MEM_RD state, observed at least in IDE-DMA operation).
+> + * In effect, disabling the channel when only DONE bit is set could stop
+> + * currently running DMA transfer. To avoid this, we use Buffer FSM and
+> + * Control FSM to check current state of DMA channel.
+> + */
+>  static int m2m_hw_interrupt(struct ep93xx_dma_chan *edmac)
+>  {
+> +	u32 status = readl(edmac->regs + M2M_STATUS);
+> +	u32 ctl_fsm = status & M2M_STATUS_CTL_MASK;
+> +	u32 buf_fsm = status & M2M_STATUS_BUF_MASK;
+> +	bool done = status & M2M_STATUS_DONE;
+> +	bool last;
+>  	u32 control;
+>  
+> -	if (!(readl(edmac->regs + M2M_INTERRUPT) & M2M_INTERRUPT_DONEINT))
+> +	/* Accept only DONE and NFB interrupts */
+> +	if (!(readl(edmac->regs + M2M_INTERRUPT) & M2M_INTERRUPT_MASK))
+>  		return INTERRUPT_UNKNOWN;
+>  
+> -	/* Clear the DONE bit */
+> -	writel(0, edmac->regs + M2M_INTERRUPT);
+> +	if (done)
+> +		/* Clear the DONE bit */
+> +		writel(0, edmac->regs + M2M_INTERRUPT);
+>  
+> -	/* Disable interrupts and the channel */
+> -	control = readl(edmac->regs + M2M_CONTROL);
+> -	control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_ENABLE);
+> -	writel(control, edmac->regs + M2M_CONTROL);
+> +	/*
+> +	 * Check whether we are done with descriptors or not. This, together
+> +	 * with DMA channel state, determines action to take in interrupt.
+> +	 */
+> +	last = list_first_entry(edmac->active.next,
+> +		struct ep93xx_dma_desc, node)->txd.cookie;
+>  
+>  	/*
+> -	 * Since we only get DONE interrupt we have to find out ourselves
+> -	 * whether there still is something to process. So we try to advance
+> -	 * the chain an see whether it succeeds.
+> +	 * Use M2M DMA Buffer FSM and Control FSM to check current state of
+> +	 * DMA channel. Using DONE and NFB bits from channel status register
+> +	 * or bits from channel interrupt register was proven not to be
+> +	 * reliable.
+>  	 */
+> -	if (ep93xx_dma_advance_active(edmac)) {
+> -		edmac->edma->hw_submit(edmac);
+> +	if (!last &&
+> +	    (buf_fsm == M2M_STATUS_BUF_NO ||
+> +	     buf_fsm == M2M_STATUS_BUF_ON)) {
+> +		/*
+> +		 * Two buffers are ready for update when Buffer FSM is in
+> +		 * DMA_NO_BUF state. Only one buffer can be prepared without
+> +		 * disabling the channel, or polling the DONE bit.
+> +		 * To simplify things, always prepare only one buffer.
+> +		 */
+> +		ep93xx_dma_advance_active(edmac);
+> +		m2m_fill_desc(edmac);
+> +		if (done && !edmac->chan.private) {
+> +			/* Software trigger for memcpy channel */
+> +			control = readl(edmac->regs + M2M_CONTROL);
+> +			control |= M2M_CONTROL_START;
+> +			writel(control, edmac->regs + M2M_CONTROL);
+> +		}
+>  		return INTERRUPT_NEXT_BUFFER;
+>  	}
+>  
+> -	return INTERRUPT_DONE;
+> +	/*
+> +	 * Disable the channel only when Buffer FSM is in DMA_NO_BUF state
+> +	 * and Control FSM is in DMA_STALL state.
+> +	 */
+> +	if (last &&
+> +	    buf_fsm == M2M_STATUS_BUF_NO &&
+> +	    ctl_fsm == M2M_STATUS_CTL_STALL) {
+> +		/* Disable interrupts and the channel */
+> +		control = readl(edmac->regs + M2M_CONTROL);
+> +		control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_NFBINT
+> +			    | M2M_CONTROL_ENABLE);
+> +		writel(control, edmac->regs + M2M_CONTROL);
+> +		return INTERRUPT_DONE;
+> +	}
+> +
+> +	/*
+> +	 * Nothing to do this time.
+> +	 */
+> +	return INTERRUPT_NEXT_BUFFER;
+>  }
+>  
+>  /*
