@@ -1,32 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Mar 2012 16:12:21 -0700
-Subject: [PATCH] ARM: OMAP3+: fix oops triggered in
- omap_prcm_register_chain_handler(v1)
-In-Reply-To: <1332379417-7408-1-git-send-email-tom.leiming@gmail.com> (Ming
- Lei's message of "Thu, 22 Mar 2012 09:23:37 +0800")
-References: <1332379417-7408-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <87mx7844dm.fsf@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 22 Mar 2012 17:40:50 -0600 (MDT)
+Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
+In-Reply-To: <CAMrsUdLtC0iVk2qDDDXj2tteAzP5UQJXNvsCoJLEC9Yty2QjvQ@mail.gmail.com>
+References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+ <87limurpsx.fsf@ti.com>
+ <CAMrsUdLtC0iVk2qDDDXj2tteAzP5UQJXNvsCoJLEC9Yty2QjvQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1203221740140.24425@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
+Hi
 
-> This patch fixes the oops below[1].
->
-> Obviously, the count of "struct irq_chip_generic" instances to be
-> allocated and setup should be irq_setup->nr_regs instead of
-> irq_setup->nr_regs plus one, so just fix the iterator to avoid
-> the oops. 
+On Thu, 22 Mar 2012, Raja, Govindraj wrote:
 
-[...]
+> Sorry I for got to add that, here are details on what was tested.
+> 
+> 1.) OMAP2430 SDP : Boot tested with uart1 as console.
+> 
+> 2.) OMAP3430 SDP: Boot test, suspend/resume tests, retention off mode
+>                                (checking retention and off mode count
+> in cpu idle cases)
+> 
+> 3.) OMAP3630 - Beagle XM:  Boot test, suspend/resume tests, retention off mode
+>                                             (checking retention and
+> off mode count in cpu idle cases)
+> 
+> 4.) OMAP4430 - PANDA: Boot test, suspend/resume tests
+> 
+> 5.) OMAP4460 - PANDA: Boot test.
 
-> ---
-> v1:
-> 	-add a bit more description to the changelog as suggested by
-> 	Tero and Kevin.
+What kernel .config was used for these tests?
 
-Thanks for the updated version.
 
-Queuing as a fix for v3.4-rc (branch: for_3.4/fixes/pm)
-
-Kevin
+- Paul
