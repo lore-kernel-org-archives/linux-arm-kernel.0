@@ -1,84 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 22 Mar 2012 07:08:22 -0700
-Subject: [PATCH v4 05/12] ARM: EXYNOS: add support uart for EXYNOS4 and
- EXYNOS5
-In-Reply-To: <074401cd074f$c2946b90$47bd42b0$%szyprowski@samsung.com>
-References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
- <1331736138-28964-6-git-send-email-kgene.kim@samsung.com>
- <CAJuYYwTJsA1M1Qj2P1-1K=pWzi0BPo8YJNDSx4NqGC7NX0030g@mail.gmail.com>
- <074401cd074f$c2946b90$47bd42b0$%szyprowski@samsung.com>
-Message-ID: <4F6B3256.40304@samsung.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Thu, 22 Mar 2012 15:11:52 +0100
+Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <CACKLOr03tTymT1vdTH7=nqEHu3OvAinPUHEusK+mR+J6Yc35mQ@mail.gmail.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+ <1332344363.19804.12.camel@vkoul-udesk3>
+ <CACKLOr03tTymT1vdTH7=nqEHu3OvAinPUHEusK+mR+J6Yc35mQ@mail.gmail.com>
+Message-ID: <CACKLOr0JTgp+poXCNg8+8pXko3s2JWQhovMw8Z1j-q4aL4oaKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/12 03:45, Marek Szyprowski wrote:
-> Hello,
->
-> On Wednesday, March 21, 2012 10:14 AM Thomas Abraham wrote:
->
->> On 14 March 2012 20:12, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->>> Actually, the base address of uart is different between EXYNOS4
->>> and EXYNOS5 and this patch enables to support uart for EXYNOS4
->>> and EXYNOS5 SoCs at runtime.
+On 22 March 2012 10:39, javier Martin <javier.martin@vista-silicon.com> wrote:
+> On 21 March 2012 16:39, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+>> On Fri, 2012-03-09 at 16:20 +0100, Javier Martin wrote:
+>>> The following series have to be applied on top of the following patches:
+>>> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+>>> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
 >>>
->>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
->>> ---
->>
->> [...]
->>
->>> diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S b/arch/arm/mach-
->> exynos/include/mach/debug-macro.S
->>> index 6cacf16..6c857ff 100644
->>> --- a/arch/arm/mach-exynos/include/mach/debug-macro.S
->>> +++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
->>> @@ -21,8 +21,13 @@
->>>          */
+>>> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+>>> is deprecated and no new patches are accepted for it.
 >>>
->>>         .macro addruart, rp, rv, tmp
->>> -               ldr     \rp, = S3C_PA_UART
->>> -               ldr     \rv, = S3C_VA_UART
->>> +               mov     \rp, #0x10000000
+>>> This series merges this code into the imx-dma.c dmaengine driver.
+>>>
+>>> Notes for v3:
+>>> ?- I send the whole series again despite some patches being the same. I think
+>>> ?this is more comfortable for Vinod than just sending those patches that have
+>>> ?been modified.
+>>> ?- I've generated my series with the following command this time:
+>>> ?'git format-patch -s -13 -M -B --subject-prefix="PATCH v3"' as suggested by
+>>> ?Sascha but still removing two files in 01/13 generates a lot of noisy diffs.
+>>> ?Sorry about that.
+>>> ?- I don't include Sascha's Tested-by since maybe he wants to test this last
+>>> ?version.
+>> This doesn't apply for me (starting with 6th) on current slave-dma.next
+>> due to obvious changes which have gone into imx.
 >>
->> This is physical address of Exynos4/5 CPUID register which cannot be
->> used here. And virtual address S5P_VA_CPUID also cannot be used here
->> since this will be called before paging_init when earlyprintk boot
->> param is used. So, with this change, earlyprintk does not work for
->> both Exynos4 and Exynos5.
+>> Can you quickly rebase the series and resend.
 >
-> I confirm, printascii freeze the system on EXYNOS4 after that patch,
-> tested on Exynos4210 Nuri board.
+> Great,
+> now your 'next' branch is actually broken for imx-dma.
 >
-Hi,
+> I'm currently trying a bisect to find out what is the commit
+> responsible for that but I suspect it will be related to the cookie
+> changes submitted by Russell.
 
-I think, it can be solved with following and if no problems, it will be 
-fixed during v3.4-rcX.
+Here,
+take a look at this series:
 
-diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S 
-b/arch/arm/mach-exynos/in
-index 6c857ff..a865417 100644
---- a/arch/arm/mach-exynos/include/mach/debug-macro.S
-+++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
-@@ -21,10 +21,10 @@
-          */
+[PATCH v4 00/15] dmaengine: imx-dma: rebase of features for 3.4.
 
-         .macro addruart, rp, rv, tmp
--               mov     \rp, #0x10000000
--               ldr     \rp, [\rp, #0x0]
--               and     \rp, \rp, #0xf00000
--               teq     \rp, #0x500000          @@ EXYNOS5
-+               mrc     p15, 0, \tmp, c0, c0, 0
-+               and     \tmp, \tmp, #0xf0
-+               teq     \tmp, #0xf0             @@ A15
-+
-                 ldreq   \rp, =EXYNOS5_PA_UART
-                 movne   \rp, #EXYNOS4_PA_UART   @@ EXYNOS4
-                 ldr     \rv, =S3C_VA_UART
+I've included a new fix patch which solves the merge issue.
 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
