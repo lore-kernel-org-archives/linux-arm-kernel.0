@@ -1,62 +1,165 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Thu, 22 Mar 2012 12:29:56 +0530
-Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
-In-Reply-To: <87limurpsx.fsf@ti.com>
-References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
- <87limurpsx.fsf@ti.com>
-Message-ID: <CAMrsUdLtC0iVk2qDDDXj2tteAzP5UQJXNvsCoJLEC9Yty2QjvQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Mar 2012 15:11:54 +0800
+Subject: [PATCH v13] Regulator: Add Anatop regulator driver
+In-Reply-To: <4F6ACB80.10809@linaro.org>
+References: <1331692152-9256-1-git-send-email-paul.liu@linaro.org>
+ <20120322052449.GB2213@S2101-09.ap.freescale.net>
+ <4F6ACB80.10809@linaro.org>
+Message-ID: <20120322071152.GC2213@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 7:58 PM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> From: "Govindraj.R" <govindraj.raja@ti.com>
->>
->> Based on Linux-OMAP tree uart branch.
->> (git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
->> remotes/origin/uart)
->>
->> * Removes the cpu checks wherever possible and use version reg
->> ? for populating features and errata's
->> * enable tx wakeup available in wer reg for applicable
->> ? module revision's
->
-> As this affects multiple SoCs, please report what SoCs it was tested on
-> as well.
+On Thu, Mar 22, 2012 at 02:49:36PM +0800, Ying-Chun Liu (PaulLiu) wrote:
+...
+> Ouch. I'll prepare a separate patch to add back the documentation.
+> 
+I just gave a quick testing on the driver with the dts change you
+posted on imx6.  There is some little problem we may need to address.
 
-Sorry I for got to add that, here are details on what was tested.
+prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddpu at 140
+vddpu: 725 <--> 1300 mV at 1100 mV
+prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddcore at 140
+cpu: 725 <--> 1300 mV at 1100 mV
+prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddsoc at 140
+vddsoc: 725 <--> 1300 mV at 1100 mV
+prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-2p5 at 130
+vdd2p5: 2000 <--> 2775 mV at 2400 mV
+prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-1p1 at 110
+vdd1p1: 800 <--> 1400 mV at 1100 mV
+prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-3p0 at 120
+vdd3p0: 2800 <--> 3150 mV at 3000 mV
 
-1.) OMAP2430 SDP : Boot tested with uart1 as console.
+The DT core function __of_translate_address will give some annoying
+error messages.  We call of_platform_populate from anatop mfd driver
+to populate regulator device, and during the call, DT core tries to
+translate "reg" property to address resource, and will complain if
+!(#size-cells > 0). 
 
-2.) OMAP3430 SDP: Boot test, suspend/resume tests, retention off mode
-                               (checking retention and off mode count
-in cpu idle cases)
+To fix that, we may want to rename "reg" property to something else,
+e.g. "anatop-reg-offset".  I tested the following changes removed the
+error messages above.
 
-3.) OMAP3630 - Beagle XM:  Boot test, suspend/resume tests, retention off mode
-                                            (checking retention and
-off mode count in cpu idle cases)
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 56d3c16..65bad45 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -346,16 +346,14 @@
+                                compatible = "fsl,imx6q-anatop";
+                                reg = <0x020c8000 0x1000>;
+                                interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
+-                               #address-cells = <1>;
+-                               #size-cells = <0>;
 
-4.) OMAP4430 - PANDA: Boot test, suspend/resume tests
+-                               regulator-vddpu at 140 {
++                               regulator-vddpu {
+                                        compatible = "fsl,anatop-regulator";
+                                        regulator-name = "vddpu";
+                                        regulator-min-microvolt = <725000>;
+                                        regulator-max-microvolt = <1300000>;
+                                        regulator-always-on;
+-                                       reg = <0x140>;
++                                       anatop-reg-offset = <0x140>;
+                                        anatop-vol-bit-shift = <9>;
+                                        anatop-vol-bit-width = <5>;
+                                        anatop-min-bit-val = <1>;
+@@ -363,13 +361,13 @@
+                                        anatop-max-voltage = <1300000>;
+                                };
 
-5.) OMAP4460 - PANDA: Boot test.
+-                               regulator-vddcore at 140 {
++                               regulator-vddcore {
+                                        compatible = "fsl,anatop-regulator";
+                                        regulator-name = "cpu";
+                                        regulator-min-microvolt = <725000>;
+                                        regulator-max-microvolt = <1300000>;
+                                        regulator-always-on;
+-                                       reg = <0x140>;
++                                       anatop-reg-offset = <0x140>;
+                                        anatop-vol-bit-shift = <0>;
+                                        anatop-vol-bit-width = <5>;
+                                        anatop-min-bit-val = <1>;
+@@ -377,13 +375,13 @@
+                                        anatop-max-voltage = <1300000>;
+                                };
 
---
-Thanks,
-Govindraj.R
+-                               regulator-vddsoc at 140 {
++                               regulator-vddsoc {
+                                        compatible = "fsl,anatop-regulator";
+                                        regulator-name = "vddsoc";
+                                        regulator-min-microvolt = <725000>;
+                                        regulator-max-microvolt = <1300000>;
+                                        regulator-always-on;
+-                                       reg = <0x140>;
++                                       anatop-reg-offset = <0x140>;
+                                        anatop-vol-bit-shift = <18>;
+                                        anatop-vol-bit-width = <5>;
+                                        anatop-min-bit-val = <1>;
+@@ -391,13 +389,13 @@
+                                        anatop-max-voltage = <1300000>;
+                                };
+
+-                               regulator-2p5 at 130 {
++                               regulator-2p5 {
+                                        compatible = "fsl,anatop-regulator";
+                                        regulator-name = "vdd2p5";
+                                        regulator-min-microvolt = <2000000>;
+                                        regulator-max-microvolt = <2775000>;
+                                        regulator-always-on;
+-                                       reg = <0x130>;
++                                       anatop-reg-offset = <0x130>;
+                                        anatop-vol-bit-shift = <8>;
+                                        anatop-vol-bit-width = <5>;
+                                        anatop-min-bit-val = <0>;
+@@ -405,13 +403,13 @@
+                                        anatop-max-voltage = <2775000>;
+                                };
+
+-                               regulator-1p1 at 110 {
++                               regulator-1p1 {
+                                        compatible = "fsl,anatop-regulator";
+                                        regulator-name = "vdd1p1";
+                                        regulator-min-microvolt = <800000>;
+                                        regulator-max-microvolt = <1400000>;
+                                        regulator-always-on;
+-                                       reg = <0x110>;
++                                       anatop-reg-offset = <0x110>;
+                                        anatop-vol-bit-shift = <8>;
+                                        anatop-vol-bit-width = <5>;
+                                        anatop-min-bit-val = <4>;
+@@ -419,13 +417,13 @@
+                                        anatop-max-voltage = <1400000>;
+                                };
+
+-                               regulator-3p0 at 120 {
++                               regulator-3p0 {
+                                        compatible = "fsl,anatop-regulator";
+                                        regulator-name = "vdd3p0";
+                                        regulator-min-microvolt = <2800000>;
+                                        regulator-max-microvolt = <3150000>;
+                                        regulator-always-on;
+-                                       reg = <0x120>;
++                                       anatop-reg-offset = <0x120>;
+                                        anatop-vol-bit-shift = <8>;
+                                        anatop-vol-bit-width = <5>;
+                                        anatop-min-bit-val = <7>;
+diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
+index 17499a5..632c087 100644
+--- a/drivers/regulator/anatop-regulator.c
++++ b/drivers/regulator/anatop-regulator.c
+@@ -138,9 +138,9 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
+        rdesc->type = REGULATOR_VOLTAGE;
+        rdesc->owner = THIS_MODULE;
+        sreg->mfd = anatopmfd;
+-       ret = of_property_read_u32(np, "reg", &sreg->control_reg);
++       ret = of_property_read_u32(np, "anatop-reg-offset", &sreg->control_reg);
+        if (ret) {
+-               dev_err(dev, "no reg property set\n");
++               dev_err(dev, "no anatop-reg-offset property set\n");
+                goto anatop_probe_end;
+        }
+        ret = of_property_read_u32(np, "anatop-vol-bit-width",
 
 
->
-> Thanks,
->
-> Kevin
->
->> Govindraj.R (3):
->> ? OMAP2+: UART: Remove cpu checks for populating errata flags
->> ? OMAP2+: UART: enable tx wakeup bit for wer reg
->> ? OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
->>
->> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 13 +----
->> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?8 +++-
->> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 71 ++++++++++++++++++++++++-
->> ?3 files changed, 78 insertions(+), 14 deletions(-)
+-- 
+Regards,
+Shawn
