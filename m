@@ -1,36 +1,69 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 22 Mar 2012 14:21:06 -0700
-Subject: [PATCH 07/16] mm/arm: use vm_flags_t for vma flags
-In-Reply-To: <20120321065642.13852.95838.stgit@zurg>
-References: <20120321065140.13852.52315.stgit@zurg>
- <20120321065642.13852.95838.stgit@zurg>
-Message-ID: <20120322142106.3aa383a5.akpm@linux-foundation.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 22 Mar 2012 16:36:51 -0500
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <20120322200339.GA5812@mwesterb-mobl.ger.corp.intel.com>
+References: <4F683B36.8090101@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
+ <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
+ <20120322073750.GA637@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48CAF@AUSP01VMBX24.collaborationhost.net>
+ <20120322200339.GA5812@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020696D48D83@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Mar 2012 10:56:42 +0400
-Konstantin Khlebnikov <khlebnikov@openvz.org> wrote:
-
-> Cast vm_flags to unsigned int for __cpuc_flush_user_range(),
-> because its vm_flags argument declared as unsigned int.
-> Asssembler code wants to test VM_EXEC bit on vma->vm_flags,
-> but for big-endian we should get upper word for this.
-> 
-> ...
+On Thursday, March 22, 2012 1:04 PM, Mika Westerberg wrote:
+> On Thu, Mar 22, 2012 at 01:52:52PM -0500, H Hartley Sweeten wrote:
 >
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -217,7 +217,7 @@ vivt_flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
->  {
->  	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
->  		__cpuc_flush_user_range(start & PAGE_MASK, PAGE_ALIGN(end),
-> -					vma->vm_flags);
-> +					(__force unsigned int)vma->vm_flags);
->  }
+>> I hacked this back to the handle_one_vic function. It looks like every time
+>> I get the message above the stat read in that function shows an active
+>> interrupt for DMAM2M0 (the dma rx channel) and DMAM2M1 (the dma
+>> tx channel). Because of the way handle_one_vic processes the irq's, the
+>> DMAM2M0 interrupt gets handled first. When it's done it must be clearing
+>> the DMAM2M1 interrupt automatically for some reason. So, when it's
+>> handled there is no interrupt pending so we get the message.
+>> 
+>> The "cleanest" fix I can think of is the following patch.  This is against
+>> linux-next.
+>
+> I can't figure out any better fix unless we move ep93xx back to use
+> !MULTI_IRQ_HANDLER which obviously is not good thing to do.
 
-This won't work if a later version of __cpuc_flush_user_range() needs
-access to newly-added flags in the upper 32 bits.
+I agree.
 
-I guess we don't have to do anything about it at this stage, and that
-if we do ever hit this problem, we'll need to put those newly-added
-flags into the lower 32 bits of the vm_flags_t.
+>> From: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> 
+>> dma: ep93xx: check for spurious interrupts
+>> 
+>> The ep93xx dma controller generates spurious interrupts on dma1chan1 when
+>> used with the mmc_spi driver. Catch these early by making sure there is an
+>> interrupt to actually process.
+>> 
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>
+> Tested-by: Mika Westerberg <mika.westerberg@iki.fi>
+>
+> Thanks for investigating this. You missed one thing though, see below.
+> Otherwise it doesn't compile :)
+>
+> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
+> index e1cc87a..614bff4 100644
+> --- a/drivers/dma/ep93xx_dma.c
+> +++ b/drivers/dma/ep93xx_dma.c
+> @@ -751,7 +751,7 @@ static irqreturn_t ep93xx_dma_interrupt(int irq, void *dev_id)
+> 		return IRQ_NONE;
+>  	}
+>  
+> -	switch (edmac->edma->hw_interrupt(edmac)) {
+> +	switch (edmac->edma->hw_interrupt(edmac, irq_status)) {
+> 	case INTERRUPT_DONE:
+> 		desc->complete = true;
+> 		tasklet_schedule(&edmac->tasklet);
+
+Gah... Misstyped it when I created the patch.
+
+I'll fix it and post a proper patch with your Tested-by.
+
+Thanks,
+Hartley
