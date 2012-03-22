@@ -1,35 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Mar 2012 16:34:59 +0800
-Subject: [PATCH] ARM: mxs: enforce semantics of
- clk_prepare()/clk_unprepare() and clk_enable()/clk_disable()
-In-Reply-To: <1332404298-18891-1-git-send-email-LW@KARO-electronics.de>
-References: <1332404298-18891-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20120322083457.GE2213@S2101-09.ap.freescale.net>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 22 Mar 2012 09:57:37 +0100
+Subject: [PATCH 1/3] mmc: atmel-mci: correct data timeout computation
+In-Reply-To: <4F6A011C.3000900@mvista.com>
+References: <1332344483-3915-1-git-send-email-ludovic.desroches@atmel.com>
+ <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
+ <4F6A011C.3000900@mvista.com>
+Message-ID: <20120322085736.GM11834@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 09:18:17AM +0100, Lothar Wa?mann wrote:
-> After introducing clk_prepare()/clk_unprepare() there may still be
-> drivers out there that don't use the new functions.
-> This patch warns about drivers calling clk_enable() without a
-> preceding clk_prepare() and various other invalid sequences of calls
-> to clk_enable()/clk_disable() and clk_prepare()/clk_unprepare().
+Hello Sergei,
+
+On Wed, Mar 21, 2012 at 07:26:04PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 03/21/2012 06:41 PM, ludovic.desroches at atmel.com wrote:
+> 
+> >From: Ludovic Desroches<ludovic.desroches@atmel.com>
+> 
+> >The HSMCI operates at a rate of up to Master Clock divided by two.
+> 
+> >Signed-off-by: Ludovic Desroches<ludovic.desroches@atmel.com>
+> >---
+> >  drivers/mmc/host/atmel-mci.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> >diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> >index e4449a5..e161452 100644
+> >--- a/drivers/mmc/host/atmel-mci.c
+> >+++ b/drivers/mmc/host/atmel-mci.c
+> >@@ -480,7 +480,7 @@ err:
+> >  static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
+> >  					unsigned int ns)
+> >  {
+> >-	return (ns * (host->bus_hz / 1000000) + 999) / 1000;
+> >+	return (ns * ((host->bus_hz/2) / 1000000) + 999) / 1000;
+> 
+>    Why don't you keep the notation by addign spaces around '/'?
+>    BTW, could use DIV_ROUND_UP() here.
 > 
 
-I plan to migrate the mxs clock driver to common clk framework in the
-next merge window.  Thus, I do not see much point to take this patch.
+Thanks for your comments. BTW I have realized (when testing values return using
+DIV_ROUND_UP) that I may have another issue with this timeout calculation.
+I will send a new patch.
 
-> To not make a system unusable due to excessive warning messages the
-> warnings are limited to 1 per clk by a flag in the 'flags' member of
-> struct clk.
-> 
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  arch/arm/mach-mxs/clock.c              |   98 ++++++++++++++++++++++++++++----
->  arch/arm/mach-mxs/include/mach/clock.h |    6 ++
->  2 files changed, 93 insertions(+), 11 deletions(-)
+Regards
 
--- 
-Regards,
-Shawn
+Ludovic
