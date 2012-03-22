@@ -1,211 +1,206 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 22 Mar 2012 10:29:23 +0100
-Subject: [PATCH v2] ARM: davinci: implement DEBUG_LL port choice
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B631800A8C@DBDE01.ent.ti.com>
-References: <DF0F476B391FA8409C78302C7BA518B631800A8C@DBDE01.ent.ti.com>
-Message-ID: <1332408563-18444-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Thu, 22 Mar 2012 10:33:55 +0100
+Subject: [PATCH] ARM: davinci: make all struct davinci_uart_config const and
+ __initconst
+Message-ID: <1332408835-22030-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apart from the necessity to do this change for multi-platform kernels
-the previous logic depended on the zImage decompressor to write the
-physical and virtual address to a magic memory location.
-If the decompressor is unused or not correctly configured for the
-current machid, the addruart macro was an infinite loop. Moreover
-debugging the early zImage code was not possible either.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-Changes since (implicit) v1:
- - add closing " to description strings
- - remove debug setting for unmainlined machine id in uncompress.h
+Hello,
 
- arch/arm/Kconfig.debug                           |   16 ++++++
- arch/arm/mach-davinci/include/mach/debug-macro.S |   58 ++++++++--------------
- arch/arm/mach-davinci/include/mach/hardware.h    |    2 +-
- arch/arm/mach-davinci/include/mach/serial.h      |   10 ----
- arch/arm/mach-davinci/include/mach/uncompress.h  |   24 ++-------
- 5 files changed, 43 insertions(+), 67 deletions(-)
+I'm not sure it's worth to do this because I guess it becomes obsolete when
+davinci is converted to dt. But as I did the patch and I don't know
+when/if davinci is converted I'm sending it anyhow.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e0d236d..4c2fb44 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -108,6 +108,22 @@ choice
- 		bool "Kernel low-level debugging on 9263, 9g45 and cap9"
- 		depends on HAVE_AT91_DBGU1
+Best regards
+Uwe
+
+ arch/arm/mach-davinci/board-da830-evm.c     |    2 +-
+ arch/arm/mach-davinci/board-da850-evm.c     |    2 +-
+ arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c    |    2 +-
+ arch/arm/mach-davinci/board-mityomapl138.c  |    2 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c |    3 ++-
+ arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
+ arch/arm/mach-davinci/include/mach/serial.h |    2 +-
+ arch/arm/mach-davinci/serial.c              |    2 +-
+ 13 files changed, 14 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index dc1afe5..a4976dc 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -185,7 +185,7 @@ static __init void da830_evm_usb_init(void)
+ 			   __func__, ret);
+ }
  
-+	config DEBUG_DAVINCI_UART0
-+		bool "Kernel low-level debugging on Davinci using uart0"
-+		depends on ARCH_DAVINCI_DM644x
-+
-+	config DEBUG_DA8XX_UART1
-+		bool "Kernel low-level debugging on DA8xx using uart1"
-+		depends on ARCH_DAVINCI_DA8XX
-+
-+	config DEBUG_DA8XX_UART2
-+		bool "Kernel low-level debugging on DA8xx using uart2"
-+		depends on ARCH_DAVINCI_DA8XX
-+
-+	config DEBUG_TNETV107X_UART1
-+		bool "Kernel low-level debugging on TNETV107x using uart1"
-+		depends on ARCH_DAVINCI_TNETV107X
-+
- 	config DEBUG_FOOTBRIDGE_COM1
- 		bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
- 		depends on FOOTBRIDGE
-diff --git a/arch/arm/mach-davinci/include/mach/debug-macro.S b/arch/arm/mach-davinci/include/mach/debug-macro.S
-index cf94552..9c08295 100644
---- a/arch/arm/mach-davinci/include/mach/debug-macro.S
-+++ b/arch/arm/mach-davinci/include/mach/debug-macro.S
-@@ -22,46 +22,28 @@
+-static struct davinci_uart_config da830_evm_uart_config __initdata = {
++static const struct davinci_uart_config da830_evm_uart_config __initconst = {
+ 	.enabled_uarts = 0x7,
+ };
  
- #define UART_SHIFT	2
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index d508890..1ca1e56 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -734,7 +734,7 @@ static struct davinci_i2c_platform_data da850_evm_i2c_0_pdata = {
+ 	.bus_delay	= 0,	/* usec */
+ };
  
--		.pushsection .data
--davinci_uart_phys:	.word	0
--davinci_uart_virt:	.word	0
--		.popsection
--
--		.macro addruart, rp, rv, tmp
--
--		/* Use davinci_uart_phys/virt if already configured */
--10:		adr	\rp, 99f		@ get effective addr of 99f
--		ldr	\rv, [\rp]		@ get absolute addr of 99f
--		sub	\rv, \rv, \rp		@ offset between the two
--		ldr	\rp, [\rp, #4]		@ abs addr of omap_uart_phys
--		sub	\tmp, \rp, \rv		@ make it effective
--		ldr	\rp, [\tmp, #0]		@ davinci_uart_phys
--		ldr	\rv, [\tmp, #4]		@ davinci_uart_virt
--		cmp	\rp, #0			@ is port configured?
--		cmpne	\rv, #0
--		bne	100f			@ already configured
--
--		/* Check the debug UART address set in uncompress.h */
--		and	\rp, pc, #0xff000000
--		ldr	\rv, =DAVINCI_UART_INFO_OFS
--		add	\rp, \rp, \rv
--
--		/* Copy uart phys address from decompressor uart info */
--		ldr	\rv, [\rp, #0]
--		str	\rv, [\tmp, #0]
--
--		/* Copy uart virt address from decompressor uart info */
--		ldr	\rv, [\rp, #4]
--		str	\rv, [\tmp, #4]
--
--		b	10b
-+#if defined(CONFIG_DEBUG_DAVINCI_UART0)
-+#define UART_BASE	DAVINCI_UART0_BASE
-+#elif defined(CONFIG_DEBUG_DA8XX_UART0)
-+#define UART_BASE	DA8XX_UART0_BASE
-+#elif defined(CONFIG_DEBUG_DA8XX_UART1)
-+#define UART_BASE	DA8XX_UART1_BASE
-+#elif defined(CONFIG_DEBUG_DA8XX_UART2)
-+#define UART_BASE	DA8XX_UART2_BASE
-+#elif defined(CONFIG_DEBUG_TNETV107X_UART1)
-+#define UART_BASE	TNETV107X_UART2_BASE
-+#define UART_VIRTBASE	TNETV107X_UART2_VIRT
-+#else
-+#error "Select a specifc port for DEBUG_LL"
-+#endif
+-static struct davinci_uart_config da850_evm_uart_config __initdata = {
++static const struct davinci_uart_config da850_evm_uart_config __initconst = {
+ 	.enabled_uarts = 0x7,
+ };
  
--		.align
--99:		.word	.
--		.word	davinci_uart_phys
--		.ltorg
-+#ifndef UART_VIRTBASE
-+#define UART_VIRTBASE IO_ADDRESS(UART_BASE)
-+#endif
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index 275341f..e5ebe57 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -246,7 +246,7 @@ static struct platform_device *davinci_evm_devices[] __initdata = {
+ 	&davinci_nand_device,
+ };
  
--100:
-+		.macro addruart, rp, rv, tmp
-+		ldr     \rp, =UART_BASE
-+		ldr     \rv, =UART_VIRTBASE
- 		.endm
+-static struct davinci_uart_config uart_config __initdata = {
++static const struct davinci_uart_config uart_config __initconst = {
+ 	.enabled_uarts = (1 << 0),
+ };
  
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-davinci/include/mach/hardware.h b/arch/arm/mach-davinci/include/mach/hardware.h
-index 414e0b9..649ddc2 100644
---- a/arch/arm/mach-davinci/include/mach/hardware.h
-+++ b/arch/arm/mach-davinci/include/mach/hardware.h
-@@ -24,7 +24,7 @@
- /*
-  * I/O mapping
-  */
--#define IO_PHYS				0x01c00000UL
-+#define IO_PHYS				UL(0x01c00000)
- #define IO_OFFSET			0xfd000000 /* Virtual IO = 0xfec00000 */
- #define IO_SIZE				0x00400000
- #define IO_VIRT				(IO_PHYS + IO_OFFSET)
+diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+index e99db28..f21e2d4 100644
+--- a/arch/arm/mach-davinci/board-dm355-leopard.c
++++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+@@ -171,7 +171,7 @@ static struct platform_device *davinci_leopard_devices[] __initdata = {
+ 	&davinci_nand_device,
+ };
+ 
+-static struct davinci_uart_config uart_config __initdata = {
++static const struct davinci_uart_config uart_config __initconst = {
+ 	.enabled_uarts = (1 << 0),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 849311d..35cecc0 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -557,7 +557,7 @@ fail:
+ 	/* REVISIT export switches: NTSC/PAL (SW5.6), EXTRA1 (SW5.2), etc */
+ }
+ 
+-static struct davinci_uart_config uart_config __initdata = {
++static const struct davinci_uart_config uart_config __initconst = {
+ 	.enabled_uarts = (1 << 0),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 1247ecd..8e204e1 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -617,7 +617,7 @@ static struct platform_device *davinci_evm_devices[] __initdata = {
+ 	&rtc_dev,
+ };
+ 
+-static struct davinci_uart_config uart_config __initdata = {
++static const struct davinci_uart_config uart_config __initconst = {
+ 	.enabled_uarts = (1 << 0),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 872ac69..d4b7b53 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -732,7 +732,7 @@ static void __init davinci_map_io(void)
+ 	cdce_clk_init();
+ }
+ 
+-static struct davinci_uart_config uart_config __initdata = {
++static const struct davinci_uart_config uart_config __initconst = {
+ 	.enabled_uarts = (1 << 0),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 672d820..9432ae2 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -434,7 +434,7 @@ static void __init mityomapl138_setup_nand(void)
+ 				 ARRAY_SIZE(mityomapl138_devices));
+ }
+ 
+-static struct davinci_uart_config mityomapl138_uart_config __initdata = {
++static const struct davinci_uart_config mityomapl138_uart_config __initconst = {
+ 	.enabled_uarts = 0x7,
+ };
+ 
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index 8d34f51..adaf8cd 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -152,7 +152,7 @@ static struct platform_device *davinci_ntosd2_devices[] __initdata = {
+ 	&ntosd2_leds_dev,
+ };
+ 
+-static struct davinci_uart_config uart_config __initdata = {
++static const struct davinci_uart_config uart_config __initconst = {
+ 	.enabled_uarts = (1 << 0),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index 45e8157..5f5e0ac 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -293,7 +293,8 @@ usb11_setup_oc_fail:
+ 	gpio_free(DA850_USB1_VBUS_PIN);
+ }
+ 
+-static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
++static const struct davinci_uart_config
++		omapl138_hawk_uart_config __initconst = {
+ 	.enabled_uarts = 0x7,
+ };
+ 
+diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+index 31da3c5..0fdd0cb 100644
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@ -124,7 +124,7 @@ static struct platform_device *davinci_sffsdr_devices[] __initdata = {
+ 	&davinci_sffsdr_nandflash_device,
+ };
+ 
+-static struct davinci_uart_config uart_config __initdata = {
++static const struct davinci_uart_config uart_config __initconst = {
+ 	.enabled_uarts = (1 << 0),
+ };
+ 
 diff --git a/arch/arm/mach-davinci/include/mach/serial.h b/arch/arm/mach-davinci/include/mach/serial.h
-index e347d88..46b3cd1 100644
+index 46b3cd1..2429aee 100644
 --- a/arch/arm/mach-davinci/include/mach/serial.h
 +++ b/arch/arm/mach-davinci/include/mach/serial.h
-@@ -15,16 +15,6 @@
+@@ -42,7 +42,7 @@ struct davinci_uart_config {
+ 	unsigned int enabled_uarts;
+ };
  
- #include <mach/hardware.h>
+-extern int davinci_serial_init(struct davinci_uart_config *);
++extern int davinci_serial_init(const struct davinci_uart_config *);
+ #endif
  
--/*
-- * Stolen area that contains debug uart physical and virtual addresses.  These
-- * addresses are filled in by the uncompress.h code, and are used by the debug
-- * macros in debug-macro.S.
-- *
-- * This area sits just below the page tables (see arch/arm/kernel/head.S).
-- * We define it as a relative offset from start of usable RAM.
-- */
--#define DAVINCI_UART_INFO_OFS	0x3ff8
--
- #define DAVINCI_UART0_BASE	(IO_PHYS + 0x20000)
- #define DAVINCI_UART1_BASE	(IO_PHYS + 0x20400)
- #define DAVINCI_UART2_BASE	(IO_PHYS + 0x20800)
-diff --git a/arch/arm/mach-davinci/include/mach/uncompress.h b/arch/arm/mach-davinci/include/mach/uncompress.h
-index 9dc7cf9..0ff7363 100644
---- a/arch/arm/mach-davinci/include/mach/uncompress.h
-+++ b/arch/arm/mach-davinci/include/mach/uncompress.h
-@@ -41,37 +41,25 @@ static inline void flush(void)
- 		barrier();
+ #endif /* __ASM_ARCH_SERIAL_H */
+diff --git a/arch/arm/mach-davinci/serial.c b/arch/arm/mach-davinci/serial.c
+index 1875740..0d054c4 100644
+--- a/arch/arm/mach-davinci/serial.c
++++ b/arch/arm/mach-davinci/serial.c
+@@ -70,7 +70,7 @@ static void __init davinci_serial_reset(struct plat_serial8250_port *p)
+ 				 UART_DM646X_SCR_TX_WATERMARK);
  }
  
--static inline void set_uart_info(u32 phys, void * __iomem virt)
-+static inline void set_uart_info(u32 phys)
+-int __init davinci_serial_init(struct davinci_uart_config *info)
++int __init davinci_serial_init(const struct davinci_uart_config *info)
  {
--	/*
--	 * Get address of some.bss variable and round it down
--	 * a la CONFIG_AUTO_ZRELADDR.
--	 */
--	u32 ram_start = (u32)&uart & 0xf8000000;
--	u32 *uart_info = (u32 *)(ram_start + DAVINCI_UART_INFO_OFS);
--
- 	uart = (u32 *)phys;
--	uart_info[0] = phys;
--	uart_info[1] = (u32)virt;
- }
- 
--#define _DEBUG_LL_ENTRY(machine, phys, virt)			\
-+#define _DEBUG_LL_ENTRY(machine, phys)				\
- 	if (machine_is_##machine()) {				\
--		set_uart_info(phys, virt);			\
-+		set_uart_info(phys);				\
- 		break;						\
- 	}
- 
- #define DEBUG_LL_DAVINCI(machine, port)				\
--	_DEBUG_LL_ENTRY(machine, DAVINCI_UART##port##_BASE,	\
--			IO_ADDRESS(DAVINCI_UART##port##_BASE))
-+	_DEBUG_LL_ENTRY(machine, DAVINCI_UART##port##_BASE)
- 
- #define DEBUG_LL_DA8XX(machine, port)				\
--	_DEBUG_LL_ENTRY(machine, DA8XX_UART##port##_BASE,	\
--			IO_ADDRESS(DA8XX_UART##port##_BASE))
-+	_DEBUG_LL_ENTRY(machine, DA8XX_UART##port##_BASE)
- 
- #define DEBUG_LL_TNETV107X(machine, port)			\
--	_DEBUG_LL_ENTRY(machine, TNETV107X_UART##port##_BASE,	\
--			TNETV107X_UART##port##_VIRT)
-+	_DEBUG_LL_ENTRY(machine, TNETV107X_UART##port##_BASE)
- 
- static inline void __arch_decomp_setup(unsigned long arch_id)
- {
+ 	int i;
+ 	char name[16];
 -- 
 1.7.9.1
