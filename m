@@ -1,165 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Mar 2012 15:11:54 +0800
-Subject: [PATCH v13] Regulator: Add Anatop regulator driver
-In-Reply-To: <4F6ACB80.10809@linaro.org>
-References: <1331692152-9256-1-git-send-email-paul.liu@linaro.org>
- <20120322052449.GB2213@S2101-09.ap.freescale.net>
- <4F6ACB80.10809@linaro.org>
-Message-ID: <20120322071152.GC2213@S2101-09.ap.freescale.net>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 22 Mar 2012 09:37:50 +0200
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
+References: <4F683B36.8090101@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
+ <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20120322073750.GA637@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 02:49:36PM +0800, Ying-Chun Liu (PaulLiu) wrote:
-...
-> Ouch. I'll prepare a separate patch to add back the documentation.
+On Wed, Mar 21, 2012 at 07:47:52PM -0500, H Hartley Sweeten wrote:
+
+> I think you misunderstood my comment above.
 > 
-I just gave a quick testing on the driver with the dts change you
-posted on imx6.  There is some little problem we may need to address.
+> With this patch applied I get the "unknown interrupt!" storm. These messages
+> keep getting spewed until I power off the board.
 
-prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddpu at 140
-vddpu: 725 <--> 1300 mV at 1100 mV
-prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddcore at 140
-cpu: 725 <--> 1300 mV at 1100 mV
-prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-vddsoc at 140
-vddsoc: 725 <--> 1300 mV at 1100 mV
-prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-2p5 at 130
-vdd2p5: 2000 <--> 2775 mV at 2400 mV
-prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-1p1 at 110
-vdd1p1: 800 <--> 1400 mV at 1100 mV
-prom_parse: Bad cell count for /soc/aips-bus at 02000000/anatop at 020c8000/regulator-3p0 at 120
-vdd3p0: 2800 <--> 3150 mV at 3000 mV
+Ah, right you are. Sorry.
 
-The DT core function __of_translate_address will give some annoying
-error messages.  We call of_platform_populate from anatop mfd driver
-to populate regulator device, and during the call, DT core tries to
-translate "reg" property to address resource, and will complain if
-!(#size-cells > 0). 
+With my Sim.One board, I don't see any interrupt storms at all and I also have
+mmc_spi with DMA enabled.
 
-To fix that, we may want to rename "reg" property to something else,
-e.g. "anatop-reg-offset".  I tested the following changes removed the
-error messages above.
+> Without this patch I get the "got interrupt while active list is empty" messages
+> but only occasionally. Other than the messages the mmc_spi driver seems to
+> be working ok with dma.
+> 
+> I hacked in a dump of the DMA Global Interrupt register when I get the
+> "got interrupt while active list is empty" messages and get this:
+> 
+> dma dma1chan1: got interrupt while active list is empty (00000000)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 56d3c16..65bad45 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -346,16 +346,14 @@
-                                compatible = "fsl,imx6q-anatop";
-                                reg = <0x020c8000 0x1000>;
-                                interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
--                               #address-cells = <1>;
--                               #size-cells = <0>;
+In addition to these messages my board hangs almost every boot.
 
--                               regulator-vddpu at 140 {
-+                               regulator-vddpu {
-                                        compatible = "fsl,anatop-regulator";
-                                        regulator-name = "vddpu";
-                                        regulator-min-microvolt = <725000>;
-                                        regulator-max-microvolt = <1300000>;
-                                        regulator-always-on;
--                                       reg = <0x140>;
-+                                       anatop-reg-offset = <0x140>;
-                                        anatop-vol-bit-shift = <9>;
-                                        anatop-vol-bit-width = <5>;
-                                        anatop-min-bit-val = <1>;
-@@ -363,13 +361,13 @@
-                                        anatop-max-voltage = <1300000>;
-                                };
+> So, according to the DMAGlInt register, there are no channels with an
+> active interrupt.
+> 
+> Are we missing a write to the INTERRUPT registers somewhere to clear the
+> current interrupt?
 
--                               regulator-vddcore at 140 {
-+                               regulator-vddcore {
-                                        compatible = "fsl,anatop-regulator";
-                                        regulator-name = "cpu";
-                                        regulator-min-microvolt = <725000>;
-                                        regulator-max-microvolt = <1300000>;
-                                        regulator-always-on;
--                                       reg = <0x140>;
-+                                       anatop-reg-offset = <0x140>;
-                                        anatop-vol-bit-shift = <0>;
-                                        anatop-vol-bit-width = <5>;
-                                        anatop-min-bit-val = <1>;
-@@ -377,13 +375,13 @@
-                                        anatop-max-voltage = <1300000>;
-                                };
+In the current code we only enable DONE interrupt and we always clear that at
+the beginning of the ISR.
 
--                               regulator-vddsoc at 140 {
-+                               regulator-vddsoc {
-                                        compatible = "fsl,anatop-regulator";
-                                        regulator-name = "vddsoc";
-                                        regulator-min-microvolt = <725000>;
-                                        regulator-max-microvolt = <1300000>;
-                                        regulator-always-on;
--                                       reg = <0x140>;
-+                                       anatop-reg-offset = <0x140>;
-                                        anatop-vol-bit-shift = <18>;
-                                        anatop-vol-bit-width = <5>;
-                                        anatop-min-bit-val = <1>;
-@@ -391,13 +389,13 @@
-                                        anatop-max-voltage = <1300000>;
-                                };
-
--                               regulator-2p5 at 130 {
-+                               regulator-2p5 {
-                                        compatible = "fsl,anatop-regulator";
-                                        regulator-name = "vdd2p5";
-                                        regulator-min-microvolt = <2000000>;
-                                        regulator-max-microvolt = <2775000>;
-                                        regulator-always-on;
--                                       reg = <0x130>;
-+                                       anatop-reg-offset = <0x130>;
-                                        anatop-vol-bit-shift = <8>;
-                                        anatop-vol-bit-width = <5>;
-                                        anatop-min-bit-val = <0>;
-@@ -405,13 +403,13 @@
-                                        anatop-max-voltage = <2775000>;
-                                };
-
--                               regulator-1p1 at 110 {
-+                               regulator-1p1 {
-                                        compatible = "fsl,anatop-regulator";
-                                        regulator-name = "vdd1p1";
-                                        regulator-min-microvolt = <800000>;
-                                        regulator-max-microvolt = <1400000>;
-                                        regulator-always-on;
--                                       reg = <0x110>;
-+                                       anatop-reg-offset = <0x110>;
-                                        anatop-vol-bit-shift = <8>;
-                                        anatop-vol-bit-width = <5>;
-                                        anatop-min-bit-val = <4>;
-@@ -419,13 +417,13 @@
-                                        anatop-max-voltage = <1400000>;
-                                };
-
--                               regulator-3p0 at 120 {
-+                               regulator-3p0 {
-                                        compatible = "fsl,anatop-regulator";
-                                        regulator-name = "vdd3p0";
-                                        regulator-min-microvolt = <2800000>;
-                                        regulator-max-microvolt = <3150000>;
-                                        regulator-always-on;
--                                       reg = <0x120>;
-+                                       anatop-reg-offset = <0x120>;
-                                        anatop-vol-bit-shift = <8>;
-                                        anatop-vol-bit-width = <5>;
-                                        anatop-min-bit-val = <7>;
-diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-index 17499a5..632c087 100644
---- a/drivers/regulator/anatop-regulator.c
-+++ b/drivers/regulator/anatop-regulator.c
-@@ -138,9 +138,9 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
-        rdesc->type = REGULATOR_VOLTAGE;
-        rdesc->owner = THIS_MODULE;
-        sreg->mfd = anatopmfd;
--       ret = of_property_read_u32(np, "reg", &sreg->control_reg);
-+       ret = of_property_read_u32(np, "anatop-reg-offset", &sreg->control_reg);
-        if (ret) {
--               dev_err(dev, "no reg property set\n");
-+               dev_err(dev, "no anatop-reg-offset property set\n");
-                goto anatop_probe_end;
-        }
-        ret = of_property_read_u32(np, "anatop-vol-bit-width",
-
-
--- 
-Regards,
-Shawn
+The VIC code was changed in 3.3. Its behaviour is different now as it tries to
+handle as many IRQs as possible in one go whereas before it only handled one
+IRQ at a time. Could it be that the VIC in ep93xx doesn't cope with that?
