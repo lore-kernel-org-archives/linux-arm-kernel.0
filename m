@@ -1,47 +1,62 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Thu, 22 Mar 2012 14:49:36 +0800
-Subject: [PATCH v13] Regulator: Add Anatop regulator driver
-In-Reply-To: <20120322052449.GB2213@S2101-09.ap.freescale.net>
-References: <1331692152-9256-1-git-send-email-paul.liu@linaro.org>
- <20120322052449.GB2213@S2101-09.ap.freescale.net>
-Message-ID: <4F6ACB80.10809@linaro.org>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Thu, 22 Mar 2012 12:29:56 +0530
+Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
+In-Reply-To: <87limurpsx.fsf@ti.com>
+References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+ <87limurpsx.fsf@ti.com>
+Message-ID: <CAMrsUdLtC0iVk2qDDDXj2tteAzP5UQJXNvsCoJLEC9Yty2QjvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2012?03?22? 13:24), Shawn Guo wrote:
-> On Wed, Mar 14, 2012 at 10:29:12AM +0800, Ying-Chun Liu (PaulLiu) wrote:
->> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+On Wed, Mar 21, 2012 at 7:58 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> From: "Govindraj.R" <govindraj.raja@ti.com>
 >>
->> Anatop is an integrated regulator inside i.MX6 SoC.
->> There are 3 digital regulators which controls PU, CORE (ARM), and SOC.
->> And 3 analog regulators which controls 1P1, 2P5, 3P0 (USB).
->> This patch adds the Anatop regulator driver.
+>> Based on Linux-OMAP tree uart branch.
+>> (git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+>> remotes/origin/uart)
 >>
->> Signed-off-by: Nancy Chen <Nancy.Chen@freescale.com>
->> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
->> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->> Reviewed-by: Axel Lin <axel.lin@gmail.com>
->> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Cc: Liam Girdwood <lrg@ti.com>
->> Cc: Samuel Ortiz <sameo@linux.intel.com>
->> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> ---
->>  drivers/regulator/Kconfig            |    8 +
->>  drivers/regulator/Makefile           |    1 +
->>  drivers/regulator/anatop-regulator.c |  241 ++++++++++++++++++++++++++++++++++
->>  3 files changed, 250 insertions(+), 0 deletions(-)
->>  create mode 100644 drivers/regulator/anatop-regulator.c
+>> * Removes the cpu checks wherever possible and use version reg
+>> ? for populating features and errata's
+>> * enable tx wakeup available in wer reg for applicable
+>> ? module revision's
+>
+> As this affects multiple SoCs, please report what SoCs it was tested on
+> as well.
+
+Sorry I for got to add that, here are details on what was tested.
+
+1.) OMAP2430 SDP : Boot tested with uart1 as console.
+
+2.) OMAP3430 SDP: Boot test, suspend/resume tests, retention off mode
+                               (checking retention and off mode count
+in cpu idle cases)
+
+3.) OMAP3630 - Beagle XM:  Boot test, suspend/resume tests, retention off mode
+                                            (checking retention and
+off mode count in cpu idle cases)
+
+4.) OMAP4430 - PANDA: Boot test, suspend/resume tests
+
+5.) OMAP4460 - PANDA: Boot test.
+
+--
+Thanks,
+Govindraj.R
+
+
+>
+> Thanks,
+>
+> Kevin
+>
+>> Govindraj.R (3):
+>> ? OMAP2+: UART: Remove cpu checks for populating errata flags
+>> ? OMAP2+: UART: enable tx wakeup bit for wer reg
+>> ? OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
 >>
-> I just noticed that the binding document below got lost since v11 of
-> the series.
-> 
->   Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-> 
-> It got lost by mistaken or you dropped it for some reason?
-> 
-
-Ouch. I'll prepare a separate patch to add back the documentation.
-
-Sorry,
-
-Paul
+>> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 13 +----
+>> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?8 +++-
+>> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 71 ++++++++++++++++++++++++-
+>> ?3 files changed, 78 insertions(+), 14 deletions(-)
