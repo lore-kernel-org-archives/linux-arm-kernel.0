@@ -1,58 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Mar 2012 14:20:09 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <CAOh2x=k6ZfamB8DnPgVPjxZ7E1gTuHOQYg6s1Nd1ybA+TSquWA@mail.gmail.com>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203211236.37891.arnd@arndb.de>
- <CAOh2x=k6ZfamB8DnPgVPjxZ7E1gTuHOQYg6s1Nd1ybA+TSquWA@mail.gmail.com>
-Message-ID: <201203221420.10127.arnd@arndb.de>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Thu, 22 Mar 2012 19:52:02 +0530
+Subject: [PATCH v5 0/2] Add Qualcomm MSM ADM DMAEngine driver
+Message-ID: <1332426122-25174-1-git-send-email-kumarrav@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 March 2012, viresh kumar wrote:
-> On Mar 21, 2012 6:09 PM, "Arnd Bergmann" <arnd@arndb.de> wrote:
-> > Regarding the spear3xx patches, I'm looking forward to your patches.
-> > I think spear is simple and clean enough that it can serve as an example
-> > for others doing DT conversion.
-> 
-> I was doing DT stuff for 3xx and have a doubt
-> regarding DT. How are boards identified at runtime now? Earlier we had
-> machine_is_*() to do that.
+Following are the changes we have done from the previous
+v1 posted here: https://lkml.org/lkml/2011/12/22/148
 
-The direct replacement is of_machine_is_compatible(), but there are a lot
-of cases where it's better to have a local property in the device node
-that a driver is using.
+As our ADM Scatter-gather hardware needs
+-32-bit command configuration parameter
+ apart from
+-32-bit source address
+-32-bit destination address
+-16-bit length
 
-For instance, in case of your clock driver, I would suggest you use
-the "compatible" property of the clock device node, and do
+So,we have added new parameter in struct scatterlist to support xfer descriptor
+specific private data, and for supporting ADM Box mode DMA we added new
+API and data structure.
 
-/* null terminated array, turn the lookups into null termination as well */
-struct of_device_id spear_clock_match = {
-	{ "st,spear300-clock", &spear300_clk_lookups },
-	{ "st,spear310-clock", &spear310_clk_lookups },
-	{ "st,spear320-clock", &spear320_clk_lookups },
-	{ },
-};
+Changes done from v2:
 
-void __init spear3xx_of_clk_init(void)
-{
-	struct device_node *np;
-	struct of_device_id *match;
-	struct clk_lookup *lookup;
+As per our previous discussion you had suggested us to follow the below patch
+https://lkml.org/lkml/2012/1/26/405
+Please check the below link of our discussion
+https://lkml.org/lkml/2012/1/30/48
 
-	for_each_matching_node(np, &spear_clock_match)
-		match = of_match_node(&spear_clock_match, np);
+So we have added the new context parameter in device_prep_dma_sg and
+device_prep_interleave_dma API's to support for passing client channel specific
+private data associated with every transfer descriptor.
 
-	for (lookup = match->data; lookup->clk; lookup++)
-		clk_register(lookup);
+We are using
+Interleaved API for BOX type transfer.
+SG API for SG type transfer.
 
-	for (lookup = spear_clk_lookups; lookup->clk; lookup++)
-		clk_register(lookup);
-}
+Changes done from v3:
 
-> Also why are both DT_MACHINE_START and MACHINE_START present on some SoC's?
+Implemented the wrappers as suggested by Russell King in following patch
+https://lkml.org/lkml/2012/2/3/269
+Fixed the dmaengine & client drivers to follow above changes
 
-This is for the transition phase where you want to be able to boot both
-using ATAG and using DT.
+Changes done from v4:
 
-	Arnd
+Changed return value of prep_dma_sg & prep_interleaved_dma to NULL
+when some thing fails inside the API
+ 
+Ravi Kumar V (2):
+  dmaengine: Add context parameter to prep_dma_sg and
+    prep_interleaved_dma
+  DMAEngine: Add DMAEngine driver based on old MSM ADM DMA APIs
+
+ arch/arm/mach-msm/include/mach/dma.h    |   35 ++
+ drivers/dma/Kconfig                     |   12 +
+ drivers/dma/Makefile                    |    1 +
+ drivers/dma/fsldma.c                    |    2 +-
+ drivers/dma/msm_adm_dma.c               |  728 +++++++++++++++++++++++++++++++
+ drivers/dma/sirf-dma.c                  |    2 +-
+ drivers/dma/ste_dma40.c                 |    2 +-
+ drivers/misc/carma/carma-fpga-program.c |    2 +-
+ drivers/misc/carma/carma-fpga.c         |    7 +-
+ include/linux/dmaengine.h               |   22 +-
+ 10 files changed, 803 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/dma/msm_adm_dma.c
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
