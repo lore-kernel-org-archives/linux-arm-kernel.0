@@ -1,123 +1,208 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 22 Mar 2012 14:49:51 +0000
-Subject: Occasional crashes in suspend-resume with MMC transactions
-In-Reply-To: <CANfBPZ9b=6dLbY2D3oAg=Gz_vwAOJ+KC_Bo5ugVJEwumeej_Bw@mail.gmail.com>
-References: <B5906170F1614E41A8A28DE3B8D12143317FDFBB@DBDE01.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D12143317FF773@DBDE01.ent.ti.com>
- <CANfBPZ9b=6dLbY2D3oAg=Gz_vwAOJ+KC_Bo5ugVJEwumeej_Bw@mail.gmail.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C3317FA311@DBDE01.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 22 Mar 2012 15:50:48 +0100
+Subject: [PATCH 1/4] mmc: atmel-mci: add device tree support
+In-Reply-To: <1332352994-20983-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1332352994-20983-1-git-send-email-ludovic.desroches@atmel.com>
+ <1332352994-20983-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <4F6B3C48.90002@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 19:57:16, S, Venkatraman wrote:
-> On Thu, Mar 22, 2012 at 6:50 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> > On Thu, Mar 22, 2012 at 09:53:23, Bedia, Vaibhav wrote:
-> >> Hi,
-> >>
-> >> I am trying to do suspend-resume test with a file copy on MMC/SD going on
-> >> in the background. The test involves simply copying a 450MB file on an ext3
-> >> partition to the same partition under a different name.
-> >>
-> >> This is on an AM335x board which uses the omap_hsmmc driver.
-> >> The kernel is v3.2 and I have also applied the following patch
-> >>
-> >
-> > [...]
-> >
-> > I found that whenever this issue crops up, mmc_host_suspend() is not able to claim the host
-> > And returns -EBUSY. omap_hsmmc driver does not pass on this error code to the PM core and
-> > hence the suspend process continues. When the driver is made to return -EBUSY, the suspend
-> > process gets aborted and the user can try suspending again. I am not sure whether this sort
-> > of suspend failure is acceptable or the driver is doing something wrong. The following
-> > workaround is what I came up with. Do this look a reasonable thing to do?
-> >
-> > ---
-> >
-> > From a4040dd1869b351a5fa29dacd08facf6e24df609 Mon Sep 17 00:00:00 2001
-> > From: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > Date: Thu, 22 Mar 2012 17:14:49 +0530
-> > Subject: [PATCH 1/1] mmc: omap_hsmmc: Pass on the suspend failure to the PM core
-> >
-> > In some cases mmc_host_suspend() is not able to claim the
-> > host and proceed with the suspend process. The core returns
-> > -EBUSY to the host controller driver. Unfortunately, the
-> > host controller driver does not pass on this information
-> > to the PM core and hence the system suspend process continues.
-> >
-> > In these cases the MMC core gets to an unexpected state
-> > during resume and multiple issues related to MMC crop up.
-> > 1. Host controller driver starts accessing the device registers
-> > before the clocks are enabled which leads to a prefetch abort.
-> > 2. A file copy thread which was launched before suspend gets
-> > stuck due to the host not being reclaimed during resume.
-> >
-> > To avoid such problems pass on the -EBUSY status to the PM core
-> > from the host controller driver. With this change, MMC core
-> > suspend might still fail but it does not end up making the
-> > system unusable. Suspend gets aborted and the user can try
-> > suspending the system again.
-> >
-> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > ---
-> > ?drivers/mmc/host/omap_hsmmc.c | ? ?1 +
-> > ?1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> > index 3d8dbbb..1f938d9 100644
-> > --- a/drivers/mmc/host/omap_hsmmc.c
-> > +++ b/drivers/mmc/host/omap_hsmmc.c
-> > @@ -2238,6 +2238,7 @@ static int omap_hsmmc_suspend(struct device *dev)
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(mmc_dev(host->mmc),
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"Unmask interrupt failed\n");
-> > ? ? ? ? ? ? ? ? ? ? ? ?}
-> > + ? ? ? ? ? ? ? ? ? ? ? ret = -EBUSY;
-> > ? ? ? ? ? ? ? ? ? ? ? ?goto err;
-> > ? ? ? ? ? ? ? ?}
-> >
-> > --
-> > 1.7.0.4
+On 03/21/2012 07:03 PM, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> I see (in 3.3) that the host controller driver does a "return ret" and
-> that means the errors is propagated.
-> Where is the return code lost /overridden ?
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-As seen from http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/mmc/host/omap_hsmmc.c;h=fd0c661bbad38a7152a37955146ff6068d4d7137;hb=refs/tags/v3.3
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-omap_hsmmc.c 
-
-@ 2045
-
-pdata->resume = omap_hsmmc_resume_cdirq;
-
-
-@227
-
-static int omap_hsmmc_resume_cdirq(struct device *dev, int slot)
-{
-        struct omap_mmc_platform_data *mmc = dev->platform_data;
-
-        enable_irq(mmc->slots[0].card_detect_irq);
-        return 0;							-----> always return 0
-}
-
-@2167
-
-                        if (host->pdata->resume) {
-                                ret = host->pdata->resume(&pdev->dev,		--> ret becomes zero irrespective of its previous value.
-                                                          host->slot_id);
-                                if (ret)
-                                        dev_dbg(mmc_dev(host->mmc),
-                                                "Unmask interrupt failed\n");
-                        }
-
-
+> ---
+>  .../devicetree/bindings/mmc/atmel-hsmci.txt        |   55 +++++++++++++++
+>  drivers/mmc/host/atmel-mci.c                       |   74 +++++++++++++++++++-
+>  2 files changed, 126 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> diff --git a/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> new file mode 100644
+> index 0000000..657f9de
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> @@ -0,0 +1,55 @@
+> +* Atmel High Speed MultiMedia Card Interface
+> +
+> +This controller on atmel products provides an interface for MMC, SD and SDIO
+> +types of memory cards.
+> +
+> +1) MCI node
+> +
+> +Required properties:
+> +- compatible: no blank "atmel,hsmci"
+> +- reg: should contain HSMCI registers location and length
+> +- interrupts: should contain HSMCI interrupt number
+> +- at least one slot node
+> +
+> +The node contains child nodes for each slot that the platform uses
+> +
+> +Example MCI node:
+> +
+> +mmc0: mmc at f0008000 {
+> +	compatible = "atmel,hsmci";
+> +	reg = <0xf0008000 0x600>;
+> +	interrupts = <12 4>;
+> +
+> +	[ child node definitions...]
+> +};
+> +
+> +2) slot nodes
+> +
+> +Optional properties:
+> +- bus-width: number of data lines connected to the controller
+> +- cd-gpios: specify GPIOs for card detection
+> +- cd-invert: invert the value of external card detect gpio line
+> +- wp-gpios: specify GPIOs for write protection
+> +
+> +Example slot node:
+> +
+> +slot at 0 {
+> +	bus-width = <4>;
+> +	cd-gpios = <&pioD 15 0>
+> +	cd-invert;
+> +};
+> +
+> +Example full MCI node:
+> +mmc0: mmc at f0008000 {
+> +	compatible = "atmel,hsmci";
+> +	reg = <0xf0008000 0x600>;
+> +	interrupts = <12 4>;
+> +	slot at 0 {
+> +		bus-width = <4>;
+> +		cd-gpios = <&pioD 15 0>
+> +		cd-invert;
+> +	};
+> +	slot at 1 {
+> +		bus-width = <4>;
+> +	};
+> +};
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index b5693fd..2d6a04a 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -19,6 +19,9 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/ioport.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/scatterlist.h>
+>  #include <linux/seq_file.h>
+> @@ -477,6 +480,54 @@ err:
+>  	dev_err(&mmc->class_dev, "failed to initialize debugfs for slot\n");
+>  }
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id atmci_dt_ids[] = {
+> +	{ .compatible = "atmel,hsmci" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, atmci_dt_ids);
+> +
+> +static void __init
+> +atmci_get_of_slots(struct device *dev, struct mci_platform_data *pdata)
+> +{
+> +	struct device_node *np = dev->of_node;
+> +	struct device_node *cnp;
+> +	unsigned int slot_nb = 0;
+> +
+> +	if (!np)
+> +		return;
+> +
+> +	for_each_child_of_node(np, cnp) {
+> +		if (slot_nb > (ATMCI_MAX_NR_SLOTS-1)) {
+> +			dev_warn(dev, "can't have more than %d slots\n",
+> +			         ATMCI_MAX_NR_SLOTS);
+> +			break;
+> +		}
+> +		if (of_property_read_u32(cnp, "bus-width",
+> +		                         &pdata->slot[slot_nb].bus_width))
+> +			pdata->slot[slot_nb].bus_width = 1;
+> +
+> +		pdata->slot[slot_nb].detect_pin =
+> +			of_get_named_gpio(cnp, "cd-gpios", 0);
+> +
+> +		if (of_find_property(cnp, "cd-invert", NULL))
+> +			pdata->slot[slot_nb].detect_is_active_high = true;
+> +
+> +		pdata->slot[slot_nb].wp_pin =
+> +			of_get_named_gpio(cnp, "wp-gpios", 0);
+> +
+> +		slot_nb++;
+> +	}
+> +}
+> +#else /* CONFIG_OF */
+> +static inline void
+> +atmci_get_of_slots(struct device *dev, struct mci_platform_data *pdata)
+> +{
+> +	return;
+> +}
+> +#endif
+> +
+>  static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
+>  					unsigned int ns)
+>  {
+> @@ -1847,6 +1898,13 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+>  	slot->sdc_reg = sdc_reg;
+>  	slot->sdio_irq = sdio_irq;
+>  
+> +	dev_dbg(&mmc->class_dev,
+> +	        "slot[%u]: bus_width=%u, detect_pin=%d, "
+> +		"detect_is_active_high=%s, wp_pin=%d\n",
+> +		id, slot_data->bus_width, slot_data->detect_pin,
+> +		slot_data->detect_is_active_high ? "true" : "false",
+> +		slot_data->wp_pin);
+> +
+>  	mmc->ops = &atmci_ops;
+>  	mmc->f_min = DIV_ROUND_UP(host->bus_hz, 512);
+>  	mmc->f_max = host->bus_hz / 2;
+> @@ -2047,9 +2105,17 @@ static int __init atmci_probe(struct platform_device *pdev)
+>  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!regs)
+>  		return -ENXIO;
+> -	pdata = pdev->dev.platform_data;
+> -	if (!pdata)
+> -		return -ENXIO;
+> +
+> +	if (pdev->dev.of_node) {
+> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +		if (!pdata)
+> +			return -ENOMEM;
+> +	} else {
+> +		pdata = pdev->dev.platform_data;
+> +		if (!pdata)
+> +			return -ENXIO;
+> +	}
+> +
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0)
+>  		return irq;
+> @@ -2109,6 +2175,7 @@ static int __init atmci_probe(struct platform_device *pdev)
+>  	/* We need at least one slot to succeed */
+>  	nr_slots = 0;
+>  	ret = -ENODEV;
+> +	atmci_get_of_slots(&pdev->dev, pdata);
+>  	if (pdata->slot[0].bus_width) {
+>  		ret = atmci_init_slot(host, &pdata->slot[0],
+>  				0, ATMCI_SDCSEL_SLOT_A, ATMCI_SDIOIRQA);
+> @@ -2242,6 +2309,7 @@ static struct platform_driver atmci_driver = {
+>  	.driver		= {
+>  		.name		= "atmel_mci",
+>  		.pm		= ATMCI_PM_OPS,
+> +		.of_match_table	= of_match_ptr(atmci_dt_ids),
+>  	},
+>  };
+>  
 
 
-Regards, 
-Gururaja
+-- 
+Nicolas Ferre
