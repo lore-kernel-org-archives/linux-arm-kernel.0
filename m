@@ -1,33 +1,47 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 22 Mar 2012 14:54:15 +0100
-Subject: [PATCH v4 15/15] dmaengine: i.MX: Fix merge of cookie branch.
-In-Reply-To: <1332424455-15594-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1332424455-15594-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1332424455-15594-16-git-send-email-javier.martin@vista-silicon.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Thu, 22 Mar 2012 19:29:42 +0530
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <CAHQjnOMjSPDOymJe356AWnJszQv+X-QWrVrB7ahYDkXBr5HrQw@mail.gmail.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+ <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
+ <4F688B2D.20808@gmail.com>
+ <CAHQjnOMjSPDOymJe356AWnJszQv+X-QWrVrB7ahYDkXBr5HrQw@mail.gmail.com>
+Message-ID: <4F6B304E.5010402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When merging DMA cookie changes a small chunk
-of code was dropped. This broke imx-dma driver.
+Hi KyongHo,
 
-This patch adds this chunk again and fixes the problem.
-
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- drivers/dma/imx-dma.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 2155d82..32b1f86 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -679,6 +679,7 @@ static dma_cookie_t imxdma_tx_submit(struct dma_async_tx_descriptor *tx)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&imxdma->lock, flags);
-+	list_move_tail(imxdmac->ld_free.next, &imxdmac->ld_queue);
- 	cookie = dma_cookie_assign(tx);
- 	spin_unlock_irqrestore(&imxdma->lock, flags);
- 
--- 
-1.7.0.4
+On 03/21/2012 05:26 AM, KyongHo Cho wrote:
+> On Tue, Mar 20, 2012 at 10:50 PM, Subash Patel<subashrp@gmail.com>  wrote:
+>> Sorry for digging this very late. But as part of integrating dma_map v7&
+>> sysmmu v12 on 3.3-rc5, I am facing below issue:
+>>
+>> a) By un-selecting IOMMU in menu config, I am able to allocate memory in
+>> vb2-dma-contig
+>>
+>> b) When I enable SYSMMU support for the IP's, I am receiving below fault:
+>>
+>> Unhandled fault: external abort on non-linefetch (0x818) at 0xb6f55000
+>>
+>> I think this has something to do with the access to the SYSMMU registers for
+>> writing the page table. Has anyone of you faced this issue while testing
+>> these(dma_map+iommu) patches on kernel mentioned above? This must be
+>> something related to recent changes, as I didn't have issues with these
+>> patches on 3.2 kernel.
+>>
+>
+> 0xb6f55000 is not an address of SYSMMU register if your kernel starts
+> at 0xc0000000.
+>
+> Can you tell me any detailed information or situation?
+I hate to say this, but I am not able to catch the fault location even 
+with JTAG. Once the fault comes, the debugger looses all control over. I 
+think now possible method is reproduction at your end :)
+>
+> Regards,
+>
+> KyongHo.
+Regards,
+Subash
