@@ -1,228 +1,326 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 22 Mar 2012 08:42:41 -0500
-Subject: [PATCH v2] ARM: pxa: use common IOMEM definition
-In-Reply-To: <1332296149-28110-2-git-send-email-robherring2@gmail.com>
-References: <1332296149-28110-2-git-send-email-robherring2@gmail.com>
-Message-ID: <1332423761-27205-1-git-send-email-robherring2@gmail.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Thu, 22 Mar 2012 19:15:02 +0530
+Subject: [PATCHv7 8/9] ARM: dma-mapping: use alloc, mmap, free from dma_ops
+In-Reply-To: <1330527862-16234-9-git-send-email-m.szyprowski@samsung.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F6B2CDE.4020601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hello,
 
-pxa was missed in the moving of IOMEM to a common definition, so lots of
-IOMEM redefined warnings were introduced. So remove pxa IOMEM definition
-and fix all the fallout.
+I have found out an issue with dma_mmap_writecombine() and coherent devices.
 
-Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: Jaroslav Kysela <perex@perex.cz>
-Cc: Takashi Iwai <tiwai@suse.de>
-Cc: rtc-linux at googlegroups.com
-Cc: alsa-devel at alsa-project.org
----
-v2:
-- fix my commit msg typos
-- add fix for sa1100_wdt.c
+On 02/29/2012 08:34 PM, Marek Szyprowski wrote:
+> This patch converts dma_alloc/free/mmap_{coherent,writecombine}
+> functions to use generic alloc/free/mmap methods from dma_map_ops
+> structure. A new DMA_ATTR_WRITE_COMBINE DMA attribute have been
+> introduced to implement writecombine methods.
+>
+> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+> ---
+>   arch/arm/common/dmabounce.c        |    3 +
+>   arch/arm/include/asm/dma-mapping.h |  107 ++++++++++++++++++++++++++----------
+>   arch/arm/mm/dma-mapping.c          |   53 ++++++------------
+>   3 files changed, 98 insertions(+), 65 deletions(-)
+>
+> diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+> index 119f487..dbae5ad 100644
+> --- a/arch/arm/common/dmabounce.c
+> +++ b/arch/arm/common/dmabounce.c
+> @@ -449,6 +449,9 @@ static int dmabounce_set_mask(struct device *dev, u64 dma_mask)
+>   }
+>
+>   static struct dma_map_ops dmabounce_ops = {
+> +	.alloc			= arm_dma_alloc,
+> +	.free			= arm_dma_free,
+> +	.mmap			= arm_dma_mmap,
+>   	.map_page		= dmabounce_map_page,
+>   	.unmap_page		= dmabounce_unmap_page,
+>   	.sync_single_for_cpu	= dmabounce_sync_for_cpu,
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 266cba6..4342b75 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -5,6 +5,7 @@
+>
+>   #include<linux/mm_types.h>
+>   #include<linux/scatterlist.h>
+> +#include<linux/dma-attrs.h>
+>   #include<linux/dma-debug.h>
+>
+>   #include<asm-generic/dma-coherent.h>
+> @@ -110,68 +111,115 @@ static inline void dma_free_noncoherent(struct device *dev, size_t size,
+>   extern int dma_supported(struct device *dev, u64 mask);
+>
+>   /**
+> - * dma_alloc_coherent - allocate consistent memory for DMA
+> + * arm_dma_alloc - allocate consistent memory for DMA
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>    * @size: required memory size
+>    * @handle: bus-specific DMA address
+> + * @attrs: optinal attributes that specific mapping properties
+>    *
+> - * Allocate some uncached, unbuffered memory for a device for
+> - * performing DMA.  This function allocates pages, and will
+> - * return the CPU-viewed address, and sets @handle to be the
+> - * device-viewed address.
+> + * Allocate some memory for a device for performing DMA.  This function
+> + * allocates pages, and will return the CPU-viewed address, and sets @handle
+> + * to be the device-viewed address.
+>    */
+> -extern void *dma_alloc_coherent(struct device *, size_t, dma_addr_t *, gfp_t);
+> +extern void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+> +			   gfp_t gfp, struct dma_attrs *attrs);
+> +
+> +#define dma_alloc_coherent(d,s,h,f) dma_alloc_attrs(d,s,h,f,NULL)
+> +
+> +static inline void *dma_alloc_attrs(struct device *dev, size_t size,
+> +				       dma_addr_t *dma_handle, gfp_t flag,
+> +				       struct dma_attrs *attrs)
+> +{
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+> +	void *cpu_addr;
+> +	BUG_ON(!ops);
+> +
+> +	cpu_addr = ops->alloc(dev, size, dma_handle, flag, attrs);
+> +	debug_dma_alloc_coherent(dev, size, *dma_handle, cpu_addr);
+> +	return cpu_addr;
+> +}
+>
+>   /**
+> - * dma_free_coherent - free memory allocated by dma_alloc_coherent
+> + * arm_dma_free - free memory allocated by arm_dma_alloc
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>    * @size: size of memory originally requested in dma_alloc_coherent
+>    * @cpu_addr: CPU-view address returned from dma_alloc_coherent
+>    * @handle: device-view address returned from dma_alloc_coherent
+> + * @attrs: optinal attributes that specific mapping properties
+>    *
+>    * Free (and unmap) a DMA buffer previously allocated by
+> - * dma_alloc_coherent().
+> + * arm_dma_alloc().
+>    *
+>    * References to memory and mappings associated with cpu_addr/handle
+>    * during and after this call executing are illegal.
+>    */
+> -extern void dma_free_coherent(struct device *, size_t, void *, dma_addr_t);
+> +extern void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> +			 dma_addr_t handle, struct dma_attrs *attrs);
+> +
+> +#define dma_free_coherent(d,s,c,h) dma_free_attrs(d,s,c,h,NULL)
+> +
+> +static inline void dma_free_attrs(struct device *dev, size_t size,
+> +				     void *cpu_addr, dma_addr_t dma_handle,
+> +				     struct dma_attrs *attrs)
+> +{
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+> +	BUG_ON(!ops);
+> +
+> +	debug_dma_free_coherent(dev, size, cpu_addr, dma_handle);
+> +	ops->free(dev, size, cpu_addr, dma_handle, attrs);
+> +}
+>
+>   /**
+> - * dma_mmap_coherent - map a coherent DMA allocation into user space
+> + * arm_dma_mmap - map a coherent DMA allocation into user space
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>    * @vma: vm_area_struct describing requested user mapping
+>    * @cpu_addr: kernel CPU-view address returned from dma_alloc_coherent
+>    * @handle: device-view address returned from dma_alloc_coherent
+>    * @size: size of memory originally requested in dma_alloc_coherent
+> + * @attrs: optinal attributes that specific mapping properties
+>    *
+>    * Map a coherent DMA buffer previously allocated by dma_alloc_coherent
+>    * into user space.  The coherent DMA buffer must not be freed by the
+>    * driver until the user space mapping has been released.
+>    */
+> -int dma_mmap_coherent(struct device *, struct vm_area_struct *,
+> -		void *, dma_addr_t, size_t);
+> +extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+> +			void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +			struct dma_attrs *attrs);
+>
+> +#define dma_mmap_coherent(d,v,c,h,s) dma_mmap_attrs(d,v,c,h,s,NULL)
+>
+> -/**
+> - * dma_alloc_writecombine - allocate writecombining memory for DMA
+> - * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+> - * @size: required memory size
+> - * @handle: bus-specific DMA address
+> - *
+> - * Allocate some uncached, buffered memory for a device for
+> - * performing DMA.  This function allocates pages, and will
+> - * return the CPU-viewed address, and sets @handle to be the
+> - * device-viewed address.
+> - */
+> -extern void *dma_alloc_writecombine(struct device *, size_t, dma_addr_t *,
+> -		gfp_t);
+> +static inline int dma_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+> +				  void *cpu_addr, dma_addr_t dma_addr,
+> +				  size_t size, struct dma_attrs *attrs)
+> +{
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+> +	BUG_ON(!ops);
+> +	return ops->mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
+> +}
+>
+> -#define dma_free_writecombine(dev,size,cpu_addr,handle) \
+> -	dma_free_coherent(dev,size,cpu_addr,handle)
+> +static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
+> +				       dma_addr_t *dma_handle, gfp_t flag)
+> +{
+> +	DEFINE_DMA_ATTRS(attrs);
+> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE,&attrs);
+> +	return dma_alloc_attrs(dev, size, dma_handle, flag,&attrs);
+> +}
+>
+> -int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
+> -		void *, dma_addr_t, size_t);
+> +static inline void dma_free_writecombine(struct device *dev, size_t size,
+> +				     void *cpu_addr, dma_addr_t dma_handle)
+> +{
+> +	DEFINE_DMA_ATTRS(attrs);
+> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE,&attrs);
+> +	return dma_free_attrs(dev, size, cpu_addr, dma_handle,&attrs);
+> +}
+> +
+> +static inline int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
+> +		      void *cpu_addr, dma_addr_t dma_addr, size_t size)
+> +{
+> +	DEFINE_DMA_ATTRS(attrs);
+> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE,&attrs);
+> +	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size,&attrs);
+> +}
+>
+For devices, which do not have a coherent/reserved pool, then the 
+allocation in function __dma_alloc() happens, and the memory will be 
+remapped by calling __dma_alloc_remap(). In the above function, 
+arm_vmregion_find() will be called, and it succeeds to get the map and 
+it will be mapped to used.
 
-I plan to send this fix thru the arm-soc tree.
-
-Rob
-
- arch/arm/mach-pxa/clock-pxa2xx.c          |    1 +
- arch/arm/mach-pxa/corgi_pm.c              |    1 +
- arch/arm/mach-pxa/cpufreq-pxa3xx.c        |    1 +
- arch/arm/mach-pxa/include/mach/hardware.h |    2 --
- arch/arm/mach-pxa/mfp-pxa2xx.c            |    1 +
- arch/arm/mach-pxa/pxa2xx.c                |    1 +
- arch/arm/mach-pxa/pxa300.c                |    1 +
- arch/arm/mach-pxa/pxa320.c                |    1 +
- arch/arm/mach-pxa/sharpsl_pm.c            |    1 +
- drivers/rtc/rtc-sa1100.c                  |    1 +
- drivers/watchdog/sa1100_wdt.c             |    1 +
- sound/arm/pxa2xx-ac97-lib.c               |    1 +
- sound/arm/pxa2xx-ac97.c                   |    1 +
- sound/soc/pxa/pxa2xx-ac97.c               |    1 +
- 14 files changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/clock-pxa2xx.c b/arch/arm/mach-pxa/clock-pxa2xx.c
-index 1d5859d..9ee2ad6 100644
---- a/arch/arm/mach-pxa/clock-pxa2xx.c
-+++ b/arch/arm/mach-pxa/clock-pxa2xx.c
-@@ -9,6 +9,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/syscore_ops.h>
- 
- #include <mach/pxa2xx-regs.h>
-diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
-index 39e265c..048c429 100644
---- a/arch/arm/mach-pxa/corgi_pm.c
-+++ b/arch/arm/mach-pxa/corgi_pm.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/apm-emulation.h>
-+#include <linux/io.h>
- 
- #include <asm/irq.h>
- #include <asm/mach-types.h>
-diff --git a/arch/arm/mach-pxa/cpufreq-pxa3xx.c b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
-index 88fbec0..b85b4ab 100644
---- a/arch/arm/mach-pxa/cpufreq-pxa3xx.c
-+++ b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
-@@ -15,6 +15,7 @@
- #include <linux/init.h>
- #include <linux/cpufreq.h>
- #include <linux/slab.h>
-+#include <linux/io.h>
- 
- #include <mach/pxa3xx-regs.h>
- 
-diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
-index 54b64ea..56d92e5 100644
---- a/arch/arm/mach-pxa/include/mach/hardware.h
-+++ b/arch/arm/mach-pxa/include/mach/hardware.h
-@@ -40,7 +40,6 @@
- #define io_p2v(x) IOMEM(0xf2000000 + ((x) & 0x01ffffff) + (((x) & 0x1c000000) >> 1))
- 
- #ifndef __ASSEMBLY__
--# define IOMEM(x) ((void __iomem *)(x))
- # define __REG(x)	(*((volatile u32 __iomem *)io_p2v(x)))
- 
- /* With indexed regs we don't want to feed the index through io_p2v()
-@@ -52,7 +51,6 @@
- 
- #else
- 
--# define IOMEM(x)	x 
- # define __REG(x)	io_p2v(x)
- # define __PREG(x)	io_v2p(x)
- 
-diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
-index f147755..b029562 100644
---- a/arch/arm/mach-pxa/mfp-pxa2xx.c
-+++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/syscore_ops.h>
- 
- #include <mach/pxa2xx-regs.h>
-diff --git a/arch/arm/mach-pxa/pxa2xx.c b/arch/arm/mach-pxa/pxa2xx.c
-index 8682704..f8ec854 100644
---- a/arch/arm/mach-pxa/pxa2xx.c
-+++ b/arch/arm/mach-pxa/pxa2xx.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/device.h>
-+#include <linux/io.h>
- 
- #include <mach/hardware.h>
- #include <mach/pxa2xx-regs.h>
-diff --git a/arch/arm/mach-pxa/pxa300.c b/arch/arm/mach-pxa/pxa300.c
-index 40bb165..17cbc0c 100644
---- a/arch/arm/mach-pxa/pxa300.c
-+++ b/arch/arm/mach-pxa/pxa300.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/io.h>
- 
- #include <mach/pxa300.h>
- 
-diff --git a/arch/arm/mach-pxa/pxa320.c b/arch/arm/mach-pxa/pxa320.c
-index 8d614ec..6dc99d4 100644
---- a/arch/arm/mach-pxa/pxa320.c
-+++ b/arch/arm/mach-pxa/pxa320.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/io.h>
- 
- #include <mach/pxa320.h>
- 
-diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-index 8d5168d..6d3b39f 100644
---- a/arch/arm/mach-pxa/sharpsl_pm.c
-+++ b/arch/arm/mach-pxa/sharpsl_pm.c
-@@ -24,6 +24,7 @@
- #include <linux/leds.h>
- #include <linux/suspend.h>
- #include <linux/gpio.h>
-+#include <linux/io.h>
- 
- #include <asm/mach-types.h>
- #include <mach/pm.h>
-diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-index cb9a585..398ab7a 100644
---- a/drivers/rtc/rtc-sa1100.c
-+++ b/drivers/rtc/rtc-sa1100.c
-@@ -30,6 +30,7 @@
- #include <linux/string.h>
- #include <linux/pm.h>
- #include <linux/bitops.h>
-+#include <linux/io.h>
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
-diff --git a/drivers/watchdog/sa1100_wdt.c b/drivers/watchdog/sa1100_wdt.c
-index 0162454..a3ff321 100644
---- a/drivers/watchdog/sa1100_wdt.c
-+++ b/drivers/watchdog/sa1100_wdt.c
-@@ -25,6 +25,7 @@
- #include <linux/miscdevice.h>
- #include <linux/watchdog.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/bitops.h>
- #include <linux/uaccess.h>
- #include <linux/timex.h>
-diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-index d1aa421..d760371 100644
---- a/sound/arm/pxa2xx-ac97-lib.c
-+++ b/sound/arm/pxa2xx-ac97-lib.c
-@@ -17,6 +17,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/module.h>
-+#include <linux/io.h>
- 
- #include <sound/ac97_codec.h>
- #include <sound/pxa2xx-lib.h>
-diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
-index 3a39626..afef72c 100644
---- a/sound/arm/pxa2xx-ac97.c
-+++ b/sound/arm/pxa2xx-ac97.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- 
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index 837ff34..b4bfd97 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- 
--- 
-1.7.5.4
+This has issues with devices with coherent memory. If we have any device 
+which has declared coherent memory, then the allocation happens from 
+per-device coherent area. Eg: Exynos MFC which declares: 
+s5p_mfc_reserve_mem(). In that case, dma_mmap_writecombine() fails, and 
+hence vb2_dc_mmap() fails as well.
+>   /*
+>    * This can be called during boot to increase the size of the consistent
+> @@ -180,7 +228,6 @@ int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
+>    */
+>   extern void __init init_consistent_dma_size(unsigned long size);
+>
+> -
+>   /*
+>    * For SA-1111, IXP425, and ADI systems  the dma-mapping functions are "magic"
+>    * and utilize bounce buffers as needed to work around limited DMA windows.
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index cd54b2d..67fe7e2 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -113,6 +113,9 @@ static void arm_dma_sync_single_for_device(struct device *dev,
+>   static int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+>
+>   struct dma_map_ops arm_dma_ops = {
+> +	.alloc			= arm_dma_alloc,
+> +	.free			= arm_dma_free,
+> +	.mmap			= arm_dma_mmap,
+>   	.map_page		= arm_dma_map_page,
+>   	.unmap_page		= arm_dma_unmap_page,
+>   	.map_sg			= arm_dma_map_sg,
+> @@ -461,33 +464,26 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
+>    * Allocate DMA-coherent memory space and return both the kernel remapped
+>    * virtual and bus address for that space.
+>    */
+> -void *
+> -dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+> +void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+> +		    gfp_t gfp, struct dma_attrs *attrs)
+>   {
+> +	pgprot_t prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
+> +			pgprot_writecombine(pgprot_kernel) :
+> +			pgprot_dmacoherent(pgprot_kernel);
+>   	void *memory;
+>
+>   	if (dma_alloc_from_coherent(dev, size, handle,&memory))
+>   		return memory;
+>
+> -	return __dma_alloc(dev, size, handle, gfp,
+> -			   pgprot_dmacoherent(pgprot_kernel));
+> +	return __dma_alloc(dev, size, handle, gfp, prot);
+>   }
+> -EXPORT_SYMBOL(dma_alloc_coherent);
+>
+>   /*
+> - * Allocate a writecombining region, in much the same way as
+> - * dma_alloc_coherent above.
+> + * Create userspace mapping for the DMA-coherent memory.
+>    */
+> -void *
+> -dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+> -{
+> -	return __dma_alloc(dev, size, handle, gfp,
+> -			   pgprot_writecombine(pgprot_kernel));
+> -}
+> -EXPORT_SYMBOL(dma_alloc_writecombine);
+> -
+> -static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
+> -		    void *cpu_addr, dma_addr_t dma_addr, size_t size)
+> +int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+> +		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +		 struct dma_attrs *attrs)
+>   {
+>   	int ret = -ENXIO;
+>   #ifdef CONFIG_MMU
+> @@ -495,6 +491,9 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>   	struct arm_vmregion *c;
+>
+>   	user_size = (vma->vm_end - vma->vm_start)>>  PAGE_SHIFT;
+> +	vma->vm_page_prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
+> +			    pgprot_writecombine(vma->vm_page_prot) :
+> +			    pgprot_dmacoherent(vma->vm_page_prot);
+>
+>   	c = arm_vmregion_find(&consistent_head, (unsigned long)cpu_addr);
+>   	if (c) {
+> @@ -515,27 +514,12 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>   	return ret;
+>   }
+>
+> -int dma_mmap_coherent(struct device *dev, struct vm_area_struct *vma,
+> -		      void *cpu_addr, dma_addr_t dma_addr, size_t size)
+> -{
+> -	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
+> -	return dma_mmap(dev, vma, cpu_addr, dma_addr, size);
+> -}
+> -EXPORT_SYMBOL(dma_mmap_coherent);
+> -
+> -int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
+> -			  void *cpu_addr, dma_addr_t dma_addr, size_t size)
+> -{
+> -	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+> -	return dma_mmap(dev, vma, cpu_addr, dma_addr, size);
+> -}
+> -EXPORT_SYMBOL(dma_mmap_writecombine);
+> -
+>   /*
+>    * free a page as defined by the above mapping.
+>    * Must not be called with IRQs disabled.
+>    */
+> -void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr_t handle)
+> +void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> +		  dma_addr_t handle, struct dma_attrs *attrs)
+>   {
+>   	WARN_ON(irqs_disabled());
+>
+> @@ -549,7 +533,6 @@ void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr
+>
+>   	__dma_free_buffer(pfn_to_page(dma_to_pfn(dev, handle)), size);
+>   }
+> -EXPORT_SYMBOL(dma_free_coherent);
+>
+>   static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>   	size_t size, enum dma_data_direction dir,
+Regards,
+Subash
