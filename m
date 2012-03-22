@@ -1,32 +1,21 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Thu, 22 Mar 2012 06:11:19 +0530
-Subject: [PATCH v3] serial: PL011: clear pending interrupts
-In-Reply-To: <CACRpkdZ-epTV8dAY4gT9HKgPifRS_wfooy0QqEGsSgCqZ98MYw@mail.gmail.com>
-References: <1331641643-25929-1-git-send-email-linus.walleij@stericsson.com>
- <CAOh2x=nh-aiJ1FQecm=5WsNw=Fph5osNh5C2YU6x9TGrKBoMmA@mail.gmail.com>
- <CACRpkdZ-epTV8dAY4gT9HKgPifRS_wfooy0QqEGsSgCqZ98MYw@mail.gmail.com>
-Message-ID: <CAOh2x=mrjzX=BuoQW+pdcHsdzyenXFEbt0jNTYf-HV0GNk--1Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Mar 2012 00:42:58 +0000
+Subject: [PATCH v7 1/3] Documentation: common clk API
+In-Reply-To: <4F6A2EF5.3010008@codeaurora.org>
+References: <4F6A2042.9030302@codeaurora.org>
+ <20120321190741.GL3226@opensource.wolfsonmicro.com>
+ <20120321193304.GO9859@atomide.com> <4F6A2EF5.3010008@codeaurora.org>
+Message-ID: <20120322004258.GG16389@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 12:38 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> Strange, because these changes are not even in 3.3. Did you mean 3.4
-> HEAD?
+On Wed, Mar 21, 2012 at 12:41:41PM -0700, Saravana Kannan wrote:
+> The meaning of clk_enable/disable has been changed and they won't work  
+> without calling clk_prepare/unprepare. So, these are definitely new  
+> APIs. If it weren't new APIs, then none of the general drivers would  
+> need to change.
 
-Ya. you are correct, actually i was switching between both of them and so
-wrote 3.3 :(
-
-> The uap->port is likely the problem. The clock does not need to be
-> enabled for this, the clock that need to be enabled is the pclk and that
-> should be taken care of by the amba/primecell core.
-
-Ya. I know uap->port is the problem. But i thought like normal platform drivers
-writers: "we need to enable clk too". And i was wrong :(.
-
-> I'm sending a fixup patch to sort out my own screwing up.
-
-Waiting for that.
-
---
-viresh
+Yes and no.  I disagree that the meaning of clk_enable/disable() has
+changed.  It hasn't.  What has changed is the preconditions for calling
+those functions, and necessarily so in the interest of being able to
+unify the different implementations.
