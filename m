@@ -1,48 +1,40 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Thu, 22 Mar 2012 17:03:22 +0100
-Subject: [PATCH] ARM: OMAP: Add support for AM35xx UART4/ttyO3
-In-Reply-To: <1318963661-27755-1-git-send-email-kyle.manna@fuel7.com>
-References: <1318963661-27755-1-git-send-email-kyle.manna@fuel7.com>
-Message-ID: <4F6B4D4A.2040103@denx.de>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Thu, 22 Mar 2012 21:36:36 +0530
+Subject: Occasional crashes in suspend-resume with MMC transactions
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317FFAC0@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D12143317FDFBB@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D12143317FF773@DBDE01.ent.ti.com>
+ <CANfBPZ9b=6dLbY2D3oAg=Gz_vwAOJ+KC_Bo5ugVJEwumeej_Bw@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D12143317FFAC0@DBDE01.ent.ti.com>
+Message-ID: <CANfBPZ9AU+W7qP+uE2s2EnpzKhUqVQLdEgN=CUeNJZkSoh7+5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/2011 20:47, Kyle Manna wrote:
-> Add hwmod support to enable access to UART4 of the AM35xx series of
-> chips.  The UART4 device referenced from the TRM will show up as ttyO3.
-> 
-> This was tested on an AM3505.
-> 
-> Signed-off-by: Kyle Manna <kyle.manna@fuel7.com>
-> ---
+On Thu, Mar 22, 2012 at 8:13 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> On Thu, Mar 22, 2012 at 19:57:16, S, Venkatraman wrote:
+> [...]
+>>
+>> I see (in 3.3) that the host controller driver does a "return ret" and
+>> that means the errors is propagated.
+>> Where is the return code lost /overridden ?
+>>
+>
+> The return code gets overridden due to the call to host->pdata->resume()
+> which always returns 0.
 
-Hi Kyle,
+Thanks - I see what you mean. But the patch is clunky.
+A clean fix would be to not capture the return code of resume() in
+"ret" and let the old
+value of ret be propagated as is.
 
->  arch/arm/mach-omap2/clock3xxx_data.c       |   11 ++++++
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   52 ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prcm-common.h          |    2 +
->  arch/arm/plat-omap/include/plat/irqs.h     |    2 +-
->  arch/arm/plat-omap/include/plat/serial.h   |    1 +
->  5 files changed, 67 insertions(+), 1 deletions(-)
-
-Can I gently ask you which pinmux setup do you use to test your patch ?
-
-I am trying to make uart4 working on a am3517 with mainline kernel
-(3.3+, your patch is merged). However, on my board the uart4 pins are
-shared with the camera, and not with SD, as maybe is more common. I set
-the pinmux to switch the pins (gpio_95 / gpio_96 / gpio_97 /gpio_98) to
-the uart4, and ttyO3 is registered and available, and thanks your patch
-both clocks iclk and fclk are active. However, I cannot see activity on
-the tx line if I try to send some characters.
-
-Maybe do you use the same pinmux and am I forgetting something else ?
-
-Thanks,
-Stefano Babic
-
--- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-53 Fax: +49-8142-66989-80 Email: sbabic at denx.de
-=====================================================================
+>
+> static int omap_hsmmc_resume_cdirq(struct device *dev, int slot)
+> {
+> ? ? ? ?struct omap_mmc_platform_data *mmc = dev->platform_data;
+>
+> ? ? ? ?enable_irq(mmc->slots[0].card_detect_irq);
+> ? ? ? ?return 0;
+> }
+>
+> Regards,
+> Vaibhav
