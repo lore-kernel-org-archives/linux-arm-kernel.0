@@ -1,21 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Mar 2012 00:42:58 +0000
-Subject: [PATCH v7 1/3] Documentation: common clk API
-In-Reply-To: <4F6A2EF5.3010008@codeaurora.org>
-References: <4F6A2042.9030302@codeaurora.org>
- <20120321190741.GL3226@opensource.wolfsonmicro.com>
- <20120321193304.GO9859@atomide.com> <4F6A2EF5.3010008@codeaurora.org>
-Message-ID: <20120322004258.GG16389@n2100.arm.linux.org.uk>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Thu, 22 Mar 2012 06:15:45 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203211826.38993.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <CAOh2x==J4qkp29w+v=GWORBua-DE3yb0MRGOtBLyELxbGZwcuA@mail.gmail.com>
+ <201203211404.35847.arnd@arndb.de>
+ <201203211826.38993.arnd@arndb.de>
+Message-ID: <CAOh2x=nZUobbRJo7kdAwmEG+s51BabxPwUVz=S3oNJyTpuRpCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 12:41:41PM -0700, Saravana Kannan wrote:
-> The meaning of clk_enable/disable has been changed and they won't work  
-> without calling clk_prepare/unprepare. So, these are definitely new  
-> APIs. If it weren't new APIs, then none of the general drivers would  
-> need to change.
+On Wed, Mar 21, 2012 at 11:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> I just noticed that you have git trees on http://git.stlinux.com/,
+> which I would personally prefer you to use actually. git.kernel.org
+> is most useful for people that don't have their own git servers.
 
-Yes and no.  I disagree that the meaning of clk_enable/disable() has
-changed.  It hasn't.  What has changed is the preconditions for calling
-those functions, and necessarily so in the interest of being able to
-unify the different implementations.
+Ah, that's even better for me too. I don't really have to manage
+two trees.
+
+Just to understand the flow, how does this work now?
+There can be two sources of patches:
+- From ST internal developers
+- From external developers
+
+Should i apply them all to my tree and then send you a pull request?
+Or you automatically pull everyday from some specific branch?
+
+Sorry i am new to this. :(
+
+--
+viresh
