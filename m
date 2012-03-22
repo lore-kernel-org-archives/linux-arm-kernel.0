@@ -1,33 +1,31 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 22 Mar 2012 13:41:13 +0100
-Subject: [PATCH] ARM: SPEAr600: Change FSMC and SMI clock names
-Message-ID: <1332420073-17703-1-git-send-email-sr@denx.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 22 Mar 2012 17:14:12 +0400
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <4F6AF845.9070209@metasoft.pl>
+References: <4F683B36.8090101@metasoft.pl> <4F6A78ED.3050403@gmail.com>
+ <4F6AF845.9070209@metasoft.pl>
+Message-ID: <4F6B25A4.4090006@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change FSMC and SMI clock names to match the ones needed for DT based
-probing.
+Hello.
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/mach-spear6xx/clock.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 22-03-2012 14:00, Rafal Prylowski wrote:
 
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index a86499a..f051804 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -660,8 +660,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "dma",		.clk = &dma_clk},
- 	{ .dev_id = "jpeg",		.clk = &jpeg_clk},
- 	{ .dev_id = "gmac",		.clk = &gmac_clk},
--	{ .dev_id = "smi",		.clk = &smi_clk},
--	{ .dev_id = "fsmc-nand",	.clk = &fsmc_clk},
-+	{ .dev_id = "fc000000.flash",	.clk = &smi_clk},
-+	{ .dev_id = "d1800000.flash",	.clk = &fsmc_clk},
- 	/* clock derived from apb clk */
- 	{ .dev_id = "adc",		.clk = &adc_clk},
- 	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
--- 
-1.7.9.2
+>> I haven't looked through the patch yet, since I'm waiting on more
+>> information from Mika and Hartley's testing.
+
+>> However, the commit log doesn't tell me why we want this change. Is it a
+>> performance improvement? If so, do you have some numbers that we can
+>> paste into the commit log?
+
+> In principle, using double buffering should be faster than using only
+> one buffer and disabling/enabling channel each time. But my measurements
+> doesn't show any significant change.
+
+> The real reason for this change is that current code is not 100% reliable
+> in IDE-DMA (I'm planning to submit ep93xx ide driver to linux-ide soon).
+
+    IDE or libata driver? Asking because IDE drivers are not accepted anymore.
+
+WBR, Sergei
