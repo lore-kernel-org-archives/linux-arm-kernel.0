@@ -1,30 +1,36 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Thu, 22 Mar 2012 16:53:13 -0400
-Subject: [PATCH] Kbuild: centralize MKIMAGE and cmd_uimage definitions
-In-Reply-To: <4F6B7226.8000102@wwwdotorg.org>
-References: <1331931835-12346-1-git-send-email-swarren@wwwdotorg.org>
- <4F6B7226.8000102@wwwdotorg.org>
-Message-ID: <201203221653.19268.vapier@gentoo.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 22 Mar 2012 14:21:06 -0700
+Subject: [PATCH 07/16] mm/arm: use vm_flags_t for vma flags
+In-Reply-To: <20120321065642.13852.95838.stgit@zurg>
+References: <20120321065140.13852.52315.stgit@zurg>
+ <20120321065642.13852.95838.stgit@zurg>
+Message-ID: <20120322142106.3aa383a5.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 March 2012 14:40:38 Stephen Warren wrote:
-> On 03/16/2012 03:03 PM, Stephen Warren wrote:
-> > All ARCHs have the same definition of MKIMAGE. Move it to Makefile.lib
-> > to avoid duplication.
-> > 
-> > All ARCHs have similar definitions of cmd_uimage. Place a sufficiently
-> > parameterized version in Makefile.lib to avoid duplication.
-> 
-> Does this change look reasonable? It has acks from people working on 4
-> of the 7 affected architectures; would you prefer acks from all?
+On Wed, 21 Mar 2012 10:56:42 +0400
+Konstantin Khlebnikov <khlebnikov@openvz.org> wrote:
 
-isn't that what linux-next is for ? ;)
--mike
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120322/ceac9709/attachment.sig>
+> Cast vm_flags to unsigned int for __cpuc_flush_user_range(),
+> because its vm_flags argument declared as unsigned int.
+> Asssembler code wants to test VM_EXEC bit on vma->vm_flags,
+> but for big-endian we should get upper word for this.
+> 
+> ...
+>
+> --- a/arch/arm/include/asm/cacheflush.h
+> +++ b/arch/arm/include/asm/cacheflush.h
+> @@ -217,7 +217,7 @@ vivt_flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+>  {
+>  	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
+>  		__cpuc_flush_user_range(start & PAGE_MASK, PAGE_ALIGN(end),
+> -					vma->vm_flags);
+> +					(__force unsigned int)vma->vm_flags);
+>  }
+
+This won't work if a later version of __cpuc_flush_user_range() needs
+access to newly-added flags in the upper 32 bits.
+
+I guess we don't have to do anything about it at this stage, and that
+if we do ever hit this problem, we'll need to put those newly-added
+flags into the lower 32 bits of the vm_flags_t.
