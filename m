@@ -1,191 +1,62 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 22 Mar 2012 11:57:17 +1100
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <4F683B36.8090101@metasoft.pl>
-References: <4F683B36.8090101@metasoft.pl>
-Message-ID: <4F6A78ED.3050403@gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Thu, 22 Mar 2012 06:34:37 +0530
+Subject: [PATCH] serial: PL011: move interrupt clearing
+In-Reply-To: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
+References: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAOh2x==5QHEcA3h216p8rJukx0LR=cVcGYN84aqzw=fnhu8Y-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/12 19:09, Rafal Prylowski wrote:
+On Thu, Mar 22, 2012 at 12:45 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> Commit 360f748b204275229f8398cb2f9f53955db1503b
+> "serial: PL011: clear pending interrupts"
+> attempts to clear interrupts by writing to a
+> yet-unassigned memory address. This fixes the issue.
+>
+> The breaking patch is marked for stable so should be
+> carried along with the other patch.
+>
+> Cc: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: stable <stable@vger.kernel.org>
+> Reported-by: Viresh Kumar <viresh.kumar@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ?drivers/tty/serial/amba-pl011.c | ? ?8 ++++----
+> ?1 files changed, 4 insertions(+), 4 deletions(-)
 
-> Implement double buffering for M2M DMA channels.
-> 
+You missed me in CC??
 
-
-I haven't looked through the patch yet, since I'm waiting on more
-information from Mika and Hartley's testing.
-
-However, the commit log doesn't tell me why we want this change. Is it a
-performance improvement? If so, do you have some numbers that we can
-paste into the commit log?
-
-Thanks,
-~Ryan
-
-> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
-> 
-> Index: slave-dma/drivers/dma/ep93xx_dma.c
-> ===================================================================
-> --- slave-dma.orig/drivers/dma/ep93xx_dma.c
-> +++ slave-dma/drivers/dma/ep93xx_dma.c
-> @@ -69,6 +69,7 @@
->  #define M2M_CONTROL_TM_SHIFT		13
->  #define M2M_CONTROL_TM_TX		(1 << M2M_CONTROL_TM_SHIFT)
->  #define M2M_CONTROL_TM_RX		(2 << M2M_CONTROL_TM_SHIFT)
-> +#define M2M_CONTROL_NFBINT		BIT(21)
->  #define M2M_CONTROL_RSS_SHIFT		22
->  #define M2M_CONTROL_RSS_SSPRX		(1 << M2M_CONTROL_RSS_SHIFT)
->  #define M2M_CONTROL_RSS_SSPTX		(2 << M2M_CONTROL_RSS_SHIFT)
-> @@ -77,7 +78,23 @@
->  #define M2M_CONTROL_PWSC_SHIFT		25
->  
->  #define M2M_INTERRUPT			0x0004
-> -#define M2M_INTERRUPT_DONEINT		BIT(1)
-> +#define M2M_INTERRUPT_MASK		6
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 7e01399..4ed35c5 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1930,10 +1930,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+> ? ? ? ? ? ? ? ?goto unmap;
+> ? ? ? ?}
+>
+> - ? ? ? /* Ensure interrupts from this UART are masked and cleared */
+> - ? ? ? writew(0, uap->port.membase + UART011_IMSC);
+> - ? ? ? writew(0xffff, uap->port.membase + UART011_ICR);
+> -
+> ? ? ? ?uap->vendor = vendor;
+> ? ? ? ?uap->lcrh_rx = vendor->lcrh_rx;
+> ? ? ? ?uap->lcrh_tx = vendor->lcrh_tx;
+> @@ -1951,6 +1947,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+> ? ? ? ?uap->port.line = i;
+> ? ? ? ?pl011_dma_probe(uap);
+>
+> + ? ? ? /* Ensure interrupts from this UART are masked and cleared */
+> + ? ? ? writew(0, uap->port.membase + UART011_IMSC);
+> + ? ? ? writew(0xffff, uap->port.membase + UART011_ICR);
 > +
-> +#define M2M_STATUS			0x000c
-> +#define M2M_STATUS_CTL_SHIFT		1
-> +#define M2M_STATUS_CTL_IDLE		(0 << M2M_STATUS_CTL_SHIFT)
-> +#define M2M_STATUS_CTL_STALL		(1 << M2M_STATUS_CTL_SHIFT)
-> +#define M2M_STATUS_CTL_MEMRD		(2 << M2M_STATUS_CTL_SHIFT)
-> +#define M2M_STATUS_CTL_MEMWR		(3 << M2M_STATUS_CTL_SHIFT)
-> +#define M2M_STATUS_CTL_BWCWAIT		(4 << M2M_STATUS_CTL_SHIFT)
-> +#define M2M_STATUS_CTL_MASK		(7 << M2M_STATUS_CTL_SHIFT)
-> +#define M2M_STATUS_BUF_SHIFT		4
-> +#define M2M_STATUS_BUF_NO		(0 << M2M_STATUS_BUF_SHIFT)
-> +#define M2M_STATUS_BUF_ON		(1 << M2M_STATUS_BUF_SHIFT)
-> +#define M2M_STATUS_BUF_NEXT		(2 << M2M_STATUS_BUF_SHIFT)
-> +#define M2M_STATUS_BUF_MASK		(3 << M2M_STATUS_BUF_SHIFT)
-> +#define M2M_STATUS_DONE			BIT(6)
-> +
->  
->  #define M2M_BCR0			0x0010
->  #define M2M_BCR1			0x0014
-> @@ -426,15 +443,6 @@ static int m2p_hw_interrupt(struct ep93x
->  
->  /*
->   * M2M DMA implementation
-> - *
-> - * For the M2M transfers we don't use NFB at all. This is because it simply
-> - * doesn't work well with memcpy transfers. When you submit both buffers it is
-> - * extremely unlikely that you get an NFB interrupt, but it instead reports
-> - * DONE interrupt and both buffers are already transferred which means that we
-> - * weren't able to update the next buffer.
-> - *
-> - * So for now we "simulate" NFB by just submitting buffer after buffer
-> - * without double buffering.
->   */
->  
->  static int m2m_hw_setup(struct ep93xx_dma_chan *edmac)
-> @@ -543,6 +551,11 @@ static void m2m_hw_submit(struct ep93xx_
->  	m2m_fill_desc(edmac);
->  	control |= M2M_CONTROL_DONEINT;
->  
-> +	if (ep93xx_dma_advance_active(edmac)) {
-> +		m2m_fill_desc(edmac);
-> +		control |= M2M_CONTROL_NFBINT;
-> +	}
-> +
->  	/*
->  	 * Now we can finally enable the channel. For M2M channel this must be
->  	 * done _after_ the BCRx registers are programmed.
-> @@ -560,32 +573,85 @@ static void m2m_hw_submit(struct ep93xx_
->  	}
->  }
->  
-> +/*
-> + * According to EP93xx User's Guide, we should receive DONE interrupt when all
-> + * M2M DMA controller transactions complete normally. This is not always the
-> + * case - sometimes EP93xx M2M DMA asserts DONE interrupt when the DMA channel
-> + * is still running (channel Buffer FSM in DMA_BUF_ON state, and channel
-> + * Control FSM in DMA_MEM_RD state, observed at least in IDE-DMA operation).
-> + * In effect, disabling the channel when only DONE bit is set could stop
-> + * currently running DMA transfer. To avoid this, we use Buffer FSM and
-> + * Control FSM to check current state of DMA channel.
-> + */
->  static int m2m_hw_interrupt(struct ep93xx_dma_chan *edmac)
->  {
-> +	u32 status = readl(edmac->regs + M2M_STATUS);
-> +	u32 ctl_fsm = status & M2M_STATUS_CTL_MASK;
-> +	u32 buf_fsm = status & M2M_STATUS_BUF_MASK;
-> +	bool done = status & M2M_STATUS_DONE;
-> +	bool last;
->  	u32 control;
->  
-> -	if (!(readl(edmac->regs + M2M_INTERRUPT) & M2M_INTERRUPT_DONEINT))
-> +	/* Accept only DONE and NFB interrupts */
-> +	if (!(readl(edmac->regs + M2M_INTERRUPT) & M2M_INTERRUPT_MASK))
->  		return INTERRUPT_UNKNOWN;
->  
-> -	/* Clear the DONE bit */
-> -	writel(0, edmac->regs + M2M_INTERRUPT);
-> +	if (done)
-> +		/* Clear the DONE bit */
-> +		writel(0, edmac->regs + M2M_INTERRUPT);
->  
-> -	/* Disable interrupts and the channel */
-> -	control = readl(edmac->regs + M2M_CONTROL);
-> -	control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_ENABLE);
-> -	writel(control, edmac->regs + M2M_CONTROL);
-> +	/*
-> +	 * Check whether we are done with descriptors or not. This, together
-> +	 * with DMA channel state, determines action to take in interrupt.
-> +	 */
-> +	last = list_first_entry(edmac->active.next,
-> +		struct ep93xx_dma_desc, node)->txd.cookie;
->  
->  	/*
-> -	 * Since we only get DONE interrupt we have to find out ourselves
-> -	 * whether there still is something to process. So we try to advance
-> -	 * the chain an see whether it succeeds.
-> +	 * Use M2M DMA Buffer FSM and Control FSM to check current state of
-> +	 * DMA channel. Using DONE and NFB bits from channel status register
-> +	 * or bits from channel interrupt register was proven not to be
-> +	 * reliable.
->  	 */
-> -	if (ep93xx_dma_advance_active(edmac)) {
-> -		edmac->edma->hw_submit(edmac);
-> +	if (!last &&
-> +	    (buf_fsm == M2M_STATUS_BUF_NO ||
-> +	     buf_fsm == M2M_STATUS_BUF_ON)) {
-> +		/*
-> +		 * Two buffers are ready for update when Buffer FSM is in
-> +		 * DMA_NO_BUF state. Only one buffer can be prepared without
-> +		 * disabling the channel, or polling the DONE bit.
-> +		 * To simplify things, always prepare only one buffer.
-> +		 */
-> +		ep93xx_dma_advance_active(edmac);
-> +		m2m_fill_desc(edmac);
-> +		if (done && !edmac->chan.private) {
-> +			/* Software trigger for memcpy channel */
-> +			control = readl(edmac->regs + M2M_CONTROL);
-> +			control |= M2M_CONTROL_START;
-> +			writel(control, edmac->regs + M2M_CONTROL);
-> +		}
->  		return INTERRUPT_NEXT_BUFFER;
->  	}
->  
-> -	return INTERRUPT_DONE;
-> +	/*
-> +	 * Disable the channel only when Buffer FSM is in DMA_NO_BUF state
-> +	 * and Control FSM is in DMA_STALL state.
-> +	 */
-> +	if (last &&
-> +	    buf_fsm == M2M_STATUS_BUF_NO &&
-> +	    ctl_fsm == M2M_STATUS_CTL_STALL) {
-> +		/* Disable interrupts and the channel */
-> +		control = readl(edmac->regs + M2M_CONTROL);
-> +		control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_NFBINT
-> +			    | M2M_CONTROL_ENABLE);
-> +		writel(control, edmac->regs + M2M_CONTROL);
-> +		return INTERRUPT_DONE;
-> +	}
-> +
-> +	/*
-> +	 * Nothing to do this time.
-> +	 */
-> +	return INTERRUPT_NEXT_BUFFER;
->  }
->  
->  /*
+> ? ? ? ?snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
+>
+> ? ? ? ?amba_ports[i] = uap;
+
+Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
+
+--
+viresh
