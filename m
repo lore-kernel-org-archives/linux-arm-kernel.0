@@ -1,69 +1,199 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Mar 2012 08:10:00 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <CAOh2x=nZUobbRJo7kdAwmEG+s51BabxPwUVz=S3oNJyTpuRpCQ@mail.gmail.com>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203211826.38993.arnd@arndb.de>
- <CAOh2x=nZUobbRJo7kdAwmEG+s51BabxPwUVz=S3oNJyTpuRpCQ@mail.gmail.com>
-Message-ID: <201203220810.00628.arnd@arndb.de>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Thu, 22 Mar 2012 09:18:17 +0100
+Subject: [PATCH] ARM: mxs: enforce semantics of clk_prepare()/clk_unprepare()
+ and clk_enable()/clk_disable()
+Message-ID: <1332404298-18891-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 March 2012, viresh kumar wrote:
-> On Wed, Mar 21, 2012 at 11:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I just noticed that you have git trees on http://git.stlinux.com/,
-> > which I would personally prefer you to use actually. git.kernel.org
-> > is most useful for people that don't have their own git servers.
-> 
-> Ah, that's even better for me too. I don't really have to manage
-> two trees.
-> 
-> Just to understand the flow, how does this work now?
-> There can be two sources of patches:
-> - From ST internal developers
-> - From external developers
-> 
-> Should i apply them all to my tree and then send you a pull request?
-> Or you automatically pull everyday from some specific branch?
-> 
-> Sorry i am new to this. :(
+After introducing clk_prepare()/clk_unprepare() there may still be
+drivers out there that don't use the new functions.
+This patch warns about drivers calling clk_enable() without a
+preceding clk_prepare() and various other invalid sequences of calls
+to clk_enable()/clk_disable() and clk_prepare()/clk_unprepare().
 
-No problem. Just apply them all to one tree and send me pull
-requests when you think they are stable enough and should get into
-arm-soc. Once they are in there, I'm not rebasing the patches
-any more, but you are free to rebase and reorder the patches
-before you send them to me.
+To not make a system unusable due to excessive warning messages the
+warnings are limited to 1 per clk by a flag in the 'flags' member of
+struct clk.
 
-If you would like me to take patches that are still under work
-and may have to get changed, that's fine too, but tell me in advance
-so we can put them into a staging branch that will be part of 
-the linux-next kernel but can still get rebased. I'm not sending
-staging branches to Linus though, unless you tell me to turn
-them into stable branches before the merge window.
 
-Also, please base all your pull requests on an -rc release from
-Linus, or (if you have special dependencies) on a stable branch
-from another person that then needs to get sent to Linus before
-I send your changes. The pull requests should be split up by
-topic, e.g. 'general cleanup', 'consolidation of SPEAr3xx and
-SPEAr600', 'device tree conversion', 'board specific changes'
-etc. so we can combine them with similar topics from other
-platform maintainers when sending them out to Linus.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/mach-mxs/clock.c              |   98 ++++++++++++++++++++++++++++----
+ arch/arm/mach-mxs/include/mach/clock.h |    6 ++
+ 2 files changed, 93 insertions(+), 11 deletions(-)
 
-There are two bug fix branches, one for the current kernel (now
-3.4) and one for the 'next' kernel (will be 3.5). Any important
-changes should go into the 'current' fixes branch, and patches
-that also apply to older kernels should get marked 'Cc:
-stable at vger.kernel.org' so that Greg will automatically grab
-them and apply them to his stable kernel series.
-
-When you send a pull request, please send it to arm at kernel.org
-so it reaches both Olof and me, as we are taking turns in
-applying them to the arm-soc tree.
-
-Don't hesitate to ask if you have further process questions, I
-know this can be confusing and we're doing things much stricter
-than other maintainters in order to keep up with ~600 patches
-per merge window.
-
-	Arnd
+diff --git a/arch/arm/mach-mxs/clock.c b/arch/arm/mach-mxs/clock.c
+index 97a6f4a..4c23351 100644
+--- a/arch/arm/mach-mxs/clock.c
++++ b/arch/arm/mach-mxs/clock.c
+@@ -56,24 +56,61 @@ static void __clk_disable(struct clk *clk)
+ 	if (!(--clk->usecount)) {
+ 		if (clk->disable)
+ 			clk->disable(clk);
+-		__clk_disable(clk->parent);
+ 	}
+ }
+ 
+ static int __clk_enable(struct clk *clk)
+ {
+-	if (clk == NULL || IS_ERR(clk))
+-		return -EINVAL;
++	if (clk == NULL)
++		return 0;
+ 
+-	if (clk->usecount++ == 0) {
+-		__clk_enable(clk->parent);
++	if (IS_ERR(clk))
++		return -EINVAL;
+ 
+-		if (clk->enable)
+-			clk->enable(clk);
++	if (clk->usecount == 0) {
++		if (clk->enable) {
++			int ret = clk->enable(clk);
++			if (ret)
++				return ret;
++		}
+ 	}
++	clk->usecount++;
++
+ 	return 0;
+ }
+ 
++static void __clk_unprepare(struct clk *clk)
++{
++	if (clk == NULL || IS_ERR(clk))
++		return;
++
++	if (clk->parent)
++		__clk_unprepare(clk->parent);
++
++	__clk_disable(clk);
++}
++
++static int __clk_prepare(struct clk *clk)
++{
++	int ret;
++
++	if (clk == NULL)
++		return 0;
++
++	if (IS_ERR(clk))
++		return -EINVAL;
++
++	ret = __clk_prepare(clk->parent);
++	if (ret)
++		return ret;
++
++	ret = __clk_enable(clk);
++	if (ret)
++		__clk_unprepare(clk->parent);
++
++	return ret;
++}
++
+ /*
+  * The clk_enable/clk_disable could be called by drivers in atomic context,
+  * so they should not really hold mutex.  Instead, clk_prepare/clk_unprepare
+@@ -86,11 +123,18 @@ int clk_prepare(struct clk *clk)
+ {
+ 	int ret = 0;
+ 
+-	if (clk == NULL || IS_ERR(clk))
++	if (clk == NULL)
++		return 0;
++
++	if (IS_ERR(clk))
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&clocks_mutex);
+-	ret = __clk_enable(clk);
++	if (clk->prepared++ == 0) {
++		ret = __clk_prepare(clk);
++		if (ret)
++			clk->prepared--;
++	}
+ 	mutex_unlock(&clocks_mutex);
+ 
+ 	return ret;
+@@ -103,20 +147,52 @@ void clk_unprepare(struct clk *clk)
+ 		return;
+ 
+ 	mutex_lock(&clocks_mutex);
+-	__clk_disable(clk);
++	if (WARN_ON(!clk->prepared && !(clk->flags & CLK_WARNED))) {
++		pr_err("clk_unprepare() called without clk_prepare()\n");
++		clk->flags |= CLK_WARNED;
++	}
++	if (WARN_ON(clk->prepared == 1 && clk->usecount > 1)) {
++		pr_err("unbalanced calls (%d) to clk_enable()/clk_disable() before clk_unprepare()\n",
++			clk->usecount);
++		clk->flags |= CLK_WARNED;
++	}
++	if (!(--clk->prepared))
++		__clk_unprepare(clk);
+ 	mutex_unlock(&clocks_mutex);
+ }
+ EXPORT_SYMBOL(clk_unprepare);
+ 
+ int clk_enable(struct clk *clk)
+ {
++	if (clk == NULL)
++		return 0;
++
++	if (IS_ERR(clk))
++		return -EINVAL;
++
++	if (WARN_ON(!clk->prepared && !(clk->flags & CLK_WARNED))) {
++		pr_err("clk_enable() called without clk_prepare()\n");
++		clk->flags |= CLK_WARNED;
++	}
++	clk->usecount++;
+ 	return 0;
+ }
+ EXPORT_SYMBOL(clk_enable);
+ 
+ void clk_disable(struct clk *clk)
+ {
+-	/* nothing to do */
++	if (clk == NULL || IS_ERR(clk))
++		return;
++
++	if (WARN_ON(!clk->prepared && !(clk->flags & CLK_WARNED))) {
++		pr_err("clk_disable() called without clk_prepare()\n");
++		clk->flags |= CLK_WARNED;
++	}
++	if (WARN_ON(clk->usecount <= 1 && !(clk->flags & CLK_WARNED))) {
++		pr_err("unbalanced clk_disable()\n");
++		clk->flags |= CLK_WARNED;
++	}
++	clk->usecount--;
+ }
+ EXPORT_SYMBOL(clk_disable);
+ 
+diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
+index 592c9ab..285ca6b 100644
+--- a/arch/arm/mach-mxs/include/mach/clock.h
++++ b/arch/arm/mach-mxs/include/mach/clock.h
+@@ -25,12 +25,18 @@
+ 
+ struct module;
+ 
++enum clk_flags {
++	CLK_WARNED = 0x01,
++};
++
+ struct clk {
+ 	int id;
+ 	/* Source clock this clk depends on */
+ 	struct clk *parent;
+ 	/* Reference count of clock enable/disable */
+ 	__s8 usecount;
++	/* Reference count of clock prepare/unprepare */
++	__s8 prepared;
+ 	/* Register bit position for clock's enable/disable control. */
+ 	u8 enable_shift;
+ 	/* Register address for clock's enable/disable control. */
+-- 
+1.7.2.5
