@@ -1,8 +1,8 @@
 From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Thu, 22 Mar 2012 16:25:36 +0530
-Subject: [PATCH 2/2] DMAEngine: Add DMAEngine driver based on old MSM ADM DMA
- APIs
-Message-ID: <1332413736-8379-1-git-send-email-kumarrav@codeaurora.org>
+Date: Thu, 22 Mar 2012 16:28:02 +0530
+Subject: [PATCH v4 2/2] DMAEngine: Add DMAEngine driver based on old MSM ADM
+ DMA APIs
+Message-ID: <1332413882-8456-1-git-send-email-kumarrav@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
