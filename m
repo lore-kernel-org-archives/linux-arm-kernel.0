@@ -1,113 +1,168 @@
 From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 22 Mar 2012 14:54:07 +0100
-Subject: [PATCH v4 07/15] dmaengine: imx-dma: remove sg member from internal
- structure.
+Date: Thu, 22 Mar 2012 14:54:06 +0100
+Subject: [PATCH v4 06/15] dmaengine: imx-dma: remove 'imxdma_setup_sg_hw'
+ function.
 In-Reply-To: <1332424455-15594-1-git-send-email-javier.martin@vista-silicon.com>
 References: <1332424455-15594-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1332424455-15594-8-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1332424455-15594-7-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This member is redundant, because it is already present in
-descriptor structure. Removing it will make further removing
-of 'internal' structure easier.
+Removing this function allows moving 'ccr_to_device' and
+'ccr_from_device' from internal struct to channel struct.
+This repesents a step forward towards removing auxiliary
+'internal' structure.
 
 Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- drivers/dma/imx-dma.c |   42 ++++++++++++++++++------------------------
- 1 files changed, 18 insertions(+), 24 deletions(-)
+ drivers/dma/imx-dma.c |   98 +++++++++++++++++-------------------------------
+ 1 files changed, 35 insertions(+), 63 deletions(-)
 
 diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 484f353..82d4099 100644
+index 25b4108..484f353 100644
 --- a/drivers/dma/imx-dma.c
 +++ b/drivers/dma/imx-dma.c
-@@ -129,7 +129,6 @@ enum  imxdma_prep_type {
-  */
- 
- struct imxdma_channel_internal {
--	struct scatterlist *sg;
- 	unsigned int resbytes;
+@@ -134,9 +134,6 @@ struct imxdma_channel_internal {
  
  	int in_use;
-@@ -278,11 +277,11 @@ static void imxdma_enable_hw(struct imxdma_desc *d)
- 		CCR_ACRPT, DMA_CCR(channel));
  
- 	if ((cpu_is_mx21() || cpu_is_mx27()) &&
--			imxdmac->internal.sg && imxdma_hw_chain(&imxdmac->internal)) {
--		imxdmac->internal.sg = sg_next(imxdmac->internal.sg);
--		if (imxdmac->internal.sg) {
-+			d->sg && imxdma_hw_chain(&imxdmac->internal)) {
-+		d->sg = sg_next(d->sg);
-+		if (d->sg) {
- 			u32 tmp;
--			imxdma_sg_next(d, imxdmac->internal.sg);
-+			imxdma_sg_next(d, d->sg);
- 			tmp = imx_dmav1_readl(DMA_CCR(channel));
- 			imx_dmav1_writel(tmp | CCR_RPT | CCR_ACRPT,
- 				DMA_CCR(channel));
-@@ -319,7 +318,6 @@ static void imxdma_watchdog(unsigned long data)
- 
- 	imx_dmav1_writel(0, DMA_CCR(channel));
- 	imxdmac->internal.in_use = 0;
--	imxdmac->internal.sg = NULL;
- 
- 	/* Tasklet watchdog error handler */
- 	tasklet_schedule(&imxdmac->dma_tasklet);
-@@ -387,24 +385,23 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
- 	int chno = imxdmac->channel;
- 	struct imxdma_desc *desc;
- 
--	if (imxdma->sg) {
--		u32 tmp;
--		imxdma->sg = sg_next(imxdma->sg);
+-	u32 ccr_from_device;
+-	u32 ccr_to_device;
 -
--		if (imxdma->sg) {
-+	spin_lock(&imxdmac->lock);
-+	if (list_empty(&imxdmac->ld_active)) {
-+		spin_unlock(&imxdmac->lock);
-+		goto out;
-+	}
+ 	struct timer_list watchdog;
  
--			spin_lock(&imxdmac->lock);
--			if (list_empty(&imxdmac->ld_active)) {
--				spin_unlock(&imxdmac->lock);
--				goto out;
--			}
-+	desc = list_first_entry(&imxdmac->ld_active,
-+				struct imxdma_desc,
-+				node);
-+	spin_unlock(&imxdmac->lock);
+ 	int hw_chaining;
+@@ -182,6 +179,8 @@ struct imxdma_channel {
+ 	enum dma_status			status;
+ 	int				dma_request;
+ 	struct scatterlist		*sg_list;
++	u32				ccr_from_device;
++	u32				ccr_to_device;
+ };
  
--			desc = list_first_entry(&imxdmac->ld_active,
--						struct imxdma_desc,
--						node);
--			spin_unlock(&imxdmac->lock);
-+	if (desc->sg) {
-+		u32 tmp;
-+		desc->sg = sg_next(desc->sg);
+ struct imxdma_engine {
+@@ -313,58 +312,6 @@ static void imxdma_disable_hw(struct imxdma_channel *imxdmac)
+ 	local_irq_restore(flags);
+ }
  
--			imxdma_sg_next(desc, imxdma->sg);
-+		if (desc->sg) {
-+			imxdma_sg_next(desc, desc->sg);
+-static int
+-imxdma_setup_sg_hw(struct imxdma_desc *d,
+-		 struct scatterlist *sg, unsigned int sgcount,
+-		 unsigned int dma_length, unsigned int dev_addr,
+-		 enum dma_transfer_direction direction)
+-{
+-	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+-	int channel = imxdmac->channel;
+-
+-	if (imxdmac->internal.in_use)
+-		return -EBUSY;
+-
+-	imxdmac->internal.sg = sg;
+-	imxdmac->internal.resbytes = dma_length;
+-
+-	if (!sg || !sgcount) {
+-		printk(KERN_ERR "imxdma%d: imx_dma_setup_sg empty sg list\n",
+-		       channel);
+-		return -EINVAL;
+-	}
+-
+-	if (!sg->length) {
+-		printk(KERN_ERR "imxdma%d: imx_dma_setup_sg zero length\n",
+-		       channel);
+-		return -EINVAL;
+-	}
+-
+-	if (direction == DMA_DEV_TO_MEM) {
+-		pr_debug("imxdma%d: %s sg=%p sgcount=%d total length=%d "
+-			"dev_addr=0x%08x for read\n",
+-			channel, __func__, sg, sgcount, dma_length, dev_addr);
+-
+-		imx_dmav1_writel(dev_addr, DMA_SAR(channel));
+-		imx_dmav1_writel(imxdmac->internal.ccr_from_device, DMA_CCR(channel));
+-	} else if (direction == DMA_MEM_TO_DEV) {
+-		pr_debug("imxdma%d: %s sg=%p sgcount=%d total length=%d "
+-			"dev_addr=0x%08x for write\n",
+-			channel, __func__, sg, sgcount, dma_length, dev_addr);
+-
+-		imx_dmav1_writel(dev_addr, DMA_DAR(channel));
+-		imx_dmav1_writel(imxdmac->internal.ccr_to_device, DMA_CCR(channel));
+-	} else {
+-		printk(KERN_ERR "imxdma%d: imx_dma_setup_sg bad dmamode\n",
+-		       channel);
+-		return -EINVAL;
+-	}
+-
+-	imxdma_sg_next(d, sg);
+-
+-	return 0;
+-}
+-
+ static void imxdma_watchdog(unsigned long data)
+ {
+ 	struct imxdma_channel *imxdmac = (struct imxdma_channel *)data;
+@@ -526,7 +473,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+-	int ret;
  
- 			tmp = imx_dmav1_readl(DMA_CCR(chno));
- 
-@@ -477,8 +474,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
  	/* Configure and enable */
  	switch (d->type) {
- 	case IMXDMA_DESC_MEMCPY:
--		imxdmac->internal.sg = NULL;
--
- 		imx_dmav1_writel(d->src, DMA_SAR(imxdmac->channel));
- 		imx_dmav1_writel(d->dest, DMA_DAR(imxdmac->channel));
- 		imx_dmav1_writel(d->config_mem | (d->config_port << 2),
-@@ -494,7 +489,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+@@ -548,10 +494,37 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
  	/* Cyclic transfer is the same as slave_sg with special sg configuration. */
  	case IMXDMA_DESC_CYCLIC:
  	case IMXDMA_DESC_SLAVE_SG:
--		imxdmac->internal.sg = d->sg;
- 		imxdmac->internal.resbytes = d->len;
- 
- 		if (d->direction == DMA_DEV_TO_MEM) {
+-		ret = imxdma_setup_sg_hw(d, d->sg, d->sgcount, d->len,
+-					 imxdmac->per_address, d->direction);
+-		if (ret < 0)
+-			return ret;
++		imxdmac->internal.sg = d->sg;
++		imxdmac->internal.resbytes = d->len;
++
++		if (d->direction == DMA_DEV_TO_MEM) {
++			imx_dmav1_writel(imxdmac->per_address,
++					 DMA_SAR(imxdmac->channel));
++			imx_dmav1_writel(imxdmac->ccr_from_device,
++					 DMA_CCR(imxdmac->channel));
++
++			dev_dbg(imxdma->dev, "%s channel: %d sg=%p sgcount=%d "
++				"total length=%d dev_addr=0x%08x (dev2mem)\n",
++				__func__, imxdmac->channel, d->sg, d->sgcount,
++				d->len, imxdmac->per_address);
++		} else if (d->direction == DMA_MEM_TO_DEV) {
++			imx_dmav1_writel(imxdmac->per_address,
++					 DMA_DAR(imxdmac->channel));
++			imx_dmav1_writel(imxdmac->ccr_to_device,
++					 DMA_CCR(imxdmac->channel));
++
++			dev_dbg(imxdma->dev, "%s channel: %d sg=%p sgcount=%d "
++				"total length=%d dev_addr=0x%08x (mem2dev)\n",
++				__func__, imxdmac->channel, d->sg, d->sgcount,
++				d->len, imxdmac->per_address);
++		} else {
++			dev_err(imxdma->dev, "%s channel: %d bad dma mode\n",
++				__func__, imxdmac->channel);
++			return -EINVAL;
++		}
++
++		imxdma_sg_next(d, d->sg);
++
+ 		break;
+ 	default:
+ 		return -EINVAL;
+@@ -641,11 +614,10 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		imxdmac->internal.hw_chaining = 1;
+ 		if (!imxdma_hw_chain(&imxdmac->internal))
+ 			return -EINVAL;
+-		imxdmac->internal.ccr_from_device =
+-			(mode | IMX_DMA_TYPE_FIFO) |
++		imxdmac->ccr_from_device = (mode | IMX_DMA_TYPE_FIFO) |
+ 			((IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) << 2) |
+ 			CCR_REN;
+-		imxdmac->internal.ccr_to_device =
++		imxdmac->ccr_to_device =
+ 			(IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) |
+ 			((mode | IMX_DMA_TYPE_FIFO) << 2) | CCR_REN;
+ 		imx_dmav1_writel(imxdmac->dma_request,
 -- 
 1.7.0.4
