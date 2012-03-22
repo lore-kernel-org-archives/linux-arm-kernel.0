@@ -1,58 +1,48 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 22 Mar 2012 22:03:39 +0200
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020696D48CAF@AUSP01VMBX24.collaborationhost.net>
-References: <4F683B36.8090101@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
- <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
- <20120322073750.GA637@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48CAF@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20120322200339.GA5812@mwesterb-mobl.ger.corp.intel.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 22 Mar 2012 13:49:35 -0700
+Subject: [GIT PULL] gpio/omap: more fixes for v3.4
+Message-ID: <871uok5pk0.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 01:52:52PM -0500, H Hartley Sweeten wrote:
+Hi Grant,
 
-> I hacked this back to the handle_one_vic function. It looks like every time
-> I get the message above the stat read in that function shows an active
-> interrupt for DMAM2M0 (the dma rx channel) and DMAM2M1 (the dma
-> tx channel). Because of the way handle_one_vic processes the irq's, the
-> DMAM2M0 interrupt gets handled first. When it's done it must be clearing
-> the DMAM2M1 interrupt automatically for some reason. So, when it's
-> handled there is no interrupt pending so we get the message.
-> 
-> The "cleanest" fix I can think of is the following patch.  This is against
-> linux-next.
+Please pull these OMAP GPIO fixes for v3.4.  These fix some rather
+serious regressions introduced by the cleanup and runtime PM conversion
+series which is also queued for v3.4.  This branch is based on your
+gpio/next branch.
 
-I can't figure out any better fix unless we move ep93xx back to use
-!MULTI_IRQ_HANDLER which obviously is not good thing to do.
+This version is functionally the same as the version you previously
+merged (and I asked you to back it out), but this version has some
+better changlogs, and I added reviewed-by and s-o-b from me as well.
 
-> From: H Hartley Sweeten <hsweeten@visionengravers.com>
-> 
-> dma: ep93xx: check for spurious interrupts
-> 
-> The ep93xx dma controller generates spurious interrupts on dma1chan1 when
-> used with the mmc_spi driver. Catch these early by making sure there is an
-> interrupt to actually process.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Thanks,
 
-Tested-by: Mika Westerberg <mika.westerberg@iki.fi>
+Kevin
 
-Thanks for investigating this. You missed one thing though, see below.
-Otherwise it doesn't compile :)
 
-diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
-index e1cc87a..614bff4 100644
---- a/drivers/dma/ep93xx_dma.c
-+++ b/drivers/dma/ep93xx_dma.c
-@@ -751,7 +751,7 @@ static irqreturn_t ep93xx_dma_interrupt(int irq, void *dev_id)
- 		return IRQ_NONE;
- 	}
- 
--	switch (edmac->edma->hw_interrupt(edmac)) {
-+	switch (edmac->edma->hw_interrupt(edmac, irq_status)) {
- 	case INTERRUPT_DONE:
- 		desc->complete = true;
- 		tasklet_schedule(&edmac->tasklet);
+
+The following changes since commit 81b279d80a63628e580c71a31d30a8c3b3047ad4:
+
+  gpio/davinci: fix enabling unbanked GPIO IRQs (2012-03-12 11:53:33 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/fixes/gpio-2
+
+for you to fetch changes up to 7fcca715de3438b8fc3c8a144702f3a95c8ff63c:
+
+  gpio/omap: fix redundant decoding of gpio offset (2012-03-21 10:21:24 +0530)
+
+----------------------------------------------------------------
+Tarun Kanti DebBarma (7):
+      gpio/omap: fix wakeup_en register update in _set_gpio_wakeup()
+      gpio/omap: fix trigger type to unsigned
+      gpio/omap: fix _set_gpio_irqenable implementation
+      gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
+      gpio/omap: fix incorrect context restore logic in omap_gpio_runtime_*
+      gpio/omap: fix incorrect update to context.irqenable1
+      gpio/omap: fix redundant decoding of gpio offset
+
+ drivers/gpio/gpio-omap.c |   47 ++++++++++++++++++++++++----------------------
+ 1 file changed, 25 insertions(+), 22 deletions(-)
