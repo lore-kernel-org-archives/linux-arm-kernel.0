@@ -1,26 +1,39 @@
 From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Thu, 22 Mar 2012 11:00:37 +0100
+Date: Thu, 22 Mar 2012 11:16:57 +0100
 Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <4F6A78ED.3050403@gmail.com>
-References: <4F683B36.8090101@metasoft.pl> <4F6A78ED.3050403@gmail.com>
-Message-ID: <4F6AF845.9070209@metasoft.pl>
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
+References: <4F683B36.8090101@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F6AFC19.9040003@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-03-22 01:57, Ryan Mallon wrote:
-> I haven't looked through the patch yet, since I'm waiting on more
-> information from Mika and Hartley's testing.
+On 2012-03-21 18:12, H Hartley Sweeten wrote:
+> Hmm... This isn't working on my ep9307 board...
 > 
-> However, the commit log doesn't tell me why we want this change. Is it a
-> performance improvement? If so, do you have some numbers that we can
-> paste into the commit log?
+> When the system boots I get stormed with messages:
+> 
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan0: unknown interrupt!
+> dma dma1chan1: unknown interrupt!
+> 
+> Note, I have use_dma set for the ep93xx_spi driver and am using mmc_spi.
 
-In principle, using double buffering should be faster than using only
-one buffer and disabling/enabling channel each time. But my measurements
-doesn't show any significant change.
+Thanks for testing. Unfortunately, I'm unable to test this patch with SPI,
+because my hardware uses it only for very simple communication (one byte
+commands, I noticed that DMA is not used in this case, even if enabled).
 
-The real reason for this change is that current code is not 100% reliable
-in IDE-DMA (I'm planning to submit ep93xx ide driver to linux-ide soon).
-Although using only one buffer and DONE interrupt is simple, surprisingly
-we can get interrupt when M2M DMA is in DMA_BUF_ON and DMA_STALL state.
-If we disable the channel at this moment, we end with ata timeout.
+In current mainline I also get these messages:
+
+dma dma1chan0: unknown interrupt!
+dma dma1chan1: got interrupt while active list is empty
+
+With my patch applied they happen more often (maybe because NFB interrupt
+is enabled), but the system is usable. Changing kernel to 3.2.x or using
+hack proposed by Mika makes the problem is gone.
