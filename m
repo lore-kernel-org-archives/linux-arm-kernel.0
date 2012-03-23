@@ -1,60 +1,47 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 23 Mar 2012 11:13:53 -0600
-Subject: [PATCH 6/9] omap2: select twl4030 support on boards that need it
+Date: Fri, 23 Mar 2012 11:13:50 -0600
+Subject: [PATCH 3/9] ARM: omap2/n8x0: work around modular omap mmc
 In-Reply-To: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1332522836-29517-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1332522836-29517-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+From: Russell King <linux@arm.linux.org.uk>
 
-These three boards unconditionally use the twl4030 driver
-from the board-zoom-display.c file. Make sure that the driver
-is always there.
-We also need to select the I2C core so we are able to build
-that driver.
+When the omap driver is built as a module for n8x0,
+n8x0_mmc_set_power_menelaus cannot call into the driver:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+arch/arm/mach-omap2/board-n8x0.c:374: undefined reference
+to `omap_mmc_notify_cover_event'
+
+As a workaround, do not provide that device in this case. This needs
+to be fixed properly, e.g. by converting n8x0 to be probed through the
+device tree and moving that code into the driver.
+
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Suggested-by: Russell King <linux@arm.linux.org.uk>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Kconfig |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-n8x0.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index e20c8ab..0279e9e 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -265,6 +265,9 @@ config MACH_OMAP_ZOOM2
- 	select SERIAL_CORE_CONSOLE
- 	select SERIAL_8250_CONSOLE
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-+	select TWL4030_CORE
-+	select MFD_SUPPORT
-+	select I2C
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index 6722627..8529ca0 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -193,8 +193,10 @@ static struct omap_onenand_platform_data board_onenand_data[] = {
+ };
+ #endif
  
- config MACH_OMAP_ZOOM3
- 	bool "OMAP3630 Zoom3 board"
-@@ -275,6 +278,9 @@ config MACH_OMAP_ZOOM3
- 	select SERIAL_CORE_CONSOLE
- 	select SERIAL_8250_CONSOLE
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-+	select TWL4030_CORE
-+	select MFD_SUPPORT
-+	select I2C
+-#if defined(CONFIG_MENELAUS) &&						\
+-	(defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE))
++#ifdef CONFIG_MMC_OMAP_MODULE
++#warning FIXME: cannot call omap_mmc_notify_cover_event for CONFIG_MMC_OMAP_MODULE
++#endif
++#if defined(CONFIG_MENELAUS) && (defined(CONFIG_MMC_OMAP)
  
- config MACH_CM_T35
- 	bool "CompuLab CM-T35/CM-T3730 modules"
-@@ -316,6 +322,9 @@ config MACH_OMAP_3630SDP
- 	depends on ARCH_OMAP3
- 	default y
- 	select OMAP_PACKAGE_CBP
-+	select TWL4030_CORE
-+	select MFD_SUPPORT
-+	select I2C
- 
- config MACH_TI8168EVM
- 	bool "TI8168 Evaluation Module"
+ /*
+  * On both N800 and N810, only the first of the two MMC controllers is in use.
 -- 
 1.7.5.4
