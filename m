@@ -1,45 +1,37 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 23 Mar 2012 08:59:28 +0530
-Subject: [PATCH] ARM: SPEAr600: Change FSMC and SMI clock names
-In-Reply-To: <1332420073-17703-1-git-send-email-sr@denx.de>
-References: <1332420073-17703-1-git-send-email-sr@denx.de>
-Message-ID: <4F6BEE18.1080209@st.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Fri, 23 Mar 2012 09:09:16 +0530
+Subject: [PATCH] serial: PL011: move interrupt clearing
+In-Reply-To: <CACRpkdate+sQJvS8H7qNXiwe6c+F58g=OF0Qg=TxxnTwPXBrYQ@mail.gmail.com>
+References: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
+ <CAOh2x==5QHEcA3h216p8rJukx0LR=cVcGYN84aqzw=fnhu8Y-g@mail.gmail.com>
+ <CACRpkdate+sQJvS8H7qNXiwe6c+F58g=OF0Qg=TxxnTwPXBrYQ@mail.gmail.com>
+Message-ID: <CAOh2x=kqTZxzyEMEF0bYFQ0a0zMEQNZWrzw48e1WFiMxYpRSeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/22/2012 6:11 PM, Stefan Roese wrote:
-> Change FSMC and SMI clock names to match the ones needed for DT based
-> probing.
-> 
+On Thu, Mar 22, 2012 at 1:30 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Mar 22, 2012 at 2:04 AM, viresh kumar <viresh.linux@gmail.com> wrote:
+>> You missed me in CC??
+>
+> I put you in Reported-by, then used --cc at the prompt because git send-email
+> still does not realize it must put Reported-by: tags on the CC list.
 
-please keep spear-devel at list.st.com in cc. :)
+That's strange. When i check my mail on @st.com id, i see myself in cc
+list, but on
+gmail i see following cc list in your first mail.
 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  arch/arm/mach-spear6xx/clock.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-> index a86499a..f051804 100644
-> --- a/arch/arm/mach-spear6xx/clock.c
-> +++ b/arch/arm/mach-spear6xx/clock.c
-> @@ -660,8 +660,8 @@ static struct clk_lookup spear_clk_lookups[] = {
->  	{ .dev_id = "dma",		.clk = &dma_clk},
->  	{ .dev_id = "jpeg",		.clk = &jpeg_clk},
->  	{ .dev_id = "gmac",		.clk = &gmac_clk},
-> -	{ .dev_id = "smi",		.clk = &smi_clk},
-> -	{ .dev_id = "fsmc-nand",	.clk = &fsmc_clk},
-> +	{ .dev_id = "fc000000.flash",	.clk = &smi_clk},
-> +	{ .dev_id = "d1800000.flash",	.clk = &fsmc_clk},
->  	/* clock derived from apb clk */
->  	{ .dev_id = "adc",		.clk = &adc_clk},
->  	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
+linux-serial at vger.kernel.org, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org>, Russell King <linux@arm.linux.org.uk>,
+Jong-Sung Kim <neidhard.kim@lge.com>, stable <stable@vger.kernel.org>,
+Chanho Min <chanho0207@gmail.com>,
+linux-arm-kernel at lists.infradead.org, Shreshtha Kumar Sahu
+<shreshthakumar.sahu@stericsson.com>
 
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
+Why don't i see myself in cc here?
 
-@Arnd: I would start to apply these patches on my git tree from now
-onwards and will send you pull request later.
+I have seen similar issues earlier too, with our ST internal and
+Mainline mailing lists.
+Any ideas?
 
--- 
+--
 viresh
