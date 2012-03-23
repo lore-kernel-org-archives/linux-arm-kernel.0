@@ -1,157 +1,94 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 23 Mar 2012 13:21:23 +0100
-Subject: [RFC][PATCH 2/9] ARM: OMAP3: cpuidle - remove next_valid_state
- function
-In-Reply-To: <1332494794-7810-2-git-send-email-daniel.lezcano@linaro.org>
+Date: Fri, 23 Mar 2012 13:22:32 +0100
+Subject: [RFC][PATCH 3/9] ARM: OMAP3: cpuidle - set enable_off_mode as
+ static
+In-Reply-To: <1332494794-7810-3-git-send-email-daniel.lezcano@linaro.org>
 References: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
- <1332494794-7810-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CAORVsuVMSF-LEuGfkFWjm6QLv79RM4ewz4sZqNdWj66K55iB-w@mail.gmail.com>
+ <1332494794-7810-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CAORVsuVBC2TgVyt-PFWV878mXpM1GqETQnzdVi0ZYH-2x8D4nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
 On Fri, Mar 23, 2012 at 10:26 AM, Daniel Lezcano
 <daniel.lezcano@linaro.org> wrote:
-> As we will be able to remove C-states from userspace with the sysfs
-> API, this function is no longer needed. We remove it and that simplifies
-> the code for more consolidation.
+> This variable is only used in the pm-debug.c file.
 >
 > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
-> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 85 +------------------------------------
-> ?1 files changed, 2 insertions(+), 83 deletions(-)
+> ?arch/arm/mach-omap2/pm-debug.c | ? ?2 +-
+> ?arch/arm/mach-omap2/pm.h ? ? ? | ? 30 ++++++++++++------------------
+> ?2 files changed, 13 insertions(+), 19 deletions(-)
 >
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index d67431a..65b4e7aa 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -164,84 +164,6 @@ return_sleep_time:
+> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+> index 814bcd9..86aa398 100644
+> --- a/arch/arm/mach-omap2/pm-debug.c
+> +++ b/arch/arm/mach-omap2/pm-debug.c
+> @@ -38,7 +38,7 @@
+> ?#include "prm2xxx_3xxx.h"
+> ?#include "pm.h"
+>
+> -u32 enable_off_mode;
+> +static u32 enable_off_mode;
+It is stil needed in cpuidle34xx.c.
+
+>
+> ?#ifdef CONFIG_DEBUG_FS
+> ?#include <linux/debugfs.h>
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index af73a86..f5c3072 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -25,6 +25,18 @@ extern int omap4_idle_init(void);
+> ?extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
+> ?extern int (*omap_pm_suspend)(void);
+>
+> +/*
+> + * cpuidle mach specific parameters
+> + *
+> + * The board code can override the default C-states definition using
+> + * omap3_pm_init_cpuidle
+> + */
+> +struct cpuidle_params {
+> + ? ? ? u32 exit_latency; ? ? ? /* exit_latency = sleep + wake-up latencies */
+> + ? ? ? u32 target_residency;
+> + ? ? ? u8 valid; ? ? ? ? ? ? ? /* validates the C-state */
+> +};
+> +
+Is this move needed? This will be removed in a later patch.
+
+> ?#if defined(CONFIG_PM_OPP)
+> ?extern int omap3_opp_init(void);
+> ?extern int omap4_opp_init(void);
+> @@ -39,27 +51,9 @@ static inline int omap4_opp_init(void)
 > ?}
+> ?#endif
 >
-> ?/**
-> - * next_valid_state - Find next valid C-state
-> - * @dev: cpuidle device
-> - * @drv: cpuidle driver
-> - * @index: Index of currently selected c-state
+> -/*
+> - * cpuidle mach specific parameters
 > - *
-> - * If the state corresponding to index is valid, index is returned back
-> - * to the caller. Else, this function searches for a lower c-state which is
-> - * still valid (as defined in omap3_power_states[]) and returns its index.
-> - *
-> - * A state is valid if the 'valid' field is enabled and
-> - * if it satisfies the enable_off_mode condition.
+> - * The board code can override the default C-states definition using
+> - * omap3_pm_init_cpuidle
 > - */
-> -static int next_valid_state(struct cpuidle_device *dev,
-> - ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
-> -{
-> - ? ? ? struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
-> - ? ? ? struct cpuidle_state *curr = &drv->states[index];
-> - ? ? ? struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
-> - ? ? ? u32 mpu_deepest_state = PWRDM_POWER_RET;
-> - ? ? ? u32 core_deepest_state = PWRDM_POWER_RET;
-> - ? ? ? int next_index = -1;
+> -struct cpuidle_params {
+> - ? ? ? u32 exit_latency; ? ? ? /* exit_latency = sleep + wake-up latencies */
+> - ? ? ? u32 target_residency;
+> - ? ? ? u8 valid; ? ? ? ? ? ? ? /* validates the C-state */
+> -};
 > -
-> - ? ? ? if (enable_off_mode) {
-> - ? ? ? ? ? ? ? mpu_deepest_state = PWRDM_POWER_OFF;
-> - ? ? ? ? ? ? ? /*
-> - ? ? ? ? ? ? ? ?* Erratum i583: valable for ES rev < Es1.2 on 3630.
-> - ? ? ? ? ? ? ? ?* CORE OFF mode is not supported in a stable form, restrict
-> - ? ? ? ? ? ? ? ?* instead the CORE state to RET.
-> - ? ? ? ? ? ? ? ?*/
-> - ? ? ? ? ? ? ? if (!IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
-> - ? ? ? ? ? ? ? ? ? ? ? core_deepest_state = PWRDM_POWER_OFF;
-> - ? ? ? }
-I am OK to remove the function but some of the code needs to stay (can
-be moved into enter_idle_bm).
-The errata code is needed.
-
-> -
-> - ? ? ? /* Check if current state is valid */
-> - ? ? ? if ((cx->valid) &&
-> - ? ? ? ? ? (cx->mpu_state >= mpu_deepest_state) &&
-> - ? ? ? ? ? (cx->core_state >= core_deepest_state)) {
-> - ? ? ? ? ? ? ? return index;
-> - ? ? ? } else {
-> - ? ? ? ? ? ? ? int idx = OMAP3_NUM_STATES - 1;
-On OMAP3 not all the power states combinations are allowed, so this
-code looks for a C-state which satisfies the enable_off_mode flag.
-I am planning to remove the enable_off_mode flag but this has to come
-with the per-device PM QoS constraints code.
-
-> -
-> - ? ? ? ? ? ? ? /* Reach the current state starting at highest C-state */
-> - ? ? ? ? ? ? ? for (; idx >= 0; idx--) {
-> - ? ? ? ? ? ? ? ? ? ? ? if (&drv->states[idx] == curr) {
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? next_index = idx;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
-> - ? ? ? ? ? ? ? ? ? ? ? }
-> - ? ? ? ? ? ? ? }
-> -
-> - ? ? ? ? ? ? ? /* Should never hit this condition */
-> - ? ? ? ? ? ? ? WARN_ON(next_index == -1);
-> -
-> - ? ? ? ? ? ? ? /*
-> - ? ? ? ? ? ? ? ?* Drop to next valid state.
-> - ? ? ? ? ? ? ? ?* Start search from the next (lower) state.
-> - ? ? ? ? ? ? ? ?*/
-> - ? ? ? ? ? ? ? idx--;
-> - ? ? ? ? ? ? ? for (; idx >= 0; idx--) {
-> - ? ? ? ? ? ? ? ? ? ? ? cx = cpuidle_get_statedata(&dev->states_usage[idx]);
-> - ? ? ? ? ? ? ? ? ? ? ? if ((cx->valid) &&
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? (cx->mpu_state >= mpu_deepest_state) &&
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? (cx->core_state >= core_deepest_state)) {
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? next_index = idx;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
-> - ? ? ? ? ? ? ? ? ? ? ? }
-> - ? ? ? ? ? ? ? }
-> - ? ? ? ? ? ? ? /*
-> - ? ? ? ? ? ? ? ?* C1 is always valid.
-> - ? ? ? ? ? ? ? ?* So, no need to check for 'next_index == -1' outside
-> - ? ? ? ? ? ? ? ?* this loop.
-> - ? ? ? ? ? ? ? ?*/
-> - ? ? ? }
-> -
-> - ? ? ? return next_index;
-> -}
-> -
-> -/**
-> ?* omap3_enter_idle_bm - Checks for any bus activity
-> ?* @dev: cpuidle device
-> ?* @drv: cpuidle driver
-> @@ -254,7 +176,6 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
-> ?{
-> - ? ? ? int new_state_idx;
-> ? ? ? ?u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
-> ? ? ? ?struct omap3_idle_statedata *cx;
-> ? ? ? ?int ret;
-> @@ -265,7 +186,7 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
-> ? ? ? ? */
-> ? ? ? ?cam_state = pwrdm_read_pwrst(cam_pd);
-> ? ? ? ?if (cam_state == PWRDM_POWER_ON) {
-> - ? ? ? ? ? ? ? new_state_idx = drv->safe_state_index;
-> + ? ? ? ? ? ? ? index = drv->safe_state_index;
-> ? ? ? ? ? ? ? ?goto select_state;
-> ? ? ? ?}
+> ?extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
+> ?extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
 >
-> @@ -292,10 +213,8 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
-> ? ? ? ?if (per_next_state != per_saved_state)
-> ? ? ? ? ? ? ? ?pwrdm_set_next_pwrst(per_pd, per_next_state);
->
-> - ? ? ? new_state_idx = next_valid_state(dev, drv, index);
+> -#ifdef CONFIG_PM_DEBUG
+> -extern u32 enable_off_mode;
+> -#else
+> -#define enable_off_mode 0
+> -#endif
 > -
-> ?select_state:
-> - ? ? ? ret = omap3_enter_idle(dev, drv, new_state_idx);
-> + ? ? ? ret = omap3_enter_idle(dev, drv, index);
->
-> ? ? ? ?/* Restore original PER state if it was modified */
-> ? ? ? ?if (per_next_state != per_saved_state)
+> ?#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+> ?extern void pm_dbg_update_time(struct powerdomain *pwrdm, int prev);
+> ?#else
 > --
 > 1.7.5.4
 >
 
-Regards,
 Jean
