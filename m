@@ -1,35 +1,67 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 22 Mar 2012 20:23:58 -0400
-Subject: ioremap to a specific virtual address
-Message-ID: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 23 Mar 2012 11:02:12 +1030
+Subject: [PATCH] ARM: test for PMU feature on v7.
+References: <4F590411.9060201@arm.com>
+Message-ID: <87ty1g88dv.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When iotable is used to initially map memory you can specify the
-mapping address. In this case IO_SDMMC_PHYS is 0x18000000 and it gets
-mapped to  0xf1800000
+The v7 ARM (B4.1.82) specifies that bits 27-24 of the ID_DFR0 reg show
+what performance monitoring (if any) is available.  We should test this
+before assuming (useful for inside virtualized environments, for example).
 
-NXP has supplied this handly macro
-#define io_p2v(x) (0xf0000000 | (((x) & 0xff000000) >> 4) | ((x) & 0x000fffff))
+Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
 
-iotable_init(lpc313x_io_desc, ARRAY_SIZE(lpc313x_io_desc));
-
-	{
-		.virtual	= io_p2v(IO_SDMMC_PHYS),
-		.pfn		= __phys_to_pfn(IO_SDMMC_PHYS),
-		.length		= IO_SDMMC_SIZE,
-		.type		= MT_DEVICE
-	},
-
-The supplied kernel is full of code that uses this type of addressing.
-It has macros for register definition that all depend on the registers
-being mapped to a well know location - io_p2v(x).
-
-I'd like to move the map out of the core code and into the SDMMC
-device driver and then only do it if the driver loads.  Is there some
-way to ioremap to a specific address on ARM? Or is there another way
-to build the mapping in the driver?
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 6933244..303d1e1 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1108,6 +1108,12 @@ static struct arm_pmu armv7pmu = {
+ 	.max_period		= (1LLU << 32) - 1,
+ };
+ 
++static bool armv7_pmu_avail(void)
++{
++	/* 0 means unknown (maybe v1), 1 means v2, 2 means v2, 15 means none */
++	return ((read_cpuid_ext(CPUID_EXT_DFR0) >> 24) & 0xF) != 0xF;
++}
++
+ static u32 __init armv7_read_num_pmnc_events(void)
+ {
+ 	u32 nb_cnt;
+@@ -1121,6 +1127,8 @@ static u32 __init armv7_read_num_pmnc_events(void)
+ 
+ static struct arm_pmu *__init armv7_a8_pmu_init(void)
+ {
++	if (!armv7_pmu_avail())
++		return NULL;
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA8;
+ 	armv7pmu.name		= "ARMv7 Cortex-A8";
+ 	armv7pmu.map_event	= armv7_a8_map_event;
+@@ -1130,6 +1138,8 @@ static struct arm_pmu *__init armv7_a8_pmu_init(void)
+ 
+ static struct arm_pmu *__init armv7_a9_pmu_init(void)
+ {
++	if (!armv7_pmu_avail())
++		return NULL;
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA9;
+ 	armv7pmu.name		= "ARMv7 Cortex-A9";
+ 	armv7pmu.map_event	= armv7_a9_map_event;
+@@ -1139,6 +1149,8 @@ static struct arm_pmu *__init armv7_a9_pmu_init(void)
+ 
+ static struct arm_pmu *__init armv7_a5_pmu_init(void)
+ {
++	if (!armv7_pmu_avail())
++		return NULL;
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA5;
+ 	armv7pmu.name		= "ARMv7 Cortex-A5";
+ 	armv7pmu.map_event	= armv7_a5_map_event;
+@@ -1148,6 +1160,8 @@ static struct arm_pmu *__init armv7_a5_pmu_init(void)
+ 
+ static struct arm_pmu *__init armv7_a15_pmu_init(void)
+ {
++	if (!armv7_pmu_avail())
++		return NULL;
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA15;
+ 	armv7pmu.name		= "ARMv7 Cortex-A15";
+ 	armv7pmu.map_event	= armv7_a15_map_event;
