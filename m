@@ -1,23 +1,55 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 23 Mar 2012 14:22:35 +0800
-Subject: [GIT PULL][for 3.4] pull request from arch-pxa git for board branch
-Message-ID: <CAN1soZyCRQSVUQe+iBWX0nGwViWjp=W32BkYCcUUDmR894PJ9w@mail.gmail.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Fri, 23 Mar 2012 12:06:07 +0530
+Subject: [RFC][PATCH 0/5] Convert GPMC to driver
+Message-ID: <1332484567-21710-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+Hi,
 
-Please help to merge this patch from arch-pxa git tree.
+Convert GPCM code to be a driver. Existing GPMC
+NAND platform handling has been modified to work
+with the new GPMC driver (patches 2 & 3). Patch 5
+is to test the driver in OMAP3EVM.
 
-The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
+Once all the users has been converted to use this
+driver, would be converted to MFD type.
 
-  Linux 3.3 (2012-03-18 16:15:34 -0700)
+TODO:
+1. Let OMAP NAND driver deal with GPMC NAND block
+2. Remove struct gpmc * stored as static
+3. Convert all peripherals to use GPMC driver
+4. Devise method to handle OneNAND cleanly
+5. Handle acquiring CS# cases
+6. Convert to MFD driver
 
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git board-specific
+Regards
+Afzal
 
-Paul Parsons (1):
-      pxa/hx4700: Add standard UART to hx4700_pin_config[]
+Afzal Mohammed (5):
+  ARM: OMAP2+: gpmc: driver conversion
+  ARM: OMAP2+: nand: create platform data structure
+  ARM: OMAP2+: gpmc-nand: populate gpmc configs
+  mtd: nand: omap2: obtain memory from resource
+  OMAP3EVM: Test gpmc-nand
 
- arch/arm/mach-pxa/hx4700.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-devkit8000.c     |    6 +-
+ arch/arm/mach-omap2/board-flash.c          |   63 +-
+ arch/arm/mach-omap2/board-flash.h          |   13 +-
+ arch/arm/mach-omap2/board-ldp.c            |    4 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    6 +-
+ arch/arm/mach-omap2/board-omap3evm.c       |   82 +++
+ arch/arm/mach-omap2/board-omap3touchbook.c |    6 +-
+ arch/arm/mach-omap2/board-overo.c          |    5 +-
+ arch/arm/mach-omap2/board-zoom.c           |    5 +-
+ arch/arm/mach-omap2/common-board-devices.c |   46 --
+ arch/arm/mach-omap2/common-board-devices.h |    1 -
+ arch/arm/mach-omap2/gpmc-nand.c            |   88 +--
+ arch/arm/mach-omap2/gpmc.c                 | 1083 ++++++++++++++++------------
+ arch/arm/plat-omap/include/plat/gpmc.h     |   34 +-
+ arch/arm/plat-omap/include/plat/nand.h     |    9 +-
+ drivers/mtd/nand/omap2.c                   |   19 +-
+ 16 files changed, 869 insertions(+), 601 deletions(-)
+
+-- 
+1.7.9.3
