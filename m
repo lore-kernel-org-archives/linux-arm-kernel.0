@@ -1,40 +1,23 @@
 From: matt@grid-net.com (Matt Burtch)
-Date: Fri, 23 Mar 2012 11:38:41 -0700
+Date: Fri, 23 Mar 2012 11:38:58 -0700
 Subject: [PATCH 1/1] ARM iMX28: incorrect frac/div calculation
-In-Reply-To: <20120323025208.GG2213@S2101-09.ap.freescale.net>
+In-Reply-To: <20332.8856.841320.610752@ipc1.ka-ro>
 References: <1332457501-8153-1-git-send-email-matt@grid-net.com>
- <20120323025208.GG2213@S2101-09.ap.freescale.net>
-Message-ID: <4F6CC331.20505@grid-net.com>
+ <20332.8856.841320.610752@ipc1.ka-ro>
+Message-ID: <4F6CC342.4010609@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2012 07:52 PM, Shawn Guo wrote:
-> On Thu, Mar 22, 2012 at 04:05:01PM -0700, Matt Burtch wrote:
+On 03/23/2012 12:13 AM, Lothar Wa?mann wrote:
+> Hi,
+>
+> Matt Burtch writes:
 >> The frac and div values in _CLK_SET_RATE are calculated incorrectly
 >> for some clock rates ie. CPU clk of 454.73MHz, 392.72MHz, 261.81Mhz,
 >> etc.
 >>
 >> Now the frac and div values which result in the closest actual clock
->> rate to that requested is selected.
-> My understanding on clk_set_rate is we need to set the clk to a rate
-> closest to the requested one but never exceeding it.  Does your change
-> ensure that?
->
-> Regards,
-> Shawn
-
-It currently doesn't check that the resultant clock is lower than the 
-requested.  I can certainly make that change and resubmit.  I wasn't 
-aware of this requirement.
-
-So with the patch as it stands, if you request a CPU clock of 391Mhz, 
-it'll give you 392.71MHz. Would it be correct for the clock to be set at 
-375.65MHz (the next closest valid clock rate without going over)?
-
-Thanks,
-Matt
-
->> Also there are no limitations
+>> rate to that requested is selected.  Also there are no limitations
 >> on what frac values can be used, as long as they fall in the valid
 >> (18<  frac<  35) range.
 >>
@@ -64,13 +47,13 @@ Matt
 >>   									\
 >> -			if (rate - calc_rate<  diff) {			\
 >> +			if (abs(rate - calc_rate)<  diff) {		\
->>   				frac = f;				\
->>   				div = d;				\
->> -				diff = rate - calc_rate;		\
->> +				diff = abs(rate - calc_rate);		\
->>   			}						\
->>   									\
->>   			if (diff == 0)					\
->> -- 
->> 1.7.5.4
->>
+> Shouldn't this actually be '<=' (also in the original code)?
+Hi Lothar,
+
+It shouldn't make a difference. If it was '<=' it would result in a 
+different frac and higher div value but the difference between the 
+requested rate and actual would be the same.
+
+Thanks,
+Matt Burtch
+> Lothar Wa?mann
