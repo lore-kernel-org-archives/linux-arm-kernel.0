@@ -1,49 +1,44 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Fri, 23 Mar 2012 08:37:52 +0100
-Subject: [PATCH 1/8] clk: add a fixed factor clock
-In-Reply-To: <1332164166-6055-2-git-send-email-s.hauer@pengutronix.de>
-References: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
- <1332164166-6055-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1332488272.2876.5.camel@flow>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Fri, 23 Mar 2012 08:38:50 +0100
+Subject: [PATCH] avr32: fix build failures from mis-naming of atmel_nand.h
+In-Reply-To: <4F6B316F.5080307@atmel.com>
+References: <1332296128-16262-1-git-send-email-paul.gortmaker@windriver.com>
+ <20120321072632.GA15703@samfundet.no> <4F6990AF.2000004@atmel.com>
+ <20120322051840.GC923@windriver.com>
+ <20120322123327.GA14690@samfundet.no> <4F6B316F.5080307@atmel.com>
+Message-ID: <20120323073850.GB31010@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Around Thu 22 Mar 2012 15:04:31 +0100 or thereabout, Nicolas Ferre wrote:
+> On 03/22/2012 01:33 PM, Hans-Christian Egtvedt :
+>> Around Thu 22 Mar 2012 01:18:40 -0400 or thereabout, Paul Gortmaker wrote:
 
-Am Montag, den 19.03.2012, 14:35 +0100 schrieb Sascha Hauer:
-> Having fixed factors/dividers in hardware is a common pattern, so
-> add a clock doing this. Currently no rate propagation is supported.
+<snipp Atmel NAND cleanup>
+
+>>>> Yes, we need to fix this. But I would not like to see this
+>>>> "platform_data/atmel.h" renamed: I think that this file was designed to
+>>>> collect several common platform data (ie: not just NAND related).
+>>>>
+>>>> So maybe we should just rename the entry that exists in
+>>>> mach-at32ap/include/mach/board.h
+>>>> and remove all occurrences of platform_data/atmel_nand.h
+>>>
+>>> Funny, since this is what I did 1st before I re-read the original commit
+>>> log in more detail. :)  Oh well.  Here is the alternate solution.  You
+>>> guys can pick whichever one you like best.  I compile tested this one
+>>> as well.
+>> 
+>> I'll leave it to Nicolas to sign-off on this, but the changes look fine for
+>> me.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Ok, which way do you want to follow for inclusion in mainline? I take it
+> through arm-soc?
 
-Tested-by: Philipp Zabel <philipp.zabel@gmail.com>
+I have not gotten my key signed by any kernel developers yet, so typically
+I've asked people to take it through Andrew's tree.
 
-Only a few clk-gateisms remain in clk_register_fixed_factor:
+<snipp>
 
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index 7c5e1fc..d99b842 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -64,14 +64,14 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
- 	struct clk_fixed_factor *fix;
- 	struct clk *clk;
- 
--	fix = kmalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	fix = kmalloc(sizeof(struct clk_fixed_factor), GFP_KERNEL);
- 
- 	if (!fix) {
--		pr_err("%s: could not allocate gated clk\n", __func__);
-+		pr_err("%s: could not allocate fixed factor clk\n", __func__);
- 		return ERR_PTR(-ENOMEM);
- 	}
- 
--	/* struct clk_gate assignments */
-+	/* struct clk_fixed_factor assignments */
- 	fix->mult = mult;
- 	fix->div = div;
- 
---
-1.7.9.1
-
-regards
-Philipp
+-- 
+HcE
