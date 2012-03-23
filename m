@@ -1,52 +1,45 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 23 Mar 2012 11:13:47 -0600
-Subject: [PATCH 0/9] omap randconfig fixes for v3.3
-Message-ID: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri, 23 Mar 2012 11:13:48 -0600
+Subject: [PATCH 1/9] arm/omap: enable building omap2 without omap2420/2430
+In-Reply-To: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1332522836-29517-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Arnd Bergmann" <arnd@arndb.de>
+From: Arnd Bergmann <arnd@arndb.de>
 
-The following is a set of patches that have been sent
-out during the 3.1 cycle that were not acked or merged.
+Kconfig allows selecting CONFIG_OMAP2 but no specific SOC, the options
+being omap2420 and omap2430, but that leads to a build error when
+omap3 or omap4 are also enabled and the MULTI_OMAP2 symbol is
+undefined.
 
-Sending again for completeness.  
+This adds another clause to plat/multi.h, mainly to allow all
+possible randconfig combinations to build cleanly.
 
-Tony, please pull if there are no objections:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/plat-omap/include/plat/multi.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
-
-  Linux 3.3 (2012-03-18 16:15:34 -0700)
-
-are available in the git repository at:
-  git://git.linaro.org/people/mpoirier/linux.git randconfig-omap
- 
-
-Arnd Bergmann (8):
-  arm/omap: enable building omap2 without omap2420/2430
-  omap: fix visibility of omap2_mbox_iva_priv
-  ARM: omap2+: fix building without i2c
-  tty/serial/omap: console can only be built-in
-  omap2: select twl4030 support on boards that need it
-  omap2plus: ensure that one of omap2/3/4 is selected
-  arm: OMAP depends on MMU
-  ARM: omap: select CPU_FREQ_TABLE where needed
-
-Russell King (1):
-  ARM: omap2/n8x0: work around modular omap mmc
-
- arch/arm/Kconfig                           |    1 +
- arch/arm/mach-omap2/Kconfig                |   19 +++++++++++++++++++
- arch/arm/mach-omap2/board-n8x0.c           |    6 ++++--
- arch/arm/mach-omap2/mailbox.c              |    2 +-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    2 +-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- arch/arm/plat-omap/Kconfig                 |    5 +++++
- arch/arm/plat-omap/include/plat/multi.h    |    5 +++++
- drivers/tty/serial/Kconfig                 |    2 +-
- 11 files changed, 40 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/plat-omap/include/plat/multi.h b/arch/arm/plat-omap/include/plat/multi.h
+index 999ffba..fb7f196 100644
+--- a/arch/arm/plat-omap/include/plat/multi.h
++++ b/arch/arm/plat-omap/include/plat/multi.h
+@@ -82,6 +82,11 @@
+ #  define OMAP_NAME omap2430
+ # endif
+ #endif
++#ifdef CONFIG_ARCH_OMAP2
++# ifndef OMAP_NAME
++#  define OMAP_NAME omap2
++# endif
++#endif
+ #ifdef CONFIG_ARCH_OMAP3
+ # ifdef OMAP_NAME
+ #  undef  MULTI_OMAP2
 -- 
 1.7.5.4
