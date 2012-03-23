@@ -1,54 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Mar 2012 10:28:45 -0700
-Subject: [PATCH 7/9] omap2plus: ensure that one of omap2/3/4 is selected
-In-Reply-To: <1332522836-29517-8-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri, 23 Mar 2012 10:29:54 -0700
+Subject: [PATCH 3/9] ARM: omap2/n8x0: work around modular omap mmc
+In-Reply-To: <1332522836-29517-4-git-send-email-mathieu.poirier@linaro.org>
 References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
- <1332522836-29517-8-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20120323172845.GC9859@atomide.com>
+ <1332522836-29517-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20120323172953.GD9859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * mathieu.poirier at linaro.org <mathieu.poirier@linaro.org> [120323 10:16]:
-> From: Arnd Bergmann <arnd@arndb.de>
+> From: Russell King <linux@arm.linux.org.uk>
 > 
-> Random configurations can fail if none of the omap families
-> in mach-omap2 is selected. This patch automatically selects
-> omap2 if the user has not made any other choice.
+> When the omap driver is built as a module for n8x0,
+> n8x0_mmc_set_power_menelaus cannot call into the driver:
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/Kconfig |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
+> arch/arm/mach-omap2/board-n8x0.c:374: undefined reference
+> to `omap_mmc_notify_cover_event'
 > 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 0279e9e..b244e80 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -55,6 +55,16 @@ config ARCH_OMAP4
->  	select USB_ARCH_HAS_EHCI
->  	select ARM_CPU_SUSPEND if PM
->  
-> +config ARCH_OMAP2_AUTO
-> +	bool
-> +	depends on !ARCH_OMAP3 && !ARCH_OMAP4
-> +	select ARCH_OMAP2
-> +	default y
-> +	help
-> +	  At least one of OMAP2/OMAP3/OMAP4 needs to be enabled, this
-> +	  selects OMAP2 if nothing else gets selected, to avoid non-building
-> +	  configurations.
-> +
->  comment "OMAP Core Type"
->  	depends on ARCH_OMAP2
+> As a workaround, do not provide that device in this case. This needs
+> to be fixed properly, e.g. by converting n8x0 to be probed through the
+> device tree and moving that code into the driver.
 
-Hmm yeah omap2 makes the smallest build, so randconfig builds
-faster than it would for omap3 or 4.
-
-But isn't there now still a chance that randconfig does not
-select ARCH_OMAP2_AUTO either?
+This too should be fixed now in a way where just the cover events
+won't work if compiled as a module.
 
 Regards,
 
