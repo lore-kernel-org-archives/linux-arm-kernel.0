@@ -1,192 +1,60 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Fri, 23 Mar 2012 07:53:15 -0700
-Subject: [PATCH v4 3/3] ARM: support syscall tracing
-In-Reply-To: <4F6C8DAE.9070209@mentor.com>
-References: <4F44FF58.3060907@mentor.com> <4F4E3780.4060904@mentor.com>
- <4F54D0D4.7070905@mentor.com> <4F6C8DAE.9070209@mentor.com>
-Message-ID: <4F6C8E5B.7030004@mentor.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Fri, 23 Mar 2012 11:05:12 -0400
+Subject: ioremap to a specific virtual address
+In-Reply-To: <4F6C8E15.5050104@antcom.de>
+References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+ <alpine.LFD.2.02.1203230023060.24151@xanadu.home>
+ <CAKON4Ox6sp5YMryr2jzOAqYNmJG9RyahLTusrHZ_jcNQ40DAfQ@mail.gmail.com>
+ <201203231407.00686.arnd@arndb.de> <4F6C8E15.5050104@antcom.de>
+Message-ID: <CAKON4Oz8465uJnv8R_TgCeju9UqG8MTTxVSC_tfS4mP40ARp1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As specified by ftrace-design.txt, TIF_SYSCALL_TRACEPOINT was
-added, as well as NR_syscalls in asm/unistd.h.  Additionally,
-__sys_trace was modified to call trace_sys_enter and
-trace_sys_exit when appropriate.
+On Fri, Mar 23, 2012 at 10:52 AM, Roland Stigge <stigge@antcom.de> wrote:
+> Hi Jon,
+>
+> On 23/03/12 15:07, Arnd Bergmann wrote:
+>> I think you should work together with Roland Stigge, who is currently
+>> looking into doing the same for lpc32xx. My guess is that you can save
+>> a lot of work by combining your efforts, while you would get conflicting
+>> DT bindings if you don't. Note that Roland has done a lot of patches
+>> already for nxp device drivers that will be part of v3.4. He has not yet
+>> started on DT patches but wants to work on that for v3.5.
+>
+> You wrote about NXP's BSP from 3 years ago. At git.lpclinux.com, you can
+> find lpc31xx's branches, updated only some weeks ago, based on Linux 2.6.33.
 
-Tests #2 - #4 of "perf test" now complete successfully.
+I've taken the 2.6.33 code and forward ported it to v3.3 in my git
+tree. I've been incorporating the patches posted to lpclinux.com.
 
-Signed-off-by: Steven Walter <stevenrwalter@gmail.com>
-Signed-off-by: Wade Farnsworth <wade_farnsworth@mentor.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig                   |    1 +
- arch/arm/include/asm/syscall.h     |    4 ++++
- arch/arm/include/asm/thread_info.h |    2 ++
- arch/arm/include/asm/unistd.h      |    8 ++++++++
- arch/arm/kernel/entry-common.S     |   18 ++++++++++++++++--
- arch/arm/kernel/ptrace.c           |   23 ++++++++++++++++++-----
- 6 files changed, 49 insertions(+), 7 deletions(-)
+>
+> Feel free to join my efforts for DT on lpc32xx. Don't know how much
+> lpc31xx and lpc32xx have in common, and I currently don't have access to
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c87e23f..5603715 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -11,6 +11,7 @@ config ARM
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_TRACEHOOK
-+	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_KPROBES if !XIP_KERNEL
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
-diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-index c334a23..47486a4 100644
---- a/arch/arm/include/asm/syscall.h
-+++ b/arch/arm/include/asm/syscall.h
-@@ -9,6 +9,10 @@
- 
- #include <linux/err.h>
- 
-+#include <asm/unistd.h>
-+
-+#define NR_syscalls (__NR_syscalls)
-+
- extern const unsigned long sys_call_table[];
- 
- static inline int syscall_get_nr(struct task_struct *task,
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index d4c24d4..f2ff2de 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -146,6 +146,7 @@ extern void vfp_flush_hwstate(struct thread_info *);
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
- #define TIF_RESTORE_SIGMASK	20
- #define TIF_SECCOMP		21
-+#define TIF_SYSCALL_TRACEPOINT	22
- 
- #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-@@ -156,6 +157,7 @@ extern void vfp_flush_hwstate(struct thread_info *);
- #define _TIF_USING_IWMMXT	(1 << TIF_USING_IWMMXT)
- #define _TIF_RESTORE_SIGMASK	(1 << TIF_RESTORE_SIGMASK)
- #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
-+#define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
- 
- /* Checks for any syscall work in entry-common.S */
- #define _TIF_SYSCALL_WORK (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT)
-diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-index 512cd14..d27d7d7 100644
---- a/arch/arm/include/asm/unistd.h
-+++ b/arch/arm/include/asm/unistd.h
-@@ -406,6 +406,14 @@
- #define __NR_process_vm_writev		(__NR_SYSCALL_BASE+377)
- 
- /*
-+ * This may need to be greater than __NR_last_syscall+1 in order to
-+ * account for the padding in the syscall table
-+ */
-+#ifdef __KERNEL__
-+#define __NR_syscalls  (380)
-+#endif /* __KERNEL__ */
-+
-+/*
-  * The following SWIs are ARM private.
-  */
- #define __ARM_NR_BASE			(__NR_SYSCALL_BASE+0x0f0000)
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 9fd0ba9..3df0ca3 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -79,6 +79,11 @@ no_work_pending:
- ENDPROC(ret_to_user_from_irq)
- ENDPROC(ret_to_user)
- 
-+.macro test_syscall_tracing reg
-+       tst     \reg, #_TIF_SYSCALL_WORK
-+       tsteq   \reg, #_TIF_SYSCALL_TRACEPOINT
-+.endm
-+
- /*
-  * This is how we return from a fork.
-  */
-@@ -87,7 +92,7 @@ ENTRY(ret_from_fork)
- 	get_thread_info tsk
- 	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
- 	mov	why, #1
--	tst	r1, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
-+	test_syscall_tracing r1
- 	beq	ret_slow_syscall
- 	mov	r1, sp
- 	mov	r0, #1				@ trace exit [IP = 1]
-@@ -98,6 +103,15 @@ ENDPROC(ret_from_fork)
- 	.equ NR_syscalls,0
- #define CALL(x) .equ NR_syscalls,NR_syscalls+1
- #include "calls.S"
-+
-+/*
-+ * Ensure that the system call table is equal to __NR_syscalls,
-+ * which is the value the rest of the system sees
-+ */
-+.ifne NR_syscalls - __NR_syscalls
-+.error "__NR_syscalls is not equal to the size of the syscall table"
-+.endif
-+
- #undef CALL
- #define CALL(x) .long x
- 
-@@ -446,7 +460,7 @@ ENTRY(vector_swi)
- 1:
- #endif
- 
--	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
-+	test_syscall_tracing r10
- 	bne	__sys_trace
- 
- 	cmp	scno, #NR_syscalls		@ check upper syscall limit
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 46f4b41..dbbf4ce 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -30,6 +30,9 @@
- #include <asm/system.h>
- #include <asm/traps.h>
- 
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/syscalls.h>
-+
- #define REG_PC	15
- #define REG_PSR	16
- /*
-@@ -929,15 +932,25 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 		audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
- 				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
- 
--	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-+	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
-+	    !test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		return scno;
- 
- 	current_thread_info()->syscall = scno;
- 
--	if (why)
--		tracehook_report_syscall_exit(regs, 0);
--	else if (tracehook_report_syscall_entry(regs))
--		current_thread_info()->syscall = -1;
-+	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
-+		if (why)
-+			tracehook_report_syscall_exit(regs, 0);
-+		else if (tracehook_report_syscall_entry(regs))
-+			current_thread_info()->syscall = -1;
-+	}
-+
-+	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT)) {
-+		if (why)
-+			trace_sys_exit(regs, scno);
-+		else
-+			trace_sys_enter(regs, scno);
-+	}
- 
- 	regs->ARM_ip = ip;
- 
+Bangaragiri --- which peripherals do the lpc31xx and the lpc32xx
+families have in common?
+
+I know I2C is common and the lpc31xx uses the common driver.
+LCD is completely different.
+No Ethernet on the lpc31xx.
+
+What about USB? There is code for a NXP variation on EHCI in the
+lpc31xx port, does the lpc32xx use the same EHCI block?
+
+Does the lpc32xx have the same event router for interrupts?
+
+What about the rest of the peripherals?
+
+> an lpc31xx device. However, I will post patches for DT support on
+> lpc32xx, based on the patches I already have at git.antcom.de and
+> antcom.de/lpc32xx/ (some of which already go into v3.4).
+>
+> Thanks,
+>
+> Roland
+
+
+
 -- 
-1.7.0.4
+Jon Smirl
+jonsmirl at gmail.com
