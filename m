@@ -1,64 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 23 Mar 2012 10:52:11 +0800
-Subject: [PATCH 1/1] ARM iMX28: incorrect frac/div calculation
-In-Reply-To: <1332457501-8153-1-git-send-email-matt@grid-net.com>
-References: <1332457501-8153-1-git-send-email-matt@grid-net.com>
-Message-ID: <20120323025208.GG2213@S2101-09.ap.freescale.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 23 Mar 2012 08:59:28 +0530
+Subject: [PATCH] ARM: SPEAr600: Change FSMC and SMI clock names
+In-Reply-To: <1332420073-17703-1-git-send-email-sr@denx.de>
+References: <1332420073-17703-1-git-send-email-sr@denx.de>
+Message-ID: <4F6BEE18.1080209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 04:05:01PM -0700, Matt Burtch wrote:
-> The frac and div values in _CLK_SET_RATE are calculated incorrectly
-> for some clock rates ie. CPU clk of 454.73MHz, 392.72MHz, 261.81Mhz,
-> etc.
+On 3/22/2012 6:11 PM, Stefan Roese wrote:
+> Change FSMC and SMI clock names to match the ones needed for DT based
+> probing.
 > 
-> Now the frac and div values which result in the closest actual clock
-> rate to that requested is selected.
 
-My understanding on clk_set_rate is we need to set the clk to a rate
-closest to the requested one but never exceeding it.  Does your change
-ensure that?
+please keep spear-devel at list.st.com in cc. :)
 
-Regards,
-Shawn
-
-> Also there are no limitations
-> on what frac values can be used, as long as they fall in the valid
-> (18 < frac < 35) range.
-> 
-> Tested on custom iMX28 board.
-> 
-> Signed-off-by: Matt Burtch <matt@grid-net.com>
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
 > ---
->  arch/arm/mach-mxs/clock-mx28.c |    8 ++------
->  1 files changed, 2 insertions(+), 6 deletions(-)
+>  arch/arm/mach-spear6xx/clock.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 5d68e41..a058b99 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -354,19 +354,15 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
->  		}							\
->  		for (d = 1; d <= div_max; d++) {			\
->  			f = parent_rate * 18 / d / rate;		\
-> -			if ((parent_rate * 18 / d) % rate)		\
-> -				f++;					\
->  			if (f < 18 || f > 35)				\
->  				continue;				\
->  									\
->  			calc_rate = parent_rate * 18 / f / d;		\
-> -			if (calc_rate > rate)				\
-> -				continue;				\
->  									\
-> -			if (rate - calc_rate < diff) {			\
-> +			if (abs(rate - calc_rate) < diff) {		\
->  				frac = f;				\
->  				div = d;				\
-> -				diff = rate - calc_rate;		\
-> +				diff = abs(rate - calc_rate);		\
->  			}						\
->  									\
->  			if (diff == 0)					\
-> -- 
-> 1.7.5.4
-> 
+> diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+> index a86499a..f051804 100644
+> --- a/arch/arm/mach-spear6xx/clock.c
+> +++ b/arch/arm/mach-spear6xx/clock.c
+> @@ -660,8 +660,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+>  	{ .dev_id = "dma",		.clk = &dma_clk},
+>  	{ .dev_id = "jpeg",		.clk = &jpeg_clk},
+>  	{ .dev_id = "gmac",		.clk = &gmac_clk},
+> -	{ .dev_id = "smi",		.clk = &smi_clk},
+> -	{ .dev_id = "fsmc-nand",	.clk = &fsmc_clk},
+> +	{ .dev_id = "fc000000.flash",	.clk = &smi_clk},
+> +	{ .dev_id = "d1800000.flash",	.clk = &fsmc_clk},
+>  	/* clock derived from apb clk */
+>  	{ .dev_id = "adc",		.clk = &adc_clk},
+>  	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
+
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
+
+@Arnd: I would start to apply these patches on my git tree from now
+onwards and will send you pull request later.
+
+-- 
+viresh
