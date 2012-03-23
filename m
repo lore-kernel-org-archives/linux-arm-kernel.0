@@ -1,42 +1,35 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 22 Mar 2012 18:56:30 -0500
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <20120322200339.GA5812@mwesterb-mobl.ger.corp.intel.com>
-References: <4F683B36.8090101@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F0020696D488E3@AUSP01VMBX24.collaborationhost.net>
- <20120321193231.GA3740@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48AB1@AUSP01VMBX24.collaborationhost.net>
- <20120322073750.GA637@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48CAF@AUSP01VMBX24.collaborationhost.net>
- <20120322200339.GA5812@mwesterb-mobl.ger.corp.intel.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020696D48E1A@AUSP01VMBX24.collaborationhost.net>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 22 Mar 2012 20:23:58 -0400
+Subject: ioremap to a specific virtual address
+Message-ID: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 22, 2012 1:04 PM, Mika Westerberg wrote:
-> On Thu, Mar 22, 2012 at 01:52:52PM -0500, H Hartley Sweeten wrote:
->
->> I hacked this back to the handle_one_vic function. It looks like every time
->> I get the message above the stat read in that function shows an active
->> interrupt for DMAM2M0 (the dma rx channel) and DMAM2M1 (the dma
->> tx channel). Because of the way handle_one_vic processes the irq's, the
->> DMAM2M0 interrupt gets handled first. When it's done it must be clearing
->> the DMAM2M1 interrupt automatically for some reason. So, when it's
->> handled there is no interrupt pending so we get the message.
->> 
->> The "cleanest" fix I can think of is the following patch.  This is against
->> linux-next.
->
-> I can't figure out any better fix unless we move ep93xx back to use
-> !MULTI_IRQ_HANDLER which obviously is not good thing to do.
+When iotable is used to initially map memory you can specify the
+mapping address. In this case IO_SDMMC_PHYS is 0x18000000 and it gets
+mapped to  0xf1800000
 
-Mika,
+NXP has supplied this handly macro
+#define io_p2v(x) (0xf0000000 | (((x) & 0xff000000) >> 4) | ((x) & 0x000fffff))
 
-I wonder if the spurious interrupts were the real problem behind what
-was causing the Oops that prompted your patch:
+iotable_init(lpc313x_io_desc, ARRAY_SIZE(lpc313x_io_desc));
 
-dma/ep93xx_dma: prevent ep93xx_dma_tasklet() to reference an empty list
+	{
+		.virtual	= io_p2v(IO_SDMMC_PHYS),
+		.pfn		= __phys_to_pfn(IO_SDMMC_PHYS),
+		.length		= IO_SDMMC_SIZE,
+		.type		= MT_DEVICE
+	},
 
-???
+The supplied kernel is full of code that uses this type of addressing.
+It has macros for register definition that all depend on the registers
+being mapped to a well know location - io_p2v(x).
 
-Hartley
+I'd like to move the map out of the core code and into the SDMMC
+device driver and then only do it if the driver loads.  Is there some
+way to ioremap to a specific address on ARM? Or is there another way
+to build the mapping in the driver?
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
