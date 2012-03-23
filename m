@@ -1,121 +1,46 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Fri, 23 Mar 2012 08:41:29 +0100
-Subject: [PATCH 1/8] clk: add a fixed factor clock
-In-Reply-To: <1332164166-6055-2-git-send-email-s.hauer@pengutronix.de>
-References: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
- <1332164166-6055-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1332488489.2876.8.camel@flow>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Fri, 23 Mar 2012 13:17:29 +0530
+Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
+In-Reply-To: <alpine.DEB.2.00.1203221740140.24425@utopia.booyaka.com>
+References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+ <87limurpsx.fsf@ti.com>
+ <CAMrsUdLtC0iVk2qDDDXj2tteAzP5UQJXNvsCoJLEC9Yty2QjvQ@mail.gmail.com>
+ <alpine.DEB.2.00.1203221740140.24425@utopia.booyaka.com>
+Message-ID: <CAMrsUdKn6i9cNfHia+TqZ2By7V3NhXHF+1Bt-eadJd0ZWkERNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 19.03.2012, 14:35 +0100 schrieb Sascha Hauer:
-> Having fixed factors/dividers in hardware is a common pattern, so
-> add a clock doing this. Currently no rate propagation is supported.
+Hi Paul,
 
-Also, could I convince you to move struct clk_fixed_factor into
-clk-provider.h and provide a DEFINE_CLK_FIXED_FACTOR macro to align with
-the other basic clocks?
+On Fri, Mar 23, 2012 at 5:10 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi
+>
+> On Thu, 22 Mar 2012, Raja, Govindraj wrote:
+>
+>> Sorry I for got to add that, here are details on what was tested.
+>>
+>> 1.) OMAP2430 SDP : Boot tested with uart1 as console.
+>>
+>> 2.) OMAP3430 SDP: Boot test, suspend/resume tests, retention off mode
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(checking retention and off mode count
+>> in cpu idle cases)
+>>
+>> 3.) OMAP3630 - Beagle XM: ?Boot test, suspend/resume tests, retention off mode
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (checking retention and
+>> off mode count in cpu idle cases)
+>>
+>> 4.) OMAP4430 - PANDA: Boot test, suspend/resume tests
+>>
+>> 5.) OMAP4460 - PANDA: Boot test.
+>
+> What kernel .config was used for these tests?
 
----
- drivers/clk/clk-fixed-factor.c |   15 +++++++++------
- include/linux/clk-private.h    |   28 ++++++++++++++++++++++++++++
- include/linux/clk-provider.h   |   19 +++++++++++++++++++
- 3 files changed, 56 insertions(+), 6 deletions(-)
+omap2plus_defconfig was used.
 
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index d99b842..8ca427a 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -12,12 +12,15 @@
- #include <linux/slab.h>
- #include <linux/err.h>
- 
--struct clk_fixed_factor {
--	struct clk_hw	hw;
--	unsigned int	mult;
--	unsigned int	div;
--	char		*parent[1];
--};
-+/*
-+ * DOC: basic fixed multiplier and divider clock that cannot gate
-+ *
-+ * Traits of this clock:
-+ * prepare - clk_prepare only ensures that parents are prepared
-+ * enable - clk_enable only ensures that parents are enabled
-+ * rate - rate is fixed.  clk->rate = parent->rate / div * mult
-+ * parent - fixed parent.  No clk_set_parent support
-+ */
- 
- #define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
- 
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 5e4312b..9501eab 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -170,6 +170,34 @@ extern struct clk_ops clk_mux_ops;
- 		.flags = _flags,				\
- 	};
- 
-+extern struct clk_ops clk_fixed_factor_ops;
-+
-+#define DEFINE_CLK_FIXED_FACTOR(_name, _parent_name,		\
-+				_parent_ptr, _flags,		\
-+				_mult, _div)			\
-+	static struct clk _name;				\
-+	static struct clk *_name##_parents[] = {		\
-+		_parent_ptr,					\
-+	};							\
-+	static struct clk_fixed_factor _name##_hw = {		\
-+		.hw = {						\
-+			.clk = &_name,				\
-+		},						\
-+		.mult = _mult,					\
-+		.div = _div,					\
-+		.parent[0] = _parent_name,			\
-+	};							\
-+	static struct clk _name = {				\
-+		.name = #_name,					\
-+		.ops = &clk_fixed_factor_ops,			\
-+		.hw = &_name##_hw.hw,				\
-+		.parent_names = _name##_hw.parent,		\
-+		.num_parents =					\
-+			ARRAY_SIZE(_name##_hw.parent),		\
-+		.parents = _name##_parents,			\
-+		.flags = _flags,				\
-+	};
-+
- /**
-  * __clk_init - initialize the data structures in a struct clk
-  * @dev:	device initializing this clk, placeholder for now
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 21ca2f8..b58f846 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -257,6 +257,25 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock);
- 
-+/**
-+ * struct clk_fixed_factor - fixed multiplier and divider clock
-+ *
-+ * @hw:         handle between common and hardware-specific interfaces
-+ * @mult:	multiplier
-+ * @div:        divider
-+ *
-+ * Clock with a fixed multiplier and divider. The output frequency is the
-+ * parent clock rate divided by div and multiplied by mult.
-+ * Implements .recalc_rate, .set_rate and .round_rate
-+ */
-+
-+struct clk_fixed_factor {
-+        struct clk_hw   hw;
-+        unsigned int    mult;
-+        unsigned int    div;
-+        char            *parent[1];
-+};
-+
- struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned int mult, unsigned int div);
--- 
-1.7.9.1
+the same kernel image was tested with all these boards.
+(kernel image was built along with initramfs support
+using minimal busybox filesystem)
+
+--
+Thanks,
+Govindraj.R
