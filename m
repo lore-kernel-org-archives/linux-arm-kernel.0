@@ -1,34 +1,107 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 23 Mar 2012 15:52:05 +0100
-Subject: ioremap to a specific virtual address
-In-Reply-To: <201203231407.00686.arnd@arndb.de>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <alpine.LFD.2.02.1203230023060.24151@xanadu.home>
- <CAKON4Ox6sp5YMryr2jzOAqYNmJG9RyahLTusrHZ_jcNQ40DAfQ@mail.gmail.com>
- <201203231407.00686.arnd@arndb.de>
-Message-ID: <4F6C8E15.5050104@antcom.de>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Fri, 23 Mar 2012 07:52:25 -0700
+Subject: [PATCH v4 2/3] ARM: add TRACEHOOK support
+In-Reply-To: <4F6C8DAE.9070209@mentor.com>
+References: <4F44FF58.3060907@mentor.com> <4F4E3780.4060904@mentor.com>
+ <4F54D0D4.7070905@mentor.com> <4F6C8DAE.9070209@mentor.com>
+Message-ID: <4F6C8E29.3070801@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Add calls to tracehook_report_syscall_{entry,exit} and tracehook_signal_handler
 
-On 23/03/12 15:07, Arnd Bergmann wrote:
-> I think you should work together with Roland Stigge, who is currently
-> looking into doing the same for lpc32xx. My guess is that you can save
-> a lot of work by combining your efforts, while you would get conflicting
-> DT bindings if you don't. Note that Roland has done a lot of patches
-> already for nxp device drivers that will be part of v3.4. He has not yet
-> started on DT patches but wants to work on that for v3.5.
+Signed-off-by: Steven Walter <stevenrwalter@gmail.com>
+Signed-off-by: Wade Farnsworth <wade_farnsworth@mentor.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig              |    1 +
+ arch/arm/include/asm/ptrace.h |    5 +++++
+ arch/arm/kernel/ptrace.c      |   21 ++++++---------------
+ arch/arm/kernel/signal.c      |    2 ++
+ 4 files changed, 14 insertions(+), 15 deletions(-)
 
-You wrote about NXP's BSP from 3 years ago. At git.lpclinux.com, you can
-find lpc31xx's branches, updated only some weeks ago, based on Linux 2.6.33.
-
-Feel free to join my efforts for DT on lpc32xx. Don't know how much
-lpc31xx and lpc32xx have in common, and I currently don't have access to
-an lpc31xx device. However, I will post patches for DT support on
-lpc32xx, based on the patches I already have at git.antcom.de and
-antcom.de/lpc32xx/ (some of which already go into v3.4).
-
-Thanks,
-
-Roland
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dfb0312..c87e23f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -10,6 +10,7 @@ config ARM
+ 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
+ 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+ 	select HAVE_ARCH_KGDB
++	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_KPROBES if !XIP_KERNEL
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index 451808b..355ece5 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -249,6 +249,11 @@ static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
+ 	return regs->ARM_sp;
+ }
+ 
++static inline unsigned long user_stack_pointer(struct pt_regs *regs)
++{
++	return regs->ARM_sp;
++}
++
+ #endif /* __KERNEL__ */
+ 
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index ede6443..46f4b41 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -24,6 +24,7 @@
+ #include <linux/hw_breakpoint.h>
+ #include <linux/regset.h>
+ #include <linux/audit.h>
++#include <linux/tracehook.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/system.h>
+@@ -930,24 +931,14 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+ 		return scno;
+-	if (!(current->ptrace & PT_PTRACED))
+-		return scno;
+ 
+ 	current_thread_info()->syscall = scno;
+ 
+-	/* the 0x80 provides a way for the tracing parent to distinguish
+-	   between a syscall stop and SIGTRAP delivery */
+-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+-				 ? 0x80 : 0));
+-	/*
+-	 * this isn't the same as continuing with a signal, but it will do
+-	 * for normal use.  strace only continues with a signal if the
+-	 * stopping signal is not SIGTRAP.  -brl
+-	 */
+-	if (current->exit_code) {
+-		send_sig(current->exit_code, current, 1);
+-		current->exit_code = 0;
+-	}
++	if (why)
++		tracehook_report_syscall_exit(regs, 0);
++	else if (tracehook_report_syscall_entry(regs))
++		current_thread_info()->syscall = -1;
++
+ 	regs->ARM_ip = ip;
+ 
+ 	return current_thread_info()->syscall;
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 9e617bd..6f084c1 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -644,6 +644,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
+ 	recalc_sigpending();
+ 	spin_unlock_irq(&tsk->sighand->siglock);
+ 
++	tracehook_signal_handler(sig, info, ka, regs, 0);
++
+ 	return 0;
+ }
+ 
+-- 
+1.7.0.4
