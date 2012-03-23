@@ -1,139 +1,131 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 Mar 2012 10:26:27 +0100
-Subject: [RFC][PATCH 2/9] ARM: OMAP3: cpuidle - remove next_valid_state
- function
-In-Reply-To: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1332494794-7810-2-git-send-email-daniel.lezcano@linaro.org>
+Date: Fri, 23 Mar 2012 10:26:26 +0100
+Subject: [RFC][PATCH 1/9] ARM: OMAP3: cpuidle - remove rx51 cpuidle parameters
+ table
+Message-ID: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we will be able to remove C-states from userspace with the sysfs
-API, this function is no longer needed. We remove it and that simplifies
-the code for more consolidation.
+As suggested, this table is an optimized version for rx51 and we
+remove it in order to consolidate the cpuidle code between omap3
+and omap4, we remove this specific data definition which is used
+to override the default omap3 latencies but at the cost of extra
+code and complexity.
+
+In order to not lose the values which probably took time to be
+measured, the table is converted into a comment with an array
+description.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   85 +------------------------------------
- 1 files changed, 2 insertions(+), 83 deletions(-)
+ arch/arm/mach-omap2/board-rx51.c  |   38 +++++++++++++++++-------------------
+ arch/arm/mach-omap2/cpuidle34xx.c |   17 ----------------
+ arch/arm/mach-omap2/pm.h          |    9 --------
+ 3 files changed, 18 insertions(+), 46 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 27f01f0..2da92a6 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -59,25 +59,24 @@ static struct platform_device leds_gpio = {
+ };
+ 
+ /*
+- * cpuidle C-states definition override from the default values.
+- * The 'exit_latency' field is the sum of sleep and wake-up latencies.
+- */
+-static struct cpuidle_params rx51_cpuidle_params[] = {
+-	/* C1 */
+-	{110 + 162, 5 , 1},
+-	/* C2 */
+-	{106 + 180, 309, 1},
+-	/* C3 */
+-	{107 + 410, 46057, 0},
+-	/* C4 */
+-	{121 + 3374, 46057, 0},
+-	/* C5 */
+-	{855 + 1146, 46057, 1},
+-	/* C6 */
+-	{7580 + 4134, 484329, 0},
+-	/* C7 */
+-	{7505 + 15274, 484329, 1},
+-};
++ * cpuidle C-states definition for rx51.
++ *
++ * The 'exit_latency' field is the sum of sleep
++ * and wake-up latencies.
++
++    ---------------------------------------------
++   | state |  exit_latency  |  target_residency  |
++    ---------------------------------------------
++   |  C1   |    110 + 162   |            5       |
++   |  C2   |    106 + 180   |          309       |
++   |  C3   |    107 + 410   |        46057       |
++   |  C4   |    121 + 3374  |        46057       |
++   |  C5   |    855 + 1146  |        46057       |
++   |  C6   |   7580 + 4134  |       484329       |
++   |  C7   |   7505 + 15274 |       484329       |
++    ---------------------------------------------
++
++*/
+ 
+ extern void __init rx51_peripherals_init(void);
+ 
+@@ -98,7 +97,6 @@ static void __init rx51_init(void)
+ 	struct omap_sdrc_params *sdrc_params;
+ 
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+-	omap3_pm_init_cpuidle(rx51_cpuidle_params);
+ 	omap_serial_init();
+ 
+ 	sdrc_params = nokia_get_sdram_timings();
 diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index d67431a..65b4e7aa 100644
+index 464cffd..d67431a 100644
 --- a/arch/arm/mach-omap2/cpuidle34xx.c
 +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -164,84 +164,6 @@ return_sleep_time:
- }
+@@ -306,23 +306,6 @@ select_state:
  
- /**
-- * next_valid_state - Find next valid C-state
-- * @dev: cpuidle device
-- * @drv: cpuidle driver
-- * @index: Index of currently selected c-state
-- *
-- * If the state corresponding to index is valid, index is returned back
-- * to the caller. Else, this function searches for a lower c-state which is
-- * still valid (as defined in omap3_power_states[]) and returns its index.
-- *
-- * A state is valid if the 'valid' field is enabled and
-- * if it satisfies the enable_off_mode condition.
-- */
--static int next_valid_state(struct cpuidle_device *dev,
--			struct cpuidle_driver *drv,
--				int index)
+ DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+ 
+-void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params)
 -{
--	struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
--	struct cpuidle_state *curr = &drv->states[index];
--	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
--	u32 mpu_deepest_state = PWRDM_POWER_RET;
--	u32 core_deepest_state = PWRDM_POWER_RET;
--	int next_index = -1;
+-	int i;
 -
--	if (enable_off_mode) {
--		mpu_deepest_state = PWRDM_POWER_OFF;
--		/*
--		 * Erratum i583: valable for ES rev < Es1.2 on 3630.
--		 * CORE OFF mode is not supported in a stable form, restrict
--		 * instead the CORE state to RET.
--		 */
--		if (!IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
--			core_deepest_state = PWRDM_POWER_OFF;
+-	if (!cpuidle_board_params)
+-		return;
+-
+-	for (i = 0; i < OMAP3_NUM_STATES; i++) {
+-		cpuidle_params_table[i].valid =	cpuidle_board_params[i].valid;
+-		cpuidle_params_table[i].exit_latency =
+-			cpuidle_board_params[i].exit_latency;
+-		cpuidle_params_table[i].target_residency =
+-			cpuidle_board_params[i].target_residency;
 -	}
--
--	/* Check if current state is valid */
--	if ((cx->valid) &&
--	    (cx->mpu_state >= mpu_deepest_state) &&
--	    (cx->core_state >= core_deepest_state)) {
--		return index;
--	} else {
--		int idx = OMAP3_NUM_STATES - 1;
--
--		/* Reach the current state starting at highest C-state */
--		for (; idx >= 0; idx--) {
--			if (&drv->states[idx] == curr) {
--				next_index = idx;
--				break;
--			}
--		}
--
--		/* Should never hit this condition */
--		WARN_ON(next_index == -1);
--
--		/*
--		 * Drop to next valid state.
--		 * Start search from the next (lower) state.
--		 */
--		idx--;
--		for (; idx >= 0; idx--) {
--			cx = cpuidle_get_statedata(&dev->states_usage[idx]);
--			if ((cx->valid) &&
--			    (cx->mpu_state >= mpu_deepest_state) &&
--			    (cx->core_state >= core_deepest_state)) {
--				next_index = idx;
--				break;
--			}
--		}
--		/*
--		 * C1 is always valid.
--		 * So, no need to check for 'next_index == -1' outside
--		 * this loop.
--		 */
--	}
--
--	return next_index;
+-	return;
 -}
 -
--/**
-  * omap3_enter_idle_bm - Checks for any bus activity
-  * @dev: cpuidle device
-  * @drv: cpuidle driver
-@@ -254,7 +176,6 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv,
- 			       int index)
- {
--	int new_state_idx;
- 	u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
- 	struct omap3_idle_statedata *cx;
- 	int ret;
-@@ -265,7 +186,7 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	 */
- 	cam_state = pwrdm_read_pwrst(cam_pd);
- 	if (cam_state == PWRDM_POWER_ON) {
--		new_state_idx = drv->safe_state_index;
-+		index = drv->safe_state_index;
- 		goto select_state;
- 	}
+ struct cpuidle_driver omap3_idle_driver = {
+ 	.name = 	"omap3_idle",
+ 	.owner = 	THIS_MODULE,
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index a051431..af73a86 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -51,15 +51,6 @@ struct cpuidle_params {
+ 	u8 valid;		/* validates the C-state */
+ };
  
-@@ -292,10 +213,8 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	if (per_next_state != per_saved_state)
- 		pwrdm_set_next_pwrst(per_pd, per_next_state);
- 
--	new_state_idx = next_valid_state(dev, drv, index);
+-#if defined(CONFIG_PM) && defined(CONFIG_CPU_IDLE)
+-extern void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params);
+-#else
+-static
+-inline void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params)
+-{
+-}
+-#endif
 -
- select_state:
--	ret = omap3_enter_idle(dev, drv, new_state_idx);
-+	ret = omap3_enter_idle(dev, drv, index);
+ extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
+ extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
  
- 	/* Restore original PER state if it was modified */
- 	if (per_next_state != per_saved_state)
 -- 
 1.7.5.4
