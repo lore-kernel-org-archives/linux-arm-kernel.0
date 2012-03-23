@@ -1,107 +1,145 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 Mar 2012 13:38:10 +0100
-Subject: [RFC][PATCH 3/9] ARM: OMAP3: cpuidle - set enable_off_mode as
- static
-In-Reply-To: <CAORVsuVBC2TgVyt-PFWV878mXpM1GqETQnzdVi0ZYH-2x8D4nQ@mail.gmail.com>
-References: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
- <1332494794-7810-3-git-send-email-daniel.lezcano@linaro.org>
- <CAORVsuVBC2TgVyt-PFWV878mXpM1GqETQnzdVi0ZYH-2x8D4nQ@mail.gmail.com>
-Message-ID: <4F6C6EB2.70101@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 23 Mar 2012 07:40:18 -0500
+Subject: [PATCH 1/2] ARM: VIC: Create common infrastructure for vic DT
+ bindings
+In-Reply-To: <4bfe7af3761f6f40506a2089fd67866015f6d7f3.1332488625.git.viresh.kumar@st.com>
+References: <4bfe7af3761f6f40506a2089fd67866015f6d7f3.1332488625.git.viresh.kumar@st.com>
+Message-ID: <4F6C6F32.10800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2012 01:22 PM, Jean Pihet wrote:
-> On Fri, Mar 23, 2012 at 10:26 AM, Daniel Lezcano
-> <daniel.lezcano@linaro.org>  wrote:
->> This variable is only used in the pm-debug.c file.
->>
->> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->> ---
->>   arch/arm/mach-omap2/pm-debug.c |    2 +-
->>   arch/arm/mach-omap2/pm.h       |   30 ++++++++++++------------------
->>   2 files changed, 13 insertions(+), 19 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
->> index 814bcd9..86aa398 100644
->> --- a/arch/arm/mach-omap2/pm-debug.c
->> +++ b/arch/arm/mach-omap2/pm-debug.c
->> @@ -38,7 +38,7 @@
->>   #include "prm2xxx_3xxx.h"
->>   #include "pm.h"
->>
->> -u32 enable_off_mode;
->> +static u32 enable_off_mode;
-> It is stil needed in cpuidle34xx.c.
+On 03/23/2012 02:49 AM, Viresh Kumar wrote:
+> Few platforms define there own struct of_device_id[] for vic pl19*. They don't
+> do anything specific in init_irq() other than of_irq_init().
+> 
+> This patch creates this struct array in vic.c and make other platforms use it.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  arch/arm/common/vic.c               |   14 +++++++++++++-
+>  arch/arm/include/asm/hardware/vic.h |    3 ++-
+>  arch/arm/mach-picoxcell/common.c    |   12 +-----------
+>  arch/arm/mach-spear6xx/spear6xx.c   |   12 +-----------
+>  4 files changed, 17 insertions(+), 24 deletions(-)
+> 
 
-ok.
+NAK
 
->>   #ifdef CONFIG_DEBUG_FS
->>   #include<linux/debugfs.h>
->> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
->> index af73a86..f5c3072 100644
->> --- a/arch/arm/mach-omap2/pm.h
->> +++ b/arch/arm/mach-omap2/pm.h
->> @@ -25,6 +25,18 @@ extern int omap4_idle_init(void);
->>   extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
->>   extern int (*omap_pm_suspend)(void);
->>
->> +/*
->> + * cpuidle mach specific parameters
->> + *
->> + * The board code can override the default C-states definition using
->> + * omap3_pm_init_cpuidle
->> + */
->> +struct cpuidle_params {
->> +       u32 exit_latency;       /* exit_latency = sleep + wake-up latencies */
->> +       u32 target_residency;
->> +       u8 valid;               /* validates the C-state */
->> +};
->> +
-> Is this move needed? This will be removed in a later patch.
+None of these platforms have gpio interrupts or any other board
+interrupt controllers which need to be initialized early? I don't think
+DT conversions are complete enough to tell.
 
-No, I think I did a bad manipulation.
+We could do something like this, but there only needs to be a single
+match list of all controllers and function. We should consolidate the
+irqchips to drivers/irqchip first though. I have that action from Connect...
 
->>   #if defined(CONFIG_PM_OPP)
->>   extern int omap3_opp_init(void);
->>   extern int omap4_opp_init(void);
->> @@ -39,27 +51,9 @@ static inline int omap4_opp_init(void)
->>   }
->>   #endif
->>
->> -/*
->> - * cpuidle mach specific parameters
->> - *
->> - * The board code can override the default C-states definition using
->> - * omap3_pm_init_cpuidle
->> - */
->> -struct cpuidle_params {
->> -       u32 exit_latency;       /* exit_latency = sleep + wake-up latencies */
->> -       u32 target_residency;
->> -       u8 valid;               /* validates the C-state */
->> -};
->> -
->>   extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
->>   extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
->>
->> -#ifdef CONFIG_PM_DEBUG
->> -extern u32 enable_off_mode;
->> -#else
->> -#define enable_off_mode 0
->> -#endif
->> -
->>   #if defined(CONFIG_PM_DEBUG)&&  defined(CONFIG_DEBUG_FS)
->>   extern void pm_dbg_update_time(struct powerdomain *pwrdm, int prev);
->>   #else
->> --
->> 1.7.5.4
->>
->
-> Jean
+Rob
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 7a66311..190813e 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -398,7 +398,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+>  }
+>  
+>  #ifdef CONFIG_OF
+> -int __init vic_of_init(struct device_node *node, struct device_node *parent)
+> +static int __init vic_of_init(struct device_node *node, struct device_node
+> +		*parent)
+>  {
+>  	void __iomem *regs;
+>  	int irq_base;
+> @@ -423,6 +424,17 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+>  
+>  	return -EIO;
+>  }
+> +
+> +static const struct of_device_id vic_of_match[] __initconst = {
+> +	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+> +	{ .compatible = "arm,pl192-vic", .data = vic_of_init, },
+> +	{ /* Sentinel */ }
+> +};
+> +
+> +void __init vic_init_irq(void)
+> +{
+> +	of_irq_init(vic_of_match);
+> +}
+>  #endif /* CONFIG OF */
+>  
+>  /*
+> diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
+> index e14af1a..02056a8 100644
+> --- a/arch/arm/include/asm/hardware/vic.h
+> +++ b/arch/arm/include/asm/hardware/vic.h
+> @@ -42,6 +42,7 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  #include <linux/compiler.h>
+> +#include <linux/init.h>
+>  #include <linux/types.h>
+>  
+>  struct device_node;
+> @@ -50,7 +51,7 @@ struct pt_regs;
+>  void __vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources,
+>  		u32 resume_sources, struct device_node *node);
+>  void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
+> -int vic_of_init(struct device_node *node, struct device_node *parent);
+> +void __init vic_init_irq(void);
+>  void vic_handle_irq(struct pt_regs *regs);
+>  
+>  #endif /* __ASSEMBLY__ */
+> diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+> index a2e8ae8..fa0d7e9 100644
+> --- a/arch/arm/mach-picoxcell/common.c
+> +++ b/arch/arm/mach-picoxcell/common.c
+> @@ -68,16 +68,6 @@ static const char *picoxcell_dt_match[] = {
+>  	NULL
+>  };
+>  
+> -static const struct of_device_id vic_of_match[] __initconst = {
+> -	{ .compatible = "arm,pl192-vic", .data = vic_of_init, },
+> -	{ /* Sentinel */ }
+> -};
+> -
+> -static void __init picoxcell_init_irq(void)
+> -{
+> -	of_irq_init(vic_of_match);
+> -}
+> -
+>  static void picoxcell_wdt_restart(char mode, const char *cmd)
+>  {
+>  	/*
+> @@ -95,7 +85,7 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
+>  DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+>  	.map_io		= picoxcell_map_io,
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+> -	.init_irq	= picoxcell_init_irq,
+> +	.init_irq	= vic_init_irq,
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &picoxcell_timer,
+>  	.init_machine	= picoxcell_init_machine,
+> diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+> index 2ed8b14..d436118 100644
+> --- a/arch/arm/mach-spear6xx/spear6xx.c
+> +++ b/arch/arm/mach-spear6xx/spear6xx.c
+> @@ -102,19 +102,9 @@ static const char *spear600_dt_board_compat[] = {
+>  	NULL
+>  };
+>  
+> -static const struct of_device_id vic_of_match[] __initconst = {
+> -	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+> -	{ /* Sentinel */ }
+> -};
+> -
+> -static void __init spear6xx_dt_init_irq(void)
+> -{
+> -	of_irq_init(vic_of_match);
+> -}
+> -
+>  DT_MACHINE_START(SPEAR600_DT, "ST SPEAr600 (Flattened Device Tree)")
+>  	.map_io		=	spear6xx_map_io,
+> -	.init_irq	=	spear6xx_dt_init_irq,
+> +	.init_irq	=	vic_init_irq,
+>  	.handle_irq	=	vic_handle_irq,
+>  	.timer		=	&spear6xx_timer,
+>  	.init_machine	=	spear600_dt_init,
