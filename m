@@ -1,45 +1,36 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 23 Mar 2012 11:13:48 -0600
-Subject: [PATCH 1/9] arm/omap: enable building omap2 without omap2420/2430
+Date: Fri, 23 Mar 2012 11:13:49 -0600
+Subject: [PATCH 2/9] omap: fix visibility of omap2_mbox_iva_priv
 In-Reply-To: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1332522836-29517-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1332522836-29517-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Arnd Bergmann <arnd@arndb.de>
 
-Kconfig allows selecting CONFIG_OMAP2 but no specific SOC, the options
-being omap2420 and omap2430, but that leads to a build error when
-omap3 or omap4 are also enabled and the MULTI_OMAP2 symbol is
-undefined.
-
-This adds another clause to plat/multi.h, mainly to allow all
-possible randconfig combinations to build cleanly.
+map2_mbox_iva_priv is used on multiple omap2 socs but is hidden
+in an outdated #ifdef that is specific to a single soc.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/include/plat/multi.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/mailbox.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/multi.h b/arch/arm/plat-omap/include/plat/multi.h
-index 999ffba..fb7f196 100644
---- a/arch/arm/plat-omap/include/plat/multi.h
-+++ b/arch/arm/plat-omap/include/plat/multi.h
-@@ -82,6 +82,11 @@
- #  define OMAP_NAME omap2430
- # endif
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 415a6f1..ef01f6c 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -258,7 +258,7 @@ struct omap_mbox mbox_dsp_info = {
+ struct omap_mbox *omap3_mboxes[] = { &mbox_dsp_info, NULL };
  #endif
-+#ifdef CONFIG_ARCH_OMAP2
-+# ifndef OMAP_NAME
-+#  define OMAP_NAME omap2
-+# endif
-+#endif
- #ifdef CONFIG_ARCH_OMAP3
- # ifdef OMAP_NAME
- #  undef  MULTI_OMAP2
+ 
+-#if defined(CONFIG_SOC_OMAP2420)
++#if defined(CONFIG_ARCH_OMAP2)
+ /* IVA */
+ static struct omap_mbox2_priv omap2_mbox_iva_priv = {
+ 	.tx_fifo = {
 -- 
 1.7.5.4
