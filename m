@@ -1,32 +1,26 @@
-From: tsoni@codeaurora.org (Trilok Soni)
-Date: Sat, 24 Mar 2012 01:52:05 +0530
-Subject: [PATCH v3 1/1] rc: Add support for GPIO based IR Receiver driver.
-In-Reply-To: <4F5070A0.9070609@codeaurora.org>
-References: <1330408300-21939-1-git-send-email-kumarrav@codeaurora.org>
- <20120228202944.GA9373@balrog> <4F4E1911.5050208@codeaurora.org>
- <4F5070A0.9070609@codeaurora.org>
-Message-ID: <4F6CDB6D.9030801@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 23 Mar 2012 17:37:26 -0300
+Subject: [PATCH v1] i.MX35-PDK: Add Camera support
+In-Reply-To: <1332529371-3994-1-git-send-email-alexg@meprolight.com>
+References: <1332529371-3994-1-git-send-email-alexg@meprolight.com>
+Message-ID: <CAOMZO5Cf11Z3JNnsDU2c1YX5Fh=4qznc+26xndKHB1wQMDMu_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Hi Alex,
 
->>>
->>
->> Please review this patch.
->>
->> Thank you James for the review comments.
->
-> Please review and check if this patch can be merged in your tree.
->
+On Fri, Mar 23, 2012 at 4:02 PM, Alex Gershgorin
+<alexgershgorin@gmail.com> wrote:
+> Yes, yesterday I sended to Sascha and ARM mailing list another patch
+> i.MX35-PDK-Add-regulator-support, this also will need be used.
 
-Sorry to ping you again, but I am bit curious due to open merge window, 
-if would be good if this patch can make it into the mainline by this 
-merge window if it looks good. Thanks.
+Ok, good. I saw that patch as well.
 
----Trilok Soni
+It would be really nice if you could fix the I2C issues you reported
+earlier in software.
 
--- 
---
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Otherwise the camera will only work on your own modified mx35pdk ;-)
+
+Regards,
+
+Fabio Estevam
