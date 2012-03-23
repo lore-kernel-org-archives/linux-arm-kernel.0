@@ -1,94 +1,106 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 23 Mar 2012 13:22:32 +0100
-Subject: [RFC][PATCH 3/9] ARM: OMAP3: cpuidle - set enable_off_mode as
- static
-In-Reply-To: <1332494794-7810-3-git-send-email-daniel.lezcano@linaro.org>
-References: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
- <1332494794-7810-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CAORVsuVBC2TgVyt-PFWV878mXpM1GqETQnzdVi0ZYH-2x8D4nQ@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 23 Mar 2012 13:26:02 +0100
+Subject: [PATCH 1/2] common: add dma_mmap_from_coherent() function
+In-Reply-To: <1332505563-17646-1-git-send-email-m.szyprowski@samsung.com>
+References: <08af01cd08ee$2fd04770$8f70d650$%szyprowski@samsung.com>
+ <1332505563-17646-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1332505563-17646-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2012 at 10:26 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> This variable is only used in the pm-debug.c file.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
-> ?arch/arm/mach-omap2/pm-debug.c | ? ?2 +-
-> ?arch/arm/mach-omap2/pm.h ? ? ? | ? 30 ++++++++++++------------------
-> ?2 files changed, 13 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-> index 814bcd9..86aa398 100644
-> --- a/arch/arm/mach-omap2/pm-debug.c
-> +++ b/arch/arm/mach-omap2/pm-debug.c
-> @@ -38,7 +38,7 @@
-> ?#include "prm2xxx_3xxx.h"
-> ?#include "pm.h"
->
-> -u32 enable_off_mode;
-> +static u32 enable_off_mode;
-It is stil needed in cpuidle34xx.c.
+Add a common helper for dma-mapping core for mapping a coherent buffer
+to userspace.
 
->
-> ?#ifdef CONFIG_DEBUG_FS
-> ?#include <linux/debugfs.h>
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index af73a86..f5c3072 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -25,6 +25,18 @@ extern int omap4_idle_init(void);
-> ?extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
-> ?extern int (*omap_pm_suspend)(void);
->
-> +/*
-> + * cpuidle mach specific parameters
-> + *
-> + * The board code can override the default C-states definition using
-> + * omap3_pm_init_cpuidle
-> + */
-> +struct cpuidle_params {
-> + ? ? ? u32 exit_latency; ? ? ? /* exit_latency = sleep + wake-up latencies */
-> + ? ? ? u32 target_residency;
-> + ? ? ? u8 valid; ? ? ? ? ? ? ? /* validates the C-state */
-> +};
-> +
-Is this move needed? This will be removed in a later patch.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/base/dma-coherent.c        |   42 ++++++++++++++++++++++++++++++++++++
+ include/asm-generic/dma-coherent.h |    4 ++-
+ 2 files changed, 45 insertions(+), 1 deletions(-)
 
-> ?#if defined(CONFIG_PM_OPP)
-> ?extern int omap3_opp_init(void);
-> ?extern int omap4_opp_init(void);
-> @@ -39,27 +51,9 @@ static inline int omap4_opp_init(void)
-> ?}
-> ?#endif
->
-> -/*
-> - * cpuidle mach specific parameters
-> - *
-> - * The board code can override the default C-states definition using
-> - * omap3_pm_init_cpuidle
-> - */
-> -struct cpuidle_params {
-> - ? ? ? u32 exit_latency; ? ? ? /* exit_latency = sleep + wake-up latencies */
-> - ? ? ? u32 target_residency;
-> - ? ? ? u8 valid; ? ? ? ? ? ? ? /* validates the C-state */
-> -};
-> -
-> ?extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
-> ?extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
->
-> -#ifdef CONFIG_PM_DEBUG
-> -extern u32 enable_off_mode;
-> -#else
-> -#define enable_off_mode 0
-> -#endif
-> -
-> ?#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-> ?extern void pm_dbg_update_time(struct powerdomain *pwrdm, int prev);
-> ?#else
-> --
-> 1.7.5.4
->
-
-Jean
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index bb0025c..ef5ae05 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -10,6 +10,7 @@
+ struct dma_coherent_mem {
+ 	void		*virt_base;
+ 	dma_addr_t	device_base;
++	phys_addr_t	pfn_base;
+ 	int		size;
+ 	int		flags;
+ 	unsigned long	*bitmap;
+@@ -44,6 +45,7 @@ int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
+ 
+ 	dev->dma_mem->virt_base = mem_base;
+ 	dev->dma_mem->device_base = device_addr;
++	dev->dma_mem->pfn_base = PFN_DOWN(bus_addr);
+ 	dev->dma_mem->size = pages;
+ 	dev->dma_mem->flags = flags;
+ 
+@@ -176,3 +178,43 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
+ 	return 0;
+ }
+ EXPORT_SYMBOL(dma_release_from_coherent);
++
++/**
++ * dma_mmap_from_coherent() - try to mmap the memory allocated from 
++ * per-device coherent memory pool to userspace
++ * @dev:	device from which the memory was allocated
++ * @vma:	vm_area for the userspace memory
++ * @vaddr:	cpu address returned by dma_alloc_from_coherent
++ * @size:	size of the memory buffer allocated by dma_alloc_from_coherent
++ *
++ * This checks whether the memory was allocated from the per-device
++ * coherent memory pool and if so, maps that memory to the provided vma.
++ *
++ * Returns 1 if we correctly mapped the memory, or 0 if
++ * dma_release_coherent() should proceed with mapping memory from
++ * generic pools.
++ */
++int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
++			   void *vaddr, size_t size, int *ret)
++{
++	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
++
++	if (mem && vaddr >= mem->virt_base && vaddr + size <=
++		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
++		unsigned long off = vma->vm_pgoff;
++		int start = (vaddr - mem->virt_base) >> PAGE_SHIFT;
++		int user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
++		int count = size >> PAGE_SHIFT;
++
++		*ret = -ENXIO;
++		if (off < count && user_count <= count - off) {
++			unsigned pfn = mem->pfn_base + start + off;
++			*ret = remap_pfn_range(vma, vma->vm_start, pfn,
++					       user_count << PAGE_SHIFT,
++					       vma->vm_page_prot);
++		}
++		return 1;
++	}
++	return 0;
++}
++EXPORT_SYMBOL(dma_mmap_from_coherent);
+diff --git a/include/asm-generic/dma-coherent.h b/include/asm-generic/dma-coherent.h
+index 85a3ffa..b82051d 100644
+--- a/include/asm-generic/dma-coherent.h
++++ b/include/asm-generic/dma-coherent.h
+@@ -3,13 +3,15 @@
+ 
+ #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
+ /*
+- * These two functions are only for dma allocator.
++ * These three functions are only for dma allocator.
+  * Don't use them in device drivers.
+  */
+ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 				       dma_addr_t *dma_handle, void **ret);
+ int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
+ 
++int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
++                           void *cpu_addr, size_t size, int *ret);
+ /*
+  * Standard interface
+  */
+-- 
+1.7.1.569.g6f426
