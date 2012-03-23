@@ -1,122 +1,34 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Fri, 23 Mar 2012 07:51:12 -0700
-Subject: [PATCH v4 1/3] ARM: add support for the generic syscall.h interface
-In-Reply-To: <4F6C8DAE.9070209@mentor.com>
-References: <4F44FF58.3060907@mentor.com> <4F4E3780.4060904@mentor.com>
- <4F54D0D4.7070905@mentor.com> <4F6C8DAE.9070209@mentor.com>
-Message-ID: <4F6C8DE0.4010803@mentor.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 23 Mar 2012 15:52:05 +0100
+Subject: ioremap to a specific virtual address
+In-Reply-To: <201203231407.00686.arnd@arndb.de>
+References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+ <alpine.LFD.2.02.1203230023060.24151@xanadu.home>
+ <CAKON4Ox6sp5YMryr2jzOAqYNmJG9RyahLTusrHZ_jcNQ40DAfQ@mail.gmail.com>
+ <201203231407.00686.arnd@arndb.de>
+Message-ID: <4F6C8E15.5050104@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supplying the asm-generic/syscall.h interface is a
-pre-requisite for HAVE_ARCH_TRACEHOOK
+Hi Jon,
 
-Signed-off-by: Steven Walter <stevenrwalter@gmail.com>
-Signed-off-by: Wade Farnsworth <wade_farnsworth@mentor.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/syscall.h |   93 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/syscall.h
+On 23/03/12 15:07, Arnd Bergmann wrote:
+> I think you should work together with Roland Stigge, who is currently
+> looking into doing the same for lpc32xx. My guess is that you can save
+> a lot of work by combining your efforts, while you would get conflicting
+> DT bindings if you don't. Note that Roland has done a lot of patches
+> already for nxp device drivers that will be part of v3.4. He has not yet
+> started on DT patches but wants to work on that for v3.5.
 
-diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-new file mode 100644
-index 0000000..c334a23
---- /dev/null
-+++ b/arch/arm/include/asm/syscall.h
-@@ -0,0 +1,93 @@
-+/*
-+ * Access to user system call parameters and results
-+ *
-+ * See asm-generic/syscall.h for descriptions of what we must do here.
-+ */
-+
-+#ifndef _ASM_ARM_SYSCALL_H
-+#define _ASM_ARM_SYSCALL_H
-+
-+#include <linux/err.h>
-+
-+extern const unsigned long sys_call_table[];
-+
-+static inline int syscall_get_nr(struct task_struct *task,
-+				 struct pt_regs *regs)
-+{
-+	return task_thread_info(task)->syscall;
-+}
-+
-+static inline void syscall_rollback(struct task_struct *task,
-+				    struct pt_regs *regs)
-+{
-+	regs->ARM_r0 = regs->ARM_ORIG_r0;
-+}
-+
-+static inline long syscall_get_error(struct task_struct *task,
-+				     struct pt_regs *regs)
-+{
-+	unsigned long error = regs->ARM_r0;
-+	return IS_ERR_VALUE(error) ? error : 0;
-+}
-+
-+static inline long syscall_get_return_value(struct task_struct *task,
-+					    struct pt_regs *regs)
-+{
-+	return regs->ARM_r0;
-+}
-+
-+static inline void syscall_set_return_value(struct task_struct *task,
-+					    struct pt_regs *regs,
-+					    int error, long val)
-+{
-+	regs->ARM_r0 = (long) error ? error : val;
-+}
-+
-+#define SYSCALL_MAX_ARGS 7
-+
-+static inline void syscall_get_arguments(struct task_struct *task,
-+					 struct pt_regs *regs,
-+					 unsigned int i, unsigned int n,
-+					 unsigned long *args)
-+{
-+	if (i + n > SYSCALL_MAX_ARGS) {
-+		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
-+		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
-+		pr_warning("%s called with max args %d, handling only %d\n",
-+			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		memset(args_bad, 0, n_bad * sizeof(args[0]));
-+		n = SYSCALL_MAX_ARGS - i;
-+	}
-+
-+	if (i == 0) {
-+		args[0] = regs->ARM_ORIG_r0;
-+		args++;
-+		i++;
-+		n--;
-+	}
-+
-+	memcpy(args, &regs->ARM_r0 + i, n * sizeof(args[0]));
-+}
-+
-+static inline void syscall_set_arguments(struct task_struct *task,
-+					 struct pt_regs *regs,
-+					 unsigned int i, unsigned int n,
-+					 const unsigned long *args)
-+{
-+	if (i + n > SYSCALL_MAX_ARGS) {
-+		pr_warning("%s called with max args %d, handling only %d\n",
-+			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		n = SYSCALL_MAX_ARGS - i;
-+	}
-+
-+	if (i == 0) {
-+		regs->ARM_ORIG_r0 = args[0];
-+		args++;
-+		i++;
-+		n--;
-+	}
-+
-+	memcpy(&regs->ARM_r0 + i, args, n * sizeof(args[0]));
-+}
-+
-+#endif /* _ASM_ARM_SYSCALL_H */
--- 
-1.7.0.4
+You wrote about NXP's BSP from 3 years ago. At git.lpclinux.com, you can
+find lpc31xx's branches, updated only some weeks ago, based on Linux 2.6.33.
+
+Feel free to join my efforts for DT on lpc32xx. Don't know how much
+lpc31xx and lpc32xx have in common, and I currently don't have access to
+an lpc31xx device. However, I will post patches for DT support on
+lpc32xx, based on the patches I already have at git.antcom.de and
+antcom.de/lpc32xx/ (some of which already go into v3.4).
+
+Thanks,
+
+Roland
