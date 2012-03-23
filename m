@@ -1,42 +1,96 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 23 Mar 2012 15:26:42 +0530
-Subject: [PATCH] SPEAr: Use CLKDEV_INIT for defining clk_lookups
-In-Reply-To: <201203230848.52010.arnd@arndb.de>
-References: <57103011de8747743f95eb41c8dc30c632d097a8.1332490263.git.viresh.kumar@st.com>
- <201203230848.52010.arnd@arndb.de>
-Message-ID: <4F6C48DA.9080005@st.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Fri, 23 Mar 2012 10:20:38 +0000
+Subject: [RFC][PATCH 1/5] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <4F6C445A.3040103@ti.com>
+References: <1332484600-21947-1-git-send-email-afzal@ti.com>
+ <4F6C445A.3040103@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317A6A83@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/23/2012 2:18 PM, Arnd Bergmann wrote:
-> Since we're in the middle of the merge window now, I would
-> prefer not to pull any cosmetic changes or new features but
-> instead just take the bug fix. Once -rc1 is done, we will
-> start taking patches for v3.5.
+Hi Benoit,
+
+On Fri, Mar 23, 2012 at 15:07:30, Cousson, Benoit wrote:
+> > Final destination aimed for this driver is MFD.
 > 
+> Why? Are you sure this is appropriate? This is not really a 
+> multifunction device but rather a bus device that can manage multiple 
+> kind of devices.
 
-Ok.
 
-> If the second patch is actually required and nit just cosmetic,
-> please provide a description why that is so.
+Agree, this not an MFD, but can we call this a bus?, as there is
+nothing like GPMC protocol. We considered it logically as MFD &
+proceeded and there was a similar attempt for davinci EMIF [1,2].
+   
 
-It is just an cosmetic one. I posted it, so stefan can work over
-it and i don't have to rework on it again. What's the preferred
-way of handling such stuff during merge window?
+> >   arch/arm/mach-omap2/gpmc.c             | 1083 +++++++++++++++++++-------------
+> 
+> You should probably find the proper location first, move the code and 
+> convert to driver.
+> I will let Tony comment but this is the strategy today for all this 
+> pseudo driver that should not be in OMAP arch directory anymore.
 
-> Finally, the branch you mentioned does not seem to be there
-> on the server.
+Please let me know whether you have any suggestions on where GPMC driver
+should live.
 
-I am so sorry. Actually we have two interfaces to stlinux, one
-is ST internal and other is external. I have pushed the branch
-at the time i posted it, but stlinux site takes a bit to get
-everything synched (i came to know this today only :( ).
+> > +		printk(KERN_DEBUG "GPMC CS%d: %-10s* %3d ns, %3d ticks>= %d\n",
+> 
+> Nit, but since you are cleaning extensively this code, you should use 
+> pr_ macros instead or even dev_ macros since you do have a real driver 
+> now with real devices now.
 
-> I recommend using 'git request-pull', which will actually check
-> that the branch you refer to can be pulled and holds the right
-> contents.
+Sure, this was overlooked
 
-Sure.
+> > +struct gpmc_cs_config {
+> > +	u32 config1;
+> > +	u32 config2;
+> > +	u32 config3;
+> > +	u32 config4;
+> > +	u32 config5;
+> > +	u32 config6;
+> > +	u32 config7;
+> > +	int is_valid;
+> > +};
+> 
+> OK, so this code was just moved and not removed. Becasue of these big 
+> code move, the patch is not super readable. We cannot really see what 
+> part is new and what was changed.
+> 
+> Maybe you should try to split that in sevarl patches or minized the move.
 
---
-Viresh
+Yes, I was really in two minds before the coding started. Lot of code in
+this patch has been moved from one place to other, this was done to put
+codes that handle similar things together, so that trees can be made
+visible easily in the forest. And once the patch is applied, as similar
+sections are together, it may be easy to make further changes
+
+If an initial patch just to rearrange the code to have similar section
+together & then new changes in a another patch, would that be fine?
+
+> +static int __init gpmc_clk_init(void)
+> > +{
+> > +	char *ck = NULL;
+> > +
+> > +	if (cpu_is_omap24xx())
+> > +		ck = "core_l3_ck";
+> > +	else if (cpu_is_omap34xx())
+> > +		ck = "gpmc_fck";
+> > +	else if (cpu_is_omap44xx())
+> > +		ck = "gpmc_ck";
+> 
+> Please don't do that anymore. The CLKDEV array is done to create alias 
+> and avoid this kind of hacks. Moreover you should rely on hwmod for 
+> device creation and thus main clock alias will already be populated for 
+> free.
+
+There are not added, they are existing code, result of rearranging the
+code. These sections were given not given much importance as these won't
+go into driver. But noted the point you are making.
+
+Thanks for your quick comments.
+
+Regards
+Afzal
+
+[1] http://lkml.indiana.edu/hypermail/linux/kernel/1202.2/03228.html
+[2] http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
