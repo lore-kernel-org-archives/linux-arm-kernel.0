@@ -1,21 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 23 Mar 2012 10:55:44 -0600
-Subject: [PATCH 2/2] ARM: GIC: Create common infrastructure for GIC DT
- bindings
-In-Reply-To: <23b4d2ea357a7a785b6c42d0fa7ae9478bad552b.1332488625.git.viresh.kumar@st.com>
-References: <4bfe7af3761f6f40506a2089fd67866015f6d7f3.1332488625.git.viresh.kumar@st.com>
- <23b4d2ea357a7a785b6c42d0fa7ae9478bad552b.1332488625.git.viresh.kumar@st.com>
-Message-ID: <4F6CAB10.2020204@wwwdotorg.org>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Fri, 23 Mar 2012 11:13:47 -0600
+Subject: [PATCH 0/9] omap randconfig fixes for v3.3
+Message-ID: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2012 01:49 AM, Viresh Kumar wrote:
-> Few platforms define there own struct of_device_id[] for GIC. They don't
-> do anything specific in init_irq() other than of_irq_init().
-> 
-> This patch creates this struct array in gic.c and make other platforms use it.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+From: "Arnd Bergmann" <arnd@arndb.de>
 
-For Tegra,
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+The following is a set of patches that have been sent
+out during the 3.1 cycle that were not acked or merged.
+
+Sending again for completeness.  
+
+Tony, please pull if there are no objections:
+
+The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
+
+  Linux 3.3 (2012-03-18 16:15:34 -0700)
+
+are available in the git repository at:
+  git://git.linaro.org/people/mpoirier/linux.git randconfig-omap
+ 
+
+Arnd Bergmann (8):
+  arm/omap: enable building omap2 without omap2420/2430
+  omap: fix visibility of omap2_mbox_iva_priv
+  ARM: omap2+: fix building without i2c
+  tty/serial/omap: console can only be built-in
+  omap2: select twl4030 support on boards that need it
+  omap2plus: ensure that one of omap2/3/4 is selected
+  arm: OMAP depends on MMU
+  ARM: omap: select CPU_FREQ_TABLE where needed
+
+Russell King (1):
+  ARM: omap2/n8x0: work around modular omap mmc
+
+ arch/arm/Kconfig                           |    1 +
+ arch/arm/mach-omap2/Kconfig                |   19 +++++++++++++++++++
+ arch/arm/mach-omap2/board-n8x0.c           |    6 ++++--
+ arch/arm/mach-omap2/mailbox.c              |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ arch/arm/plat-omap/Kconfig                 |    5 +++++
+ arch/arm/plat-omap/include/plat/multi.h    |    5 +++++
+ drivers/tty/serial/Kconfig                 |    2 +-
+ 11 files changed, 40 insertions(+), 8 deletions(-)
+
+-- 
+1.7.5.4
