@@ -1,62 +1,62 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 23 Mar 2012 08:49:18 +0000
-Subject: [GIT PULL] gpio/omap: more fixes for v3.4
-In-Reply-To: <871uok5pk0.fsf@ti.com>
-References: <871uok5pk0.fsf@ti.com>
-Message-ID: <CACxGe6vvDLVyirAxFw6JxaZYNzWSr1Z6cVgfnJS4+Sna1EZ+1g@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 23 Mar 2012 10:10:35 +0100
+Subject: [RFC][PATCH 0/5] Convert GPMC to driver
+In-Reply-To: <1332484567-21710-1-git-send-email-afzal@ti.com>
+References: <1332484567-21710-1-git-send-email-afzal@ti.com>
+Message-ID: <4F6C3E0B.9090004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 8:49 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Hi Grant,
->
-> Please pull these OMAP GPIO fixes for v3.4. ?These fix some rather
-> serious regressions introduced by the cleanup and runtime PM conversion
-> series which is also queued for v3.4. ?This branch is based on your
-> gpio/next branch.
->
-> This version is functionally the same as the version you previously
-> merged (and I asked you to back it out), but this version has some
-> better changlogs, and I added reviewed-by and s-o-b from me as well.
->
-> Thanks,
->
-> Kevin
+Hi Mohammed,
 
-Merged, thanks.
+On 3/23/2012 7:36 AM, Afzal Mohammed wrote:
+> Hi,
+>
+> Convert GPCM code to be a driver. Existing GPMC
+> NAND platform handling has been modified to work
+> with the new GPMC driver (patches 2&  3). Patch 5
+> is to test the driver in OMAP3EVM.
 
-g.
+Hehe, cool, thanks for that series,
+Benoit
 
 >
+> Once all the users has been converted to use this
+> driver, would be converted to MFD type.
 >
+> TODO:
+> 1. Let OMAP NAND driver deal with GPMC NAND block
+> 2. Remove struct gpmc * stored as static
+> 3. Convert all peripherals to use GPMC driver
+> 4. Devise method to handle OneNAND cleanly
+> 5. Handle acquiring CS# cases
+> 6. Convert to MFD driver
 >
-> The following changes since commit 81b279d80a63628e580c71a31d30a8c3b3047ad4:
+> Regards
+> Afzal
 >
-> ?gpio/davinci: fix enabling unbanked GPIO IRQs (2012-03-12 11:53:33 -0600)
+> Afzal Mohammed (5):
+>    ARM: OMAP2+: gpmc: driver conversion
+>    ARM: OMAP2+: nand: create platform data structure
+>    ARM: OMAP2+: gpmc-nand: populate gpmc configs
+>    mtd: nand: omap2: obtain memory from resource
+>    OMAP3EVM: Test gpmc-nand
 >
-> are available in the git repository at:
+>   arch/arm/mach-omap2/board-devkit8000.c     |    6 +-
+>   arch/arm/mach-omap2/board-flash.c          |   63 +-
+>   arch/arm/mach-omap2/board-flash.h          |   13 +-
+>   arch/arm/mach-omap2/board-ldp.c            |    4 +-
+>   arch/arm/mach-omap2/board-omap3beagle.c    |    6 +-
+>   arch/arm/mach-omap2/board-omap3evm.c       |   82 +++
+>   arch/arm/mach-omap2/board-omap3touchbook.c |    6 +-
+>   arch/arm/mach-omap2/board-overo.c          |    5 +-
+>   arch/arm/mach-omap2/board-zoom.c           |    5 +-
+>   arch/arm/mach-omap2/common-board-devices.c |   46 --
+>   arch/arm/mach-omap2/common-board-devices.h |    1 -
+>   arch/arm/mach-omap2/gpmc-nand.c            |   88 +--
+>   arch/arm/mach-omap2/gpmc.c                 | 1083 ++++++++++++++++------------
+>   arch/arm/plat-omap/include/plat/gpmc.h     |   34 +-
+>   arch/arm/plat-omap/include/plat/nand.h     |    9 +-
+>   drivers/mtd/nand/omap2.c                   |   19 +-
+>   16 files changed, 869 insertions(+), 601 deletions(-)
 >
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/fixes/gpio-2
->
-> for you to fetch changes up to 7fcca715de3438b8fc3c8a144702f3a95c8ff63c:
->
-> ?gpio/omap: fix redundant decoding of gpio offset (2012-03-21 10:21:24 +0530)
->
-> ----------------------------------------------------------------
-> Tarun Kanti DebBarma (7):
-> ? ? ?gpio/omap: fix wakeup_en register update in _set_gpio_wakeup()
-> ? ? ?gpio/omap: fix trigger type to unsigned
-> ? ? ?gpio/omap: fix _set_gpio_irqenable implementation
-> ? ? ?gpio/omap: fix missing dataout context save in _set_gpio_dataout_reg
-> ? ? ?gpio/omap: fix incorrect context restore logic in omap_gpio_runtime_*
-> ? ? ?gpio/omap: fix incorrect update to context.irqenable1
-> ? ? ?gpio/omap: fix redundant decoding of gpio offset
->
-> ?drivers/gpio/gpio-omap.c | ? 47 ++++++++++++++++++++++++----------------------
-> ?1 file changed, 25 insertions(+), 22 deletions(-)
-
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
