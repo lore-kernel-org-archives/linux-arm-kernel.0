@@ -1,36 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Mar 2012 17:38:05 +0000
-Subject: [PATCH 7/9] omap2plus: ensure that one of omap2/3/4 is selected
-In-Reply-To: <20120323172845.GC9859@atomide.com>
-References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
- <1332522836-29517-8-git-send-email-mathieu.poirier@linaro.org>
- <20120323172845.GC9859@atomide.com>
-Message-ID: <201203231738.05742.arnd@arndb.de>
+From: alexgershgorin@gmail.com (Alex Gershgorin)
+Date: Fri, 23 Mar 2012 20:11:07 +0200
+Subject: [PATCH] regulator: i.MX35-PDK Add regulator support
+Message-ID: <1332526267-3236-1-git-send-email-alexg@meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 March 2012, Tony Lindgren wrote:
-> >  
-> > +config ARCH_OMAP2_AUTO
-> > +     bool
-> > +     depends on !ARCH_OMAP3 && !ARCH_OMAP4
-> > +     select ARCH_OMAP2
-> > +     default y
-> > +     help
-> > +       At least one of OMAP2/OMAP3/OMAP4 needs to be enabled, this
-> > +       selects OMAP2 if nothing else gets selected, to avoid non-building
-> > +       configurations.
-> > +
-> >  comment "OMAP Core Type"
-> >       depends on ARCH_OMAP2
-> 
-> Hmm yeah omap2 makes the smallest build, so randconfig builds
-> faster than it would for omap3 or 4.
-> 
-> But isn't there now still a chance that randconfig does not
-> select ARCH_OMAP2_AUTO either?
+From: Alex <alexg@meprolight.com>
 
-No. ARCH_OMAP2_AUTO is only disabled if one of OMAP3 or OMAP4
-are enabled.
+Hi Marc,
 
-	Arnd
+Thanks for the patches.
+
+v4 3/4 not directly applicable to Linux version 3.3,
+I installed it manually, you could check it out?
+
+> > I'm not very experienced with the regulator driver, but noticed a couple of 
+> > minor things with your patch...
+
+I think that my experience in the regulator driver a little less than you :-)
+
+>  static struct resource mx35pdk_flash_resource = {
+>  	.start	= MX35_CS0_BASE_ADDR,
+> -	.end	= MX35_CS0_BASE_ADDR + SZ_64M - 1,
+> +	.end    = MX35_CS0_BASE_ADDR + SZ_64M - 1,
+
+> > did you mean to change this?
+
+No, I will correct this.
+
+> +static struct regulator_init_data vsd_init = {
+> +	.constraints = {
+> +		.name = "VSD",
+> +		.min_uV = 1800000,
+> +		.max_uV = 3150000,
+> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+> +	}
+> +};
+
+> > I think this is on at power up too (for imx35)
+
+Maybe you're right, but in this case, the i.MX35 PDK
+Do not use PMIC "VSD" regulator, but instead it is used 
+a different power source.
+I think it can be removed from here :-)
+
+
+Regards,
+Alex Gershgorin
