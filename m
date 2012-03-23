@@ -1,46 +1,39 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 23 Mar 2012 11:13:54 -0600
-Subject: [PATCH 7/9] omap2plus: ensure that one of omap2/3/4 is selected
+Date: Fri, 23 Mar 2012 11:13:55 -0600
+Subject: [PATCH 8/9] arm: OMAP depends on MMU
 In-Reply-To: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1332522836-29517-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1332522836-29517-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Arnd Bergmann <arnd@arndb.de>
 
-Random configurations can fail if none of the omap families
-in mach-omap2 is selected. This patch automatically selects
-omap2 if the user has not made any other choice.
+There is no way to build OMAP kernels without an MMU
+at this point because of dependencies on MMU-only functions.
+
+As long as nobody is interested in fixing this, let's just disable
+this platforms for nommu kernels.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Kconfig |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 0279e9e..b244e80 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -55,6 +55,16 @@ config ARCH_OMAP4
- 	select USB_ARCH_HAS_EHCI
- 	select ARM_CPU_SUSPEND if PM
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dfb0312..8124ce0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -939,6 +939,7 @@ config ARCH_DAVINCI
  
-+config ARCH_OMAP2_AUTO
-+	bool
-+	depends on !ARCH_OMAP3 && !ARCH_OMAP4
-+	select ARCH_OMAP2
-+	default y
-+	help
-+	  At least one of OMAP2/OMAP3/OMAP4 needs to be enabled, this
-+	  selects OMAP2 if nothing else gets selected, to avoid non-building
-+	  configurations.
-+
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
- 
+ config ARCH_OMAP
+ 	bool "TI OMAP"
++	depends on MMU
+ 	select HAVE_CLK
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_HAS_CPUFREQ
 -- 
 1.7.5.4
