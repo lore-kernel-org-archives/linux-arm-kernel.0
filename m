@@ -1,27 +1,55 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 23 Mar 2012 16:12:44 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Mar 2012 15:20:22 +0000
 Subject: ioremap to a specific virtual address
-In-Reply-To: <CAKON4Oz8465uJnv8R_TgCeju9UqG8MTTxVSC_tfS4mP40ARp1A@mail.gmail.com>
+In-Reply-To: <CAKON4OzF9KV=51yAR2pVHJZNQsGDkXVhBwbn4njhZPRjeh=-dA@mail.gmail.com>
 References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <alpine.LFD.2.02.1203230023060.24151@xanadu.home>
- <CAKON4Ox6sp5YMryr2jzOAqYNmJG9RyahLTusrHZ_jcNQ40DAfQ@mail.gmail.com>
- <201203231407.00686.arnd@arndb.de> <4F6C8E15.5050104@antcom.de>
- <CAKON4Oz8465uJnv8R_TgCeju9UqG8MTTxVSC_tfS4mP40ARp1A@mail.gmail.com>
-Message-ID: <4F6C92EC.2050200@antcom.de>
+ <201203231407.00686.arnd@arndb.de>
+ <CAKON4OzF9KV=51yAR2pVHJZNQsGDkXVhBwbn4njhZPRjeh=-dA@mail.gmail.com>
+Message-ID: <201203231520.22588.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/12 16:05, jonsmirl at gmail.com wrote:
-> I've taken the 2.6.33 code and forward ported it to v3.3 in my git
-> tree. I've been incorporating the patches posted to lpclinux.com.
+On Friday 23 March 2012, jonsmirl at gmail.com wrote:
+> I will need to check how similar the chips actually are. NXP did not
+> use primecells in the lpc31xx family.
+> 
+> I'd be happy to have some help. My trees are here:
+> https://github.com/jonsmirl
 
-Similar to what I did with lpc32xx. :-) NXP maintains lpc31xx and
-lpc32xx at different repos, though.
+I've taken a brief look at your tree, some comments:
 
-> What about USB? There is code for a NXP variation on EHCI in the
-> lpc31xx port, does the lpc32xx use the same EHCI block?
+* Once you're done with the DT conversion, you should be able to
+  completely remvoe the three board files. You probably know that already
 
-LPC32xx only has OHCI. For v3.4, I joined ohci-pnx4008 and ohci-lpc32xx
-into ohci-nxp since only some transceiver I2C initialization was different.
+* We're merging the new common clock framework in v3.4. Once that has
+  matured, all new platforms will be required to use it. You should probably
+  move to that already.
 
-Roland
+* The dma driver uses a nonstandard interface and should be moved to
+  drivers/dma, using the dmaengine API.
+
+* The __REG needs to be removed. All MMIO register accesses should go
+  through readl/writel or readl_relaxed/writel_relaxed, using a pointer
+  you get from ioremap.
+
+* gpio*.c should get moved to drivers/gpio/gpio-lpc31xx. If it's similar
+  to the 32xx version, merge the two
+
+* i2c.c should no longer be needed with the device tree, but you might
+  have to add stuff to i2c-pnx.c. That file is shared with pnx4008 and
+  lpc32xx.
+
+* irq.c will eventually go to drivers/irqchip/. We have a plan to create
+  that directory, but nobody has started moving drivers there.
+
+* Some of the header files have been removed on other platforms, you
+  should do the same.
+
+* Regarding the static mappings, it certainly makes sense to map all of
+  ABP01_PHYS and IO_APB2_PHYS using 1MB mappings, for performance reasons,
+  and I guess you need INTC_PHYS to be mapped, too, for the interrupt
+  controller code to work. However, none of the drivers should be aware
+  of this and just call ioremap anyway, which will now return an address
+  from the static mapping.
+
+	Arnd
