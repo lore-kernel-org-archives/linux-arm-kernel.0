@@ -1,43 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Mar 2012 11:14:56 -0700
-Subject: [PATCH 7/9] omap2plus: ensure that one of omap2/3/4 is selected
-In-Reply-To: <201203231738.05742.arnd@arndb.de>
+Date: Fri, 23 Mar 2012 11:27:46 -0700
+Subject: [PATCH 9/9] ARM: omap: select CPU_FREQ_TABLE where needed
+In-Reply-To: <1332522836-29517-10-git-send-email-mathieu.poirier@linaro.org>
 References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
- <1332522836-29517-8-git-send-email-mathieu.poirier@linaro.org>
- <20120323172845.GC9859@atomide.com>
- <201203231738.05742.arnd@arndb.de>
-Message-ID: <20120323181455.GE9859@atomide.com>
+ <1332522836-29517-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20120323182746.GF9859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120323 10:40]:
-> On Friday 23 March 2012, Tony Lindgren wrote:
-> > >  
-> > > +config ARCH_OMAP2_AUTO
-> > > +     bool
-> > > +     depends on !ARCH_OMAP3 && !ARCH_OMAP4
-> > > +     select ARCH_OMAP2
-> > > +     default y
-> > > +     help
-> > > +       At least one of OMAP2/OMAP3/OMAP4 needs to be enabled, this
-> > > +       selects OMAP2 if nothing else gets selected, to avoid non-building
-> > > +       configurations.
-> > > +
-> > >  comment "OMAP Core Type"
-> > >       depends on ARCH_OMAP2
-> > 
-> > Hmm yeah omap2 makes the smallest build, so randconfig builds
-> > faster than it would for omap3 or 4.
-> > 
-> > But isn't there now still a chance that randconfig does not
-> > select ARCH_OMAP2_AUTO either?
+* mathieu.poirier at linaro.org <mathieu.poirier@linaro.org> [120323 10:17]:
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
-> No. ARCH_OMAP2_AUTO is only disabled if one of OMAP3 or OMAP4
-> are enabled.
+> The omap platform requires CPU_FREQ_TABLE support to be enabled for its
+> CPU_FREQ implementations, so automatically select that when CPU_FREQ
+> is enabled.
 
-And then no description in bool keeps it hidden from selection.
-Nice, this works. Too bad these got forgotten in your branch.
+I think this is also solved now, Kevin might be able to confirm this.
 
 Regards,
 
 Tony
+ 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  arch/arm/plat-omap/Kconfig |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index aa59f42..1983d16 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -207,6 +207,11 @@ config OMAP_PM_NOOP
+>  
+>  endchoice
+>  
+> +config OMAP_CPU_FREQ
+> +	def_bool "y"
+> +	depends on CPU_FREQ
+> +	select CPU_FREQ_TABLE
+> +
+>  endmenu
+>  
+>  endif
+> -- 
+> 1.7.5.4
+> 
