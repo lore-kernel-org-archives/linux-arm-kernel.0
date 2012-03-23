@@ -1,35 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Mar 2012 14:49:11 +0000
-Subject: ioremap to a specific virtual address
-In-Reply-To: <CAKON4OzF9KV=51yAR2pVHJZNQsGDkXVhBwbn4njhZPRjeh=-dA@mail.gmail.com>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <201203231407.00686.arnd@arndb.de>
- <CAKON4OzF9KV=51yAR2pVHJZNQsGDkXVhBwbn4njhZPRjeh=-dA@mail.gmail.com>
-Message-ID: <201203231449.12209.arnd@arndb.de>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Fri, 23 Mar 2012 07:50:22 -0700
+Subject: [PATCH v4 0/3] ARM support for syscall tracing
+In-Reply-To: <4F54D0D4.7070905@mentor.com>
+References: <4F44FF58.3060907@mentor.com> <4F4E3780.4060904@mentor.com>
+ <4F54D0D4.7070905@mentor.com>
+Message-ID: <4F6C8DAE.9070209@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 March 2012, jonsmirl at gmail.com wrote:
-> > In particular, in order to enable the multiplatform kernel, we have
-> > to restrict access of device drivers to platform specific header file
-> > in all cases where those have conflicting contents.
-> 
-> Isn't this a symptom of not having device trees? If the devices are
-> identical the header files should be identical except for the base
-> address. The device tree allows you to get that base address out of
-> the header file.
+This is a rework of Steven Walter's syscall tracing patches first
+posted here:
 
-Well, device trees are not the only solution that works for this.
-You can also get the base address out of statically declared platform
-devices in the platform code. The problem here is not the lack
-of device trees, but code that is not written to be run time
-configured. Moving to device tree requires the same changes though.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074454.html
 
-> Assuming that we can clear up the conflicts in the header files, then
-> wouldn't it make sense to use ioremap in the  driver, let it assign a
-> random address, and then fix my code to the base+offset model?
+I've rebased the patches against the current mainline master branch, as well
+as implemented several changes based on feedback from Will Deacon and
+Russel King.
 
-I think that is the right solution in any case, as it helps with
-both the multiplatform kernels and device trees.
+v2: - Tested on EABI and OABI.
+    - Removed an instance of the ?: operator in syscall_set_return_value()
+    - Moved #define of NR_syscalls to syscall.h
+    - Changed the test of NR_syscalls vs __NR_syscalls in entry-common.S
+      to .ifne
+v3: - Added Will Deacon's Reviewed-by line.  Code is identical to v2.
+v4: - Updated comment and error string for the NR_syscalls test to
+      reflect that it's now testing for inequality.
 
-	Arnd
+Russell, now that this has been reviewed by Will and tested with both
+ABIs, is this okay to submit to your patch tracker?
+
+Wade Farnsworth (3):
+  ARM: add support for the generic syscall.h interface
+  ARM: add TRACEHOOK support
+  ARM: support syscall tracing
+
+ arch/arm/Kconfig                   |    2 +
+ arch/arm/include/asm/ptrace.h      |    5 ++
+ arch/arm/include/asm/syscall.h     |   97 ++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/thread_info.h |    2 +
+ arch/arm/include/asm/unistd.h      |    8 +++
+ arch/arm/kernel/entry-common.S     |   18 ++++++-
+ arch/arm/kernel/ptrace.c           |   34 +++++++------
+ arch/arm/kernel/signal.c           |    2 +
+ 8 files changed, 151 insertions(+), 17 deletions(-)
+ create mode 100644 arch/arm/include/asm/syscall.h
