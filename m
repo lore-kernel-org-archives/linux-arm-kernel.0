@@ -1,5 +1,5 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 23 Mar 2012 14:51:20 -0700
+Date: Fri, 23 Mar 2012 15:12:37 -0700
 Subject: [PATCH v7 2/3] clk: introduce the common clock framework
 In-Reply-To: <CAJOA=zNDKesFtuRgv+6brmBvmbQQecKEOJ89EiG-+YzXVTosWw@mail.gmail.com>
 References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
@@ -9,7 +9,7 @@ References: <1331878280-2758-1-git-send-email-mturquette@linaro.org>
  <CAJOA=zNmgSQfYAUZ-vqqTk0w3s3eKz3tjVOpyDgO35Q_Ogkz0g@mail.gmail.com>
  <4F6946AA.4070201@codeaurora.org> <4F6CEC0C.4060704@codeaurora.org>
  <CAJOA=zNDKesFtuRgv+6brmBvmbQQecKEOJ89EiG-+YzXVTosWw@mail.gmail.com>
-Message-ID: <4F6CF058.5020007@codeaurora.org>
+Message-ID: <4F6CF555.4080109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -39,12 +39,29 @@ On 03/23/2012 02:39 PM, Turquette, Mike wrote:
 > clk_set_parent.  __clk_recalc_rates is also called by clk_set_rate.
 >
 > Does this not handle the old cached clk->rate for you?
->
 
-Yeah, I realized this just after I sent the email. I'm looking at the 
-code to see if that's sufficient or not. Will get back soon.
+For the set_parent case, ops->recalc_rate() is called twice. Once for 
+PRE_CHANGE and once for POST_CHANGE. For this clock, I can only really 
+recalc the rate during the POST_CHANGE call. So, how should I 
+differentiate the two cases?
 
--Saravana
+On a separate note:
+Sorry if I missed any earlier discussion on this, but what's the reason 
+for calling recalc_rate() pre-change and post-change but without giving 
+it the ability to differentiate between the two?
+
+I think it's quite useful for recalc_rate to be called pre/post change 
+(some steps have to be done pre/post change depending on whether the 
+parent rate is increasing or decreasing). But I don't see the "msg" 
+being passed along.
+
+Also, I noticed that clk_set_parent() is treating a NULL as an invalid 
+clock. Should that be fixed? set_parent(NULL) could be treated as a 
+grounding the clock. Should we let the ops->set_parent determine if NULL 
+is valid option?
+
+Thanks,
+Saravana
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
