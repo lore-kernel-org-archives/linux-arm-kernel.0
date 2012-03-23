@@ -1,8 +1,9 @@
 From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 23 Mar 2012 11:02:12 +1030
-Subject: [PATCH] ARM: test for PMU feature on v7.
-References: <4F590411.9060201@arm.com>
-Message-ID: <87ty1g88dv.fsf@rustcorp.com.au>
+Date: Fri, 23 Mar 2012 11:04:57 +1030
+Subject: [PATCH] ARM: test for PMU feature on v7 (v2 with typo fix)
+In-Reply-To: <87ty1g88dv.fsf@rustcorp.com.au>
+References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
+Message-ID: <87r4wk889a.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,7 +23,7 @@ index 6933244..303d1e1 100644
  
 +static bool armv7_pmu_avail(void)
 +{
-+	/* 0 means unknown (maybe v1), 1 means v2, 2 means v2, 15 means none */
++	/* 0 means unknown (maybe v1), 1 means v1, 2 means v2, 15 means none */
 +	return ((read_cpuid_ext(CPUID_EXT_DFR0) >> 24) & 0xF) != 0xF;
 +}
 +
