@@ -1,37 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Mar 2012 09:17:44 +0100
-Subject: [PATCH] serial: PL011: move interrupt clearing
-In-Reply-To: <CAOh2x=kqTZxzyEMEF0bYFQ0a0zMEQNZWrzw48e1WFiMxYpRSeg@mail.gmail.com>
-References: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
- <CAOh2x==5QHEcA3h216p8rJukx0LR=cVcGYN84aqzw=fnhu8Y-g@mail.gmail.com>
- <CACRpkdate+sQJvS8H7qNXiwe6c+F58g=OF0Qg=TxxnTwPXBrYQ@mail.gmail.com>
- <CAOh2x=kqTZxzyEMEF0bYFQ0a0zMEQNZWrzw48e1WFiMxYpRSeg@mail.gmail.com>
-Message-ID: <CACRpkdY+vmSsqH80ty6H5vFbc-SjRSeNboCv5e5O0OtkAVSTSg@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 23 Mar 2012 16:20:25 +0800
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A831823816@DBDE01.ent.ti.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
+ <87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831823816@DBDE01.ent.ti.com>
+Message-ID: <CACVXFVPTsFY7UJMH5jZa16V0KYEZB=o7WRYqVEYyNJw1tMq-yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2012 at 4:39 AM, viresh kumar <viresh.linux@gmail.com> wrote:
+On Wed, Mar 21, 2012 at 7:29 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> On Mon, Mar 19, 2012 at 17:14:30, Ming Lei wrote:
+>> On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+>> >
+>> > I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
+>> > It will always use 32k-counter, and never fall back to dmtimer.
+>> >
+>> > Then the only options we have here is,
+>> >
+>> > 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
+>> > ? Kernel pick up best rating clocksource out of these two.
+>> >
+>> > ? In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
+>> > ? Rating. User can choose the 32k-counter clocksource via bootargs.
+>> >
+>> > ? Impact: without bootargs for clocksource selection, kernel will choose
+>> > ? ? dmtimer, impacting loss of time during suspend/resume.
+>> >
+>> >
+>> > 2) Let the current code be as is, means, the clocksource registration will
+>> > ? Happened based on "#ifdef CONFIG_OMAP_32K_TIMER" and this option
+>> > ? selection will be Controlled by Kconfig rules.
+>>
+>> How about the 3rd option?
+>>
+>> 3), take the way in your patch 1) at default, but will switch to
+>> register dmtimer
+>> directly and bypass 32k-counter if user need it via kernel parameter.
+>>
+>> As far as I can think of, the situations required for dmtimer are high-frequency
+>> perf sample and high precision trace points, so looks it is OK to take
+>> 32k-counter
+>> at default.
+>>
+> But if you register both the timers (dmtimer & 32ksync), then initially kernel will only pick up dmtimer, as this has better rating. And late in
 
-> That's strange. When i check my mail on @st.com id, i see myself in cc
-> list, but on
-> gmail i see following cc list in your first mail.
-(...)
+Looks not so, I found that 32ksync is always selected as the default
+clocksource if both are registered.
+
+> the boot sequence clocksource switch will happen, base on
+> kernel parameter (clocksource=).
 >
-> Why don't i see myself in cc here?
+> So logically dmtimer will be always used as a default here.
 
-No clue :-(
+Not so at least on my Pandaboard.
 
-On *my* gmail it looks like this:
 
-Cc: linux-arm-kernel at lists.infradead.org,
-	Chanho Min <chanho0207@gmail.com>,
-	Jong-Sung Kim <neidhard.kim@lge.com>,
-	Viresh Kumar <viresh.kumar@st.com>,
-	Linus Walleij <linus.walleij@linaro.org>,
-	Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>,
-	Russell King <linux@arm.linux.org.uk>,
-	stable <stable@vger.kernel.org>
-
-Trust no gmail...
-
-Linus Walleij
+Thanks,
+-- 
+Ming Lei
