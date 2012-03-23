@@ -1,46 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Mar 2012 11:33:39 -0700
-Subject: [PATCH 5/9] tty/serial/omap: console can only be built-in
-In-Reply-To: <1332522836-29517-6-git-send-email-mathieu.poirier@linaro.org>
-References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
- <1332522836-29517-6-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20120323183339.GH9859@atomide.com>
+From: matt@grid-net.com (Matt Burtch)
+Date: Fri, 23 Mar 2012 11:38:41 -0700
+Subject: [PATCH 1/1] ARM iMX28: incorrect frac/div calculation
+In-Reply-To: <20120323025208.GG2213@S2101-09.ap.freescale.net>
+References: <1332457501-8153-1-git-send-email-matt@grid-net.com>
+ <20120323025208.GG2213@S2101-09.ap.freescale.net>
+Message-ID: <4F6CC331.20505@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* mathieu.poirier at linaro.org <mathieu.poirier@linaro.org> [120323 10:16]:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> When the omap serial driver is built as a module, we must
-> not allow the console driver to be selected, because consoles
-> can not be loadable modules.
+On 03/22/2012 07:52 PM, Shawn Guo wrote:
+> On Thu, Mar 22, 2012 at 04:05:01PM -0700, Matt Burtch wrote:
+>> The frac and div values in _CLK_SET_RATE are calculated incorrectly
+>> for some clock rates ie. CPU clk of 454.73MHz, 392.72MHz, 261.81Mhz,
+>> etc.
+>>
+>> Now the frac and div values which result in the closest actual clock
+>> rate to that requested is selected.
+> My understanding on clk_set_rate is we need to set the clk to a rate
+> closest to the requested one but never exceeding it.  Does your change
+> ensure that?
+>
+> Regards,
+> Shawn
 
-Looks valid to me, this should get posted and merged via
-linux-serial at vger.kernel.org.
+It currently doesn't check that the resultant clock is lower than the 
+requested.  I can certainly make that change and resubmit.  I wasn't 
+aware of this requirement.
 
-Tony
+So with the patch as it stands, if you request a CPU clock of 391Mhz, 
+it'll give you 392.71MHz. Would it be correct for the clock to be set at 
+375.65MHz (the next closest valid clock rate without going over)?
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Acked-by: Govindraj.R <govindraj.raja@ti.com>
-> ---
->  drivers/tty/serial/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 2de9924..bcf7e24 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1041,7 +1041,7 @@ config SERIAL_OMAP
->  
->  config SERIAL_OMAP_CONSOLE
->  	bool "Console on OMAP serial port"
-> -	depends on SERIAL_OMAP
-> +	depends on SERIAL_OMAP=y
->  	select SERIAL_CORE_CONSOLE
->  	help
->  	  Select this option if you would like to use omap serial port as
-> -- 
-> 1.7.5.4
-> 
+Thanks,
+Matt
+
+>> Also there are no limitations
+>> on what frac values can be used, as long as they fall in the valid
+>> (18<  frac<  35) range.
+>>
+>> Tested on custom iMX28 board.
+>>
+>> Signed-off-by: Matt Burtch<matt@grid-net.com>
+>> ---
+>>   arch/arm/mach-mxs/clock-mx28.c |    8 ++------
+>>   1 files changed, 2 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+>> index 5d68e41..a058b99 100644
+>> --- a/arch/arm/mach-mxs/clock-mx28.c
+>> +++ b/arch/arm/mach-mxs/clock-mx28.c
+>> @@ -354,19 +354,15 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>>   		}							\
+>>   		for (d = 1; d<= div_max; d++) {			\
+>>   			f = parent_rate * 18 / d / rate;		\
+>> -			if ((parent_rate * 18 / d) % rate)		\
+>> -				f++;					\
+>>   			if (f<  18 || f>  35)				\
+>>   				continue;				\
+>>   									\
+>>   			calc_rate = parent_rate * 18 / f / d;		\
+>> -			if (calc_rate>  rate)				\
+>> -				continue;				\
+>>   									\
+>> -			if (rate - calc_rate<  diff) {			\
+>> +			if (abs(rate - calc_rate)<  diff) {		\
+>>   				frac = f;				\
+>>   				div = d;				\
+>> -				diff = rate - calc_rate;		\
+>> +				diff = abs(rate - calc_rate);		\
+>>   			}						\
+>>   									\
+>>   			if (diff == 0)					\
+>> -- 
+>> 1.7.5.4
+>>
