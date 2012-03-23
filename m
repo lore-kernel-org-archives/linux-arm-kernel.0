@@ -1,164 +1,64 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 Mar 2012 10:26:29 +0100
-Subject: [RFC][PATCH 4/9] ARM: OMAP3: define cpuidle statically
+Date: Fri, 23 Mar 2012 10:26:30 +0100
+Subject: [RFC][PATCH 5/9] ARM: OMAP3: cpuidle - remove the 'valid' field
 In-Reply-To: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1332494794-7810-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1332494794-7810-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1332494794-7810-5-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new cpuidle API and define in the driver the states.
+With the previous changes all the states are valid, except
+the last state which can be handled by decreasing the number
+of states.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   85 +++++++++++++++++++++++++-----------
- 1 files changed, 59 insertions(+), 26 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 65b4e7aa..62e3cfd 100644
+index 62e3cfd..39aa1b8 100644
 --- a/arch/arm/mach-omap2/cpuidle34xx.c
 +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -228,23 +228,67 @@ DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
- struct cpuidle_driver omap3_idle_driver = {
- 	.name = 	"omap3_idle",
- 	.owner = 	THIS_MODULE,
-+	.states = {
-+		{
-+			.enter		  = omap3_enter_idle,
-+			.exit_latency	  = 2 + 2,
-+			.target_residency = 5,
-+			.flags		  = CPUIDLE_FLAG_TIME_VALID,
-+			.name		  = "C1",
-+			.desc		  = "MPU ON + CORE ON",
-+		},
-+		{
-+			.enter		  = omap3_enter_idle_bm,
-+			.exit_latency	  = 10 + 10,
-+			.target_residency = 30,
-+			.flags		  = CPUIDLE_FLAG_TIME_VALID,
-+			.name		  = "C2",
-+			.desc		  = "MPU ON + CORE ON",
-+		},
-+		{
-+			.enter		  = omap3_enter_idle_bm,
-+			.exit_latency	  = 50 + 50,
-+			.target_residency = 300,
-+			.flags		  = CPUIDLE_FLAG_TIME_VALID,
-+			.name		  = "C3",
-+			.desc		  = "MPU RET + CORE ON",
-+		},
-+		{
-+			.enter		  = omap3_enter_idle_bm,
-+			.exit_latency	  = 1500 + 1800,
-+			.target_residency = 4000,
-+			.flags		  = CPUIDLE_FLAG_TIME_VALID,
-+			.name		  = "C4",
-+			.desc		  = "MPU OFF + CORE ON",
-+		},
-+		{
-+			.enter		  = omap3_enter_idle_bm,
-+			.exit_latency	  = 2500 + 7500,
-+			.target_residency = 12000,
-+			.flags		  = CPUIDLE_FLAG_TIME_VALID,
-+			.name		  = "C5",
-+			.desc		  = "MPU RET + CORE RET",
-+		},
-+		{
-+			.enter		  = omap3_enter_idle_bm,
-+			.exit_latency	  = 3000 + 8500,
-+			.target_residency = 15000,
-+			.flags		  = CPUIDLE_FLAG_TIME_VALID,
-+			.name		  = "C6",
-+			.desc		  = "MPU OFF + CORE RET",
-+		},
-+		{
-+			.enter		  = omap3_enter_idle_bm,
-+			.exit_latency	  = 10000 + 30000,
-+			.target_residency = 30000,
-+			.flags		  = CPUIDLE_FLAG_TIME_VALID,
-+			.name		  = "C7",
-+			.desc		  = "MPU OFF + CORE OFF",
-+		},
-+	},
-+	.state_count = OMAP3_NUM_STATES,
+@@ -67,7 +67,6 @@ static struct cpuidle_params cpuidle_params_table[] = {
+ struct omap3_idle_statedata {
+ 	u32 mpu_state;
+ 	u32 core_state;
+-	u8 valid;
  };
+ struct omap3_idle_statedata omap3_idle_data[OMAP3_NUM_STATES];
  
--/* Helper to fill the C-state common data*/
--static inline void _fill_cstate(struct cpuidle_driver *drv,
--					int idx, const char *descr)
--{
--	struct cpuidle_state *state = &drv->states[idx];
--
--	state->exit_latency	= cpuidle_params_table[idx].exit_latency;
--	state->target_residency	= cpuidle_params_table[idx].target_residency;
--	state->flags		= CPUIDLE_FLAG_TIME_VALID;
--	state->enter		= omap3_enter_idle_bm;
--	sprintf(state->name, "C%d", idx + 1);
--	strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
--
--}
--
- /* Helper to register the driver_data */
- static inline struct omap3_idle_statedata *_fill_cstate_usage(
- 					struct cpuidle_device *dev,
-@@ -277,50 +321,40 @@ int __init omap3_idle_init(void)
- 	cam_pd = pwrdm_lookup("cam_pwrdm");
+@@ -297,7 +296,6 @@ static inline struct omap3_idle_statedata *_fill_cstate_usage(
+ 	struct omap3_idle_statedata *cx = &omap3_idle_data[idx];
+ 	struct cpuidle_state_usage *state_usage = &dev->states_usage[idx];
  
+-	cx->valid		= cpuidle_params_table[idx].valid;
+ 	cpuidle_set_statedata(state_usage, cx);
  
--	drv->safe_state_index = -1;
- 	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
+ 	return cx;
+@@ -325,7 +323,6 @@ int __init omap3_idle_init(void)
  
  	/* C1 . MPU WFI + Core active */
--	_fill_cstate(drv, 0, "MPU ON + CORE ON");
--	(&drv->states[0])->enter = omap3_enter_idle;
--	drv->safe_state_index = 0;
  	cx = _fill_cstate_usage(dev, 0);
- 	cx->valid = 1;	/* C1 is always valid */
+-	cx->valid = 1;	/* C1 is always valid */
  	cx->mpu_state = PWRDM_POWER_ON;
  	cx->core_state = PWRDM_POWER_ON;
  
- 	/* C2 . MPU WFI + Core inactive */
--	_fill_cstate(drv, 1, "MPU ON + CORE ON");
- 	cx = _fill_cstate_usage(dev, 1);
- 	cx->mpu_state = PWRDM_POWER_ON;
- 	cx->core_state = PWRDM_POWER_ON;
- 
- 	/* C3 . MPU CSWR + Core inactive */
--	_fill_cstate(drv, 2, "MPU RET + CORE ON");
- 	cx = _fill_cstate_usage(dev, 2);
- 	cx->mpu_state = PWRDM_POWER_RET;
- 	cx->core_state = PWRDM_POWER_ON;
- 
- 	/* C4 . MPU OFF + Core inactive */
--	_fill_cstate(drv, 3, "MPU OFF + CORE ON");
- 	cx = _fill_cstate_usage(dev, 3);
+@@ -362,14 +359,13 @@ int __init omap3_idle_init(void)
+ 	 * We disable C7 state as a result.
+ 	 */
+ 	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583)) {
+-		cx->valid = 0;
++		drv->state_count = OMAP3_NUM_STATES - 1;
+ 		pr_warn("%s: core off state C7 disabled due to i583\n",
+ 			__func__);
+ 	}
  	cx->mpu_state = PWRDM_POWER_OFF;
- 	cx->core_state = PWRDM_POWER_ON;
+ 	cx->core_state = PWRDM_POWER_OFF;
  
- 	/* C5 . MPU RET + Core RET */
--	_fill_cstate(drv, 4, "MPU RET + CORE RET");
- 	cx = _fill_cstate_usage(dev, 4);
- 	cx->mpu_state = PWRDM_POWER_RET;
- 	cx->core_state = PWRDM_POWER_RET;
- 
- 	/* C6 . MPU OFF + Core RET */
--	_fill_cstate(drv, 5, "MPU OFF + CORE RET");
- 	cx = _fill_cstate_usage(dev, 5);
- 	cx->mpu_state = PWRDM_POWER_OFF;
- 	cx->core_state = PWRDM_POWER_RET;
- 
- 	/* C7 . MPU OFF + Core OFF */
--	_fill_cstate(drv, 6, "MPU OFF + CORE OFF");
- 	cx = _fill_cstate_usage(dev, 6);
- 	/*
- 	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
-@@ -338,7 +372,6 @@ int __init omap3_idle_init(void)
- 	drv->state_count = OMAP3_NUM_STATES;
+-	drv->state_count = OMAP3_NUM_STATES;
  	cpuidle_register_driver(&omap3_idle_driver);
  
--	dev->state_count = OMAP3_NUM_STATES;
  	if (cpuidle_register_device(dev)) {
- 		printk(KERN_ERR "%s: CPUidle register device failed\n",
- 		       __func__);
 -- 
 1.7.5.4
