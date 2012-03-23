@@ -1,61 +1,49 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 23 Mar 2012 08:13:28 +0100
-Subject: [PATCH 1/1] ARM iMX28: incorrect frac/div calculation
-In-Reply-To: <1332457501-8153-1-git-send-email-matt@grid-net.com>
-References: <1332457501-8153-1-git-send-email-matt@grid-net.com>
-Message-ID: <20332.8856.841320.610752@ipc1.ka-ro>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Fri, 23 Mar 2012 08:37:52 +0100
+Subject: [PATCH 1/8] clk: add a fixed factor clock
+In-Reply-To: <1332164166-6055-2-git-send-email-s.hauer@pengutronix.de>
+References: <1332164166-6055-1-git-send-email-s.hauer@pengutronix.de>
+ <1332164166-6055-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1332488272.2876.5.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha,
 
-Matt Burtch writes:
-> The frac and div values in _CLK_SET_RATE are calculated incorrectly
-> for some clock rates ie. CPU clk of 454.73MHz, 392.72MHz, 261.81Mhz,
-> etc.
+Am Montag, den 19.03.2012, 14:35 +0100 schrieb Sascha Hauer:
+> Having fixed factors/dividers in hardware is a common pattern, so
+> add a clock doing this. Currently no rate propagation is supported.
 > 
-> Now the frac and div values which result in the closest actual clock
-> rate to that requested is selected.  Also there are no limitations
-> on what frac values can be used, as long as they fall in the valid
-> (18 < frac < 35) range.
-> 
-> Tested on custom iMX28 board.
-> 
-> Signed-off-by: Matt Burtch <matt@grid-net.com>
-> ---
->  arch/arm/mach-mxs/clock-mx28.c |    8 ++------
->  1 files changed, 2 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 5d68e41..a058b99 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -354,19 +354,15 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
->  		}							\
->  		for (d = 1; d <= div_max; d++) {			\
->  			f = parent_rate * 18 / d / rate;		\
-> -			if ((parent_rate * 18 / d) % rate)		\
-> -				f++;					\
->  			if (f < 18 || f > 35)				\
->  				continue;				\
->  									\
->  			calc_rate = parent_rate * 18 / f / d;		\
-> -			if (calc_rate > rate)				\
-> -				continue;				\
->  									\
-> -			if (rate - calc_rate < diff) {			\
-> +			if (abs(rate - calc_rate) < diff) {		\
-Shouldn't this actually be '<=' (also in the original code)?
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
+Tested-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Only a few clk-gateisms remain in clk_register_fixed_factor:
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 7c5e1fc..d99b842 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -64,14 +64,14 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+ 	struct clk_fixed_factor *fix;
+ 	struct clk *clk;
+ 
+-	fix = kmalloc(sizeof(struct clk_gate), GFP_KERNEL);
++	fix = kmalloc(sizeof(struct clk_fixed_factor), GFP_KERNEL);
+ 
+ 	if (!fix) {
+-		pr_err("%s: could not allocate gated clk\n", __func__);
++		pr_err("%s: could not allocate fixed factor clk\n", __func__);
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+-	/* struct clk_gate assignments */
++	/* struct clk_fixed_factor assignments */
+ 	fix->mult = mult;
+ 	fix->div = div;
+ 
+--
+1.7.9.1
 
-www.karo-electronics.de | info@karo-electronics.de
-___________________________________________________________
+regards
+Philipp
