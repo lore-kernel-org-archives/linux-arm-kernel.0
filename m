@@ -1,160 +1,64 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Fri, 23 Mar 2012 12:23:09 +1100
-Subject: [PATCH] regulator: i.MX35-PDK Add regulator support
-In-Reply-To: <1332460334-11173-1-git-send-email-alexg@meprolight.com>
-References: <1332460334-11173-1-git-send-email-alexg@meprolight.com>
-Message-ID: <201203231223.10043.marc@cpdesign.com.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Mar 2012 10:52:11 +0800
+Subject: [PATCH 1/1] ARM iMX28: incorrect frac/div calculation
+In-Reply-To: <1332457501-8153-1-git-send-email-matt@grid-net.com>
+References: <1332457501-8153-1-git-send-email-matt@grid-net.com>
+Message-ID: <20120323025208.GG2213@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I'm not very experienced with the regulator driver, but noticed a couple of 
-minor things with your patch..
-
-<snip>
-
+On Thu, Mar 22, 2012 at 04:05:01PM -0700, Matt Burtch wrote:
+> The frac and div values in _CLK_SET_RATE are calculated incorrectly
+> for some clock rates ie. CPU clk of 454.73MHz, 392.72MHz, 261.81Mhz,
+> etc.
 > 
->  static const struct imxuart_platform_data uart_pdata __initconst = {
-> @@ -55,7 +58,7 @@ static struct physmap_flash_data mx35pdk_flash_data = {
+> Now the frac and div values which result in the closest actual clock
+> rate to that requested is selected.
+
+My understanding on clk_set_rate is we need to set the clk to a rate
+closest to the requested one but never exceeding it.  Does your change
+ensure that?
+
+Regards,
+Shawn
+
+> Also there are no limitations
+> on what frac values can be used, as long as they fall in the valid
+> (18 < frac < 35) range.
 > 
->  static struct resource mx35pdk_flash_resource = {
->  	.start	= MX35_CS0_BASE_ADDR,
-> -	.end	= MX35_CS0_BASE_ADDR + SZ_64M - 1,
-> +	.end    = MX35_CS0_BASE_ADDR + SZ_64M - 1,
-
-did you mean to change this?
-
->  	.flags	= IORESOURCE_MEM,
->  };
+> Tested on custom iMX28 board.
 > 
-> @@ -120,8 +123,214 @@ static iomux_v3_cfg_t mx35pdk_pads[] = {
->  	/* I2C1 */
->  	MX35_PAD_I2C1_CLK__I2C1_SCL,
->  	MX35_PAD_I2C1_DAT__I2C1_SDA,
-> +	/*PMIC IRQ*/
-> +	MX35_PAD_GPIO2_0__GPIO2_0,
->  };
+> Signed-off-by: Matt Burtch <matt@grid-net.com>
+> ---
+>  arch/arm/mach-mxs/clock-mx28.c |    8 ++------
+>  1 files changed, 2 insertions(+), 6 deletions(-)
 > 
-> +static struct regulator_init_data sw1_init = {
-> +	.constraints = {
-> +		.name = "SW1",
-> +		.min_uV = 600000,
-> +		.max_uV = 1375000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.valid_modes_mask = 0,
-> +		.always_on = 1,
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data sw2_init = {
-> +	.constraints = {
-> +		.name = "SW2",
-> +		.min_uV = 900000,
-> +		.max_uV = 1850000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.always_on = 1,
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data sw3_init = {
-> +	.constraints = {
-> +		.name = "SW3",
-> +		.min_uV = 1100000,
-> +		.max_uV = 1850000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.always_on = 1,
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data sw4_init = {
-> +	.constraints = {
-> +		.name = "SW4",
-> +		.min_uV = 1100000,
-> +		.max_uV = 1850000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.always_on = 1,
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data viohi_init = {
-> +	.constraints = {
-> +		.name = "VIOHI",
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data vusb_init = {
-> +	.constraints = {
-> +		.name = "VUSB",
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data vdig_init = {
-> +	.constraints = {
-> +		.name = "VDIG",
-> +		.min_uV = 1050000,
-> +		.max_uV = 1800000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data vpll_init = {
-> +	.constraints = {
-> +		.name = "VPLL",
-> +		.min_uV = 1050000,
-> +		.max_uV = 1800000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data vusb2_init = {
-> +	.constraints = {
-> +		.name = "VUSB2",
-> +		.min_uV = 2400000,
-> +		.max_uV = 2775000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.boot_on = 1,
-> +	}
-> +};
-> +
-> +static struct regulator_init_data vvideo_init = {
-> +	.constraints = {
-> +		.name = "VVIDEO",
-> +		.min_uV = 2500000,
-> +		.max_uV = 2775000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.boot_on = 1
-> +	}
-> +};
-> +
-> +static struct regulator_init_data vaudio_init = {
-> +	.constraints = {
-> +		.name = "VAUDIO",
-> +		.min_uV = 2300000,
-> +		.max_uV = 3000000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +		.boot_on = 1
-> +	}
-> +};
-> +
-> +static struct regulator_init_data vsd_init = {
-> +	.constraints = {
-> +		.name = "VSD",
-> +		.min_uV = 1800000,
-> +		.max_uV = 3150000,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> +	}
-> +};
-
-I think this is on at power up too (for imx35)
-
-Cheers,
-Marc
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 5d68e41..a058b99 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -354,19 +354,15 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>  		}							\
+>  		for (d = 1; d <= div_max; d++) {			\
+>  			f = parent_rate * 18 / d / rate;		\
+> -			if ((parent_rate * 18 / d) % rate)		\
+> -				f++;					\
+>  			if (f < 18 || f > 35)				\
+>  				continue;				\
+>  									\
+>  			calc_rate = parent_rate * 18 / f / d;		\
+> -			if (calc_rate > rate)				\
+> -				continue;				\
+>  									\
+> -			if (rate - calc_rate < diff) {			\
+> +			if (abs(rate - calc_rate) < diff) {		\
+>  				frac = f;				\
+>  				div = d;				\
+> -				diff = rate - calc_rate;		\
+> +				diff = abs(rate - calc_rate);		\
+>  			}						\
+>  									\
+>  			if (diff == 0)					\
+> -- 
+> 1.7.5.4
+> 
