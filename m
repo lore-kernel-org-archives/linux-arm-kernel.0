@@ -1,37 +1,23 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 22 Mar 2012 22:41:52 -0700 (PDT)
-Subject: [PATCH] ARM: fixup section mismatch warning for alloc_init_pud()
-Message-ID: <87398zswkj.wl%kuninori.morimoto.gx@renesas.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 23 Mar 2012 14:22:35 +0800
+Subject: [GIT PULL][for 3.4] pull request from arch-pxa git for board branch
+Message-ID: <CAN1soZyCRQSVUQe+iBWX0nGwViWjp=W32BkYCcUUDmR894PJ9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixup below warning
+Hi Arnd & Olof,
 
-WARNING: arch/arm/mm/built-in.o(.text+0x2320):
-Section mismatch in reference from the function alloc_init_pud()
-to the function .init.text:alloc_init_section()
-The function alloc_init_pud() references
-the function __init alloc_init_section().
-This is often because alloc_init_pud lacks a __init
-annotation or the annotation of alloc_init_section is wrong.
+Please help to merge this patch from arch-pxa git tree.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
- arch/arm/mm/mmu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 94c5a0c..95a8098 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -616,7 +616,7 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
- 	}
- }
- 
--static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
-+static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 	unsigned long phys, const struct mem_type *type)
- {
- 	pud_t *pud = pud_offset(pgd, addr);
--- 
-1.7.5.4
+  Linux 3.3 (2012-03-18 16:15:34 -0700)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git board-specific
+
+Paul Parsons (1):
+      pxa/hx4700: Add standard UART to hx4700_pin_config[]
+
+ arch/arm/mach-pxa/hx4700.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
