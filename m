@@ -1,32 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 22 Mar 2012 21:47:02 -0300
-Subject: [PATCH v1] i.MX35-PDK: Add Camera support
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD0B@MEP-EXCH.meprolight.com>
-References: <1331651129-30540-1-git-send-email-alexg@meprolight.com>
- <4F67AD31.8030500@redhat.com> <4F67B077.5050300@redhat.com>
- <20120319223729.GC3852@pengutronix.de>
- <CAOMZO5B=Qpng68xLmxGaHMqSmYzbkpObVcjHDQSXaXcz5s6gMQ@mail.gmail.com>
- <20120319224550.GF3852@pengutronix.de>
- <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD0B@MEP-EXCH.meprolight.com>
-Message-ID: <CAOMZO5BhRbjP2hojQQPgNjsyt3hKTz5FSmCDwsgERDi8srZ78w@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 22 Mar 2012 21:19:10 -0500
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
+References: <4F683B36.8090101@metasoft.pl>
+ <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020696D48E3E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-On Tue, Mar 20, 2012 at 5:54 AM, Alex Gershgorin <alexg@meprolight.com> wrote:
+On Wednesday, March 21, 2012 12:39 PM, Mika Westerberg wrote:
+> On Tue, Mar 20, 2012 at 09:09:26AM +0100, Rafal Prylowski wrote:
+>> Implement double buffering for M2M DMA channels.
+>> 
+>> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
 >
-> Hi all,
+> The subject line prefix should probably be 'dmaengine/ep93xx_dma: ' but
+> otherwise this looks good.
 >
-> Good news...
-> After several number of changes, yesterday the camera started to work :-)
-> I will prepare some patches and send them.
+> Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
 
-Ok, great! Besides your mx35 clock patches: any other patch is
-required to getting the camera to work?
+Mika,
 
-Are you getting the camera image with the correct colors?
+Did you test this patch or just review it?
 
-Thanks,
+On my system it doesn't work. I think it has something to do with the
+changes to m2m_hw_interrupt but I haven't tracked it down yet.
 
-Fabio Estevam
+It looks like what's missing is a:
+
+	edmac->edma->hw_submit(edmac);
+
+But, maybe that's not needed with double buffering?
+
+Regards,
+Hartley
