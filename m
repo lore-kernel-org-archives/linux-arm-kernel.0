@@ -1,37 +1,51 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Sat, 24 Mar 2012 13:52:54 +0100
-Subject: [PATCH 10/10] oom: Make find_lock_task_mm() sparse-aware
-In-Reply-To: <20120324103127.GJ29067@lizard>
-References: <20120324102609.GA28356@lizard> <20120324103127.GJ29067@lizard>
-Message-ID: <1332593574.16159.31.camel@twins>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Sat, 24 Mar 2012 13:14:33 +0000
+Subject: [PATCH V2 0/3] Add support for DNS-320 and DNS-325 using devicetree
+Message-ID: <1332594876-8673-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-03-24 at 14:31 +0400, Anton Vorontsov wrote:
-> This is needed so that callers would not get 'context imbalance'
-> warnings from the sparse tool.
-> 
-> As a side effect, this patch fixes the following sparse warnings:
-> 
->   CHECK   mm/oom_kill.c
->   mm/oom_kill.c:201:28: warning: context imbalance in 'oom_badness' -
->   unexpected unlock
->   include/linux/rcupdate.h:249:30: warning: context imbalance in
->   'dump_tasks' - unexpected unlock
->   mm/oom_kill.c:453:9: warning: context imbalance in 'oom_kill_task' -
->   unexpected unlock
->   CHECK   mm/memcontrol.c
->   ...
->   mm/memcontrol.c:1130:17: warning: context imbalance in
->   'task_in_mem_cgroup' - unexpected unlock
-> 
-> p.s. I know Peter Zijlstra detest the __cond_lock() stuff, but untill
->      we have anything better in sparse, let's use it. This particular
->      patch helped me to detect one bug that I myself made during
->      task->mm fixup series. So, it is useful.
+Thankyou to Arnd and Jason for taking the time to review, sorry it's taken a
+while to get back to you both with an updated version.
 
-Yeah, so Nacked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Changes since v1:
+* Rebase against kirkwood_dt_for_3.4, removing premature devicetree ports.
+* Move additions into a separate board-dnskw.c. It could be separated further
+  into a board-dns320.c and board-dns325.c but it probably isn't worth it.
+* s/marvell,/mrvl,/g
+* Include an example dtb partition in documentation
+* Copy structure of serial nodes to allow common options for NAND to be set
+  in kirkwood.dtsi
+* Simplifications in orion-nand.c
+    
+I looked into adding a dtb partition into the d-link partition scheme. However
+D-Link supplied userland references all partitions by number and there isn't
+any obvious space that would be safe to use. Regardless, if you still have
+D-Link userland around, you probably still have D-Link u-boot, which won't load
+the dtb for you anyway.
 
-Also, why didn't lockdep catch it?
+Jamie Lentin (3):
+  ARM: kirkwood: Basic support for DNS-320 and DNS-325
+  ARM: kirkwood: Convert orion-nand to fdt
+  ARM: kirkwood: Define NAND partitions in dts
 
-Fix sparse already instead of smearing ugly all over.
+ .../devicetree/bindings/mtd/orion-nand.txt         |   46 ++++
+ arch/arm/boot/dts/kirkwood-dns320.dts              |   64 +++++
+ arch/arm/boot/dts/kirkwood-dns325.dts              |   59 +++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |   15 +-
+ arch/arm/mach-kirkwood/Kconfig                     |   23 ++
+ arch/arm/mach-kirkwood/Makefile                    |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot               |    2 +
+ arch/arm/mach-kirkwood/board-dnskw.c               |  275 ++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c                  |    5 +
+ arch/arm/mach-kirkwood/common.c                    |   12 +
+ arch/arm/mach-kirkwood/common.h                    |    6 +
+ drivers/mtd/nand/orion_nand.c                      |   34 +++-
+ 12 files changed, 539 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-dnskw.c
+
+-- 
+1.7.9.1
