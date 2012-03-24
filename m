@@ -1,141 +1,44 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Fri, 23 Mar 2012 21:14:19 -0400
-Subject: ioremap to a specific virtual address
-In-Reply-To: <201203231931.06376.arnd@arndb.de>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <201203231520.22588.arnd@arndb.de>
- <CAKON4OybXXwLEmg19NJnLsE5kB16U6Dm4ay3=XCUB57fRfz+ng@mail.gmail.com>
- <201203231931.06376.arnd@arndb.de>
-Message-ID: <CAKON4OwhcFDMC4dWjU7x4u2CPT7C2BxVuCDkTN0j14gTndi3tA@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sat, 24 Mar 2012 09:32:07 +0200
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
+References: <4F683B36.8090101@metasoft.pl>
+ <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48E3E@AUSP01VMBX24.collaborationhost.net>
+ <20120323070446.GC5812@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20120324073207.GD5812@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2012 at 3:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 23 March 2012, jonsmirl at gmail.com wrote:
->> On Fri, Mar 23, 2012 at 11:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 23 March 2012, jonsmirl at gmail.com wrote:
->> >> I will need to check how similar the chips actually are. NXP did not
->> >> use primecells in the lpc31xx family.
->> >>
->> >> I'd be happy to have some help. My trees are here:
->> >> https://github.com/jonsmirl
->> >
->> > I've taken a brief look at your tree, some comments:
->> >
->> > * Once you're done with the DT conversion, you should be able to
->> > ?completely remvoe the three board files. You probably know that already
->>
->> Thanks for the feedback.
->>
->> I don't think I can completely remove the board files. Some of the
->> generic devices have board specific callbacks. DM9000 for example. I
->> am setting up of_dev_auxdata for the boards so that I can pass these
->> callbacks in.
->
-> There are some cases where it's not possible to avoid platform_data,
-> but in most cases there is another better solution.
->
-> If you end up having to use platform_data, the auxdata mechanism
-> is the way to go.
->
->> # define DM_IO_DELAY() ? ? ? ?do { gpio_get_value(GPIO_MNAND_RYBN3);} while(0)
->>
->> static void dm9000_dumpblk(void __iomem *reg, int count)
->> {
->> ? ? ? int i;
->> ? ? ? int tmp;
->>
->> ? ? ? count = (count + 1) >> 1;
->> ? ? ? for (i = 0; i < count; i++) {
->> ? ? ? ? ? ? ? DM_IO_DELAY();
->> ? ? ? ? ? ? ? tmp = readw(reg);
->> ? ? ? }
->> }
->>
->> static void dm9000_inblk(void __iomem *reg, void *data, int count)
->> {
->> ? ? ? int i;
->> ? ? ? u16* pdata = (u16*)data;
->> ? ? ? count = (count + 1) >> 1;
->> ? ? ? for (i = 0; i < count; i++) {
->> ? ? ? ? ? ? ? DM_IO_DELAY();
->> ? ? ? ? ? ? ? *pdata++ = readw(reg);
->> ? ? ? }
->> }
->>
->> static struct dm9000_plat_data dm9000_platdata = {
->> ? ? ? .flags ? ? ? ? ?= DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM |
->> DM9000_PLATF_SIMPLE_PHY,
->
-> The flags can become simple empty properties if necessary, so there is no
-> need to keep these.
->
->> ? ? ? .dumpblk = dm9000_dumpblk,
->> ? ? ? .inblk = dm9000_inblk,
->> };
->
-> I can see two possible ways besides platform_data for the register access:
+On Fri, Mar 23, 2012 at 11:09:50AM -0500, H Hartley Sweeten wrote:
+> On Friday, March 23, 2012 12:05 AM, Mika Westerberg wrote:
+> > On Thu, Mar 22, 2012 at 09:19:10PM -0500, H Hartley Sweeten wrote:
+> >
+> >> Did you test this patch or just review it?
+> >
+> > I tested and reviewed it.
+> 
+> OK. What kernel? My tests so far have been with 3.3.
 
-The dm9000 is on the LPC3131 reference design board. It is not our
-hardware so I'm not sure what it is doing with the GPIO pin. I'm
-porting the reference board code in the hopes that someone will help
-out in this effort.
+3.3 and -next.
 
-Another piece of board specific glue is this bit that needs to be
-executed before accessing the dm9000. It puts the bus in the board's
-range in 8/16/32b mode, timings, etc.
+> >> On my system it doesn't work. I think it has something to do with the
+> >> changes to m2m_hw_interrupt but I haven't tracked it down yet.
+> >> 
+> >> It looks like what's missing is a:
+> >> 
+> >> 	edmac->edma->hw_submit(edmac);
+> >> 
+> >> But, maybe that's not needed with double buffering?
+> >
+> > Did you try without your patch and adding my VIC hack? That's what I did when
+> > I first got this patch and I saw no problems. I tested with audio (M2P),
+> > mmc_spi (M2M) and dmatest (M2M).
+> 
+> No, I have not applied your VIC hack.
 
-tatic void __init ea_add_device_dm9000(void)
-{
-	/*
-	 * Configure Chip-Select 2 on SMC for the DM9000.
-	 * Note: These timings were calculated for MASTER_CLOCK = 90000000
-	 *  according to the DM9000 timings.
-	 */
-	MPMC_STCONFIG1 = 0x81;
-	MPMC_STWTWEN1 = 1;
-	MPMC_STWTOEN1 = 1;
-	MPMC_STWTRD1 = 4;
-	MPMC_STWTPG1 = 1;
-	MPMC_STWTWR1 = 1;
-	MPMC_STWTTURN1 = 2;
-	/* enable oe toggle between consec reads */
-	SYS_MPMC_WTD_DEL1 = _BIT(5) | 4;
-
-An external  LCD controller on CS1 needs a different setup.
-
-static void __init ea_add_device_ssd1289(void)
-{
-	MPMC_STCONFIG0 = 0x81;
-	MPMC_STWTWEN0  = 0;
-	MPMC_STWTOEN0  = 0;
-	MPMC_STWTRD0   = 31;
-	MPMC_STWTPG0   = 0;
-	MPMC_STWTWR0   = 3;
-	MPMC_STWTTURN0 = 0;
-
->
-> 1. generalize the driver's accessors. Since your platform wants to read
-> a gpio pin before every access, you can provide a gpio line as the
-> property in the dm9000 device node and access that in the same place
-> in the common code if the gpio line is set, but skip the access otherwise.
-> No other platform in mainline actually needs to override the functions,
-> so there are hardly any disadvantages to this.
->
-> 2. convert the entire driver to use the "regmap" infrastructure to abstract
-> the registers, and implement a driver that implements the slow I/O. This
-> would be a rather complex solution and probably not worth it, compared
-> with the overhead of the first one or just staying with auxdata.
->
-> If any problem turns out to be really hard to convert over from
-> platform_data to device tree properties, auxdata is usually an acceptable
-> solution, or you could submit the port with more of those hacks when
-> there is reason to believe that you will fix them up later.
->
-> ? ? ? ?Arnd
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Please try it. The point there was that we have a problem in ep93xx VIC/DMA
+code but it is totally different thing and not related to Rafal's patch. We
+can sort the VIC thing out separately IMHO. ep93xx dma in 3.3 is broken
+regardless this patch.
