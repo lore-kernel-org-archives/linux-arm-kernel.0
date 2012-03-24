@@ -1,63 +1,180 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 24 Mar 2012 15:03:01 +0530
-Subject: [PATCH v5 0/2] ARM: Exynos: Add irq_domain and device tree support for
+Date: Sat, 24 Mar 2012 15:03:02 +0530
+Subject: [PATCH v5 1/2] ARM: Exynos: Add irq_domain support for interrupt
  combiner
-Message-ID: <1332581583-16100-1-git-send-email-thomas.abraham@linaro.org>
+In-Reply-To: <1332581583-16100-1-git-send-email-thomas.abraham@linaro.org>
+References: <1332581583-16100-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1332581583-16100-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v4:
-- In patch 2/2, removed the #ifdef CONFIF_OF around irq_of_parse_and_map() as
-  suggested by Grant Likely. Hence this patch series depends on the patch
-  with subject "of/irq: add empty irq_of_parse_and_map() for non-dt builds".
+Add irq_domain support for hardware interrupts of the interrupt combiner.
+The hardware interrupts of all the instances of the combiner are grouped
+in a single irq_domain.
 
-- Rebased to the latest kgene/for-next branch which now includes support for
-  Exynos5. Since this patchset modifies portions of code that are common for
-  both Exynos4 and Exynos5, there are minor modifications in this patch series
-  to accommodate Exynos5 dt support as well.
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/mach-exynos/common.c |   87 +++++++++++++++++++++++-----------------
+ 1 files changed, 50 insertions(+), 37 deletions(-)
 
-- v4 of this patchset was acked by Grant Likely and Rob Herring. This patch
-  series (v5) has minor modifications over v4 to include Exynos5 support. Since
-  those modifications are minor (not related to irq_domain or dt functionality),
-  I am retaining the Ack from Grant and Rob for this series.
-
-Changes since v3:
-- In dt case, the use of fixed gic linux irq number to map the combiner
-  interrupt output is removed. This is replaced with the interrupt number
-  obtained from the gic irq domain. (Thanks to Rob Herring and Grant
-  Likely for this suggestion).
-- Split the patch into two parts - irq_domain and device tree support
-  addition.
-
-Changes since v2:
-- Rebased to Grant's irqdomain/next branch.
-
-Changes since v1:
-- Includes all changes suggested by Rob Herring.
-- Tested with SPARSE_IRQ enabled.
-
-This patchset adds irq_domain and device tree support for the Exynos Interrupt
-Combiner controller.
-
-The first patch adds a common irq domain for the interrupts managed by the
-interrupt combiners. All the instances of irq combiner reference the common irq
-domain for translating hardware interrupts to linux irq number.
-
-The second patch adds a interrupt specifier translator to support device tree
-based instantiation. It can translate interrupt specifiers for device nodes
-which use combiner as their interrupt parent.
-
-This patchset is based on
-http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git [for-next]
-
-with all patches merged from
-http://git.secretlab.ca/git/linux-2.6.git [irqdomain/next]
-
-Thomas Abraham (2):
-  ARM: Exynos: Add irq_domain support for interrupt combiner
-  ARM: Exynos: Add device tree support for interrupt combiner
-
- .../bindings/arm/samsung/interrupt-combiner.txt    |   52 ++++++++
- arch/arm/mach-exynos/common.c                      |  138 ++++++++++++++-----
- 2 files changed, 153 insertions(+), 37 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 85ed8b5..7518945 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -19,6 +19,8 @@
+ #include <linux/serial_core.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
++#include <linux/export.h>
++#include <linux/irqdomain.h>
+ 
+ #include <asm/proc-fns.h>
+ #include <asm/exception.h>
+@@ -394,6 +396,7 @@ struct combiner_chip_data {
+ 	void __iomem *base;
+ };
+ 
++static struct irq_domain *combiner_irq_domain;
+ static struct combiner_chip_data combiner_data[MAX_COMBINER_NR];
+ 
+ static inline void __iomem *combiner_base(struct irq_data *data)
+@@ -406,14 +409,14 @@ static inline void __iomem *combiner_base(struct irq_data *data)
+ 
+ static void combiner_mask_irq(struct irq_data *data)
+ {
+-	u32 mask = 1 << (data->irq % 32);
++	u32 mask = 1 << (data->hwirq % 32);
+ 
+ 	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
+ }
+ 
+ static void combiner_unmask_irq(struct irq_data *data)
+ {
+-	u32 mask = 1 << (data->irq % 32);
++	u32 mask = 1 << (data->hwirq % 32);
+ 
+ 	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_SET);
+ }
+@@ -469,36 +472,59 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
+ 	irq_set_chained_handler(irq, combiner_handle_cascade_irq);
+ }
+ 
+-static void __init combiner_init(unsigned int combiner_nr, void __iomem *base,
+-			  unsigned int irq_start)
++static void __init combiner_init_one(unsigned int combiner_nr,
++						void __iomem *base)
+ {
+-	unsigned int i;
+-	unsigned int max_nr;
+-
+-	if (soc_is_exynos5250())
+-		max_nr = EXYNOS5_MAX_COMBINER_NR;
+-	else
+-		max_nr = EXYNOS4_MAX_COMBINER_NR;
+-
+-	if (combiner_nr >= max_nr)
+-		BUG();
+-
+ 	combiner_data[combiner_nr].base = base;
+-	combiner_data[combiner_nr].irq_offset = irq_start;
++	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
++		combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
+ 	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
+ 
+ 	/* Disable all interrupts */
+ 
+ 	__raw_writel(combiner_data[combiner_nr].irq_mask,
+ 		     base + COMBINER_ENABLE_CLEAR);
++}
++
++static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
++					irq_hw_number_t hw)
++{
++	irq_set_chip_and_handler(irq, &combiner_chip, handle_level_irq);
++	irq_set_chip_data(irq, &combiner_data[hw >> 3]);
++	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	return 0;
++}
++
++static struct irq_domain_ops combiner_irq_domain_ops = {
++	.map = combiner_irq_domain_map,
++};
+ 
+-	/* Setup the Linux IRQ subsystem */
++void __init combiner_init(void __iomem *combiner_base, struct device_node *np)
++{
++	int i, irq_base;
++	unsigned int max_nr, nr_irq;
++
++	max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
++						EXYNOS4_MAX_COMBINER_NR;
++	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
++
++	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
++	if (IS_ERR_VALUE(irq_base)) {
++		irq_base = COMBINER_IRQ(0, 0);
++		pr_warning("%s: irq desc alloc failed. Continuing with %d as "
++				"linux irq base\n", __func__, irq_base);
++	}
++
++	combiner_irq_domain = irq_domain_add_legacy(np, nr_irq, irq_base, 0,
++				&combiner_irq_domain_ops, &combiner_data);
++	if (WARN_ON(!combiner_irq_domain)) {
++		pr_warning("%s: irq domain init failed\n", __func__);
++		return;
++	}
+ 
+-	for (i = irq_start; i < combiner_data[combiner_nr].irq_offset
+-				+ MAX_IRQ_IN_COMBINER; i++) {
+-		irq_set_chip_and_handler(i, &combiner_chip, handle_level_irq);
+-		irq_set_chip_data(i, &combiner_data[combiner_nr]);
+-		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
++	for (i = 0; i < max_nr; i++) {
++		combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
++		combiner_cascade_irq(i, IRQ_SPI(i));
+ 	}
+ }
+ 
+@@ -511,7 +537,6 @@ static const struct of_device_id exynos4_dt_irq_match[] = {
+ 
+ void __init exynos4_init_irq(void)
+ {
+-	int irq;
+ 	unsigned int gic_bank_offset;
+ 
+ 	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
+@@ -523,12 +548,7 @@ void __init exynos4_init_irq(void)
+ 		of_irq_init(exynos4_dt_irq_match);
+ #endif
+ 
+-	for (irq = 0; irq < EXYNOS4_MAX_COMBINER_NR; irq++) {
+-
+-		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
+-				COMBINER_IRQ(irq, 0));
+-		combiner_cascade_irq(irq, IRQ_SPI(irq));
+-	}
++	combiner_init(S5P_VA_COMBINER_BASE, NULL);
+ 
+ 	/*
+ 	 * The parameters of s5p_init_irq() are for VIC init.
+@@ -540,15 +560,8 @@ void __init exynos4_init_irq(void)
+ 
+ void __init exynos5_init_irq(void)
+ {
+-	int irq;
+-
+ 	gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
+-
+-	for (irq = 0; irq < EXYNOS5_MAX_COMBINER_NR; irq++) {
+-		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
+-				COMBINER_IRQ(irq, 0));
+-		combiner_cascade_irq(irq, IRQ_SPI(irq));
+-	}
++	combiner_init(S5P_VA_COMBINER_BASE, NULL);
+ 
+ 	/*
+ 	 * The parameters of s5p_init_irq() are for VIC init.
+-- 
+1.6.6.rc2
