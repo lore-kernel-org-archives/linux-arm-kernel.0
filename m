@@ -1,97 +1,256 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 24 Mar 2012 21:58:46 +0530
-Subject: [PATCH v3 2/4] video: s3c-fb: remove 'default_win' element from
- platform data
+Date: Sat, 24 Mar 2012 21:58:47 +0530
+Subject: [PATCH v3 3/4] ARM: s3c64xx: Decouple lcd type from display controller
+ window data
 In-Reply-To: <1332606528-32338-1-git-send-email-thomas.abraham@linaro.org>
 References: <1332606528-32338-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1332606528-32338-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1332606528-32338-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The decision to enable or disable the data output to the lcd panel from
-the controller need not be based on the value of 'default_win' element
-in the platform data. Instead, the data output to the panel is enabled
-if any of the windows are active, else data output is disabled.
+The display controller window data should contain window configuration data
+for only one type of lcd panel. So, for real6410 and mini6410 boards, split
+the existing display controller window data, which contains window
+configuration data for two different types of lcd panels, into two seperate
+instances and register one of them depending on the type of the lcd panel
+detected at runtime.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+This is a prerequisite change for a subsequent commit that reorders the
+platform data of display controller by moving video interface timing out
+of window setup data.
+
+Cc: Darius Augulis <augulis.darius@gmail.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/plat-samsung/include/plat/fb.h |    2 --
- drivers/video/s3c-fb.c                  |   25 +++++--------------------
- 2 files changed, 5 insertions(+), 22 deletions(-)
+ arch/arm/mach-s3c64xx/mach-mini6410.c |   82 +++++++++++++++++---------------
+ arch/arm/mach-s3c64xx/mach-real6410.c |   82 +++++++++++++++++---------------
+ 2 files changed, 88 insertions(+), 76 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index 39d6bd7..536002f 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -62,8 +62,6 @@ struct s3c_fb_platdata {
- 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
- 	struct fb_videomode     *vtiming;
- 
--	u32			 default_win;
--
- 	u32			 vidcon0;
- 	u32			 vidcon1;
+diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+index c34c2ab..34f5195 100644
+--- a/arch/arm/mach-s3c64xx/mach-mini6410.c
++++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+@@ -151,41 +151,49 @@ static struct s3c2410_platform_nand mini6410_nand_info = {
+ 	.sets		= mini6410_nand_sets,
  };
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index c94f40d..18c84b8 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -531,7 +531,7 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	/* disable the window whilst we update it */
- 	writel(0, regs + WINCON(win_no));
  
--	if (win_no == sfb->pdata->default_win)
-+	if (!sfb->output_on)
- 		s3c_fb_enable(sfb, 1);
+-static struct s3c_fb_pd_win mini6410_fb_win[] = {
+-	{
+-		.win_mode	= {	/* 4.3" 480x272 */
+-			.left_margin	= 3,
+-			.right_margin	= 2,
+-			.upper_margin	= 1,
+-			.lower_margin	= 1,
+-			.hsync_len	= 40,
+-			.vsync_len	= 1,
+-			.xres		= 480,
+-			.yres		= 272,
+-		},
+-		.max_bpp	= 32,
+-		.default_bpp	= 16,
+-	}, {
+-		.win_mode	= {	/* 7.0" 800x480 */
+-			.left_margin	= 8,
+-			.right_margin	= 13,
+-			.upper_margin	= 7,
+-			.lower_margin	= 5,
+-			.hsync_len	= 3,
+-			.vsync_len	= 1,
+-			.xres		= 800,
+-			.yres		= 480,
+-		},
+-		.max_bpp	= 32,
+-		.default_bpp	= 16,
++static struct s3c_fb_pd_win mini6410_lcd_type0_fb_win = {
++	.win_mode	= {	/* 4.3" 480x272 */
++		.left_margin	= 3,
++		.right_margin	= 2,
++		.upper_margin	= 1,
++		.lower_margin	= 1,
++		.hsync_len	= 40,
++		.vsync_len	= 1,
++		.xres		= 480,
++		.yres		= 272,
+ 	},
++	.max_bpp	= 32,
++	.default_bpp	= 16,
+ };
  
- 	/* write the buffer address */
-@@ -799,6 +799,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
- 	struct s3c_fb *sfb = win->parent;
- 	unsigned int index = win->index;
- 	u32 wincon;
-+	u32 output_on = sfb->output_on;
+-static struct s3c_fb_platdata mini6410_lcd_pdata __initdata = {
+-	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
+-	.win[0]		= &mini6410_fb_win[0],
+-	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+-	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++static struct s3c_fb_pd_win mini6410_lcd_type1_fb_win = {
++	.win_mode	= {	/* 7.0" 800x480 */
++		.left_margin	= 8,
++		.right_margin	= 13,
++		.upper_margin	= 7,
++		.lower_margin	= 5,
++		.hsync_len	= 3,
++		.vsync_len	= 1,
++		.xres		= 800,
++		.yres		= 480,
++	},
++	.max_bpp	= 32,
++	.default_bpp	= 16,
++};
++
++static struct s3c_fb_platdata mini6410_lcd_pdata[] __initdata = {
++	{
++		.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
++		.win[0]		= &mini6410_lcd_type0_fb_win,
++		.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
++		.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	}, {
++		.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
++		.win[0]		= &mini6410_lcd_type1_fb_win,
++		.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
++		.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	},
++	{ },
+ };
  
- 	dev_dbg(sfb->dev, "blank mode %d\n", blank_mode);
+ static void mini6410_lcd_power_set(struct plat_lcd_data *pd,
+@@ -283,7 +291,7 @@ static void mini6410_parse_features(
+ 					"screen type already set\n", f);
+ 			} else {
+ 				int li = f - '0';
+-				if (li >= ARRAY_SIZE(mini6410_fb_win))
++				if (li >= ARRAY_SIZE(mini6410_lcd_pdata))
+ 					printk(KERN_INFO "MINI6410: '%c' out "
+ 						"of range LCD mode\n", f);
+ 				else {
+@@ -307,14 +315,12 @@ static void __init mini6410_machine_init(void)
+ 	/* Parse the feature string */
+ 	mini6410_parse_features(&features, mini6410_features_str);
  
-@@ -837,34 +838,18 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
- 
- 	shadow_protect_win(win, 1);
- 	writel(wincon, sfb->regs + sfb->variant.wincon + (index * 4));
--	shadow_protect_win(win, 0);
- 
- 	/* Check the enabled state to see if we need to be running the
- 	 * main LCD interface, as if there are no active windows then
- 	 * it is highly likely that we also do not need to output
- 	 * anything.
- 	 */
+-	mini6410_lcd_pdata.win[0] = &mini6410_fb_win[features.lcd_index];
 -
--	/* We could do something like the following code, but the current
--	 * system of using framebuffer events means that we cannot make
--	 * the distinction between just window 0 being inactive and all
--	 * the windows being down.
--	 *
--	 * s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
--	*/
+ 	printk(KERN_INFO "MINI6410: selected LCD display is %dx%d\n",
+-		mini6410_lcd_pdata.win[0]->win_mode.xres,
+-		mini6410_lcd_pdata.win[0]->win_mode.yres);
++		mini6410_lcd_pdata[features.lcd_index].win[0]->win_mode.xres,
++		mini6410_lcd_pdata[features.lcd_index].win[0]->win_mode.yres);
+ 
+ 	s3c_nand_set_platdata(&mini6410_nand_info);
+-	s3c_fb_set_platdata(&mini6410_lcd_pdata);
++	s3c_fb_set_platdata(&mini6410_lcd_pdata[features.lcd_index]);
+ 	s3c24xx_ts_set_platdata(NULL);
+ 
+ 	/* configure nCS1 width to 16 bits */
+diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+index be2a9a2..21f91e5 100644
+--- a/arch/arm/mach-s3c64xx/mach-real6410.c
++++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+@@ -117,41 +117,49 @@ static struct platform_device real6410_device_eth = {
+ 	},
+ };
+ 
+-static struct s3c_fb_pd_win real6410_fb_win[] = {
+-	{
+-		.win_mode	= {	/* 4.3" 480x272 */
+-			.left_margin	= 3,
+-			.right_margin	= 2,
+-			.upper_margin	= 1,
+-			.lower_margin	= 1,
+-			.hsync_len	= 40,
+-			.vsync_len	= 1,
+-			.xres		= 480,
+-			.yres		= 272,
+-		},
+-		.max_bpp	= 32,
+-		.default_bpp	= 16,
+-	}, {
+-		.win_mode	= {	/* 7.0" 800x480 */
+-			.left_margin	= 8,
+-			.right_margin	= 13,
+-			.upper_margin	= 7,
+-			.lower_margin	= 5,
+-			.hsync_len	= 3,
+-			.vsync_len	= 1,
+-			.xres		= 800,
+-			.yres		= 480,
+-		},
+-		.max_bpp	= 32,
+-		.default_bpp	= 16,
++static struct s3c_fb_pd_win real6410_lcd_type0_fb_win = {
++	.win_mode	= {	/* 4.3" 480x272 */
++		.left_margin	= 3,
++		.right_margin	= 2,
++		.upper_margin	= 1,
++		.lower_margin	= 1,
++		.hsync_len	= 40,
++		.vsync_len	= 1,
++		.xres		= 480,
++		.yres		= 272,
+ 	},
++	.max_bpp	= 32,
++	.default_bpp	= 16,
+ };
+ 
+-static struct s3c_fb_platdata real6410_lcd_pdata __initdata = {
+-	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
+-	.win[0]		= &real6410_fb_win[0],
+-	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+-	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++static struct s3c_fb_pd_win real6410_lcd_type1_fb_win = {
++	.win_mode	= {	/* 7.0" 800x480 */
++		.left_margin	= 8,
++		.right_margin	= 13,
++		.upper_margin	= 7,
++		.lower_margin	= 5,
++		.hsync_len	= 3,
++		.vsync_len	= 1,
++		.xres		= 800,
++		.yres		= 480,
++	},
++	.max_bpp	= 32,
++	.default_bpp	= 16,
++};
++
++static struct s3c_fb_platdata real6410_lcd_pdata[] __initdata = {
++	{
++		.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
++		.win[0]		= &real6410_lcd_type0_fb_win,
++		.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
++		.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	}, {
++		.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
++		.win[0]		= &real6410_lcd_type1_fb_win,
++		.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
++		.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	},
++	{ },
+ };
+ 
+ static struct mtd_partition real6410_nand_part[] = {
+@@ -264,7 +272,7 @@ static void real6410_parse_features(
+ 					"screen type already set\n", f);
+ 			} else {
+ 				int li = f - '0';
+-				if (li >= ARRAY_SIZE(real6410_fb_win))
++				if (li >= ARRAY_SIZE(real6410_lcd_pdata))
+ 					printk(KERN_INFO "REAL6410: '%c' out "
+ 						"of range LCD mode\n", f);
+ 				else {
+@@ -288,13 +296,11 @@ static void __init real6410_machine_init(void)
+ 	/* Parse the feature string */
+ 	real6410_parse_features(&features, real6410_features_str);
+ 
+-	real6410_lcd_pdata.win[0] = &real6410_fb_win[features.lcd_index];
 -
--	/* we're stuck with this until we can do something about overriding
--	 * the power control using the blanking event for a single fb.
--	 */
--	if (index == sfb->pdata->default_win) {
--		shadow_protect_win(win, 1);
--		s3c_fb_enable(sfb, blank_mode != FB_BLANK_POWERDOWN ? 1 : 0);
--		shadow_protect_win(win, 0);
--	}
-+	s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
-+	shadow_protect_win(win, 0);
+ 	printk(KERN_INFO "REAL6410: selected LCD display is %dx%d\n",
+-		real6410_lcd_pdata.win[0]->win_mode.xres,
+-		real6410_lcd_pdata.win[0]->win_mode.yres);
++		real6410_lcd_pdata[features.lcd_index].win[0]->win_mode.xres,
++		real6410_lcd_pdata[features.lcd_index].win[0]->win_mode.yres);
  
- 	pm_runtime_put_sync(sfb->dev);
+-	s3c_fb_set_platdata(&real6410_lcd_pdata);
++	s3c_fb_set_platdata(&real6410_lcd_pdata[features.lcd_index]);
+ 	s3c_nand_set_platdata(&real6410_nand_info);
+ 	s3c24xx_ts_set_platdata(NULL);
  
--	return 0;
-+	return output_on == sfb->output_on;
- }
- 
- /**
 -- 
 1.6.6.rc2
