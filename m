@@ -1,261 +1,97 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 24 Mar 2012 21:58:45 +0530
-Subject: [PATCH v3 1/4] video: s3c-fb: move video interface timing out of
- window setup data
+Date: Sat, 24 Mar 2012 21:58:46 +0530
+Subject: [PATCH v3 2/4] video: s3c-fb: remove 'default_win' element from
+ platform data
 In-Reply-To: <1332606528-32338-1-git-send-email-thomas.abraham@linaro.org>
 References: <1332606528-32338-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1332606528-32338-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1332606528-32338-3-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The video interface timing is independent of the window setup data.
-The resolution of the window can be smaller than that of the lcd
-panel to which the video data is output.
-
-So move the video timing data from the per-window setup data to the
-platform specific section in the platform data. This also removes
-the restriction that atleast one window should have the same
-resolution as that of the panel attached.
+The decision to enable or disable the data output to the lcd panel from
+the controller need not be based on the value of 'default_win' element
+in the platform data. Instead, the data output to the panel is enabled
+if any of the windows are active, else data output is disabled.
 
 Cc: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/fb.h |    9 ++-
- drivers/video/s3c-fb.c                  |  112 +++++++++++++++++--------------
- 2 files changed, 67 insertions(+), 54 deletions(-)
+ arch/arm/plat-samsung/include/plat/fb.h |    2 --
+ drivers/video/s3c-fb.c                  |   25 +++++--------------------
+ 2 files changed, 5 insertions(+), 22 deletions(-)
 
 diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index 0fedf47..39d6bd7 100644
+index 39d6bd7..536002f 100644
 --- a/arch/arm/plat-samsung/include/plat/fb.h
 +++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -24,15 +24,16 @@
- 
- /**
-  * struct s3c_fb_pd_win - per window setup data
-- * @win_mode: The display parameters to initialise (not for window 0)
-+ * @xres     : The window X size.
-+ * @yres     : The window Y size.
-  * @virtual_x: The virtual X size.
-  * @virtual_y: The virtual Y size.
-  */
- struct s3c_fb_pd_win {
--	struct fb_videomode	win_mode;
--
- 	unsigned short		default_bpp;
- 	unsigned short		max_bpp;
-+	unsigned short		xres;
-+	unsigned short		yres;
- 	unsigned short		virtual_x;
- 	unsigned short		virtual_y;
- };
-@@ -45,6 +46,7 @@ struct s3c_fb_pd_win {
-  * @default_win: default window layer number to be used for UI layer.
-  * @vidcon0: The base vidcon0 values to control the panel data format.
-  * @vidcon1: The base vidcon1 values to control the panel data output.
-+ * @vtiming: Video timing when connected to a RGB type panel.
-  * @win: The setup data for each hardware window, or NULL for unused.
-  * @display_mode: The LCD output display mode.
-  *
-@@ -58,6 +60,7 @@ struct s3c_fb_platdata {
- 	void	(*setup_gpio)(void);
- 
+@@ -62,8 +62,6 @@ struct s3c_fb_platdata {
  	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
-+	struct fb_videomode     *vtiming;
+ 	struct fb_videomode     *vtiming;
  
- 	u32			 default_win;
- 
+-	u32			 default_win;
+-
+ 	u32			 vidcon0;
+ 	u32			 vidcon1;
+ };
 diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index f310516..c94f40d 100644
+index c94f40d..18c84b8 100644
 --- a/drivers/video/s3c-fb.c
 +++ b/drivers/video/s3c-fb.c
-@@ -495,7 +495,6 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	u32 alpha = 0;
- 	u32 data;
- 	u32 pagewidth;
--	int clkdiv;
- 
- 	dev_dbg(sfb->dev, "setting framebuffer parameters\n");
- 
-@@ -532,48 +531,9 @@ static int s3c_fb_set_par(struct fb_info *info)
+@@ -531,7 +531,7 @@ static int s3c_fb_set_par(struct fb_info *info)
  	/* disable the window whilst we update it */
  	writel(0, regs + WINCON(win_no));
  
--	/* use platform specified window as the basis for the lcd timings */
--
--	if (win_no == sfb->pdata->default_win) {
--		clkdiv = s3c_fb_calc_pixclk(sfb, var->pixclock);
--
--		data = sfb->pdata->vidcon0;
--		data &= ~(VIDCON0_CLKVAL_F_MASK | VIDCON0_CLKDIR);
--
--		if (clkdiv > 1)
--			data |= VIDCON0_CLKVAL_F(clkdiv-1) | VIDCON0_CLKDIR;
--		else
--			data &= ~VIDCON0_CLKDIR;	/* 1:1 clock */
--
--		/* write the timing data to the panel */
--
--		if (sfb->variant.is_2443)
--			data |= (1 << 5);
--
--		writel(data, regs + VIDCON0);
--
-+	if (win_no == sfb->pdata->default_win)
+-	if (win_no == sfb->pdata->default_win)
++	if (!sfb->output_on)
  		s3c_fb_enable(sfb, 1);
  
--		data = VIDTCON0_VBPD(var->upper_margin - 1) |
--		       VIDTCON0_VFPD(var->lower_margin - 1) |
--		       VIDTCON0_VSPW(var->vsync_len - 1);
--
--		writel(data, regs + sfb->variant.vidtcon);
--
--		data = VIDTCON1_HBPD(var->left_margin - 1) |
--		       VIDTCON1_HFPD(var->right_margin - 1) |
--		       VIDTCON1_HSPW(var->hsync_len - 1);
--
--		/* VIDTCON1 */
--		writel(data, regs + sfb->variant.vidtcon + 4);
--
--		data = VIDTCON2_LINEVAL(var->yres - 1) |
--		       VIDTCON2_HOZVAL(var->xres - 1) |
--		       VIDTCON2_LINEVAL_E(var->yres - 1) |
--		       VIDTCON2_HOZVAL_E(var->xres - 1);
--		writel(data, regs + sfb->variant.vidtcon + 8);
--	}
--
  	/* write the buffer address */
+@@ -799,6 +799,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
+ 	struct s3c_fb *sfb = win->parent;
+ 	unsigned int index = win->index;
+ 	u32 wincon;
++	u32 output_on = sfb->output_on;
  
- 	/* start and end registers stride is 8 */
-@@ -1144,11 +1104,11 @@ static int __devinit s3c_fb_alloc_memory(struct s3c_fb *sfb,
+ 	dev_dbg(sfb->dev, "blank mode %d\n", blank_mode);
  
- 	dev_dbg(sfb->dev, "allocating memory for display\n");
+@@ -837,34 +838,18 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
  
--	real_size = windata->win_mode.xres * windata->win_mode.yres;
-+	real_size = windata->xres * windata->yres;
- 	virt_size = windata->virtual_x * windata->virtual_y;
+ 	shadow_protect_win(win, 1);
+ 	writel(wincon, sfb->regs + sfb->variant.wincon + (index * 4));
+-	shadow_protect_win(win, 0);
  
- 	dev_dbg(sfb->dev, "real_size=%u (%u.%u), virt_size=%u (%u.%u)\n",
--		real_size, windata->win_mode.xres, windata->win_mode.yres,
-+		real_size, windata->xres, windata->yres,
- 		virt_size, windata->virtual_x, windata->virtual_y);
+ 	/* Check the enabled state to see if we need to be running the
+ 	 * main LCD interface, as if there are no active windows then
+ 	 * it is highly likely that we also do not need to output
+ 	 * anything.
+ 	 */
+-
+-	/* We could do something like the following code, but the current
+-	 * system of using framebuffer events means that we cannot make
+-	 * the distinction between just window 0 being inactive and all
+-	 * the windows being down.
+-	 *
+-	 * s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
+-	*/
+-
+-	/* we're stuck with this until we can do something about overriding
+-	 * the power control using the blanking event for a single fb.
+-	 */
+-	if (index == sfb->pdata->default_win) {
+-		shadow_protect_win(win, 1);
+-		s3c_fb_enable(sfb, blank_mode != FB_BLANK_POWERDOWN ? 1 : 0);
+-		shadow_protect_win(win, 0);
+-	}
++	s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
++	shadow_protect_win(win, 0);
  
- 	size = (real_size > virt_size) ? real_size : virt_size;
-@@ -1230,7 +1190,7 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 				      struct s3c_fb_win **res)
- {
- 	struct fb_var_screeninfo *var;
--	struct fb_videomode *initmode;
-+	struct fb_videomode initmode;
- 	struct s3c_fb_pd_win *windata;
- 	struct s3c_fb_win *win;
- 	struct fb_info *fbinfo;
-@@ -1251,11 +1211,11 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 	}
+ 	pm_runtime_put_sync(sfb->dev);
  
- 	windata = sfb->pdata->win[win_no];
--	initmode = &windata->win_mode;
-+	initmode = *sfb->pdata->vtiming;
- 
- 	WARN_ON(windata->max_bpp == 0);
--	WARN_ON(windata->win_mode.xres == 0);
--	WARN_ON(windata->win_mode.yres == 0);
-+	WARN_ON(windata->xres == 0);
-+	WARN_ON(windata->yres == 0);
- 
- 	win = fbinfo->par;
- 	*res = win;
-@@ -1294,7 +1254,9 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 	}
- 
- 	/* setup the initial video mode from the window */
--	fb_videomode_to_var(&fbinfo->var, initmode);
-+	initmode.xres = windata->xres;
-+	initmode.yres = windata->yres;
-+	fb_videomode_to_var(&fbinfo->var, &initmode);
- 
- 	fbinfo->fix.type	= FB_TYPE_PACKED_PIXELS;
- 	fbinfo->fix.accel	= FB_ACCEL_NONE;
-@@ -1339,6 +1301,53 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
+-	return 0;
++	return output_on == sfb->output_on;
  }
  
  /**
-+ * s3c_fb_set_rgb_timing() - set video timing for rgb interface.
-+ * @sfb: The base resources for the hardware.
-+ *
-+ * Set horizontal and vertical lcd rgb interface timing.
-+ */
-+static void s3c_fb_set_rgb_timing(struct s3c_fb *sfb)
-+{
-+	struct fb_videomode *vmode = sfb->pdata->vtiming;
-+	void __iomem *regs = sfb->regs;
-+	int clkdiv;
-+	u32 data;
-+
-+	if (!vmode->pixclock)
-+		s3c_fb_missing_pixclock(vmode);
-+
-+	clkdiv = s3c_fb_calc_pixclk(sfb, vmode->pixclock);
-+
-+	data = sfb->pdata->vidcon0;
-+	data &= ~(VIDCON0_CLKVAL_F_MASK | VIDCON0_CLKDIR);
-+
-+	if (clkdiv > 1)
-+		data |= VIDCON0_CLKVAL_F(clkdiv-1) | VIDCON0_CLKDIR;
-+	else
-+		data &= ~VIDCON0_CLKDIR;	/* 1:1 clock */
-+
-+	if (sfb->variant.is_2443)
-+		data |= (1 << 5);
-+	writel(data, regs + VIDCON0);
-+
-+	data = VIDTCON0_VBPD(vmode->upper_margin - 1) |
-+	       VIDTCON0_VFPD(vmode->lower_margin - 1) |
-+	       VIDTCON0_VSPW(vmode->vsync_len - 1);
-+	writel(data, regs + sfb->variant.vidtcon);
-+
-+	data = VIDTCON1_HBPD(vmode->left_margin - 1) |
-+	       VIDTCON1_HFPD(vmode->right_margin - 1) |
-+	       VIDTCON1_HSPW(vmode->hsync_len - 1);
-+	writel(data, regs + sfb->variant.vidtcon + 4);
-+
-+	data = VIDTCON2_LINEVAL(vmode->yres - 1) |
-+	       VIDTCON2_HOZVAL(vmode->xres - 1) |
-+	       VIDTCON2_LINEVAL_E(vmode->yres - 1) |
-+	       VIDTCON2_HOZVAL_E(vmode->xres - 1);
-+	writel(data, regs + sfb->variant.vidtcon + 8);
-+}
-+
-+/**
-  * s3c_fb_clear_win() - clear hardware window registers.
-  * @sfb: The base resources for the hardware.
-  * @win: The window to process.
-@@ -1481,15 +1490,14 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
- 		writel(0xffffff, regs + WKEYCON1);
- 	}
- 
-+	s3c_fb_set_rgb_timing(sfb);
-+
- 	/* we have the register setup, start allocating framebuffers */
- 
- 	for (win = 0; win < fbdrv->variant.nr_windows; win++) {
- 		if (!pd->win[win])
- 			continue;
- 
--		if (!pd->win[win]->win_mode.pixclock)
--			s3c_fb_missing_pixclock(&pd->win[win]->win_mode);
--
- 		ret = s3c_fb_probe_win(sfb, win, fbdrv->win[win],
- 				       &sfb->windows[win]);
- 		if (ret < 0) {
-@@ -1623,6 +1631,8 @@ static int s3c_fb_resume(struct device *dev)
- 		shadow_protect_win(win, 0);
- 	}
- 
-+	s3c_fb_set_rgb_timing(sfb);
-+
- 	/* restore framebuffers */
- 	for (win_no = 0; win_no < S3C_FB_MAX_WIN; win_no++) {
- 		win = sfb->windows[win_no];
 -- 
 1.6.6.rc2
