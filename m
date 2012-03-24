@@ -1,57 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 24 Mar 2012 09:23:16 +0000
-Subject: [PATCH 3/9] ARM: omap2/n8x0: work around modular omap mmc
-In-Reply-To: <1332522836-29517-4-git-send-email-mathieu.poirier@linaro.org>
-References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
- <1332522836-29517-4-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20120324092316.GA22608@n2100.arm.linux.org.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 24 Mar 2012 15:03:01 +0530
+Subject: [PATCH v5 0/2] ARM: Exynos: Add irq_domain and device tree support for
+ combiner
+Message-ID: <1332581583-16100-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2012 at 11:13:50AM -0600, mathieu.poirier at linaro.org wrote:
-> From: Russell King <linux@arm.linux.org.uk>
+Changes since v4:
+- In patch 2/2, removed the #ifdef CONFIF_OF around irq_of_parse_and_map() as
+  suggested by Grant Likely. Hence this patch series depends on the patch
+  with subject "of/irq: add empty irq_of_parse_and_map() for non-dt builds".
 
-This is wrong.  I am not the author of this patch.
+- Rebased to the latest kgene/for-next branch which now includes support for
+  Exynos5. Since this patchset modifies portions of code that are common for
+  both Exynos4 and Exynos5, there are minor modifications in this patch series
+  to accommodate Exynos5 dt support as well.
 
-> When the omap driver is built as a module for n8x0,
-> n8x0_mmc_set_power_menelaus cannot call into the driver:
-> 
-> arch/arm/mach-omap2/board-n8x0.c:374: undefined reference
-> to `omap_mmc_notify_cover_event'
-> 
-> As a workaround, do not provide that device in this case. This needs
-> to be fixed properly, e.g. by converting n8x0 to be probed through the
-> device tree and moving that code into the driver.
-> 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Suggested-by: Russell King <linux@arm.linux.org.uk>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/board-n8x0.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-> index 6722627..8529ca0 100644
-> --- a/arch/arm/mach-omap2/board-n8x0.c
-> +++ b/arch/arm/mach-omap2/board-n8x0.c
-> @@ -193,8 +193,10 @@ static struct omap_onenand_platform_data board_onenand_data[] = {
->  };
->  #endif
->  
-> -#if defined(CONFIG_MENELAUS) &&						\
-> -	(defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE))
-> +#ifdef CONFIG_MMC_OMAP_MODULE
-> +#warning FIXME: cannot call omap_mmc_notify_cover_event for CONFIG_MMC_OMAP_MODULE
-> +#endif
-> +#if defined(CONFIG_MENELAUS) && (defined(CONFIG_MMC_OMAP)
->  
->  /*
->   * On both N800 and N810, only the first of the two MMC controllers is in use.
-> -- 
-> 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+- v4 of this patchset was acked by Grant Likely and Rob Herring. This patch
+  series (v5) has minor modifications over v4 to include Exynos5 support. Since
+  those modifications are minor (not related to irq_domain or dt functionality),
+  I am retaining the Ack from Grant and Rob for this series.
+
+Changes since v3:
+- In dt case, the use of fixed gic linux irq number to map the combiner
+  interrupt output is removed. This is replaced with the interrupt number
+  obtained from the gic irq domain. (Thanks to Rob Herring and Grant
+  Likely for this suggestion).
+- Split the patch into two parts - irq_domain and device tree support
+  addition.
+
+Changes since v2:
+- Rebased to Grant's irqdomain/next branch.
+
+Changes since v1:
+- Includes all changes suggested by Rob Herring.
+- Tested with SPARSE_IRQ enabled.
+
+This patchset adds irq_domain and device tree support for the Exynos Interrupt
+Combiner controller.
+
+The first patch adds a common irq domain for the interrupts managed by the
+interrupt combiners. All the instances of irq combiner reference the common irq
+domain for translating hardware interrupts to linux irq number.
+
+The second patch adds a interrupt specifier translator to support device tree
+based instantiation. It can translate interrupt specifiers for device nodes
+which use combiner as their interrupt parent.
+
+This patchset is based on
+http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git [for-next]
+
+with all patches merged from
+http://git.secretlab.ca/git/linux-2.6.git [irqdomain/next]
+
+Thomas Abraham (2):
+  ARM: Exynos: Add irq_domain support for interrupt combiner
+  ARM: Exynos: Add device tree support for interrupt combiner
+
+ .../bindings/arm/samsung/interrupt-combiner.txt    |   52 ++++++++
+ arch/arm/mach-exynos/common.c                      |  138 ++++++++++++++-----
+ 2 files changed, 153 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
