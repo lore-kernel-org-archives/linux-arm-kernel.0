@@ -1,21 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 25 Mar 2012 10:57:11 +0100
-Subject: [PATCH v8 RESEND] ARM: net: JIT compiler for packet filters
-In-Reply-To: <4F6EEAB5.7070009@gmail.com>
-References: <1331933316-10197-1-git-send-email-mgherzan@gmail.com>
- <20120319.172005.1889334604020296555.davem@davemloft.net>
- <4F6EEAB5.7070009@gmail.com>
-Message-ID: <20120325095711.GC5611@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 25 Mar 2012 10:21:58 +0000
+Subject: [GIT PULL 02/09] ARM: global cleanups
+In-Reply-To: <1332626568-17812-3-git-send-email-arnd@arndb.de>
+References: <1332626568-17812-1-git-send-email-arnd@arndb.de>
+ <1332626568-17812-3-git-send-email-arnd@arndb.de>
+Message-ID: <201203251021.59187.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 25, 2012 at 11:51:49AM +0200, Mircea Gherzan wrote:
-> Am 19.03.2012 22:20, schrieb David Miller:
-> > I would like to see this merged however is feasible, this has been in
-> > a catatonic state for two releases and waiting longer isn't going to
-> > improve things enough to justify any further delay.
+On Saturday 24 March 2012, Arnd Bergmann wrote:
+> Quite a bit of code gets removed, and some stuff moved around, mostly
+> the old samsung s3c24xx stuff. There should be no functional changes in
+> this series otherwise. Some cleanups have dependencies on other arm-soc
+> branches and will be sent in the second round.
 > 
-> It has been merged into the ARM tree more than a week ago, but
-> unfortunately it seems it will not make it into 3.4.
+> The at91cap9 platform is removed and no longer listed in
+> Documentation/feature-removal-schedule.txt, which conflicts with two
+> new entries in that file.
+> 
+> arch/arm/plat-mxc/audmux-v1.c was removed, so the changes to its comments
+> are meaningless now.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Why do you say that?
+Hi Linus,
+
+I've just had to update this tag again, the top commit is now 24d2e18,
+this fixes a regression pointed out by Russell, which was introduced
+in the cleanup branch but fixed in another commit that you have already
+pulled. I've merged that branch into mine to keep this (more) bisectible.
+
+	Arnd
