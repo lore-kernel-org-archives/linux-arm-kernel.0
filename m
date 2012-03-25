@@ -1,95 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 25 Mar 2012 17:34:41 +0000
-Subject: ioremap to a specific virtual address
-In-Reply-To: <CAKON4OwhcFDMC4dWjU7x4u2CPT7C2BxVuCDkTN0j14gTndi3tA@mail.gmail.com>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <201203231931.06376.arnd@arndb.de>
- <CAKON4OwhcFDMC4dWjU7x4u2CPT7C2BxVuCDkTN0j14gTndi3tA@mail.gmail.com>
-Message-ID: <201203251734.41780.arnd@arndb.de>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Sun, 25 Mar 2012 19:42:10 +0200
+Subject: [PATCH v2.1 01/10] cpu: Introduce clear_tasks_mm_cpumask() helper
+In-Reply-To: <20120324164316.GB3640@lizard>
+References: <20120324102609.GA28356@lizard> <20120324102751.GA29067@lizard>
+ <1332593021.16159.27.camel@twins> <20120324164316.GB3640@lizard>
+Message-ID: <20120325174210.GA23605@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 March 2012, jonsmirl at gmail.com wrote:
-> The dm9000 is on the LPC3131 reference design board. It is not our
-> hardware so I'm not sure what it is doing with the GPIO pin. I'm
-> porting the reference board code in the hopes that someone will help
-> out in this effort.
+On 03/24, Anton Vorontsov wrote:
+>
+> Many architctures clear tasks' mm_cpumask like this:
+>
+> 	read_lock(&tasklist_lock);
+> 	for_each_process(p) {
+> 		if (p->mm)
+> 			cpumask_clear_cpu(cpu, mm_cpumask(p->mm));
+> 	}
+> 	read_unlock(&tasklist_lock);
 
-Ok, so it's possible that nobody knows why the gpio read was put
-in then and it might be completely bogus?
+Namely arm, powerpc, and sh.
 
-> Another piece of board specific glue is this bit that needs to be
-> executed before accessing the dm9000. It puts the bus in the board's
-> range in 8/16/32b mode, timings, etc.
-> 
-> static void __init ea_add_device_dm9000(void)
-> {
->         /*
->          * Configure Chip-Select 2 on SMC for the DM9000.
->          * Note: These timings were calculated for MASTER_CLOCK = 90000000
->          *  according to the DM9000 timings.
->          */
->         MPMC_STCONFIG1 = 0x81;
->         MPMC_STWTWEN1 = 1;
->         MPMC_STWTOEN1 = 1;
->         MPMC_STWTRD1 = 4;
->         MPMC_STWTPG1 = 1;
->         MPMC_STWTWR1 = 1;
->         MPMC_STWTTURN1 = 2;
->         /* enable oe toggle between consec reads */
->         SYS_MPMC_WTD_DEL1 = _BIT(5) | 4;
-> 
+> The code above has several problems, such as:
+>
+> 1. Working with task->mm w/o getting mm or grabing the task lock is
+>    dangerous as ->mm might disappear (exit_mm() assigns NULL under
+>    task_lock(), so tasklist lock is not enough).
 
-I would try to describe the MPMC static memory configuration using a device
-node containing these, if you can't reliably move the configuration into the
-boot loader itself.
+This is not actually true for arm and sh, afaics. They do not even
+need tasklist or rcu lock for for_each_process().
 
-In the device tree, this can look like:
+__cpu_disable() is called by __stop_machine(), we know that nobody
+can preempt us and other CPUs can do nothing.
 
-/ {
+> 2. Checking for process->mm is not enough because process' main
+>    thread may exit or detach its mm via use_mm(), but other threads
+>    may still have a valid mm.
 
-	ahb {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
+Yes,
 
-		mpmc at 17008200 {
-			compatible = "nxp,lpc31xx-mpmc";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges = <0 0x20000000 0x20000>; /* map to sram0 */
-			reg = <0x17008200 0x20>;
-			status = "disabled"; /* unused here */
-		};
+> Also, Per Peter Zijlstra's idea, now we don't grab tasklist_lock in
+> the new helper, instead we take the rcu read lock. We can do this
+> because the function is called after the cpu is taken down and marked
+> offline, so no new tasks will get this cpu set in their mm mask.
 
-		mpmc at 17008220 {
-			compatible = "nxp,lpc31xx-mpmc";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges = <0 0x20020000 0x20000>; /* map to sram1 */
-			reg = <0x17008220 0x20>;
+And only powerpc needs rcu_read_lock() and task_lock().
 
-			/* mpmc configuration */
-			mpmc-static-config     = <0x81>;
-			mpmc-static-wait-wen   = <1>;
-			mpmc-static-wait-oen   = <1>;
-			mpmc-static-wait-rd    = <4>;
-			mpmc-static-wait-page  = <1>;
-			mpmc-static-wait-write = <1>;
-			mpmc-static-wait-turn  = <2>;
+OTOH, I do not understand why powepc does this on CPU_DEAD...
+And probably CPU_UP_CANCELED doesn't need to clear mm_cpumask().
 
-			ethernet at 20020000 {
-				compatible = "davicom,dm9000";
-				reg = <0 100  10000 100>; /* local address */
-				interrupts = <0x1>; /* ??? */
-				gpios = <&gpio-i2stx 0>;
-			}
-		};
-	};
-};
+That said, personally I think these patches are fine, the common
+helper makes sense.
 
-This means you will need a driver for mpmc, but since all its code is only
-run at boot time, it can live entirely in the init section.
-
-	Arnd
+Oleg.
