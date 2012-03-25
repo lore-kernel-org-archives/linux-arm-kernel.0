@@ -1,21 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 25 Mar 2012 14:09:12 +0100
-Subject: ARM11MPcore: tlb_ops_need_broadcast causes deadlock
-In-Reply-To: <loom.20120325T135816-592@post.gmane.org>
-References: <274124B9C6907D4B8CE985903EAA19E91B2D579066@SI-MBX06.de.bosch.com>
- <20120323173055.GC16225@mudshark.cambridge.arm.com>
- <loom.20120325T135816-592@post.gmane.org>
-Message-ID: <20120325130912.GF5611@n2100.arm.linux.org.uk>
+From: mgherzan@gmail.com (Mircea Gherzan)
+Date: Sun, 25 Mar 2012 15:12:34 +0200
+Subject: [PATCH v8 RESEND] ARM: net: JIT compiler for packet filters
+In-Reply-To: <20120325095711.GC5611@n2100.arm.linux.org.uk>
+References: <1331933316-10197-1-git-send-email-mgherzan@gmail.com>
+ <20120319.172005.1889334604020296555.davem@davemloft.net>
+ <4F6EEAB5.7070009@gmail.com> <20120325095711.GC5611@n2100.arm.linux.org.uk>
+Message-ID: <4F6F19C2.60602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 25, 2012 at 12:08:47PM +0000, Peter Waechtler wrote:
-> But Will, is that tlb_flush necessary at all? The ARM has only 3 permission
-> bits in the page table (APX and AP0 and AP1). The young/accessed bit is done
-> via software.
+Am 25.03.2012 11:57, schrieb Russell King - ARM Linux:
+> On Sun, Mar 25, 2012 at 11:51:49AM +0200, Mircea Gherzan wrote:
+>> Am 19.03.2012 22:20, schrieb David Miller:
+>>> I would like to see this merged however is feasible, this has been in
+>>> a catatonic state for two releases and waiting longer isn't going to
+>>> improve things enough to justify any further delay.
+>>
+>> It has been merged into the ARM tree more than a week ago, but
+>> unfortunately it seems it will not make it into 3.4.
+> 
+> Why do you say that?
 
-Yes it most definitely is, because setting a page to be young means we
-must receive a subsequent fault to make it 'old' again.  This means we
-must set the page to be inaccessible to get that fault, and flush the
-TLBs across all CPUs so that any CPU accessing that page receives a
-fault.
+The patch is nowhere to be found in any of the branches of your
+linaro.org tree, the tree from which Linus pulls.
