@@ -1,29 +1,62 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sun, 25 Mar 2012 13:48:16 +0200
-Subject: uImage with integrated dtb file
-In-Reply-To: <4F6E5D5B.8050306@antcom.de>
-References: <4F6E5D5B.8050306@antcom.de>
-Message-ID: <20120325114816.GA13903@avionic-0098.mockup.avionic-design.de>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sun, 25 Mar 2012 14:31:06 +0200
+Subject: [PATCH RESEND 1/2] omap3: nand: Make board_onenand_init() visible to
+ board code
+Message-ID: <1332678667-4185-1-git-send-email-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roland Stigge wrote:
-> Hi,
-> 
-> since I will need to maintain some machines with DT enabled kernels but 
-> containing a U-Boot without DT support, I sometimes need to integrate a 
-> dtb file into uImage.
+board_onenand_init() and board_nand_init() initialization functions are
+used to initialize OneNAND and NAND memories respectively. But only
+board_nand_init() was visible to be used from board code. This patch makes
+possible to initialize a OneNAND flash memory within platform code.
 
-I use the new image format that is itself based on FDT and has support for
-appending a DTB. Some documentation can be found here:
+Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+---
+ arch/arm/mach-omap2/board-flash.c |    4 ++--
+ arch/arm/mach-omap2/board-flash.h |   11 +++++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-	http://git.denx.de/u-boot.git/?p=u-boot.git;a=tree;f=doc/uImage.FIT
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120325/02582b30/attachment.sig>
+diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
+index 0349fd2..70a81f9 100644
+--- a/arch/arm/mach-omap2/board-flash.c
++++ b/arch/arm/mach-omap2/board-flash.c
+@@ -87,7 +87,7 @@ static struct omap_onenand_platform_data board_onenand_data = {
+ 	.dma_channel	= -1,   /* disable DMA in OMAP OneNAND driver */
+ };
+ 
+-static void
++void
+ __init board_onenand_init(struct mtd_partition *onenand_parts,
+ 				u8 nr_parts, u8 cs)
+ {
+@@ -98,7 +98,7 @@ __init board_onenand_init(struct mtd_partition *onenand_parts,
+ 	gpmc_onenand_init(&board_onenand_data);
+ }
+ #else
+-static void
++void
+ __init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
+ {
+ }
+diff --git a/arch/arm/mach-omap2/board-flash.h b/arch/arm/mach-omap2/board-flash.h
+index d25503a..c44b70d 100644
+--- a/arch/arm/mach-omap2/board-flash.h
++++ b/arch/arm/mach-omap2/board-flash.h
+@@ -47,3 +47,14 @@ static inline void board_nand_init(struct mtd_partition *nand_parts,
+ {
+ }
+ #endif
++
++#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
++		defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
++extern void board_onenand_init(struct mtd_partition *nand_parts,
++					u8 nr_parts, u8 cs);
++#else
++static inline void board_onenand_init(struct mtd_partition *nand_parts,
++					u8 nr_parts, u8 cs)
++{
++}
++#endif
+-- 
+1.7.7.6
