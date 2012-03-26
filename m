@@ -1,30 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Mar 2012 08:47:37 +0000
-Subject: ioremap to a specific virtual address
-In-Reply-To: <201203251734.41780.arnd@arndb.de>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <CAKON4OwhcFDMC4dWjU7x4u2CPT7C2BxVuCDkTN0j14gTndi3tA@mail.gmail.com>
- <201203251734.41780.arnd@arndb.de>
-Message-ID: <201203260847.38176.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Mar 2012 11:05:16 +0200
+Subject: [PATCH] serial: pl011: implement workaround for CTS clear event
+ issue
+In-Reply-To: <20120326081756.GI5611@n2100.arm.linux.org.uk>
+References: <1332748868-10172-1-git-send-email-linus.walleij@stericsson.com>
+ <20120326081756.GI5611@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZAc0yk6URPzQ7x8UGaVHBMV-3MB2r0gu-7muc3hsh6aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 25 March 2012, Arnd Bergmann wrote:
->                         /* mpmc configuration */
->                         mpmc-static-config     = <0x81>;
->                         mpmc-static-wait-wen   = <1>;
->                         mpmc-static-wait-oen   = <1>;
->                         mpmc-static-wait-rd    = <4>;
->                         mpmc-static-wait-page  = <1>;
->                         mpmc-static-wait-write = <1>;
->                         mpmc-static-wait-turn  = <2>;
+On Mon, Mar 26, 2012 at 10:17 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 26, 2012 at 10:01:08AM +0200, Linus Walleij wrote:
+>> - ? ? unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
+>> + ? ? unsigned int status;
+>
+> Why are you removing the pass counter and associated code, which was
+> there before your work-around patch was applied?
 
-On second though, I guess you can turn these into a single
-property named "mpmc-timings" or such and then just copy
-them to the registers.
+Good point, I'll cook a v2 which restores that counter an break clause to
+what it was before the workaround was added.
 
-I also wonder whether the timings are actually correct for your
-dm9000 device. Maybe the additional gpio read in there was
-just an indication that someone worked around incorrect timings?
-
-	Arnd
+Yours,
+Linus Walleij
