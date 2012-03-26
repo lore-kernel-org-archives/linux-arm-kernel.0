@@ -1,66 +1,40 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 26 Mar 2012 16:51:10 +0200
-Subject: [PATCH] ARM: OMAP: fix section mismatches in usb-host.c
-Message-ID: <1332773470-22800-1-git-send-email-grinberg@compulab.co.il>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 26 Mar 2012 15:47:12 +0100
+Subject: [PATCH v1] regulator: i.MX35-PDK Add regulator support
+In-Reply-To: <1332772593-13313-1-git-send-email-alexg@meprolight.com>
+References: <1332772593-13313-1-git-send-email-alexg@meprolight.com>
+Message-ID: <20120326144712.GA8579@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the below section mismatch warning and alike:
+On Mon, Mar 26, 2012 at 04:36:33PM +0200, Alex Gershgorin wrote:
 
-WARNING: vmlinux.o(.text+0x281d4): Section mismatch in reference from
-the function setup_ehci_io_mux() to the function
-.init.text:omap_mux_init_signal()
-The function setup_ehci_io_mux() references
-the function __init omap_mux_init_signal().
-This is often because setup_ehci_io_mux lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
+> +static struct regulator_init_data sw1_init = {
+> +	.constraints = {
+> +		.name = "SW1",
+> +		.min_uV = 600000,
+> +		.max_uV = 1375000,
+> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+> +		.valid_modes_mask = 0,
+> +		.always_on = 1,
+> +		.boot_on = 1,
+> +	}
+> +};
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
- arch/arm/mach-omap2/usb-host.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+These constraints don't make sense, you've got a voltage range and the
+ability to change voltages but no consumers so nothing that could ever
+change the voltage...
 
-diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
-index f51348d..dde8a11 100644
---- a/arch/arm/mach-omap2/usb-host.c
-+++ b/arch/arm/mach-omap2/usb-host.c
-@@ -54,7 +54,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
- /*
-  * setup_ehci_io_mux - initialize IO pad mux for USBHOST
-  */
--static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-+static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- {
- 	switch (port_mode[0]) {
- 	case OMAP_EHCI_PORT_MODE_PHY:
-@@ -197,7 +197,8 @@ static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- 	return;
- }
- 
--static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-+static
-+void __init setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- {
- 	switch (port_mode[0]) {
- 	case OMAP_EHCI_PORT_MODE_PHY:
-@@ -315,7 +316,7 @@ static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- 	}
- }
- 
--static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-+static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- {
- 	switch (port_mode[0]) {
- 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
-@@ -412,7 +413,8 @@ static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- 	}
- }
- 
--static void setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-+static
-+void __init setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- {
- 	switch (port_mode[0]) {
- 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
--- 
-1.7.3.4
+> +static struct regulator_init_data vpll_init = {
+> +	.constraints = {
+> +		.name = "VPLL",
+> +		.min_uV = 1050000,
+> +		.max_uV = 1800000,
+> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+> +		.boot_on = 1,
+> +	}
+> +};
+
+...and in many cases the supply names don't look like things I'd expect
+to be varying too much at runtime.  It looks like you just typed the
+maximum datasheet ranges in, not things that make sense for the board.
