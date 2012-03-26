@@ -1,50 +1,70 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 26 Mar 2012 14:56:19 +0200
-Subject: [PATCH 3/3] i.MX27: visstrim_m10: Remove use of MX2_CAMERA_SWAP16.
-In-Reply-To: <20120326121023.GD18420@sapphire.tkos.co.il>
-References: <1332760804-22743-1-git-send-email-javier.martin@vista-silicon.com>
- <1332760804-22743-4-git-send-email-javier.martin@vista-silicon.com>
- <20120326121023.GD18420@sapphire.tkos.co.il>
-Message-ID: <CACKLOr0abquyZ2bZMnq8pXTL8BXqzN_izK92hdA=gPJ6dBsTdA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Mar 2012 15:08:10 +0200
+Subject: [GIT PULL] AT91 drivers Kconfig cleanup
+Message-ID: <4F706A3A.1070309@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2012 14:10, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Javier,
->
-> On Mon, Mar 26, 2012 at 01:20:04PM +0200, Javier Martin wrote:
->>
->> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
->> ---
->> ?arch/arm/mach-imx/mach-imx27_visstrim_m10.c | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
->> index 3128cfe..4db00c6 100644
->> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
->> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
->> @@ -164,7 +164,7 @@ static struct platform_device visstrim_tvp5150 = {
->>
->>
->> ?static struct mx2_camera_platform_data visstrim_camera = {
->> - ? ? .flags = MX2_CAMERA_CCIR | MX2_CAMERA_CCIR_INTERLACE | MX2_CAMERA_SWAP16 | MX2_CAMERA_PCLK_SAMPLE_RISING,
->> + ? ? .flags = MX2_CAMERA_CCIR | MX2_CAMERA_CCIR_INTERLACE | MX2_CAMERA_PCLK_SAMPLE_RISING,
->> ? ? ? .clk = 100000,
->> ?};
->
-> The order of the last two patches in this series should be switched to
-> preserve bisectability.
->
-> baruch
+(previous email without mailing-lists addresses)
 
-You are right.
-Thanks.
+Arnd, Olof,
 
+This is a series which deals with AT91 drivers Kconfig entries. Its goal is
+to remove too restrictive dependencies on SoC names.
+This will allow to add support for newer SoC seamlessly.
+Some very "cosmetic" changes are also added (entry names, comments, etc.).
+
+Some patches are dealing with other subsystem Kconfig files. I have
+collected
+"Acked-by" and included them in this series.
+
+I have built this pull-request on top of arm-soc/next/dt2 branch for
+easy merge with
+at91 material that is already queued for 3.4. It is for sure a very late
+pull request
+for 3.4, event though it is non intrusive. So, feel free to delay it to
+3.5 or
+a "staging" branch...
+
+The following changes since commit 7d1206bc2859c6e9f46e35ae697c138e7d7858a7:
+
+  Merge branch 'kirkwood/dt' into next/dt2 (2012-03-24 19:16:04 +0000)
+
+are available in the git repository at:
+
+
+  git://github.com/at91linux/linux-at91.git armsoc-next-dt2+at91-kconfig
+
+for you to fetch changes up to 40ef130751f4438ae73603ab00aa2a2590a3201d:
+
+  hwrng: Kconfig: remove dependency for atmel-rng driver (2012-03-26
+14:06:23 +0200)
+
+----------------------------------------------------------------
+Nicolas Ferre (12):
+      ARM: at91: change AT91 Kconfig entry comment
+      ARM: at91/Kconfig: change at91sam9g45 entry
+      ARM: at91/Kconfig: add comment to at91sam9x5 family entry
+      ARM: at91/Kconfig: add clarifications to AT91SAM9M10G45-EK entry
+      ARM: at91/Kconfig: add AT91SAM9x5 family to AT91_EARLY_DBGU0 entry
+      ARM: at91/Kconfig: website link for AT91SAM9G20-EK
+      dmaengine: Kconfig: fix Atmel at_hdmac entry
+      mmc: Kconfig: remove choice between at91_mci and atmel-mci
+      mmc: atmel-mci: remove the need for CONFIG_MMC_ATMELMCI_DMA
+      rtc: Kconfig: remove dependency for AT91 rtc driver
+      Input: Kconfig: remove dependency for atmel_tsadcc driver
+      hwrng: Kconfig: remove dependency for atmel-rng driver
+
+ arch/arm/Kconfig                  |    4 ++--
+ arch/arm/mach-at91/Kconfig        |   21 ++++++++++++++++-----
+ drivers/char/hw_random/Kconfig    |    2 +-
+ drivers/dma/Kconfig               |    5 ++---
+ drivers/input/touchscreen/Kconfig |    4 ++--
+ drivers/mmc/host/Kconfig          |   23 ++---------------------
+ drivers/mmc/host/atmel-mci.c      |    2 --
+ drivers/rtc/Kconfig               |    2 +-
+ 8 files changed, 26 insertions(+), 37 deletions(-)
+
+Thanks, best regards,
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Nicolas Ferre
