@@ -1,130 +1,152 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Mon, 26 Mar 2012 07:21:02 -0400
-Subject: ioremap to a specific virtual address
-In-Reply-To: <201203231931.06376.arnd@arndb.de>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <201203231520.22588.arnd@arndb.de>
- <CAKON4OybXXwLEmg19NJnLsE5kB16U6Dm4ay3=XCUB57fRfz+ng@mail.gmail.com>
- <201203231931.06376.arnd@arndb.de>
-Message-ID: <CAKON4Oy=C8EsCGyWu7ZiZPKQp29NLcohCKzz2LGUL-WWK=FxyQ@mail.gmail.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Mon, 26 Mar 2012 17:08:35 +0530
+Subject: [PATCHv7 5/9] ARM: dma-mapping: implement dma sg methods on top
+ of any generic dma ops
+In-Reply-To: <1330527862-16234-6-git-send-email-m.szyprowski@samsung.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F70553B.2000100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2012 at 3:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 23 March 2012, jonsmirl at gmail.com wrote:
->> On Fri, Mar 23, 2012 at 11:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 23 March 2012, jonsmirl at gmail.com wrote:
->> >> I will need to check how similar the chips actually are. NXP did not
->> >> use primecells in the lpc31xx family.
->> >>
->> >> I'd be happy to have some help. My trees are here:
->> >> https://github.com/jonsmirl
->> >
->> > I've taken a brief look at your tree, some comments:
->> >
->> > * Once you're done with the DT conversion, you should be able to
->> > ?completely remvoe the three board files. You probably know that already
->>
->> Thanks for the feedback.
->>
->> I don't think I can completely remove the board files. Some of the
->> generic devices have board specific callbacks. DM9000 for example. I
->> am setting up of_dev_auxdata for the boards so that I can pass these
->> callbacks in.
+Hi Marek,
+
+As per our discussion over IRC, I would like to check with you the 
+feasibility to extend the dma operation calls for the coherent regions. 
+You said that since struct page wont be available for the buffers in 
+these regions, functions like arm_dma_map_sg() (below) will fail in the 
+cache maintenance operations. Infact, I am facing this issue when I 
+integrated dma-buf buffer sharing + v4l2/vb2 exporter patch series + 
+dma_mapping (v7) and use coherent memory.
+
+So I want to know opinion of you, others about extending the dma-mapping 
+framework for scenarios which use device coherent memory.
+
+Regards,
+Subash
+
+On 02/29/2012 08:34 PM, Marek Szyprowski wrote:
+> This patch converts all dma_sg methods to be generic (independent of the
+> current DMA mapping implementation for ARM architecture). All dma sg
+> operations are now implemented on top of respective
+> dma_map_page/dma_sync_single_for* operations from dma_map_ops structure.
 >
-> There are some cases where it's not possible to avoid platform_data,
-> but in most cases there is another better solution.
+> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+> ---
+>   arch/arm/mm/dma-mapping.c |   43 +++++++++++++++++++------------------------
+>   1 files changed, 19 insertions(+), 24 deletions(-)
 >
-> If you end up having to use platform_data, the auxdata mechanism
-> is the way to go.
-
-Here's the answer from the owners of the hardware...
-
-
----------- Forwarded message ----------
-From: Support@EmbeddedArtists.com <support@embeddedartists.com>
-Date: Mon, Mar 26, 2012 at 2:31 AM
-Subject: Re: [Ticket#10005612] DM9000 on EA3131 board
-To: "jonsmirl at gmail.com" <jonsmirl@gmail.com>
-
-
-Hi Jon,
-This driver was created a long time ago and it was not done by us.
-If I remember correctly the delay is needed because the LPC31xx memory
-controller does some strange things when you change memory regions. It
-can for example happen if an interrupt happen in the middle of some
-other operation in external memory. We have actually forgot about the
-exact details but you can probably find it in the LPC31xx user's
-manual from NXP or by asking NXP directly.
-
-Kind Regards,
-Anders Rosvall
-Embedded Artists AB
-
-
-
-
-
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index cd5ed8d..a5a0b5b 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -616,7 +616,7 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
+>   EXPORT_SYMBOL(___dma_page_dev_to_cpu);
 >
->> # define DM_IO_DELAY() ? ? ? ?do { gpio_get_value(GPIO_MNAND_RYBN3);} while(0)
->>
->> static void dm9000_dumpblk(void __iomem *reg, int count)
->> {
->> ? ? ? int i;
->> ? ? ? int tmp;
->>
->> ? ? ? count = (count + 1) >> 1;
->> ? ? ? for (i = 0; i < count; i++) {
->> ? ? ? ? ? ? ? DM_IO_DELAY();
->> ? ? ? ? ? ? ? tmp = readw(reg);
->> ? ? ? }
->> }
->>
->> static void dm9000_inblk(void __iomem *reg, void *data, int count)
->> {
->> ? ? ? int i;
->> ? ? ? u16* pdata = (u16*)data;
->> ? ? ? count = (count + 1) >> 1;
->> ? ? ? for (i = 0; i < count; i++) {
->> ? ? ? ? ? ? ? DM_IO_DELAY();
->> ? ? ? ? ? ? ? *pdata++ = readw(reg);
->> ? ? ? }
->> }
->>
->> static struct dm9000_plat_data dm9000_platdata = {
->> ? ? ? .flags ? ? ? ? ?= DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM |
->> DM9000_PLATF_SIMPLE_PHY,
+>   /**
+> - * dma_map_sg - map a set of SG buffers for streaming mode DMA
+> + * arm_dma_map_sg - map a set of SG buffers for streaming mode DMA
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>    * @sg: list of buffers
+>    * @nents: number of buffers to map
+> @@ -634,12 +634,13 @@ EXPORT_SYMBOL(___dma_page_dev_to_cpu);
+>   int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+>   		enum dma_data_direction dir, struct dma_attrs *attrs)
+>   {
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+>   	struct scatterlist *s;
+>   	int i, j;
 >
-> The flags can become simple empty properties if necessary, so there is no
-> need to keep these.
+>   	for_each_sg(sg, s, nents, i) {
+> -		s->dma_address = __dma_map_page(dev, sg_page(s), s->offset,
+> -						s->length, dir);
+> +		s->dma_address = ops->map_page(dev, sg_page(s), s->offset,
+> +						s->length, dir, attrs);
+>   		if (dma_mapping_error(dev, s->dma_address))
+>   			goto bad_mapping;
+>   	}
+> @@ -647,12 +648,12 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 >
->> ? ? ? .dumpblk = dm9000_dumpblk,
->> ? ? ? .inblk = dm9000_inblk,
->> };
+>    bad_mapping:
+>   	for_each_sg(sg, s, i, j)
+> -		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
+> +		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
+>   	return 0;
+>   }
 >
-> I can see two possible ways besides platform_data for the register access:
+>   /**
+> - * dma_unmap_sg - unmap a set of SG buffers mapped by dma_map_sg
+> + * arm_dma_unmap_sg - unmap a set of SG buffers mapped by dma_map_sg
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>    * @sg: list of buffers
+>    * @nents: number of buffers to unmap (same as was passed to dma_map_sg)
+> @@ -664,15 +665,17 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+>   void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+>   		enum dma_data_direction dir, struct dma_attrs *attrs)
+>   {
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+>   	struct scatterlist *s;
+> +
+>   	int i;
 >
-> 1. generalize the driver's accessors. Since your platform wants to read
-> a gpio pin before every access, you can provide a gpio line as the
-> property in the dm9000 device node and access that in the same place
-> in the common code if the gpio line is set, but skip the access otherwise.
-> No other platform in mainline actually needs to overrid the functions,
-> so there are hardly any disadvantages to this.
+>   	for_each_sg(sg, s, nents, i)
+> -		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
+> +		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
+>   }
 >
-> 2. convert the entire driver to use the "regmap" infrastructure to abstract
-> the registers, and implement a driver that implements the slow I/O. This
-> would be a rather complex solution and probably not worth it, compared
-> with the overhead of the first one or just staying with auxdata.
+>   /**
+> - * dma_sync_sg_for_cpu
+> + * arm_dma_sync_sg_for_cpu
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>    * @sg: list of buffers
+>    * @nents: number of buffers to map (returned from dma_map_sg)
+> @@ -681,21 +684,17 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+>   void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>   			int nents, enum dma_data_direction dir)
+>   {
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+>   	struct scatterlist *s;
+>   	int i;
 >
-> If any problem turns out to be really hard to convert over from
-> platform_data to device tree properties, auxdata is usually an acceptable
-> solution, or you could submit the port with more of those hacks when
-> there is reason to believe that you will fix them up later.
+> -	for_each_sg(sg, s, nents, i) {
+> -		if (!dmabounce_sync_for_cpu(dev, sg_dma_address(s),
+> -					    sg_dma_len(s), dir))
+> -			continue;
+> -
+> -		__dma_page_dev_to_cpu(sg_page(s), s->offset,
+> -				      s->length, dir);
+> -	}
+> +	for_each_sg(sg, s, nents, i)
+> +		ops->sync_single_for_cpu(dev, sg_dma_address(s), s->length,
+> +					 dir);
+>   }
 >
-> ? ? ? ?Arnd
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+>   /**
+> - * dma_sync_sg_for_device
+> + * arm_dma_sync_sg_for_device
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>    * @sg: list of buffers
+>    * @nents: number of buffers to map (returned from dma_map_sg)
+> @@ -704,17 +703,13 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>   void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+>   			int nents, enum dma_data_direction dir)
+>   {
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+>   	struct scatterlist *s;
+>   	int i;
+>
+> -	for_each_sg(sg, s, nents, i) {
+> -		if (!dmabounce_sync_for_device(dev, sg_dma_address(s),
+> -					sg_dma_len(s), dir))
+> -			continue;
+> -
+> -		__dma_page_cpu_to_dev(sg_page(s), s->offset,
+> -				      s->length, dir);
+> -	}
+> +	for_each_sg(sg, s, nents, i)
+> +		ops->sync_single_for_device(dev, sg_dma_address(s), s->length,
+> +					    dir);
+>   }
+>
+>   /*
