@@ -1,61 +1,35 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 26 Mar 2012 12:51:50 -0500
-Subject: [TMP][PATCH 5/5] OMAP3EVM: Test gpmc-nand
-In-Reply-To: <1332484630-22181-1-git-send-email-afzal@ti.com>
-References: <1332484630-22181-1-git-send-email-afzal@ti.com>
-Message-ID: <4F70ACB6.5070208@ti.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Mon, 26 Mar 2012 19:23:44 +0200
+Subject: [PATCH v2.1 01/10] cpu: Introduce clear_tasks_mm_cpumask() helper
+In-Reply-To: <20120326170443.GA25229@redhat.com>
+References: <20120324102609.GA28356@lizard> <20120324102751.GA29067@lizard>
+ <1332593021.16159.27.camel@twins> <20120324164316.GB3640@lizard>
+ <20120325174210.GA23605@redhat.com> <1332748746.16159.62.camel@twins>
+ <20120326170443.GA25229@redhat.com>
+Message-ID: <1332782624.16159.145.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+On Mon, 2012-03-26 at 19:04 +0200, Oleg Nesterov wrote:
 
-On 3/23/2012 1:37, Afzal Mohammed wrote:
+> Interesting... Why? I mean, why do you dislike stop_machine() in
+> _cpu_down() ? Just curious.
 
-[snip]
+It disturbs all cpus, the -rt people don't like that their FIFO tasks
+don't get to run, the trading people don't like their RDMA poll loops to
+be interrupted.. etc.
 
->   static void __init omap3_evm_init(void)
->   {
-> +	struct omap_nand_platform_data *nand_data;
-> +
->   	omap3_evm_get_revision();
->
->   	if (cpu_is_omap3630())
-> @@ -684,6 +747,25 @@ static void __init omap3_evm_init(void)
->   	omap3evm_init_smsc911x();
->   	omap3_evm_display_init();
->   	omap3_evm_wl12xx_init();
-> +	/* NAND */
-> +	nand_data = omap_nand_init(omap3_evm_nand_partitions,
-> +			ARRAY_SIZE(omap3_evm_nand_partitions),
-> +			0, NAND_BUSWIDTH_16, nand_default_timings);
-> +	if (nand_data == NULL) {
-> +		pr_err("omap_nand_init() failed\n");
-> +		return;
-> +	}
-> +
-> +	gpmc_data.device_pdata = gpmc_nand_init(nand_data);
-> +	if (gpmc_data.device_pdata == NULL) {
-> +		pr_err("gpmc_nand_init() failed\n");
-> +		return;
-> +	}
-> +
-> +	gpmc_data.num_device++;
-> +	gpmc_data.fclk_rate = gpmc_get_fclk_period();
-> +
-> +	platform_device_register(&gpmc_device);
->   }
+Now arguably, one should simply not do hotplug crap while such things
+are running, and mostly that's a perfectly fine constraint. But it
+doesn't help that people view cpu hotplug as a power savings or resource
+provisioning 'feature' and there's userspace daemons that plug
+on-demand.
 
-I see this is marked as a temp patch, but this is actually needed to 
-register the device. Actually, we would need to do this for all boards, 
-right?
+But my ultimate goal is to completely remove synchronization that is
+actively machine wide, since we all know that as long as such stuff
+exists people will want to use it.
 
-Rather than registering the device here, may be we should add a function 
-in arch/arm/mach-omap2/devices.c called "omap_gpmc_init()" that is 
-called from all of the boards files passing the pdata structure. Then 
-the omap_gmpc_init() function should use omap_device_build() API to 
-register the device. If you look at arch/arm/mach-omap2/devices.c you 
-can look at omap4_keyboard_init() as an example. Let me know if this is 
-clear.
-
-Cheers
-Jon
+Now I don't know we'll ever fully get there -- see the BKL saga -- but
+its worth trying I think. The module unload and esp. the text_poke usage
+of stop_machine are much worse offenders, since both those are
+relatively common and much harder to avoid.
