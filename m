@@ -1,28 +1,45 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Mon, 26 Mar 2012 08:44:34 +0200
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <20120324073207.GD5812@mwesterb-mobl.ger.corp.intel.com>
-References: <4F683B36.8090101@metasoft.pl>
- <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48E3E@AUSP01VMBX24.collaborationhost.net>
- <20120323070446.GC5812@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
- <20120324073207.GD5812@mwesterb-mobl.ger.corp.intel.com>
-Message-ID: <4F701052.5000509@metasoft.pl>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Mon, 26 Mar 2012 12:19:12 +0530
+Subject: Occasional crashes in suspend-resume with MMC transactions
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317FFC59@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D12143317FDFBB@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D12143317FF773@DBDE01.ent.ti.com>
+ <CANfBPZ9b=6dLbY2D3oAg=Gz_vwAOJ+KC_Bo5ugVJEwumeej_Bw@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D12143317FFAC0@DBDE01.ent.ti.com>
+ <CANfBPZ9AU+W7qP+uE2s2EnpzKhUqVQLdEgN=CUeNJZkSoh7+5A@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D12143317FFC59@DBDE01.ent.ti.com>
+Message-ID: <CANfBPZ8SD4jimMsrbFNrYemNUQzb5dLbwdMKB=x8EADWCJktvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-03-24 08:32, Mika Westerberg wrote:
-> Please try it. The point there was that we have a problem in ep93xx VIC/DMA
-> code but it is totally different thing and not related to Rafal's patch. We
-> can sort the VIC thing out separately IMHO. ep93xx dma in 3.3 is broken
-> regardless this patch.
+On Thu, Mar 22, 2012 at 9:43 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> On Thu, Mar 22, 2012 at 21:36:36, S, Venkatraman wrote:
+>> On Thu, Mar 22, 2012 at 8:13 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+>> > On Thu, Mar 22, 2012 at 19:57:16, S, Venkatraman wrote:
+>> > [...]
+>> >>
+>> >> I see (in 3.3) that the host controller driver does a "return ret" and
+>> >> that means the errors is propagated.
+>> >> Where is the return code lost /overridden ?
+>> >>
+>> >
+>> > The return code gets overridden due to the call to host->pdata->resume()
+>> > which always returns 0.
+>>
+>> Thanks - I see what you mean. But the patch is clunky.
+>> A clean fix would be to not capture the return code of resume() in
+>> "ret" and let the old
+>> value of ret be propagated as is.
+>>
+>
+> I agree. However, right now there's a dev_dbg() which checks for the return code.
+> I could change the host->pdata->resume() and host->pdata->suspend() to not return
+> anything if that's acceptable.
+>
+That's a good idea.
 
-I think, that we can't be 100% sure that these two problems are not related
-at all. If some changes to VIC/ep93xx interrupt handling etc will be send
-to list, I'll test them in my configuration without my patch. If it will
-help (to fix the problem I'm observing also in 3.2), then double buffering
-for M2M could be much simplier.
+> More importantly, is this the right fix or does the driver need some other fix
+> to make sure that such suspend failures do not occur at all?
 
-Now, I'm trying to test mmc_spi in ep93xx and let you know what the results
-are.
+I will look into this - but haven't seen such failures here to know
+what's behind the symptom.
