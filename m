@@ -1,232 +1,240 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 26 Mar 2012 10:01:08 +0200
-Subject: [PATCH] serial: pl011: implement workaround for CTS clear event issue
-Message-ID: <1332748868-10172-1-git-send-email-linus.walleij@stericsson.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 26 Mar 2012 08:04:50 +0000
+Subject: [RFC][PATCH 1/5] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <4F6D0569.6080203@ti.com>
+References: <1332484600-21947-1-git-send-email-afzal@ti.com>
+ <4F6D0569.6080203@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317BB895@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+Hi Jon,
 
-Problem Observed:
-- interrupt status is set by rising or falling edge on CTS line
-- interrupt status is cleared on a .0. to .1. transition of the
-  interrupt-clear register bit 1.
-- interrupt-clear register is reset by hardware once the interrupt
-  status is .0..
-  Remark: It seems not possible to read this register back by the
-  CPU though, but internally this register exists.
-- when simultaneous set and reset event on the interrupt status
-  happens, then the set-event has priority and the status remains
-  .1.. As a result the interrupt-clear register is not reset to
-  .0., and no new .0. to .1. transition can be detected on it when
-  writing a .1. to it.
-  This implies race condition, the clear must be performed at least
-  one UARTCLK the riding edge of CTS RIS interrupt.
+On Sat, Mar 24, 2012 at 04:51:13, Hunter, Jon wrote:
+> > +struct gpmc_child {
+> > +	char			*name;
+> > +	int			id;
+> > +	struct resource		*res;
+> > +	unsigned		num_res;
+> > +	struct resource		gpmc_res[GPMC_CS_NUM];
+> 
+> Does this imply a gpmc child device can use more than one chip-select? I 
+> am trying to understand the link between number of resources and 
+> GPMC_CS_NUM.
 
-Fix:
-  Instead of resetting UART as done in commit
-  c16d51a32bbb61ac8fd96f78b5ce2fccfe0fb4c3
-  "amba pl011: workaround for uart registers lockup" do the
-  following:
+Yes, relevant portion in commit message as follows,
 
-  write .0. and then  .1. to the interrupt-clear register to make
-  sure that this transition is detected. According to the datasheet
-  writing a .0. does not have any effect, but actually it allows to
-  reset the internal interrupt-clear register.
+A peripheral connected to GPMC can have multiple
+address spaces using different chip select. Hence
+GPMC driver has been provided capability to
+distinguish this scenario, i.e. create platform
+devices only once for each connected peripheral,
+and not for each configured chip select. The
+peripheral that made it necessary was tusb6010.
 
-  Take into account:
-  The .0. needs to last at least for one clk_uart clock period
-  (~ 38 MHz, 26.08ns)
 
-This way we can do away with the tasklet and keep only a tiny
-fix triggered by the variant flag introduced in this patch.
+> 
+> > +	unsigned		gpmc_num_res;
+> > +	void			*pdata;
+> > +	unsigned		pdata_size;
+> > +};
+> 
+> Does pdata_size need to be stored? If pdata is always of type 
+> gpmc_device_pdata then you could avoid using void * and elsewhere use 
+> sizeof.
 
-Signed-off-by: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
-Signed-off-by: Christophe Arnal <christophe.arnal@stericsson.com>
-Signed-off-by: Matthias Locher  <Matthias.Locher@stericsson.com>
-Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
-Reviewed-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/tty/serial/amba-pl011.c |  114 +++++++--------------------------------
- 1 file changed, 18 insertions(+), 96 deletions(-)
+This is the size of platform data of peripheral connected to GPMC,
+like NAND.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 4ed35c5..e48211d 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -61,35 +61,9 @@
- #define SERIAL_AMBA_MINOR	64
- #define SERIAL_AMBA_NR		UART_NR
+> > -	reg_addr = gpmc_base + GPMC_CS0_OFFSET + (cs * GPMC_CS_SIZE) + idx;
+> > -	__raw_writel(val, reg_addr);
+> > +	reg_addr = gpmc->io_base + GPMC_CS0_OFFSET + (cs * GPMC_CS_SIZE) + idx;
+> > +	writel(val, reg_addr);
+> >   }
+> 
+> I understand this was inherited from the original code, but I think that 
+> we should drop the "GPMC_CS0_OFFSET". We are already passing an index 
+> and so we should use this as an offset. This obviously implies changing 
+> the defintion of the GPMC_CS_xxxx registers in gpmc.h. This would save 
+> one addition too.
+
+Ok
+
+> > +/* This is a duplication of an existing function; before GPMC probe
+> > +   invocation, platform code may need to find divider value, hence
+> > +   other function (gpmc_cs_calc_divider) is not removed, functions
+> > +   like it that are required by platform, probably can be put in
+> > +   common omap platform file. gpmc_calc_divider will get invoked
+> > +   only after GPMC driver gets probed. gpmc_cs_calc_divider is not
+> > +   invoked by GPMC driver to cleanly separate platform&  driver
+> > +   code, although both should return sme value.
+> >    */
+> > -int gpmc_nand_read(int cs, int cmd)
+> > +static int gpmc_calc_divider(u32 sync_clk)
+> >   {
+> > -	int rval = -EINVAL;
+> > -
+> > -	switch (cmd) {
+> > -	case GPMC_NAND_DATA:
+> > -		rval = gpmc_cs_read_byte(cs, GPMC_CS_NAND_DATA);
+> > -		break;
+> > +	int div;
+> > +	u32 l;
+> >
+> > -	default:
+> > -		printk(KERN_ERR "gpmc_read_nand_ctrl: Not supported\n");
+> > -	}
+> > -	return rval;
+> > +	l = sync_clk + (gpmc->fclk_rate - 1);
+> 
+> This was a little confusing to me at first. When I see fclk_rate I think 
+> frequency (eg. clk_get_rate()) and not period. The original code had a 
+> function called gpmc_get_fclk_period. I would consider renaming the 
+> variable to fclk_period to be clear.
+
+Agree
+
+> > +#define GPMC_SET_ONE(reg, st, end, field) \
+> 
+> Nit-pick, set-one is a bit generic, maybe GPMC_SET_TIME?
+
+Agree
+
+> > +	if (cpu_is_omap34xx()) {
+> > +		GPMC_SET_ONE(GPMC_CS_CONFIG6, 16, 19, wr_data_mux_bus);
+> > +		GPMC_SET_ONE(GPMC_CS_CONFIG6, 24, 28, wr_access);
+> > +	}
+> 
+> OMAP4/5 also has the above fields and so maybe this should be 
+> (!cpu_is_omap24xx()).
+
+Will try to remove the usage of cpu_is_xxx itself
+
+> 
+> > +
+> > +	/* caller is expected to have initialized CONFIG1 to cover
+> > +	 * at least sync vs async
+> > +	 */
+> > +	l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
+> > +	if (l&  (GPMC_CONFIG1_READTYPE_SYNC | GPMC_CONFIG1_WRITETYPE_SYNC)) {
+> 
+> Is it valid to have READTYPE != WRITETYPE? I am wondering if there 
+> should be a check here to see if READTYPE and WRITETYPE are not equal?
+
+Seems possible, but not sure, will look into this
  
--#define AMBA_ISR_PASS_LIMIT	256
--
- #define UART_DR_ERROR		(UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
- #define UART_DUMMY_DR_RX	(1 << 16)
+> > +		printk(KERN_DEBUG "GPMC CS%d CLK period is %lu ns (div %d)\n",
+> > +				cs, (div * gpmc_get_fclk_period()) / 1000, div);
+> > +		l&= ~0x03;
+> 
+> I think we should define GPMC_CONFIG1_FCLK_DIV_MASK for this.
+
+Ok
+
+> +	*base = (l&  0x3f)<<  GPMC_CHUNK_SHIFT;
+> 
+> Define GPMC_CONFIG7_BASEADDRESS_MASK
+
+Ok
+
+> > +	mask = (l>>  8)&  0x0f;
+> 
+> Define GPMC_CONFIG7_MASKADDRESS_MASK/SHIFT
+
+Ok
+
+> > +static __devinit int gpmc_setup_child(struct gpmc_device_pdata *gdev)
+> 
+> Nit-pick, gdev was a bit confusing to me, maybe just pdata instead?
+
+Ok
+
+> > +		gpmc->child_device[i].gpmc_res[j] = res;
+> 
+> So struct "res" is a local variable and you are storing in a global 
+> structure? Did you intend to store the address of the pdata struct passed?
+
+
+No, copy res structure
+
+> > +	gpmc->ecc_used = -EINVAL;
+> 
+> Why not 0?
+
+That may modify default behavior of OMAP NAND driver w.r.t ECC,
+will check this.
  
--
--#define UART_WA_SAVE_NR 14
--
--static void pl011_lockup_wa(unsigned long data);
--static const u32 uart_wa_reg[UART_WA_SAVE_NR] = {
--	ST_UART011_DMAWM,
--	ST_UART011_TIMEOUT,
--	ST_UART011_LCRH_RX,
--	UART011_IBRD,
--	UART011_FBRD,
--	ST_UART011_LCRH_TX,
--	UART011_IFLS,
--	ST_UART011_XFCR,
--	ST_UART011_XON1,
--	ST_UART011_XON2,
--	ST_UART011_XOFF1,
--	ST_UART011_XOFF2,
--	UART011_CR,
--	UART011_IMSC
--};
--
--static u32 uart_wa_regdata[UART_WA_SAVE_NR];
--static DECLARE_TASKLET(pl011_lockup_tlet, pl011_lockup_wa, 0);
--
- /* There is by now@least one vendor with differing details, so handle it */
- struct vendor_data {
- 	unsigned int		ifls;
-@@ -99,6 +73,7 @@ struct vendor_data {
- 	bool			oversampling;
- 	bool			interrupt_may_hang;   /* vendor-specific */
- 	bool			dma_threshold;
-+	bool			cts_event_workaround;
- };
- 
- static struct vendor_data vendor_arm = {
-@@ -108,6 +83,7 @@ static struct vendor_data vendor_arm = {
- 	.lcrh_rx		= UART011_LCRH,
- 	.oversampling		= false,
- 	.dma_threshold		= false,
-+	.cts_event_workaround	= false,
- };
- 
- static struct vendor_data vendor_st = {
-@@ -118,6 +94,7 @@ static struct vendor_data vendor_st = {
- 	.oversampling		= true,
- 	.interrupt_may_hang	= true,
- 	.dma_threshold		= true,
-+	.cts_event_workaround	= true,
- };
- 
- static struct uart_amba_port *amba_ports[UART_NR];
-@@ -1038,69 +1015,6 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
- #define pl011_dma_flush_buffer	NULL
- #endif
- 
--
--/*
-- * pl011_lockup_wa
-- * This workaround aims to break the deadlock situation
-- * when after long transfer over uart in hardware flow
-- * control, uart interrupt registers cannot be cleared.
-- * Hence uart transfer gets blocked.
-- *
-- * It is seen that during such deadlock condition ICR
-- * don't get cleared even on multiple write. This leads
-- * pass_counter to decrease and finally reach zero. This
-- * can be taken as trigger point to run this UART_BT_WA.
-- *
-- */
--static void pl011_lockup_wa(unsigned long data)
--{
--	struct uart_amba_port *uap = amba_ports[0];
--	void __iomem *base = uap->port.membase;
--	struct circ_buf *xmit = &uap->port.state->xmit;
--	struct tty_struct *tty = uap->port.state->port.tty;
--	int buf_empty_retries = 200;
--	int loop;
--
--	/* Stop HCI layer from submitting data for tx */
--	tty->hw_stopped = 1;
--	while (!uart_circ_empty(xmit)) {
--		if (buf_empty_retries-- == 0)
--			break;
--		udelay(100);
--	}
--
--	/* Backup registers */
--	for (loop = 0; loop < UART_WA_SAVE_NR; loop++)
--		uart_wa_regdata[loop] = readl(base + uart_wa_reg[loop]);
--
--	/* Disable UART so that FIFO data is flushed out */
--	writew(0x00, uap->port.membase + UART011_CR);
--
--	/* Soft reset UART module */
--	if (uap->port.dev->platform_data) {
--		struct amba_pl011_data *plat;
--
--		plat = uap->port.dev->platform_data;
--		if (plat->reset)
--			plat->reset();
--	}
--
--	/* Restore registers */
--	for (loop = 0; loop < UART_WA_SAVE_NR; loop++)
--		writew(uart_wa_regdata[loop] ,
--				uap->port.membase + uart_wa_reg[loop]);
--
--	/* Initialise the old status of the modem signals */
--	uap->old_status = readw(uap->port.membase + UART01x_FR) &
--		UART01x_FR_MODEM_ANY;
--
--	if (readl(base + UART011_MIS) & 0x2)
--		printk(KERN_EMERG "UART_BT_WA: ***FAILED***\n");
--
--	/* Start Tx/Rx */
--	tty->hw_stopped = 0;
--}
--
- static void pl011_stop_tx(struct uart_port *port)
- {
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-@@ -1227,14 +1141,28 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- {
- 	struct uart_amba_port *uap = dev_id;
- 	unsigned long flags;
--	unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
-+	unsigned int status;
- 	int handled = 0;
-+	unsigned int dummy_read;
- 
- 	spin_lock_irqsave(&uap->port.lock, flags);
- 
- 	status = readw(uap->port.membase + UART011_MIS);
- 	if (status) {
- 		do {
-+			if (uap->vendor->cts_event_workaround) {
-+				/* workaround to make sure that all bits are unlocked.. */
-+				writew(0x00, uap->port.membase + UART011_ICR);
-+
-+				/*
-+				 * WA: introduce 26ns(1 uart clk) delay before W1C;
-+				 * single apb access will incur 2 pclk(133.12Mhz) delay,
-+				 * so add 2 dummy reads
-+				 */
-+				dummy_read = readw(uap->port.membase + UART011_ICR);
-+				dummy_read = readw(uap->port.membase + UART011_ICR);
-+			}
-+
- 			writew(status & ~(UART011_TXIS|UART011_RTIS|
- 					  UART011_RXIS),
- 			       uap->port.membase + UART011_ICR);
-@@ -1251,12 +1179,6 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 			if (status & UART011_TXIS)
- 				pl011_tx_chars(uap);
- 
--			if (pass_counter-- == 0) {
--				if (uap->interrupt_may_hang)
--					tasklet_schedule(&pl011_lockup_tlet);
--				break;
--			}
--
- 			status = readw(uap->port.membase + UART011_MIS);
- 		} while (status != 0);
- 		handled = 1;
--- 
-1.7.9.2
+> > +	spin_lock_init(&gpmc->mem_lock);
+> > +	platform_set_drvdata(pdev, gpmc);
+> >
+> >   	l = gpmc_read_reg(GPMC_REVISION);
+> > -	printk(KERN_INFO "GPMC revision %d.%d\n", (l>>  4)&  0x0f, l&  0x0f);
+> > -	/* Set smart idle mode and automatic L3 clock gating */
+> > -	l = gpmc_read_reg(GPMC_SYSCONFIG);
+> > -	l&= 0x03<<  3;
+> > -	l |= (0x02<<  3) | (1<<  0);
+> > -	gpmc_write_reg(GPMC_SYSCONFIG, l);
+> 
+> Really need to clean up the above with some #defines. Ideally we would 
+> be using hwmod/pm_runtime for configuring the SYSCONFIG.
+
+Ok
+
+> Do we need to free irqs here?
+
+Irqs has been conveniently forgotten in this patch, in mainline, I could
+not find any platforms using GPMC irq. This can be added later once
+driver conversion is done, if required.
+
+> > +		gpmc_write_reg(GPMC_PREFETCH_CONFIG1, ((cs<<  CS_NUM_SHIFT) |
+> > +					PREFETCH_FIFOTHRESHOLD(fifo_th) |
+> > +					ENABLE_PREFETCH |
+> > +					(dma_mode<<  DMA_MPU_MODE) |
+> > +					(0x1&  is_write)));
+> 
+> #define GPMC_PREFETCH_CONFIG1_ACCESSMODE
+
+Ok
+
+> > +	/* check if the same module/cs is trying to reset */
+> > +	config1 = gpmc_read_reg(GPMC_PREFETCH_CONFIG1);
+> > +	if (((config1>>  CS_NUM_SHIFT)&  0x7) != cs)
+> 
+> Maybe define a mask value for the ENGINECSSELECTOR
+
+Ok
+
+> > +	/* GPMC specific */
+> > +	unsigned		cs;
+> > +	unsigned long		mem_size;
+> > +	unsigned long		mem_start;
+> > +	unsigned long		mem_offset;
+> > +	struct gpmc_config	*config;
+> > +	unsigned		num_config;
+> > +	struct gpmc_timings	*timing;
+> > +};
+> > +
+> > +struct gpmc_pdata {
+> > +	/* GPMC_FCLK rate in picoseconds */
+> > +	unsigned long			fclk_rate;
+> 
+> fclk_period
+> 
+> > +	struct gpmc_device_pdata	*device_pdata;
+> > +	unsigned			num_device;
+> > +};
+> 
+> Do you need both gpmc_pdata and gpmc_device_pdata? Would not a single 
+> structure work?
+
+Gpmc_device_data is dedicated to each CS, gpmc_pdata is required
+at least to inform driver about clock rate.
+
+Generally, as the change involved moving a lot of code, seems more reviews
+are on those than the actual changes than what I intended to get reviewed,
+next patch series will be modified not to move existing code, hence some
+of your suggested changes may not be present in it, probably those to be
+done as another cleanup patch.
+
+Regards
+Afzal
