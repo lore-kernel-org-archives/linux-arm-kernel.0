@@ -1,152 +1,30 @@
-From: subashrp@gmail.com (Subash Patel)
-Date: Mon, 26 Mar 2012 17:08:35 +0530
-Subject: [PATCHv7 5/9] ARM: dma-mapping: implement dma sg methods on top
- of any generic dma ops
-In-Reply-To: <1330527862-16234-6-git-send-email-m.szyprowski@samsung.com>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-6-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4F70553B.2000100@gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 26 Mar 2012 17:13:57 +0530
+Subject: [PATCH 1/5] SPEAr6xx: Add compilation support for dtbs using 'make
+ dtbs'
+In-Reply-To: <cover.1332762103.git.viresh.kumar@st.com>
+References: <cover.1332762103.git.viresh.kumar@st.com>
+Message-ID: <7f41195f813f788d9c72f139fcef2f024bf20a6a.1332762103.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+'make dtbs' compiles all dtbs for a family. For this we need to add entries for
+all board dtb's in Makefile.boot file. This patch does it.
 
-As per our discussion over IRC, I would like to check with you the 
-feasibility to extend the dma operation calls for the coherent regions. 
-You said that since struct page wont be available for the buffers in 
-these regions, functions like arm_dma_map_sg() (below) will fail in the 
-cache maintenance operations. Infact, I am facing this issue when I 
-integrated dma-buf buffer sharing + v4l2/vb2 exporter patch series + 
-dma_mapping (v7) and use coherent memory.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/mach-spear6xx/Makefile.boot |    2 ++
+ 1 file changed, 2 insertions(+)
 
-So I want to know opinion of you, others about extending the dma-mapping 
-framework for scenarios which use device coherent memory.
-
-Regards,
-Subash
-
-On 02/29/2012 08:34 PM, Marek Szyprowski wrote:
-> This patch converts all dma_sg methods to be generic (independent of the
-> current DMA mapping implementation for ARM architecture). All dma sg
-> operations are now implemented on top of respective
-> dma_map_page/dma_sync_single_for* operations from dma_map_ops structure.
->
-> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
-> ---
->   arch/arm/mm/dma-mapping.c |   43 +++++++++++++++++++------------------------
->   1 files changed, 19 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index cd5ed8d..a5a0b5b 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -616,7 +616,7 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
->   EXPORT_SYMBOL(___dma_page_dev_to_cpu);
->
->   /**
-> - * dma_map_sg - map a set of SG buffers for streaming mode DMA
-> + * arm_dma_map_sg - map a set of SG buffers for streaming mode DMA
->    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
->    * @sg: list of buffers
->    * @nents: number of buffers to map
-> @@ -634,12 +634,13 @@ EXPORT_SYMBOL(___dma_page_dev_to_cpu);
->   int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
->   		enum dma_data_direction dir, struct dma_attrs *attrs)
->   {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->   	struct scatterlist *s;
->   	int i, j;
->
->   	for_each_sg(sg, s, nents, i) {
-> -		s->dma_address = __dma_map_page(dev, sg_page(s), s->offset,
-> -						s->length, dir);
-> +		s->dma_address = ops->map_page(dev, sg_page(s), s->offset,
-> +						s->length, dir, attrs);
->   		if (dma_mapping_error(dev, s->dma_address))
->   			goto bad_mapping;
->   	}
-> @@ -647,12 +648,12 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
->
->    bad_mapping:
->   	for_each_sg(sg, s, i, j)
-> -		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
-> +		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
->   	return 0;
->   }
->
->   /**
-> - * dma_unmap_sg - unmap a set of SG buffers mapped by dma_map_sg
-> + * arm_dma_unmap_sg - unmap a set of SG buffers mapped by dma_map_sg
->    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
->    * @sg: list of buffers
->    * @nents: number of buffers to unmap (same as was passed to dma_map_sg)
-> @@ -664,15 +665,17 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
->   void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->   		enum dma_data_direction dir, struct dma_attrs *attrs)
->   {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->   	struct scatterlist *s;
-> +
->   	int i;
->
->   	for_each_sg(sg, s, nents, i)
-> -		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
-> +		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
->   }
->
->   /**
-> - * dma_sync_sg_for_cpu
-> + * arm_dma_sync_sg_for_cpu
->    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
->    * @sg: list of buffers
->    * @nents: number of buffers to map (returned from dma_map_sg)
-> @@ -681,21 +684,17 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->   void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->   			int nents, enum dma_data_direction dir)
->   {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->   	struct scatterlist *s;
->   	int i;
->
-> -	for_each_sg(sg, s, nents, i) {
-> -		if (!dmabounce_sync_for_cpu(dev, sg_dma_address(s),
-> -					    sg_dma_len(s), dir))
-> -			continue;
-> -
-> -		__dma_page_dev_to_cpu(sg_page(s), s->offset,
-> -				      s->length, dir);
-> -	}
-> +	for_each_sg(sg, s, nents, i)
-> +		ops->sync_single_for_cpu(dev, sg_dma_address(s), s->length,
-> +					 dir);
->   }
->
->   /**
-> - * dma_sync_sg_for_device
-> + * arm_dma_sync_sg_for_device
->    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
->    * @sg: list of buffers
->    * @nents: number of buffers to map (returned from dma_map_sg)
-> @@ -704,17 +703,13 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->   void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
->   			int nents, enum dma_data_direction dir)
->   {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->   	struct scatterlist *s;
->   	int i;
->
-> -	for_each_sg(sg, s, nents, i) {
-> -		if (!dmabounce_sync_for_device(dev, sg_dma_address(s),
-> -					sg_dma_len(s), dir))
-> -			continue;
-> -
-> -		__dma_page_cpu_to_dev(sg_page(s), s->offset,
-> -				      s->length, dir);
-> -	}
-> +	for_each_sg(sg, s, nents, i)
-> +		ops->sync_single_for_device(dev, sg_dma_address(s), s->length,
-> +					    dir);
->   }
->
->   /*
+diff --git a/arch/arm/mach-spear6xx/Makefile.boot b/arch/arm/mach-spear6xx/Makefile.boot
+index 4674a4c..af493da 100644
+--- a/arch/arm/mach-spear6xx/Makefile.boot
++++ b/arch/arm/mach-spear6xx/Makefile.boot
+@@ -1,3 +1,5 @@
+ zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
++
++dtb-$(CONFIG_BOARD_SPEAR600_DT)	+= spear600-evb.dtb
+-- 
+1.7.10.rc2.10.gb47606
