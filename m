@@ -1,55 +1,48 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 25 Mar 2012 20:50:44 -0500
-Subject: [PATCH] ARM: tegra: Include assembler.h in sleep.S to fix build
- break
-In-Reply-To: <4F6A0D99.2000309@gmail.com>
-References: <1332176863-12537-1-git-send-email-swarren@wwwdotorg.org>
- <4F677691.8020307@gmail.com> <4F69FEB5.2020901@wwwdotorg.org>
- <4F6A0999.9020104@gmail.com> <4F6A0A44.3010304@wwwdotorg.org>
- <4F6A0D99.2000309@gmail.com>
-Message-ID: <4F6FCB74.7010706@gmail.com>
+Date: Sun, 25 Mar 2012 20:59:22 -0500
+Subject: [PATCH 1/2] ARM: VIC: Create common infrastructure for vic DT
+ bindings
+In-Reply-To: <CAOh2x=n-sZ6jV1M9XY9cOp7_8EeRfvqkjL5y3AakgpYymFRHkg@mail.gmail.com>
+References: <4bfe7af3761f6f40506a2089fd67866015f6d7f3.1332488625.git.viresh.kumar@st.com>
+ <4F6C6F32.10800@gmail.com>
+ <CAOh2x=n-sZ6jV1M9XY9cOp7_8EeRfvqkjL5y3AakgpYymFRHkg@mail.gmail.com>
+Message-ID: <4F6FCD7A.3030804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
-
-On 03/21/2012 12:19 PM, Rob Herring wrote:
-> On 03/21/2012 12:05 PM, Stephen Warren wrote:
->> On 03/21/2012 11:02 AM, Rob Herring wrote:
->>> On 03/21/2012 11:15 AM, Stephen Warren wrote:
->>>> On 03/19/2012 12:10 PM, Rob Herring wrote:
->>>>> On 03/19/2012 12:07 PM, Stephen Warren wrote:
->>>>>> Commit 6f6f6a7 "ARM: create a common IOMEM definition" moved macro
->>>>>> IOMEM(), and requires users to include <asm/assembler.h>. Fix Tegra's
->>>>>> sleep.S to do so.
->>>>>>
->>>>>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
->>>>>
->>>>> Acked-by: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> Arnd,
->>>>
->>>> Can you pick up this fix directly into arm-soc, or do you want me to
->>>> generate a pull request for this kind of thing too?
->>>>
->>>> ARM: tegra: Include assembler.h in sleep.S to fix build break
->>>> http://patchwork.ozlabs.org/patch/147587/
->>>>
->>>> The same goes for:
->>>>
->>>> ARM: tegra: Fix device tree AUXDATA for USB/EHCI
->>>> http://patchwork.ozlabs.org/patch/147616/
->>>
->>> I can take it and send the pull request. I've got a couple of other
->>> fixes as well.
+On 03/25/2012 02:31 AM, viresh kumar wrote:
+> On Fri, Mar 23, 2012 at 6:10 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> NAK
 >>
->> That's just for the sleep.S change, right.
+>> None of these platforms have gpio interrupts or any other board
+>> interrupt controllers which need to be initialized early?
 > 
-> Ah, I missed the 2nd one. So it makes less sense now for me to take it.
-> I'm still happy to, but it doesn't really save you anything.
+> Atleast SPEAr600 have GPIO interrupts.
+> 
+>> I don't think DT conversions are complete enough to tell.
+> 
+> Couldn't get your comment, sorry.
 
-After our irc discussion, I pulled this in and then realized this is a
-newly added file that's not in my tree. So you should send this fix to
-Arnd/Olof.
+Some DT enabled platforms may only have the gic or vic included in their
+match list currently because other interrupt controllers aren't yet
+converted to DT. I believe Exynos is one such example.
+
+> 
+>> We could do something like this, but there only needs to be a single
+>> match list of all controllers and function. We should consolidate the
+>> irqchips to drivers/irqchip first though. I have that action from Connect...
+> 
+> That would be good.
+> I am updating DT support for SPEAr3xx, where i need to use VIC OF
+> support. So i would still like to get this patch going and you can consilidate
+> code at irqchips level later. What do you say?
+
+No. I don't think moving this into the gic and vic code just to move it
+back out later is a good idea. Just looking at the diffstat, the net
+number of lines removed is not very compelling either.
 
 Rob
+
+> 
+> --
+> viresh
