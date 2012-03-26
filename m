@@ -1,45 +1,64 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Mon, 26 Mar 2012 12:19:12 +0530
-Subject: Occasional crashes in suspend-resume with MMC transactions
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317FFC59@DBDE01.ent.ti.com>
-References: <B5906170F1614E41A8A28DE3B8D12143317FDFBB@DBDE01.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D12143317FF773@DBDE01.ent.ti.com>
- <CANfBPZ9b=6dLbY2D3oAg=Gz_vwAOJ+KC_Bo5ugVJEwumeej_Bw@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D12143317FFAC0@DBDE01.ent.ti.com>
- <CANfBPZ9AU+W7qP+uE2s2EnpzKhUqVQLdEgN=CUeNJZkSoh7+5A@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D12143317FFC59@DBDE01.ent.ti.com>
-Message-ID: <CANfBPZ8SD4jimMsrbFNrYemNUQzb5dLbwdMKB=x8EADWCJktvw@mail.gmail.com>
+From: tsoni@codeaurora.org (Trilok Soni)
+Date: Mon, 26 Mar 2012 12:25:56 +0530
+Subject: [PATCH v5 1/2] dmaengine: Add context parameter to prep_dma_sg
+ and prep_interleaved_dma
+In-Reply-To: <1332743073.19804.26.camel@vkoul-udesk3>
+References: <1332426167-25213-1-git-send-email-kumarrav@codeaurora.org>
+ <1332743073.19804.26.camel@vkoul-udesk3>
+Message-ID: <4F7012FC.10203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2012 at 9:43 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> On Thu, Mar 22, 2012 at 21:36:36, S, Venkatraman wrote:
->> On Thu, Mar 22, 2012 at 8:13 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
->> > On Thu, Mar 22, 2012 at 19:57:16, S, Venkatraman wrote:
->> > [...]
->> >>
->> >> I see (in 3.3) that the host controller driver does a "return ret" and
->> >> that means the errors is propagated.
->> >> Where is the return code lost /overridden ?
->> >>
->> >
->> > The return code gets overridden due to the call to host->pdata->resume()
->> > which always returns 0.
->>
->> Thanks - I see what you mean. But the patch is clunky.
->> A clean fix would be to not capture the return code of resume() in
->> "ret" and let the old
->> value of ret be propagated as is.
->>
->
-> I agree. However, right now there's a dev_dbg() which checks for the return code.
-> I could change the host->pdata->resume() and host->pdata->suspend() to not return
-> anything if that's acceptable.
->
-That's a good idea.
+On 3/26/2012 11:54 AM, Vinod Koul wrote:
+> On Thu, 2012-03-22 at 19:52 +0530, Ravi Kumar V wrote:
+>> Add new context parameter to DMA SG and Interleaveid mode for passing
+> Typo					  ^^^^^^^^^^^^
 
-> More importantly, is this the right fix or does the driver need some other fix
-> to make sure that such suspend failures do not occur at all?
+Sorry, we will fix this.
 
-I will look into this - but haven't seen such failures here to know
-what's behind the symptom.
+>> diff --git a/drivers/misc/carma/carma-fpga-program.c b/drivers/misc/carma/carma-fpga-program.c
+>> index a2d25e4..3739a12 100644
+>> --- a/drivers/misc/carma/carma-fpga-program.c
+>> +++ b/drivers/misc/carma/carma-fpga-program.c
+>> @@ -530,7 +530,7 @@ static noinline int fpga_program_dma(struct fpga_dev *priv)
+>>   	}
+>>
+>>   	/* setup and submit the DMA transaction */
+>> -	tx = chan->device->device_prep_dma_sg(chan,
+>> +	tx = chan->device->dmaengine_prep_dma_sg(chan,
+>>   					      table.sgl, num_pages,
+>>   					      vb->sglist, vb->sglen, 0);
+> No the idea is that clients will not know anything about additionlay
+> parameter hence avoiding abuse. You need to reread the patches sent by
+> Alexandre.
+>
+> You need to
+> 1) add wrappers over interleaved api which dont expose this additional
+> parameter
+> 2) move existing users to use these wrappers
+
+Above two steps would be exactly same as 
+https://lkml.org/lkml/2012/3/8/401 - [PATCH 1/2 V2] dmaengine/dma_slave: 
+introduce inline wrappers, right?
+
+> 3) add a new API which has your additional argument (not an opaque
+> object) and this calls .device_xx callback with additional arg.
+> 4. Above can be under conditional of your specific subsystem where these
+> parameters are valid.
+
+Now, this would be different from what Alexandre had submitted, since he 
+had added "void *context" parameter directly to existing callbacks 
+dma_slave_sg and and cyclic under struct dma_device.
+
+And you prefer that we add new callbacks under "struct dma_device" for 
+our specific requirement with new name and with that extra non-opaque 
+object. After that add wrappers for these two new callbacks say
+dmaengine_prep_dma_sg_ext and dmagengine_prep_interleaved_dma_ext (same
+name goes for callback).
+
+---Trilok Soni
+
+-- 
+--
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
