@@ -1,26 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 26 Mar 2012 11:38:54 +0100
-Subject: [PATCH] ARM: fixup section mismatch warning for alloc_init_pud()
-In-Reply-To: <87398zswkj.wl%kuninori.morimoto.gx@renesas.com>
-References: <87398zswkj.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20120326103854.GG30455@arm.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Mon, 26 Mar 2012 16:34:28 +0530
+Subject: [PATCH 0/2] ARM: dma-mapping: Fix mmap support for coherent
+ buffers
+In-Reply-To: <1332505563-17646-1-git-send-email-m.szyprowski@samsung.com>
+References: <08af01cd08ee$2fd04770$8f70d650$%szyprowski@samsung.com>
+ <1332505563-17646-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F704D3C.50003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2012 at 05:41:52AM +0000, Kuninori Morimoto wrote:
-> This patch fixup below warning
-> 
-> WARNING: arch/arm/mm/built-in.o(.text+0x2320):
-> Section mismatch in reference from the function alloc_init_pud()
-> to the function .init.text:alloc_init_section()
-> The function alloc_init_pud() references
-> the function __init alloc_init_section().
-> This is often because alloc_init_pud lacks a __init
-> annotation or the annotation of alloc_init_section is wrong.
-> 
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Marek,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I have tested these patch series for origen board, and they mmap the 
+buffers to user-space for the coherent pool. You can add:
 
--- 
-Catalin
+Tested-By: Subash Patel <subashrp@gmail.com>
+
+Regards,
+Subash
+
+On 03/23/2012 05:56 PM, Marek Szyprowski wrote:
+> Hello,
+>
+> This patchset contains patches to fix broken mmap operation for memory
+> buffers allocated from 'dma_declare_coherent' pool after applying my dma
+> mapping redesign patches [1]. These issues have been reported by Subash
+> Patel.
+>
+> [1] http://thread.gmane.org/gmane.linux.kernel.cross-arch/12819
+>
+> Patch summary:
+>
+> Marek Szyprowski (2):
+>    common: add dma_mmap_from_coherent() function
+>    arm: dma-mapping: use dma_mmap_from_coherent()
+>
+>   arch/arm/mm/dma-mapping.c          |    3 ++
+>   drivers/base/dma-coherent.c        |   42 ++++++++++++++++++++++++++++++++++++
+>   include/asm-generic/dma-coherent.h |    4 ++-
+>   3 files changed, 48 insertions(+), 1 deletions(-)
+>
