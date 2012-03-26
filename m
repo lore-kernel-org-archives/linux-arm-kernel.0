@@ -1,48 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 25 Mar 2012 20:59:22 -0500
-Subject: [PATCH 1/2] ARM: VIC: Create common infrastructure for vic DT
- bindings
-In-Reply-To: <CAOh2x=n-sZ6jV1M9XY9cOp7_8EeRfvqkjL5y3AakgpYymFRHkg@mail.gmail.com>
-References: <4bfe7af3761f6f40506a2089fd67866015f6d7f3.1332488625.git.viresh.kumar@st.com>
- <4F6C6F32.10800@gmail.com>
- <CAOh2x=n-sZ6jV1M9XY9cOp7_8EeRfvqkjL5y3AakgpYymFRHkg@mail.gmail.com>
-Message-ID: <4F6FCD7A.3030804@gmail.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Mon, 26 Mar 2012 11:33:53 +0530
+Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <CACKLOr0JTgp+poXCNg8+8pXko3s2JWQhovMw8Z1j-q4aL4oaKQ@mail.gmail.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+ <1332344363.19804.12.camel@vkoul-udesk3>
+ <CACKLOr03tTymT1vdTH7=nqEHu3OvAinPUHEusK+mR+J6Yc35mQ@mail.gmail.com>
+ <CACKLOr0JTgp+poXCNg8+8pXko3s2JWQhovMw8Z1j-q4aL4oaKQ@mail.gmail.com>
+Message-ID: <1332741833.19804.17.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2012 02:31 AM, viresh kumar wrote:
-> On Fri, Mar 23, 2012 at 6:10 PM, Rob Herring <robherring2@gmail.com> wrote:
->> NAK
->>
->> None of these platforms have gpio interrupts or any other board
->> interrupt controllers which need to be initialized early?
+On Thu, 2012-03-22 at 15:11 +0100, javier Martin wrote:
+> On 22 March 2012 10:39, javier Martin <javier.martin@vista-silicon.com> wrote:
+> > On 21 March 2012 16:39, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> >> This doesn't apply for me (starting with 6th) on current slave-dma.next
+> >> due to obvious changes which have gone into imx.
+> >>
+> >> Can you quickly rebase the series and resend.
+> >
+> > Great,
+> > now your 'next' branch is actually broken for imx-dma.
+> >
+> > I'm currently trying a bisect to find out what is the commit
+> > responsible for that but I suspect it will be related to the cookie
+> > changes submitted by Russell.
+I had these in branch for quite some time for people to look and point
+out any issues with merge.
 > 
-> Atleast SPEAr600 have GPIO interrupts.
+> Here,
+> take a look at this series:
 > 
->> I don't think DT conversions are complete enough to tell.
+> [PATCH v4 00/15] dmaengine: imx-dma: rebase of features for 3.4.
 > 
-> Couldn't get your comment, sorry.
+> I've included a new fix patch which solves the merge issue.
+Thanks Applied all, now
+> 
+> Regards.
 
-Some DT enabled platforms may only have the gic or vic included in their
-match list currently because other interrupt controllers aren't yet
-converted to DT. I believe Exynos is one such example.
 
-> 
->> We could do something like this, but there only needs to be a single
->> match list of all controllers and function. We should consolidate the
->> irqchips to drivers/irqchip first though. I have that action from Connect...
-> 
-> That would be good.
-> I am updating DT support for SPEAr3xx, where i need to use VIC OF
-> support. So i would still like to get this patch going and you can consilidate
-> code at irqchips level later. What do you say?
-
-No. I don't think moving this into the gic and vic code just to move it
-back out later is a good idea. Just looking at the diffstat, the net
-number of lines removed is not very compelling either.
-
-Rob
-
-> 
-> --
-> viresh
+-- 
+~Vinod
