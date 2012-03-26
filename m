@@ -1,33 +1,30 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 26 Mar 2012 15:53:57 -0300
-Subject: [PATCH] ARM: 3ds_debugboard: Fix smsc911x driver probe
-Message-ID: <1332788037-31064-1-git-send-email-fabio.estevam@freescale.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Mon, 26 Mar 2012 20:56:35 +0200
+Subject: [PATCH v1] regulator: i.MX35-PDK Add regulator support
+In-Reply-To: <20120326153429.GX3098@opensource.wolfsonmicro.com>
+References: <1332772593-13313-1-git-send-email-alexg@meprolight.com>
+ <20120326144712.GA8579@sirena.org.uk>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD16@MEP-EXCH.meprolight.com>,
+ <20120326153429.GX3098@opensource.wolfsonmicro.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD1F@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix smsc911x id field in order to fix smsc911x driver probe error:
 
-smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
-smsc911x smsc911x.0: (unregistered net_device): couldn't get regulators -517
-platform smsc911x.0: Driver smsc911x requests probe deferral
+On Mon, Mar 26, 2012 at 05:28:55PM +0200, Alex Gershgorin wrote:
+> On Mon, Mar 26, 2012 at 04:36:33PM +0200, Alex Gershgorin wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/3ds_debugboard.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> It's not quite true, I was based on the Freescale BSP and I assume,
+> that this is checked.  I also tested it on v3.3
 
-diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
-index d1e31fa..5cac2c5 100644
---- a/arch/arm/plat-mxc/3ds_debugboard.c
-+++ b/arch/arm/plat-mxc/3ds_debugboard.c
-@@ -80,7 +80,7 @@ static struct smsc911x_platform_config smsc911x_config = {
- 
- static struct platform_device smsc_lan9217_device = {
- 	.name = "smsc911x",
--	.id = 0,
-+	.id = -1,
- 	.dev = {
- 		.platform_data = &smsc911x_config,
- 	},
--- 
-1.7.1
+> > Uh, presence in a vendor BSP isn't a guarantee of sanity...  Since you
+> > didn't specify any consumers the regulator API obviously won't do
+> > anything with the voltage range provided but to repeat it's really not
+> > at all obvious that anything sane ever would.
+
+Thanks Mark I think that understand you,
+if not have consumers do not set ranges.
+I will correct it
+
+Thanks 
+Alex Gershgorin
