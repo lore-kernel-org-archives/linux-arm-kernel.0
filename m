@@ -1,45 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Mar 2012 16:15:19 +0100
-Subject: [Android-virt] [PATCH] ARM: test for PMU feature on v7 (v2 with
- typo fix)
-In-Reply-To: <CAFEAcA-S3pN0AihjMZdchRyvFpifvKN8rNytpEP_iaA3H5RWfQ@mail.gmail.com>
-References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
- <87r4wk889a.fsf@rustcorp.com.au>
- <20120323095314.GA13622@mudshark.cambridge.arm.com>
- <87fwcy9abw.fsf@rustcorp.com.au>
- <20120326094054.GA2475@mudshark.cambridge.arm.com>
- <CAFEAcA-S3pN0AihjMZdchRyvFpifvKN8rNytpEP_iaA3H5RWfQ@mail.gmail.com>
-Message-ID: <20120326151519.GJ2475@mudshark.cambridge.arm.com>
+Date: Mon, 26 Mar 2012 16:20:37 +0100
+Subject: ARM11MPcore: tlb_ops_need_broadcast causes deadlock
+In-Reply-To: <20120325215535.GB3147@n2100.arm.linux.org.uk>
+References: <274124B9C6907D4B8CE985903EAA19E91B2D579066@SI-MBX06.de.bosch.com>
+ <20120323173055.GC16225@mudshark.cambridge.arm.com>
+ <loom.20120325T135816-592@post.gmane.org>
+ <20120325130912.GF5611@n2100.arm.linux.org.uk>
+ <4F6F624D.8060409@mac.com>
+ <20120325191556.GA3147@n2100.arm.linux.org.uk>
+ <4F6F7E99.1020500@mac.com>
+ <20120325215535.GB3147@n2100.arm.linux.org.uk>
+Message-ID: <20120326152037.GK2475@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 10:50:35AM +0100, Peter Maydell wrote:
-> On 26 March 2012 10:40, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Mar 23, 2012 at 11:17:07PM +0000, Rusty Russell wrote:
-> >>
-> >> OK, I see that argument, but I don't like it. ?eg. the Cortex A-15 is
-> >> defined to have a PMUv2 with 6 counters, and below you're arguing we
-> >> should implement zero of them.
-> >
-> > Well, I think you should actually implement all 6 of them if that's the
-> > target which you're emulating.
+Hmm, I somehow got dropped from this, but I'll pick it back up here.
+
+On Sun, Mar 25, 2012 at 10:55:35PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Mar 25, 2012 at 10:22:49PM +0200, Peter Waechtler wrote:
+> > And again I don't understand the abort handler: why do we get a page  
+> > fault on
+> > a young page then? grrh
 > 
-> The trouble with this line of thought is that it leads to the requirement
-> to support nested virtualization and virtualization of TrustZone, neither
-> of which are actually particularly useful or simple to do. At some point
-> we're going to end up saying that the "A15" we expose to the guest is
-> not an exact match to the real hardware, that it's missing certain
-> features (and hopefully that the lack of those features is advertised
-> via the feature registers). So the question is where you draw the line...
+> Permissions?  Userspace trying to write to the page when it isn't marked
+> writable and dirty?
+> 
+> >> Moreover, what about the case where we actually remove the page?
+> > I don't claim that this is the only way to deadlock - but this is the  
+> > case we encounter.
+> 
+> No, but you're arguing that we drop the TLB flush for your specific case.
+> I'm telling you that's pointless if there's other cases as well which
+> we'll deadlock.
+> 
+> But that's neither here nor there because you haven't fully explained
+> what the problem is yet..
 
-I'd be inclined to say that, at least for kvm, you should draw the line at
-the point where the guest doesn't need modifications to run in the virtual
-environment. That is, everything used by Linux is emulated enough for the
-kernel to run happily. Clearly you can improve on that in the areas which
-are considered to be most critical.
+Yes, I'm inclined to agree with Russell here. Things don't add up and
+without further information there's not a lot we can do.
 
-Aside: given that guests have to run non-secure, how would you emulate a
-secure platform without emulating the corresponding TrustZone API? Or is
-that one of the reasons why you're currently targetting Versatile Express?
+Peter - are you able to reproduce and investigate this problem or was it a
+one-off observation? If you can figure out what really goes on inside CPU B
+in your example, then we may be able to look into this further. A good first
+step might be to work out what triggers the initial data abort and look at
+the state of the world at that point.
 
 Will
