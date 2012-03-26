@@ -1,35 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 26 Mar 2012 16:34:29 +0100
-Subject: [PATCH v1] regulator: i.MX35-PDK Add regulator support
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD16@MEP-EXCH.meprolight.com>
-References: <1332772593-13313-1-git-send-email-alexg@meprolight.com>
- <20120326144712.GA8579@sirena.org.uk>
- <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD16@MEP-EXCH.meprolight.com>
-Message-ID: <20120326153429.GX3098@opensource.wolfsonmicro.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Mon, 26 Mar 2012 10:53:29 -0500
+Subject: [PATCH V2 3/3] ARM: kirkwood: Define NAND partitions in dts
+In-Reply-To: <1332594876-8673-4-git-send-email-jm@lentin.co.uk>
+References: <1332594876-8673-1-git-send-email-jm@lentin.co.uk>
+ <1332594876-8673-4-git-send-email-jm@lentin.co.uk>
+Message-ID: <4F7090F9.5000603@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 05:28:55PM +0200, Alex Gershgorin wrote:
-> On Mon, Mar 26, 2012 at 04:36:33PM +0200, Alex Gershgorin wrote:
+On 03/24/2012 08:14 AM, Jamie Lentin wrote:
+> Use devicetree to define NAND partitions. Use D-link partition scheme by
+> default, to be vaguely compatible with their userland.
+> 
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> ---
+>  arch/arm/boot/dts/kirkwood-dns320.dts |   35 +++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-dns325.dts |   35 +++++++++++++++++++++++++++++++++
+>  arch/arm/mach-kirkwood/board-dnskw.c  |   31 -----------------------------
+>  3 files changed, 70 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
+> index 58de7f2..fbf55ff 100644
+> --- a/arch/arm/boot/dts/kirkwood-dns320.dts
+> +++ b/arch/arm/boot/dts/kirkwood-dns320.dts
+> @@ -25,5 +25,40 @@
+>  			clock-frequency = <166666667>;
+>  			status = "ok";
+>  		};
+> +
+> +		nand at 3000000 {
+> +			status = "ok";
+> +
 
-Fix your mailer to word wrap within paragraphs, I reflowed your text to
-be legible.
+This should be "okay", not "ok" -- see IEEE1275.  Or just leave it out.
 
-> > >...and in many cases the supply names don't look like things I'd expect
-> > >to be varying too much at runtime.  It looks like you just typed the
-> > >maximum datasheet ranges in, not things that make sense for the board.
-
-> It's not quite true, I was based on the Freescale BSP and I assume,
-> that this is checked.  I also tested it on v3.3
-
-Uh, presence in a vendor BSP isn't a guarantee of sanity...  Since you
-didn't specify any consumers the regulator API obviously won't do
-anything with the voltage range provided but to repeat it's really not
-at all obvious that anything sane ever would.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120326/c9de4116/attachment.sig>
+-Scott
