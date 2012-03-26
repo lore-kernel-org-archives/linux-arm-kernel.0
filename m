@@ -1,34 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Mar 2012 08:39:46 +0000
-Subject: Inconsistent kallsyms data on ARM.
-In-Reply-To: <20120326074533.GL15647@pengutronix.de>
-References: <CAP=VYLoStscdVJretZ-Rkbp7V3Vsm8N0oWcjih7ruHFiDN7CiA@mail.gmail.com>
- <20120326073704.GH5611@n2100.arm.linux.org.uk>
- <20120326074533.GL15647@pengutronix.de>
-Message-ID: <201203260839.46858.arnd@arndb.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 26 Mar 2012 14:16:38 +0530
+Subject: [PATCH v3 0/2] Add lcd driver for panels with gpio controlled panel
+ reset
+Message-ID: <1332751600-11371-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 March 2012, Uwe Kleine-K?nig wrote:
-> On Mon, Mar 26, 2012 at 08:37:04AM +0100, Russell King - ARM Linux wrote:
-> > On Sun, Mar 25, 2012 at 07:59:44PM -0400, Jon Masters wrote:
-> > > As to longer term, I am happy to work up something that will spot this
-> > > particular kind of failure (symbol changes type) and output something
-> > > more useful during the kallsyms generation if you would like.
-> > > 
-> > > Are you planning to pull in either of the fixes you mention?
-> > 
-> > I'm not, because those are all sub-optimal - I don't see why we should
-> > bloat the kernel image just for the sake of working around kallsyms.
-> > 
-> > The best I've come up with so far which avoids that is to force
-> > KALLSYMS_EXTRA_PASS to always be set on ARM.
-> Just to let you know: I even saw failures with KALLSYMS_EXTRA_PASS set.
-> Not so in the recent past and sometimes not even reproducible IIRC.
-> I will save the build results next time it happens now that I saw what
-> to look for.
+Changes since v2:
+- Reworked as per comments[1] from Mark Brown.
+  - removed the setting of regulator voltage.
 
-Yes, I saw these too in my randconfig builds some time ago. Maybe a handful
-of builds among 50000 configurations.
+[1] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg08743.html
 
-	Arnd
+Changes since v1:
+- Fixed gpio leak, added MODULE_DEVICE_TABLE and dev_pm_ops.
+- Changed device tree bindings.
+
+This patchset adds support for passive panels that use a nRESET line which is
+controlled by a GPIO of the host system and which do not use a serial comamnd
+interface (i2c or spi) or memory-mapped-io interface. Platforms that do not
+require any additional control apart from the nRESET line can use this driver
+for lcd power control.
+
+The first patch adds driver for passive raster-type lcd's with gpio controlled
+panel reset. It includes support for both dt and non-dt platforms. The second
+patch adds support for using this driver on Origen board.
+
+Thomas Abraham (2):
+  backlight: lcd: add driver for raster-type lcd's with gpio controlled panel reset
+  ARM: Exynos: Use lcd power control driver for lcd panel
+
+ .../devicetree/bindings/lcd/lcd-pwrctrl.txt        |   36 +++
+ arch/arm/mach-exynos/mach-origen.c                 |   29 +--
+ drivers/video/backlight/Kconfig                    |    7 +
+ drivers/video/backlight/Makefile                   |    1 +
+ drivers/video/backlight/lcd_pwrctrl.c              |  226 ++++++++++++++++++++
+ include/video/lcd_pwrctrl.h                        |   24 ++
+ 6 files changed, 300 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/lcd/lcd-pwrctrl.txt
+ create mode 100644 drivers/video/backlight/lcd_pwrctrl.c
+ create mode 100644 include/video/lcd_pwrctrl.h
