@@ -1,70 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Mar 2012 15:08:10 +0200
-Subject: [GIT PULL] AT91 drivers Kconfig cleanup
-Message-ID: <4F706A3A.1070309@atmel.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Mon, 26 Mar 2012 09:11:45 -0400
+Subject: ioremap to a specific virtual address
+In-Reply-To: <201203260847.38176.arnd@arndb.de>
+References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+ <CAKON4OwhcFDMC4dWjU7x4u2CPT7C2BxVuCDkTN0j14gTndi3tA@mail.gmail.com>
+ <201203251734.41780.arnd@arndb.de>
+ <201203260847.38176.arnd@arndb.de>
+Message-ID: <CAKON4OyPpTNHoWbYQ+jOHEF+c9Rz983wMjArsqkMnUKnYe_V0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(previous email without mailing-lists addresses)
+On Mon, Mar 26, 2012 at 4:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 25 March 2012, Arnd Bergmann wrote:
+>> ? ? ? ? ? ? ? ? ? ? ? ? /* mpmc configuration */
+>> ? ? ? ? ? ? ? ? ? ? ? ? mpmc-static-config ? ? = <0x81>;
+>> ? ? ? ? ? ? ? ? ? ? ? ? mpmc-static-wait-wen ? = <1>;
+>> ? ? ? ? ? ? ? ? ? ? ? ? mpmc-static-wait-oen ? = <1>;
+>> ? ? ? ? ? ? ? ? ? ? ? ? mpmc-static-wait-rd ? ?= <4>;
+>> ? ? ? ? ? ? ? ? ? ? ? ? mpmc-static-wait-page ?= <1>;
+>> ? ? ? ? ? ? ? ? ? ? ? ? mpmc-static-wait-write = <1>;
+>> ? ? ? ? ? ? ? ? ? ? ? ? mpmc-static-wait-turn ?= <2>;
+>
+> On second though, I guess you can turn these into a single
+> property named "mpmc-timings" or such and then just copy
+> them to the registers.
+>
+> I also wonder whether the timings are actually correct for your
+> dm9000 device. Maybe the additional gpio read in there was
+> just an indication that someone worked around incorrect timings?
 
-Arnd, Olof,
+Maybe the GPIO read is bogus? Looks like they needed a 70ns delay and
+the GPIO read was a way of getting that.
 
-This is a series which deals with AT91 drivers Kconfig entries. Its goal is
-to remove too restrictive dependencies on SoC names.
-This will allow to add support for newer SoC seamlessly.
-Some very "cosmetic" changes are also added (entry names, comments, etc.).
+How do MPNC delays work? Shouldn't the CPU enforce this delay in hardware?
 
-Some patches are dealing with other subsystem Kconfig files. I have
-collected
-"Acked-by" and included them in this series.
+/* ARM MPMC contoller as part of low power design doesn't de-assert
+nCS and nOE for consecutive reads but just changes address. But DM9000
+requires nCS and nOE change between address. So access other chip
+select area (nCS0) to force de-assertion of nCS1 and nOE1. Or else
+wait for long time such as 80 usecs.
+LPC313x has external logic outside of MPMC IP to toggle nOE to split
+consecutive reads.
 
-I have built this pull-request on top of arm-soc/next/dt2 branch for
-easy merge with
-at91 material that is already queued for 3.4. It is for sure a very late
-pull request
-for 3.4, event though it is non intrusive. So, feel free to delay it to
-3.5 or
-a "staging" branch...
+The latest Apex bootloader patch makes use of this feature. For this
+to work SYS_MPMC_WTD_DEL0 & SYS_MPMC_WTD_DEL1 should be programmed
+with MPMC_STWTRD0 & MPMC_STWTRD1 values. The logic only deactivates
+the nOE for one clock cycle which is 11nsec but DM9000 needs 80nsec
+between nOEs. So lets add some dummy instructions such as reading a
+GPIO register to compensate for extra 70nsec.
+*/
 
-The following changes since commit 7d1206bc2859c6e9f46e35ae697c138e7d7858a7:
+WTD_DEL1
+This following register is used for the static device0 of the MPMC. It
+provides that the output enable signal for the static device0 (OE) is
+split up into two equal portions, with one inactive cycle in the
+middle. This is needed because some memories do no detect consecutive
+reads within one OE period
 
-  Merge branch 'kirkwood/dt' into next/dt2 (2012-03-24 19:16:04 +0000)
-
-are available in the git repository at:
+MPMCStaticExtendedWait is set to 4 which should be a 2us delay.
 
 
-  git://github.com/at91linux/linux-at91.git armsoc-next-dt2+at91-kconfig
 
-for you to fetch changes up to 40ef130751f4438ae73603ab00aa2a2590a3201d:
-
-  hwrng: Kconfig: remove dependency for atmel-rng driver (2012-03-26
-14:06:23 +0200)
-
-----------------------------------------------------------------
-Nicolas Ferre (12):
-      ARM: at91: change AT91 Kconfig entry comment
-      ARM: at91/Kconfig: change at91sam9g45 entry
-      ARM: at91/Kconfig: add comment to at91sam9x5 family entry
-      ARM: at91/Kconfig: add clarifications to AT91SAM9M10G45-EK entry
-      ARM: at91/Kconfig: add AT91SAM9x5 family to AT91_EARLY_DBGU0 entry
-      ARM: at91/Kconfig: website link for AT91SAM9G20-EK
-      dmaengine: Kconfig: fix Atmel at_hdmac entry
-      mmc: Kconfig: remove choice between at91_mci and atmel-mci
-      mmc: atmel-mci: remove the need for CONFIG_MMC_ATMELMCI_DMA
-      rtc: Kconfig: remove dependency for AT91 rtc driver
-      Input: Kconfig: remove dependency for atmel_tsadcc driver
-      hwrng: Kconfig: remove dependency for atmel-rng driver
-
- arch/arm/Kconfig                  |    4 ++--
- arch/arm/mach-at91/Kconfig        |   21 ++++++++++++++++-----
- drivers/char/hw_random/Kconfig    |    2 +-
- drivers/dma/Kconfig               |    5 ++---
- drivers/input/touchscreen/Kconfig |    4 ++--
- drivers/mmc/host/Kconfig          |   23 ++---------------------
- drivers/mmc/host/atmel-mci.c      |    2 --
- drivers/rtc/Kconfig               |    2 +-
- 8 files changed, 26 insertions(+), 37 deletions(-)
-
-Thanks, best regards,
 -- 
-Nicolas Ferre
+Jon Smirl
+jonsmirl at gmail.com
