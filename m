@@ -1,66 +1,55 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 25 Mar 2012 20:36:44 -0500
-Subject: [GIT PULL] pxa io.h clean-up fixes
-Message-ID: <4F6FC82C.2040303@gmail.com>
+Date: Sun, 25 Mar 2012 20:50:44 -0500
+Subject: [PATCH] ARM: tegra: Include assembler.h in sleep.S to fix build
+ break
+In-Reply-To: <4F6A0D99.2000309@gmail.com>
+References: <1332176863-12537-1-git-send-email-swarren@wwwdotorg.org>
+ <4F677691.8020307@gmail.com> <4F69FEB5.2020901@wwwdotorg.org>
+ <4F6A0999.9020104@gmail.com> <4F6A0A44.3010304@wwwdotorg.org>
+ <4F6A0D99.2000309@gmail.com>
+Message-ID: <4F6FCB74.7010706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Stephen,
 
-Here's a couple more fixes for pxa from mach/io.h cleanup. This is based
-on my previous pull request.
+On 03/21/2012 12:19 PM, Rob Herring wrote:
+> On 03/21/2012 12:05 PM, Stephen Warren wrote:
+>> On 03/21/2012 11:02 AM, Rob Herring wrote:
+>>> On 03/21/2012 11:15 AM, Stephen Warren wrote:
+>>>> On 03/19/2012 12:10 PM, Rob Herring wrote:
+>>>>> On 03/19/2012 12:07 PM, Stephen Warren wrote:
+>>>>>> Commit 6f6f6a7 "ARM: create a common IOMEM definition" moved macro
+>>>>>> IOMEM(), and requires users to include <asm/assembler.h>. Fix Tegra's
+>>>>>> sleep.S to do so.
+>>>>>>
+>>>>>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+>>>>>
+>>>>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>>>>
+>>>> Arnd,
+>>>>
+>>>> Can you pick up this fix directly into arm-soc, or do you want me to
+>>>> generate a pull request for this kind of thing too?
+>>>>
+>>>> ARM: tegra: Include assembler.h in sleep.S to fix build break
+>>>> http://patchwork.ozlabs.org/patch/147587/
+>>>>
+>>>> The same goes for:
+>>>>
+>>>> ARM: tegra: Fix device tree AUXDATA for USB/EHCI
+>>>> http://patchwork.ozlabs.org/patch/147616/
+>>>
+>>> I can take it and send the pull request. I've got a couple of other
+>>> fixes as well.
+>>
+>> That's just for the sleep.S change, right.
+> 
+> Ah, I missed the 2nd one. So it makes less sense now for me to take it.
+> I'm still happy to, but it doesn't really save you anything.
 
-This still doesn't get pxa completely working on my branch. I had to add
-commit e23e8c0690d (ARM/PCI: Remove ARM's duplicate definition of
-'pcibios_max_latency') to get my tree building for pxa. This commit is
-already in final 3.3.
-
-There's some new breakage when I merged the current next in and built
-with Russell's pxa test config. The failures are due to struct device
-removal in this commit:
-
-commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0
-Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Date:   Thu Feb 2 00:10:51 2012 +0000
-
-    regulator: Remove support for supplies specified by struct device
-
-    This has been deprecated for a very long time now.
-
-    Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-    Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-    Acked-by: Liam Girdwood <lrg@ti.com>
+After our irc discussion, I pulled this in and then realized this is a
+newly added file that's not in my tree. So you should send this fix to
+Arnd/Olof.
 
 Rob
-
-The following changes since commit a2a47ca36642e3995e982957bc42678cf11ca6ac:
-
-  ARM: __io abuse cleanup (2012-03-13 21:25:21 -0500)
-
-are available in the git repository at:
-  git://sources.calxeda.com/kernel/linux.git io-cleanup-for-3.4
-
-Rob Herring (2):
-      ARM: dma-mapping: convert ARCH_HAS_DMA_SET_COHERENT_MASK to
-kconfig symbol
-      ARM: pxa: use common IOMEM definition
-
- arch/arm/Kconfig                             |    4 ++++
- arch/arm/mach-ixp4xx/include/mach/hardware.h |    2 --
- arch/arm/mach-pxa/Kconfig                    |    1 +
- arch/arm/mach-pxa/clock-pxa2xx.c             |    1 +
- arch/arm/mach-pxa/corgi_pm.c                 |    1 +
- arch/arm/mach-pxa/cpufreq-pxa3xx.c           |    1 +
- arch/arm/mach-pxa/include/mach/hardware.h    |    6 ------
- arch/arm/mach-pxa/mfp-pxa2xx.c               |    1 +
- arch/arm/mach-pxa/pxa2xx.c                   |    1 +
- arch/arm/mach-pxa/pxa300.c                   |    1 +
- arch/arm/mach-pxa/pxa320.c                   |    1 +
- arch/arm/mach-pxa/sharpsl_pm.c               |    1 +
- drivers/rtc/rtc-sa1100.c                     |    1 +
- drivers/watchdog/sa1100_wdt.c                |    1 +
- include/linux/dma-mapping.h                  |    2 +-
- sound/arm/pxa2xx-ac97-lib.c                  |    1 +
- sound/arm/pxa2xx-ac97.c                      |    1 +
- sound/soc/pxa/pxa2xx-ac97.c                  |    1 +
- 18 files changed, 19 insertions(+), 9 deletions(-)
