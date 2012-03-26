@@ -1,56 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Mar 2012 09:06:02 -0600
-Subject: uImage with integrated dtb file
-In-Reply-To: <4F6E5D5B.8050306@antcom.de>
-References: <4F6E5D5B.8050306@antcom.de>
-Message-ID: <4F7085DA.6030402@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Mar 2012 16:15:19 +0100
+Subject: [Android-virt] [PATCH] ARM: test for PMU feature on v7 (v2 with
+ typo fix)
+In-Reply-To: <CAFEAcA-S3pN0AihjMZdchRyvFpifvKN8rNytpEP_iaA3H5RWfQ@mail.gmail.com>
+References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
+ <87r4wk889a.fsf@rustcorp.com.au>
+ <20120323095314.GA13622@mudshark.cambridge.arm.com>
+ <87fwcy9abw.fsf@rustcorp.com.au>
+ <20120326094054.GA2475@mudshark.cambridge.arm.com>
+ <CAFEAcA-S3pN0AihjMZdchRyvFpifvKN8rNytpEP_iaA3H5RWfQ@mail.gmail.com>
+Message-ID: <20120326151519.GJ2475@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2012 05:48 PM, Roland Stigge wrote:
-> Hi,
+On Mon, Mar 26, 2012 at 10:50:35AM +0100, Peter Maydell wrote:
+> On 26 March 2012 10:40, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Mar 23, 2012 at 11:17:07PM +0000, Rusty Russell wrote:
+> >>
+> >> OK, I see that argument, but I don't like it. ?eg. the Cortex A-15 is
+> >> defined to have a PMUv2 with 6 counters, and below you're arguing we
+> >> should implement zero of them.
+> >
+> > Well, I think you should actually implement all 6 of them if that's the
+> > target which you're emulating.
 > 
-> since I will need to maintain some machines with DT enabled kernels but 
-> containing a U-Boot without DT support, I sometimes need to integrate a 
-> dtb file into uImage.
-> 
-> I'm sure others have got the same issue. But searching for a while I 
-> only got older/meanwhile neglected approaches like:
-> 
-> git://kernel.ubuntu.com/jk/dt/linux-2.6.git - branch: dtbimage
-> 
-> I'm currently using a simple hack like attached below.
-...
-> --- a/arch/arm/boot/Makefile
-...
->  quiet_cmd_uimage = UIMAGE  $@
-> -      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
-> +      cmd_uimage = cat $< arch/arm/boot/*.dtb > $<.tmp ; \
+> The trouble with this line of thought is that it leads to the requirement
+> to support nested virtualization and virtualization of TrustZone, neither
+> of which are actually particularly useful or simple to do. At some point
+> we're going to end up saying that the "A15" we expose to the guest is
+> not an exact match to the real hardware, that it's missing certain
+> features (and hopefully that the lack of those features is advertised
+> via the feature registers). So the question is where you draw the line...
 
-That won't work well when multiple .dtb files are built. That's
-certainly common for Tegra, and probably most subarchs.
+I'd be inclined to say that, at least for kvm, you should draw the line at
+the point where the guest doesn't need modifications to run in the virtual
+environment. That is, everything used by Linux is emulated enough for the
+kernel to run happily. Clearly you can improve on that in the areas which
+are considered to be most critical.
 
-The concatenation should be optional; people not using
-CONFIG_APPENDED_DTB (hopefully the majority) wouldn't want this for example.
+Aside: given that guests have to run non-secure, how would you emulate a
+secure platform without emulating the corresponding TrustZone API? Or is
+that one of the reasons why you're currently targetting Versatile Express?
 
-Please be aware of:
-
-https://lkml.org/lkml/2012/3/16/450
-Kbuild: centralize MKIMAGE and cmd_uimage definitions
-
-I believe previous discussion around this topic has resolved into people
-not wanting to make CONFIG_APPENDED_DTB to easy to use, so that people
-who don't need to use it won't be tempted to just use it instead of
-explicit FDT support in bootloaders. For example, see:
-
-https://lkml.org/lkml/2011/8/2/200
-Build a uImage with dtb already appended
-
-... which Grant has specifically stated he didn't want applied upstream
-for the reason I mention above.
-
-> +                  $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
->                    -C none -a $(LOADADDR) -e $(STARTADDR) \
-> -                  -n 'Linux-$(KERNELRELEASE)' -d $< $@
-> +                  -n 'Linux-$(KERNELRELEASE)' -d $<.tmp $@ ; \
-> +                  rm -f $<.tmp
+Will
