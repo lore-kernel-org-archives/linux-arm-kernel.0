@@ -1,35 +1,31 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Mon, 26 Mar 2012 19:23:44 +0200
-Subject: [PATCH v2.1 01/10] cpu: Introduce clear_tasks_mm_cpumask() helper
-In-Reply-To: <20120326170443.GA25229@redhat.com>
-References: <20120324102609.GA28356@lizard> <20120324102751.GA29067@lizard>
- <1332593021.16159.27.camel@twins> <20120324164316.GB3640@lizard>
- <20120325174210.GA23605@redhat.com> <1332748746.16159.62.camel@twins>
- <20120326170443.GA25229@redhat.com>
-Message-ID: <1332782624.16159.145.camel@twins>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 26 Mar 2012 15:09:34 -0300
+Subject: [PATCH 4/4] ARM i.MX 3ds debugboard: register a dummy regulator
+ for the smsc911x device
+In-Reply-To: <1330774804-7310-5-git-send-email-s.hauer@pengutronix.de>
+References: <1330774804-7310-1-git-send-email-s.hauer@pengutronix.de>
+ <1330774804-7310-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CAOMZO5DL8YQT2qb=vxdQtdN+zfZLK9H9_1qu5sS+1YAvSo5SAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-03-26 at 19:04 +0200, Oleg Nesterov wrote:
+Hi Sascha,
 
-> Interesting... Why? I mean, why do you dislike stop_machine() in
-> _cpu_down() ? Just curious.
+On Sat, Mar 3, 2012 at 8:40 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-It disturbs all cpus, the -rt people don't like that their FIFO tasks
-don't get to run, the trading people don't like their RDMA poll loops to
-be interrupted.. etc.
+...
+> ? ? ? ?/* Register Lan device on the debugboard */
+> + ? ? ? regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
 
-Now arguably, one should simply not do hotplug crap while such things
-are running, and mostly that's a perfectly fine constraint. But it
-doesn't help that people view cpu hotplug as a power savings or resource
-provisioning 'feature' and there's userspace daemons that plug
-on-demand.
+I am using linux-next, which has this patch applied and I am getting:
 
-But my ultimate goal is to completely remove synchronization that is
-actively machine wide, since we all know that as long as such stuff
-exists people will want to use it.
+smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
+smsc911x smsc911x.0: (unregistered net_device): couldn't get regulators -517
+platform smsc911x.0: Driver smsc911x requests probe deferral
 
-Now I don't know we'll ever fully get there -- see the BKL saga -- but
-its worth trying I think. The module unload and esp. the text_poke usage
-of stop_machine are much worse offenders, since both those are
-relatively common and much harder to avoid.
+Does this work for you on pcm037?
+
+If I select CONFIG_REGULATOR_DUMMY then the the smsc driver is probed
+correctly, but if I understand correctly your suggestion was to not
+select CONFIG_REGULATOR_DUMMY, right?
