@@ -1,45 +1,20 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 26 Mar 2012 16:52:55 +0000
-Subject: [PATCH] ARM: kirkwood: fdt: use IEEE1275 status = "okay".
-In-Reply-To: <4F70991E.1000204@freescale.com>
-References: <4F70991E.1000204@freescale.com>
-Message-ID: <1332780775-3694-1-git-send-email-jason@lakedaemon.net>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 26 Mar 2012 18:48:23 +0200
+Subject: uImage with integrated dtb file
+In-Reply-To: <4F7085DA.6030402@wwwdotorg.org>
+References: <4F6E5D5B.8050306@antcom.de> <4F7085DA.6030402@wwwdotorg.org>
+Message-ID: <4F709DD7.2080606@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- - This should prevent others from making the same mistake I did when searching
-   the code.
+On 26/03/12 17:06, Stephen Warren wrote:
+>>  quiet_cmd_uimage = UIMAGE  $@
+>> -      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+>> +      cmd_uimage = cat $< arch/arm/boot/*.dtb > $<.tmp ; \
+> 
+> That won't work well when multiple .dtb files are built.
 
- arch/arm/boot/dts/kirkwood-dreamplug.dts |    2 +-
- drivers/of/base.c                        |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
+That's completely correct! Therefore I called it "hack" (maybe
+forgetting to prefix it "ugly"), so please don't use it. ;-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index a5376b8..7b2b961 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -18,7 +18,7 @@
- 	ocp at f1000000 {
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
--			status = "ok";
-+			status = "okay";
- 		};
- 	};
- };
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 133908a..31eac15 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -285,6 +285,7 @@ int of_device_is_available(const struct device_node *device)
- 		return 1;
- 
- 	if (statlen > 0) {
-+		/* new boards should use "okay" according to IEEE1275 */
- 		if (!strcmp(status, "okay") || !strcmp(status, "ok"))
- 			return 1;
- 	}
--- 
-1.7.3.4
+Roland
