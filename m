@@ -1,85 +1,30 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 26 Mar 2012 14:16:40 +0530
-Subject: [PATCH v3 2/2] ARM: Exynos: Use lcd power control driver for lcd panel
-In-Reply-To: <1332751600-11371-1-git-send-email-thomas.abraham@linaro.org>
-References: <1332751600-11371-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1332751600-11371-3-git-send-email-thomas.abraham@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Mar 2012 08:47:37 +0000
+Subject: ioremap to a specific virtual address
+In-Reply-To: <201203251734.41780.arnd@arndb.de>
+References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+ <CAKON4OwhcFDMC4dWjU7x4u2CPT7C2BxVuCDkTN0j14gTndi3tA@mail.gmail.com>
+ <201203251734.41780.arnd@arndb.de>
+Message-ID: <201203260847.38176.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hydis hv070wsa lcd panel used with the Origen board uses a gpio
-for reset and the Vcc supply to the panel can be controlled using
-a voltage regulator. Switch to using the lcd power control driver
-for controlling the power to the lcd panel.
+On Sunday 25 March 2012, Arnd Bergmann wrote:
+>                         /* mpmc configuration */
+>                         mpmc-static-config     = <0x81>;
+>                         mpmc-static-wait-wen   = <1>;
+>                         mpmc-static-wait-oen   = <1>;
+>                         mpmc-static-wait-rd    = <4>;
+>                         mpmc-static-wait-page  = <1>;
+>                         mpmc-static-wait-write = <1>;
+>                         mpmc-static-wait-turn  = <2>;
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos/mach-origen.c |   29 ++++++-----------------------
- 1 files changed, 6 insertions(+), 23 deletions(-)
+On second though, I guess you can turn these into a single
+property named "mpmc-timings" or such and then just copy
+them to the registers.
 
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index d3b2e9d..6c4997c 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -26,7 +26,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- 
--#include <video/platform_lcd.h>
-+#include <video/lcd_pwrctrl.h>
- 
- #include <plat/regs-serial.h>
- #include <plat/regs-fb-v4.h>
-@@ -129,7 +129,7 @@ static struct regulator_consumer_supply __initdata buck3_consumer[] = {
- 	REGULATOR_SUPPLY("vdd_g3d", "mali_drm"), /* G3D */
- };
- static struct regulator_consumer_supply __initdata buck7_consumer[] = {
--	REGULATOR_SUPPLY("vcc", "platform-lcd"), /* LCD */
-+	REGULATOR_SUPPLY("vcc-lcd", "lcd-pwrctrl.0"), /* LCD */
- };
- 
- static struct regulator_init_data __initdata max8997_ldo1_data = {
-@@ -384,7 +384,7 @@ static struct regulator_init_data __initdata max8997_buck7_data = {
- 		.name		= "VDD_LCD_3.3V",
- 		.min_uV		= 3300000,
- 		.max_uV		= 3300000,
--		.boot_on	= 1,
-+		.boot_on	= 0,
- 		.apply_uV	= 1,
- 		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
- 		.state_mem	= {
-@@ -553,29 +553,12 @@ static struct platform_device origen_device_gpiokeys = {
- 	},
- };
- 
--static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
--{
--	int ret;
--
--	if (power)
--		ret = gpio_request_one(EXYNOS4_GPE3(4),
--					GPIOF_OUT_INIT_HIGH, "GPE3_4");
--	else
--		ret = gpio_request_one(EXYNOS4_GPE3(4),
--					GPIOF_OUT_INIT_LOW, "GPE3_4");
--
--	gpio_free(EXYNOS4_GPE3(4));
--
--	if (ret)
--		pr_err("failed to request gpio for LCD power: %d\n", ret);
--}
--
--static struct plat_lcd_data origen_lcd_hv070wsa_data = {
--	.set_power = lcd_hv070wsa_set_power,
-+static struct lcd_pwrctrl_data origen_lcd_hv070wsa_data = {
-+	.gpio	= EXYNOS4_GPE3(4),
- };
- 
- static struct platform_device origen_lcd_hv070wsa = {
--	.name			= "platform-lcd",
-+	.name			= "lcd-pwrctrl",
- 	.dev.parent		= &s5p_device_fimd0.dev,
- 	.dev.platform_data	= &origen_lcd_hv070wsa_data,
- };
--- 
-1.6.6.rc2
+I also wonder whether the timings are actually correct for your
+dm9000 device. Maybe the additional gpio read in there was
+just an indication that someone worked around incorrect timings?
+
+	Arnd
