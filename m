@@ -1,70 +1,45 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Mon, 26 Mar 2012 17:36:10 +0100 (BST)
-Subject: [PATCH V2 3/3] ARM: kirkwood: Define NAND partitions in dts
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 26 Mar 2012 16:52:55 +0000
+Subject: [PATCH] ARM: kirkwood: fdt: use IEEE1275 status = "okay".
 In-Reply-To: <4F70991E.1000204@freescale.com>
-References: <1332594876-8673-1-git-send-email-jm@lentin.co.uk>
- <1332594876-8673-4-git-send-email-jm@lentin.co.uk>
- <4F7090F9.5000603@freescale.com> <20120326162050.GT2484@titan.lakedaemon.net>
- <4F70991E.1000204@freescale.com>
-Message-ID: <alpine.DEB.2.00.1203261730590.23719@marmot.wormnet.eu>
+References: <4F70991E.1000204@freescale.com>
+Message-ID: <1332780775-3694-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Mar 2012, Scott Wood wrote:
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ - This should prevent others from making the same mistake I did when searching
+   the code.
 
-> On 03/26/2012 11:20 AM, Jason Cooper wrote:
->> On Mon, Mar 26, 2012 at 10:53:29AM -0500, Scott Wood wrote:
->>> On 03/24/2012 08:14 AM, Jamie Lentin wrote:
->>>> Use devicetree to define NAND partitions. Use D-link partition scheme by
->>>> default, to be vaguely compatible with their userland.
->>>>
->>>> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
->>>> ---
->>>>  arch/arm/boot/dts/kirkwood-dns320.dts |   35 +++++++++++++++++++++++++++++++++
->>>>  arch/arm/boot/dts/kirkwood-dns325.dts |   35 +++++++++++++++++++++++++++++++++
->>>>  arch/arm/mach-kirkwood/board-dnskw.c  |   31 -----------------------------
->>>>  3 files changed, 70 insertions(+), 31 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
->>>> index 58de7f2..fbf55ff 100644
->>>> --- a/arch/arm/boot/dts/kirkwood-dns320.dts
->>>> +++ b/arch/arm/boot/dts/kirkwood-dns320.dts
->>>> @@ -25,5 +25,40 @@
->>>>  			clock-frequency = <166666667>;
->>>>  			status = "ok";
->>>>  		};
->>>> +
->>>> +		nand at 3000000 {
->>>> +			status = "ok";
->>>> +
->>>
->>> This should be "okay", not "ok" -- see IEEE1275.  Or just leave it out.
->>
->> Ack, but it needs to be there.  Most, but not all, kirkwood boards have
->> nand, so we define it in kirkwood.dtsi and set it as disabled.
->> Individual boards can then enable it as needed.
->>
->> As for 'okay', looks like we may need to patch of_device_is_available()
->> in drivers/of/base.c (~284) if we want to be consistent with IEEE1275.
->
-> No need to change of_device_is_available() -- it handles the
-> standards-compliant "okay" as well as "ok" which is non-compliant but
-> probably exists in some broken real OF trees (and even if not, it's bad
-> to break compatibility with older device trees without a good reason).
->
-> Maybe add a comment indicating which should be used.
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |    2 +-
+ drivers/of/base.c                        |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
-I need to re-jig this part anyway, so will update to "okay" too---looks 
-like a fairly harmless change.
-
-Would it make sense to change drivers/of/base.c to emit a warning if "ok" 
-is used? Or are there already too many devicetrees in the wild that use 
-"ok"?
-
->
-> -Scott
->
->
-
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index a5376b8..7b2b961 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -18,7 +18,7 @@
+ 	ocp at f1000000 {
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
+-			status = "ok";
++			status = "okay";
+ 		};
+ 	};
+ };
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 133908a..31eac15 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -285,6 +285,7 @@ int of_device_is_available(const struct device_node *device)
+ 		return 1;
+ 
+ 	if (statlen > 0) {
++		/* new boards should use "okay" according to IEEE1275 */
+ 		if (!strcmp(status, "okay") || !strcmp(status, "ok"))
+ 			return 1;
+ 	}
 -- 
-Jamie Lentin
+1.7.3.4
