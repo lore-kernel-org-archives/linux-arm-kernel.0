@@ -1,82 +1,1407 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 26 Mar 2012 17:13:56 +0530
-Subject: [PATCH 0/5] SPEAr DT support updates
-Message-ID: <cover.1332762103.git.viresh.kumar@st.com>
+Date: Mon, 26 Mar 2012 17:14:00 +0530
+Subject: [PATCH 4/5] SPEAr: Add PL080 DMA support for 3xx and 6xx
+In-Reply-To: <cover.1332762103.git.viresh.kumar@st.com>
+References: <cover.1332762103.git.viresh.kumar@st.com>
+Message-ID: <ef2f5015b01a46ea83e994f7e28d13e6ecaef0de.1332762104.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Both SPEAr3xx and SPEAr6xx families have one instance of ARM PL080 DMA
+controller. This patch adds in support for that.
 
-This patchset updates DT support for SPEAr3xx and 6xx.
-It has following changes:
-- updates DT support Mainly for SPEAr3xx family
-- updates dma support for SPEAr6xx
-- updates defconfig
-
-It has dependency on following patchsets:
-- ehci & ohci: http://www.spinics.net/lists/linux-usb/msg60362.html
-- rtc: http://lkml.org/lkml/2012/3/26/96
-- keyboard: Link not yet available:
-  subject: Input: spear-keyboard: add device tree bindings
-- SPEAr patches: http://comments.gmane.org/gmane.linux.ports.arm.kernel/158865
-
-Viresh Kumar (5):
-  SPEAr6xx: Add compilation support for dtbs using 'make dtbs'
-  SPEAr3xx: Replace printk() with pr_*()
-  ARM: SPEAr3xx: Add device-tree support to SPEAr3xx architecture
-  SPEAr: Add PL080 DMA support for 3xx and 6xx
-  SPEAr: Update defconfigs
-
- Documentation/arm/SPEAr/overview.txt            |   13 +-
- Documentation/devicetree/bindings/arm/spear.txt |   18 ++
- arch/arm/Makefile                               |    6 +-
- arch/arm/boot/dts/spear300-evb.dts              |  181 +++++++++++
- arch/arm/boot/dts/spear300.dtsi                 |   74 +++++
- arch/arm/boot/dts/spear310-evb.dts              |  102 +++++++
- arch/arm/boot/dts/spear310.dtsi                 |   75 +++++
- arch/arm/boot/dts/spear320-evb.dts              |  110 +++++++
- arch/arm/boot/dts/spear320.dtsi                 |   92 ++++++
- arch/arm/boot/dts/spear3xx.dtsi                 |  151 +++++++++
- arch/arm/boot/dts/spear600-evb.dts              |    4 +
- arch/arm/boot/dts/spear600.dtsi                 |    8 +
- arch/arm/configs/spear3xx_defconfig             |   52 +++-
- arch/arm/configs/spear6xx_defconfig             |   41 ++-
- arch/arm/mach-spear3xx/Kconfig                  |   40 +--
- arch/arm/mach-spear3xx/Makefile                 |   19 +-
- arch/arm/mach-spear3xx/Makefile.boot            |    4 +
- arch/arm/mach-spear3xx/clock.c                  |   93 +++---
- arch/arm/mach-spear3xx/include/mach/generic.h   |   48 ++-
- arch/arm/mach-spear3xx/include/mach/irqs.h      |    6 +-
- arch/arm/mach-spear3xx/include/mach/spear300.h  |    4 +-
- arch/arm/mach-spear3xx/include/mach/spear310.h  |    4 +-
- arch/arm/mach-spear3xx/include/mach/spear320.h  |    4 +-
- arch/arm/mach-spear3xx/spear300.c               |  253 +++++++++++++--
- arch/arm/mach-spear3xx/spear300_evb.c           |   75 -----
- arch/arm/mach-spear3xx/spear310.c               |  293 ++++++++++++++++--
- arch/arm/mach-spear3xx/spear310_evb.c           |   81 -----
- arch/arm/mach-spear3xx/spear320.c               |  293 ++++++++++++++++--
- arch/arm/mach-spear3xx/spear320_evb.c           |   79 -----
- arch/arm/mach-spear3xx/spear3xx.c               |  131 ++++++--
- arch/arm/mach-spear6xx/Makefile.boot            |    2 +
- arch/arm/mach-spear6xx/clock.c                  |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c               |  372 ++++++++++++++++++++++-
- arch/arm/plat-spear/Kconfig                     |    5 +-
- arch/arm/plat-spear/Makefile                    |    4 +-
- arch/arm/plat-spear/include/plat/pl080.h        |   21 ++
- arch/arm/plat-spear/pl080.c                     |   79 +++++
- 37 files changed, 2371 insertions(+), 468 deletions(-)
- create mode 100644 arch/arm/boot/dts/spear300-evb.dts
- create mode 100644 arch/arm/boot/dts/spear300.dtsi
- create mode 100644 arch/arm/boot/dts/spear310-evb.dts
- create mode 100644 arch/arm/boot/dts/spear310.dtsi
- create mode 100644 arch/arm/boot/dts/spear320-evb.dts
- create mode 100644 arch/arm/boot/dts/spear320.dtsi
- create mode 100644 arch/arm/boot/dts/spear3xx.dtsi
- delete mode 100644 arch/arm/mach-spear3xx/spear300_evb.c
- delete mode 100644 arch/arm/mach-spear3xx/spear310_evb.c
- delete mode 100644 arch/arm/mach-spear3xx/spear320_evb.c
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/boot/dts/spear300-evb.dts            |    4 +
+ arch/arm/boot/dts/spear310-evb.dts            |    4 +
+ arch/arm/boot/dts/spear320-evb.dts            |    4 +
+ arch/arm/boot/dts/spear3xx.dtsi               |    8 +
+ arch/arm/boot/dts/spear600-evb.dts            |    4 +
+ arch/arm/boot/dts/spear600.dtsi               |    8 +
+ arch/arm/mach-spear3xx/clock.c                |    2 +-
+ arch/arm/mach-spear3xx/include/mach/generic.h |    2 +
+ arch/arm/mach-spear3xx/spear300.c             |  190 +++++++++++++
+ arch/arm/mach-spear3xx/spear310.c             |  190 +++++++++++++
+ arch/arm/mach-spear3xx/spear320.c             |  190 +++++++++++++
+ arch/arm/mach-spear3xx/spear3xx.c             |   21 ++
+ arch/arm/mach-spear6xx/clock.c                |    2 +-
+ arch/arm/mach-spear6xx/spear6xx.c             |  372 ++++++++++++++++++++++++-
+ arch/arm/plat-spear/Makefile                  |    2 +-
+ arch/arm/plat-spear/include/plat/pl080.h      |   21 ++
+ arch/arm/plat-spear/pl080.c                   |   79 ++++++
+ 17 files changed, 1099 insertions(+), 4 deletions(-)
  create mode 100644 arch/arm/plat-spear/include/plat/pl080.h
  create mode 100644 arch/arm/plat-spear/pl080.c
 
+diff --git a/arch/arm/boot/dts/spear300-evb.dts b/arch/arm/boot/dts/spear300-evb.dts
+index be3df48..4764ba3 100644
+--- a/arch/arm/boot/dts/spear300-evb.dts
++++ b/arch/arm/boot/dts/spear300-evb.dts
+@@ -29,6 +29,10 @@
+ 			status = "okay";
+ 		};
+ 
++		dma at fc400000 {
++			status = "okay";
++		};
++
+ 		fsmc: flash at 94000000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/spear310-evb.dts b/arch/arm/boot/dts/spear310-evb.dts
+index 1e14bf3..e46496f 100644
+--- a/arch/arm/boot/dts/spear310-evb.dts
++++ b/arch/arm/boot/dts/spear310-evb.dts
+@@ -25,6 +25,10 @@
+ 	};
+ 
+ 	ahb {
++		dma at fc400000 {
++			status = "okay";
++		};
++
+ 		fsmc: flash at 44000000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
+index 7dea99c..ca72645 100644
+--- a/arch/arm/boot/dts/spear320-evb.dts
++++ b/arch/arm/boot/dts/spear320-evb.dts
+@@ -29,6 +29,10 @@
+ 			status = "okay";
+ 		};
+ 
++		dma at fc400000 {
++			status = "okay";
++		};
++
+ 		fsmc: flash at 4c000000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/spear3xx.dtsi b/arch/arm/boot/dts/spear3xx.dtsi
+index 1a85ff2..dc85461 100644
+--- a/arch/arm/boot/dts/spear3xx.dtsi
++++ b/arch/arm/boot/dts/spear3xx.dtsi
+@@ -38,6 +38,14 @@
+ 			#interrupt-cells = <1>;
+ 		};
+ 
++		dma at fc400000 {
++			compatible = "arm,pl080", "arm,primecell";
++			reg = <0xfc400000 0x1000>;
++			interrupt-parent = <&vic>;
++			interrupts = <8>;
++			status = "disabled";
++		};
++
+ 		gmac: eth at e0800000 {
+ 			compatible = "st,spear600-gmac";
+ 			reg = <0xe0800000 0x8000>;
+diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+index 636292e..790a7a8 100644
+--- a/arch/arm/boot/dts/spear600-evb.dts
++++ b/arch/arm/boot/dts/spear600-evb.dts
+@@ -24,6 +24,10 @@
+ 	};
+ 
+ 	ahb {
++		dma at fc400000 {
++			status = "okay";
++		};
++
+ 		gmac: ethernet at e0800000 {
+ 			phy-mode = "gmii";
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+index ebe0885..d777e3a 100644
+--- a/arch/arm/boot/dts/spear600.dtsi
++++ b/arch/arm/boot/dts/spear600.dtsi
+@@ -45,6 +45,14 @@
+ 			#interrupt-cells = <1>;
+ 		};
+ 
++		dma at fc400000 {
++			compatible = "arm,pl080", "arm,primecell";
++			reg = <0xfc400000 0x1000>;
++			interrupt-parent = <&vic1>;
++			interrupts = <10>;
++			status = "disabled";
++		};
++
+ 		gmac: ethernet at e0800000 {
+ 			compatible = "st,spear600-gmac";
+ 			reg = <0xe0800000 0x8000>;
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index 1e2ddd0..d073133 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -683,7 +683,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	/* clock derived from ahb clk */
+ 	CLKDEV_INIT(NULL, "apb_clk", &apb_clk),
+ 	CLKDEV_INIT("d0180000.i2c", NULL, &i2c_clk),
+-	CLKDEV_INIT("dma", NULL, &dma_clk),
++	CLKDEV_INIT("fc400000.dma", NULL, &dma_clk),
+ 	CLKDEV_INIT("jpeg", NULL, &jpeg_clk),
+ 	CLKDEV_INIT("e080000.eth", NULL, &gmac_clk),
+ 	CLKDEV_INIT("fc000000.flash", NULL, &smi_clk),
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 3469377..882b074 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -14,6 +14,7 @@
+ #ifndef __MACH_GENERIC_H
+ #define __MACH_GENERIC_H
+ 
++#include <linux/amba/pl08x.h>
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+@@ -33,6 +34,7 @@
+ 
+ /* Add spear3xx family device structure declarations here */
+ extern struct sys_timer spear3xx_timer;
++extern struct pl08x_platform_data pl080_plat_data;
+ 
+ /* Add spear3xx family function declarations here */
+ void __init spear3xx_clk_init(void);
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 4d0f6c7..3a6e888 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -19,6 +19,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/types.h>
+ #include <linux/amba/pl061.h>
++#include <linux/amba/pl08x.h>
+ #include <linux/ptrace.h>
+ #include <asm/irq.h>
+ #include <plat/shirq.h>
+@@ -429,6 +430,193 @@ static struct spear_shirq shirq_ras1 = {
+ 	},
+ };
+ 
++/* DMAC platform data's slave info */
++struct pl08x_channel_data spear300_dma_info[] = {
++	{
++		.bus_id = "uart0_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "uart0_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp0_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp0_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "irda",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "adc",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "to_jpeg",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "from_jpeg",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras0_rx",
++		.min_signal = 0,
++		.max_signal = 0,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras0_tx",
++		.min_signal = 1,
++		.max_signal = 1,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras1_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras1_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras2_rx",
++		.min_signal = 4,
++		.max_signal = 4,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras2_tx",
++		.min_signal = 5,
++		.max_signal = 5,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras3_rx",
++		.min_signal = 6,
++		.max_signal = 6,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras3_tx",
++		.min_signal = 7,
++		.max_signal = 7,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras4_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras4_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras5_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras5_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras6_rx",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras6_tx",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras7_rx",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras7_tx",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	},
++};
++
+ static struct pl061_platform_data pl061_plat_data = {
+ 	.gpio_base	= 8,
+ 	.irq_base	= SPEAR300_GPIO1_INT_BASE,
+@@ -461,6 +649,8 @@ int __init spear300_init(void)
+ {
+ 	int ret = 0;
+ 
++	pl080_plat_data.slave_channels = spear300_dma_info;
++	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear300_dma_info);
+ 
+ 	/* shared irq registration */
+ 	shirq_ras1.regs.base = ioremap(SPEAR300_TELECOM_BASE, SZ_4K);
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index 90156bf..e2d8021 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -13,6 +13,7 @@
+ 
+ #define pr_fmt(fmt) "SPEAr310: " fmt
+ 
++#include <linux/amba/pl08x.h>
+ #include <linux/amba/serial.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -262,6 +263,193 @@ static struct spear_shirq shirq_intrcomm_ras = {
+ 	},
+ };
+ 
++/* DMAC platform data's slave info */
++struct pl08x_channel_data spear310_dma_info[] = {
++	{
++		.bus_id = "uart0_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "uart0_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp0_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp0_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "irda",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "adc",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "to_jpeg",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "from_jpeg",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras0_rx",
++		.min_signal = 0,
++		.max_signal = 0,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras0_tx",
++		.min_signal = 1,
++		.max_signal = 1,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras1_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras1_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras2_rx",
++		.min_signal = 4,
++		.max_signal = 4,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras2_tx",
++		.min_signal = 5,
++		.max_signal = 5,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras3_rx",
++		.min_signal = 6,
++		.max_signal = 6,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras3_tx",
++		.min_signal = 7,
++		.max_signal = 7,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras4_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras4_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras5_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras5_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras6_rx",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras6_tx",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras7_rx",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras7_tx",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	},
++};
++
+ /* uart devices plat data */
+ static struct amba_pl011_data uart_data[] = {
+ 	{
+@@ -327,6 +515,8 @@ int __init spear310_init(void)
+ 	void __iomem *base;
+ 	int ret = 0;
+ 
++	pl080_plat_data.slave_channels = spear310_dma_info;
++	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear310_dma_info);
+ 
+ 	/* shared irq registration */
+ 	base = ioremap(SPEAR310_SOC_CONFIG_BASE, SZ_4K);
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 582d1af..3668ea9 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -14,6 +14,7 @@
+ #define pr_fmt(fmt) "SPEAr320: " fmt
+ 
+ #include <linux/amba/pl022.h>
++#include <linux/amba/pl08x.h>
+ #include <linux/amba/serial.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -516,6 +517,193 @@ static struct spear_shirq shirq_intrcomm_ras = {
+ 	},
+ };
+ 
++/* DMAC platform data's slave info */
++struct pl08x_channel_data spear320_dma_info[] = {
++	{
++		.bus_id = "uart0_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "uart0_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp0_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp0_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c0_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c0_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "irda",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "adc",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "to_jpeg",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "from_jpeg",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp1_rx",
++		.min_signal = 0,
++		.max_signal = 0,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ssp1_tx",
++		.min_signal = 1,
++		.max_signal = 1,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ssp2_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ssp2_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "uart1_rx",
++		.min_signal = 4,
++		.max_signal = 4,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "uart1_tx",
++		.min_signal = 5,
++		.max_signal = 5,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "uart2_rx",
++		.min_signal = 6,
++		.max_signal = 6,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "uart2_tx",
++		.min_signal = 7,
++		.max_signal = 7,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "i2c1_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "i2c1_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "i2c2_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "i2c2_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "i2s_rx",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "i2s_tx",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "rs485_rx",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "rs485_tx",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	},
++};
++
+ static struct pl022_ssp_controller ssp_data[] = {
+ 	{
+ 		.bus_id = 1,
+@@ -582,6 +770,8 @@ int __init spear320_init(void)
+ 	void __iomem *base;
+ 	int ret = 0;
+ 
++	pl080_plat_data.slave_channels = spear320_dma_info;
++	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear320_dma_info);
+ 
+ 	/* shared irq registration */
+ 	base = ioremap(SPEAR320_SOC_CONFIG_BASE, SZ_4K);
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index a2bfb86..90cd9fb 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -15,6 +15,7 @@
+ 
+ #include <linux/amba/pl022.h>
+ #include <linux/amba/pl061.h>
++#include <linux/amba/pl08x.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+@@ -22,9 +23,11 @@
+ #include <linux/types.h>
+ #include <linux/ptrace.h>
+ #include <linux/io.h>
++#include <asm/hardware/pl080.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/irq.h>
+ #include <asm/mach/arch.h>
++#include <plat/pl080.h>
+ #include <mach/generic.h>
+ #include <mach/hardware.h>
+ 
+@@ -53,6 +56,22 @@ static struct pl061_platform_data pl061_plat_data = {
+ 	.irq_base	= SPEAR3XX_GPIO_INT_BASE,
+ };
+ 
++/* dmac device registration */
++struct pl08x_platform_data pl080_plat_data = {
++	.memcpy_channel = {
++		.bus_id = "memcpy",
++		.cctl = (PL080_BSIZE_16 << PL080_CONTROL_SB_SIZE_SHIFT | \
++			PL080_BSIZE_16 << PL080_CONTROL_DB_SIZE_SHIFT | \
++			PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT | \
++			PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT | \
++			PL080_CONTROL_PROT_BUFF | PL080_CONTROL_PROT_CACHE | \
++			PL080_CONTROL_PROT_SYS),
++	},
++	.lli_buses = PL08X_AHB1,
++	.mem_buses = PL08X_AHB1,
++	.get_signal = pl080_get_signal,
++	.put_signal = pl080_put_signal,
++};
+ 
+ /* Add auxdata to pass platform data */
+ struct of_dev_auxdata spear3xx_auxdata_lookup[] __initdata = {
+@@ -60,6 +79,8 @@ struct of_dev_auxdata spear3xx_auxdata_lookup[] __initdata = {
+ 			&pl022_plat_data),
+ 	OF_DEV_AUXDATA("arm,pl061", SPEAR3XX_ICM3_GPIO_BASE, NULL,
+ 			&pl061_plat_data),
++	OF_DEV_AUXDATA("arm,pl080", SPEAR3XX_ICM3_DMA_BASE, NULL,
++			&pl080_plat_data),
+ 	{}
+ };
+ 
+diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+index 5a46980..adadef2 100644
+--- a/arch/arm/mach-spear6xx/clock.c
++++ b/arch/arm/mach-spear6xx/clock.c
+@@ -657,7 +657,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	/* clock derived from ahb clk */
+ 	CLKDEV_INIT(NULL, "apb_clk", &apb_clk),
+ 	CLKDEV_INIT("d0200000.i2c", NULL, &i2c_clk),
+-	CLKDEV_INIT("dma", NULL, &dma_clk),
++	CLKDEV_INIT("fc400000.dma", NULL, &dma_clk),
+ 	CLKDEV_INIT("jpeg", NULL, &jpeg_clk),
+ 	CLKDEV_INIT("gmac", NULL, &gmac_clk),
+ 	CLKDEV_INIT("fc000000.flash", NULL, &smi_clk),
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index d436118..8bbbee3 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -13,15 +13,377 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#include <linux/amba/pl08x.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <asm/hardware/pl080.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/mach/arch.h>
++#include <plat/pl080.h>
+ #include <mach/generic.h>
+ #include <mach/hardware.h>
+ 
++/* dmac device registration */
++static struct pl08x_channel_data spear600_dma_info[] = {
++	{
++		.bus_id = "ssp1_rx",
++		.min_signal = 0,
++		.max_signal = 0,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp1_tx",
++		.min_signal = 1,
++		.max_signal = 1,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "uart0_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "uart0_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "uart1_rx",
++		.min_signal = 4,
++		.max_signal = 4,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "uart1_tx",
++		.min_signal = 5,
++		.max_signal = 5,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp2_rx",
++		.min_signal = 6,
++		.max_signal = 6,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ssp2_tx",
++		.min_signal = 7,
++		.max_signal = 7,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ssp0_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ssp0_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "i2c_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "irda",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "adc",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "to_jpeg",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "from_jpeg",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 0,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras0_rx",
++		.min_signal = 0,
++		.max_signal = 0,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras0_tx",
++		.min_signal = 1,
++		.max_signal = 1,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras1_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras1_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras2_rx",
++		.min_signal = 4,
++		.max_signal = 4,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras2_tx",
++		.min_signal = 5,
++		.max_signal = 5,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras3_rx",
++		.min_signal = 6,
++		.max_signal = 6,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras3_tx",
++		.min_signal = 7,
++		.max_signal = 7,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras4_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras4_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras5_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras5_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras6_rx",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras6_tx",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras7_rx",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ras7_tx",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 1,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB1,
++	}, {
++		.bus_id = "ext0_rx",
++		.min_signal = 0,
++		.max_signal = 0,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext0_tx",
++		.min_signal = 1,
++		.max_signal = 1,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext1_rx",
++		.min_signal = 2,
++		.max_signal = 2,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext1_tx",
++		.min_signal = 3,
++		.max_signal = 3,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext2_rx",
++		.min_signal = 4,
++		.max_signal = 4,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext2_tx",
++		.min_signal = 5,
++		.max_signal = 5,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext3_rx",
++		.min_signal = 6,
++		.max_signal = 6,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext3_tx",
++		.min_signal = 7,
++		.max_signal = 7,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext4_rx",
++		.min_signal = 8,
++		.max_signal = 8,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext4_tx",
++		.min_signal = 9,
++		.max_signal = 9,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext5_rx",
++		.min_signal = 10,
++		.max_signal = 10,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext5_tx",
++		.min_signal = 11,
++		.max_signal = 11,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext6_rx",
++		.min_signal = 12,
++		.max_signal = 12,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext6_tx",
++		.min_signal = 13,
++		.max_signal = 13,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext7_rx",
++		.min_signal = 14,
++		.max_signal = 14,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	}, {
++		.bus_id = "ext7_tx",
++		.min_signal = 15,
++		.max_signal = 15,
++		.muxval = 2,
++		.cctl = 0,
++		.periph_buses = PL08X_AHB2,
++	},
++};
++
++struct pl08x_platform_data pl080_plat_data = {
++	.memcpy_channel = {
++		.bus_id = "memcpy",
++		.cctl = (PL080_BSIZE_16 << PL080_CONTROL_SB_SIZE_SHIFT | \
++			PL080_BSIZE_16 << PL080_CONTROL_DB_SIZE_SHIFT | \
++			PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT | \
++			PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT | \
++			PL080_CONTROL_PROT_BUFF | PL080_CONTROL_PROT_CACHE | \
++			PL080_CONTROL_PROT_SYS),
++	},
++	.lli_buses = PL08X_AHB1,
++	.mem_buses = PL08X_AHB1,
++	.get_signal = pl080_get_signal,
++	.put_signal = pl080_put_signal,
++	.slave_channels = spear600_dma_info,
++	.num_slave_channels = ARRAY_SIZE(spear600_dma_info),
++};
++
+ /* Following will create static virtual/physical mappings */
+ static struct map_desc spear6xx_io_desc[] __initdata = {
+ 	{
+@@ -92,9 +454,17 @@ struct sys_timer spear6xx_timer = {
+ 	.init = spear6xx_timer_init,
+ };
+ 
++/* Add auxdata to pass platform data */
++struct of_dev_auxdata spear6xx_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("arm,pl080", SPEAR6XX_ICM3_DMA_BASE, NULL,
++			&pl080_plat_data),
++	{}
++};
++
+ static void __init spear600_dt_init(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table,
++			spear6xx_auxdata_lookup, NULL);
+ }
+ 
+ static const char *spear600_dt_board_compat[] = {
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index 4b906bb..cc87823 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
+@@ -3,6 +3,6 @@
+ #
+ 
+ # Common support
+-obj-y	:= clock.o restart.o time.o
++obj-y	:= clock.o restart.o time.o pl080.o
+ 
+ obj-$(CONFIG_ARCH_SPEAR3XX_DT)	+= shirq.o padmux.o
+diff --git a/arch/arm/plat-spear/include/plat/pl080.h b/arch/arm/plat-spear/include/plat/pl080.h
+new file mode 100644
+index 0000000..e14a3e4
+--- /dev/null
++++ b/arch/arm/plat-spear/include/plat/pl080.h
+@@ -0,0 +1,21 @@
++/*
++ * arch/arm/plat-spear/include/plat/pl080.h
++ *
++ * DMAC pl080 definitions for SPEAr platform
++ *
++ * Copyright (C) 2012 ST Microelectronics
++ * Viresh Kumar <viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __PLAT_PL080_H
++#define __PLAT_PL080_H
++
++struct pl08x_dma_chan;
++int pl080_get_signal(struct pl08x_dma_chan *ch);
++void pl080_put_signal(struct pl08x_dma_chan *ch);
++
++#endif /* __PLAT_PL080_H */
+diff --git a/arch/arm/plat-spear/pl080.c b/arch/arm/plat-spear/pl080.c
+new file mode 100644
+index 0000000..d53d75e
+--- /dev/null
++++ b/arch/arm/plat-spear/pl080.c
+@@ -0,0 +1,79 @@
++/*
++ * arch/arm/plat-spear/pl080.c
++ *
++ * DMAC pl080 definitions for SPEAr platform
++ *
++ * Copyright (C) 2012 ST Microelectronics
++ * Viresh Kumar <viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/amba/pl08x.h>
++#include <linux/amba/bus.h>
++#include <linux/bug.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/spinlock_types.h>
++#include <mach/misc_regs.h>
++
++static spinlock_t lock = __SPIN_LOCK_UNLOCKED(x);
++
++struct {
++	unsigned char busy;
++	unsigned char val;
++} signals[16] = {{0, 0}, };
++
++int pl080_get_signal(struct pl08x_dma_chan *ch)
++{
++	const struct pl08x_channel_data *cd = ch->cd;
++	unsigned int signal = cd->min_signal, val;
++	unsigned long flags;
++
++	spin_lock_irqsave(&lock, flags);
++
++	/* Return if signal is already acquired by somebody else */
++	if (signals[signal].busy &&
++			(signals[signal].val != cd->muxval)) {
++		spin_unlock_irqrestore(&lock, flags);
++		return -EBUSY;
++	}
++
++	/* If acquiring for the first time, configure it */
++	if (!signals[signal].busy) {
++		val = readl(DMA_CHN_CFG);
++
++		/*
++		 * Each request line has two bits in DMA_CHN_CFG register. To
++		 * goto the bits of current request line, do left shift of
++		 * value by 2 * signal number.
++		 */
++		val &= ~(0x3 << (signal * 2));
++		val |= cd->muxval << (signal * 2);
++		writel(val, DMA_CHN_CFG);
++	}
++
++	signals[signal].busy++;
++	signals[signal].val = cd->muxval;
++	spin_unlock_irqrestore(&lock, flags);
++
++	return signal;
++}
++
++void pl080_put_signal(struct pl08x_dma_chan *ch)
++{
++	const struct pl08x_channel_data *cd = ch->cd;
++	unsigned long flags;
++
++	spin_lock_irqsave(&lock, flags);
++
++	/* if signal is not used */
++	if (!signals[cd->min_signal].busy)
++		BUG();
++
++	signals[cd->min_signal].busy--;
++
++	spin_unlock_irqrestore(&lock, flags);
++}
 -- 
 1.7.10.rc2.10.gb47606
