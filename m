@@ -1,62 +1,27 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 26 Mar 2012 15:07:22 -0700
-Subject: [PATCH 6/6] ARM: OMAP: fix cpufreq build
-In-Reply-To: <20120326083256.GC22608@n2100.arm.linux.org.uk> (Russell King's
- message of "Mon, 26 Mar 2012 09:32:56 +0100")
-References: <20120315102845.GB16389@n2100.arm.linux.org.uk>
- <E1S87xU-0000N8-6u@rmk-PC.arm.linux.org.uk>
- <20120326083256.GC22608@n2100.arm.linux.org.uk>
-Message-ID: <87ehsfrp7p.fsf@ti.com>
+Date: Mon, 26 Mar 2012 16:09:07 -0700
+Subject: [PATCH 9/9] ARM: omap: select CPU_FREQ_TABLE where needed
+In-Reply-To: <20120323182746.GF9859@atomide.com> (Tony Lindgren's message of
+ "Fri, 23 Mar 2012 11:27:46 -0700")
+References: <1332522836-29517-1-git-send-email-mathieu.poirier@linaro.org>
+ <1332522836-29517-10-git-send-email-mathieu.poirier@linaro.org>
+ <20120323182746.GF9859@atomide.com>
+Message-ID: <87limnq7sb.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Tony Lindgren <tony@atomide.com> writes:
 
-> Kevin,
+> * mathieu.poirier at linaro.org <mathieu.poirier@linaro.org> [120323 10:17]:
+>> From: Arnd Bergmann <arnd@arndb.de>
+>> 
+>> The omap platform requires CPU_FREQ_TABLE support to be enabled for its
+>> CPU_FREQ implementations, so automatically select that when CPU_FREQ
+>> is enabled.
 >
-> I only just found this via the arm-soc tree, while trying to merge the
-> kautobuildv2 build tree.
->
-> You changed my patch and broke it:
->
-> config ARM_OMAP2PLUS_CPUFREQ
->         bool "TI OMAP2+"
->         default ARCH_OMAP2PLUS
->         select CPU_FREQ_TABLE
->
-> So now, OMAP2 CPUFREQ is selectable on ANYTHING but it will only build
-> successfully on OMAP.
+> I think this is also solved now, Kevin might be able to confirm this.
 
-Yes, I screwed it up.
-
-I wanted it to be selectable, but majorly screwed it up and it is
-certainly not randconfig friendly.
-
-This was also pointed out by Grazvydas soon after merging[1], and I was
-expecting a patch from him to remedy that, but I will take care of it
-and submit a patch for v3.4-rc right away.
- 
-> If you're going to change someone elses patch, do them the favour of
-> re-posting it back to them for comment *BEFORE* you commit it and send
-> it upstream, 
-
-I did.  On Feb 16th, I posted my modified version with you and
-linux-arm-kernel Cc'd:
-
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/085053.html
-
-and then I didn't send the pull request for this for another 3 weeks.
-
-> rather than making it look like they're a total tosser for
-> authoring a patch which fucks up other architecture builds.
-
-/me has cache miss on tosser in American jargon cache
-/me looks up in urban dictionary.
-
-> Many thanks for that.
-
-Many apologies.
+Yes, this is solved in mainline by selecting it from
+drivers/cpufreq/Kconfig.arm
 
 Kevin
-
-[1] http://marc.info/?l=linux-omap&m=133174677506294&w=2
