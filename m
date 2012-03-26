@@ -1,43 +1,63 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 26 Mar 2012 11:33:53 +0530
-Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
- dmaengine.
-In-Reply-To: <CACKLOr0JTgp+poXCNg8+8pXko3s2JWQhovMw8Z1j-q4aL4oaKQ@mail.gmail.com>
-References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
- <1332344363.19804.12.camel@vkoul-udesk3>
- <CACKLOr03tTymT1vdTH7=nqEHu3OvAinPUHEusK+mR+J6Yc35mQ@mail.gmail.com>
- <CACKLOr0JTgp+poXCNg8+8pXko3s2JWQhovMw8Z1j-q4aL4oaKQ@mail.gmail.com>
-Message-ID: <1332741833.19804.17.camel@vkoul-udesk3>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 26 Mar 2012 06:03:21 +0000
+Subject: [RFC][PATCH 1/5] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <4F6C9929.6030704@ti.com>
+References: <1332484600-21947-1-git-send-email-afzal@ti.com>
+ <4F6C445A.3040103@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317A6A83@DBDE01.ent.ti.com>
+ <4F6C9929.6030704@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317BAF9E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-03-22 at 15:11 +0100, javier Martin wrote:
-> On 22 March 2012 10:39, javier Martin <javier.martin@vista-silicon.com> wrote:
-> > On 21 March 2012 16:39, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> >> This doesn't apply for me (starting with 6th) on current slave-dma.next
-> >> due to obvious changes which have gone into imx.
-> >>
-> >> Can you quickly rebase the series and resend.
-> >
-> > Great,
-> > now your 'next' branch is actually broken for imx-dma.
-> >
-> > I'm currently trying a bisect to find out what is the commit
-> > responsible for that but I suspect it will be related to the cookie
-> > changes submitted by Russell.
-I had these in branch for quite some time for people to look and point
-out any issues with merge.
-> 
-> Here,
-> take a look at this series:
-> 
-> [PATCH v4 00/15] dmaengine: imx-dma: rebase of features for 3.4.
-> 
-> I've included a new fix patch which solves the merge issue.
-Thanks Applied all, now
-> 
-> Regards.
+Hi Benoit,
 
+On Fri, Mar 23, 2012 at 21:09:21, Cousson, Benoit wrote:
+> But EMIF does not have anything to do in MFD either :-)
+> 
+> What was the feedback for this series?
+> 
+> We discussed that at Linaro connect, but it looks like MFD is becoming 
+> the place for miscellaneous drivers that we do not know where to put.
+> 
+> Maybe we should introduce a driver/memory/ directory for memory 
+> controller. At least for EMIF.
+> In the case of GMPC, it is slightly different because it can handle 
+> NOR/NAND memory but as well behave like an ISA bus controller for 
+> Ethernet ISA chip.
+> But since it can control several devices thanks the chipselects lines it 
+> has, it behaves like a multi-protocol bus controller.
+> But in anycase, it does not look like an MFD for my point of view. For 
+> me a MFD is like a small soc, it does contain several completely 
+> unrelated block (Power, Audio, GPIO...), but does share some memory 
+> space / IRQ lines.
+> 
+> Is this the only controller doing that kind of stuff in the kernel so far?
 
--- 
-~Vinod
+An additional intention of sending RFC early was to find out whether selection
+of MFD was acceptable. Coding so far has been done so that it can easily move
+to MFD or other types.
+
+Frankly I had not done much research on where GPMC driver should belong,
+my thought was first convert it into a driver (but vaguely in mind it may have
+to go to MFD), later decide on where it should go. Probably task of finding
+correct place for GPMC driver should happen in parallel with driver conversion.
+
+For davinci EMIF, afaik, no conclusion has been reached yet.
+
+I will try to find whether there is anything similar already in Kernel,
+and find out a suitable place for GPMC driver.
+
+> > If an initial patch just to rearrange the code to have similar section
+> > together&  then new changes in a another patch, would that be fine?
+> 
+> Well, if this is just comestic, I will even do that after the driver 
+> conversion. Because if you do that before you will move some piece of 
+> code that you might completely delete later. So you should fix the code 
+> first and then potentially, move some part if that will improve the 
+> readability.
+
+Ok
+
+Regards
+Afzal
