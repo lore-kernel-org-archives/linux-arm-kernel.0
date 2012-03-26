@@ -1,27 +1,66 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 26 Mar 2012 15:50:55 +0100
-Subject: [PATCH] regmap: Add 24 bits support
-In-Reply-To: <1332772808-13346-1-git-send-email-alexg@meprolight.com>
-References: <1332772808-13346-1-git-send-email-alexg@meprolight.com>
-Message-ID: <20120326145054.GV3098@opensource.wolfsonmicro.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 26 Mar 2012 16:51:10 +0200
+Subject: [PATCH] ARM: OMAP: fix section mismatches in usb-host.c
+Message-ID: <1332773470-22800-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 04:40:08PM +0200, Alex Gershgorin wrote:
-> This patch adds support for PMIC who use regmap and 24 bit registers
-> For example MC13892, the patch was tested on i.MX35-PDK
+Fix the below section mismatch warning and alike:
 
-A similar patch from Marc Reilly has already been applied.  You don't
-have his signoff here but then...
+WARNING: vmlinux.o(.text+0x281d4): Section mismatch in reference from
+the function setup_ehci_io_mux() to the function
+.init.text:omap_mux_init_signal()
+The function setup_ehci_io_mux() references
+the function __init omap_mux_init_signal().
+This is often because setup_ehci_io_mux lacks a __init
+annotation or the annotation of omap_mux_init_signal is wrong.
 
-> +typedef struct { __u8 b[3]; } __be24;
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/mach-omap2/usb-host.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
-...you're adding stuff like this to the regmap headers which *clearly*
-isn't regmap specific so this looks like a separate development.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120326/29610d5f/attachment.sig>
+diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+index f51348d..dde8a11 100644
+--- a/arch/arm/mach-omap2/usb-host.c
++++ b/arch/arm/mach-omap2/usb-host.c
+@@ -54,7 +54,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
+ /*
+  * setup_ehci_io_mux - initialize IO pad mux for USBHOST
+  */
+-static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
++static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+ {
+ 	switch (port_mode[0]) {
+ 	case OMAP_EHCI_PORT_MODE_PHY:
+@@ -197,7 +197,8 @@ static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+ 	return;
+ }
+ 
+-static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
++static
++void __init setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+ {
+ 	switch (port_mode[0]) {
+ 	case OMAP_EHCI_PORT_MODE_PHY:
+@@ -315,7 +316,7 @@ static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+ 	}
+ }
+ 
+-static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
++static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+ {
+ 	switch (port_mode[0]) {
+ 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+@@ -412,7 +413,8 @@ static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+ 	}
+ }
+ 
+-static void setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
++static
++void __init setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+ {
+ 	switch (port_mode[0]) {
+ 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+-- 
+1.7.3.4
