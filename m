@@ -1,56 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 26 Mar 2012 12:20:50 -0400
-Subject: [PATCH V2 3/3] ARM: kirkwood: Define NAND partitions in dts
-In-Reply-To: <4F7090F9.5000603@freescale.com>
-References: <1332594876-8673-1-git-send-email-jm@lentin.co.uk>
- <1332594876-8673-4-git-send-email-jm@lentin.co.uk>
- <4F7090F9.5000603@freescale.com>
-Message-ID: <20120326162050.GT2484@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Mar 2012 10:19:47 -0600
+Subject: [GIT PULL] ARM: tegra: Include assembler.h in sleep.S to fix build
+ break
+Message-ID: <4F709723.4080206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 10:53:29AM -0500, Scott Wood wrote:
-> On 03/24/2012 08:14 AM, Jamie Lentin wrote:
-> > Use devicetree to define NAND partitions. Use D-link partition scheme by
-> > default, to be vaguely compatible with their userland.
-> > 
-> > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> > ---
-> >  arch/arm/boot/dts/kirkwood-dns320.dts |   35 +++++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/kirkwood-dns325.dts |   35 +++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-kirkwood/board-dnskw.c  |   31 -----------------------------
-> >  3 files changed, 70 insertions(+), 31 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
-> > index 58de7f2..fbf55ff 100644
-> > --- a/arch/arm/boot/dts/kirkwood-dns320.dts
-> > +++ b/arch/arm/boot/dts/kirkwood-dns320.dts
-> > @@ -25,5 +25,40 @@
-> >  			clock-frequency = <166666667>;
-> >  			status = "ok";
-> >  		};
-> > +
-> > +		nand at 3000000 {
-> > +			status = "ok";
-> > +
-> 
-> This should be "okay", not "ok" -- see IEEE1275.  Or just leave it out.
+Arnd, Olof,
 
-Ack, but it needs to be there.  Most, but not all, kirkwood boards have
-nand, so we define it in kirkwood.dtsi and set it as disabled.
-Individual boards can then enable it as needed.
+This pull request depends on the merge of:
 
-As for 'okay', looks like we may need to patch of_device_is_available()
-in drivers/of/base.c (~284) if we want to be consistent with IEEE1275.
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+devel/io-cleanup
+(specifically 6f6f6a7 ARM: create a common IOMEM definition)
 
-The following boards would need to be updated:
+and:
 
-arch/arm/boot/dts/kirkwood-dreamplug.dts
-arch/powerpc/boot/dts/currituck.dts
-arch/powerpc/boot/dts/iss4xx-mpic.dts
+git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.4/soc
+(specifically c76fcc8 ARM: tegra: assembler code for LP3)
 
-Grant, any thoughts on this?
+and is based on a local branch that merges the two branches above.
 
-thx,
+The following changes since commit 1ad105fc77e61f9dd7a272659a248e2979fdb893:
+  Stephen Warren (1):
+        Merge remote branch 'remotes/korg_olof_tegra/for-3.4/soc' into
+for-3.4/fixes-for-io-cleanup
 
-Jason.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+for-3.4/fixes-for-io-cleanup
+
+Stephen Warren (1):
+      ARM: tegra: Include assembler.h in sleep.S to fix build break
+
+ arch/arm/mach-tegra/sleep.S |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
