@@ -1,164 +1,82 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 26 Mar 2012 17:13:58 +0530
-Subject: [PATCH 2/5] SPEAr3xx: Replace printk() with pr_*()
-In-Reply-To: <cover.1332762103.git.viresh.kumar@st.com>
-References: <cover.1332762103.git.viresh.kumar@st.com>
-Message-ID: <e6e6b8c9f3298ac9524a480f1085d7e0ce06b7af.1332762103.git.viresh.kumar@st.com>
+Date: Mon, 26 Mar 2012 17:13:56 +0530
+Subject: [PATCH 0/5] SPEAr DT support updates
+Message-ID: <cover.1332762103.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For better print logs/messages, it is advisable to use pr_*() routines instead
-of directly calling printks. This patch removes direct calling of printks for
-spear3xx.
+Hello,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/mach-spear3xx/spear300.c |    8 +++++---
- arch/arm/mach-spear3xx/spear310.c |   13 +++++++------
- arch/arm/mach-spear3xx/spear320.c |   11 ++++++-----
- arch/arm/mach-spear3xx/spear3xx.c |    2 ++
- 4 files changed, 20 insertions(+), 14 deletions(-)
+This patchset updates DT support for SPEAr3xx and 6xx.
+It has following changes:
+- updates DT support Mainly for SPEAr3xx family
+- updates dma support for SPEAr6xx
+- updates defconfig
 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index f7db668..adee72b 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -11,6 +11,8 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#define pr_fmt(fmt) "SPEAr300: " fmt
-+
- #include <linux/types.h>
- #include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
-@@ -447,7 +449,7 @@ void __init spear300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 	if (shirq_ras1.regs.base) {
- 		ret = spear_shirq_register(&shirq_ras1);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ\n");
-+			pr_err("Error registering Shared IRQ\n");
- 	}
- 
- 	/* pmx initialization */
-@@ -459,8 +461,8 @@ void __init spear300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 	if (pmx_driver.base) {
- 		ret = pmx_register(&pmx_driver);
- 		if (ret)
--			printk(KERN_ERR "padmux: registration failed. err no"
--					": %d\n", ret);
-+			pr_err("padmux: registration failed. err no: %d\n",
-+					ret);
- 		/* Free Mapping, device selection already done */
- 		iounmap(pmx_driver.base);
- 	}
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index febaa6f..b7c2876 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -11,6 +11,8 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#define pr_fmt(fmt) "SPEAr310: " fmt
-+
- #include <linux/ptrace.h>
- #include <asm/irq.h>
- #include <plat/shirq.h>
-@@ -274,25 +276,25 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 		shirq_ras1.regs.base = base;
- 		ret = spear_shirq_register(&shirq_ras1);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ 1\n");
-+			pr_err("Error registering Shared IRQ 1\n");
- 
- 		/* shirq 2 */
- 		shirq_ras2.regs.base = base;
- 		ret = spear_shirq_register(&shirq_ras2);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ 2\n");
-+			pr_err("Error registering Shared IRQ 2\n");
- 
- 		/* shirq 3 */
- 		shirq_ras3.regs.base = base;
- 		ret = spear_shirq_register(&shirq_ras3);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ 3\n");
-+			pr_err("Error registering Shared IRQ 3\n");
- 
- 		/* shirq 4 */
- 		shirq_intrcomm_ras.regs.base = base;
- 		ret = spear_shirq_register(&shirq_intrcomm_ras);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ 4\n");
-+			pr_err("Error registering Shared IRQ 4\n");
- 	}
- 
- 	/* pmx initialization */
-@@ -303,6 +305,5 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 
- 	ret = pmx_register(&pmx_driver);
- 	if (ret)
--		printk(KERN_ERR "padmux: registration failed. err no: %d\n",
--				ret);
-+		pr_err("padmux: registration failed. err no: %d\n", ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index deaaf19..7bd39c0 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -11,6 +11,8 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#define pr_fmt(fmt) "SPEAr320: " fmt
-+
- #include <linux/ptrace.h>
- #include <asm/irq.h>
- #include <plat/shirq.h>
-@@ -527,19 +529,19 @@ void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 		shirq_ras1.regs.base = base;
- 		ret = spear_shirq_register(&shirq_ras1);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ 1\n");
-+			pr_err("Error registering Shared IRQ 1\n");
- 
- 		/* shirq 3 */
- 		shirq_ras3.regs.base = base;
- 		ret = spear_shirq_register(&shirq_ras3);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ 3\n");
-+			pr_err("Error registering Shared IRQ 3\n");
- 
- 		/* shirq 4 */
- 		shirq_intrcomm_ras.regs.base = base;
- 		ret = spear_shirq_register(&shirq_intrcomm_ras);
- 		if (ret)
--			printk(KERN_ERR "Error registering Shared IRQ 4\n");
-+			pr_err("Error registering Shared IRQ 4\n");
- 	}
- 
- 	/* pmx initialization */
-@@ -550,6 +552,5 @@ void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 
- 	ret = pmx_register(&pmx_driver);
- 	if (ret)
--		printk(KERN_ERR "padmux: registration failed. err no: %d\n",
--				ret);
-+		pr_err("padmux: registration failed. err no: %d\n", ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index b1733c3..a236925 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -11,6 +11,8 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#define pr_fmt(fmt) "SPEAr3xx: " fmt
-+
- #include <linux/types.h>
- #include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
+It has dependency on following patchsets:
+- ehci & ohci: http://www.spinics.net/lists/linux-usb/msg60362.html
+- rtc: http://lkml.org/lkml/2012/3/26/96
+- keyboard: Link not yet available:
+  subject: Input: spear-keyboard: add device tree bindings
+- SPEAr patches: http://comments.gmane.org/gmane.linux.ports.arm.kernel/158865
+
+Viresh Kumar (5):
+  SPEAr6xx: Add compilation support for dtbs using 'make dtbs'
+  SPEAr3xx: Replace printk() with pr_*()
+  ARM: SPEAr3xx: Add device-tree support to SPEAr3xx architecture
+  SPEAr: Add PL080 DMA support for 3xx and 6xx
+  SPEAr: Update defconfigs
+
+ Documentation/arm/SPEAr/overview.txt            |   13 +-
+ Documentation/devicetree/bindings/arm/spear.txt |   18 ++
+ arch/arm/Makefile                               |    6 +-
+ arch/arm/boot/dts/spear300-evb.dts              |  181 +++++++++++
+ arch/arm/boot/dts/spear300.dtsi                 |   74 +++++
+ arch/arm/boot/dts/spear310-evb.dts              |  102 +++++++
+ arch/arm/boot/dts/spear310.dtsi                 |   75 +++++
+ arch/arm/boot/dts/spear320-evb.dts              |  110 +++++++
+ arch/arm/boot/dts/spear320.dtsi                 |   92 ++++++
+ arch/arm/boot/dts/spear3xx.dtsi                 |  151 +++++++++
+ arch/arm/boot/dts/spear600-evb.dts              |    4 +
+ arch/arm/boot/dts/spear600.dtsi                 |    8 +
+ arch/arm/configs/spear3xx_defconfig             |   52 +++-
+ arch/arm/configs/spear6xx_defconfig             |   41 ++-
+ arch/arm/mach-spear3xx/Kconfig                  |   40 +--
+ arch/arm/mach-spear3xx/Makefile                 |   19 +-
+ arch/arm/mach-spear3xx/Makefile.boot            |    4 +
+ arch/arm/mach-spear3xx/clock.c                  |   93 +++---
+ arch/arm/mach-spear3xx/include/mach/generic.h   |   48 ++-
+ arch/arm/mach-spear3xx/include/mach/irqs.h      |    6 +-
+ arch/arm/mach-spear3xx/include/mach/spear300.h  |    4 +-
+ arch/arm/mach-spear3xx/include/mach/spear310.h  |    4 +-
+ arch/arm/mach-spear3xx/include/mach/spear320.h  |    4 +-
+ arch/arm/mach-spear3xx/spear300.c               |  253 +++++++++++++--
+ arch/arm/mach-spear3xx/spear300_evb.c           |   75 -----
+ arch/arm/mach-spear3xx/spear310.c               |  293 ++++++++++++++++--
+ arch/arm/mach-spear3xx/spear310_evb.c           |   81 -----
+ arch/arm/mach-spear3xx/spear320.c               |  293 ++++++++++++++++--
+ arch/arm/mach-spear3xx/spear320_evb.c           |   79 -----
+ arch/arm/mach-spear3xx/spear3xx.c               |  131 ++++++--
+ arch/arm/mach-spear6xx/Makefile.boot            |    2 +
+ arch/arm/mach-spear6xx/clock.c                  |    2 +-
+ arch/arm/mach-spear6xx/spear6xx.c               |  372 ++++++++++++++++++++++-
+ arch/arm/plat-spear/Kconfig                     |    5 +-
+ arch/arm/plat-spear/Makefile                    |    4 +-
+ arch/arm/plat-spear/include/plat/pl080.h        |   21 ++
+ arch/arm/plat-spear/pl080.c                     |   79 +++++
+ 37 files changed, 2371 insertions(+), 468 deletions(-)
+ create mode 100644 arch/arm/boot/dts/spear300-evb.dts
+ create mode 100644 arch/arm/boot/dts/spear300.dtsi
+ create mode 100644 arch/arm/boot/dts/spear310-evb.dts
+ create mode 100644 arch/arm/boot/dts/spear310.dtsi
+ create mode 100644 arch/arm/boot/dts/spear320-evb.dts
+ create mode 100644 arch/arm/boot/dts/spear320.dtsi
+ create mode 100644 arch/arm/boot/dts/spear3xx.dtsi
+ delete mode 100644 arch/arm/mach-spear3xx/spear300_evb.c
+ delete mode 100644 arch/arm/mach-spear3xx/spear310_evb.c
+ delete mode 100644 arch/arm/mach-spear3xx/spear320_evb.c
+ create mode 100644 arch/arm/plat-spear/include/plat/pl080.h
+ create mode 100644 arch/arm/plat-spear/pl080.c
+
 -- 
 1.7.10.rc2.10.gb47606
