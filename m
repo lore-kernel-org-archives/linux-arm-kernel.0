@@ -1,52 +1,165 @@
 From: jm@lentin.co.uk (Jamie Lentin)
-Date: Tue, 27 Mar 2012 22:54:12 +0100
-Subject: [PATCH V3 2/5] mtd: Add orion_nand devicetree bindings
+Date: Tue, 27 Mar 2012 22:54:15 +0100
+Subject: [PATCH V3 5/5] mtd: Move fdt partition documentation to a seperate
+ file
 In-Reply-To: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
 References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1332885255-8304-3-git-send-email-jm@lentin.co.uk>
+Message-ID: <1332885255-8304-6-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a NAND chip using the orion_nand driver to be described using devicetree.
+Partitions are described in the same way for all mtd devices when using
+devicetree, move the documentation to a separate file and add references
+to it.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 ---
- .../devicetree/bindings/mtd/orion-nand.txt         |   46 ++++++++++++++++++++
- drivers/mtd/nand/orion_nand.c                      |   35 ++++++++++++++-
- 2 files changed, 79 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
+ .../devicetree/bindings/mtd/arm-versatile.txt      |    4 +-
+ .../devicetree/bindings/mtd/atmel-dataflash.txt    |    3 ++
+ .../devicetree/bindings/mtd/fsl-upm-nand.txt       |    4 ++
+ .../devicetree/bindings/mtd/gpio-control-nand.txt  |    3 ++
+ .../devicetree/bindings/mtd/mtd-physmap.txt        |   23 +-----------
+ .../devicetree/bindings/mtd/orion-nand.txt         |    3 ++
+ .../devicetree/bindings/mtd/partition.txt          |   38 ++++++++++++++++++++
+ 7 files changed, 55 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/partition.txt
 
+diff --git a/Documentation/devicetree/bindings/mtd/arm-versatile.txt b/Documentation/devicetree/bindings/mtd/arm-versatile.txt
+index 476845d..beace4b 100644
+--- a/Documentation/devicetree/bindings/mtd/arm-versatile.txt
++++ b/Documentation/devicetree/bindings/mtd/arm-versatile.txt
+@@ -4,5 +4,5 @@ Required properties:
+ - compatible : must be "arm,versatile-flash";
+ - bank-width : width in bytes of flash interface.
+ 
+-Optional properties:
+-- Subnode partition map from mtd flash binding
++The device tree may optionally contain sub-nodes describing partitions of the
++address space. See partition.txt for more detail.
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
+index ef66ddd..1889a4d 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
+@@ -3,6 +3,9 @@
+ Required properties:
+ - compatible : "atmel,<model>", "atmel,<series>", "atmel,dataflash".
+ 
++The device tree may optionally contain sub-nodes describing partitions of the
++address space. See partition.txt for more detail.
++
+ Example:
+ 
+ flash at 1 {
+diff --git a/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt b/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt
+index 00f1f54..fce4894 100644
+--- a/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt
+@@ -19,6 +19,10 @@ Optional properties:
+ 	read registers (tR). Required if property "gpios" is not used
+ 	(R/B# pins not connected).
+ 
++Each flash chip described may optionally contain additional sub-nodes
++describing partitions of the address space. See partition.txt for more
++detail.
++
+ Examples:
+ 
+ upm at 1,0 {
+diff --git a/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt b/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
+index 719f4dc..36ef07d 100644
+--- a/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
+@@ -25,6 +25,9 @@ Optional properties:
+   GPIO state and before and after command byte writes, this register will be
+   read to ensure that the GPIO accesses have completed.
+ 
++The device tree may optionally contain sub-nodes describing partitions of the
++address space. See partition.txt for more detail.
++
+ Examples:
+ 
+ gpio-nand at 1,0 {
+diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+index 80152cb..a63c2bd7 100644
+--- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+@@ -23,27 +23,8 @@ are defined:
+  - vendor-id : Contains the flash chip's vendor id (1 byte).
+  - device-id : Contains the flash chip's device id (1 byte).
+ 
+-In addition to the information on the mtd bank itself, the
+-device tree may optionally contain additional information
+-describing partitions of the address space.  This can be
+-used on platforms which have strong conventions about which
+-portions of a flash are used for what purposes, but which don't
+-use an on-flash partition table such as RedBoot.
+-
+-Each partition is represented as a sub-node of the mtd device.
+-Each node's name represents the name of the corresponding
+-partition of the mtd device.
+-
+-Flash partitions
+- - reg : The partition's offset and size within the mtd bank.
+- - label : (optional) The label / name for this partition.
+-   If omitted, the label is taken from the node name (excluding
+-   the unit address).
+- - read-only : (optional) This parameter, if present, is a hint to
+-   Linux that this partition should only be mounted
+-   read-only.  This is usually used for flash partitions
+-   containing early-boot firmware images or data which should not
+-   be clobbered.
++The device tree may optionally contain sub-nodes describing partitions of the
++address space. See partition.txt for more detail.
+ 
+ Example:
+ 
 diff --git a/Documentation/devicetree/bindings/mtd/orion-nand.txt b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-new file mode 100644
-index 0000000..22c7438
---- /dev/null
+index 22c7438..d606009 100644
+--- a/Documentation/devicetree/bindings/mtd/orion-nand.txt
 +++ b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-@@ -0,0 +1,46 @@
-+NAND support for Marvell Orion SoC platforms
+@@ -11,6 +11,9 @@ Optional properties:
+ - bank-width :
+ - chip-delay :
+ 
++The device tree may optionally contain sub-nodes describing partitions of the
++address space. See partition.txt for more detail.
++
+ Examples:
+ 
+ nand at f4000000 {
+diff --git a/Documentation/devicetree/bindings/mtd/partition.txt b/Documentation/devicetree/bindings/mtd/partition.txt
+new file mode 100644
+index 0000000..f114ce1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/partition.txt
+@@ -0,0 +1,38 @@
++Representing flash partitions in devicetree
++
++Partitions can be represented by sub-nodes of an mtd device. This can be used
++on platforms which have strong conventions about which portions of a flash are
++used for what purposes, but which don't use an on-flash partition table such
++as RedBoot.
++
++#address-cells & #size-cells must both be present in the mtd device and be
++equal to 1.
 +
 +Required properties:
-+- compatible : "mrvl,orion-nand".
-+- reg : Base physical address of the NAND and length of memory mapped
-+	region
++- reg : The partition's offset and size within the mtd bank.
 +
 +Optional properties:
-+- cle :
-+- ale :
-+- bank-width :
-+- chip-delay :
++- label : The label / name for this partition.  If omitted, the label is taken
++  from the node name (excluding the unit address).
++- read-only : This parameter, if present, is a hint to Linux that this
++  partition should only be mounted read-only. This is usually used for flash
++  partitions containing early-boot firmware images or data which should not be
++  clobbered.
 +
 +Examples:
 +
-+nand at f4000000 {
++
++flash at 0 {
 +	#address-cells = <1>;
 +	#size-cells = <1>;
-+	cle = <0>;
-+	ale = <1>;
-+	bank-width = <8>;
-+	chip-delay = <25>;
-+	compatible = "mrvl,orion-nand";
-+	reg = <0xf4000000 0x400>;
 +
 +	partition at 0 {
 +		label = "u-boot";
@@ -54,104 +167,9 @@ index 0000000..22c7438
 +		read-only;
 +	};
 +
-+	partition at 100000 {
-+		label = "uImage";
++	uimage at 100000 {
 +		reg = <0x0100000 0x200000>;
 +	};
-+
-+	partition at 300000 {
-+		label = "dtb";
-+		reg = <0x0300000 0x100000>;
-+	};
-+
-+	partition at 400000 {
-+		label = "root";
-+		reg = <0x0400000 0x7d00000>;
-+	};
-+};
-diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-index 29f505a..3b7c82f 100644
---- a/drivers/mtd/nand/orion_nand.c
-+++ b/drivers/mtd/nand/orion_nand.c
-@@ -13,6 +13,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-@@ -74,11 +75,13 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- static int __init orion_nand_probe(struct platform_device *pdev)
- {
- 	struct mtd_info *mtd;
-+	struct mtd_part_parser_data ppdata = {};
- 	struct nand_chip *nc;
- 	struct orion_nand_data *board;
- 	struct resource *res;
- 	void __iomem *io_base;
- 	int ret = 0;
-+	u32 val = 0;
- 
- 	nc = kzalloc(sizeof(struct nand_chip) + sizeof(struct mtd_info), GFP_KERNEL);
- 	if (!nc) {
-@@ -101,7 +104,26 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 		goto no_res;
- 	}
- 
--	board = pdev->dev.platform_data;
-+	if (pdev->dev.of_node) {
-+		board = devm_kzalloc(&pdev->dev, sizeof(struct orion_nand_data),
-+					GFP_KERNEL);
-+		if (!board) {
-+			printk(KERN_ERR "orion_nand: failed to allocate board structure.\n");
-+			ret = -ENOMEM;
-+			goto no_res;
-+		}
-+		if (!of_property_read_u32(pdev->dev.of_node, "cle", &val))
-+			board->cle = (u8)val;
-+		if (!of_property_read_u32(pdev->dev.of_node, "ale", &val))
-+			board->ale = (u8)val;
-+		if (!of_property_read_u32(pdev->dev.of_node,
-+						"bank-width", &val))
-+			board->width = (u8)val;
-+		if (!of_property_read_u32(pdev->dev.of_node,
-+						"chip-delay", &val))
-+			board->chip_delay = (u8)val;
-+	} else
-+		board = pdev->dev.platform_data;
- 
- 	mtd->priv = nc;
- 	mtd->owner = THIS_MODULE;
-@@ -129,7 +151,8 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	}
- 
- 	mtd->name = "orion_nand";
--	ret = mtd_device_parse_register(mtd, NULL, 0,
-+	ppdata.of_node = pdev->dev.of_node;
-+	ret = mtd_device_parse_register(mtd, NULL, &ppdata,
- 			board->parts, board->nr_parts);
- 	if (ret) {
- 		nand_release(mtd);
-@@ -161,11 +184,19 @@ static int __devexit orion_nand_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id orion_nand_of_match_table[] = {
-+	{ .compatible = "mrvl,orion-nand", },
-+	{},
-+};
-+#endif
-+
- static struct platform_driver orion_nand_driver = {
- 	.remove		= __devexit_p(orion_nand_remove),
- 	.driver		= {
- 		.name	= "orion_nand",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(orion_nand_of_match_table),
- 	},
- };
- 
++];
 -- 
 1.7.9.1
