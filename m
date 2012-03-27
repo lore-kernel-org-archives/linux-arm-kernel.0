@@ -1,29 +1,57 @@
-From: rkuo@codeaurora.org (Richard Kuo)
-Date: Tue, 27 Mar 2012 11:41:40 -0500
-Subject: [PATCHv2 10/14] Hexagon: adapt for dma_map_ops changes
-In-Reply-To: <1332855768-32583-11-git-send-email-m.szyprowski@samsung.com>
-References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
- <1332855768-32583-11-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120327164140.GA3916@codeaurora.org>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 27 Mar 2012 17:50:38 +0100
+Subject: [PATCH RESEND 1/2] ARM: ThumbEE: Disable userspace TEEHBR access for
+ !CONFIG_ARM_THUMBEE
+Message-ID: <1332867039-3567-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 03:42:44PM +0200, Marek Szyprowski wrote:
-> Adapt core Hexagon architecture code for dma_map_ops changes: replace
-> alloc/free_coherent with generic alloc/free methods.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/hexagon/include/asm/dma-mapping.h |   18 ++++++++++++------
->  arch/hexagon/kernel/dma.c              |    9 +++++----
->  2 files changed, 17 insertions(+), 10 deletions(-)
-> 
+Currently when ThumbEE is not enabled (!CONFIG_ARM_THUMBEE) the ThumbEE
+register states are not saved/restored at context switch. The default state
+of the ThumbEE Ctrl register (TEECR) allows userspace accesses to the
+ThumbEE Base Handler register (TEEHBR). This can cause unexpected behaviour
+when people use ThumbEE on !CONFIG_ARM_THUMBEE kernels, as well as allowing
+covert communication - eg between userspace tasks running inside chroot
+jails.
 
-Acked-by: Richard Kuo <rkuo@codeaurora.org> 
+This patch sets up TEECR in order to prevent user-space access to TEEHBR
+when !CONFIG_ARM_THUMBEE. In this case, tasks are sent SIGILL if they try to
+access TEEHBR.
 
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+
+Resending these patches, rebased on v3.3. If there are no comments again
+this time around I will submit them to the patch-system when RC1 comes
+around.
+
+
+ arch/arm/mm/proc-v7.S |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index f1c8486..c2e2b66 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -255,6 +255,18 @@ __v7_setup:
+ 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
+ 	mcr	p15, 0, r6, c10, c2, 1		@ write NMRR
+ #endif
++#ifndef CONFIG_ARM_THUMBEE
++	mrc	p15, 0, r0, c0, c1, 0		@ read ID_PFR0 for ThumbEE
++	and	r0, r0, #(0xf << 12)		@ ThumbEE enabled field
++	teq	r0, #(1 << 12)			@ check if ThumbEE is present
++	bne	1f
++	mov	r5, #0
++	mcr	p14, 6, r5, c1, c0, 0		@ Initialize TEEHBR to 0
++	mrc	p14, 6, r0, c0, c0, 0		@ load TEECR
++	orr	r0, r0, #1			@ set the 1st bit in order to
++	mcr	p14, 6, r0, c0, c0, 0		@ stop userspace TEEHBR access
++1:
++#endif
+ 	adr	r5, v7_crval
+ 	ldmia	r5, {r5, r6}
+ #ifdef CONFIG_CPU_ENDIAN_BE8
 -- 
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
