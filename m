@@ -1,64 +1,60 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 27 Mar 2012 10:31:56 -0500
-Subject: [RFC][PATCH 1/5] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A9317BD6E2@DBDE01.ent.ti.com>
-References: <1332484600-21947-1-git-send-email-afzal@ti.com>
- <4F6D0569.6080203@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317BB895@DBDE01.ent.ti.com>
- <4F70AA82.3000204@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317BD6E2@DBDE01.ent.ti.com>
-Message-ID: <4F71DD6C.5010305@ti.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 27 Mar 2012 11:50:24 -0400
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
+ device tree support
+In-Reply-To: <m2vcn0496y.fsf@bob.laptop.org> (Chris Ball's message of "Tue, 21
+ Feb 2012 08:17:41 -0500")
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+ <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
+ <m239abgc32.fsf@bob.laptop.org>
+ <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
+ <m2vcn0496y.fsf@bob.laptop.org>
+Message-ID: <87k426vy9r.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+Hi Kukjin,
 
-On 3/27/2012 0:12, Mohammed, Afzal wrote:
-> Hi Jon,
->
-> On Mon, Mar 26, 2012 at 23:12:26, Hunter, Jon wrote:
->> Also, I don't see where the gpmc_child->res and gpmc_child->num_res are
->> actually used. Are these needed?
->
-> These are for the peripheral resources not in control of GPMC, like
-> gpio irq. These are copied in gpmc_create_child.
-
-Right, I see they are copied during gpmc_create_child. However, I don't 
-see where they are initialised before that. The function 
-gpmc_setup_child is only initialising gpmc_res and gpmc_num_res and not 
-res and num_res. So I still don't see who is initialising these before 
-they are copied.
-
->>> Gpmc_device_data is dedicated to each CS, gpmc_pdata is required
->>> at least to inform driver about clock rate.
+On Tue, Feb 21 2012, Chris Ball wrote:
+> On Tue, Feb 21 2012, Kukjin Kim wrote:
+>> I created topic branch for this we talked. You can pull that following:
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> v3.4-for-cjb
 >>
->> Ok, understood! So the struct gpmc_device_pdata only has a single
->> chip-select entry and so looking at the code you will have multiple
->> instances of this structure of a gpmc device that uses more than one
->> chip-select. Any reason you did it this way and not have a single pdata
->> struct for each device defining all chip-selects it uses?
+>> If any problems, please kindly let me know.
 >
-> When coding started, multiple CS for a peripheral was not taken into
-> consideration, later handling multiple CS was incorporated making it
-> this way. But your suggestion seems better to me, will see if code can
-> modified accordingly in later patch series (v2 already sent)
+> Pushed to mmc-next, thanks.  (I'm expecting that you'll do the merge
+> to Linus.)
 
-Ok great. I will wait for your v3.
+I was expecting you to merge these patches, but they aren't in the
+arm-soc tree and haven't been sent to Linus, and we're in the last few
+days of the merge window.
 
->>
->>> Generally, as the change involved moving a lot of code, seems more reviews
->>> are on those than the actual changes than what I intended to get reviewed,
->>> next patch series will be modified not to move existing code, hence some
->>> of your suggested changes may not be present in it, probably those to be
->>> done as another cleanup patch.
->>
->> Yes I understand. However, it is a good opportunity to clean some of
->> this up even if it is existing code :-)
->
-> Ok
+As a result I'm dropping this tree -- and all of the patches that I
+have on top of it -- from mmc-next so that I can get a pull request
+out.  This means that I'm dropping:
 
-I see you did not incorporate any clean-up in v2. Do you want me to send 
-you some patches to include?
+mmc: sdhci-s3c: Add device tree support
+mmc: sdhci-s3c: Keep a copy of platform data and use it
+mmc: sdhci-s3c: derive transfer width host capability from max_width in 
+ARM: SAMSUNG: remove all uses of clk_type member in sdhci platform data
+ARM: EXYNOS: use 'exynos4-sdhci' as device name for sdhci controllers
+mmc: sdhci-s3c: Remove usage of clk_type member in platform data
 
-Cheers
-Jon
+.. which I was expecting you to merge, and also:
+
+mmc: sdhci-s3c: fix broken compilation for non-Exynos SoCs
+mmc: sdhci-s3c: Enable runtime power management
+mmc: sdhci-s3c: Use CONFIG_PM_SLEEP to ifdef system suspend
+mmc: sdhci-s3c: use devm_ functions
+
+.. which were merged on top of the above patches.
+
+We'll have to try again with 3.5 for the new features, and post-rc1 for
+the fixes.  Please let me know what happened with this merge.  Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
