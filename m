@@ -1,109 +1,115 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 27 Mar 2012 15:23:21 +0800
-Subject: [PATCH 02/10] clk: remove unnecessary EXPORT_SYMBOL_GPL
+Date: Tue, 27 Mar 2012 15:23:22 +0800
+Subject: [PATCH 03/10] clk: add "const" for clk_ops of basic clks
 In-Reply-To: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
 References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1332833009-4121-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1332833009-4121-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It makes no sense to have EXPORT_SYMBOL_GPL on static functions.
+The clk_ops of basic clks should have "const" to match the definition
+in "struct clk" and clk_register prototype.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/clk/clk-divider.c    |    3 ---
- drivers/clk/clk-fixed-rate.c |    1 -
- drivers/clk/clk-gate.c       |    3 ---
- drivers/clk/clk-mux.c        |    2 --
- 4 files changed, 0 insertions(+), 9 deletions(-)
+ drivers/clk/clk-divider.c    |    2 +-
+ drivers/clk/clk-fixed-rate.c |    2 +-
+ drivers/clk/clk-gate.c       |    2 +-
+ drivers/clk/clk-mux.c        |    2 +-
+ include/linux/clk-private.h  |    8 ++++----
+ 5 files changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index d5ac6a7..231cd6e 100644
+index 231cd6e..b1c4b02 100644
 --- a/drivers/clk/clk-divider.c
 +++ b/drivers/clk/clk-divider.c
-@@ -45,7 +45,6 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
- 
- 	return parent_rate / div;
- }
--EXPORT_SYMBOL_GPL(clk_divider_recalc_rate);
- 
- /*
-  * The reverse of DIV_ROUND_UP: The maximum number which
-@@ -117,7 +116,6 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
- 		return r / div;
- 	}
- }
--EXPORT_SYMBOL_GPL(clk_divider_round_rate);
- 
- static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
- {
-@@ -147,7 +145,6 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
- 
+@@ -146,7 +146,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
  	return 0;
  }
--EXPORT_SYMBOL_GPL(clk_divider_set_rate);
  
- struct clk_ops clk_divider_ops = {
+-struct clk_ops clk_divider_ops = {
++const struct clk_ops clk_divider_ops = {
  	.recalc_rate = clk_divider_recalc_rate,
+ 	.round_rate = clk_divider_round_rate,
+ 	.set_rate = clk_divider_set_rate,
 diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index 90c79fb..651b06f 100644
+index 651b06f..027e477 100644
 --- a/drivers/clk/clk-fixed-rate.c
 +++ b/drivers/clk/clk-fixed-rate.c
-@@ -32,7 +32,6 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
- {
+@@ -33,7 +33,7 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
  	return to_clk_fixed_rate(hw)->fixed_rate;
  }
--EXPORT_SYMBOL_GPL(clk_fixed_rate_recalc_rate);
  
- struct clk_ops clk_fixed_rate_ops = {
+-struct clk_ops clk_fixed_rate_ops = {
++const struct clk_ops clk_fixed_rate_ops = {
  	.recalc_rate = clk_fixed_rate_recalc_rate,
+ };
+ EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
 diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index b5902e2..b688f47 100644
+index b688f47..fe2ff9e 100644
 --- a/drivers/clk/clk-gate.c
 +++ b/drivers/clk/clk-gate.c
-@@ -71,7 +71,6 @@ static int clk_gate_enable(struct clk_hw *hw)
- 
- 	return 0;
- }
--EXPORT_SYMBOL_GPL(clk_gate_enable);
- 
- static void clk_gate_disable(struct clk_hw *hw)
- {
-@@ -82,7 +81,6 @@ static void clk_gate_disable(struct clk_hw *hw)
- 	else
- 		clk_gate_clear_bit(gate);
- }
--EXPORT_SYMBOL_GPL(clk_gate_disable);
- 
- static int clk_gate_is_enabled(struct clk_hw *hw)
- {
-@@ -99,7 +97,6 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
- 
+@@ -98,7 +98,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
  	return reg ? 1 : 0;
  }
--EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
  
- struct clk_ops clk_gate_ops = {
+-struct clk_ops clk_gate_ops = {
++const struct clk_ops clk_gate_ops = {
  	.enable = clk_gate_enable,
+ 	.disable = clk_gate_disable,
+ 	.is_enabled = clk_gate_is_enabled,
 diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 50e0595..45cad61 100644
+index 45cad61..5424488 100644
 --- a/drivers/clk/clk-mux.c
 +++ b/drivers/clk/clk-mux.c
-@@ -55,7 +55,6 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
- 
- 	return val;
- }
--EXPORT_SYMBOL_GPL(clk_mux_get_parent);
- 
- static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- {
-@@ -82,7 +81,6 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- 
+@@ -82,7 +82,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
  	return 0;
  }
--EXPORT_SYMBOL_GPL(clk_mux_set_parent);
  
- struct clk_ops clk_mux_ops = {
+-struct clk_ops clk_mux_ops = {
++const struct clk_ops clk_mux_ops = {
  	.get_parent = clk_mux_get_parent,
+ 	.set_parent = clk_mux_set_parent,
+ };
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index 5e4312b..5f4ccd7 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -55,7 +55,7 @@ struct clk {
+  * alternative macro for static initialization
+  */
+ 
+-extern struct clk_ops clk_fixed_rate_ops;
++extern const struct clk_ops clk_fixed_rate_ops;
+ 
+ #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
+ 				_fixed_rate_flags)		\
+@@ -78,7 +78,7 @@ extern struct clk_ops clk_fixed_rate_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern struct clk_ops clk_gate_ops;
++extern const struct clk_ops clk_gate_ops;
+ 
+ #define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr,	\
+ 				_flags, _reg, _bit_idx,		\
+@@ -110,7 +110,7 @@ extern struct clk_ops clk_gate_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern struct clk_ops clk_divider_ops;
++extern const struct clk_ops clk_divider_ops;
+ 
+ #define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr,	\
+ 				_flags, _reg, _shift, _width,	\
+@@ -143,7 +143,7 @@ extern struct clk_ops clk_divider_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern struct clk_ops clk_mux_ops;
++extern const struct clk_ops clk_mux_ops;
+ 
+ #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags,	\
+ 				_reg, _shift, _width,		\
 -- 
 1.7.5.4
