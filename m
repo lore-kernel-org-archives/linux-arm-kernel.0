@@ -1,104 +1,121 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Tue, 27 Mar 2012 09:26:54 +0900
-Subject: [PATCH 1/2] ARM: lib: Add optimized memcpy with 64 byte pld size
+Date: Tue, 27 Mar 2012 09:27:52 +0900
+Subject: [PATCH 2/2] ARM: lib: use LDRD/STRD for data copy
 In-Reply-To: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
 References: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
-Message-ID: <00cf01cd0bb0$4fa49c30$eeedd490$%kim@samsung.com>
+Message-ID: <00d501cd0bb0$724ab260$56e01720$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the optimized memcpy() for the architecture that has 64 byte PLD size.
+This patch uses LDRD/STRD that loads and stores data as DWORD unit.
+It brings better performance than LDRM/STRM with cortex-a15.
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig             |    7 ++++++
- arch/arm/lib/copy_template.S |   44 +++++++++++++++++++++++++++++++++--------
- 2 files changed, 42 insertions(+), 9 deletions(-)
+ arch/arm/lib/copy_from_user.S |    9 +++++++++
+ arch/arm/lib/copy_template.S  |   14 ++++++++------
+ arch/arm/lib/copy_to_user.S   |    9 +++++++++
+ arch/arm/lib/memcpy.S         |    9 +++++++++
+ 4 files changed, 35 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8fec56d..ba306b3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1132,6 +1132,13 @@ config ARM_NR_BANKS
- 	default 16 if ARCH_EP93XX
- 	default 8
+diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
+index 66a477a..dd1fe01 100644
+--- a/arch/arm/lib/copy_from_user.S
++++ b/arch/arm/lib/copy_from_user.S
+@@ -68,6 +68,15 @@
+ 	stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
+ 	.endm
 
-+config ARM_PLD_SIZE
-+	int
-+	default 64 if ARCH_EXYNOS5
-+	default 32
-+	help
-+	  Configure preload size used on memcpy(). Select 64 for cortex-a15.
++	.macro cpy8w dst src reg1 reg2 abort
++	.irp offset, #0, #8, #16, #24
++	ldr1w \src, \reg1, \abort
++	ldr1w \src, \reg2, \abort
++	strd \reg1, \reg2, [\dst, \offset]
++	.endr
++	add \dst, \dst, #32
++	.endm
 +
- config IWMMXT
- 	bool "Enable iWMMXt support"
- 	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+ 	.macro str1b ptr reg cond=al abort
+ 	str\cond\()b \reg, [\ptr], #1
+ 	.endm
 diff --git a/arch/arm/lib/copy_template.S b/arch/arm/lib/copy_template.S
-index 805e3f8..7dc5b8c 100644
+index 7dc5b8c..a2dd5e2 100644
 --- a/arch/arm/lib/copy_template.S
 +++ b/arch/arm/lib/copy_template.S
-@@ -66,6 +66,7 @@
-  *	than one 32bit instruction in Thumb-2)
-  */
+@@ -47,6 +47,11 @@
+  *	Same as their ldr* counterparts, but data is stored to 'ptr' location
+  *	rather than being loaded.
+  *
++ * cpy8w src dst reg1 reg2 abort
++ *
++ *	This loads eight words starting from 'src' and stores them to 'dst'.
++ *	The 'abort' argument is used for fixup tables.
++ *
+  * enter reg1 reg2
+  *
+  *	Preserve the provided registers on the stack plus any additional
+@@ -102,18 +107,15 @@
+ 	PLD(	pld	[r1, #PLDSIZE*3-4]	)
 
-+#define PLDSIZE	(CONFIG_ARM_PLD_SIZE)
-
- 		enter	r4, lr
-
-@@ -90,19 +91,44 @@
- 	CALGN(	add	pc, r4, ip		)
-
- 	PLD(	pld	[r1, #0]		)
--2:	PLD(	subs	r2, r2, #96		)
--	PLD(	pld	[r1, #28]		)
-+
-+#if (PLDSIZE == 64)
-+2:	PLD(	cmp	r2, #32)
-+	PLD(	blt	.32cpy)
-+.64cpy:	PLD(	subs	r2, r2, #(PLDSIZE*3+32)	)
-+	PLD(	pld	[r1, #PLDSIZE-4]	)
- 	PLD(	blt	4f			)
--	PLD(	pld	[r1, #60]		)
--	PLD(	pld	[r1, #92]		)
-+	PLD(	pld	[r1, #PLDSIZE*2-4]	)
-+	PLD(	pld	[r1, #PLDSIZE*3-4]	)
-+
-+3:	PLD(	pld	[r1, #PLDSIZE*4-4]	)
-+4:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+		subs	r2, r2, #PLDSIZE
-+		bge	3b
-+	PLD(	cmn	r2, #(PLDSIZE*3)	)
-+	PLD(	bge	4b			)
-+	PLD(	cmn	r2, #(PLDSIZE*4-32)	)
-+	PLD(	blt	5f)
-+.32cpy:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+#else
-+2:	PLD(	subs	r2, r2, #(PLDSIZE*3)	)
-+	PLD(	pld	[r1, #(PLDSIZE-4)]	)
-+	PLD(	blt	4f			)
-+	PLD(	pld	[r1, #(PLDSIZE*2-4)]	)
-+	PLD(	pld	[r1, #(PLDSIZE*3-4)]	)
-
--3:	PLD(	pld	[r1, #124]		)
--4:		ldr8w	r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
--		subs	r2, r2, #32
--		str8w	r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+3:	PLD(	pld	[r1, #(PLDSIZE*4-4)]	)
-+4:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
-+		subs	r2, r2, #PLDSIZE
-+		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+ 3:	PLD(	pld	[r1, #PLDSIZE*4-4]	)
+-4:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+-		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+-		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+-		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++4:		cpy8w   r0, r1, r4, r5, abort=20f
++		cpy8w   r0, r1, r4, r5, abort=20f
+ 		subs	r2, r2, #PLDSIZE
  		bge	3b
--	PLD(	cmn	r2, #96			)
-+	PLD(	cmn	r2, #(PLDSIZE*3)	)
+ 	PLD(	cmn	r2, #(PLDSIZE*3)	)
  	PLD(	bge	4b			)
-+#endif
+ 	PLD(	cmn	r2, #(PLDSIZE*4-32)	)
+ 	PLD(	blt	5f)
+-.32cpy:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+-		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++32copy:		cpy8w   r0, r1, r4, r5, abort=20f
+ #else
+ 2:	PLD(	subs	r2, r2, #(PLDSIZE*3)	)
+ 	PLD(	pld	[r1, #(PLDSIZE-4)]	)
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index d066df6..fc8ea7a 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -71,6 +71,15 @@
+ 	str1w \ptr, \reg8, \abort
+ 	.endm
 
- 5:		ands	ip, r2, #28
- 		rsb	ip, ip, #32
++	.macro cpy8w dst src reg1 reg2 abort
++	.irp offset, #0, #8, #16, #24
++	ldrd \reg1, \reg2, [\src, \offset]
++	str1w \dst, \reg1, \abort
++	str1w \dst, \reg2, \abort
++	.endr
++	add \src, \src, #32
++	.endm
++
+ 	.macro str1b ptr reg cond=al abort
+ 	strusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
+diff --git a/arch/arm/lib/memcpy.S b/arch/arm/lib/memcpy.S
+index a9b9e22..5b4ca72 100644
+--- a/arch/arm/lib/memcpy.S
++++ b/arch/arm/lib/memcpy.S
+@@ -40,6 +40,15 @@
+ 	stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
+ 	.endm
+
++	.macro cpy8w dst src reg1 reg2 abort
++	.irp offset, #0, #8, #16, #24
++	ldrd \reg1, \reg2, [\src, \offset]
++	strd \reg1, \reg2, [\dst, \offset]
++	.endr
++	add \src, \src, #32
++	add \dst, \dst, #32
++	.endm
++
+ 	.macro str1b ptr reg cond=al abort
+ 	str\cond\()b \reg, [\ptr], #1
+ 	.endm
 --
 1.7.1
