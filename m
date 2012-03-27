@@ -1,106 +1,67 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 27 Mar 2012 15:42:42 +0200
-Subject: [PATCHv2 08/14] Microblaze: adapt for dma_map_ops changes
-In-Reply-To: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
-References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1332855768-32583-9-git-send-email-m.szyprowski@samsung.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 27 Mar 2012 14:54:01 +0100
+Subject: [PATCH v2 0/4] ARM: opcodes: Facilitate custom opcode injection
+Message-ID: <1332856445-7007-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+Changes since v1:
 
-Adapt core Microblaze architecture code for dma_map_ops changes: replace
-alloc/free_coherent with generic alloc/free methods.
+ * This update contains minor typo fixes and extra clarification
+   in the commit messages.  There are no functional changes.
 
-Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-[fixed coding style issues]
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/microblaze/include/asm/dma-mapping.h |   18 ++++++++++++------
- arch/microblaze/kernel/dma.c              |   10 ++++++----
- 2 files changed, 18 insertions(+), 10 deletions(-)
+Thanks to Nico for his review.
 
-diff --git a/arch/microblaze/include/asm/dma-mapping.h b/arch/microblaze/include/asm/dma-mapping.h
-index 3a3e5b8..01d2282 100644
---- a/arch/microblaze/include/asm/dma-mapping.h
-+++ b/arch/microblaze/include/asm/dma-mapping.h
-@@ -123,28 +123,34 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
- #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
- #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
- 
--static inline void *dma_alloc_coherent(struct device *dev, size_t size,
--					dma_addr_t *dma_handle, gfp_t flag)
-+#define dma_alloc_coherent(d, s, h, f) dma_alloc_attrs(d, s, h, f, NULL)
-+
-+static inline void *dma_alloc_attrs(struct device *dev, size_t size,
-+				    dma_addr_t *dma_handle, gfp_t flag,
-+				    struct dma_attrs *attrs)
- {
- 	struct dma_map_ops *ops = get_dma_ops(dev);
- 	void *memory;
- 
- 	BUG_ON(!ops);
- 
--	memory = ops->alloc_coherent(dev, size, dma_handle, flag);
-+	memory = ops->alloc(dev, size, dma_handle, flag, attrs);
- 
- 	debug_dma_alloc_coherent(dev, size, *dma_handle, memory);
- 	return memory;
- }
- 
--static inline void dma_free_coherent(struct device *dev, size_t size,
--				     void *cpu_addr, dma_addr_t dma_handle)
-+#define dma_free_coherent(d,s,c,h) dma_free_attrs(d, s, c, h, NULL)
-+
-+static inline void dma_free_attrs(struct device *dev, size_t size,
-+				  void *cpu_addr, dma_addr_t dma_handle,
-+				  struct dma_attrs *attrs)
- {
- 	struct dma_map_ops *ops = get_dma_ops(dev);
- 
- 	BUG_ON(!ops);
- 	debug_dma_free_coherent(dev, size, cpu_addr, dma_handle);
--	ops->free_coherent(dev, size, cpu_addr, dma_handle);
-+	ops->free(dev, size, cpu_addr, dma_handle, attrs);
- }
- 
- static inline void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
-diff --git a/arch/microblaze/kernel/dma.c b/arch/microblaze/kernel/dma.c
-index 65a4af4..a2bfa2c 100644
---- a/arch/microblaze/kernel/dma.c
-+++ b/arch/microblaze/kernel/dma.c
-@@ -33,7 +33,8 @@ static unsigned long get_dma_direct_offset(struct device *dev)
- #define NOT_COHERENT_CACHE
- 
- static void *dma_direct_alloc_coherent(struct device *dev, size_t size,
--				dma_addr_t *dma_handle, gfp_t flag)
-+				       dma_addr_t *dma_handle, gfp_t flag,
-+				       struct dma_attrs *attrs)
- {
- #ifdef NOT_COHERENT_CACHE
- 	return consistent_alloc(flag, size, dma_handle);
-@@ -57,7 +58,8 @@ static void *dma_direct_alloc_coherent(struct device *dev, size_t size,
- }
- 
- static void dma_direct_free_coherent(struct device *dev, size_t size,
--			      void *vaddr, dma_addr_t dma_handle)
-+				     void *vaddr, dma_addr_t dma_handle,
-+				     struct dma_attrs *attrs)
- {
- #ifdef NOT_COHERENT_CACHE
- 	consistent_free(size, vaddr);
-@@ -176,8 +178,8 @@ dma_direct_sync_sg_for_device(struct device *dev,
- }
- 
- struct dma_map_ops dma_direct_ops = {
--	.alloc_coherent	= dma_direct_alloc_coherent,
--	.free_coherent	= dma_direct_free_coherent,
-+	.alloc		= dma_direct_alloc_coherent,
-+	.free		= dma_direct_free_coherent,
- 	.map_sg		= dma_direct_map_sg,
- 	.unmap_sg	= dma_direct_unmap_sg,
- 	.dma_supported	= dma_direct_dma_supported,
+
+Original cover letter:
+
+Since my "uniform assembler" series had some problems and did not
+meet with widespread agreement, this can't be used as a basis for a
+mechanism to safely inject custom instruction opcodes (which was my
+immediate reason for writing those patchse).
+
+This series follows a more conventional approach to achieve the
+goal for safe opcode injection across all kernel endianness and
+instruction set configurations.
+
+I have made best efforts to verify that these patches do the right
+thing for big-endian configurations, but review/testing from people
+who are actively working with big-endian targets would be
+appreciated.  There's no code in the kernel using these macros yet,
+but you can experiment with the __HVC() macro added by the final
+patch.  If this disassembles correctly in vmlinux (see below), then
+the macros should be safe for your configuration.
+
+
+Note that for BE8 targets, you _will_ get weird-looking instruction
+data in your .o files:  because the ".inst" family of assembler
+directives is relatively new I use data directives instead.  This
+means that the data for those directives has to be pre-swapped by
+the opcode injection macros, whereas _instruction_ data should get
+byteswapped by the linker in the final link (with ld --be8).  Using
+with older assembler versions.
+
+To check correctness, you should therefore review the final linker
+output (vmlinux) if you want to be certain what the final
+instruction stream looks like.  You may need to strip data mapping
+symbols (strip -N'$d') from vmlinux in order for the injected
+instructions to be disassembled properly -- note that this has no
+effect on the run-time meaning of the image.
+
+For BE32 the situation is simpler again, because like LE, BE32 uses
+the same endianness for data and instructions.
+
+
+Dave Martin (4):
+  ARM: opcodes: Don't define the thumb32 byteswapping macros for BE32
+  ARM: opcodes: Make opcode byteswapping macros assembly-compatible
+  ARM: opcodes: Add helpers for emitting custom opcodes
+  ARM: opcodes: Opcode definitions for the Virtualization Extensions
+
+ arch/arm/include/asm/opcodes-virt.h |   29 ++++++
+ arch/arm/include/asm/opcodes.h      |  181 ++++++++++++++++++++++++++++++++---
+ 2 files changed, 195 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/include/asm/opcodes-virt.h
+
 -- 
-1.7.1.569.g6f426
+1.7.4.1
