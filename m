@@ -1,17 +1,103 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Mar 2012 08:40:39 +0100
-Subject: [PATCH 2/2] ARM: lib: use LDRD/STRD for data copy
-In-Reply-To: <00d501cd0bb0$724ab260$56e01720$%kim@samsung.com>
-References: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
- <00d501cd0bb0$724ab260$56e01720$%kim@samsung.com>
-Message-ID: <20120327074039.GJ5611@n2100.arm.linux.org.uk>
+Date: Tue, 27 Mar 2012 08:49:31 +0100
+Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
+In-Reply-To: <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
+References: <20120213094940.GA15338@n2100.arm.linux.org.uk>
+ <4F3CF3DA.7000806@samsung.com>
+ <20120216160250.GP13673@n2100.arm.linux.org.uk>
+ <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
+Message-ID: <20120327074931.GK5611@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 09:27:52AM +0900, Boojin Kim wrote:
-> This patch uses LDRD/STRD that loads and stores data as DWORD unit.
-> It brings better performance than LDRM/STRM with cortex-a15.
+On Tue, Feb 21, 2012 at 07:35:49PM +0900, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> > 
+> > On Thu, Feb 16, 2012 at 09:17:30PM +0900, Kukjin Kim wrote:
+> > > On 02/13/12 18:49, Russell King - ARM Linux wrote:
+> > >> From: Russell King<rmk+kernel@arm.linux.org.uk>
+> > >>
+> > >> exynos4210-cpufreq.c is not buildable on non-exynos builds, so it's
+> > >> pointless allowing this option to be exposed.  Fix this by adding a
+> > >> dependency on ARCH_EXYNOS.
+> > >>
+> > >> drivers/cpufreq/exynos4210-cpufreq.c:20:29: error: mach/regs-clock.h:
+> > No such file or directory
+> > >> drivers/cpufreq/exynos4210-cpufreq.c:21:26: error: mach/cpufreq.h: No
+> > such file or directory
+> > >>
+> > >> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+> > >> Cc: Dave Jones<davej@redhat.com>
+> > >> Cc: cpufreq at vger.kernel.org
+> > >> Cc: Kukjin Kim<kgene.kim@samsung.com>
+> > >> ---
+> > >>   drivers/cpufreq/Kconfig.arm |    1 +
+> > >>   1 files changed, 1 insertions(+), 0 deletions(-)
+> > >>
+> > >> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > >> index e0664fe..c8bde43 100644
+> > >> --- a/drivers/cpufreq/Kconfig.arm
+> > >> +++ b/drivers/cpufreq/Kconfig.arm
+> > >> @@ -34,6 +34,7 @@ config ARM_EXYNOS_CPUFREQ
+> > >>
+> > >>   config ARM_EXYNOS4210_CPUFREQ
+> > >>   	bool "Samsung EXYNOS4210"
+> > >> +	depends on ARCH_EXYNOS
+> > >>   	help
+> > >>   	  This adds the CPUFreq driver for Samsung EXYNOS4210
+> > >>   	  SoC (S5PV310 or S5PC210).
+> > >>
+> > >
+> > > Yes, you're right. Should be added it.
+> > > BTW, how about following?
+> > >
+> > > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > > index e0664fe..a5e0487 100644
+> > > --- a/drivers/cpufreq/Kconfig.arm
+> > > +++ b/drivers/cpufreq/Kconfig.arm
+> > > @@ -33,7 +33,7 @@ config ARM_EXYNOS_CPUFREQ
+> > >           If in doubt, say N.
+> > >
+> > >  config ARM_EXYNOS4210_CPUFREQ
+> > > -       bool "Samsung EXYNOS4210"
+> > > +       bool
+> > >         help
+> > >           This adds the CPUFreq driver for Samsung EXYNOS4210
+> > >           SoC (S5PV310 or S5PC210).
+> > >
+> > > I think, when selecting "ARM_EXYNOS_CPUFREQ", "ARM_EXYNOS4210_CPUFREQ"
+> > > will be selected on EXYNOS4210 with above changes.
+> > 
+> Hi Russell,
+> 
+> > I don't think so.  If you select this symbol you'll get a complaint
+> > that CPU_FREQ is not selected.
+> 
+> Hmm..when I selected this symbol, I didn't get any warning about CPU_FREQ,
+> because the cpufreq/Kconfig.arm depends on CPU_FREQ. It means, when CPU_FREQ
+> is not selected, I can't select anything in cpufreq/Kconfig.arm.
+> 
+> > What's probably much better is:
+> > 
+> Yes, looks better than mine.
+> 
+> > config ARM_EXYNOS4210_CPUFREQ
+> > 	def_bool ARCH_EXYNOS
+> 
+> But, should be...
+> 	def_bool CPU_EXYNOS4210
+> 
+> Because the ARM_EXYNOS4210_CPUFREQ is only for EXYNOS4210 and the
+> ARM_EXYNOS4X12_CPUFREQ will be added, actually submitted for other
+> SOC_EXYNOS4212 and SOC_EXYNOS4412.
+> 
+> > 
+> > because that ensures that if the CPU_FREQ dependencies change you don't
+> > have to update numerous places for that too.
+> 
+> OK, I agree.
+> 
+> So could you  please re-send/re-work this?
 
-Why should I bother looking at this rubbish?  You've been told before
-that using ldrd and strd unconditionally is not acceptable.  Stop
-wasting peoples review time.
+As predicted, this is breaking other ARM platforms.  Please fix this
+yourself before your crappy code gets pushed into mainline.  Thanks.
