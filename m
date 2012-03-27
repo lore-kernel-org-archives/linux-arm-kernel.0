@@ -1,43 +1,40 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 27 Mar 2012 14:09:28 -0700
-Subject: [PATCH 02/10] clk: remove unnecessary EXPORT_SYMBOL_GPL
-In-Reply-To: <20120327131002.GC3719@S2101-09.ap.freescale.net>
-References: <20120327092828.GA16397@lunn.ch>
- <20120327131002.GC3719@S2101-09.ap.freescale.net>
-Message-ID: <CAJOA=zMEtyYuPwSAnnJ2PUnymkn-QWD7rJaymemH5on21EB4Sw@mail.gmail.com>
+From: tony.luck@intel.com (Tony Luck)
+Date: Tue, 27 Mar 2012 14:20:05 -0700
+Subject: [PATCH 05/14] IA64: adapt for dma_map_ops changes
+In-Reply-To: <1324643253-3024-6-git-send-email-m.szyprowski@samsung.com>
+References: <1324643253-3024-1-git-send-email-m.szyprowski@samsung.com>
+ <1324643253-3024-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+8MBbLAafFbVwviFmkjD0DNz5RsCbB_TNLL67wEi2k-hyXkXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 6:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Mar 27, 2012 at 11:28:28AM +0200, Andrew Lunn wrote:
->> > Date: Tue, 27 Mar 2012 15:23:21 +0800
->> > From: Shawn Guo <shawn.guo@linaro.org>
->> > To: linux-arm-kernel at lists.infradead.org
->> > Cc: Shawn Guo <shawn.guo@linaro.org>, Mike Turquette
->> > ? ? ? ?<mturquette@linaro.org>
->> > Subject: [PATCH 02/10] clk: remove unnecessary EXPORT_SYMBOL_GPL
->> > Message-ID: <1332833009-4121-3-git-send-email-shawn.guo@linaro.org>
->> >
->> > It makes no sense to have EXPORT_SYMBOL_GPL on static functions.
->>
->> Hi Shawn
->>
->> I agree, exporting static functions makes no sense.
->>
->> However, i think it would be good to export them. I will probably need
->> to build a clk very similar to the gated clock. I would like to use
->> these functions when building my ops structure and just add wrappers
->> around them where needed.
->>
->> Could you instead remove the static?
->>
-> Hmm, I would not.
+On Fri, Dec 23, 2011 at 4:27 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
 >
-> I have a similar need for clk_divider_ops calls. ?Instead of exporting
-> every single clk_gate_ops call, we should just export "struct clk_ops
-> clk_gate_ops". ?That's exactly why I have the patch #4 here.
+> Adapt core IA64 architecture code for dma_map_ops changes: replace
+> alloc/free_coherent with generic alloc/free methods.
+>
+> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> ?arch/ia64/hp/common/sba_iommu.c ? ? | ? 11 ++++++-----
+> ?arch/ia64/include/asm/dma-mapping.h | ? 18 ++++++++++++------
+> ?arch/ia64/kernel/pci-swiotlb.c ? ? ?| ? ?9 +++++----
+> ?arch/ia64/sn/pci/pci_dma.c ? ? ? ? ?| ? ?9 +++++----
+> ?4 files changed, 28 insertions(+), 19 deletions(-)
 
-Andrew, does this approach work for you?  I prefer it over the EXPORT madness.
+The series breaks bisection from part 2 (when the x86 part changes
+lib/swiotlb.c)
+until part 5 (when ia64 sees the changes to match).  You could either merge part
+5 into part 2 (to make a combined x86+ia64 piece) ... or try to pull
+the libswiotlb
+changes into their own piece (which would have some of the ia64 and x86 bits).
+Or at the very least minimize the breakage window by putting ia64
+right after x86
+in the patch sequence.
 
-Regards,
-Mike
+Otherwise seems OK
+
+Acked-by: Tony Luck <tony.luck@intel.com>
