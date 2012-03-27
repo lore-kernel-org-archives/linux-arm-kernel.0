@@ -1,56 +1,24 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 27 Mar 2012 14:52:49 -0500
-Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
- OMAP4 onwards
-In-Reply-To: <1332842311-12308-1-git-send-email-rnayak@ti.com>
-References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
-Message-ID: <4F721A91.7000102@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 27 Mar 2012 13:26:28 -0700
+Subject: [PATCH] atmel-serial: fix RS485 half-duplex problem
+In-Reply-To: <6FF0F449D45DEE479E93D93A0C07A8BD025E9F8D47@USROCEX01>
+References: <6FF0F449D45DEE479E93D93A0C07A8BD025E8F0631@USROCEX01>
+ <20120327175433.GA6623@kroah.com>
+ <6FF0F449D45DEE479E93D93A0C07A8BD025E9F8D47@USROCEX01>
+Message-ID: <20120327202628.GB15798@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+On Tue, Mar 27, 2012 at 04:20:51PM -0400, Siftar, Gabe wrote:
+> >From: Greg KH [mailto:gregkh at linuxfoundation.org]
+> >Sent: Tuesday, March 27, 2012 1:55 PM
+> >Care to resend this without the footer so I can accept it?
+> 
+> Sorry.  It turns out that the footer was added by our 3rd party email 
+> filtering service - I hope that it's no longer being included.
 
-On 3/27/2012 4:58, Rajendra Nayak wrote:
-> Some functions like _omap4_disable_module() and _omap4_wait_target_disable()
-> are (will be) used on all OMAPs OMAP4 and beyond which support module level
-> control. Fix the error checks in these functions to return if called on
-> any platform pre OMAP4 (i.e OMAP2 and OMAP3) instead of checking for
-> !cpu_is_omap44xx(). This avoids having to update the error check with a
-> '&&  !cpu_is_omap54xx()' when OMAP5 is introduced and possibly similar updates
-> when further OMAP generations are added.
->
-> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod.c |    4 ++--
->   1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 8ac26f2..f2a9afa 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -808,7 +808,7 @@ static void _enable_module(struct omap_hwmod *oh)
->    */
->   static int _omap4_wait_target_disable(struct omap_hwmod *oh)
->   {
-> -	if (!cpu_is_omap44xx())
-> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
->   		return 0;
+Looks good, thanks, I'll queue this up once 3.4-rc1 is out.
 
-What about omap36xx?
+thanks,
 
->   	if (!oh)
-> @@ -838,7 +838,7 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
->   	int v;
->
->   	/* The module mode does not exist prior OMAP4 */
-> -	if (!cpu_is_omap44xx())
-> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
->   		return -EINVAL;
-
-Same here.
-
->
->   	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
-
-Cheers
-Jon
+greg k-h
