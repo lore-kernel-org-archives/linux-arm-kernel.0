@@ -1,22 +1,17 @@
 From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 27 Mar 2012 17:50:38 +0100
-Subject: [PATCH RESEND 1/2] ARM: ThumbEE: Disable userspace TEEHBR access for
- !CONFIG_ARM_THUMBEE
-Message-ID: <1332867039-3567-1-git-send-email-jonathan.austin@arm.com>
+Date: Tue, 27 Mar 2012 17:50:39 +0100
+Subject: [PATCH RESEND 2/2] ARM: ThumbEE: Use cpuid macros to read ID_PFR0 for
+ ThumbEE
+In-Reply-To: <1332867039-3567-1-git-send-email-jonathan.austin@arm.com>
+References: <1332867039-3567-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <1332867039-3567-2-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently when ThumbEE is not enabled (!CONFIG_ARM_THUMBEE) the ThumbEE
-register states are not saved/restored at context switch. The default state
-of the ThumbEE Ctrl register (TEECR) allows userspace accesses to the
-ThumbEE Base Handler register (TEEHBR). This can cause unexpected behaviour
-when people use ThumbEE on !CONFIG_ARM_THUMBEE kernels, as well as allowing
-covert communication - eg between userspace tasks running inside chroot
-jails.
+The ThumbEE probe code uses inline assembly to read ID_PFR0 in order to
+detect whether ThumbEE is implemented by the processor.
 
-This patch sets up TEECR in order to prevent user-space access to TEEHBR
-when !CONFIG_ARM_THUMBEE. In this case, tasks are sent SIGILL if they try to
-access TEEHBR.
+This patch replaces the inline asm with the read_cpuid_ext macro.
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
@@ -25,33 +20,32 @@ Reviewed-by: Will Deacon <will.deacon@arm.com>
 Resending these patches, rebased on v3.3. If there are no comments again
 this time around I will submit them to the patch-system when RC1 comes
 around.
+ 
 
+ arch/arm/kernel/thumbee.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/mm/proc-v7.S |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index f1c8486..c2e2b66 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -255,6 +255,18 @@ __v7_setup:
- 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
- 	mcr	p15, 0, r6, c10, c2, 1		@ write NMRR
- #endif
-+#ifndef CONFIG_ARM_THUMBEE
-+	mrc	p15, 0, r0, c0, c1, 0		@ read ID_PFR0 for ThumbEE
-+	and	r0, r0, #(0xf << 12)		@ ThumbEE enabled field
-+	teq	r0, #(1 << 12)			@ check if ThumbEE is present
-+	bne	1f
-+	mov	r5, #0
-+	mcr	p14, 6, r5, c1, c0, 0		@ Initialize TEEHBR to 0
-+	mrc	p14, 6, r0, c0, c0, 0		@ load TEECR
-+	orr	r0, r0, #1			@ set the 1st bit in order to
-+	mcr	p14, 6, r0, c0, c0, 0		@ stop userspace TEEHBR access
-+1:
-+#endif
- 	adr	r5, v7_crval
- 	ldmia	r5, {r5, r6}
- #ifdef CONFIG_CPU_ENDIAN_BE8
+diff --git a/arch/arm/kernel/thumbee.c b/arch/arm/kernel/thumbee.c
+index 9cb7aac..3471f63 100644
+--- a/arch/arm/kernel/thumbee.c
++++ b/arch/arm/kernel/thumbee.c
+@@ -20,6 +20,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ 
++#include <asm/cputype.h>
+ #include <asm/thread_notify.h>
+ 
+ /*
+@@ -66,8 +67,7 @@ static int __init thumbee_init(void)
+ 	if (cpu_arch < CPU_ARCH_ARMv7)
+ 		return 0;
+ 
+-	/* processor feature register 0 */
+-	asm("mrc	p15, 0, %0, c0, c1, 0\n" : "=r" (pfr0));
++	pfr0 = read_cpuid_ext(CPUID_EXT_PFR0);
+ 	if ((pfr0 & 0x0000f000) != 0x00001000)
+ 		return 0;
+ 
 -- 
 1.7.1
