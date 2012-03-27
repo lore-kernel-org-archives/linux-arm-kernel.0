@@ -1,22 +1,28 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 27 Mar 2012 17:15:37 +0530
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <4F71A42C.3090108@st.com>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203221420.10127.arnd@arndb.de> <4F71961E.2080208@st.com>
- <201203271115.07805.arnd@arndb.de> <4F71A42C.3090108@st.com>
-Message-ID: <4F71A861.6090106@st.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 27 Mar 2012 16:12:05 +0400
+Subject: [PATCH] amba-pl011: fix panic introduced by "clear pending
+ interrupts"
+In-Reply-To: <20120326203209.GA8182@mail.gnudd.com>
+References: <20120326203209.GA8182@mail.gnudd.com>
+Message-ID: <4F71AE95.9080600@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/27/2012 4:57 PM, Viresh Kumar wrote:
-> DT should be up but, nodes would be up only once we call
-> of_platform_populate() from this init routine.
+Hello.
 
-I was wrong here atleast :(
-Can use these routines here before calling populate().
+On 27-03-2012 0:32, Alessandro Rubini wrote:
 
-But question regarding multiple DT_MACHINE_START() is still valid.
+> patch 9b96fba, currently in linux-next, clears interrupts using
 
--- 
-viresh
+    Please also specify the summary of this commit in parens.
+
+> uap->port.membase that has not been assigned.  My x86 system,
+> that uses a pci-to-amba bridge, panics with a message like:
+
+>     BUG: unable to handle kernel NULL pointer dereference at 00000038
+>     IP: [<c12c85ed>] pl011_probe+0x119/0x303
+
+> Signed-off-by: Alessandro Rubini<rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi<giancarlo.asnaghi@st.com>
+
+WBR, Sergei
