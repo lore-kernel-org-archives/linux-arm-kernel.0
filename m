@@ -1,47 +1,32 @@
-From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Tue, 27 Mar 2012 15:46:44 +0530
-Subject: [PATCH] ARM: Samsung: Make PM_GENERIC_DOMAINS config depend on
- CONFIG_PM
-In-Reply-To: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
-References: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1332843404-25476-2-git-send-email-thomas.ab@samsung.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 27 Mar 2012 15:57:42 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203221420.10127.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203211236.37891.arnd@arndb.de>
+ <CAOh2x=k6ZfamB8DnPgVPjxZ7E1gTuHOQYg6s1Nd1ybA+TSquWA@mail.gmail.com>
+ <201203221420.10127.arnd@arndb.de>
+Message-ID: <4F71961E.2080208@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For s3c64xx and exynos platforms, make the selection of PM_GENERIC_DOMAINS
-depend on the CONFIG_PM.
+On 3/22/2012 7:50 PM, Arnd Bergmann wrote:
+> The direct replacement is of_machine_is_compatible(), but there are a lot
+> of cases where it's better to have a local property in the device node
+> that a driver is using.
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
----
- arch/arm/mach-exynos/Kconfig  |    2 +-
- arch/arm/mach-s3c64xx/Kconfig |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Hey Arnd,
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 0491cee..6c8f17b 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -35,7 +35,7 @@ config CPU_EXYNOS4210
- 	select ARM_CPU_SUSPEND if PM
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
--	select PM_GENERIC_DOMAINS
-+	select PM_GENERIC_DOMAINS if PM
- 	help
- 	  Enable EXYNOS4210 CPU support
- 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 82c0915..2609349 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -8,7 +8,7 @@ config PLAT_S3C64XX
- 	bool
- 	depends on ARCH_S3C64XX
- 	select SAMSUNG_WAKEMASK
--	select PM_GENERIC_DOMAINS
-+	select PM_GENERIC_DOMAINS if PM
- 	default y
- 	help
- 	  Base platform code for any Samsung S3C64XX device
+I used of_machine_is_compatible() at several places, where it is not working :(
+Actually all these usages are before a call to of_platform_populate() and
+it looks the tree is not up by this time.
+
+So, of_machine_is_compatible() always fails. The places where i am using this
+routine are:
+- spear3xx_dt_init(): to call SoC specific of_platform_populate()
+- spear3xx_clk_init(): to call SoC specific clk_register()
+
+Can you please suggest what should i do here?
+
 -- 
-1.6.6.rc2
+viresh
