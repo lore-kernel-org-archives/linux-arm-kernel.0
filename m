@@ -1,10 +1,10 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2012 16:15:43 +0000
+Date: Tue, 27 Mar 2012 16:19:13 +0000
 Subject: [PATCH v3 6/6] mmc: sdhci-s3c: Add device tree support
 In-Reply-To: <1328032576-9269-7-git-send-email-thomas.abraham@linaro.org>
 References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
  <1328032576-9269-7-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <201203271615.43394.arnd@arndb.de>
+Message-ID: <201203271619.13320.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
