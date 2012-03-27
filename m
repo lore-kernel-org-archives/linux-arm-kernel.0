@@ -1,27 +1,64 @@
-From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
-Date: Tue, 27 Mar 2012 17:06:36 +0200
-Subject: [PATCH v5 2/8] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
-In-Reply-To: <1331888204-27058-3-git-send-email-shawn.guo@linaro.org>
-References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
- <1331888204-27058-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <2976261.6mYHfHvpym@laptop>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 27 Mar 2012 10:31:56 -0500
+Subject: [RFC][PATCH 1/5] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A9317BD6E2@DBDE01.ent.ti.com>
+References: <1332484600-21947-1-git-send-email-afzal@ti.com>
+ <4F6D0569.6080203@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317BB895@DBDE01.ent.ti.com>
+ <4F70AA82.3000204@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317BD6E2@DBDE01.ent.ti.com>
+Message-ID: <4F71DD6C.5010305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le vendredi 16 mars 2012 16:56:38 Shawn Guo a ?crit :
-> Freescale PowerPC and ARM/IMX families share the same SSI IP block.
-> The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
-> code sharing and consolidation can happen.
-> 
-> This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
-> in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
-> IMX platform.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi Afzal,
 
-This patch has been merged ? If yes in which tree is it available ? 
+On 3/27/2012 0:12, Mohammed, Afzal wrote:
+> Hi Jon,
+>
+> On Mon, Mar 26, 2012 at 23:12:26, Hunter, Jon wrote:
+>> Also, I don't see where the gpmc_child->res and gpmc_child->num_res are
+>> actually used. Are these needed?
+>
+> These are for the peripheral resources not in control of GPMC, like
+> gpio irq. These are copied in gpmc_create_child.
 
-Thanks,
+Right, I see they are copied during gpmc_create_child. However, I don't 
+see where they are initialised before that. The function 
+gpmc_setup_child is only initialising gpmc_res and gpmc_num_res and not 
+res and num_res. So I still don't see who is initialising these before 
+they are copied.
 
-Philippe
+>>> Gpmc_device_data is dedicated to each CS, gpmc_pdata is required
+>>> at least to inform driver about clock rate.
+>>
+>> Ok, understood! So the struct gpmc_device_pdata only has a single
+>> chip-select entry and so looking at the code you will have multiple
+>> instances of this structure of a gpmc device that uses more than one
+>> chip-select. Any reason you did it this way and not have a single pdata
+>> struct for each device defining all chip-selects it uses?
+>
+> When coding started, multiple CS for a peripheral was not taken into
+> consideration, later handling multiple CS was incorporated making it
+> this way. But your suggestion seems better to me, will see if code can
+> modified accordingly in later patch series (v2 already sent)
+
+Ok great. I will wait for your v3.
+
+>>
+>>> Generally, as the change involved moving a lot of code, seems more reviews
+>>> are on those than the actual changes than what I intended to get reviewed,
+>>> next patch series will be modified not to move existing code, hence some
+>>> of your suggested changes may not be present in it, probably those to be
+>>> done as another cleanup patch.
+>>
+>> Yes I understand. However, it is a good opportunity to clean some of
+>> this up even if it is existing code :-)
+>
+> Ok
+
+I see you did not incorporate any clean-up in v2. Do you want me to send 
+you some patches to include?
+
+Cheers
+Jon
