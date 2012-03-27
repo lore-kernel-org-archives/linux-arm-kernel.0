@@ -1,32 +1,55 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 27 Mar 2012 15:57:42 +0530
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203221420.10127.arnd@arndb.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203211236.37891.arnd@arndb.de>
- <CAOh2x=k6ZfamB8DnPgVPjxZ7E1gTuHOQYg6s1Nd1ybA+TSquWA@mail.gmail.com>
- <201203221420.10127.arnd@arndb.de>
-Message-ID: <4F71961E.2080208@st.com>
+From: joancarles@fqingenieria.es (joancarles)
+Date: Tue, 27 Mar 2012 12:56:31 +0200
+Subject: [MX25][MMC] mmc esdhc failure in 3.3
+In-Reply-To: <20120327114048.6af2e178@eb-e6520>
+References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
+ <20120312132423.GC2459@pengutronix.de>
+ <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
+ <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
+ <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
+ <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
+ <20120327101259.73525f9d@eb-e6520>
+ <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
+ <20120327090148.GB6790@pengutronix.de> <20120327110615.3bfaf969@eb-e6520>
+ <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
+ <20120327114048.6af2e178@eb-e6520>
+Message-ID: <137e8b8e079af62aea2fd4d363be6273@mail.fqingenieria.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/22/2012 7:50 PM, Arnd Bergmann wrote:
-> The direct replacement is of_machine_is_compatible(), but there are a lot
-> of cases where it's better to have a local property in the device node
-> that a driver is using.
+Hi
 
-Hey Arnd,
+>> Might be unrelated, however I have been keeping my eyes on the fix 
+>> of
+>> ENGcm07207 quirk introduced with 16a790bcc. According to the
+>> IMX25CE.pdf, to abort data transfers on the AHB, software can reset 
+>> the
+>> eSDHC by writing 1 to SYSCTL[24] (RSTA), which currently is not done
+>> with SDHCI_QUIRK_NO_MULTIBLOCK. It sets the max_blk_count to 1 
+>> instead
+>> of 65535. Not sure if this is also limiting the speed.
+>>
+> I tried to increase max_blk_count and it breaks after a few tests.
 
-I used of_machine_is_compatible() at several places, where it is not working :(
-Actually all these usages are before a call to of_platform_populate() and
-it looks the tree is not up by this time.
+I will redo your tests in a jiffy, however the latency issues worry me 
+a wee bit.
 
-So, of_machine_is_compatible() always fails. The places where i am using this
-routine are:
-- spear3xx_dt_init(): to call SoC specific of_platform_populate()
-- spear3xx_clk_init(): to call SoC specific clk_register()
+> Using an oscilloscope it seems we have a big latency between each
+> transfer which could explain the low throughput, I didn't have the
+> time to look deeper at this problem.
 
-Can you please suggest what should i do here?
+The latency we can see here in the oscilloscope is tremendous between 
+two CMD24: 8ms! What is causing this? It is certainly unrelated to the 
+MULTIBLOCK feature. Having a clock at 33.25MHz, our maximal read, as 
+confirmed by dd is:
 
+33.25[MHz] * 4[bits data] / 8[bits/Byte] * 30 [us write] / 8000 [us 
+sleep] =~ 60KB/s
+
+So, what's keeping the driver 8ms from sending the data??? Any pointers 
+on where I could twiddle some bits in the driver? Where do I start 
+looking?
+
+Cheers
 -- 
-viresh
+Joan C. Abelaira
