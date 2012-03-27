@@ -1,5 +1,5 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Tue, 27 Mar 2012 10:58:19 +0200
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 27 Mar 2012 11:01:49 +0200
 Subject: [MX25][MMC] mmc esdhc failure in 3.3
 In-Reply-To: <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
 References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
@@ -10,37 +10,38 @@ References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
  <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
  <20120327101259.73525f9d@eb-e6520>
  <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
-Message-ID: <20120327105819.00d89783@eb-e6520>
+Message-ID: <20120327090148.GB6790@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joan Carles,
 
-Le Tue, 27 Mar 2012 10:46:45 +0200,
-joancarles <joancarles@fqingenieria.es> a ?crit :
-> >> This is still present, and we have absolutely no idea where to 
-> >> continue
-> >> searching for the solution of the problem. Any pointers? Any git 
-> >> trees
-> >> of mmc driver changes we could try? Anybody else with a MX25 that 
-> >> has
-> >> this issue?
-> >>
-> > does that attached patch fix your problem ?
+> >does that attached patch fix your problem ?
 > 
-> YES, indeed it does to a certain degree. The timeout errors do not 
-> occur anymore and I can successfully perform many fs->ops, such as READ, 
-> WRITE, UNLINK ... . So thank you very much for this insight through your 
-> patch!
-> 
-> The speed of the card is excruciatingly slow, however. We roughly get 
-> between 34KB/s and 64KB/s from a dd if=/dev/zero write to any of the 
-> following partitions:
-> 
-I have the same speed problem here on i.MX25 but still haven't found
-the reason.
-Shawn, Richard : do you have an idea of why the eSDHC is so slow on
-i.MX25 ?
+> YES, indeed it does to a certain degree. The timeout errors do not
+> occur anymore and I can successfully perform many fs->ops, such as
 
-Thanks,
-Eric
+Interesting question is now why it worked on your older kernel? The code
+around BROKEN_TIMEOUT is there for much longer, I'd think.
+
+> The speed of the card is excruciatingly slow, however. We roughly
+> get between 34KB/s and 64KB/s from a dd if=/dev/zero write to any of
+> the following partitions:
+
+Check the code below what is patched. That's currently the best solution
+for the errata. There might be better ones, though, but you'd need to
+find out.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/0b5c95e0/attachment.sig>
