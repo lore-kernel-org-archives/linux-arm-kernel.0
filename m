@@ -1,83 +1,151 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 27 Mar 2012 11:54:27 +0300
-Subject: [PATCH] ARM: OMAP: fix section mismatches in usb-host.c
-In-Reply-To: <1332773470-22800-1-git-send-email-grinberg@compulab.co.il>
-References: <1332773470-22800-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <20120327085426.GI7379@arwen.pp.htv.fi>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 27 Mar 2012 10:55:14 +0200
+Subject: [PATCH 09/10] clk: dynamically allocate parent_names basic clk
+ registration
+In-Reply-To: <1332833009-4121-10-git-send-email-shawn.guo@linaro.org>
+References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
+ <1332833009-4121-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120327085514.GI29317@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 04:51:10PM +0200, Igor Grinberg wrote:
-> Fix the below section mismatch warning and alike:
-> 
-> WARNING: vmlinux.o(.text+0x281d4): Section mismatch in reference from
-> the function setup_ehci_io_mux() to the function
-> .init.text:omap_mux_init_signal()
-> The function setup_ehci_io_mux() references
-> the function __init omap_mux_init_signal().
-> This is often because setup_ehci_io_mux lacks a __init
-> annotation or the annotation of omap_mux_init_signal is wrong.
-> 
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+On Tue, Mar 27, 2012 at 03:23:28PM +0800, Shawn Guo wrote:
+> It's not necessary to have "char *parent[1]" carried in struct clk_gate
+> and clk_divider.  Instead, it can be dynamically allocated in
+> registration function, just like what clk_register_fixed_rate does.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+I patched it the way it is to get rid of the additional malloc which
+seemed unnecessary. Maybe the real question is whether the core should
+duplicate the parent strings instead of the basic clock types.
 
+Sascha
+
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  arch/arm/mach-omap2/usb-host.c |   10 ++++++----
->  1 files changed, 6 insertions(+), 4 deletions(-)
+>  drivers/clk/clk-divider.c    |   14 ++++++++++----
+>  drivers/clk/clk-gate.c       |   15 +++++++++++----
+>  include/linux/clk-provider.h |    2 --
+>  3 files changed, 21 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
-> index f51348d..dde8a11 100644
-> --- a/arch/arm/mach-omap2/usb-host.c
-> +++ b/arch/arm/mach-omap2/usb-host.c
-> @@ -54,7 +54,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
->  /*
->   * setup_ehci_io_mux - initialize IO pad mux for USBHOST
->   */
-> -static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-> +static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index b1c4b02..df03a61 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -160,6 +160,7 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
 >  {
->  	switch (port_mode[0]) {
->  	case OMAP_EHCI_PORT_MODE_PHY:
-> @@ -197,7 +197,8 @@ static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
->  	return;
->  }
+>  	struct clk_divider *div;
+>  	struct clk *clk;
+> +	const char **parent_names = NULL;
 >  
-> -static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-> +static
-> +void __init setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
->  {
->  	switch (port_mode[0]) {
->  	case OMAP_EHCI_PORT_MODE_PHY:
-> @@ -315,7 +316,7 @@ static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
+>  
+> @@ -176,21 +177,26 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+>  	div->lock = lock;
+>  
+>  	if (parent_name) {
+> -		div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+> -		if (!div->parent[0])
+> +		parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
+> +		if (!parent_names)
+> +			goto out;
+> +
+> +		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
+> +		if (!parent_names[0])
+>  			goto out;
 >  	}
->  }
 >  
-> -static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-> +static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  	clk = clk_register(dev, name,
+>  			&clk_divider_ops, &div->hw,
+> -			div->parent,
+> +			parent_names,
+>  			(parent_name ? 1 : 0),
+>  			flags);
+>  	if (clk)
+>  		return clk;
+>  
+>  out:
+> -	kfree(div->parent[0]);
+> +	kfree(parent_names[0]);
+> +	kfree(parent_names);
+>  	kfree(div);
+>  
+>  	return NULL;
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index fe2ff9e..51c56cb 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -112,6 +112,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
 >  {
->  	switch (port_mode[0]) {
->  	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
-> @@ -412,7 +413,8 @@ static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  	struct clk_gate *gate;
+>  	struct clk *clk;
+> +	const char **parent_names = NULL;
+>  
+>  	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
+>  
+> @@ -127,20 +128,26 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+>  	gate->lock = lock;
+>  
+>  	if (parent_name) {
+> -		gate->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+> -		if (!gate->parent[0])
+> +		parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
+> +		if (!parent_names)
+> +			goto out;
+> +
+> +		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
+> +		if (parent_names[0])
+>  			goto out;
 >  	}
->  }
 >  
-> -static void setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-> +static
-> +void __init setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
->  {
->  	switch (port_mode[0]) {
->  	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+>  	clk = clk_register(dev, name,
+>  			&clk_gate_ops, &gate->hw,
+> -			gate->parent,
+> +			parent_names,
+>  			(parent_name ? 1 : 0),
+>  			flags);
+>  	if (clk)
+>  		return clk;
+> +
+>  out:
+> -	kfree(gate->parent[0]);
+> +	kfree(parent_names[0]);
+> +	kfree(parent_names);
+>  	kfree(gate);
+>  
+>  	return NULL;
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 24c5013..7948640 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -176,7 +176,6 @@ struct clk_gate {
+>  	u8		bit_idx;
+>  	u8		flags;
+>  	spinlock_t	*lock;
+> -	char		*parent[1];
+>  };
+>  
+>  #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+> @@ -214,7 +213,6 @@ struct clk_divider {
+>  	u8		width;
+>  	u8		flags;
+>  	spinlock_t	*lock;
+> -	const char	*parent[1];
+>  };
+>  
+>  #define CLK_DIVIDER_ONE_BASED		BIT(0)
 > -- 
-> 1.7.3.4
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/b002ec64/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
