@@ -1,67 +1,69 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 27 Mar 2012 14:54:01 +0100
-Subject: [PATCH v2 0/4] ARM: opcodes: Facilitate custom opcode injection
-Message-ID: <1332856445-7007-1-git-send-email-dave.martin@linaro.org>
+Date: Tue, 27 Mar 2012 14:54:02 +0100
+Subject: [PATCH v2 1/4] ARM: opcodes: Don't define the thumb32 byteswapping
+ macros for BE32
+In-Reply-To: <1332856445-7007-1-git-send-email-dave.martin@linaro.org>
+References: <1332856445-7007-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1332856445-7007-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
+The existing __mem_to_opcode_thumb32() is incorrect for BE32
+platforms.  However, these don't support Thumb-2 kernels, so this
+option is not so relevant for those platforms anyway.
 
- * This update contains minor typo fixes and extra clarification
-   in the commit messages.  There are no functional changes.
+This operation is complicated by the lack of unaligned memory
+access support prior to ARMv6.
 
-Thanks to Nico for his review.
+Rather than provide a "working" macro which will probably won't get
+used (or worse, will get misused), this patch removes the macro for
+BE32 kernels.  People manipulating Thumb opcodes prior to ARMv6
+should almost certainly be splitting these operations into
+halfwords anyway, using __opcode_thumb32_{first,second,compose}()
+and the 16-bit opcode transformations.
 
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/include/asm/opcodes.h |   15 ++++++++++++++-
+ 1 files changed, 14 insertions(+), 1 deletions(-)
 
-Original cover letter:
-
-Since my "uniform assembler" series had some problems and did not
-meet with widespread agreement, this can't be used as a basis for a
-mechanism to safely inject custom instruction opcodes (which was my
-immediate reason for writing those patchse).
-
-This series follows a more conventional approach to achieve the
-goal for safe opcode injection across all kernel endianness and
-instruction set configurations.
-
-I have made best efforts to verify that these patches do the right
-thing for big-endian configurations, but review/testing from people
-who are actively working with big-endian targets would be
-appreciated.  There's no code in the kernel using these macros yet,
-but you can experiment with the __HVC() macro added by the final
-patch.  If this disassembles correctly in vmlinux (see below), then
-the macros should be safe for your configuration.
-
-
-Note that for BE8 targets, you _will_ get weird-looking instruction
-data in your .o files:  because the ".inst" family of assembler
-directives is relatively new I use data directives instead.  This
-means that the data for those directives has to be pre-swapped by
-the opcode injection macros, whereas _instruction_ data should get
-byteswapped by the linker in the final link (with ld --be8).  Using
-with older assembler versions.
-
-To check correctness, you should therefore review the final linker
-output (vmlinux) if you want to be certain what the final
-instruction stream looks like.  You may need to strip data mapping
-symbols (strip -N'$d') from vmlinux in order for the injected
-instructions to be disassembled properly -- note that this has no
-effect on the run-time meaning of the image.
-
-For BE32 the situation is simpler again, because like LE, BE32 uses
-the same endianness for data and instructions.
-
-
-Dave Martin (4):
-  ARM: opcodes: Don't define the thumb32 byteswapping macros for BE32
-  ARM: opcodes: Make opcode byteswapping macros assembly-compatible
-  ARM: opcodes: Add helpers for emitting custom opcodes
-  ARM: opcodes: Opcode definitions for the Virtualization Extensions
-
- arch/arm/include/asm/opcodes-virt.h |   29 ++++++
- arch/arm/include/asm/opcodes.h      |  181 ++++++++++++++++++++++++++++++++---
- 2 files changed, 195 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/include/asm/opcodes-virt.h
-
+diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+index 19c48de..6bf54f9 100644
+--- a/arch/arm/include/asm/opcodes.h
++++ b/arch/arm/include/asm/opcodes.h
+@@ -49,18 +49,31 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+ #include <linux/swab.h>
+ 
+ #ifdef CONFIG_CPU_ENDIAN_BE8
++
+ #define __opcode_to_mem_arm(x) swab32(x)
+ #define __opcode_to_mem_thumb16(x) swab16(x)
+ #define __opcode_to_mem_thumb32(x) swahb32(x)
+-#else
++
++#else /* ! CONFIG_CPU_ENDIAN_BE8 */
++
+ #define __opcode_to_mem_arm(x) ((u32)(x))
+ #define __opcode_to_mem_thumb16(x) ((u16)(x))
++#ifndef CONFIG_CPU_ENDIAN_BE32
++/*
++ * On BE32 systems, using 32-bit accesses to store Thumb instructions will not
++ * work in all cases, due to alignment constraints.  For now, a correct
++ * version is not provided for BE32.
++ */
+ #define __opcode_to_mem_thumb32(x) swahw32(x)
+ #endif
+ 
++#endif /* ! CONFIG_CPU_ENDIAN_BE8 */
++
+ #define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
+ #define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
++#ifndef CONFIG_CPU_ENDIAN_BE32
+ #define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
++#endif
+ 
+ /* Operations specific to Thumb opcodes */
+ 
 -- 
 1.7.4.1
