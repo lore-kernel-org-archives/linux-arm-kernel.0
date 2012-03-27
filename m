@@ -1,52 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 27 Mar 2012 10:56:59 +0200
-Subject: [PATCH] ARM: 3ds_debugboard: Fix smsc911x driver probe
-In-Reply-To: <1332788037-31064-1-git-send-email-fabio.estevam@freescale.com>
-References: <1332788037-31064-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120327085659.GW3852@pengutronix.de>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Tue, 27 Mar 2012 10:58:19 +0200
+Subject: [MX25][MMC] mmc esdhc failure in 3.3
+In-Reply-To: <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
+References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
+ <20120312132423.GC2459@pengutronix.de>
+ <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
+ <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
+ <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
+ <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
+ <20120327101259.73525f9d@eb-e6520>
+ <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
+Message-ID: <20120327105819.00d89783@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 03:53:57PM -0300, Fabio Estevam wrote:
-> Fix smsc911x id field in order to fix smsc911x driver probe error:
-> 
-> smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
-> smsc911x smsc911x.0: (unregistered net_device): couldn't get regulators -517
-> platform smsc911x.0: Driver smsc911x requests probe deferral
+Hi Joan Carles,
 
-Looks good. I couldn't test it on the 3ds board. Could you collect your
-patches until the beginning of next week? I'm on holidays right now and
-will be back next week.
+Le Tue, 27 Mar 2012 10:46:45 +0200,
+joancarles <joancarles@fqingenieria.es> a ?crit :
+> >> This is still present, and we have absolutely no idea where to 
+> >> continue
+> >> searching for the solution of the problem. Any pointers? Any git 
+> >> trees
+> >> of mmc driver changes we could try? Anybody else with a MX25 that 
+> >> has
+> >> this issue?
+> >>
+> > does that attached patch fix your problem ?
+> 
+> YES, indeed it does to a certain degree. The timeout errors do not 
+> occur anymore and I can successfully perform many fs->ops, such as READ, 
+> WRITE, UNLINK ... . So thank you very much for this insight through your 
+> patch!
+> 
+> The speed of the card is excruciatingly slow, however. We roughly get 
+> between 34KB/s and 64KB/s from a dd if=/dev/zero write to any of the 
+> following partitions:
+> 
+I have the same speed problem here on i.MX25 but still haven't found
+the reason.
+Shawn, Richard : do you have an idea of why the eSDHC is so slow on
+i.MX25 ?
 
-Sascha
-
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/plat-mxc/3ds_debugboard.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
-> index d1e31fa..5cac2c5 100644
-> --- a/arch/arm/plat-mxc/3ds_debugboard.c
-> +++ b/arch/arm/plat-mxc/3ds_debugboard.c
-> @@ -80,7 +80,7 @@ static struct smsc911x_platform_config smsc911x_config = {
->  
->  static struct platform_device smsc_lan9217_device = {
->  	.name = "smsc911x",
-> -	.id = 0,
-> +	.id = -1,
->  	.dev = {
->  		.platform_data = &smsc911x_config,
->  	},
-> -- 
-> 1.7.1
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Eric
