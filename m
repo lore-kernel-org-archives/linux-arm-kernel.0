@@ -1,55 +1,80 @@
-From: joancarles@fqingenieria.es (joancarles)
-Date: Tue, 27 Mar 2012 12:56:31 +0200
-Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <20120327114048.6af2e178@eb-e6520>
-References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
- <20120312132423.GC2459@pengutronix.de>
- <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
- <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
- <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
- <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
- <20120327101259.73525f9d@eb-e6520>
- <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
- <20120327090148.GB6790@pengutronix.de> <20120327110615.3bfaf969@eb-e6520>
- <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
- <20120327114048.6af2e178@eb-e6520>
-Message-ID: <137e8b8e079af62aea2fd4d363be6273@mail.fqingenieria.es>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2012 11:15:07 +0000
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <4F71961E.2080208@st.com>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203221420.10127.arnd@arndb.de> <4F71961E.2080208@st.com>
+Message-ID: <201203271115.07805.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tuesday 27 March 2012, Viresh Kumar wrote:
+> On 3/22/2012 7:50 PM, Arnd Bergmann wrote:
+> > The direct replacement is of_machine_is_compatible(), but there are a lot
+> > of cases where it's better to have a local property in the device node
+> > that a driver is using.
+> 
+> Hey Arnd,
+> 
+> I used of_machine_is_compatible() at several places, where it is not working :(
+> Actually all these usages are before a call to of_platform_populate() and
+> it looks the tree is not up by this time.
+> 
+> So, of_machine_is_compatible() always fails. The places where i am using this
+> routine are:
+> - spear3xx_dt_init(): to call SoC specific of_platform_populate()
+> - spear3xx_clk_init(): to call SoC specific clk_register()
+> 
+> Can you please suggest what should i do here?
 
->> Might be unrelated, however I have been keeping my eyes on the fix 
->> of
->> ENGcm07207 quirk introduced with 16a790bcc. According to the
->> IMX25CE.pdf, to abort data transfers on the AHB, software can reset 
->> the
->> eSDHC by writing 1 to SYSCTL[24] (RSTA), which currently is not done
->> with SDHCI_QUIRK_NO_MULTIBLOCK. It sets the max_blk_count to 1 
->> instead
->> of 65535. Not sure if this is also limiting the speed.
->>
-> I tried to increase max_blk_count and it breaks after a few tests.
+The normal way is to turn around the logic so you don't have to include this test
+at all. Just have one soc-specific init_machine and map_io function, that calls
+both soc-specific and shared soc functions, e.g.
 
-I will redo your tests in a jiffy, however the latency issues worry me 
-a wee bit.
+void __init spear3xx_clk_init(void)
+{
+	int i;
+	struct clk_lookup *lookups;
 
-> Using an oscilloscope it seems we have a big latency between each
-> transfer which could explain the low throughput, I didn't have the
-> time to look deeper at this problem.
+	for (i = 0; i < ARRAY_SIZE(spear3xx_clk_lookups); i++) 
+		clk_register(&spear3xx_clk_lookups[i])
+}
 
-The latency we can see here in the oscilloscope is tremendous between 
-two CMD24: 8ms! What is causing this? It is certainly unrelated to the 
-MULTIBLOCK feature. Having a clock at 33.25MHz, our maximal read, as 
-confirmed by dd is:
+void __init spear300_clk_init(void)
+{
+	int i;
+	struct clk_lookup *lookups;
 
-33.25[MHz] * 4[bits data] / 8[bits/Byte] * 30 [us write] / 8000 [us 
-sleep] =~ 60KB/s
+	spear3xx_clk_init();
 
-So, what's keeping the driver 8ms from sending the data??? Any pointers 
-on where I could twiddle some bits in the driver? Where do I start 
-looking?
+	for (i = 0; i < ARRAY_SIZE(spear300_clk_lookups); i++) 
+		clk_register(&spear300_clk_lookups[i])
 
-Cheers
--- 
-Joan C. Abelaira
+	clk_init();
+}
+
+void __init spear300_map_io(void)
+{
+	spear3xx_map_io();
+	spear300_clk_init();
+}
+
+The other option would be to try to move stuff to a later point, e.g. don't
+initialize the clocks until the basic device tree is set up.
+of_machine_is_compatible() should work at init_early() time, but not at
+map_io() time. Other platforms set up the clocks@init_early() time.
+The spear3xx_dt_init function should be called from init_machine(), which
+happens much later, so I'm pretty sure you can use of_machine_is_compatible()
+if you can't just avoid it.
+
+In the long run, I would hope that a lot of the differences go away anyway
+as information that is now hardcoded just moves into the device tree.
+At that point, you should no longer need to care which soc you are running
+on. I realize that there is still significant amount of work to be done
+until you get there.
+
+In case of the clocks, I think you could already merge all the clk_lookup
+arrays into one, which would result in a larger kernel image but should
+do no harm otherwise.
+
+	Arnd
