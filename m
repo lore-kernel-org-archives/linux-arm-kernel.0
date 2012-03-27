@@ -1,51 +1,48 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 27 Mar 2012 14:56:05 +0530
-Subject: [PATCH 4/4] ARM: Exynos5: Add PDMA and MDMA physical base address
- defines
-In-Reply-To: <1332840365-24827-1-git-send-email-thomas.abraham@linaro.org>
-References: <1332840365-24827-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1332840365-24827-5-git-send-email-thomas.abraham@linaro.org>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Tue, 27 Mar 2012 11:23:42 +0200
+Subject: [MX25][MMC] mmc esdhc failure in 3.3
+In-Reply-To: <20120327091425.GC6790@pengutronix.de>
+References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
+ <20120312132423.GC2459@pengutronix.de>
+ <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
+ <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
+ <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
+ <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
+ <20120327101259.73525f9d@eb-e6520>
+ <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
+ <20120327090148.GB6790@pengutronix.de>
+ <20120327110615.3bfaf969@eb-e6520>
+ <20120327091425.GC6790@pengutronix.de>
+Message-ID: <20120327112342.73a85a1b@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PDMA and MDMA physical base address macros which is require for Exynos5
-of_dev_auxdata setup.
+Le Tue, 27 Mar 2012 11:14:25 +0200,
+Wolfram Sang <w.sang@pengutronix.de> a ?crit :
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
----
- arch/arm/mach-exynos/include/mach/map.h |    5 +++++
- arch/arm/mach-exynos/mach-exynos5-dt.c  |    3 ++-
- 2 files changed, 7 insertions(+), 1 deletions(-)
+> 
+> > > Interesting question is now why it worked on your older kernel? The code
+> > > around BROKEN_TIMEOUT is there for much longer, I'd think.
+> > > 
+> > not in fact it seems to have been broken from a long time and I think
+> 
+> I know and you are saying the same, in fact :) Your patch came in around
+> 2.6.37 and here it was said that 2.6.39 works fine. Might be random,
+> though.
+> 
+what is surprising is that no one reported this problem between 2.6.37
+and 3.3
 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 024d38f..37d93fd 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -90,6 +90,11 @@
- #define EXYNOS4_PA_PDMA0		0x12680000
- #define EXYNOS4_PA_PDMA1		0x12690000
- 
-+#define EXYNOS5_PA_PDMA0		0x121A0000
-+#define EXYNOS5_PA_PDMA1		0x121B0000
-+#define EXYNOS5_PA_MDMA0		0x10800000
-+#define EXYNOS5_PA_MDMA1		0x11C10000
-+
- #define EXYNOS4_PA_SYSMMU_MDMA		0x10A40000
- #define EXYNOS4_PA_SYSMMU_SSS		0x10A50000
- #define EXYNOS4_PA_SYSMMU_FIMC0		0x11A20000
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 0d26f50..cdc3a26 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -45,7 +45,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"exynos4210-uart.3", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
--	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.2", NULL),
-+	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA0, "dma-pl330.2", NULL),
-+	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA0, "dma-pl330.3", NULL),
- 	{},
- };
- 
--- 
-1.6.6.rc2
+> > because unlike the i.MX35 it seems that the i.MX25 manages to read
+> > properly the partition table even without the timeout quirk and it
+> > seems that I didn't do more extensive tests for this patch.
+> 
+> Please do next time.
+> 
+well I should have said "enough extensive" tests as I did a lot of tests
+on the 3 archs (i.MX25, i.MX35 and i.MX51). What I see here is that on
+i.MX35 and i.MX51 the problem is very easy to reproduce without
+extensive tests (card not detected) and that on i.MX25 it needs more
+tests as the card is properly detected.
+
+Eric
