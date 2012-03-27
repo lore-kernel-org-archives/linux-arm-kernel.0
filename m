@@ -1,36 +1,40 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Tue, 27 Mar 2012 10:12:59 +0200
-Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
-References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
- <20120312132423.GC2459@pengutronix.de>
- <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
- <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
- <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
- <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
-Message-ID: <20120327101259.73525f9d@eb-e6520>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 27 Mar 2012 16:19:01 +0800
+Subject: =?UTF-8?Q?Question=EF=BC=9ALeds_handling_in_drivers?=
+Message-ID: <CAK5ve-+p=RS00V=bmaCU6jYtX1R3X71dS4H7Zqd_f=UWQfVp+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Russell,
 
-Le Tue, 27 Mar 2012 09:32:36 +0200,
-joancarles <joancarles@fqingenieria.es> a ?crit :
+I'm still working on the LEDS consolidation stuff and try to convert
+the old style to LED CPU trigger driver [1].
 
-> G'day
-> 
-> This is still present, and we have absolutely no idea where to continue 
-> searching for the solution of the problem. Any pointers? Any git trees 
-> of mmc driver changes we could try? Anybody else with a MX25 that has 
-> this issue?
-> 
-does that attached patch fix your problem ?
+But in drivers/char/nwflash.c:
+---
+$ grep leds_event drivers/char/nwflash.c
+	leds_event(led_claim);
+	leds_event(led_green_on);
+	leds_event(led_release);
+	leds_event(led_amber_on);
+	leds_event(led_amber_off);
+	leds_event(led_red_on);
+				leds_event(led_amber_off);
+				leds_event(led_red_on);
+	leds_event(led_amber_off);
+	leds_event(led_green_on);
+---
 
-Eric
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-esdhc-imx-unbreak-on-i.MX25.patch
-Type: text/x-patch
-Size: 1054 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/6729fea5/attachment.bin>
+It looks like very difficult to fit this in LEDS CPU trigger driver,
+looks like an new LEDS trigger driver to indicate FLASH
+reading/writing/verifying activities.
+How do you think of this? Any suggestion?
+
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/088639.html
+
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
