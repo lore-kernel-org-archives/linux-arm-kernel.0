@@ -1,64 +1,135 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 27 Mar 2012 17:53:52 +0200
-Subject: [PATCH 05/12] Add dummy smsc911x regulators to cm-t35.
-In-Reply-To: <1332494504-10251-6-git-send-email-Russ.Dill@ti.com>
-References: <1332494504-10251-1-git-send-email-Russ.Dill@ti.com>
- <1332494504-10251-6-git-send-email-Russ.Dill@ti.com>
-Message-ID: <4F71E290.2050403@compulab.co.il>
+From: mattst88@gmail.com (Matt Turner)
+Date: Tue, 27 Mar 2012 11:56:43 -0400
+Subject: [PATCHv2 06/14] Alpha: adapt for dma_map_ops changes
+In-Reply-To: <1332855768-32583-7-git-send-email-m.szyprowski@samsung.com>
+References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
+ <1332855768-32583-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAEdQ38H6xJsHDZh2LJA4NZOQJ0AEtYLKK2i7w=+98TXCCRxEQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russ,
-
-This patch works, but can we, please use the attached patch instead?
-
-Thanks
-
-On 03/23/12 11:21, Russ Dill wrote:
-> Signed-off-by: Russ Dill <russ.dill@ti.com>
+On Tue, Mar 27, 2012 at 9:42 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+>
+> Adapt core Alpha architecture code for dma_map_ops changes: replace
+> alloc/free_coherent with generic alloc/free methods.
+>
+> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/mach-omap2/board-cm-t35.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-> index 41b0a2f..289ded3 100644
-> --- a/arch/arm/mach-omap2/board-cm-t35.c
-> +++ b/arch/arm/mach-omap2/board-cm-t35.c
-> @@ -26,6 +26,7 @@
->  
->  #include <linux/i2c/at24.h>
->  #include <linux/i2c/twl.h>
-> +#include <linux/regulator/fixed.h>
->  #include <linux/regulator/machine.h>
->  #include <linux/mmc/host.h>
->  
-> @@ -630,10 +631,18 @@ static inline void cm_t3730_init_mux(void) {}
->  static struct omap_board_config_kernel cm_t35_config[] __initdata = {
->  };
->  
-> +static struct regulator_consumer_supply dummy_supplies[] = {
-> +	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
-> +	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
-> +	REGULATOR_SUPPLY("vddvario", "smsc911x.1"),
-> +	REGULATOR_SUPPLY("vdd33a", "smsc911x.1"),
-> +};
+> ?arch/alpha/include/asm/dma-mapping.h | ? 18 ++++++++++++------
+> ?arch/alpha/kernel/pci-noop.c ? ? ? ? | ? 10 ++++++----
+> ?arch/alpha/kernel/pci_iommu.c ? ? ? ?| ? 10 ++++++----
+> ?3 files changed, 24 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/alpha/include/asm/dma-mapping.h b/arch/alpha/include/asm/dma-mapping.h
+> index 4567aca..dfa32f0 100644
+> --- a/arch/alpha/include/asm/dma-mapping.h
+> +++ b/arch/alpha/include/asm/dma-mapping.h
+> @@ -12,16 +12,22 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+>
+> ?#include <asm-generic/dma-mapping-common.h>
+>
+> -static inline void *dma_alloc_coherent(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t *dma_handle, gfp_t gfp)
+> +#define dma_alloc_coherent(d,s,h,f) ? ?dma_alloc_attrs(d,s,h,f,NULL)
 > +
->  static void __init cm_t3x_common_init(void)
->  {
->  	omap_board_config = cm_t35_config;
->  	omap_board_config_size = ARRAY_SIZE(cm_t35_config);
-> +	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
->  	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
->  	omap_serial_init();
->  	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
+> +static inline void *dma_alloc_attrs(struct device *dev, size_t size,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t *dma_handle, gfp_t gfp,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_attrs *attrs)
+> ?{
+> - ? ? ? return get_dma_ops(dev)->alloc_coherent(dev, size, dma_handle, gfp);
+> + ? ? ? return get_dma_ops(dev)->alloc(dev, size, dma_handle, gfp, attrs);
+> ?}
+>
+> -static inline void dma_free_coherent(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *vaddr, dma_addr_t dma_handle)
+> +#define dma_free_coherent(d,s,c,h) dma_free_attrs(d,s,c,h,NULL)
+> +
+> +static inline void dma_free_attrs(struct device *dev, size_t size,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *vaddr, dma_addr_t dma_handle,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_attrs *attrs)
+> ?{
+> - ? ? ? get_dma_ops(dev)->free_coherent(dev, size, vaddr, dma_handle);
+> + ? ? ? get_dma_ops(dev)->free(dev, size, vaddr, dma_handle, attrs);
+> ?}
+>
+> ?static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+> diff --git a/arch/alpha/kernel/pci-noop.c b/arch/alpha/kernel/pci-noop.c
+> index 04eea48..df24b76 100644
+> --- a/arch/alpha/kernel/pci-noop.c
+> +++ b/arch/alpha/kernel/pci-noop.c
+> @@ -108,7 +108,8 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
+> ?}
+>
+> ?static void *alpha_noop_alloc_coherent(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t *dma_handle, gfp_t gfp)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t *dma_handle, gfp_t gfp,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct dma_attrs *attrs)
+> ?{
+> ? ? ? ?void *ret;
+>
+> @@ -123,7 +124,8 @@ static void *alpha_noop_alloc_coherent(struct device *dev, size_t size,
+> ?}
+>
+> ?static void alpha_noop_free_coherent(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *cpu_addr, dma_addr_t dma_addr)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *cpu_addr, dma_addr_t dma_addr,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct dma_attrs *attrs)
+> ?{
+> ? ? ? ?free_pages((unsigned long)cpu_addr, get_order(size));
+> ?}
+> @@ -174,8 +176,8 @@ static int alpha_noop_set_mask(struct device *dev, u64 mask)
+> ?}
+>
+> ?struct dma_map_ops alpha_noop_ops = {
+> - ? ? ? .alloc_coherent ? ? ? ? = alpha_noop_alloc_coherent,
+> - ? ? ? .free_coherent ? ? ? ? ?= alpha_noop_free_coherent,
+> + ? ? ? .alloc ? ? ? ? ? ? ? ? ?= alpha_noop_alloc_coherent,
+> + ? ? ? .free ? ? ? ? ? ? ? ? ? = alpha_noop_free_coherent,
+> ? ? ? ?.map_page ? ? ? ? ? ? ? = alpha_noop_map_page,
+> ? ? ? ?.map_sg ? ? ? ? ? ? ? ? = alpha_noop_map_sg,
+> ? ? ? ?.mapping_error ? ? ? ? ?= alpha_noop_mapping_error,
+> diff --git a/arch/alpha/kernel/pci_iommu.c b/arch/alpha/kernel/pci_iommu.c
+> index 4361080..cd63479 100644
+> --- a/arch/alpha/kernel/pci_iommu.c
+> +++ b/arch/alpha/kernel/pci_iommu.c
+> @@ -434,7 +434,8 @@ static void alpha_pci_unmap_page(struct device *dev, dma_addr_t dma_addr,
+> ? ?else DMA_ADDRP is undefined. ?*/
+>
+> ?static void *alpha_pci_alloc_coherent(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t *dma_addrp, gfp_t gfp)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t *dma_addrp, gfp_t gfp,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_attrs *attrs)
+> ?{
+> ? ? ? ?struct pci_dev *pdev = alpha_gendev_to_pci(dev);
+> ? ? ? ?void *cpu_addr;
+> @@ -478,7 +479,8 @@ try_again:
+> ? ?DMA_ADDR past this call are illegal. ?*/
+>
+> ?static void alpha_pci_free_coherent(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *cpu_addr, dma_addr_t dma_addr)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *cpu_addr, dma_addr_t dma_addr,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_attrs *attrs)
+> ?{
+> ? ? ? ?struct pci_dev *pdev = alpha_gendev_to_pci(dev);
+> ? ? ? ?pci_unmap_single(pdev, dma_addr, size, PCI_DMA_BIDIRECTIONAL);
+> @@ -952,8 +954,8 @@ static int alpha_pci_set_mask(struct device *dev, u64 mask)
+> ?}
+>
+> ?struct dma_map_ops alpha_pci_ops = {
+> - ? ? ? .alloc_coherent ? ? ? ? = alpha_pci_alloc_coherent,
+> - ? ? ? .free_coherent ? ? ? ? ?= alpha_pci_free_coherent,
+> + ? ? ? .alloc ? ? ? ? ? ? ? ? ?= alpha_pci_alloc_coherent,
+> + ? ? ? .free ? ? ? ? ? ? ? ? ? = alpha_pci_free_coherent,
+> ? ? ? ?.map_page ? ? ? ? ? ? ? = alpha_pci_map_page,
+> ? ? ? ?.unmap_page ? ? ? ? ? ? = alpha_pci_unmap_page,
+> ? ? ? ?.map_sg ? ? ? ? ? ? ? ? = alpha_pci_map_sg,
+> --
+> 1.7.1.569.g6f426
+>
 
--- 
-Regards,
-Igor.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-OMAP3-cm-t35-add-smsc911x-regulators.patch
-Type: text/x-patch
-Size: 1711 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/56f3e669/attachment.bin>
+Acked-by: Matt Turner <mattst88@gmail.com>
