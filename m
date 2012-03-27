@@ -1,184 +1,113 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 27 Mar 2012 14:54:03 +0100
-Subject: [PATCH v2 2/4] ARM: opcodes: Make opcode byteswapping macros
- assembly-compatible
+Date: Tue, 27 Mar 2012 14:54:04 +0100
+Subject: [PATCH v2 3/4] ARM: opcodes: Add helpers for emitting custom opcodes
 In-Reply-To: <1332856445-7007-1-git-send-email-dave.martin@linaro.org>
 References: <1332856445-7007-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1332856445-7007-3-git-send-email-dave.martin@linaro.org>
+Message-ID: <1332856445-7007-4-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the existing macros don't work with assembler, due to the
-use of type casts and C functions from <linux/swab.h>.
+This patch adds some __inst_() macros for injecting custom opcodes
+in assembler (both inline and in .S files).  They should make it
+easier and cleaner to get things right in little-/big-
+endian/ARM/Thumb-2 kernels without a lot of #ifdefs.
 
-This patch abstracts out those operations and provides simple
-explicit versions for use in assembly code.
+This pure-preprocessor approach is preferred over the alternative
+method of wedging extra assembler directives into the assembler
+input using top-level asm() blocks, since there is no way to
+guarantee that the compiler won't reorder those with respect to
+each other or with respect to non-toplevel asm() blocks, unless
+-fno-toplevel-reorder is passed (which is in itself somewhat
+undesirable because it defeats some potential optimisations).
 
-__opcode_is_thumb32() and __opcode_is_thumb16() are also converted
-to do bitmask-based testing to avoid confusion if these are used in
-assembly code (the assembler typically treats all arithmetic values
-as signed).
-
-These changes avoid the need for the compiler to pre-evaluate
-constant expressions used to generate opcodes.  By ensuring that
-the forms of these expressions can be evaluated directly by the
-assembler, we can just stringify the expressions directly into the
-asm during the preprocessing pass.  The alternative approach
-(passing the evaluated expression via an inline asm "i" constraint)
-gets painful because the contents of the asm and the constraints
-must be kept in sync.  This makes the resulting macros awkward to
-use.
-
-Retaining the C forms of the macros allows more efficient code to
-be generated when opcodes are generated programmatically at run-
-time, but there is no way to embed run-time-generated opcodes in
-asm() blocks.
+Currently <asm/unified.h> _does_ silently rely on the compiler not
+reordering at the top level, but it seems better to avoid adding
+extra code which depends on this if the same result can be achieved
+in another way.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/opcodes.h |   97 +++++++++++++++++++++++++++++++++------
- 1 files changed, 82 insertions(+), 15 deletions(-)
+ arch/arm/include/asm/opcodes.h |   69 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 69 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-index 6bf54f9..f57e417 100644
+index f57e417..f7937e1 100644
 --- a/arch/arm/include/asm/opcodes.h
 +++ b/arch/arm/include/asm/opcodes.h
-@@ -19,6 +19,33 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+@@ -156,4 +156,73 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+ 	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
+ )
  
- 
- /*
-+ * Assembler opcode byteswap helpers.
-+ * These are only intended for use by this header: don't use them directly,
-+ * because they will be suboptimal in most cases.
-+ */
-+#define ___asm_opcode_swab32(x) (	\
-+	  (((x) << 24) & 0xFF000000)	\
-+	| (((x) <<  8) & 0x00FF0000)	\
-+	| (((x) >>  8) & 0x0000FF00)	\
-+	| (((x) >> 24) & 0x000000FF)	\
-+)
-+#define ___asm_opcode_swab16(x) (	\
-+	  (((x) << 8) & 0xFF00)		\
-+	| (((x) >> 8) & 0x00FF)		\
-+)
-+#define ___asm_opcode_swahb32(x) (	\
-+	  (((x) << 8) & 0xFF00FF00)	\
-+	| (((x) >> 8) & 0x00FF00FF)	\
-+)
-+#define ___asm_opcode_swahw32(x) (	\
-+	  (((x) << 16) & 0xFFFF0000)	\
-+	| (((x) >> 16) & 0x0000FFFF)	\
-+)
-+#define ___asm_opcode_identity32(x) ((x) & 0xFFFFFFFF)
-+#define ___asm_opcode_identity16(x) ((x) & 0xFFFF)
-+
-+
 +/*
-  * Opcode byteswap helpers
-  *
-  * These macros help with converting instructions between a canonical integer
-@@ -41,30 +68,58 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
-  * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
-  * represent any valid Thumb-2 instruction.  For this range,
-  * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
++ * Opcode injection helpers
 + *
-+ * The ___asm variants are intended only for use by this header, in situations
-+ * involving inline assembler.  For .S files, the normal __opcode_*() macros
-+ * should do the right thing.
-  */
++ * In rare cases it is necessary to assemble an opcode which the
++ * assembler does not support directly, or which would normally be
++ * rejected because of the CFLAGS or AFLAGS used to build the affected
++ * file.
++ *
++ * Before using these macros, consider carefully whether it is feasible
++ * instead to change the build flags for your file, or whether it really
++ * makes sense to support old assembler versions when building that
++ * particular kernel feature.
++ *
++ * The macros defined here should only be used where there is no viable
++ * alternative.
++ *
++ *
++ * __inst_arm(x): emit the specified ARM opcode
++ * __inst_thumb16(x): emit the specified 16-bit Thumb opcode
++ * __inst_thumb32(x): emit the specified 32-bit Thumb opcode
++ *
++ * __inst_arm_thumb16(arm, thumb): emit either the specified arm or
++ *	16-bit Thumb opcode, depending on whether an ARM or Thumb-2
++ *	kernel is being built
++ *
++ * __inst_arm_thumb32(arm, thumb): emit either the specified arm or
++ *	32-bit Thumb opcode, depending on whether an ARM or Thumb-2
++ *	kernel is being built
++ *
++ *
++ * Note that using these macros directly is poor practice.  Instead, you
++ * should use them to define human-readable wrapper macros to encode the
++ * instructions that you care about.  In code which might run on ARMv7 or
++ * above, you can usually use the __inst_arm_thumb{16,32} macros to
++ * specify the ARM and Thumb alternatives at the same time.  This ensures
++ * that the correct opcode gets emitted depending on the instruction set
++ * used for the kernel build.
++ */
++#include <linux/stringify.h>
++
++#define __inst_arm(x) ___inst_arm(___asm_opcode_to_mem_arm(x))
++#define __inst_thumb32(x) ___inst_thumb32(				\
++	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_first(x)),	\
++	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_second(x))	\
++)
++#define __inst_thumb16(x) ___inst_thumb16(___asm_opcode_to_mem_thumb16(x))
++
++#ifdef CONFIG_THUMB2_KERNEL
++#define __inst_arm_thumb16(arm_opcode, thumb_opcode) \
++	__inst_thumb16(thumb_opcode)
++#define __inst_arm_thumb32(arm_opcode, thumb_opcode) \
++	__inst_thumb32(thumb_opcode)
++#else
++#define __inst_arm_thumb16(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
++#define __inst_arm_thumb32(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
++#endif
++
++/* Helpers for the helpers.  Don't use these directly. */
 +#ifdef __ASSEMBLY__
- 
--#ifndef __ASSEMBLY__
-+#define ___opcode_swab32(x) ___asm_opcode_swab32(x)
-+#define ___opcode_swab16(x) ___asm_opcode_swab16(x)
-+#define ___opcode_swahb32(x) ___asm_opcode_swahb32(x)
-+#define ___opcode_swahw32(x) ___asm_opcode_swahw32(x)
-+#define ___opcode_identity32(x) ___asm_opcode_identity32(x)
-+#define ___opcode_identity16(x) ___asm_opcode_identity16(x)
++#define ___inst_arm(x) .long x
++#define ___inst_thumb16(x) .short x
++#define ___inst_thumb32(first, second) .short first, second
++#else
++#define ___inst_arm(x) ".long " __stringify(x) "\n\t"
++#define ___inst_thumb16(x) ".short " __stringify(x) "\n\t"
++#define ___inst_thumb32(first, second) \
++	".short " __stringify(first) ", " __stringify(second) "\n\t"
++#endif
 +
-+#else /* ! __ASSEMBLY__ */
- 
- #include <linux/types.h>
- #include <linux/swab.h>
- 
-+#define ___opcode_swab32(x) swab32(x)
-+#define ___opcode_swab16(x) swab16(x)
-+#define ___opcode_swahb32(x) swahb32(x)
-+#define ___opcode_swahw32(x) swahw32(x)
-+#define ___opcode_identity32(x) ((u32)(x))
-+#define ___opcode_identity16(x) ((u16)(x))
-+
-+#endif /* ! __ASSEMBLY__ */
-+
-+
- #ifdef CONFIG_CPU_ENDIAN_BE8
- 
--#define __opcode_to_mem_arm(x) swab32(x)
--#define __opcode_to_mem_thumb16(x) swab16(x)
--#define __opcode_to_mem_thumb32(x) swahb32(x)
-+#define __opcode_to_mem_arm(x) ___opcode_swab32(x)
-+#define __opcode_to_mem_thumb16(x) ___opcode_swab16(x)
-+#define __opcode_to_mem_thumb32(x) ___opcode_swahb32(x)
-+#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_swab32(x)
-+#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_swab16(x)
-+#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahb32(x)
- 
- #else /* ! CONFIG_CPU_ENDIAN_BE8 */
- 
--#define __opcode_to_mem_arm(x) ((u32)(x))
--#define __opcode_to_mem_thumb16(x) ((u16)(x))
-+#define __opcode_to_mem_arm(x) ___opcode_identity32(x)
-+#define __opcode_to_mem_thumb16(x) ___opcode_identity16(x)
-+#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_identity32(x)
-+#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_identity16(x)
- #ifndef CONFIG_CPU_ENDIAN_BE32
- /*
-  * On BE32 systems, using 32-bit accesses to store Thumb instructions will not
-  * work in all cases, due to alignment constraints.  For now, a correct
-  * version is not provided for BE32.
-  */
--#define __opcode_to_mem_thumb32(x) swahw32(x)
-+#define __opcode_to_mem_thumb32(x) ___opcode_swahw32(x)
-+#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahw32(x)
- #endif
- 
- #endif /* ! CONFIG_CPU_ENDIAN_BE8 */
-@@ -78,15 +133,27 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
- /* Operations specific to Thumb opcodes */
- 
- /* Instruction size checks: */
--#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
--#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-+#define __opcode_is_thumb32(x) (		\
-+	   ((x) & 0xF8000000) == 0xE8000000	\
-+	|| ((x) & 0xF0000000) == 0xF0000000	\
-+)
-+#define __opcode_is_thumb16(x) (					\
-+	   ((x) & 0xFFFF0000) == 0					\
-+	&& !(((x) & 0xF800) == 0xE800 || ((x) & 0xF000) == 0xF000)	\
-+)
- 
- /* Operations to construct or split 32-bit Thumb instructions: */
--#define __opcode_thumb32_first(x) ((u16)((x) >> 16))
--#define __opcode_thumb32_second(x) ((u16)(x))
--#define __opcode_thumb32_compose(first, second) \
--	(((u32)(u16)(first) << 16) | (u32)(u16)(second))
--
--#endif /* __ASSEMBLY__ */
-+#define __opcode_thumb32_first(x) (___opcode_identity16((x) >> 16))
-+#define __opcode_thumb32_second(x) (___opcode_identity16(x))
-+#define __opcode_thumb32_compose(first, second) (			\
-+	  (___opcode_identity32(___opcode_identity16(first)) << 16)	\
-+	| ___opcode_identity32(___opcode_identity16(second))		\
-+)
-+#define ___asm_opcode_thumb32_first(x) (___asm_opcode_identity16((x) >> 16))
-+#define ___asm_opcode_thumb32_second(x) (___asm_opcode_identity16(x))
-+#define ___asm_opcode_thumb32_compose(first, second) (			    \
-+	  (___asm_opcode_identity32(___asm_opcode_identity16(first)) << 16) \
-+	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
-+)
- 
  #endif /* __ASM_ARM_OPCODES_H */
 -- 
 1.7.4.1
