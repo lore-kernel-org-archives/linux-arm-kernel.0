@@ -1,8 +1,10 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 27 Mar 2012 11:36:44 +0200
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Tue, 27 Mar 2012 11:40:48 +0200
 Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <20120327112342.73a85a1b@eb-e6520>
-References: <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
+In-Reply-To: <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
+References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
+ <20120312132423.GC2459@pengutronix.de>
+ <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
  <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
  <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
  <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
@@ -10,35 +12,47 @@ References: <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
  <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
  <20120327090148.GB6790@pengutronix.de>
  <20120327110615.3bfaf969@eb-e6520>
- <20120327091425.GC6790@pengutronix.de>
- <20120327112342.73a85a1b@eb-e6520>
-Message-ID: <20120327093644.GD6790@pengutronix.de>
+ <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
+Message-ID: <20120327114048.6af2e178@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> well I should have said "enough extensive" tests as I did a lot of tests
-> on the 3 archs (i.MX25, i.MX35 and i.MX51). What I see here is that on
-> i.MX35 and i.MX51 the problem is very easy to reproduce without
-> extensive tests (card not detected) and that on i.MX25 it needs more
-> tests as the card is properly detected.
+Le Tue, 27 Mar 2012 11:33:57 +0200,
+joancarles <joancarles@fqingenieria.es> a ?crit :
+> >> Interesting question is now why it worked on your older kernel? The 
+> >> code
+> >> around BROKEN_TIMEOUT is there for much longer, I'd think.
+> >>
+> > not in fact it seems to have been broken from a long time and I think
+> > I'm responsible of that in 37865fe91582582a6f6c00652f6a2b1ff71f8a78
+> > "mmc: sdhci-esdhc-imx: fix timeout on i.MX's sdhc"
+> > because unlike the i.MX35 it seems that the i.MX25 manages to read
+> > properly the partition table even without the timeout quirk and it
+> > seems that I didn't do more extensive tests for this patch.
+> 
+> Might be unrelated, however I have been keeping my eyes on the fix of 
+> ENGcm07207 quirk introduced with 16a790bcc. According to the 
+> IMX25CE.pdf, to abort data transfers on the AHB, software can reset the 
+> eSDHC by writing 1 to SYSCTL[24] (RSTA), which currently is not done 
+> with SDHCI_QUIRK_NO_MULTIBLOCK. It sets the max_blk_count to 1 instead 
+> of 65535. Not sure if this is also limiting the speed.
+> 
+I tried to increase max_blk_count and it breaks after a few tests.
+Using an oscilloscope it seems we have a big latency between each
+transfer which could explain the low throughput, I didn't have the
+time to look deeper at this problem.
 
-Ah, okay, thanks for the clarification! Well, since you retested now and
-found it is harder to trigger that could explain why nobody reported it
-and why 2.6.39 seems to work (although it maybe doesn't). Thanks for
-rechecking. If you submit the patch, you can add my
+> I have tried putting the SD card into an ALL-in-One reader via USB and 
+> I get 6MB/s read and 15MB/s write performance. Since I didn't know the 
+> exact class of the card, this reassures me that there is nothing 
+> substantially wrong with the card per se.
+> 
+> So, how can we find a solution to this speed issue? Also, do you plan 
+> on submitting your patch to revert the timeout quirk for MX25?
+> 
+yes, I'm writing a proper commit message and will send it in a few
+minutes.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-
-Best regards.
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/7b294c8d/attachment.sig>
+Eric
