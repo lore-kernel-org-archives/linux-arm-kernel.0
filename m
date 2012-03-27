@@ -1,51 +1,45 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 27 Mar 2012 11:45:45 +0200
-Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
-References: <20120312132423.GC2459@pengutronix.de>
- <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
- <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
- <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
- <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
- <20120327101259.73525f9d@eb-e6520>
- <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
- <20120327090148.GB6790@pengutronix.de>
- <20120327110615.3bfaf969@eb-e6520>
- <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
-Message-ID: <20120327094545.GE6790@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 27 Mar 2012 15:28:31 +0530
+Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used OMAP4
+ onwards
+Message-ID: <1332842311-12308-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some functions like _omap4_disable_module() and _omap4_wait_target_disable()
+are (will be) used on all OMAPs OMAP4 and beyond which support module level
+control. Fix the error checks in these functions to return if called on
+any platform pre OMAP4 (i.e OMAP2 and OMAP3) instead of checking for
+!cpu_is_omap44xx(). This avoids having to update the error check with a
+'&& !cpu_is_omap54xx()' when OMAP5 is introduced and possibly similar updates
+when further OMAP generations are added.
 
-> Might be unrelated, however I have been keeping my eyes on the fix
-> of ENGcm07207 quirk introduced with 16a790bcc. According to the
-> IMX25CE.pdf, to abort data transfers on the AHB, software can reset
-> the eSDHC by writing 1 to SYSCTL[24] (RSTA), which currently is not
-> done with SDHCI_QUIRK_NO_MULTIBLOCK. It sets the max_blk_count to 1
-> instead of 65535. Not sure if this is also limiting the speed.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Oh, it is limiting speed, for sure.
-
-SDHCI_QUIRK_NO_MULTIBLOCK is a _generic_ quirk which can be enabled by
-various buggy sdhci implementations, not only esdhc (which is pretty
-good at being buggy). It is not there to fix MX25 specific issues,
-that would have to be done seperately in sdhci-esdhc-imx.c.
-
-So, the above quirk is a big hammer solution. There might be more
-precise ones, but those still would have to be developed. I don't know
-of anyone planning to do this.
-
-Regards,
-
-   Wolfram
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 8ac26f2..f2a9afa 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -808,7 +808,7 @@ static void _enable_module(struct omap_hwmod *oh)
+  */
+ static int _omap4_wait_target_disable(struct omap_hwmod *oh)
+ {
+-	if (!cpu_is_omap44xx())
++	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+ 		return 0;
+ 
+ 	if (!oh)
+@@ -838,7 +838,7 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
+ 	int v;
+ 
+ 	/* The module mode does not exist prior OMAP4 */
+-	if (!cpu_is_omap44xx())
++	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+ 		return -EINVAL;
+ 
+ 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/c71d2935/attachment-0001.sig>
+1.7.1
