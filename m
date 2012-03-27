@@ -1,60 +1,64 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 27 Mar 2012 11:50:24 -0400
-Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
- device tree support
-In-Reply-To: <m2vcn0496y.fsf@bob.laptop.org> (Chris Ball's message of "Tue, 21
- Feb 2012 08:17:41 -0500")
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
- <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
- <m239abgc32.fsf@bob.laptop.org>
- <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
- <m2vcn0496y.fsf@bob.laptop.org>
-Message-ID: <87k426vy9r.fsf@laptop.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 27 Mar 2012 17:53:52 +0200
+Subject: [PATCH 05/12] Add dummy smsc911x regulators to cm-t35.
+In-Reply-To: <1332494504-10251-6-git-send-email-Russ.Dill@ti.com>
+References: <1332494504-10251-1-git-send-email-Russ.Dill@ti.com>
+ <1332494504-10251-6-git-send-email-Russ.Dill@ti.com>
+Message-ID: <4F71E290.2050403@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi Russ,
 
-On Tue, Feb 21 2012, Chris Ball wrote:
-> On Tue, Feb 21 2012, Kukjin Kim wrote:
->> I created topic branch for this we talked. You can pull that following:
->>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> v3.4-for-cjb
->>
->> If any problems, please kindly let me know.
->
-> Pushed to mmc-next, thanks.  (I'm expecting that you'll do the merge
-> to Linus.)
+This patch works, but can we, please use the attached patch instead?
 
-I was expecting you to merge these patches, but they aren't in the
-arm-soc tree and haven't been sent to Linus, and we're in the last few
-days of the merge window.
+Thanks
 
-As a result I'm dropping this tree -- and all of the patches that I
-have on top of it -- from mmc-next so that I can get a pull request
-out.  This means that I'm dropping:
+On 03/23/12 11:21, Russ Dill wrote:
+> Signed-off-by: Russ Dill <russ.dill@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-cm-t35.c |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+> index 41b0a2f..289ded3 100644
+> --- a/arch/arm/mach-omap2/board-cm-t35.c
+> +++ b/arch/arm/mach-omap2/board-cm-t35.c
+> @@ -26,6 +26,7 @@
+>  
+>  #include <linux/i2c/at24.h>
+>  #include <linux/i2c/twl.h>
+> +#include <linux/regulator/fixed.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/mmc/host.h>
+>  
+> @@ -630,10 +631,18 @@ static inline void cm_t3730_init_mux(void) {}
+>  static struct omap_board_config_kernel cm_t35_config[] __initdata = {
+>  };
+>  
+> +static struct regulator_consumer_supply dummy_supplies[] = {
+> +	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
+> +	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+> +	REGULATOR_SUPPLY("vddvario", "smsc911x.1"),
+> +	REGULATOR_SUPPLY("vdd33a", "smsc911x.1"),
+> +};
+> +
+>  static void __init cm_t3x_common_init(void)
+>  {
+>  	omap_board_config = cm_t35_config;
+>  	omap_board_config_size = ARRAY_SIZE(cm_t35_config);
+> +	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+>  	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
+>  	omap_serial_init();
+>  	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
 
-mmc: sdhci-s3c: Add device tree support
-mmc: sdhci-s3c: Keep a copy of platform data and use it
-mmc: sdhci-s3c: derive transfer width host capability from max_width in 
-ARM: SAMSUNG: remove all uses of clk_type member in sdhci platform data
-ARM: EXYNOS: use 'exynos4-sdhci' as device name for sdhci controllers
-mmc: sdhci-s3c: Remove usage of clk_type member in platform data
-
-.. which I was expecting you to merge, and also:
-
-mmc: sdhci-s3c: fix broken compilation for non-Exynos SoCs
-mmc: sdhci-s3c: Enable runtime power management
-mmc: sdhci-s3c: Use CONFIG_PM_SLEEP to ifdef system suspend
-mmc: sdhci-s3c: use devm_ functions
-
-.. which were merged on top of the above patches.
-
-We'll have to try again with 3.5 for the new features, and post-rc1 for
-the fixes.  Please let me know what happened with this merge.  Thanks,
-
-- Chris.
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Regards,
+Igor.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-OMAP3-cm-t35-add-smsc911x-regulators.patch
+Type: text/x-patch
+Size: 1711 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/56f3e669/attachment.bin>
