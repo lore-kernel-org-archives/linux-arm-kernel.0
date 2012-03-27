@@ -1,40 +1,51 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Tue, 27 Mar 2012 16:19:01 +0800
-Subject: =?UTF-8?Q?Question=EF=BC=9ALeds_handling_in_drivers?=
-Message-ID: <CAK5ve-+p=RS00V=bmaCU6jYtX1R3X71dS4H7Zqd_f=UWQfVp+w@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 27 Mar 2012 12:22:49 +0400
+Subject: [PATCH] ARM: clps711x: serial driver hungs are a result of call
+ disable_irq within ISR
+Message-ID: <1332836569-11726-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Since 2.6.30-rc1 clps711x serial driver hungs system. This is a result
+of call disable_irq from ISR. synchronize_irq waits for end of interrupt
+and goes to infinite loop. This patch fix this problem.
 
-I'm still working on the LEDS consolidation stuff and try to convert
-the old style to LED CPU trigger driver [1].
-
-But in drivers/char/nwflash.c:
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
-$ grep leds_event drivers/char/nwflash.c
-	leds_event(led_claim);
-	leds_event(led_green_on);
-	leds_event(led_release);
-	leds_event(led_amber_on);
-	leds_event(led_amber_off);
-	leds_event(led_red_on);
-				leds_event(led_amber_off);
-				leds_event(led_red_on);
-	leds_event(led_amber_off);
-	leds_event(led_green_on);
----
+ drivers/tty/serial/clps711x.c |   14 ++++++++------
+ 1 files changed, 8 insertions(+), 6 deletions(-)
 
-It looks like very difficult to fit this in LEDS CPU trigger driver,
-looks like an new LEDS trigger driver to indicate FLASH
-reading/writing/verifying activities.
-How do you think of this? Any suggestion?
-
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/088639.html
-
-Thanks,
+diff --git a/drivers/tty/serial/clps711x.c b/drivers/tty/serial/clps711x.c
+index e6c3dbd..836fe273 100644
+--- a/drivers/tty/serial/clps711x.c
++++ b/drivers/tty/serial/clps711x.c
+@@ -154,10 +154,9 @@ static irqreturn_t clps711xuart_int_tx(int irq, void *dev_id)
+ 		port->x_char = 0;
+ 		return IRQ_HANDLED;
+ 	}
+-	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
+-		clps711xuart_stop_tx(port);
+-		return IRQ_HANDLED;
+-	}
++
++	if (uart_circ_empty(xmit) || uart_tx_stopped(port))
++		goto disable_tx_irq;
+ 
+ 	count = port->fifosize >> 1;
+ 	do {
+@@ -171,8 +170,11 @@ static irqreturn_t clps711xuart_int_tx(int irq, void *dev_id)
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+ 		uart_write_wakeup(port);
+ 
+-	if (uart_circ_empty(xmit))
+-		clps711xuart_stop_tx(port);
++	if (uart_circ_empty(xmit)) {
++	disable_tx_irq:
++		disable_irq_nosync(TX_IRQ(port));
++		tx_enabled(port) = 0;
++	}
+ 
+ 	return IRQ_HANDLED;
+ }
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+1.7.3.4
