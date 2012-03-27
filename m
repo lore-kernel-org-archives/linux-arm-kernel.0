@@ -1,73 +1,30 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Tue, 27 Mar 2012 13:25:46 +0800
-Subject: [PATCH 3/3] ARM: MMP: add 88pm860x battery-charger support
-Message-ID: <1332825946-2260-1-git-send-email-jtzhou@marvell.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 27 Mar 2012 05:38:58 +0000
+Subject: [TMP][PATCH 5/5] OMAP3EVM: Test gpmc-nand
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A9317BD700@DBDE01.ent.ti.com>
+References: <1332484630-22181-1-git-send-email-afzal@ti.com>
+ <4F70ACB6.5070208@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317BD700@DBDE01.ent.ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317BD76F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 88pm860x chg_desc platform data for ttc platform.
+Hi Jon,
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
----
- arch/arm/mach-mmp/ttc_dkb.c |   37 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 37 insertions(+), 0 deletions(-)
+On Tue, Mar 27, 2012 at 10:49:32, Mohammed, Afzal wrote:
+> Hi Jon,
+> 
+> On Mon, Mar 26, 2012 at 23:21:50, Hunter, Jon wrote:
+> > I see this is marked as a temp patch, but this is actually needed to 
+> > register the device. Actually, we would need to do this for all boards, 
+> > right?
+> 
+> Yes, as NAND support on OMAP3EVM was not in mainline, made it TMP.
+> Once GPMC driver interfaces are acceptable, other boards too will
+> be modified accordingly.
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 5ac5d58..4e18be7 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -17,6 +17,9 @@
- #include <linux/interrupt.h>
- #include <linux/i2c/pca953x.h>
- #include <linux/gpio.h>
-+#include <linux/mfd/88pm860x.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/power/charger-manager.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -134,8 +137,42 @@ static struct pca953x_platform_data max7312_data[] = {
- 	},
- };
- 
-+static char *ttc_psy_chg_stat[] = {"usb", NULL};
-+/*
-+ * Temperature can be handled by battery monitor base on interrupt
-+ * scheme, so dummy it to make sure charger-manager initialize ok.
-+ */
-+static int dummy_temp_out_of_range(int *mC)
-+{
-+	*mC = 2500;
-+	return 0;
-+}
-+
-+struct charger_desc chg_desc_data = {
-+	.polling_mode		= CM_POLL_ALWAYS,
-+	.polling_interval_ms	= 180000,
-+	.battery_present	= CM_FUEL_GAUGE,
-+	.psy_charger_stat	= &ttc_psy_chg_stat[0],
-+	.psy_fuel_gauge		= "battery-monitor",
-+	.temperature_out_of_range	= dummy_temp_out_of_range,
-+};
-+
-+static struct pm860x_platform_data ttc_dkb_pm8607_info = {
-+	.chg_desc	= &chg_desc_data,
-+	.companion_addr	= 0x11,
-+	.irq_mode	= 0,
-+	.irq_base	= IRQ_BOARD_START,
-+	.i2c_port	= GI2C_PORT,
-+};
-+
- static struct i2c_board_info ttc_dkb_i2c_info[] = {
- 	{
-+		.type		= "88PM860x",
-+		.addr		= 0x34,
-+		.platform_data	= &ttc_dkb_pm8607_info,
-+		.irq		= IRQ_PXA910_PMIC_INT,
-+	},
-+	{
- 		.type		= "max7312",
- 		.addr		= 0x23,
- 		.irq		= MMP_GPIO_TO_IRQ(80),
--- 
-1.7.0.4
+Forgot to add that this patch was meant for testing and as the way
+platforms deal with GPMC may change, this was kept as TMP for now.
+
+Regards
+Afzal
