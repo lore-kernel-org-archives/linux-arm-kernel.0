@@ -1,8 +1,10 @@
 From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Tue, 27 Mar 2012 15:46:43 +0530
+Date: Tue, 27 Mar 2012 15:46:44 +0530
 Subject: [PATCH] ARM: Samsung: Make PM_GENERIC_DOMAINS config depend on
  CONFIG_PM
-Message-ID: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
+In-Reply-To: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
+References: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1332843404-25476-2-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
