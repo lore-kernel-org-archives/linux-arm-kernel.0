@@ -1,7 +1,7 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Tue, 27 Mar 2012 11:06:15 +0200
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 27 Mar 2012 11:14:25 +0200
 Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <20120327090148.GB6790@pengutronix.de>
+In-Reply-To: <20120327110615.3bfaf969@eb-e6520>
 References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
  <20120312132423.GC2459@pengutronix.de>
  <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
@@ -11,27 +11,38 @@ References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
  <20120327101259.73525f9d@eb-e6520>
  <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
  <20120327090148.GB6790@pengutronix.de>
-Message-ID: <20120327110615.3bfaf969@eb-e6520>
+ <20120327110615.3bfaf969@eb-e6520>
+Message-ID: <20120327091425.GC6790@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
 
-Le Tue, 27 Mar 2012 11:01:49 +0200,
-Wolfram Sang <w.sang@pengutronix.de> a ?crit :
-> > >does that attached patch fix your problem ?
+> > Interesting question is now why it worked on your older kernel? The code
+> > around BROKEN_TIMEOUT is there for much longer, I'd think.
 > > 
-> > YES, indeed it does to a certain degree. The timeout errors do not
-> > occur anymore and I can successfully perform many fs->ops, such as
-> 
-> Interesting question is now why it worked on your older kernel? The code
-> around BROKEN_TIMEOUT is there for much longer, I'd think.
-> 
-not in fact it seems to have been broken from a long time and I think
-I'm responsible of that in 37865fe91582582a6f6c00652f6a2b1ff71f8a78
-"mmc: sdhci-esdhc-imx: fix timeout on i.MX's sdhc"
-because unlike the i.MX35 it seems that the i.MX25 manages to read
-properly the partition table even without the timeout quirk and it
-seems that I didn't do more extensive tests for this patch.
+> not in fact it seems to have been broken from a long time and I think
 
-Eric
+I know and you are saying the same, in fact :) Your patch came in around
+2.6.37 and here it was said that 2.6.39 works fine. Might be random,
+though.
+
+> because unlike the i.MX35 it seems that the i.MX25 manages to read
+> properly the partition table even without the timeout quirk and it
+> seems that I didn't do more extensive tests for this patch.
+
+Please do next time.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/10d98581/attachment.sig>
