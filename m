@@ -1,48 +1,25 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 27 Mar 2012 11:14:25 +0200
-Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <20120327110615.3bfaf969@eb-e6520>
-References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
- <20120312132423.GC2459@pengutronix.de>
- <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
- <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
- <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
- <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
- <20120327101259.73525f9d@eb-e6520>
- <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
- <20120327090148.GB6790@pengutronix.de>
- <20120327110615.3bfaf969@eb-e6520>
-Message-ID: <20120327091425.GC6790@pengutronix.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 27 Mar 2012 14:56:01 +0530
+Subject: [PATCH 0/4] ARM: Exynos: Fixes for Exynos5 device tree support
+Message-ID: <1332840365-24827-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series includes general fixes for Exynos5 device tree support. This
+is based on the following tree. Both Exynos4 and Exynos5 device tree
+support have been tested when this series.
 
-> > Interesting question is now why it worked on your older kernel? The code
-> > around BROKEN_TIMEOUT is there for much longer, I'd think.
-> > 
-> not in fact it seems to have been broken from a long time and I think
+http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git [for-next]
 
-I know and you are saying the same, in fact :) Your patch came in around
-2.6.37 and here it was said that 2.6.39 works fine. Might be random,
-though.
 
-> because unlike the i.MX35 it seems that the i.MX25 manages to read
-> properly the partition table even without the timeout quirk and it
-> seems that I didn't do more extensive tests for this patch.
+Thomas Abraham (4):
+  ARM: Exynos: Use CHIP_ID to detect cpu type during decompression setup
+  ARM: Exynos: Remove a new bus_type instance for Exynos5
+  ARM: Exynos5: Fix incorrect initialization of GIC
+  ARM: Exynos5: Add PDMA and MDMA physical base address defines
 
-Please do next time.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/10d98581/attachment.sig>
+ arch/arm/mach-exynos/common.c                  |   21 +++------------------
+ arch/arm/mach-exynos/include/mach/map.h        |    5 +++++
+ arch/arm/mach-exynos/include/mach/uncompress.h |    6 +++++-
+ arch/arm/mach-exynos/mach-exynos5-dt.c         |    3 ++-
+ 4 files changed, 15 insertions(+), 20 deletions(-)
