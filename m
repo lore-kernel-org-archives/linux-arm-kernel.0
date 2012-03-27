@@ -1,175 +1,169 @@
 From: jm@lentin.co.uk (Jamie Lentin)
-Date: Tue, 27 Mar 2012 22:54:15 +0100
-Subject: [PATCH V3 5/5] mtd: Move fdt partition documentation to a seperate
- file
+Date: Tue, 27 Mar 2012 22:54:14 +0100
+Subject: [PATCH V3 4/5] ARM: kirkwood: Define DNS-320/DNS-325 NAND in fdt
 In-Reply-To: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
 References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1332885255-8304-6-git-send-email-jm@lentin.co.uk>
+Message-ID: <1332885255-8304-5-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Partitions are described in the same way for all mtd devices when using
-devicetree, move the documentation to a separate file and add references
-to it.
+Use devicetree to define NAND partitions. Use D-link partition scheme by
+default, to be vaguely compatible with their userland.
 
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 ---
- .../devicetree/bindings/mtd/arm-versatile.txt      |    4 +-
- .../devicetree/bindings/mtd/atmel-dataflash.txt    |    3 ++
- .../devicetree/bindings/mtd/fsl-upm-nand.txt       |    4 ++
- .../devicetree/bindings/mtd/gpio-control-nand.txt  |    3 ++
- .../devicetree/bindings/mtd/mtd-physmap.txt        |   23 +-----------
- .../devicetree/bindings/mtd/orion-nand.txt         |    3 ++
- .../devicetree/bindings/mtd/partition.txt          |   38 ++++++++++++++++++++
- 7 files changed, 55 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/partition.txt
+ arch/arm/boot/dts/kirkwood-dns320.dts |   35 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-dns325.dts |   35 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dnskw.c  |   31 -----------------------------
+ 3 files changed, 70 insertions(+), 31 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/arm-versatile.txt b/Documentation/devicetree/bindings/mtd/arm-versatile.txt
-index 476845d..beace4b 100644
---- a/Documentation/devicetree/bindings/mtd/arm-versatile.txt
-+++ b/Documentation/devicetree/bindings/mtd/arm-versatile.txt
-@@ -4,5 +4,5 @@ Required properties:
- - compatible : must be "arm,versatile-flash";
- - bank-width : width in bytes of flash interface.
- 
--Optional properties:
--- Subnode partition map from mtd flash binding
-+The device tree may optionally contain sub-nodes describing partitions of the
-+address space. See partition.txt for more detail.
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-index ef66ddd..1889a4d 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-@@ -3,6 +3,9 @@
- Required properties:
- - compatible : "atmel,<model>", "atmel,<series>", "atmel,dataflash".
- 
-+The device tree may optionally contain sub-nodes describing partitions of the
-+address space. See partition.txt for more detail.
+diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
+index 78c834f..dc09a73 100644
+--- a/arch/arm/boot/dts/kirkwood-dns320.dts
++++ b/arch/arm/boot/dts/kirkwood-dns320.dts
+@@ -25,5 +25,40 @@
+ 			clock-frequency = <166666667>;
+ 			status = "okay";
+ 		};
 +
- Example:
- 
- flash at 1 {
-diff --git a/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt b/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt
-index 00f1f54..fce4894 100644
---- a/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/fsl-upm-nand.txt
-@@ -19,6 +19,10 @@ Optional properties:
- 	read registers (tR). Required if property "gpios" is not used
- 	(R/B# pins not connected).
- 
-+Each flash chip described may optionally contain additional sub-nodes
-+describing partitions of the address space. See partition.txt for more
-+detail.
++		nand at 3000000 {
++			status = "okay";
 +
- Examples:
- 
- upm at 1,0 {
-diff --git a/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt b/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
-index 719f4dc..36ef07d 100644
---- a/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
-@@ -25,6 +25,9 @@ Optional properties:
-   GPIO state and before and after command byte writes, this register will be
-   read to ensure that the GPIO accesses have completed.
- 
-+The device tree may optionally contain sub-nodes describing partitions of the
-+address space. See partition.txt for more detail.
++			partition at 0 {
++				label = "u-boot";
++				reg = <0x0000000 0x100000>;
++				read-only;
++			};
 +
- Examples:
++			partition at 100000 {
++				label = "uImage";
++				reg = <0x0100000 0x500000>;
++			};
++
++			partition at 600000 {
++				label = "ramdisk";
++				reg = <0x0600000 0x500000>;
++			};
++
++			partition at b00000 {
++				label = "image";
++				reg = <0x0b00000 0x6600000>;
++			};
++
++			partition at 7100000 {
++				label = "mini firmware";
++				reg = <0x7100000 0xa00000>;
++			};
++
++			partition at 7b00000 {
++				label = "config";
++				reg = <0x7b00000 0x500000>;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
+index 23241ab..c2a5562 100644
+--- a/arch/arm/boot/dts/kirkwood-dns325.dts
++++ b/arch/arm/boot/dts/kirkwood-dns325.dts
+@@ -20,5 +20,40 @@
+ 			clock-frequency = <200000000>;
+ 			status = "okay";
+ 		};
++
++		nand at 3000000 {
++			status = "okay";
++
++			partition at 0 {
++				label = "u-boot";
++				reg = <0x0000000 0x100000>;
++				read-only;
++			};
++
++			partition at 100000 {
++				label = "uImage";
++				reg = <0x0100000 0x500000>;
++			};
++
++			partition at 600000 {
++				label = "ramdisk";
++				reg = <0x0600000 0x500000>;
++			};
++
++			partition at b00000 {
++				label = "image";
++				reg = <0x0b00000 0x6600000>;
++			};
++
++			partition at 7100000 {
++				label = "mini firmware";
++				reg = <0x7100000 0xa00000>;
++			};
++
++			partition at 7b00000 {
++				label = "config";
++				reg = <0x7b00000 0x500000>;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+index 7cb7f6a..dc4e80a 100644
+--- a/arch/arm/mach-kirkwood/board-dnskw.c
++++ b/arch/arm/mach-kirkwood/board-dnskw.c
+@@ -23,7 +23,6 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/gpio-fan.h>
+ #include <linux/leds.h>
+-#include <linux/mtd/physmap.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -32,35 +31,6 @@
+ #include "common.h"
+ #include "mpp.h"
  
- gpio-nand at 1,0 {
-diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-index 80152cb..a63c2bd7 100644
---- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-+++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-@@ -23,27 +23,8 @@ are defined:
-  - vendor-id : Contains the flash chip's vendor id (1 byte).
-  - device-id : Contains the flash chip's device id (1 byte).
- 
--In addition to the information on the mtd bank itself, the
--device tree may optionally contain additional information
--describing partitions of the address space.  This can be
--used on platforms which have strong conventions about which
--portions of a flash are used for what purposes, but which don't
--use an on-flash partition table such as RedBoot.
+-static struct mtd_partition dnskw_nand_parts[] = {
+-	{
+-		.name		= "u-boot",
+-		.offset		= 0,
+-		.size		= SZ_1M,
+-		.mask_flags	= MTD_WRITEABLE
+-	}, {
+-		.name		= "uImage",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= 5 * SZ_1M
+-	}, {
+-		.name		= "ramdisk",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= 5 * SZ_1M
+-	}, {
+-		.name		= "image",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= 102 * SZ_1M
+-	}, {
+-		.name		= "mini firmware",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= 10 * SZ_1M
+-	}, {
+-		.name		= "config",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= 5 * SZ_1M
+-	},
+-};
 -
--Each partition is represented as a sub-node of the mtd device.
--Each node's name represents the name of the corresponding
--partition of the mtd device.
--
--Flash partitions
-- - reg : The partition's offset and size within the mtd bank.
-- - label : (optional) The label / name for this partition.
--   If omitted, the label is taken from the node name (excluding
--   the unit address).
-- - read-only : (optional) This parameter, if present, is a hint to
--   Linux that this partition should only be mounted
--   read-only.  This is usually used for flash partitions
--   containing early-boot firmware images or data which should not
--   be clobbered.
-+The device tree may optionally contain sub-nodes describing partitions of the
-+address space. See partition.txt for more detail.
+ static struct mv643xx_eth_platform_data dnskw_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+ };
+@@ -272,7 +242,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
+ void __init dnskw_init(void)
+ {
+ 	kirkwood_mpp_conf(dnskw_mpp_config);
+-	kirkwood_nand_init(ARRAY_AND_SIZE(dnskw_nand_parts), 25);
  
- Example:
- 
-diff --git a/Documentation/devicetree/bindings/mtd/orion-nand.txt b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-index 22c7438..d606009 100644
---- a/Documentation/devicetree/bindings/mtd/orion-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-@@ -11,6 +11,9 @@ Optional properties:
- - bank-width :
- - chip-delay :
- 
-+The device tree may optionally contain sub-nodes describing partitions of the
-+address space. See partition.txt for more detail.
-+
- Examples:
- 
- nand at f4000000 {
-diff --git a/Documentation/devicetree/bindings/mtd/partition.txt b/Documentation/devicetree/bindings/mtd/partition.txt
-new file mode 100644
-index 0000000..f114ce1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/partition.txt
-@@ -0,0 +1,38 @@
-+Representing flash partitions in devicetree
-+
-+Partitions can be represented by sub-nodes of an mtd device. This can be used
-+on platforms which have strong conventions about which portions of a flash are
-+used for what purposes, but which don't use an on-flash partition table such
-+as RedBoot.
-+
-+#address-cells & #size-cells must both be present in the mtd device and be
-+equal to 1.
-+
-+Required properties:
-+- reg : The partition's offset and size within the mtd bank.
-+
-+Optional properties:
-+- label : The label / name for this partition.  If omitted, the label is taken
-+  from the node name (excluding the unit address).
-+- read-only : This parameter, if present, is a hint to Linux that this
-+  partition should only be mounted read-only. This is usually used for flash
-+  partitions containing early-boot firmware images or data which should not be
-+  clobbered.
-+
-+Examples:
-+
-+
-+flash at 0 {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0000000 0x100000>;
-+		read-only;
-+	};
-+
-+	uimage at 100000 {
-+		reg = <0x0100000 0x200000>;
-+	};
-+];
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&dnskw_ge00_data);
 -- 
 1.7.9.1
