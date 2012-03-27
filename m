@@ -1,115 +1,105 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 27 Mar 2012 15:23:22 +0800
-Subject: [PATCH 03/10] clk: add "const" for clk_ops of basic clks
+Date: Tue, 27 Mar 2012 15:23:23 +0800
+Subject: [PATCH 04/10] clk: declare clk_ops of basic clks in clk-provider.h
 In-Reply-To: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
 References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1332833009-4121-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1332833009-4121-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk_ops of basic clks should have "const" to match the definition
-in "struct clk" and clk_register prototype.
+Besides the static initialization, the clk_ops of basic clks could
+also be used by particular clk type being subclass of the basic clks.
+
+For example, clk_busy_divider has the same clk_ops as clk_divider,
+except it has to wait for a busy bit before return success with
+.set_rate.  clk_busy_divider will somehow reuse clk_ops of clk_divider.
+
+Since clk-provider.h is included by clk-private.h, it's safe to move
+those clk_ops declaration of basic clks form  clk-private.h into
+clk-provider.h, so that implementation of clks like clk_busy_divider
+above do not need to include clk-private.h to access those clk_ops.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/clk/clk-divider.c    |    2 +-
- drivers/clk/clk-fixed-rate.c |    2 +-
- drivers/clk/clk-gate.c       |    2 +-
- drivers/clk/clk-mux.c        |    2 +-
- include/linux/clk-private.h  |    8 ++++----
- 5 files changed, 8 insertions(+), 8 deletions(-)
+ include/linux/clk-private.h  |    8 --------
+ include/linux/clk-provider.h |    4 ++++
+ 2 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 231cd6e..b1c4b02 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -146,7 +146,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
- 	return 0;
- }
- 
--struct clk_ops clk_divider_ops = {
-+const struct clk_ops clk_divider_ops = {
- 	.recalc_rate = clk_divider_recalc_rate,
- 	.round_rate = clk_divider_round_rate,
- 	.set_rate = clk_divider_set_rate,
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index 651b06f..027e477 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -33,7 +33,7 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
- 	return to_clk_fixed_rate(hw)->fixed_rate;
- }
- 
--struct clk_ops clk_fixed_rate_ops = {
-+const struct clk_ops clk_fixed_rate_ops = {
- 	.recalc_rate = clk_fixed_rate_recalc_rate,
- };
- EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index b688f47..fe2ff9e 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -98,7 +98,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
- 	return reg ? 1 : 0;
- }
- 
--struct clk_ops clk_gate_ops = {
-+const struct clk_ops clk_gate_ops = {
- 	.enable = clk_gate_enable,
- 	.disable = clk_gate_disable,
- 	.is_enabled = clk_gate_is_enabled,
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 45cad61..5424488 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -82,7 +82,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- 	return 0;
- }
- 
--struct clk_ops clk_mux_ops = {
-+const struct clk_ops clk_mux_ops = {
- 	.get_parent = clk_mux_get_parent,
- 	.set_parent = clk_mux_set_parent,
- };
 diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 5e4312b..5f4ccd7 100644
+index 5f4ccd7..f19fee0 100644
 --- a/include/linux/clk-private.h
 +++ b/include/linux/clk-private.h
-@@ -55,7 +55,7 @@ struct clk {
+@@ -55,8 +55,6 @@ struct clk {
   * alternative macro for static initialization
   */
  
--extern struct clk_ops clk_fixed_rate_ops;
-+extern const struct clk_ops clk_fixed_rate_ops;
- 
+-extern const struct clk_ops clk_fixed_rate_ops;
+-
  #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
  				_fixed_rate_flags)		\
-@@ -78,7 +78,7 @@ extern struct clk_ops clk_fixed_rate_ops;
+ 	static struct clk _name;				\
+@@ -78,8 +76,6 @@ extern const struct clk_ops clk_fixed_rate_ops;
  		.flags = _flags,				\
  	};
  
--extern struct clk_ops clk_gate_ops;
-+extern const struct clk_ops clk_gate_ops;
- 
+-extern const struct clk_ops clk_gate_ops;
+-
  #define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr,	\
  				_flags, _reg, _bit_idx,		\
-@@ -110,7 +110,7 @@ extern struct clk_ops clk_gate_ops;
+ 				_gate_flags, _lock)		\
+@@ -110,8 +106,6 @@ extern const struct clk_ops clk_gate_ops;
  		.flags = _flags,				\
  	};
  
--extern struct clk_ops clk_divider_ops;
-+extern const struct clk_ops clk_divider_ops;
- 
+-extern const struct clk_ops clk_divider_ops;
+-
  #define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr,	\
  				_flags, _reg, _shift, _width,	\
-@@ -143,7 +143,7 @@ extern struct clk_ops clk_divider_ops;
+ 				_divider_flags, _lock)		\
+@@ -143,8 +137,6 @@ extern const struct clk_ops clk_divider_ops;
  		.flags = _flags,				\
  	};
  
--extern struct clk_ops clk_mux_ops;
-+extern const struct clk_ops clk_mux_ops;
- 
+-extern const struct clk_ops clk_mux_ops;
+-
  #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags,	\
  				_reg, _shift, _width,		\
+ 				_mux_flags, _lock)		\
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5508897..6eb8e5d 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -149,6 +149,7 @@ struct clk_fixed_rate {
+ 	u8		flags;
+ };
+ 
++extern const struct clk_ops clk_fixed_rate_ops;
+ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		unsigned long fixed_rate);
+@@ -180,6 +181,7 @@ struct clk_gate {
+ 
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+ 
++extern const struct clk_ops clk_gate_ops;
+ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+@@ -218,6 +220,7 @@ struct clk_divider {
+ #define CLK_DIVIDER_ONE_BASED		BIT(0)
+ #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
+ 
++extern const struct clk_ops clk_divider_ops;
+ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+@@ -252,6 +255,7 @@ struct clk_mux {
+ #define CLK_MUX_INDEX_ONE		BIT(0)
+ #define CLK_MUX_INDEX_BIT		BIT(1)
+ 
++extern const struct clk_ops clk_mux_ops;
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
 -- 
 1.7.5.4
