@@ -1,58 +1,66 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 27 Mar 2012 16:17:37 -0700
-Subject: [PATCH 09/10] clk: dynamically allocate parent_names basic clk
- registration
-In-Reply-To: <20120327194010.GJ29317@pengutronix.de>
+Date: Tue, 27 Mar 2012 16:28:19 -0700
+Subject: [PATCH 05/10] clk: align error return of basic clks registeration
+In-Reply-To: <1332833009-4121-6-git-send-email-shawn.guo@linaro.org>
 References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
- <1332833009-4121-10-git-send-email-shawn.guo@linaro.org>
- <20120327085514.GI29317@pengutronix.de>
- <20120327125122.GB3719@S2101-09.ap.freescale.net>
- <20120327194010.GJ29317@pengutronix.de>
-Message-ID: <CAJOA=zNWvfWX8Qc-f758O1GbO41T00+7umjgk1_N1Tu_KGtwgw@mail.gmail.com>
+ <1332833009-4121-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAJOA=zOVVnq8DgfAzqnC+XrGtSGU7SLF+8Qwn3L76EfwqOGzNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 12:40 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Tue, Mar 27, 2012 at 08:51:24PM +0800, Shawn Guo wrote:
->> On Tue, Mar 27, 2012 at 10:55:14AM +0200, Sascha Hauer wrote:
->> > On Tue, Mar 27, 2012 at 03:23:28PM +0800, Shawn Guo wrote:
->> > > It's not necessary to have "char *parent[1]" carried in struct clk_gate
->> > > and clk_divider. ?Instead, it can be dynamically allocated in
->> > > registration function, just like what clk_register_fixed_rate does.
->> >
->> > I patched it the way it is to get rid of the additional malloc which
->> > seemed unnecessary. Maybe the real question is whether the core should
->> > duplicate the parent strings instead of the basic clock types.
->> >
->> If we can ensure the parent strings will only be used during
->> clk_register call, we do not need to duplicate the parent strings.
->>
->> But right now the parent strings is used not only in clk_register call
->> but also __clk_set_parent for finding parent index in case the search
->> on cached parent points fails. ?I guess Mike has a good reason for that.
+On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> clk_register_gate and clk_register_divider return NULL for error,
+> which is aligned with clk_register function. ?But clk_register_mux
+> and clk_register_fixed_rate return ERR_PTR. ?Change them to return
+> NULL for better aligning with other registeration functions.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-I'd like to think my reasons are good ;-)
-
-The common clk framework pulls together clock data from many sources,
-and we can never assume that the tree of struct clk's is "complete".
-For example an on-SoC multiplexer clock might have one input from an
-external PMIC.  It is conceivable that clock data / common clk support
-for that PMIC isn't yet merged.  Should that prevent the on-SoC mux
-clock from using that source via clk_set_parent?  Absolutely not.
-That is why the parent_names arrays are necessary.  They represent
-"complete" data even in the absence of actual clock data.  Using only
-the index of the array the .set_rate callback should be able to do the
-[register write | i2c command | whatever] in order to switch to the
-PMIC source.  The rate will be unknown, but at least the operation is
-possible.
-
-> Probably. That's why I suggest to copy the strings in the framework.
-> Then we do not have to duplicate the code to copy the strings and also
-> make sure that the core works on its own strings.
-
-Copying the strings in the fwk is sensible.  I'll throw together a
-patch which takes in the const char *parent_name and passes that to
-clk_register directly, which builds up the char **parent_names itself.
+Thanks for the patch Shawn, but this is actually the opposite
+direction that I want to go.  In light of the other thread with
+Saravana and Russell on a similar topic, I'd like to make sure that
+the driver-facing functions clearly return -EERROR during failure.
+I've lined up a patch for the same on my side.
 
 Regards,
 Mike
+
+> ---
+> ?drivers/clk/clk-fixed-rate.c | ? ?2 +-
+> ?drivers/clk/clk-mux.c ? ? ? ?| ? ?2 +-
+> ?2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+> index 027e477..d268439 100644
+> --- a/drivers/clk/clk-fixed-rate.c
+> +++ b/drivers/clk/clk-fixed-rate.c
+> @@ -50,7 +50,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+>
+> ? ? ? ?if (!fixed) {
+> ? ? ? ? ? ? ? ?pr_err("%s: could not allocate fixed clk\n", __func__);
+> - ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+> + ? ? ? ? ? ? ? return NULL;
+> ? ? ? ?}
+>
+> ? ? ? ?/* struct clk_fixed_rate assignments */
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 5424488..19f3116 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -99,7 +99,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+>
+> ? ? ? ?if (!mux) {
+> ? ? ? ? ? ? ? ?pr_err("%s: could not allocate mux clk\n", __func__);
+> - ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+> + ? ? ? ? ? ? ? return NULL;
+> ? ? ? ?}
+>
+> ? ? ? ?/* struct clk_mux assignments */
+> --
+> 1.7.5.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
