@@ -1,32 +1,109 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 27 Mar 2012 15:23:20 +0800
-Subject: [PATCH 01/10] clk: use kzalloc in clk_register_mux
+Date: Tue, 27 Mar 2012 15:23:21 +0800
+Subject: [PATCH 02/10] clk: remove unnecessary EXPORT_SYMBOL_GPL
 In-Reply-To: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
 References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1332833009-4121-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1332833009-4121-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change clk_register_mux to use kzalloc, just like what all other basic
-clk registration functions do.
+It makes no sense to have EXPORT_SYMBOL_GPL on static functions.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/clk/clk-mux.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/clk/clk-divider.c    |    3 ---
+ drivers/clk/clk-fixed-rate.c |    1 -
+ drivers/clk/clk-gate.c       |    3 ---
+ drivers/clk/clk-mux.c        |    2 --
+ 4 files changed, 0 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index d5ac6a7..231cd6e 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -45,7 +45,6 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+ 
+ 	return parent_rate / div;
+ }
+-EXPORT_SYMBOL_GPL(clk_divider_recalc_rate);
+ 
+ /*
+  * The reverse of DIV_ROUND_UP: The maximum number which
+@@ -117,7 +116,6 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 		return r / div;
+ 	}
+ }
+-EXPORT_SYMBOL_GPL(clk_divider_round_rate);
+ 
+ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
+ {
+@@ -147,7 +145,6 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(clk_divider_set_rate);
+ 
+ struct clk_ops clk_divider_ops = {
+ 	.recalc_rate = clk_divider_recalc_rate,
+diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+index 90c79fb..651b06f 100644
+--- a/drivers/clk/clk-fixed-rate.c
++++ b/drivers/clk/clk-fixed-rate.c
+@@ -32,7 +32,6 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
+ {
+ 	return to_clk_fixed_rate(hw)->fixed_rate;
+ }
+-EXPORT_SYMBOL_GPL(clk_fixed_rate_recalc_rate);
+ 
+ struct clk_ops clk_fixed_rate_ops = {
+ 	.recalc_rate = clk_fixed_rate_recalc_rate,
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index b5902e2..b688f47 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -71,7 +71,6 @@ static int clk_gate_enable(struct clk_hw *hw)
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(clk_gate_enable);
+ 
+ static void clk_gate_disable(struct clk_hw *hw)
+ {
+@@ -82,7 +81,6 @@ static void clk_gate_disable(struct clk_hw *hw)
+ 	else
+ 		clk_gate_clear_bit(gate);
+ }
+-EXPORT_SYMBOL_GPL(clk_gate_disable);
+ 
+ static int clk_gate_is_enabled(struct clk_hw *hw)
+ {
+@@ -99,7 +97,6 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ 
+ 	return reg ? 1 : 0;
+ }
+-EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
+ 
+ struct clk_ops clk_gate_ops = {
+ 	.enable = clk_gate_enable,
 diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index c71ad1f..50e0595 100644
+index 50e0595..45cad61 100644
 --- a/drivers/clk/clk-mux.c
 +++ b/drivers/clk/clk-mux.c
-@@ -97,7 +97,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+@@ -55,7 +55,6 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 
+ 	return val;
+ }
+-EXPORT_SYMBOL_GPL(clk_mux_get_parent);
+ 
+ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
  {
- 	struct clk_mux *mux;
+@@ -82,7 +81,6 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
  
--	mux = kmalloc(sizeof(struct clk_mux), GFP_KERNEL);
-+	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(clk_mux_set_parent);
  
- 	if (!mux) {
- 		pr_err("%s: could not allocate mux clk\n", __func__);
+ struct clk_ops clk_mux_ops = {
+ 	.get_parent = clk_mux_get_parent,
 -- 
 1.7.5.4
