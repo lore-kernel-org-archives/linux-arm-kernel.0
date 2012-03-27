@@ -1,113 +1,83 @@
-From: joancarles@fqingenieria.es (joancarles)
-Date: Tue, 27 Mar 2012 10:46:45 +0200
-Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <20120327101259.73525f9d@eb-e6520>
-References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
- <20120312132423.GC2459@pengutronix.de>
- <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
- <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
- <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
- <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
- <20120327101259.73525f9d@eb-e6520>
-Message-ID: <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 27 Mar 2012 11:54:27 +0300
+Subject: [PATCH] ARM: OMAP: fix section mismatches in usb-host.c
+In-Reply-To: <1332773470-22800-1-git-send-email-grinberg@compulab.co.il>
+References: <1332773470-22800-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <20120327085426.GI7379@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric
+On Mon, Mar 26, 2012 at 04:51:10PM +0200, Igor Grinberg wrote:
+> Fix the below section mismatch warning and alike:
+> 
+> WARNING: vmlinux.o(.text+0x281d4): Section mismatch in reference from
+> the function setup_ehci_io_mux() to the function
+> .init.text:omap_mux_init_signal()
+> The function setup_ehci_io_mux() references
+> the function __init omap_mux_init_signal().
+> This is often because setup_ehci_io_mux lacks a __init
+> annotation or the annotation of omap_mux_init_signal is wrong.
+> 
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 
->> G'day
->>
->> This is still present, and we have absolutely no idea where to 
->> continue
->> searching for the solution of the problem. Any pointers? Any git 
->> trees
->> of mmc driver changes we could try? Anybody else with a MX25 that 
->> has
->> this issue?
->>
-> does that attached patch fix your problem ?
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-YES, indeed it does to a certain degree. The timeout errors do not 
-occur anymore and I can successfully perform many fs->ops, such as READ, 
-WRITE, UNLINK ... . So thank you very much for this insight through your 
-patch!
+> ---
+>  arch/arm/mach-omap2/usb-host.c |   10 ++++++----
+>  1 files changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+> index f51348d..dde8a11 100644
+> --- a/arch/arm/mach-omap2/usb-host.c
+> +++ b/arch/arm/mach-omap2/usb-host.c
+> @@ -54,7 +54,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
+>  /*
+>   * setup_ehci_io_mux - initialize IO pad mux for USBHOST
+>   */
+> -static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+> +static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  {
+>  	switch (port_mode[0]) {
+>  	case OMAP_EHCI_PORT_MODE_PHY:
+> @@ -197,7 +197,8 @@ static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  	return;
+>  }
+>  
+> -static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+> +static
+> +void __init setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  {
+>  	switch (port_mode[0]) {
+>  	case OMAP_EHCI_PORT_MODE_PHY:
+> @@ -315,7 +316,7 @@ static void setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  	}
+>  }
+>  
+> -static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+> +static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  {
+>  	switch (port_mode[0]) {
+>  	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+> @@ -412,7 +413,8 @@ static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  	}
+>  }
+>  
+> -static void setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+> +static
+> +void __init setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  {
+>  	switch (port_mode[0]) {
+>  	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+> -- 
+> 1.7.3.4
+> 
 
-The speed of the card is excruciatingly slow, however. We roughly get 
-between 34KB/s and 64KB/s from a dd if=/dev/zero write to any of the 
-following partitions:
-
-root at mx25-noah:~$> grep mmc /proc/mounts
-/dev/mmcblk0p2 /media/card-ext3 ext3 
-rw,sync,relatime,user_xattr,barrier=1,nodelalloc,data=ordered 0 0
-/dev/mmcblk0p1 /media/card vfat 
-rw,sync,relatime,fmask=0022,dmask=0022,codepage=cp437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 
-0 0
-root at mx25-noah:~$> df -kh | grep mmc
-/dev/mmcblk0p2            1.7G    133.1M      1.5G   8% 
-/media/card-ext3
-/dev/mmcblk0p1          123.6M      2.7M    120.9M   2% /media/card
-root at mx25-noah:~$> dd if=/dev/zero of=/media/card/test-10M bs=1024K 
-count=10
-10+0 records in
-10+0 records out
-10485760 bytes (10.0MB) copied, 296.004564 seconds, 34.6KB/s
-root at mx25-noah:~$> dd if=/dev/zero of=/media/card-ext3/test-10M 
-bs=1024K count=10
-10+0 records in
-10+0 records out
-10485760 bytes (10.0MB) copied, 158.207481 seconds, 64.7KB/s
-
-What's going on here, why is it so slow?
-
-root at mx25-noah:~$> dmesg | grep -A1 CMD24
-[  635.195042] mmc0: starting CMD24 arg 0e5c1600 flags 000000b5
-[  635.195081] mmc0:     blksz 512 blocks 1 flags 00000100 tsac 300 ms 
-nsac 0
---
-[  635.199831] mmc0: req done (CMD24): 0: 00000900 00000000 00000000 
-00000000
-[  635.199866] mmc0:     512 bytes transferred: 0
---
-[  635.200212] mmc0: starting CMD24 arg 0e5c1800 flags 000000b5
-[  635.200251] mmc0:     blksz 512 blocks 1 flags 00000100 tsac 300 ms 
-nsac 0
---
-[  635.206516] mmc0: req done (CMD24): 0: 00000900 00000000 00000000 
-00000000
-[  635.206549] mmc0:     512 bytes transferred: 0
---
-[  635.206892] mmc0: starting CMD24 arg 0e5c1a00 flags 000000b5
-[  635.206932] mmc0:     blksz 512 blocks 1 flags 00000100 tsac 300 ms 
-nsac 0
---
-[  635.211763] mmc0: req done (CMD24): 0: 00000900 00000000 00000000 
-00000000
-[  635.211796] mmc0:     512 bytes transferred: 0
---
-[  635.212409] mmc0: starting CMD24 arg 0e5c1c00 flags 000000b5
-[  635.212449] mmc0:     blksz 512 blocks 1 flags 00000100 tsac 300 ms 
-nsac 0
-
-Also, debugfs values don't make sense to me:
-
-root at mx25-noah:/sys/kernel/debug/mmc0$> cat clock
-50000000
-root at mx25-noah:/sys/kernel/debug/mmc0$> cat ios
-clock:		50000000 Hz
-vdd:		17 (2.9 ~ 3.0 V)
-bus mode:	2 (push-pull)
-chip select:	0 (don't care)
-power mode:	2 (on)
-bus width:	2 (4 bits)
-timing spec:	2 (sd high-speed)
-root at mx25-noah:/sys/kernel/debug/mmc0$> cat mmc0\:0002/stat
-state   status
-root at mx25-noah:/sys/kernel/debug/mmc0$> cat mmc0\:0002/state
-0x00000005
-root at mx25-noah:/sys/kernel/debug/mmc0$> cat mmc0\:0002/status
-00000900
-
-Best regards and thank you so much for this real improvement of our 
-situation here.
 -- 
-Joan C. Abelaira
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120327/b002ec64/attachment.sig>
