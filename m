@@ -1,129 +1,47 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 27 Mar 2012 15:42:40 +0200
-Subject: [PATCHv2 06/14] Alpha: adapt for dma_map_ops changes
+Date: Tue, 27 Mar 2012 15:42:35 +0200
+Subject: [PATCHv2 01/14] common: dma-mapping: introduce alloc_attrs and
+ free_attrs methods
 In-Reply-To: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
 References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1332855768-32583-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1332855768-32583-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+Introduce new generic alloc and free methods with attributes argument.
 
-Adapt core Alpha architecture code for dma_map_ops changes: replace
-alloc/free_coherent with generic alloc/free methods.
+Existing alloc_coherent and free_coherent can be implemented on top of the
+new calls with NULL attributes argument. Later also dma_alloc_non_coherent
+can be implemented using DMA_ATTR_NONCOHERENT attribute as well as
+dma_alloc_writecombine with separate DMA_ATTR_WRITECOMBINE attribute.
 
-Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+This way the drivers will get more generic, platform independent way of
+allocating dma buffers with specific parameters.
+
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Reviewed-by: David Gibson <david@gibson.dropbear.ud.au>
 Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/alpha/include/asm/dma-mapping.h |   18 ++++++++++++------
- arch/alpha/kernel/pci-noop.c         |   10 ++++++----
- arch/alpha/kernel/pci_iommu.c        |   10 ++++++----
- 3 files changed, 24 insertions(+), 14 deletions(-)
+ include/linux/dma-mapping.h |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/alpha/include/asm/dma-mapping.h b/arch/alpha/include/asm/dma-mapping.h
-index 4567aca..dfa32f0 100644
---- a/arch/alpha/include/asm/dma-mapping.h
-+++ b/arch/alpha/include/asm/dma-mapping.h
-@@ -12,16 +12,22 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
- 
- #include <asm-generic/dma-mapping-common.h>
- 
--static inline void *dma_alloc_coherent(struct device *dev, size_t size,
--				       dma_addr_t *dma_handle, gfp_t gfp)
-+#define dma_alloc_coherent(d,s,h,f)	dma_alloc_attrs(d,s,h,f,NULL)
-+
-+static inline void *dma_alloc_attrs(struct device *dev, size_t size,
-+				    dma_addr_t *dma_handle, gfp_t gfp,
-+				    struct dma_attrs *attrs)
- {
--	return get_dma_ops(dev)->alloc_coherent(dev, size, dma_handle, gfp);
-+	return get_dma_ops(dev)->alloc(dev, size, dma_handle, gfp, attrs);
- }
- 
--static inline void dma_free_coherent(struct device *dev, size_t size,
--				     void *vaddr, dma_addr_t dma_handle)
-+#define dma_free_coherent(d,s,c,h) dma_free_attrs(d,s,c,h,NULL)
-+
-+static inline void dma_free_attrs(struct device *dev, size_t size,
-+				  void *vaddr, dma_addr_t dma_handle,
-+				  struct dma_attrs *attrs)
- {
--	get_dma_ops(dev)->free_coherent(dev, size, vaddr, dma_handle);
-+	get_dma_ops(dev)->free(dev, size, vaddr, dma_handle, attrs);
- }
- 
- static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
-diff --git a/arch/alpha/kernel/pci-noop.c b/arch/alpha/kernel/pci-noop.c
-index 04eea48..df24b76 100644
---- a/arch/alpha/kernel/pci-noop.c
-+++ b/arch/alpha/kernel/pci-noop.c
-@@ -108,7 +108,8 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
- }
- 
- static void *alpha_noop_alloc_coherent(struct device *dev, size_t size,
--				       dma_addr_t *dma_handle, gfp_t gfp)
-+				       dma_addr_t *dma_handle, gfp_t gfp,
-+				       struct dma_attrs *attrs)
- {
- 	void *ret;
- 
-@@ -123,7 +124,8 @@ static void *alpha_noop_alloc_coherent(struct device *dev, size_t size,
- }
- 
- static void alpha_noop_free_coherent(struct device *dev, size_t size,
--				     void *cpu_addr, dma_addr_t dma_addr)
-+				     void *cpu_addr, dma_addr_t dma_addr,
-+				     struct dma_attrs *attrs)
- {
- 	free_pages((unsigned long)cpu_addr, get_order(size));
- }
-@@ -174,8 +176,8 @@ static int alpha_noop_set_mask(struct device *dev, u64 mask)
- }
- 
- struct dma_map_ops alpha_noop_ops = {
--	.alloc_coherent		= alpha_noop_alloc_coherent,
--	.free_coherent		= alpha_noop_free_coherent,
-+	.alloc			= alpha_noop_alloc_coherent,
-+	.free			= alpha_noop_free_coherent,
- 	.map_page		= alpha_noop_map_page,
- 	.map_sg			= alpha_noop_map_sg,
- 	.mapping_error		= alpha_noop_mapping_error,
-diff --git a/arch/alpha/kernel/pci_iommu.c b/arch/alpha/kernel/pci_iommu.c
-index 4361080..cd63479 100644
---- a/arch/alpha/kernel/pci_iommu.c
-+++ b/arch/alpha/kernel/pci_iommu.c
-@@ -434,7 +434,8 @@ static void alpha_pci_unmap_page(struct device *dev, dma_addr_t dma_addr,
-    else DMA_ADDRP is undefined.  */
- 
- static void *alpha_pci_alloc_coherent(struct device *dev, size_t size,
--				      dma_addr_t *dma_addrp, gfp_t gfp)
-+				      dma_addr_t *dma_addrp, gfp_t gfp,
-+				      struct dma_attrs *attrs)
- {
- 	struct pci_dev *pdev = alpha_gendev_to_pci(dev);
- 	void *cpu_addr;
-@@ -478,7 +479,8 @@ try_again:
-    DMA_ADDR past this call are illegal.  */
- 
- static void alpha_pci_free_coherent(struct device *dev, size_t size,
--				    void *cpu_addr, dma_addr_t dma_addr)
-+				    void *cpu_addr, dma_addr_t dma_addr,
-+				    struct dma_attrs *attrs)
- {
- 	struct pci_dev *pdev = alpha_gendev_to_pci(dev);
- 	pci_unmap_single(pdev, dma_addr, size, PCI_DMA_BIDIRECTIONAL);
-@@ -952,8 +954,8 @@ static int alpha_pci_set_mask(struct device *dev, u64 mask)
- }
- 
- struct dma_map_ops alpha_pci_ops = {
--	.alloc_coherent		= alpha_pci_alloc_coherent,
--	.free_coherent		= alpha_pci_free_coherent,
-+	.alloc			= alpha_pci_alloc_coherent,
-+	.free			= alpha_pci_free_coherent,
- 	.map_page		= alpha_pci_map_page,
- 	.unmap_page		= alpha_pci_unmap_page,
- 	.map_sg			= alpha_pci_map_sg,
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index e13117c..8cc7f95 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -13,6 +13,12 @@ struct dma_map_ops {
+ 				dma_addr_t *dma_handle, gfp_t gfp);
+ 	void (*free_coherent)(struct device *dev, size_t size,
+ 			      void *vaddr, dma_addr_t dma_handle);
++	void* (*alloc)(struct device *dev, size_t size,
++				dma_addr_t *dma_handle, gfp_t gfp,
++				struct dma_attrs *attrs);
++	void (*free)(struct device *dev, size_t size,
++			      void *vaddr, dma_addr_t dma_handle,
++			      struct dma_attrs *attrs);
+ 	dma_addr_t (*map_page)(struct device *dev, struct page *page,
+ 			       unsigned long offset, size_t size,
+ 			       enum dma_data_direction dir,
 -- 
 1.7.1.569.g6f426
