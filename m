@@ -1,43 +1,104 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 26 Mar 2012 17:19:28 -0700
-Subject: [PATCH] cpufreq: OMAP: fix build errors: depends on ARCH_OMAP2PLUS
-Message-ID: <1332807568-638-1-git-send-email-khilman@ti.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Tue, 27 Mar 2012 09:26:54 +0900
+Subject: [PATCH 1/2] ARM: lib: Add optimized memcpy with 64 byte pld size
+In-Reply-To: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
+References: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
+Message-ID: <00cf01cd0bb0$4fa49c30$eeedd490$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP driver needs a 'depends on ARCH_OMAP2PLUS' since it only
-builds for OMAP2+ platforms.
+This patch adds the optimized memcpy() for the architecture that has 64 byte PLD size.
 
-This 'depends on' was in the original patch from Russell King, but was
-erroneously removed by me when making this option user-selectable in
-commit b09db45c (cpufreq: OMAP driver depends CPUfreq tables.)  This
-patch remedies that.
-
-Apologies to Russell King for breaking his originally working patch.
-
-Also, thanks to Grazvydas Ignotas for reporting the same problem.
-
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Grazvydas Ignotas <notasas@gmail.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
-Dave, this applies on top of your current fixes branch, and fixes a 
-problem introduced there by me.  Please merge for v3.4-rc.  Thanks.
+ arch/arm/Kconfig             |    7 ++++++
+ arch/arm/lib/copy_template.S |   44 +++++++++++++++++++++++++++++++++--------
+ 2 files changed, 42 insertions(+), 9 deletions(-)
 
- drivers/cpufreq/Kconfig.arm |    1 +
- 1 file changed, 1 insertion(+)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8fec56d..ba306b3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1132,6 +1132,13 @@ config ARM_NR_BANKS
+ 	default 16 if ARCH_EP93XX
+ 	default 8
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 82f1aa9..555a57b 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -4,6 +4,7 @@
- 
- config ARM_OMAP2PLUS_CPUFREQ
- 	bool "TI OMAP2+"
-+	depends on ARCH_OMAP2PLUS
- 	default ARCH_OMAP2PLUS
- 	select CPU_FREQ_TABLE
- 
--- 
-1.7.9.2
++config ARM_PLD_SIZE
++	int
++	default 64 if ARCH_EXYNOS5
++	default 32
++	help
++	  Configure preload size used on memcpy(). Select 64 for cortex-a15.
++
+ config IWMMXT
+ 	bool "Enable iWMMXt support"
+ 	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+diff --git a/arch/arm/lib/copy_template.S b/arch/arm/lib/copy_template.S
+index 805e3f8..7dc5b8c 100644
+--- a/arch/arm/lib/copy_template.S
++++ b/arch/arm/lib/copy_template.S
+@@ -66,6 +66,7 @@
+  *	than one 32bit instruction in Thumb-2)
+  */
+
++#define PLDSIZE	(CONFIG_ARM_PLD_SIZE)
+
+ 		enter	r4, lr
+
+@@ -90,19 +91,44 @@
+ 	CALGN(	add	pc, r4, ip		)
+
+ 	PLD(	pld	[r1, #0]		)
+-2:	PLD(	subs	r2, r2, #96		)
+-	PLD(	pld	[r1, #28]		)
++
++#if (PLDSIZE == 64)
++2:	PLD(	cmp	r2, #32)
++	PLD(	blt	.32cpy)
++.64cpy:	PLD(	subs	r2, r2, #(PLDSIZE*3+32)	)
++	PLD(	pld	[r1, #PLDSIZE-4]	)
+ 	PLD(	blt	4f			)
+-	PLD(	pld	[r1, #60]		)
+-	PLD(	pld	[r1, #92]		)
++	PLD(	pld	[r1, #PLDSIZE*2-4]	)
++	PLD(	pld	[r1, #PLDSIZE*3-4]	)
++
++3:	PLD(	pld	[r1, #PLDSIZE*4-4]	)
++4:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++		subs	r2, r2, #PLDSIZE
++		bge	3b
++	PLD(	cmn	r2, #(PLDSIZE*3)	)
++	PLD(	bge	4b			)
++	PLD(	cmn	r2, #(PLDSIZE*4-32)	)
++	PLD(	blt	5f)
++.32cpy:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++#else
++2:	PLD(	subs	r2, r2, #(PLDSIZE*3)	)
++	PLD(	pld	[r1, #(PLDSIZE-4)]	)
++	PLD(	blt	4f			)
++	PLD(	pld	[r1, #(PLDSIZE*2-4)]	)
++	PLD(	pld	[r1, #(PLDSIZE*3-4)]	)
+
+-3:	PLD(	pld	[r1, #124]		)
+-4:		ldr8w	r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+-		subs	r2, r2, #32
+-		str8w	r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++3:	PLD(	pld	[r1, #(PLDSIZE*4-4)]	)
++4:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
++		subs	r2, r2, #PLDSIZE
++		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+ 		bge	3b
+-	PLD(	cmn	r2, #96			)
++	PLD(	cmn	r2, #(PLDSIZE*3)	)
+ 	PLD(	bge	4b			)
++#endif
+
+ 5:		ands	ip, r2, #28
+ 		rsb	ip, ip, #32
+--
+1.7.1
