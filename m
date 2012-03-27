@@ -1,61 +1,124 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 27 Mar 2012 16:28:19 -0700
-Subject: [PATCH 05/10] clk: align error return of basic clks registeration
-In-Reply-To: <1332833009-4121-6-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 27 Mar 2012 16:29:48 -0700
+Subject: [PATCH 03/10] clk: add "const" for clk_ops of basic clks
+In-Reply-To: <1332833009-4121-4-git-send-email-shawn.guo@linaro.org>
 References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
- <1332833009-4121-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAJOA=zOVVnq8DgfAzqnC+XrGtSGU7SLF+8Qwn3L76EfwqOGzNw@mail.gmail.com>
+ <1332833009-4121-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAJOA=zOp1sgTbYmWiaiNBo4PtCqAgboKOFLMHiWfz9yYfsUtzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> clk_register_gate and clk_register_divider return NULL for error,
-> which is aligned with clk_register function. ?But clk_register_mux
-> and clk_register_fixed_rate return ERR_PTR. ?Change them to return
-> NULL for better aligning with other registeration functions.
+> The clk_ops of basic clks should have "const" to match the definition
+> in "struct clk" and clk_register prototype.
 >
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks for the patch Shawn, but this is actually the opposite
-direction that I want to go.  In light of the other thread with
-Saravana and Russell on a similar topic, I'd like to make sure that
-the driver-facing functions clearly return -EERROR during failure.
-I've lined up a patch for the same on my side.
+Thanks for the patch.  Will take into my fixes branch.
 
 Regards,
 Mike
 
 > ---
+> ?drivers/clk/clk-divider.c ? ?| ? ?2 +-
 > ?drivers/clk/clk-fixed-rate.c | ? ?2 +-
+> ?drivers/clk/clk-gate.c ? ? ? | ? ?2 +-
 > ?drivers/clk/clk-mux.c ? ? ? ?| ? ?2 +-
-> ?2 files changed, 2 insertions(+), 2 deletions(-)
+> ?include/linux/clk-private.h ?| ? ?8 ++++----
+> ?5 files changed, 8 insertions(+), 8 deletions(-)
 >
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 231cd6e..b1c4b02 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -146,7 +146,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
+> ? ? ? ?return 0;
+> ?}
+>
+> -struct clk_ops clk_divider_ops = {
+> +const struct clk_ops clk_divider_ops = {
+> ? ? ? ?.recalc_rate = clk_divider_recalc_rate,
+> ? ? ? ?.round_rate = clk_divider_round_rate,
+> ? ? ? ?.set_rate = clk_divider_set_rate,
 > diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-> index 027e477..d268439 100644
+> index 651b06f..027e477 100644
 > --- a/drivers/clk/clk-fixed-rate.c
 > +++ b/drivers/clk/clk-fixed-rate.c
-> @@ -50,7 +50,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+> @@ -33,7 +33,7 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
+> ? ? ? ?return to_clk_fixed_rate(hw)->fixed_rate;
+> ?}
 >
-> ? ? ? ?if (!fixed) {
-> ? ? ? ? ? ? ? ?pr_err("%s: could not allocate fixed clk\n", __func__);
-> - ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
-> + ? ? ? ? ? ? ? return NULL;
-> ? ? ? ?}
+> -struct clk_ops clk_fixed_rate_ops = {
+> +const struct clk_ops clk_fixed_rate_ops = {
+> ? ? ? ?.recalc_rate = clk_fixed_rate_recalc_rate,
+> ?};
+> ?EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index b688f47..fe2ff9e 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -98,7 +98,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+> ? ? ? ?return reg ? 1 : 0;
+> ?}
 >
-> ? ? ? ?/* struct clk_fixed_rate assignments */
+> -struct clk_ops clk_gate_ops = {
+> +const struct clk_ops clk_gate_ops = {
+> ? ? ? ?.enable = clk_gate_enable,
+> ? ? ? ?.disable = clk_gate_disable,
+> ? ? ? ?.is_enabled = clk_gate_is_enabled,
 > diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 5424488..19f3116 100644
+> index 45cad61..5424488 100644
 > --- a/drivers/clk/clk-mux.c
 > +++ b/drivers/clk/clk-mux.c
-> @@ -99,7 +99,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+> @@ -82,7 +82,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+> ? ? ? ?return 0;
+> ?}
 >
-> ? ? ? ?if (!mux) {
-> ? ? ? ? ? ? ? ?pr_err("%s: could not allocate mux clk\n", __func__);
-> - ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
-> + ? ? ? ? ? ? ? return NULL;
-> ? ? ? ?}
+> -struct clk_ops clk_mux_ops = {
+> +const struct clk_ops clk_mux_ops = {
+> ? ? ? ?.get_parent = clk_mux_get_parent,
+> ? ? ? ?.set_parent = clk_mux_set_parent,
+> ?};
+> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+> index 5e4312b..5f4ccd7 100644
+> --- a/include/linux/clk-private.h
+> +++ b/include/linux/clk-private.h
+> @@ -55,7 +55,7 @@ struct clk {
+> ?* alternative macro for static initialization
+> ?*/
 >
-> ? ? ? ?/* struct clk_mux assignments */
+> -extern struct clk_ops clk_fixed_rate_ops;
+> +extern const struct clk_ops clk_fixed_rate_ops;
+>
+> ?#define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate, ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_fixed_rate_flags) ? ? ? ? ? ? ?\
+> @@ -78,7 +78,7 @@ extern struct clk_ops clk_fixed_rate_ops;
+> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?};
+>
+> -extern struct clk_ops clk_gate_ops;
+> +extern const struct clk_ops clk_gate_ops;
+>
+> ?#define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr, ? ? ?\
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _bit_idx, ? ? ? ? \
+> @@ -110,7 +110,7 @@ extern struct clk_ops clk_gate_ops;
+> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?};
+>
+> -extern struct clk_ops clk_divider_ops;
+> +extern const struct clk_ops clk_divider_ops;
+>
+> ?#define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr, ? \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _shift, _width, ? \
+> @@ -143,7 +143,7 @@ extern struct clk_ops clk_divider_ops;
+> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?};
+>
+> -extern struct clk_ops clk_mux_ops;
+> +extern const struct clk_ops clk_mux_ops;
+>
+> ?#define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags, \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_reg, _shift, _width, ? ? ? ? ? \
 > --
 > 1.7.5.4
 >
