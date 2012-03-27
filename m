@@ -1,79 +1,41 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Tue, 27 Mar 2012 15:54:01 +0800
-Subject: [PATCH] Regulator: anatop-regulator: patching to device-tree property
- "reg".
-Message-ID: <1332834841-13925-1-git-send-email-paul.liu@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Mar 2012 08:56:00 +0100
+Subject: [PATCH v8 RESEND] ARM: net: JIT compiler for packet filters
+In-Reply-To: <20120325133506.GG5611@n2100.arm.linux.org.uk>
+References: <1331933316-10197-1-git-send-email-mgherzan@gmail.com>
+ <20120319.172005.1889334604020296555.davem@davemloft.net>
+ <4F6EEAB5.7070009@gmail.com> <20120325095711.GC5611@n2100.arm.linux.org.uk>
+ <4F6F19C2.60602@gmail.com> <20120325133506.GG5611@n2100.arm.linux.org.uk>
+Message-ID: <20120327075600.GL5611@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+Mircea, could you please supply an ack for the below fix to silence a
+warning.  Thanks.
 
-Change "reg" to "anatop-reg-offset" due to there is a warning of handling no
-size field in reg.
+8<=====
+ARM: fix Kconfig warning for HAVE_BPF_JIT
 
-This patch also adds the missing device-tree binding documentation.
+Last night's randconfig and the allnoconfig builds spat out the
+following warning while building:
 
-Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
+warning: (ARM) selects HAVE_BPF_JIT which has unmet direct dependencies (NET)
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- .../bindings/regulator/anatop-regulator.txt        |   29 ++++++++++++++++++++
- drivers/regulator/anatop-regulator.c               |    5 ++-
- 2 files changed, 32 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/anatop-regulator.txt
+ arch/arm/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/regulator/anatop-regulator.txt b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-new file mode 100644
-index 0000000..357758c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-@@ -0,0 +1,29 @@
-+Anatop Voltage regulators
-+
-+Required properties:
-+- compatible: Must be "fsl,anatop-regulator"
-+- anatop-reg-offset: Anatop MFD register offset
-+- anatop-vol-bit-shift: Bit shift for the register
-+- anatop-vol-bit-width: Number of bits used in the register
-+- anatop-min-bit-val: Minimum value of this register
-+- anatop-min-voltage: Minimum voltage of this regulator
-+- anatop-max-voltage: Maximum voltage of this regulator
-+
-+Any property defined as part of the core regulator
-+binding, defined in regulator.txt, can also be used.
-+
-+Example:
-+
-+	regulator-vddpu {
-+		compatible = "fsl,anatop-regulator";
-+		regulator-name = "vddpu";
-+		regulator-min-microvolt = <725000>;
-+		regulator-max-microvolt = <1300000>;
-+		regulator-always-on;
-+		anatop-reg-offset = <0x140>;
-+		anatop-vol-bit-shift = <9>;
-+		anatop-vol-bit-width = <5>;
-+		anatop-min-bit-val = <1>;
-+		anatop-min-voltage = <725000>;
-+		anatop-max-voltage = <1300000>;
-+	};
-diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-index 17499a5..53969af 100644
---- a/drivers/regulator/anatop-regulator.c
-+++ b/drivers/regulator/anatop-regulator.c
-@@ -138,9 +138,10 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
- 	rdesc->type = REGULATOR_VOLTAGE;
- 	rdesc->owner = THIS_MODULE;
- 	sreg->mfd = anatopmfd;
--	ret = of_property_read_u32(np, "reg", &sreg->control_reg);
-+	ret = of_property_read_u32(np, "anatop-reg-offset",
-+				   &sreg->control_reg);
- 	if (ret) {
--		dev_err(dev, "no reg property set\n");
-+		dev_err(dev, "no anatop-reg-offset property set\n");
- 		goto anatop_probe_end;
- 	}
- 	ret = of_property_read_u32(np, "anatop-vol-bit-width",
--- 
-1.7.9.1
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9e21b6e..6a54606 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -33,7 +33,7 @@ config ARM
+ 	select GENERIC_IRQ_SHOW
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select GENERIC_PCI_IOMAP
+-	select HAVE_BPF_JIT
++	select HAVE_BPF_JIT if NET
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
