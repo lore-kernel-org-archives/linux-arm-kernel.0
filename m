@@ -1,83 +1,47 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 27 Mar 2012 16:57:40 +0300
-Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators for
- v3.4
-In-Reply-To: <87pqchv1pc.fsf@ti.com>
-References: <877gywjhht.fsf@ti.com> <20120308021843.GQ12083@atomide.com>
- <87399jc6cj.fsf@ti.com> <20120309003217.GB12083@atomide.com>
- <20120309114731.GA3273@opensource.wolfsonmicro.com>
- <87zkbp4wtj.fsf@ti.com>
- <20120311204232.GC3171@opensource.wolfsonmicro.com>
- <87399dzq5e.fsf@ti.com>
- <20120312173215.GL3110@opensource.wolfsonmicro.com>
- <87pqchv1pc.fsf@ti.com>
-Message-ID: <CANOLnOMfsdGn-B0zftcV-zh+tSCGgmf0g1BsrFB0+Kh-HnNq0g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2012 13:59:16 +0000
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <CAOh2x==7gNt2Jb3-EHz9-R1pTy6zL93FmUmTBMdpYUnW3F=9Uw@mail.gmail.com>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203271159.35306.arnd@arndb.de>
+ <CAOh2x==7gNt2Jb3-EHz9-R1pTy6zL93FmUmTBMdpYUnW3F=9Uw@mail.gmail.com>
+Message-ID: <201203271359.16553.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 1:28 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tony, updated pull request below. ?This includes all the TWL depencies
-> merged from the 'topic/twl' tag in Mark's tree.
->
+On Tuesday 27 March 2012, viresh kumar wrote:
+> On Mar 27, 2012 7:07 PM, "Arnd Bergmann" <arnd@arndb.de> wrote:
+> >
+> > On Tuesday 27 March 2012, Viresh Kumar wrote:
+> > > On 3/27/2012 4:45 PM, Arnd Bergmann wrote:
+> > > > On Tuesday 27 March 2012, Viresh Kumar wrote:
+> > > > The normal way is to turn around the logic so you don't have to include this test
+> > > > at all. Just have one soc-specific init_machine and map_io function, that calls
+> > > > both soc-specific and shared soc functions, e.g.
+> > >
+> > > But with that, i need multiple DT_MACHINE_START(). Isn't it?
+> > > Is this advisable?
+> >
+> > Having one DT_MACHINE_START per soc is ok if it helps you. Of course if you
+> > have multiple ones that are basically identical, it's simpler to just
+> > combine them.
+> 
+> That's what i have done in V1. And then only i came to
+> The first problem i mentioned.
 
-Has this been lost now? It seems regulator parts got merged, but
-voltage parts are missing from Arnd's pull requests and are not
-showing up in linux-next.
-Was looking forward for voltage control in 3.4 to achieve higher clock
-rates on our aging OMAP3 hardware.
+Right. I mean you can feel free to do whichever works best for you. If it's easy
+to combine the DT_MACHINE_START sections, then do, otherwise don't.
 
->
-> The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
->
-> ?Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
->
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/pm/smps-regulator
->
-> for you to fetch changes up to 39358f2b57f37fe079eff4159307c844a0bfb176:
->
-> ?Merge branch 'pm-wip/smps-regulator' into for_3.4/pm/smps-regulator (2012-03-12 15:36:45 -0700)
->
-> ----------------------------------------------------------------
->
-> Kevin Hilman (3):
-> ? ? ?ARM: OMAP2+: voltage: ensure voltage used is exact voltage from OPP table
-> ? ? ?Merge tag 'topic/twl' into for_3.4/pm/smps-regulator
-> ? ? ?Merge branch 'pm-wip/smps-regulator' into for_3.4/pm/smps-regulator
->
-> Laxman Dewangan (1):
-> ? ? ?regulator: twl6030: Fix voltage selection logic
->
-> Peter Ujfalusi (2):
-> ? ? ?regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
-> ? ? ?mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
->
-> Rajendra Nayak (1):
-> ? ? ?regulator: twl: adapt twl-regulator driver to dt
->
-> Tero Kristo (6):
-> ? ? ?arm: omap3: voltage: fix channel configuration
-> ? ? ?arm: omap3: add common twl configurations for vdd1 and vdd2
-> ? ? ?arm: omap3: twl: add external controllers for core voltage regulators
-> ? ? ?arm: omap4: add common twl configurations for vdd1, vdd2 and vdd3
-> ? ? ?regulator: twl4030: add support for external voltage get/set
-> ? ? ?regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators
->
-> ?.../bindings/regulator/twl-regulator.txt ? ? ? ? ? | ? 68 ++++
-> ?arch/arm/mach-omap2/twl-common.c ? ? ? ? ? ? ? ? ? | ?147 +++++++++
-> ?arch/arm/mach-omap2/vc3xxx_data.c ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-omap2/voltage.c ? ? ? ? ? ? ? ? ? ? ?| ? 21 +-
-> ?drivers/mfd/twl-core.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 41 ++-
-> ?drivers/regulator/twl-regulator.c ? ? ? ? ? ? ? ? ?| ?327 +++++++++++++++-----
-> ?include/linux/i2c/twl.h ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 14 +-
-> ?7 files changed, 532 insertions(+), 87 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> > Obviously that only works when you initialize the clocks from init_early()
+> > instead of from map_io(), but I think that would be the cleanest choice
+> > if you want to have single function with run-time dependencies.
+> 
+> But then why not use machine_init() for doing this too.
 
+That would be even better. I think we should generally try do initialization
+as late as possible, ideally from initcalls. The init_early() function should
+only be used for code that absolutely has to be run from setup_arch() and
+no later, while the map_io() function should ideally only be used to set up
+the static mappings and nothing else.
 
---
-Gra?vydas
+	Arnd
