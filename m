@@ -1,22 +1,73 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 28 Mar 2012 13:15:03 +0900
-Subject: [PATCHv2 07/14] SH: adapt for dma_map_ops changes
-In-Reply-To: <1332855768-32583-8-git-send-email-m.szyprowski@samsung.com>
-References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
- <1332855768-32583-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120328041503.GM26543@linux-sh.org>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Wed, 28 Mar 2012 13:08:41 +0800
+Subject: [PATCH 1/4] Input: pxa27x_keypad keep clock on as wakeup source
+Message-ID: <1332911324-9840-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 03:42:41PM +0200, Marek Szyprowski wrote:
-> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> 
-> Adapt core SH architecture code for dma_map_ops changes: replace
-> alloc/free_coherent with generic alloc/free methods.
-> 
-> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+When the keypad is used as wake up source, the clock can not
+be disabled. Or it can not detect key pressing.
+If the keypad is used as wake up source, when resume back,
+do not enable the clock and configure it again because the
+register content is retained.
 
-Acked-by: Paul Mundt <lethal@linux-sh.org>
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ drivers/input/keyboard/pxa27x_keypad.c |   27 ++++++++++++++++++---------
+ 1 files changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+index 29fe1b2..1c5752f 100644
+--- a/drivers/input/keyboard/pxa27x_keypad.c
++++ b/drivers/input/keyboard/pxa27x_keypad.c
+@@ -419,10 +419,14 @@ static int pxa27x_keypad_suspend(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+ 
+-	clk_disable(keypad->clk);
+-
++	/*
++	 * If the keypad is used a wake up source, clock can not be disabled.
++	 * Or it can not detect the key pressing.
++	 */
+ 	if (device_may_wakeup(&pdev->dev))
+ 		enable_irq_wake(keypad->irq);
++	else
++		clk_disable(keypad->clk);
+ 
+ 	return 0;
+ }
+@@ -433,19 +437,24 @@ static int pxa27x_keypad_resume(struct device *dev)
+ 	struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+ 	struct input_dev *input_dev = keypad->input_dev;
+ 
++	/*
++	 * If the keypad is used as wake up source, the clock is not turned
++	 * off. So do not need configure it again.
++	 */
+ 	if (device_may_wakeup(&pdev->dev))
+ 		disable_irq_wake(keypad->irq);
++	else {
++		mutex_lock(&input_dev->mutex);
+ 
+-	mutex_lock(&input_dev->mutex);
++		if (input_dev->users) {
++			/* Enable unit clock */
++			clk_enable(keypad->clk);
++			pxa27x_keypad_config(keypad);
++		}
+ 
+-	if (input_dev->users) {
+-		/* Enable unit clock */
+-		clk_enable(keypad->clk);
+-		pxa27x_keypad_config(keypad);
++		mutex_unlock(&input_dev->mutex);
+ 	}
+ 
+-	mutex_unlock(&input_dev->mutex);
+-
+ 	return 0;
+ }
+ 
+-- 
+1.7.0.4
