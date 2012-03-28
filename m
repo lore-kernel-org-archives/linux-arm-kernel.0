@@ -1,31 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Mar 2012 17:35:13 +0100
-Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD25@MEP-EXCH.meprolight.com>
-References: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
- <20120328144017.GV3232@opensource.wolfsonmicro.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD25@MEP-EXCH.meprolight.com>
-Message-ID: <20120328163512.GB3232@opensource.wolfsonmicro.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 28 Mar 2012 11:36:27 -0500
+Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
+ OMAP4 onwards
+In-Reply-To: <alpine.DEB.2.00.1203272039010.22961@utopia.booyaka.com>
+References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
+ <4F721A91.7000102@ti.com>
+ <alpine.DEB.2.00.1203272039010.22961@utopia.booyaka.com>
+Message-ID: <4F733E0B.2020901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 06:31:04PM +0200, Alex Gershgorin wrote:
-> On Wed, Mar 28, 2012 at 04:01:13PM +0200, Alex Gershgorin wrote:
+Hi Paul,
 
-> > +     select REGMAP_I2C if I2C
-> > +     select REGMAP_SPI if SPI_MASTER
+On 3/27/2012 21:39, Paul Walmsley wrote:
+> Hi Jon,
+>
+> On Tue, 27 Mar 2012, Jon Hunter wrote:
+>
+>> On 3/27/2012 4:58, Rajendra Nayak wrote:
+>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
+>>> b/arch/arm/mach-omap2/omap_hwmod.c
+>>> index 8ac26f2..f2a9afa 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>>> @@ -808,7 +808,7 @@ static void _enable_module(struct omap_hwmod *oh)
+>>>     */
+>>>    static int _omap4_wait_target_disable(struct omap_hwmod *oh)
+>>>    {
+>>> -	if (!cpu_is_omap44xx())
+>>> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+>>>    		return 0;
+>>
+>> What about omap36xx?
+>
+> Unfortunately, cpu_is_omap34xx() also covers OMAP36xx :-(
 
-> > > I'd really expect this to be squashed into the patches adding the regmap
-> > > usage for I2C and SPI, how can those patches work without this?
+Thanks. Is that still the case when MULTI_OMAP2 is defined? I can see if 
+it is not define then it will always return 1 for all OMAP3, but for 
+MULTI_OMAP2 it did not seem to me that it would. May be I should test ...
 
-> You ask me about another solution?
-
-I'm saying either I'm missing something or this needs to be fixed in the
-patches that introduce the regmap usage.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120328/6b5ebf67/attachment.sig>
+Cheers
+Jon
