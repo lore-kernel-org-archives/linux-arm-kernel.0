@@ -1,64 +1,43 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Wed, 28 Mar 2012 16:39:31 +1030
-Subject: [PATCH] ARM: test for PMU feature on v7 (v2 with typo fix)
-In-Reply-To: <20120326094054.GA2475@mudshark.cambridge.arm.com>
-References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
- <87r4wk889a.fsf@rustcorp.com.au>
- <20120323095314.GA13622@mudshark.cambridge.arm.com>
- <87fwcy9abw.fsf@rustcorp.com.au>
- <20120326094054.GA2475@mudshark.cambridge.arm.com>
-Message-ID: <87pqbx9rz8.fsf@rustcorp.com.au>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 28 Mar 2012 08:10:20 +0200
+Subject: [PATCHv2 09/14] Unicore32: adapt for dma_map_ops changes
+In-Reply-To: <4F7275FE.8000100@mprc.pku.edu.cn>
+References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
+ <1332855768-32583-10-git-send-email-m.szyprowski@samsung.com>
+ <4F7275FE.8000100@mprc.pku.edu.cn>
+Message-ID: <00ac01cd0ca9$7508f4e0$5f1adea0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Mar 2012 10:40:54 +0100, Will Deacon <will.deacon@arm.com> wrote:
-> [removed some dead email addresses from CC]
+Hello,
 
-Thanks!
+On Wednesday, March 28, 2012 4:23 AM Guan Xuetao wrote:
 
-> On Fri, Mar 23, 2012 at 11:17:07PM +0000, Rusty Russell wrote:
-> > I had assumed that as we trend towards a common cross-platform kernel,
-> > we should be relying on feature registers where available, not the
-> > model.
-> 
-> The PMU is very tightly coupled with the CPU and it is necessary to know
-> exactly which CPU you have so that you can map microarchitectural events to
-> their identifiers. This is not discoverable in the architecture [PMUv2
-> provides some support for discovering the status of architected events, but
-> that is still not enough and is only present on A7 and A15 so far] so that's
-> why we probe the CPU instead.
+> On 03/27/2012 09:42 PM, Marek Szyprowski wrote:
+> > diff --git a/arch/unicore32/mm/dma-swiotlb.c b/arch/unicore32/mm/dma-swiotlb.c
+> > index bfa9fbb..4cf5f0c 100644
+> > --- a/arch/unicore32/mm/dma-swiotlb.c
+> > +++ b/arch/unicore32/mm/dma-swiotlb.c
+> > @@ -17,9 +17,23 @@
+> >
+> >   #include<asm/dma.h>
+> >
+> > +static void *unicore_swiotlb_alloc_coherent(struct device *dev, size_t size,
+> > +					    dma_addr_t *dma_handle, gfp_t flags,
+> > +					    struct dma_attrs *attrs)
+> > +{
+> > +	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
+> > +}
+> > +
+> > +static void unicode_swiotlb_free_coherent(struct device *dev, size_t size,
+> The bit is ok for me. Only a typo here, please change unicode to unicore.
 
-OK.
+Ups, I'm sorry for that typo. I've fixed it on my git tree:
 
-> Now, if everything was device-tree based then we could simply use a
-> different binding for each CPU but since we support perf on non-DT
-> platforms, probing the CPU type is the best solution. I would like to avoid
-> the probing code if we are initialised from DT, but I've not got round to it
-> yet (this would be useful for big.LITTLE).
+http://git.linaro.org/gitweb?p=people/mszyprowski/linux-dma-mapping.git;a=commitdiff;h=bbe43c05b0653
+9c09f89e07bcaf61ea0fca8d67f
 
-I'll be interested to see how you encode the mapping of
-microarchitectural events to their identifiers here.
-
-> > > Would you be able to advertise 0 event counters instead and treat the PMU
-> > > largely as RAZ/WI? The only tricky bit I can see is the cycle counter, which
-> > > is mandated by the presence of a PMU, however this could also just RAZ
-> > > initially.
-> > 
-> > Yes, that's the effect of the current emulation hack.  Far better not to
-> > lie to the guest, however, than get weird results from profiling.
-> 
-> I'd rather lie to the guest than modify it just to avoid emulating the
-> device correctly. Even then, the profiling results wouldn't be especially
-> weird -- everything would be 0, which is a lot better than random
-> numbers.
-
-Sure, but nowhere as neat an experience as having "no hardware support
-available" printed, and nicely defined failure mode :(
-
-When I get back in May, I'll look at how hard it will to be implement
-this properly, if noone else does.
-
-Thanks,
-Rusty.
+Best regards
 -- 
-  How could I marry someone with more hair than me?  http://baldalex.org
+Marek Szyprowski
+Samsung Poland R&D Center
