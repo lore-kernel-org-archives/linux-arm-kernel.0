@@ -1,56 +1,131 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Wed, 28 Mar 2012 09:19:49 +0900
-Subject: [PATCH 2/2] ARM: lib: use LDRD/STRD for data copy
-In-Reply-To: <20120327074039.GJ5611@n2100.arm.linux.org.uk>
+Date: Wed, 28 Mar 2012 09:28:54 +0900
+Subject: [PATCH 1/2] ARM: lib: Add optimized memcpy with 64 byte pld size
+In-Reply-To: <alpine.LFD.2.02.1203262231220.24151@xanadu.home>
 References: <007201cd059e$4af2cc10$e0d86430$%kim@samsung.com>
- <00d501cd0bb0$724ab260$56e01720$%kim@samsung.com>
- <20120327074039.GJ5611@n2100.arm.linux.org.uk>
-Message-ID: <012d01cd0c78$7d2f19a0$778d4ce0$%kim@samsung.com>
+ <00cf01cd0bb0$4fa49c30$eeedd490$%kim@samsung.com>
+ <alpine.LFD.2.02.1203262231220.24151@xanadu.home>
+Message-ID: <013501cd0c79$c1e244e0$45a6cea0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> Sent: Tuesday, March 27, 2012 4:41 PM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org; 'Catalin Marinas'; 'Nicolas Pitre';
-> kgene.kim at samsung.com
-> Subject: Re: [PATCH 2/2] ARM: lib: use LDRD/STRD for data copy
+Nicolas wrote:
+
+> This creates quite convoluted code.  If this is worth doing, we'll have
+> to find a cleaner way to do this.
 >
-> On Tue, Mar 27, 2012 at 09:27:52AM +0900, Boojin Kim wrote:
-> > This patch uses LDRD/STRD that loads and stores data as DWORD unit.
-> > It brings better performance than LDRM/STRM with cortex-a15.
+> Could you please provide performance measurement numbers with and
+> without this patch, and similarly for the next patch?
 >
-> Why should I bother looking at this rubbish?  You've been told before
-> that using ldrd and strd unconditionally is not acceptable.  Stop
-> wasting peoples review time.
-This patch brings better memcpy results on Cortex-a15.
-Please see following result. I measured it on cortex-a15.
-2nd line is default memcpy.
-3rd line is memcpy using ldrd/strd with this patch.
-4th line is memcpy using ldrd/strd and PLD optimization on my 1st patch.
-===================================================================
-Memcpy performance (unit: size: Bytes, results: MBps)
-===================================================================
-size		default	ldrd/strd	ldrd/strd + PLD opti
-===================================================================
-64		1245.615434	1565.004006		1565.004006
-128		1743.861607	2393.535539		2491.230867
-256		2199.46509	3212.376645		3487.723214
-512		2569.901316	4137.976695		4479.644495
-1024		2880.715339	4245.923913		5250.336022
-2048		3623.608534	4752.128954		5365.728022
-4096		4120.516878	5119.593709		5710.891813
-8192		4431.366988	5126.312336		5440.45961
-16384		4603.712434	5040.322581		5529.016277
-32768		4559.381383	4712.002413		5238.893546
-65536		3483.446661	3513.802215		3516.965843
-131072		3495.623479	3498.460677		3506.31136
-262144		3484.02921	3475.987876		3499.783013
-524288		3427.662608	3430.037525		3454.637159
-1048576	2263.903195	2225.9222		2458.911587
-2097152	1732.182125	1703.940362		1833.96223
-4194304	1713.663165	1708.351146		1781.780052
-===================================================================
-I think it brings meaningful results on cache boundary. So I tried it again.
-And, I saw your review. So, I make this patch be effective on cortex-a15 only if machine selects it.
-Thanks for your time and review :)
+> Did you try enabling the cache alignment code?  What performance
+> difference if any did you see?
+My patch brings about 10% better result on cache boundary.
+64bytes PLD size makes the cache efficiency be higher on machines that has 64byte cache line.
+And, Which one is convoluted code? Can you explain it more detail?
+Thank you for  your review.
+
+>
+> > ---
+> >  arch/arm/Kconfig             |    7 ++++++
+> >  arch/arm/lib/copy_template.S |   44 +++++++++++++++++++++++++++++++++--------
+> >  2 files changed, 42 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 8fec56d..ba306b3 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1132,6 +1132,13 @@ config ARM_NR_BANKS
+> >  	default 16 if ARCH_EP93XX
+> >  	default 8
+> >
+> > +config ARM_PLD_SIZE
+> > +	int
+> > +	default 64 if ARCH_EXYNOS5
+> > +	default 32
+> > +	help
+> > +	  Configure preload size used on memcpy(). Select 64 for cortex-a15.
+> > +
+> >  config IWMMXT
+> >  	bool "Enable iWMMXt support"
+> >  	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+> > diff --git a/arch/arm/lib/copy_template.S b/arch/arm/lib/copy_template.S
+> > index 805e3f8..7dc5b8c 100644
+> > --- a/arch/arm/lib/copy_template.S
+> > +++ b/arch/arm/lib/copy_template.S
+> > @@ -66,6 +66,7 @@
+> >   *	than one 32bit instruction in Thumb-2)
+> >   */
+> >
+> > +#define PLDSIZE	(CONFIG_ARM_PLD_SIZE)
+> >
+> >  		enter	r4, lr
+> >
+> > @@ -90,19 +91,44 @@
+> >  	CALGN(	add	pc, r4, ip		)
+> >
+> >  	PLD(	pld	[r1, #0]		)
+> > -2:	PLD(	subs	r2, r2, #96		)
+> > -	PLD(	pld	[r1, #28]		)
+> > +
+> > +#if (PLDSIZE == 64)
+> > +2:	PLD(	cmp	r2, #32)
+> > +	PLD(	blt	.32cpy)
+> > +.64cpy:	PLD(	subs	r2, r2, #(PLDSIZE*3+32)	)
+> > +	PLD(	pld	[r1, #PLDSIZE-4]	)
+> >  	PLD(	blt	4f			)
+> > -	PLD(	pld	[r1, #60]		)
+> > -	PLD(	pld	[r1, #92]		)
+> > +	PLD(	pld	[r1, #PLDSIZE*2-4]	)
+> > +	PLD(	pld	[r1, #PLDSIZE*3-4]	)
+> > +
+> > +3:	PLD(	pld	[r1, #PLDSIZE*4-4]	)
+> > +4:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +		subs	r2, r2, #PLDSIZE
+> > +		bge	3b
+> > +	PLD(	cmn	r2, #(PLDSIZE*3)	)
+> > +	PLD(	bge	4b			)
+> > +	PLD(	cmn	r2, #(PLDSIZE*4-32)	)
+> > +	PLD(	blt	5f)
+> > +.32cpy:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +#else
+> > +2:	PLD(	subs	r2, r2, #(PLDSIZE*3)	)
+> > +	PLD(	pld	[r1, #(PLDSIZE-4)]	)
+> > +	PLD(	blt	4f			)
+> > +	PLD(	pld	[r1, #(PLDSIZE*2-4)]	)
+> > +	PLD(	pld	[r1, #(PLDSIZE*3-4)]	)
+> >
+> > -3:	PLD(	pld	[r1, #124]		)
+> > -4:		ldr8w	r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > -		subs	r2, r2, #32
+> > -		str8w	r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +3:	PLD(	pld	[r1, #(PLDSIZE*4-4)]	)
+> > +4:		ldr8w   r1, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> > +		subs	r2, r2, #PLDSIZE
+> > +		str8w   r0, r3, r4, r5, r6, r7, r8, ip, lr, abort=20f
+> >  		bge	3b
+> > -	PLD(	cmn	r2, #96			)
+> > +	PLD(	cmn	r2, #(PLDSIZE*3)	)
+> >  	PLD(	bge	4b			)
+> > +#endif
+> >
+> >  5:		ands	ip, r2, #28
+> >  		rsb	ip, ip, #32
+> > --
+> > 1.7.1
+> >
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
