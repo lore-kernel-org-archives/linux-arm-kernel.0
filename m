@@ -1,221 +1,218 @@
-From: joancarles@fqingenieria.es (joancarles)
-Date: Wed, 28 Mar 2012 11:26:50 +0200
-Subject: [MX25][MMC] mmc esdhc failure in 3.3
-In-Reply-To: <137e8b8e079af62aea2fd4d363be6273@mail.fqingenieria.es>
-References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
- <20120312132423.GC2459@pengutronix.de>
- <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
- <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
- <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
- <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
- <20120327101259.73525f9d@eb-e6520>
- <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
- <20120327090148.GB6790@pengutronix.de> <20120327110615.3bfaf969@eb-e6520>
- <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
- <20120327114048.6af2e178@eb-e6520>
- <137e8b8e079af62aea2fd4d363be6273@mail.fqingenieria.es>
-Message-ID: <c4306c7d39eac8f1751957eefe20a6c2@mail.fqingenieria.es>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 28 Mar 2012 17:53:47 +0800
+Subject: [PATCH v2 1/1] ARM: imx28: add basic dt support
+In-Reply-To: <20120328055801.GA3953@S2100-06.ap.freescale.net>
+References: <1332513070-5400-1-git-send-email-b29396@freescale.com>
+ <20120328055801.GA3953@S2100-06.ap.freescale.net>
+Message-ID: <20120328095346.GA31901@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ADDENDUM:
+On Wed, Mar 28, 2012 at 01:58:04PM +0800, Guo Shawn-R65073 wrote:
+> On Fri, Mar 23, 2012 at 10:31:10PM +0800, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+...
+> > +/dts-v1/;
+> > +/include/ "imx28.dtsi"
+> > +
+> > +/ {
+> > +	model = "Freescale i.MX28 Evaluation Kit";
+> > +	compatible = "fsl,imx28-evk", "fsl,imx28";
+> > +
+> > +	memory {
+> > +		device_type = "memory";
+> 
+> This is already in skeleton.dtsi included by imx28.dtsi.
+> 
+Correct.
 
->> I tried to increase max_blk_count and it breaks after a few tests.
->
-> I will redo your tests in a jiffy, however the latency issues worry
-> me a wee bit.
+> > +/include/ "skeleton.dtsi"
+> > +
+> > +/ {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> 
+> These two are already in skeleton.dtsi.
+> 
+will remove.
 
-Increasing max_blk_count did not help really, however I am not sure if 
-setting it unconditionally to 65535 was the only change I had to make.
+> > +			icoll: interrupt-controller at 80000000 {
+> > +				compatible = "fsl,imx28-icoll";
+> 
+> I would expect it be:
+> 
+> 	compatible = "fsl,imx28-icoll", "fsl,mxs-icoll";
+> 
+> So it can be matched by both imx23 and imx28.
+> 
+Yes, i can change like that.
 
-> So, what's keeping the driver 8ms from sending the data??? Any
-> pointers on where I could twiddle some bits in the driver? Where do I
-> start looking?
+> > +				#interrupt-cells = <1>;
+> > +			};
+> > +
+> > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> > index c57f996..c776aef 100644
+> > --- a/arch/arm/mach-mxs/Kconfig
+> > +++ b/arch/arm/mach-mxs/Kconfig
+> > @@ -17,6 +17,14 @@ config SOC_IMX28
+> >  
+> >  comment "MXS platforms:"
+> >  
+> > +config MACH_MXS_DT
+> > +	bool "Support MXS platforms from device tree"
+> > +	select SOC_IMX28
+> > +	select USE_OF
+> > +	help
+> > +	  Include support for Freescale MXS platforms(i.MX23 and i.MX28)
+> > +	  using the device tree for discovery
+> > +
+> 
+> If I build mxs_defconfig with only MACH_MXS_DT enabled, I got
+> 
+>   LD      .tmp_vmlinux1
+> arch/arm/mach-mxs/built-in.o: In function `mxs_add_amba_device':
+> arch/arm/mach-mxs/devices.c:89: undefined reference to `amba_device_register'
+> 
+It looks ideally we do not need to compile devices.c and devices/* for only dt.
 
-Using the following setup, I tried to get some more information:
+> It's caused by missing "select ARM_AMBA".  For non-dt build, it gets
+> selected under "config MXS_HAVE_AMBA_DUART" (mach-mxs/devices/Kconfig).
+> 
+> I intend to fix it in the following way.
+> 
+I agree with this temporary fix.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c 
-b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 0be4e20..4896f24 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -467,8 +467,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct 
-platform_device *pdev)
-         clk_enable(clk);
-         pltfm_host->clk = clk;
+> --8<---
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 570d5d5..d076452 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -7,11 +7,13 @@ config MXS_OCOTP
+> 
+>  config SOC_IMX23
+>         bool
+> +       select ARM_AMBA
+>         select CPU_ARM926T
+>         select HAVE_PWM
+> 
+>  config SOC_IMX28
+>         bool
+> +       select ARM_AMBA
+>         select CPU_ARM926T
+>         select HAVE_PWM
+> 
+> diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+> index 18b6bf5..2febd62 100644
+> --- a/arch/arm/mach-mxs/devices/Kconfig
+> +++ b/arch/arm/mach-mxs/devices/Kconfig
+> @@ -1,6 +1,5 @@
+>  config MXS_HAVE_AMBA_DUART
+>         bool
+> -       select ARM_AMBA
+> 
+> --->8--
+> 
+> > +#include <linux/init.h>
+> > +#include <linux/irqdomain.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/of_platform.h>
+> > +#include <asm/mach/arch.h>
+> > +#include <asm/mach/time.h>
+> > +#include <mach/common.h>
+> > +#include <mach/mx28.h>
+> 
+> This one is not needed.
+> 
+Correct.
 
--       if (!is_imx25_esdhc(imx_data))
--               host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
-+       host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+> > +
+> > +static int __init imx28_icoll_add_irq_domain(struct device_node *np,
+> 
+> mxs_icoll_add_irq_domain
+> 
+> > +				struct device_node *interrupt_parent)
+> > +{
+> > +	irq_domain_add_simple(np, 0);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id mxs_irq_match[] __initconst = {
+> > +	{ .compatible = "fsl,imx28-icoll", .data = imx28_icoll_add_irq_domain, },
+> 
+> "fsl,mxs-icoll"
+> 
+Will change.
 
-         if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
-                 /* Fix errata ENGcm07207 present on i.MX25 and i.MX35 
-*/
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 8d66706..0b60d14 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -713,6 +713,8 @@ static void sdhci_prepare_data(struct sdhci_host 
-*host, struct mmc_command *cmd)
-                 sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
-         }
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +static void __init mxs_dt_init_irq(void)
+> > +{
+> > +	icoll_init_irq();
+> > +	of_irq_init(mxs_irq_match);
+> > +}
+> > +
+> > +static void __init imx28_timer_init(void)
+> > +{
+> > +	mx28_clocks_init();
+> > +}
+> > +
+> > +static struct sys_timer imx28_timer = {
+> > +	.init = imx28_timer_init,
+> > +};
+> > +
+> > +static void __init imx28_machine_init(void)
+> 
+> mxs_init_machine(), so that imx23 can use it later and have the
+> function name somehow aligned with hook name .init_machine.
+> 
+I can do it, but, as icoll, that means we're doing things by assuming
+no difference between mx23 and mx28 before we really start mx23 dt work.
+However, i think at least of_platform_populate should be common.
+So i agree to change to mxs_init_machine right now.
+If any difference we may change accordingly latter.
 
-+       sdhci_dumpregs(host);
-+
-         if (!data)
-                 return;
+> > +{
+> > +       of_platform_populate(NULL, of_default_bus_match_table,
+> > +		NULL, NULL);
+> > +}
+> > +
+> > +static const char *imx28_dt_compat[] __initdata = {
+> 
+> mxs_dt_compat
+> 
+If changed like that, is it reasonable for mx23 to use this
+compatible string list?
+I planed to have separate compatible string for mx23 and mx28.
 
-echo 'file core.c line 193 +p' > 
-/sys/kernel/debug/dynamic_debug/control
-echo 'file core.c line 158 +p' > 
-/sys/kernel/debug/dynamic_debug/control
-echo 'file sdhci.c line 72-115 +p' > 
-/sys/kernel/debug/dynamic_debug/control
-mount /media/card
-dd if=/dev/urandom of=/media/card/file-4K bs=4K count=1
+> > +	"fsl,imx28",
+> > +	"fsl,imx28-evk",
+> 
+> I would have the list sorted from the most specific to the most
+> general.  That said, it's better to have "fsl,imx28" sorted after
+> "fsl,imx28-evk".
+> 
+I prefer to keep the basic one first, then for future boards support
+we just add them below rather than insert above the basic one "fsl,imx28".
+However, it's really not a big deal.
+If you persist to do like that, i can also do it.
 
-[  119.895460] mmc0: starting CMD24 arg 00045e00 flags 000000b5
-[  119.895531] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.895570] sdhci: Sys addr: 0x82480000 | Version:  0x00000000
-[  119.895602] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.895633] sdhci: Argument: 0x00049c00 | Trn mode: 0x00000013
-[  119.895664] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.895693] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.895724] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.895754] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.895787] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.895819] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.895852] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.895883] sdhci: Cmd:      0x0000113a | Max curr: 0x00000000
-[  119.895911] sdhci: Host ctl2: 0x00000000
-[  119.895936] sdhci: ===========================================
-[  119.900527] mmc0: starting CMD13 arg 00020000 flags 00000195
-[  119.900585] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.900624] sdhci: Sys addr: 0x82452400 | Version:  0x00000000
-[  119.900655] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.900687] sdhci: Argument: 0x00045e00 | Trn mode: 0x00000003
-[  119.900718] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.900746] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.900776] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.900807] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.900840] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.900869] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.900902] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.900933] sdhci: Cmd:      0x0000183a | Max curr: 0x00000000
-[  119.900962] sdhci: Host ctl2: 0x00000000
-[  119.900985] sdhci: ===========================================
-[  119.901357] mmc0: starting CMD17 arg 00009000 flags 000000b5
-[  119.901419] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.901458] sdhci: Sys addr: 0x82452400 | Version:  0x00000000
-[  119.901490] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.901520] sdhci: Argument: 0x00020000 | Trn mode: 0x00000003
-[  119.901551] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.901579] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.901610] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.901641] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.901673] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.901703] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.901735] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.901765] sdhci: Cmd:      0x00000d1a | Max curr: 0x00000000
-[  119.901793] sdhci: Host ctl2: 0x00000000
-[  119.901816] sdhci: ===========================================
-[  119.908072] mmc0: starting CMD17 arg 00009200 flags 000000b5
-[  119.908141] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.908179] sdhci: Sys addr: 0x82480000 | Version:  0x00000000
-[  119.908212] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.908243] sdhci: Argument: 0x00009000 | Trn mode: 0x00000013
-[  119.908274] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.908304] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.908335] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.908367] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.908400] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.908432] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.908464] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.908495] sdhci: Cmd:      0x0000113a | Max curr: 0x00000000
-[  119.908524] sdhci: Host ctl2: 0x00000000
-[  119.908547] sdhci: ===========================================
-[  119.910858] mmc0: starting CMD17 arg 00009400 flags 000000b5
-[  119.910929] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.910969] sdhci: Sys addr: 0x82480000 | Version:  0x00000000
-[  119.911002] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.911034] sdhci: Argument: 0x00009200 | Trn mode: 0x00000013
-[  119.911065] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.911095] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.911126] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.911157] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.911191] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.911223] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.911255] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.911286] sdhci: Cmd:      0x0000113a | Max curr: 0x00000000
-[  119.911314] sdhci: Host ctl2: 0x00000000
-[  119.911338] sdhci: ===========================================
-[  119.913935] mmc0: starting CMD24 arg 00009000 flags 000000b5
-[  119.914004] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.914042] sdhci: Sys addr: 0x82480000 | Version:  0x00000000
-[  119.914073] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.914105] sdhci: Argument: 0x00009400 | Trn mode: 0x00000013
-[  119.914135] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.914164] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.914194] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.914224] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.914257] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.914288] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.914321] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.914352] sdhci: Cmd:      0x0000113a | Max curr: 0x00000000
-[  119.914380] sdhci: Host ctl2: 0x00000000
-[  119.914404] sdhci: ===========================================
-[  119.921304] mmc0: starting CMD13 arg 00020000 flags 00000195
-[  119.921368] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.921407] sdhci: Sys addr: 0x82403600 | Version:  0x00000000
-[  119.921440] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.921472] sdhci: Argument: 0x00009000 | Trn mode: 0x00000003
-[  119.921503] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.921532] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.921564] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.921594] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.921626] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.921658] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.921689] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.921720] sdhci: Cmd:      0x0000183a | Max curr: 0x00000000
-[  119.921747] sdhci: Host ctl2: 0x00000000
-[  119.921770] sdhci: ===========================================
-[  119.921889] mmc0: starting CMD24 arg 00009200 flags 000000b5
-[  119.921941] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.921976] sdhci: Sys addr: 0x82403600 | Version:  0x00000000
-[  119.922007] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.922038] sdhci: Argument: 0x00020000 | Trn mode: 0x00000003
-[  119.922070] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.922098] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.922129] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.922161] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.922193] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.922223] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.922256] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.922287] sdhci: Cmd:      0x00000d1a | Max curr: 0x00000000
-[  119.922315] sdhci: Host ctl2: 0x00000000
-[  119.922338] sdhci: ===========================================
-[  119.927417] mmc0: starting CMD13 arg 00020000 flags 00000195
-[  119.927481] sdhci: =========== REGISTER DUMP (mmc0)===========
-[  119.927523] sdhci: Sys addr: 0x82403800 | Version:  0x00000000
-[  119.927554] sdhci: Blk size: 0x00000200 | Blk cnt:  0x00000000
-[  119.927586] sdhci: Argument: 0x00009200 | Trn mode: 0x00000003
-[  119.927616] sdhci: Present:  0xff880000 | Host ctl: 0x00000023
-[  119.927645] sdhci: Power:    0x00000000 | Blk gap:  0x00000000
-[  119.927675] sdhci: Wake-up:  0x00000000 | Clock:    0x00000107
-[  119.927707] sdhci: Timeout:  0x0000000e | Int stat: 0x00000000
-[  119.927740] sdhci: Int enab: 0x107f000b | Sig enab: 0x107f000b
-[  119.927772] sdhci: AC12 err: 0x00000000 | Slot int: 0x00001001
-[  119.927804] sdhci: Caps:     0x07eb0000 | Caps_1:   0x04100410
-[  119.927835] sdhci: Cmd:      0x0000183a | Max curr: 0x00000000
-[  119.927864] sdhci: Host ctl2: 0x00000000
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(IMX28, "Freescale i.MX28 (Device Tree)")
+> > +	.map_io		= mx28_map_io,
+> > +	.init_irq	= mxs_dt_init_irq,
+> > +	.timer		= &imx28_timer,
+> > +	.init_machine	= imx28_machine_init,
+> > +	.dt_compat	= imx28_dt_compat,
+> > +	.restart	= mxs_restart,
+> > +MACHINE_END
+> > -- 
+> > 1.7.0.4
+> > 
+> 
 
-[CMD24/CMD13 changes go on like this ...]
-
-Anybody with more insights? Why is the interval between two CMD24 more 
-or less in the range of 6ms and the CMD13 follows in varying intervals 
-between 1ms to 4ms? What's keeping the driver from bursting CMD24 and 
-successive CMD13 requests?
-
-Thanks and best regards
--- 
-Joan C. Abelaira
+Regards
+Dong Aisheng
