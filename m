@@ -1,88 +1,33 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 28 Mar 2012 14:16:13 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 28 Mar 2012 10:17:29 -0400 (EDT)
+Subject: [PATCH] ARM: test for PMU feature on v7 (v2 with typo fix)
+In-Reply-To: <20120326094054.GA2475@mudshark.cambridge.arm.com>
+References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
+ <87r4wk889a.fsf@rustcorp.com.au>
+ <20120323095314.GA13622@mudshark.cambridge.arm.com>
+ <87fwcy9abw.fsf@rustcorp.com.au>
+ <20120326094054.GA2475@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1203281005110.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 19:30:01, Shilimkar, Santosh wrote:
-> On Wed, Mar 21, 2012 at 5:12 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> > On Mon, Mar 19, 2012 at 17:45:32, Shilimkar, Santosh wrote:
-> >> On Monday 19 March 2012 05:14 PM, Ming Lei wrote:
-> >> > On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> >> >>
-> >> >> I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
-> >> >> It will always use 32k-counter, and never fall back to dmtimer.
-> >> >>
-> >> >> Then the only options we have here is,
-> >> >>
-> >> >> 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
-> >> >> ? Kernel pick up best rating clocksource out of these two.
-> >> >>
-> >> >> ? In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
-> >> >> ? Rating. User can choose the 32k-counter clocksource via bootargs.
-> >> >>
-> >> >> ? Impact: without bootargs for clocksource selection, kernel will choose
-> >> >> ? ? dmtimer, impacting loss of time during suspend/resume.
-> >> >>
-> >> This is the right option. The problem is gptimer clocksource
-> >> doesn't work across power transitions and hence it is broken.
-> >>
-> >> Even for the perf, with PM enabled, dmtimer can't be used or it needs
-> >> to be used with 32KHz clock which makes it no better than sync timer.
-> >>
-> >> So here keeping 32K sync timer is default clocksource makes sense since
-> >> it is the only working and viable option.
-> >>
-> >> So what can be done is register both 32K and gptimer together but make
-> >> gptimer clocksource registration depends on PM enabled.
-> >>
-> >> This should solve all the needs I guess.
-> >>
-> >
-> > I am not sure this will work on all platforms, for example, AM33XX, where
-> > We do not have 32ksync timer available, but we need PM support. Also, I
-> > personally think, we should not again use compile time option here.
-> >
-> Why not ?
-> If 32ksync timer is not available, don't register it. Then in AM case
-> you just have one clock-source. 
+On Mon, 26 Mar 2012, Will Deacon wrote:
 
-In case of AM33xx, what about kernel without PM support?
-As clocksource registration would be dependent on PM option, it won't work.
+> Now, if everything was device-tree based then we could simply use a
+> different binding for each CPU but since we support perf on non-DT
+> platforms, probing the CPU type is the best solution. I would like to avoid
+> the probing code if we are initialised from DT, but I've not got round to it
+> yet (this would be useful for big.LITTLE).
 
-> I am against the idea of making
-> gptimer as the default and asking user to choose sync32k from
-> command-line.
-> 
-
-I understand your concern here.
+Still... my opinion is that we should try to autodetect as much as 
+possible and avoid overstuffing the DT with content that can otherwise 
+be run-time probed.  OK to use DT to override the probe for corner 
+cases, but IMHO the probe should be the default method of 
+initialization.  The rational is that we want to spread knowledge about 
+part of the system and have it confined into respective drivers and 
+subsystems for easier maintenance.  If the guy who has to maintain the 
+dts has to know all the details for everything then that won't scale and 
+the risk for discrepancies is increased.
 
 
-> Btw, if you need PM, how are you going to use GPTIMER
-> as a clocksource. Note sys-clock is generally stopped in
-> low power states. So that leaves you option with using
-> gptimer with 32K clock and in that case, GPTIMER
-> is not a better clock-source compare to 32K sync timer
-> and so shouldn't be the rating.
-> 
-
-AM33xx has GPTIMER1 in wakeup domain, so that we are already using as a
-Clocksource, without any issues.
-
-Thanks,
-Vaibhav
-
-> Regards
-> Santosh
-> 
+Nicolas
