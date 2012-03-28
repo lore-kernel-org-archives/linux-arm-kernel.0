@@ -1,27 +1,32 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 27 Mar 2012 18:03:49 -0700
-Subject: [PATCH 07/10] clk: Constify parent name arrays
-In-Reply-To: <1332833009-4121-8-git-send-email-shawn.guo@linaro.org>
-References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
- <1332833009-4121-8-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAJOA=zOXwtpefp2vgHprnmdpaOsHzo_rtMPMrN=X=K7YXM2EYA@mail.gmail.com>
+From: gxt@mprc.pku.edu.cn (Guan Xuetao)
+Date: Wed, 28 Mar 2012 10:22:54 +0800
+Subject: [PATCHv2 09/14] Unicore32: adapt for dma_map_ops changes
+In-Reply-To: <1332855768-32583-10-git-send-email-m.szyprowski@samsung.com>
+References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
+ <1332855768-32583-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F7275FE.8000100@mprc.pku.edu.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> From: Mark Brown <broonie@opensource.wolfsonmicro.com>
+On 03/27/2012 09:42 PM, Marek Szyprowski wrote:
+> diff --git a/arch/unicore32/mm/dma-swiotlb.c b/arch/unicore32/mm/dma-swiotlb.c
+> index bfa9fbb..4cf5f0c 100644
+> --- a/arch/unicore32/mm/dma-swiotlb.c
+> +++ b/arch/unicore32/mm/dma-swiotlb.c
+> @@ -17,9 +17,23 @@
 >
-> Drivers should be able to declare their arrays of parent names as const
-> so the APIs need to accept const arguments.
+>   #include<asm/dma.h>
 >
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> +static void *unicore_swiotlb_alloc_coherent(struct device *dev, size_t size,
+> +					    dma_addr_t *dma_handle, gfp_t flags,
+> +					    struct dma_attrs *attrs)
+> +{
+> +	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
+> +}
+> +
+> +static void unicode_swiotlb_free_coherent(struct device *dev, size_t size,
+The bit is ok for me. Only a typo here, please change unicode to unicore.
 
-Thanks for reposting Shawn.
+Thanks and Regards.
 
-Mark, I've taken this in to my fixes branch, but I dropped the change
-in drivers/clk/clk-fixed-rate.c (since that code has shuffled) and I
-also marked the char *parent[1] in fixed-rate and gate clocks as
-const, in addition to the divider you did in your patch.
-
-Thanks,
-Mike
+Guan Xuetao
