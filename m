@@ -1,29 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Mar 2012 12:34:10 +0000
-Subject: [GIT PULL 1/5] ARM: cleanups of io includes
-In-Reply-To: <CAOesGMjwZOON9kFNvaEq8QhSvjAgsJT_J1Ysb9-AbePd6g+-rQ@mail.gmail.com>
-References: <1332918842-13521-1-git-send-email-olof@lixom.net>
- <20120328082501.GA22414@n2100.arm.linux.org.uk>
- <CAOesGMjwZOON9kFNvaEq8QhSvjAgsJT_J1Ysb9-AbePd6g+-rQ@mail.gmail.com>
-Message-ID: <201203281234.10632.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 28 Mar 2012 21:22:29 +0800
+Subject: [PATCH v2 1/1] ARM: imx28: add basic dt support
+In-Reply-To: <20120328095346.GA31901@shlinux2.ap.freescale.net>
+References: <1332513070-5400-1-git-send-email-b29396@freescale.com>
+ <20120328055801.GA3953@S2100-06.ap.freescale.net>
+ <20120328095346.GA31901@shlinux2.ap.freescale.net>
+Message-ID: <20120328132227.GA3254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 March 2012, Olof Johansson wrote:
-> If you prefer to let it sit in linux-next for a day or two before
-> going in, that's fine. But I verified that the original build problem
-> introduced was fixed before I sent it out.
-> 
-> Unfortunately, PXA is also broken due to the regulator changes
-> mentioned in the above referenced mail, which is already upstream and
-> unrelated to the changes in this branch.
-> 
-> Linus; the rest of the pull requests should be OK to go in
-> independently of this, so please go ahead with those if you don't
-> mind. The only changes to those branches in the last few days is the
-> merge resolution I did to the drivers2 branch/tag.
+On Wed, Mar 28, 2012 at 05:53:47PM +0800, Dong Aisheng wrote:
+> On Wed, Mar 28, 2012 at 01:58:04PM +0800, Guo Shawn-R65073 wrote:
+> > On Fri, Mar 23, 2012 at 10:31:10PM +0800, Dong Aisheng wrote:
+> > > From: Dong Aisheng <dong.aisheng@linaro.org>
+...
+> > > +static const char *imx28_dt_compat[] __initdata = {
+> > 
+> > mxs_dt_compat
+> > 
+> If changed like that, is it reasonable for mx23 to use this
+> compatible string list?
+> I planed to have separate compatible string for mx23 and mx28.
 
-Yes, sounds good. I've also verified that none of the other branches
-depends on this one.
+Ok, I'm fine with that, since we will have separate DT_MACHINE_START
+for imx23 and imx28.
 
-	Arnd
+> 
+> > > +	"fsl,imx28",
+> > > +	"fsl,imx28-evk",
+> > 
+> > I would have the list sorted from the most specific to the most
+> > general.  That said, it's better to have "fsl,imx28" sorted after
+> > "fsl,imx28-evk".
+> > 
+> I prefer to keep the basic one first, then for future boards support
+> we just add them below rather than insert above the basic one "fsl,imx28".
+> However, it's really not a big deal.
+> If you persist to do like that, i can also do it.
+> 
+Yes, please.  Listing items from the most specific to the general is
+the rule for compatible property and match table.
+
+-- 
+Regards,
+Shawn
