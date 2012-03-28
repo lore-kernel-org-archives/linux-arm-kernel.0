@@ -1,33 +1,26 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 28 Mar 2012 10:17:29 -0400 (EDT)
-Subject: [PATCH] ARM: test for PMU feature on v7 (v2 with typo fix)
-In-Reply-To: <20120326094054.GA2475@mudshark.cambridge.arm.com>
-References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
- <87r4wk889a.fsf@rustcorp.com.au>
- <20120323095314.GA13622@mudshark.cambridge.arm.com>
- <87fwcy9abw.fsf@rustcorp.com.au>
- <20120326094054.GA2475@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1203281005110.24151@xanadu.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 28 Mar 2012 22:18:14 +0800
+Subject: [alsa-devel] [PATCH] ASoC: sgtl5000: fix power on/off of MIC bias
+In-Reply-To: <7FE21149F4667147B645348EC605788514EDFF@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
+ <7FE21149F4667147B645348EC605788514EDFF@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <20120328141812.GB3254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Mar 2012, Will Deacon wrote:
+On Wed, Mar 28, 2012 at 09:52:15AM +0000, Dong Aisheng-B29396 wrote:
+> Did you test line-in record?
 
-> Now, if everything was device-tree based then we could simply use a
-> different binding for each CPU but since we support perf on non-DT
-> platforms, probing the CPU type is the best solution. I would like to avoid
-> the probing code if we are initialised from DT, but I've not got round to it
-> yet (this would be useful for big.LITTLE).
+No, I did not.  I'm playing imx51 babbage board which has no LINE-IN
+routed.
 
-Still... my opinion is that we should try to autodetect as much as 
-possible and avoid overstuffing the DT with content that can otherwise 
-be run-time probed.  OK to use DT to override the probe for corner 
-cases, but IMHO the probe should be the default method of 
-initialization.  The rational is that we want to spread knowledge about 
-part of the system and have it confined into respective drivers and 
-subsystems for easier maintenance.  If the guy who has to maintain the 
-dts has to know all the details for everything then that won't scale and 
-the risk for discrepancies is increased.
+> IIRC for line-in record, it may also need VAG_POWER up.
+> Then only enable VAG_POWER for mic_bias_event may not be sufficient.
+> Will verify it latter when I'm free.
+> 
+This patch only fixes MIC.  I think you can submit another patch after
+you confirm LINE-IN has the same issue.
 
-
-Nicolas
+-- 
+Regards,
+Shawn
