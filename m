@@ -1,35 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 27 Mar 2012 20:39:34 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
- OMAP4 onwards
-In-Reply-To: <4F721A91.7000102@ti.com>
-References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
- <4F721A91.7000102@ti.com>
-Message-ID: <alpine.DEB.2.00.1203272039010.22961@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 28 Mar 2012 10:42:18 +0800
+Subject: [PATCH v5 2/8] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
+In-Reply-To: <2976261.6mYHfHvpym@laptop>
+References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
+ <1331888204-27058-3-git-send-email-shawn.guo@linaro.org>
+ <2976261.6mYHfHvpym@laptop>
+Message-ID: <CAAQ0ZWSPJ-5gAJGEYwbyUzjM_Ho851RAHSTBYKgcMtYNRn6ktQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Tue, 27 Mar 2012, Jon Hunter wrote:
-
-> On 3/27/2012 4:58, Rajendra Nayak wrote:
+2012/3/27 Philippe R?tornaz <philippe.retornaz@epfl.ch>:
+> Le vendredi 16 mars 2012 16:56:38 Shawn Guo a ?crit :
+>> Freescale PowerPC and ARM/IMX families share the same SSI IP block.
+>> The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
+>> code sharing and consolidation can happen.
+>>
+>> This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
+>> in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
+>> IMX platform.
+>>
+>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 >
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c
-> > b/arch/arm/mach-omap2/omap_hwmod.c
-> > index 8ac26f2..f2a9afa 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> > @@ -808,7 +808,7 @@ static void _enable_module(struct omap_hwmod *oh)
-> >    */
-> >   static int _omap4_wait_target_disable(struct omap_hwmod *oh)
-> >   {
-> > -	if (!cpu_is_omap44xx())
-> > +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-> >   		return 0;
-> 
-> What about omap36xx?
+> This patch has been merged ? If yes in which tree is it available ?
+>
+git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.5
 
-Unfortunately, cpu_is_omap34xx() also covers OMAP36xx :-(
-
-- Paul
+Regards,
+Shawn
