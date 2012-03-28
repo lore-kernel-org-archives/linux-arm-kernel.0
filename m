@@ -1,32 +1,35 @@
-From: gxt@mprc.pku.edu.cn (Guan Xuetao)
-Date: Wed, 28 Mar 2012 10:22:54 +0800
-Subject: [PATCHv2 09/14] Unicore32: adapt for dma_map_ops changes
-In-Reply-To: <1332855768-32583-10-git-send-email-m.szyprowski@samsung.com>
-References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
- <1332855768-32583-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4F7275FE.8000100@mprc.pku.edu.cn>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 27 Mar 2012 20:39:34 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
+ OMAP4 onwards
+In-Reply-To: <4F721A91.7000102@ti.com>
+References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
+ <4F721A91.7000102@ti.com>
+Message-ID: <alpine.DEB.2.00.1203272039010.22961@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2012 09:42 PM, Marek Szyprowski wrote:
-> diff --git a/arch/unicore32/mm/dma-swiotlb.c b/arch/unicore32/mm/dma-swiotlb.c
-> index bfa9fbb..4cf5f0c 100644
-> --- a/arch/unicore32/mm/dma-swiotlb.c
-> +++ b/arch/unicore32/mm/dma-swiotlb.c
-> @@ -17,9 +17,23 @@
->
->   #include<asm/dma.h>
->
-> +static void *unicore_swiotlb_alloc_coherent(struct device *dev, size_t size,
-> +					    dma_addr_t *dma_handle, gfp_t flags,
-> +					    struct dma_attrs *attrs)
-> +{
-> +	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
-> +}
-> +
-> +static void unicode_swiotlb_free_coherent(struct device *dev, size_t size,
-The bit is ok for me. Only a typo here, please change unicode to unicore.
+Hi Jon,
 
-Thanks and Regards.
+On Tue, 27 Mar 2012, Jon Hunter wrote:
 
-Guan Xuetao
+> On 3/27/2012 4:58, Rajendra Nayak wrote:
+>
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c
+> > b/arch/arm/mach-omap2/omap_hwmod.c
+> > index 8ac26f2..f2a9afa 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> > @@ -808,7 +808,7 @@ static void _enable_module(struct omap_hwmod *oh)
+> >    */
+> >   static int _omap4_wait_target_disable(struct omap_hwmod *oh)
+> >   {
+> > -	if (!cpu_is_omap44xx())
+> > +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> >   		return 0;
+> 
+> What about omap36xx?
+
+Unfortunately, cpu_is_omap34xx() also covers OMAP36xx :-(
+
+- Paul
