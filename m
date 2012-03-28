@@ -1,48 +1,33 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 28 Mar 2012 16:51:32 +0530
-Subject: [PATCH] ARM: Samsung: Make PM_GENERIC_DOMAINS config depend on
- CONFIG_PM
-In-Reply-To: <20120328105122.GF3232@opensource.wolfsonmicro.com>
-References: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
- <20120328105122.GF3232@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwQgZqN6nguddjS6bjLhx_ZhUZ5AfcrSAKBa7Ft-Bn6wPQ@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 28 Mar 2012 15:29:07 +0400
+Subject: [PATCHv2 01/14] common: dma-mapping: introduce alloc_attrs and
+ free_attrs methods
+In-Reply-To: <1332855768-32583-2-git-send-email-m.szyprowski@samsung.com>
+References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
+ <1332855768-32583-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F72F603.2000803@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 March 2012 16:21, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Mar 27, 2012 at 03:46:43PM +0530, Thomas Abraham wrote:
->> For s3c64xx and exynos platforms, make the selection of PM_GENERIC_DOMAINS
->> depend on the CONFIG_PM.
->
-> What's the underlying issue here? ?This seems like something the PM core
-> should be dealing with gracefully...
+Hello.
 
-The PM_GENERIC_DOMAINS config option has dependency on CONFIG_PM
-option. When building with PM disabled, the following errors occur.
+On 27-03-2012 17:42, Marek Szyprowski wrote:
 
-warning: (PLAT_S3C64XX && CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS
-which has unmet direct dependencies (PM)
-warning: (MACH_EXYNOS5_DT) selects SOC_EXYNOS5250 which has unmet
-direct dependencies (ARCH_EXYNOS && ARCH_EXYNOS5)
-warning: (PLAT_S3C64XX && CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS
-which has unmet direct dependencies (PM)
-warning: (MACH_EXYNOS5_DT) selects SOC_EXYNOS5250 which has unmet
-direct dependencies (ARCH_EXYNOS && ARCH_EXYNOS5)
+> Introduce new generic alloc and free methods with attributes argument.
 
-[...]
+    The method names don't match the ones in the subject.
 
-drivers/base/power/domain.c: In function '__pm_genpd_add_device':
-drivers/base/power/domain.c:1132: error: implicit declaration of
-function 'genpd_acquire_lock'
-drivers/base/power/domain.c:1168: error: implicit declaration of
-function 'genpd_release_lock'
-drivers/base/power/domain.c: In function 'pm_genpd_add_subdomain':
-drivers/base/power/domain.c:1298: error: implicit declaration of
-function 'genpd_sd_counter_inc'
-drivers/base/power/domain.c: In function 'pm_genpd_remove_subdomain':
-drivers/base/power/domain.c:1341: error: implicit declaration of
-function 'genpd_sd_counter_dec'
-make[3]: *** [drivers/base/power/domain.o] Error 1
+> Existing alloc_coherent and free_coherent can be implemented on top of the
+> new calls with NULL attributes argument. Later also dma_alloc_non_coherent
+> can be implemented using DMA_ATTR_NONCOHERENT attribute as well as
+> dma_alloc_writecombine with separate DMA_ATTR_WRITECOMBINE attribute.
 
-Thanks,
-Thomas.
+> This way the drivers will get more generic, platform independent way of
+> allocating dma buffers with specific parameters.
+
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Reviewed-by: David Gibson <david@gibson.dropbear.ud.au>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+
+WBR, Sergei
