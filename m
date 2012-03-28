@@ -1,25 +1,54 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 28 Mar 2012 21:51:16 +0800
-Subject: [GIT PULL] pull request from arch-pxa git on fixes branch
-Message-ID: <CAN1soZytJ-CxepQAZn5oZ06=ezTQ85O-iC7tUDOeWqi=zpuf8A@mail.gmail.com>
+From: joancarles@fqingenieria.es (joancarles)
+Date: Wed, 28 Mar 2012 16:01:46 +0200
+Subject: [MX25][MMC] mmc esdhc failure in 3.3
+In-Reply-To: <c4306c7d39eac8f1751957eefe20a6c2@mail.fqingenieria.es>
+References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
+ <20120312132423.GC2459@pengutronix.de>
+ <9018463dfcd3c9e9a311aeed42b758bf@mail.fqingenieria.es>
+ <0E83723C55F66F43A6041464FE31119D099A34@039-SN2MPN1-011.039d.mgd.msft.net>
+ <a06e68c3687c7390e15950bc20831fd4@mail.fqingenieria.es>
+ <85b807b77d73328485781d6fa1568e46@mail.fqingenieria.es>
+ <20120327101259.73525f9d@eb-e6520>
+ <ac05d6e5c1ce4bf9cfc5c28d235f866f@mail.fqingenieria.es>
+ <20120327090148.GB6790@pengutronix.de> <20120327110615.3bfaf969@eb-e6520>
+ <7f2ae9e3800848e140461a0506808fb4@mail.fqingenieria.es>
+ <20120327114048.6af2e178@eb-e6520>
+ <137e8b8e079af62aea2fd4d363be6273@mail.fqingenieria.es>
+ <c4306c7d39eac8f1751957eefe20a6c2@mail.fqingenieria.es>
+Message-ID: <cb665484c55065958358acb4fd91bbdb@mail.fqingenieria.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+> Anybody with more insights? Why is the interval between two CMD24
+> more or less in the range of 6ms and the CMD13 follows in varying
+> intervals between 1ms to 4ms? What's keeping the driver from bursting
+> CMD24 and successive CMD13 requests?
 
-Please help to pull fixes branch in arch-pxa git. This fix can resolve
-build issues on updating regulator interface.
+A 4*128KB dd run shows the following patterns of latency between 
+various CMDs issued:
 
-The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
+http://i43.tinypic.com/2bcmsw.png
 
-  Linux 3.3 (2012-03-18 16:15:34 -0700)
+The latency distribution is plotted here:
 
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git fixes
+http://i41.tinypic.com/9gvbqo.png
 
-Paul Gortmaker (1):
-      ARM: pxa: fix regulator related build fail in magician_defconfig
+bin limits	freq count	pct
+<0ms	0	0.0%
+<1ms	922	43.6%
+<6ms	491	23.2%
+<10ms	411	19.4%
+<20ms	113	5.3%
+<100ms	163	7.7%
+<300ms	9	0.4%
+<1000ms	7	0.3%
 
- arch/arm/mach-pxa/hx4700.c   |    2 --
- arch/arm/mach-pxa/magician.c |    2 --
- 2 files changed, 0 insertions(+), 4 deletions(-)
+It took 25 seconds to write 4*128KB to the SD-card using the current 
+drivers. More than 50% of the CMD requests issued take more than 1ms 
+from issuing to response between the host and the card. Anybody else 
+with this issue on the i.MX25? How can I pinpoint this down to the 
+culprits in the kernel source?
+
+Regards
+-- 
+Joan C. Abelaira
