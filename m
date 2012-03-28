@@ -1,158 +1,46 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 28 Mar 2012 11:43:48 -0500
-Subject: [PATCH 1/3] OMAP2+: UART: Remove cpu checks for populating errata
- flags
-In-Reply-To: <CAMrsUdKfsoks4fB4GhrRcEur8niJsaWuYGE34+j5Bk6u2XiZQQ@mail.gmail.com>
-References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
- <1332325501-10467-2-git-send-email-govindraj.raja@ti.com>
- <4F722C63.9080900@ti.com>
- <CAMrsUdKfsoks4fB4GhrRcEur8niJsaWuYGE34+j5Bk6u2XiZQQ@mail.gmail.com>
-Message-ID: <4F733FC4.9010506@ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 28 Mar 2012 12:59:39 -0400
+Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
+ em-x270.c
+In-Reply-To: <20120328161305.GZ3232@opensource.wolfsonmicro.com>
+References: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
+ <1331244366-6147-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F732C97.2030804@compulab.co.il>
+ <20120328152743.GW3232@opensource.wolfsonmicro.com>
+ <4F73356D.5080401@windriver.com>
+ <20120328161305.GZ3232@opensource.wolfsonmicro.com>
+Message-ID: <4F73437B.6070806@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Govindraj,
+On 12-03-28 12:13 PM, Mark Brown wrote:
+> On Wed, Mar 28, 2012 at 11:59:41AM -0400, Paul Gortmaker wrote:
+>> On 12-03-28 11:27 AM, Mark Brown wrote:
+> 
+>> static struct platform_device em_x270_gps_userspace_consumer = {
+>>         .name           = "reg-userspace-consumer",
+>>         .id             = 0,
+> 
+>> static struct platform_device em_x270_gprs_userspace_consumer = {
+>>         .name           = "reg-userspace-consumer",
+>>         .id             = 1,
+> 
+>> Note that the existing names currently don't incorporate the .id
+>> field as a suffix, and so never were unique.
+> 
+> No, this is just a basic part of how platform devices work - the device
+> name is always the same and if you've got more than one of them they get
+> different .ids.  dev_name() returns name.id, or just name if id is set
+> to -1 indicating that there's onyl one device of a given type.
 
-On 3/28/2012 6:09, Raja, Govindraj wrote:
-> On Wed, Mar 28, 2012 at 2:38 AM, Jon Hunter<jon-hunter@ti.com>  wrote:
->> Hi Govindraj,
->>
->>
->> On 3/21/2012 5:24, Govindraj.R wrote:
->>>
->>> From: "Govindraj.R"<govindraj.raja@ti.com>
->>>
->>> Currently the errata is populated based on cpu checks this can
->>> be removed and replaced with module version check of uart ip block.
->>> MVR reg is provided within the uart reg map use the same
->>> to populate the errata and thus now errata population and handling
->>> can be managed within the driver itself.
->>>
->>> Cc: Paul Walmsley<paul@pwsan.com>
->>> Cc: Kevin Hilman<khilman@ti.com>
->>> Signed-off-by: Felipe Balbi<balbi@ti.com>
->>> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
->>> ---
->>>   arch/arm/mach-omap2/serial.c                  |    8 ---
->>>   arch/arm/plat-omap/include/plat/omap-serial.h |    1 -
->>>   drivers/tty/serial/omap-serial.c              |   62
->>> ++++++++++++++++++++++++-
->>>   3 files changed, 61 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->>> index f590afc..330ee04 100644
->>> --- a/arch/arm/mach-omap2/serial.c
->>> +++ b/arch/arm/mach-omap2/serial.c
->>> @@ -357,14 +357,6 @@ void __init omap_serial_init_port(struct
->>> omap_board_data *bdata,
->>>         omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
->>>         omap_up.autosuspend_timeout = info->autosuspend_timeout;
->>>
->>> -       /* Enable the MDR1 Errata i202 for OMAP2430/3xxx/44xx */
->>> -       if (!cpu_is_omap2420()&&    !cpu_is_ti816x())
->>>
->>> -               omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
->>> -
->>> -       /* Enable DMA Mode Force Idle Errata i291 for omap34xx/3630 */
->>> -       if (cpu_is_omap34xx() || cpu_is_omap3630())
->>> -               omap_up.errata |= UART_ERRATA_i291_DMA_FORCEIDLE;
->>> -
->>>         pdata =&omap_up;
->>>         pdata_size = sizeof(struct omap_uart_port_info);
->>>
->>> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h
->>> b/arch/arm/plat-omap/include/plat/omap-serial.h
->>> index 9ff4444..1a52725 100644
->>> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
->>> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
->>> @@ -65,7 +65,6 @@ struct omap_uart_port_info {
->>>         bool                    dma_enabled;    /* To specify DMA Mode */
->>>         unsigned int            uartclk;        /* UART clock rate */
->>>         upf_t                   flags;          /* UPF_* flags */
->>> -       u32                     errata;
->>>         unsigned int            dma_rx_buf_size;
->>>         unsigned int            dma_rx_timeout;
->>>         unsigned int            autosuspend_timeout;
->>> diff --git a/drivers/tty/serial/omap-serial.c
->>> b/drivers/tty/serial/omap-serial.c
->>> index f809041..c7666d6 100644
->>> --- a/drivers/tty/serial/omap-serial.c
->>> +++ b/drivers/tty/serial/omap-serial.c
->>> @@ -44,6 +44,13 @@
->>>   #include<plat/dmtimer.h>
->>>   #include<plat/omap-serial.h>
->>>
->>> +#define UART_BUILD_REVISION(x, y)      (((x)<<    8) | (y))
->>> +
->>> +#define OMAP_UART_REV_42 0x0402
->>> +#define OMAP_UART_REV_46 0x0406
->>> +#define OMAP_UART_REV_52 0x0502
->>> +#define OMAP_UART_REV_63 0x0603
->>> +
->>>   #define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
->>>
->>>   /* SCR register bitmasks */
->>> @@ -1346,6 +1353,58 @@ static void uart_tx_dma_callback(int lch, u16
->>> ch_status, void *data)
->>>         return;
->>>   }
->>>
->>> +static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
->>> +{
->>> +       u32 mvr, scheme;
->>> +       u16 revision, major, minor;
->>> +
->>> +       mvr = serial_in(up, UART_OMAP_MVER);
->>> +
->>> +       /* Check revision register scheme */
->>> +       scheme = mvr&    (0x03<<    30);
->>> +       scheme>>= 30;
->>
->>
->> Minor nit-pick, why not ...
->>
->>         scheme = mvr>>  30;
->>
->
-> yes will correct it.
+OK, so Igor - can you simply retest the v2 patch, but make the
+two trivial changes:
 
-Thinking some more, could be better to add some #defines for 
-OMAP_MVR_VERSION_MASK/SHIFT here.
+-REGULATOR_CONSUMER(ldo3, "reg-userspace-consumer", "vcc gps");
++REGULATOR_CONSUMER(ldo3, "reg-userspace-consumer.0", "vcc gps");
 
->>
->>> +       switch (scheme) {
->>> +       case 0: /* Legacy Scheme: OMAP2/3 */
->>> +               /* MINOR_REV[0:4], MAJOR_REV[4:7] */
->>
->>
->> This scheme is also true from OMAP1 devices. Maybe we could include in the
->> comment.
->
-> No omap1 from $SUBJECT also reason,
->
-> mach-omap1/serial.c =>  8250.c
-> mach-omap2/serial.c =>  omap-serial.c
+-REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer", "vcc gprs");
++REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer.1", "vcc gprs");
 
-Got it! Thanks.
-
->>> +               major = (mvr&    0xf0)>>    4;
->>> +               minor = (mvr&    0x0f);
->>>
->>> +               break;
->>> +       case 1:
->>> +               /* New Scheme: OMAP4+ */
->>> +               /* MINOR_REV[0:5], MAJOR_REV[8:10] */
->>> +               major = (mvr&    0x7<<    8)>>    8;
->>
->>
->> Nit-pick ...
->>
->>         major = (mvr>>  8)&  0x7;
->
-> yes fine will correct this.
-
-May be we should add #defines here to for OMAP_UART_MVR1_MAJ_MASK/SHIFT, 
-OMAP_UART_MVR1_MIN_MASK/SHIFT, OMAP_UART_MVR2_MAJ_MASK/SHIFT and 
-OMAP_UART_MVR2_MIN_MASK/SHIFT.
-
-Jon
+Thanks,
+Paul.
