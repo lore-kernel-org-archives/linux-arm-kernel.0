@@ -1,17 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Mar 2012 09:25:01 +0100
-Subject: [GIT PULL 1/5] ARM: cleanups of io includes
-In-Reply-To: <1332918842-13521-2-git-send-email-olof@lixom.net>
-References: <1332918842-13521-1-git-send-email-olof@lixom.net>
- <1332918842-13521-2-git-send-email-olof@lixom.net>
-Message-ID: <20120328082501.GA22414@n2100.arm.linux.org.uk>
+From: dan.j.williams@intel.com (Williams, Dan J)
+Date: Wed, 28 Mar 2012 01:30:37 -0700
+Subject: [PATCH V2] iop-adma: Corrected array overflow in RAID6 Xscale(R)
+ test.
+In-Reply-To: <1331834850-27409-1-git-send-email-don.morris@hp.com>
+References: <1331834850-27409-1-git-send-email-don.morris@hp.com>
+Message-ID: <CABE8wwsP+o9AeSYW1wUJLfZ6y1v9c8EXT8b3nfTDiDdKW0fA+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 12:13:58AM -0700, Olof Johansson wrote:
-> Rob Herring has done a sweeping change cleaning up all of the mach/io.h includes,
-> moving some of the oft-repeated macros to a common location and removing a bunch of
-> boiler plate. This is another step closer to a common zImage for multiple platforms.
+On Thu, Mar 15, 2012 at 11:07 AM, Don Morris <don.morris@hp.com> wrote:
+> Bug: cppcheck reported overflow in array assignment (for loop walks
+> 0 to IOP_ADMA_NUM_SRC_TEST+2, array size is IOP_ADMA_NUM_SRC_TEST).
+>
+> Reported as: https://bugzilla.kernel.org/show_bug.cgi?id=42677
+>
+> Test code pq_src array was grown by two elements to correspond with actual
+> usage (IOP_ADMA_NUM_SRC_TEST+2), stack consumption was kept constant by
+> modifying the pq_dest two element array which is only used when pq_src
+> is referenced up to IOP_ADMA_NUM_SRC_TEST elements into the address
+> of the new last two elements of the pq_src array. This is presumed to
+> be the original intent but would be reliant on compilers always having
+> pq_dest contiguous with the final element of pq_src.
+>
+> Note: This is a re-send of a request for review from two weeks ago.
+> Looking for review (or shootdown), adding LKML to list for a wider
+> audience. Thanks.
+>
+> Updated per review comments of Sergei Shtylyov <sshtylyov@mvista.com>
+>
+> Signed-off-by: Don Morris <don.morris@hp.com>
 
-NAK.  Linus, do not pull this.  This breaks PXA compilation, which has
-been known about for more than a week.
+Applied, thanks, and I'll send it along for Vinod's tree.
