@@ -1,115 +1,48 @@
-From: R63889@freescale.com (Xu Lionel-R63889)
-Date: Wed, 28 Mar 2012 11:17:13 +0000
-Subject: [alsa-devel] [PATCH] ASoC: sgtl5000: fix power on/off of MIC bias
-In-Reply-To: <20120328101117.GA2940@zzm-ubuntu>
-References: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
- <7FE21149F4667147B645348EC605788514EDFF@039-SN2MPN1-011.039d.mgd.msft.net>
- <20120328101117.GA2940@zzm-ubuntu>
-Message-ID: <1134DBD29ABD7C45BA97B9951E61EC9007DF10@039-SN2MPN1-011.039d.mgd.msft.net>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 28 Mar 2012 16:51:32 +0530
+Subject: [PATCH] ARM: Samsung: Make PM_GENERIC_DOMAINS config depend on
+ CONFIG_PM
+In-Reply-To: <20120328105122.GF3232@opensource.wolfsonmicro.com>
+References: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
+ <20120328105122.GF3232@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwQgZqN6nguddjS6bjLhx_ZhUZ5AfcrSAKBa7Ft-Bn6wPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, theoretically it should be added to line-in record too, 
-I check the mx53smd board just now, found the line-in port is connected to a connector,
-I am afraid we did not check the line-in record before. 
+On 28 March 2012 16:21, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Mar 27, 2012 at 03:46:43PM +0530, Thomas Abraham wrote:
+>> For s3c64xx and exynos platforms, make the selection of PM_GENERIC_DOMAINS
+>> depend on the CONFIG_PM.
+>
+> What's the underlying issue here? ?This seems like something the PM core
+> should be dealing with gracefully...
 
------Original Message-----
-From: Zeng Zhaoming [mailto:zengzm.kernel at gmail.com] 
-Sent: Wednesday, March 28, 2012 6:11 PM
-To: Dong Aisheng-B29396
-Cc: Shawn Guo; alsa-devel at alsa-project.org; Xu Lionel-R63889; Mark Brown; Zeng at alsa-project.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: [alsa-devel] [PATCH] ASoC: sgtl5000: fix power on/off of MIC bias
+The PM_GENERIC_DOMAINS config option has dependency on CONFIG_PM
+option. When building with PM disabled, the following errors occur.
 
-On Wed 2012-03-28 09:52:15, Dong Aisheng-B29396 wrote:
-> > -----Original Message-----
-> > From: alsa-devel-bounces at alsa-project.org [mailto:alsa-devel- 
-> > bounces at alsa-project.org] On Behalf Of Shawn Guo
-> > Sent: Wednesday, March 28, 2012 3:31 PM
-> > To: alsa-devel at alsa-project.org
-> > Cc: Xu Lionel-R63889; Mark Brown; Zeng at alsa-project.org; Zhaoming; 
-> > Shawn Guo; Xu Lionel-R63889; linux-arm-kernel at lists.infradead.org
-> > Subject: [alsa-devel] [PATCH] ASoC: sgtl5000: fix power on/off of 
-> > MIC bias
-> > 
-> > From: Lionel Xu <Lionel.Xu@freescale.com>
-> > 
-> > There is no sound in the recorded wav, to enable recording, the VAG 
-> > should be powered up, and the mic bias resistor should be set up 
-> > with proper value.
-> > 
-> > Signed-off-by: Lionel Xu <lionel.xu@freescale.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Zeng Zhaoming <zengzm.kernel@gmail.com>
-> > ---
-> >  sound/soc/codecs/sgtl5000.c |   14 +++++++++++---
-> >  1 files changed, 11 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/sound/soc/codecs/sgtl5000.c 
-> > b/sound/soc/codecs/sgtl5000.c index d192626..a24299c 100644
-> > --- a/sound/soc/codecs/sgtl5000.c
-> > +++ b/sound/soc/codecs/sgtl5000.c
-> > @@ -132,11 +132,18 @@ static int mic_bias_event(struct 
-> > snd_soc_dapm_widget *w,
-> >  		snd_soc_update_bits(w->codec, SGTL5000_CHIP_MIC_CTRL,
-> >  				SGTL5000_BIAS_R_MASK,
-> >  				SGTL5000_BIAS_R_4k << SGTL5000_BIAS_R_SHIFT);
-> > +
-> > +		snd_soc_update_bits(w->codec, SGTL5000_CHIP_ANA_POWER,
-> > +				SGTL5000_VAG_POWERUP, SGTL5000_VAG_POWERUP);
-> Did you test line-in record?
-> IIRC for line-in record, it may also need VAG_POWER up.
-> Then only enable VAG_POWER for mic_bias_event may not be sufficient.
-> Will verify it latter when I'm free.
-> 
-Yes, if mic bias needs VAG powerup, LINE-IN capture has the same issue.
-But I remember Line-out test passed in mx28, it there any defect I ignored?
+warning: (PLAT_S3C64XX && CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS
+which has unmet direct dependencies (PM)
+warning: (MACH_EXYNOS5_DT) selects SOC_EXYNOS5250 which has unmet
+direct dependencies (ARCH_EXYNOS && ARCH_EXYNOS5)
+warning: (PLAT_S3C64XX && CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS
+which has unmet direct dependencies (PM)
+warning: (MACH_EXYNOS5_DT) selects SOC_EXYNOS5250 which has unmet
+direct dependencies (ARCH_EXYNOS && ARCH_EXYNOS5)
 
-Thanks.
-Zeng Zhaoming
+[...]
 
-> Regards
-> Dong Aisheng
-> 
-> >  		break;
-> > 
-> >  	case SND_SOC_DAPM_PRE_PMD:
-> >  		snd_soc_update_bits(w->codec, SGTL5000_CHIP_MIC_CTRL,
-> > -				SGTL5000_BIAS_R_MASK, 0);
-> > +				SGTL5000_BIAS_R_MASK,
-> > +				SGTL5000_BIAS_R_off << SGTL5000_BIAS_R_SHIFT);
-> > +
-> > +		snd_soc_update_bits(w->codec, SGTL5000_CHIP_ANA_POWER,
-> > +				SGTL5000_VAG_POWERUP, 0);
-> >  		break;
-> >  	}
-> >  	return 0;
-> > @@ -197,7 +204,7 @@ static const struct snd_soc_dapm_widget 
-> > sgtl5000_dapm_widgets[] = {
-> >  	SND_SOC_DAPM_OUTPUT("HP_OUT"),
-> >  	SND_SOC_DAPM_OUTPUT("LINE_OUT"),
-> > 
-> > -	SND_SOC_DAPM_MICBIAS_E("Mic Bias", SGTL5000_CHIP_MIC_CTRL, 8, 0,
-> > +	SND_SOC_DAPM_MICBIAS_E("Mic Bias", SND_SOC_NOPM, 0, 0,
-> >  				mic_bias_event,
-> >  				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
-> > 
-> > @@ -229,7 +236,8 @@ static const struct snd_soc_dapm_widget 
-> > sgtl5000_dapm_widgets[] = {
-> >  /* routes for sgtl5000 */
-> >  static const struct snd_soc_dapm_route sgtl5000_dapm_routes[] = {
-> >  	{"Capture Mux", "LINE_IN", "LINE_IN"},	/* line_in --> adc_mux */
-> > -	{"Capture Mux", "MIC_IN", "MIC_IN"},	/* mic_in --> adc_mux */
-> > +	{"Mic Bias", NULL, "MIC_IN"},		/* mic_in --> mic bias */
-> > +	{"Capture Mux", "MIC_IN", "Mic Bias"},	/* mic bias --> adc_mux
-> > */
-> > 
-> >  	{"ADC", NULL, "Capture Mux"},		/* adc_mux --> adc */
-> >  	{"AIFOUT", NULL, "ADC"},		/* adc --> i2s_out */
-> > --
-> > 1.7.4.1
-> > 
-> > 
-> > _______________________________________________
-> > Alsa-devel mailing list
-> > Alsa-devel at alsa-project.org
-> > http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+drivers/base/power/domain.c: In function '__pm_genpd_add_device':
+drivers/base/power/domain.c:1132: error: implicit declaration of
+function 'genpd_acquire_lock'
+drivers/base/power/domain.c:1168: error: implicit declaration of
+function 'genpd_release_lock'
+drivers/base/power/domain.c: In function 'pm_genpd_add_subdomain':
+drivers/base/power/domain.c:1298: error: implicit declaration of
+function 'genpd_sd_counter_inc'
+drivers/base/power/domain.c: In function 'pm_genpd_remove_subdomain':
+drivers/base/power/domain.c:1341: error: implicit declaration of
+function 'genpd_sd_counter_dec'
+make[3]: *** [drivers/base/power/domain.o] Error 1
+
+Thanks,
+Thomas.
