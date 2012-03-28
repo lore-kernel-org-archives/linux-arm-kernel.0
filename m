@@ -1,30 +1,24 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 28 Mar 2012 10:42:18 +0800
-Subject: [PATCH v5 2/8] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
-In-Reply-To: <2976261.6mYHfHvpym@laptop>
-References: <1331888204-27058-1-git-send-email-shawn.guo@linaro.org>
- <1331888204-27058-3-git-send-email-shawn.guo@linaro.org>
- <2976261.6mYHfHvpym@laptop>
-Message-ID: <CAAQ0ZWSPJ-5gAJGEYwbyUzjM_Ho851RAHSTBYKgcMtYNRn6ktQ@mail.gmail.com>
+Date: Wed, 28 Mar 2012 10:45:27 +0800
+Subject: [PATCH] Regulator: anatop-regulator: patching to device-tree
+ property "reg".
+In-Reply-To: <1332834841-13925-1-git-send-email-paul.liu@linaro.org>
+References: <1332834841-13925-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <CAAQ0ZWRh30PhS_zDhG5U1s8vTjETNQ0auHa9oNRt+Pv4zeCN1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/27 Philippe R?tornaz <philippe.retornaz@epfl.ch>:
-> Le vendredi 16 mars 2012 16:56:38 Shawn Guo a ?crit :
->> Freescale PowerPC and ARM/IMX families share the same SSI IP block.
->> The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
->> code sharing and consolidation can happen.
->>
->> This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
->> in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
->> IMX platform.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+On 27 March 2012 15:54, Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org> wrote:
+> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 >
-> This patch has been merged ? If yes in which tree is it available ?
+> Change "reg" to "anatop-reg-offset" due to there is a warning of handling no
+> size field in reg.
 >
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.5
+> This patch also adds the missing device-tree binding documentation.
+>
+> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
 
-Regards,
-Shawn
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
