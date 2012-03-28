@@ -1,41 +1,164 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Mar 2012 10:54:50 +0100
-Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
- device tree support
-In-Reply-To: <87k426vy9r.fsf@laptop.org>
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
- <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
- <m239abgc32.fsf@bob.laptop.org>
- <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
- <m2vcn0496y.fsf@bob.laptop.org> <87k426vy9r.fsf@laptop.org>
-Message-ID: <20120328095450.GA23005@sirena.org.uk>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 28 Mar 2012 15:11:45 +0530
+Subject: [PATCH V2 4/7] SPEAr3xx: Replace printk() with pr_*()
+In-Reply-To: <cover.1332926608.git.viresh.kumar@st.com>
+References: <cover.1332926608.git.viresh.kumar@st.com>
+Message-ID: <f678c2fee8c82f7e8a7aef197e6d429a51330361.1332926608.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 11:50:24AM -0400, Chris Ball wrote:
-> On Tue, Feb 21 2012, Chris Ball wrote:
-> > On Tue, Feb 21 2012, Kukjin Kim wrote:
+For better print logs/messages, it is advisable to use pr_*() routines instead
+of directly calling printks. This patch removes direct calling of printks for
+spear3xx.
 
-> >> I created topic branch for this we talked. You can pull that following:
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >> v3.4-for-cjb
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/mach-spear3xx/spear300.c |    8 +++++---
+ arch/arm/mach-spear3xx/spear310.c |   13 +++++++------
+ arch/arm/mach-spear3xx/spear320.c |   11 ++++++-----
+ arch/arm/mach-spear3xx/spear3xx.c |    2 ++
+ 4 files changed, 20 insertions(+), 14 deletions(-)
 
-> >> If any problems, please kindly let me know.
-
-> > Pushed to mmc-next, thanks.  (I'm expecting that you'll do the merge
-> > to Linus.)
-
-> I was expecting you to merge these patches, but they aren't in the
-> arm-soc tree and haven't been sent to Linus, and we're in the last few
-> days of the merge window.
-
-> As a result I'm dropping this tree -- and all of the patches that I
-> have on top of it -- from mmc-next so that I can get a pull request
-> out.  This means that I'm dropping:
-
-If they're already in your tree why not just send them to Linus?  Given
-that everything's in git I don't understand why you'd need Kukjin to
-push them separately or what the benefit of that would be?
-
-This is all extremely frustrating fromm the contributor point of view.
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index f7db668..adee72b 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -11,6 +11,8 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#define pr_fmt(fmt) "SPEAr300: " fmt
++
+ #include <linux/types.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/ptrace.h>
+@@ -447,7 +449,7 @@ void __init spear300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 	if (shirq_ras1.regs.base) {
+ 		ret = spear_shirq_register(&shirq_ras1);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ\n");
++			pr_err("Error registering Shared IRQ\n");
+ 	}
+ 
+ 	/* pmx initialization */
+@@ -459,8 +461,8 @@ void __init spear300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 	if (pmx_driver.base) {
+ 		ret = pmx_register(&pmx_driver);
+ 		if (ret)
+-			printk(KERN_ERR "padmux: registration failed. err no"
+-					": %d\n", ret);
++			pr_err("padmux: registration failed. err no: %d\n",
++					ret);
+ 		/* Free Mapping, device selection already done */
+ 		iounmap(pmx_driver.base);
+ 	}
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index febaa6f..b7c2876 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -11,6 +11,8 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#define pr_fmt(fmt) "SPEAr310: " fmt
++
+ #include <linux/ptrace.h>
+ #include <asm/irq.h>
+ #include <plat/shirq.h>
+@@ -274,25 +276,25 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 		shirq_ras1.regs.base = base;
+ 		ret = spear_shirq_register(&shirq_ras1);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ 1\n");
++			pr_err("Error registering Shared IRQ 1\n");
+ 
+ 		/* shirq 2 */
+ 		shirq_ras2.regs.base = base;
+ 		ret = spear_shirq_register(&shirq_ras2);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ 2\n");
++			pr_err("Error registering Shared IRQ 2\n");
+ 
+ 		/* shirq 3 */
+ 		shirq_ras3.regs.base = base;
+ 		ret = spear_shirq_register(&shirq_ras3);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ 3\n");
++			pr_err("Error registering Shared IRQ 3\n");
+ 
+ 		/* shirq 4 */
+ 		shirq_intrcomm_ras.regs.base = base;
+ 		ret = spear_shirq_register(&shirq_intrcomm_ras);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ 4\n");
++			pr_err("Error registering Shared IRQ 4\n");
+ 	}
+ 
+ 	/* pmx initialization */
+@@ -303,6 +305,5 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 
+ 	ret = pmx_register(&pmx_driver);
+ 	if (ret)
+-		printk(KERN_ERR "padmux: registration failed. err no: %d\n",
+-				ret);
++		pr_err("padmux: registration failed. err no: %d\n", ret);
+ }
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index deaaf19..7bd39c0 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -11,6 +11,8 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#define pr_fmt(fmt) "SPEAr320: " fmt
++
+ #include <linux/ptrace.h>
+ #include <asm/irq.h>
+ #include <plat/shirq.h>
+@@ -527,19 +529,19 @@ void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 		shirq_ras1.regs.base = base;
+ 		ret = spear_shirq_register(&shirq_ras1);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ 1\n");
++			pr_err("Error registering Shared IRQ 1\n");
+ 
+ 		/* shirq 3 */
+ 		shirq_ras3.regs.base = base;
+ 		ret = spear_shirq_register(&shirq_ras3);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ 3\n");
++			pr_err("Error registering Shared IRQ 3\n");
+ 
+ 		/* shirq 4 */
+ 		shirq_intrcomm_ras.regs.base = base;
+ 		ret = spear_shirq_register(&shirq_intrcomm_ras);
+ 		if (ret)
+-			printk(KERN_ERR "Error registering Shared IRQ 4\n");
++			pr_err("Error registering Shared IRQ 4\n");
+ 	}
+ 
+ 	/* pmx initialization */
+@@ -550,6 +552,5 @@ void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 
+ 	ret = pmx_register(&pmx_driver);
+ 	if (ret)
+-		printk(KERN_ERR "padmux: registration failed. err no: %d\n",
+-				ret);
++		pr_err("padmux: registration failed. err no: %d\n", ret);
+ }
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index b1733c3..a236925 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -11,6 +11,8 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#define pr_fmt(fmt) "SPEAr3xx: " fmt
++
+ #include <linux/types.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/ptrace.h>
+-- 
+1.7.10.rc2.10.gb47606
