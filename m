@@ -1,44 +1,88 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Wed, 28 Mar 2012 16:01:13 +0200
-Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
-Message-ID: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 28 Mar 2012 14:16:13 +0000
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+ <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
+ <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the compilation errors after the patches
-from series mc13xxx-add-I2C-support-V4 were applied.
+On Wed, Mar 21, 2012 at 19:30:01, Shilimkar, Santosh wrote:
+> On Wed, Mar 21, 2012 at 5:12 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> > On Mon, Mar 19, 2012 at 17:45:32, Shilimkar, Santosh wrote:
+> >> On Monday 19 March 2012 05:14 PM, Ming Lei wrote:
+> >> > On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> >> >>
+> >> >> I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
+> >> >> It will always use 32k-counter, and never fall back to dmtimer.
+> >> >>
+> >> >> Then the only options we have here is,
+> >> >>
+> >> >> 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
+> >> >> ? Kernel pick up best rating clocksource out of these two.
+> >> >>
+> >> >> ? In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
+> >> >> ? Rating. User can choose the 32k-counter clocksource via bootargs.
+> >> >>
+> >> >> ? Impact: without bootargs for clocksource selection, kernel will choose
+> >> >> ? ? dmtimer, impacting loss of time during suspend/resume.
+> >> >>
+> >> This is the right option. The problem is gptimer clocksource
+> >> doesn't work across power transitions and hence it is broken.
+> >>
+> >> Even for the perf, with PM enabled, dmtimer can't be used or it needs
+> >> to be used with 32KHz clock which makes it no better than sync timer.
+> >>
+> >> So here keeping 32K sync timer is default clocksource makes sense since
+> >> it is the only working and viable option.
+> >>
+> >> So what can be done is register both 32K and gptimer together but make
+> >> gptimer clocksource registration depends on PM enabled.
+> >>
+> >> This should solve all the needs I guess.
+> >>
+> >
+> > I am not sure this will work on all platforms, for example, AM33XX, where
+> > We do not have 32ksync timer available, but we need PM support. Also, I
+> > personally think, we should not again use compile time option here.
+> >
+> Why not ?
+> If 32ksync timer is not available, don't register it. Then in AM case
+> you just have one clock-source. 
 
-Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
----
- drivers/mfd/Kconfig        |    2 ++
- drivers/mfd/mc13xxx-core.c |    2 +-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+In case of AM33xx, what about kernel without PM support?
+As clocksource registration would be dependent on PM option, it won't work.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index c3fbc5e..2119732 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -577,6 +577,8 @@ config MFD_MC13XXX
- 	depends on SPI_MASTER || I2C
- 	select MFD_CORE
- 	select MFD_MC13783
-+	select REGMAP_I2C if I2C
-+	select REGMAP_SPI if SPI_MASTER
- 	help
- 	  Enable support for the Freescale MC13783 and MC13892 PMICs.
- 	  This driver provides common support for accessing the device,
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index 31dbf91..5a60273 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -616,7 +616,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
- #ifdef CONFIG_OF
- static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
- {
--	struct device_node *np = mc13xxx->dev.of_node;
-+	struct device_node *np = mc13xxx->dev->of_node;
- 
- 	if (!np)
- 		return -ENODEV;
--- 
-1.7.0.4
+> I am against the idea of making
+> gptimer as the default and asking user to choose sync32k from
+> command-line.
+> 
+
+I understand your concern here.
+
+
+> Btw, if you need PM, how are you going to use GPTIMER
+> as a clocksource. Note sys-clock is generally stopped in
+> low power states. So that leaves you option with using
+> gptimer with 32K clock and in that case, GPTIMER
+> is not a better clock-source compare to 32K sync timer
+> and so shouldn't be the rating.
+> 
+
+AM33xx has GPTIMER1 in wakeup domain, so that we are already using as a
+Clocksource, without any issues.
+
+Thanks,
+Vaibhav
+
+> Regards
+> Santosh
+> 
