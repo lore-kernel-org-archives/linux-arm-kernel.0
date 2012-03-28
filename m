@@ -1,36 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Mar 2012 12:42:08 +0100
-Subject: [PATCH] ARM: Samsung: Make PM_GENERIC_DOMAINS config depend on
- CONFIG_PM
-In-Reply-To: <CAJuYYwRR6eo8LruyOtyi3Sp96jydRvPFhMnbF6wfk55eM-zjbw@mail.gmail.com>
-References: <1332843404-25476-1-git-send-email-thomas.ab@samsung.com>
- <20120328105122.GF3232@opensource.wolfsonmicro.com>
- <CAJuYYwQgZqN6nguddjS6bjLhx_ZhUZ5AfcrSAKBa7Ft-Bn6wPQ@mail.gmail.com>
- <20120328113419.GM3232@opensource.wolfsonmicro.com>
- <CAJuYYwRR6eo8LruyOtyi3Sp96jydRvPFhMnbF6wfk55eM-zjbw@mail.gmail.com>
-Message-ID: <20120328114208.GP3232@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 28 Mar 2012 13:44:37 +0200
+Subject: [PATCH v2 1/3] mmc: atmel-mci: correct data timeout computation
+In-Reply-To: <1332930513-14893-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
+ <1332930513-14893-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <4F72F9A5.60900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 05:07:03PM +0530, Thomas Abraham wrote:
-> On 28 March 2012 17:04, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+On 03/28/2012 12:28 PM, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> The HSMCI operates at a rate of up to Master Clock divided by two.
+> Moreover previous calculation can cause overflows and so wrong
+> timeouts.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> > Right, this does seem like something which it'd be better to handle
-> > more gracefully in the PM core.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> Ok. Selecting PM_GENERIC_DOMAINS without checking for dependency on PM
-> did not seem correct.
+> Cc: stable <stable@vger.kernel.org>
+> ---
+>  drivers/mmc/host/atmel-mci.c |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index e4449a5..3a57964 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -480,7 +480,14 @@ err:
+>  static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
+>  					unsigned int ns)
+>  {
+> -	return (ns * (host->bus_hz / 1000000) + 999) / 1000;
+> +	/*
+> +	 * It is easier here to use us instead of ns for the timeout,
+> +	 * it prevents from overflows during calculation.
+> +	 */
+> +	unsigned int us = DIV_ROUND_UP(ns, 1000);
+> +
+> +	/* Maximum clock frequency is host->bus_hz/2 */
+> +	return us * (DIV_ROUND_UP(host->bus_hz, 2000000));
+>  }
+>  
+>  static void atmci_set_timeout(struct atmel_mci *host,
 
-I dunno, perhaps the PM guys will disagree but it seems like if the
-idiomatic way to use this is to select it the API ought to cope with
-being selected when half enabled.
 
-As I've said before I'm in favour of just making CONFIG_PM non-optional,
-I'm not convinced there's much meaningful use case for disabling it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120328/88fd7cbf/attachment.sig>
+-- 
+Nicolas Ferre
