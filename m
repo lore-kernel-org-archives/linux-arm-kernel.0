@@ -1,41 +1,43 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 27 Mar 2012 16:47:59 -0700
-Subject: [V2 2/4] rtc: fix 88pm860x rtc irq enable callback
-In-Reply-To: <1331259874-26503-1-git-send-email-jtzhou@marvell.com>
-References: <1329997662-2931-1-git-send-email-jtzhou@marvell.com>
- <1331259874-26503-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20120327164759.ec04c62e.akpm@linux-foundation.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 28 Mar 2012 11:01:14 +1100
+Subject: [PATCH v2.1 01/10] cpu: Introduce clear_tasks_mm_cpumask() helper
+In-Reply-To: <20120325174210.GA23605@redhat.com>
+References: <20120324102609.GA28356@lizard> <20120324102751.GA29067@lizard>
+ <1332593021.16159.27.camel@twins> <20120324164316.GB3640@lizard>
+ <20120325174210.GA23605@redhat.com>
+Message-ID: <1332892874.2882.66.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  9 Mar 2012 10:24:34 +0800
-"Jett.Zhou" <jtzhou@marvell.com> wrote:
-
-> According to 88pm860x spec, rtc alarm irq enable control is bit3 for
-> RTC_ALARM_EN, so fix it.
+On Sun, 2012-03-25 at 19:42 +0200, Oleg Nesterov wrote:
+> > Also, Per Peter Zijlstra's idea, now we don't grab tasklist_lock in
+> > the new helper, instead we take the rcu read lock. We can do this
+> > because the function is called after the cpu is taken down and
+> marked
+> > offline, so no new tasks will get this cpu set in their mm mask.
 > 
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-> ---
->  drivers/rtc/rtc-88pm860x.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> And only powerpc needs rcu_read_lock() and task_lock().
 > 
-> diff --git a/drivers/rtc/rtc-88pm860x.c b/drivers/rtc/rtc-88pm860x.c
-> index f04761e..8b72b4c 100644
-> --- a/drivers/rtc/rtc-88pm860x.c
-> +++ b/drivers/rtc/rtc-88pm860x.c
-> @@ -72,9 +72,9 @@ static int pm860x_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
->  	struct pm860x_rtc_info *info = dev_get_drvdata(dev);
->  
->  	if (enabled)
-> -		pm860x_set_bits(info->i2c, PM8607_RTC1, ALARM, ALARM);
-> +		pm860x_set_bits(info->i2c, PM8607_RTC1, ALARM_EN, ALARM_EN);
->  	else
-> -		pm860x_set_bits(info->i2c, PM8607_RTC1, ALARM, 0);
-> +		pm860x_set_bits(info->i2c, PM8607_RTC1, ALARM_EN, 0);
->  	return 0;
->  }
+> OTOH, I do not understand why powepc does this on CPU_DEAD...
+> And probably CPU_UP_CANCELED doesn't need to clear mm_cpumask().
+> 
+> That said, personally I think these patches are fine, the common
+> helper makes sense. 
 
-It's surprising that the driver has been in-tree for a year and nobody
-has noticed this bug.  This makes me wonder if the fix is wrong.
+Not strictly speaking a problem with this patch, but I was wondering...
 
-Has the patch been runtime tested?
+Do we know for sure that the mmu context has been fully flushed out
+before the unplug ? idle_task_exit() will do a context switch but in our
+case that may not be enough.
+
+Once the CPU is offline, tlb flushes won't hit it any more so it can get
+out of sync (in some cases the offlining process is just some kind of
+deep sleep loop that doesn't involve a TLB state loss).
+
+Should we add a flush_tlb_mm of all those bits in that loop ? that would
+be a tad expensive... we don't have a flush_tlb_all() as a generic kind
+of accessors, but we could add something like that as a requirement for
+ppc_md.cpu_die ?
+
+Cheers,
+Ben.
