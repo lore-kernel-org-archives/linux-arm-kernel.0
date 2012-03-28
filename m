@@ -1,43 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 28 Mar 2012 16:38:40 +0200
-Subject: [PATCHv2 01/14] common: dma-mapping: introduce alloc_attrs and
- free_attrs methods
-In-Reply-To: <4F72F603.2000803@mvista.com>
-References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
- <1332855768-32583-2-git-send-email-m.szyprowski@samsung.com>
- <4F72F603.2000803@mvista.com>
-Message-ID: <016001cd0cf0$7807bdb0$68173910$%szyprowski@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Mar 2012 15:40:17 +0100
+Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
+In-Reply-To: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
+References: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
+Message-ID: <20120328144017.GV3232@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Wed, Mar 28, 2012 at 04:01:13PM +0200, Alex Gershgorin wrote:
 
-On Wednesday, March 28, 2012 1:29 PM Sergei Shtylyov wrote:
+> index c3fbc5e..2119732 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -577,6 +577,8 @@ config MFD_MC13XXX
+>  	depends on SPI_MASTER || I2C
+>  	select MFD_CORE
+>  	select MFD_MC13783
+> +	select REGMAP_I2C if I2C
+> +	select REGMAP_SPI if SPI_MASTER
+>  	help
+>  	  Enable support for the Freescale MC13783 and MC13892 PMICs.
+>  	  This driver provides common support for accessing the device,
 
-> On 27-03-2012 17:42, Marek Szyprowski wrote:
-> 
-> > Introduce new generic alloc and free methods with attributes argument.
-> 
->     The method names don't match the ones in the subject.
+I'd really expect this to be squashed into the patches adding the regmap
+usage for I2C and SPI, how can those patches work without this?
 
-Right, I will reword the subject to "common: dma-mapping: introduce generic alloc()
-and free() methods".
+> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+> index 31dbf91..5a60273 100644
+> --- a/drivers/mfd/mc13xxx-core.c
+> +++ b/drivers/mfd/mc13xxx-core.c
+> @@ -616,7 +616,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
+>  #ifdef CONFIG_OF
+>  static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
+>  {
+> -	struct device_node *np = mc13xxx->dev.of_node;
+> +	struct device_node *np = mc13xxx->dev->of_node;
 
-> > Existing alloc_coherent and free_coherent can be implemented on top of the
-> > new calls with NULL attributes argument. Later also dma_alloc_non_coherent
-> > can be implemented using DMA_ATTR_NONCOHERENT attribute as well as
-> > dma_alloc_writecombine with separate DMA_ATTR_WRITECOMBINE attribute.
-> 
-> > This way the drivers will get more generic, platform independent way of
-> > allocating dma buffers with specific parameters.
-> 
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Reviewed-by: David Gibson <david@gibson.dropbear.ud.au>
-> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> 
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+This looks like it should be submitted properly as a bug fix for
+inclusion on 3.4 or squashed into whatever change introduces the issue
+if it's not present in 3.4.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120328/161ab84e/attachment.sig>
