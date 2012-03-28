@@ -1,41 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 28 Mar 2012 02:05:50 -0700
-Subject: [GIT PULL 1/5] ARM: cleanups of io includes
-In-Reply-To: <20120328082501.GA22414@n2100.arm.linux.org.uk>
-References: <1332918842-13521-1-git-send-email-olof@lixom.net>
- <1332918842-13521-2-git-send-email-olof@lixom.net>
- <20120328082501.GA22414@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMjwZOON9kFNvaEq8QhSvjAgsJT_J1Ysb9-AbePd6g+-rQ@mail.gmail.com>
+From: zengzm.kernel@gmail.com (Zeng Zhaoming)
+Date: Wed, 28 Mar 2012 17:05:58 +0800
+Subject: [PATCH] ASoC: sgtl5000: fix power on/off of MIC bias
+In-Reply-To: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
+References: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120328090558.GA31596@zzm-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 1:25 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Mar 28, 2012 at 12:13:58AM -0700, Olof Johansson wrote:
->> Rob Herring has done a sweeping change cleaning up all of the mach/io.h includes,
->> moving some of the oft-repeated macros to a common location and removing a bunch of
->> boiler plate. This is another step closer to a common zImage for multiple platforms.
->
-> NAK. ?Linus, do not pull this. ?This breaks PXA compilation, which has
-> been known about for more than a week.
+It is OK to me, Thanks.
 
-The branch contains fixes for the compilation failures, they were
-pulled in right before I staged the tag for the pull request:
+Acked-by: Zeng Zhaoming <zengzm.kernel@gmail.com>
 
-http://marc.info/?l=linux-arm-kernel&m=133272592723334
-
-If you prefer to let it sit in linux-next for a day or two before
-going in, that's fine. But I verified that the original build problem
-introduced was fixed before I sent it out.
-
-Unfortunately, PXA is also broken due to the regulator changes
-mentioned in the above referenced mail, which is already upstream and
-unrelated to the changes in this branch.
-
-Linus; the rest of the pull requests should be OK to go in
-independently of this, so please go ahead with those if you don't
-mind. The only changes to those branches in the last few days is the
-merge resolution I did to the drivers2 branch/tag.
-
-
--Olof
+On Wed 2012-03-28 15:30:33, Shawn Guo wrote:
+> From: Lionel Xu <Lionel.Xu@freescale.com>
+> 
+> There is no sound in the recorded wav, to enable recording, the VAG
+> should be powered up, and the mic bias resistor should be set up with
+> proper value.
+> 
+> Signed-off-by: Lionel Xu <lionel.xu@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Zeng Zhaoming <zengzm.kernel@gmail.com>
+> ---
+>  sound/soc/codecs/sgtl5000.c |   14 +++++++++++---
+>  1 files changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+> index d192626..a24299c 100644
+> --- a/sound/soc/codecs/sgtl5000.c
+> +++ b/sound/soc/codecs/sgtl5000.c
+> @@ -132,11 +132,18 @@ static int mic_bias_event(struct snd_soc_dapm_widget *w,
+>  		snd_soc_update_bits(w->codec, SGTL5000_CHIP_MIC_CTRL,
+>  				SGTL5000_BIAS_R_MASK,
+>  				SGTL5000_BIAS_R_4k << SGTL5000_BIAS_R_SHIFT);
+> +
+> +		snd_soc_update_bits(w->codec, SGTL5000_CHIP_ANA_POWER,
+> +				SGTL5000_VAG_POWERUP, SGTL5000_VAG_POWERUP);
+>  		break;
+>  
+>  	case SND_SOC_DAPM_PRE_PMD:
+>  		snd_soc_update_bits(w->codec, SGTL5000_CHIP_MIC_CTRL,
+> -				SGTL5000_BIAS_R_MASK, 0);
+> +				SGTL5000_BIAS_R_MASK,
+> +				SGTL5000_BIAS_R_off << SGTL5000_BIAS_R_SHIFT);
+> +
+> +		snd_soc_update_bits(w->codec, SGTL5000_CHIP_ANA_POWER,
+> +				SGTL5000_VAG_POWERUP, 0);
+>  		break;
+>  	}
+>  	return 0;
+> @@ -197,7 +204,7 @@ static const struct snd_soc_dapm_widget sgtl5000_dapm_widgets[] = {
+>  	SND_SOC_DAPM_OUTPUT("HP_OUT"),
+>  	SND_SOC_DAPM_OUTPUT("LINE_OUT"),
+>  
+> -	SND_SOC_DAPM_MICBIAS_E("Mic Bias", SGTL5000_CHIP_MIC_CTRL, 8, 0,
+> +	SND_SOC_DAPM_MICBIAS_E("Mic Bias", SND_SOC_NOPM, 0, 0,
+>  				mic_bias_event,
+>  				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+>  
+> @@ -229,7 +236,8 @@ static const struct snd_soc_dapm_widget sgtl5000_dapm_widgets[] = {
+>  /* routes for sgtl5000 */
+>  static const struct snd_soc_dapm_route sgtl5000_dapm_routes[] = {
+>  	{"Capture Mux", "LINE_IN", "LINE_IN"},	/* line_in --> adc_mux */
+> -	{"Capture Mux", "MIC_IN", "MIC_IN"},	/* mic_in --> adc_mux */
+> +	{"Mic Bias", NULL, "MIC_IN"},		/* mic_in --> mic bias */
+> +	{"Capture Mux", "MIC_IN", "Mic Bias"},	/* mic bias --> adc_mux */
+>  
+>  	{"ADC", NULL, "Capture Mux"},		/* adc_mux --> adc */
+>  	{"AIFOUT", NULL, "ADC"},		/* adc --> i2s_out */
+> -- 
+> 1.7.4.1
