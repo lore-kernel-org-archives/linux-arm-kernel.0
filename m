@@ -1,31 +1,121 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Wed, 28 Mar 2012 22:13:28 +0100
-Subject: [PATCH 2/5] arm: Use the plat_nand default partition parser
-In-Reply-To: <201203281113.10684.hartleys@visionengravers.com>
-References: <201203281113.10684.hartleys@visionengravers.com>
-Message-ID: <20120328211327.GC6586@marmot>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 28 Mar 2012 14:20:30 -0700
+Subject: [PATCH 04/10] clk: declare clk_ops of basic clks in clk-provider.h
+In-Reply-To: <1332833009-4121-5-git-send-email-shawn.guo@linaro.org>
+References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
+ <1332833009-4121-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAJOA=zOCyCVG-uk_BoO1fj0Tt6p2WbWgtktP5arjGqjk9RyhXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* H Hartley Sweeten <hartleys@visionengravers.com> [2012-03-28 11:13:09-0700]:
+On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Besides the static initialization, the clk_ops of basic clks could
+> also be used by particular clk type being subclass of the basic clks.
 >
-> Use the default partition parser, cmdlinepart, provided by the plat_nand driver.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Alexander Clouter <alex@digriz.org.uk>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Marek Vasut <marek.vasut@gmail.com>
-> 
-Acked-by: Alexander Clouter <alex@digriz.org.uk>
+> For example, clk_busy_divider has the same clk_ops as clk_divider,
+> except it has to wait for a busy bit before return success with
+> .set_rate. ?clk_busy_divider will somehow reuse clk_ops of clk_divider.
+>
+> Since clk-provider.h is included by clk-private.h, it's safe to move
+> those clk_ops declaration of basic clks form ?clk-private.h into
+> clk-provider.h, so that implementation of clks like clk_busy_divider
+> above do not need to include clk-private.h to access those clk_ops.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks
+Hi Shawn,
 
--- 
-Alexander Clouter
-.sigmonster says: The only rose without thorns is friendship.
+Thanks for the patch.  After Andrew's response on using clk_ops over
+the EXPORT'd functions I'll take this in my fixes branch.
+
+Mike
+
+> ---
+> ?include/linux/clk-private.h ?| ? ?8 --------
+> ?include/linux/clk-provider.h | ? ?4 ++++
+> ?2 files changed, 4 insertions(+), 8 deletions(-)
+>
+> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+> index 5f4ccd7..f19fee0 100644
+> --- a/include/linux/clk-private.h
+> +++ b/include/linux/clk-private.h
+> @@ -55,8 +55,6 @@ struct clk {
+> ?* alternative macro for static initialization
+> ?*/
+>
+> -extern const struct clk_ops clk_fixed_rate_ops;
+> -
+> ?#define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate, ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_fixed_rate_flags) ? ? ? ? ? ? ?\
+> ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> @@ -78,8 +76,6 @@ extern const struct clk_ops clk_fixed_rate_ops;
+> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?};
+>
+> -extern const struct clk_ops clk_gate_ops;
+> -
+> ?#define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr, ? ? ?\
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _bit_idx, ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_gate_flags, _lock) ? ? ? ? ? ? \
+> @@ -110,8 +106,6 @@ extern const struct clk_ops clk_gate_ops;
+> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?};
+>
+> -extern const struct clk_ops clk_divider_ops;
+> -
+> ?#define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr, ? \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _shift, _width, ? \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_divider_flags, _lock) ? ? ? ? ?\
+> @@ -143,8 +137,6 @@ extern const struct clk_ops clk_divider_ops;
+> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?};
+>
+> -extern const struct clk_ops clk_mux_ops;
+> -
+> ?#define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags, \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_reg, _shift, _width, ? ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_mux_flags, _lock) ? ? ? ? ? ? ?\
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 5508897..6eb8e5d 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -149,6 +149,7 @@ struct clk_fixed_rate {
+> ? ? ? ?u8 ? ? ? ? ? ? ?flags;
+> ?};
+>
+> +extern const struct clk_ops clk_fixed_rate_ops;
+> ?struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
+> ? ? ? ? ? ? ? ?unsigned long fixed_rate);
+> @@ -180,6 +181,7 @@ struct clk_gate {
+>
+> ?#define CLK_GATE_SET_TO_DISABLE ? ? ? ? ? ? ? ?BIT(0)
+>
+> +extern const struct clk_ops clk_gate_ops;
+> ?struct clk *clk_register_gate(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
+> ? ? ? ? ? ? ? ?void __iomem *reg, u8 bit_idx,
+> @@ -218,6 +220,7 @@ struct clk_divider {
+> ?#define CLK_DIVIDER_ONE_BASED ? ? ? ? ?BIT(0)
+> ?#define CLK_DIVIDER_POWER_OF_TWO ? ? ? BIT(1)
+>
+> +extern const struct clk_ops clk_divider_ops;
+> ?struct clk *clk_register_divider(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
+> ? ? ? ? ? ? ? ?void __iomem *reg, u8 shift, u8 width,
+> @@ -252,6 +255,7 @@ struct clk_mux {
+> ?#define CLK_MUX_INDEX_ONE ? ? ? ? ? ? ?BIT(0)
+> ?#define CLK_MUX_INDEX_BIT ? ? ? ? ? ? ?BIT(1)
+>
+> +extern const struct clk_ops clk_mux_ops;
+> ?struct clk *clk_register_mux(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?char **parent_names, u8 num_parents, unsigned long flags,
+> ? ? ? ? ? ? ? ?void __iomem *reg, u8 shift, u8 width,
+> --
+> 1.7.5.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
