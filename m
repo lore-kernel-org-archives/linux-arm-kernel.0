@@ -1,39 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Mar 2012 17:13:05 +0100
-Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
- em-x270.c
-In-Reply-To: <4F73356D.5080401@windriver.com>
-References: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
- <1331244366-6147-1-git-send-email-paul.gortmaker@windriver.com>
- <4F732C97.2030804@compulab.co.il>
- <20120328152743.GW3232@opensource.wolfsonmicro.com>
- <4F73356D.5080401@windriver.com>
-Message-ID: <20120328161305.GZ3232@opensource.wolfsonmicro.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Wed, 28 Mar 2012 18:31:04 +0200
+Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
+In-Reply-To: <20120328144017.GV3232@opensource.wolfsonmicro.com>
+References: <1332943273-22447-1-git-send-email-alexg@meprolight.com>,
+ <20120328144017.GV3232@opensource.wolfsonmicro.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD25@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 11:59:41AM -0400, Paul Gortmaker wrote:
-> On 12-03-28 11:27 AM, Mark Brown wrote:
 
-> static struct platform_device em_x270_gps_userspace_consumer = {
->         .name           = "reg-userspace-consumer",
->         .id             = 0,
+On Wed, Mar 28, 2012 at 04:01:13PM +0200, Alex Gershgorin wrote:
 
-> static struct platform_device em_x270_gprs_userspace_consumer = {
->         .name           = "reg-userspace-consumer",
->         .id             = 1,
+> index c3fbc5e..2119732 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -577,6 +577,8 @@ config MFD_MC13XXX
+>       depends on SPI_MASTER || I2C
+>       select MFD_CORE
+>       select MFD_MC13783
+> +     select REGMAP_I2C if I2C
+> +     select REGMAP_SPI if SPI_MASTER
+>       help
+>         Enable support for the Freescale MC13783 and MC13892 PMICs.
+>         This driver provides common support for accessing the device,
 
-> Note that the existing names currently don't incorporate the .id
-> field as a suffix, and so never were unique.
+> > I'd really expect this to be squashed into the patches adding the regmap
+> > usage for I2C and SPI, how can those patches work without this?
 
-No, this is just a basic part of how platform devices work - the device
-name is always the same and if you've got more than one of them they get
-different .ids.  dev_name() returns name.id, or just name if id is set
-to -1 indicating that there's onyl one device of a given type.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120328/6c767616/attachment.sig>
+You ask me about another solution?
+ 
+> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+> index 31dbf91..5a60273 100644
+> --- a/drivers/mfd/mc13xxx-core.c
+> +++ b/drivers/mfd/mc13xxx-core.c
+> @@ -616,7 +616,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
+>  #ifdef CONFIG_OF
+>  static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
+>  {
+> -     struct device_node *np = mc13xxx->dev.of_node;
+> +     struct device_node *np = mc13xxx->dev->of_node;
+
+> >This looks like it should be submitted properly as a bug fix for
+> >inclusion on 3.4 or squashed into whatever change introduces the issue
+> >if it's not present in 3.4.
+
+Ok 
+
+  
