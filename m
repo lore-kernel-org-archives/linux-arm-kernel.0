@@ -1,25 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Mar 2012 19:37:12 +0200
-Subject: [PATCH] ARM: ux500: fix compile error in new timer code
-In-Reply-To: <1332931787-27741-1-git-send-email-lee.jones@linaro.org>
-References: <1332931787-27741-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbi3JM_iGmWiV9pF0Pff+p9_4taw1aQOpgzprgrnLFdWQ@mail.gmail.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Wed, 28 Mar 2012 19:38:56 +0200
+Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
+In-Reply-To: <20120328163512.GB3232@opensource.wolfsonmicro.com>
+References: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
+ <20120328144017.GV3232@opensource.wolfsonmicro.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD25@MEP-EXCH.meprolight.com>,
+ <20120328163512.GB3232@opensource.wolfsonmicro.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD26@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 12:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+ 
+> You ask me about another solution?
 
-> This patch fixes the errors below:
->
-> error: implicit declaration of function ?pr_err?
-> error: implicit declaration of function ?BUG?
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > I'm saying either I'm missing something or this needs to be fixed in the
+> > patches that introduce the regmap usage.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+You understood correctly, it took me time to understand :-)
+No problem I can split this patch:
 
-I'll apply and funnel to ARM-SoC when I'm back in Europe unless
-you want to push it to Arnd/Olof directly.
+> > +     select REGMAP_I2C if I2C
+> > +     select REGMAP_SPI if SPI_MASTER
 
-Thanks,
-Linus Walleij
+It will go to  v4 mfd: mc13xxx-core: use regmap for register access, 
+
+Only the second part will be in this patch
+
+-	struct device_node *np = mc13xxx->dev.of_node;
++	struct device_node *np = mc13xxx->dev->of_node;
+
+ 
