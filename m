@@ -1,43 +1,67 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 28 Mar 2012 08:10:20 +0200
-Subject: [PATCHv2 09/14] Unicore32: adapt for dma_map_ops changes
-In-Reply-To: <4F7275FE.8000100@mprc.pku.edu.cn>
-References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
- <1332855768-32583-10-git-send-email-m.szyprowski@samsung.com>
- <4F7275FE.8000100@mprc.pku.edu.cn>
-Message-ID: <00ac01cd0ca9$7508f4e0$5f1adea0$%szyprowski@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 28 Mar 2012 06:32:33 +0000
+Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
+ OMAP4 onwards
+In-Reply-To: <1332842311-12308-1-git-send-email-rnayak@ti.com>
+References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Mar 27, 2012 at 15:28:31, Nayak, Rajendra wrote:
+> Some functions like _omap4_disable_module() and _omap4_wait_target_disable()
+> are (will be) used on all OMAPs OMAP4 and beyond which support module level
+> control. Fix the error checks in these functions to return if called on
+> any platform pre OMAP4 (i.e OMAP2 and OMAP3) instead of checking for
+> !cpu_is_omap44xx(). This avoids having to update the error check with a
+> '&& !cpu_is_omap54xx()' when OMAP5 is introduced and possibly similar updates
+> when further OMAP generations are added.
+> 
 
-On Wednesday, March 28, 2012 4:23 AM Guan Xuetao wrote:
+Let me add some flavor here :)
 
-> On 03/27/2012 09:42 PM, Marek Szyprowski wrote:
-> > diff --git a/arch/unicore32/mm/dma-swiotlb.c b/arch/unicore32/mm/dma-swiotlb.c
-> > index bfa9fbb..4cf5f0c 100644
-> > --- a/arch/unicore32/mm/dma-swiotlb.c
-> > +++ b/arch/unicore32/mm/dma-swiotlb.c
-> > @@ -17,9 +17,23 @@
-> >
-> >   #include<asm/dma.h>
-> >
-> > +static void *unicore_swiotlb_alloc_coherent(struct device *dev, size_t size,
-> > +					    dma_addr_t *dma_handle, gfp_t flags,
-> > +					    struct dma_attrs *attrs)
-> > +{
-> > +	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
-> > +}
-> > +
-> > +static void unicode_swiotlb_free_coherent(struct device *dev, size_t size,
-> The bit is ok for me. Only a typo here, please change unicode to unicore.
+AM33xx, which has module level control, but falls under OMAP3 family of 
+devices. cpu_is_omap34xx() is true for AM33xx device and we have to add 
+check in all these functions. And I am sure we will have many of such 
+devices in the future.
 
-Ups, I'm sorry for that typo. I've fixed it on my git tree:
+Can we use some flag based option here, instead of cpu_is_xxx() check?
 
-http://git.linaro.org/gitweb?p=people/mszyprowski/linux-dma-mapping.git;a=commitdiff;h=bbe43c05b0653
-9c09f89e07bcaf61ea0fca8d67f
+Thanks,
+Vaibhav
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 8ac26f2..f2a9afa 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -808,7 +808,7 @@ static void _enable_module(struct omap_hwmod *oh)
+>   */
+>  static int _omap4_wait_target_disable(struct omap_hwmod *oh)
+>  {
+> -	if (!cpu_is_omap44xx())
+> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+>  		return 0;
+>  
+>  	if (!oh)
+> @@ -838,7 +838,7 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
+>  	int v;
+>  
+>  	/* The module mode does not exist prior OMAP4 */
+> -	if (!cpu_is_omap44xx())
+> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+>  		return -EINVAL;
+>  
+>  	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
