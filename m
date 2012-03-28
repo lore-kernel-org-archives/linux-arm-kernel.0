@@ -1,33 +1,43 @@
-From: dan.j.williams@intel.com (Williams, Dan J)
-Date: Wed, 28 Mar 2012 01:30:37 -0700
-Subject: [PATCH V2] iop-adma: Corrected array overflow in RAID6 Xscale(R)
- test.
-In-Reply-To: <1331834850-27409-1-git-send-email-don.morris@hp.com>
-References: <1331834850-27409-1-git-send-email-don.morris@hp.com>
-Message-ID: <CABE8wwsP+o9AeSYW1wUJLfZ6y1v9c8EXT8b3nfTDiDdKW0fA+A@mail.gmail.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Wed, 28 Mar 2012 12:28:33 +0200
+Subject: [PATCH v2 1/3] mmc: atmel-mci: correct data timeout computation
+In-Reply-To: <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1332930513-14893-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 11:07 AM, Don Morris <don.morris@hp.com> wrote:
-> Bug: cppcheck reported overflow in array assignment (for loop walks
-> 0 to IOP_ADMA_NUM_SRC_TEST+2, array size is IOP_ADMA_NUM_SRC_TEST).
->
-> Reported as: https://bugzilla.kernel.org/show_bug.cgi?id=42677
->
-> Test code pq_src array was grown by two elements to correspond with actual
-> usage (IOP_ADMA_NUM_SRC_TEST+2), stack consumption was kept constant by
-> modifying the pq_dest two element array which is only used when pq_src
-> is referenced up to IOP_ADMA_NUM_SRC_TEST elements into the address
-> of the new last two elements of the pq_src array. This is presumed to
-> be the original intent but would be reliant on compilers always having
-> pq_dest contiguous with the final element of pq_src.
->
-> Note: This is a re-send of a request for review from two weeks ago.
-> Looking for review (or shootdown), adding LKML to list for a wider
-> audience. Thanks.
->
-> Updated per review comments of Sergei Shtylyov <sshtylyov@mvista.com>
->
-> Signed-off-by: Don Morris <don.morris@hp.com>
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Applied, thanks, and I'll send it along for Vinod's tree.
+The HSMCI operates at a rate of up to Master Clock divided by two.
+Moreover previous calculation can cause overflows and so wrong
+timeouts.
+
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: stable <stable@vger.kernel.org>
+---
+ drivers/mmc/host/atmel-mci.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index e4449a5..3a57964 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -480,7 +480,14 @@ err:
+ static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
+ 					unsigned int ns)
+ {
+-	return (ns * (host->bus_hz / 1000000) + 999) / 1000;
++	/*
++	 * It is easier here to use us instead of ns for the timeout,
++	 * it prevents from overflows during calculation.
++	 */
++	unsigned int us = DIV_ROUND_UP(ns, 1000);
++
++	/* Maximum clock frequency is host->bus_hz/2 */
++	return us * (DIV_ROUND_UP(host->bus_hz, 2000000));
+ }
+ 
+ static void atmci_set_timeout(struct atmel_mci *host,
+-- 
+1.7.5.4
