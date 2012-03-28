@@ -1,31 +1,37 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 28 Mar 2012 12:36:39 -0700
-Subject: [GIT PULL 4/5] ARM: More device tree support updates
-In-Reply-To: <1332918842-13521-5-git-send-email-olof@lixom.net>
-References: <1332918842-13521-1-git-send-email-olof@lixom.net>
- <1332918842-13521-5-git-send-email-olof@lixom.net>
-Message-ID: <CA+55aFy4QNiDTL2b37Y870kZ-09sFp9qsFn+SaKCbzWqm8xtoQ@mail.gmail.com>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Wed, 28 Mar 2012 21:45:14 +0200
+Subject: Handling device shared SFR on dt platform
+In-Reply-To: <20120324193200.822AD3E0B06@localhost>
+References: <4F6A5853.9090809@gmail.com> <20120324193200.822AD3E0B06@localhost>
+Message-ID: <4F736A4A.6050302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 12:14 AM, Olof Johansson <olof@lixom.net> wrote:
+Hello Grant,
+
+On 03/24/2012 08:32 PM, Grant Likely wrote:
 >
-> Merge conflicts and proposed solutions:
->
-> arch/arm/mach-ux500/Kconfig: Two new config options. Keep both.
+> Generally, this is handled by having a third node for the shared
+> register block and both device nodes holding a phandle to it.
+> 
+> No, there isn't any common infrastructure for implementing this, but
+> it isn't very much code.
 
-Guys, I'm seeing merge problems that go way beyond this.
+Thank you, that sounds good. I'm just wondering how to handle the shared
+resource access synchronisation. There is an IORESOURCE_MUXED resource type 
+flag which could be used to prevent drivers from stomping on each others 
+feet when accessing the shared register, if I understand the software muxed
+resource semantics correctly. That is, using something like 
+request_muxed_(mem_)region()/release_mem_region() for the shared register
+protection.
 
-Look at that MACH_U8500 config option. It got renamed to MACH_MOP500,
-but it continues to live in the tree.
+What concerns me, is an overhead from region request/ioremap(?)/release, just
+to access a single 32-bit register. I'm going to see if those accesses could
+be moved to only device driver's probe() and remove() callbacks and what might
+be the resulting power consumption increase from that, if any.
 
-This rename conflict happened earlier and I didn't notice (grep for
-it: it's used by a staging driver), so it's already in my pushed out
-tree. But it seems to be getting worse, and your proposed merge
-solution doesn't cover it.
 
-I'll try to fix things up, but you need to verify my merge. And you
-guys should have noticed and noted it, rather than leave it to my
-random bumbling about.
+--
 
-                     Linus
+Thanks,
+Sylwester
