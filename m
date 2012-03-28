@@ -1,121 +1,61 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 28 Mar 2012 14:20:30 -0700
-Subject: [PATCH 04/10] clk: declare clk_ops of basic clks in clk-provider.h
-In-Reply-To: <1332833009-4121-5-git-send-email-shawn.guo@linaro.org>
-References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
- <1332833009-4121-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAJOA=zOCyCVG-uk_BoO1fj0Tt6p2WbWgtktP5arjGqjk9RyhXg@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Thu, 29 Mar 2012 07:47:50 +1100
+Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
+In-Reply-To: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
+References: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
+Message-ID: <201203290747.50881.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Besides the static initialization, the clk_ops of basic clks could
-> also be used by particular clk type being subclass of the basic clks.
->
-> For example, clk_busy_divider has the same clk_ops as clk_divider,
-> except it has to wait for a busy bit before return success with
-> .set_rate. ?clk_busy_divider will somehow reuse clk_ops of clk_divider.
->
-> Since clk-provider.h is included by clk-private.h, it's safe to move
-> those clk_ops declaration of basic clks form ?clk-private.h into
-> clk-provider.h, so that implementation of clks like clk_busy_divider
-> above do not need to include clk-private.h to access those clk_ops.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Hi,
 
-Hi Shawn,
+As Mark Brown already said, these changes should be squashed into a new 
+version of the patches.
 
-Thanks for the patch.  After Andrew's response on using clk_ops over
-the EXPORT'd functions I'll take this in my fixes branch.
-
-Mike
-
+On Thursday, March 29, 2012 01:01:13 AM Alex Gershgorin wrote:
+> This patch fixes the compilation errors after the patches
+> from series mc13xxx-add-I2C-support-V4 were applied.
+> 
+> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
 > ---
-> ?include/linux/clk-private.h ?| ? ?8 --------
-> ?include/linux/clk-provider.h | ? ?4 ++++
-> ?2 files changed, 4 insertions(+), 8 deletions(-)
->
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index 5f4ccd7..f19fee0 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -55,8 +55,6 @@ struct clk {
-> ?* alternative macro for static initialization
-> ?*/
->
-> -extern const struct clk_ops clk_fixed_rate_ops;
-> -
-> ?#define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate, ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_fixed_rate_flags) ? ? ? ? ? ? ?\
-> ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> @@ -78,8 +76,6 @@ extern const struct clk_ops clk_fixed_rate_ops;
-> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?};
->
-> -extern const struct clk_ops clk_gate_ops;
-> -
-> ?#define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr, ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _bit_idx, ? ? ? ? \
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_gate_flags, _lock) ? ? ? ? ? ? \
-> @@ -110,8 +106,6 @@ extern const struct clk_ops clk_gate_ops;
-> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?};
->
-> -extern const struct clk_ops clk_divider_ops;
-> -
-> ?#define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr, ? \
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _shift, _width, ? \
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_divider_flags, _lock) ? ? ? ? ?\
-> @@ -143,8 +137,6 @@ extern const struct clk_ops clk_divider_ops;
-> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?};
->
-> -extern const struct clk_ops clk_mux_ops;
-> -
-> ?#define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags, \
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_reg, _shift, _width, ? ? ? ? ? \
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_mux_flags, _lock) ? ? ? ? ? ? ?\
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 5508897..6eb8e5d 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -149,6 +149,7 @@ struct clk_fixed_rate {
-> ? ? ? ?u8 ? ? ? ? ? ? ?flags;
-> ?};
->
-> +extern const struct clk_ops clk_fixed_rate_ops;
-> ?struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
-> ? ? ? ? ? ? ? ?unsigned long fixed_rate);
-> @@ -180,6 +181,7 @@ struct clk_gate {
->
-> ?#define CLK_GATE_SET_TO_DISABLE ? ? ? ? ? ? ? ?BIT(0)
->
-> +extern const struct clk_ops clk_gate_ops;
-> ?struct clk *clk_register_gate(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
-> ? ? ? ? ? ? ? ?void __iomem *reg, u8 bit_idx,
-> @@ -218,6 +220,7 @@ struct clk_divider {
-> ?#define CLK_DIVIDER_ONE_BASED ? ? ? ? ?BIT(0)
-> ?#define CLK_DIVIDER_POWER_OF_TWO ? ? ? BIT(1)
->
-> +extern const struct clk_ops clk_divider_ops;
-> ?struct clk *clk_register_divider(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
-> ? ? ? ? ? ? ? ?void __iomem *reg, u8 shift, u8 width,
-> @@ -252,6 +255,7 @@ struct clk_mux {
-> ?#define CLK_MUX_INDEX_ONE ? ? ? ? ? ? ?BIT(0)
-> ?#define CLK_MUX_INDEX_BIT ? ? ? ? ? ? ?BIT(1)
->
-> +extern const struct clk_ops clk_mux_ops;
-> ?struct clk *clk_register_mux(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?char **parent_names, u8 num_parents, unsigned long flags,
-> ? ? ? ? ? ? ? ?void __iomem *reg, u8 shift, u8 width,
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  drivers/mfd/Kconfig        |    2 ++
+>  drivers/mfd/mc13xxx-core.c |    2 +-
+>  2 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index c3fbc5e..2119732 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -577,6 +577,8 @@ config MFD_MC13XXX
+>  	depends on SPI_MASTER || I2C
+>  	select MFD_CORE
+>  	select MFD_MC13783
+> +	select REGMAP_I2C if I2C
+This can go under the "config MFD_MC13XXX_I2C" entry in patch 4/4 (the "if 
+I2C" won't be needed)
+
+> +	select REGMAP_SPI if SPI_MASTER
+This can go under the "config MFD_MC13XXX_SPI" entry in patch 3/4
+
+
+>  	help
+>  	  Enable support for the Freescale MC13783 and MC13892 PMICs.
+>  	  This driver provides common support for accessing the device,
+> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+> index 31dbf91..5a60273 100644
+> --- a/drivers/mfd/mc13xxx-core.c
+> +++ b/drivers/mfd/mc13xxx-core.c
+> @@ -616,7 +616,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx
+> *mc13xxx, const char *format) #ifdef CONFIG_OF
+>  static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
+>  {
+> -	struct device_node *np = mc13xxx->dev.of_node;
+> +	struct device_node *np = mc13xxx->dev->of_node;
+
+Good catch! This can be fixed up in 4/4
+
+@Alex, you seen keen to do this, so I'll leave it to you :)
+Otherwise, I'm happy to do it, just let me know.
+
+Cheers,
+Marc
