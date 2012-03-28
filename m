@@ -1,331 +1,323 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 28 Mar 2012 16:33:57 +0200
-Subject: [PATCH v5 15/16] pwm-backlight: Add rudimentary device tree support
+Date: Wed, 28 Mar 2012 16:33:56 +0200
+Subject: [PATCH v5 14/16] ARM vt8500: Move vt8500 pwm driver to pwm framework
 In-Reply-To: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1332945238-14897-16-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1332945238-14897-15-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds very basic support for device tree probing. Currently,
-only a PWM and a list of distinct brightness levels can be specified.
-Enabling or disabling backlight power via GPIOs is not yet supported.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
+Move the driver to drivers/pwm/ and convert it to use the framework.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Alexey Charkov <alchark@gmail.com>
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v5:
-- use "pwms" fixed property name
-- document brightness-levels and default-brightness-level properties
-- check default-brightness-level against brightness-levels
-- use new PWM API (pwm_get() and pwm_put()), legacy API (pwm_request())
-  as fallback
+- adopt patch by Sascha Hauer to move vt8500 driver to PWM framework
 
-Changes in v4:
-- store a PWM requested with of_pwm_request() in the platform data
+ arch/arm/mach-vt8500/Makefile                      |    2 -
+ drivers/pwm/Kconfig                                |    9 ++
+ drivers/pwm/Makefile                               |    1 +
+ .../mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c  |  169 +++++++-------------
+ 4 files changed, 66 insertions(+), 115 deletions(-)
+ rename arch/arm/mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c (52%)
 
-Changes in v3:
-- use a list of distinct brightness levels instead of a linear range
-  as discussed with Stephen Warren and Mitch Bradley
-
-Changes in v2:
-- avoid oops by keeping a reference to the platform-specific exit()
-  callback
-
-TODO:
-- add fixed-regulator support for backlight enable/disable
-
- .../bindings/video/backlight/pwm-backlight         |   30 ++++
- drivers/video/backlight/Kconfig                    |    2 +-
- drivers/video/backlight/pwm_bl.c                   |  145 +++++++++++++++++---
- include/linux/pwm_backlight.h                      |    1 +
- 4 files changed, 157 insertions(+), 21 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/video/backlight/pwm-backlight
-
-diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
-new file mode 100644
-index 0000000..bc2d08d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
-@@ -0,0 +1,30 @@
-+pwm-backlight bindings
-+
-+Required properties:
-+  - compatible: "pwm-backlight"
-+  - pwms: OF device-tree PWM specification (see PWM binding[0])
-+  - num-brightness-levels: number of distinct brightness levels
-+  - brightness-levels: Array of distinct brightness levels. Typically these
-+      are in the range from 0 to 255, but any range starting at 0 will do.
-+      The actual brightness level (PWM duty cycle) will be interpolated
-+      from these values. 0 means a 0% duty cycle (darkest/off), while the
-+      last value in the array represents a 100% duty cycle (brightest).
-+  - default-brightness-level: the default brightness level (index into the
-+      array defined by the "brightness-levels" property)
-+
-+Optional properties:
-+  - pwm-names: a list of names for the PWM devices specified in the
-+               "pwms" property (see PWM binding[0])
-+
-+[0]: Documentation/devicetree/bindings/pwm/pwm.txt
-+
-+Example:
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 0 5000000>;
-+
-+		num-brightness-levels = <8>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-index 7ed9991..cd77e79 100644
---- a/drivers/video/backlight/Kconfig
-+++ b/drivers/video/backlight/Kconfig
-@@ -233,7 +233,7 @@ config BACKLIGHT_CARILLO_RANCH
+diff --git a/arch/arm/mach-vt8500/Makefile b/arch/arm/mach-vt8500/Makefile
+index 81aedb7..8df9e4a 100644
+--- a/arch/arm/mach-vt8500/Makefile
++++ b/arch/arm/mach-vt8500/Makefile
+@@ -5,5 +5,3 @@ obj-$(CONFIG_VTWM_VERSION_WM8505) += devices-wm8505.o
  
- config BACKLIGHT_PWM
- 	tristate "Generic PWM based Backlight Driver"
--	depends on HAVE_PWM
-+	depends on PWM
- 	help
- 	  If you have a LCD backlight adjustable by PWM, say Y to enable
- 	  this driver.
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 342b7d7..b996548 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -26,11 +26,13 @@ struct pwm_bl_data {
- 	struct device		*dev;
- 	unsigned int		period;
- 	unsigned int		lth_brightness;
-+	unsigned int		*levels;
- 	int			(*notify)(struct device *,
- 					  int brightness);
- 	void			(*notify_after)(struct device *,
- 					int brightness);
- 	int			(*check_fb)(struct device *, struct fb_info *);
-+	void			(*exit)(struct device *);
+ obj-$(CONFIG_MACH_BV07) += bv07.o
+ obj-$(CONFIG_MACH_WM8505_7IN_NETBOOK) += wm8505_7in.o
+-
+-obj-$(CONFIG_HAVE_PWM) += pwm.o
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 0d9aa92..a93feff 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -55,4 +55,13 @@ config PWM_TEGRA
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called pwm-tegra.
+ 
++config PWM_VT8500
++	tristate "vt8500 pwm support"
++	depends on ARCH_VT8500
++	help
++	  Generic PWM framework driver for vt8500.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-vt8500.
++
+ endif
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index a1d87b1..b7c0fcf 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -4,3 +4,4 @@ obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
+ obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
+ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+ obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
++obj-$(CONFIG_PWM_VT8500)	+= pwm-vt8500.o
+diff --git a/arch/arm/mach-vt8500/pwm.c b/drivers/pwm/pwm-vt8500.c
+similarity index 52%
+rename from arch/arm/mach-vt8500/pwm.c
+rename to drivers/pwm/pwm-vt8500.c
+index 8ad825e..3db0746 100644
+--- a/arch/arm/mach-vt8500/pwm.c
++++ b/drivers/pwm/pwm-vt8500.c
+@@ -26,21 +26,13 @@
+ 
+ #define VT8500_NR_PWMS 4
+ 
+-static DEFINE_MUTEX(pwm_lock);
+-static LIST_HEAD(pwm_list);
+-
+-struct pwm_device {
+-	struct list_head	node;
+-	struct platform_device	*pdev;
+-
+-	const char	*label;
+-
+-	void __iomem	*regbase;
+-
+-	unsigned int	use_count;
+-	unsigned int	pwm_id;
++struct vt8500_chip {
++	struct pwm_chip chip;
++	void __iomem *base;
  };
  
- static int pwm_backlight_update_status(struct backlight_device *bl)
-@@ -52,6 +54,11 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
- 		pwm_config(pb->pwm, 0, pb->period);
- 		pwm_disable(pb->pwm);
- 	} else {
-+		if (pb->levels) {
-+			brightness = pb->levels[brightness];
-+			max = pb->levels[max];
-+		}
++#define to_vt8500_chip(chip)	container_of(chip, struct vt8500_chip, chip)
 +
- 		brightness = pb->lth_brightness +
- 			(brightness * (pb->period - pb->lth_brightness) / max);
- 		pwm_config(pb->pwm, brightness, pb->period);
-@@ -83,17 +90,94 @@ static const struct backlight_ops pwm_backlight_ops = {
- 	.check_fb	= pwm_backlight_check_fb,
- };
- 
-+#ifdef CONFIG_OF
-+static int pwm_backlight_parse_dt(struct device *dev,
-+				  struct platform_pwm_backlight_data *data)
-+{
-+	struct device_node *node = dev->of_node;
-+	u32 value;
-+	int ret;
-+
-+	if (!node)
-+		return -ENODEV;
-+
-+	memset(data, 0, sizeof(*data));
-+
-+	ret = of_property_read_u32(node, "num-brightness-levels", &value);
-+	if (ret < 0)
-+		return ret;
-+
-+	data->max_brightness = value;
-+
-+	if (data->max_brightness > 0) {
-+		size_t size = sizeof(*data->levels) * data->max_brightness;
-+
-+		data->levels = devm_kzalloc(dev, size, GFP_KERNEL);
-+		if (!data->levels)
-+			return -ENOMEM;
-+
-+		ret = of_property_read_u32_array(node, "brightness-levels",
-+						 data->levels,
-+						 data->max_brightness);
-+		if (ret < 0)
-+			return ret;
-+
-+		ret = of_property_read_u32(node, "default-brightness-level",
-+					   &value);
-+		if (ret < 0)
-+			return ret;
-+
-+		if (value >= data->max_brightness) {
-+			dev_warn(dev, "invalid default brightness level: %u, using %u\n",
-+				 value, data->max_brightness - 1);
-+			value = data->max_brightness - 1;
-+		}
-+
-+		data->dft_brightness = value;
-+		data->max_brightness--;
-+	}
-+
-+	/*
-+	 * TODO: Most users of this driver use a number of GPIOs to control
-+	 *       backlight power. Support for specifying these needs to be
-+	 *       added.
-+	 */
-+
-+	return 0;
-+}
-+
-+static struct of_device_id pwm_backlight_of_match[] = {
-+	{ .compatible = "pwm-backlight" },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, pwm_backlight_of_match);
-+#else
-+static int pwm_backlight_parse_dt(struct device *dev,
-+				  struct platform_pwm_backlight_data *data)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int pwm_backlight_probe(struct platform_device *pdev)
+ #define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
+ static inline void pwm_busy_wait(void __iomem *reg, u8 bitmask)
  {
--	struct backlight_properties props;
- 	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
-+	struct platform_pwm_backlight_data defdata;
-+	struct backlight_properties props;
- 	struct backlight_device *bl;
- 	struct pwm_bl_data *pb;
-+	unsigned int max;
- 	int ret;
+@@ -53,14 +45,13 @@ static inline void pwm_busy_wait(void __iomem *reg, u8 bitmask)
+ 			   bitmask);
+ }
  
- 	if (!data) {
--		dev_err(&pdev->dev, "failed to find platform data\n");
+-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++		int duty_ns, int period_ns)
+ {
++	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
+ 	unsigned long long c;
+ 	unsigned long period_cycles, prescale, pv, dc;
+ 
+-	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
 -		return -EINVAL;
-+		ret = pwm_backlight_parse_dt(&pdev->dev, &defdata);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "failed to find platform data\n");
-+			return ret;
-+		}
-+
-+		data = &defdata;
- 	}
+-
+ 	c = 25000000/2; /* wild guess --- need to implement clocks */
+ 	c = c * period_ns;
+ 	do_div(c, 1000000000);
+@@ -80,104 +71,58 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 	do_div(c, period_ns);
+ 	dc = c;
  
- 	if (data->init) {
-@@ -109,21 +193,42 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 		goto err_alloc;
- 	}
+-	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 1));
+-	writel(prescale, pwm->regbase + 0x4 + (pwm->pwm_id << 4));
++	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 1));
++	writel(prescale, vt8500->base + 0x4 + (pwm->hwpwm << 4));
  
--	pb->period = data->pwm_period_ns;
-+	if (data->levels) {
-+		max = data->levels[data->max_brightness];
-+		pb->levels = data->levels;
-+	} else
-+		max = data->max_brightness;
-+
- 	pb->notify = data->notify;
- 	pb->notify_after = data->notify_after;
- 	pb->check_fb = data->check_fb;
--	pb->lth_brightness = data->lth_brightness *
--		(data->pwm_period_ns / data->max_brightness);
-+	pb->exit = data->exit;
- 	pb->dev = &pdev->dev;
+-	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 2));
+-	writel(pv, pwm->regbase + 0x8 + (pwm->pwm_id << 4));
++	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 2));
++	writel(pv, vt8500->base + 0x8 + (pwm->hwpwm << 4));
  
--	pb->pwm = pwm_request(data->pwm_id, "backlight");
-+	pb->pwm = pwm_get(&pdev->dev, "pwm-backlight");
- 	if (IS_ERR(pb->pwm)) {
--		dev_err(&pdev->dev, "unable to request PWM for backlight\n");
--		ret = PTR_ERR(pb->pwm);
--		goto err_alloc;
--	} else
--		dev_dbg(&pdev->dev, "got pwm for backlight\n");
-+		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
-+
-+		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
-+		if (IS_ERR(pb->pwm)) {
-+			dev_err(&pdev->dev, "unable to request legacy PWM\n");
-+			ret = PTR_ERR(pb->pwm);
-+			goto err_alloc;
-+		}
-+	}
-+
-+	dev_dbg(&pdev->dev, "got pwm for backlight\n");
-+
-+	/*
-+	 * The DT case will set the pwm_period_ns field to 0 and store the
-+	 * period, parsed from the DT, in the PWM device. For the non-DT case,
-+	 * set the period from platform data.
-+	 */
-+	if (data->pwm_period_ns > 0)
-+		pwm_set_period(pb->pwm, data->pwm_period_ns);
-+
-+	pb->period = pwm_get_period(pb->pwm);
-+	pb->lth_brightness = data->lth_brightness * (pb->period / max);
+-	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 3));
+-	writel(dc, pwm->regbase + 0xc + (pwm->pwm_id << 4));
++	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 3));
++	writel(dc, vt8500->base + 0xc + (pwm->hwpwm << 4));
  
- 	memset(&props, 0, sizeof(struct backlight_properties));
- 	props.type = BACKLIGHT_RAW;
-@@ -143,7 +248,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
  	return 0;
+ }
+-EXPORT_SYMBOL(pwm_config);
  
- err_bl:
--	pwm_free(pb->pwm);
-+	pwm_put(pb->pwm);
- err_alloc:
- 	if (data->exit)
- 		data->exit(&pdev->dev);
-@@ -152,16 +257,15 @@ err_alloc:
- 
- static int pwm_backlight_remove(struct platform_device *pdev)
+-int pwm_enable(struct pwm_device *pwm)
++static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
  {
--	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
- 	struct backlight_device *bl = platform_get_drvdata(pdev);
- 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
+-	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 0));
+-	writel(5, pwm->regbase + (pwm->pwm_id << 4));
+-	return 0;
+-}
+-EXPORT_SYMBOL(pwm_enable);
+-
+-void pwm_disable(struct pwm_device *pwm)
+-{
+-	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 0));
+-	writel(0, pwm->regbase + (pwm->pwm_id << 4));
+-}
+-EXPORT_SYMBOL(pwm_disable);
+-
+-struct pwm_device *pwm_request(int pwm_id, const char *label)
+-{
+-	struct pwm_device *pwm;
+-	int found = 0;
+-
+-	mutex_lock(&pwm_lock);
++	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
  
- 	backlight_device_unregister(bl);
- 	pwm_config(pb->pwm, 0, pb->period);
- 	pwm_disable(pb->pwm);
--	pwm_free(pb->pwm);
--	if (data->exit)
--		data->exit(&pdev->dev);
-+	pwm_put(pb->pwm);
-+	if (pb->exit)
-+		pb->exit(&pdev->dev);
+-	list_for_each_entry(pwm, &pwm_list, node) {
+-		if (pwm->pwm_id == pwm_id) {
+-			found = 1;
+-			break;
+-		}
+-	}
+-
+-	if (found) {
+-		if (pwm->use_count == 0) {
+-			pwm->use_count++;
+-			pwm->label = label;
+-		} else {
+-			pwm = ERR_PTR(-EBUSY);
+-		}
+-	} else {
+-		pwm = ERR_PTR(-ENOENT);
+-	}
+-
+-	mutex_unlock(&pwm_lock);
+-	return pwm;
++	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
++	writel(5, vt8500->base + (pwm->hwpwm << 4));
++	return 0;
+ }
+-EXPORT_SYMBOL(pwm_request);
+ 
+-void pwm_free(struct pwm_device *pwm)
++static void vt8500_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+-	mutex_lock(&pwm_lock);
+-
+-	if (pwm->use_count) {
+-		pwm->use_count--;
+-		pwm->label = NULL;
+-	} else {
+-		pr_warning("PWM device already freed\n");
+-	}
++	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
+ 
+-	mutex_unlock(&pwm_lock);
++	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
++	writel(0, vt8500->base + (pwm->hwpwm << 4));
+ }
+-EXPORT_SYMBOL(pwm_free);
+ 
+-static inline void __add_pwm(struct pwm_device *pwm)
+-{
+-	mutex_lock(&pwm_lock);
+-	list_add_tail(&pwm->node, &pwm_list);
+-	mutex_unlock(&pwm_lock);
+-}
++static struct pwm_ops vt8500_pwm_ops = {
++	.enable = vt8500_pwm_enable,
++	.disable = vt8500_pwm_disable,
++	.config = vt8500_pwm_config,
++	.owner = THIS_MODULE,
++};
+ 
+ static int __devinit pwm_probe(struct platform_device *pdev)
+ {
+-	struct pwm_device *pwms;
++	struct vt8500_chip *chip;
+ 	struct resource *r;
+-	int ret = 0;
+-	int i;
++	int ret;
+ 
+-	pwms = kzalloc(sizeof(struct pwm_device) * VT8500_NR_PWMS, GFP_KERNEL);
+-	if (pwms == NULL) {
++	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
++	if (chip == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate memory\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	for (i = 0; i < VT8500_NR_PWMS; i++) {
+-		pwms[i].use_count = 0;
+-		pwms[i].pwm_id = i;
+-		pwms[i].pdev = pdev;
+-	}
++	chip->chip.dev = &pdev->dev;
++	chip->chip.ops = &vt8500_pwm_ops;
++	chip->chip.base = -1;
++	chip->chip.npwm = VT8500_NR_PWMS;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+@@ -193,51 +138,49 @@ static int __devinit pwm_probe(struct platform_device *pdev)
+ 		goto err_free;
+ 	}
+ 
+-	pwms[0].regbase = ioremap(r->start, resource_size(r));
+-	if (pwms[0].regbase == NULL) {
++	chip->base = ioremap(r->start, resource_size(r));
++	if (chip->base == NULL) {
+ 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
+ 		ret = -ENODEV;
+ 		goto err_free_mem;
+ 	}
+ 
+-	for (i = 1; i < VT8500_NR_PWMS; i++)
+-		pwms[i].regbase = pwms[0].regbase;
+-
+-	for (i = 0; i < VT8500_NR_PWMS; i++)
+-		__add_pwm(&pwms[i]);
++	ret = pwmchip_add(&chip->chip);
++	if (ret < 0)
++		goto err_unmap;
+ 
+-	platform_set_drvdata(pdev, pwms);
+-	return 0;
++	platform_set_drvdata(pdev, chip);
++	return ret;
+ 
++err_unmap:
++	iounmap(chip->base);
+ err_free_mem:
+ 	release_mem_region(r->start, resource_size(r));
+ err_free:
+-	kfree(pwms);
++	kfree(chip);
+ 	return ret;
+ }
+ 
+ static int __devexit pwm_remove(struct platform_device *pdev)
+ {
+-	struct pwm_device *pwms;
++	struct vt8500_chip *chip;
+ 	struct resource *r;
+-	int i;
++	int err;
+ 
+-	pwms = platform_get_drvdata(pdev);
+-	if (pwms == NULL)
++	chip = platform_get_drvdata(pdev);
++	if (chip == NULL)
+ 		return -ENODEV;
+ 
+-	mutex_lock(&pwm_lock);
+-
+-	for (i = 0; i < VT8500_NR_PWMS; i++)
+-		list_del(&pwms[i].node);
+-	mutex_unlock(&pwm_lock);
++	err = pwmchip_remove(&chip->chip);
++	if (err < 0)
++		return err;
+ 
+-	iounmap(pwms[0].regbase);
++	iounmap(chip->base);
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(r->start, resource_size(r));
+ 
+-	kfree(pwms);
++	kfree(chip);
  	return 0;
  }
  
-@@ -195,11 +299,12 @@ static SIMPLE_DEV_PM_OPS(pwm_backlight_pm_ops, pwm_backlight_suspend,
- 
- static struct platform_driver pwm_backlight_driver = {
- 	.driver		= {
--		.name	= "pwm-backlight",
--		.owner	= THIS_MODULE,
-+		.name		= "pwm-backlight",
-+		.owner		= THIS_MODULE,
- #ifdef CONFIG_PM
--		.pm	= &pwm_backlight_pm_ops,
-+		.pm		= &pwm_backlight_pm_ops,
- #endif
-+		.of_match_table	= of_match_ptr(pwm_backlight_of_match),
- 	},
- 	.probe		= pwm_backlight_probe,
- 	.remove		= pwm_backlight_remove,
-diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
-index 63d2df4..56f4a86 100644
---- a/include/linux/pwm_backlight.h
-+++ b/include/linux/pwm_backlight.h
-@@ -12,6 +12,7 @@ struct platform_pwm_backlight_data {
- 	unsigned int dft_brightness;
- 	unsigned int lth_brightness;
- 	unsigned int pwm_period_ns;
-+	unsigned int *levels;
- 	int (*init)(struct device *dev);
- 	int (*notify)(struct device *dev, int brightness);
- 	void (*notify_after)(struct device *dev, int brightness);
 -- 
 1.7.9.4
