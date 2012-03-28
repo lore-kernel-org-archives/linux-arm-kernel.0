@@ -1,337 +1,568 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 28 Mar 2012 16:33:50 +0200
-Subject: [PATCH v5 08/16] pwm: Add NVIDIA Tegra SoC support
+Date: Wed, 28 Mar 2012 16:33:44 +0200
+Subject: [PATCH v5 02/16] pwm: Allow chips to support multiple PWMs
 In-Reply-To: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1332945238-14897-9-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1332945238-14897-3-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a generic PWM framework driver for the PWFM controller
-found on NVIDIA Tegra SoCs. The driver is based on code from the
-Chromium kernel tree and was originally written by Gary King (NVIDIA)
-and later modified by Simon Que (Chromium).
+Many PWM controllers provide access to more than a single PWM output and
+may even share some resource among them. Allowing a PWM chip to provide
+multiple PWM devices enables better sharing of those resources. As a
+side-effect this change allows easy integration with the device tree
+where a given PWM can be looked up based on the PWM chip's phandle and a
+corresponding index.
+
+This commit modifies the PWM core to support multiple PWMs per struct
+pwm_chip. It achieves this in a similar way to how gpiolib works, by
+allowing PWM ranges to be requested dynamically (pwm_chip.base == -1) or
+starting at a given offset (pwm_chip.base >= 0). A chip specifies how
+many PWMs it controls using the npwm member. Each of the functions in
+the pwm_ops structure gets an additional argument that specified the PWM
+number (it can be converted to a per-chip index by subtracting the
+chip's base).
+
+The total maximum number of PWM devices is currently fixed to 1024 while
+the data is actually stored in a radix tree, thus saving resources if
+not all of them are used.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v5:
-- use devm_request_and_ioremap()
-- use clk_prepare_enable() and clk_disable_unprepare()
-- call pwmchip_remove() after disabling PWM devices
-- remove tegra_pwm_chip.enable[] field and use the PWM flags instead
-- use pwm_readl()/pwm_writel() for register accesses and split out clock
-  management to where it's needed
-- add MODULE_ALIAS to enable automatic module loading
+- add sanity checks to pwmchip_add()
+- make pwm_chip.pwm_ops constant
+- remove unused pwm_request_from_device() function
+- check for valid chip in pwm_request_from_chip()
+- add sanity checks to pwm_config(), pwm_enable() and pwm_disable()
+- update Documentation/pwm.txt
+- use deferred driver probing if pwm_request() cannot find a PWM
 
 Changes in v4:
-- merge patch from ChromiumOS kernel to fix a rounding issue
-- move DT code to patch 7
+- remove OF-specific code to preserve bisectability
+- add pwm_request_from_device() and pwm_request_from_chip() functions
+- refactor PWM requesting code
+- store period in struct pwm_device and get rid of the unused struct
+  pwm_spec
 
 Changes in v3:
-- use pwm_device.hwpwm instead of recomputing it
-- update pwm_ops for changes in patch 2
+- get rid of pwm_desc structure and keep only struct pwm_device
+- keep a list of pwm_chip structures for fast and easy lookup
+- pass struct pwm_device directly to pwm_ops
+- add debugfs file
 
 Changes in v2:
-- set pwm_chip.dev field
-- rename clk_enb to enable
-- introduce NUM_PWM macro instead of hard-coding the number of PWM
-  devices
-- update comment in tegra_pwm_config
-- fix coding-style for multi-line comments
-- use module_platform_driver
-- change license to GPL
+- add 'struct device *dev' field to pwm_chip, drop label field
+- use radix tree for PWM descriptors
+- add pwm_set_chip_data() and pwm_get_chip_data() functions to allow
+  storing and retrieving chip-specific per-PWM data
 
- drivers/pwm/Kconfig     |   10 ++
- drivers/pwm/Makefile    |    1 +
- drivers/pwm/pwm-tegra.c |  254 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 265 insertions(+)
- create mode 100644 drivers/pwm/pwm-tegra.c
+ Documentation/pwm.txt |    9 +-
+ drivers/pwm/core.c    |  263 ++++++++++++++++++++++++++++++++++---------------
+ include/linux/pwm.h   |   71 ++++++++++---
+ 3 files changed, 250 insertions(+), 93 deletions(-)
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 93c1052..bda6f23 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -9,4 +9,14 @@ menuconfig PWM
+diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
+index 03e39d1..48f598a 100644
+--- a/Documentation/pwm.txt
++++ b/Documentation/pwm.txt
+@@ -33,9 +33,12 @@ there only has been the barebone API meaning that each driver has
+ to implement the pwm_*() functions itself. This means that it's impossible
+ to have multiple PWM drivers in the system. For this reason it's mandatory
+ for new drivers to use the generic PWM framework.
+-A new PWM device can be added using pwmchip_add() and removed again with
+-pwmchip_remove(). pwmchip_add() takes a filled in struct pwm_chip as
+-argument which provides the ops and the pwm id to the framework.
++
++A new PWM controller/chip can be added using pwmchip_add() and removed
++again with pwmchip_remove(). pwmchip_add() takes a filled in struct
++pwm_chip as argument which provides a description of the PWM chip, the
++number of PWM devices provider by the chip and the chip-specific
++implementation of the supported PWM operations to the framework.
  
- if PWM
+ Locking
+ -------
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index db2f048..46dcbe1 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -2,6 +2,7 @@
+  * Generic pwmlib implementation
+  *
+  * Copyright (C) 2011 Sascha Hauer <s.hauer@pengutronix.de>
++ * Copyright (C) 2011-2012 Avionic Design GmbH
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -20,66 +21,157 @@
  
-+config PWM_TEGRA
-+	tristate "NVIDIA Tegra PWM support"
-+	depends on ARCH_TEGRA
-+	help
-+	  Generic PWM framework driver for the PWFM controller found on NVIDIA
-+	  Tegra SoCs.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-tegra.
-+
- endif
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 3469c3d..12300f5 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_PWM)		+= core.o
-+obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
-new file mode 100644
-index 0000000..2219be1
---- /dev/null
-+++ b/drivers/pwm/pwm-tegra.c
-@@ -0,0 +1,254 @@
-+/*
-+ * drivers/pwm/pwm-tegra.c
-+ *
-+ * Tegra pulse-width-modulation controller driver
-+ *
-+ * Copyright (c) 2010, NVIDIA Corporation.
-+ * Based on arch/arm/plat-mxc/pwm.c by Sascha Hauer <s.hauer@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pwm.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#define PWM_ENABLE	(1 << 31)
-+#define PWM_DUTY_WIDTH	8
-+#define PWM_DUTY_SHIFT	16
-+#define PWM_SCALE_WIDTH	13
-+#define PWM_SCALE_SHIFT	0
-+
-+#define NUM_PWM 4
-+
-+struct tegra_pwm_chip {
-+	struct pwm_chip		chip;
-+	struct device		*dev;
-+
-+	struct clk		*clk;
-+
-+	void __iomem		*mmio_base;
-+};
-+
-+static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct tegra_pwm_chip, chip);
+ #include <linux/module.h>
+ #include <linux/pwm.h>
++#include <linux/radix-tree.h>
+ #include <linux/list.h>
+ #include <linux/mutex.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
+ #include <linux/device.h>
+ 
+-struct pwm_device {
+-	struct			pwm_chip *chip;
+-	const char		*label;
+-	unsigned long		flags;
+-#define FLAG_REQUESTED	0
+-#define FLAG_ENABLED	1
+-	struct list_head	node;
+-};
+-
+-static LIST_HEAD(pwm_list);
++#define MAX_PWMS 1024
+ 
+ static DEFINE_MUTEX(pwm_lock);
++static LIST_HEAD(pwm_chips);
++static DECLARE_BITMAP(allocated_pwms, MAX_PWMS);
++static RADIX_TREE(pwm_tree, GFP_KERNEL);
+ 
+-static struct pwm_device *_find_pwm(int pwm_id)
++static struct pwm_device *pwm_to_device(unsigned int pwm)
+ {
+-	struct pwm_device *pwm;
++	return radix_tree_lookup(&pwm_tree, pwm);
 +}
 +
-+static inline u32 pwm_readl(struct tegra_pwm_chip *chip, unsigned int num)
++static int alloc_pwms(int pwm, unsigned int count)
 +{
-+	return readl(chip->mmio_base + (num << 4));
-+}
++	unsigned int from = 0;
++	unsigned int start;
 +
-+static inline void pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
-+			     unsigned long val)
-+{
-+	writel(val, chip->mmio_base + (num << 4));
-+}
-+
-+static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			    int duty_ns, int period_ns)
-+{
-+	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-+	unsigned long long c;
-+	unsigned long rate, hz;
-+	u32 val = 0;
-+	int err;
-+
-+	/*
-+	 * Convert from duty_ns / period_ns to a fixed number of duty ticks
-+	 * per (1 << PWM_DUTY_WIDTH) cycles and make sure to round to the
-+	 * nearest integer during division.
-+	 */
-+	c = duty_ns * ((1 << PWM_DUTY_WIDTH) - 1) + period_ns / 2;
-+	do_div(c, period_ns);
-+
-+	val = (u32)c << PWM_DUTY_SHIFT;
-+
-+	/*
-+	 * Compute the prescaler value for which (1 << PWM_DUTY_WIDTH)
-+	 * cycles@the PWM clock rate will take period_ns nanoseconds.
-+	 */
-+	rate = clk_get_rate(pc->clk) >> PWM_DUTY_WIDTH;
-+	hz = 1000000000ul / period_ns;
-+
-+	rate = (rate + (hz / 2)) / hz;
-+
-+	/*
-+	 * Since the actual PWM divider is the register's frequency divider
-+	 * field minus 1, we need to decrement to get the correct value to
-+	 * write to the register.
-+	 */
-+	if (rate > 0)
-+		rate--;
-+
-+	/*
-+	 * Make sure that the rate will fit in the register's frequency
-+	 * divider field.
-+	 */
-+	if (rate >> PWM_SCALE_WIDTH)
++	if (pwm >= MAX_PWMS)
 +		return -EINVAL;
 +
-+	val |= rate << PWM_SCALE_SHIFT;
++	if (pwm >= 0)
++		from = pwm;
 +
-+	/*
-+	 * If the PWM channel is disabled, make sure to turn on the clock
-+	 * before writing the register. Otherwise, keep it enabled.
-+	 */
-+	if (!test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		err = clk_prepare_enable(pc->clk);
-+		if (err < 0)
++	start = bitmap_find_next_zero_area(allocated_pwms, MAX_PWMS, from,
++					   count, 0);
++
++	if (pwm >= 0 && start != pwm)
++		return -EEXIST;
++
++	if (start + count > MAX_PWMS)
++		return -ENOSPC;
++
++	return start;
++}
+ 
+-	list_for_each_entry(pwm, &pwm_list, node) {
+-		if (pwm->chip->pwm_id == pwm_id)
+-			return pwm;
++static void free_pwms(struct pwm_chip *chip)
++{
++	unsigned int i;
++
++	for (i = 0; i < chip->npwm; i++) {
++		struct pwm_device *pwm = &chip->pwms[i];
++		radix_tree_delete(&pwm_tree, pwm->pwm);
++	}
++
++	bitmap_clear(allocated_pwms, chip->base, chip->npwm);
++
++	kfree(chip->pwms);
++	chip->pwms = NULL;
++}
++
++static int pwm_device_request(struct pwm_device *pwm, const char *label)
++{
++	int err;
++
++	if (test_bit(PWMF_REQUESTED, &pwm->flags))
++		return -EBUSY;
++
++	if (!try_module_get(pwm->chip->ops->owner))
++		return -ENODEV;
++
++	if (pwm->chip->ops->request) {
++		err = pwm->chip->ops->request(pwm->chip, pwm);
++		if (err) {
++			module_put(pwm->chip->ops->owner);
 +			return err;
-+	} else
-+		val |= PWM_ENABLE;
-+
-+	pwm_writel(pc, pwm->hwpwm, val);
-+
-+	/*
-+	 * If the PWM is not enabled, turn the clock off again to save power.
-+	 */
-+	if (!test_bit(PWMF_ENABLED, &pwm->flags))
-+		clk_disable_unprepare(pc->clk);
++		}
+ 	}
+ 
+-	return NULL;
++	set_bit(PWMF_REQUESTED, &pwm->flags);
++	pwm->label = label;
 +
 +	return 0;
 +}
 +
-+static int tegra_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++/**
++ * pwm_set_chip_data() - set private chip data for a PWM
++ * @pwm: PWM device
++ * @data: pointer to chip-specific data
++ */
++int pwm_set_chip_data(struct pwm_device *pwm, void *data)
 +{
-+	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-+	int rc = 0;
-+	u32 val;
++	if (!pwm)
++		return -EINVAL;
 +
-+	rc = clk_prepare_enable(pc->clk);
-+	if (rc < 0)
-+		return rc;
-+
-+	val = pwm_readl(pc, pwm->hwpwm);
-+	val |= PWM_ENABLE;
-+	pwm_writel(pc, pwm->hwpwm, val);
++	pwm->chip_data = data;
 +
 +	return 0;
 +}
 +
-+static void tegra_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++/**
++ * pwm_get_chip_data() - get private chip data for a PWM
++ * @pwm: PWM device
++ */
++void *pwm_get_chip_data(struct pwm_device *pwm)
 +{
-+	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-+	u32 val;
-+
-+	val = pwm_readl(pc, pwm->hwpwm);
-+	val &= ~PWM_ENABLE;
-+	pwm_writel(pc, pwm->hwpwm, val);
-+
-+	clk_disable_unprepare(pc->clk);
-+}
-+
-+static struct pwm_ops tegra_pwm_ops = {
-+	.config = tegra_pwm_config,
-+	.enable = tegra_pwm_enable,
-+	.disable = tegra_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int tegra_pwm_probe(struct platform_device *pdev)
-+{
-+	struct tegra_pwm_chip *pwm;
-+	struct resource *r;
++	return pwm ? pwm->chip_data : NULL;
+ }
+ 
+ /**
+  * pwmchip_add() - register a new PWM chip
+  * @chip: the PWM chip to add
++ *
++ * Register a new PWM chip. If chip->base < 0 then a dynamically assigned base
++ * will be used.
+  */
+ int pwmchip_add(struct pwm_chip *chip)
+ {
+ 	struct pwm_device *pwm;
+-	int ret = 0;
+-
+-	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
+-	if (!pwm)
+-		return -ENOMEM;
++	unsigned int i;
 +	int ret;
+ 
+-	pwm->chip = chip;
++	if (!chip || !chip->dev || !chip->ops || !chip->ops->config ||
++	    !chip->ops->enable || !chip->ops->disable)
++		return -EINVAL;
+ 
+ 	mutex_lock(&pwm_lock);
+ 
+-	if (chip->pwm_id >= 0 && _find_pwm(chip->pwm_id)) {
+-		ret = -EBUSY;
++	ret = alloc_pwms(chip->base, chip->npwm);
++	if (ret < 0)
+ 		goto out;
 +
-+	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-+	if (!pwm) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
++	chip->pwms = kzalloc(chip->npwm * sizeof(*pwm), GFP_KERNEL);
++	if (!chip->pwms)
 +		return -ENOMEM;
-+	}
 +
-+	pwm->dev = &pdev->dev;
++	chip->base = ret;
 +
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!r) {
-+		dev_err(&pdev->dev, "no memory resources defined\n");
-+		return -ENODEV;
-+	}
++	for (i = 0; i < chip->npwm; i++) {
++		pwm = &chip->pwms[i];
 +
-+	pwm->mmio_base = devm_request_and_ioremap(&pdev->dev, r);
-+	if (!pwm->mmio_base) {
-+		dev_err(&pdev->dev, "failed to ioremap() region\n");
-+		return -ENODEV;
-+	}
++		pwm->chip = chip;
++		pwm->pwm = chip->base + i;
++		pwm->hwpwm = i;
 +
-+	platform_set_drvdata(pdev, pwm);
++		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
+ 	}
+ 
+-	list_add_tail(&pwm->node, &pwm_list);
+-out:
+-	mutex_unlock(&pwm_lock);
++	bitmap_set(allocated_pwms, chip->base, chip->npwm);
+ 
+-	if (ret)
+-		kfree(pwm);
++	INIT_LIST_HEAD(&chip->list);
++	list_add(&chip->list, &pwm_chips);
+ 
++out:
++	mutex_unlock(&pwm_lock);
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(pwmchip_add);
+@@ -93,28 +185,25 @@ EXPORT_SYMBOL_GPL(pwmchip_add);
+  */
+ int pwmchip_remove(struct pwm_chip *chip)
+ {
+-	struct pwm_device *pwm;
++	unsigned int i;
+ 	int ret = 0;
+ 
+ 	mutex_lock(&pwm_lock);
+ 
+-	pwm = _find_pwm(chip->pwm_id);
+-	if (!pwm) {
+-		ret = -ENOENT;
+-		goto out;
+-	}
++	for (i = 0; i < chip->npwm; i++) {
++		struct pwm_device *pwm = &chip->pwms[i];
+ 
+-	if (test_bit(FLAG_REQUESTED, &pwm->flags)) {
+-		ret = -EBUSY;
+-		goto out;
++		if (test_bit(PWMF_REQUESTED, &pwm->flags)) {
++			ret = -EBUSY;
++			goto out;
++		}
+ 	}
+ 
+-	list_del(&pwm->node);
++	list_del_init(&chip->list);
++	free_pwms(chip);
+ 
+-	kfree(pwm);
+ out:
+ 	mutex_unlock(&pwm_lock);
+-
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(pwmchip_remove);
+@@ -124,50 +213,64 @@ EXPORT_SYMBOL_GPL(pwmchip_remove);
+  * @pwm: global PWM device index
+  * @label: PWM device label
+  */
+-struct pwm_device *pwm_request(int pwm_id, const char *label)
++struct pwm_device *pwm_request(int pwm, const char *label)
+ {
+-	struct pwm_device *pwm;
+-	int ret;
++	struct pwm_device *dev;
++	int err;
 +
-+	pwm->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pwm->clk))
-+		return PTR_ERR(pwm->clk);
-+
-+	pwm->chip.dev = &pdev->dev;
-+	pwm->chip.ops = &tegra_pwm_ops;
-+	pwm->chip.base = -1;
-+	pwm->chip.npwm = NUM_PWM;
-+
-+	ret = pwmchip_add(&pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
-+		clk_put(pwm->clk);
-+		return ret;
-+	}
-+
-+	return 0;
++	if (pwm < 0 || pwm >= MAX_PWMS)
++		return ERR_PTR(-EINVAL);
+ 
+ 	mutex_lock(&pwm_lock);
+ 
+-	pwm = _find_pwm(pwm_id);
+-	if (!pwm) {
+-		pwm = ERR_PTR(-ENOENT);
++	dev = pwm_to_device(pwm);
++	if (!dev) {
++		dev = ERR_PTR(-EPROBE_DEFER);
+ 		goto out;
+ 	}
+ 
+-	if (test_bit(FLAG_REQUESTED, &pwm->flags)) {
+-		pwm = ERR_PTR(-EBUSY);
+-		goto out;
+-	}
++	err = pwm_device_request(dev, label);
++	if (err < 0)
++		dev = ERR_PTR(err);
+ 
+-	if (!try_module_get(pwm->chip->ops->owner)) {
+-		pwm = ERR_PTR(-ENODEV);
+-		goto out;
+-	}
++out:
++	mutex_unlock(&pwm_lock);
+ 
+-	if (pwm->chip->ops->request) {
+-		ret = pwm->chip->ops->request(pwm->chip);
+-		if (ret) {
+-			pwm = ERR_PTR(ret);
+-			goto out_put;
+-		}
+-	}
++	return dev;
 +}
-+
-+static int __devexit tegra_pwm_remove(struct platform_device *pdev)
++EXPORT_SYMBOL_GPL(pwm_request);
+ 
+-	pwm->label = label;
+-	set_bit(FLAG_REQUESTED, &pwm->flags);
++/**
++ * pwm_request_from_chip() - request a PWM device relative to a PWM chip
++ * @chip: PWM chip
++ * @index: per-chip index of the PWM to request
++ * @label: a literal description string of this PWM
++ *
++ * Returns the PWM at the given index of the given PWM chip. A negative error
++ * code is returned if the index is not valid for the specified PWM chip or
++ * if the PWM device cannot be requested.
++ */
++struct pwm_device *pwm_request_from_chip(struct pwm_chip *chip,
++					 unsigned int index,
++					 const char *label)
 +{
-+	struct tegra_pwm_chip *pc = platform_get_drvdata(pdev);
-+	int i;
++	struct pwm_device *pwm;
++	int err;
+ 
+-	goto out;
++	if (!chip || index >= chip->npwm)
++		return ERR_PTR(-EINVAL);
+ 
+-out_put:
+-	module_put(pwm->chip->ops->owner);
+-out:
+-	mutex_unlock(&pwm_lock);
++	mutex_lock(&pwm_lock);
++	pwm = &chip->pwms[index];
+ 
++	err = pwm_device_request(pwm, label);
++	if (err < 0)
++		pwm = ERR_PTR(err);
 +
-+	if (WARN_ON(!pc))
-+		return -ENODEV;
++	mutex_unlock(&pwm_lock);
+ 	return pwm;
+ }
+-EXPORT_SYMBOL_GPL(pwm_request);
++EXPORT_SYMBOL_GPL(pwm_request_from_chip);
+ 
+ /**
+  * pwm_free() - free a PWM device
+@@ -177,11 +280,14 @@ void pwm_free(struct pwm_device *pwm)
+ {
+ 	mutex_lock(&pwm_lock);
+ 
+-	if (!test_and_clear_bit(FLAG_REQUESTED, &pwm->flags)) {
++	if (!test_and_clear_bit(PWMF_REQUESTED, &pwm->flags)) {
+ 		pr_warning("PWM device already freed\n");
+ 		goto out;
+ 	}
+ 
++	if (pwm->chip->ops->free)
++		pwm->chip->ops->free(pwm->chip, pwm);
 +
-+	for (i = 0; i < NUM_PWM; i++) {
-+		struct pwm_device *pwm = &pc->chip.pwms[i];
+ 	pwm->label = NULL;
+ 
+ 	module_put(pwm->chip->ops->owner);
+@@ -198,7 +304,10 @@ EXPORT_SYMBOL_GPL(pwm_free);
+  */
+ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ {
+-	return pwm->chip->ops->config(pwm->chip, duty_ns, period_ns);
++	if (!pwm || period_ns == 0 || duty_ns > period_ns)
++		return -EINVAL;
 +
-+		if (!test_bit(PWMF_ENABLED, &pwm->flags))
-+			if (clk_prepare_enable(pc->clk) < 0)
-+				continue;
-+
-+		pwm_writel(pc, i, 0);
-+
-+		clk_disable_unprepare(pc->clk);
-+	}
-+
-+	pwmchip_remove(&pc->chip);
-+	clk_put(pc->clk);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver tegra_pwm_driver = {
-+	.driver = {
-+		.name = "tegra-pwm",
-+	},
-+	.probe = tegra_pwm_probe,
-+	.remove = __devexit_p(tegra_pwm_remove),
++	return pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
+ }
+ EXPORT_SYMBOL_GPL(pwm_config);
+ 
+@@ -208,10 +317,10 @@ EXPORT_SYMBOL_GPL(pwm_config);
+  */
+ int pwm_enable(struct pwm_device *pwm)
+ {
+-	if (!test_and_set_bit(FLAG_ENABLED, &pwm->flags))
+-		return pwm->chip->ops->enable(pwm->chip);
++	if (pwm && !test_and_set_bit(PWMF_ENABLED, &pwm->flags))
++		return pwm->chip->ops->enable(pwm->chip, pwm);
+ 
+-	return 0;
++	return pwm ? 0 : -EINVAL;
+ }
+ EXPORT_SYMBOL_GPL(pwm_enable);
+ 
+@@ -221,7 +330,7 @@ EXPORT_SYMBOL_GPL(pwm_enable);
+  */
+ void pwm_disable(struct pwm_device *pwm)
+ {
+-	if (test_and_clear_bit(FLAG_ENABLED, &pwm->flags))
+-		pwm->chip->ops->disable(pwm->chip);
++	if (pwm && test_and_clear_bit(PWMF_ENABLED, &pwm->flags))
++		pwm->chip->ops->disable(pwm->chip, pwm);
+ }
+ EXPORT_SYMBOL_GPL(pwm_disable);
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 4bad29c..5710391 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -31,6 +31,33 @@ void pwm_disable(struct pwm_device *pwm);
+ #ifdef CONFIG_PWM
+ struct pwm_chip;
+ 
++enum {
++	PWMF_REQUESTED = 1 << 0,
++	PWMF_ENABLED = 1 << 1,
 +};
 +
-+module_platform_driver(tegra_pwm_driver);
++struct pwm_device {
++	const char		*label;
++	unsigned long		flags;
++	unsigned int		hwpwm;
++	unsigned int		pwm;
++	struct pwm_chip		*chip;
++	void			*chip_data;
 +
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("NVIDIA Corporation");
-+MODULE_ALIAS("platform:tegra-pwm");
++	unsigned int		period; /* in nanoseconds */
++};
++
++static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
++{
++	if (pwm)
++		pwm->period = period;
++}
++
++static inline unsigned int pwm_get_period(struct pwm_device *pwm)
++{
++	return pwm ? pwm->period : 0;
++}
++
+ /**
+  * struct pwm_ops - PWM controller operations
+  * @request: optional hook for requesting a PWM
+@@ -41,29 +68,47 @@ struct pwm_chip;
+  * @owner: helps prevent removal of modules exporting active PWMs
+  */
+ struct pwm_ops {
+-	int			(*request)(struct pwm_chip *chip);
+-	void			(*free)(struct pwm_chip *chip);
+-	int			(*config)(struct pwm_chip *chip, int duty_ns,
+-						int period_ns);
+-	int			(*enable)(struct pwm_chip *chip);
+-	void			(*disable)(struct pwm_chip *chip);
++	int			(*request)(struct pwm_chip *chip,
++					   struct pwm_device *pwm);
++	void			(*free)(struct pwm_chip *chip,
++					struct pwm_device *pwm);
++	int			(*config)(struct pwm_chip *chip,
++					  struct pwm_device *pwm,
++					  int duty_ns, int period_ns);
++	int			(*enable)(struct pwm_chip *chip,
++					  struct pwm_device *pwm);
++	void			(*disable)(struct pwm_chip *chip,
++					   struct pwm_device *pwm);
+ 	struct module		*owner;
+ };
+ 
+ /**
+- * struct pwm_chip - abstract a PWM
+- * @label: for diagnostics
+- * @owner: helps prevent removal of modules exporting active PWMs
+- * @ops: The callbacks for this PWM
++ * struct pwm_chip - abstract a PWM controller
++ * @dev: device providing the PWMs
++ * @list: list node for internal use
++ * @ops: callbacks for this PWM controller
++ * @base: number of first PWM controlled by this chip
++ * @npwm: number of PWMs controlled by this chip
++ * @pwms: array of PWM devices allocated by the framework
+  */
+ struct pwm_chip {
+-	int			pwm_id;
+-	const char		*label;
+-	struct pwm_ops		*ops;
++	struct device		*dev;
++	struct list_head	list;
++	const struct pwm_ops	*ops;
++	int			base;
++	unsigned int		npwm;
++
++	struct pwm_device	*pwms;
+ };
+ 
++int pwm_set_chip_data(struct pwm_device *pwm, void *data);
++void *pwm_get_chip_data(struct pwm_device *pwm);
++
+ int pwmchip_add(struct pwm_chip *chip);
+ int pwmchip_remove(struct pwm_chip *chip);
++struct pwm_device *pwm_request_from_chip(struct pwm_chip *chip,
++					 unsigned int index,
++					 const char *label);
+ #endif
+ 
+ #endif /* __LINUX_PWM_H */
 -- 
 1.7.9.4
