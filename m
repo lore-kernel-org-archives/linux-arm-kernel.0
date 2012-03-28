@@ -1,48 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Mar 2012 15:40:17 +0100
-Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
-In-Reply-To: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
-References: <1332943273-22447-1-git-send-email-alexg@meprolight.com>
-Message-ID: <20120328144017.GV3232@opensource.wolfsonmicro.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 28 Mar 2012 10:41:55 -0400
+Subject: [PATCH V3 5/5] mtd: Move fdt partition documentation to a
+ seperate file
+In-Reply-To: <1332885255-8304-6-git-send-email-jm@lentin.co.uk>
+References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
+ <1332885255-8304-6-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120328144155.GA32333@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 04:01:13PM +0200, Alex Gershgorin wrote:
+On Tue, Mar 27, 2012 at 10:54:15PM +0100, Jamie Lentin wrote:
+> Partitions are described in the same way for all mtd devices when using
+> devicetree, move the documentation to a separate file and add references
+> to it.
+> 
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 
-> index c3fbc5e..2119732 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -577,6 +577,8 @@ config MFD_MC13XXX
->  	depends on SPI_MASTER || I2C
->  	select MFD_CORE
->  	select MFD_MC13783
-> +	select REGMAP_I2C if I2C
-> +	select REGMAP_SPI if SPI_MASTER
->  	help
->  	  Enable support for the Freescale MC13783 and MC13892 PMICs.
->  	  This driver provides common support for accessing the device,
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-I'd really expect this to be squashed into the patches adding the regmap
-usage for I2C and SPI, how can those patches work without this?
-
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index 31dbf91..5a60273 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -616,7 +616,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
->  #ifdef CONFIG_OF
->  static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
->  {
-> -	struct device_node *np = mc13xxx->dev.of_node;
-> +	struct device_node *np = mc13xxx->dev->of_node;
-
-This looks like it should be submitted properly as a bug fix for
-inclusion on 3.4 or squashed into whatever change introduces the issue
-if it's not present in 3.4.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120328/161ab84e/attachment.sig>
+> ---
+>  .../devicetree/bindings/mtd/arm-versatile.txt      |    4 +-
+>  .../devicetree/bindings/mtd/atmel-dataflash.txt    |    3 ++
+>  .../devicetree/bindings/mtd/fsl-upm-nand.txt       |    4 ++
+>  .../devicetree/bindings/mtd/gpio-control-nand.txt  |    3 ++
+>  .../devicetree/bindings/mtd/mtd-physmap.txt        |   23 +-----------
+>  .../devicetree/bindings/mtd/orion-nand.txt         |    3 ++
+>  .../devicetree/bindings/mtd/partition.txt          |   38 ++++++++++++++++++++
+>  7 files changed, 55 insertions(+), 23 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/partition.txt
