@@ -1,95 +1,41 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 28 Mar 2012 09:52:15 +0000
-Subject: [alsa-devel] [PATCH] ASoC: sgtl5000: fix power on/off of MIC bias
-In-Reply-To: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
-References: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <7FE21149F4667147B645348EC605788514EDFF@039-SN2MPN1-011.039d.mgd.msft.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Mar 2012 10:54:50 +0100
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
+ device tree support
+In-Reply-To: <87k426vy9r.fsf@laptop.org>
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+ <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
+ <m239abgc32.fsf@bob.laptop.org>
+ <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
+ <m2vcn0496y.fsf@bob.laptop.org> <87k426vy9r.fsf@laptop.org>
+Message-ID: <20120328095450.GA23005@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: alsa-devel-bounces at alsa-project.org [mailto:alsa-devel-
-> bounces at alsa-project.org] On Behalf Of Shawn Guo
-> Sent: Wednesday, March 28, 2012 3:31 PM
-> To: alsa-devel at alsa-project.org
-> Cc: Xu Lionel-R63889; Mark Brown; Zeng at alsa-project.org; Zhaoming; Shawn
-> Guo; Xu Lionel-R63889; linux-arm-kernel at lists.infradead.org
-> Subject: [alsa-devel] [PATCH] ASoC: sgtl5000: fix power on/off of MIC
-> bias
-> 
-> From: Lionel Xu <Lionel.Xu@freescale.com>
-> 
-> There is no sound in the recorded wav, to enable recording, the VAG
-> should be powered up, and the mic bias resistor should be set up with
-> proper value.
-> 
-> Signed-off-by: Lionel Xu <lionel.xu@freescale.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Zeng Zhaoming <zengzm.kernel@gmail.com>
-> ---
->  sound/soc/codecs/sgtl5000.c |   14 +++++++++++---
->  1 files changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
-> index d192626..a24299c 100644
-> --- a/sound/soc/codecs/sgtl5000.c
-> +++ b/sound/soc/codecs/sgtl5000.c
-> @@ -132,11 +132,18 @@ static int mic_bias_event(struct
-> snd_soc_dapm_widget *w,
->  		snd_soc_update_bits(w->codec, SGTL5000_CHIP_MIC_CTRL,
->  				SGTL5000_BIAS_R_MASK,
->  				SGTL5000_BIAS_R_4k << SGTL5000_BIAS_R_SHIFT);
-> +
-> +		snd_soc_update_bits(w->codec, SGTL5000_CHIP_ANA_POWER,
-> +				SGTL5000_VAG_POWERUP, SGTL5000_VAG_POWERUP);
-Did you test line-in record?
-IIRC for line-in record, it may also need VAG_POWER up.
-Then only enable VAG_POWER for mic_bias_event may not be sufficient.
-Will verify it latter when I'm free.
+On Tue, Mar 27, 2012 at 11:50:24AM -0400, Chris Ball wrote:
+> On Tue, Feb 21 2012, Chris Ball wrote:
+> > On Tue, Feb 21 2012, Kukjin Kim wrote:
 
-Regards
-Dong Aisheng
+> >> I created topic branch for this we talked. You can pull that following:
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> >> v3.4-for-cjb
 
->  		break;
-> 
->  	case SND_SOC_DAPM_PRE_PMD:
->  		snd_soc_update_bits(w->codec, SGTL5000_CHIP_MIC_CTRL,
-> -				SGTL5000_BIAS_R_MASK, 0);
-> +				SGTL5000_BIAS_R_MASK,
-> +				SGTL5000_BIAS_R_off << SGTL5000_BIAS_R_SHIFT);
-> +
-> +		snd_soc_update_bits(w->codec, SGTL5000_CHIP_ANA_POWER,
-> +				SGTL5000_VAG_POWERUP, 0);
->  		break;
->  	}
->  	return 0;
-> @@ -197,7 +204,7 @@ static const struct snd_soc_dapm_widget
-> sgtl5000_dapm_widgets[] = {
->  	SND_SOC_DAPM_OUTPUT("HP_OUT"),
->  	SND_SOC_DAPM_OUTPUT("LINE_OUT"),
-> 
-> -	SND_SOC_DAPM_MICBIAS_E("Mic Bias", SGTL5000_CHIP_MIC_CTRL, 8, 0,
-> +	SND_SOC_DAPM_MICBIAS_E("Mic Bias", SND_SOC_NOPM, 0, 0,
->  				mic_bias_event,
->  				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
-> 
-> @@ -229,7 +236,8 @@ static const struct snd_soc_dapm_widget
-> sgtl5000_dapm_widgets[] = {
->  /* routes for sgtl5000 */
->  static const struct snd_soc_dapm_route sgtl5000_dapm_routes[] = {
->  	{"Capture Mux", "LINE_IN", "LINE_IN"},	/* line_in --> adc_mux */
-> -	{"Capture Mux", "MIC_IN", "MIC_IN"},	/* mic_in --> adc_mux */
-> +	{"Mic Bias", NULL, "MIC_IN"},		/* mic_in --> mic bias */
-> +	{"Capture Mux", "MIC_IN", "Mic Bias"},	/* mic bias --> adc_mux
-> */
-> 
->  	{"ADC", NULL, "Capture Mux"},		/* adc_mux --> adc */
->  	{"AIFOUT", NULL, "ADC"},		/* adc --> i2s_out */
-> --
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+> >> If any problems, please kindly let me know.
+
+> > Pushed to mmc-next, thanks.  (I'm expecting that you'll do the merge
+> > to Linus.)
+
+> I was expecting you to merge these patches, but they aren't in the
+> arm-soc tree and haven't been sent to Linus, and we're in the last few
+> days of the merge window.
+
+> As a result I'm dropping this tree -- and all of the patches that I
+> have on top of it -- from mmc-next so that I can get a pull request
+> out.  This means that I'm dropping:
+
+If they're already in your tree why not just send them to Linus?  Given
+that everything's in git I don't understand why you'd need Kukjin to
+push them separately or what the benefit of that would be?
+
+This is all extremely frustrating fromm the contributor point of view.
