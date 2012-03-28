@@ -1,147 +1,162 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 28 Mar 2012 16:33:42 +0200
-Subject: [PATCH v5 00/16] Add PWM framework and device tree support
-Message-ID: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+Date: Wed, 28 Mar 2012 16:33:45 +0200
+Subject: [PATCH v5 03/16] pwm: Add debugfs interface
+In-Reply-To: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1332945238-14897-4-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds very rudimentary device-tree support for PWM
-devices. With all of these patches applied (plus one board-specific
-patch that is not included), I'm able to control the backlight on the
-device I'm working on using the sysfs interface provided by the pwm-bl
-driver and the backlight class.
+This commit adds a debugfs interface that can be used to list the
+current internal state of the PWM devices registered with the PWM
+framework.
 
-This series is based on Sascha Hauer's series of patches[0] to add a
-generic PWM framework. The first patch in this series is taken from
-Sascha's branch, while the second patch enables each PWM chip to provide
-multiple PWM devices (the Blackfin and PXA drivers have been ported to
-the framework for reference). Currently a global namespace is still
-provided to keep backwards-compatibility with the legacy PWM API. In
-order to achieve this, the number of global PWM devices is limited to
-1024. However, patch 2 introduces per-chip indexing of PWM devices in
-the core and patch 4 adds an API to request a PWM device using a lookup
-table registered by board setup code. They are supposed to eventually
-replace pwm_request() and allow to get rid of the global namespace. The
-device tree support code does not use the global namespace.
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+---
+Changes in v5:
+- new patch splitting off debugfs interface implementation
+- use seq_file's iterator interface for debugfs support
+- add missing forward declaration of struct seq_file
 
-Patch 3 adds a debugfs interface.
+ drivers/pwm/core.c  |   90 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pwm.h |    6 ++++
+ 2 files changed, 96 insertions(+)
 
-Patch 5 adds some code to lookup a PWM chip given its device-tree
-handle. This code will be used later on by the pwm-bl driver to find the
-PWM device that it should be using. If the no corresponding PWM chip is
-available yet, the code returns EPROBE_DEFER to have users automatically
-probed again later when the PWM provider may have become available.
-Device tree binding documentation is also provided.
-
-Patch 6 was taken from the Chromium tree and is required to provide
-proper clocking of the Tegra2 PWFM controller. All Chromium-specific
-tags have been removed from the commit message. Some cleanup of the
-clock registration for Tegra is done in patch 7 because a subsequent
-patch will instantiate one PWFM controller device instead of four.
-
-Patch 8 adds a generic PWM framework driver for the Tegra2 PWFM
-controller. The code is taken from the Chromium tree with some
-adjustments to integrate it with the PWM framework. Device tree based
-probing of the driver is implemented in patch 9.
-
-Patches 10 and 11 are ports of the Blackfin PWM and the PXA PWM drivers
-to the PWM framework. These are only compile-tested as I do not have any
-hardware to test them on.
-
-Patches 12, 13 and 14 move the i.MX, Samsung and VT8500 drivers over to
-the framework. These are originally by Sascha Hauer and were updated to
-take advantage of the multiple PWM devices per chip feature.
-
-Patch 15 implements DT-based probing in the pwm-backlight driver. Note
-that this code only handles the "pwms" property (by looking up the PWM
-device via the new PWM DT binding). Switching power to the backlight via
-GPIOs is not supported yet. The DT binding also deviates from the
-platform data in that it requires a list of brightness levels to be
-specified instead of assuming a linearily spaced range from 0 to a given
-maximum brightness.
-
-Finally, patch 16 makes me the new maintainer of the PWM subsystem.
-
-The whole series is based on the linux-next tree from 20120328. I think
-I've addressed all of the concerns raised in the first four versions.
-
-Thierry
-
-[0]: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/pwmlib
-
-Sascha Hauer (4):
-  pwm: Add PWM framework support
-  ARM i.MX: Move i.MX pwm driver to pwm framework
-  ARM Samsung: Move s3c pwm driver to pwm framework
-  ARM vt8500: Move vt8500 pwm driver to pwm framework
-
-Simon Que (1):
-  ARM: tegra: Fix PWM clock programming
-
-Thierry Reding (11):
-  pwm: Allow chips to support multiple PWMs
-  pwm: Add debugfs interface
-  pwm: Add table-based lookup for static mappings
-  pwm: Add device tree support
-  ARM: tegra: Provide clock for only one PWM controller
-  pwm: Add NVIDIA Tegra SoC support
-  pwm: tegra: Add device tree support
-  pwm: Move Blackfin PWM driver to PWM framework
-  pwm: Move PXA PWM driver to PWM framework
-  pwm-backlight: Add rudimentary device tree support
-  pwm: Take over maintainership of the PWM subsystem
-
- .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt |   18 +
- Documentation/devicetree/bindings/pwm/pwm.txt      |   53 ++
- .../bindings/video/backlight/pwm-backlight         |   30 +
- Documentation/pwm.txt                              |   76 +++
- MAINTAINERS                                        |   12 +
- arch/arm/boot/dts/tegra20.dtsi                     |    6 +
- arch/arm/boot/dts/tegra30.dtsi                     |    6 +
- arch/arm/mach-tegra/board-dt-tegra20.c             |    1 +
- arch/arm/mach-tegra/board-dt-tegra30.c             |    3 +
- arch/arm/mach-tegra/tegra2_clocks.c                |   36 +-
- arch/arm/mach-tegra/tegra30_clocks.c               |    6 +-
- arch/arm/mach-vt8500/Makefile                      |    2 -
- arch/arm/plat-mxc/Kconfig                          |    6 -
- arch/arm/plat-mxc/Makefile                         |    1 -
- arch/arm/plat-pxa/Makefile                         |    1 -
- arch/arm/plat-samsung/Makefile                     |    4 -
- arch/blackfin/Kconfig                              |   10 -
- arch/blackfin/kernel/Makefile                      |    1 -
- arch/blackfin/kernel/pwm.c                         |  100 ---
- drivers/Kconfig                                    |    2 +
- drivers/Makefile                                   |    1 +
- drivers/pwm/Kconfig                                |   67 ++
- drivers/pwm/Makefile                               |    7 +
- drivers/pwm/core.c                                 |  679 ++++++++++++++++++++
- drivers/pwm/pwm-bfin.c                             |  164 +++++
- arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c   |  182 ++----
- arch/arm/plat-pxa/pwm.c => drivers/pwm/pwm-pxa.c   |  172 ++---
- .../pwm.c => drivers/pwm/pwm-samsung.c             |  228 +++----
- drivers/pwm/pwm-tegra.c                            |  265 ++++++++
- .../mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c  |  169 ++---
- drivers/video/backlight/Kconfig                    |    2 +-
- drivers/video/backlight/pwm_bl.c                   |  145 ++++-
- include/linux/of_pwm.h                             |   34 +
- include/linux/pwm.h                                |  115 ++++
- include/linux/pwm_backlight.h                      |    1 +
- 35 files changed, 1967 insertions(+), 638 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm.txt
- create mode 100644 Documentation/devicetree/bindings/video/backlight/pwm-backlight
- create mode 100644 Documentation/pwm.txt
- delete mode 100644 arch/blackfin/kernel/pwm.c
- create mode 100644 drivers/pwm/Kconfig
- create mode 100644 drivers/pwm/Makefile
- create mode 100644 drivers/pwm/core.c
- create mode 100644 drivers/pwm/pwm-bfin.c
- rename arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c (58%)
- rename arch/arm/plat-pxa/pwm.c => drivers/pwm/pwm-pxa.c (57%)
- rename arch/arm/plat-samsung/pwm.c => drivers/pwm/pwm-samsung.c (58%)
- create mode 100644 drivers/pwm/pwm-tegra.c
- rename arch/arm/mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c (52%)
- create mode 100644 include/linux/of_pwm.h
-
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 46dcbe1..12a643d 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -27,6 +27,8 @@
+ #include <linux/err.h>
+ #include <linux/slab.h>
+ #include <linux/device.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
+ 
+ #define MAX_PWMS 1024
+ 
+@@ -334,3 +336,91 @@ void pwm_disable(struct pwm_device *pwm)
+ 		pwm->chip->ops->disable(pwm->chip, pwm);
+ }
+ EXPORT_SYMBOL_GPL(pwm_disable);
++
++#ifdef CONFIG_DEBUG_FS
++static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
++{
++	unsigned int i;
++
++	for (i = 0; i < chip->npwm; i++) {
++		struct pwm_device *pwm = &chip->pwms[i];
++
++		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
++
++		if (test_bit(PWMF_REQUESTED, &pwm->flags))
++			seq_printf(s, " requested");
++
++		if (test_bit(PWMF_ENABLED, &pwm->flags))
++			seq_printf(s, " enabled");
++
++		seq_printf(s, "\n");
++	}
++}
++
++static void *pwm_seq_start(struct seq_file *s, loff_t *pos)
++{
++	mutex_lock(&pwm_lock);
++	s->private = "";
++
++	return seq_list_start(&pwm_chips, *pos);
++}
++
++static void *pwm_seq_next(struct seq_file *s, void *v, loff_t *pos)
++{
++	s->private = "\n";
++
++	return seq_list_next(v, &pwm_chips, pos);
++}
++
++static void pwm_seq_stop(struct seq_file *s, void *v)
++{
++	mutex_unlock(&pwm_lock);
++}
++
++static int pwm_seq_show(struct seq_file *s, void *v)
++{
++	struct pwm_chip *chip = list_entry(v, struct pwm_chip, list);
++
++	seq_printf(s, "%s%s/%s, %d PWM device%s\n", (char *)s->private,
++		   chip->dev->bus ? chip->dev->bus->name : "no-bus",
++		   dev_name(chip->dev), chip->npwm,
++		   (chip->npwm != 1) ? "s" : "");
++
++	if (chip->ops->dbg_show)
++		chip->ops->dbg_show(chip, s);
++	else
++		pwm_dbg_show(chip, s);
++
++	return 0;
++}
++
++static const struct seq_operations pwm_seq_ops = {
++	.start = pwm_seq_start,
++	.next = pwm_seq_next,
++	.stop = pwm_seq_stop,
++	.show = pwm_seq_show,
++};
++
++static int pwm_seq_open(struct inode *inode, struct file *file)
++{
++	return seq_open(file, &pwm_seq_ops);
++}
++
++static const struct file_operations pwm_debugfs_ops = {
++	.owner = THIS_MODULE,
++	.open = pwm_seq_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = seq_release,
++};
++
++static int __init pwm_debugfs_init(void)
++{
++	debugfs_create_file("pwm", S_IFREG | S_IRUGO, NULL, NULL,
++			    &pwm_debugfs_ops);
++
++	return 0;
++}
++
++subsys_initcall(pwm_debugfs_init);
++#endif /* CONFIG_DEBUG_FS */
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 5710391..047cd53 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -2,6 +2,7 @@
+ #define __LINUX_PWM_H
+ 
+ struct pwm_device;
++struct seq_file;
+ 
+ /*
+  * pwm_request - request a PWM device
+@@ -65,6 +66,7 @@ static inline unsigned int pwm_get_period(struct pwm_device *pwm)
+  * @config: configure duty cycles and period length for this PWM
+  * @enable: enable PWM output toggling
+  * @disable: disable PWM output toggling
++ * @dbg_show: optional routine to show contents in debugfs
+  * @owner: helps prevent removal of modules exporting active PWMs
+  */
+ struct pwm_ops {
+@@ -79,6 +81,10 @@ struct pwm_ops {
+ 					  struct pwm_device *pwm);
+ 	void			(*disable)(struct pwm_chip *chip,
+ 					   struct pwm_device *pwm);
++#ifdef CONFIG_DEBUG_FS
++	void			(*dbg_show)(struct pwm_chip *chip,
++					    struct seq_file *s);
++#endif
+ 	struct module		*owner;
+ };
+ 
 -- 
 1.7.9.4
