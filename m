@@ -1,38 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 Mar 2012 17:56:08 -0700
-Subject: [GIT PULL] ARM: tegra: Include assembler.h in sleep.S to fix
- build break
-In-Reply-To: <4F709723.4080206@wwwdotorg.org>
-References: <4F709723.4080206@wwwdotorg.org>
-Message-ID: <CAOesGMiK3fLQP0oNZS0QwTM1+4uLs_QfAWbLXzH-=TWXSXbY7A@mail.gmail.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 27 Mar 2012 18:03:49 -0700
+Subject: [PATCH 07/10] clk: Constify parent name arrays
+In-Reply-To: <1332833009-4121-8-git-send-email-shawn.guo@linaro.org>
+References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
+ <1332833009-4121-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAJOA=zOXwtpefp2vgHprnmdpaOsHzo_rtMPMrN=X=K7YXM2EYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> From: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>
+> Drivers should be able to declare their arrays of parent names as const
+> so the APIs need to accept const arguments.
+>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-On Mon, Mar 26, 2012 at 9:19 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> Arnd, Olof,
->
-> This pull request depends on the merge of:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> devel/io-cleanup
-> (specifically 6f6f6a7 ARM: create a common IOMEM definition)
->
-> and:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.4/soc
-> (specifically c76fcc8 ARM: tegra: assembler code for LP3)
->
-> and is based on a local branch that merges the two branches above.
->
-> The following changes since commit 1ad105fc77e61f9dd7a272659a248e2979fdb893:
-> ?Stephen Warren (1):
-> ? ? ? ?Merge remote branch 'remotes/korg_olof_tegra/for-3.4/soc' into
-> for-3.4/fixes-for-io-cleanup
+Thanks for reposting Shawn.
 
-Thanks, pulled into next/cleanup2 (after pulling in tegra/t30-smp into
-the same).
+Mark, I've taken this in to my fixes branch, but I dropped the change
+in drivers/clk/clk-fixed-rate.c (since that code has shuffled) and I
+also marked the char *parent[1] in fixed-rate and gate clocks as
+const, in addition to the divider you did in your patch.
 
-
--Olof
+Thanks,
+Mike
