@@ -1,51 +1,43 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 28 Mar 2012 19:50:02 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
-Message-ID: <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 28 Mar 2012 09:26:50 -0500
+Subject: [GIT PULL 0/5] Second batch of arm-soc changes
+In-Reply-To: <1332918842-13521-1-git-send-email-olof@lixom.net>
+References: <1332918842-13521-1-git-send-email-olof@lixom.net>
+Message-ID: <4F731FAA.5040708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 7:46 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> On Wed, Mar 21, 2012 at 19:30:01, Shilimkar, Santosh wrote:
->> On Wed, Mar 21, 2012 at 5:12 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
->> > On Mon, Mar 19, 2012 at 17:45:32, Shilimkar, Santosh wrote:
->> >> On Monday 19 March 2012 05:14 PM, Ming Lei wrote:
->> >> > On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+On 03/28/2012 02:13 AM, Olof Johansson wrote:
+> Hi Linus,
+> 
+> Here is the second batch of arm-soc changes for this merge window. As Arnd
+> mentioned with the first cover letter, most of these either had external
+> dependencies that have now been pulled in, or just needed a bit more
+> linux-next bake time due to getting picked up close to the 3.3 release.
+> 
+> 
+> There are 128 non-merge patches, with a total diffstat of:
+> 
+>  346 files changed, 10790 insertions(+), 2792 deletions(-)
+> 
+> So, while there's been some good cleanups especially in the first branch,
+> there's been a net addition of code:
+> 
+> * New SoC family support for Samsung EXYNOS5250: clock tables, driver
+>   updates, etc means net gain in code.
+> * Added device tree conversions. Once we start to sunset non-device tree
+>   boards on the enabled platforms, we should see payback in code removal.
+> * Common clock framework. As SoCs get converted over to the framework,
+>   we should see more code removal from this as well.
+> 
+> 
+> There are a handful of merge conflicts on the branches, nothing that
+> should be too messy to sort out. I've described each conflict in the
+> corresponding pull request, including how we've resolved them in our
+> for-next branch.
+> 
 
-[...]
+Why isn't lakml getting copied on emails 1-5? The same thing happened
+with Arnd's pull request. Are they getting hung up for moderator approval?
 
->
->> Btw, if you need PM, how are you going to use GPTIMER
->> as a clocksource. Note sys-clock is generally stopped in
->> low power states. So that leaves you option with using
->> gptimer with 32K clock and in that case, GPTIMER
->> is not a better clock-source compare to 32K sync timer
->> and so shouldn't be the rating.
->>
->
-> AM33xx has GPTIMER1 in wakeup domain, so that we are already using as a
-> Clocksource, without any issues.
->
-GPTIMER1 is in wakeup domain on OMAP too but that doesn't
-solve the issue I am talking. Once the sysclock is stopped, GPTIMER
-can't tick anymore even if it is in wakeup domain.
-
-The only way it will work is using always running 32KHz clock as
-the clock input to GPT1. And then the end result is the accuracy
-of GPTIMER = sync 32K timer. So they are of same rating.
-
-Hope it is clear now.
-
-Regards
-Santosh
+Rob
