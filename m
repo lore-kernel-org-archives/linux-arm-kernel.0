@@ -1,51 +1,29 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 28 Mar 2012 13:08:44 +0800
-Subject: [PATCH 4/4] Input: pxa27x_keypad add choice to set direct_key_mask
-In-Reply-To: <1332911324-9840-1-git-send-email-chao.xie@marvell.com>
-References: <1332911324-9840-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1332911324-9840-4-git-send-email-chao.xie@marvell.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 28 Mar 2012 10:33:21 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203271359.16553.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203271159.35306.arnd@arndb.de>
+ <CAOh2x==7gNt2Jb3-EHz9-R1pTy6zL93FmUmTBMdpYUnW3F=9Uw@mail.gmail.com>
+ <201203271359.16553.arnd@arndb.de>
+Message-ID: <4F729B99.4020909@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Direct keys usage may not start from KP_DKIN0, add a msk option
-to configure the specifics for platforms that can skip some keys.
+On 3/27/2012 7:29 PM, Arnd Bergmann wrote:
+> That would be even better. I think we should generally try do initialization
+> as late as possible, ideally from initcalls. The init_early() function should
+> only be used for code that absolutely has to be run from setup_arch() and
+> no later, while the map_io() function should ideally only be used to set up
+> the static mappings and nothing else.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/plat-pxa/include/plat/pxa27x_keypad.h |    2 ++
- drivers/input/keyboard/pxa27x_keypad.c         |    7 ++++++-
- 2 files changed, 8 insertions(+), 1 deletions(-)
+I remember now why we do it in map_io().
+Timers need clock support and they are up before machine_init() is called.
 
-diff --git a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-index 7ffb16b..5ce8d5e 100644
---- a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-+++ b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-@@ -46,6 +46,8 @@ struct pxa27x_keypad_platform_data {
- 	unsigned int	direct_key_map[MAX_DIRECT_KEY_NUM];
- 	/* the key output may be low active */
- 	int		direct_key_low_active;
-+	/* give board a chance to choose the start direct key */
-+	unsigned int	direct_key_mask;
- 
- 	/* rotary encoders 0 */
- 	int		enable_rotary0;
-diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
-index b41ebda..661892b 100644
---- a/drivers/input/keyboard/pxa27x_keypad.c
-+++ b/drivers/input/keyboard/pxa27x_keypad.c
-@@ -391,7 +391,12 @@ static void pxa27x_keypad_config(struct pxa27x_keypad *keypad)
- 	if (pdata->direct_key_num > direct_key_num)
- 		direct_key_num = pdata->direct_key_num;
- 
--	keypad->direct_key_mask = ((1 << direct_key_num) - 1) & ~mask;
-+	/* Direct keys usage may not start from KP_DKIN0, check the platfrom
-+	 * msk data to config the specific */
-+	if (pdata->direct_key_mask)
-+		keypad->direct_key_mask = pdata->direct_key_mask;
-+	else
-+		keypad->direct_key_mask = ((1 << direct_key_num) - 1) & ~mask;
- 
- 	/* enable direct key */
- 	if (direct_key_num)
+So, i believe i must have DT_MACHINE_START per SoC.
+
+I will post V2 for 3xx DT support today, but can i have initial level of review
+from you, so that i can fixup minor issues in V2 only?
+
 -- 
-1.7.0.4
+viresh
