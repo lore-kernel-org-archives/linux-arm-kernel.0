@@ -1,75 +1,43 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 28 Mar 2012 14:37:53 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 28 Mar 2012 16:38:40 +0200
+Subject: [PATCHv2 01/14] common: dma-mapping: introduce alloc_attrs and
+ free_attrs methods
+In-Reply-To: <4F72F603.2000803@mvista.com>
+References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
+ <1332855768-32583-2-git-send-email-m.szyprowski@samsung.com>
+ <4F72F603.2000803@mvista.com>
+Message-ID: <016001cd0cf0$7807bdb0$68173910$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 19:50:02, Shilimkar, Santosh wrote:
-> On Wed, Mar 28, 2012 at 7:46 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> > On Wed, Mar 21, 2012 at 19:30:01, Shilimkar, Santosh wrote:
-> >> On Wed, Mar 21, 2012 at 5:12 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> >> > On Mon, Mar 19, 2012 at 17:45:32, Shilimkar, Santosh wrote:
-> >> >> On Monday 19 March 2012 05:14 PM, Ming Lei wrote:
-> >> >> > On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+Hi Sergei,
+
+On Wednesday, March 28, 2012 1:29 PM Sergei Shtylyov wrote:
+
+> On 27-03-2012 17:42, Marek Szyprowski wrote:
 > 
-> [...]
+> > Introduce new generic alloc and free methods with attributes argument.
 > 
-> >
-> >> Btw, if you need PM, how are you going to use GPTIMER
-> >> as a clocksource. Note sys-clock is generally stopped in
-> >> low power states. So that leaves you option with using
-> >> gptimer with 32K clock and in that case, GPTIMER
-> >> is not a better clock-source compare to 32K sync timer
-> >> and so shouldn't be the rating.
-> >>
-> >
-> > AM33xx has GPTIMER1 in wakeup domain, so that we are already using as a
-> > Clocksource, without any issues.
-> >
-> GPTIMER1 is in wakeup domain on OMAP too but that doesn't
-> solve the issue I am talking. Once the sysclock is stopped, GPTIMER
-> can't tick anymore even if it is in wakeup domain.
+>     The method names don't match the ones in the subject.
+
+Right, I will reword the subject to "common: dma-mapping: introduce generic alloc()
+and free() methods".
+
+> > Existing alloc_coherent and free_coherent can be implemented on top of the
+> > new calls with NULL attributes argument. Later also dma_alloc_non_coherent
+> > can be implemented using DMA_ATTR_NONCOHERENT attribute as well as
+> > dma_alloc_writecombine with separate DMA_ATTR_WRITECOMBINE attribute.
 > 
-> The only way it will work is using always running 32KHz clock as
-> the clock input to GPT1. And then the end result is the accuracy
-> of GPTIMER = sync 32K timer. So they are of same rating.
+> > This way the drivers will get more generic, platform independent way of
+> > allocating dma buffers with specific parameters.
+> 
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Reviewed-by: David Gibson <david@gibson.dropbear.ud.au>
+> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 > 
 
-Ohh ok, sorry I should have clarified it in my last response itself.
-
-AM33xx architecture is bit different than OMAP family, and gmtimer1 is 
-sourced from RTC32K clock, which is in wakeup domain.
-This means we have RTC32K clock always running across suspend/resume.
-
-0 - SEL1: Select CLK_M_OSC clock
-1 - SEL2: Select CLK_32KHZ clock
-2 - SEL3: Select TCLKIN clock
-3 - SEL4: Select CLK_RC32K clock
-4 - SEL5: Selects the CLK_32768 from 32KHz Crystal Osc
-
-
-We use value "4" here, for RTC32K (always on clock).
-I hope this clarifies what I am trying to say here.
-
-
-Thanks,
-Vaibhav
-
-> Hope it is clear now.
-> 
-> Regards
-> Santosh
-> 
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
