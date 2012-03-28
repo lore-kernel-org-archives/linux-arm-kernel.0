@@ -1,162 +1,74 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 28 Mar 2012 16:33:45 +0200
-Subject: [PATCH v5 03/16] pwm: Add debugfs interface
+Date: Wed, 28 Mar 2012 16:33:49 +0200
+Subject: [PATCH v5 07/16] ARM: tegra: Provide clock for only one PWM controller
 In-Reply-To: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1332945238-14897-4-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1332945238-14897-8-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a debugfs interface that can be used to list the
-current internal state of the PWM devices registered with the PWM
-framework.
+A subsequent patch will add a generic PWM API driver for the Tegra PWFM
+controller, supporting all four PWM devices with a single PWM chip. The
+device will be named tegra-pwm and only one clock needs to be provided.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 ---
 Changes in v5:
-- new patch splitting off debugfs interface implementation
-- use seq_file's iterator interface for debugfs support
-- add missing forward declaration of struct seq_file
+- rename the device name to "tegra-pwm" in the clock lookup table
+- get rid of all CLK_DUPLICATE entries which are no longer needed
 
- drivers/pwm/core.c  |   90 +++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pwm.h |    6 ++++
- 2 files changed, 96 insertions(+)
+ arch/arm/mach-tegra/tegra2_clocks.c  |    6 +-----
+ arch/arm/mach-tegra/tegra30_clocks.c |    6 +-----
+ 2 files changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 46dcbe1..12a643d 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -27,6 +27,8 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- #include <linux/device.h>
-+#include <linux/debugfs.h>
-+#include <linux/seq_file.h>
- 
- #define MAX_PWMS 1024
- 
-@@ -334,3 +336,91 @@ void pwm_disable(struct pwm_device *pwm)
- 		pwm->chip->ops->disable(pwm->chip, pwm);
- }
- EXPORT_SYMBOL_GPL(pwm_disable);
-+
-+#ifdef CONFIG_DEBUG_FS
-+static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < chip->npwm; i++) {
-+		struct pwm_device *pwm = &chip->pwms[i];
-+
-+		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
-+
-+		if (test_bit(PWMF_REQUESTED, &pwm->flags))
-+			seq_printf(s, " requested");
-+
-+		if (test_bit(PWMF_ENABLED, &pwm->flags))
-+			seq_printf(s, " enabled");
-+
-+		seq_printf(s, "\n");
-+	}
-+}
-+
-+static void *pwm_seq_start(struct seq_file *s, loff_t *pos)
-+{
-+	mutex_lock(&pwm_lock);
-+	s->private = "";
-+
-+	return seq_list_start(&pwm_chips, *pos);
-+}
-+
-+static void *pwm_seq_next(struct seq_file *s, void *v, loff_t *pos)
-+{
-+	s->private = "\n";
-+
-+	return seq_list_next(v, &pwm_chips, pos);
-+}
-+
-+static void pwm_seq_stop(struct seq_file *s, void *v)
-+{
-+	mutex_unlock(&pwm_lock);
-+}
-+
-+static int pwm_seq_show(struct seq_file *s, void *v)
-+{
-+	struct pwm_chip *chip = list_entry(v, struct pwm_chip, list);
-+
-+	seq_printf(s, "%s%s/%s, %d PWM device%s\n", (char *)s->private,
-+		   chip->dev->bus ? chip->dev->bus->name : "no-bus",
-+		   dev_name(chip->dev), chip->npwm,
-+		   (chip->npwm != 1) ? "s" : "");
-+
-+	if (chip->ops->dbg_show)
-+		chip->ops->dbg_show(chip, s);
-+	else
-+		pwm_dbg_show(chip, s);
-+
-+	return 0;
-+}
-+
-+static const struct seq_operations pwm_seq_ops = {
-+	.start = pwm_seq_start,
-+	.next = pwm_seq_next,
-+	.stop = pwm_seq_stop,
-+	.show = pwm_seq_show,
-+};
-+
-+static int pwm_seq_open(struct inode *inode, struct file *file)
-+{
-+	return seq_open(file, &pwm_seq_ops);
-+}
-+
-+static const struct file_operations pwm_debugfs_ops = {
-+	.owner = THIS_MODULE,
-+	.open = pwm_seq_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = seq_release,
-+};
-+
-+static int __init pwm_debugfs_init(void)
-+{
-+	debugfs_create_file("pwm", S_IFREG | S_IRUGO, NULL, NULL,
-+			    &pwm_debugfs_ops);
-+
-+	return 0;
-+}
-+
-+subsys_initcall(pwm_debugfs_init);
-+#endif /* CONFIG_DEBUG_FS */
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 5710391..047cd53 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -2,6 +2,7 @@
- #define __LINUX_PWM_H
- 
- struct pwm_device;
-+struct seq_file;
- 
- /*
-  * pwm_request - request a PWM device
-@@ -65,6 +66,7 @@ static inline unsigned int pwm_get_period(struct pwm_device *pwm)
-  * @config: configure duty cycles and period length for this PWM
-  * @enable: enable PWM output toggling
-  * @disable: disable PWM output toggling
-+ * @dbg_show: optional routine to show contents in debugfs
-  * @owner: helps prevent removal of modules exporting active PWMs
-  */
- struct pwm_ops {
-@@ -79,6 +81,10 @@ struct pwm_ops {
- 					  struct pwm_device *pwm);
- 	void			(*disable)(struct pwm_chip *chip,
- 					   struct pwm_device *pwm);
-+#ifdef CONFIG_DEBUG_FS
-+	void			(*dbg_show)(struct pwm_chip *chip,
-+					    struct seq_file *s);
-+#endif
- 	struct module		*owner;
- };
- 
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 64735bd..c95a878 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -2170,7 +2170,7 @@ static struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("i2s2",	"tegra-i2s.1",		NULL,	18,	0x104,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("spdif_out",	"spdif_out",		NULL,	10,	0x108,	100000000, mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("spdif_in",	"spdif_in",		NULL,	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71),
+-	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71 | MUX_PWM),
++	PERIPH_CLK("pwm",	"tegra-pwm",		NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71 | MUX_PWM),
+ 	PERIPH_CLK("spi",	"spi",			NULL,	43,	0x114,	40000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("xio",	"xio",			NULL,	45,	0x120,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("twc",	"twc",			NULL,	16,	0x12c,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+@@ -2269,10 +2269,6 @@ static struct clk_duplicate tegra_clk_duplicates[] = {
+ 	CLK_DUPLICATE("usbd", "tegra-otg", NULL),
+ 	CLK_DUPLICATE("hdmi", "tegradc.0", "hdmi"),
+ 	CLK_DUPLICATE("hdmi", "tegradc.1", "hdmi"),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.0", NULL),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.1", NULL),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.2", NULL),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.3", NULL),
+ 	CLK_DUPLICATE("host1x", "tegra_grhost", "host1x"),
+ 	CLK_DUPLICATE("2d", "tegra_grhost", "gr2d"),
+ 	CLK_DUPLICATE("3d", "tegra_grhost", "gr3d"),
+diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
+index 6d08b53..18afd0c 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks.c
++++ b/arch/arm/mach-tegra/tegra30_clocks.c
+@@ -2886,7 +2886,7 @@ struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("i2s4",	"tegra30-i2s.4",	NULL,	102,	0x3c0,	26000000,  mux_pllaout0_audio4_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+ 	PERIPH_CLK("spdif_out",	"tegra30-spdif",	"spdif_out",	10,	0x108,	100000000, mux_pllaout0_audio_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+ 	PERIPH_CLK("spdif_in",	"tegra30-spdif",	"spdif_in",	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71 | PERIPH_ON_APB),
+-	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_clk32_clkm,	MUX | MUX_PWM | DIV_U71 | PERIPH_ON_APB),
++	PERIPH_CLK("pwm",	"tegra-pwm",		NULL,	17,	0x110,	432000000, mux_pllp_pllc_clk32_clkm,	MUX | MUX_PWM | DIV_U71 | PERIPH_ON_APB),
+ 	PERIPH_CLK("d_audio",	"tegra30-ahub",		"d_audio", 106,	0x3d0,	48000000,  mux_plla_pllc_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("dam0",	"tegra30-dam.0",	NULL,   108,	0x3d8,	48000000,  mux_plla_pllc_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("dam1",	"tegra30-dam.1",	NULL,   109,	0x3dc,	48000000,  mux_plla_pllc_pllp_clkm,	MUX | DIV_U71),
+@@ -2990,10 +2990,6 @@ struct clk_duplicate tegra_clk_duplicates[] = {
+ 	CLK_DUPLICATE("hdmi", "tegradc.1", "hdmi"),
+ 	CLK_DUPLICATE("dsib", "tegradc.0", "dsib"),
+ 	CLK_DUPLICATE("dsia", "tegradc.1", "dsia"),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.0", NULL),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.1", NULL),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.2", NULL),
+-	CLK_DUPLICATE("pwm", "tegra_pwm.3", NULL),
+ 	CLK_DUPLICATE("bsev", "tegra-avp", "bsev"),
+ 	CLK_DUPLICATE("bsev", "nvavp", "bsev"),
+ 	CLK_DUPLICATE("vde", "tegra-aes", "vde"),
 -- 
 1.7.9.4
