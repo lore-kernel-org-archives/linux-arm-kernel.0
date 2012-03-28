@@ -1,38 +1,27 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 28 Mar 2012 15:13:25 +0530
-Subject: [PATCH] watchdog: sp805: call watchdog_set_drvdata() early
-Message-ID: <78377bb3c0a861281cfdc5c166f0c082e126f4b7.1332927751.git.viresh.kumar@st.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Mar 2012 11:06:17 +0100
+Subject: [V2 2/4] rtc: fix 88pm860x rtc irq enable callback
+In-Reply-To: <20120327164759.ec04c62e.akpm@linux-foundation.org>
+References: <1329997662-2931-1-git-send-email-jtzhou@marvell.com>
+ <1331259874-26503-1-git-send-email-jtzhou@marvell.com>
+ <20120327164759.ec04c62e.akpm@linux-foundation.org>
+Message-ID: <20120328100617.GB3232@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-wdt_setload() uses watchdog_get_drvdata() and hence we must call
-watchdog_set_drvdata() before actually calling wdt_setload(). This patch moves
-watchdog_set_drvdata() up in code.
+On Tue, Mar 27, 2012 at 04:47:59PM -0700, Andrew Morton wrote:
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/watchdog/sp805_wdt.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> It's surprising that the driver has been in-tree for a year and nobody
+> has noticed this bug.  This makes me wonder if the fix is wrong.
 
-diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-index 40e628a..ef85676 100644
---- a/drivers/watchdog/sp805_wdt.c
-+++ b/drivers/watchdog/sp805_wdt.c
-@@ -250,6 +250,7 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
- 	wdt->wdd.ops = &wdt_ops;
- 
- 	spin_lock_init(&wdt->lock);
-+	watchdog_set_drvdata(&wdt->wdd, wdt);
- 	watchdog_set_nowayout(&wdt->wdd, nowayout);
- 	wdt_setload(&wdt->wdd, DEFAULT_TIMEOUT);
- 
-@@ -260,7 +261,6 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto err_register;
- 	}
- 	amba_set_drvdata(adev, wdt);
--	watchdog_set_drvdata(&wdt->wdd, wdt);
- 
- 	dev_info(&adev->dev, "registration successful\n");
- 	return 0;
--- 
-1.7.10.rc2.10.gb47606
+I rather suspect few of the boards that use this chip ever run mainline
+and we're seeing the effects of Android's ICS release rolling out here -
+it's using 3.0 as the default kernel which was the first version which
+included this driver as standard.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120328/9915d3a0/attachment.sig>
