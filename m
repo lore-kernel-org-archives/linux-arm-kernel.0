@@ -1,131 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 29 Mar 2012 10:00:14 +0200
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <20120329101927.8ab6b1993475b7e16ae2258f@nvidia.com>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
- <20120329101927.8ab6b1993475b7e16ae2258f@nvidia.com>
-Message-ID: <01b301cd0d81$f935d750$eba185f0$%szyprowski@samsung.com>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Thu, 29 Mar 2012 10:10:15 +0200
+Subject: [PATCH 0/3] Add PATA host controller support for Cirrus Logic EP93xx
+ CPU
+Message-ID: <4F7418E7.4060500@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi.
 
-On Thursday, March 29, 2012 9:19 AM Hiroshi Doyu wrote:
+The following patchset adds support for IDE interface controller found on
+Cirrus Logic's EP931x CPUs. It is based on an earlier work done by
+Alessandro Zummo, Lennert Buytenhek, Joao Ramos and Bartlomiej
+Zolnierkiewicz. I tried to take the best parts of code from previous
+attempts for inclusion and added dma support. The driver is working
+correctly in both PIO and DMA mode (with exception that it could give
+timeouts in DMA mode occasionally - the problem has been solved by me
+and solution proposed to LAKML; it's not related to this driver, but
+DMA/interrupt handling of ep93xx IMHO).
 
-> On Wed, 29 Feb 2012 16:04:22 +0100
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> 
-> > This patch add a complete implementation of DMA-mapping API for
-> > devices that have IOMMU support. All DMA-mapping calls are supported.
-> >
-> > This patch contains some of the code kindly provided by Krishna Reddy
-> > <vdumpa@nvidia.com> and Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > ---
-> >  arch/arm/Kconfig                 |    8 +
-> >  arch/arm/include/asm/device.h    |    3 +
-> >  arch/arm/include/asm/dma-iommu.h |   34 ++
-> >  arch/arm/mm/dma-mapping.c        |  726 +++++++++++++++++++++++++++++++++++++-
-> >  arch/arm/mm/vmregion.h           |    2 +-
-> >  5 files changed, 758 insertions(+), 15 deletions(-)
-> >  create mode 100644 arch/arm/include/asm/dma-iommu.h
-> >
-> 
-> <snip>
-> 
-> > +/*
-> > + * Map a part of the scatter-gather list into contiguous io address space
-> > + */
-> > +static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
-> > +                         size_t size, dma_addr_t *handle,
-> > +                         enum dma_data_direction dir)
-> > +{
-> > +       struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-> > +       dma_addr_t iova, iova_base;
-> > +       int ret = 0;
-> > +       unsigned int count;
-> > +       struct scatterlist *s;
-> > +
-> > +       size = PAGE_ALIGN(size);
-> > +       *handle = ARM_DMA_ERROR;
-> > +
-> > +       iova_base = iova = __alloc_iova(mapping, size);
-> > +       if (iova == ARM_DMA_ERROR)
-> > +               return -ENOMEM;
-> > +
-> > +       for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
-> > +       {
-> > +               phys_addr_t phys = page_to_phys(sg_page(s));
-> > +               unsigned int len = PAGE_ALIGN(s->offset + s->length);
-> > +
-> > +               if (!arch_is_coherent())
-> > +                       __dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
-> > +
-> > +               ret = iommu_map(mapping->domain, iova, phys, len, 0);
-> > +               if (ret < 0)
-> > +                       goto fail;
-> > +               count += len >> PAGE_SHIFT;
-> > +               iova += len;
-> > +       }
-> > +       *handle = iova_base;
-> > +
-> > +       return 0;
-> > +fail:
-> > +       iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE);
-> > +       __free_iova(mapping, iova_base, size);
-> > +       return ret;
-> > +}
-> 
-> Do we need to set dma_address as below?
+I'm not sure about correctness of the following in the driver:
+- module copyrights/authorship - I just added all copyrights of the
+  earlier drivers and MODULE_AUTHOR macro lists their authors,
+- timeout in IORDY polling (how long to wait for IORDY?),
+- GPIO/IDE pin muxing - I hope it's done in a way acceptable for
+  ep93xx maintainers (patch 2/3). I would like for the driver to refuse
+  loading when muxing is wrong (first commented out lines of
+  ep93xx_pata_probe, patch 1/3), but some api is needed as raw access
+  to SYSCON register is prohibited in drivers.
 
-Nope, this one is not correct. Please check the arm_iommu_map_sg() function. It calls 
-__map_sg_chunk() and gives it &dma->dma_address as one of the arguments, so the dma 
-address is correctly stored in the scatter list. Please note that scatterlist is really
-non-trivial structure and information about physical memory pages/chunks is disjoint 
-from the information about dma address space chunks, although both are stored on the 
-same list. In arm_iommu_map_sg() 's' pointer is used for physical memory chunks and 
-'dma' pointer is used for dma address space chunks. 
+Patchset is against current mainline kernel.
 
-The number of dma address space chunks (returned by arm_iommu_map_sq) can be lower 
-than the number of physical memory chunks (given as nents argument).
+Regards,
+RP
 
-In case of IOMMU you usually construct the scatter list in such a way, that you get
-only one dma address chunk (so in fact you get a buffer mapped contiguously in 
-virtual io address space).
 
-> From e8bcc3cdac5375b5d7f5ac5b3f716a11c1008f38 Mon Sep 17 00:00:00 2001
-> From: Hiroshi DOYU <hdoyu@nvidia.com>
-> Date: Thu, 29 Mar 2012 09:59:04 +0300
-> Subject: [PATCH 1/1] ARM: dma-mapping: Fix dma_address in sglist
-> 
-> s->dma_address wasn't set at mapping.
-> 
-> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> ---
->  arch/arm/mm/dma-mapping.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 3347c37..11a9d65 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1111,6 +1111,8 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->  		ret = iommu_map(mapping->domain, iova, phys, len, 0);
->  		if (ret < 0)
->  			goto fail;
-> +		s->dma_address = iova;
-> +
->  		count += len >> PAGE_SHIFT;
->  		iova += len;
->  	}
+[PATCH 1/3] PATA host controller driver for ep93xx
+[PATCH 2/3] ep93xx: IDE driver platform support code
+[PATCH 3/3] ep93xx: Add IDE support to edb93xx boards
 
-The above patch is not needed at all.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+ arch/arm/mach-ep93xx/core.c                  |   36
+ arch/arm/mach-ep93xx/edb93xx.c               |   23
+ arch/arm/mach-ep93xx/include/mach/platform.h |    1
+ arch/arm/mach-ep93xx/soc.h                   |    1
+ drivers/ata/Kconfig                          |    9
+ drivers/ata/Makefile                         |    1
+ drivers/ata/pata_ep93xx.c                    |  949 +++++++++++++++++
+ 7 files changed, 1020 insertions(+)
