@@ -1,77 +1,113 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Mar 2012 20:15:35 -0700
-Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add device
- tree support
-In-Reply-To: <20120328095450.GA23005@sirena.org.uk>
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
- <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
- <m239abgc32.fsf@bob.laptop.org>
- <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
- <m2vcn0496y.fsf@bob.laptop.org> <87k426vy9r.fsf@laptop.org>
- <20120328095450.GA23005@sirena.org.uk>
-Message-ID: <4F73D3D7.1010202@samsung.com>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Thu, 29 Mar 2012 08:55:17 +0530
+Subject: [PATCH] ARM: EXYNOS4: Support Suspend/Resume for EXYNOS4412
+Message-ID: <1332991517-3083-1-git-send-email-inderpal.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/12 02:54, Mark Brown wrote:
-> On Tue, Mar 27, 2012 at 11:50:24AM -0400, Chris Ball wrote:
->> On Tue, Feb 21 2012, Chris Ball wrote:
->>> On Tue, Feb 21 2012, Kukjin Kim wrote:
->
->>>> I created topic branch for this we talked. You can pull that following:
->>>>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>>> v3.4-for-cjb
->
->>>> If any problems, please kindly let me know.
->
->>> Pushed to mmc-next, thanks.  (I'm expecting that you'll do the merge
->>> to Linus.)
->
->> I was expecting you to merge these patches, but they aren't in the
->> arm-soc tree and haven't been sent to Linus,
+This patch provides the suspend/resume support for EXYNOS4412.
 
-(Cc'ed Olof and Arnd)
+Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+---
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |   10 +++++++++-
+ arch/arm/mach-exynos/pm.c                    |    2 +-
+ arch/arm/mach-exynos/pmu.c                   |   24 ++++++++++++++++++++----
+ 3 files changed, 30 insertions(+), 6 deletions(-)
 
-Chris, Yeah, it is not in arm-soc tree now. Because I sent a pull 
-request of samsung-mmc which is including this v3.4-for-cjb but Olof 
-wanted to merge only arch/arm/ part for samsung mmc because they are not 
-unrelated to the branch, v3.4-for-cjb sent to you. Since I thought the 
-branch would be sent to upstream via your tree and you were included in 
-the mailing loop, I agreed. So there is no it in arm-soc.
-
->> and we're in the last few
->> days of the merge window.
->
-Yeah...it means not closed yet ;)
-
->> As a result I'm dropping this tree -- and all of the patches that I
->> have on top of it -- from mmc-next so that I can get a pull request
->> out.  This means that I'm dropping:
->
-Hmm, I think, if you're ok, you can send a second pull request to Linus 
-for it and actually, it is in linux-next for a long time via mmc and 
-samsung tree.
-
-Note, please don't rebase it because its resolution for conflicts is in 
-linux-next and I think Linus will use it when happens conflicts...Or I 
-can provide new tree on top of latest mainline. But I'm not sure about 
-latter.
-
-> If they're already in your tree why not just send them to Linus?  Given
-> that everything's in git I don't understand why you'd need Kukjin to
-> push them separately or what the benefit of that would be?
->
-Yes, I already agreed its merging in the mmc tree :)
-
-> This is all extremely frustrating fromm the contributor point of view.
-
-If any my effort is required, feel free to contact me.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index 4c53f38..606b199 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+@@ -177,7 +177,7 @@
+ 
+ #define S5P_PMU_LCD1_CONF		S5P_PMUREG(0x3CA0)
+ 
+-/* Only for EXYNOS4212 */
++/* Only for EXYNOS4x12 */
+ #define S5P_ISP_ARM_LOWPWR			S5P_PMUREG(0x1050)
+ #define S5P_DIS_IRQ_ISP_ARM_LOCAL_LOWPWR	S5P_PMUREG(0x1054)
+ #define S5P_DIS_IRQ_ISP_ARM_CENTRAL_LOWPWR	S5P_PMUREG(0x1058)
+@@ -218,4 +218,12 @@
+ #define S5P_SECSS_MEM_OPTION			S5P_PMUREG(0x2EC8)
+ #define S5P_ROTATOR_MEM_OPTION			S5P_PMUREG(0x2F48)
+ 
++/* Only for EXYNOS4412 */
++#define S5P_ARM_CORE2_LOWPWR			S5P_PMUREG(0x1020)
++#define S5P_DIS_IRQ_CORE2			S5P_PMUREG(0x1024)
++#define S5P_DIS_IRQ_CENTRAL2			S5P_PMUREG(0x1028)
++#define S5P_ARM_CORE3_LOWPWR			S5P_PMUREG(0x1030)
++#define S5P_DIS_IRQ_CORE3			S5P_PMUREG(0x1034)
++#define S5P_DIS_IRQ_CENTRAL3			S5P_PMUREG(0x1038)
++
+ #endif /* __ASM_ARCH_REGS_PMU_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 428cfeb..f0bb467 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -313,7 +313,7 @@ static int exynos4_pm_suspend(void)
+ 	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+ 	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+ 
+-	if (soc_is_exynos4212()) {
++	if (soc_is_exynos4212() || soc_is_exynos4412()) {
+ 		tmp = __raw_readl(S5P_CENTRAL_SEQ_OPTION);
+ 		tmp &= ~(S5P_USE_STANDBYWFI_ISP_ARM |
+ 			 S5P_USE_STANDBYWFE_ISP_ARM);
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index bba48f5..77c6815 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -94,7 +94,7 @@ static struct exynos4_pmu_conf exynos4210_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
+ 
+-static struct exynos4_pmu_conf exynos4212_pmu_config[] = {
++static struct exynos4_pmu_conf exynos4x12_pmu_config[] = {
+ 	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
+ 	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
+ 	{ S5P_DIS_IRQ_CENTRAL0,			{ 0x0, 0x0, 0x0 } },
+@@ -202,6 +202,16 @@ static struct exynos4_pmu_conf exynos4212_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
+ 
++static struct exynos4_pmu_conf exynos4412_pmu_config[] = {
++	{ S5P_ARM_CORE2_LOWPWR,			{ 0x0, 0x0, 0x2 } },
++	{ S5P_DIS_IRQ_CORE2,			{ 0x0, 0x0, 0x0 } },
++	{ S5P_DIS_IRQ_CENTRAL2,			{ 0x0, 0x0, 0x0 } },
++	{ S5P_ARM_CORE3_LOWPWR,			{ 0x0, 0x0, 0x2 } },
++	{ S5P_DIS_IRQ_CORE3,			{ 0x0, 0x0, 0x0 } },
++	{ S5P_DIS_IRQ_CENTRAL3,			{ 0x0, 0x0, 0x0 } },
++	{ PMU_TABLE_END,},
++};
++
+ void exynos4_sys_powerdown_conf(enum sys_powerdown mode)
+ {
+ 	unsigned int i;
+@@ -209,6 +219,12 @@ void exynos4_sys_powerdown_conf(enum sys_powerdown mode)
+ 	for (i = 0; (exynos4_pmu_config[i].reg != PMU_TABLE_END) ; i++)
+ 		__raw_writel(exynos4_pmu_config[i].val[mode],
+ 				exynos4_pmu_config[i].reg);
++
++	if (soc_is_exynos4412()) {
++		for (i = 0; exynos4412_pmu_config[i].reg != PMU_TABLE_END ; i++)
++			__raw_writel(exynos4412_pmu_config[i].val[mode],
++				exynos4412_pmu_config[i].reg);
++	}
+ }
+ 
+ static int __init exynos4_pmu_init(void)
+@@ -218,9 +234,9 @@ static int __init exynos4_pmu_init(void)
+ 	if (soc_is_exynos4210()) {
+ 		exynos4_pmu_config = exynos4210_pmu_config;
+ 		pr_info("EXYNOS4210 PMU Initialize\n");
+-	} else if (soc_is_exynos4212()) {
+-		exynos4_pmu_config = exynos4212_pmu_config;
+-		pr_info("EXYNOS4212 PMU Initialize\n");
++	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
++		exynos4_pmu_config = exynos4x12_pmu_config;
++		pr_info("EXYNOS4x12 PMU Initialize\n");
+ 	} else {
+ 		pr_info("EXYNOS4: PMU not supported\n");
+ 	}
+-- 
+1.7.5.4
