@@ -1,54 +1,35 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 29 Mar 2012 15:27:18 +0200
-Subject: [PATCH 07/12] USB: ohci-at91: coding style modifications with
- one-line ifs
+Date: Thu, 29 Mar 2012 15:27:19 +0200
+Subject: [PATCH 08/12] USB: ohci-at91: trivial return code name change
 In-Reply-To: <cover.1333026637.git.nicolas.ferre@atmel.com>
 References: <cover.1333026637.git.nicolas.ferre@atmel.com>
-Message-ID: <ebf89ca2b0cb635d900e5fd3cc350935e41918ea.1333026637.git.nicolas.ferre@atmel.com>
+Message-ID: <50fc3e3c625bfe22ae8fbf07d9e60df15ef41dd2.1333026637.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- drivers/usb/host/ohci-at91.c |   12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ drivers/usb/host/ohci-at91.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index cf9707d..dd58b555 100644
+index dd58b555..81c1f3d 100644
 --- a/drivers/usb/host/ohci-at91.c
 +++ b/drivers/usb/host/ohci-at91.c
-@@ -327,9 +327,8 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 			dev_dbg(hcd->self.controller,
- 				"ClearPortFeature: OVER_CURRENT\n");
+@@ -546,10 +546,9 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	int			gpio;
+ 	int			ret;
  
--			if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin)) {
-+			if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin))
- 				pdata->overcurrent_status[wIndex-1] = 0;
--			}
+-	i = ohci_at91_of_init(pdev);
+-
+-	if (i)
+-		return i;
++	ret = ohci_at91_of_init(pdev);
++	if (ret)
++		return ret;
  
- 			goto out;
- 
-@@ -382,17 +381,14 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 		dev_dbg(hcd->self.controller, "GetPortStatus(%d)\n", wIndex);
- 
- 		if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin)) {
--			if (! ohci_at91_usb_get_power(pdata, wIndex-1)) {
-+			if (! ohci_at91_usb_get_power(pdata, wIndex-1))
- 				*data &= ~cpu_to_le32(RH_PS_PPS);
--			}
- 
--			if (pdata->overcurrent_changed[wIndex-1]) {
-+			if (pdata->overcurrent_changed[wIndex-1])
- 				*data |= cpu_to_le32(RH_PS_OCIC);
--			}
- 
--			if (pdata->overcurrent_status[wIndex-1]) {
-+			if (pdata->overcurrent_status[wIndex-1])
- 				*data |= cpu_to_le32(RH_PS_POCI);
--			}
- 		}
- 	}
+ 	pdata = pdev->dev.platform_data;
  
 -- 
 1.7.9.4
