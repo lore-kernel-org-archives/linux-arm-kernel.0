@@ -1,171 +1,78 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 29 Mar 2012 00:00:24 -0400
-Subject: [PATCH 4/4] ARM: option to select LDRD/STRD optimized memory copy
-In-Reply-To: <1332993624-16552-1-git-send-email-nico@fluxnic.net>
-References: <alpine.LFD.2.02.1203280119550.24151@xanadu.home>
- <1332993624-16552-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1332993624-16552-5-git-send-email-nico@fluxnic.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Mar 2012 21:58:07 -0700
+Subject: [PATCH v2 1/4] ARM: OMAP1: boards: Fix OMAP_GPIO_IRQ usage with
+ gpio_to_irq()
+In-Reply-To: <1332158817-26311-2-git-send-email-tarun.kanti@ti.com>
+References: <1332158817-26311-1-git-send-email-tarun.kanti@ti.com>
+ <1332158817-26311-2-git-send-email-tarun.kanti@ti.com>
+Message-ID: <CAOesGMg0eZAGdnU4A6Ubbyrn-zZAK4xvBVqoPkhhVReoHTAfaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Hi,
 
-Because STRD requires a 64-bit aligned destination pointer, we
-unconditionally enable the cache alignment code.
+Sorry for the slow reply, I noticed this when dealing with merge
+conflicts pulling in this patch and others from Tony.
 
-Same concern with LDRD, but we conditionally execute them or the LDM
-fallback depending on the source pointer alignment.
+On Mon, Mar 19, 2012 at 5:06 AM, Tarun Kanti DebBarma
+<tarun.kanti@ti.com> wrote:
+> With dynamic allocation of IRQ the usage of OMAP_GPIO_IRQ
+> is no longer valid. We should be using gpio_to_irq() instead.
+>
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> ---
+> ?arch/arm/mach-omap1/board-h2.c ? ? ? ?| ? ?8 ++++----
+> ?arch/arm/mach-omap1/board-h3.c ? ? ? ?| ? ?9 ++++-----
+> ?arch/arm/mach-omap1/board-htcherald.c | ? ?6 +++---
+> ?arch/arm/mach-omap1/board-innovator.c | ? ?4 ++--
+> ?arch/arm/mach-omap1/board-nokia770.c ?| ? ?2 +-
+> ?arch/arm/mach-omap1/board-osk.c ? ? ? | ? 12 ++++++------
+> ?arch/arm/mach-omap1/board-palmte.c ? ?| ? ?2 +-
+> ?arch/arm/mach-omap1/board-palmtt.c ? ?| ? ?2 +-
+> ?arch/arm/mach-omap1/board-palmz71.c ? | ? ?2 +-
+> ?arch/arm/mach-omap1/board-voiceblue.c | ? 16 +++++++---------
+> ?10 files changed, 30 insertions(+), 33 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+> index 00ad6b2..ad0eece 100644
+> --- a/arch/arm/mach-omap1/board-h2.c
+> +++ b/arch/arm/mach-omap1/board-h2.c
+> @@ -244,8 +244,6 @@ static struct resource h2_smc91x_resources[] = {
+> ? ? ? ? ? ? ? ?.flags ?= IORESOURCE_MEM,
+> ? ? ? ?},
+> ? ? ? ?[1] = {
+> - ? ? ? ? ? ? ? .start ?= OMAP_GPIO_IRQ(0),
+> - ? ? ? ? ? ? ? .end ? ?= OMAP_GPIO_IRQ(0),
+> ? ? ? ? ? ? ? ?.flags ?= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+> ? ? ? ?},
+> ?};
+> @@ -364,11 +362,9 @@ static struct tps65010_board tps_board = {
+> ?static struct i2c_board_info __initdata h2_i2c_board_info[] = {
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?I2C_BOARD_INFO("tps65010", 0x48),
+> - ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= OMAP_GPIO_IRQ(58),
+> ? ? ? ? ? ? ? ?.platform_data ?= &tps_board,
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?I2C_BOARD_INFO("isp1301_omap", 0x2d),
+> - ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= OMAP_GPIO_IRQ(2),
+> ? ? ? ?},
+> ?};
+>
+> @@ -437,10 +433,14 @@ static void __init h2_init(void)
+> ? ? ? ?omap_cfg_reg(E19_1610_KBR4);
+> ? ? ? ?omap_cfg_reg(N19_1610_KBR5);
+>
+> + ? ? ? h2_devices[2]->resource[1].start = gpio_to_irq(0);
+> + ? ? ? h2_devices[2]->resource[1].end = gpio_to_irq(0);
 
-Obviously, this could be optimized further by duplicating each loop and
-increasing the code.  Convincing benchmarks would be in order before
-doing so.
+Never, ever, ever do this. What happens here when someone else adds
+another device to the h2_devices array before the smc91x one?  Booom.
+Extremely fragile code.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/Kconfig              |    9 +++++++++
- arch/arm/lib/copy_from_user.S |   15 ++++++++++++++-
- arch/arm/lib/copy_template.S  |    3 +++
- arch/arm/lib/copy_to_user.S   |   11 ++++++++++-
- arch/arm/lib/memcpy.S         |   26 ++++++++++++++++++++++++--
- 5 files changed, 60 insertions(+), 4 deletions(-)
+There's already a named resource struct you can use for this
+(h2_smc91x_resources). Use it.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5098564d58..b87069730a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1826,6 +1826,15 @@ config UACCESS_WITH_MEMCPY
- 	  However, if the CPU data cache is using a write-allocate mode,
- 	  this option is unlikely to provide any performance gain.
- 
-+config USE_LDRDSTRD_OVER_LDMSTM
-+	bool "Use 64-bit access instructions to optimize memory copy"
-+	depends on CPU_V7
-+	help
-+	  Some processors, notably the Cortex-A15, are known to perform
-+	  better when accessing memory using LDRD/STRD instructions instead
-+	  of LDM/STM.  Select this to optimize memory copy routines
-+	  accordingly.
-+
- config SECCOMP
- 	bool
- 	prompt "Enable seccomp to safely compute untrusted bytecode"
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index d1df0ec62b..375cbbf0e5 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -40,6 +40,12 @@
- #endif
- #define STR1W_SHIFT	0
- 
-+#ifdef CONFIG_USE_LDRDSTRD_OVER_LDMSTM
-+/* Enforce destination cache line alignment */
-+#undef CALGN
-+#define CALGN(x...) x
-+#endif
-+
- 	.macro ldr1w ptr reg abort
- 	ldrusr	\reg, \ptr, 4, abort=\abort
- 	.endm
-@@ -64,7 +70,14 @@
- 	.endm
- 
- 	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
--	stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#ifdef CONFIG_USE_LDRDSTRD_OVER_LDMSTM
-+	strd	\reg1, \reg2, [\ptr], #8
-+	strd	\reg3, \reg4, [\ptr], #8
-+	strd	\reg5, \reg6, [\ptr], #8
-+	strd	\reg7, \reg8, [\ptr], #8
-+#else
-+	stmia	\ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#endif
- 	.endm
- 
- 	.macro str1b ptr reg cond=al abort
-diff --git a/arch/arm/lib/copy_template.S b/arch/arm/lib/copy_template.S
-index f6f42c3330..6a9823d51f 100644
---- a/arch/arm/lib/copy_template.S
-+++ b/arch/arm/lib/copy_template.S
-@@ -63,6 +63,9 @@
-  *	Correction to be applied to the "ip" register when branching into
-  *	the ldr1w or str1w instructions (some of these macros may expand to
-  *	more than one 32bit instruction in Thumb-2)
-+ *
-+ * Note: ldr8w is the only accessor that is allowed to change the
-+ * condition code. 
-  */
- 
- 
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index a83bc04365..11534edea1 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -45,7 +45,16 @@
- 	.endm
- 
- 	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
--	ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#ifdef CONFIG_USE_LDRDSTRD_OVER_LDMSTM
-+	tst	\ptr, #7
-+	ldreqd	\reg1, \reg2, [\ptr], #8
-+	ldreqd	\reg3, \reg4, [\ptr], #8
-+	ldreqd	\reg5, \reg6, [\ptr], #8
-+	ldreqd	\reg7, \reg8, [\ptr], #8
-+	ldmneia	\ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#else
-+	ldmia	\ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#endif
- 	.endm
- 
- 	.macro ldr1b ptr reg cond=al abort
-diff --git a/arch/arm/lib/memcpy.S b/arch/arm/lib/memcpy.S
-index adbccc6e2d..db49a300c8 100644
---- a/arch/arm/lib/memcpy.S
-+++ b/arch/arm/lib/memcpy.S
-@@ -16,12 +16,27 @@
- #define LDR1W_SHIFT	0
- #define STR1W_SHIFT	0
- 
-+#ifdef CONFIG_USE_LDRDSTRD_OVER_LDMSTM
-+/* Enforce destination cache line alignment */
-+#undef CALGN
-+#define CALGN(x...) x
-+#endif
-+
- 	.macro ldr1w ptr reg abort
- 	W(ldr) \reg, [\ptr], #4
- 	.endm
- 
- 	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
--	ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#ifdef CONFIG_USE_LDRDSTRD_OVER_LDMSTM
-+	tst	\ptr, #7
-+	ldreqd	\reg1, \reg2, [\ptr], #8
-+	ldreqd	\reg3, \reg4, [\ptr], #8
-+	ldreqd	\reg5, \reg6, [\ptr], #8
-+	ldreqd	\reg7, \reg8, [\ptr], #8
-+	ldmneia	\ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#else
-+	ldmia	\ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#endif
- 	.endm
- 
- 	.macro ldr1b ptr reg cond=al abort
-@@ -33,7 +48,14 @@
- 	.endm
- 
- 	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
--	stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#ifdef CONFIG_USE_LDRDSTRD_OVER_LDMSTM
-+	strd	\reg1, \reg2, [\ptr], #8
-+	strd	\reg3, \reg4, [\ptr], #8
-+	strd	\reg5, \reg6, [\ptr], #8
-+	strd	\reg7, \reg8, [\ptr], #8
-+#else
-+	stmia	\ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8}
-+#endif
- 	.endm
- 
- 	.macro str1b ptr reg cond=al abort
--- 
-1.7.9.rc2
+Same comments go for the other locations in this file as well as the
+other OMAP2+ patch, where appropriate.
+
+-Olof
