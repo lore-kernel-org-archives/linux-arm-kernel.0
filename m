@@ -1,26 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 29 Mar 2012 13:56:06 +0800
-Subject: [PATCH] ASoC: sgtl5000: fix power on/off of MIC bias
-In-Reply-To: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
-References: <1332919833-9641-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120329055604.GB19506@S2101-09.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 29 Mar 2012 11:42:34 +0530
+Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
+ OMAP4 onwards
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
+References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
+ <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
+Message-ID: <4F73FD52.60209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 03:30:33PM +0800, Shawn Guo wrote:
-> From: Lionel Xu <Lionel.Xu@freescale.com>
-> 
-> There is no sound in the recorded wav, to enable recording, the VAG
-> should be powered up, and the mic bias resistor should be set up with
-> proper value.
-> 
-> Signed-off-by: Lionel Xu <lionel.xu@freescale.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Zeng Zhaoming <zengzm.kernel@gmail.com>
+On Wednesday 28 March 2012 12:02 PM, Hiremath, Vaibhav wrote:
+> On Tue, Mar 27, 2012 at 15:28:31, Nayak, Rajendra wrote:
+>> Some functions like _omap4_disable_module() and _omap4_wait_target_disable()
+>> are (will be) used on all OMAPs OMAP4 and beyond which support module level
+>> control. Fix the error checks in these functions to return if called on
+>> any platform pre OMAP4 (i.e OMAP2 and OMAP3) instead of checking for
+>> !cpu_is_omap44xx(). This avoids having to update the error check with a
+>> '&&  !cpu_is_omap54xx()' when OMAP5 is introduced and possibly similar updates
+>> when further OMAP generations are added.
+>>
+>
+> Let me add some flavor here :)
+>
+> AM33xx, which has module level control, but falls under OMAP3 family of
+> devices. cpu_is_omap34xx() is true for AM33xx device and we have to add
+> check in all these functions. And I am sure we will have many of such
+> devices in the future.
+>
+> Can we use some flag based option here, instead of cpu_is_xxx() check?
+>
 
-Mark, I just send a patch authored by Zeng Zhaoming, which fixes the
-problem in a more sensible way.  So please ignore this one.
+The intent of this patch was to make the error handling uniform across
+all modules control functions in hwmod, and it atleast addresses one
+problem of having to update these checks every time a new OMAP gets
+added.
 
--- 
-Regards,
-Shawn
+The problem that you bring up with AM33xx is regardless of this patch
+(you would still need to go update every !cpu_is_omap44xx() check)
+and IMHO should be handled separately, with a flag like you are
+suggesting or by some other means. If you already have patches on how
+this can be done, you should go ahead and post them out.
