@@ -1,110 +1,59 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Mar 2012 17:59:13 -0700
-Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
-In-Reply-To: <20120327074931.GK5611@n2100.arm.linux.org.uk>
-References: <20120213094940.GA15338@n2100.arm.linux.org.uk>
- <4F3CF3DA.7000806@samsung.com>
- <20120216160250.GP13673@n2100.arm.linux.org.uk>
- <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
- <20120327074931.GK5611@n2100.arm.linux.org.uk>
-Message-ID: <4F73B3E1.4080807@samsung.com>
+Date: Wed, 28 Mar 2012 18:23:47 -0700
+Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
+ definitions
+In-Reply-To: <20120318132746.GL26973@8bytes.org>
+References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
+ <20120315111227.GA2384@amd.com> <4F61FF1D.5000502@samsung.com>
+ <4F630841.2070307@linaro.org> <4F63A6F6.9050506@samsung.com>
+ <20120318132746.GL26973@8bytes.org>
+Message-ID: <4F73B9A3.30605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> On Tue, Feb 21, 2012 at 07:35:49PM +0900, Kukjin Kim wrote:
->> Russell King - ARM Linux wrote:
->>>
->>> On Thu, Feb 16, 2012 at 09:17:30PM +0900, Kukjin Kim wrote:
->>>> On 02/13/12 18:49, Russell King - ARM Linux wrote:
->>>>> From: Russell King<rmk+kernel@arm.linux.org.uk>
->>>>>
->>>>> exynos4210-cpufreq.c is not buildable on non-exynos builds, so it's
->>>>> pointless allowing this option to be exposed.  Fix this by adding a
->>>>> dependency on ARCH_EXYNOS.
->>>>>
->>>>> drivers/cpufreq/exynos4210-cpufreq.c:20:29: error: mach/regs-clock.h:
->>> No such file or directory
->>>>> drivers/cpufreq/exynos4210-cpufreq.c:21:26: error: mach/cpufreq.h: No
->>> such file or directory
->>>>>
->>>>> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
->>>>> Cc: Dave Jones<davej@redhat.com>
->>>>> Cc: cpufreq at vger.kernel.org
->>>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
->>>>> ---
->>>>>    drivers/cpufreq/Kconfig.arm |    1 +
->>>>>    1 files changed, 1 insertions(+), 0 deletions(-)
->>>>>
->>>>> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->>>>> index e0664fe..c8bde43 100644
->>>>> --- a/drivers/cpufreq/Kconfig.arm
->>>>> +++ b/drivers/cpufreq/Kconfig.arm
->>>>> @@ -34,6 +34,7 @@ config ARM_EXYNOS_CPUFREQ
->>>>>
->>>>>    config ARM_EXYNOS4210_CPUFREQ
->>>>>    	bool "Samsung EXYNOS4210"
->>>>> +	depends on ARCH_EXYNOS
->>>>>    	help
->>>>>    	  This adds the CPUFreq driver for Samsung EXYNOS4210
->>>>>    	  SoC (S5PV310 or S5PC210).
->>>>>
->>>>
->>>> Yes, you're right. Should be added it.
->>>> BTW, how about following?
->>>>
->>>> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->>>> index e0664fe..a5e0487 100644
->>>> --- a/drivers/cpufreq/Kconfig.arm
->>>> +++ b/drivers/cpufreq/Kconfig.arm
->>>> @@ -33,7 +33,7 @@ config ARM_EXYNOS_CPUFREQ
->>>>            If in doubt, say N.
->>>>
->>>>   config ARM_EXYNOS4210_CPUFREQ
->>>> -       bool "Samsung EXYNOS4210"
->>>> +       bool
->>>>          help
->>>>            This adds the CPUFreq driver for Samsung EXYNOS4210
->>>>            SoC (S5PV310 or S5PC210).
->>>>
->>>> I think, when selecting "ARM_EXYNOS_CPUFREQ", "ARM_EXYNOS4210_CPUFREQ"
->>>> will be selected on EXYNOS4210 with above changes.
->>>
->> Hi Russell,
->>
->>> I don't think so.  If you select this symbol you'll get a complaint
->>> that CPU_FREQ is not selected.
->>
->> Hmm..when I selected this symbol, I didn't get any warning about CPU_FREQ,
->> because the cpufreq/Kconfig.arm depends on CPU_FREQ. It means, when CPU_FREQ
->> is not selected, I can't select anything in cpufreq/Kconfig.arm.
->>
->>> What's probably much better is:
->>>
->> Yes, looks better than mine.
->>
->>> config ARM_EXYNOS4210_CPUFREQ
->>> 	def_bool ARCH_EXYNOS
->>
->> But, should be...
->> 	def_bool CPU_EXYNOS4210
->>
->> Because the ARM_EXYNOS4210_CPUFREQ is only for EXYNOS4210 and the
->> ARM_EXYNOS4X12_CPUFREQ will be added, actually submitted for other
->> SOC_EXYNOS4212 and SOC_EXYNOS4412.
->>
->>>
->>> because that ensures that if the CPU_FREQ dependencies change you don't
->>> have to update numerous places for that too.
->>
->> OK, I agree.
->>
->> So could you  please re-send/re-work this?
+Joerg Roedel wrote:
+> On Fri, Mar 16, 2012 at 01:47:50PM -0700, Kukjin Kim wrote:
+>> Anyway Joerg, how do you want to handle this? Do you want to pick up
+>> 1/2/3 all of them in your tree? If so, 2nd patch should be on top of
+>> some samsung topic stuff.
 >
-> As predicted, this is breaking other ARM platforms.  Please fix this
-> yourself before your crappy code gets pushed into mainline.  Thanks.
+> Since patch 2 only applies to the Samsung tree, it is best to carry
+> this in your tree for merging. Feel free to add my Acked-by to patch 3.
+> But any further patches for the Exynos IOMMU drivers should go through
+> my tree after it is merged.
 >
-I fixed it.
+
+Hi Joerg,
+
+Now that 1st and 2nd can be applied cleanly into latest mainline. But 
+unfortunately, I have no chance to send them to Linus now and I'm not 
+sure you can do it during this merge window. If it is possible, please 
+keep going on with my ack.
+
+KyongHo, just note, happens follwoing complaint with checkpatch, but I'm 
+not sure this should be fixed right now. I think, if required, we can 
+fix it later.
+
+ERROR: Macros with complex values should be enclosed in parenthesis
+#698: FILE: arch/arm/mach-exynos/dev-sysmmu.c:64:
++#define DEFINE_SYSMMU_RESOURCE(core, mem, irq)                         \
++       DEFINE_RES_MEM_NAMED(core##_PA_SYSMMU_##mem, SZ_4K, #mem),      \
++       DEFINE_RES_IRQ_NAMED(core##_IRQ_SYSMMU_##irq##_0, #mem)
+
+ERROR: Macros with complex values should be enclosed in parenthesis
+#702: FILE: arch/arm/mach-exynos/dev-sysmmu.c:68:
++#define SYSMMU_RESOURCE_DEFINE(core, ipname, mem, irq)                 \
++       SYSMMU_RESOURCE(core, ipname) {                                 \
++               DEFINE_SYSMMU_RESOURCE(core, mem, irq)                  \
++       }
+
+WARNING: quoted string split across lines
+#914: FILE: arch/arm/mach-exynos/dev-sysmmu.c:259:
++                               pr_err("%s: Failed to add device 
+resources for "
++                                               "%s.%d\n", __func__,
+
+total: 2 errors, 1 warnings, 1062 lines checked
 
 Thanks.
 
