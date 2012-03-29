@@ -1,52 +1,74 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 29 Mar 2012 10:03:17 -0500
-Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
- OMAP4 onwards
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83183FB9F@DBDE01.ent.ti.com>
-References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
- <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
- <4F73FD52.60209@ti.com>
- <79CD15C6BA57404B839C016229A409A83183FB9F@DBDE01.ent.ti.com>
-Message-ID: <4F7479B5.5060401@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 29 Mar 2012 11:04:38 -0400 (EDT)
+Subject: [PATCH 06/12] USB: ohci-at91: change maximum number of ports
+In-Reply-To: <8072618d667d37cca7a0d8d3ce14e54919c013cc.1333026637.git.nicolas.ferre@atmel.com>
+Message-ID: <Pine.LNX.4.44L0.1203291100400.1417-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viabhav,
+On Thu, 29 Mar 2012, Nicolas Ferre wrote:
 
-On 3/29/2012 3:56, Hiremath, Vaibhav wrote:
-> On Thu, Mar 29, 2012 at 11:42:34, Nayak, Rajendra wrote:
->> On Wednesday 28 March 2012 12:02 PM, Hiremath, Vaibhav wrote:
->>> On Tue, Mar 27, 2012 at 15:28:31, Nayak, Rajendra wrote:
->>>> Some functions like _omap4_disable_module() and _omap4_wait_target_disable()
->>>> are (will be) used on all OMAPs OMAP4 and beyond which support module level
->>>> control. Fix the error checks in these functions to return if called on
->>>> any platform pre OMAP4 (i.e OMAP2 and OMAP3) instead of checking for
->>>> !cpu_is_omap44xx(). This avoids having to update the error check with a
->>>> '&&   !cpu_is_omap54xx()' when OMAP5 is introduced and possibly similar updates
->>>> when further OMAP generations are added.
->>>>
->>>
->>> Let me add some flavor here :)
->>>
->>> AM33xx, which has module level control, but falls under OMAP3 family of
->>> devices. cpu_is_omap34xx() is true for AM33xx device and we have to add
->>> check in all these functions. And I am sure we will have many of such
->>> devices in the future.
->>>
->>> Can we use some flag based option here, instead of cpu_is_xxx() check?
->>>
->>
->> The intent of this patch was to make the error handling uniform across
->> all modules control functions in hwmod, and it atleast addresses one
->> problem of having to update these checks every time a new OMAP gets
->> added.
->>
->> The problem that you bring up with AM33xx is regardless of this patch
->> (you would still need to go update every !cpu_is_omap44xx() check)
->
-> Indeed, in any of cpu_is_xxx() check implementation, I have to add check
-> for cpu_is_am33xx().
+> Change number of ports to 3 for newer SoCs. Modify pdata structure
+> and ohci-at91 code that was dealing with ports information and check
+> of port indexes.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+>  arch/arm/mach-at91/include/mach/board.h |   13 +++++++------
+>  drivers/usb/host/ohci-at91.c            |   22 +++++++++++++---------
+>  2 files changed, 20 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+> index 544a5d5..49a8211 100644
+> --- a/arch/arm/mach-at91/include/mach/board.h
+> +++ b/arch/arm/mach-at91/include/mach/board.h
+> @@ -86,14 +86,15 @@ extern void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *d
+>  extern void __init at91_add_device_eth(struct macb_platform_data *data);
+>  
+>   /* USB Host */
+> +#define AT91_MAX_USBH_PORTS	3
+>  struct at91_usbh_data {
+> -	u8		ports;		/* number of ports on root hub */
+> -	int		vbus_pin[2];	/* port power-control pin */
+> -	u8              vbus_pin_active_low[2];
+> +	int		vbus_pin[AT91_MAX_USBH_PORTS];	/* port power-control pin */
+> +	int             overcurrent_pin[AT91_MAX_USBH_PORTS];
+> +	u8		ports;				/* number of ports on root hub */
+>  	u8              overcurrent_supported;
+> -	int             overcurrent_pin[2];
+> -	u8              overcurrent_status[2];
+> -	u8              overcurrent_changed[2];
+> +	u8              vbus_pin_active_low[AT91_MAX_USBH_PORTS];
+> +	u8              overcurrent_status[AT91_MAX_USBH_PORTS];
+> +	u8              overcurrent_changed[AT91_MAX_USBH_PORTS];
+>  };
+>  extern void __init at91_add_device_usbh(struct at91_usbh_data *data);
+>  extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 1262532..cf9707d 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -240,7 +240,7 @@ ohci_at91_start (struct usb_hcd *hcd)
+>  
+>  static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int enable)
+>  {
+> -	if (port < 0 || port >= 2)
+> +	if (port < 0 || port >= ARRAY_SIZE(pdata->vbus_pin))
 
-I hope we can avoid adding more cpu_is_amXXXX. That should be a last resort.
+Here and below, it will be a lot clearer to write AT91_MAX_USBH_PORTS 
+instead of ARRAY_SIZE(padata->...).
 
-Jon
+> @@ -301,7 +301,11 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+>  	case SetPortFeature:
+>  		if (wValue == USB_PORT_FEAT_POWER) {
+>  			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
+> -			ohci_at91_usb_set_power(pdata, wIndex - 1, 1);
+> +			if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin)) {
+> +				ohci_at91_usb_set_power(pdata, wIndex - 1, 1);
+
+Here and throughout the hub_control routine, things will be a lot 
+simpler if you decrement wIndex at the start of the SetPortFeature 
+case.  Same for ClearPortFeature and maybe also GetPortStatus.
+
+Alan Stern
