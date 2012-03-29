@@ -1,34 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 29 Mar 2012 15:51:36 +0200 (CEST)
-Subject: [PATCHv2 02/14] X86 & IA64: adapt for dma_map_ops changes
-In-Reply-To: <1332855768-32583-3-git-send-email-m.szyprowski@samsung.com>
-References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
- <1332855768-32583-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <alpine.LFD.2.02.1203291545520.2542@ionos>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 29 Mar 2012 16:08:00 +0200
+Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi,
+ regulator and mmc DTS updates
+In-Reply-To: <201203150801.13183.arnd@arndb.de>
+References: <4F612C29.40608@ti.com> <20120315004638.GW12083@atomide.com>
+ <201203150801.13183.arnd@arndb.de>
+Message-ID: <4F746CC0.9050507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Mar 2012, Marek Szyprowski wrote:
-> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> -static inline void *dma_alloc_coherent(struct device *dev, size_t size,
-> -				       dma_addr_t *daddr, gfp_t gfp)
-> +#define dma_alloc_coherent(d,s,h,f)	dma_alloc_attrs(d,s,h,f,NULL)
+Hi Arnd and Olof,
 
-Please make this an inline function.
+On 3/15/2012 9:01 AM, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Tony Lindgren wrote:
+>> * Cousson, Benoit<b-cousson@ti.com>  [120314 16:41]:
+>>> Hi Tony,
+>>>
+>>> Here are the remaining DTS patches for 3.4.
+>>>
+>>> On top of the previous pull request, I just added the MMC DTS since the driver adaptation just got queued.
+>>>
+>>> It will be still be good to have that for 3.4 if possible, otherwise we will
+>>> have a bunch of drivers DT adapted but no DTS file to use them :-(
+>>
+>> This might be doable as a follow-up patch series at the end
+>> of the merge window or at -rc1 when the related driver changes
+>> have been merged.
+>>
+>> Arnd and Olof, what do you guys think?
+>
+> I'll have to look at the patches more closely, but from the diffstat it definitely
+> looks ok for a later merge once the driver is in. If you can rebase the branch on
+> top of the mmc tree (or the merge of that tree with whatever else is needed), it
+> should give us a bisectable history and I can stick it into a late/* branch right
+> away.
 
->  
-> +#define dma_alloc_coherent(d,s,h,f)	dma_alloc_attrs(d,s,h,f,NULL)
-
-Inline please.
-
-> -static inline void dma_free_coherent(struct device *dev, size_t size,
-> -				     void *vaddr, dma_addr_t bus)
-> +#define dma_free_coherent(d,s,c,h) dma_free_attrs(d,s,c,h,NULL)
-
-Ditto
-
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+FYI, MMC DT adaptation just got merged, I2C, GPIO, SPI, regulator DT 
+adaptation were already merged before, so it means that this branch can 
+be merged to take advantage of all the DT adapted drivers.
 
 Thanks,
-
-	tglx
+Benoit
