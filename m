@@ -1,34 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Mar 2012 11:01:03 -0700
-Subject: [GIT PULL] USB AUXDATA fix for tegra
-In-Reply-To: <201203211830.25161.arnd@arndb.de>
-References: <4F6A1AEA.7070505@wwwdotorg.org> <201203211830.25161.arnd@arndb.de>
-Message-ID: <20120329180103.GA2659@quad.lixom.net>
+Date: Thu, 29 Mar 2012 11:02:47 -0700
+Subject: [PATCH] ARM: LPC32xx: clock.c: Fix lpc-eth clock reference
+In-Reply-To: <1332974996-13045-1-git-send-email-stigge@antcom.de>
+References: <1332974996-13045-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120329180247.GB2659@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 06:30:24PM +0000, Arnd Bergmann wrote:
-> On Wednesday 21 March 2012, Stephen Warren wrote:
-> > This is my first pull request for Tegra; hopefully it all works out OK!
-> > 
-> > Note: Nobody has ack'd this change. I'm a maintainer for the files that
-> > are touched, but I'm not sure if maintainers are supposed to have
-> > another maintainer ack the change before committing it and sending a
-> > pull request (in particular for their own changes), or if it's up to
-> > their discretion?
-> > 
+On Thu, Mar 29, 2012 at 12:49:56AM +0200, Roland Stigge wrote:
+> During a complex merge for v3.4, one line of the commit
+> c20b909be9ba27173294a52d08cab293ec030a2c ("ARM: LPC32xx: Ethernet support") was
+> reverted wrongly ("lpc-eth.0" -> "lpc-net.0") while the other conflicts were
+> merged correctly. This patch re-applies the clock name "lpc-eth.0".
 > 
-> Hi Stephen,
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 > 
-> The pull request looks good. There is no need for anyone else to ack
-> your patches, but you should always post them on the appropriate
-> mailing lists so people can weigh in if they see something wrong.
-> 
-> I'm currently trying to get the first set of my v3.4 pull requests
-> out to Linus, so I'll apply this when I'm done with that.
+> ---
+>  Applies on top of Olof's 1f5b7dcfdad3840d4bce27ab0b3cc8f376b81544 in
+>  preparation of v3.4-rc1
 
-I've started staging the first batch of fixes for 3.4-rc, and I've pulled this
-into that branch. Thanks, Stephen.
+
+Looks like it was me who messed up the conflict resolution, apologies
+about that. Applied to fixes branch for 3.4-rc.
 
 
 -Olof
