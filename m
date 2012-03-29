@@ -1,74 +1,49 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 29 Mar 2012 11:04:38 -0400 (EDT)
-Subject: [PATCH 06/12] USB: ohci-at91: change maximum number of ports
-In-Reply-To: <8072618d667d37cca7a0d8d3ce14e54919c013cc.1333026637.git.nicolas.ferre@atmel.com>
-Message-ID: <Pine.LNX.4.44L0.1203291100400.1417-100000@iolanthe.rowland.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 29 Mar 2012 08:11:29 -0700
+Subject: [PATCH] omap2+: pm: fix compilation break.
+In-Reply-To: <1333015762-476-1-git-send-email-govindraj.raja@ti.com>
+References: <1333015762-476-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <20120329151128.GT9859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Mar 2012, Nicolas Ferre wrote:
-
-> Change number of ports to 3 for newer SoCs. Modify pdata structure
-> and ohci-at91 code that was dealing with ports information and check
-> of port indexes.
+* Govindraj.R <govindraj.raja@ti.com> [120329 03:12]:
+> From: "Govindraj.R" <govindraj.raja@ti.com>
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Fix the compilation break observed on latest mainline.
+> 
+> Fixes below compilation break:
+> 
+> arch/arm/mach-omap2/pm.c: In function 'omap_pm_begin':
+> arch/arm/mach-omap2/pm.c:239: error: implicit declaration of function 'disable_hlt'
+> arch/arm/mach-omap2/pm.c: In function 'omap_pm_end':
+> arch/arm/mach-omap2/pm.c:247: error: implicit declaration of function 'enable_hlt'
+
+Care to mention which commit broke the compile?
+
+Regards,
+
+Tony
+ 
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 > ---
->  arch/arm/mach-at91/include/mach/board.h |   13 +++++++------
->  drivers/usb/host/ohci-at91.c            |   22 +++++++++++++---------
->  2 files changed, 20 insertions(+), 15 deletions(-)
+>  arch/arm/mach-omap2/pm.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-> index 544a5d5..49a8211 100644
-> --- a/arch/arm/mach-at91/include/mach/board.h
-> +++ b/arch/arm/mach-at91/include/mach/board.h
-> @@ -86,14 +86,15 @@ extern void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *d
->  extern void __init at91_add_device_eth(struct macb_platform_data *data);
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index a7bdec6..70da4f7 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/opp.h>
+>  #include <linux/export.h>
+>  #include <linux/suspend.h>
+> +#include <asm/system_misc.h>
 >  
->   /* USB Host */
-> +#define AT91_MAX_USBH_PORTS	3
->  struct at91_usbh_data {
-> -	u8		ports;		/* number of ports on root hub */
-> -	int		vbus_pin[2];	/* port power-control pin */
-> -	u8              vbus_pin_active_low[2];
-> +	int		vbus_pin[AT91_MAX_USBH_PORTS];	/* port power-control pin */
-> +	int             overcurrent_pin[AT91_MAX_USBH_PORTS];
-> +	u8		ports;				/* number of ports on root hub */
->  	u8              overcurrent_supported;
-> -	int             overcurrent_pin[2];
-> -	u8              overcurrent_status[2];
-> -	u8              overcurrent_changed[2];
-> +	u8              vbus_pin_active_low[AT91_MAX_USBH_PORTS];
-> +	u8              overcurrent_status[AT91_MAX_USBH_PORTS];
-> +	u8              overcurrent_changed[AT91_MAX_USBH_PORTS];
->  };
->  extern void __init at91_add_device_usbh(struct at91_usbh_data *data);
->  extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 1262532..cf9707d 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -240,7 +240,7 @@ ohci_at91_start (struct usb_hcd *hcd)
->  
->  static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int enable)
->  {
-> -	if (port < 0 || port >= 2)
-> +	if (port < 0 || port >= ARRAY_SIZE(pdata->vbus_pin))
-
-Here and below, it will be a lot clearer to write AT91_MAX_USBH_PORTS 
-instead of ARRAY_SIZE(padata->...).
-
-> @@ -301,7 +301,11 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  	case SetPortFeature:
->  		if (wValue == USB_PORT_FEAT_POWER) {
->  			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
-> -			ohci_at91_usb_set_power(pdata, wIndex - 1, 1);
-> +			if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin)) {
-> +				ohci_at91_usb_set_power(pdata, wIndex - 1, 1);
-
-Here and throughout the hub_control routine, things will be a lot 
-simpler if you decrement wIndex at the start of the SetPortFeature 
-case.  Same for ClearPortFeature and maybe also GetPortStatus.
-
-Alan Stern
+>  #include <plat/omap-pm.h>
+>  #include <plat/omap_device.h>
+> -- 
+> 1.7.5.4
+> 
