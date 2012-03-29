@@ -1,47 +1,115 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 29 Mar 2012 09:14:34 +0900
-Subject: [PATCH] ARM: S3C24XX: fix missing common.h in mach-s3c24xx/
-Message-ID: <1332980074-4614-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed, 28 Mar 2012 17:59:13 -0700
+Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
+In-Reply-To: <20120327074931.GK5611@n2100.arm.linux.org.uk>
+References: <20120213094940.GA15338@n2100.arm.linux.org.uk>
+ <4F3CF3DA.7000806@samsung.com>
+ <20120216160250.GP13673@n2100.arm.linux.org.uk>
+ <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
+ <20120327074931.GK5611@n2100.arm.linux.org.uk>
+Message-ID: <4F73B3E1.4080807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes missing mach-s3c24xx/common.h which has been
-lost when regarding s3c24xx directories merged.
+Russell King wrote:
+> On Tue, Feb 21, 2012 at 07:35:49PM +0900, Kukjin Kim wrote:
+>> Russell King - ARM Linux wrote:
+>>>
+>>> On Thu, Feb 16, 2012 at 09:17:30PM +0900, Kukjin Kim wrote:
+>>>> On 02/13/12 18:49, Russell King - ARM Linux wrote:
+>>>>> From: Russell King<rmk+kernel@arm.linux.org.uk>
+>>>>>
+>>>>> exynos4210-cpufreq.c is not buildable on non-exynos builds, so it's
+>>>>> pointless allowing this option to be exposed.  Fix this by adding a
+>>>>> dependency on ARCH_EXYNOS.
+>>>>>
+>>>>> drivers/cpufreq/exynos4210-cpufreq.c:20:29: error: mach/regs-clock.h:
+>>> No such file or directory
+>>>>> drivers/cpufreq/exynos4210-cpufreq.c:21:26: error: mach/cpufreq.h: No
+>>> such file or directory
+>>>>>
+>>>>> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+>>>>> Cc: Dave Jones<davej@redhat.com>
+>>>>> Cc: cpufreq at vger.kernel.org
+>>>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>>>>> ---
+>>>>>    drivers/cpufreq/Kconfig.arm |    1 +
+>>>>>    1 files changed, 1 insertions(+), 0 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+>>>>> index e0664fe..c8bde43 100644
+>>>>> --- a/drivers/cpufreq/Kconfig.arm
+>>>>> +++ b/drivers/cpufreq/Kconfig.arm
+>>>>> @@ -34,6 +34,7 @@ config ARM_EXYNOS_CPUFREQ
+>>>>>
+>>>>>    config ARM_EXYNOS4210_CPUFREQ
+>>>>>    	bool "Samsung EXYNOS4210"
+>>>>> +	depends on ARCH_EXYNOS
+>>>>>    	help
+>>>>>    	  This adds the CPUFreq driver for Samsung EXYNOS4210
+>>>>>    	  SoC (S5PV310 or S5PC210).
+>>>>>
+>>>>
+>>>> Yes, you're right. Should be added it.
+>>>> BTW, how about following?
+>>>>
+>>>> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+>>>> index e0664fe..a5e0487 100644
+>>>> --- a/drivers/cpufreq/Kconfig.arm
+>>>> +++ b/drivers/cpufreq/Kconfig.arm
+>>>> @@ -33,7 +33,7 @@ config ARM_EXYNOS_CPUFREQ
+>>>>            If in doubt, say N.
+>>>>
+>>>>   config ARM_EXYNOS4210_CPUFREQ
+>>>> -       bool "Samsung EXYNOS4210"
+>>>> +       bool
+>>>>          help
+>>>>            This adds the CPUFreq driver for Samsung EXYNOS4210
+>>>>            SoC (S5PV310 or S5PC210).
+>>>>
+>>>> I think, when selecting "ARM_EXYNOS_CPUFREQ", "ARM_EXYNOS4210_CPUFREQ"
+>>>> will be selected on EXYNOS4210 with above changes.
+>>>
+>> Hi Russell,
+>>
+>>> I don't think so.  If you select this symbol you'll get a complaint
+>>> that CPU_FREQ is not selected.
+>>
+>> Hmm..when I selected this symbol, I didn't get any warning about CPU_FREQ,
+>> because the cpufreq/Kconfig.arm depends on CPU_FREQ. It means, when CPU_FREQ
+>> is not selected, I can't select anything in cpufreq/Kconfig.arm.
+>>
+>>> What's probably much better is:
+>>>
+>> Yes, looks better than mine.
+>>
+>>> config ARM_EXYNOS4210_CPUFREQ
+>>> 	def_bool ARCH_EXYNOS
+>>
+>> But, should be...
+>> 	def_bool CPU_EXYNOS4210
+>>
+>> Because the ARM_EXYNOS4210_CPUFREQ is only for EXYNOS4210 and the
+>> ARM_EXYNOS4X12_CPUFREQ will be added, actually submitted for other
+>> SOC_EXYNOS4212 and SOC_EXYNOS4412.
+>>
+>>>
+>>> because that ensures that if the CPU_FREQ dependencies change you don't
+>>> have to update numerous places for that too.
+>>
+>> OK, I agree.
+>>
+>> So could you  please re-send/re-work this?
+>
+> As predicted, this is breaking other ARM platforms.  Please fix this
+> yourself before your crappy code gets pushed into mainline.  Thanks.
+>
+I fixed it.
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s3c24xx/common.h |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s3c24xx/common.h
+Thanks.
 
-diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
-new file mode 100644
-index 0000000..a7cd62f
---- /dev/null
-+++ b/arch/arm/mach-s3c24xx/common.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Common Header for S3C24XX SoCs
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ARCH_ARM_MACH_S3C24XX_COMMON_H
-+#define __ARCH_ARM_MACH_S3C24XX_COMMON_H
-+
-+#ifdef CONFIG_CPU_S3C2410
-+void s3c2410_restart(char mode, const char *cmd);
-+#endif
-+
-+#ifdef CONFIG_CPU_S3C244X
-+void s3c244x_restart(char mode, const char *cmd);
-+#endif
-+
-+#endif /* __ARCH_ARM_MACH_S3C24XX_COMMON_H */
--- 
-1.7.2.3
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
