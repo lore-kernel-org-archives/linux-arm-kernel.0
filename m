@@ -1,52 +1,54 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 29 Mar 2012 15:27:15 +0200
-Subject: [PATCH 04/12] ARM: at91/dts: USB host vbus is active low
+Date: Thu, 29 Mar 2012 15:27:18 +0200
+Subject: [PATCH 07/12] USB: ohci-at91: coding style modifications with
+ one-line ifs
 In-Reply-To: <cover.1333026637.git.nicolas.ferre@atmel.com>
 References: <cover.1333026637.git.nicolas.ferre@atmel.com>
-Message-ID: <44829c6b9071853311b87eaf3b8952fd6c5b8d82.1333026637.git.nicolas.ferre@atmel.com>
+Message-ID: <ebf89ca2b0cb635d900e5fd3cc350935e41918ea.1333026637.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change vbus gpio configuration in .dts files to switch to
-active low configuration.
-
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: stable <stable@vger.kernel.org>
 ---
- arch/arm/boot/dts/at91sam9g25ek.dts    |    4 ++--
- arch/arm/boot/dts/at91sam9m10g45ek.dts |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/usb/host/ohci-at91.c |   12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index ac0dc00..7829a4d 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -37,8 +37,8 @@
- 		usb0: ohci at 00600000 {
- 			status = "okay";
- 			num-ports = <2>;
--			atmel,vbus-gpio = <&pioD 19 0
--					   &pioD 20 0
-+			atmel,vbus-gpio = <&pioD 19 1
-+					   &pioD 20 1
- 					  >;
- 		};
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index cf9707d..dd58b555 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -327,9 +327,8 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+ 			dev_dbg(hcd->self.controller,
+ 				"ClearPortFeature: OVER_CURRENT\n");
  
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index c4c8ae4..6abb571 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -73,8 +73,8 @@
- 		usb0: ohci at 00700000 {
- 			status = "okay";
- 			num-ports = <2>;
--			atmel,vbus-gpio = <&pioD 1 0
--					   &pioD 3 0>;
-+			atmel,vbus-gpio = <&pioD 1 1
-+					   &pioD 3 1>;
- 		};
+-			if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin)) {
++			if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin))
+ 				pdata->overcurrent_status[wIndex-1] = 0;
+-			}
  
- 		usb1: ehci at 00800000 {
+ 			goto out;
+ 
+@@ -382,17 +381,14 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+ 		dev_dbg(hcd->self.controller, "GetPortStatus(%d)\n", wIndex);
+ 
+ 		if (wIndex && wIndex <= ARRAY_SIZE(pdata->vbus_pin)) {
+-			if (! ohci_at91_usb_get_power(pdata, wIndex-1)) {
++			if (! ohci_at91_usb_get_power(pdata, wIndex-1))
+ 				*data &= ~cpu_to_le32(RH_PS_PPS);
+-			}
+ 
+-			if (pdata->overcurrent_changed[wIndex-1]) {
++			if (pdata->overcurrent_changed[wIndex-1])
+ 				*data |= cpu_to_le32(RH_PS_OCIC);
+-			}
+ 
+-			if (pdata->overcurrent_status[wIndex-1]) {
++			if (pdata->overcurrent_status[wIndex-1])
+ 				*data |= cpu_to_le32(RH_PS_POCI);
+-			}
+ 		}
+ 	}
+ 
 -- 
 1.7.9.4
