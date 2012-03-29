@@ -1,28 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 29 Mar 2012 21:58:58 +0200
-Subject: [PATCH] ARM: imx/mx21ads: remove unneeded cast
-Message-ID: <1333051138-27360-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 29 Mar 2012 14:49:37 -0600
+Subject: [PATCH] serial: PL011: move interrupt clearing
+In-Reply-To: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
+References: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACxGe6u+KeYzWwiJ7MK7pWG444Y99CQ1LLCZP4m3R=zdYFR_pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/mach-mx21ads.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+On Wed, Mar 21, 2012 at 1:15 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Commit 360f748b204275229f8398cb2f9f53955db1503b
+> "serial: PL011: clear pending interrupts"
+> attempts to clear interrupts by writing to a
+> yet-unassigned memory address. This fixes the issue.
+>
+> The breaking patch is marked for stable so should be
+> carried along with the other patch.
+>
+> Cc: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: stable <stable@vger.kernel.org>
+> Reported-by: Viresh Kumar <viresh.kumar@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index e432d4a..d14bbe9 100644
---- a/arch/arm/mach-imx/mach-mx21ads.c
-+++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -304,8 +304,7 @@ static void __init mx21ads_board_init(void)
- 	imx21_add_mxc_nand(&mx21ads_nand_board_info);
- 
- 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--	platform_device_register_full(
--			(struct platform_device_info *)&mx21ads_cs8900_devinfo);
-+	platform_device_register_full(&mx21ads_cs8900_devinfo);
- }
- 
- static void __init mx21ads_timer_init(void)
--- 
-1.7.9.1
+Ugh; the original patch is obviously broken.  How did it get applied
+without testing?
+
+Greg, can you get this out to Linus ASAP please?  I have one comment
+below, but I don't think it should block merging this patch.
+
+Tested-by: Grant Likely <grant.likely@secretlab.ca>
+
+> ---
+> ?drivers/tty/serial/amba-pl011.c | ? ?8 ++++----
+> ?1 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 7e01399..4ed35c5 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1930,10 +1930,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+> ? ? ? ? ? ? ? ?goto unmap;
+> ? ? ? ?}
+>
+> - ? ? ? /* Ensure interrupts from this UART are masked and cleared */
+> - ? ? ? writew(0, uap->port.membase + UART011_IMSC);
+> - ? ? ? writew(0xffff, uap->port.membase + UART011_ICR);
+> -
+> ? ? ? ?uap->vendor = vendor;
+> ? ? ? ?uap->lcrh_rx = vendor->lcrh_rx;
+> ? ? ? ?uap->lcrh_tx = vendor->lcrh_tx;
+> @@ -1951,6 +1947,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+> ? ? ? ?uap->port.line = i;
+> ? ? ? ?pl011_dma_probe(uap);
+>
+> + ? ? ? /* Ensure interrupts from this UART are masked and cleared */
+> + ? ? ? writew(0, uap->port.membase + UART011_IMSC);
+> + ? ? ? writew(0xffff, uap->port.membase + UART011_ICR);
+> +
+
+Is it correct to move the interrupt clearing below the
+pl011_dma_probe() call?  I've tested the fix with the interrupt
+clearing both above and below the pl011_dma_probe() call and versatile
+qemu boots in both cases.
+
+g.
