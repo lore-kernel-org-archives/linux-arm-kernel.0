@@ -1,43 +1,57 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 29 Mar 2012 16:08:00 +0200
-Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi,
- regulator and mmc DTS updates
-In-Reply-To: <201203150801.13183.arnd@arndb.de>
-References: <4F612C29.40608@ti.com> <20120315004638.GW12083@atomide.com>
- <201203150801.13183.arnd@arndb.de>
-Message-ID: <4F746CC0.9050507@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 29 Mar 2012 16:28:48 +0200
+Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
+ em-x270.c
+In-Reply-To: <4F73437B.6070806@windriver.com>
+References: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
+ <1331244366-6147-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F732C97.2030804@compulab.co.il>
+ <20120328152743.GW3232@opensource.wolfsonmicro.com>
+ <4F73356D.5080401@windriver.com>
+ <20120328161305.GZ3232@opensource.wolfsonmicro.com>
+ <4F73437B.6070806@windriver.com>
+Message-ID: <4F7471A0.6070208@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
-
-On 3/15/2012 9:01 AM, Arnd Bergmann wrote:
-> On Thursday 15 March 2012, Tony Lindgren wrote:
->> * Cousson, Benoit<b-cousson@ti.com>  [120314 16:41]:
->>> Hi Tony,
->>>
->>> Here are the remaining DTS patches for 3.4.
->>>
->>> On top of the previous pull request, I just added the MMC DTS since the driver adaptation just got queued.
->>>
->>> It will be still be good to have that for 3.4 if possible, otherwise we will
->>> have a bunch of drivers DT adapted but no DTS file to use them :-(
+On 03/28/12 18:59, Paul Gortmaker wrote:
+> On 12-03-28 12:13 PM, Mark Brown wrote:
+>> On Wed, Mar 28, 2012 at 11:59:41AM -0400, Paul Gortmaker wrote:
+>>> On 12-03-28 11:27 AM, Mark Brown wrote:
 >>
->> This might be doable as a follow-up patch series at the end
->> of the merge window or at -rc1 when the related driver changes
->> have been merged.
+>>> static struct platform_device em_x270_gps_userspace_consumer = {
+>>>         .name           = "reg-userspace-consumer",
+>>>         .id             = 0,
 >>
->> Arnd and Olof, what do you guys think?
->
-> I'll have to look at the patches more closely, but from the diffstat it definitely
-> looks ok for a later merge once the driver is in. If you can rebase the branch on
-> top of the mmc tree (or the merge of that tree with whatever else is needed), it
-> should give us a bisectable history and I can stick it into a late/* branch right
-> away.
+>>> static struct platform_device em_x270_gprs_userspace_consumer = {
+>>>         .name           = "reg-userspace-consumer",
+>>>         .id             = 1,
+>>
+>>> Note that the existing names currently don't incorporate the .id
+>>> field as a suffix, and so never were unique.
+>>
+>> No, this is just a basic part of how platform devices work - the device
+>> name is always the same and if you've got more than one of them they get
+>> different .ids.  dev_name() returns name.id, or just name if id is set
+>> to -1 indicating that there's onyl one device of a given type.
+> 
+> OK, so Igor - can you simply retest the v2 patch, but make the
+> two trivial changes:
+> 
+> -REGULATOR_CONSUMER(ldo3, "reg-userspace-consumer", "vcc gps");
+> +REGULATOR_CONSUMER(ldo3, "reg-userspace-consumer.0", "vcc gps");
+> 
+> -REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer", "vcc gprs");
+> +REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer.1", "vcc gprs");
 
-FYI, MMC DT adaptation just got merged, I2C, GPIO, SPI, regulator DT 
-adaptation were already merged before, so it means that this branch can 
-be merged to take advantage of all the DT adapted drivers.
+Well, I thought of this solution, but I don't like it, as it makes
+the whole thing very fragile and sensitive to the reg-userspace-consumer
+platform device registration order and count, isn't it?
+(That's why I proposed to use NULL...).
 
-Thanks,
-Benoit
+So, Mark, how do you think the above issues can be handled without
+putting NULL into the dev_name?
+
+-- 
+Regards,
+Igor.
