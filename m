@@ -1,10 +1,8 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 29 Mar 2012 15:31:54 +0530
+Date: Thu, 29 Mar 2012 15:38:26 +0530
 Subject: [PATCH v3 1/4] ARM: OMAP1: boards: Fix OMAP_GPIO_IRQ usage with
  gpio_to_irq()
-In-Reply-To: <1333015317-11866-1-git-send-email-tarun.kanti@ti.com>
-References: <1333015317-11866-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1333015317-11866-2-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1333015706-11931-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
