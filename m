@@ -1,42 +1,103 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 29 Mar 2012 11:42:34 +0530
-Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
- OMAP4 onwards
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
-References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
- <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
-Message-ID: <4F73FD52.60209@ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 29 Mar 2012 12:09:02 +0530
+Subject: [PATCH V2 5/7] ARM: SPEAr3xx: Add device-tree support to SPEAr3xx
+ architecture
+In-Reply-To: <201203281227.32299.arnd@arndb.de>
+References: <cover.1332926608.git.viresh.kumar@st.com>
+ <f4ad79023c6155d4de7e87c3cd798aadd493454e.1332926608.git.viresh.kumar@st.com>
+ <201203281227.32299.arnd@arndb.de>
+Message-ID: <4F740386.2080509@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 March 2012 12:02 PM, Hiremath, Vaibhav wrote:
-> On Tue, Mar 27, 2012 at 15:28:31, Nayak, Rajendra wrote:
->> Some functions like _omap4_disable_module() and _omap4_wait_target_disable()
->> are (will be) used on all OMAPs OMAP4 and beyond which support module level
->> control. Fix the error checks in these functions to return if called on
->> any platform pre OMAP4 (i.e OMAP2 and OMAP3) instead of checking for
->> !cpu_is_omap44xx(). This avoids having to update the error check with a
->> '&&  !cpu_is_omap54xx()' when OMAP5 is introduced and possibly similar updates
->> when further OMAP generations are added.
->>
->
-> Let me add some flavor here :)
->
-> AM33xx, which has module level control, but falls under OMAP3 family of
-> devices. cpu_is_omap34xx() is true for AM33xx device and we have to add
-> check in all these functions. And I am sure we will have many of such
-> devices in the future.
->
-> Can we use some flag based option here, instead of cpu_is_xxx() check?
->
+On 3/28/2012 5:57 PM, Arnd Bergmann wrote:
 
-The intent of this patch was to make the error handling uniform across
-all modules control functions in hwmod, and it atleast addresses one
-problem of having to update these checks every time a new OMAP gets
-added.
+Hi Arnd,
 
-The problem that you bring up with AM33xx is regardless of this patch
-(you would still need to go update every !cpu_is_omap44xx() check)
-and IMHO should be handled separately, with a flag like you are
-suggesting or by some other means. If you already have patches on how
-this can be done, you should go ahead and post them out.
+Thanks for reviewing. :)
+
+All comments accepted.
+
+> Does spear310-evb really connect all seven serial ports?
+
+Yes, since it was an evaluation board, it contained all of them.
+
+>> +/* Following will create static virtual/physical mappings */
+>> > +struct map_desc spear3xx_io_desc[] __initdata = {
+>> > +	{
+>> > +		.virtual	= VA_SPEAR3XX_ICM1_UART_BASE,
+>> > +		.pfn		= __phys_to_pfn(SPEAR3XX_ICM1_UART_BASE),
+>> > +		.length		= SZ_4K,
+>> > +		.type		= MT_DEVICE
+>> > +	}, {
+>> > +		.virtual	= VA_SPEAR3XX_ML1_VIC_BASE,
+>> > +		.pfn		= __phys_to_pfn(SPEAR3XX_ML1_VIC_BASE),
+>> > +		.length		= SZ_4K,
+>> > +		.type		= MT_DEVICE
+>> > +	}, {
+>> > +		.virtual	= VA_SPEAR3XX_ICM3_SYS_CTRL_BASE,
+>> > +		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_SYS_CTRL_BASE),
+>> > +		.length		= SZ_4K,
+>> > +		.type		= MT_DEVICE
+>> > +	}, {
+>> > +		.virtual	= VA_SPEAR3XX_ICM3_MISC_REG_BASE,
+>> > +		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_MISC_REG_BASE),
+>> > +		.length		= SZ_4K,
+>> > +		.type		= MT_DEVICE
+>> > +	},
+>> > +};
+> Note: there no real reason to just map 4K pages here, or to compute the
+> virtual addresses using the IO_ADDRESS macro. Using larger mappings mean
+> you have more efficient TLB lookup for any I/O windows that are located
+> closely together.
+
+Agreed.
+
+> I would actually write this something like
+> struct map_desc spear3xx_io_desc[] __initdata = {
+> 	{
+> 		.virtual = 0xf0000000,
+> 		.pfn	 = __phys_to_pfn(SPEAR3XX_ICM1_2_BASE),
+> 		.length	 = SZ_16M,
+> 		.type	 = MT_DEVICE,
+> 	}, {
+> 		.virtual = 0xf1000000,
+> 		.pfn	 = __phys_to_pfn(SPEAR3XX_ICM4_BASE),
+> 		.length  = 3 * SZ_16M,
+> 		.type	 = MT_DEVICE,
+> 	}, {
+> 		.virtual = 0xf4000000,
+> 		.pfn	 = __phys_to_pfn(SPEAR3XX_ICM3_ML1_2_BASE),
+> 		.length  = 2 * SZ_16M,
+> 		.type	 = MT_DEVICE,
+> 	}, {
+> 		.virtual = 0xf6000000,
+> 		.pfn	 = __phys_to_pfn(SPEAR3XX_ICM3_SMI_CTRL_BASE),
+> 		.length  = SZ_16M,
+> 		.type	 = MT_DEVICE,
+> 	},
+> };
+> 
+> This would cover almost all of your devices with just seven TLB entries,
+> and ioremap can now find the right virtual addresses automatically.
+
+But there are few concerns.
+Firstly, i wasn't aware that ioremap will reuse these mappings.
+I believed that it will create new mappings and this is what i
+saw till 2-6.37. What will happen if iounmap is called?
+
+Over that, board would not be using all the devices present in SoC. So,
+we don't really need to map everything. And so above wouldn't be valid
+there.
+
+To avoid holes, that were created in my original mappings, i can pick your
+idea of dropping IO_ADDRESS() in .virtual field and use tightly aligned
+virtual address for all peripherals.
+
+Like: UART - 4K - 0xf0000000 - 0xf0001000
+      SPI - 4K -  0xf0001000 - 0xf0002000
+
+      ...
+
+-- 
+viresh
