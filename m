@@ -1,29 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Mar 2012 13:43:37 +0000
-Subject: [PATCH] ARM: ux500: fix compile error in new timer code
-In-Reply-To: <CACRpkdbi3JM_iGmWiV9pF0Pff+p9_4taw1aQOpgzprgrnLFdWQ@mail.gmail.com>
-References: <1332931787-27741-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdbi3JM_iGmWiV9pF0Pff+p9_4taw1aQOpgzprgrnLFdWQ@mail.gmail.com>
-Message-ID: <201203291343.37298.arnd@arndb.de>
+Date: Thu, 29 Mar 2012 13:46:45 +0000
+Subject: [PATCH] drivers/base: fix compiler warning in SoC export driver -
+ idr should be ida
+In-Reply-To: <201203172116.30154.arnd@arndb.de>
+References: <4F6456BD.9080205@linaro.org> <201203172116.30154.arnd@arndb.de>
+Message-ID: <201203291346.45328.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 March 2012, Linus Walleij wrote:
-> On Wed, Mar 28, 2012 at 12:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > This patch fixes the errors below:
-> >
-> > error: implicit declaration of function ?pr_err?
-> > error: implicit declaration of function ?BUG?
-> >
+On Saturday 17 March 2012, Arnd Bergmann wrote:
+> On Saturday 17 March 2012, Lee Jones wrote:
+> > 
+> > This fixes:
+> >   note: expected ?struct ida *? but argument is of type ?struct idr *?
+> >   warning: passing argument 1 of ?ida_pre_get? from incompatible pointer type
+> > 
+> > Reported-by: Arnd Bergman <arnd@arndb.de>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> >  drivers/base/soc.c |    2 +-
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> I'll apply and funnel to ARM-SoC when I'm back in Europe unless
-> you want to push it to Arnd/Olof directly.
+> Greg, are you taking this through your tree?
 
-I've applied it now to the fixes branch, as I'm collecting other patches
-as well.
+I've applied it to arm-soc/fixes now. Greg, if you have any objections,
+tell me before the weekend and I'll take it out again, otherwise I'll
+submit it before -rc1.
 
 	Arnd
