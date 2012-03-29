@@ -1,39 +1,29 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Thu, 29 Mar 2012 15:39:22 +0530
-Subject: [PATCH] omap2+: pm: fix compilation break.
-Message-ID: <1333015762-476-1-git-send-email-govindraj.raja@ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 29 Mar 2012 16:14:46 +0530
+Subject: [PATCH V2 5/7] ARM: SPEAr3xx: Add device-tree support to SPEAr3xx
+ architecture
+In-Reply-To: <201203290753.04758.arnd@arndb.de>
+References: <cover.1332926608.git.viresh.kumar@st.com>
+ <201203281227.32299.arnd@arndb.de> <4F740386.2080509@st.com>
+ <201203290753.04758.arnd@arndb.de>
+Message-ID: <4F743D1E.9030209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+On 3/29/2012 1:23 PM, Arnd Bergmann wrote:
+> That should not really be a concern, you only waste a little bit of
+> the vmalloc space that you gained recently when ioremap was changed.
+> Nothing should ever be able to get to those pointers other than by
+> calling ioremap, so it doesn't hurt to have them mapped, except for
+> the very unlikely scenario that you get a wild pointer dereference
+> in the kernel that would otherwise result in an oops.
 
-Fix the compilation break observed on latest mainline.
+Ok. I will create two 16M mappings for now:
 
-Fixes below compilation break:
+PHYSICAL			VIRTUAL
+0xD0000000 - 0xD1000000		0xFD000000
+0xFC000000 - 0xFD000000		0xFC000000
 
-arch/arm/mach-omap2/pm.c: In function 'omap_pm_begin':
-arch/arm/mach-omap2/pm.c:239: error: implicit declaration of function 'disable_hlt'
-arch/arm/mach-omap2/pm.c: In function 'omap_pm_end':
-arch/arm/mach-omap2/pm.c:247: error: implicit declaration of function 'enable_hlt'
 
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/pm.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index a7bdec6..70da4f7 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -16,6 +16,7 @@
- #include <linux/opp.h>
- #include <linux/export.h>
- #include <linux/suspend.h>
-+#include <asm/system_misc.h>
- 
- #include <plat/omap-pm.h>
- #include <plat/omap_device.h>
 -- 
-1.7.5.4
+viresh
