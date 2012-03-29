@@ -1,52 +1,44 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 29 Mar 2012 10:57:08 -0400
-Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
- em-x270.c
-In-Reply-To: <20120329145436.GS3668@opensource.wolfsonmicro.com>
-References: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
- <1331244366-6147-1-git-send-email-paul.gortmaker@windriver.com>
- <4F732C97.2030804@compulab.co.il>
- <20120328152743.GW3232@opensource.wolfsonmicro.com>
- <4F73356D.5080401@windriver.com>
- <20120328161305.GZ3232@opensource.wolfsonmicro.com>
- <4F73437B.6070806@windriver.com> <4F7471A0.6070208@compulab.co.il>
- <20120329145436.GS3668@opensource.wolfsonmicro.com>
-Message-ID: <4F747844.9000900@windriver.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 29 Mar 2012 10:01:48 -0500
+Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
+ OMAP4 onwards
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83183FC32@DBDE01.ent.ti.com>
+References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
+ <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
+ <4F73FD52.60209@ti.com>
+ <79CD15C6BA57404B839C016229A409A83183FB9F@DBDE01.ent.ti.com>
+ <4F74252A.7060809@ti.com>
+ <79CD15C6BA57404B839C016229A409A83183FC32@DBDE01.ent.ti.com>
+Message-ID: <4F74795C.1080506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-03-29 10:54 AM, Mark Brown wrote:
-> On Thu, Mar 29, 2012 at 04:28:48PM +0200, Igor Grinberg wrote:
->> On 03/28/12 18:59, Paul Gortmaker wrote:
-> 
->>>>> static struct platform_device em_x270_gps_userspace_consumer = {
->>>>>         .name           = "reg-userspace-consumer",
->>>>>         .id             = 0,
-> 
->>>>> static struct platform_device em_x270_gprs_userspace_consumer = {
->>>>>         .name           = "reg-userspace-consumer",
->>>>>         .id             = 1,
-> 
->>> -REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer", "vcc gprs");
->>> +REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer.1", "vcc gprs");
-> 
->> Well, I thought of this solution, but I don't like it, as it makes
->> the whole thing very fragile and sensitive to the reg-userspace-consumer
->> platform device registration order and count, isn't it?
->> (That's why I proposed to use NULL...).
-> 
-> No the platform device numbering should be totally stable for a given
-> board unless someone deliberately sets out to renumber them - the .ids
-> are explicitly assigned by the board when it registers the device.
-> 
->> So, Mark, how do you think the above issues can be handled without
->> putting NULL into the dev_name?
-> 
-> It shouldn't be a problem I think.
+Hi Viabhav,
 
-Mark,
+On 3/29/2012 4:14, Hiremath, Vaibhav wrote:
+> On Thu, Mar 29, 2012 at 14:32:34, Nayak, Rajendra wrote:
+>> On Thursday 29 March 2012 02:26 PM, Hiremath, Vaibhav wrote:
+>>> The point I was trying to make here was, cpu_is_xxx() check will become ugly,
+>>> as more and more devices gets added to the list, am33xx being the first one
+>>> in omap34xx family.
+>>
+>> So are there more, other than AM33xx which are cortex A8 based but
+>> share the OMAP4 PRCM IP block?
+>>
+>
+> I would say, probably yes.
+>
+> But, things are so dynamic and you never know how things will shape up by
+> the time you freeze the design.
 
-Would you like me to send a v3 with the .0 and .1 added, or
-are you OK with making that small change to v2 yourself?
+So this begs the question, why does AM33xx return true from 
+cpu_is_omap34xx() is the architecture is based upon OMAP4 and not OMAP3?
 
-Paul.
+I understand it is a Cortex-A8 versus Corex-A9, but if the architecture 
+is closer to OMAP4, then should it not be classed as OMAP4 and not OMAP3?
+
+Raises another question if we should really have arch_is_omapXXXX and 
+not cpu_is_omapXXXX.
+
+Cheers
+Jon
