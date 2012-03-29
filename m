@@ -1,31 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 29 Mar 2012 17:30:59 +0100
-Subject: [PATCH] ASoC: fsl: enable ssi clock in probe function
-In-Reply-To: <4F748C8E.1010702@freescale.com>
-References: <1332989621-5211-1-git-send-email-shawn.guo@linaro.org>
- <20120329112949.GM3668@opensource.wolfsonmicro.com>
- <4F748751.3020300@freescale.com>
- <20120329160916.GG19506@S2101-09.ap.freescale.net>
- <4F748C8E.1010702@freescale.com>
-Message-ID: <20120329163059.GW3668@opensource.wolfsonmicro.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 29 Mar 2012 11:32:28 -0500
+Subject: [PATCH 3/3] ep93xx: Add IDE support to edb93xx boards
+In-Reply-To: <4F741B3F.4000507@metasoft.pl>
+References: <4F7418E7.4060500@metasoft.pl> <4F741B3F.4000507@metasoft.pl>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F00206970255C3@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 11:23:42AM -0500, Timur Tabi wrote:
+On Thursday, March 29, 2012 1:20 AM, Rafal Prylowski wrote:
+> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
+>
+> ---
+>  arch/arm/mach-ep93xx/edb93xx.c |   23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>
+> Index: linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-ep93xx/edb93xx.c
+> +++ linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
+> @@ -233,6 +233,28 @@ static void __init edb93xx_register_fb(v
+>  }
+>  
+>  
+> +/*************************************************************************
+> + * EDB93xx IDE
+> + *************************************************************************/
+> +static int __init edb93xx_has_ide(void)
+> +{
+> +	/*
+> +	 * Although EDB9312 and EDB9315 do have IDE capability, they have
+> +	 * INTRQ line wired as pull-up, which makes using IDE interface
+> +	 * problematic.
+> +	 */
+> +	return machine_is_edb9315a();
 
-> I do have one question though.  I don't know much about the clock layer.
-> When you do this:
+Allow the driver to be loaded on the EDB9312 and EDB9315 but leave the comment.
+If a use of these boards wishes to use the IDE they could remove the pull-up and add
+a pull-down to their board.
 
-> 	ssi_private->clk = clk_get(&pdev->dev, NULL);
+> +}
+> +
+> +static void __init edb93xx_register_ide(void)
+> +{
+> +	if (!edb93xx_has_ide())
+> +		return;
+> +
+> +	ep93xx_register_ide();
+> +}
+> +
+> +
+>  static void __init edb93xx_init_machine(void)
+>  {
+>  	ep93xx_init_devices();
+> @@ -243,6 +265,7 @@ static void __init edb93xx_init_machine(
+>  	edb93xx_register_i2s();
+>  	edb93xx_register_pwm();
+>  	edb93xx_register_fb();
+> +	edb93xx_register_ide();
+>  }
 
-> What clock are you getting?
+Regards,
+Hartley
 
-The default clock - personally I much prefer always naming the clocks
-even if there's one of them but more people seem to prefer this style.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120329/ffaf352d/attachment.sig>
+ 
