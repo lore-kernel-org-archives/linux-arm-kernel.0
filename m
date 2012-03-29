@@ -1,108 +1,103 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 29 Mar 2012 10:19:27 +0300
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120329101927.8ab6b1993475b7e16ae2258f@nvidia.com>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Thu, 29 Mar 2012 13:05:24 +0530
+Subject: [PATCH 1/3] OMAP2+: UART: Remove cpu checks for populating errata
+ flags
+In-Reply-To: <4F733FC4.9010506@ti.com>
+References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+ <1332325501-10467-2-git-send-email-govindraj.raja@ti.com>
+ <4F722C63.9080900@ti.com>
+ <CAMrsUdKfsoks4fB4GhrRcEur8niJsaWuYGE34+j5Bk6u2XiZQQ@mail.gmail.com>
+ <4F733FC4.9010506@ti.com>
+Message-ID: <CAMrsUdKAAcc=tnC_vGRosEsqUmJBVaDQ9T=n898+9n30QwsSag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Wed, Mar 28, 2012 at 10:13 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+> Hi Govindraj,
+>
+>
+> On 3/28/2012 6:09, Raja, Govindraj wrote:
+>>
+>> On Wed, Mar 28, 2012 at 2:38 AM, Jon Hunter<jon-hunter@ti.com> ?wrote:
+>>>
+>>> Hi Govindraj,
+>>>
+>>>
 
-On Wed, 29 Feb 2012 16:04:22 +0100
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+[...]
 
-> This patch add a complete implementation of DMA-mapping API for
-> devices that have IOMMU support. All DMA-mapping calls are supported.
-> 
-> This patch contains some of the code kindly provided by Krishna Reddy
-> <vdumpa@nvidia.com> and Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> ---
->  arch/arm/Kconfig                 |    8 +
->  arch/arm/include/asm/device.h    |    3 +
->  arch/arm/include/asm/dma-iommu.h |   34 ++
->  arch/arm/mm/dma-mapping.c        |  726 +++++++++++++++++++++++++++++++++++++-
->  arch/arm/mm/vmregion.h           |    2 +-
->  5 files changed, 758 insertions(+), 15 deletions(-)
->  create mode 100644 arch/arm/include/asm/dma-iommu.h
-> 
+>>>> + ? ? ? u32 mvr, scheme;
+>>>> + ? ? ? u16 revision, major, minor;
+>>>> +
+>>>> + ? ? ? mvr = serial_in(up, UART_OMAP_MVER);
+>>>> +
+>>>> + ? ? ? /* Check revision register scheme */
+>>>> + ? ? ? scheme = mvr& ? ?(0x03<< ? ?30);
+>>>> + ? ? ? scheme>>= 30;
+>>>
+>>>
+>>>
+>>> Minor nit-pick, why not ...
+>>>
+>>> ? ? ? ?scheme = mvr>> ?30;
+>>>
+>>
+>> yes will correct it.
+>
+>
+> Thinking some more, could be better to add some #defines for
+> OMAP_MVR_VERSION_MASK/SHIFT here.
+>
 
-<snip>
+Yes sure.
 
-> +/*
-> + * Map a part of the scatter-gather list into contiguous io address space
-> + */
-> +static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
-> +                         size_t size, dma_addr_t *handle,
-> +                         enum dma_data_direction dir)
-> +{
-> +       struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-> +       dma_addr_t iova, iova_base;
-> +       int ret = 0;
-> +       unsigned int count;
-> +       struct scatterlist *s;
-> +
-> +       size = PAGE_ALIGN(size);
-> +       *handle = ARM_DMA_ERROR;
-> +
-> +       iova_base = iova = __alloc_iova(mapping, size);
-> +       if (iova == ARM_DMA_ERROR)
-> +               return -ENOMEM;
-> +
-> +       for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
-> +       {
-> +               phys_addr_t phys = page_to_phys(sg_page(s));
-> +               unsigned int len = PAGE_ALIGN(s->offset + s->length);
-> +
-> +               if (!arch_is_coherent())
-> +                       __dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
-> +
-> +               ret = iommu_map(mapping->domain, iova, phys, len, 0);
-> +               if (ret < 0)
-> +                       goto fail;
-> +               count += len >> PAGE_SHIFT;
-> +               iova += len;
-> +       }
-> +       *handle = iova_base;
-> +
-> +       return 0;
-> +fail:
-> +       iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE);
-> +       __free_iova(mapping, iova_base, size);
-> +       return ret;
-> +}
+>
+>>>
+>>>> + ? ? ? switch (scheme) {
+>>>> + ? ? ? case 0: /* Legacy Scheme: OMAP2/3 */
+>>>> + ? ? ? ? ? ? ? /* MINOR_REV[0:4], MAJOR_REV[4:7] */
+>>>
+>>>
+>>>
+>>> This scheme is also true from OMAP1 devices. Maybe we could include in
+>>> the
+>>> comment.
+>>
+>>
+>> No omap1 from $SUBJECT also reason,
+>>
+>> mach-omap1/serial.c => ?8250.c
+>> mach-omap2/serial.c => ?omap-serial.c
+>
+>
+> Got it! Thanks.
+>
+>>>> + ? ? ? ? ? ? ? major = (mvr& ? ?0xf0)>> ? ?4;
+>>>> + ? ? ? ? ? ? ? minor = (mvr& ? ?0x0f);
+>>>>
+>>>> + ? ? ? ? ? ? ? break;
+>>>> + ? ? ? case 1:
+>>>> + ? ? ? ? ? ? ? /* New Scheme: OMAP4+ */
+>>>> + ? ? ? ? ? ? ? /* MINOR_REV[0:5], MAJOR_REV[8:10] */
+>>>> + ? ? ? ? ? ? ? major = (mvr& ? ?0x7<< ? ?8)>> ? ?8;
+>>>
+>>>
+>>>
+>>> Nit-pick ...
+>>>
+>>> ? ? ? ?major = (mvr>> ?8)& ?0x7;
+>>
+>>
+>> yes fine will correct this.
+>
+>
+> May be we should add #defines here to for OMAP_UART_MVR1_MAJ_MASK/SHIFT,
+> OMAP_UART_MVR1_MIN_MASK/SHIFT, OMAP_UART_MVR2_MAJ_MASK/SHIFT and
+> OMAP_UART_MVR2_MIN_MASK/SHIFT.
+>
 
-Do we need to set dma_address as below?
+okay will add this.
 
->From e8bcc3cdac5375b5d7f5ac5b3f716a11c1008f38 Mon Sep 17 00:00:00 2001
-From: Hiroshi DOYU <hdoyu@nvidia.com>
-Date: Thu, 29 Mar 2012 09:59:04 +0300
-Subject: [PATCH 1/1] ARM: dma-mapping: Fix dma_address in sglist
-
-s->dma_address wasn't set at mapping.
-
-Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
----
- arch/arm/mm/dma-mapping.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 3347c37..11a9d65 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1111,6 +1111,8 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 		ret = iommu_map(mapping->domain, iova, phys, len, 0);
- 		if (ret < 0)
- 			goto fail;
-+		s->dma_address = iova;
-+
- 		count += len >> PAGE_SHIFT;
- 		iova += len;
- 	}
--- 
-1.7.5.4
+--
+Thanks,
+Govindraj.R
