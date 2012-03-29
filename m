@@ -1,49 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 29 Mar 2012 08:11:29 -0700
-Subject: [PATCH] omap2+: pm: fix compilation break.
-In-Reply-To: <1333015762-476-1-git-send-email-govindraj.raja@ti.com>
-References: <1333015762-476-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <20120329151128.GT9859@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 29 Mar 2012 16:11:57 +0100
+Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
+ em-x270.c
+In-Reply-To: <4F747844.9000900@windriver.com>
+References: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
+ <1331244366-6147-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F732C97.2030804@compulab.co.il>
+ <20120328152743.GW3232@opensource.wolfsonmicro.com>
+ <4F73356D.5080401@windriver.com>
+ <20120328161305.GZ3232@opensource.wolfsonmicro.com>
+ <4F73437B.6070806@windriver.com> <4F7471A0.6070208@compulab.co.il>
+ <20120329145436.GS3668@opensource.wolfsonmicro.com>
+ <4F747844.9000900@windriver.com>
+Message-ID: <20120329151157.GT3668@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Govindraj.R <govindraj.raja@ti.com> [120329 03:12]:
-> From: "Govindraj.R" <govindraj.raja@ti.com>
-> 
-> Fix the compilation break observed on latest mainline.
-> 
-> Fixes below compilation break:
-> 
-> arch/arm/mach-omap2/pm.c: In function 'omap_pm_begin':
-> arch/arm/mach-omap2/pm.c:239: error: implicit declaration of function 'disable_hlt'
-> arch/arm/mach-omap2/pm.c: In function 'omap_pm_end':
-> arch/arm/mach-omap2/pm.c:247: error: implicit declaration of function 'enable_hlt'
+On Thu, Mar 29, 2012 at 10:57:08AM -0400, Paul Gortmaker wrote:
 
-Care to mention which commit broke the compile?
+> Would you like me to send a v3 with the .0 and .1 added, or
+> are you OK with making that small change to v2 yourself?
 
-Regards,
-
-Tony
- 
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-> ---
->  arch/arm/mach-omap2/pm.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index a7bdec6..70da4f7 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -16,6 +16,7 @@
->  #include <linux/opp.h>
->  #include <linux/export.h>
->  #include <linux/suspend.h>
-> +#include <asm/system_misc.h>
->  
->  #include <plat/omap-pm.h>
->  #include <plat/omap_device.h>
-> -- 
-> 1.7.5.4
-> 
+Please resend, makes life easier.  I'm not sure if it's me or Haojin
+who will end up applying the change anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120329/76f74b6c/attachment.sig>
