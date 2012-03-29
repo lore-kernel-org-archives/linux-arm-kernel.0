@@ -1,45 +1,131 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Mar 2012 07:53:04 +0000
-Subject: [PATCH V2 5/7] ARM: SPEAr3xx: Add device-tree support to SPEAr3xx
- architecture
-In-Reply-To: <4F740386.2080509@st.com>
-References: <cover.1332926608.git.viresh.kumar@st.com>
- <201203281227.32299.arnd@arndb.de> <4F740386.2080509@st.com>
-Message-ID: <201203290753.04758.arnd@arndb.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 29 Mar 2012 10:00:14 +0200
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <20120329101927.8ab6b1993475b7e16ae2258f@nvidia.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+ <20120329101927.8ab6b1993475b7e16ae2258f@nvidia.com>
+Message-ID: <01b301cd0d81$f935d750$eba185f0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 March 2012, Viresh Kumar wrote:
-> But there are few concerns.
-> Firstly, i wasn't aware that ioremap will reuse these mappings.
-> I believed that it will create new mappings and this is what i
-> saw till 2-6.37. What will happen if iounmap is called?
+Hello,
 
-Yes, it was a fairly recent change. iounmap on one of these areas
-will do nothing.
+On Thursday, March 29, 2012 9:19 AM Hiroshi Doyu wrote:
 
-> Over that, board would not be using all the devices present in SoC. So,
-> we don't really need to map everything. And so above wouldn't be valid
-> there.
-
-That should not really be a concern, you only waste a little bit of
-the vmalloc space that you gained recently when ioremap was changed.
-Nothing should ever be able to get to those pointers other than by
-calling ioremap, so it doesn't hurt to have them mapped, except for
-the very unlikely scenario that you get a wild pointer dereference
-in the kernel that would otherwise result in an oops.
-
-> To avoid holes, that were created in my original mappings, i can pick your
-> idea of dropping IO_ADDRESS() in .virtual field and use tightly aligned
-> virtual address for all peripherals.
+> On Wed, 29 Feb 2012 16:04:22 +0100
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 > 
-> Like: UART - 4K - 0xf0000000 - 0xf0001000
->       SPI - 4K -  0xf0001000 - 0xf0002000
+> > This patch add a complete implementation of DMA-mapping API for
+> > devices that have IOMMU support. All DMA-mapping calls are supported.
+> >
+> > This patch contains some of the code kindly provided by Krishna Reddy
+> > <vdumpa@nvidia.com> and Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> > ---
+> >  arch/arm/Kconfig                 |    8 +
+> >  arch/arm/include/asm/device.h    |    3 +
+> >  arch/arm/include/asm/dma-iommu.h |   34 ++
+> >  arch/arm/mm/dma-mapping.c        |  726 +++++++++++++++++++++++++++++++++++++-
+> >  arch/arm/mm/vmregion.h           |    2 +-
+> >  5 files changed, 758 insertions(+), 15 deletions(-)
+> >  create mode 100644 arch/arm/include/asm/dma-iommu.h
+> >
+> 
+> <snip>
+> 
+> > +/*
+> > + * Map a part of the scatter-gather list into contiguous io address space
+> > + */
+> > +static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+> > +                         size_t size, dma_addr_t *handle,
+> > +                         enum dma_data_direction dir)
+> > +{
+> > +       struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> > +       dma_addr_t iova, iova_base;
+> > +       int ret = 0;
+> > +       unsigned int count;
+> > +       struct scatterlist *s;
+> > +
+> > +       size = PAGE_ALIGN(size);
+> > +       *handle = ARM_DMA_ERROR;
+> > +
+> > +       iova_base = iova = __alloc_iova(mapping, size);
+> > +       if (iova == ARM_DMA_ERROR)
+> > +               return -ENOMEM;
+> > +
+> > +       for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
+> > +       {
+> > +               phys_addr_t phys = page_to_phys(sg_page(s));
+> > +               unsigned int len = PAGE_ALIGN(s->offset + s->length);
+> > +
+> > +               if (!arch_is_coherent())
+> > +                       __dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
+> > +
+> > +               ret = iommu_map(mapping->domain, iova, phys, len, 0);
+> > +               if (ret < 0)
+> > +                       goto fail;
+> > +               count += len >> PAGE_SHIFT;
+> > +               iova += len;
+> > +       }
+> > +       *handle = iova_base;
+> > +
+> > +       return 0;
+> > +fail:
+> > +       iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE);
+> > +       __free_iova(mapping, iova_base, size);
+> > +       return ret;
+> > +}
+> 
+> Do we need to set dma_address as below?
 
-Well, if you use the 4k mappings here, you won't benefit from reduced
-TLB pressure through section maps, although you still get rid of IO_ADDRESS.
-I would not put any devices into the static mapping, other than those
-you need to access before mm_init() or when you can actually use the section
-mapping.
+Nope, this one is not correct. Please check the arm_iommu_map_sg() function. It calls 
+__map_sg_chunk() and gives it &dma->dma_address as one of the arguments, so the dma 
+address is correctly stored in the scatter list. Please note that scatterlist is really
+non-trivial structure and information about physical memory pages/chunks is disjoint 
+from the information about dma address space chunks, although both are stored on the 
+same list. In arm_iommu_map_sg() 's' pointer is used for physical memory chunks and 
+'dma' pointer is used for dma address space chunks. 
 
-	Arnd
+The number of dma address space chunks (returned by arm_iommu_map_sq) can be lower 
+than the number of physical memory chunks (given as nents argument).
+
+In case of IOMMU you usually construct the scatter list in such a way, that you get
+only one dma address chunk (so in fact you get a buffer mapped contiguously in 
+virtual io address space).
+
+> From e8bcc3cdac5375b5d7f5ac5b3f716a11c1008f38 Mon Sep 17 00:00:00 2001
+> From: Hiroshi DOYU <hdoyu@nvidia.com>
+> Date: Thu, 29 Mar 2012 09:59:04 +0300
+> Subject: [PATCH 1/1] ARM: dma-mapping: Fix dma_address in sglist
+> 
+> s->dma_address wasn't set at mapping.
+> 
+> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> ---
+>  arch/arm/mm/dma-mapping.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 3347c37..11a9d65 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1111,6 +1111,8 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+>  		ret = iommu_map(mapping->domain, iova, phys, len, 0);
+>  		if (ret < 0)
+>  			goto fail;
+> +		s->dma_address = iova;
+> +
+>  		count += len >> PAGE_SHIFT;
+>  		iova += len;
+>  	}
+
+The above patch is not needed at all.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
