@@ -1,32 +1,52 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 29 Mar 2012 15:27:22 +0200
-Subject: [PATCH 11/12] USB: ehci-atmel: add needed of.h header file
+Date: Thu, 29 Mar 2012 15:27:15 +0200
+Subject: [PATCH 04/12] ARM: at91/dts: USB host vbus is active low
 In-Reply-To: <cover.1333026637.git.nicolas.ferre@atmel.com>
 References: <cover.1333026637.git.nicolas.ferre@atmel.com>
-Message-ID: <9c773949b61764153d82c9612a228256b535c581.1333026637.git.nicolas.ferre@atmel.com>
+Message-ID: <44829c6b9071853311b87eaf3b8952fd6c5b8d82.1333026637.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compilation error in case of non-DT configuration without this
-of.h header file.
+Change vbus gpio configuration in .dts files to switch to
+active low configuration.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: stable <stable@vger.kernel.org>
 ---
- drivers/usb/host/ehci-atmel.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/at91sam9g25ek.dts    |    4 ++--
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 19f318a..cf14c95 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -13,6 +13,7 @@
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+index ac0dc00..7829a4d 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -37,8 +37,8 @@
+ 		usb0: ohci at 00600000 {
+ 			status = "okay";
+ 			num-ports = <2>;
+-			atmel,vbus-gpio = <&pioD 19 0
+-					   &pioD 20 0
++			atmel,vbus-gpio = <&pioD 19 1
++					   &pioD 20 1
+ 					  >;
+ 		};
  
- #include <linux/clk.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/of_platform.h>
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index c4c8ae4..6abb571 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -73,8 +73,8 @@
+ 		usb0: ohci at 00700000 {
+ 			status = "okay";
+ 			num-ports = <2>;
+-			atmel,vbus-gpio = <&pioD 1 0
+-					   &pioD 3 0>;
++			atmel,vbus-gpio = <&pioD 1 1
++					   &pioD 3 1>;
+ 		};
  
- /* interface and function clocks */
+ 		usb1: ehci at 00800000 {
 -- 
 1.7.9.4
