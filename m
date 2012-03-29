@@ -1,31 +1,46 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 29 Mar 2012 09:14:19 +0000
-Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
- OMAP4 onwards
-In-Reply-To: <4F74252A.7060809@ti.com>
-References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
- <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
- <4F73FD52.60209@ti.com>
- <79CD15C6BA57404B839C016229A409A83183FB9F@DBDE01.ent.ti.com>
- <4F74252A.7060809@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83183FC32@DBDE01.ent.ti.com>
+From: cxie4@marvell.com (Chao Xie)
+Date: Thu, 29 Mar 2012 02:15:00 -0700
+Subject: [PATCH 4/4] Input: pxa27x_keypad add choice to set direct_key_mask
+In-Reply-To: <4F735295.2010604@mvista.com>
+References: <1332911324-9840-1-git-send-email-chao.xie@marvell.com>
+ <1332911324-9840-4-git-send-email-chao.xie@marvell.com>
+ <4F735295.2010604@mvista.com>
+Message-ID: <AAD1C6EB06EE3649B35B7E026785068D1A7474ABC7@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 14:32:34, Nayak, Rajendra wrote:
-> On Thursday 29 March 2012 02:26 PM, Hiremath, Vaibhav wrote:
-> > The point I was trying to make here was, cpu_is_xxx() check will become ugly,
-> > as more and more devices gets added to the list, am33xx being the first one
-> > in omap34xx family.
-> 
-> So are there more, other than AM33xx which are cortex A8 based but
-> share the OMAP4 PRCM IP block?
-> 
+Thanks. I will sent V2 patches.
 
-I would say, probably yes. 
+-----Original Message-----
+From: Sergei Shtylyov [mailto:sshtylyov at mvista.com] 
+Sent: Thursday, March 29, 2012 2:04 AM
+To: Chao Xie
+Cc: linux-input at vger.kernel.org; eric.y.miao at gmail.com; Haojian Zhuang; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 4/4] Input: pxa27x_keypad add choice to set direct_key_mask
 
-But, things are so dynamic and you never know how things will shape up by 
-the time you freeze the design.
+Hello.
 
-Thanks,
-Vaibhav
+On 03/28/2012 09:08 AM, Chao Xie wrote:
+
+> Direct keys usage may not start from KP_DKIN0, add a msk option
+> to configure the specifics for platforms that can skip some keys.
+
+> Signed-off-by: Chao Xie<chao.xie@marvell.com>
+[...]
+
+> diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+> index b41ebda..661892b 100644
+> --- a/drivers/input/keyboard/pxa27x_keypad.c
+> +++ b/drivers/input/keyboard/pxa27x_keypad.c
+> @@ -391,7 +391,12 @@ static void pxa27x_keypad_config(struct pxa27x_keypad *keypad)
+>   	if (pdata->direct_key_num>  direct_key_num)
+>   		direct_key_num = pdata->direct_key_num;
+>
+> -	keypad->direct_key_mask = ((1<<  direct_key_num) - 1)&  ~mask;
+> +	/* Direct keys usage may not start from KP_DKIN0, check the platfrom
+> +	 * msk data to config the specific */
+
+    The preferred multi-line comment style is not this one. You got it right in 
+the previous patch. :-)
+
+WBR, Sergei
