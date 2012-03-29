@@ -1,20 +1,45 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Thu, 29 Mar 2012 09:51:32 +0200
-Subject: [PATCH] mfd: mc13xxx: add I2C support fix building for v3.4
-In-Reply-To: <201203290747.50881.marc@cpdesign.com.au>
-References: <1332943273-22447-1-git-send-email-alexg@meprolight.com>,
- <201203290747.50881.marc@cpdesign.com.au>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD28@MEP-EXCH.meprolight.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Mar 2012 07:53:04 +0000
+Subject: [PATCH V2 5/7] ARM: SPEAr3xx: Add device-tree support to SPEAr3xx
+ architecture
+In-Reply-To: <4F740386.2080509@st.com>
+References: <cover.1332926608.git.viresh.kumar@st.com>
+ <201203281227.32299.arnd@arndb.de> <4F740386.2080509@st.com>
+Message-ID: <201203290753.04758.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 29 March 2012, Viresh Kumar wrote:
+> But there are few concerns.
+> Firstly, i wasn't aware that ioremap will reuse these mappings.
+> I believed that it will create new mappings and this is what i
+> saw till 2-6.37. What will happen if iounmap is called?
 
-Hi Marc,
+Yes, it was a fairly recent change. iounmap on one of these areas
+will do nothing.
 
-> @Alex, you seen keen to do this, so I'll leave it to you :)
-> Otherwise, I'm happy to do it, just let me know.
+> Over that, board would not be using all the devices present in SoC. So,
+> we don't really need to map everything. And so above wouldn't be valid
+> there.
 
-No problem, I would gladly give it to you :-)
+That should not really be a concern, you only waste a little bit of
+the vmalloc space that you gained recently when ioremap was changed.
+Nothing should ever be able to get to those pointers other than by
+calling ioremap, so it doesn't hurt to have them mapped, except for
+the very unlikely scenario that you get a wild pointer dereference
+in the kernel that would otherwise result in an oops.
 
-Regards,
-Alex Gershgorin
+> To avoid holes, that were created in my original mappings, i can pick your
+> idea of dropping IO_ADDRESS() in .virtual field and use tightly aligned
+> virtual address for all peripherals.
+> 
+> Like: UART - 4K - 0xf0000000 - 0xf0001000
+>       SPI - 4K -  0xf0001000 - 0xf0002000
+
+Well, if you use the 4k mappings here, you won't benefit from reduced
+TLB pressure through section maps, although you still get rid of IO_ADDRESS.
+I would not put any devices into the static mapping, other than those
+you need to access before mm_init() or when you can actually use the section
+mapping.
+
+	Arnd
