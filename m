@@ -1,67 +1,85 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 29 Mar 2012 11:32:28 -0500
-Subject: [PATCH 3/3] ep93xx: Add IDE support to edb93xx boards
-In-Reply-To: <4F741B3F.4000507@metasoft.pl>
-References: <4F7418E7.4060500@metasoft.pl> <4F741B3F.4000507@metasoft.pl>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F00206970255C3@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 29 Mar 2012 09:33:10 -0700
+Subject: [PATCH] omap2+: pm: fix compilation break.
+In-Reply-To: <20120329151128.GT9859@atomide.com>
+References: <1333015762-476-1-git-send-email-govindraj.raja@ti.com>
+ <20120329151128.GT9859@atomide.com>
+Message-ID: <20120329163309.GW9859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 29, 2012 1:20 AM, Rafal Prylowski wrote:
-> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
-> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
->
-> ---
->  arch/arm/mach-ep93xx/edb93xx.c |   23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->
-> Index: linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-ep93xx/edb93xx.c
-> +++ linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-> @@ -233,6 +233,28 @@ static void __init edb93xx_register_fb(v
->  }
->  
->  
-> +/*************************************************************************
-> + * EDB93xx IDE
-> + *************************************************************************/
-> +static int __init edb93xx_has_ide(void)
-> +{
-> +	/*
-> +	 * Although EDB9312 and EDB9315 do have IDE capability, they have
-> +	 * INTRQ line wired as pull-up, which makes using IDE interface
-> +	 * problematic.
-> +	 */
-> +	return machine_is_edb9315a();
+* Tony Lindgren <tony@atomide.com> [120329 08:14]:
+> * Govindraj.R <govindraj.raja@ti.com> [120329 03:12]:
+> > From: "Govindraj.R" <govindraj.raja@ti.com>
+> > 
+> > Fix the compilation break observed on latest mainline.
+> > 
+> > Fixes below compilation break:
+> > 
+> > arch/arm/mach-omap2/pm.c: In function 'omap_pm_begin':
+> > arch/arm/mach-omap2/pm.c:239: error: implicit declaration of function 'disable_hlt'
+> > arch/arm/mach-omap2/pm.c: In function 'omap_pm_end':
+> > arch/arm/mach-omap2/pm.c:247: error: implicit declaration of function 'enable_hlt'
+> 
+> Care to mention which commit broke the compile?
 
-Allow the driver to be loaded on the EDB9312 and EDB9315 but leave the comment.
-If a use of these boards wishes to use the IDE they could remove the pull-up and add
-a pull-down to their board.
+Seems like it was 9f97da78 (Disintegrate asm/system.h for ARM),
+and also needs to be fixed for omap1 too. Using the updated
+patch below.
 
-> +}
-> +
-> +static void __init edb93xx_register_ide(void)
-> +{
-> +	if (!edb93xx_has_ide())
-> +		return;
-> +
-> +	ep93xx_register_ide();
-> +}
-> +
-> +
->  static void __init edb93xx_init_machine(void)
->  {
->  	ep93xx_init_devices();
-> @@ -243,6 +265,7 @@ static void __init edb93xx_init_machine(
->  	edb93xx_register_i2s();
->  	edb93xx_register_pwm();
->  	edb93xx_register_fb();
-> +	edb93xx_register_ide();
->  }
+Tony
 
-Regards,
-Hartley
 
+From: Govindraj.R <govindraj.raja@ti.com>
+Date: Thu, 29 Mar 2012 09:30:28 -0700
+Subject: [PATCH] ARM: OMAP: pm: fix compilation break
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Fix the compilation break observed on latest mainline caused
+by 9f97da78 (Disintegrate asm/system.h for ARM):
+
+arch/arm/mach-omap1/pm.c: In function ?omap_pm_prepare?:
+arch/arm/mach-omap1/pm.c:587: error: implicit declaration of function ?disable_hlt?
+arch/arm/mach-omap1/pm.c: In function ?omap_pm_finish?:
+arch/arm/mach-omap1/pm.c:624: error: implicit declaration of function ?enable_hlt?
+arch/arm/mach-omap1/pm.c: In function ?omap_pm_init?:
+arch/arm/mach-omap1/pm.c:681: error: ?arm_pm_idle? undeclared (first use in this function)
+...
+
+arch/arm/mach-omap2/pm.c: In function 'omap_pm_begin':
+arch/arm/mach-omap2/pm.c:239: error: implicit declaration of function 'disable_hlt'
+arch/arm/mach-omap2/pm.c: In function 'omap_pm_end':
+arch/arm/mach-omap2/pm.c:247: error: implicit declaration of function 'enable_hlt'
+
+Cc: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+[tony at atomide.com: updated to fix omap1 too]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
+index 306beac..f66c329 100644
+--- a/arch/arm/mach-omap1/pm.c
++++ b/arch/arm/mach-omap1/pm.c
+@@ -44,6 +44,7 @@
+ #include <linux/io.h>
+ #include <linux/atomic.h>
  
++#include <asm/system_misc.h>
+ #include <asm/irq.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/irq.h>
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index a7bdec6..d0c1c96 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -17,6 +17,8 @@
+ #include <linux/export.h>
+ #include <linux/suspend.h>
+ 
++#include <asm/system_misc.h>
++
+ #include <plat/omap-pm.h>
+ #include <plat/omap_device.h>
+ #include "common.h"
