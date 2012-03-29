@@ -1,56 +1,32 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 29 Mar 2012 16:28:31 +0400
-Subject: [PATCH] ARM: S3C24XX: fix missing common.h in mach-s3c24xx/
-In-Reply-To: <1332980074-4614-1-git-send-email-kgene.kim@samsung.com>
-References: <1332980074-4614-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4F74556F.10704@mvista.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 29 Mar 2012 15:27:22 +0200
+Subject: [PATCH 11/12] USB: ehci-atmel: add needed of.h header file
+In-Reply-To: <cover.1333026637.git.nicolas.ferre@atmel.com>
+References: <cover.1333026637.git.nicolas.ferre@atmel.com>
+Message-ID: <9c773949b61764153d82c9612a228256b535c581.1333026637.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Compilation error in case of non-DT configuration without this
+of.h header file.
 
-On 29-03-2012 4:14, Kukjin Kim wrote:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/usb/host/ehci-atmel.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-> This patch fixes missing mach-s3c24xx/common.h which has been
-> lost when regarding s3c24xx directories merged.
-
-> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> ---
->   arch/arm/mach-s3c24xx/common.h |   23 +++++++++++++++++++++++
->   1 files changed, 23 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/mach-s3c24xx/common.h
-
-> diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
-> new file mode 100644
-> index 0000000..a7cd62f
-> --- /dev/null
-> +++ b/arch/arm/mach-s3c24xx/common.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * Common Header for S3C24XX SoCs
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ARCH_ARM_MACH_S3C24XX_COMMON_H
-> +#define __ARCH_ARM_MACH_S3C24XX_COMMON_H
-> +
-> +#ifdef CONFIG_CPU_S3C2410
-> +void s3c2410_restart(char mode, const char *cmd);
-> +#endif
-> +
-> +#ifdef CONFIG_CPU_S3C244X
-> +void s3c244x_restart(char mode, const char *cmd);
-> +#endif
-
-    Those #ifdef's around function prototypes are not necessary.
-
-> +
-> +#endif /* __ARCH_ARM_MACH_S3C24XX_COMMON_H */
-
-WBR, Sergei
+diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+index 19f318a..cf14c95 100644
+--- a/drivers/usb/host/ehci-atmel.c
++++ b/drivers/usb/host/ehci-atmel.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ #include <linux/of_platform.h>
+ 
+ /* interface and function clocks */
+-- 
+1.7.9.4
