@@ -1,67 +1,104 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Mar 2012 18:54:52 -0700
-Subject: [PATCH 4/4] ARM: Exynos5: Add PDMA and MDMA physical base address
- defines
-In-Reply-To: <1332840365-24827-5-git-send-email-thomas.abraham@linaro.org>
-References: <1332840365-24827-1-git-send-email-thomas.abraham@linaro.org>
- <1332840365-24827-5-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F73C0EC.60201@samsung.com>
+Date: Wed, 28 Mar 2012 19:05:53 -0700
+Subject: [PATCH v4 05/12] ARM: EXYNOS: add support uart for EXYNOS4 and
+ EXYNOS5
+In-Reply-To: <CAJuYYwT5_EHPD4D+Qx0rX8bUVGLbLYUps2BYSUihLbuKGnhHdA@mail.gmail.com>
+References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
+ <1331736138-28964-6-git-send-email-kgene.kim@samsung.com>
+ <CAJuYYwTJsA1M1Qj2P1-1K=pWzi0BPo8YJNDSx4NqGC7NX0030g@mail.gmail.com>
+ <074401cd074f$c2946b90$47bd42b0$%szyprowski@samsung.com>
+ <4F6B3256.40304@samsung.com>
+ <CAJuYYwT5_EHPD4D+Qx0rX8bUVGLbLYUps2BYSUihLbuKGnhHdA@mail.gmail.com>
+Message-ID: <4F73C381.1090504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Thomas Abraham wrote:
-> Add PDMA and MDMA physical base address macros which is require for Exynos5
-> of_dev_auxdata setup.
-> 
-> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
-> ---
->   arch/arm/mach-exynos/include/mach/map.h |    5 +++++
->   arch/arm/mach-exynos/mach-exynos5-dt.c  |    3 ++-
->   2 files changed, 7 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-> index 024d38f..37d93fd 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -90,6 +90,11 @@
->   #define EXYNOS4_PA_PDMA0		0x12680000
->   #define EXYNOS4_PA_PDMA1		0x12690000
-> 
-> +#define EXYNOS5_PA_PDMA0		0x121A0000
-> +#define EXYNOS5_PA_PDMA1		0x121B0000
-> +#define EXYNOS5_PA_MDMA0		0x10800000
-> +#define EXYNOS5_PA_MDMA1		0x11C10000
-> +
+> 2012/3/22 Kukjin Kim<kgene.kim@samsung.com>:
+>> On 03/21/12 03:45, Marek Szyprowski wrote:
+>>>
+>>> Hello,
+>>>
+>>> On Wednesday, March 21, 2012 10:14 AM Thomas Abraham wrote:
+>>>
+>>>> On 14 March 2012 20:12, Kukjin Kim<kgene.kim@samsung.com>    wrote:
+>>>>>
+>>>>> Actually, the base address of uart is different between EXYNOS4
+>>>>> and EXYNOS5 and this patch enables to support uart for EXYNOS4
+>>>>> and EXYNOS5 SoCs at runtime.
+>>>>>
+>>>>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+>>>>> ---
+>>>>
+>>>>
+>>>> [...]
+>>>>
+>>>>> diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S
+>>>>> b/arch/arm/mach-
+>>>>
+>>>> exynos/include/mach/debug-macro.S
+>>>>>
+>>>>> index 6cacf16..6c857ff 100644
+>>>>> --- a/arch/arm/mach-exynos/include/mach/debug-macro.S
+>>>>> +++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
+>>>>> @@ -21,8 +21,13 @@
+>>>>>          */
+>>>>>
+>>>>>         .macro addruart, rp, rv, tmp
+>>>>> -               ldr     \rp, = S3C_PA_UART
+>>>>> -               ldr     \rv, = S3C_VA_UART
+>>>>> +               mov     \rp, #0x10000000
+>>>>
+>>>>
+>>>> This is physical address of Exynos4/5 CPUID register which cannot be
+>>>> used here. And virtual address S5P_VA_CPUID also cannot be used here
+>>>> since this will be called before paging_init when earlyprintk boot
+>>>> param is used. So, with this change, earlyprintk does not work for
+>>>> both Exynos4 and Exynos5.
+>>>
+>>>
+>>> I confirm, printascii freeze the system on EXYNOS4 after that patch,
+>>> tested on Exynos4210 Nuri board.
+>>>
+>> Hi,
+>>
+>> I think, it can be solved with following and if no problems, it will be
+>> fixed during v3.4-rcX.
+>>
+>> diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S
+>> b/arch/arm/mach-exynos/in
+>> index 6c857ff..a865417 100644
+>> --- a/arch/arm/mach-exynos/include/mach/debug-macro.S
+>> +++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
+>> @@ -21,10 +21,10 @@
+>>
+>>          */
+>>
+>>         .macro addruart, rp, rv, tmp
+>> -               mov     \rp, #0x10000000
+>> -               ldr     \rp, [\rp, #0x0]
+>> -               and     \rp, \rp, #0xf00000
+>> -               teq     \rp, #0x500000          @@ EXYNOS5
+>> +               mrc     p15, 0, \tmp, c0, c0, 0
+>> +               and     \tmp, \tmp, #0xf0
+>> +               teq     \tmp, #0xf0             @@ A15
+>> +
+>>                 ldreq   \rp, =EXYNOS5_PA_UART
+>>
+>>                 movne   \rp, #EXYNOS4_PA_UART   @@ EXYNOS4
+>>                 ldr     \rv, =S3C_VA_UART
+>>
+>
+> Dear Mr. Kim,
+>
+> I have tested the above patch on Exynos5. Thanks.
+>
+> Tested-by: Thomas Abraham<thomas.abraham@linaro.org>
 
-See, "ARM: EXYNOS: Support DMA for Exynos5250 SoC"
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/085434.html
+Hi Marek, Thomas,
 
-But this merge window is not including it :(
-
->   #define EXYNOS4_PA_SYSMMU_MDMA		0x10A40000
->   #define EXYNOS4_PA_SYSMMU_SSS		0x10A50000
->   #define EXYNOS4_PA_SYSMMU_FIMC0		0x11A20000
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> index 0d26f50..cdc3a26 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -45,7 +45,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
->   				"exynos4210-uart.3", NULL),
->   	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
->   	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
-> -	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.2", NULL),
-> +	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA0, "dma-pl330.2", NULL),
-
-OK.
-
-> +	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA0, "dma-pl330.3", NULL),
-
-Well...there is a MDMA1 on EXYNOS5250 SoC, so if we can use MDMA1,
-should be MDMA1 for dma-pl330.3 but...I think, I need to check :)
-
->   	{},
->   };
-> 
+Thanks for your test.
+I will apply above patch with your 'Tested-by:...'
 
 Thanks.
 
