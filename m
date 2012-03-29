@@ -1,32 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Mar 2012 13:46:45 +0000
-Subject: [PATCH] drivers/base: fix compiler warning in SoC export driver -
- idr should be ida
-In-Reply-To: <201203172116.30154.arnd@arndb.de>
-References: <4F6456BD.9080205@linaro.org> <201203172116.30154.arnd@arndb.de>
-Message-ID: <201203291346.45328.arnd@arndb.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 29 Mar 2012 15:51:36 +0200 (CEST)
+Subject: [PATCHv2 02/14] X86 & IA64: adapt for dma_map_ops changes
+In-Reply-To: <1332855768-32583-3-git-send-email-m.szyprowski@samsung.com>
+References: <1332855768-32583-1-git-send-email-m.szyprowski@samsung.com>
+ <1332855768-32583-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <alpine.LFD.2.02.1203291545520.2542@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 March 2012, Arnd Bergmann wrote:
-> On Saturday 17 March 2012, Lee Jones wrote:
-> > 
-> > This fixes:
-> >   note: expected ?struct ida *? but argument is of type ?struct idr *?
-> >   warning: passing argument 1 of ?ida_pre_get? from incompatible pointer type
-> > 
-> > Reported-by: Arnd Bergman <arnd@arndb.de>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >
-> >  drivers/base/soc.c |    2 +-
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Greg, are you taking this through your tree?
+On Tue, 27 Mar 2012, Marek Szyprowski wrote:
+> From: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> -static inline void *dma_alloc_coherent(struct device *dev, size_t size,
+> -				       dma_addr_t *daddr, gfp_t gfp)
+> +#define dma_alloc_coherent(d,s,h,f)	dma_alloc_attrs(d,s,h,f,NULL)
 
-I've applied it to arm-soc/fixes now. Greg, if you have any objections,
-tell me before the weekend and I'll take it out again, otherwise I'll
-submit it before -rc1.
+Please make this an inline function.
 
-	Arnd
+>  
+> +#define dma_alloc_coherent(d,s,h,f)	dma_alloc_attrs(d,s,h,f,NULL)
+
+Inline please.
+
+> -static inline void dma_free_coherent(struct device *dev, size_t size,
+> -				     void *vaddr, dma_addr_t bus)
+> +#define dma_free_coherent(d,s,c,h) dma_free_attrs(d,s,c,h,NULL)
+
+Ditto
+
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+
+Thanks,
+
+	tglx
