@@ -1,49 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 30 Mar 2012 18:23:30 +0530
-Subject: [PATCHv2 0/5] coupled cpuidle state support
-In-Reply-To: <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
-References: <1331749794-8056-1-git-send-email-ccross@android.com>
- <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
-Message-ID: <4F75ACCA.4090009@ti.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Fri, 30 Mar 2012 15:02:35 +0200
+Subject: [PATCH] ARM: at91: add support for Telit GE863-PRO3 Evaluation Kit
+In-Reply-To: <20120330115906.GM7757@game.jcrosoft.org>
+References: <1333097816-8641-1-git-send-email-fabio.porcedda@gmail.com>
+ <20120330115906.GM7757@game.jcrosoft.org>
+Message-ID: <CAHkwnC9XZneX-9def=0VYifyVDG4ZtXo1L+ZJNQDhxSm1fPj9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin,
+On Fri, Mar 30, 2012 at 1:59 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> tks for the patch but now we have close the non dt board for this soc
 
-On Friday 16 March 2012 05:07 AM, Colin Cross wrote:
-> On Wed, Mar 14, 2012 at 11:29 AM, Colin Cross <ccross@android.com> wrote:
+Thanks for the reply.
 
-[...]
+> and for 3.5 nearly all the devices of this soc will converted to DT
+>
+> so you need to switch to DT too
 
->>
->> v2:
->>   * removed the coupled lock, replacing it with atomic counters
->>   * added a check for outstanding pokes before beginning the
->>     final transition to avoid extra wakeups
->>   * made the cpuidle_coupled struct completely private
->>   * fixed kerneldoc comment formatting
->>   * added a patch with a helper function for resynchronizing
->>     cpus after aborting idle
->>   * added a patch (not for merging) to add trace events for
->>     verification and performance testing
-> 
-> I forgot to mention, this patch series is on v3.3-rc7, and will
-> conflict with the cpuidle timekeeping patches.  If those go in first
-> (which is likely), I will rework this series on top of it.  I left it
-> on v3.3-rc7 now to make testing easier.
+Ok, i will switch to DT too.
+Do you plan to add support to any 9260 board to the board-dt.c for 3.5?
+I think that, as far as there is a working 9260 board using DT, i can
+work on the GE863-PRO3 support using DT.
 
-I have re-based your series against Len Browns
-next branch [1] which has time keeping and other cpuidle patches.
-Have also folded the CPU hotplug fix which I posted in the
-original coupled idle patch.
+> As today I've not finished the pinctrl support you need to do all the pin mux
+> in the bootlader. For 3.5 it will not be the case anymore
+>
+> Best Regards,
+> J.
 
-If you want, the updated branch can be pulled from:
-
-git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
-for_3.5/coupled_cpuidle-rebase
-
-Regards
-Santosh
-
-[1] Power Management
-git://git.kernel.org/pub/scm/linux/kernel/git/lenb/linux.git
+Thanks and regards
+-- 
+Fabio Porcedda
