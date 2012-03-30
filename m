@@ -1,119 +1,123 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 30 Mar 2012 09:48:16 -0600
-Subject: [PATCH v3 6/6] mmc: sdhci-s3c: Add device tree support
-In-Reply-To: <201203301136.05038.arnd@arndb.de>
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <201203271619.13320.arnd@arndb.de> <4F7553D1.4030008@st.com>
- <201203301136.05038.arnd@arndb.de>
-Message-ID: <4F75D5C0.5050307@wwwdotorg.org>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Fri, 30 Mar 2012 16:52:13 +0100 (BST)
+Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
+In-Reply-To: <4F75D269.7030500@compulab.co.il>
+Message-ID: <1333122733.41820.YahooMailClassic@web29002.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2012 05:36 AM, Arnd Bergmann wrote:
-> On Friday 30 March 2012, Viresh Kumar wrote:
->> On 3/27/2012 9:49 PM, Arnd Bergmann wrote:
->>> These bindings came up in a discussion IRC today. I think it's rather bad that
->>> we can't agree on a common way to name the properties for mmc. We have
->>> bindings being proposed or already included from Anton, Stephen, Shawn,
->>> Rajendra, Viresh, Lee and Thomas. Almost all of them define GPIO pins
->>> for card detect and write protect, as well properties to define the bus
->>> width and high-speed modes, but we seem to have almost as many different
->>> definitions of these as we have drivers.
->>>
->>> Can we please come up with a common binding for these?
->>
->> Is there any progress on this? Sorry i wasn't following all mails.
->> How should i progress for sdhci-spear?
+--- On Fri, 30/3/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> On 03/30/12 18:06, Paul Parsons wrote:
+> > --- On Fri, 30/3/12, Igor Grinberg <grinberg@compulab.co.il>
+> wrote:
+> >> On 03/28/12 20:12, Paul Parsons
+> >> wrote:
+> >>> On PXA2xx platforms, the MFP API (described in
+> >> Documentation/arm/pxa/mfp.txt)
+> >>> provides values for the following:
+> >>>
+> >>> 1. GPIO inputs (e.g. GPIO105_GPIO).
+> >>> 2. Alternate function inputs (e.g.
+> GPIO105_CIF_DD_1).
+> >>> 3. Alternate function outputs (e.g.
+> >> GPIO105_KP_MKOUT_2).
+> >>>
+> >>> It does not provide values for GPIO outputs
+> (i.e. AF0
+> >> outputs).
+> >>>
+> >>> One cannot use the macro used by the MFP API
+> internally
+> >> - MFP_CFG_OUT() - to
+> >>> define new GPIO output values, since that macro
+> is
+> >> forbidden in platform code.
+> >>>
+> >>> Without the ability to add GPIO outputs to the
+> MFP
+> >> configuration, it is not
+> >>> possible to drive GPIO outputs high during
+> sleep mode.
+> >>>
+> >>> This would be useful, for example, on the
+> hx4700
+> >> platform, where driving the
+> >>> infrared powerdown GPIO 105 high during sleep
+> mode
+> >> would save some mA.
+> >>>
+> >>> So my question is: what method should one use
+> to add
+> >> GPIO outputs to the MFP
+> >>> configuration?
+> >>>
+> >>> One possible method, namely manually defining
+> values in
+> >> the platform code:
+> >>>
+> >>>? ???MFP_PIN_GPIO105 |
+> MFP_AF0 |
+> >> MFP_DIR_OUT | MFP_LPM_DRIVE_HIGH,
+> >>
+> >> Have you tried:
+> >> GPIO105_GPIO | MFP_LPM_DRIVE_HIGH,
+> >> ?
+> >>
+> >> This way it works on other boards.
+> > 
+> > Hello Igor,
+> > 
+> > GPIO105_GPIO expands to a GPIO input -
+> MFP_CFG_IN(GPIO105, AF0) -
+> > not an output.
 > 
-> No progress so far. I would suggest we apply the patch below to unify
-> the bindings we have. I tried to minimize the impact by picking the most
-> common version for each property, but if we know about devices that would
-> get broken by this, we may have to be more careful.
+> Yeah, I know... but read in mfp-pxa2xx.h, lines 6-20:
+> /*
+>  * the following MFP_xxx bit definitions in mfp.h are
+> re-used for pxa2xx:
+>  *
+>  *? MFP_PIN(x)
+>  *? MFP_AFx
+>  *? MFP_LPM_DRIVE_{LOW, HIGH}
+>  *? MFP_LPM_EDGE_x
+>  *
+>  * other MFP_x bit definitions will be ignored
+>  *
+>  * and adds the below two bits specifically for pxa2xx:
+>  *
+>  * bit? ???23 - Input/Output (PXA2xx
+> specific)
+>  * bit? ???24 - Wakeup Enable(PXA2xx
+> specific)
+>  */
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-> @@ -0,0 +1,25 @@
-> +These properties are common to multiple MMC host controllers. Any host
-> +that requires the respective functionality should implement them using
-> +these definitions.
-> +
-> +Required properties:
-> +- bus-width: Number of data lines, can be <1>, <4>, or <8>
+> This means, that there is no difference between: MFP_CFG_IN
+> and MFP_CFG_OUT for PXA2xx.
 
-That property looks very reasonable.
+The mfp-pxa2xx.c code says otherwise. It uses the MFP direction bit
+to set the GPDR registers on entering sleep mode:
 
-Question: This would be a non-backwards-compatible change to the binding
-definition. How should this be handled? In the past, I believe it's been
-stated that new kernels need to run against old device trees, and hence
-once a DT binding was defined and in use, it couldn't change except in a
-backwards-compatible way. However, more recently, Grant has said that
-his opinion is that (some or all?) bindings are currently considered
-experimental and subject to change. And besides, the .dts files are
-contained in the kernel tree at present... Some generally stated and
-agreed upon policy here might be useful.
+   353	static int pxa2xx_mfp_suspend(void)
+   354	{
+   355		int i;
+        ...
+   368		for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++) {
+   369	
+        ...
+   375			GPDR(i * 32) = gpdr_lpm[i];
+   376		}
+   377		return 0;
+   378	}
 
-> +Optional properties:
-> +- cd-gpios : Specify GPIOs for card detection, see gpio binding
-> +- wp-gpios : Specify GPIOs for write protection, see gpio binding
+gpdr_lpm[] is initialized@startup to the current GPDR values, and
+thereafter is updated by the value of the MFP_DIR_OUT bit in calls to
+__mfp_config_gpio().
 
-> +- cd-inverted: when present, polarity on the wp gpio line is inverted
-> +- wp-inverted: when present, polarity on the wp gpio line is inverted
+> The reason for this is that PXA2xx h/w does not have a
+> dedicated MFP registers.
+> All goes through the GPIO controller, so the whole MFP for
+> PXA2xx is only to conform
+> to newer "PXA" platform features...
 
-I'm not sure about those two: Some of the GPIO bindings have flags in
-the GPIO specifier (Tegra, ARM PL061, gpio.txt mentions the possibility
-of polarity being in the specifier), and bit 0 of the flags is used to
-indicate inversion. I think that either we should rely on GPIO
-specifiers having such flags and remove these xxx-inverted properties
-from the MMC binding, or remove that flag bit from the GPIO bindings.
-
-Note that anything using of_gpio_simple_xlate() is going to end up using
-the GPIO flag definitions from <linux/of_gpio.h> in their GPIO
-specifier, and there a number of active users of this feature; grep for
-OF_GPIO_ACTIVE_LOW.
-
-The rather begs the question why of_get_named_gpio() exists; surely
-of_get_named_gpio_flags() should always be used so that consumers know
-whether the GPIO value should be inverted, or are the GPIO flags
-supposed to be processed by the OF/GPIO core or GPIO driver somehow, and
-act transparently to GPIO consumers?
-
-> diff --git a/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
-...
-> -- interrupts : Should contain SD/MMC interrupt
-> +- interrupt  : Should contain SD/MMC interrupt
-
-Isn't that usually pluralized, so interrupts?
-
-> +- bus-width : Number of data lines, can be <1>, <4>, or <8>
-
-For the device-specific binding documentation, rather than repeating the
-core bindings, shouldn't we say something like:
-
-This binding is based on the core MMC bindings documented in mmc.txt.
-This file only documents additions or changes to those bindings.
-
-... and then remove any of the common properties from the individual files?
-
-> diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
-...
-> @@ -66,5 +67,6 @@
->  
->  	sdhci at 78000400 {
->  		support-8bit;
-> +		bus-width = <8>;
->  	};
->  };
-
-Ah OK, so the first phase is to add all the new standardize properties,
-then later remove all the legacy properties once the drivers have been
-updated.
-
-You've missed additions of "non-removable", but I can add them later. or
-provide you an incremental patch or something.
-
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-
-This doesn't seem to decode cd-inverted, or do anything with the
-bus-width property value that it reads. Was that intentional?
+Regards,
+Paul
