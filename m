@@ -1,61 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 30 Mar 2012 16:51:06 +0800
-Subject: [PATCH v3 1/1] ARM: imx28: add basic dt support
-In-Reply-To: <1333089130-24832-1-git-send-email-b29396@freescale.com>
-References: <1333089130-24832-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120330085103.GF3254@S2101-09.ap.freescale.net>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Fri, 30 Mar 2012 17:56:01 +0900
+Subject: [PATCH v6 1/5] Extcon (external connector): import Android's
+ switch class and modify.
+In-Reply-To: <CACSP8ShU5tu=9N53PtYMLyFVFMS9whNRhMvu7nu8rBoPuVCy+Q@mail.gmail.com>
+References: <1328856038-21912-1-git-send-email-myungjoo.ham@samsung.com>
+ <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
+ <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
+ <20120309124119.GV3273@opensource.wolfsonmicro.com>
+ <CACSP8ShU5tu=9N53PtYMLyFVFMS9whNRhMvu7nu8rBoPuVCy+Q@mail.gmail.com>
+Message-ID: <CAJ0PZbT728rhQ5esf0arRw-TtgBGMCgAvZhW9-AejmbT9WOahw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I tried to apply the patch, but ...
+On Fri, Mar 30, 2012 at 7:27 AM, Erik Gilling <konkers@google.com> wrote:
+> On Fri, Mar 9, 2012 at 4:41 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+>> On Mon, Feb 27, 2012 at 09:15:35PM +0900, MyungJoo Ham wrote:
+>>
+>>> +#ifdef CONFIG_ANDROID
+>>> + ? ? ? ? ? ? extcon_class = class_create(THIS_MODULE, "switch");
+>>> +#else /* !CONFIG_ANDROID */
+>>> + ? ? ? ? ? ? extcon_class = class_create(THIS_MODULE, "extcon");
+>>> +#endif /* CONFIG_ANDROID */
+>>
+>> This seems somewhat sad - if ANDROID is turned on the standard ABI
+>> vanishes. ?It'd be much nicer to do this with a symlink (or with
+>> symlinks within the android directory if the driver core doesn't support
+>> that). ?That way userspace code can be written to the new ABI and will
+>> work on Android systems without ifdefery.
+>
+> This won't work if userspace code is receiving uevents through netlink
+> and comparing based on the device name which it does in android. ?Why
+> change the name at all? ?Extcon is much more specific than "switch."
+> A switch can can be used for more than just external connections such
+> as availability of HMDI audio (which is only available once a HDMI
+> mode is chosen and the interface is enabled.)
+>
+> -Erik
 
-On Fri, Mar 30, 2012 at 02:32:10PM +0800, Dong Aisheng wrote:
-...
-> +static int __init mxs_icoll_add_irq_domain(struct device_node *np,
-> +				struct device_node *interrupt_parent)
-> +{
-> +	irq_domain_add_simple(np, 0);
+With class_compat as in patchset v7, (this thread is w/ v6) does the
+issue (missing link from device name directory) still exist? (I don't
+think so)
 
-The irq_domain_add_simple() has been removed from mainline.  You need
-a rebase against Linus' tree.
+In the earlier iteration of dicussion, the name "switch" was dropped
+as "switch" may mislead the concept.
+https://lkml.org/lkml/2011/11/29/299
 
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id mxs_irq_match[] __initconst = {
-> +	{ .compatible = "fsl,mxs-icoll", .data = mxs_icoll_add_irq_domain, },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static void __init mxs_dt_init_irq(void)
-> +{
-> +	icoll_init_irq();
-> +	of_irq_init(mxs_irq_match);
-> +}
-> +
-> +static void __init imx28_timer_init(void)
-> +{
-> +	mx28_clocks_init();
-> +}
-> +
-> +static struct sys_timer imx28_timer = {
-> +	.init = imx28_timer_init,
-> +};
-> +
-> +static void __init mxs_machine_init(void)
-> +{
-> +       of_platform_populate(NULL, of_default_bus_match_table,
+For HDMI and HDMI-audio, although HDMI-audio is not physically
+seperated from HDMI-cable and it is available after HDMI-cable is
+"attached", HDMI-audio is still an external connection to the kernel
+and its device drivers, isn' it?
 
-Given by checkpatch:
-
-WARNING: please, no spaces at the start of a line
-#565: FILE: arch/arm/mach-mxs/mach-mxs.c:51:
-+       of_platform_populate(NULL, of_default_bus_match_table,$
-
-> +				NULL, NULL);
-> +}
-
+Cheers!
+MyungJoo.
 -- 
-Regards,
-Shawn
+MyungJoo Ham, Ph.D.
+System S/W Lab, S/W Center, Samsung Electronics
