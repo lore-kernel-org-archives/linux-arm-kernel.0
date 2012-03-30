@@ -1,58 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 30 Mar 2012 19:24:19 -0400
-Subject: Support for Iomega iConnect
-In-Reply-To: <201203302330.49834.linux@baker-net.org.uk>
-References: <201203302330.49834.linux@baker-net.org.uk>
-Message-ID: <20120330232419.GF7274@titan.lakedaemon.net>
+From: oskar.andero@gmail.com (Oskar Andero)
+Date: Sat, 31 Mar 2012 01:37:37 +0200
+Subject: [PATCH] ARM: versatile: fix broken build in pci.c
+Message-ID: <1333150657-6534-1-git-send-email-oskar.andero@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 11:30:49PM +0100, Adam Baker wrote:
-> Hi,
+An undefined reference to sys was introduced by 9f786d03.
 
-Hi Adam,
+Signed-off-by: Oskar Andero <oskar.andero@gmail.com>
+---
+ arch/arm/mach-versatile/pci.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-> Is anyone aware of any technical reason why support for the Iomega iConnect is 
-> not included in the mainline kernel (e.g. there are significant changes 
-> happening in the area of the Kirkwood CPUs that mean now isn't a good time to 
-> include it).
-
-No one ushered it in.  Patches are always welcome.
-
-> There are several versions floating around the internet but as far 
-> as I can see the only mention of the iConnect on this list is Russell saying 
-> he will remove it from mach types soon as there is no mainline support for it.
-
-mach-type is no longer needed, once conversion to devicetree is done.
-Converting you patches to devicetree should be pretty easy.  See my
-recommendation, below.
-
-> Based upon work that Iomega posted to the open source code area on their web 
-> site and code that was submitted to OpenWRT with a sign off line from Wojciech 
-> Dubowik, I have patched support into the 3.2.11 kernel. If there is no 
-> objection in principle to inclusion then I will rebase the patch and submit 
-> it.
-
-Please base off of v3.3 and merge in the following branch:
-
-git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt_for_3.4_v3
-
-This has been merged into Linus' tree, but it's after v3.3.
-
-You can also look at the history in this branch to see how support for
-dreamplug (also kirkwood SoC) was added.  Converting drivers to
-devicetree is still a work in progress, so, just match what dreamplug is
-doing.
-
-Post the resulting patches to the ml, and I'll queue it up with the others
-(after sufficient review, of course).
-
-> Is Linus' git repository still the preferred baseline for linux-arm patches?
-
-Yes, always base off of a tag as I mentioned above.
-
-Just shout if you have any questions.
-
-hth,
-
-Jason.
+diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
+index a6e23f4..e4447dd 100644
+--- a/arch/arm/mach-versatile/pci.c
++++ b/arch/arm/mach-versatile/pci.c
+@@ -190,8 +190,9 @@ static struct resource pre_mem = {
+ 	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
+ };
+ 
+-static int __init pci_versatile_setup_resources(struct list_head *resources)
++static int __init pci_versatile_setup_resources(struct pci_sys_data *sys)
+ {
++	struct list_head *resources = &sys->resources;
+ 	int ret = 0;
+ 
+ 	ret = request_resource(&iomem_resource, &io_mem);
+@@ -249,7 +250,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
+ 
+ 	if (nr == 0) {
+ 		sys->mem_offset = 0;
+-		ret = pci_versatile_setup_resources(&sys->resources);
++		ret = pci_versatile_setup_resources(sys);
+ 		if (ret < 0) {
+ 			printk("pci_versatile_setup: resources... oops?\n");
+ 			goto out;
+-- 
+1.7.3.4
