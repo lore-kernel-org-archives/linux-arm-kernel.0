@@ -1,59 +1,39 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 30 Mar 2012 09:06:37 +0800
-Subject: [GIT PULL] pull request from arch-pxa git on fixes branch
-In-Reply-To: <CAOesGMgxq-HEeKSPvaW-kTLqNyDJUUmG0OEpockMBNninQL0wQ@mail.gmail.com>
-References: <CAN1soZytJ-CxepQAZn5oZ06=ezTQ85O-iC7tUDOeWqi=zpuf8A@mail.gmail.com>
- <4F732D14.3020803@compulab.co.il>
- <CAOesGMgxq-HEeKSPvaW-kTLqNyDJUUmG0OEpockMBNninQL0wQ@mail.gmail.com>
-Message-ID: <CAN1soZzqxy=wsPVEXY8BxTK24szq7x5Oxk2JjuUJ6di7ij8hWA@mail.gmail.com>
+Date: Fri, 30 Mar 2012 09:33:30 +0800
+Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
+In-Reply-To: <1332958336.11131.YahooMailClassic@web29001.mail.ird.yahoo.com>
+References: <1332958336.11131.YahooMailClassic@web29001.mail.ird.yahoo.com>
+Message-ID: <CAN1soZwzBqDGTX+a-maVr5baaoZ7qwgdvXyPeya5R80cN_iA0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 1:12 AM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
+On Thu, Mar 29, 2012 at 2:12 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> On PXA2xx platforms, the MFP API (described in Documentation/arm/pxa/mfp.txt)
+> provides values for the following:
 >
-> On Wed, Mar 28, 2012 at 8:24 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> 1. GPIO inputs (e.g. GPIO105_GPIO).
+> 2. Alternate function inputs (e.g. GPIO105_CIF_DD_1).
+> 3. Alternate function outputs (e.g. GPIO105_KP_MKOUT_2).
 >
->> Can Paul's patch [1] be included in this or later request?
->>
->> Thanks.
->>
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/091750.html
+> It does not provide values for GPIO outputs (i.e. AF0 outputs).
 >
-> Yes, Haojian, please add that to the branch (with the proposed fixups)
-> as well so we can pick it up and send it in ASAP. Both are broken
-> today in Russell's PXA defconfig.
+> One cannot use the macro used by the MFP API internally - MFP_CFG_OUT() - to
+> define new GPIO output values, since that macro is forbidden in platform code.
 >
-> There is one more failure as well, that I haven't seen a patch posted for:
+> Without the ability to add GPIO outputs to the MFP configuration, it is not
+> possible to drive GPIO outputs high during sleep mode.
 >
-> arch/arm/mach-pxa/cm-x300.c:716:3: error: unknown field 'dev'
-> specified in initializer
+> This would be useful, for example, on the hx4700 platform, where driving the
+> infrared powerdown GPIO 105 high during sleep mode would save some mA.
 >
+> So my question is: what method should one use to add GPIO outputs to the MFP
+> configuration?
 >
+> One possible method, namely manually defining values in the platform code:
 >
-> -Olof
+> ? ? ? ?MFP_PIN_GPIO105 | MFP_AF0 | MFP_DIR_OUT | MFP_LPM_DRIVE_HIGH,
+>
+> is essentially no different from using the forbidden MFP_CFG_OUT() macro.
+>
 
-Now these build issues are fixed. Could you help to pull these fixes
-from arch-pxa git?
-
-The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
-
-  Linux 3.3 (2012-03-18 16:15:34 -0700)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git fixes
-
-Haojian Zhuang (2):
-      ARM: pxa: fix build issue on cm-x300
-      ARM: pxa: fix build issue on stargate2
-
-Paul Gortmaker (2):
-      ARM: pxa: fix regulator related build fail in magician_defconfig
-      ARM: pxa: fix build failure for regulator consumer in em-x270.c
-
- arch/arm/mach-pxa/cm-x300.c   |    1 -
- arch/arm/mach-pxa/em-x270.c   |   10 +++++-----
- arch/arm/mach-pxa/hx4700.c    |    2 --
- arch/arm/mach-pxa/magician.c  |    2 --
- arch/arm/mach-pxa/stargate2.c |    2 +-
- 5 files changed, 6 insertions(+), 11 deletions(-)
+Does MFP_CFG_OUT() help you? This macro is defined in mfp-pxa2xx.h.
