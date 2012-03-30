@@ -1,41 +1,29 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Thu, 29 Mar 2012 19:24:21 -0700
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <01b301cd0d81$f935d750$eba185f0$%szyprowski@samsung.com>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
- <20120329101927.8ab6b1993475b7e16ae2258f@nvidia.com>
- <01b301cd0d81$f935d750$eba185f0$%szyprowski@samsung.com>
-Message-ID: <401E54CE964CD94BAE1EB4A729C7087E37978A1E66@HQMAIL04.nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Mar 2012 21:01:24 -0700
+Subject: [GIT PULL] pull request from arch-pxa git on fixes branch
+In-Reply-To: <CAN1soZzqxy=wsPVEXY8BxTK24szq7x5Oxk2JjuUJ6di7ij8hWA@mail.gmail.com>
+References: <CAN1soZytJ-CxepQAZn5oZ06=ezTQ85O-iC7tUDOeWqi=zpuf8A@mail.gmail.com>
+ <4F732D14.3020803@compulab.co.il>
+ <CAOesGMgxq-HEeKSPvaW-kTLqNyDJUUmG0OEpockMBNninQL0wQ@mail.gmail.com>
+ <CAN1soZzqxy=wsPVEXY8BxTK24szq7x5Oxk2JjuUJ6di7ij8hWA@mail.gmail.com>
+Message-ID: <CAOesGMg+1WjWRJsL4dE3dFanRk61piqH3WcXcz-B=KTvJpaB0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I have found a bug in arm_iommu_map_sg(). 
+On Thu, Mar 29, 2012 at 6:06 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
 
-> +int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
-> +		     enum dma_data_direction dir, struct dma_attrs *attrs) {
-> +	struct scatterlist *s = sg, *dma = sg, *start = sg;
-> +	int i, count = 0;
-> +	unsigned int offset = s->offset;
-> +	unsigned int size = s->offset + s->length;
-> +	unsigned int max = dma_get_max_seg_size(dev);
-> +
-> +	for (i = 1; i < nents; i++) {
-> +		s->dma_address = ARM_DMA_ERROR;
-> +		s->dma_length = 0;
-> +
-> +		s = sg_next(s);
+> Now these build issues are fixed. Could you help to pull these fixes
+> from arch-pxa git?
+>
+> The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
+>
+> ?Linux 3.3 (2012-03-18 16:15:34 -0700)
+>
+> are available in the git repository at:
+> ?git://github.com/hzhuang1/linux.git fixes
 
-With above code, the last sg element's dma_length is not getting set to zero.
-This causing additional incorrect  unmapping during arm_iommu_unmap_sg call and 
-leading to random crashes.
-The order of above three lines should be as follows.
-		s = sg_next(s);
-
-		s->dma_address = ARM_DMA_ERROR;
-		s->dma_length = 0;
+Pulled, thanks!
 
 
--KR
---nvpublic
+-Olof
