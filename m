@@ -1,58 +1,392 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Fri, 30 Mar 2012 17:56:01 +0900
-Subject: [PATCH v6 1/5] Extcon (external connector): import Android's
- switch class and modify.
-In-Reply-To: <CACSP8ShU5tu=9N53PtYMLyFVFMS9whNRhMvu7nu8rBoPuVCy+Q@mail.gmail.com>
-References: <1328856038-21912-1-git-send-email-myungjoo.ham@samsung.com>
- <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
- <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
- <20120309124119.GV3273@opensource.wolfsonmicro.com>
- <CACSP8ShU5tu=9N53PtYMLyFVFMS9whNRhMvu7nu8rBoPuVCy+Q@mail.gmail.com>
-Message-ID: <CAJ0PZbT728rhQ5esf0arRw-TtgBGMCgAvZhW9-AejmbT9WOahw@mail.gmail.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Fri, 30 Mar 2012 10:56:56 +0200
+Subject: [PATCH] ARM: at91: add support for Telit GE863-PRO3 Evaluation Kit
+Message-ID: <1333097816-8641-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 7:27 AM, Erik Gilling <konkers@google.com> wrote:
-> On Fri, Mar 9, 2012 at 4:41 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Mon, Feb 27, 2012 at 09:15:35PM +0900, MyungJoo Ham wrote:
->>
->>> +#ifdef CONFIG_ANDROID
->>> + ? ? ? ? ? ? extcon_class = class_create(THIS_MODULE, "switch");
->>> +#else /* !CONFIG_ANDROID */
->>> + ? ? ? ? ? ? extcon_class = class_create(THIS_MODULE, "extcon");
->>> +#endif /* CONFIG_ANDROID */
->>
->> This seems somewhat sad - if ANDROID is turned on the standard ABI
->> vanishes. ?It'd be much nicer to do this with a symlink (or with
->> symlinks within the android directory if the driver core doesn't support
->> that). ?That way userspace code can be written to the new ABI and will
->> work on Android systems without ifdefery.
->
-> This won't work if userspace code is receiving uevents through netlink
-> and comparing based on the device name which it does in android. ?Why
-> change the name at all? ?Extcon is much more specific than "switch."
-> A switch can can be used for more than just external connections such
-> as availability of HMDI audio (which is only available once a HDMI
-> mode is chosen and the interface is enabled.)
->
-> -Erik
+Based on board-sam9260ek.c.
 
-With class_compat as in patchset v7, (this thread is w/ v6) does the
-issue (missing link from device name directory) still exist? (I don't
-think so)
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+---
+ arch/arm/mach-at91/Kconfig            |    6 +
+ arch/arm/mach-at91/Makefile           |    1 +
+ arch/arm/mach-at91/board-ge863-pro3.c |  338 +++++++++++++++++++++++++++++++++
+ 3 files changed, 345 insertions(+)
+ create mode 100644 arch/arm/mach-at91/board-ge863-pro3.c
 
-In the earlier iteration of dicussion, the name "switch" was dropped
-as "switch" may mislead the concept.
-https://lkml.org/lkml/2011/11/29/299
-
-For HDMI and HDMI-audio, although HDMI-audio is not physically
-seperated from HDMI-cable and it is available after HDMI-cable is
-"attached", HDMI-audio is still an external connection to the kernel
-and its device drivers, isn' it?
-
-Cheers!
-MyungJoo.
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 45db05d..4197a2a 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -272,6 +272,12 @@ config MACH_FLEXIBITY
+ 	  Select this if you are using Flexibity Connect board
+ 	  <http://www.flexibity.com>
+ 
++config MACH_GE863_PRO3_EVK
++       bool "Telit GE863-PRO3 Evaluation Kit"
++       help
++         Select this if you are using Telit GE863-PRO3 Evaluation Kit
++	 <http://www.telit.com>
++
+ endif
+ 
+ # ----------------------------------------------------------
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 8512e53..5ca096d 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -49,6 +49,7 @@ obj-$(CONFIG_MACH_QIL_A9260)	+= board-qil-a9260.o
+ obj-$(CONFIG_MACH_AFEB9260)	+= board-afeb-9260v1.o
+ obj-$(CONFIG_MACH_CPU9260)	+= board-cpu9krea.o
+ obj-$(CONFIG_MACH_FLEXIBITY)	+= board-flexibity.o
++obj-$(CONFIG_MACH_GE863_PRO3_EVK) += board-ge863-pro3.o
+ 
+ # AT91SAM9261 board-specific support
+ obj-$(CONFIG_MACH_AT91SAM9261EK) += board-sam9261ek.o
+diff --git a/arch/arm/mach-at91/board-ge863-pro3.c b/arch/arm/mach-at91/board-ge863-pro3.c
+new file mode 100644
+index 0000000..2855cc0
+--- /dev/null
++++ b/arch/arm/mach-at91/board-ge863-pro3.c
+@@ -0,0 +1,338 @@
++/*
++ * linux/arch/arm/mach-at91/board-ge863-pro3-evk.c
++ *
++ *  Copyright (C) 2012 Telit
++ *
++ * linux/arch/arm/mach-at91/board-sam9260ek.c
++ *
++ *  Copyright (C) 2005 SAN People
++ *  Copyright (C) 2006 Atmel
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/types.h>
++#include <linux/gpio.h>
++#include <linux/init.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/at73c213.h>
++#include <linux/clk.h>
++#include <linux/i2c/at24.h>
++#include <linux/gpio_keys.h>
++#include <linux/input.h>
++
++#include <asm/setup.h>
++#include <asm/mach-types.h>
++#include <asm/irq.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/irq.h>
++
++#include <mach/hardware.h>
++#include <mach/board.h>
++#include <mach/at91sam9_smc.h>
++#include <mach/at91_shdwc.h>
++#include <mach/system_rev.h>
++
++#include "sam9_smc.h"
++#include "generic.h"
++
++
++static void __init ek_init_early(void)
++{
++	/* Initialize processor: 6.000 MHz crystal */
++	at91_initialize(6000000);
++
++	/* DBGU on ttyS0. (Rx & Tx only) */
++	at91_register_uart(0, 0, 0);
++
++	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
++	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS
++			   | ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR
++			   | ATMEL_UART_DCD | ATMEL_UART_RI);
++
++	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
++	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS
++			   | ATMEL_UART_RTS);
++
++	/* set serial console to ttyS0 (ie, DBGU) */
++	at91_set_serial_console(0);
++}
++
++/* USB Host port */
++static struct at91_usbh_data __initdata ek_usbh_data = {
++	.ports		 = 2,
++	.vbus_pin	 = {-EINVAL, -EINVAL},
++	.overcurrent_pin = {-EINVAL, -EINVAL},
++};
++
++/* USB Device port */
++static struct at91_udc_data __initdata ek_udc_data = {
++	.vbus_pin	= AT91_PIN_PC5,
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
++};
++
++
++/* Audio */
++static struct at73c213_board_info at73c213_data = {
++	.ssc_id		= 0,
++	.shortname	= "AT91SAM9260-EK external DAC",
++};
++
++#if defined(CONFIG_SND_AT73C213) || defined(CONFIG_SND_AT73C213_MODULE)
++static void __init at73c213_set_clk(struct at73c213_board_info *info)
++{
++	struct clk *pck0;
++	struct clk *plla;
++
++	pck0 = clk_get(NULL, "pck0");
++	plla = clk_get(NULL, "plla");
++
++	/* AT73C213 MCK Clock */
++	at91_set_B_periph(AT91_PIN_PC1, 0);	/* PCK0 */
++
++	clk_set_parent(pck0, plla);
++	clk_put(plla);
++
++	info->dac_clk = pck0;
++}
++#else
++static void __init at73c213_set_clk(struct at73c213_board_info *info) {}
++#endif
++
++/* SPI devices. */
++static struct spi_board_info ek_spi_devices[] = {
++#if !defined(CONFIG_MMC_AT91)
++	{	/* DataFlash chip */
++		.modalias	= "mtd_dataflash",
++		.chip_select	= 1,
++		.max_speed_hz	= 15 * 1000 * 1000,
++		.bus_num	= 0,
++	},
++#if defined(CONFIG_MTD_AT91_DATAFLASH_CARD)
++	{	/* DataFlash card */
++		.modalias	= "mtd_dataflash",
++		.chip_select	= 0,
++		.max_speed_hz	= 15 * 1000 * 1000,
++		.bus_num	= 0,
++	},
++#endif
++#endif
++#if defined(CONFIG_SND_AT73C213) || defined(CONFIG_SND_AT73C213_MODULE)
++	{	/* AT73C213 DAC */
++		.modalias	= "at73c213",
++		.chip_select	= 0,
++		.max_speed_hz	= 10 * 1000 * 1000,
++		.bus_num	= 1,
++		.mode		= SPI_MODE_1,
++		.platform_data	= &at73c213_data,
++	},
++#endif
++};
++
++
++/* MACB Ethernet device */
++static struct macb_platform_data __initdata ek_macb_data = {
++	.phy_irq_pin	= AT91_PIN_PA7,
++	.is_rmii	= 1,
++};
++
++
++/* NAND flash */
++static struct mtd_partition __initdata ek_nand_partition[] = {
++	{
++		.name	= "Partition 1",
++		.offset	= 0,
++		.size	= SZ_256K,
++	},
++	{
++		.name	= "Partition 2",
++		.offset	= MTDPART_OFS_NXTBLK,
++		.size	= MTDPART_SIZ_FULL,
++	},
++};
++
++static struct atmel_nand_data __initdata ek_nand_data = {
++	.ale		= 21,
++	.cle		= 22,
++	.det_pin	= -EINVAL,
++	.rdy_pin	= AT91_PIN_PC13,
++	.enable_pin	= AT91_PIN_PC14,
++	.parts		= ek_nand_partition,
++	.num_parts	= ARRAY_SIZE(ek_nand_partition),
++};
++
++static struct sam9_smc_config __initdata ek_nand_smc_config = {
++	.ncs_read_setup		= 0,
++	.nrd_setup		= 1,
++	.ncs_write_setup	= 0,
++	.nwe_setup		= 1,
++
++	.ncs_read_pulse		= 3,
++	.nrd_pulse		= 3,
++	.ncs_write_pulse	= 3,
++	.nwe_pulse		= 3,
++
++	.read_cycle		= 5,
++	.write_cycle		= 5,
++
++	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE
++				  | AT91_SMC_EXNWMODE_DISABLE,
++	.tdf_cycles		= 2,
++};
++
++static void __init ek_add_device_nand(void)
++{
++	ek_nand_data.bus_width_16 = board_have_nand_16bit();
++	/* setup bus-width (8 or 16) */
++	if (ek_nand_data.bus_width_16)
++		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
++	else
++		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
++
++	/* configure chip-select 3 (NAND) */
++	sam9_smc_configure(0, 3, &ek_nand_smc_config);
++
++	at91_add_device_nand(&ek_nand_data);
++}
++
++
++/* MCI (SD/MMC) */
++static struct at91_mmc_data __initdata ek_mmc_data = {
++	.slot_b		= 1,
++	.wire4		= 1,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
++};
++
++
++/* LEDs */
++static struct gpio_led ek_leds[] = {
++	{	/* "bottom" led, green, userled1 to be defined */
++		.name			= "ds5",
++		.gpio			= AT91_PIN_PA6,
++		.active_low		= 1,
++		.default_trigger	= "none",
++	},
++	{	/* "power" led, yellow */
++		.name			= "ds1",
++		.gpio			= AT91_PIN_PA9,
++		.default_trigger	= "heartbeat",
++	}
++};
++
++/* I2C devices */
++static struct at24_platform_data at24c512 = {
++	.byte_len	= SZ_512K / 8,
++	.page_size	= 128,
++	.flags		= AT24_FLAG_ADDR16,
++};
++
++static struct i2c_board_info __initdata ek_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO("24c512", 0x50),
++		.platform_data = &at24c512,
++	},
++	/* more devices can be added using expansion connectors */
++};
++
++
++/* GPIO Buttons */
++#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
++static struct gpio_keys_button ek_buttons[] = {
++	{
++		.gpio		= AT91_PIN_PA30,
++		.code		= BTN_3,
++		.desc		= "Button 3",
++		.active_low	= 1,
++		.wakeup		= 1,
++	},
++	{
++		.gpio		= AT91_PIN_PA31,
++		.code		= BTN_4,
++		.desc		= "Button 4",
++		.active_low	= 1,
++		.wakeup		= 1,
++	}
++};
++
++static struct gpio_keys_platform_data ek_button_data = {
++	.buttons	= ek_buttons,
++	.nbuttons	= ARRAY_SIZE(ek_buttons),
++};
++
++static struct platform_device ek_button_device = {
++	.name		= "gpio-keys",
++	.id		= -1,
++	.num_resources	= 0,
++	.dev		= {
++		.platform_data	= &ek_button_data,
++	}
++};
++
++static void __init ek_add_device_buttons(void)
++{
++	at91_set_gpio_input(AT91_PIN_PA30, 1);	/* btn3 */
++	at91_set_deglitch(AT91_PIN_PA30, 1);
++	at91_set_gpio_input(AT91_PIN_PA31, 1);	/* btn4 */
++	at91_set_deglitch(AT91_PIN_PA31, 1);
++
++	platform_device_register(&ek_button_device);
++}
++#else
++static void __init ek_add_device_buttons(void) {}
++#endif
++
++
++static void __init ek_board_init(void)
++{
++	/* Serial */
++	at91_add_device_serial();
++	/* USB Host */
++	at91_add_device_usbh(&ek_usbh_data);
++	/* USB Device */
++	at91_add_device_udc(&ek_udc_data);
++	/* SPI */
++	at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
++	/* NAND */
++	ek_add_device_nand();
++	/* Ethernet */
++	at91_add_device_eth(&ek_macb_data);
++	/* MMC */
++	at91_add_device_mmc(0, &ek_mmc_data);
++	/* I2C */
++	at91_add_device_i2c(ek_i2c_devices, ARRAY_SIZE(ek_i2c_devices));
++	/* SSC (to AT73C213) */
++	at73c213_set_clk(&at73c213_data);
++	at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX);
++	/* LEDs */
++	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
++	/* Push Buttons */
++	ek_add_device_buttons();
++}
++
++MACHINE_START(GE863, "Telit GE863-PRO3 Evaluation Kit")
++	/* Maintainer: Telit */
++	.timer		= &at91sam926x_timer,
++	.map_io		= at91_map_io,
++	.init_early	= ek_init_early,
++	.init_irq	= at91_init_irq_default,
++	.init_machine	= ek_board_init,
++MACHINE_END
 -- 
-MyungJoo Ham, Ph.D.
-System S/W Lab, S/W Center, Samsung Electronics
+1.7.9.4
