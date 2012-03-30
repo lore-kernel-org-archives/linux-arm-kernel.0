@@ -1,71 +1,104 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 30 Mar 2012 16:59:53 -0600
-Subject: [PATCH 00/11] ARM: tegra: GPIO and pinmux-related changes
-Message-ID: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 30 Mar 2012 16:59:54 -0600
+Subject: [PATCH 01/11] usb: ehci-tegra: Add vbus_gpio to platform data
+In-Reply-To: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
+References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1333148404-17691-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-This series:
-* Updates the Tegra GPIO driver to interact with pinctrl per the recent
-  gpio.txt documentation changes. Consequently, there's no need for
-  tegra_gpio_enable() any more, and no need for board-pinmux.c to do
-  anything GPIO-related.
-* Switches to the new Tegra pinctrl driver, and deletes the old one.
-* Moves pinctrl configuration to the device tree when booted using DT, so
-  that board-dt-tegra*.c no longer depend on anything in board*.[ch].
+Add a vbus_gpio field to platform data. This mirrors the device tree
+property nvidia,vbus-gpio. This makes the VBUS GPIO handling identical
+between booting with board files and device tree; the driver always does
+it.
 
-Note to self: This series relies upon DT support in pinctrl, which
-should be merged in 3.5.
+This removes the need for board files to request and initialize the GPIO
+early during their boot process, perhaps even before the GPIO driver is
+ready to process the request.
 
-Stephen Warren (11):
-  usb: ehci-tegra: Add vbus_gpio to platform data
-  ARM: tegra: Remove VBUS_GPIO handling from board files
-  gpio: tegra: fix register address calculations for Tegra30
-  gpio: tegra: Iterate over the correct number of banks
-  gpio: tegra: configure pins during irq_set_type
-  ARM: tegra: seaboard: Don't gpio_request() ISL29018_IRQ
-  gpio: tegra: Hide tegra_gpio_enable/disable()
-  ARM: tegra: Switch to new pinctrl driver
-  ARM: tegra: Remove pre-pinctrl pinmux driver
-  ARM: dt: tegra cardhu: add pinmux to device tree
-  ARM: dt: tegra20: add pinmux to device tree
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: linux-usb at vger.kernel.org
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/devices.c           |    3 +++
+ drivers/usb/host/ehci-tegra.c           |   13 +++++++------
+ include/linux/platform_data/tegra_usb.h |    1 +
+ 3 files changed, 11 insertions(+), 6 deletions(-)
 
- arch/arm/boot/dts/tegra-cardhu.dts                |   44 +
- arch/arm/boot/dts/tegra-harmony.dts               |  224 +++++
- arch/arm/boot/dts/tegra-paz00.dts                 |  220 +++++
- arch/arm/boot/dts/tegra-seaboard.dts              |  243 +++++
- arch/arm/boot/dts/tegra-trimslice.dts             |  230 +++++
- arch/arm/boot/dts/tegra-ventana.dts               |  230 +++++
- arch/arm/mach-tegra/Makefile                      |    3 -
- arch/arm/mach-tegra/board-dt-tegra20.c            |   31 -
- arch/arm/mach-tegra/board-harmony-pinmux.c        |  266 +++---
- arch/arm/mach-tegra/board-paz00-pinmux.c          |  263 +++---
- arch/arm/mach-tegra/board-pinmux.c                |  105 +--
- arch/arm/mach-tegra/board-pinmux.h                |   38 +-
- arch/arm/mach-tegra/board-seaboard-pinmux.c       |  346 ++++----
- arch/arm/mach-tegra/board-seaboard.c              |   21 +-
- arch/arm/mach-tegra/board-trimslice-pinmux.c      |  264 +++---
- arch/arm/mach-tegra/board-trimslice.c             |   15 +-
- arch/arm/mach-tegra/devices.c                     |    3 +
- arch/arm/mach-tegra/include/mach/gpio-tegra.h     |    9 -
- arch/arm/mach-tegra/include/mach/pinmux-tegra20.h |  184 ----
- arch/arm/mach-tegra/include/mach/pinmux-tegra30.h |  320 -------
- arch/arm/mach-tegra/include/mach/pinmux.h         |  302 -------
- arch/arm/mach-tegra/pinmux-tegra20-tables.c       |  244 -----
- arch/arm/mach-tegra/pinmux-tegra30-tables.c       |  376 --------
- arch/arm/mach-tegra/pinmux.c                      |  987 ---------------------
- arch/arm/mach-tegra/usb_phy.c                     |    1 -
- drivers/gpio/gpio-tegra.c                         |   98 ++-
- drivers/mmc/host/sdhci-tegra.c                    |   24 +-
- drivers/pinctrl/pinctrl-tegra.c                   |    6 +-
- drivers/usb/host/ehci-tegra.c                     |   13 +-
- include/linux/platform_data/tegra_usb.h           |    1 +
- 30 files changed, 1887 insertions(+), 3224 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/include/mach/pinmux-tegra20.h
- delete mode 100644 arch/arm/mach-tegra/include/mach/pinmux-tegra30.h
- delete mode 100644 arch/arm/mach-tegra/include/mach/pinmux.h
- delete mode 100644 arch/arm/mach-tegra/pinmux-tegra20-tables.c
- delete mode 100644 arch/arm/mach-tegra/pinmux-tegra30-tables.c
- delete mode 100644 arch/arm/mach-tegra/pinmux.c
+diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+index c3b9900..fcd872d 100644
+--- a/arch/arm/mach-tegra/devices.c
++++ b/arch/arm/mach-tegra/devices.c
+@@ -448,17 +448,20 @@ static struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
+ struct tegra_ehci_platform_data tegra_ehci1_pdata = {
+ 	.operating_mode = TEGRA_USB_OTG,
+ 	.power_down_on_bus_suspend = 1,
++	.vbus_gpio = -1,
+ };
+ 
+ struct tegra_ehci_platform_data tegra_ehci2_pdata = {
+ 	.phy_config = &tegra_ehci2_ulpi_phy_config,
+ 	.operating_mode = TEGRA_USB_HOST,
+ 	.power_down_on_bus_suspend = 1,
++	.vbus_gpio = -1,
+ };
+ 
+ struct tegra_ehci_platform_data tegra_ehci3_pdata = {
+ 	.operating_mode = TEGRA_USB_HOST,
+ 	.power_down_on_bus_suspend = 1,
++	.vbus_gpio = -1,
+ };
+ 
+ static u64 tegra_ehci_dmamask = DMA_BIT_MASK(32);
+diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+index 3de48a2..faed4c4 100644
+--- a/drivers/usb/host/ehci-tegra.c
++++ b/drivers/usb/host/ehci-tegra.c
+@@ -579,15 +579,16 @@ static const struct hc_driver tegra_ehci_hc_driver = {
+ 	.port_handed_over	= ehci_port_handed_over,
+ };
+ 
+-static int setup_vbus_gpio(struct platform_device *pdev)
++static int setup_vbus_gpio(struct platform_device *pdev,
++			   struct tegra_ehci_platform_data *pdata)
+ {
+ 	int err = 0;
+ 	int gpio;
+ 
+-	if (!pdev->dev.of_node)
+-		return 0;
+-
+-	gpio = of_get_named_gpio(pdev->dev.of_node, "nvidia,vbus-gpio", 0);
++	gpio = pdata->vbus_gpio;
++	if (!gpio_is_valid(gpio))
++		gpio = of_get_named_gpio(pdev->dev.of_node,
++					 "nvidia,vbus-gpio", 0);
+ 	if (!gpio_is_valid(gpio))
+ 		return 0;
+ 
+@@ -631,7 +632,7 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &tegra_ehci_dma_mask;
+ 
+-	setup_vbus_gpio(pdev);
++	setup_vbus_gpio(pdev, pdata);
+ 
+ 	tegra = kzalloc(sizeof(struct tegra_ehci_hcd), GFP_KERNEL);
+ 	if (!tegra)
+diff --git a/include/linux/platform_data/tegra_usb.h b/include/linux/platform_data/tegra_usb.h
+index 6bca5b5..66c673f 100644
+--- a/include/linux/platform_data/tegra_usb.h
++++ b/include/linux/platform_data/tegra_usb.h
+@@ -26,6 +26,7 @@ struct tegra_ehci_platform_data {
+ 	/* power down the phy on bus suspend */
+ 	int power_down_on_bus_suspend;
+ 	void *phy_config;
++	int vbus_gpio;
+ };
+ 
+ #endif /* _TEGRA_USB_H_ */
+-- 
+1.7.0.4
