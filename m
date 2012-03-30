@@ -1,34 +1,35 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 30 Mar 2012 13:55:53 +0800
-Subject: [PATCH] ASoC: fsl: enable ssi clock in probe function
-In-Reply-To: <4F748C8E.1010702@freescale.com>
-References: <1332989621-5211-1-git-send-email-shawn.guo@linaro.org>
- <20120329112949.GM3668@opensource.wolfsonmicro.com>
- <4F748751.3020300@freescale.com>
- <20120329160916.GG19506@S2101-09.ap.freescale.net>
- <4F748C8E.1010702@freescale.com>
-Message-ID: <20120330055543.GH19506@S2101-09.ap.freescale.net>
+Date: Fri, 30 Mar 2012 14:11:36 +0800
+Subject: [PATCH 03/17] ARM: mark const init data with __initconst instead
+ of __initdata
+In-Reply-To: <1333055554-31300-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20120329211131.GA31250@pengutronix.de>
+ <1333055554-31300-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120330061134.GD3254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 11:23:42AM -0500, Timur Tabi wrote:
-> Shawn Guo wrote:
-> > d18b63ab0b04af1bad01e59a96b88fc8cda08752
-> > ASoC: core: Use driver core probe deferral
-> 
-> That fixed it, but the SHA in my repository is
-> 97883ef0a8f61fbd5fb8242980f6998290d1dd95
-> 
-> Anyway, I just want to say that for-3.5 still works on PowerPC.
-> 
-I guess you only meant mpc85xx_defconfig (and mpc85xx_smp_defconfig).
-I sent the patch after compile-testing for mpc85xx_defconfig, and
-took it for granted that mpc8610_hpcd_defconfig will also compile.
-But I just discovered that PPC_CLOCK is not enabled for
-mpc8610_hpcd_defconfig, so it fails on the final link.
+On Thu, Mar 29, 2012 at 11:12:20PM +0200, Uwe Kleine-K?nig wrote:
+...
+> diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
+> index 5cca573..7e00748 100644
+> --- a/arch/arm/mach-imx/imx51-dt.c
+> +++ b/arch/arm/mach-imx/imx51-dt.c
+> @@ -102,7 +102,7 @@ static struct sys_timer imx51_timer = {
+>  	.init = imx51_timer_init,
+>  };
+>  
+> -static const char *imx51_dt_board_compat[] __initdata = {
+> +static const char *imx51_dt_board_compat[] __initconst = {
+>  	"fsl,imx51-babbage",
+>  	"fsl,imx51",
+>  	NULL
 
-I just sent a patch proposing to fix it by always building in PPC_CLOCK
-for FSL_SOC.
+  CC      arch/arm/mach-imx/imx51-dt.o
+arch/arm/mach-imx/imx51-dt.c:105:20: error: imx51_dt_board_compat causes a section type conflict
+make[2]: *** [arch/arm/mach-imx/imx51-dt.o] Error 1
+
+I do not understand why though.
 
 -- 
 Regards,
