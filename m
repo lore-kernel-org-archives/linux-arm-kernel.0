@@ -1,64 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Mar 2012 16:20:25 -0700
-Subject: [GIT PULL] ARM: Two more fixes for merge window fallout
-Message-ID: <CAOesGMjU5tehTf7+nYQv1_7a=+gGN2hVYUdh1g_BF=WRYj0hgg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 30 Mar 2012 19:24:19 -0400
+Subject: Support for Iomega iConnect
+In-Reply-To: <201203302330.49834.linux@baker-net.org.uk>
+References: <201203302330.49834.linux@baker-net.org.uk>
+Message-ID: <20120330232419.GF7274@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Fri, Mar 30, 2012 at 11:30:49PM +0100, Adam Baker wrote:
+> Hi,
 
-Apologies for back-to-back fixes pull requests, but one of the patches
-below are the kind we'll see posted over and over if we don't send it
-in. I hadn't done the full sanity-check of defconfig builds by the
-time I sent up the other fixes yesterday or I would have included it
-then.
+Hi Adam,
 
-After this we're likely to switch to a more regular frequency of
-sending fixes up.
+> Is anyone aware of any technical reason why support for the Iomega iConnect is 
+> not included in the mainline kernel (e.g. there are significant changes 
+> happening in the area of the Kirkwood CPUs that mean now isn't a good time to 
+> include it).
 
+No one ushered it in.  Patches are always welcome.
 
+> There are several versions floating around the internet but as far 
+> as I can see the only mention of the iConnect on this list is Russell saying 
+> he will remove it from mach types soon as there is no mainline support for it.
 
-Thanks,
+mach-type is no longer needed, once conversion to devicetree is done.
+Converting you patches to devicetree should be pretty easy.  See my
+recommendation, below.
 
--Olof
+> Based upon work that Iomega posted to the open source code area on their web 
+> site and code that was submitted to OpenWRT with a sign off line from Wojciech 
+> Dubowik, I have patched support into the 3.2.11 kernel. If there is no 
+> objection in principle to inclusion then I will rebase the patch and submit 
+> it.
 
+Please base off of v3.3 and merge in the following branch:
 
+git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt_for_3.4_v3
 
-The following changes since commit f00e9b11863abdb837e555a2b1e3417e8b5d80dd:
+This has been merged into Linus' tree, but it's after v3.3.
 
-  Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
-(2012-03-29 20:36:18 -0700)
+You can also look at the history in this branch to see how support for
+dreamplug (also kirkwood SoC) was added.  Converting drivers to
+devicetree is still a work in progress, so, just match what dreamplug is
+doing.
 
-are available in the git repository at:
+Post the resulting patches to the ml, and I'll queue it up with the others
+(after sufficient review, of course).
 
+> Is Linus' git repository still the preferred baseline for linux-arm patches?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
+Yes, always base off of a tag as I mentioned above.
 
-for you to fetch changes up to d3c7de52096a201ac188adb95b8351b90cab11f1:
+Just shout if you have any questions.
 
-  ARM: clps711x: fix missing include file (2012-03-30 15:44:48 -0700)
+hth,
 
-----------------------------------------------------------------
-ARM: A few more platform fixes for include file fallout
-
-Two patches, one dealing with the system.h fallout, the other is a missing
-linux/bug.h in a place where ARRAY_SIZE() is used.
-
-----------------------------------------------------------------
-Olof Johansson (2):
-      ARM: fix builds due to missing <asm/system_misc.h> includes
-      ARM: clps711x: fix missing include file
-
- arch/arm/mach-at91/at91x40.c        |    1 +
- arch/arm/mach-at91/setup.c          |    1 +
- arch/arm/mach-clps711x/edb7211-mm.c |    1 +
- arch/arm/mach-h720x/common.c        |    1 +
- arch/arm/mach-imx/mm-imx3.c         |    1 +
- arch/arm/mach-imx/mm-imx5.c         |    1 +
- arch/arm/mach-ixp23xx/core.c        |    1 +
- arch/arm/mach-ixp4xx/common.c       |    1 +
- arch/arm/mach-pxa/raumfeld.c        |    2 ++
- arch/arm/mach-shark/core.c          |    1 +
- arch/arm/mach-w90x900/dev.c         |    1 +
- arch/arm/plat-s3c24xx/cpu.c         |    1 +
- 12 files changed, 13 insertions(+)
+Jason.
