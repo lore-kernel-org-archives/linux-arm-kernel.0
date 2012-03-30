@@ -1,88 +1,113 @@
 From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 30 Mar 2012 06:39:26 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CACVXFVPTsFY7UJMH5jZa16V0KYEZB=o7WRYqVEYyNJw1tMq-yw@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com>	<87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831823816@DBDE01.ent.ti.com>
- <CACVXFVPTsFY7UJMH5jZa16V0KYEZB=o7WRYqVEYyNJw1tMq-yw@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831840C67@DBDE01.ent.ti.com>
+Date: Fri, 30 Mar 2012 07:13:57 +0000
+Subject: [PATCH-V3 0/3] ARM: OMAP2+: Add powerdomain & PRM support for
+ AM33XX device
+In-Reply-To: <87limjl1xf.fsf@ti.com>
+References: <1331809586-24652-1-git-send-email-hvaibhav@ti.com>
+ <87limjl1xf.fsf@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A831840CD6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2012 at 13:50:25, Ming Lei wrote:
-> On Wed, Mar 21, 2012 at 7:29 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> > On Mon, Mar 19, 2012 at 17:14:30, Ming Lei wrote:
-> >> On Mon, Mar 19, 2012 at 7:11 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> >> >
-> >> > I think you made very good point here. With the above patch, we are almost missing the capability of registering dmtimer as a clocksource for OMAP.
-> >> > It will always use 32k-counter, and never fall back to dmtimer.
-> >> >
-> >> > Then the only options we have here is,
-> >> >
-> >> > 1) Register both the timers, 32k-counter and dmtimer for clocksource; let
-> >> > ? Kernel pick up best rating clocksource out of these two.
-> >> >
-> >> > ? In case of OMAP1/2/3/4, kernel will use dmtimer, since it has better
-> >> > ? Rating. User can choose the 32k-counter clocksource via bootargs.
-> >> >
-> >> > ? Impact: without bootargs for clocksource selection, kernel will choose
-> >> > ? ? dmtimer, impacting loss of time during suspend/resume.
-> >> >
-> >> >
-> >> > 2) Let the current code be as is, means, the clocksource registration will
-> >> > ? Happened based on "#ifdef CONFIG_OMAP_32K_TIMER" and this option
-> >> > ? selection will be Controlled by Kconfig rules.
-> >>
-> >> How about the 3rd option?
-> >>
-> >> 3), take the way in your patch 1) at default, but will switch to
-> >> register dmtimer
-> >> directly and bypass 32k-counter if user need it via kernel parameter.
-> >>
-> >> As far as I can think of, the situations required for dmtimer are high-frequency
-> >> perf sample and high precision trace points, so looks it is OK to take
-> >> 32k-counter
-> >> at default.
-> >>
-> > But if you register both the timers (dmtimer & 32ksync), then initially kernel will only pick up dmtimer, as this has better rating. And late in
+On Thu, Mar 29, 2012 at 23:33:40, Hilman, Kevin wrote:
+> Hi Vaibhav,
 > 
-> Looks not so, I found that 32ksync is always selected as the default
-> clocksource if both are registered.
+> Vaibhav Hiremath <hvaibhav@ti.com> writes:
 > 
-
-No. Kernel always chooses better-rated timer/counter for clocksource.
-Please refer to the file 
-
-"kernel/time/clocksource.c"
-
-When you register any clocksource, the sequence is
-	...
-	clocksource_enqueue(cs);
-	...
-	clocksource_select();
-	...
-
-And clocksource_enqueue(), makes sure that the list of registered clocksource is always sorted by its rating. And clocksource_select()
-Chooses best (first in the list) as a clocksource, unless you override
-It using bootparams or sysfs.
-
-Thanks,
-Vaibhav
-
-> > the boot sequence clocksource switch will happen, base on
-> > kernel parameter (clocksource=).
+> > After going round-n-round on how to add support for AM33XX family
+> > of device into kernel, especially for PRM and CM support, we have
+> > decided to handle it separately; as AM33XX-PRCM module is different
+> > than OMAP3 and OMAP4 architecture.
 > >
-> > So logically dmtimer will be always used as a default here.
+> > The difference becomes very interesting/weird when it comes to
+> > the consistency for register offsets in PRM address space and
+> > bit-field offsets inside PRM registers,
+> > So along with Powerdomain data and PRM api's required for AM33XX
+> > device, this patch series adds,
+> >
+> >  - XXX_RSTST register offset to "struct omap_hwmod_omap4_prcm"
+> >  - PWRSTCTRL & PWRSTST register offsets to "struct powerdomain"
+> >  - Logicretstate and mem_on/ret/pwrst/retst mask to "struct powerdomain"
+> >
+> >
+> > Testing: This patch series has been boot tested on AM37xEVM and AM335x
+> >          based BeagleBone community board.
+> >
+> > THANKS TO PAUL HERE...for helping and concluding on this, soon I will
+> > have similar patch for CM support, then clock-tree and hwmod will follow...
+> >
+> > Changes from V1 & V2:
+> > 	- Rolled back to my original approach, where AM33xx device was
+> > 	  handled separately (RFC version).
 > 
-> Not so at least on my Pandaboard.
+> My apologies for causing the run around.  
 > 
+> This approach (without the prminst layer) is indeed a better approach.
 > 
-> Thanks,
-> -- 
-> Ming Lei
+> Thanks for your patience (and persistence.)
+> 
+> I went to give this a test on my BeagleBone, but it doesn't apply to
+> mainline.  What upstream commit is this supposed to apply onto.  
+
+I and using, linux-omap/master and/or linux-omap/cleanup branches as a 
+baseline for sending the patches.
+
+
+> I tried it on v3.3, but patch 3 fails with a conflict in io.c.
+> 
+
+My bad. I did not include (or resend) voltage domain patch (had submitted 
+last time itself). 
+I will resend the all patch-series again including voltage domain addition 
+patch. Just for reference, the series will follow the sequence -
+
+voltagedomains 
+powerdomains 
+clockdomains
+clock
+hwmod
+
+
+> Looking at your am335x-staging branch, it seems that it depends on
+> previous changes to io.c made in:
+> 
+>         arm:omap:am33xx: Add AM335XEVM machine support
+> 
+> That patch appears to need an update for mainline as well.
+>
+
+Can you please clarify on this? I use v3.3 to check on this, and it is
+Getting applied without any issues for me.
+
+I believe you are using V5 version of this patch series, also you can pick this patch from (created to give pull request to Tony)
+https://github.com/hvaibhav/am335x-linux/tree/am335x-baseport-for-tony
+
+
+Log:
+==============
+commit 812e168a9584e180c12588ca2b0233e96461e997
+Author: Afzal Mohammed <afzal@ti.com>
+Date:   Tue Aug 9 14:29:41 2011 +0530
+
+    arm:omap:am33xx: Add AM335XEVM machine support
+
+    This patch adds minimal support for AM335X EVM.
+    The approach taken here is to add AM335X EVM support
+    to AM3517EVM, considering the fact that with device tree
+    developement we will get rid of board-*.c.
+
+    Signed-off-by: Afzal Mohammed <afzal@ti.com>
+    Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+    [Changed ti816x_init_irq=>ti81xx_init_irq, due to recent acceptance of patches]
+    Reviewed-by: Kevin Hilman <khilman@ti.com>
+
+commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sun Mar 18 16:15:34 2012 -0700
+
+    Linux 3.3
+
+
+ 
+> Kevin
 > 
