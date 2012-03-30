@@ -1,65 +1,160 @@
-From: dima@android.com (Dima Zavin)
-Date: Fri, 30 Mar 2012 10:38:30 -0700
-Subject: [PATCH v6 1/5] Extcon (external connector): import Android's
- switch class and modify.
-In-Reply-To: <CACSP8SjhOZcXZa2hCNsH8zS+hm8X-i9uNm50UH=_VwOV=BJGmA@mail.gmail.com>
-References: <1328856038-21912-1-git-send-email-myungjoo.ham@samsung.com>
- <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
- <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
- <20120309124119.GV3273@opensource.wolfsonmicro.com>
- <CACSP8ShU5tu=9N53PtYMLyFVFMS9whNRhMvu7nu8rBoPuVCy+Q@mail.gmail.com>
- <20120330100742.GB21950@opensource.wolfsonmicro.com>
- <CACSP8SjhOZcXZa2hCNsH8zS+hm8X-i9uNm50UH=_VwOV=BJGmA@mail.gmail.com>
-Message-ID: <CAPz4a6C9J+7pSHsCabdtF8pXgx7msFDjYNBi2KviHuSShXWuZQ@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Fri, 30 Mar 2012 20:59:51 +0300
+Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
+In-Reply-To: <1333122733.41820.YahooMailClassic@web29002.mail.ird.yahoo.com>
+References: <1333122733.41820.YahooMailClassic@web29002.mail.ird.yahoo.com>
+Message-ID: <4F75F497.50909@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 10:29 AM, Erik Gilling <konkers@google.com> wrote:
-> On Fri, Mar 30, 2012 at 3:07 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Thu, Mar 29, 2012 at 03:27:01PM -0700, Erik Gilling wrote:
->>> On Fri, Mar 9, 2012 at 4:41 AM, Mark Brown
+On 03/30/12 18:52, Paul Parsons wrote:
+> --- On Fri, 30/3/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>> On 03/30/12 18:06, Paul Parsons wrote:
+>>> --- On Fri, 30/3/12, Igor Grinberg <grinberg@compulab.co.il>
+>> wrote:
+>>>> On 03/28/12 20:12, Paul Parsons
+>>>> wrote:
+>>>>> On PXA2xx platforms, the MFP API (described in
+>>>> Documentation/arm/pxa/mfp.txt)
+>>>>> provides values for the following:
+>>>>>
+>>>>> 1. GPIO inputs (e.g. GPIO105_GPIO).
+>>>>> 2. Alternate function inputs (e.g.
+>> GPIO105_CIF_DD_1).
+>>>>> 3. Alternate function outputs (e.g.
+>>>> GPIO105_KP_MKOUT_2).
+>>>>>
+>>>>> It does not provide values for GPIO outputs
+>> (i.e. AF0
+>>>> outputs).
+>>>>>
+>>>>> One cannot use the macro used by the MFP API
+>> internally
+>>>> - MFP_CFG_OUT() - to
+>>>>> define new GPIO output values, since that macro
+>> is
+>>>> forbidden in platform code.
+>>>>>
+>>>>> Without the ability to add GPIO outputs to the
+>> MFP
+>>>> configuration, it is not
+>>>>> possible to drive GPIO outputs high during
+>> sleep mode.
+>>>>>
+>>>>> This would be useful, for example, on the
+>> hx4700
+>>>> platform, where driving the
+>>>>> infrared powerdown GPIO 105 high during sleep
+>> mode
+>>>> would save some mA.
+>>>>>
+>>>>> So my question is: what method should one use
+>> to add
+>>>> GPIO outputs to the MFP
+>>>>> configuration?
+>>>>>
+>>>>> One possible method, namely manually defining
+>> values in
+>>>> the platform code:
+>>>>>
+>>>>>      MFP_PIN_GPIO105 |
+>> MFP_AF0 |
+>>>> MFP_DIR_OUT | MFP_LPM_DRIVE_HIGH,
+>>>>
+>>>> Have you tried:
+>>>> GPIO105_GPIO | MFP_LPM_DRIVE_HIGH,
+>>>> ?
+>>>>
+>>>> This way it works on other boards.
+>>>
+>>> Hello Igor,
+>>>
+>>> GPIO105_GPIO expands to a GPIO input -
+>> MFP_CFG_IN(GPIO105, AF0) -
+>>> not an output.
 >>
->>> > This seems somewhat sad - if ANDROID is turned on the standard ABI
->>> > vanishes. ?It'd be much nicer to do this with a symlink (or with
->>> > symlinks within the android directory if the driver core doesn't support
->>> > that). ?That way userspace code can be written to the new ABI and will
->>> > work on Android systems without ifdefery.
+>> Yeah, I know... but read in mfp-pxa2xx.h, lines 6-20:
+>> /*
+>>  * the following MFP_xxx bit definitions in mfp.h are
+>> re-used for pxa2xx:
+>>  *
+>>  *  MFP_PIN(x)
+>>  *  MFP_AFx
+>>  *  MFP_LPM_DRIVE_{LOW, HIGH}
+>>  *  MFP_LPM_EDGE_x
+>>  *
+>>  * other MFP_x bit definitions will be ignored
+>>  *
+>>  * and adds the below two bits specifically for pxa2xx:
+>>  *
+>>  * bit     23 - Input/Output (PXA2xx
+>> specific)
+>>  * bit     24 - Wakeup Enable(PXA2xx
+>> specific)
+>>  */
 >>
->>> This won't work if userspace code is receiving uevents through netlink
->>> and comparing based on the device name which it does in android. ?Why
->>
->> That's not really the point here - the point is that the new ABI
->> vanishes as soon as you turn on the legacy Android ABI. ?You're right
->> that the particular fix I suggested has issues but the overall problem
->> exists and should be dealt with more sensibly.
->
-> I'm also not in favor of having functionality conditionally compiled
-> based on CONFIG_ANDROID. ?If fact, going through the patch stack
-> there's much more that changes the ABI from the switch driver than
-> just the name. ?Android asumes that there is a single "switch" for
-> each logical entity (called cable types in extcon) each with a binary
-> state (0,1). ?Here things have changed to have a single extcon
-> instance that can have a bitmask of states which are sent as strings
-> in the uevent.
+>> This means, that there is no difference between: MFP_CFG_IN
+>> and MFP_CFG_OUT for PXA2xx.
+> 
+> The mfp-pxa2xx.c code says otherwise.
 
-In addition to all this added complexity, the fact that you now have
-to white-list the possible "cable types" is also undesirable. If I
-wanted to expose a new cable type, I now have to modify the extcon.h
-file and the extcon.c file and I don't see what that white-list buys
-me. The class device itself should not care for which cable types can
-be registered, nor how they relate to each other. Let the client
-drivers decide, just enforce uniqueness.
+That's just great... outdated documentation...
 
---Dima
+> It uses the MFP direction bit
+> to set the GPDR registers on entering sleep mode:
+> 
+>    353	static int pxa2xx_mfp_suspend(void)
+>    354	{
+>    355		int i;
+>         ...
+>    368		for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++) {
+>    369	
+>         ...
+>    375			GPDR(i * 32) = gpdr_lpm[i];
+>    376		}
+>    377		return 0;
+>    378	}
+> 
+> gpdr_lpm[] is initialized at startup to the current GPDR values, and
+> thereafter is updated by the value of the MFP_DIR_OUT bit in calls to
+> __mfp_config_gpio().
 
->
-> As it stands, this patch does not solve the cases where we use switch
-> today and we'll probably continue to carry the switch driver in the
-> common android tree. ?If, instead, we got rid of the idea of multiple
-> states and mutual exclusivity and relied on the driver that uses
-> extcon to have multiple instances for each logical entity and deal
-> with mutual exclusion itself, we'd have a driver that would be pretty
-> easy to support in android.
->
-> -Erik
+static int __mfp_config_gpio(unsigned gpio, unsigned long c)
+{
+	unsigned long gafr, mask = GPIO_bit(gpio);
+	int bank = gpio_to_bank(gpio);
+	int uorl = !!(gpio & 0x10); /* GAFRx_U or GAFRx_L ? */
+	int shft = (gpio & 0xf) << 1;
+	int fn = MFP_AF(c);
+	int is_out = (c & MFP_DIR_OUT) ? 1 : 0;
+
+[...]
+
+	/* alternate function and direction@low power mode */
+	switch (c & MFP_LPM_STATE_MASK) {
+	case MFP_LPM_DRIVE_HIGH:
+		PGSR(bank) |= mask;
+		is_out = 1;
+		break;
+	case MFP_LPM_DRIVE_LOW:
+		PGSR(bank) &= ~mask;
+		is_out = 1;
+		break;
+
+And in the lines above, it gets overridden by MFP_LPM_DRIVE_*,
+or am I missing something?
+[...]
+
+	if (is_out ^ gpio_desc[gpio].dir_inverted)
+		gpdr_lpm[bank] |= mask;
+	else
+		gpdr_lpm[bank] &= ~mask;
+
+
+So, I think,
+GPIO105_GPIO | MFP_LPM_DRIVE_HIGH,
+as I've proposed in my first email, should still work for you.
+
+-- 
+Regards,
+Igor.
