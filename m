@@ -1,36 +1,598 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 30 Mar 2012 14:11:36 +0800
-Subject: [PATCH 03/17] ARM: mark const init data with __initconst instead
- of __initdata
-In-Reply-To: <1333055554-31300-3-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20120329211131.GA31250@pengutronix.de>
- <1333055554-31300-3-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120330061134.GD3254@S2101-09.ap.freescale.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 30 Mar 2012 11:25:40 +0530
+Subject: [PATCH] pinctrl: Replace list_*() with get_*_count()
+Message-ID: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 11:12:20PM +0200, Uwe Kleine-K?nig wrote:
-...
-> diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-> index 5cca573..7e00748 100644
-> --- a/arch/arm/mach-imx/imx51-dt.c
-> +++ b/arch/arm/mach-imx/imx51-dt.c
-> @@ -102,7 +102,7 @@ static struct sys_timer imx51_timer = {
->  	.init = imx51_timer_init,
->  };
->  
-> -static const char *imx51_dt_board_compat[] __initdata = {
-> +static const char *imx51_dt_board_compat[] __initconst = {
->  	"fsl,imx51-babbage",
->  	"fsl,imx51",
->  	NULL
+Most of the SoC drivers implement list_groups() and list_functions() routines
+for pinctrl and pinmux. These routines continue returning zero until the
+selector argument is greater than total count of available groups or functions.
 
-  CC      arch/arm/mach-imx/imx51-dt.o
-arch/arm/mach-imx/imx51-dt.c:105:20: error: imx51_dt_board_compat causes a section type conflict
-make[2]: *** [arch/arm/mach-imx/imx51-dt.o] Error 1
+This patch replaces these list_*() routines with get_*_count() routines, which
+returns the number of available selection for SoC driver. pinctrl layer will use
+this value to check the range it can choose.
 
-I do not understand why though.
+This patch fixes all user drivers for this change. There are other routines in
+user drivers, which have checks to check validity of selector passed to them. It
+is also no more required and hence removed.
 
+Documentation updated as well.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ Documentation/pinctrl.txt        |   37 +++++++++++++++----------------------
+ drivers/pinctrl/core.c           |    9 ++++++---
+ drivers/pinctrl/pinconf.c        |    3 ++-
+ drivers/pinctrl/pinctrl-pxa3xx.c |   24 ++++++++++--------------
+ drivers/pinctrl/pinctrl-sirf.c   |   20 ++++++--------------
+ drivers/pinctrl/pinctrl-tegra.c  |   34 ++++++----------------------------
+ drivers/pinctrl/pinctrl-u300.c   |   20 ++++++--------------
+ drivers/pinctrl/pinmux.c         |   11 +++++++----
+ include/linux/pinctrl/pinctrl.h  |    6 ++----
+ include/linux/pinctrl/pinmux.h   |    7 +++----
+ 10 files changed, 63 insertions(+), 108 deletions(-)
+
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index f2e27ef..6e0c9ca 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -152,11 +152,9 @@ static const struct foo_group foo_groups[] = {
+ };
+ 
+ 
+-static int foo_list_groups(struct pinctrl_dev *pctldev, unsigned selector)
++static int foo_get_groups_count(struct pinctrl_dev *pctldev)
+ {
+-	if (selector >= ARRAY_SIZE(foo_groups))
+-		return -EINVAL;
+-	return 0;
++	return ARRAY_SIZE(foo_groups);
+ }
+ 
+ static const char *foo_get_group_name(struct pinctrl_dev *pctldev,
+@@ -175,7 +173,7 @@ static int foo_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
+ }
+ 
+ static struct pinctrl_ops foo_pctrl_ops = {
+-	.list_groups = foo_list_groups,
++	.get_groups_count = foo_get_groups_count,
+ 	.get_group_name = foo_get_group_name,
+ 	.get_group_pins = foo_get_group_pins,
+ };
+@@ -186,13 +184,12 @@ static struct pinctrl_desc foo_desc = {
+        .pctlops = &foo_pctrl_ops,
+ };
+ 
+-The pin control subsystem will call the .list_groups() function repeatedly
+-beginning on 0 until it returns non-zero to determine legal selectors, then
+-it will call the other functions to retrieve the name and pins of the group.
+-Maintaining the data structure of the groups is up to the driver, this is
+-just a simple example - in practice you may need more entries in your group
+-structure, for example specific register ranges associated with each group
+-and so on.
++The pin control subsystem will call the .get_groups_count() function to
++determine total number of legal selectors, then it will call the other functions
++to retrieve the name and pins of the group. Maintaining the data structure of
++the groups is up to the driver, this is just a simple example - in practice you
++may need more entries in your group structure, for example specific register
++ranges associated with each group and so on.
+ 
+ 
+ Pin configuration
+@@ -606,11 +603,9 @@ static const struct foo_group foo_groups[] = {
+ };
+ 
+ 
+-static int foo_list_groups(struct pinctrl_dev *pctldev, unsigned selector)
++static int foo_get_groups_count(struct pinctrl_dev *pctldev)
+ {
+-	if (selector >= ARRAY_SIZE(foo_groups))
+-		return -EINVAL;
+-	return 0;
++	return ARRAY_SIZE(foo_groups);
+ }
+ 
+ static const char *foo_get_group_name(struct pinctrl_dev *pctldev,
+@@ -629,7 +624,7 @@ static int foo_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
+ }
+ 
+ static struct pinctrl_ops foo_pctrl_ops = {
+-	.list_groups = foo_list_groups,
++	.get_groups_count = foo_get_groups_count,
+ 	.get_group_name = foo_get_group_name,
+ 	.get_group_pins = foo_get_group_pins,
+ };
+@@ -663,11 +658,9 @@ static const struct foo_pmx_func foo_functions[] = {
+ 	},
+ };
+ 
+-int foo_list_funcs(struct pinctrl_dev *pctldev, unsigned selector)
++int foo_get_functions_count(struct pinctrl_dev *pctldev)
+ {
+-	if (selector >= ARRAY_SIZE(foo_functions))
+-		return -EINVAL;
+-	return 0;
++	return ARRAY_SIZE(foo_functions);
+ }
+ 
+ const char *foo_get_fname(struct pinctrl_dev *pctldev, unsigned selector)
+@@ -703,7 +696,7 @@ void foo_disable(struct pinctrl_dev *pctldev, unsigned selector,
+ }
+ 
+ struct pinmux_ops foo_pmxops = {
+-	.list_functions = foo_list_funcs,
++	.get_functions_count = foo_get_functions_count,
+ 	.get_function_name = foo_get_fname,
+ 	.get_function_groups = foo_get_groups,
+ 	.enable = foo_enable,
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index ec3b8cc18..5ed576a 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -318,9 +318,10 @@ int pinctrl_get_group_selector(struct pinctrl_dev *pctldev,
+ 			       const char *pin_group)
+ {
+ 	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
++	unsigned ngroups = pctlops->get_groups_count(pctldev);
+ 	unsigned group_selector = 0;
+ 
+-	while (pctlops->list_groups(pctldev, group_selector) >= 0) {
++	while (group_selector < ngroups) {
+ 		const char *gname = pctlops->get_group_name(pctldev,
+ 							    group_selector);
+ 		if (!strcmp(gname, pin_group)) {
+@@ -906,16 +907,18 @@ static int pinctrl_groups_show(struct seq_file *s, void *what)
+ {
+ 	struct pinctrl_dev *pctldev = s->private;
+ 	const struct pinctrl_ops *ops = pctldev->desc->pctlops;
+-	unsigned selector = 0;
++	unsigned ngroups, selector = 0;
+ 
+ 	/* No grouping */
+ 	if (!ops)
+ 		return 0;
+ 
++	ngroups = ops->get_groups_count(pctldev);
++
+ 	mutex_lock(&pinctrl_mutex);
+ 
+ 	seq_puts(s, "registered pin groups:\n");
+-	while (ops->list_groups(pctldev, selector) >= 0) {
++	while (selector < ngroups) {
+ 		const unsigned *pins;
+ 		unsigned num_pins;
+ 		const char *gname = ops->get_group_name(pctldev, selector);
+diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+index 7321e86..eb3a14f4 100644
+--- a/drivers/pinctrl/pinconf.c
++++ b/drivers/pinctrl/pinconf.c
+@@ -495,6 +495,7 @@ static int pinconf_groups_show(struct seq_file *s, void *what)
+ 	struct pinctrl_dev *pctldev = s->private;
+ 	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
+ 	const struct pinconf_ops *ops = pctldev->desc->confops;
++	unsigned ngroups = pctlops->get_groups_count(pctldev);
+ 	unsigned selector = 0;
+ 
+ 	if (!ops || !ops->pin_config_group_get)
+@@ -505,7 +506,7 @@ static int pinconf_groups_show(struct seq_file *s, void *what)
+ 
+ 	mutex_lock(&pinctrl_mutex);
+ 
+-	while (pctlops->list_groups(pctldev, selector) >= 0) {
++	while (selector < ngroups) {
+ 		const char *gname = pctlops->get_group_name(pctldev, selector);
+ 
+ 		seq_printf(s, "%u (%s):", selector, gname);
+diff --git a/drivers/pinctrl/pinctrl-pxa3xx.c b/drivers/pinctrl/pinctrl-pxa3xx.c
+index 079dce0..7644e42 100644
+--- a/drivers/pinctrl/pinctrl-pxa3xx.c
++++ b/drivers/pinctrl/pinctrl-pxa3xx.c
+@@ -25,20 +25,18 @@ static struct pinctrl_gpio_range pxa3xx_pinctrl_gpio_range = {
+ 	.pin_base	= 0,
+ };
+ 
+-static int pxa3xx_list_groups(struct pinctrl_dev *pctrldev, unsigned selector)
++static int pxa3xx_get_groups_count(struct pinctrl_dev *pctrldev)
+ {
+ 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
+-	if (selector >= info->num_grps)
+-		return -EINVAL;
+-	return 0;
++
++	return info->num_grps;
+ }
+ 
+ static const char *pxa3xx_get_group_name(struct pinctrl_dev *pctrldev,
+ 					 unsigned selector)
+ {
+ 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
+-	if (selector >= info->num_grps)
+-		return NULL;
++
+ 	return info->grps[selector].name;
+ }
+ 
+@@ -48,25 +46,23 @@ static int pxa3xx_get_group_pins(struct pinctrl_dev *pctrldev,
+ 				 unsigned *num_pins)
+ {
+ 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
+-	if (selector >= info->num_grps)
+-		return -EINVAL;
++
+ 	*pins = info->grps[selector].pins;
+ 	*num_pins = info->grps[selector].npins;
+ 	return 0;
+ }
+ 
+ static struct pinctrl_ops pxa3xx_pctrl_ops = {
+-	.list_groups	= pxa3xx_list_groups,
++	.get_groups_count = pxa3xx_get_groups_count,
+ 	.get_group_name	= pxa3xx_get_group_name,
+ 	.get_group_pins	= pxa3xx_get_group_pins,
+ };
+ 
+-static int pxa3xx_pmx_list_func(struct pinctrl_dev *pctrldev, unsigned func)
++static int pxa3xx_pmx_get_funcs_count(struct pinctrl_dev *pctrldev)
+ {
+ 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
+-	if (func >= info->num_funcs)
+-		return -EINVAL;
+-	return 0;
++
++	return info->num_funcs;
+ }
+ 
+ static const char *pxa3xx_pmx_get_func_name(struct pinctrl_dev *pctrldev,
+@@ -170,7 +166,7 @@ static int pxa3xx_pmx_request_gpio(struct pinctrl_dev *pctrldev,
+ }
+ 
+ static struct pinmux_ops pxa3xx_pmx_ops = {
+-	.list_functions		= pxa3xx_pmx_list_func,
++	.get_functions_count	= pxa3xx_pmx_get_funcs_count,
+ 	.get_function_name	= pxa3xx_pmx_get_func_name,
+ 	.get_function_groups	= pxa3xx_pmx_get_groups,
+ 	.enable			= pxa3xx_pmx_enable,
+diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
+index 6b3534c..ba15b1a 100644
+--- a/drivers/pinctrl/pinctrl-sirf.c
++++ b/drivers/pinctrl/pinctrl-sirf.c
+@@ -853,18 +853,14 @@ static const struct sirfsoc_pin_group sirfsoc_pin_groups[] = {
+ 	SIRFSOC_PIN_GROUP("gpsgrp", gps_pins),
+ };
+ 
+-static int sirfsoc_list_groups(struct pinctrl_dev *pctldev, unsigned selector)
++static int sirfsoc_get_groups_count(struct pinctrl_dev *pctldev)
+ {
+-	if (selector >= ARRAY_SIZE(sirfsoc_pin_groups))
+-		return -EINVAL;
+-	return 0;
++	return ARRAY_SIZE(sirfsoc_pin_groups);
+ }
+ 
+ static const char *sirfsoc_get_group_name(struct pinctrl_dev *pctldev,
+ 				       unsigned selector)
+ {
+-	if (selector >= ARRAY_SIZE(sirfsoc_pin_groups))
+-		return NULL;
+ 	return sirfsoc_pin_groups[selector].name;
+ }
+ 
+@@ -872,8 +868,6 @@ static int sirfsoc_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector
+ 			       const unsigned **pins,
+ 			       unsigned *num_pins)
+ {
+-	if (selector >= ARRAY_SIZE(sirfsoc_pin_groups))
+-		return -EINVAL;
+ 	*pins = sirfsoc_pin_groups[selector].pins;
+ 	*num_pins = sirfsoc_pin_groups[selector].num_pins;
+ 	return 0;
+@@ -886,7 +880,7 @@ static void sirfsoc_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s
+ }
+ 
+ static struct pinctrl_ops sirfsoc_pctrl_ops = {
+-	.list_groups = sirfsoc_list_groups,
++	.get_groups_count = sirfsoc_get_groups_count,
+ 	.get_group_name = sirfsoc_get_group_name,
+ 	.get_group_pins = sirfsoc_get_group_pins,
+ 	.pin_dbg_show = sirfsoc_pin_dbg_show,
+@@ -1033,11 +1027,9 @@ static void sirfsoc_pinmux_disable(struct pinctrl_dev *pmxdev, unsigned selector
+ 	sirfsoc_pinmux_endisable(spmx, selector, false);
+ }
+ 
+-static int sirfsoc_pinmux_list_funcs(struct pinctrl_dev *pmxdev, unsigned selector)
++static int sirfsoc_pinmux_get_funcs_count(struct pinctrl_dev *pmxdev)
+ {
+-	if (selector >= ARRAY_SIZE(sirfsoc_pmx_functions))
+-		return -EINVAL;
+-	return 0;
++	return ARRAY_SIZE(sirfsoc_pmx_functions);
+ }
+ 
+ static const char *sirfsoc_pinmux_get_func_name(struct pinctrl_dev *pctldev,
+@@ -1074,9 +1066,9 @@ static int sirfsoc_pinmux_request_gpio(struct pinctrl_dev *pmxdev,
+ }
+ 
+ static struct pinmux_ops sirfsoc_pinmux_ops = {
+-	.list_functions = sirfsoc_pinmux_list_funcs,
+ 	.enable = sirfsoc_pinmux_enable,
+ 	.disable = sirfsoc_pinmux_disable,
++	.get_functions_count = sirfsoc_pinmux_get_funcs_count,
+ 	.get_function_name = sirfsoc_pinmux_get_func_name,
+ 	.get_function_groups = sirfsoc_pinmux_get_groups,
+ 	.gpio_request_enable = sirfsoc_pinmux_request_gpio,
+diff --git a/drivers/pinctrl/pinctrl-tegra.c b/drivers/pinctrl/pinctrl-tegra.c
+index 9b32968..774f7fd 100644
+--- a/drivers/pinctrl/pinctrl-tegra.c
++++ b/drivers/pinctrl/pinctrl-tegra.c
+@@ -53,15 +53,11 @@ static inline void pmx_writel(struct tegra_pmx *pmx, u32 val, u32 bank, u32 reg)
+ 	writel(val, pmx->regs[bank] + reg);
+ }
+ 
+-static int tegra_pinctrl_list_groups(struct pinctrl_dev *pctldev,
+-				     unsigned group)
++static int tegra_pinctrl_get_groups_count(struct pinctrl_dev *pctldev)
+ {
+ 	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	if (group >= pmx->soc->ngroups)
+-		return -EINVAL;
+-
+-	return 0;
++	return pmx->soc->ngroups;
+ }
+ 
+ static const char *tegra_pinctrl_get_group_name(struct pinctrl_dev *pctldev,
+@@ -69,9 +65,6 @@ static const char *tegra_pinctrl_get_group_name(struct pinctrl_dev *pctldev,
+ {
+ 	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	if (group >= pmx->soc->ngroups)
+-		return NULL;
+-
+ 	return pmx->soc->groups[group].name;
+ }
+ 
+@@ -82,9 +75,6 @@ static int tegra_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
+ {
+ 	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	if (group >= pmx->soc->ngroups)
+-		return -EINVAL;
+-
+ 	*pins = pmx->soc->groups[group].pins;
+ 	*num_pins = pmx->soc->groups[group].npins;
+ 
+@@ -99,21 +89,17 @@ static void tegra_pinctrl_pin_dbg_show(struct pinctrl_dev *pctldev,
+ }
+ 
+ static struct pinctrl_ops tegra_pinctrl_ops = {
+-	.list_groups = tegra_pinctrl_list_groups,
++	.get_groups_count = tegra_pinctrl_get_groups_count,
+ 	.get_group_name = tegra_pinctrl_get_group_name,
+ 	.get_group_pins = tegra_pinctrl_get_group_pins,
+ 	.pin_dbg_show = tegra_pinctrl_pin_dbg_show,
+ };
+ 
+-static int tegra_pinctrl_list_funcs(struct pinctrl_dev *pctldev,
+-				    unsigned function)
++static int tegra_pinctrl_get_funcs_count(struct pinctrl_dev *pctldev)
+ {
+ 	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	if (function >= pmx->soc->nfunctions)
+-		return -EINVAL;
+-
+-	return 0;
++	return pmx->soc->nfunctions;
+ }
+ 
+ static const char *tegra_pinctrl_get_func_name(struct pinctrl_dev *pctldev,
+@@ -121,9 +107,6 @@ static const char *tegra_pinctrl_get_func_name(struct pinctrl_dev *pctldev,
+ {
+ 	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	if (function >= pmx->soc->nfunctions)
+-		return NULL;
+-
+ 	return pmx->soc->functions[function].name;
+ }
+ 
+@@ -134,9 +117,6 @@ static int tegra_pinctrl_get_func_groups(struct pinctrl_dev *pctldev,
+ {
+ 	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	if (function >= pmx->soc->nfunctions)
+-		return -EINVAL;
+-
+ 	*groups = pmx->soc->functions[function].groups;
+ 	*num_groups = pmx->soc->functions[function].ngroups;
+ 
+@@ -151,8 +131,6 @@ static int tegra_pinctrl_enable(struct pinctrl_dev *pctldev, unsigned function,
+ 	int i;
+ 	u32 val;
+ 
+-	if (group >= pmx->soc->ngroups)
+-		return -EINVAL;
+ 	g = &pmx->soc->groups[group];
+ 
+ 	if (g->mux_reg < 0)
+@@ -194,7 +172,7 @@ static void tegra_pinctrl_disable(struct pinctrl_dev *pctldev,
+ }
+ 
+ static struct pinmux_ops tegra_pinmux_ops = {
+-	.list_functions = tegra_pinctrl_list_funcs,
++	.get_functions_count = tegra_pinctrl_get_funcs_count,
+ 	.get_function_name = tegra_pinctrl_get_func_name,
+ 	.get_function_groups = tegra_pinctrl_get_func_groups,
+ 	.enable = tegra_pinctrl_enable,
+diff --git a/drivers/pinctrl/pinctrl-u300.c b/drivers/pinctrl/pinctrl-u300.c
+index 26eb8cc..05d0299 100644
+--- a/drivers/pinctrl/pinctrl-u300.c
++++ b/drivers/pinctrl/pinctrl-u300.c
+@@ -836,18 +836,14 @@ static const struct u300_pin_group u300_pin_groups[] = {
+ 	},
+ };
+ 
+-static int u300_list_groups(struct pinctrl_dev *pctldev, unsigned selector)
++static int u300_get_groups_count(struct pinctrl_dev *pctldev)
+ {
+-	if (selector >= ARRAY_SIZE(u300_pin_groups))
+-		return -EINVAL;
+-	return 0;
++	return ARRAY_SIZE(u300_pin_groups);
+ }
+ 
+ static const char *u300_get_group_name(struct pinctrl_dev *pctldev,
+ 				       unsigned selector)
+ {
+-	if (selector >= ARRAY_SIZE(u300_pin_groups))
+-		return NULL;
+ 	return u300_pin_groups[selector].name;
+ }
+ 
+@@ -855,8 +851,6 @@ static int u300_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
+ 			       const unsigned **pins,
+ 			       unsigned *num_pins)
+ {
+-	if (selector >= ARRAY_SIZE(u300_pin_groups))
+-		return -EINVAL;
+ 	*pins = u300_pin_groups[selector].pins;
+ 	*num_pins = u300_pin_groups[selector].num_pins;
+ 	return 0;
+@@ -869,7 +863,7 @@ static void u300_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
+ }
+ 
+ static struct pinctrl_ops u300_pctrl_ops = {
+-	.list_groups = u300_list_groups,
++	.get_groups_count = u300_get_groups_count,
+ 	.get_group_name = u300_get_group_name,
+ 	.get_group_pins = u300_get_group_pins,
+ 	.pin_dbg_show = u300_pin_dbg_show,
+@@ -991,11 +985,9 @@ static void u300_pmx_disable(struct pinctrl_dev *pctldev, unsigned selector,
+ 	u300_pmx_endisable(upmx, selector, false);
+ }
+ 
+-static int u300_pmx_list_funcs(struct pinctrl_dev *pctldev, unsigned selector)
++static int u300_pmx_get_funcs_count(struct pinctrl_dev *pctldev)
+ {
+-	if (selector >= ARRAY_SIZE(u300_pmx_functions))
+-		return -EINVAL;
+-	return 0;
++	return ARRAY_SIZE(u300_pmx_functions);
+ }
+ 
+ static const char *u300_pmx_get_func_name(struct pinctrl_dev *pctldev,
+@@ -1014,7 +1006,7 @@ static int u300_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
+ }
+ 
+ static struct pinmux_ops u300_pmx_ops = {
+-	.list_functions = u300_pmx_list_funcs,
++	.get_functions_count = u300_pmx_get_funcs_count,
+ 	.get_function_name = u300_pmx_get_func_name,
+ 	.get_function_groups = u300_pmx_get_groups,
+ 	.enable = u300_pmx_enable,
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 4e62783..375b214 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -33,10 +33,11 @@
+ int pinmux_check_ops(struct pinctrl_dev *pctldev)
+ {
+ 	const struct pinmux_ops *ops = pctldev->desc->pmxops;
++	unsigned nfuncs = ops->get_functions_count(pctldev);
+ 	unsigned selector = 0;
+ 
+ 	/* Check that we implement required operations */
+-	if (!ops->list_functions ||
++	if (!ops->get_functions_count ||
+ 	    !ops->get_function_name ||
+ 	    !ops->get_function_groups ||
+ 	    !ops->enable ||
+@@ -44,7 +45,7 @@ int pinmux_check_ops(struct pinctrl_dev *pctldev)
+ 		return -EINVAL;
+ 
+ 	/* Check that all functions registered have names */
+-	while (ops->list_functions(pctldev, selector) >= 0) {
++	while (selector < nfuncs) {
+ 		const char *fname = ops->get_function_name(pctldev,
+ 							   selector);
+ 		if (!fname) {
+@@ -287,10 +288,11 @@ static int pinmux_func_name_to_selector(struct pinctrl_dev *pctldev,
+ 					const char *function)
+ {
+ 	const struct pinmux_ops *ops = pctldev->desc->pmxops;
++	unsigned nfuncs = ops->get_functions_count(pctldev);
+ 	unsigned selector = 0;
+ 
+ 	/* See if this pctldev has this function */
+-	while (ops->list_functions(pctldev, selector) >= 0) {
++	while (selector < nfuncs) {
+ 		const char *fname = ops->get_function_name(pctldev,
+ 							   selector);
+ 
+@@ -477,11 +479,12 @@ static int pinmux_functions_show(struct seq_file *s, void *what)
+ {
+ 	struct pinctrl_dev *pctldev = s->private;
+ 	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
++	unsigned nfuncs = pmxops->get_functions_count(pctldev);
+ 	unsigned func_selector = 0;
+ 
+ 	mutex_lock(&pinctrl_mutex);
+ 
+-	while (pmxops->list_functions(pctldev, func_selector) >= 0) {
++	while (func_selector < nfuncs) {
+ 		const char *func = pmxops->get_function_name(pctldev,
+ 							  func_selector);
+ 		const char * const *groups;
+diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
+index 4e9f078..515fd99 100644
+--- a/include/linux/pinctrl/pinctrl.h
++++ b/include/linux/pinctrl/pinctrl.h
+@@ -64,9 +64,7 @@ struct pinctrl_gpio_range {
+ /**
+  * struct pinctrl_ops - global pin control operations, to be implemented by
+  * pin controller drivers.
+- * @list_groups: list the number of selectable named groups available
+- *	in this pinmux driver, the core will begin on 0 and call this
+- *	repeatedly as long as it returns >= 0 to enumerate the groups
++ * @get_groups_count: Returns the count of total number of groups registered.
+  * @get_group_name: return the group name of the pin group
+  * @get_group_pins: return an array of pins corresponding to a certain
+  *	group selector @pins, and the size of the array in @num_pins
+@@ -74,7 +72,7 @@ struct pinctrl_gpio_range {
+  *	info for a certain pin in debugfs
+  */
+ struct pinctrl_ops {
+-	int (*list_groups) (struct pinctrl_dev *pctldev, unsigned selector);
++	int (*get_groups_count) (struct pinctrl_dev *pctldev);
+ 	const char *(*get_group_name) (struct pinctrl_dev *pctldev,
+ 				       unsigned selector);
+ 	int (*get_group_pins) (struct pinctrl_dev *pctldev,
+diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
+index 47e9237..dd7bef6 100644
+--- a/include/linux/pinctrl/pinmux.h
++++ b/include/linux/pinctrl/pinmux.h
+@@ -29,9 +29,8 @@ struct pinctrl_dev;
+  *	is allowed to answer "no" by returning a negative error code
+  * @free: the reverse function of the request() callback, frees a pin after
+  *	being requested
+- * @list_functions: list the number of selectable named functions available
+- *	in this pinmux driver, the core will begin on 0 and call this
+- *	repeatedly as long as it returns >= 0 to enumerate mux settings
++ * @get_functions_count: returns number of selectable named functions available
++ *	in this pinmux driver
+  * @get_function_name: return the function name of the muxing selector,
+  *	called by the core to figure out which mux setting it shall map a
+  *	certain device to
+@@ -62,7 +61,7 @@ struct pinctrl_dev;
+ struct pinmux_ops {
+ 	int (*request) (struct pinctrl_dev *pctldev, unsigned offset);
+ 	int (*free) (struct pinctrl_dev *pctldev, unsigned offset);
+-	int (*list_functions) (struct pinctrl_dev *pctldev, unsigned selector);
++	int (*get_functions_count) (struct pinctrl_dev *pctldev);
+ 	const char *(*get_function_name) (struct pinctrl_dev *pctldev,
+ 					  unsigned selector);
+ 	int (*get_function_groups) (struct pinctrl_dev *pctldev,
 -- 
-Regards,
-Shawn
+1.7.9
