@@ -1,29 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Mar 2012 21:01:24 -0700
-Subject: [GIT PULL] pull request from arch-pxa git on fixes branch
-In-Reply-To: <CAN1soZzqxy=wsPVEXY8BxTK24szq7x5Oxk2JjuUJ6di7ij8hWA@mail.gmail.com>
-References: <CAN1soZytJ-CxepQAZn5oZ06=ezTQ85O-iC7tUDOeWqi=zpuf8A@mail.gmail.com>
- <4F732D14.3020803@compulab.co.il>
- <CAOesGMgxq-HEeKSPvaW-kTLqNyDJUUmG0OEpockMBNninQL0wQ@mail.gmail.com>
- <CAN1soZzqxy=wsPVEXY8BxTK24szq7x5Oxk2JjuUJ6di7ij8hWA@mail.gmail.com>
-Message-ID: <CAOesGMg+1WjWRJsL4dE3dFanRk61piqH3WcXcz-B=KTvJpaB0Q@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 30 Mar 2012 09:31:11 +0530
+Subject: [RFC] pinctrl: Replace list_groups() with get_groups_count()
+In-Reply-To: <4F74A05E.7050803@wwwdotorg.org>
+References: <CAOh2x==LTHPM+O9LXVFVdX2NfzKs2bttiYLm8VcL6qLXKrUMBg@mail.gmail.com>
+ <4F749B58.4070608@wwwdotorg.org>
+ <CAOh2x==mGDZRoxdbuvbhKtfoxiEDVb+7vdfBEYD=u+DdMCYVhw@mail.gmail.com>
+ <4F74A05E.7050803@wwwdotorg.org>
+Message-ID: <4F753007.2030707@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 6:06 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
+On 3/29/2012 11:18 PM, Stephen Warren wrote:
+>>> >> I vaguely recall raising the same issue before, and Linus saying he
+>>> >> wanted to be consistent with similar list_*() functions in other
+>>> >> subsystems, but personally I'd prefer to evaluate this aspect of the
+>>> >> pinctrl subsystem on its own.
+>> > 
+>> > Which other subsystems have such stuff?
+> For example. include/linux/regulator/driver.h struct regulator_ops field
+> list_voltage().
 
-> Now these build issues are fixed. Could you help to pull these fixes
-> from arch-pxa git?
->
-> The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
->
-> ?Linux 3.3 (2012-03-18 16:15:34 -0700)
->
-> are available in the git repository at:
-> ?git://github.com/hzhuang1/linux.git fixes
+Thanks.
 
-Pulled, thanks!
+Anyway, if others implement it, that doesn't mean we also do that, even
+if we are not happy with it. It is not only about cleaning of code, but
+it will save boot time too.
 
+@Linus: Can i have your viewpoint before i start doing this?
 
--Olof
+-- 
+viresh
