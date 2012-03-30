@@ -1,23 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Mar 2012 17:55:36 +0100
-Subject: [PATCH v4 0/3] ARM support for syscall tracing
-In-Reply-To: <4F6C8DAE.9070209@mentor.com>
-References: <4F44FF58.3060907@mentor.com> <4F4E3780.4060904@mentor.com>
- <4F54D0D4.7070905@mentor.com> <4F6C8DAE.9070209@mentor.com>
-Message-ID: <20120330165536.GC11451@mudshark.cambridge.arm.com>
+Date: Fri, 30 Mar 2012 18:04:01 +0100
+Subject: [PATCH] ARM: test for PMU feature on v7 (v2 with typo fix)
+In-Reply-To: <alpine.LFD.2.02.1203281005110.24151@xanadu.home>
+References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
+ <87r4wk889a.fsf@rustcorp.com.au>
+ <20120323095314.GA13622@mudshark.cambridge.arm.com>
+ <87fwcy9abw.fsf@rustcorp.com.au>
+ <20120326094054.GA2475@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1203281005110.24151@xanadu.home>
+Message-ID: <20120330170401.GD11451@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wade,
+Hi Nicolas,
 
-On Fri, Mar 23, 2012 at 02:50:22PM +0000, Wade Farnsworth wrote:
-> Russell, now that this has been reviewed by Will and tested with both
-> ABIs, is this okay to submit to your patch tracker?
+On Wed, Mar 28, 2012 at 03:17:29PM +0100, Nicolas Pitre wrote:
+> On Mon, 26 Mar 2012, Will Deacon wrote:
+> 
+> > Now, if everything was device-tree based then we could simply use a
+> > different binding for each CPU but since we support perf on non-DT
+> > platforms, probing the CPU type is the best solution. I would like to avoid
+> > the probing code if we are initialised from DT, but I've not got round to it
+> > yet (this would be useful for big.LITTLE).
+> 
+> Still... my opinion is that we should try to autodetect as much as 
+> possible and avoid overstuffing the DT with content that can otherwise 
+> be run-time probed.  OK to use DT to override the probe for corner 
+> cases, but IMHO the probe should be the default method of 
+> initialization.  The rational is that we want to spread knowledge about 
+> part of the system and have it confined into respective drivers and 
+> subsystems for easier maintenance.  If the guy who has to maintain the 
+> dts has to know all the details for everything then that won't scale and 
+> the risk for discrepancies is increased.
 
-I'd recommend putting this into the patch system once -rc1 has landed.
-Any conflicts after that are fairly unlikely and Russell can decide what
-to do with the patches then.
-
-Cheers,
+I agree that probing is preferable where possible but, since the PMUs are
+banked, we cannot reliably probe them on big.LITTLE platforms. I guess if
+there were some infrastructure for probing on the remote cluster, I could
+use that, but it seems like DT would be easier.
 
 Will
