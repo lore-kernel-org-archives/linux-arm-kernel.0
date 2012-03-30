@@ -1,74 +1,118 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 30 Mar 2012 21:33:51 +0530
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain,
- powerdomain & PRM support for AM33XX device
-Message-ID: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+Date: Fri, 30 Mar 2012 21:33:52 +0530
+Subject: [PATCH-V4 1/4] ARM: OMAP3+: am33xx: Add voltage domain data
+In-Reply-To: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <1333123435-27186-2-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After some healthy discussion, now we have come to the conclusion and
-decided to handle AM33XX PRM/CM part separately; as AM33XX-PRCM module is
-different than OMAP3 and OMAP4 architecture.
+Currently dummy voltage domain data is being created
+in order to succeed boot process, nothing has been done
+w.r.t actual hardware (voltage control).
 
-The difference becomes very interesting/weird when it comes to
-the consistency for register offsets in PRM address space and
-bit-field offsets inside PRM registers,
-So along with Powerdomain data and PRM api's required for AM33XX
-device, this patch series adds,
+Also, hook up the AM33XX voltage domain to OMAP framework.
 
- - XXX_RSTST register offset to "struct omap_hwmod_omap4_prcm"
- - PWRSTCTRL & PWRSTST register offsets to "struct powerdomain"
- - Logicretstate and mem_on/ret/pwrst/retst mask to "struct
-   powerdomain"
-
-Testing: This patch series has been boot tested on AM37xEVM and AM335x
-         based BeagleBone community board.
-
-Thanks to Paul here...for helping and concluding on this,
-shortly I will submit similar patch for CM, clockdomain and clock-tree
-support for AM33xx.
-
-This patch-series is created on top of "linux-omap/cleanup" branch, and
-also gets applied to "linux-omap/master" branch.
-The patches are also available at -
-https://github.com/hvaibhav/am335x-linux/tree/am335x-prm-cm
-
-Changes from previous versions:
-===============================
->From V3:
-	- No code change, only added Voltagedomain patch (from V2 series)
-	  to this series.
-
->From V1 & V2:
-    	- Rolled back to my original approach, where AM33xx
-	  device was handled separately (RFC version).
-	- As per Paul's comments, added Register offsets & bit-fields
-	  masks.
-
-Vaibhav Hiremath (4):
-  ARM: OMAP3+: am33xx: Add voltage domain data
-  ARM: OMAP3/4: omap_hwmod: Add rstst_off field to struct
-    omap_hwmod_omap4_prcm
-  ARM: OMAP2+: powerdomain: Add offset & mask fields to struct
-    powerdomain
-  ARM: OMAP3+: am33xx: Add powerdomain & PRM support
-
- arch/arm/mach-omap2/Makefile                  |    6 +
- arch/arm/mach-omap2/io.c                      |    2 +
- arch/arm/mach-omap2/omap_hwmod.c              |   32 ++-
- arch/arm/mach-omap2/powerdomain.h             |   23 ++-
- arch/arm/mach-omap2/powerdomain33xx.c         |  230 ++++++++++++++++
- arch/arm/mach-omap2/powerdomains33xx_data.c   |  185 +++++++++++++
- arch/arm/mach-omap2/prm-regbits-33xx.h        |  357 +++++++++++++++++++++++++
- arch/arm/mach-omap2/prm33xx.c                 |  134 +++++++++
- arch/arm/mach-omap2/prm33xx.h                 |  129 +++++++++
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/Makefile                  |    2 +
+ arch/arm/mach-omap2/io.c                      |    1 +
  arch/arm/mach-omap2/voltage.h                 |    1 +
- arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 +++
- arch/arm/plat-omap/include/plat/omap_hwmod.h  |    2 +
- 12 files changed, 1139 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-omap2/powerdomain33xx.c
- create mode 100644 arch/arm/mach-omap2/powerdomains33xx_data.c
- create mode 100644 arch/arm/mach-omap2/prm-regbits-33xx.h
- create mode 100644 arch/arm/mach-omap2/prm33xx.c
- create mode 100644 arch/arm/mach-omap2/prm33xx.h
+ arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 +++++++++++++++++++++++++
+ 4 files changed, 47 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 74ae499..8d90f9f 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -99,6 +99,8 @@ obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common) \
+ 					   voltagedomains2xxx_data.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
+ 					   voltagedomains3xxx_data.o
++obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(voltagedomain-common) \
++					   voltagedomains33xx_data.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
+ 					   voltagedomains44xx_data.o
+
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 51d4df8..523fb6d 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -466,6 +466,7 @@ void __init am33xx_init_early(void)
+ {
+ 	omap2_set_globals_am33xx();
+ 	omap_common_init_early();
++	am33xx_voltagedomains_init();
+ 	omap3xxx_clk_init();
+ }
+ #endif
+diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+index 16a1b09..a7c43c1 100644
+--- a/arch/arm/mach-omap2/voltage.h
++++ b/arch/arm/mach-omap2/voltage.h
+@@ -156,6 +156,7 @@ int omap_voltage_late_init(void);
+
+ extern void omap2xxx_voltagedomains_init(void);
+ extern void omap3xxx_voltagedomains_init(void);
++extern void am33xx_voltagedomains_init(void);
+ extern void omap44xx_voltagedomains_init(void);
+
+ struct voltagedomain *voltdm_lookup(const char *name);
+diff --git a/arch/arm/mach-omap2/voltagedomains33xx_data.c b/arch/arm/mach-omap2/voltagedomains33xx_data.c
+new file mode 100644
+index 0000000..965458d
+--- /dev/null
++++ b/arch/arm/mach-omap2/voltagedomains33xx_data.c
+@@ -0,0 +1,43 @@
++/*
++ * AM33XX voltage domain data
++ *
++ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include "voltage.h"
++
++static struct voltagedomain am33xx_voltdm_mpu = {
++	.name		= "mpu",
++};
++
++static struct voltagedomain am33xx_voltdm_core = {
++	.name		= "core",
++};
++
++static struct voltagedomain am33xx_voltdm_rtc = {
++	.name		= "rtc",
++};
++
++static struct voltagedomain *voltagedomains_am33xx[] __initdata = {
++	&am33xx_voltdm_mpu,
++	&am33xx_voltdm_core,
++	&am33xx_voltdm_rtc,
++	NULL,
++};
++
++void __init am33xx_voltagedomains_init(void)
++{
++	voltdm_init(voltagedomains_am33xx);
++}
+--
+1.7.0.4
