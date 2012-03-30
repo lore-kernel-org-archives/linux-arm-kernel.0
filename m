@@ -1,25 +1,27 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Fri, 30 Mar 2012 10:32:25 +0200
-Subject: [PATCH 3/3] ep93xx: Add IDE support to edb93xx boards
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F00206970255C3@AUSP01VMBX24.collaborationhost.net>
-References: <4F7418E7.4060500@metasoft.pl> <4F741B3F.4000507@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F00206970255C3@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4F756F99.8090301@metasoft.pl>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 30 Mar 2012 10:32:54 +0200
+Subject: [PATCH] ARM: S3C64XX: Add basic cpuidle driver
+In-Reply-To: <20111222181359.GA19259@sirena.org.uk>
+References: <1323117169-9817-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112061231.22570.heiko@sntech.de> <20111222181359.GA19259@sirena.org.uk>
+Message-ID: <201203301032.54739.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-03-29 18:32, H Hartley Sweeten wrote:
->> +static int __init edb93xx_has_ide(void)
->> +{
->> +	/*
->> +	 * Although EDB9312 and EDB9315 do have IDE capability, they have
->> +	 * INTRQ line wired as pull-up, which makes using IDE interface
->> +	 * problematic.
->> +	 */
->> +	return machine_is_edb9315a();
-> 
-> Allow the driver to be loaded on the EDB9312 and EDB9315 but leave the comment.
-> If a use of these boards wishes to use the IDE they could remove the pull-up and add
-> a pull-down to their board.
+Hi Mark,
 
-Ok. Will do that.
+Am Donnerstag, 22. Dezember 2011, 19:13:59 schrieb Mark Brown:
+> On Tue, Dec 06, 2011 at 12:31:21PM +0100, Heiko St?bner wrote:
+> > So I'm really looking forward to seeing a possible example on how to
+> > support the STOP and DEEP-STOP modes best.
+> 
+> My plan there for the s3c64xx was to use pm_domain to figure out if the
+> system is idle enough to drop down, I've been adding some pm_runtime
+> support to provide the information to the core to let it figure this out.
+
+sorry for digging this up again, but do you happen to have some preliminary 
+code laying around for this, that I could "borrow"?
+
+
+Thanks
+Heiko
