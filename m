@@ -1,117 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Mar 2012 21:15:06 -0700
-Subject: [GIT PULL] ARM: arm-soc fixes for 3.4-rc
-Message-ID: <CAOesGMiGrqe6eB_pO_OxKFKprheZaRLsoQCus_CikfoPcs0H9w@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 30 Mar 2012 06:34:56 +0200
+Subject: [PATCH 03/17] ARM: mark const init data with __initconst
+ instead of __initdata
+In-Reply-To: <1333055554-31300-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20120329211131.GA31250@pengutronix.de>
+ <1333055554-31300-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120330043456.GL7757@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 23:12 Thu 29 Mar     , Uwe Kleine-K?nig wrote:
+> As long as there is no other non-const variable marked __initdata in the
+> same compilation unit it doesn't hurt. If there were one however
+> compilation would fail with
+> 
+> 	error: $variablename causes a section type conflict
+> 
+> because a section containing const variables is marked read only and so
+> cannot contain non-const variables.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Barry Song <baohua.song@csr.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Lucas De Marchi <lucas.demarchi@profusion.mobi>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> ---
+>  arch/arm/mach-at91/board-dt.c                 |    2 +-
+>  arch/arm/mach-at91/clock.c                    |    2 +-
+for at91
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-
-The following changes since commit b5174fa3a7f4f8f150bfa3b917c92608953dfa0f:
-
-  Merge tag 'mmc-merge-for-3.4-rc1' of
-git://git.kernel.org/pub/scm/linux/kernel/git/cjb/mmc (2012-03-28
-20:59:45 -0700)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/fixes-for-linus
-
-for you to fetch changes up to f00e9b11863abdb837e555a2b1e3417e8b5d80dd:
-
-  Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
-(2012-03-29 20:36:18 -0700)
-
-----------------------------------------------------------------
-
-ARM: arm-soc fixes for 3.4-rc
-
-This is a first pass of some of the merge window fallout for ARM platforms.
-
-Nothing controversial:
-
-* A system.h fallout fix for OMAP
-* PXA fixes for breakage caused by the regulator struct changes
-* GPIO fixes for OMAP to properly deal with dynamic IRQ allocation
-* A mismerge in our arm-soc tree of an lpc32xx change for networking
-* A fix for USB setup on tegra
-* An undo of __init annotation of display mux setup on OMAP that's needed
-  at runtime
-
-----------------------------------------------------------------
-Govindraj.R (1):
-      ARM: OMAP: pm: fix compilation break
-
-Haojian Zhuang (2):
-      ARM: pxa: fix build issue on cm-x300
-      ARM: pxa: fix build issue on stargate2
-
-Olof Johansson (3):
-      Merge branch 'for-3.4/fixes-for-rc1-and-v3.3' of
-git://git.kernel.org/.../swarren/linux-tegra into fixes
-      Merge branch 'fixes' of
-git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
-
-Paul Gortmaker (2):
-      ARM: pxa: fix regulator related build fail in magician_defconfig
-      ARM: pxa: fix build failure for regulator consumer in em-x270.c
-
-Roland Stigge (1):
-      ARM: LPC32xx: clock.c: Fix lpc-eth clock reference
-
-Stephen Warren (1):
-      ARM: tegra: Fix device tree AUXDATA for USB/EHCI
-
-Tarun Kanti DebBarma (3):
-      ARM: OMAP: boards: Fix OMAP_GPIO_IRQ usage with gpio_to_irq()
-      drivers: input: Fix OMAP_GPIO_IRQ with gpio_to_irq() in
-ams_delta_serio_exit()
-      ARM: OMAP: Remove OMAP_GPIO_IRQ macro definition
-
-Tomi Valkeinen (1):
-      ARM: OMAP2+: Remove __init from DSI mux functions
-
-Tony Lindgren (2):
-      Merge branch 'fix-dss-mux' into fixes
-      Merge branch 'fixes-gpio-to-irq' into fixes
-
- arch/arm/mach-lpc32xx/clock.c                |    2 +-
- arch/arm/mach-omap1/board-h2.c               |    8 ++++----
- arch/arm/mach-omap1/board-h3.c               |    9 ++++-----
- arch/arm/mach-omap1/board-htcherald.c        |    6 +++---
- arch/arm/mach-omap1/board-innovator.c        |    4 ++--
- arch/arm/mach-omap1/board-nokia770.c         |    2 +-
- arch/arm/mach-omap1/board-osk.c              |   12 ++++++------
- arch/arm/mach-omap1/board-palmte.c           |    2 +-
- arch/arm/mach-omap1/board-palmtt.c           |    2 +-
- arch/arm/mach-omap1/board-palmz71.c          |    2 +-
- arch/arm/mach-omap1/board-voiceblue.c        |   16 +++++++---------
- arch/arm/mach-omap1/pm.c                     |    1 +
- arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
- arch/arm/mach-omap2/board-4430sdp.c          |    2 +-
- arch/arm/mach-omap2/board-apollon.c          |    4 ++--
- arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
- arch/arm/mach-omap2/board-h4.c               |    2 +-
- arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
- arch/arm/mach-omap2/board-omap4panda.c       |    2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c |    3 ++-
- arch/arm/mach-omap2/board-zoom-debugboard.c  |    3 ++-
- arch/arm/mach-omap2/board-zoom-peripherals.c |    6 ++++--
- arch/arm/mach-omap2/common-board-devices.c   |    2 +-
- arch/arm/mach-omap2/display.c                |    8 ++++----
- arch/arm/mach-omap2/pm.c                     |    2 ++
- arch/arm/mach-pxa/cm-x300.c                  |    1 -
- arch/arm/mach-pxa/em-x270.c                  |   10 +++++-----
- arch/arm/mach-pxa/hx4700.c                   |    2 --
- arch/arm/mach-pxa/magician.c                 |    2 --
- arch/arm/mach-pxa/stargate2.c                |    2 +-
- arch/arm/mach-tegra/board-dt-tegra20.c       |    6 +++---
- arch/arm/mach-tegra/devices.c                |    7 +++----
- arch/arm/mach-tegra/devices.h                |    5 +++++
- arch/arm/plat-omap/include/plat/gpio.h       |    4 ----
- drivers/input/serio/ams_delta_serio.c        |    2 +-
- 35 files changed, 73 insertions(+), 74 deletions(-)
+Best Regards,
+J.
