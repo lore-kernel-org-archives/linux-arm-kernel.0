@@ -1,117 +1,38 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Fri, 30 Mar 2012 21:46:53 +0800
-Subject: [PATCH v2] ARM: dts: imx6q: add anatop regulators
-Message-ID: <1333115213-28922-1-git-send-email-paul.liu@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 30 Mar 2012 21:55:37 +0800
+Subject: [PATCH] ARM: amba: adapt to regulator probe deferral change
+Message-ID: <1333115737-1654-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+The commit 04bf301 (regulator: Support driver probe deferral) changes
+regulator_get() and regulator_register() to return -EPROBE_DEFER
+instead of -ENODEV.  Adapt amba bus driver to the change, otherwise
+amba_probe() will fail on the platforms that do not have "vcore"
+regulator device.
 
-Add anatop regulators to imx6q.dtsi for all imx6q platforms.
+It fixes the boot failure on i.mx28 which uses amba-pl011 as serial
+console.
 
-Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx6q.dtsi |   86 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 86 insertions(+), 0 deletions(-)
+ drivers/amba/bus.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 263e8f3..79f59e7 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -346,6 +346,92 @@
- 				compatible = "fsl,imx6q-anatop";
- 				reg = <0x020c8000 0x1000>;
- 				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				regulator-1p1 at 110 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd1p1";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1375000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x110>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <4>;
-+					anatop-min-voltage = <800000>;
-+					anatop-max-voltage = <1375000>;
-+				};
-+
-+				regulator-3p0 at 120 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd3p0";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <3150000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x120>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <0>;
-+					anatop-min-voltage = <2625000>;
-+					anatop-max-voltage = <3400000>;
-+				};
-+
-+				regulator-2p5 at 130 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd2p5";
-+					regulator-min-microvolt = <2000000>;
-+					regulator-max-microvolt = <2750000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x130>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <0>;
-+					anatop-min-voltage = <2000000>;
-+					anatop-max-voltage = <2750000>;
-+				};
-+
-+				regulator-vddcore at 140 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "cpu";
-+					regulator-min-microvolt = <725000>;
-+					regulator-max-microvolt = <1450000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x140>;
-+					anatop-vol-bit-shift = <0>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <1>;
-+					anatop-min-voltage = <725000>;
-+					anatop-max-voltage = <1450000>;
-+				};
-+
-+				regulator-vddpu at 140 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vddpu";
-+					regulator-min-microvolt = <725000>;
-+					regulator-max-microvolt = <1450000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x140>;
-+					anatop-vol-bit-shift = <9>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <1>;
-+					anatop-min-voltage = <725000>;
-+					anatop-max-voltage = <1450000>;
-+				};
-+
-+				regulator-vddsoc at 140 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vddsoc";
-+					regulator-min-microvolt = <725000>;
-+					regulator-max-microvolt = <1450000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x140>;
-+					anatop-vol-bit-shift = <18>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <1>;
-+					anatop-min-voltage = <725000>;
-+					anatop-max-voltage = <1450000>;
-+				};
- 			};
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 01c2cf4..aafee73 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -362,8 +362,8 @@ static int amba_get_enable_vcore(struct amba_device *pcdev)
+ 	pcdev->vcore = vcore;
  
- 			usbphy at 020c9000 { /* USBPHY1 */
+ 	if (IS_ERR(vcore)) {
+-		/* It is OK not to supply a vcore regulator */
+-		if (PTR_ERR(vcore) == -ENODEV)
++		/* It should not fail in case of -EPROBE_DEFER */
++		if (PTR_ERR(vcore) == -EPROBE_DEFER)
+ 			return 0;
+ 		return PTR_ERR(vcore);
+ 	}
 -- 
-1.7.9.1
+1.7.5.4
