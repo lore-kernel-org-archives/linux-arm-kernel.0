@@ -1,11 +1,13 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Fri, 30 Mar 2012 18:28:37 +0300
+Date: Fri, 30 Mar 2012 18:34:01 +0300
 Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
 In-Reply-To: <1333119961.87678.YahooMailClassic@web29013.mail.ird.yahoo.com>
 References: <1333119961.87678.YahooMailClassic@web29013.mail.ird.yahoo.com>
-Message-ID: <4F75D125.2070203@compulab.co.il>
+Message-ID: <4F75D269.7030500@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+
 
 On 03/30/12 18:06, Paul Parsons wrote:
 > --- On Fri, 30/3/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
@@ -75,8 +77,11 @@ Yeah, I know... but read in mfp-pxa2xx.h, lines 6-20:
  * bit     24 - Wakeup Enable(PXA2xx specific)
  */
 
-Also, PXA2xx h/w does not have an MFP registers, but only AF setting regs,
-So the whole MFP for PXA2xx is only to conform to newer "PXA" platform features...
+This means, that there is no difference between: MFP_CFG_IN and MFP_CFG_OUT for PXA2xx.
+The reason for this is that PXA2xx h/w does not have a dedicated MFP registers.
+All goes through the GPIO controller, so the whole MFP for PXA2xx is only to conform
+to newer "PXA" platform features...
+
 
 -- 
 Regards,
