@@ -1,162 +1,104 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 30 Mar 2012 07:24:18 -0700
-Subject: [PATCH] cpufreq: OMAP: fix build errors: depends on ARCH_OMAP2PLUS
-In-Reply-To: <20120330131200.GA23442@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 30 Mar 2012 14:12:00 +0100")
-References: <1332807568-638-1-git-send-email-khilman@ti.com>
- <20120330131200.GA23442@n2100.arm.linux.org.uk>
-Message-ID: <87limif9pp.fsf@ti.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Fri, 30 Mar 2012 15:30:33 +0100 (BST)
+Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
+In-Reply-To: <CAN1soZwgUooLEcDimUxyLO20x0__pAa+J3wRrH3zoW3pJsR2bg@mail.gmail.com>
+Message-ID: <1333117833.65604.YahooMailClassic@web29013.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+--- On Fri, 30/3/12, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> On Fri, Mar 30, 2012 at 6:41 PM, Paul
+> Parsons <lost.distance@yahoo.com>
+> wrote:
+> > --- On Fri, 30/3/12, Haojian Zhuang <haojian.zhuang@gmail.com>
+> wrote:
+> >> On Thu, Mar 29, 2012 at 2:12 AM, Paul
+> >> Parsons <lost.distance@yahoo.com>
+> >> wrote:
+> >> > On PXA2xx platforms, the MFP API (described
+> in
+> >> Documentation/arm/pxa/mfp.txt)
+> >> > provides values for the following:
+> >> >
+> >> > 1. GPIO inputs (e.g. GPIO105_GPIO).
+> >> > 2. Alternate function inputs (e.g.
+> GPIO105_CIF_DD_1).
+> >> > 3. Alternate function outputs (e.g.
+> >> GPIO105_KP_MKOUT_2).
+> >> >
+> >> > It does not provide values for GPIO outputs
+> (i.e. AF0
+> >> outputs).
+> >> >
+> >> > One cannot use the macro used by the MFP API
+> internally
+> >> - MFP_CFG_OUT() - to
+> >> > define new GPIO output values, since that
+> macro is
+> >> forbidden in platform code.
+> >> >
+> >> > Without the ability to add GPIO outputs to the
+> MFP
+> >> configuration, it is not
+> >> > possible to drive GPIO outputs high during
+> sleep mode.
+> >> >
+> >> > This would be useful, for example, on the
+> hx4700
+> >> platform, where driving the
+> >> > infrared powerdown GPIO 105 high during sleep
+> mode
+> >> would save some mA.
+> >> >
+> >> > So my question is: what method should one use
+> to add
+> >> GPIO outputs to the MFP
+> >> > configuration?
+> >> >
+> >> > One possible method, namely manually defining
+> values in
+> >> the platform code:
+> >> >
+> >> > ? ? ? ?MFP_PIN_GPIO105 | MFP_AF0 |
+> MFP_DIR_OUT |
+> >> MFP_LPM_DRIVE_HIGH,
+> >> >
+> >> > is essentially no different from using the
+> forbidden
+> >> MFP_CFG_OUT() macro.
+> >> >
+> >>
+> >> Does MFP_CFG_OUT() help you? This macro is defined
+> in
+> >> mfp-pxa2xx.h.
+> >
+> > Yes, MFP_CFG_OUT() does help. But it has been pointed
+> out that
+> > MFP_CFG_OUT() is not allowed to be used in board
+> support code:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086456.html
+> >
+> > Is that no longer true?
+> 
+> I'm sorry that I messed it. Since GPIOxx_GPIO is always
+> defined as MFP_CFG_IN().
+> It seems that you're blocked to specify MFP_CFG_OUT().
+> 
+> Actually it's not a problem. While you're using it as
+> output, you must
+> assign special
+> usage for this pin, like some peripheral rest signal. So I
+> think that
+> you can define new
+> macro GPIOxx_yy() in mfp-pxa27x.h, like GPIO9_HZ_CLK(). Is
+> it meaningful?
 
-> On Mon, Mar 26, 2012 at 05:19:28PM -0700, Kevin Hilman wrote:
->> The OMAP driver needs a 'depends on ARCH_OMAP2PLUS' since it only
->> builds for OMAP2+ platforms.
->> 
->> This 'depends on' was in the original patch from Russell King, but was
->> erroneously removed by me when making this option user-selectable in
->> commit b09db45c (cpufreq: OMAP driver depends CPUfreq tables.)  This
->> patch remedies that.
->> 
->> Apologies to Russell King for breaking his originally working patch.
->> 
->> Also, thanks to Grazvydas Ignotas for reporting the same problem.
->> 
->> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
->> Cc: Grazvydas Ignotas <notasas@gmail.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> Dave, this applies on top of your current fixes branch, and fixes a 
->> problem introduced there by me.  Please merge for v3.4-rc.  Thanks.
->
-> Can you please check that you've picked up everything that's necessary,
-> as I'm still seeing the below as outstanding from my original patch.
+The GPIO output value I wish to add is specific to the hx4700 platform;
+it is not defined in any PXA27x documentation.
 
-Yes, all the code you touch below is now removed, and queued by Paul,
-but unfortunately, that branch didn't make it in time for v3.4. :(
+Is it acceptable to add such platform-specific values to the generic
+mfp-pxa27x.h file?
 
-Paul, maybe you can pull out my "cleanup cpufreq leftovers" patch and
-submit for v3.4-rc?
-
-Thanks,
-
-Kevin
-
->
-> commit e55a42528cebb8fa7408dc95abb3859639a46750
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date:   Wed Feb 15 11:20:51 2012 +0000
->
->     ARM: OMAP: fix cpufreq build
->     
->     OMAPs cpufreq requires the frequency table support, but nothing ensures
->     that this is selected.  This can result in configurations which fail to
->     build:
->     
->     drivers/built-in.o:(.data+0x5238): undefined reference to `cpufreq_freq_attr_scaling_available_freqs'
->     drivers/cpufreq/omap-cpufreq.c:88: undefined reference to `cpufreq_frequency_table_target'
->     drivers/cpufreq/omap-cpufreq.c:60: undefined reference to `cpufreq_frequency_table_verify'
->     drivers/cpufreq/omap-cpufreq.c:186: undefined reference to `cpufreq_frequency_table_cpuinfo'
->     drivers/cpufreq/omap-cpufreq.c:190: undefined reference to `cpufreq_frequency_table_get_attr'
->     
->     Fix this by introducing a new configuration variable and having that
->     select CPU_FREQ_TABLE.
->     
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-> index 7072e0d..ad35d4e 100644
-> --- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-> +++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-> @@ -166,7 +166,7 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_CPU_FREQ
-> +#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
->  /*
->   * Walk PRCM rate table and fillout cpufreq freq_table
->   * XXX This should be replaced by an OPP layer in the near future
-> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-> index f57ed5b..450feb0 100644
-> --- a/arch/arm/mach-omap2/clock.c
-> +++ b/arch/arm/mach-omap2/clock.c
-> @@ -536,7 +536,7 @@ struct clk_functions omap2_clk_functions = {
->  	.clk_set_rate		= omap2_clk_set_rate,
->  	.clk_set_parent		= omap2_clk_set_parent,
->  	.clk_disable_unused	= omap2_clk_disable_unused,
-> -#ifdef CONFIG_CPU_FREQ
-> +#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
->  	/* These will be removed when the OPP code is integrated */
->  	.clk_init_cpufreq_table	= omap2_clk_init_cpufreq_table,
->  	.clk_exit_cpufreq_table	= omap2_clk_exit_cpufreq_table,
-> diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-> index b8c2a68..f331cfc 100644
-> --- a/arch/arm/mach-omap2/clock.h
-> +++ b/arch/arm/mach-omap2/clock.h
-> @@ -146,7 +146,7 @@ extern const struct clksel_rate gpt_sys_rates[];
->  extern const struct clksel_rate gfx_l3_rates[];
->  extern const struct clksel_rate dsp_ick_rates[];
->  
-> -#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_CPU_FREQ)
-> +#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_ARM_OMAP2PLUS_CPUFREQ)
->  extern void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
->  extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
->  #else
-> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-> index 56b6f8b..618cf80 100644
-> --- a/arch/arm/plat-omap/clock.c
-> +++ b/arch/arm/plat-omap/clock.c
-> @@ -398,7 +398,7 @@ struct clk dummy_ck = {
->  	.ops	= &clkops_null,
->  };
->  
-> -#ifdef CONFIG_CPU_FREQ
-> +#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
->  void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
->  {
->  	unsigned long flags;
-> diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-> index 240a7b9..879ba27 100644
-> --- a/arch/arm/plat-omap/include/plat/clock.h
-> +++ b/arch/arm/plat-omap/include/plat/clock.h
-> @@ -283,7 +283,7 @@ struct clk_functions {
->  	void		(*clk_allow_idle)(struct clk *clk);
->  	void		(*clk_deny_idle)(struct clk *clk);
->  	void		(*clk_disable_unused)(struct clk *clk);
-> -#ifdef CONFIG_CPU_FREQ
-> +#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
->  	void		(*clk_init_cpufreq_table)(struct cpufreq_frequency_table **);
->  	void		(*clk_exit_cpufreq_table)(struct cpufreq_frequency_table **);
->  #endif
-> @@ -301,7 +301,7 @@ extern void recalculate_root_clocks(void);
->  extern unsigned long followparent_recalc(struct clk *clk);
->  extern void clk_enable_init_clocks(void);
->  unsigned long omap_fixed_divisor_recalc(struct clk *clk);
-> -#ifdef CONFIG_CPU_FREQ
-> +#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
->  extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
->  extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
->  #endif
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 32d790d..587b578 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -3,8 +3,8 @@
->  #
->  
->  config ARM_OMAP2PLUS_CPUFREQ
-> -	bool "TI OMAP2+"
-> -	default ARCH_OMAP2PLUS
-> +	def_bool y
-> +	depends on ARCH_OMAP2PLUS
->  	select CPU_FREQ_TABLE
->  
->  config ARM_S3C2416_CPUFREQ
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Paul
