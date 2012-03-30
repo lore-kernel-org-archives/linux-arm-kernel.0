@@ -1,101 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Mar 2012 20:18:43 +0000
-Subject: [PATCH 1/3] PATA host controller driver for ep93xx
-In-Reply-To: <4F741AB1.4000107@metasoft.pl>
-References: <4F7418E7.4060500@metasoft.pl> <4F741AB1.4000107@metasoft.pl>
-Message-ID: <201203302018.43681.arnd@arndb.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 30 Mar 2012 22:24:20 +0200
+Subject: [U-Boot] zImage and raw ramdisk support -- test
+In-Reply-To: <CAOCHtYiewpJ6PERFP_O-0gXkkrQte1kL3m4za9=9ZaNBMgyqLg@mail.gmail.com>
+References: <201203301738.57972.marek.vasut@gmail.com>
+ <CAOCHtYiewpJ6PERFP_O-0gXkkrQte1kL3m4za9=9ZaNBMgyqLg@mail.gmail.com>
+Message-ID: <201203302224.20196.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 March 2012, Rafal Prylowski wrote:
+Dear Robert Nelson,
 
-> +static u16 ep93xx_pata_read(struct ep93xx_pata_data *drv_data,
-> +			    void *addr_io,
-> +			    const struct ata_timing *t)
-> +{
-> +	unsigned long addr = (unsigned long) addr_io & 0x1f;
-> +	void __iomem *base = drv_data->ide_base;
-> +	u16 ret;
-> +
-> +	writel(IDECtrl_DIOWn | IDECtrl_DIORn | addr, base + IDECtrl);
-> +	ndelay(t->setup);
-> +	writel(IDECtrl_DIOWn | addr, base + IDECtrl);
+> On Fri, Mar 30, 2012 at 10:38 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Guys,
+> > 
+> > I need final test on as much platforms as possible. Can you please run
+> > these two following patches and tell me if they work with zImage and raw
+> > ramdisk for you?
+> > 
+> > http://patchwork.ozlabs.org/patch/146848/
+> > http://patchwork.ozlabs.org/patch/147440/
+> > 
+> > I can't promise they will make it to this release (I've been pestering WD
+> > pretty thoroughly (sorry about that), though I'm starting to be unhappy
+> > to merge this stuff at the verge of release myself).
+> 
+> Hi Marek,
+> 
+> These work great on my omap3 Beagle xM C / omap4 Panda, using a zImage
+> and initramfs..
+> 
+> Just added the two appropriate board configs, to enable it..
+> #define CONFIG_CMD_BOOTZ
+> #define CONFIG_SUPPORT_RAW_INITRD
+> 
+> and used todays u-boot git head:
+> http://git.denx.de/?p=u-boot.git;a=commit;h=7cb30b13f12077c7eec8ce2419cd96c
+> d65ace8e2
 
-The pointer arithmetic that you do here on addr_io looks really evil.
-Basically your registers are indirect and cannot be accessed through
-pointer dereference. Maybe you should not be trying to do that then
-and not use the ata_port->ioaddr structure.
+And it makes u-boot about 20% cooler, doesn't it ;-)
 
-> +	ndelay(t->act8b);
+Thanks a lot for your testing!
 
-I'm not too familar with ata drivers, but I don't think you're supposed
-to have delays in the code for the timings, rather than programming
-the timings into the controller registers. Are you sure this is the
-right thing here?
+> Tested-by: Robert Nelson <robertcnelson@gmail.com>
+> 
+> Regards,
 
-> +	if (drv_data->iordy) {
-> +		/* min. 1s timeout (at cpu cycle = 5ns) */
-> +		unsigned int timeout = 200000;
-> +		while (!ep93xx_pata_check_iordy(base) && --timeout)
-> +			cpu_relax();
-> +	}
-
-This is not a reliable way to implement a timeout. Instead, you should
-use time_before() to check if hte timeout has expired.
-
-
-> +static void ep93xx_pata_setup_port(struct ata_ioports *ioaddr)
-> +{
-> +	/*
-> +	 * the device IDE register to be accessed is selected through
-> +	 * IDECTRL register's specific bitfields 'DA', 'CS1n' and 'CS0n':
-> +	 *   b4   b3   b2    b1     b0
-> +	 *   A2   A1   A0   CS1n   CS0n
-> +	 * the values filled in this structure allows the value to be directly
-> +	 * ORed to the IDECTRL register, hence giving directly the A[2:0] and
-> +	 * CS1n/CS0n values for each IDE register.
-> +	 * The values correspond to the transformation:
-> +	 *   ((real IDE address) << 2) | CS1n value << 1 | CS0n value
-> +	 */
-> +	ioaddr->cmd_addr	= (void __iomem *) 0 + 2; /* CS1 */
-> +
-> +	ioaddr->data_addr	= (void __iomem *) (ATA_REG_DATA << 2) + 2;
-> +	ioaddr->error_addr	= (void __iomem *) (ATA_REG_ERR << 2) + 2;
-> +	ioaddr->feature_addr	= (void __iomem *) (ATA_REG_FEATURE << 2) + 2;
-> +	ioaddr->nsect_addr	= (void __iomem *) (ATA_REG_NSECT << 2) + 2;
-> +	ioaddr->lbal_addr	= (void __iomem *) (ATA_REG_LBAL << 2) + 2;
-> +	ioaddr->lbam_addr	= (void __iomem *) (ATA_REG_LBAM << 2) + 2;
-> +	ioaddr->lbah_addr	= (void __iomem *) (ATA_REG_LBAH << 2) + 2;
-> +	ioaddr->device_addr	= (void __iomem *) (ATA_REG_DEVICE << 2) + 2;
-> +	ioaddr->status_addr	= (void __iomem *) (ATA_REG_STATUS << 2) + 2;
-> +	ioaddr->command_addr	= (void __iomem *) (ATA_REG_CMD << 2) + 2;
-> +
-> +	ioaddr->altstatus_addr	= (void __iomem *) (0x06 << 2) + 1; /* CS0 */
-> +	ioaddr->ctl_addr	= (void __iomem *) (0x06 << 2) + 1; /* CS0 */
-> +}
-
-As mentioned above, this seems to make no sense.
-
-> ===================================================================
-> --- linux-2.6.orig/drivers/ata/Kconfig
-> +++ linux-2.6/drivers/ata/Kconfig
-> @@ -416,6 +416,15 @@ config PATA_EFAR
->  
->  	  If unsure, say N.
->  
-> +config PATA_EP93XX
-> +	tristate "Cirrus Logic EP93xx PATA support"
-> +	depends on ARCH_EP93XX
-> +	help
-> +	  This option enables support for the PATA controller in
-> +	  the Cirrus Logic EP9312 and EP9315 ARM CPU.
-> +
-> +	  If unsure, say N.
-> +
->  config PATA_HPT366
->  	tristate "HPT 366/368 PATA support"
->  	depends on PCI
-
-And I think this should be consequently be sorted below nonstandard ports, instead of the SFF list.
-
-	Arnd
+Best regards,
+Marek Vasut
