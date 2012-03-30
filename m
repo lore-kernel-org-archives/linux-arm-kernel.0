@@ -1,76 +1,43 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 30 Mar 2012 21:25:50 +0800
-Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
-In-Reply-To: <1333104093.65224.YahooMailClassic@web29002.mail.ird.yahoo.com>
-References: <CAN1soZwzBqDGTX+a-maVr5baaoZ7qwgdvXyPeya5R80cN_iA0w@mail.gmail.com>
- <1333104093.65224.YahooMailClassic@web29002.mail.ird.yahoo.com>
-Message-ID: <CAN1soZwgUooLEcDimUxyLO20x0__pAa+J3wRrH3zoW3pJsR2bg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 30 Mar 2012 18:57:25 +0530
+Subject: [PATCH 0/3] OMAP4: CPUidle: Add coupled idle support
+Message-ID: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 6:41 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> --- On Fri, 30/3/12, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->> On Thu, Mar 29, 2012 at 2:12 AM, Paul
->> Parsons <lost.distance@yahoo.com>
->> wrote:
->> > On PXA2xx platforms, the MFP API (described in
->> Documentation/arm/pxa/mfp.txt)
->> > provides values for the following:
->> >
->> > 1. GPIO inputs (e.g. GPIO105_GPIO).
->> > 2. Alternate function inputs (e.g. GPIO105_CIF_DD_1).
->> > 3. Alternate function outputs (e.g.
->> GPIO105_KP_MKOUT_2).
->> >
->> > It does not provide values for GPIO outputs (i.e. AF0
->> outputs).
->> >
->> > One cannot use the macro used by the MFP API internally
->> - MFP_CFG_OUT() - to
->> > define new GPIO output values, since that macro is
->> forbidden in platform code.
->> >
->> > Without the ability to add GPIO outputs to the MFP
->> configuration, it is not
->> > possible to drive GPIO outputs high during sleep mode.
->> >
->> > This would be useful, for example, on the hx4700
->> platform, where driving the
->> > infrared powerdown GPIO 105 high during sleep mode
->> would save some mA.
->> >
->> > So my question is: what method should one use to add
->> GPIO outputs to the MFP
->> > configuration?
->> >
->> > One possible method, namely manually defining values in
->> the platform code:
->> >
->> > ? ? ? ?MFP_PIN_GPIO105 | MFP_AF0 | MFP_DIR_OUT |
->> MFP_LPM_DRIVE_HIGH,
->> >
->> > is essentially no different from using the forbidden
->> MFP_CFG_OUT() macro.
->> >
->>
->> Does MFP_CFG_OUT() help you? This macro is defined in
->> mfp-pxa2xx.h.
->
-> Yes, MFP_CFG_OUT() does help. But it has been pointed out that
-> MFP_CFG_OUT() is not allowed to be used in board support code:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086456.html
->
-> Is that no longer true?
+The series adds the coupled cpuidle support for OMAP4 based on the v2
+series posted [1]. This makes OMAP4 to support SMP cpuidle and also
+removes the hard dependency of off-lining CPU1 to trigger deeper
+C-states.
 
-I'm sorry that I messed it. Since GPIOxx_GPIO is always defined as MFP_CFG_IN().
-It seems that you're blocked to specify MFP_CFG_OUT().
+I have put together a branch which is based on 3.3 kernel with
+Len Browns next branch [2] which has time keeping and other cpuidle
+patches which will mostly get merged by 3.4-rc1 and rebased coupled
+idle series from [1].
 
-Actually it's not a problem. While you're using it as output, you must
-assign special
-usage for this pin, like some peripheral rest signal. So I think that
-you can define new
-macro GPIOxx_yy() in mfp-pxa27x.h, like GPIO9_HZ_CLK(). Is it meaningful?
+git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+for_3.5/omap4_coupled_cpuidle-rebase
 
-Best Regards
-Haojian
+Special thanks to Kevin Hilman and Colin Cross on their help on this
+series.
+
+Kevin Hilman (1):
+  ARM: OMAP4: CPUidle: add synchronization for coupled idle states
+
+Santosh Shilimkar (2):
+  ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
+  ARM: OMAP4: cpuidle: Use coupled cpuidle states to implement SMP
+    cpuidle.
+
+ arch/arm/mach-omap2/Kconfig       |    1 +
+ arch/arm/mach-omap2/cpuidle44xx.c |  187 ++++++++++++++++++++++++-------------
+ arch/arm/mach-omap2/timer.c       |    4 +-
+ 3 files changed, 124 insertions(+), 68 deletions(-)
+
+
+Regards
+Santosh
+[1] http://lwn.net/Articles/486484/
+
+[2] Power Management
+git://git.kernel.org/pub/scm/linux/kernel/git/lenb/linux.git
