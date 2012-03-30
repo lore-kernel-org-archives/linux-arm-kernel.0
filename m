@@ -1,28 +1,40 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 30 Mar 2012 21:33:53 +0530
-Subject: [PATCH-V4 2/4] ARM: OMAP3/4: omap_hwmod: Add rstst_off field to
- struct omap_hwmod_omap4_prcm
+Date: Fri, 30 Mar 2012 21:33:54 +0530
+Subject: [PATCH-V4 3/4] ARM: OMAP2+: powerdomain: Add offset & mask fields to
+ struct powerdomain
 In-Reply-To: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
 References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1333123435-27186-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <1333123435-27186-4-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of AM33XX device, XXX_RSTST register offset is not
-consistent across PRM modules/instances,
+In case of AM33xx family of devices, there is no consistency between
+PWRSTCTRL & PWRSTST register offsers in PRM space, for example -
 
-PRM_XXX            RSTST
-=========================
-PRM_PER_MOD:       0x04
-PRM_WKUP_MOD:      0x0C
-PRM_MPU_MOD:       NA
-PRM_DEVICE_MOD:    0x08
+PRM_XXX           PWRSTCTRL     PWRSTST
+=======================================
+PRM_PER_MOD:      0x0C,         0x08
+PRM_WKUP_MOD:     0x04,         0x08
+PRM_MPU_MOD:      0x00,         0x04
+PRM_DEVICE_MOD:   NA,           NA
 
-This means, we need to pass on XXX_RSTST register offset
-information through omap_hwmod data, similar to XXX_RSTCTRL.
+And also, there is no consistency between bit-offsets inside
+PWRSTCTRL & PWRSTST register, for example -
 
-Currently, this field is only applicable and used for AM33XX
-devices.
+PRM_XXX           LOGICRET  MEMON  MEMRET
+=======================================
+GFX_PWRCTRL:      2,        17,    6
+PER_PWRCTRL:      3,        25,    29
+MPU_PWRCTRL:      2,        18,    22
+WKUP_PWRCTRL:     3,        NA,    NA
+
+This means, we need to maintain and pass on all this information
+in powerdomain handle; so adding fields for,
+   - PWRSTCTRL/ST register offset
+   - Logic retention state mask
+   - mem_on/ret/pwrst/retst mask
+
+Currently, this fields is only applicable and used for AM33XX devices.
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
@@ -31,26 +43,43 @@ Cc: Kevin Hilman <khilman@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/powerdomain.h |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 9ae87eb..50f42ec 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -374,11 +374,13 @@ struct omap_hwmod_omap2_prcm {
-  * struct omap_hwmod_omap4_prcm - OMAP4-specific PRCM data
-  * @clkctrl_reg: PRCM address of the clock control register
-  * @rstctrl_reg: address of the XXX_RSTCTRL register located in the PRM
-+ * @rstst_reg: (AM33XX Only) address of the XXX_RSTST register located in the PRM
-  * @submodule_wkdep_bit: bit shift of the WKDEP range
-  */
- struct omap_hwmod_omap4_prcm {
- 	u16		clkctrl_offs;
- 	u16		rstctrl_offs;
-+	u16		rstst_offs;
- 	u16		context_offs;
- 	u8		submodule_wkdep_bit;
- 	u8		modulemode;
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 0d72a8a..8fc50b2 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -92,6 +92,15 @@ struct powerdomain;
+  * @pwrdm_clkdms: Clockdomains in this powerdomain
+  * @node: list_head linking all powerdomains
+  * @voltdm_node: list_head linking all powerdomains in a voltagedomain
++ * @pwrstctrl_offs: (AM33XX only) XXX_PWRSTCTRL reg offset from prcm_offs
++ * @pwrstst_offs: (AM33XX only) XXX_PWRSTST reg offset from prcm_offs
++ * @logicretstate_mask: (AM33XX only) mask for logic retention bitfield
++ *	in @pwrstctrl_offs
++ * @mem_on_mask: (AM33XX only) mask for mem on bitfield in @pwrstctrl_offs
++ * @mem_ret_mask: (AM33XX only) mask for mem retention bitfield in @pwrstctrl_offs
++ * @mem_pwrst_mask: (AM33XX only) mask for mem state bitfield in @pwrstst_offs
++ * @mem_retst_mask: (AM33XX only) mask for mem retention state bitfield
++ *	in @pwrstctrl_offs
+  * @state:
+  * @state_counter:
+  * @timer:
+@@ -121,6 +130,14 @@ struct powerdomain {
+ 	unsigned ret_logic_off_counter;
+ 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
+
++	const u8 pwrstctrl_offs;
++	const u8 pwrstst_offs;
++	const u32 logicretstate_mask;
++	const u32 mem_on_mask[PWRDM_MAX_MEM_BANKS];
++	const u32 mem_ret_mask[PWRDM_MAX_MEM_BANKS];
++	const u32 mem_pwrst_mask[PWRDM_MAX_MEM_BANKS];
++	const u32 mem_retst_mask[PWRDM_MAX_MEM_BANKS];
++
+ #ifdef CONFIG_PM_DEBUG
+ 	s64 timer;
+ 	s64 state_timer[PWRDM_MAX_PWRSTS];
 --
 1.7.0.4
