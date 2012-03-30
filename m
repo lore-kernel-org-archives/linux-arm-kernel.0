@@ -1,7 +1,7 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 30 Mar 2012 14:31:18 +0800
-Subject: [PATCH 1/1] ARM: imx28: add basic dt support
-Message-ID: <1333089078-24724-1-git-send-email-b29396@freescale.com>
+Date: Fri, 30 Mar 2012 14:32:10 +0800
+Subject: [PATCH v3 1/1] ARM: imx28: add basic dt support
+Message-ID: <1333089130-24832-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
