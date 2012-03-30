@@ -1,54 +1,44 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Fri, 30 Mar 2012 14:27:43 +0530
-Subject: [PATCH v2] ARM: OMAP2+: Fix omap2+ build error.
-Message-ID: <1333097863-7205-1-git-send-email-r.sricharan@ti.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Fri, 30 Mar 2012 17:11:51 +0800
+Subject: [PATCH v3 1/1] ARM: imx28: add basic dt support
+In-Reply-To: <20120330085103.GF3254@S2101-09.ap.freescale.net>
+References: <1333089130-24832-1-git-send-email-b29396@freescale.com>
+ <20120330085103.GF3254@S2101-09.ap.freescale.net>
+Message-ID: <20120330091150.GA21517@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_OMAP4_ERRATA_I688 enabled, omap2+ build
-was broken as below.
+On Fri, Mar 30, 2012 at 04:51:06PM +0800, Shawn Guo wrote:
+> I tried to apply the patch, but ...
+> 
+> On Fri, Mar 30, 2012 at 02:32:10PM +0800, Dong Aisheng wrote:
+> ...
+> > +static int __init mxs_icoll_add_irq_domain(struct device_node *np,
+> > +				struct device_node *interrupt_parent)
+> > +{
+> > +	irq_domain_add_simple(np, 0);
+> 
+> The irq_domain_add_simple() has been removed from mainline.  You need
+> a rebase against Linus' tree.
+> 
+Will rebase.
 
-	arch/arm/kernel/io.c: In function '_memcpy_toio':
-	arch/arm/kernel/io.c:29: error: implicit declaration of function 'outer_sync'
-	make[1]: *** [arch/arm/kernel/io.o] Error 1
+> > +static struct sys_timer imx28_timer = {
+> > +	.init = imx28_timer_init,
+> > +};
+> > +
+> > +static void __init mxs_machine_init(void)
+> > +{
+> > +       of_platform_populate(NULL, of_default_bus_match_table,
+> 
+> Given by checkpatch:
+> 
+> WARNING: please, no spaces at the start of a line
+> #565: FILE: arch/arm/mach-mxs/mach-mxs.c:51:
+> +       of_platform_populate(NULL, of_default_bus_match_table,$
+> 
+Hmm, it seems my checkpatch is out of date.
+With new checkpatch i found it.
 
-after the commit,
-
-	commit 9f97da78bf018206fb623cd351d454af2f105fe0
-	Author: David Howells <dhowells@redhat.com>
-	Date:   Wed Mar 28 18:30:01 2012 +0100
-
-	    Disintegrate asm/system.h for ARM
-    
-	    Disintegrate asm/system.h for ARM.
-
-Fixing this here.
-
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/barrier.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-index 44f4a09..0511238 100644
---- a/arch/arm/include/asm/barrier.h
-+++ b/arch/arm/include/asm/barrier.h
-@@ -2,6 +2,7 @@
- #define __ASM_BARRIER_H
- 
- #ifndef __ASSEMBLY__
-+#include <asm/outercache.h>
- 
- #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
- 
-@@ -39,7 +40,6 @@
- #ifdef CONFIG_ARCH_HAS_BARRIERS
- #include <mach/barriers.h>
- #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
--#include <asm/outercache.h>
- #define mb()		do { dsb(); outer_sync(); } while (0)
- #define rmb()		dsb()
- #define wmb()		mb()
--- 
-1.7.1
+Regards
+Dong Aisheng
