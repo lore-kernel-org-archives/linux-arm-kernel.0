@@ -1,34 +1,33 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Fri, 30 Mar 2012 15:02:35 +0200
-Subject: [PATCH] ARM: at91: add support for Telit GE863-PRO3 Evaluation Kit
-In-Reply-To: <20120330115906.GM7757@game.jcrosoft.org>
-References: <1333097816-8641-1-git-send-email-fabio.porcedda@gmail.com>
- <20120330115906.GM7757@game.jcrosoft.org>
-Message-ID: <CAHkwnC9XZneX-9def=0VYifyVDG4ZtXo1L+ZJNQDhxSm1fPj9A@mail.gmail.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Fri, 30 Mar 2012 08:03:28 -0500
+Subject: [PATCH] ASoC: fsl: enable ssi clock in probe function
+In-Reply-To: <20120330055543.GH19506@S2101-09.ap.freescale.net>
+References: <1332989621-5211-1-git-send-email-shawn.guo@linaro.org>
+ <20120329112949.GM3668@opensource.wolfsonmicro.com>
+ <4F748751.3020300@freescale.com>
+ <20120329160916.GG19506@S2101-09.ap.freescale.net>
+ <4F748C8E.1010702@freescale.com>
+ <20120330055543.GH19506@S2101-09.ap.freescale.net>
+Message-ID: <4F75AF20.6080009@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 1:59 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> tks for the patch but now we have close the non dt board for this soc
+Shawn Guo wrote:
+> I guess you only meant mpc85xx_defconfig (and mpc85xx_smp_defconfig).
+> I sent the patch after compile-testing for mpc85xx_defconfig, and
+> took it for granted that mpc8610_hpcd_defconfig will also compile.
+> But I just discovered that PPC_CLOCK is not enabled for
+> mpc8610_hpcd_defconfig, so it fails on the final link.
 
-Thanks for the reply.
+Argh.  I was thinking about testing mpc8610 as well, but I thought, "Hey,
+p1022ds works, why bother testing the 8610?  Why would it fail?"
 
-> and for 3.5 nearly all the devices of this soc will converted to DT
->
-> so you need to switch to DT too
+> I just sent a patch proposing to fix it by always building in PPC_CLOCK
+> for FSL_SOC.
 
-Ok, i will switch to DT too.
-Do you plan to add support to any 9260 board to the board-dt.c for 3.5?
-I think that, as far as there is a working 9260 board using DT, i can
-work on the GE863-PRO3 support using DT.
+You'll need to get Kumar Gala's ACK on that one, but if only the 8610 is
+broken, then I don't think he'll like it.
 
-> As today I've not finished the pinctrl support you need to do all the pin mux
-> in the bootlader. For 3.5 it will not be the case anymore
->
-> Best Regards,
-> J.
-
-Thanks and regards
 -- 
-Fabio Porcedda
+Timur Tabi
+Linux kernel developer at Freescale
