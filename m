@@ -1,31 +1,29 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 30 Mar 2012 09:19:13 -0400 (EDT)
-Subject: [PATCH 0/4] memcpy optimized with strd/ldrd
-In-Reply-To: <030501cd0e6a$03642770$0a2c7650$%kim@samsung.com>
-References: <03e101cd0e07$eec39f10$cc4add30$@com>
- <030501cd0e6a$03642770$0a2c7650$%kim@samsung.com>
-Message-ID: <alpine.LFD.2.02.1203300914510.24151@xanadu.home>
+From: timur@freescale.com (Timur Tabi)
+Date: Fri, 30 Mar 2012 08:19:44 -0500
+Subject: [PATCH] ASoC: fsl: enable ssi clock in probe function
+In-Reply-To: <CAAQ0ZWR5ws7od92bOcLn-kDdbSPAVRDQwdVu-90tRfDSH_49KA@mail.gmail.com>
+References: <1332989621-5211-1-git-send-email-shawn.guo@linaro.org>
+ <20120329112949.GM3668@opensource.wolfsonmicro.com>
+ <4F748751.3020300@freescale.com>
+ <20120329160916.GG19506@S2101-09.ap.freescale.net>
+ <4F748C8E.1010702@freescale.com>
+ <20120330055543.GH19506@S2101-09.ap.freescale.net>
+ <4F75AF20.6080009@freescale.com>
+ <CAAQ0ZWR5ws7od92bOcLn-kDdbSPAVRDQwdVu-90tRfDSH_49KA@mail.gmail.com>
+Message-ID: <4F75B2F0.6090104@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Mar 2012, Boojin Kim wrote:
+Shawn Guo wrote:
+>> > You'll need to get Kumar Gala's ACK on that one, but if only the 8610 is
+>> > broken, then I don't think he'll like it.
+>> >
+> It's only about building in arch/powerpc/kernel/clock.c, which is a
+> pretty dummy clk API and does not take much cost.
 
-> Nicolas Pitre wrote:
-> >
-> >
-> > Here's my version.  Lightly tested.
-> > I have no A15 hardware to run any performance comparison though.
-> >
-> I'm reviewing and testing your patch. But, My other work disturbs to reviewing it.
-> I will give you feedback soon within this week.
-> Wait a little more.
-> And, Thanks for your patches. :)
+Like I said, it needs Kumar's review.  You should ping him on it.  He may
+just want the 8610 fixed.
 
-FYI, it occurred to me that some corner cases might not be quite right 
-with regards to alignment for the STRD instruction.  It seems that the 
-hardware on which I tested it (Marvell Dove CPU) apparently copes with 
-misaligned SDRD's when they're still 32-bit aligned.  So I need to run 
-this code through a real validation harness on different hardware.
-
-
-Nicolas
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
