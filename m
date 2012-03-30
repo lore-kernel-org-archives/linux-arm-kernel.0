@@ -1,46 +1,37 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 30 Mar 2012 16:22:07 +0000
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831841943@DBDE01.ent.ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 30 Mar 2012 10:23:26 -0600
+Subject: [PATCH] pinctrl: Replace list_*() with get_*_count()
+In-Reply-To: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
+References: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
+Message-ID: <4F75DDFE.3030408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 21:33:51, Hiremath, Vaibhav wrote:
-> After some healthy discussion, now we have come to the conclusion and
-> decided to handle AM33XX PRM/CM part separately; as AM33XX-PRCM module is
-> different than OMAP3 and OMAP4 architecture.
+On 03/29/2012 11:55 PM, Viresh Kumar wrote:
+> Most of the SoC drivers implement list_groups() and list_functions() routines
+> for pinctrl and pinmux. These routines continue returning zero until the
+> selector argument is greater than total count of available groups or functions.
 > 
-> The difference becomes very interesting/weird when it comes to
-> the consistency for register offsets in PRM address space and
-> bit-field offsets inside PRM registers,
-> So along with Powerdomain data and PRM api's required for AM33XX
-> device, this patch series adds,
+> This patch replaces these list_*() routines with get_*_count() routines, which
+> returns the number of available selection for SoC driver. pinctrl layer will use
+> this value to check the range it can choose.
 > 
->  - XXX_RSTST register offset to "struct omap_hwmod_omap4_prcm"
->  - PWRSTCTRL & PWRSTST register offsets to "struct powerdomain"
->  - Logicretstate and mem_on/ret/pwrst/retst mask to "struct
->    powerdomain"
+> This patch fixes all user drivers for this change. There are other routines in
+> user drivers, which have checks to check validity of selector passed to them. It
+> is also no more required and hence removed.
 > 
-> Testing: This patch series has been boot tested on AM37xEVM and AM335x
->          based BeagleBone community board.
+> Documentation updated as well.
 > 
-> Thanks to Paul here...for helping and concluding on this,
-> shortly I will submit similar patch for CM, clockdomain and clock-tree
-> support for AM33xx.
-> 
-> This patch-series is created on top of "linux-omap/cleanup" branch, and
-> also gets applied to "linux-omap/master" branch.
-> The patches are also available at -
-> https://github.com/hvaibhav/am335x-linux/tree/am335x-prm-cm
-> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-Please use "am335x-upstream-staging" branch, to able to boot on BeagleBone
-board, due to missing clock & hwmod data.
+This looks fine to me, so:
 
-I am in the process of submitting these patches.
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-Thanks,
-Vaibhav
+One small issue to fix though: In pinctrl-tegra.c, you've removed all
+the range-checkes from the ops functions, except you forgot to update
+tegra_pinctrl_disable().
+
+This is simple enough I don't think I need to test it; it doesn't
+actually apply to my local tree since it conflicts with all the pinctrl
+DT work I have.
