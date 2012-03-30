@@ -1,37 +1,117 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Mar 2012 14:28:40 +0100
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20120330132256.GI3254@S2101-09.ap.freescale.net>
-References: <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20120104135204.GA14741@S2100-06.ap.freescale.net>
- <20120104211800.GF11810@n2100.arm.linux.org.uk>
- <20120105113106.GR11810@n2100.arm.linux.org.uk>
- <20120330131320.GH3254@S2101-09.ap.freescale.net>
- <20120330131509.GE22981@n2100.arm.linux.org.uk>
- <20120330132256.GI3254@S2101-09.ap.freescale.net>
-Message-ID: <20120330132840.GG22981@n2100.arm.linux.org.uk>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Fri, 30 Mar 2012 21:46:53 +0800
+Subject: [PATCH v2] ARM: dts: imx6q: add anatop regulators
+Message-ID: <1333115213-28922-1-git-send-email-paul.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 09:22:59PM +0800, Shawn Guo wrote:
-> I have seen it's on the linux-next at the early time of the cycle,
-> but I have to admit that I have not done that at the later time.
+From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 
-Well, I did lose track of which branches I had in linux-next during this
-last cycle, which is probably how it got dropped.
+Add anatop regulators to imx6q.dtsi for all imx6q platforms.
 
-The last update gave this against mainline:
+Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx6q.dtsi |   86 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 86 insertions(+), 0 deletions(-)
 
- arch/arm/tools/mach-types |  186 ++++++++++++++++++++++++--------------------
- 1 files changed, 101 insertions(+), 85 deletions(-)
-
-and the latest update gives this also against mainline:
-
- arch/arm/tools/mach-types |  416 ++++++++++++++++++++++++---------------------
- 1 files changed, 219 insertions(+), 197 deletions(-)
-
-so that's 196 platform IDs deleted, which is way too much to be 'safe'.
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 263e8f3..79f59e7 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -346,6 +346,92 @@
+ 				compatible = "fsl,imx6q-anatop";
+ 				reg = <0x020c8000 0x1000>;
+ 				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				regulator-1p1 at 110 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "vdd1p1";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1375000>;
++					regulator-always-on;
++					anatop-reg-offset = <0x110>;
++					anatop-vol-bit-shift = <8>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <4>;
++					anatop-min-voltage = <800000>;
++					anatop-max-voltage = <1375000>;
++				};
++
++				regulator-3p0 at 120 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "vdd3p0";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <3150000>;
++					regulator-always-on;
++					anatop-reg-offset = <0x120>;
++					anatop-vol-bit-shift = <8>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <0>;
++					anatop-min-voltage = <2625000>;
++					anatop-max-voltage = <3400000>;
++				};
++
++				regulator-2p5 at 130 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "vdd2p5";
++					regulator-min-microvolt = <2000000>;
++					regulator-max-microvolt = <2750000>;
++					regulator-always-on;
++					anatop-reg-offset = <0x130>;
++					anatop-vol-bit-shift = <8>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <0>;
++					anatop-min-voltage = <2000000>;
++					anatop-max-voltage = <2750000>;
++				};
++
++				regulator-vddcore at 140 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "cpu";
++					regulator-min-microvolt = <725000>;
++					regulator-max-microvolt = <1450000>;
++					regulator-always-on;
++					anatop-reg-offset = <0x140>;
++					anatop-vol-bit-shift = <0>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <1>;
++					anatop-min-voltage = <725000>;
++					anatop-max-voltage = <1450000>;
++				};
++
++				regulator-vddpu at 140 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "vddpu";
++					regulator-min-microvolt = <725000>;
++					regulator-max-microvolt = <1450000>;
++					regulator-always-on;
++					anatop-reg-offset = <0x140>;
++					anatop-vol-bit-shift = <9>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <1>;
++					anatop-min-voltage = <725000>;
++					anatop-max-voltage = <1450000>;
++				};
++
++				regulator-vddsoc at 140 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "vddsoc";
++					regulator-min-microvolt = <725000>;
++					regulator-max-microvolt = <1450000>;
++					regulator-always-on;
++					anatop-reg-offset = <0x140>;
++					anatop-vol-bit-shift = <18>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <1>;
++					anatop-min-voltage = <725000>;
++					anatop-max-voltage = <1450000>;
++				};
+ 			};
+ 
+ 			usbphy at 020c9000 { /* USBPHY1 */
+-- 
+1.7.9.1
