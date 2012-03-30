@@ -1,60 +1,78 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 30 Mar 2012 18:43:18 -0400 (EDT)
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20120330132840.GG22981@n2100.arm.linux.org.uk>
-References: <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20120104135204.GA14741@S2100-06.ap.freescale.net>
- <20120104211800.GF11810@n2100.arm.linux.org.uk>
- <20120105113106.GR11810@n2100.arm.linux.org.uk>
- <20120330131320.GH3254@S2101-09.ap.freescale.net>
- <20120330131509.GE22981@n2100.arm.linux.org.uk>
- <20120330132256.GI3254@S2101-09.ap.freescale.net>
- <20120330132840.GG22981@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1203301837550.24151@xanadu.home>
+From: manabian@gmail.com (manabian at gmail.com)
+Date: Sat, 31 Mar 2012 00:46:06 +0200
+Subject: [PATCH] ARM: at91: resurrect mach-at91/include/mach/io.h
+Message-ID: <4f7637c4.51e4cc0a.35ba.ffffce95@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Mar 2012, Russell King - ARM Linux wrote:
+From: Joachim Eastwood <joachim.eastwood@jotron.com>
 
-> On Fri, Mar 30, 2012 at 09:22:59PM +0800, Shawn Guo wrote:
-> > I have seen it's on the linux-next at the early time of the cycle,
-> > but I have to admit that I have not done that at the later time.
-> 
-> Well, I did lose track of which branches I had in linux-next during this
-> last cycle, which is probably how it got dropped.
-> 
-> The last update gave this against mainline:
-> 
->  arch/arm/tools/mach-types |  186 ++++++++++++++++++++++++--------------------
->  1 files changed, 101 insertions(+), 85 deletions(-)
-> 
-> and the latest update gives this also against mainline:
-> 
->  arch/arm/tools/mach-types |  416 ++++++++++++++++++++++++---------------------
->  1 files changed, 219 insertions(+), 197 deletions(-)
-> 
-> so that's 196 platform IDs deleted, which is way too much to be 'safe'.
+Commmit 4d5fc58dbe34b78 "ARM: remove bunch of now unused mach/io.h files"
+removed the at91 io.h header. This makes pata_pcmcia when used with at91_cf
+fail on ioport_map in pcmcia_init_one.
 
-The "safest" at this point might be to just push the added and modified 
-lines and postpone any removal for the next cycle.
+Adding io.h and NEED_MACH_IO_H makes my CF card work again.
 
+Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+---
 
-Nicolas
+If there is better/correct way to solve the problem please disregard this
+patch.
 
+ arch/arm/mach-at91/Kconfig           |    1 +
+ arch/arm/mach-at91/include/mach/io.h |   32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
+ create mode 100644 arch/arm/mach-at91/include/mach/io.h
 
-And not to make things 
-
-
-
-
-
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 6631d35..8bcf917 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -37,6 +37,7 @@ config ARCH_AT91RM9200
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_AT91_USART3
++	select NEED_MACH_IO_H
+ 
+ config ARCH_AT91SAM9260
+ 	bool "AT91SAM9260 or AT91SAM9XE"
+diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
+new file mode 100644
+index 0000000..ba9a22f
+--- /dev/null
++++ b/arch/arm/mach-at91/include/mach/io.h
+@@ -0,0 +1,32 @@
++/*
++ * arch/arm/mach-at91/include/mach/io.h
++ *
++ *  Copyright (C) 2003 SAN People
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __ASM_ARCH_IO_H
++#define __ASM_ARCH_IO_H
++
++#include <mach/hardware.h>
++
++#define IO_SPACE_LIMIT		0xFFFFFFFF
++
++#define __io(a)			__typesafe_io(a)
++#define __mem_pci(a)		(a)
++
++#endif
++
+-- 
+1.7.9.2
