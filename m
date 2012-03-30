@@ -1,41 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Mar 2012 17:34:04 -0700
-Subject: [GIT PULL 1/5] ARM: cleanups of io includes
-In-Reply-To: <CAOesGMgaQ7mjV-1Q5uPthw8PAtU+BUfDgOqor=3jtvkL30L1ZA@mail.gmail.com>
-References: <1332918842-13521-1-git-send-email-olof@lixom.net>
- <1332918842-13521-2-git-send-email-olof@lixom.net>
- <20120328082501.GA22414@n2100.arm.linux.org.uk>
- <CAOesGMjwZOON9kFNvaEq8QhSvjAgsJT_J1Ysb9-AbePd6g+-rQ@mail.gmail.com>
- <20120328192816.GD22414@n2100.arm.linux.org.uk>
- <CA+55aFyJH8yO7=AzuddsQZouHqRDtmeh-vbd8Y5VQLQx-6ZV-Q@mail.gmail.com>
- <CAOesGMgaQ7mjV-1Q5uPthw8PAtU+BUfDgOqor=3jtvkL30L1ZA@mail.gmail.com>
-Message-ID: <CAOesGMj4Osx0KBCxM4_N09PMTkpTdhhQRvEcwEeY8PFKanT_-w@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 30 Mar 2012 08:41:58 +0800
+Subject: [PATCH v3] ARM: pxa: fix build failure for regulator consumer in
+ em-x270.c
+In-Reply-To: <1333043034-3374-1-git-send-email-paul.gortmaker@windriver.com>
+References: <20120329151157.GT3668@opensource.wolfsonmicro.com>
+ <1333043034-3374-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CAN1soZzssbD1CymiHewy9F8y=1Uc3HDZmL4ws7KTp__R+cpasA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 5:27 PM, Olof Johansson <olof@lixom.net> wrote:
+On Fri, Mar 30, 2012 at 1:43 AM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
+> Commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0
+>
+> ?"regulator: Remove support for supplies specified by struct device"
+>
+> caused this file to break, since it was still relying on the
+> device field to be present. ?Map it onto dev_name appropriately
+>
+> Since there are two consumers with the name "reg-userspace-consumer",
+> we have to supply the ID as a suffix in the REGULATOR_CONSUMER calls.
+>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>
+> [v3: add .0/.1 ID suffix to "reg-userspace-consumer" instances ]
+>
+> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+> index c1b65da..16ec557 100644
+> --- a/arch/arm/mach-pxa/em-x270.c
+> +++ b/arch/arm/mach-pxa/em-x270.c
+> @@ -1083,19 +1083,19 @@ static void __init em_x270_userspace_consumers_init(void)
+> ?}
+>
+> ?/* DA9030 related initializations */
+> -#define REGULATOR_CONSUMER(_name, _dev, _supply) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> +#define REGULATOR_CONSUMER(_name, _dev_name, _supply) ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?static struct regulator_consumer_supply _name##_consumers[] = { \
+> ? ? ? ? ? ? ? ?{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> - ? ? ? ? ? ? ? ? ? ? ? .dev = _dev, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? .dev_name = _dev_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ? ? ? ? ?.supply = _supply, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ?}, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?}
+>
+> -REGULATOR_CONSUMER(ldo3, &em_x270_gps_userspace_consumer.dev, "vcc gps");
+> +REGULATOR_CONSUMER(ldo3, "reg-userspace-consumer.0", "vcc gps");
+> ?REGULATOR_CONSUMER(ldo5, NULL, "vcc cam");
+> -REGULATOR_CONSUMER(ldo10, &pxa_device_mci.dev, "vcc sdio");
+> +REGULATOR_CONSUMER(ldo10, "pxa2xx-mci", "vcc sdio");
+> ?REGULATOR_CONSUMER(ldo12, NULL, "vcc usb");
+> -REGULATOR_CONSUMER(ldo19, &em_x270_gprs_userspace_consumer.dev, "vcc gprs");
+> +REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer.1", "vcc gprs");
+> ?REGULATOR_CONSUMER(buck2, NULL, "vcc_core");
+>
+> ?#define REGULATOR_INIT(_ldo, _min_uV, _max_uV, _ops_mask) ? ? ? ? ? ? ?\
+> --
+> 1.7.9.1
+>
 
-> It hasn't grown any new merge conflicts
-> since before as of now, so see the original pull request for those.
+Applied
 
-D'oh, I did a git remote update but didn't checkout the new head for
-your tree when I verified the merge conflict situation. It does have a
-couple of new trivial ones:
-
-* arch/arm/mach-tegra/Makefile: keep reset.o, remove localtimer.o
-* arch/arm/mach-vexpress/include/mach/io.h: line remove vs file remove
-conflict: file is gone, but a patch in rmk's tree had removed a line
-from it. It's safe to still remove the file.
-
-+ the previous ones from original pull request:
-
-arch/arm/Kconfig: New selects added for ARCH_S3C24X. Include both
-sides of the merge.
-
-arch/arm/mach-shmobile/smp-sh73a0.c: A readl vs readw fix collided
-with the io accessor cleanup. Ditch the __io() use but keep readl.
-
-arch/arm/mach-tegra/include/mach/debug-macro.S: include of mach/io.h
-is going away, iomap.h is kept.
-
--Olof
+Thanks
+Haojian
