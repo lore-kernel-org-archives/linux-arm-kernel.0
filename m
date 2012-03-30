@@ -1,104 +1,176 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Fri, 30 Mar 2012 15:30:33 +0100 (BST)
-Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
-In-Reply-To: <CAN1soZwgUooLEcDimUxyLO20x0__pAa+J3wRrH3zoW3pJsR2bg@mail.gmail.com>
-Message-ID: <1333117833.65604.YahooMailClassic@web29013.mail.ird.yahoo.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 30 Mar 2012 07:38:01 -0700
+Subject: [PATCH 1/2] ARM: fix builds due to missing <asm/system_misc.h>
+ includes
+Message-ID: <1333118281-25295-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Fri, 30/3/12, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> On Fri, Mar 30, 2012 at 6:41 PM, Paul
-> Parsons <lost.distance@yahoo.com>
-> wrote:
-> > --- On Fri, 30/3/12, Haojian Zhuang <haojian.zhuang@gmail.com>
-> wrote:
-> >> On Thu, Mar 29, 2012 at 2:12 AM, Paul
-> >> Parsons <lost.distance@yahoo.com>
-> >> wrote:
-> >> > On PXA2xx platforms, the MFP API (described
-> in
-> >> Documentation/arm/pxa/mfp.txt)
-> >> > provides values for the following:
-> >> >
-> >> > 1. GPIO inputs (e.g. GPIO105_GPIO).
-> >> > 2. Alternate function inputs (e.g.
-> GPIO105_CIF_DD_1).
-> >> > 3. Alternate function outputs (e.g.
-> >> GPIO105_KP_MKOUT_2).
-> >> >
-> >> > It does not provide values for GPIO outputs
-> (i.e. AF0
-> >> outputs).
-> >> >
-> >> > One cannot use the macro used by the MFP API
-> internally
-> >> - MFP_CFG_OUT() - to
-> >> > define new GPIO output values, since that
-> macro is
-> >> forbidden in platform code.
-> >> >
-> >> > Without the ability to add GPIO outputs to the
-> MFP
-> >> configuration, it is not
-> >> > possible to drive GPIO outputs high during
-> sleep mode.
-> >> >
-> >> > This would be useful, for example, on the
-> hx4700
-> >> platform, where driving the
-> >> > infrared powerdown GPIO 105 high during sleep
-> mode
-> >> would save some mA.
-> >> >
-> >> > So my question is: what method should one use
-> to add
-> >> GPIO outputs to the MFP
-> >> > configuration?
-> >> >
-> >> > One possible method, namely manually defining
-> values in
-> >> the platform code:
-> >> >
-> >> > ? ? ? ?MFP_PIN_GPIO105 | MFP_AF0 |
-> MFP_DIR_OUT |
-> >> MFP_LPM_DRIVE_HIGH,
-> >> >
-> >> > is essentially no different from using the
-> forbidden
-> >> MFP_CFG_OUT() macro.
-> >> >
-> >>
-> >> Does MFP_CFG_OUT() help you? This macro is defined
-> in
-> >> mfp-pxa2xx.h.
-> >
-> > Yes, MFP_CFG_OUT() does help. But it has been pointed
-> out that
-> > MFP_CFG_OUT() is not allowed to be used in board
-> support code:
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086456.html
-> >
-> > Is that no longer true?
-> 
-> I'm sorry that I messed it. Since GPIOxx_GPIO is always
-> defined as MFP_CFG_IN().
-> It seems that you're blocked to specify MFP_CFG_OUT().
-> 
-> Actually it's not a problem. While you're using it as
-> output, you must
-> assign special
-> usage for this pin, like some peripheral rest signal. So I
-> think that
-> you can define new
-> macro GPIOxx_yy() in mfp-pxa27x.h, like GPIO9_HZ_CLK(). Is
-> it meaningful?
+This does a sweeping change fixing up all the missing system_misc.h and
+system_info.h includes from the system.h split-up change. These were the
+ones I came across when building all defconfigs in arch/arm/configs, there
+might be more but they lack adequate build coverage to be easily caught.
 
-The GPIO output value I wish to add is specific to the hx4700 platform;
-it is not defined in any PXA27x documentation.
+I'm expecting to get a lot of these piecemeal by each maintainer, so we
+might just as well do one sweeping change to get them all at once.
 
-Is it acceptable to add such platform-specific values to the generic
-mfp-pxa27x.h file?
 
-Regards,
-Paul
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Wan ZongShun <mcuos.com@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-at91/at91x40.c  |    1 +
+ arch/arm/mach-at91/setup.c    |    1 +
+ arch/arm/mach-h720x/common.c  |    1 +
+ arch/arm/mach-imx/mm-imx3.c   |    1 +
+ arch/arm/mach-imx/mm-imx5.c   |    1 +
+ arch/arm/mach-ixp23xx/core.c  |    1 +
+ arch/arm/mach-ixp4xx/common.c |    1 +
+ arch/arm/mach-pxa/raumfeld.c  |    2 ++
+ arch/arm/mach-shark/core.c    |    1 +
+ arch/arm/mach-w90x900/dev.c   |    1 +
+ arch/arm/plat-s3c24xx/cpu.c   |    1 +
+ 11 files changed, 12 insertions(+)
+
+diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+index 5400a1d..d62fe09 100644
+--- a/arch/arm/mach-at91/at91x40.c
++++ b/arch/arm/mach-at91/at91x40.c
+@@ -14,6 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <asm/proc-fns.h>
++#include <asm/system_misc.h>
+ #include <asm/mach/arch.h>
+ #include <mach/at91x40.h>
+ #include <mach/at91_st.h>
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 1083739..97cc04d 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -11,6 +11,7 @@
+ #include <linux/pm.h>
+ #include <linux/of_address.h>
+ 
++#include <asm/system_misc.h>
+ #include <asm/mach/map.h>
+ 
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-h720x/common.c b/arch/arm/mach-h720x/common.c
+index e756d1a..aa1331e 100644
+--- a/arch/arm/mach-h720x/common.c
++++ b/arch/arm/mach-h720x/common.c
+@@ -24,6 +24,7 @@
+ #include <asm/dma.h>
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
++#include <asm/system_misc.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index d534d7f..7412738 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -21,6 +21,7 @@
+ #include <linux/err.h>
+ 
+ #include <asm/pgtable.h>
++#include <asm/system_misc.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/map.h>
+ 
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index 51af9fa..05250ae 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/clk.h>
+ 
++#include <asm/system_misc.h>
+ #include <asm/mach/map.h>
+ 
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-ixp23xx/core.c b/arch/arm/mach-ixp23xx/core.c
+index d2c2dc3..d345424 100644
+--- a/arch/arm/mach-ixp23xx/core.c
++++ b/arch/arm/mach-ixp23xx/core.c
+@@ -36,6 +36,7 @@
+ #include <asm/irq.h>
+ #include <asm/tlbflush.h>
+ #include <asm/pgtable.h>
++#include <asm/system_misc.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index c60e7b8..ebbd7fc 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -37,6 +37,7 @@
+ #include <asm/page.h>
+ #include <asm/irq.h>
+ #include <asm/sched_clock.h>
++#include <asm/system_misc.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 7d691e5..5905ed1 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -43,6 +43,8 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/delay.h>
+ 
++#include <asm/system_info.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
+index 6a2a7f2..2704bcd 100644
+--- a/arch/arm/mach-shark/core.c
++++ b/arch/arm/mach-shark/core.c
+@@ -15,6 +15,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/leds.h>
+ #include <asm/param.h>
++#include <asm/system_misc.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
+index db82568..48f5b9f 100644
+--- a/arch/arm/mach-w90x900/dev.c
++++ b/arch/arm/mach-w90x900/dev.c
+@@ -27,6 +27,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/spi/flash.h>
+ 
++#include <asm/system_misc.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index 0db73ae..290942d 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -36,6 +36,7 @@
+ #include <asm/irq.h>
+ #include <asm/cacheflush.h>
+ #include <asm/system_info.h>
++#include <asm/system_misc.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-- 
+1.7.9.2.359.gebfc2
