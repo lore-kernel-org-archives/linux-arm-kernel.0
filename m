@@ -1,55 +1,48 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 30 Mar 2012 19:24:12 +0530
-Subject: [PATCH-V2 0/3] ARM: OMAP: Make OMAP clocksource source selection
- runtime
-Message-ID: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
+Date: Fri, 30 Mar 2012 19:24:13 +0530
+Subject: [PATCH-V2 1/3] ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to
+ prcm-common header
+In-Reply-To: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
+References: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <1333115655-28530-2-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current OMAP code supports couple of clocksource options based
-on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
+Add missing idle_st bit for 32k-sync timer into the prcm-common
+header file, required for hwmod data.
 
-This patch series cleans up the existing 32k-sync timer implementation
-without any major code change, in order to enable runtime selection between
-32k sync-timer and gptimer and adds hwmod lookup for omap2+ devices,
-if lookup fails then fall back to gp-timer.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Ming Lei <tom.leiming@gmail.com>
+---
+ arch/arm/mach-omap2/prcm-common.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-With this, we should be able to support multi-omap boot
-including devices with/without 32k-sync timer.
-For example, AM33xx device doesn't have 32k-sync timer available,
-which breaks multi-omap boot.
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index 5aa5435..29955d5 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -177,6 +177,8 @@
+ /* PM_WKST_WKUP, CM_IDLEST_WKUP shared bits */
+ #define OMAP24XX_ST_GPIOS_SHIFT				2
+ #define OMAP24XX_ST_GPIOS_MASK				(1 << 2)
++#define OMAP24XX_ST_32KSYNC_SHIFT			1
++#define OMAP24XX_ST_32KSYNC_MASK			(1 << 1)
+ #define OMAP24XX_ST_GPT1_SHIFT				0
+ #define OMAP24XX_ST_GPT1_MASK				(1 << 0)
 
-This patch-series has been boot tested on AM37xEVM platform, it
-would be helpful if somebody help me to validate it on OMAP1/2
-platforms.
-
-Changes from previous submissions:
-==================================
-
-Changes from V1:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/081037.html
-
-	- Based on Tony's comment, added pbase & size argument to
-	  omap_init_clocksource_32k(), to avoid cpu_is_xxx() check.
-	- Added commit description based on discussion on list
-	  (Thanks to Santosh here)
-	- Reorder patch sequence
-
-
-Vaibhav Hiremath (3):
-  ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to prcm-common
-    header
-  ARM: OMAP2+: hwmod data: Add 32k-sync timer data to hwmod database
-  ARM: OMAP: Make OMAP clocksource source selection runtime
-
- arch/arm/mach-omap1/timer32k.c             |    6 ++-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |   53 +++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |   52 +++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   51 ++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- arch/arm/mach-omap2/prcm-common.h          |    4 +
- arch/arm/mach-omap2/timer.c                |   45 ++++++++------
- arch/arm/plat-omap/counter_32k.c           |   86 ++++++++++++----------------
- arch/arm/plat-omap/include/plat/common.h   |    2 +-
- 9 files changed, 229 insertions(+), 72 deletions(-)
+@@ -307,6 +309,8 @@
+ #define OMAP3430_ST_SR1_MASK				(1 << 6)
+ #define OMAP3430_ST_GPIO1_SHIFT				3
+ #define OMAP3430_ST_GPIO1_MASK				(1 << 3)
++#define OMAP3430_ST_32KSYNC_SHIFT			2
++#define OMAP3430_ST_32KSYNC_MASK			(1 << 2)
+ #define OMAP3430_ST_GPT12_SHIFT				1
+ #define OMAP3430_ST_GPT12_MASK				(1 << 1)
+ #define OMAP3430_ST_GPT1_SHIFT				0
+--
+1.7.0.4
