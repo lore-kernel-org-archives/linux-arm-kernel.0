@@ -1,26 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Mar 2012 19:01:34 +0100
-Subject: [PATCH] ARM: amba: adapt to regulator probe deferral change
-In-Reply-To: <1333115737-1654-1-git-send-email-shawn.guo@linaro.org>
-References: <1333115737-1654-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120330180134.GJ22981@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 30 Mar 2012 13:40:59 -0400 (EDT)
+Subject: [PATCH] ARM: test for PMU feature on v7 (v2 with typo fix)
+In-Reply-To: <20120330170401.GD11451@mudshark.cambridge.arm.com>
+References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
+ <87r4wk889a.fsf@rustcorp.com.au>
+ <20120323095314.GA13622@mudshark.cambridge.arm.com>
+ <87fwcy9abw.fsf@rustcorp.com.au>
+ <20120326094054.GA2475@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1203281005110.24151@xanadu.home>
+ <20120330170401.GD11451@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1203301336480.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 09:55:37PM +0800, Shawn Guo wrote:
-> The commit 04bf301 (regulator: Support driver probe deferral) changes
-> regulator_get() and regulator_register() to return -EPROBE_DEFER
-> instead of -ENODEV.  Adapt amba bus driver to the change, otherwise
-> amba_probe() will fail on the platforms that do not have "vcore"
-> regulator device.
+On Fri, 30 Mar 2012, Will Deacon wrote:
 
-Are you sure this is correct?  Did you read and understand the comment
-you removed?
+> Hi Nicolas,
+> 
+> On Wed, Mar 28, 2012 at 03:17:29PM +0100, Nicolas Pitre wrote:
+> > On Mon, 26 Mar 2012, Will Deacon wrote:
+> > 
+> > > Now, if everything was device-tree based then we could simply use a
+> > > different binding for each CPU but since we support perf on non-DT
+> > > platforms, probing the CPU type is the best solution. I would like to avoid
+> > > the probing code if we are initialised from DT, but I've not got round to it
+> > > yet (this would be useful for big.LITTLE).
+> > 
+> > Still... my opinion is that we should try to autodetect as much as 
+> > possible and avoid overstuffing the DT with content that can otherwise 
+> > be run-time probed.  OK to use DT to override the probe for corner 
+> > cases, but IMHO the probe should be the default method of 
+> > initialization.  The rational is that we want to spread knowledge about 
+> > part of the system and have it confined into respective drivers and 
+> > subsystems for easier maintenance.  If the guy who has to maintain the 
+> > dts has to know all the details for everything then that won't scale and 
+> > the risk for discrepancies is increased.
+> 
+> I agree that probing is preferable where possible but, since the PMUs are
+> banked, we cannot reliably probe them on big.LITTLE platforms.
 
-What do platforms do which have AMBA devices but don't have any vcore
-regulators?
+Are they tied to each cluster power domains?  If so you'll have to 
+preserve/restore their state when clusters are suspended even if the 
+interface tries to present a consistent view to users.  The probe can be 
+done there, and differences in capabilities adjusted dynamically.
 
-We're not going through the same farce that the smsc network driver has
-gone through: OMAP3430LDP remains fucked through that idiotic ill-thought
-out change (c7e963f68888, net/smsc911x: Add regulator support).  See
-http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=99
+
+Nicolas
