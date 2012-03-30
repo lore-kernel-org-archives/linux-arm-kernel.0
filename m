@@ -1,31 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Mar 2012 07:38:46 -0700
-Subject: [PATCH 2/2] ARM: clps711x: fix missing include file
-Message-ID: <1333118326-25438-1-git-send-email-olof@lixom.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 30 Mar 2012 22:50:42 +0800
+Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
+In-Reply-To: <1333117833.65604.YahooMailClassic@web29013.mail.ird.yahoo.com>
+References: <CAN1soZwgUooLEcDimUxyLO20x0__pAa+J3wRrH3zoW3pJsR2bg@mail.gmail.com>
+ <1333117833.65604.YahooMailClassic@web29013.mail.ird.yahoo.com>
+Message-ID: <CAN1soZwSOiKZQdRrykoP6oSPr-00svu+qKy4X61tCTSqQRv76w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux/bug.h is needed due to an ARRAY_SIZE being used:
+>
+> The GPIO output value I wish to add is specific to the hx4700 platform;
+> it is not defined in any PXA27x documentation.
+>
+> Is it acceptable to add such platform-specific values to the generic
+> mfp-pxa27x.h file?
+>
+Unless we append a new macro to resolve this issue. But I don't want to
+put too much effort on MFP code. I'm planning to migrate to pinmux driver
+since it could integrate with gpio and suspend code better.
 
-arch/arm/mach-clps711x/edb7211-mm.c: In function 'edb7211_map_io':
-arch/arm/mach-clps711x/edb7211-mm.c:79:9: error: implicit declaration of function 'BUILD_BUG_ON_ZERO'
+Actually I appended pinmux driver for pxa3xx/mmp. They could be found
+in linux-next tree. For next stage, I'll add support for DT and suspend.
+If you like, you can also add pxa2xx support.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-clps711x/edb7211-mm.c |    1 +
- 1 file changed, 1 insertion(+)
+So I prefer you change mfp-pxa27x.h directly.
 
-diff --git a/arch/arm/mach-clps711x/edb7211-mm.c b/arch/arm/mach-clps711x/edb7211-mm.c
-index 0bea145..4372f06 100644
---- a/arch/arm/mach-clps711x/edb7211-mm.c
-+++ b/arch/arm/mach-clps711x/edb7211-mm.c
-@@ -21,6 +21,7 @@
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/bug.h>
- 
- #include <mach/hardware.h>
- #include <asm/page.h>
--- 
-1.7.9.2.359.gebfc2
+Best Regards
+Haojian
