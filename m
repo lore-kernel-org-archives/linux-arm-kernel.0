@@ -1,68 +1,61 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 30 Mar 2012 12:38:40 +0200
-Subject: [PATCH v5 04/16] pwm: Add table-based lookup for static mappings
-In-Reply-To: <20120330101800.GD21950@opensource.wolfsonmicro.com>
-References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
- <1332945238-14897-5-git-send-email-thierry.reding@avionic-design.de>
- <20120329220342.GK4153@opensource.wolfsonmicro.com>
- <20120330050641.GA21823@avionic-0098.mockup.avionic-design.de>
- <20120330101800.GD21950@opensource.wolfsonmicro.com>
-Message-ID: <20120330103840.GB961@avionic-0098.mockup.avionic-design.de>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Fri, 30 Mar 2012 11:41:33 +0100 (BST)
+Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
+In-Reply-To: <CAN1soZwzBqDGTX+a-maVr5baaoZ7qwgdvXyPeya5R80cN_iA0w@mail.gmail.com>
+Message-ID: <1333104093.65224.YahooMailClassic@web29002.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown wrote:
-> On Fri, Mar 30, 2012 at 07:06:41AM +0200, Thierry Reding wrote:
-> > * Mark Brown wrote:
+--- On Fri, 30/3/12, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> On Thu, Mar 29, 2012 at 2:12 AM, Paul
+> Parsons <lost.distance@yahoo.com>
+> wrote:
+> > On PXA2xx platforms, the MFP API (described in
+> Documentation/arm/pxa/mfp.txt)
+> > provides values for the following:
+> >
+> > 1. GPIO inputs (e.g. GPIO105_GPIO).
+> > 2. Alternate function inputs (e.g. GPIO105_CIF_DD_1).
+> > 3. Alternate function outputs (e.g.
+> GPIO105_KP_MKOUT_2).
+> >
+> > It does not provide values for GPIO outputs (i.e. AF0
+> outputs).
+> >
+> > One cannot use the macro used by the MFP API internally
+> - MFP_CFG_OUT() - to
+> > define new GPIO output values, since that macro is
+> forbidden in platform code.
+> >
+> > Without the ability to add GPIO outputs to the MFP
+> configuration, it is not
+> > possible to drive GPIO outputs high during sleep mode.
+> >
+> > This would be useful, for example, on the hx4700
+> platform, where driving the
+> > infrared powerdown GPIO 105 high during sleep mode
+> would save some mA.
+> >
+> > So my question is: what method should one use to add
+> GPIO outputs to the MFP
+> > configuration?
+> >
+> > One possible method, namely manually defining values in
+> the platform code:
+> >
+> > ? ? ? ?MFP_PIN_GPIO105 | MFP_AF0 | MFP_DIR_OUT |
+> MFP_LPM_DRIVE_HIGH,
+> >
+> > is essentially no different from using the forbidden
+> MFP_CFG_OUT() macro.
+> >
 > 
-> > > The clock and regulator APIs namespace the consumers by struct device -
-> > > might this not be sensible here?  pwm_get() does already take the device
-> > > as an argument.  It'd feel safer, and for example there's plenty of
-> > > phones out there with two backlit displays...
-> 
-> > That's actually how this is supposed to work. "pwm-backlight" in the above
-> > case is matched against the name of the struct device that you pass in to
-> > pwm_get(). The only difference, at least as far as I can tell, to the clock
-> > and regulator APIs is that a second name is not listed explicitly in the
-> > lookup table.
-> 
-> Both clock and regulator APIs map (source) -> (dev, name).  This only
-> has a mapping (source) -> (dev).
-> 
-> > So compared with the clock and regulator APIs it doesn't make too much sense
-> > to pass both the struct device and the name to pwm_get() because it will
-> > match the device name against the consumer name in the lookup table first and
-> > only use the passed name if no match was found.
-> 
-> This is different to what the clock and regulator APIs do - they look up
-> the name in the context of the struct device.  This is because...
-> 
-> > In case you have two backlight devices I would expect the following to work:
-> 
-> > 	static struct pwm_lookup board_pwm_lookup[] = {
-> > 		PWM_LOOKUP("tegra-pwm", 0, "pwm-backlight.0"),
-> > 		PWM_LOOKUP("tegra-pwm", 1, "pwm-backlight.1"),
-> > 	};
-> 
-> ...if a single device uses more than one PWM then the above scheme won't
-> work - unless I'm missing something?
+> Does MFP_CFG_OUT() help you? This macro is defined in
+> mfp-pxa2xx.h.
 
-Right, now it makes more sense. So basically if I have a single device using
-two PWM devices, then I'll need to have something like this:
+Yes, MFP_CFG_OUT() does help. But it has been pointed out that
+MFP_CFG_OUT() is not allowed to be used in board support code:
 
-	static struct pwm_lookup board_pwm_lookup[] = {
-		PWM_LOOKUP("tegra-pwm", 0, "pwm-foo.0", "bar"),
-		PWM_LOOKUP("tegra-pwm", 1, "pwm-foo.0", "baz"),
-	};
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086456.html
 
-And then of course I'll need to have a second field by which the PWM device
-can be identified. Good, I'll fix that up for the next round.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120330/c9e19b10/attachment.sig>
+Is that no longer true?
