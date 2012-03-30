@@ -1,39 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 30 Mar 2012 14:31:09 +0200
-Subject: [PATCH] ARM: at91: include newly created system_misc.h file
-In-Reply-To: <cover.1333026637.git.nicolas.ferre@atmel.com>
-References: <cover.1333026637.git.nicolas.ferre@atmel.com>
-Message-ID: <1333110669-24554-1-git-send-email-nicolas.ferre@atmel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 30 Mar 2012 18:23:30 +0530
+Subject: [PATCHv2 0/5] coupled cpuidle state support
+In-Reply-To: <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
+References: <1331749794-8056-1-git-send-email-ccross@android.com>
+ <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
+Message-ID: <4F75ACCA.4090009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-system.h file has been split by commit "0195c00". Now include
-system_misc.h for having access to arm_pm_restart.
+Colin,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi,
+On Friday 16 March 2012 05:07 AM, Colin Cross wrote:
+> On Wed, Mar 14, 2012 at 11:29 AM, Colin Cross <ccross@android.com> wrote:
 
-It seems that this split of system.h is now in linus' tree. AT91 build
-is broken without this patch.
+[...]
 
-I will include it in a "at91-fixes" series that I will rebase on top
-of 3.4-rc1.
+>>
+>> v2:
+>>   * removed the coupled lock, replacing it with atomic counters
+>>   * added a check for outstanding pokes before beginning the
+>>     final transition to avoid extra wakeups
+>>   * made the cpuidle_coupled struct completely private
+>>   * fixed kerneldoc comment formatting
+>>   * added a patch with a helper function for resynchronizing
+>>     cpus after aborting idle
+>>   * added a patch (not for merging) to add trace events for
+>>     verification and performance testing
+> 
+> I forgot to mention, this patch series is on v3.3-rc7, and will
+> conflict with the cpuidle timekeeping patches.  If those go in first
+> (which is likely), I will rework this series on top of it.  I left it
+> on v3.3-rc7 now to make testing easier.
 
- arch/arm/mach-at91/setup.c |    1 +
- 1 file changed, 1 insertion(+)
+I have re-based your series against Len Browns
+next branch [1] which has time keeping and other cpuidle patches.
+Have also folded the CPU hotplug fix which I posted in the
+original coupled idle patch.
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 1083739..d4d334a 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -12,6 +12,7 @@
- #include <linux/of_address.h>
- 
- #include <asm/mach/map.h>
-+#include <asm/system_misc.h>
- 
- #include <mach/hardware.h>
- #include <mach/cpu.h>
--- 
-1.7.9.4
+If you want, the updated branch can be pulled from:
+
+git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+for_3.5/coupled_cpuidle-rebase
+
+Regards
+Santosh
+
+[1] Power Management
+git://git.kernel.org/pub/scm/linux/kernel/git/lenb/linux.git
