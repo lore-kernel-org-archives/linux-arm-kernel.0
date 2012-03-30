@@ -1,49 +1,65 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Fri, 30 Mar 2012 18:06:07 -0400
-Subject: [PATCH] ARM: include linux/bug.h in insn.c
-In-Reply-To: <1333142002-15431-1-git-send-email-joachim.eastwood@jotron.com>
-References: <1333142002-15431-1-git-send-email-joachim.eastwood@jotron.com>
-Message-ID: <CAP=VYLp173qpMwrLDRuvNURjJ6+TvkP7dHb6vDWgELiz9T9kGg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 30 Mar 2012 15:24:34 -0700
+Subject: [PATCH 1/2] ARM: fix builds due to missing <asm/system_misc.h>
+ includes
+In-Reply-To: <1333118281-25295-1-git-send-email-olof@lixom.net>
+References: <1333118281-25295-1-git-send-email-olof@lixom.net>
+Message-ID: <4F7632A2.7030302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 5:13 PM, Joachim Eastwood <manabian@gmail.com> wrote:
-> After commit d82227cf8 building the kernel fails with:
-
-Please also list the shortlog when giving a commit ID, i.e.
-
-   "ARM: 7331/1: extract out insn generation code from ftrace"
-
-Thanks,
-Paul.
-
-> ?arch/arm/kernel/insn.c: In function '__arm_gen_branch_thumb2':
-> ?arch/arm/kernel/insn.c:13: error: implicit declaration of function 'WARN_ON_ONCE'
-> ?make[1]: *** [arch/arm/kernel/insn.o] Error 1
-> ?make: *** [arch/arm/kernel] Error 2
+Olof Johansson wrote:
+> This does a sweeping change fixing up all the missing system_misc.h and
+> system_info.h includes from the system.h split-up change. These were the
+> ones I came across when building all defconfigs in arch/arm/configs, there
+> might be more but they lack adequate build coverage to be easily caught.
 >
-> insn.c uses WARN_ON_ONCE so lets include bug.h.
+> I'm expecting to get a lot of these piecemeal by each maintainer, so we
+> might just as well do one sweeping change to get them all at once.
 >
-> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+>
+> Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+> Cc: Russell King<linux@arm.linux.org.uk>
+> Cc: Sascha Hauer<kernel@pengutronix.de>
+> Cc: Imre Kaloz<kaloz@openwrt.org>
+> Cc: Krzysztof Halasa<khc@pm.waw.pl>
+> Cc: Eric Miao<eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang<haojian.zhuang@gmail.com>
+> Cc: Wan ZongShun<mcuos.com@gmail.com>
+> Cc: Kukjin Kim<kgene.kim@samsung.com>
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thansk, this fixes following:
+
+arch/arm/plat-s3c24xx/cpu.c: In function 's3c24xx_init_io':
+arch/arm/plat-s3c24xx/cpu.c:221: error: 'arm_pm_idle' undeclared (first 
+use in this function)
+arch/arm/plat-s3c24xx/cpu.c:221: error: (Each undeclared identifier is 
+reported only once
+arch/arm/plat-s3c24xx/cpu.c:221: error: for each function it appears in.)
+make[2]: *** [arch/arm/plat-s3c24xx/cpu.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Signed-off-by: Olof Johansson<olof@lixom.net>
 > ---
-> ?arch/arm/kernel/insn.c | ? ?1 +
-> ?1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/kernel/insn.c b/arch/arm/kernel/insn.c
-> index ab312e5..080fc70 100644
-> --- a/arch/arm/kernel/insn.c
-> +++ b/arch/arm/kernel/insn.c
-> @@ -1,4 +1,5 @@
-> ?#include <linux/kernel.h>
-> +#include <linux/bug.h>
-> ?#include <asm/opcodes.h>
->
-> ?static unsigned long
-> --
-> 1.7.9.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   arch/arm/mach-at91/at91x40.c  |    1 +
+>   arch/arm/mach-at91/setup.c    |    1 +
+>   arch/arm/mach-h720x/common.c  |    1 +
+>   arch/arm/mach-imx/mm-imx3.c   |    1 +
+>   arch/arm/mach-imx/mm-imx5.c   |    1 +
+>   arch/arm/mach-ixp23xx/core.c  |    1 +
+>   arch/arm/mach-ixp4xx/common.c |    1 +
+>   arch/arm/mach-pxa/raumfeld.c  |    2 ++
+>   arch/arm/mach-shark/core.c    |    1 +
+>   arch/arm/mach-w90x900/dev.c   |    1 +
+>   arch/arm/plat-s3c24xx/cpu.c   |    1 +
+>   11 files changed, 12 insertions(+)
+
+[...]
