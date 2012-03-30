@@ -1,51 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 30 Mar 2012 18:26:43 -0300
-Subject: [PATCH] ARM: mach-imx: Include <asm/system_misc.h>
-Message-ID: <1333142803-24183-1-git-send-email-festevam@gmail.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Fri, 30 Mar 2012 23:38:31 +0200
+Subject: [U-Boot] zImage and raw ramdisk support -- test
+In-Reply-To: <201203302224.20196.marek.vasut@gmail.com>
+References: <201203301738.57972.marek.vasut@gmail.com>
+ <CAOCHtYiewpJ6PERFP_O-0gXkkrQte1kL3m4za9=9ZaNBMgyqLg@mail.gmail.com>
+ <201203302224.20196.marek.vasut@gmail.com>
+Message-ID: <20120330213831.34630202B2B@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build error:
+Dear Marek Vasut,
 
-arch/arm/mach-imx/mm-imx3.c:138:2: error: 'arm_pm_idle' undeclared (first use in this function)
-arch/arm/mach-imx/mm-imx3.c:210:2: error: 'arm_pm_idle' undeclared (first use in this function)
-make[2]: *** [arch/arm/mach-imx/mm-imx3.o] Error 1
-arch/arm/mach-imx/mm-imx5.c:105:2: error: 'arm_pm_idle' undeclared (first use in this function)
+In message <201203302224.20196.marek.vasut@gmail.com> you wrote:
+> 
+> > and used todays u-boot git head:
+> > http://git.denx.de/?p=u-boot.git;a=commit;h=7cb30b13f12077c7eec8ce2419cd96c
+> > d65ace8e2
+> 
+> And it makes u-boot about 20% cooler, doesn't it ;-)
 
-This was caused by commit 4a3ea24 (ARM: plat-mxc: hook special idle handlers to arm_pm_idle)
+No. Just so many more build warnigns :-(
 
-Include <asm/system_misc.h> to avoid the build error.
+Best regards,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-This applies against linux-next
- arch/arm/mach-imx/mm-imx3.c |    1 +
- arch/arm/mach-imx/mm-imx5.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+Wolfgang Denk
 
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index d534d7f..1da77fa 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -23,6 +23,7 @@
- #include <asm/pgtable.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/map.h>
-+#include <asm/system_misc.h>
- 
- #include <mach/common.h>
- #include <mach/devices-common.h>
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index 51af9fa..ac8e35c 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -16,6 +16,7 @@
- #include <linux/clk.h>
- 
- #include <asm/mach/map.h>
-+#include <asm/system_misc.h>
- 
- #include <mach/hardware.h>
- #include <mach/common.h>
 -- 
-1.7.1
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Bradley's Bromide: If computers get too  powerful,  we  can  organize
+them into a committee - that will do them in.
