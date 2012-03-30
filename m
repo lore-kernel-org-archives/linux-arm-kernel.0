@@ -1,29 +1,32 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 30 Mar 2012 15:50:43 -0700
-Subject: error: 'SEGMENT_SIZE' undeclared with arm-eabi-gcc toolchain
-Message-ID: <4F7638C3.4060301@samsung.com>
+Date: Fri, 30 Mar 2012 15:58:39 -0700
+Subject: [PATCH] ARM: S3C24XX: fix missing common.h in mach-s3c24xx/
+In-Reply-To: <4F74556F.10704@mvista.com>
+References: <1332980074-4614-1-git-send-email-kgene.kim@samsung.com>
+ <4F74556F.10704@mvista.com>
+Message-ID: <4F763A9F.2010907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Sergei Shtylyov wrote:
+> Hello.
+>
+> On 29-03-2012 4:14, Kukjin Kim wrote:
+>
 
-Occurs following error with arm-eabi-gcc toolchain (gcc version 4.4.3 -
-GCC). But there is no error with arm-none-linux-gnueabi-gcc toolchain
-(gcc version 4.4.1 - Sourcery G++ Lite 2009q3)...
+[...]
 
-fs/binfmt_aout.c: In function 'load_aout_binary':
-fs/binfmt_aout.c:255: error: 'SEGMENT_SIZE' undeclared (first use in
-this function)
-fs/binfmt_aout.c:255: error: (Each undeclared identifier is reported
-only once
-fs/binfmt_aout.c:255: error: for each function it appears in.)
-make[2]: *** [fs/binfmt_aout.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
-make[1]: *** [fs] Error 2
-
-Any idea?
-
-Thanks.
+>> +#ifdef CONFIG_CPU_S3C2410
+>> +void s3c2410_restart(char mode, const char *cmd);
+>> +#endif
+>> +
+>> +#ifdef CONFIG_CPU_S3C244X
+>> +void s3c244x_restart(char mode, const char *cmd);
+>> +#endif
+>
+> Those #ifdef's around function prototypes are not necessary.
+>
+OK, thanks.
 
 Best regards,
 Kgene.
