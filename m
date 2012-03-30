@@ -1,40 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Mar 2012 07:03:00 +0200
+Date: Fri, 30 Mar 2012 07:04:55 +0200
 Subject: [RFC] pinctrl: Replace list_groups() with get_groups_count()
-In-Reply-To: <4F74A05E.7050803@wwwdotorg.org>
+In-Reply-To: <4F753007.2030707@st.com>
 References: <CAOh2x==LTHPM+O9LXVFVdX2NfzKs2bttiYLm8VcL6qLXKrUMBg@mail.gmail.com>
  <4F749B58.4070608@wwwdotorg.org>
  <CAOh2x==mGDZRoxdbuvbhKtfoxiEDVb+7vdfBEYD=u+DdMCYVhw@mail.gmail.com>
- <4F74A05E.7050803@wwwdotorg.org>
-Message-ID: <CACRpkda8cYSw6m6GaH403SqoUfn7sky13Gw0okqmZse1ferARA@mail.gmail.com>
+ <4F74A05E.7050803@wwwdotorg.org> <4F753007.2030707@st.com>
+Message-ID: <CACRpkdYaJ8sH0u6VTiaiPOJJ-D0pDo5oONyFXA4EvtL+WXEtjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 7:48 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 03/29/2012 11:31 AM, viresh kumar wrote:
->> On Mar 29, 2012 10:56 PM, Stephen Warren wrote:
->>> On 03/29/2012 10:34 AM, viresh kumar wrote:
-> ...
->>> I vaguely recall raising the same issue before, and Linus saying he
->>> wanted to be consistent with similar list_*() functions in other
->>> subsystems, but personally I'd prefer to evaluate this aspect of the
->>> pinctrl subsystem on its own.
->>
->> Which other subsystems have such stuff?
+On Fri, Mar 30, 2012 at 6:01 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+
+> Anyway, if others implement it, that doesn't mean we also do that, even
+> if we are not happy with it. It is not only about cleaning of code, but
+> it will save boot time too.
 >
-> For example. include/linux/regulator/driver.h struct regulator_ops field
-> list_voltage().
+> @Linus: Can i have your viewpoint before i start doing this?
 
-Well, actually .list_voltage() returns the voltage per se for each
-enumerator, so it works like this quick way to iterate over a list
-of integers.
+Just patch it, as detailed in the other letter there is really no point
+for having it like this so go ahead. As long as you also patch all
+the users and remove the old interface, just rewrite it. If you could
+also test it on something it'd be nice ...
 
-But since we're not really getting anything back from the .list_groups()
-callback, just zero or error, there is no specific point in having
-it engineered like this.
-
-So please go ahead and patch it in whatever way makes more
-sense!
-
-Thanks,
+Yours,
 Linus Walleij
