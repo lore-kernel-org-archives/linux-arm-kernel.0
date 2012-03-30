@@ -1,48 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 30 Mar 2012 13:40:59 -0400 (EDT)
-Subject: [PATCH] ARM: test for PMU feature on v7 (v2 with typo fix)
-In-Reply-To: <20120330170401.GD11451@mudshark.cambridge.arm.com>
-References: <4F590411.9060201@arm.com> <87ty1g88dv.fsf@rustcorp.com.au>
- <87r4wk889a.fsf@rustcorp.com.au>
- <20120323095314.GA13622@mudshark.cambridge.arm.com>
- <87fwcy9abw.fsf@rustcorp.com.au>
- <20120326094054.GA2475@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1203281005110.24151@xanadu.home>
- <20120330170401.GD11451@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1203301336480.24151@xanadu.home>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Fri, 30 Mar 2012 14:42:30 -0400
+Subject: [PATCH] ARM: imx: fix compile error on missing arm_pm_idle
+Message-ID: <1333132950-28357-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Mar 2012, Will Deacon wrote:
+This shows up in imx_v6_v7_defconfig build:
 
-> Hi Nicolas,
-> 
-> On Wed, Mar 28, 2012 at 03:17:29PM +0100, Nicolas Pitre wrote:
-> > On Mon, 26 Mar 2012, Will Deacon wrote:
-> > 
-> > > Now, if everything was device-tree based then we could simply use a
-> > > different binding for each CPU but since we support perf on non-DT
-> > > platforms, probing the CPU type is the best solution. I would like to avoid
-> > > the probing code if we are initialised from DT, but I've not got round to it
-> > > yet (this would be useful for big.LITTLE).
-> > 
-> > Still... my opinion is that we should try to autodetect as much as 
-> > possible and avoid overstuffing the DT with content that can otherwise 
-> > be run-time probed.  OK to use DT to override the probe for corner 
-> > cases, but IMHO the probe should be the default method of 
-> > initialization.  The rational is that we want to spread knowledge about 
-> > part of the system and have it confined into respective drivers and 
-> > subsystems for easier maintenance.  If the guy who has to maintain the 
-> > dts has to know all the details for everything then that won't scale and 
-> > the risk for discrepancies is increased.
-> 
-> I agree that probing is preferable where possible but, since the PMUs are
-> banked, we cannot reliably probe them on big.LITTLE platforms.
+arch/arm/mach-imx/mm-imx3.c: In function 'imx31_init_early':
+arch/arm/mach-imx/mm-imx3.c:138: error: 'arm_pm_idle' undeclared
+arch/arm/mach-imx/mm-imx5.c: In function 'imx51_init_early':
+arch/arm/mach-imx/mm-imx5.c:105: error: 'arm_pm_idle' undeclared
+arch/arm/mach-imx/mm-imx3.c: In function 'imx35_init_early':
+arch/arm/mach-imx/mm-imx3.c:210: error: 'arm_pm_idle' undeclared
+arch/arm/mach-imx/mm-imx5.c: In function 'imx51_init_early':
+arch/arm/mach-imx/mm-imx5.c:105: error: 'arm_pm_idle' undeclared
 
-Are they tied to each cluster power domains?  If so you'll have to 
-preserve/restore their state when clusters are suspended even if the 
-interface tries to present a consistent view to users.  The probe can be 
-done there, and differences in capabilities adjusted dynamically.
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-
-Nicolas
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index d534d7f..7412738 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -21,6 +21,7 @@
+ #include <linux/err.h>
+ 
+ #include <asm/pgtable.h>
++#include <asm/system_misc.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/map.h>
+ 
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index 51af9fa..05250ae 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/clk.h>
+ 
++#include <asm/system_misc.h>
+ #include <asm/mach/map.h>
+ 
+ #include <mach/hardware.h>
+-- 
+1.7.9.1
