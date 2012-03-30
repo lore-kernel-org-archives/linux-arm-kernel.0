@@ -1,88 +1,232 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Fri, 30 Mar 2012 18:34:01 +0300
-Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
-In-Reply-To: <1333119961.87678.YahooMailClassic@web29013.mail.ird.yahoo.com>
-References: <1333119961.87678.YahooMailClassic@web29013.mail.ird.yahoo.com>
-Message-ID: <4F75D269.7030500@compulab.co.il>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 30 Mar 2012 10:34:40 -0500
+Subject: [PATCH-V2 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ runtime
+In-Reply-To: <1333115655-28530-4-git-send-email-hvaibhav@ti.com>
+References: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
+ <1333115655-28530-4-git-send-email-hvaibhav@ti.com>
+Message-ID: <4F75D290.8090706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vaibhav,
 
+On 3/30/2012 8:54, Vaibhav Hiremath wrote:
 
-On 03/30/12 18:06, Paul Parsons wrote:
-> --- On Fri, 30/3/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
->> On 03/28/12 20:12, Paul Parsons
->> wrote:
->>> On PXA2xx platforms, the MFP API (described in
->> Documentation/arm/pxa/mfp.txt)
->>> provides values for the following:
->>>
->>> 1. GPIO inputs (e.g. GPIO105_GPIO).
->>> 2. Alternate function inputs (e.g. GPIO105_CIF_DD_1).
->>> 3. Alternate function outputs (e.g.
->> GPIO105_KP_MKOUT_2).
->>>
->>> It does not provide values for GPIO outputs (i.e. AF0
->> outputs).
->>>
->>> One cannot use the macro used by the MFP API internally
->> - MFP_CFG_OUT() - to
->>> define new GPIO output values, since that macro is
->> forbidden in platform code.
->>>
->>> Without the ability to add GPIO outputs to the MFP
->> configuration, it is not
->>> possible to drive GPIO outputs high during sleep mode.
->>>
->>> This would be useful, for example, on the hx4700
->> platform, where driving the
->>> infrared powerdown GPIO 105 high during sleep mode
->> would save some mA.
->>>
->>> So my question is: what method should one use to add
->> GPIO outputs to the MFP
->>> configuration?
->>>
->>> One possible method, namely manually defining values in
->> the platform code:
->>>
->>>     MFP_PIN_GPIO105 | MFP_AF0 |
->> MFP_DIR_OUT | MFP_LPM_DRIVE_HIGH,
->>
->> Have you tried:
->> GPIO105_GPIO | MFP_LPM_DRIVE_HIGH,
->> ?
->>
->> This way it works on other boards.
+> Current OMAP code supports couple of clocksource options based
+> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+> So there can be 3 options -
 > 
-> Hello Igor,
+> 1. 32KHz sync-timer
+> 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+> 3. 32KHz based gptimer.
 > 
-> GPIO105_GPIO expands to a GPIO input - MFP_CFG_IN(GPIO105, AF0) -
-> not an output.
+> The optional gptimer based clocksource was added so that it can
+> give the high precision than sync-timer, so expected usage was 2
+> and not 3.
+> Unfortunately option 2, clocksource doesn't meet the requirement of
+> free-running clock as per clocksource need. It stops in low power states
+> when sys_clock is cut. That makes gptimer based clocksource option
+> useless for OMAP2/3/4 devices with sys_clock as a clock input.
+> Option 3 will still work but it is no better than 32K sync-timer
+> based clocksource.
+> 
+> So ideally we can kill the gptimer based clocksource option but there
+> are some OMAP based derivative SoCs like AM33XX which doesn't have
+> 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
+> clocksource.
+> Considering above, make sync-timer and gptimer clocksource runtime
+> selectable so that both OMAP and AMXXXX continue to use the same code.
+> 
+> Use hwmod database lookup mechanism, through which at run-time
+> we can identify availability of 32k-sync timer on the device,
+> else fall back to gptimer.
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Cc: Ming Lei <tom.leiming@gmail.com>
+> ---
+>  arch/arm/mach-omap1/timer32k.c           |    6 ++-
+>  arch/arm/mach-omap2/timer.c              |   45 +++++++++-------
+>  arch/arm/plat-omap/counter_32k.c         |   86 ++++++++++++-----------------
+>  arch/arm/plat-omap/include/plat/common.h |    2 +-
+>  4 files changed, 68 insertions(+), 71 deletions(-)
 
-Yeah, I know... but read in mfp-pxa2xx.h, lines 6-20:
-/*
- * the following MFP_xxx bit definitions in mfp.h are re-used for pxa2xx:
- *
- *  MFP_PIN(x)
- *  MFP_AFx
- *  MFP_LPM_DRIVE_{LOW, HIGH}
- *  MFP_LPM_EDGE_x
- *
- * other MFP_x bit definitions will be ignored
- *
- * and adds the below two bits specifically for pxa2xx:
- *
- * bit     23 - Input/Output (PXA2xx specific)
- * bit     24 - Wakeup Enable(PXA2xx specific)
- */
+[...]
 
-This means, that there is no difference between: MFP_CFG_IN and MFP_CFG_OUT for PXA2xx.
-The reason for this is that PXA2xx h/w does not have a dedicated MFP registers.
-All goes through the GPIO controller, so the whole MFP for PXA2xx is only to conform
-to newer "PXA" platform features...
+> @@ -280,13 +265,33 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+>  						const char *fck_source)
+>  {
+>  	int res;
+> +	struct omap_hwmod *oh;
+> +	const char *oh_name = "counter_32k";
+> +
+> +	/*
+> +	 * First check for availability for 32k-sync timer.
+> +	 *
+> +	 * In case of failure in finding 32k_counter module or
+> +	 * registering it as clocksource, execution will fallback to
+> +	 * gp-timer.
+> +	 */
+> +	oh = omap_hwmod_lookup(oh_name);
+> +	if (oh && oh->slaves_cnt != 0) {
+> +		u32 pbase;
+> +		unsigned long size;
+> +
+> +		pbase = oh->slaves[0]->addr->pa_start + 0x10;
+> +		size = oh->slaves[0]->addr->pa_end -
+> +			oh->slaves[0]->addr->pa_start;
+> +		res = omap_init_clocksource_32k(pbase, size);
+> +		if (!res)
+> +			return;
 
 
--- 
-Regards,
-Igor.
+If omap_init_clocksource_32k() fails should we also call BUG_ON here?
+
+> +	}
+> 
+> +	/* Fall back to gp-timer code */
+>  	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source);
+>  	BUG_ON(res);
+> 
+> -	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+> -		gptimer_id, clksrc.rate);
+> -
+>  	__omap_dm_timer_load_start(&clksrc,
+>  			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+>  	setup_sched_clock(dmtimer_read_sched_clock, 32, clksrc.rate);
+> @@ -294,8 +299,10 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+>  	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
+>  		pr_err("Could not register clocksource %s\n",
+>  			clocksource_gpt.name);
+> +	else
+> +		pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+> +			gptimer_id, clksrc.rate);
+>  }
+> -#endif
+> 
+>  #define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src,			\
+>  				clksrc_nr, clksrc_src)			\
+> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+> index 5068fe5..c1af18c 100644
+> --- a/arch/arm/plat-omap/counter_32k.c
+> +++ b/arch/arm/plat-omap/counter_32k.c
+> @@ -35,8 +35,6 @@
+>   */
+>  static void __iomem *timer_32k_base;
+> 
+> -#define OMAP16XX_TIMER_32K_SYNCHRONIZED		0xfffbc410
+> -
+>  static u32 notrace omap_32k_read_sched_clock(void)
+>  {
+>  	return timer_32k_base ? __raw_readl(timer_32k_base) : 0;
+> @@ -68,54 +66,42 @@ void read_persistent_clock(struct timespec *ts)
+>  	*ts = *tsp;
+>  }
+> 
+> -int __init omap_init_clocksource_32k(void)
+> +int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
+>  {
+> -	static char err[] __initdata = KERN_ERR
+> -			"%s: can't register clocksource!\n";
+> -
+> -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+> -		u32 pbase;
+> -		unsigned long size = SZ_4K;
+> -		void __iomem *base;
+> -		struct clk *sync_32k_ick;
+> -
+> -		if (cpu_is_omap16xx()) {
+> -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
+> -			size = SZ_1K;
+> -		} else if (cpu_is_omap2420())
+> -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
+> -		else if (cpu_is_omap2430())
+> -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
+> -		else if (cpu_is_omap34xx())
+> -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+> -		else if (cpu_is_omap44xx())
+> -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+> -		else
+> -			return -ENODEV;
+> -
+> -		/* For this to work we must have a static mapping in io.c for this area */
+> -		base = ioremap(pbase, size);
+> -		if (!base)
+> -			return -ENODEV;
+> -
+> -		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+> -		if (!IS_ERR(sync_32k_ick))
+> -			clk_enable(sync_32k_ick);
+
+> -
+
+> -		timer_32k_base = base;
+> -
+> -		/*
+> -		 * 120000 rough estimate from the calculations in
+> -		 * __clocksource_updatefreq_scale.
+> -		 */
+> -		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+> -				32768, NSEC_PER_SEC, 120000);
+> -
+> -		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+> -					  clocksource_mmio_readl_up))
+> -			printk(err, "32k_counter");
+> -
+> -		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
+> -	}
+> +	void __iomem *base;
+> +	struct clk *sync_32k_ick;
+> +
+> +	if (!pbase || !size)
+> +		return -ENODEV;
+> +	/*
+> +	 * For this to work we must have a static mapping in io.c
+> +	 * for this area
+> +	 */
+> +	base = ioremap(pbase, size);
+> +	if (!base)
+> +		return -ENODEV;
+> +
+> +	sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+> +	if (!IS_ERR(sync_32k_ick))
+> +		clk_enable(sync_32k_ick);
+
+
+I know that this is carry over from the original code, but seems that if
+clk_get fails we should return an error. So maybe ...
+
+
+	sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+	if (IS_ERR(sync_32k_ick))
+		return -ENODEV;
+
+	clk_enable(sync_32k_ick);
+
+> +
+> +	timer_32k_base = base;
+> +
+> +	/*
+> +	 * 120000 rough estimate from the calculations in
+> +	 * __clocksource_updatefreq_scale.
+> +	 */
+> +	clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+> +			32768, NSEC_PER_SEC, 120000);
+> +
+> +	if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+> +				clocksource_mmio_readl_up))
+> +		pr_err("32k_counter: can't register clocksource!\n");
+> +
+
+
+Extra line added here that should be removed.
+
+Cheers
+Jon
