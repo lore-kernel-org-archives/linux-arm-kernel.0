@@ -1,61 +1,63 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 30 Mar 2012 07:14:52 +0000
-Subject: [PATCH] ARM: OMAP: hwmod: Fix error handling in functions used
- OMAP4 onwards
-In-Reply-To: <4F7479B5.5060401@ti.com>
-References: <1332842311-12308-1-git-send-email-rnayak@ti.com>
- <79CD15C6BA57404B839C016229A409A83183E0CE@DBDE01.ent.ti.com>
- <4F73FD52.60209@ti.com>
- <79CD15C6BA57404B839C016229A409A83183FB9F@DBDE01.ent.ti.com>
- <4F7479B5.5060401@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831840CE9@DBDE01.ent.ti.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Fri, 30 Mar 2012 12:44:47 +0530
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <4F6B304E.5010402@gmail.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+ <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
+ <4F688B2D.20808@gmail.com>
+ <CAHQjnOMjSPDOymJe356AWnJszQv+X-QWrVrB7ahYDkXBr5HrQw@mail.gmail.com>
+ <4F6B304E.5010402@gmail.com>
+Message-ID: <4F755D67.5020802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 20:33:17, Hunter, Jon wrote:
-> Hi Viabhav,
-> 
-> On 3/29/2012 3:56, Hiremath, Vaibhav wrote:
-> > On Thu, Mar 29, 2012 at 11:42:34, Nayak, Rajendra wrote:
-> >> On Wednesday 28 March 2012 12:02 PM, Hiremath, Vaibhav wrote:
-> >>> On Tue, Mar 27, 2012 at 15:28:31, Nayak, Rajendra wrote:
-> >>>> Some functions like _omap4_disable_module() and _omap4_wait_target_disable()
-> >>>> are (will be) used on all OMAPs OMAP4 and beyond which support module level
-> >>>> control. Fix the error checks in these functions to return if called on
-> >>>> any platform pre OMAP4 (i.e OMAP2 and OMAP3) instead of checking for
-> >>>> !cpu_is_omap44xx(). This avoids having to update the error check with a
-> >>>> '&&   !cpu_is_omap54xx()' when OMAP5 is introduced and possibly similar updates
-> >>>> when further OMAP generations are added.
-> >>>>
-> >>>
-> >>> Let me add some flavor here :)
-> >>>
-> >>> AM33xx, which has module level control, but falls under OMAP3 family of
-> >>> devices. cpu_is_omap34xx() is true for AM33xx device and we have to add
-> >>> check in all these functions. And I am sure we will have many of such
-> >>> devices in the future.
-> >>>
-> >>> Can we use some flag based option here, instead of cpu_is_xxx() check?
-> >>>
-> >>
-> >> The intent of this patch was to make the error handling uniform across
-> >> all modules control functions in hwmod, and it atleast addresses one
-> >> problem of having to update these checks every time a new OMAP gets
-> >> added.
-> >>
-> >> The problem that you bring up with AM33xx is regardless of this patch
-> >> (you would still need to go update every !cpu_is_omap44xx() check)
-> >
-> > Indeed, in any of cpu_is_xxx() check implementation, I have to add check
-> > for cpu_is_am33xx().
-> 
-> I hope we can avoid adding more cpu_is_amXXXX. That should be a last resort.
-> 
+Hi KyongHo,
 
-Yes, indeed; adding cpu_is_xxx check would be my last option.
+On 03/22/2012 07:29 PM, Subash Patel wrote:
+> Hi KyongHo,
+>
+> On 03/21/2012 05:26 AM, KyongHo Cho wrote:
+>> On Tue, Mar 20, 2012 at 10:50 PM, Subash Patel<subashrp@gmail.com> wrote:
+>>> Sorry for digging this very late. But as part of integrating dma_map v7&
+>>> sysmmu v12 on 3.3-rc5, I am facing below issue:
+>>>
+>>> a) By un-selecting IOMMU in menu config, I am able to allocate memory in
+>>> vb2-dma-contig
+>>>
+>>> b) When I enable SYSMMU support for the IP's, I am receiving below
+>>> fault:
+>>>
+>>> Unhandled fault: external abort on non-linefetch (0x818) at 0xb6f55000
+>>>
+>>> I think this has something to do with the access to the SYSMMU
+>>> registers for
+>>> writing the page table. Has anyone of you faced this issue while testing
+>>> these(dma_map+iommu) patches on kernel mentioned above? This must be
+>>> something related to recent changes, as I didn't have issues with these
+>>> patches on 3.2 kernel.
+>>>
+>>
+>> 0xb6f55000 is not an address of SYSMMU register if your kernel starts
+>> at 0xc0000000.
+>>
+>> Can you tell me any detailed information or situation?
+> I hate to say this, but I am not able to catch the fault location even
+> with JTAG. Once the fault comes, the debugger looses all control over. I
+> think now possible method is reproduction at your end :)
 
-Thanks,
-Vaibhav
+Thanks to you, Issue is now figured out. This was due to generic Power 
+Domain code added recently. SYSMMU registers were not getting enabled 
+due to this. I reverted the PD changes from the machine to architecture 
+specific, and voila, SYSMMU is back into action using the 
+dma-mapping-v7. I will have to see how the same would behave when the 
+complete PD changes comes to mainline from maintainers for-next in future.
 
-> Jon
-> 
+>>
+>> Regards,
+>>
+>> KyongHo.
+> Regards,
+> Subash
+Regards,
+Subash
