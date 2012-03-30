@@ -1,66 +1,59 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 30 Mar 2012 08:41:58 +0800
-Subject: [PATCH v3] ARM: pxa: fix build failure for regulator consumer in
- em-x270.c
-In-Reply-To: <1333043034-3374-1-git-send-email-paul.gortmaker@windriver.com>
-References: <20120329151157.GT3668@opensource.wolfsonmicro.com>
- <1333043034-3374-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CAN1soZzssbD1CymiHewy9F8y=1Uc3HDZmL4ws7KTp__R+cpasA@mail.gmail.com>
+Date: Fri, 30 Mar 2012 09:06:37 +0800
+Subject: [GIT PULL] pull request from arch-pxa git on fixes branch
+In-Reply-To: <CAOesGMgxq-HEeKSPvaW-kTLqNyDJUUmG0OEpockMBNninQL0wQ@mail.gmail.com>
+References: <CAN1soZytJ-CxepQAZn5oZ06=ezTQ85O-iC7tUDOeWqi=zpuf8A@mail.gmail.com>
+ <4F732D14.3020803@compulab.co.il>
+ <CAOesGMgxq-HEeKSPvaW-kTLqNyDJUUmG0OEpockMBNninQL0wQ@mail.gmail.com>
+Message-ID: <CAN1soZzqxy=wsPVEXY8BxTK24szq7x5Oxk2JjuUJ6di7ij8hWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 1:43 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> Commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0
+On Thu, Mar 29, 2012 at 1:12 AM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
 >
-> ?"regulator: Remove support for supplies specified by struct device"
+> On Wed, Mar 28, 2012 at 8:24 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
 >
-> caused this file to break, since it was still relying on the
-> device field to be present. ?Map it onto dev_name appropriately
+>> Can Paul's patch [1] be included in this or later request?
+>>
+>> Thanks.
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/091750.html
 >
-> Since there are two consumers with the name "reg-userspace-consumer",
-> we have to supply the ID as a suffix in the REGULATOR_CONSUMER calls.
+> Yes, Haojian, please add that to the branch (with the proposed fixups)
+> as well so we can pick it up and send it in ASAP. Both are broken
+> today in Russell's PXA defconfig.
 >
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
+> There is one more failure as well, that I haven't seen a patch posted for:
 >
-> [v3: add .0/.1 ID suffix to "reg-userspace-consumer" instances ]
+> arch/arm/mach-pxa/cm-x300.c:716:3: error: unknown field 'dev'
+> specified in initializer
 >
-> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-> index c1b65da..16ec557 100644
-> --- a/arch/arm/mach-pxa/em-x270.c
-> +++ b/arch/arm/mach-pxa/em-x270.c
-> @@ -1083,19 +1083,19 @@ static void __init em_x270_userspace_consumers_init(void)
-> ?}
 >
-> ?/* DA9030 related initializations */
-> -#define REGULATOR_CONSUMER(_name, _dev, _supply) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> +#define REGULATOR_CONSUMER(_name, _dev_name, _supply) ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?static struct regulator_consumer_supply _name##_consumers[] = { \
-> ? ? ? ? ? ? ? ?{ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> - ? ? ? ? ? ? ? ? ? ? ? .dev = _dev, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? .dev_name = _dev_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ?.supply = _supply, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?}, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?}
 >
-> -REGULATOR_CONSUMER(ldo3, &em_x270_gps_userspace_consumer.dev, "vcc gps");
-> +REGULATOR_CONSUMER(ldo3, "reg-userspace-consumer.0", "vcc gps");
-> ?REGULATOR_CONSUMER(ldo5, NULL, "vcc cam");
-> -REGULATOR_CONSUMER(ldo10, &pxa_device_mci.dev, "vcc sdio");
-> +REGULATOR_CONSUMER(ldo10, "pxa2xx-mci", "vcc sdio");
-> ?REGULATOR_CONSUMER(ldo12, NULL, "vcc usb");
-> -REGULATOR_CONSUMER(ldo19, &em_x270_gprs_userspace_consumer.dev, "vcc gprs");
-> +REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer.1", "vcc gprs");
-> ?REGULATOR_CONSUMER(buck2, NULL, "vcc_core");
->
-> ?#define REGULATOR_INIT(_ldo, _min_uV, _max_uV, _ops_mask) ? ? ? ? ? ? ?\
-> --
-> 1.7.9.1
->
+> -Olof
 
-Applied
+Now these build issues are fixed. Could you help to pull these fixes
+from arch-pxa git?
 
-Thanks
-Haojian
+The following changes since commit c16fa4f2ad19908a47c63d8fa436a1178438c7e7:
+
+  Linux 3.3 (2012-03-18 16:15:34 -0700)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git fixes
+
+Haojian Zhuang (2):
+      ARM: pxa: fix build issue on cm-x300
+      ARM: pxa: fix build issue on stargate2
+
+Paul Gortmaker (2):
+      ARM: pxa: fix regulator related build fail in magician_defconfig
+      ARM: pxa: fix build failure for regulator consumer in em-x270.c
+
+ arch/arm/mach-pxa/cm-x300.c   |    1 -
+ arch/arm/mach-pxa/em-x270.c   |   10 +++++-----
+ arch/arm/mach-pxa/hx4700.c    |    2 --
+ arch/arm/mach-pxa/magician.c  |    2 --
+ arch/arm/mach-pxa/stargate2.c |    2 +-
+ 5 files changed, 6 insertions(+), 11 deletions(-)
