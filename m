@@ -1,41 +1,117 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 30 Mar 2012 21:25:14 +0530
-Subject: [PATCH v2] video: s3c-fb: Add device tree support
-In-Reply-To: <1333086797-1625-1-git-send-email-thomas.abraham@linaro.org>
-References: <1333086797-1625-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAH+eYFCrdtYC+v3tgqsaCS9-Y61JCwA1MLkkPtH14p=JWBbzBw@mail.gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Fri, 30 Mar 2012 11:03:49 -0500
+Subject: [PATCH] iommu: OMAP: device detach on domain destroy
+Message-ID: <1333123429-3727-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 11:23, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> + ? ?- samsung,fimd-display: The fimd controller is interfaced with the a
-> + ? ? ?display device such as a lcd panel. This property should specify the
-> + ? ? ?phandle of the display device node. For a display device node that
-> + ? ? ?represents a RGB type display interface, it is expected to specify the
-> + ? ? ?video interface timing using the following properties.
-> +
-> + ? ? ?- lcd-htiming: Specifies the horizontal timing for the overlay. The
-> + ? ? ? ?horizontal timing includes four parameters in the following order.
-> +
-> + ? ? ? ?- horizontal back porch (in number of lcd clocks)
-> + ? ? ? ?- horizontal front porch (in number of lcd clocks)
-> + ? ? ? ?- hsync pulse width (in number of lcd clocks)
-> + ? ? ? ?- Display panels X resolution.
-> +
-> + ? ? ?- lcd-vtiming: Specifies the vertical timing for the overlay. The
-> + ? ? ? ?vertical timing includes four parameters in the following order.
-> +
-> + ? ? ? ?- vertical back porch (in number of lcd lines)
-> + ? ? ? ?- vertical front porch (in number of lcd lines)
-> + ? ? ? ?- vsync pulse width (in number of lcd clocks)
-> + ? ? ? ?- Y resolution.
+'domain_destroy with devices attached' case isn't yet handled, instead
+code assumes that the device was already detached.
 
-In this old thread, it was suggested to use a raw EDID block to supply
-timings, and since then a couple of drivers in mainline (sm501fb and
-fsl-diu) are doing it that way:
+If the domain is destroyed the hardware still has access to invalid
+pointers to its page table and internal iommu object. In order to
+detach the users we need to track devices using the iommu, current
+use cases only have one user of iommu per instance. When required
+this can evolve to a list with the devices using the iommu_dev.
 
-http://lists.ozlabs.org/pipermail/linuxppc-dev/2010-February/080683.html
+Reported-by: Joerg Roedel <joro@8bytes.org>
+Reviewed-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+---
+ drivers/iommu/omap-iommu.c |   32 +++++++++++++++++++++++---------
+ 1 files changed, 23 insertions(+), 9 deletions(-)
 
-Shouldn't this driver be doing the same thing?  If not, shouldn't
-whatever interface this is adding be provided in a common helper (like
-that old patch was trying to add) so it's standardized between drivers?
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index 821062a..e32bd15 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -41,11 +41,13 @@
+  * @pgtable:	the page table
+  * @iommu_dev:	an omap iommu device attached to this domain. only a single
+  *		iommu device can be attached for now.
++ * @dev:	Device using this domain.
+  * @lock:	domain lock, should be taken when attaching/detaching
+  */
+ struct omap_iommu_domain {
+ 	u32 *pgtable;
+ 	struct omap_iommu *iommu_dev;
++	struct device *dev;
+ 	spinlock_t lock;
+ };
+ 
+@@ -1074,6 +1076,7 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	}
+ 
+ 	omap_domain->iommu_dev = arch_data->iommu_dev = oiommu;
++	omap_domain->dev = dev;
+ 	oiommu->domain = domain;
+ 
+ 	/* temporary workaround */
+@@ -1084,19 +1087,16 @@ out:
+ 	return ret;
+ }
+ 
+-static void omap_iommu_detach_dev(struct iommu_domain *domain,
+-				 struct device *dev)
++static void _omap_iommu_detach_dev(struct omap_iommu_domain *omap_domain,
++			struct device *dev)
+ {
+-	struct omap_iommu_domain *omap_domain = domain->priv;
+-	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
+ 	struct omap_iommu *oiommu = dev_to_omap_iommu(dev);
+-
+-	spin_lock(&omap_domain->lock);
++	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
+ 
+ 	/* only a single device is supported per domain for now */
+ 	if (omap_domain->iommu_dev != oiommu) {
+ 		dev_err(dev, "invalid iommu device\n");
+-		goto out;
++		return;
+ 	}
+ 
+ 	iopgtable_clear_entry_all(oiommu);
+@@ -1104,11 +1104,19 @@ static void omap_iommu_detach_dev(struct iommu_domain *domain,
+ 	omap_iommu_detach(oiommu);
+ 
+ 	omap_domain->iommu_dev = arch_data->iommu_dev = NULL;
++	omap_domain->dev = NULL;
+ 
+ 	/* temporary workaround */
+ 	clk_disable(oiommu->clk);
++}
+ 
+-out:
++static void omap_iommu_detach_dev(struct iommu_domain *domain,
++				 struct device *dev)
++{
++	struct omap_iommu_domain *omap_domain = domain->priv;
++
++	spin_lock(&omap_domain->lock);
++	_omap_iommu_detach_dev(omap_domain, dev);
+ 	spin_unlock(&omap_domain->lock);
+ }
+ 
+@@ -1147,13 +1155,19 @@ out:
+ 	return -ENOMEM;
+ }
+ 
+-/* assume device was already detached */
+ static void omap_iommu_domain_destroy(struct iommu_domain *domain)
+ {
+ 	struct omap_iommu_domain *omap_domain = domain->priv;
+ 
+ 	domain->priv = NULL;
+ 
++	/*
++	 * An iommu device is still attached
++	 * (currently, only one device can be attached) ?
++	 */
++	if (omap_domain->iommu_dev)
++		_omap_iommu_detach_dev(omap_domain, omap_domain->dev);
++
+ 	kfree(omap_domain->pgtable);
+ 	kfree(omap_domain);
+ }
+-- 
+1.7.4.1
