@@ -1,39 +1,73 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 30 Mar 2012 09:33:30 +0800
-Subject: How to add GPIO outputs to the PXA2xx MFP configuration?
-In-Reply-To: <1332958336.11131.YahooMailClassic@web29001.mail.ird.yahoo.com>
-References: <1332958336.11131.YahooMailClassic@web29001.mail.ird.yahoo.com>
-Message-ID: <CAN1soZwzBqDGTX+a-maVr5baaoZ7qwgdvXyPeya5R80cN_iA0w@mail.gmail.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Fri, 30 Mar 2012 09:58:15 +0800
+Subject: [PATCH V2 1/4] Input: pxa27x_keypad keep clock on as wakeup source
+Message-ID: <1333072698-15344-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2012 at 2:12 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> On PXA2xx platforms, the MFP API (described in Documentation/arm/pxa/mfp.txt)
-> provides values for the following:
->
-> 1. GPIO inputs (e.g. GPIO105_GPIO).
-> 2. Alternate function inputs (e.g. GPIO105_CIF_DD_1).
-> 3. Alternate function outputs (e.g. GPIO105_KP_MKOUT_2).
->
-> It does not provide values for GPIO outputs (i.e. AF0 outputs).
->
-> One cannot use the macro used by the MFP API internally - MFP_CFG_OUT() - to
-> define new GPIO output values, since that macro is forbidden in platform code.
->
-> Without the ability to add GPIO outputs to the MFP configuration, it is not
-> possible to drive GPIO outputs high during sleep mode.
->
-> This would be useful, for example, on the hx4700 platform, where driving the
-> infrared powerdown GPIO 105 high during sleep mode would save some mA.
->
-> So my question is: what method should one use to add GPIO outputs to the MFP
-> configuration?
->
-> One possible method, namely manually defining values in the platform code:
->
-> ? ? ? ?MFP_PIN_GPIO105 | MFP_AF0 | MFP_DIR_OUT | MFP_LPM_DRIVE_HIGH,
->
-> is essentially no different from using the forbidden MFP_CFG_OUT() macro.
->
+When the keypad is used as wake up source, the clock can not
+be disabled. Or it can not detect key pressing.
+If the keypad is used as wake up source, when resume back,
+do not enable the clock and configure it again because the
+register content is retained.
 
-Does MFP_CFG_OUT() help you? This macro is defined in mfp-pxa2xx.h.
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ drivers/input/keyboard/pxa27x_keypad.c |   27 ++++++++++++++++++---------
+ 1 files changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+index 29fe1b2..1c5752f 100644
+--- a/drivers/input/keyboard/pxa27x_keypad.c
++++ b/drivers/input/keyboard/pxa27x_keypad.c
+@@ -419,10 +419,14 @@ static int pxa27x_keypad_suspend(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+ 
+-	clk_disable(keypad->clk);
+-
++	/*
++	 * If the keypad is used a wake up source, clock can not be disabled.
++	 * Or it can not detect the key pressing.
++	 */
+ 	if (device_may_wakeup(&pdev->dev))
+ 		enable_irq_wake(keypad->irq);
++	else
++		clk_disable(keypad->clk);
+ 
+ 	return 0;
+ }
+@@ -433,19 +437,24 @@ static int pxa27x_keypad_resume(struct device *dev)
+ 	struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+ 	struct input_dev *input_dev = keypad->input_dev;
+ 
++	/*
++	 * If the keypad is used as wake up source, the clock is not turned
++	 * off. So do not need configure it again.
++	 */
+ 	if (device_may_wakeup(&pdev->dev))
+ 		disable_irq_wake(keypad->irq);
++	else {
++		mutex_lock(&input_dev->mutex);
+ 
+-	mutex_lock(&input_dev->mutex);
++		if (input_dev->users) {
++			/* Enable unit clock */
++			clk_enable(keypad->clk);
++			pxa27x_keypad_config(keypad);
++		}
+ 
+-	if (input_dev->users) {
+-		/* Enable unit clock */
+-		clk_enable(keypad->clk);
+-		pxa27x_keypad_config(keypad);
++		mutex_unlock(&input_dev->mutex);
+ 	}
+ 
+-	mutex_unlock(&input_dev->mutex);
+-
+ 	return 0;
+ }
+ 
+-- 
+1.7.0.4
