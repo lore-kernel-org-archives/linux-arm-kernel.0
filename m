@@ -1,32 +1,27 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 30 Mar 2012 10:39:07 +0530
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Mar 2012 07:14:34 +0200
 Subject: [RFC] pinctrl: Replace list_groups() with get_groups_count()
-In-Reply-To: <CACRpkdYaJ8sH0u6VTiaiPOJJ-D0pDo5oONyFXA4EvtL+WXEtjw@mail.gmail.com>
+In-Reply-To: <4F753FF3.4040704@st.com>
 References: <CAOh2x==LTHPM+O9LXVFVdX2NfzKs2bttiYLm8VcL6qLXKrUMBg@mail.gmail.com>
  <4F749B58.4070608@wwwdotorg.org>
  <CAOh2x==mGDZRoxdbuvbhKtfoxiEDVb+7vdfBEYD=u+DdMCYVhw@mail.gmail.com>
- <4F74A05E.7050803@wwwdotorg.org>	<4F753007.2030707@st.com>
+ <4F74A05E.7050803@wwwdotorg.org> <4F753007.2030707@st.com>
  <CACRpkdYaJ8sH0u6VTiaiPOJJ-D0pDo5oONyFXA4EvtL+WXEtjw@mail.gmail.com>
-Message-ID: <4F753FF3.4040704@st.com>
+ <4F753FF3.4040704@st.com>
+Message-ID: <CACRpkdaJpy_iRg4XzJepn=5tXLxBeYq3aMk1M_Z7WLD1+gw8iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/30/2012 10:34 AM, Linus Walleij wrote:
-> Just patch it, as detailed in the other letter there is really no point
-> for having it like this so go ahead. As long as you also patch all
-> the users and remove the old interface, just rewrite it.
+On Fri, Mar 30, 2012 at 7:09 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-I have this in mind. Will fix all users.
+> BTW, i am planning not to add another call, get_groups_count(),
+> but add another field like ngroups, which would be set by users.
 
-> If you could also test it on something it'd be nice ...
+get_groups_count() may make some sense if the number of
+available groups could in some instance change at runtime.
+Maybe a bit overcautious and pedantic but you never know...
 
-I don't have any board to test it. But after i am done with this, i
-will complete pinctrl support for SPEAr and there i can test it.
+But do it any way you like, I don't worry very much :-)
 
-I hope before that lot of other people would be able to test it. :)
-
-BTW, i am planning not to add another call, get_groups_count(),
-but add another field like ngroups, which would be set by users.
-
--- 
-viresh
+Yours,
+Linus Walleij
