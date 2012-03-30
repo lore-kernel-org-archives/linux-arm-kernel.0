@@ -1,142 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Mar 2012 14:12:00 +0100
-Subject: [PATCH] cpufreq: OMAP: fix build errors: depends on ARCH_OMAP2PLUS
-In-Reply-To: <1332807568-638-1-git-send-email-khilman@ti.com>
-References: <1332807568-638-1-git-send-email-khilman@ti.com>
-Message-ID: <20120330131200.GA23442@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 30 Mar 2012 21:13:24 +0800
+Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
+ Development Kit
+In-Reply-To: <20120105113106.GR11810@n2100.arm.linux.org.uk>
+References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20111219071350.GH4962@S2100-06.ap.freescale.net>
+ <4EEEE40C.3000200@bluegiga.com>
+ <20111219091916.GJ4962@S2100-06.ap.freescale.net>
+ <20111219091322.GD14542@n2100.arm.linux.org.uk>
+ <20120104135204.GA14741@S2100-06.ap.freescale.net>
+ <20120104211800.GF11810@n2100.arm.linux.org.uk>
+ <20120105113106.GR11810@n2100.arm.linux.org.uk>
+Message-ID: <20120330131320.GH3254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 05:19:28PM -0700, Kevin Hilman wrote:
-> The OMAP driver needs a 'depends on ARCH_OMAP2PLUS' since it only
-> builds for OMAP2+ platforms.
+On Thu, Jan 05, 2012 at 11:31:06AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 04, 2012 at 09:18:00PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 04, 2012 at 09:52:05PM +0800, Shawn Guo wrote:
+> > > On Mon, Dec 19, 2011 at 09:13:22AM +0000, Russell King - ARM Linux wrote:
+> > > > No.  It will be automatically removed from any update as long as it does
+> > > > not conform to the requirements - that is, in this case, the strings
+> > > > being out of sync indentified in the message to which you replied to.
+> > > > 
+> > > > Someone needs to tell me what the correct entry is supposed to look like.
+> > > > 
+> > > Hi Russell,
+> > > 
+> > > Any chance to have APX4DEVKIT included in your patch 'ARM: Update
+> > > mach-types' for 3.3?
+> > 
+> > As it appears when I run the update script, the answer is yes.  I'll
+> > update the commit in the next couple of days (I want to reduce the
+> > number of times I re-merge the tree now that I've a git-rerere immune
+> > conflict to deal with.)
 > 
-> This 'depends on' was in the original patch from Russell King, but was
-> erroneously removed by me when making this option user-selectable in
-> commit b09db45c (cpufreq: OMAP driver depends CPUfreq tables.)  This
-> patch remedies that.
+> I'll change that - as 3.2 was released last night.  I'm not going to
+> update mach-types now as that would be suicide - updating it will
+> mean a bunch of entries will be deleted, and we don't know whether that
+> will cause build failures.
 > 
-> Apologies to Russell King for breaking his originally working patch.
-> 
-> Also, thanks to Grazvydas Ignotas for reporting the same problem.
-> 
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Grazvydas Ignotas <notasas@gmail.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Dave, this applies on top of your current fixes branch, and fixes a 
-> problem introduced there by me.  Please merge for v3.4-rc.  Thanks.
+> So... not this side of the merge window.
 
-Can you please check that you've picked up everything that's necessary,
-as I'm still seeing the below as outstanding from my original patch.
+Hi Russell,
 
-commit e55a42528cebb8fa7408dc95abb3859639a46750
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Wed Feb 15 11:20:51 2012 +0000
+I thought you will send a mach-types update during v3.4 merge window,
+so I merged APX4DEVKIT board file and it's now on mainline (not enabled
+in mxs_defconfig though).  But I have not seen mach-types update yet
+while the merge window is almost done.  Do you still plan to send an
+update or plan to stop updating mach-types?
 
-    ARM: OMAP: fix cpufreq build
-    
-    OMAPs cpufreq requires the frequency table support, but nothing ensures
-    that this is selected.  This can result in configurations which fail to
-    build:
-    
-    drivers/built-in.o:(.data+0x5238): undefined reference to `cpufreq_freq_attr_scaling_available_freqs'
-    drivers/cpufreq/omap-cpufreq.c:88: undefined reference to `cpufreq_frequency_table_target'
-    drivers/cpufreq/omap-cpufreq.c:60: undefined reference to `cpufreq_frequency_table_verify'
-    drivers/cpufreq/omap-cpufreq.c:186: undefined reference to `cpufreq_frequency_table_cpuinfo'
-    drivers/cpufreq/omap-cpufreq.c:190: undefined reference to `cpufreq_frequency_table_get_attr'
-    
-    Fix this by introducing a new configuration variable and having that
-    select CPU_FREQ_TABLE.
-    
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index 7072e0d..ad35d4e 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -166,7 +166,7 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
- 	return 0;
- }
- 
--#ifdef CONFIG_CPU_FREQ
-+#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
- /*
-  * Walk PRCM rate table and fillout cpufreq freq_table
-  * XXX This should be replaced by an OPP layer in the near future
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index f57ed5b..450feb0 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -536,7 +536,7 @@ struct clk_functions omap2_clk_functions = {
- 	.clk_set_rate		= omap2_clk_set_rate,
- 	.clk_set_parent		= omap2_clk_set_parent,
- 	.clk_disable_unused	= omap2_clk_disable_unused,
--#ifdef CONFIG_CPU_FREQ
-+#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
- 	/* These will be removed when the OPP code is integrated */
- 	.clk_init_cpufreq_table	= omap2_clk_init_cpufreq_table,
- 	.clk_exit_cpufreq_table	= omap2_clk_exit_cpufreq_table,
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index b8c2a68..f331cfc 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -146,7 +146,7 @@ extern const struct clksel_rate gpt_sys_rates[];
- extern const struct clksel_rate gfx_l3_rates[];
- extern const struct clksel_rate dsp_ick_rates[];
- 
--#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_CPU_FREQ)
-+#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_ARM_OMAP2PLUS_CPUFREQ)
- extern void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
- extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
- #else
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index 56b6f8b..618cf80 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -398,7 +398,7 @@ struct clk dummy_ck = {
- 	.ops	= &clkops_null,
- };
- 
--#ifdef CONFIG_CPU_FREQ
-+#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
- void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- {
- 	unsigned long flags;
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index 240a7b9..879ba27 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -283,7 +283,7 @@ struct clk_functions {
- 	void		(*clk_allow_idle)(struct clk *clk);
- 	void		(*clk_deny_idle)(struct clk *clk);
- 	void		(*clk_disable_unused)(struct clk *clk);
--#ifdef CONFIG_CPU_FREQ
-+#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
- 	void		(*clk_init_cpufreq_table)(struct cpufreq_frequency_table **);
- 	void		(*clk_exit_cpufreq_table)(struct cpufreq_frequency_table **);
- #endif
-@@ -301,7 +301,7 @@ extern void recalculate_root_clocks(void);
- extern unsigned long followparent_recalc(struct clk *clk);
- extern void clk_enable_init_clocks(void);
- unsigned long omap_fixed_divisor_recalc(struct clk *clk);
--#ifdef CONFIG_CPU_FREQ
-+#ifdef CONFIG_ARM_OMAP2PLUS_CPUFREQ
- extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
- extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
- #endif
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 32d790d..587b578 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -3,8 +3,8 @@
- #
- 
- config ARM_OMAP2PLUS_CPUFREQ
--	bool "TI OMAP2+"
--	default ARCH_OMAP2PLUS
-+	def_bool y
-+	depends on ARCH_OMAP2PLUS
- 	select CPU_FREQ_TABLE
- 
- config ARM_S3C2416_CPUFREQ
+Regards,
+Shawn
