@@ -1,32 +1,51 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 30 Mar 2012 23:13:22 +0200
-Subject: [PATCH] ARM: include linux/bug.h in insn.c
-Message-ID: <1333142002-15431-1-git-send-email-joachim.eastwood@jotron.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 30 Mar 2012 18:26:43 -0300
+Subject: [PATCH] ARM: mach-imx: Include <asm/system_misc.h>
+Message-ID: <1333142803-24183-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit d82227cf8 building the kernel fails with:
-  arch/arm/kernel/insn.c: In function '__arm_gen_branch_thumb2':
-  arch/arm/kernel/insn.c:13: error: implicit declaration of function 'WARN_ON_ONCE'
-  make[1]: *** [arch/arm/kernel/insn.o] Error 1
-  make: *** [arch/arm/kernel] Error 2
+Fix the following build error:
 
-insn.c uses WARN_ON_ONCE so lets include bug.h.
+arch/arm/mach-imx/mm-imx3.c:138:2: error: 'arm_pm_idle' undeclared (first use in this function)
+arch/arm/mach-imx/mm-imx3.c:210:2: error: 'arm_pm_idle' undeclared (first use in this function)
+make[2]: *** [arch/arm/mach-imx/mm-imx3.o] Error 1
+arch/arm/mach-imx/mm-imx5.c:105:2: error: 'arm_pm_idle' undeclared (first use in this function)
 
-Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+This was caused by commit 4a3ea24 (ARM: plat-mxc: hook special idle handlers to arm_pm_idle)
+
+Include <asm/system_misc.h> to avoid the build error.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/kernel/insn.c |    1 +
- 1 file changed, 1 insertion(+)
+This applies against linux-next
+ arch/arm/mach-imx/mm-imx3.c |    1 +
+ arch/arm/mach-imx/mm-imx5.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/insn.c b/arch/arm/kernel/insn.c
-index ab312e5..080fc70 100644
---- a/arch/arm/kernel/insn.c
-+++ b/arch/arm/kernel/insn.c
-@@ -1,4 +1,5 @@
- #include <linux/kernel.h>
-+#include <linux/bug.h>
- #include <asm/opcodes.h>
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index d534d7f..1da77fa 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -23,6 +23,7 @@
+ #include <asm/pgtable.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/map.h>
++#include <asm/system_misc.h>
  
- static unsigned long
+ #include <mach/common.h>
+ #include <mach/devices-common.h>
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index 51af9fa..ac8e35c 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -16,6 +16,7 @@
+ #include <linux/clk.h>
+ 
+ #include <asm/mach/map.h>
++#include <asm/system_misc.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/common.h>
 -- 
-1.7.9.2
+1.7.1
