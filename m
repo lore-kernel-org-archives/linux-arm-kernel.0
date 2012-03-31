@@ -1,59 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 31 Mar 2012 13:25:18 +0800
-Subject: [PATCH] ARM: amba: adapt to regulator probe deferral change
-In-Reply-To: <20120330180134.GJ22981@n2100.arm.linux.org.uk>
-References: <1333115737-1654-1-git-send-email-shawn.guo@linaro.org>
- <20120330180134.GJ22981@n2100.arm.linux.org.uk>
-Message-ID: <20120331052516.GK3254@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 31 Mar 2012 12:00:18 +0530
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+ <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
+ <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
+ <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
+ <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
+ <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
+ <4F7570FC.8000907@ti.com>
+ <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
+ <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
+ <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+Message-ID: <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 07:01:34PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Mar 30, 2012 at 09:55:37PM +0800, Shawn Guo wrote:
-> > The commit 04bf301 (regulator: Support driver probe deferral) changes
-> > regulator_get() and regulator_register() to return -EPROBE_DEFER
-> > instead of -ENODEV.  Adapt amba bus driver to the change, otherwise
-> > amba_probe() will fail on the platforms that do not have "vcore"
-> > regulator device.
-> 
-> Are you sure this is correct?  Did you read and understand the comment
-> you removed?
-> 
-I did read the comment and try to understand it.  Correct me if the
-understanding below is wrong.
+On Sat, Mar 31, 2012 at 7:00 AM, Ming Lei <tom.leiming@gmail.com> wrote:
+> On Fri, Mar 30, 2012 at 5:20 PM, Shilimkar, Santosh <santosh.shilimkar@ti.com>
+>>
+>>> After Ming Lie's comment, the point that I came to my mind was,
+>>> certainly there will be resolution difference between these two clocksources,
+>>> if ?gptimer2 is sourced from sys_ck (26Mhz).
+>>>
+>> GPTIMER2 with sysclock is not an option. GPTIMER is not in wakeup domain
+>> and when sysclock is cut, it stops.
+>
+> If neither CONFIG_PM or CONFIG_CPUIDLE is set, GPTIMER2 with sysclock
+> should be an option.
+>
+So it's a PM disable kernel and you will recompile it.
 
-> What do platforms do which have AMBA devices but don't have any vcore
-> regulators?
-> 
-We will have two cases for platforms that do not have any vcore
-regulators.
+> As I commented before, high resolution timer is very useful for trace, debug or
+> high frequency perf sample. Suppose you want to trace the running time of
+> one function, ?32K counter can only give you a resolution of ~35us, which is
+> too coarse to work well.
+>
+Since you need to recompile the kernel, you can very much tweak the
+clocksource to use GPTIMER with sysl clock. Support for that is still
+in place.
 
-1) CONFIG_REGULATOR is not enabled
-
-   The regulator_get() returns NULL, and regulator_enable() returns 0.
-   amba_get_enable_vcore() will succeed with 'ret' as 0.  My patch
-   changes nothing for this case.
-
-2) CONFIG_REGULATOR is enabled but platform never registers any vcore
-   regulators
-
-   Before commit 04bf301 (regulator: Support driver probe deferral),
-   regulator_get() returns ERR_PTR(-ENODEV) when no "vore" regulator
-   is found, and the check "if (PTR_ERR(vcore) == -ENODEV)" in
-   amba_get_enable_vcore() forces a success return.   Now that commit
-   changes regulator_get() to returns ERR_PTR(-EPROBE_DEFER) in case
-   that no "vore" regulator is found.  My patch changes the check in
-   amba_get_enable_vcore() from -ENODEV to -EPROBE_DEFER accordingly.
-   And that's all what my patch does.
-
-> We're not going through the same farce that the smsc network driver has
-> gone through: OMAP3430LDP remains fucked through that idiotic ill-thought
-> out change (c7e963f68888, net/smsc911x: Add regulator support).  See
-> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=99
-
-If the understanding above is correct, I do not see how my patch would
-bring the same farce into amba driver.
-
--- 
-Regards,
-Shawn
+Regards
+Santosh
