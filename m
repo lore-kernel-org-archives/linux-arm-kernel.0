@@ -1,40 +1,22 @@
-From: oskar.andero@gmail.com (Oskar Andero)
-Date: Sat, 31 Mar 2012 01:37:37 +0200
-Subject: [PATCH] ARM: versatile: fix broken build in pci.c
-Message-ID: <1333150657-6534-1-git-send-email-oskar.andero@gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 30 Mar 2012 17:00:21 -0700
+Subject: [GIT PULL] ARM: Two more fixes for merge window fallout
+In-Reply-To: <CAOesGMjU5tehTf7+nYQv1_7a=+gGN2hVYUdh1g_BF=WRYj0hgg@mail.gmail.com>
+References: <CAOesGMjU5tehTf7+nYQv1_7a=+gGN2hVYUdh1g_BF=WRYj0hgg@mail.gmail.com>
+Message-ID: <CA+55aFzeN+m0mWqe6ajBB=cdTNJMF2FgW17_mm_n0BoKokQVRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An undefined reference to sys was introduced by 9f786d03.
+On Fri, Mar 30, 2012 at 4:20 PM, Olof Johansson <olof@lixom.net> wrote:
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
 
-Signed-off-by: Oskar Andero <oskar.andero@gmail.com>
----
- arch/arm/mach-versatile/pci.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+Hmm. I *think* you meant to ask me to pull the "fixes-for-linus" tag,
+which points at the same commit as the "fixes" branch. No?
 
-diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
-index a6e23f4..e4447dd 100644
---- a/arch/arm/mach-versatile/pci.c
-+++ b/arch/arm/mach-versatile/pci.c
-@@ -190,8 +190,9 @@ static struct resource pre_mem = {
- 	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
- };
- 
--static int __init pci_versatile_setup_resources(struct list_head *resources)
-+static int __init pci_versatile_setup_resources(struct pci_sys_data *sys)
- {
-+	struct list_head *resources = &sys->resources;
- 	int ret = 0;
- 
- 	ret = request_resource(&iomem_resource, &io_mem);
-@@ -249,7 +250,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
- 
- 	if (nr == 0) {
- 		sys->mem_offset = 0;
--		ret = pci_versatile_setup_resources(&sys->resources);
-+		ret = pci_versatile_setup_resources(sys);
- 		if (ret < 0) {
- 			printk("pci_versatile_setup: resources... oops?\n");
- 			goto out;
--- 
-1.7.3.4
+You might want to double-check whatever script or workflow you use to
+generate these pull requests.
+
+               Linus
