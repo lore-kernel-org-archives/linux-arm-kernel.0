@@ -1,77 +1,50 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sat, 31 Mar 2012 15:34:09 -0700
-Subject: [PATCH RFC] Simplify the Linux kernel by reducing its state space
-In-Reply-To: <4F7782ED.7050407@lkmail.de>
-References: <20120331163321.GA15809@linux.vnet.ibm.com>
- <1333227608.2325.4054.camel@edumazet-glaptop>
- <20120331212149.GI2450@linux.vnet.ibm.com>
- <4F7782ED.7050407@lkmail.de>
-Message-ID: <20120331223409.GM2450@linux.vnet.ibm.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sat, 31 Mar 2012 19:12:43 -0400
+Subject: ioremap to a specific virtual address
+In-Reply-To: <alpine.LFD.2.02.1203222348210.24151@xanadu.home>
+References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+ <alpine.LFD.2.02.1203222348210.24151@xanadu.home>
+Message-ID: <CAKON4OxVpV-2DGVswc2y+6B6LhLzkhn0ohpSEmDBCVoaNJ4vww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 01, 2012 at 12:19:25AM +0200, Lorenz Kolb wrote:
-> With that patchset in mind, I am working on a really huge patch,
-> which will greatly simplify the Linux kernel  for the real problem
-> of having that number of CPUs.
-> 
-> That patch will have a lot of changes all over the architectures, so
-> what will be the best way to post it? Should I split it architecture
-> dependend and into one generic part.
-> 
-> Currently it is a large blob of millions of changes, but will
-> greatly simplify the Linux kernel.
+On Fri, Mar 23, 2012 at 12:00 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Thu, 22 Mar 2012, jonsmirl at gmail.com wrote:
+>
+>> When iotable is used to initially map memory you can specify the
+>> mapping address. In this case IO_SDMMC_PHYS is 0x18000000 and it gets
+>> mapped to ?0xf1800000
+>>
+>> NXP has supplied this handly macro
+>> #define io_p2v(x) (0xf0000000 | (((x) & 0xff000000) >> 4) | ((x) & 0x000fffff))
+>>
+>> iotable_init(lpc313x_io_desc, ARRAY_SIZE(lpc313x_io_desc));
+>>
+>> ? ? ? {
+>> ? ? ? ? ? ? ? .virtual ? ? ? ?= io_p2v(IO_SDMMC_PHYS),
+>> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(IO_SDMMC_PHYS),
+>> ? ? ? ? ? ? ? .length ? ? ? ? = IO_SDMMC_SIZE,
+>> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
+>> ? ? ? },
+>>
+>> The supplied kernel is full of code that uses this type of addressing.
+>> It has macros for register definition that all depend on the registers
+>> being mapped to a well know location - io_p2v(x).
+>>
+>> I'd like to move the map out of the core code and into the SDMMC
+>> device driver and then only do it if the driver loads.
+>
+> Why would you do that? ?Those static mappings are meant to be global and
+> remain there. ?The handy macro is in fact not handy at all as it forces
+> virtual addresses on you.
+>
+> It is OK to keep the static mappings as you can use 1MB regions and the
+> mapping code will use first level mappings which are better with TLB
+> usage.
 
-Perhaps a branch on a public git tree?  If you are doing what I suspect
-you are, you will end up with a very large patch set.  ;-)
+I switched over to 1MB mappings. 1MB map regions are implemented on
+ARM9, right? Is there some way to see if I got the huge maps?
 
-							Thanx, Paul
-
-> Regards,
-> 
-> Lorenz Kolb
-> 
-> Am 31.03.2012 23:21, schrieb Paul E. McKenney:
-> >On Sat, Mar 31, 2012 at 11:00:08PM +0200, Eric Dumazet wrote:
-> >>On Sun, 2012-04-01 at 00:33 +0800, Paul E. McKenney wrote:
-> >>>Although there have been numerous complaints about the complexity of
-> >>>parallel programming (especially over the past 5-10 years), the plain
-> >>>truth is that the incremental complexity of parallel programming over
-> >>>that of sequential programming is not as large as is commonly believed.
-> >>>Despite that you might have heard, the mind-numbing complexity of modern
-> >>>computer systems is not due so much to there being multiple CPUs, but
-> >>>rather to there being any CPUs at all.  In short, for the ultimate in
-> >>>computer-system simplicity, the optimal choice is NR_CPUS=0.
-> >>>
-> >>>This commit therefore limits kernel builds to zero CPUs.  This change
-> >>>has the beneficial side effect of rendering all kernel bugs harmless.
-> >>>Furthermore, this commit enables additional beneficial changes, for
-> >>>example, the removal of those parts of the kernel that are not needed
-> >>>when there are zero CPUs.
-> >>>
-> >>>Signed-off-by: Paul E. McKenney<paulmck@linux.vnet.ibm.com>
-> >>>Reviewed-by: Thomas Gleixner<tglx@linutronix.de>
-> >>>---
-> >>Hmm... I believe you could go one step forward and allow negative values
-> >>as well. Antimatter was proven to exist after all.
-> >>
-> >>Hint : nr_cpu_ids is an "int", not an "unsigned int"
-> >>
-> >>Bonus: Existing bugs become "must have" features.
-> >;-) ;-) ;-)
-> >
-> >>Of course there is no hurry and this can wait 365 days.
-> >James Bottomley suggested imaginary numbers of CPUs some time back,
-> >and I suppose there is no reason you cannot have fractional numbers of
-> >CPUs, and perhaps irrational numbers as well.  Of course, these last two
-> >would require use of floating-point arithmetic (or something similar)
-> >in the kernel.  So I guess we have at several years worth.  Over to you
-> >for the negative numbers.  ;-)
-> >
-> >							Thanx, Paul
-> >
-> >_______________________________________________
-> >Linuxppc-dev mailing list
-> >Linuxppc-dev at lists.ozlabs.org
-> >https://lists.ozlabs.org/listinfo/linuxppc-dev
-> 
+-- 
+Jon Smirl
+jonsmirl at gmail.com
