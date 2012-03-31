@@ -1,45 +1,43 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 01 Apr 2012 01:47:10 +0400
-Subject: [PATCH V2 1/4] Input: pxa27x_keypad keep clock on as wakeup source
-In-Reply-To: <1333072698-15344-1-git-send-email-chao.xie@marvell.com>
-References: <1333072698-15344-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <4F777B5E.5080500@mvista.com>
+Date: Sun, 01 Apr 2012 01:51:43 +0400
+Subject: [PATCH 03/12] ARM: at91/USB host: specify and handle properly
+ vbus_pin_active_low
+In-Reply-To: <ce442f466ded5a4c75a0fc15700dc14fe60b91d8.1333026637.git.nicolas.ferre@atmel.com>
+References: <cover.1333026637.git.nicolas.ferre@atmel.com>
+ <ce442f466ded5a4c75a0fc15700dc14fe60b91d8.1333026637.git.nicolas.ferre@atmel.com>
+Message-ID: <4F777C6F.2070603@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 30-03-2012 5:58, Chao Xie wrote:
+On 29-03-2012 17:27, Nicolas Ferre wrote:
 
-> When the keypad is used as wake up source, the clock can not
-> be disabled. Or it can not detect key pressing.
-> If the keypad is used as wake up source, when resume back,
-> do not enable the clock and configure it again because the
-> register content is retained.
+> Due to an error while handling vbus_pin_active_low in ohci-at91 driver,
+> the specification of this property was not good in devices/board files.
 
-> Signed-off-by: Chao Xie<chao.xie@marvell.com>
+> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> Cc: stable<stable@vger.kernel.org>          [3.2+]
 > ---
->   drivers/input/keyboard/pxa27x_keypad.c |   27 ++++++++++++++++++---------
->   1 files changed, 18 insertions(+), 9 deletions(-)
-
-> diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
-> index 29fe1b2..1c5752f 100644
-> --- a/drivers/input/keyboard/pxa27x_keypad.c
-> +++ b/drivers/input/keyboard/pxa27x_keypad.c
-[...]
-> @@ -433,19 +437,24 @@ static int pxa27x_keypad_resume(struct device *dev)
->   	struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
->   	struct input_dev *input_dev = keypad->input_dev;
+>   arch/arm/mach-at91/at91sam9263_devices.c |    3 ++-
+>   arch/arm/mach-at91/at91sam9g45_devices.c |    6 ++++--
+>   arch/arm/mach-at91/board-sam9263ek.c     |    1 +
+>   arch/arm/mach-at91/board-sam9m10g45ek.c  |    1 +
+>   4 files changed, 8 insertions(+), 3 deletions(-)
 >
-> +	/*
-> +	 * If the keypad is used as wake up source, the clock is not turned
-> +	 * off. So do not need configure it again.
-> +	 */
->   	if (device_may_wakeup(&pdev->dev))
->   		disable_irq_wake(keypad->irq);
-> +	else {
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index 53688c4..5cdca89d 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -72,7 +72,8 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+>   	/* Enable VBus control for UHP ports */
+>   	for (i = 0; i<  data->ports; i++) {
+>   		if (gpio_is_valid(data->vbus_pin[i]))
+> -			at91_set_gpio_output(data->vbus_pin[i], 0);
+> +			at91_set_gpio_output(data->vbus_pin[i],
+> +					     data->vbus_pin_active_low[i] ^ 0);
 
-    According to CodingStyle, {} should be an all branches of *if* statement, 
-if it's used at least in one branch.
+    Note that XOR with 0 is a nop, left operand doesn't change its value.
 
 WBR, Sergei
