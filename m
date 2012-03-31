@@ -1,28 +1,28 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 01 Apr 2012 01:21:59 +0400
-Subject: [PATCH] ARM: include linux/bug.h in insn.c
-In-Reply-To: <1333142002-15431-1-git-send-email-joachim.eastwood@jotron.com>
-References: <1333142002-15431-1-git-send-email-joachim.eastwood@jotron.com>
-Message-ID: <4F777577.4020305@mvista.com>
+Date: Sun, 01 Apr 2012 01:23:30 +0400
+Subject: [PATCH] ARM: at91: Export at91_ramc_base
+In-Reply-To: <4f761fd8.8843cc0a.22b0.6caa@mx.google.com>
+References: <4f761fd8.8843cc0a.22b0.6caa@mx.google.com>
+Message-ID: <4F7775D2.7050608@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 31-03-2012 1:13, Joachim Eastwood wrote:
+On 31-03-2012 1:03, manabian at gmail.com wrote:
 
-> After commit d82227cf8 building the kernel fails with:
+> From: Joachim Eastwood<joachim.eastwood@jotron.com>
 
-    Please also specify that commit summary in parens.
+> After commit f363c407b42c4 building at91_cf as a module fails with:
 
->    arch/arm/kernel/insn.c: In function '__arm_gen_branch_thumb2':
->    arch/arm/kernel/insn.c:13: error: implicit declaration of function 'WARN_ON_ONCE'
->    make[1]: *** [arch/arm/kernel/insn.o] Error 1
->    make: *** [arch/arm/kernel] Error 2
+    Please also specify that commit's summary in parens.
 
-> insn.c uses WARN_ON_ONCE so lets include bug.h.
+>    ERROR: "at91_ramc_base" [drivers/pcmcia/at91_cf.ko] undefined!
+>    make[1]: *** [__modpost] Error 1
+>    make: *** [modules] Error 2
 
-    Let's.
+> Export at91_ramc_base symbol to allow drivers using at91_ramc_*
+> functions to be built as modules again.
 
 > Signed-off-by: Joachim Eastwood<joachim.eastwood@jotron.com>
 
