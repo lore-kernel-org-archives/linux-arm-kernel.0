@@ -1,28 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 31 Mar 2012 11:25:50 +0100
-Subject: [PATCH 1/2] regulator: fix sysfs name collision between dummy
- and fixed dummy regulator
-In-Reply-To: <1333182812-423-1-git-send-email-shawn.guo@linaro.org>
-References: <1333182812-423-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120331102549.GC3163@opensource.wolfsonmicro.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 31 Mar 2012 13:20:37 +0100 (BST)
+Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for MFP_LPM_KEEP_OUTPUT
+Message-ID: <1333196437.11228.YahooMailClassic@web29011.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 04:33:31PM +0800, Shawn Guo wrote:
-> When regulator_register_fixed() is being used to register fixed dummy
-> regulator, the following line will be seen in the boot log.  And the
-> sysfs entry for fixed dummy regulator is not shown.
-> 
->   dummy: Failed to create debugfs directory
-> 
-> The patch renames the fixed dummy supply to "fixed-dummy" to avoid
-> the name collision with dummy regulator.
+Some MFP configurations specify MFP_LPM_KEEP_OUTPUT to preserve the gpio output
+value (HIGH or LOW) during sleep mode. For example:
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120331/05e720e8/attachment.sig>
+    GPIO72_GPIO | MFP_LPM_KEEP_OUTPUT,
+
+Unfortunately MFP_LPM_KEEP_OUTPUT makes no special provision for setting the
+sleep mode gpio direction, unlike MFP_LPM_DRIVE_HIGH and MFP_LPM_DRIVE_LOW.
+Consequently MFP configurations of the form:
+
+    GPIO<n>_GPIO | MFP_LPM_KEEP_OUTPUT,
+
+will set the sleep mode gpio direction to INPUT.
+
+This patch forces the sleep mode gpio direction to OUTPUT in cases where
+MFP_LPM_KEEP_OUTPUT was specified. This brings MFP_LPM_KEEP_OUTPUT into line
+with MFP_LPM_DRIVE_HIGH and MFP_LPM_DRIVE_LOW.
+
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+---
+
+diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
+index b0a8428..3b443199 100644
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+@@ -96,6 +96,9 @@ static int __mfp_config_gpio(unsigned gpio, unsigned long c)
+ 		break;
+ 	}
+ 
++	if (c & MFP_LPM_KEEP_OUTPUT)
++		is_out = 1;
++
+ 	if (is_out ^ gpio_desc[gpio].dir_inverted)
+ 		gpdr_lpm[bank] |= mask;
+ 	else
