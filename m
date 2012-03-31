@@ -1,87 +1,59 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 31 Mar 2012 00:58:47 -0400 (EDT)
-Subject: error: 'SEGMENT_SIZE' undeclared with arm-eabi-gcc toolchain
-In-Reply-To: <4F7638C3.4060301@samsung.com>
-References: <4F7638C3.4060301@samsung.com>
-Message-ID: <alpine.LFD.2.02.1203310017440.24151@xanadu.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 31 Mar 2012 13:25:18 +0800
+Subject: [PATCH] ARM: amba: adapt to regulator probe deferral change
+In-Reply-To: <20120330180134.GJ22981@n2100.arm.linux.org.uk>
+References: <1333115737-1654-1-git-send-email-shawn.guo@linaro.org>
+ <20120330180134.GJ22981@n2100.arm.linux.org.uk>
+Message-ID: <20120331052516.GK3254@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Mar 2012, Kukjin Kim wrote:
-
-> Hi all,
+On Fri, Mar 30, 2012 at 07:01:34PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Mar 30, 2012 at 09:55:37PM +0800, Shawn Guo wrote:
+> > The commit 04bf301 (regulator: Support driver probe deferral) changes
+> > regulator_get() and regulator_register() to return -EPROBE_DEFER
+> > instead of -ENODEV.  Adapt amba bus driver to the change, otherwise
+> > amba_probe() will fail on the platforms that do not have "vcore"
+> > regulator device.
 > 
-> Occurs following error with arm-eabi-gcc toolchain (gcc version 4.4.3 -
-> GCC). But there is no error with arm-none-linux-gnueabi-gcc toolchain
-> (gcc version 4.4.1 - Sourcery G++ Lite 2009q3)...
+> Are you sure this is correct?  Did you read and understand the comment
+> you removed?
 > 
-> fs/binfmt_aout.c: In function 'load_aout_binary':
-> fs/binfmt_aout.c:255: error: 'SEGMENT_SIZE' undeclared (first use in
-> this function)
-> fs/binfmt_aout.c:255: error: (Each undeclared identifier is reported
-> only once
-> fs/binfmt_aout.c:255: error: for each function it appears in.)
-> make[2]: *** [fs/binfmt_aout.o] Error 1
-> make[2]: *** Waiting for unfinished jobs....
-> make[1]: *** [fs] Error 2
+I did read the comment and try to understand it.  Correct me if the
+understanding below is wrong.
+
+> What do platforms do which have AMBA devices but don't have any vcore
+> regulators?
 > 
-> Any idea?
+We will have two cases for platforms that do not have any vcore
+regulators.
 
-Yes.  This comes from the N_DATADDR() macro, defined in 
-include/linux/a.out.h as follows:
+1) CONFIG_REGULATOR is not enabled
 
-|#define N_DATADDR(x) \
-|    (N_MAGIC(x)==OMAGIC? (_N_TXTENDADDR(x)) \
-|     : (_N_SEGMENT_ROUND (_N_TXTENDADDR(x))))
+   The regulator_get() returns NULL, and regulator_enable() returns 0.
+   amba_get_enable_vcore() will succeed with 'ret' as 0.  My patch
+   changes nothing for this case.
 
-Then, looking at _N_SEGMENT_ROUND() in the same file:
+2) CONFIG_REGULATOR is enabled but platform never registers any vcore
+   regulators
 
-|#define _N_SEGMENT_ROUND(x) ALIGN(x, SEGMENT_SIZE)
+   Before commit 04bf301 (regulator: Support driver probe deferral),
+   regulator_get() returns ERR_PTR(-ENODEV) when no "vore" regulator
+   is found, and the check "if (PTR_ERR(vcore) == -ENODEV)" in
+   amba_get_enable_vcore() forces a success return.   Now that commit
+   changes regulator_get() to returns ERR_PTR(-EPROBE_DEFER) in case
+   that no "vore" regulator is found.  My patch changes the check in
+   amba_get_enable_vcore() from -ENODEV to -EPROBE_DEFER accordingly.
+   And that's all what my patch does.
 
-Here it is.  Now, why isn't SEGMENT_SIZE defined?  Well that's where 
-things get way more hairy than they are already (caution, barf bag 
-recommended):
+> We're not going through the same farce that the smsc network driver has
+> gone through: OMAP3430LDP remains fucked through that idiotic ill-thought
+> out change (c7e963f68888, net/smsc911x: Add regulator support).  See
+> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=99
 
-|/* Address of data segment in memory after it is loaded.
-|   Note that it is up to you to define SEGMENT_SIZE
-|   on machines not listed here.  */
-|#if defined(vax) || defined(hp300) || defined(pyr)
-|#define SEGMENT_SIZE page_size
-|#endif
-|#ifdef	sony
-|#define	SEGMENT_SIZE	0x2000
-|#endif	/* Sony.  */
-|#ifdef is68k
-|#define SEGMENT_SIZE 0x20000
-|#endif
-|#if defined(m68k) && defined(PORTAR)
-|#define PAGE_SIZE 0x400
-|#define SEGMENT_SIZE PAGE_SIZE
-|#endif
-|
-|#ifdef linux
-|#ifdef __KERNEL__
-|#include <asm/page.h>
-|#else
-|#include <unistd.h>
-|#endif
-|#if defined(__i386__) || defined(__mc68000__)
-|#define SEGMENT_SIZE	1024
-|#else
-|#ifndef SEGMENT_SIZE
-|#ifdef __KERNEL__
-|#define SEGMENT_SIZE	PAGE_SIZE
-|#else
-|#define SEGMENT_SIZE   getpagesize()
-|#endif
-|#endif
-|#endif
-|#endif
+If the understanding above is correct, I do not see how my patch would
+bring the same farce into amba driver.
 
-So the clue you're looking for is probably on the 18th line above.
-
-BTW, no one is using a.out on ARM anymore.  You should really consider 
-removing CONFIG_BINFMT_AOUT from your config.
-
-
-Nicolas
+-- 
+Regards,
+Shawn
