@@ -1,61 +1,20 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sat, 31 Mar 2012 22:36:57 -0400
-Subject: [PATCH] mtd/gpmi : do not include the mxs.h
-Message-ID: <1333247817-18472-1-git-send-email-shijie8@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 31 Mar 2012 15:35:39 +0100
+Subject: [PATCH] ARM: amba: adapt to regulator probe deferral change
+In-Reply-To: <20120331134215.GA5012@opensource.wolfsonmicro.com>
+References: <1333115737-1654-1-git-send-email-shawn.guo@linaro.org>
+ <20120330180134.GJ22981@n2100.arm.linux.org.uk>
+ <20120331134215.GA5012@opensource.wolfsonmicro.com>
+Message-ID: <20120331143539.GB26661@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs.h does not exit in the mx6q.
-So rewrite the __mxs_clrl()/__mxs_setl() and remove the mxs.h.
+On Sat, Mar 31, 2012 at 02:42:15PM +0100, Mark Brown wrote:
+> We need to change the AMBA bus so it does something better than what it
+> does now and work out a good way to roll this out.  The more I think
+> about this the less convinced I am that AMBA should have regualtor
+> support in the bus itself at all.
 
-Signed-off-by: Huang Shijie <shijie8@gmail.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 85e6071..649d459 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -21,7 +21,6 @@
- #include <linux/mtd/gpmi-nand.h>
- #include <linux/delay.h>
- #include <linux/clk.h>
--#include <mach/mxs.h>
- 
- #include "gpmi-nand.h"
- #include "gpmi-regs.h"
-@@ -37,6 +36,8 @@ struct timing_threshod timing_default_threshold = {
- 	.max_dll_delay_in_ns         = 16,
- };
- 
-+#define MXS_SET_ADDR		0x4
-+#define MXS_CLR_ADDR		0x8
- /*
-  * Clear the bit and poll it cleared.  This is usually called with
-  * a reset address and mask being either SFTRST(bit 31) or CLKGATE
-@@ -47,7 +48,7 @@ static int clear_poll_bit(void __iomem *addr, u32 mask)
- 	int timeout = 0x400;
- 
- 	/* clear the bit */
--	__mxs_clrl(mask, addr);
-+	writel(mask, addr + MXS_CLR_ADDR);
- 
- 	/*
- 	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
-@@ -92,11 +93,11 @@ static int gpmi_reset_block(void __iomem *reset_addr, bool just_enable)
- 		goto error;
- 
- 	/* clear CLKGATE */
--	__mxs_clrl(MODULE_CLKGATE, reset_addr);
-+	writel(MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
- 
- 	if (!just_enable) {
- 		/* set SFTRST to reset the block */
--		__mxs_setl(MODULE_SFTRST, reset_addr);
-+		writel(MODULE_SFTRST, reset_addr + MXS_SET_ADDR);
- 		udelay(1);
- 
- 		/* poll CLKGATE becoming set */
--- 
-1.7.4.4
+How else does it power up the peripheral to read out the IDs?  You can't
+bind a driver until you've read the ID, which implies that the bus layer
+needs to have regulator support to turn the power on.
