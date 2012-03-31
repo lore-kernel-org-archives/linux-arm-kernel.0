@@ -1,43 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 30 Mar 2012 21:30:06 -0400
-Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
- DNS-325
-In-Reply-To: <1332885255-8304-2-git-send-email-jm@lentin.co.uk>
-References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
- <1332885255-8304-2-git-send-email-jm@lentin.co.uk>
-Message-ID: <20120331013006.GH7274@titan.lakedaemon.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sat, 31 Mar 2012 09:30:31 +0800
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
+ <87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+ <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
+ <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
+ <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
+ <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
+ <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
+ <4F7570FC.8000907@ti.com>
+ <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
+ <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
+Message-ID: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 10:54:11PM +0100, Jamie Lentin wrote:
-> Add support for the DNS-320 and DNS-325. Describe as much as currently possible
-> in the devicetree files, create a board-dnskw.c for everything else.
-> 
-> Use IEEE-compliant "okay", rather than "ok"
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> ---
->  arch/arm/boot/dts/kirkwood-dns320.dts |   29 +++
->  arch/arm/boot/dts/kirkwood-dns325.dts |   24 +++
->  arch/arm/mach-kirkwood/Kconfig        |   23 +++
->  arch/arm/mach-kirkwood/Makefile       |    1 +
->  arch/arm/mach-kirkwood/Makefile.boot  |    2 +
->  arch/arm/mach-kirkwood/board-dnskw.c  |  306 +++++++++++++++++++++++++++++++++
->  arch/arm/mach-kirkwood/board-dt.c     |    5 +
->  arch/arm/mach-kirkwood/common.h       |    6 +
->  8 files changed, 396 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
->  create mode 100644 arch/arm/mach-kirkwood/board-dnskw.c
+On Fri, Mar 30, 2012 at 5:20 PM, Shilimkar, Santosh <santosh.shilimkar@ti.com>
+>
+>> After Ming Lie's comment, the point that I came to my mind was,
+>> certainly there will be resolution difference between these two clocksources,
+>> if ?gptimer2 is sourced from sys_ck (26Mhz).
+>>
+> GPTIMER2 with sysclock is not an option. GPTIMER is not in wakeup domain
+> and when sysclock is cut, it stops.
 
-Jamie,
+If neither CONFIG_PM or CONFIG_CPUIDLE is set, GPTIMER2 with sysclock
+should be an option.
 
-I've applied this locally, thanks.  Looks like Grant took #5 through his
-tree.  As #3 and #4 depend on #2, I'll wait for the next version of #2
-incorporating Grant's comments before I apply #2-#4.
+As I commented before, high resolution timer is very useful for trace, debug or
+high frequency perf sample. Suppose you want to trace the running time of
+one function,  32K counter can only give you a resolution of ~35us, which is
+too coarse to work well.
 
-thx,
 
-Jason.
+Thanks,
+-- 
+Ming Lei
