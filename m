@@ -1,39 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 31 Mar 2012 16:46:17 +0800
-Subject: [PATCH] ARM: imx: fix mc9s08dz60_gpiochip_match parameter type
-Message-ID: <1333183577-2109-1-git-send-email-shawn.guo@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 31 Mar 2012 11:19:54 +0100
+Subject: [PATCH v6 1/5] Extcon (external connector): import Android's
+ switch class and modify.
+In-Reply-To: <CACSP8SjhOZcXZa2hCNsH8zS+hm8X-i9uNm50UH=_VwOV=BJGmA@mail.gmail.com>
+References: <1328856038-21912-1-git-send-email-myungjoo.ham@samsung.com>
+ <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
+ <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
+ <20120309124119.GV3273@opensource.wolfsonmicro.com>
+ <CACSP8ShU5tu=9N53PtYMLyFVFMS9whNRhMvu7nu8rBoPuVCy+Q@mail.gmail.com>
+ <20120330100742.GB21950@opensource.wolfsonmicro.com>
+ <CACSP8SjhOZcXZa2hCNsH8zS+hm8X-i9uNm50UH=_VwOV=BJGmA@mail.gmail.com>
+Message-ID: <20120331101953.GA3163@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the change made by commit 6e2cf65 (gpio: constify the data
-parameter to gpiochip_find()), the following compile warning is seen
-on imx_v6_v7_defconfig build.
+On Fri, Mar 30, 2012 at 10:29:27AM -0700, Erik Gilling wrote:
 
-  CC      arch/arm/mach-imx/mach-mx35_3ds.o
-arch/arm/mach-imx/mach-mx35_3ds.c: In function ?mx35_3ds_lcd_set_power?:
-arch/arm/mach-imx/mach-mx35_3ds.c:112:5: warning: passing argument 2 of ?gpiochip_find? from incompatible pointer type [enabled by default]
-include/asm-generic/gpio.h:145:26: note: expected ?int (*)(struct gpio_chip *, const void *)? but argument is of type ?int (*)(struct gpio_chip *, void *)?
+> I'm also not in favor of having functionality conditionally compiled
+> based on CONFIG_ANDROID.  If fact, going through the patch stack
+> there's much more that changes the ABI from the switch driver than
+> just the name.  Android asumes that there is a single "switch" for
+> each logical entity (called cable types in extcon) each with a binary
+> state (0,1).  Here things have changed to have a single extcon
+> instance that can have a bitmask of states which are sent as strings
+> in the uevent.
 
-Change mc9s08dz60_gpiochip_match parameter type accordingly to fix
-the warning.
+The binary status thing isn't true for the original Android switch API,
+at least not in all cases - for headsets it's a tristate indicating if
+there's nothing, a headphone or headset plugged in.  This does wind up
+being a bitmask because the numbers are 0, 1 and 2 but it isn't really
+clear to me if this is intentional or just an effect of counting.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/mach-mx35_3ds.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> As it stands, this patch does not solve the cases where we use switch
+> today and we'll probably continue to carry the switch driver in the
+> common android tree.  If, instead, we got rid of the idea of multiple
+> states and mutual exclusivity and relied on the driver that uses
+> extcon to have multiple instances for each logical entity and deal
+> with mutual exclusion itself, we'd have a driver that would be pretty
+> easy to support in android.
 
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index e14291d..6ae51c6 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -97,7 +97,7 @@ static struct i2c_board_info __initdata i2c_devices_3ds[] = {
- static int lcd_power_gpio = -ENXIO;
- 
- static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
--						     void *data)
-+						     const void *data)
- {
- 	return !strcmp(chip->label, data);
- }
--- 
-1.7.5.4
+What's the advantage in not having information about mutual exclusion in
+the core, and why would a userspace that isn't interested in this care?  
+It seems like this could be used by userspace to do interesting things,
+and I rather suspect you'll find some vendors have added features along
+those lines in their Android devices.  For example, having different
+configurations for desk docks and car docks even if both end up
+connecting the same things up.
+
+Even if the userspace ABI doesn't expose the information it seems
+sensible to factor out the code for handling this into the core so
+there's less work to do in individual drivers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120331/426a6350/attachment.sig>
