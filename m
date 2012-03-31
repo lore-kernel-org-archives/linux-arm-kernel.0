@@ -1,58 +1,71 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sat, 31 Mar 2012 09:54:01 -0700
-Subject: [PATCH RFC] Simplify the Linux kernel by reducing its state space
-In-Reply-To: <CAMuHMdWTB+_AtqM6JixY=Oo_zmzX_dNxnivpARBYSbPJzp4t6A@mail.gmail.com>
-References: <20120331163321.GA15809@linux.vnet.ibm.com>
- <CAMuHMdWTB+_AtqM6JixY=Oo_zmzX_dNxnivpARBYSbPJzp4t6A@mail.gmail.com>
-Message-ID: <20120331165401.GD2450@linux.vnet.ibm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 31 Mar 2012 14:12:40 -0400
+Subject: [PATCH V4 0/3] ARM: Kirkwood: Convert DNS-325 & DNS-320 to
+ access nand via devicetree (was: Add support for DNS-320 and DNS-325 using
+ devicetree)
+In-Reply-To: <1333201985-2222-1-git-send-email-jm@lentin.co.uk>
+References: <1333201985-2222-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120331181240.GA817@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 06:40:30PM +0200, Geert Uytterhoeven wrote:
-> Hi Paul,
+On Sat, Mar 31, 2012 at 02:53:02PM +0100, Jamie Lentin wrote:
+> Right, I've stopped being lazy and researched what the various properties
+> contain and documented them.
 > 
-> On Sat, Mar 31, 2012 at 18:33, Paul E. McKenney
-> <paulmck@linux.vnet.ibm.com> wrote:
-> > Although there have been numerous complaints about the complexity of
-> > parallel programming (especially over the past 5-10 years), the plain
-> > truth is that the incremental complexity of parallel programming over
-> > that of sequential programming is not as large as is commonly believed.
-> > Despite that you might have heard, the mind-numbing complexity of modern
-> > computer systems is not due so much to there being multiple CPUs, but
-> > rather to there being any CPUs at all. ?In short, for the ultimate in
-> > computer-system simplicity, the optimal choice is NR_CPUS=0.
-> >
-> > This commit therefore limits kernel builds to zero CPUs. ?This change
-> > has the beneficial side effect of rendering all kernel bugs harmless.
-> > Furthermore, this commit enables additional beneficial changes, for
-> > example, the removal of those parts of the kernel that are not needed
-> > when there are zero CPUs.
-> >
-> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> > ---
-> >
-> > ?alpha/Kconfig ? ? ? ? ? ? ? ? ? ? | ? 11 ++++++-----
-> > ?arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?6 +++---
-> > ?blackfin/Kconfig ? ? ? ? ? ? ? ? ?| ? ?3 ++-
-> > ?hexagon/Kconfig ? ? ? ? ? ? ? ? ? | ? ?9 +++++----
-> > ?ia64/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?9 +++++----
-> > ?m32r/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 10 ++++++----
-> > ?mips/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 21 +++++++++++----------
-> > ?mn10300/Kconfig ? ? ? ? ? ? ? ? ? | ? ?3 ++-
-> > ?parisc/Kconfig ? ? ? ? ? ? ? ? ? ?| ? ?6 +++---
-> > ?powerpc/platforms/Kconfig.cputype | ? ?8 ++++----
-> > ?s390/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 12 +++++++-----
-> > ?sh/Kconfig ? ? ? ? ? ? ? ? ? ? ? ?| ? 11 ++++++-----
-> > ?sparc/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?8 ++++----
-> > ?tile/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?9 +++++----
-> > ?x86/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? 16 +++++++++-------
-> > ?15 files changed, 78 insertions(+), 64 deletions(-)
+> In the process I noticed that all other drivers have bank-width in bytes,
+> so I changed orion_nand to match. If using orion_nand without devicetree,
+> the width property is still in bits though. Hopefully this isn't considered too
+> bad? They have different names at least.
 > 
-> You forgot to fix half of the architectures, a.o. m68k?
+> I've left out everything that has been merged into either Grant or Jason's
+> tree. Hopefully this was a useful thing to do.
+> 
+> Thanks again to everyone reviewing.
+> 
+> Changes since v3: Add support for DNS-320 and DNS-325 using devicetree
+> * Remove patches that are already merged
+> * Add documentation on orion_nand devicetree bindings
+> * Convert bank-width to be in bytes to match other properties
+> * Make defaults more explicit
+> 
+> Changes since v2: Add support for DNS-320 and DNS-325 using devicetree
+> * Split patches further, separating orion_nand and kirkwood changes
+> * dts renames: "bank-width", not "width". "okay", not "ok"
+> * Separate documentation out into separate patch, add references to
+>   partition.txt to all mtd bindings.
+>   
+> Changes since v1: Add support for DNS-320 and DNS-325 using devicetree
+> * Rebase against kirkwood_dt_for_3.4, removing premature devicetree ports.
+> * Move additions into a separate board-dnskw.c. It could be separated further
+>   into a board-dns320.c and board-dns325.c but it probably isn't worth it.
+> * s/marvell,/mrvl,/g
+> * Include an example dtb partition in documentation
+> * Copy structure of serial nodes to allow common options for NAND to be set
+>   in kirkwood.dtsi
+> * Simplifications in orion-nand.c
+> 
+> Jamie Lentin (3):
+>   mtd: Add orion_nand devicetree bindings
+>   kirkwood: Allow nand to be configured via. devicetree
+>   ARM: kirkwood: Define DNS-320/DNS-325 NAND in fdt
+> 
+>  .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-dns320.dts              |   35 ++++++++++++++
+>  arch/arm/boot/dts/kirkwood-dns325.dts              |   35 ++++++++++++++
+>  arch/arm/boot/dts/kirkwood.dtsi                    |   15 ++++++-
+>  arch/arm/mach-kirkwood/board-dnskw.c               |   31 ------------
+>  arch/arm/mach-kirkwood/common.c                    |   12 +++++
+>  drivers/mtd/nand/orion_nand.c                      |   41 +++++++++++++++-
+>  7 files changed, 185 insertions(+), 34 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
 
-I must confess that I fixed only the SMP-capable architectures.
+Looks good, I'll let it sit a few days to catch any other comments.
 
-I of course would welcome additions for UP-only architectures.
+For the whole series:
 
-							Thanx, Paul
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
