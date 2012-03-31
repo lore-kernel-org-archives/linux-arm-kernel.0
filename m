@@ -1,171 +1,84 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Sat, 31 Mar 2012 14:53:05 +0100
-Subject: [PATCH V4 3/3] ARM: kirkwood: Define DNS-320/DNS-325 NAND in fdt
-In-Reply-To: <1333201985-2222-1-git-send-email-jm@lentin.co.uk>
-References: <1333201985-2222-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1333201985-2222-4-git-send-email-jm@lentin.co.uk>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sat, 31 Mar 2012 16:30:21 +0200
+Subject: [PATCH v5 04/16] pwm: Add table-based lookup for static mappings
+In-Reply-To: <20120330103840.GB961@avionic-0098.mockup.avionic-design.de>
+References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+ <1332945238-14897-5-git-send-email-thierry.reding@avionic-design.de>
+ <20120329220342.GK4153@opensource.wolfsonmicro.com>
+ <20120330050641.GA21823@avionic-0098.mockup.avionic-design.de>
+ <20120330101800.GD21950@opensource.wolfsonmicro.com>
+ <20120330103840.GB961@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120331143021.GA18382@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devicetree to define NAND partitions. Use D-link partition scheme by
-default, to be vaguely compatible with their userland.
+* Thierry Reding wrote:
+> * Mark Brown wrote:
+> > On Fri, Mar 30, 2012 at 07:06:41AM +0200, Thierry Reding wrote:
+> > > * Mark Brown wrote:
+> > 
+> > > > The clock and regulator APIs namespace the consumers by struct device -
+> > > > might this not be sensible here?  pwm_get() does already take the device
+> > > > as an argument.  It'd feel safer, and for example there's plenty of
+> > > > phones out there with two backlit displays...
+> > 
+> > > That's actually how this is supposed to work. "pwm-backlight" in the above
+> > > case is matched against the name of the struct device that you pass in to
+> > > pwm_get(). The only difference, at least as far as I can tell, to the clock
+> > > and regulator APIs is that a second name is not listed explicitly in the
+> > > lookup table.
+> > 
+> > Both clock and regulator APIs map (source) -> (dev, name).  This only
+> > has a mapping (source) -> (dev).
+> > 
+> > > So compared with the clock and regulator APIs it doesn't make too much sense
+> > > to pass both the struct device and the name to pwm_get() because it will
+> > > match the device name against the consumer name in the lookup table first and
+> > > only use the passed name if no match was found.
+> > 
+> > This is different to what the clock and regulator APIs do - they look up
+> > the name in the context of the struct device.  This is because...
+> > 
+> > > In case you have two backlight devices I would expect the following to work:
+> > 
+> > > 	static struct pwm_lookup board_pwm_lookup[] = {
+> > > 		PWM_LOOKUP("tegra-pwm", 0, "pwm-backlight.0"),
+> > > 		PWM_LOOKUP("tegra-pwm", 1, "pwm-backlight.1"),
+> > > 	};
+> > 
+> > ...if a single device uses more than one PWM then the above scheme won't
+> > work - unless I'm missing something?
+> 
+> Right, now it makes more sense. So basically if I have a single device using
+> two PWM devices, then I'll need to have something like this:
+> 
+> 	static struct pwm_lookup board_pwm_lookup[] = {
+> 		PWM_LOOKUP("tegra-pwm", 0, "pwm-foo.0", "bar"),
+> 		PWM_LOOKUP("tegra-pwm", 1, "pwm-foo.0", "baz"),
+> 	};
+> 
+> And then of course I'll need to have a second field by which the PWM device
+> can be identified. Good, I'll fix that up for the next round.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
----
-Unchanged since V3
+I've been thinking about this some more, and I can see this becoming a little
+problem with the DT bindings because the unified pwm_get() always requests
+the first PWM specified in the "pwms" property.
 
- arch/arm/boot/dts/kirkwood-dns320.dts |   35 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-dns325.dts |   35 +++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dnskw.c  |   31 -----------------------------
- 3 files changed, 70 insertions(+), 31 deletions(-)
+The best solution that I could come up with is to not pass the index into the
+of_pwm_request() function but rather forward the consumer name as passed into
+pwm_get(). The of_pwm_request() could use the "pwm-names" property to do a
+reverse lookup of the index and request that. One good thing about that would
+be that I no longer need to export the of_pwm_request() function. The "bad"
+thing is that it'll make the "pwm-names" property mandatory if more than a
+single PWM is requested.
 
-diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
-index 78c834f..dc09a73 100644
---- a/arch/arm/boot/dts/kirkwood-dns320.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns320.dts
-@@ -25,5 +25,40 @@
- 			clock-frequency = <166666667>;
- 			status = "okay";
- 		};
-+
-+		nand at 3000000 {
-+			status = "okay";
-+
-+			partition at 0 {
-+				label = "u-boot";
-+				reg = <0x0000000 0x100000>;
-+				read-only;
-+			};
-+
-+			partition at 100000 {
-+				label = "uImage";
-+				reg = <0x0100000 0x500000>;
-+			};
-+
-+			partition at 600000 {
-+				label = "ramdisk";
-+				reg = <0x0600000 0x500000>;
-+			};
-+
-+			partition at b00000 {
-+				label = "image";
-+				reg = <0x0b00000 0x6600000>;
-+			};
-+
-+			partition at 7100000 {
-+				label = "mini firmware";
-+				reg = <0x7100000 0xa00000>;
-+			};
-+
-+			partition at 7b00000 {
-+				label = "config";
-+				reg = <0x7b00000 0x500000>;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
-index 23241ab..c2a5562 100644
---- a/arch/arm/boot/dts/kirkwood-dns325.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns325.dts
-@@ -20,5 +20,40 @@
- 			clock-frequency = <200000000>;
- 			status = "okay";
- 		};
-+
-+		nand at 3000000 {
-+			status = "okay";
-+
-+			partition at 0 {
-+				label = "u-boot";
-+				reg = <0x0000000 0x100000>;
-+				read-only;
-+			};
-+
-+			partition at 100000 {
-+				label = "uImage";
-+				reg = <0x0100000 0x500000>;
-+			};
-+
-+			partition at 600000 {
-+				label = "ramdisk";
-+				reg = <0x0600000 0x500000>;
-+			};
-+
-+			partition at b00000 {
-+				label = "image";
-+				reg = <0x0b00000 0x6600000>;
-+			};
-+
-+			partition at 7100000 {
-+				label = "mini firmware";
-+				reg = <0x7100000 0xa00000>;
-+			};
-+
-+			partition at 7b00000 {
-+				label = "config";
-+				reg = <0x7b00000 0x500000>;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 7cb7f6a..dc4e80a 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -23,7 +23,6 @@
- #include <linux/gpio_keys.h>
- #include <linux/gpio-fan.h>
- #include <linux/leds.h>
--#include <linux/mtd/physmap.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -32,35 +31,6 @@
- #include "common.h"
- #include "mpp.h"
- 
--static struct mtd_partition dnskw_nand_parts[] = {
--	{
--		.name		= "u-boot",
--		.offset		= 0,
--		.size		= SZ_1M,
--		.mask_flags	= MTD_WRITEABLE
--	}, {
--		.name		= "uImage",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= 5 * SZ_1M
--	}, {
--		.name		= "ramdisk",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= 5 * SZ_1M
--	}, {
--		.name		= "image",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= 102 * SZ_1M
--	}, {
--		.name		= "mini firmware",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= 10 * SZ_1M
--	}, {
--		.name		= "config",
--		.offset		= MTDPART_OFS_NXTBLK,
--		.size		= 5 * SZ_1M
--	},
--};
--
- static struct mv643xx_eth_platform_data dnskw_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
- };
-@@ -272,7 +242,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
- void __init dnskw_init(void)
- {
- 	kirkwood_mpp_conf(dnskw_mpp_config);
--	kirkwood_nand_init(ARRAY_AND_SIZE(dnskw_nand_parts), 25);
- 
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dnskw_ge00_data);
--- 
-1.7.9.1
+Does that sound reasonable?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120331/c7eebdaf/attachment.sig>
