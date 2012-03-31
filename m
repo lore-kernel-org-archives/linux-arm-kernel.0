@@ -1,19 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 31 Mar 2012 09:16:59 +0100
-Subject: [PATCH] ARM: include linux/bug.h in insn.c
-In-Reply-To: <1333142002-15431-1-git-send-email-joachim.eastwood@jotron.com>
-References: <1333142002-15431-1-git-send-email-joachim.eastwood@jotron.com>
-Message-ID: <20120331081659.GA26661@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 31 Mar 2012 16:33:31 +0800
+Subject: [PATCH 1/2] regulator: fix sysfs name collision between dummy and
+ fixed dummy regulator
+Message-ID: <1333182812-423-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 11:13:22PM +0200, Joachim Eastwood wrote:
-> After commit d82227cf8 building the kernel fails with:
->   arch/arm/kernel/insn.c: In function '__arm_gen_branch_thumb2':
->   arch/arm/kernel/insn.c:13: error: implicit declaration of function 'WARN_ON_ONCE'
->   make[1]: *** [arch/arm/kernel/insn.o] Error 1
->   make: *** [arch/arm/kernel] Error 2
-> 
-> insn.c uses WARN_ON_ONCE so lets include bug.h.
+When regulator_register_fixed() is being used to register fixed dummy
+regulator, the following line will be seen in the boot log.  And the
+sysfs entry for fixed dummy regulator is not shown.
 
-I already have this in my tree.
+  dummy: Failed to create debugfs directory
+
+The patch renames the fixed dummy supply to "fixed-dummy" to avoid
+the name collision with dummy regulator.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/regulator/fixed-helper.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/regulator/fixed-helper.c b/drivers/regulator/fixed-helper.c
+index 30d0a15..efb52dc 100644
+--- a/drivers/regulator/fixed-helper.c
++++ b/drivers/regulator/fixed-helper.c
+@@ -32,7 +32,7 @@ struct platform_device *regulator_register_fixed(int id,
+ 	if (!data)
+ 		return NULL;
+ 
+-	data->cfg.supply_name = "dummy";
++	data->cfg.supply_name = "fixed-dummy";
+ 	data->cfg.microvolts = 0;
+ 	data->cfg.gpio = -EINVAL;
+ 	data->cfg.enabled_at_boot = 1;
+-- 
+1.7.5.4
