@@ -1,92 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 31 Mar 2012 16:33:32 +0800
-Subject: [PATCH 2/2] regulator: rename function regulator_register_fixed
-In-Reply-To: <1333182812-423-1-git-send-email-shawn.guo@linaro.org>
-References: <1333182812-423-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1333182812-423-2-git-send-email-shawn.guo@linaro.org>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sat, 31 Mar 2012 16:39:36 +0800
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
+ <87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+ <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
+ <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
+ <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
+ <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
+ <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
+ <4F7570FC.8000907@ti.com>
+ <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
+ <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
+ <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+Message-ID: <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function regulator_register_fixed() is only meant for registering
-fixed dummy regulators.  Rename it to regulator_register_fixed_dummy()
-for the explicit meaning, so that people do not attempt to register
-those real fixed regulators with this function.
+On Sat, Mar 31, 2012 at 2:30 PM, Shilimkar, Santosh
+> Since you need to recompile the kernel, you can very much tweak the
+> clocksource to use GPTIMER with sysl clock. Support for that is still
+> in place.
 
-It also removes the kernel doc for @name which is not a parameter for
-the function at all.
+With current kernel, running 'make menuconfig' can do it, but after applying
+Hiremath's patch[1], I have to edit the source code manually to get it, so looks
+this kind of tweaking is not friendly enough, :-(
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/mach-pcm037.c    |    3 ++-
- arch/arm/plat-mxc/3ds_debugboard.c |    3 ++-
- drivers/regulator/fixed-helper.c   |    5 ++---
- include/linux/regulator/fixed.h    |    4 ++--
- 4 files changed, 8 insertions(+), 7 deletions(-)
+[1], http://marc.info/?l=linux-arm-kernel&m=133311647410324&w=2
 
-diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-index 5fddf94..d8ceaba 100644
---- a/arch/arm/mach-imx/mach-pcm037.c
-+++ b/arch/arm/mach-imx/mach-pcm037.c
-@@ -586,7 +586,8 @@ static void __init pcm037_init(void)
- 
- 	imx31_soc_init();
- 
--	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
-+	regulator_register_fixed_dummy(0, dummy_supplies,
-+				       ARRAY_SIZE(dummy_supplies));
- 
- 	mxc_iomux_set_gpr(MUX_PGP_UH2, 1);
- 
-diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
-index d1e31fa..5e3cdf1 100644
---- a/arch/arm/plat-mxc/3ds_debugboard.c
-+++ b/arch/arm/plat-mxc/3ds_debugboard.c
-@@ -195,7 +195,8 @@ int __init mxc_expio_init(u32 base, u32 p_irq)
- 	irq_set_chained_handler(p_irq, mxc_expio_irq_handler);
- 
- 	/* Register Lan device on the debugboard */
--	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
-+	regulator_register_fixed_dummy(0, dummy_supplies,
-+				       ARRAY_SIZE(dummy_supplies));
- 
- 	smsc911x_resources[0].start = LAN9217_BASE_ADDR(base);
- 	smsc911x_resources[0].end = LAN9217_BASE_ADDR(base) + 0x100 - 1;
-diff --git a/drivers/regulator/fixed-helper.c b/drivers/regulator/fixed-helper.c
-index efb52dc..b24c90b 100644
---- a/drivers/regulator/fixed-helper.c
-+++ b/drivers/regulator/fixed-helper.c
-@@ -17,13 +17,12 @@ static void regulator_fixed_release(struct device *dev)
- }
- 
- /**
-- * regulator_register_fixed - register a no-op fixed regulator
-- * @name: supply name
-+ * regulator_register_fixed_dummy - register a dummy no-op fixed regulator
-  * @id: platform device id
-  * @supplies: consumers for this regulator
-  * @num_supplies: number of consumers
-  */
--struct platform_device *regulator_register_fixed(int id,
-+struct platform_device *regulator_register_fixed_dummy(int id,
- 		struct regulator_consumer_supply *supplies, int num_supplies)
- {
- 	struct fixed_regulator_data *data;
-diff --git a/include/linux/regulator/fixed.h b/include/linux/regulator/fixed.h
-index 936a7d8..2a956a9 100644
---- a/include/linux/regulator/fixed.h
-+++ b/include/linux/regulator/fixed.h
-@@ -51,10 +51,10 @@ struct fixed_voltage_config {
- struct regulator_consumer_supply;
- 
- #if IS_ENABLED(CONFIG_REGULATOR)
--struct platform_device *regulator_register_fixed(int id,
-+struct platform_device *regulator_register_fixed_dummy(int id,
- 		struct regulator_consumer_supply *supplies, int num_supplies);
- #else
--static inline struct platform_device *regulator_register_fixed(int id,
-+static inline struct platform_device *regulator_register_fixed_dummy(int id,
- 		struct regulator_consumer_supply *supplies, int num_supplies)
- {
- 	return NULL;
+Thanks,
 -- 
-1.7.5.4
+Ming Lei
