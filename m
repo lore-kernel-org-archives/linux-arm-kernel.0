@@ -1,107 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 Mar 2012 22:57:28 -0500
-Subject: [PATCH] ARM: at91: resurrect mach-at91/include/mach/io.h
-In-Reply-To: <4f7637c4.51e4cc0a.35ba.ffffce95@mx.google.com>
-References: <4f7637c4.51e4cc0a.35ba.ffffce95@mx.google.com>
-Message-ID: <4F7680A8.8030803@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 31 Mar 2012 12:34:09 +0800
+Subject: [PATCH 1/2] ARM: fix builds due to missing <asm/system_misc.h>
+ includes
+In-Reply-To: <1333118281-25295-1-git-send-email-olof@lixom.net>
+References: <1333118281-25295-1-git-send-email-olof@lixom.net>
+Message-ID: <20120331043405.GI19506@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2012 05:46 PM, manabian at gmail.com wrote:
-> From: Joachim Eastwood <joachim.eastwood@jotron.com>
+On Fri, Mar 30, 2012 at 07:38:01AM -0700, Olof Johansson wrote:
+> This does a sweeping change fixing up all the missing system_misc.h and
+> system_info.h includes from the system.h split-up change. These were the
+> ones I came across when building all defconfigs in arch/arm/configs, there
+> might be more but they lack adequate build coverage to be easily caught.
 > 
-> Commmit 4d5fc58dbe34b78 "ARM: remove bunch of now unused mach/io.h files"
-> removed the at91 io.h header. This makes pata_pcmcia when used with at91_cf
-> fail on ioport_map in pcmcia_init_one.
+> I'm expecting to get a lot of these piecemeal by each maintainer, so we
+> might just as well do one sweeping change to get them all at once.
 > 
-> Adding io.h and NEED_MACH_IO_H makes my CF card work again.
 > 
-> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
-> 
-> If there is better/correct way to solve the problem please disregard this
-> patch.
+...
+>  arch/arm/mach-imx/mm-imx3.c   |    1 +
+>  arch/arm/mach-imx/mm-imx5.c   |    1 +
 
-There is but it's not planned for 3.4. This fix is fine for 3.4 with one
-comment below.
+The changes are same as the patch below that I sent a little earlier.
 
-The real solution involves creating a fixed i/o virtual address for all
-ARM platforms. Some testing to verify would help me. The following steps
-are needed:
+  ARM: imx: fix ?arm_pm_idle? undeclared error
 
-Create a static mapping for your i/o region (up to 1MB) at virtual
-address 0xfef00000. The phys addr for this would be what
-cf->phys_baseaddr + CF_IO_PHYS works out to. Then define __io to this:
+So,
 
-#define __io(x) (0xfef00000 + ((x) & 0xfffff))
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-The i/o address needs to be an offset from the i/o base. I think this
-line is wrong (but works with old __io definition) and needs to be
-removed from at91_cf.c:
-
-	/* pcmcia layer only remaps "real" memory not iospace */
-	cf->socket.io_offset = (unsigned long)
-			ioremap(cf->phys_baseaddr + CF_IO_PHYS, SZ_2K);
-
-
-> 
->  arch/arm/mach-at91/Kconfig           |    1 +
->  arch/arm/mach-at91/include/mach/io.h |   32 ++++++++++++++++++++++++++++++++
->  2 files changed, 33 insertions(+)
->  create mode 100644 arch/arm/mach-at91/include/mach/io.h
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 6631d35..8bcf917 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -37,6 +37,7 @@ config ARCH_AT91RM9200
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_AT91_DBGU0
->  	select HAVE_AT91_USART3
-> +	select NEED_MACH_IO_H
->  
->  config ARCH_AT91SAM9260
->  	bool "AT91SAM9260 or AT91SAM9XE"
-> diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
-> new file mode 100644
-> index 0000000..ba9a22f
-> --- /dev/null
-> +++ b/arch/arm/mach-at91/include/mach/io.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + * arch/arm/mach-at91/include/mach/io.h
-> + *
-> + *  Copyright (C) 2003 SAN People
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +
-> +#ifndef __ASM_ARCH_IO_H
-> +#define __ASM_ARCH_IO_H
-> +
-> +#include <mach/hardware.h>
-> +
-> +#define IO_SPACE_LIMIT		0xFFFFFFFF
-> +
-> +#define __io(a)			__typesafe_io(a)
-> +#define __mem_pci(a)		(a)
-
-__mem_pci is removed now.
-
-Rob
-
-> +
-> +#endif
-> +
+-- 
+Regards,
+Shawn
