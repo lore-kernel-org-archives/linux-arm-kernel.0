@@ -1,54 +1,210 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 31 Mar 2012 12:00:18 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
-Message-ID: <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+Date: Sat, 31 Mar 2012 12:07:14 +0530
+Subject: [PATCH 2/3] ARM: OMAP4: cpuidle: Use coupled cpuidle states to
+ implement SMP cpuidle.
+In-Reply-To: <CAMbhsRRAQxDh_yZKayqMedvGkeSP9UGxiud9LbotWp-aMQ7cSw@mail.gmail.com>
+References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
+ <1333114048-26136-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAMbhsRRAQxDh_yZKayqMedvGkeSP9UGxiud9LbotWp-aMQ7cSw@mail.gmail.com>
+Message-ID: <CAMQu2gzN5PeOB78tA-sb=MKK8qGiCPDmTwSf2AWD77gou=sQCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 7:00 AM, Ming Lei <tom.leiming@gmail.com> wrote:
-> On Fri, Mar 30, 2012 at 5:20 PM, Shilimkar, Santosh <santosh.shilimkar@ti.com>
+On Sat, Mar 31, 2012 at 1:13 AM, Colin Cross <ccross@android.com> wrote:
+> On Fri, Mar 30, 2012 at 6:27 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> OMAP4 CPUDILE driver is converted mainly based on notes from the
+>> coupled cpuidle patch series.
 >>
->>> After Ming Lie's comment, the point that I came to my mind was,
->>> certainly there will be resolution difference between these two clocksources,
->>> if ?gptimer2 is sourced from sys_ck (26Mhz).
->>>
->> GPTIMER2 with sysclock is not an option. GPTIMER is not in wakeup domain
->> and when sysclock is cut, it stops.
+>> The changes include :
+>> - Register both CPUs and C-states to cpuidle driver.
+>> - Set struct cpuidle_device.coupled_cpus
+>> - Set struct cpuidle_device.safe_state to non coupled state.
+>> - Set CPUIDLE_FLAG_COUPLED in struct cpuidle_state.flags for each
+>> ?state that affects multiple cpus.
+>> - Separate ->enter hooks for coupled & simple idle.
+>> - CPU0 wait loop for CPU1 power transition.
+>> - CPU1 wakeup mechanism for the idle exit.
+>> - Enabling ARCH_NEEDS_CPU_IDLE_COUPLED for OMAP4.
+>>
+>> Thanks to Kevin Hilman and Colin Cross on the suggestions/fixes
+>> on the intermediate version of this patch.
+>>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> CC: Kevin Hilman <khilman@ti.com>
+>> Cc: Colin Cross <ccross@android.com>
+>> ---
+>> ?arch/arm/mach-omap2/Kconfig ? ? ? | ? ?1 +
+>> ?arch/arm/mach-omap2/cpuidle44xx.c | ?167 ++++++++++++++++++++++---------------
+>> ?2 files changed, 101 insertions(+), 67 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>> index e20c8ab..250786e 100644
+>> --- a/arch/arm/mach-omap2/Kconfig
+>> +++ b/arch/arm/mach-omap2/Kconfig
+>> @@ -54,6 +54,7 @@ config ARCH_OMAP4
+>> ? ? ? ?select PM_OPP if PM
+>> ? ? ? ?select USB_ARCH_HAS_EHCI
+>> ? ? ? ?select ARM_CPU_SUSPEND if PM
+>> + ? ? ? select ARCH_NEEDS_CPU_IDLE_COUPLED if CPU_IDLE
+> The "if CPU_IDLE" is not necessary, ARCH_NEEDS_CPU_IDLE_COUPLED is
+> designed to have no effect if CPU_IDLE is not set.
 >
-> If neither CONFIG_PM or CONFIG_CPUIDLE is set, GPTIMER2 with sysclock
-> should be an option.
->
-So it's a PM disable kernel and you will recompile it.
+OK. Will drop that if then.
 
-> As I commented before, high resolution timer is very useful for trace, debug or
-> high frequency perf sample. Suppose you want to trace the running time of
-> one function, ?32K counter can only give you a resolution of ~35us, which is
-> too coarse to work well.
+>>
+>> ?comment "OMAP Core Type"
+>> ? ? ? ?depends on ARCH_OMAP2
+>> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+>> index f386cbe..5724393 100644
+>> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+>> @@ -21,6 +21,7 @@
+>> ?#include "common.h"
+>> ?#include "pm.h"
+>> ?#include "prm.h"
+>> +#include "clockdomain.h"
+>>
+>> ?#ifdef CONFIG_CPU_IDLE
+>>
+>> @@ -44,10 +45,11 @@ static struct cpuidle_params cpuidle_params_table[] = {
+>> ?#define OMAP4_NUM_STATES ARRAY_SIZE(cpuidle_params_table)
+>>
+>> ?struct omap4_idle_statedata omap4_idle_data[OMAP4_NUM_STATES];
+>> -static struct powerdomain *mpu_pd, *cpu0_pd, *cpu1_pd;
+>> +static struct powerdomain *mpu_pd, *cpu_pd[NR_CPUS];
+>> +static struct clockdomain *cpu_clkdm[NR_CPUS];
+>>
+>> ?/**
+>> - * omap4_enter_idle - Programs OMAP4 to enter the specified state
+>> + * omap4_enter_idle_coupled_[simple/coupled] - OMAP4 cpuidle entry functions
+>> ?* @dev: cpuidle device
+>> ?* @drv: cpuidle driver
+>> ?* @index: the index of state to be entered
+>> @@ -56,34 +58,40 @@ static struct powerdomain *mpu_pd, *cpu0_pd, *cpu1_pd;
+>> ?* specified low power state selected by the governor.
+>> ?* Returns the amount of time spent in the low power state.
+>> ?*/
+>> -static int omap4_enter_idle(struct cpuidle_device *dev,
+>> +static int omap4_enter_idle_simple(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index)
+>> +{
+>> + ? ? ? local_fiq_disable();
+>> + ? ? ? omap_do_wfi();
+>> + ? ? ? local_fiq_enable();
+>> +
+>> + ? ? ? return index;
+>> +}
+>> +
+>> +static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+>> ? ? ? ? ? ? ? ? ? ? ? ?int index)
+>> ?{
+>> ? ? ? ?struct omap4_idle_statedata *cx =
+>> ? ? ? ? ? ? ? ? ? ? ? ?cpuidle_get_statedata(&dev->states_usage[index]);
+>> - ? ? ? u32 cpu1_state;
+>> ? ? ? ?int cpu_id = smp_processor_id();
+>>
+>> ? ? ? ?local_fiq_disable();
+>>
+>> + ? ? ? clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+>> +
+>> ? ? ? ?/*
+>> - ? ? ? ?* CPU0 has to stay ON (i.e in C1) until CPU1 is OFF state.
+>> + ? ? ? ?* CPU0 has to wait and stay ON until CPU1 is OFF state.
+>> ? ? ? ? * This is necessary to honour hardware recommondation
+>> ? ? ? ? * of triggeing all the possible low power modes once CPU1 is
+>> ? ? ? ? * out of coherency and in OFF mode.
+>> - ? ? ? ?* Update dev->last_state so that governor stats reflects right
+>> - ? ? ? ?* data.
+>> ? ? ? ? */
+>> - ? ? ? cpu1_state = pwrdm_read_pwrst(cpu1_pd);
+>> - ? ? ? if (cpu1_state != PWRDM_POWER_OFF) {
+>> - ? ? ? ? ? ? ? index = drv->safe_state_index;
+>> - ? ? ? ? ? ? ? cx = cpuidle_get_statedata(&dev->states_usage[index]);
+>> + ? ? ? if (dev->cpu == 0) {
+>> + ? ? ? ? ? ? ? while (pwrdm_read_pwrst(cpu_pd[1]) != PWRDM_POWER_OFF)
+>> + ? ? ? ? ? ? ? ? ? ? ? cpu_relax();
+> If something goes wrong in the core coupled code or in the cpu 1 power
+> state transition, this will hang forever and be hard to debug. ?It
+> might be worth adding a timeout with a BUG_ON.
 >
-Since you need to recompile the kernel, you can very much tweak the
-clocksource to use GPTIMER with sysl clock. Support for that is still
-in place.
+This condition is handled in patch 3/3
+
+>> ? ? ? ?}
+>>
+>> - ? ? ? if (index > 0)
+>> - ? ? ? ? ? ? ? clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+>> -
+>> ? ? ? ?/*
+>> ? ? ? ? * Call idle CPU PM enter notifier chain so that
+>> ? ? ? ? * VFP and per CPU interrupt context is saved.
+>> @@ -91,25 +99,35 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
+>> ? ? ? ?if (cx->cpu_state == PWRDM_POWER_OFF)
+>> ? ? ? ? ? ? ? ?cpu_pm_enter();
+> This should never get called without cpu_state == PWRDM_POWER_OFF, and
+> even if it did, calling cpu_pm_enter shouldn't hurt anything. ?It
+> would be clearer to unconditionally call cpu_pm_enter().
+>
+Actually coupled state is called only for CPU mode, so the check can be removed.
+
+>>
+>> - ? ? ? pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+>> - ? ? ? omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+>> -
+>> - ? ? ? /*
+>> - ? ? ? ?* Call idle CPU cluster PM enter notifier chain
+>> - ? ? ? ?* to save GIC and wakeupgen context.
+>> - ? ? ? ?*/
+>> - ? ? ? if ((cx->mpu_state == PWRDM_POWER_RET) &&
+>> - ? ? ? ? ? ? ? (cx->mpu_logic_state == PWRDM_POWER_OFF))
+>> - ? ? ? ? ? ? ? ? ? ? ? cpu_cluster_pm_enter();
+>> + ? ? ? if (dev->cpu == 0) {
+>> + ? ? ? ? ? ? ? pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+>> + ? ? ? ? ? ? ? omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+>> +
+>> + ? ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ? ?* Call idle CPU cluster PM enter notifier chain
+>> + ? ? ? ? ? ? ? ?* to save GIC and wakeupgen context.
+>> + ? ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? ? if ((cx->mpu_state == PWRDM_POWER_RET) &&
+>> + ? ? ? ? ? ? ? ? ? ? ? (cx->mpu_logic_state == PWRDM_POWER_OFF))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cpu_cluster_pm_enter();
+>> + ? ? ? }
+>>
+>> ? ? ? ?omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+>>
+>> + ? ? ? if (dev->cpu == 0) {
+>> + ? ? ? ? ? ? ? /* Wakeup CPU1 only if it is not offlined */
+>> + ? ? ? ? ? ? ? if (cpumask_test_cpu(1, cpu_online_mask)) {
+>> + ? ? ? ? ? ? ? ? ? ? ? clkdm_wakeup(cpu_clkdm[1]);
+>> + ? ? ? ? ? ? ? ? ? ? ? clkdm_allow_idle(cpu_clkdm[1]);
+>> + ? ? ? ? ? ? ? }
+>> + ? ? ? }
+>> +
+>> ? ? ? ?/*
+>> ? ? ? ? * Call idle CPU PM exit notifier chain to restore
+>> ? ? ? ? * VFP and per CPU IRQ context. Only CPU0 state is
+>> ? ? ? ? * considered since CPU1 is managed by CPU hotplug.
+>> ? ? ? ? */
+> This comment is no longer accurate? ?cpu_pm_enter is called on cpu 1 above.
+>
+Yep. Didn't pay much attention on the comments. Will fix it.
+
+
+>> - ? ? ? if (pwrdm_read_prev_pwrst(cpu0_pd) == PWRDM_POWER_OFF)
+>> + ? ? ? if (pwrdm_read_prev_pwrst(cpu_pd[dev->cpu]) == PWRDM_POWER_OFF)
+>> ? ? ? ? ? ? ? ?cpu_pm_exit();
+> This should get called unconditionally. ?It's not explicitly stated,
+> but the cpu_pm_* api expects cpu_pm_exit() to be called after
+> cpu_pm_enter(), even if the low power state was not entered.
+> Otherwise, a cpu_pm_enter notifier that disables the hardware will not
+> get a chance to re-enable it.
+
+I know what you mean now. the hardware like CPU interface can be
+disabled/enabled in the notifiers so would make sense to call them
+unconditionally. Will remove the check in both cases.
 
 Regards
 Santosh
