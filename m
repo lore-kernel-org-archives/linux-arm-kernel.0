@@ -1,43 +1,76 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 01 Apr 2012 01:51:43 +0400
-Subject: [PATCH 03/12] ARM: at91/USB host: specify and handle properly
- vbus_pin_active_low
-In-Reply-To: <ce442f466ded5a4c75a0fc15700dc14fe60b91d8.1333026637.git.nicolas.ferre@atmel.com>
-References: <cover.1333026637.git.nicolas.ferre@atmel.com>
- <ce442f466ded5a4c75a0fc15700dc14fe60b91d8.1333026637.git.nicolas.ferre@atmel.com>
-Message-ID: <4F777C6F.2070603@mvista.com>
+From: linuxppcemb@lkmail.de (Lorenz Kolb)
+Date: Sun, 01 Apr 2012 00:19:25 +0200
+Subject: [PATCH RFC] Simplify the Linux kernel by reducing its state space
+In-Reply-To: <20120331212149.GI2450@linux.vnet.ibm.com>
+References: <20120331163321.GA15809@linux.vnet.ibm.com>
+ <1333227608.2325.4054.camel@edumazet-glaptop>
+ <20120331212149.GI2450@linux.vnet.ibm.com>
+Message-ID: <4F7782ED.7050407@lkmail.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+With that patchset in mind, I am working on a really huge patch, which 
+will greatly simplify the Linux kernel  for the real problem of having 
+that number of CPUs.
 
-On 29-03-2012 17:27, Nicolas Ferre wrote:
+That patch will have a lot of changes all over the architectures, so 
+what will be the best way to post it? Should I split it architecture 
+dependend and into one generic part.
 
-> Due to an error while handling vbus_pin_active_low in ohci-at91 driver,
-> the specification of this property was not good in devices/board files.
+Currently it is a large blob of millions of changes, but will greatly 
+simplify the Linux kernel.
 
-> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
-> Cc: stable<stable@vger.kernel.org>          [3.2+]
-> ---
->   arch/arm/mach-at91/at91sam9263_devices.c |    3 ++-
->   arch/arm/mach-at91/at91sam9g45_devices.c |    6 ++++--
->   arch/arm/mach-at91/board-sam9263ek.c     |    1 +
->   arch/arm/mach-at91/board-sam9m10g45ek.c  |    1 +
->   4 files changed, 8 insertions(+), 3 deletions(-)
+Regards,
+
+Lorenz Kolb
+
+Am 31.03.2012 23:21, schrieb Paul E. McKenney:
+> On Sat, Mar 31, 2012 at 11:00:08PM +0200, Eric Dumazet wrote:
+>    
+>> On Sun, 2012-04-01 at 00:33 +0800, Paul E. McKenney wrote:
+>>      
+>>> Although there have been numerous complaints about the complexity of
+>>> parallel programming (especially over the past 5-10 years), the plain
+>>> truth is that the incremental complexity of parallel programming over
+>>> that of sequential programming is not as large as is commonly believed.
+>>> Despite that you might have heard, the mind-numbing complexity of modern
+>>> computer systems is not due so much to there being multiple CPUs, but
+>>> rather to there being any CPUs at all.  In short, for the ultimate in
+>>> computer-system simplicity, the optimal choice is NR_CPUS=0.
+>>>
+>>> This commit therefore limits kernel builds to zero CPUs.  This change
+>>> has the beneficial side effect of rendering all kernel bugs harmless.
+>>> Furthermore, this commit enables additional beneficial changes, for
+>>> example, the removal of those parts of the kernel that are not needed
+>>> when there are zero CPUs.
+>>>
+>>> Signed-off-by: Paul E. McKenney<paulmck@linux.vnet.ibm.com>
+>>> Reviewed-by: Thomas Gleixner<tglx@linutronix.de>
+>>> ---
+>>>        
+>> Hmm... I believe you could go one step forward and allow negative values
+>> as well. Antimatter was proven to exist after all.
+>>
+>> Hint : nr_cpu_ids is an "int", not an "unsigned int"
+>>
+>> Bonus: Existing bugs become "must have" features.
+>>      
+> ;-) ;-) ;-)
 >
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index 53688c4..5cdca89d 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -72,7 +72,8 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
->   	/* Enable VBus control for UHP ports */
->   	for (i = 0; i<  data->ports; i++) {
->   		if (gpio_is_valid(data->vbus_pin[i]))
-> -			at91_set_gpio_output(data->vbus_pin[i], 0);
-> +			at91_set_gpio_output(data->vbus_pin[i],
-> +					     data->vbus_pin_active_low[i] ^ 0);
-
-    Note that XOR with 0 is a nop, left operand doesn't change its value.
-
-WBR, Sergei
+>    
+>> Of course there is no hurry and this can wait 365 days.
+>>      
+> James Bottomley suggested imaginary numbers of CPUs some time back,
+> and I suppose there is no reason you cannot have fractional numbers of
+> CPUs, and perhaps irrational numbers as well.  Of course, these last two
+> would require use of floating-point arithmetic (or something similar)
+> in the kernel.  So I guess we have at several years worth.  Over to you
+> for the negative numbers.  ;-)
+>
+> 							Thanx, Paul
+>
+> _______________________________________________
+> Linuxppc-dev mailing list
+> Linuxppc-dev at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/linuxppc-dev
+>    
