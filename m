@@ -1,44 +1,39 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sat, 31 Mar 2012 16:39:36 +0800
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
- <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
-Message-ID: <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 31 Mar 2012 16:46:17 +0800
+Subject: [PATCH] ARM: imx: fix mc9s08dz60_gpiochip_match parameter type
+Message-ID: <1333183577-2109-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 2:30 PM, Shilimkar, Santosh
-> Since you need to recompile the kernel, you can very much tweak the
-> clocksource to use GPTIMER with sysl clock. Support for that is still
-> in place.
+Due to the change made by commit 6e2cf65 (gpio: constify the data
+parameter to gpiochip_find()), the following compile warning is seen
+on imx_v6_v7_defconfig build.
 
-With current kernel, running 'make menuconfig' can do it, but after applying
-Hiremath's patch[1], I have to edit the source code manually to get it, so looks
-this kind of tweaking is not friendly enough, :-(
+  CC      arch/arm/mach-imx/mach-mx35_3ds.o
+arch/arm/mach-imx/mach-mx35_3ds.c: In function ?mx35_3ds_lcd_set_power?:
+arch/arm/mach-imx/mach-mx35_3ds.c:112:5: warning: passing argument 2 of ?gpiochip_find? from incompatible pointer type [enabled by default]
+include/asm-generic/gpio.h:145:26: note: expected ?int (*)(struct gpio_chip *, const void *)? but argument is of type ?int (*)(struct gpio_chip *, void *)?
 
-[1], http://marc.info/?l=linux-arm-kernel&m=133311647410324&w=2
+Change mc9s08dz60_gpiochip_match parameter type accordingly to fix
+the warning.
 
-Thanks,
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/mach-mx35_3ds.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index e14291d..6ae51c6 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -97,7 +97,7 @@ static struct i2c_board_info __initdata i2c_devices_3ds[] = {
+ static int lcd_power_gpio = -ENXIO;
+ 
+ static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
+-						     void *data)
++						     const void *data)
+ {
+ 	return !strcmp(chip->label, data);
+ }
 -- 
-Ming Lei
+1.7.5.4
