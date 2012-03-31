@@ -1,46 +1,87 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 31 Mar 2012 12:34:09 +0800
-Subject: [PATCH 1/2] ARM: fix builds due to missing <asm/system_misc.h>
- includes
-In-Reply-To: <1333118281-25295-1-git-send-email-olof@lixom.net>
-References: <1333118281-25295-1-git-send-email-olof@lixom.net>
-Message-ID: <20120331043405.GI19506@S2101-09.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 31 Mar 2012 00:58:47 -0400 (EDT)
+Subject: error: 'SEGMENT_SIZE' undeclared with arm-eabi-gcc toolchain
+In-Reply-To: <4F7638C3.4060301@samsung.com>
+References: <4F7638C3.4060301@samsung.com>
+Message-ID: <alpine.LFD.2.02.1203310017440.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 07:38:01AM -0700, Olof Johansson wrote:
-> This does a sweeping change fixing up all the missing system_misc.h and
-> system_info.h includes from the system.h split-up change. These were the
-> ones I came across when building all defconfigs in arch/arm/configs, there
-> might be more but they lack adequate build coverage to be easily caught.
+On Fri, 30 Mar 2012, Kukjin Kim wrote:
+
+> Hi all,
 > 
-> I'm expecting to get a lot of these piecemeal by each maintainer, so we
-> might just as well do one sweeping change to get them all at once.
+> Occurs following error with arm-eabi-gcc toolchain (gcc version 4.4.3 -
+> GCC). But there is no error with arm-none-linux-gnueabi-gcc toolchain
+> (gcc version 4.4.1 - Sourcery G++ Lite 2009q3)...
 > 
+> fs/binfmt_aout.c: In function 'load_aout_binary':
+> fs/binfmt_aout.c:255: error: 'SEGMENT_SIZE' undeclared (first use in
+> this function)
+> fs/binfmt_aout.c:255: error: (Each undeclared identifier is reported
+> only once
+> fs/binfmt_aout.c:255: error: for each function it appears in.)
+> make[2]: *** [fs/binfmt_aout.o] Error 1
+> make[2]: *** Waiting for unfinished jobs....
+> make[1]: *** [fs] Error 2
 > 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-...
->  arch/arm/mach-imx/mm-imx3.c   |    1 +
->  arch/arm/mach-imx/mm-imx5.c   |    1 +
+> Any idea?
 
-The changes are same as the patch below that I sent a little earlier.
+Yes.  This comes from the N_DATADDR() macro, defined in 
+include/linux/a.out.h as follows:
 
-  ARM: imx: fix ?arm_pm_idle? undeclared error
+|#define N_DATADDR(x) \
+|    (N_MAGIC(x)==OMAGIC? (_N_TXTENDADDR(x)) \
+|     : (_N_SEGMENT_ROUND (_N_TXTENDADDR(x))))
 
-So,
+Then, looking at _N_SEGMENT_ROUND() in the same file:
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+|#define _N_SEGMENT_ROUND(x) ALIGN(x, SEGMENT_SIZE)
 
--- 
-Regards,
-Shawn
+Here it is.  Now, why isn't SEGMENT_SIZE defined?  Well that's where 
+things get way more hairy than they are already (caution, barf bag 
+recommended):
+
+|/* Address of data segment in memory after it is loaded.
+|   Note that it is up to you to define SEGMENT_SIZE
+|   on machines not listed here.  */
+|#if defined(vax) || defined(hp300) || defined(pyr)
+|#define SEGMENT_SIZE page_size
+|#endif
+|#ifdef	sony
+|#define	SEGMENT_SIZE	0x2000
+|#endif	/* Sony.  */
+|#ifdef is68k
+|#define SEGMENT_SIZE 0x20000
+|#endif
+|#if defined(m68k) && defined(PORTAR)
+|#define PAGE_SIZE 0x400
+|#define SEGMENT_SIZE PAGE_SIZE
+|#endif
+|
+|#ifdef linux
+|#ifdef __KERNEL__
+|#include <asm/page.h>
+|#else
+|#include <unistd.h>
+|#endif
+|#if defined(__i386__) || defined(__mc68000__)
+|#define SEGMENT_SIZE	1024
+|#else
+|#ifndef SEGMENT_SIZE
+|#ifdef __KERNEL__
+|#define SEGMENT_SIZE	PAGE_SIZE
+|#else
+|#define SEGMENT_SIZE   getpagesize()
+|#endif
+|#endif
+|#endif
+|#endif
+
+So the clue you're looking for is probably on the 18th line above.
+
+BTW, no one is using a.out on ARM anymore.  You should really consider 
+removing CONFIG_BINFMT_AOUT from your config.
+
+
+Nicolas
