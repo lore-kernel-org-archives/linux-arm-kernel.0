@@ -1,61 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 31 Mar 2012 18:40:30 +0200
-Subject: [PATCH RFC] Simplify the Linux kernel by reducing its state space
-In-Reply-To: <20120331163321.GA15809@linux.vnet.ibm.com>
-References: <20120331163321.GA15809@linux.vnet.ibm.com>
-Message-ID: <CAMuHMdWTB+_AtqM6JixY=Oo_zmzX_dNxnivpARBYSbPJzp4t6A@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 31 Mar 2012 17:44:53 +0100
+Subject: [PATCH] ARM: ux300: Fix unimplementable regulation constraints
+Message-ID: <1333212293-6287-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+It doesn't make sense to grant permission to change the status of a
+regulator that is also set as always on and similarly it doesn't make
+sense to allow a driver to change the voltage of a regulator which can
+only be set to a single voltage.
 
-On Sat, Mar 31, 2012 at 18:33, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
-> Although there have been numerous complaints about the complexity of
-> parallel programming (especially over the past 5-10 years), the plain
-> truth is that the incremental complexity of parallel programming over
-> that of sequential programming is not as large as is commonly believed.
-> Despite that you might have heard, the mind-numbing complexity of modern
-> computer systems is not due so much to there being multiple CPUs, but
-> rather to there being any CPUs at all. ?In short, for the ultimate in
-> computer-system simplicity, the optimal choice is NR_CPUS=0.
->
-> This commit therefore limits kernel builds to zero CPUs. ?This change
-> has the beneficial side effect of rendering all kernel bugs harmless.
-> Furthermore, this commit enables additional beneficial changes, for
-> example, the removal of those parts of the kernel that are not needed
-> when there are zero CPUs.
->
-> Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->
-> ?alpha/Kconfig ? ? ? ? ? ? ? ? ? ? | ? 11 ++++++-----
-> ?arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?6 +++---
-> ?blackfin/Kconfig ? ? ? ? ? ? ? ? ?| ? ?3 ++-
-> ?hexagon/Kconfig ? ? ? ? ? ? ? ? ? | ? ?9 +++++----
-> ?ia64/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?9 +++++----
-> ?m32r/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 10 ++++++----
-> ?mips/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 21 +++++++++++----------
-> ?mn10300/Kconfig ? ? ? ? ? ? ? ? ? | ? ?3 ++-
-> ?parisc/Kconfig ? ? ? ? ? ? ? ? ? ?| ? ?6 +++---
-> ?powerpc/platforms/Kconfig.cputype | ? ?8 ++++----
-> ?s390/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 12 +++++++-----
-> ?sh/Kconfig ? ? ? ? ? ? ? ? ? ? ? ?| ? 11 ++++++-----
-> ?sparc/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?8 ++++----
-> ?tile/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?9 +++++----
-> ?x86/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? 16 +++++++++-------
-> ?15 files changed, 78 insertions(+), 64 deletions(-)
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-u300/i2c.c |    9 +--------
+ 1 files changed, 1 insertions(+), 8 deletions(-)
 
-You forgot to fix half of the architectures, a.o. m68k?
-
-Gr{oetje,eeting}s,
-
-? ? ? ? ? ? ? ? ? ? ? ? Geert (still at GMT+2)
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+diff --git a/arch/arm/mach-u300/i2c.c b/arch/arm/mach-u300/i2c.c
+index a38f802..cb04bd6 100644
+--- a/arch/arm/mach-u300/i2c.c
++++ b/arch/arm/mach-u300/i2c.c
+@@ -146,9 +146,6 @@ static struct ab3100_platform_data ab3100_plf_data = {
+ 				.min_uV = 1800000,
+ 				.max_uV = 1800000,
+ 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-				.valid_ops_mask =
+-				REGULATOR_CHANGE_VOLTAGE |
+-				REGULATOR_CHANGE_STATUS,
+ 				.always_on = 1,
+ 				.boot_on = 1,
+ 			},
+@@ -160,9 +157,6 @@ static struct ab3100_platform_data ab3100_plf_data = {
+ 				.min_uV = 2500000,
+ 				.max_uV = 2500000,
+ 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-				.valid_ops_mask =
+-				REGULATOR_CHANGE_VOLTAGE |
+-				REGULATOR_CHANGE_STATUS,
+ 				.always_on = 1,
+ 				.boot_on = 1,
+ 			},
+@@ -230,8 +224,7 @@ static struct ab3100_platform_data ab3100_plf_data = {
+ 				.max_uV = 1800000,
+ 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
+ 				.valid_ops_mask =
+-				REGULATOR_CHANGE_VOLTAGE |
+-				REGULATOR_CHANGE_STATUS,
++				REGULATOR_CHANGE_VOLTAGE,
+ 				.always_on = 1,
+ 				.boot_on = 1,
+ 			},
+-- 
+1.7.9.1
