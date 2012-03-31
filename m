@@ -1,12 +1,59 @@
-From: heqiaomai@21cn.com (heqiaomai at 21cn.com)
-Date: Sun, 1 Apr 2012 02:35:20 +0800 (CST)
-Subject: =?UTF-8?Q?=E8=A6=81=E6=88=90=E5=8A=9F=E6=B5=B7?=
- =?UTF-8?Q?=E9=87=8F=E5=8F=91=E9=80=81EM?=
- =?UTF-8?Q?A1L,=E5=85=B3=E9=94=AE=E6=98=AF=E8=A6=81=E6=89=BE=E5=AF=B9?=
- =?UTF-8?Q?=E5=B7=A5=E5=85=B7__linux-arm-kernel?=
-Message-ID: <2857090.37591333218923653.JavaMail.root@webmail5>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sun, 1 Apr 2012 00:40:29 +0530
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+ <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
+ <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
+ <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
+ <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
+ <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
+ <4F7570FC.8000907@ti.com>
+ <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
+ <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
+ <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+ <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+Message-ID: <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120401/b195f02b/attachment-0001.html>
+On Sat, Mar 31, 2012 at 2:09 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+> On Sat, Mar 31, 2012 at 2:30 PM, Shilimkar, Santosh
+>> Since you need to recompile the kernel, you can very much tweak the
+>> clocksource to use GPTIMER with sysl clock. Support for that is still
+>> in place.
+>
+> With current kernel, running 'make menuconfig' can do it, but after applying
+> Hiremath's patch[1], I have to edit the source code manually to get it, so looks
+> this kind of tweaking is not friendly enough, :-(
+>
+It's not friendly but doable. But above can be supported I guess.
+
+Since you are talking about doing menuconfig
+and rebuilding kernel so what can be done is when one disable CPUIDLE
+and PM, one can disabled 32K source as well. And then 32K clocksource
+init should fail and fallback on gptimer clock source.
+
+Vaibhav,
+Can you update your patch to support above. The patch which I
+did was doing exactly that but was not using hwmod. The problem with your
+patch is synctimer hwmod lookup on OMAP will never fail if the hwmod
+entry is supported.
+
+So you might better use failure case of omap_init_clocksource_32k() for
+fall back on gptimer source as I tried in my patch. That should support
+the usage mentioned by Ming Lie
+
+Regards
+Santosh
