@@ -1,194 +1,159 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Sun,  1 Apr 2012 16:41:39 +1000
-Subject: [PATCH v5 4/4] mfd: mc13xxx: Add i2c driver
-In-Reply-To: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-References: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1333262499-25871-5-git-send-email-marc@cpdesign.com.au>
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Sun, 01 Apr 2012 10:01:41 +0200
+Subject: Bug in v7_coherent_kern_range() ?
+In-Reply-To: <4F77FF24.5010809@freescale.com>
+References: <4F77C9A6.6080601@freescale.com> <4F77F13D.7000402@googlemail.com>
+ <4F77FF24.5010809@freescale.com>
+Message-ID: <4F780B65.7020904@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for mc13xxx family ICs connected via i2c.
+Hi Huang Shijie,
 
-Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
----
- drivers/mfd/Kconfig       |    9 +++-
- drivers/mfd/Makefile      |    1 +
- drivers/mfd/mc13xxx-i2c.c |  128 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 137 insertions(+), 1 deletions(-)
- create mode 100644 drivers/mfd/mc13xxx-i2c.c
+On 01.04.2012 09:09, Huang Shijie wrote:
+> Hi Dirk:
+>> Hi Huang Shijie,
+>>
+>> On 01.04.2012 05:21, Huang Shijie wrote:
+>>> [1] Platform:
+>>> freescale's IMX6Q(4 cores) , ARM CORTEX-A9
+>>>
+>>> [2] kernel:
+>>> 3.0.15(I have cherry-picked many patches, and the
+>>> arch/arm/mm/cache-v7.S
+>>> is same code with the latest kernel v3.4-rc1)
+>>> enable SMP, VIPT,
+>>
+>> Could you try an unpatched, clean v3.4-rc1 instead?
+> Sorry, I could not try the v3.4-rc1. Some our bsp drivers are not DT
+> supported.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index fe0a0ab..7f4d85a 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -573,7 +573,7 @@ config MFD_MC13783
- 
- config MFD_MC13XXX
- 	tristate "Support Freescale MC13783 and MC13892"
--	depends on SPI_MASTER
-+	depends on SPI_MASTER || I2C
- 	select MFD_CORE
- 	select MFD_MC13783
- 	help
-@@ -591,6 +591,13 @@ config MFD_MC13XXX_SPI
- 	help
- 	  Select this if your MC13xxx is connected via an SPI bus.
- 
-+config MFD_MC13XXX_I2C
-+	tristate "MC13xxx I2C interface" if I2C
-+	default I2C
-+	select REGMAP_I2C
-+	help
-+	  Select this if your MC13xxx is connected via an I2C bus.
-+
- endif
- 
- config ABX500_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 2dc66ed..6d4566f 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_TWL6040_CORE)	+= twl6040-core.o twl6040-irq.o
- 
- obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
- obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
-+obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
- 
- obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
- 
-diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-new file mode 100644
-index 0000000..d22501d
---- /dev/null
-+++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -0,0 +1,128 @@
-+/*
-+ * Copyright 2009-2010 Creative Product Design
-+ * Marc Reilly marc at cpdesign.com.au
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+#include <linux/mfd/core.h>
-+#include <linux/mfd/mc13xxx.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/i2c.h>
-+#include <linux/err.h>
-+
-+#include "mc13xxx.h"
-+
-+static const struct i2c_device_id mc13xxx_i2c_device_id[] = {
-+	{
-+		.name = "mc13892",
-+		.driver_data = MC13XXX_ID_MC13892,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(i2c, mc13xxx_i2c_device_id);
-+
-+static const struct of_device_id mc13xxx_dt_ids[] = {
-+	{
-+		.compatible = "fsl,mc13892",
-+		.data = (void *) &mc13xxx_i2c_device_id[0],
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
-+
-+static struct regmap_config mc13xxx_regmap_i2c_config = {
-+	.reg_bits = 8,
-+	.val_bits = 24,
-+
-+	.max_register = MC13XXX_NUMREGS,
-+
-+	.cache_type = REGCACHE_NONE,
-+};
-+
-+static int mc13xxx_i2c_probe(struct i2c_client *client,
-+		const struct i2c_device_id *id)
-+{
-+	const struct of_device_id *of_id;
-+	struct i2c_driver *idrv = to_i2c_driver(client->dev.driver);
-+	struct mc13xxx *mc13xxx;
-+	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-+	int ret;
-+
-+	of_id = of_match_device(mc13xxx_dt_ids, &client->dev);
-+	if (of_id)
-+		idrv->id_table = (const struct i2c_device_id*) of_id->data;
-+
-+	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-+	if (!mc13xxx)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&client->dev, mc13xxx);
-+
-+	mc13xxx->dev = &client->dev;
-+	mutex_init(&mc13xxx->lock);
-+
-+	mc13xxx->regmap = regmap_init_i2c(client, &mc13xxx_regmap_i2c_config);
-+	if (IS_ERR(mc13xxx->regmap)) {
-+		ret = PTR_ERR(mc13xxx->regmap);
-+		dev_err(mc13xxx->dev, "Failed to initialize register map: %d\n",
-+				ret);
-+		dev_set_drvdata(&client->dev, NULL);
-+		kfree(mc13xxx);
-+		return ret;
-+	}
-+
-+	ret = mc13xxx_common_init(mc13xxx, pdata, client->irq);
-+
-+	if (ret == 0 && (id->driver_data != mc13xxx->ictype))
-+		dev_warn(mc13xxx->dev,
-+				"device id doesn't match auto detection!\n");
-+
-+	return ret;
-+}
-+
-+static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-+{
-+	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-+
-+	mc13xxx_common_cleanup(mc13xxx);
-+
-+	return 0;
-+}
-+
-+static struct i2c_driver mc13xxx_i2c_driver = {
-+	.id_table = mc13xxx_i2c_device_id,
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "mc13xxx",
-+		.of_match_table = mc13xxx_dt_ids,
-+	},
-+	.probe = mc13xxx_i2c_probe,
-+	.remove = __devexit_p(mc13xxx_i2c_remove),
-+};
-+
-+static int __init mc13xxx_i2c_init(void)
-+{
-+	return i2c_add_driver(&mc13xxx_i2c_driver);
-+}
-+subsys_initcall(mc13xxx_i2c_init);
-+
-+static void __exit mc13xxx_i2c_exit(void)
-+{
-+	i2c_del_driver(&mc13xxx_i2c_driver);
-+}
-+module_exit(mc13xxx_i2c_exit);
-+
-+MODULE_DESCRIPTION("i2c driver for Freescale MC13XXX PMIC");
-+MODULE_AUTHOR("Marc Reilly <marc@cpdesign.com.au");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.3.4
+I think we are not talking about drivers, we are talking about some 
+kernel core code, like cache handling? To test 
+v7_coherent_kern_range() you might not need to many bsp drivers?
+
+>> What's about your 2.6.38?
+> 2.6.38 is not a good version to run the imx6q. It losts many our
+> drivers's patches.
+>>
+>> What's about 3.0.26? 3.0.15 seems to miss some maybe relevant patches.
+>>
+> Our bsp release are based on 3.0.15. so we could not test it on 3.0.26
+> too.
+
+You can. Just give git rebase a try.
+
+>>> [3] application:
+>>
+>> Could you share a (simple) test case?
+> The test case is like this:
+> #gplay xx.avi
+>
+> gplay is our own player, such as mplayer.
+
+Could you share a (simple) test case? E.g. share 'gplay'? Or try to 
+reproduce your issue with an other test case? E.g. mplayer? Or better 
+anything simpler the community can use to try to reproduce your issue?
+
+Best regards
+
+Dirk
+
+> I just created a script which will play the video files one by one.
+>
+> BR
+> Huang Shijie
+>
+>>
+>> Best regards
+>>
+>> Dirk
+>>
+>>> I use our our application which will clone many threads,
+>>> two threads (assume as A and B) may do the same thing at the same time
+>>> as the following code:
+>>>
+>>> In most of the time, it's ok.
+>>> But in some unknown situation, cacheflush() failed and one threads
+>>> (assume A) may hung up in the following code:
+>>> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>
+>>>
+>>> open("/usr/lib/lib_mp3_dec_arm12_elinux.so.2.10.0", O_RDONLY) = 8
+>>> read(8,
+>>> "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\20\35\0\0004\0\0\0"...,
+>>>
+>>> 512) = 512
+>>> fstat64(8, {st_mode=S_IFREG|0644, st_size=56232, ...}) = 0
+>>> mmap2(NULL, 88032, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE,
+>>> 8, 0)
+>>> = 0x2ff0a000
+>>> mprotect(0x2ff18000, 28672, PROT_NONE) = 0
+>>> mmap2(0x2ff1f000, 4096, PROT_READ|PROT_WRITE,
+>>> MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 8, 0xd) = 0x2ff1f000
+>>> close(8) = 0
+>>> mprotect(0x2ff0a000, 57344, PROT_READ|PROT_WRITE) = 0
+>>> mprotect(0x2ff0a000, 57344, PROT_READ|PROT_EXEC) = 0
+>>> cacheflush(0x2ff0a000, 0x2ff18000, 0, 0x6, 0x2cd03420) = 0 // System
+>>> hung up here!!!
+>>> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>
+>>>
+>>>
+>>> [4] kernel log
+>>> I use "echo t> /proc/sysrq-trigger" to show the tasks's information:
+>>> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>
+>>>
+>>> multiqueue0:src D 804cd678 0 7328 5963 0x00000001
+>>> [<804cd678>] (__schedule+0x228/0x760) from [<804d0564>]
+>>> (__down_read+0xa8/0xe0)
+>>> [<804d0564>] (__down_read+0xa8/0xe0) from [<800478c4>]
+>>> (do_page_fault+0xbc/0x480)
+>>> [<800478c4>] (do_page_fault+0xbc/0x480) from [<8003841c>]
+>>> (do_DataAbort+0x34/0x98)
+>>> [<8003841c>] (do_DataAbort+0x34/0x98) from [<8003df10>]
+>>> (__dabt_svc+0x70/0xa0)
+>>> Exception stack(0xbae37ea8 to 0xbae37ef0)
+>>> 7ea0: 31e05000 31e1d000 00000020 0000001f 31e05000 31e1d000
+>>> 7ec0: bfac86b8 31e05000 31e1d000 bae36000 08100075 31e056fc 31e08000
+>>> bae37ef0
+>>> 7ee0: 800424a8 8004a1fc 800f0013 ffffffff
+>>> [<8003df10>] (__dabt_svc+0x70/0xa0) from [<8004a1fc>]
+>>> (v7_coherent_kern_range+0x20/0x80)
+>>> [<8004a1fc>] (v7_coherent_kern_range+0x20/0x80) from [<800424a8>]
+>>> (arm_syscall+0x2a0/0x2c4)
+>>> [<800424a8>] (arm_syscall+0x2a0/0x2c4) from [<8003e500>]
+>>> (ret_fast_syscall+0x0/0x3c)
+>>> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>
+>>>
+>>>
+>>> The do_cache_op() has already held the mm->mmap_sem, but
+>>> v7_coherent_kern_range()
+>>> cause one page fault during it flush the cache. deadlock! So it
+>>> hung up
+>>> in the do_page_fault().
+>>>
+>>> [5] questions:
+>>> Why the v7_coherent_kern_range() can caused the data abort?
+>>> Is there something wrong about the v7_coherent_kern_range()?
+>>>
+>>>
+>>> thanks
+>>> Huang Shijie
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>>
+>
+>
+>
