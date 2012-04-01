@@ -1,32 +1,57 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Sun, 01 Apr 2012 23:27:44 +0200
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
-In-Reply-To: <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- (Grant Likely's message of "Thu, 16 Feb 2012 02:09:07 -0700")
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <m2iphj3zxr.fsf@igel.home>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sun, 1 Apr 2012 17:41:08 -0400
+Subject: ioremap to a specific virtual address
+In-Reply-To: <201204011946.14113.arnd@arndb.de>
+References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+ <alpine.LFD.2.02.1203311943500.24151@xanadu.home>
+ <CAKON4OzohgrZ2k0ddhDrOTqumRYizf-aLUhWdcZstD-7QTYYZg@mail.gmail.com>
+ <201204011946.14113.arnd@arndb.de>
+Message-ID: <CAKON4OyW2t+5GNRSEFOVjsGM8OifH7iqYNoO+BEOiGsdWq56sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@secretlab.ca> writes:
+On Sun, Apr 1, 2012 at 3:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 01 April 2012, jonsmirl at gmail.com wrote:
+>> Looks good, way cleaner than my x86 desktop which is full of 8KB
+>> mappings. On my ARM I had about 50 regions before since I was mapping
+>> each device individually.
+>>
+>> root at OpenWrt:/proc# cat vmallocinfo
+>> 0xc4804000-0xc4810000 ? 49152 cramfs_uncompress_init+0x24/0x60 pages=11 vmalloc
+>> 0xc4810000-0xc4853000 ?274432 jffs2_zlib_init+0x14/0xa4 pages=66 vmalloc
+>> 0xc4853000-0xc485f000 ? 49152 jffs2_zlib_init+0x48/0xa4 pages=11 vmalloc
+>> 0xc485f000-0xc4886000 ?159744 ssd1289_probe+0x250/0x85c pages=38 vmalloc
+>> 0xf1300000-0xf1400000 1048576 iotable_init+0x0/0xb0 phys=13000000 ioremap
+>> 0xf1500000-0xf1600000 1048576 iotable_init+0x0/0xb0 phys=15000000 ioremap
+>> 0xf1600000-0xf1700000 1048576 iotable_init+0x0/0xb0 phys=16000000 ioremap
+>> 0xf1700000-0xf1800000 1048576 iotable_init+0x0/0xb0 phys=17000000 ioremap
+>> 0xf1800000-0xf1900000 1048576 iotable_init+0x0/0xb0 phys=18000000 ioremap
+>> 0xf1900000-0xf1a00000 1048576 iotable_init+0x0/0xb0 phys=19000000 ioremap
+>> 0xf2000000-0xf2100000 1048576 iotable_init+0x0/0xb0 phys=20000000 ioremap
+>> 0xf6000000-0xf6100000 1048576 iotable_init+0x0/0xb0 phys=60000000 ioremap
+>> 0xf7000000-0xf7100000 1048576 iotable_init+0x0/0xb0 phys=70000000 ioremap
+>> root at OpenWrt:/proc#
+>
+> Well, you loose the information about which devices specifically do the ioremap,
+> but that wasn't very reliable to start with. How about combining those that
+> are already consecutive areas, e.g. 0xf1300000-0xf1a00000? I don't see
+> any downsides of doing that, and it would save a few bytes here and there.
 
-> This patch drops the powerpc-specific irq_map table and replaces it with
-> directly using the irq_alloc_desc()/irq_free_desc() interfaces for allocating
-> and freeing irq_desc structures.
+ 0xf1300000-0xf1a00000 is the virtual address.  0x13000000-0x21000000
+is the physical address.  That's a span of 224MB.  How do the page
+table entries work on ARM? I thought we only got 1MB per entry.  So I
+need seven entries to span the range with the individual maps. I'd
+need 224 entries to cover the entire region. Or can we make make the
+page table entries any size we want?
 
-This breaks irqs on PowerMac G5.  I see lost irq errors from the sata
-driver.
+There is only about 64KB in use at each of the 16MB boundaries.
 
-Note that the breakage only started after the series was merged into
-mainline.  But when transplanted upon the parent of the merge this is
-the commit that was blamed by bisect.  So something changed between
-v3.3-rc3 and the merge of this series that broke it.
 
-Andreas.
+>
+> ? ? ? ?Arnd
+
+
 
 -- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+Jon Smirl
+jonsmirl at gmail.com
