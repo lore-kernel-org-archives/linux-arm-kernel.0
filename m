@@ -1,57 +1,47 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sun, 1 Apr 2012 17:41:08 -0400
-Subject: ioremap to a specific virtual address
-In-Reply-To: <201204011946.14113.arnd@arndb.de>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <alpine.LFD.2.02.1203311943500.24151@xanadu.home>
- <CAKON4OzohgrZ2k0ddhDrOTqumRYizf-aLUhWdcZstD-7QTYYZg@mail.gmail.com>
- <201204011946.14113.arnd@arndb.de>
-Message-ID: <CAKON4OyW2t+5GNRSEFOVjsGM8OifH7iqYNoO+BEOiGsdWq56sg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 2 Apr 2012 00:33:20 +0200
+Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
+In-Reply-To: <20120401212750.GE8971@opensource.wolfsonmicro.com>
+References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
+ <20120401212750.GE8971@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdbj_shuGWATGER+zxvA9MNDobGjWC3XHh+-5e0R6V4n4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 1, 2012 at 3:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 01 April 2012, jonsmirl at gmail.com wrote:
->> Looks good, way cleaner than my x86 desktop which is full of 8KB
->> mappings. On my ARM I had about 50 regions before since I was mapping
->> each device individually.
->>
->> root at OpenWrt:/proc# cat vmallocinfo
->> 0xc4804000-0xc4810000 ? 49152 cramfs_uncompress_init+0x24/0x60 pages=11 vmalloc
->> 0xc4810000-0xc4853000 ?274432 jffs2_zlib_init+0x14/0xa4 pages=66 vmalloc
->> 0xc4853000-0xc485f000 ? 49152 jffs2_zlib_init+0x48/0xa4 pages=11 vmalloc
->> 0xc485f000-0xc4886000 ?159744 ssd1289_probe+0x250/0x85c pages=38 vmalloc
->> 0xf1300000-0xf1400000 1048576 iotable_init+0x0/0xb0 phys=13000000 ioremap
->> 0xf1500000-0xf1600000 1048576 iotable_init+0x0/0xb0 phys=15000000 ioremap
->> 0xf1600000-0xf1700000 1048576 iotable_init+0x0/0xb0 phys=16000000 ioremap
->> 0xf1700000-0xf1800000 1048576 iotable_init+0x0/0xb0 phys=17000000 ioremap
->> 0xf1800000-0xf1900000 1048576 iotable_init+0x0/0xb0 phys=18000000 ioremap
->> 0xf1900000-0xf1a00000 1048576 iotable_init+0x0/0xb0 phys=19000000 ioremap
->> 0xf2000000-0xf2100000 1048576 iotable_init+0x0/0xb0 phys=20000000 ioremap
->> 0xf6000000-0xf6100000 1048576 iotable_init+0x0/0xb0 phys=60000000 ioremap
->> 0xf7000000-0xf7100000 1048576 iotable_init+0x0/0xb0 phys=70000000 ioremap
->> root at OpenWrt:/proc#
+On Sun, Apr 1, 2012 at 11:27 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Sun, Apr 01, 2012 at 09:22:50PM +0200, Linus Walleij wrote:
 >
-> Well, you loose the information about which devices specifically do the ioremap,
-> but that wasn't very reliable to start with. How about combining those that
-> are already consecutive areas, e.g. 0xf1300000-0xf1a00000? I don't see
-> any downsides of doing that, and it would save a few bytes here and there.
-
- 0xf1300000-0xf1a00000 is the virtual address.  0x13000000-0x21000000
-is the physical address.  That's a span of 224MB.  How do the page
-table entries work on ARM? I thought we only got 1MB per entry.  So I
-need seven entries to span the range with the individual maps. I'd
-need 224 entries to cover the entire region. Or can we make make the
-page table entries any size we want?
-
-There is only about 64KB in use at each of the 16MB boundaries.
-
-
+>> Combined with the PL022 patch this causes a power regression since
+>> the PL022 is hereafter always on.
 >
-> ? ? ? ?Arnd
+> I guess this code isn't in mainline, though? ?In that case you can
+> always add a revert of this commit to your out of tree patches if you
+> need to.
 
+No, we can sure live with it... Out-of-mainline we do use power domains
+so that's what we should do instead. It currently looks like this:
+http://www.igloocommunity.org/gitweb/?p=kernel/igloo-kernel.git;a=blob;f=arch/arm/mach-ux500/pm/runtime.c;hb=HEAD
 
+It's a really nice piece of code but uses some out-of-tree features,
+the most obvious one is "atomic regulators" (which are exactly
+that).
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+>> But to the defence: power domain code was not in the kernel
+>> when the AMBA "vcore" regulator was introduced so how else
+>> could we do it... except for inventing power domains...
+>
+> Which might've happened sooner if we'd noticed :) ?There were some other
+> platforms doing similar things but they mostly used the clock API since
+> it was always entirely platform code until 3.4 so they're less intrusive
+> into the generic code.
+
+Yeah ... but this sounds familiar, (searching searching) Yes! We did ask on
+the lists if regulators were proper for modeling power domains in 2008:
+http://marc.info/?l=linux-arm-kernel&m=121580531500758&w=2
+
+But I should've pushed for a proper answer ...
+
+Yours,
+Linus Walleij
