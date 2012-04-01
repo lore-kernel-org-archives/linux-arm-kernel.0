@@ -1,24 +1,21 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Sat, 31 Mar 2012 23:43:06 -0400
-Subject: [PATCH v2 1/3] mmc: atmel-mci: correct data timeout computation
-In-Reply-To: <4F72F9A5.60900@atmel.com> (Nicolas Ferre's message of "Wed, 28
- Mar 2012 13:44:37 +0200")
-References: <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
- <1332930513-14893-1-git-send-email-ludovic.desroches@atmel.com>
- <4F72F9A5.60900@atmel.com>
-Message-ID: <87vclkm81h.fsf@laptop.org>
+Date: Sat, 31 Mar 2012 23:43:45 -0400
+Subject: [PATCH 2/3] mmc: atmel-mci: r/w proof capability only available
+ since v2xx
+In-Reply-To: <4F6B3AE3.6080901@atmel.com> (Nicolas Ferre's message of "Thu, 22
+ Mar 2012 15:44:51 +0100")
+References: <1332344483-3915-1-git-send-email-ludovic.desroches@atmel.com>
+ <1332344483-3915-3-git-send-email-ludovic.desroches@atmel.com>
+ <4F6B3AE3.6080901@atmel.com>
+Message-ID: <87r4w8m80e.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Mar 28 2012, Nicolas Ferre wrote:
-> On 03/28/2012 12:28 PM, ludovic.desroches at atmel.com :
+On Thu, Mar 22 2012, Nicolas Ferre wrote:
+> On 03/21/2012 04:41 PM, ludovic.desroches at atmel.com :
 >> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->> 
->> The HSMCI operates at a rate of up to Master Clock divided by two.
->> Moreover previous calculation can cause overflows and so wrong
->> timeouts.
 >> 
 >> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 >
