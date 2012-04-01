@@ -1,41 +1,34 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 2 Apr 2012 01:02:36 +0530
-Subject: [PATCH/RFC] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <CACRpkdb6+2SLm1Ojw2jNkK9ejW66fw2Pcit-b3AL67wP4Hr_ow@mail.gmail.com>
-References: <1333294181-27653-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <CACRpkdb6+2SLm1Ojw2jNkK9ejW66fw2Pcit-b3AL67wP4Hr_ow@mail.gmail.com>
-Message-ID: <CAH+eYFDqTrgpz7Rh+LyUUMBp+PuURgLzF5xv94jK7HkhDLRoHA@mail.gmail.com>
+Date: Mon, 2 Apr 2012 01:09:27 +0530
+Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
+In-Reply-To: <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
+References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
+Message-ID: <CAH+eYFC+q4xFuSdRBkO9nb0XZWU4pQ_yCyinMy2X3ds9WQd1kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 1, 2012 at 22:52, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sun, Apr 1, 2012 at 5:29 PM, Mark Brown
+On Mon, Apr 2, 2012 at 00:52, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Apr 1, 2012 at 8:58 PM, Mark Brown
 > <broonie@opensource.wolfsonmicro.com> wrote:
->> The impact should be minimal since currently there are no mainline
->> systems which actually provide a vcore regulator so none need updating.
 >
-> Oh yes there are:
-> drivers/mfd/db8500-prcmu.c
+>> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+>> index ebc1e86..5be3248 100644
+>> --- a/drivers/mfd/db8500-prcmu.c
+>> +++ b/drivers/mfd/db8500-prcmu.c
+>> @@ -2788,6 +2788,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
+>> ? ? ? ? ? ? ? ?.constraints = {
+>> ? ? ? ? ? ? ? ? ? ? ? ?.name = "db8500-vape",
+>> ? ? ? ? ? ? ? ? ? ? ? ?.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+>> + ? ? ? ? ? ? ? ? ? ? ? .always_on = true,
+>> ? ? ? ? ? ? ? ?},
+>> ? ? ? ? ? ? ? ?.consumer_supplies = db8500_vape_consumers,
+>> ? ? ? ? ? ? ? ?.num_consumer_supplies = ARRAY_SIZE(db8500_vape_consumers),
 >
-> This driver registers a number of voltage domain regulators,
-> among those:
->
-> static struct regulator_consumer_supply db8500_vape_consumers[] = {
-> ? ? ? (...)
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "sdi0"),
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "sdi1"),
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "sdi2"),
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "sdi3"),
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "sdi4"),
-> ? ? ? ?(...)
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "uart0"),
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "uart1"),
-> ? ? ? ?REGULATOR_SUPPLY("vcore", "uart2"),
->
-> IIRC the machine will not boot (i.e. these drivers cannot even
-> probe) without these regulators in place, so they get enabled by
-> the AMBA bus code.
+> Combined with the PL022 patch this causes a power regression since
+> the PL022 is hereafter always on.
 
-These vcore "regulators" do nothing but increment a variable which is
-write-only in mainline, so the machine will boot and drivers will probe
-fine with Mark's patch.
+How can there be a "power regression" here?  This is the only user of
+the vcore regulator, and, apart from the fact that its disable routine
+only decrements an essentialy write-only variable, it is shared which
+several devices which already never disable it.
