@@ -1,38 +1,166 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 1 Apr 2012 16:34:50 +0100
-Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
-In-Reply-To: <4F787392.5040308@codeaurora.org>
-References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <4F787392.5040308@codeaurora.org>
-Message-ID: <20120401153450.GC8971@opensource.wolfsonmicro.com>
+Date: Sun,  1 Apr 2012 16:29:40 +0100
+Subject: [PATCH/RFC] ARM: amba: Remove AMBA level regulator support
+Message-ID: <1333294181-27653-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 01, 2012 at 08:26:10AM -0700, Stephen Boyd wrote:
-> On 4/1/2012 4:32 AM, Mark Brown wrote:
+The AMBA bus regulator support is being used to model on/off switches
+for power domains which isn't terribly idiomatic for modern kernels with
+the generic power domain code and creates integration problems on platforms
+which don't use regulators for their power domains as it's hard to tell
+the difference between a regulator that is needed but failed to be provided
+and one that isn't supposed to be there (though DT does make that easier).
 
-> >  Documentation/driver-model/devres.txt |    3 +++
-> >  drivers/clk/clkdev.c                  |   25 +++++++++++++++++++++++++
-> >  include/linux/clk.h                   |   20 ++++++++++++++++++++
-> >  3 files changed, 48 insertions(+), 0 deletions(-)
+Platforms that wish to use the regulator API to manage their power domains
+can indirect via the power domain interface.
 
-> But why is this part of clkdev.c? devm_clk_get() should work regardless
-> of the implementation of clk_get() so can we put it into some other file
-> that is compiled if HAVE_CLK=y so everyone benefits from this and not
-> just users who select CLKDEV_LOOKUP?
+The impact should be minimal since currently there are no mainline
+systems which actually provide a vcore regulator so none need updating.
 
-Mostly just because clk_get() is part of clkdev.c and I didn't feel like
-creating a new file, though also because I really hope that we're going
-to be moving away from open coding clock framework things so that we can
-start to push clock API usage into non-SoC code.  Things like adding new
-clocks are going to be a part of that.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
 
-To put it another way, why would a platform want to avoid clkdev?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120401/9bba3e11/attachment-0001.sig>
+RFC because there's some disagreement about this.
+
+ drivers/amba/bus.c       |   42 +-----------------------------------------
+ drivers/spi/spi-pl022.c  |    2 --
+ include/linux/amba/bus.h |    8 --------
+ 3 files changed, 1 insertions(+), 51 deletions(-)
+
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 01c2cf4..cc27322 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -247,8 +247,7 @@ static int amba_pm_restore(struct device *dev)
+ /*
+  * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
+  * enable/disable the bus clock at runtime PM suspend/resume as this
+- * does not result in loss of context.  However, disabling vcore power
+- * would do, so we leave that to the driver.
++ * does not result in loss of context.
+  */
+ static int amba_pm_runtime_suspend(struct device *dev)
+ {
+@@ -354,39 +353,6 @@ static void amba_put_disable_pclk(struct amba_device *pcdev)
+ 	clk_put(pclk);
+ }
+ 
+-static int amba_get_enable_vcore(struct amba_device *pcdev)
+-{
+-	struct regulator *vcore = regulator_get(&pcdev->dev, "vcore");
+-	int ret;
+-
+-	pcdev->vcore = vcore;
+-
+-	if (IS_ERR(vcore)) {
+-		/* It is OK not to supply a vcore regulator */
+-		if (PTR_ERR(vcore) == -ENODEV)
+-			return 0;
+-		return PTR_ERR(vcore);
+-	}
+-
+-	ret = regulator_enable(vcore);
+-	if (ret) {
+-		regulator_put(vcore);
+-		pcdev->vcore = ERR_PTR(-ENODEV);
+-	}
+-
+-	return ret;
+-}
+-
+-static void amba_put_disable_vcore(struct amba_device *pcdev)
+-{
+-	struct regulator *vcore = pcdev->vcore;
+-
+-	if (!IS_ERR(vcore)) {
+-		regulator_disable(vcore);
+-		regulator_put(vcore);
+-	}
+-}
+-
+ /*
+  * These are the device model conversion veneers; they convert the
+  * device model structures to our more specific structures.
+@@ -399,10 +365,6 @@ static int amba_probe(struct device *dev)
+ 	int ret;
+ 
+ 	do {
+-		ret = amba_get_enable_vcore(pcdev);
+-		if (ret)
+-			break;
+-
+ 		ret = amba_get_enable_pclk(pcdev);
+ 		if (ret)
+ 			break;
+@@ -420,7 +382,6 @@ static int amba_probe(struct device *dev)
+ 		pm_runtime_put_noidle(dev);
+ 
+ 		amba_put_disable_pclk(pcdev);
+-		amba_put_disable_vcore(pcdev);
+ 	} while (0);
+ 
+ 	return ret;
+@@ -442,7 +403,6 @@ static int amba_remove(struct device *dev)
+ 	pm_runtime_put_noidle(dev);
+ 
+ 	amba_put_disable_pclk(pcdev);
+-	amba_put_disable_vcore(pcdev);
+ 
+ 	return ret;
+ }
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 96f0da6..09c925a 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2195,7 +2195,6 @@ static int pl022_runtime_suspend(struct device *dev)
+ 	struct pl022 *pl022 = dev_get_drvdata(dev);
+ 
+ 	clk_disable(pl022->clk);
+-	amba_vcore_disable(pl022->adev);
+ 
+ 	return 0;
+ }
+@@ -2204,7 +2203,6 @@ static int pl022_runtime_resume(struct device *dev)
+ {
+ 	struct pl022 *pl022 = dev_get_drvdata(dev);
+ 
+-	amba_vcore_enable(pl022->adev);
+ 	clk_enable(pl022->clk);
+ 
+ 	return 0;
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index 7847e19..63a59ac 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -19,7 +19,6 @@
+ #include <linux/mod_devicetable.h>
+ #include <linux/err.h>
+ #include <linux/resource.h>
+-#include <linux/regulator/consumer.h>
+ 
+ #define AMBA_NR_IRQS	2
+ #define AMBA_CID	0xb105f00d
+@@ -30,7 +29,6 @@ struct amba_device {
+ 	struct device		dev;
+ 	struct resource		res;
+ 	struct clk		*pclk;
+-	struct regulator	*vcore;
+ 	u64			dma_mask;
+ 	unsigned int		periphid;
+ 	unsigned int		irq[AMBA_NR_IRQS];
+@@ -75,12 +73,6 @@ void amba_release_regions(struct amba_device *);
+ #define amba_pclk_disable(d)	\
+ 	do { if (!IS_ERR((d)->pclk)) clk_disable((d)->pclk); } while (0)
+ 
+-#define amba_vcore_enable(d)	\
+-	(IS_ERR((d)->vcore) ? 0 : regulator_enable((d)->vcore))
+-
+-#define amba_vcore_disable(d)	\
+-	do { if (!IS_ERR((d)->vcore)) regulator_disable((d)->vcore); } while (0)
+-
+ /* Some drivers don't use the struct amba_device */
+ #define AMBA_CONFIG_BITS(a) (((a) >> 24) & 0xff)
+ #define AMBA_REV_BITS(a) (((a) >> 20) & 0x0f)
+-- 
+1.7.9.1
