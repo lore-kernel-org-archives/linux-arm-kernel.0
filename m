@@ -1,20 +1,30 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Sun, 1 Apr 2012 14:12:32 +0300
-Subject: mc13xxx: add I2C support, V5
-In-Reply-To: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-References: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CC34CAD2A@MEP-EXCH.meprolight.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 1 Apr 2012 12:29:49 +0100
+Subject: [PATCH v3 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <201203301845.07534.arnd@arndb.de>
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <201203301136.05038.arnd@arndb.de> <4F75D5C0.5050307@wwwdotorg.org>
+ <201203301845.07534.arnd@arndb.de>
+Message-ID: <20120401112949.GA19107@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc, thanks for V5.
+On Fri, Mar 30, 2012 at 06:45:07PM +0000, Arnd Bergmann wrote:
+> On Friday 30 March 2012, Stephen Warren wrote:
 
-> This series (against mfd-2.6/for-next) changes the mc13xxx driver to use
-> regmap and adds I2C support.
-> It has a compile dependency on regmap/for-next, as the spi driver uses the
-> recently added pad_bits config field.
+> > > +- cd-inverted: when present, polarity on the wp gpio line is inverted
+> > > +- wp-inverted: when present, polarity on the wp gpio line is inverted
 
-If included in your plans to relocate the current version of patches for version 3.4?
+> > I'm not sure about those two: Some of the GPIO bindings have flags in
+> > the GPIO specifier (Tegra, ARM PL061, gpio.txt mentions the possibility
+> > of polarity being in the specifier), and bit 0 of the flags is used to
+> > indicate inversion. I think that either we should rely on GPIO
+> > specifiers having such flags and remove these xxx-inverted properties
+> > from the MMC binding, or remove that flag bit from the GPIO bindings.
 
-Cheers,
-Alex
+> Maybe the GPIO maintainer can comment on this. My understanding is
+> that not all gpio controllers support this in their bindings. If they
+> do, I agree that we can remove the extra properties here.
+
+Surely it'd be better to fix this at the GPIO controller end rather than
+having a patchwork of approaches?
