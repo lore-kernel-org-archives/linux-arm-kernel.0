@@ -1,239 +1,426 @@
 From: marc@cpdesign.com.au (Marc Reilly)
-Date: Sun,  1 Apr 2012 16:41:37 +1000
-Subject: [PATCH v5 2/4] mfd: mc13xxx-core: use regmap for register access
+Date: Sun,  1 Apr 2012 16:41:36 +1000
+Subject: [PATCH v5 1/4] mfd: mc13xxx-core: Prepare for separate spi and i2c
+ backends.
 In-Reply-To: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
 References: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1333262499-25871-3-git-send-email-marc@cpdesign.com.au>
+Message-ID: <1333262499-25871-2-git-send-email-marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change converts the mc13xxx core to use regmap rather than direct
-spi r/w.
-The spidev member of mc13xxx struct becomes redundant and is removed.
-Extra debugging aids are added to mc13xxx_reg_rmw.
-Mutex init is moved to before regmap init.
+This patch abstracts the bus specific operations from the driver core.
+Generic init and cleanup is consolidated into mc13xxx_common_*.
+spi specific functions are renamed to reflect such.
+(The irq member of the mc13xxx struct is no longer redundant, it's used
+to store the irq for cleanup time).
 
 Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
 ---
- drivers/mfd/Kconfig        |    1 +
- drivers/mfd/mc13xxx-core.c |  113 +++++++++++++------------------------------
- 2 files changed, 35 insertions(+), 79 deletions(-)
+ drivers/mfd/mc13xxx-core.c |  187 ++++++++++++++++++++++++++------------------
+ 1 files changed, 112 insertions(+), 75 deletions(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index cd13e9f..4e92513 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -576,6 +576,7 @@ config MFD_MC13XXX
- 	depends on SPI_MASTER
- 	select MFD_CORE
- 	select MFD_MC13783
-+	select REGMAP_SPI
- 	help
- 	  Support for the Freescale (Atlas) PMIC and audio CODECs
- 	  MC13783 and MC13892.
 diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index 0753402..3223625 100644
+index 7122386..0753402 100644
 --- a/drivers/mfd/mc13xxx-core.c
 +++ b/drivers/mfd/mc13xxx-core.c
-@@ -21,6 +21,8 @@
- #include <linux/of.h>
+@@ -22,8 +22,18 @@
  #include <linux/of_device.h>
  #include <linux/of_gpio.h>
-+#include <linux/regmap.h>
-+#include <linux/err.h>
  
- enum mc13xxx_id {
- 	MC13XXX_ID_MC13783,
-@@ -29,7 +31,7 @@ enum mc13xxx_id {
- };
- 
++enum mc13xxx_id {
++	MC13XXX_ID_MC13783,
++	MC13XXX_ID_MC13892,
++	MC13XXX_ID_INVALID,
++};
++
  struct mc13xxx {
--	struct spi_device *spidev;
-+	struct regmap *regmap;
+ 	struct spi_device *spidev;
++
++	struct device *dev;
++	enum mc13xxx_id ictype;
++
+ 	struct mutex lock;
+ 	int irq;
+ 	int flags;
+@@ -144,36 +154,32 @@ struct mc13xxx {
+ void mc13xxx_lock(struct mc13xxx *mc13xxx)
+ {
+ 	if (!mutex_trylock(&mc13xxx->lock)) {
+-		dev_dbg(&mc13xxx->spidev->dev, "wait for %s from %pf\n",
++		dev_dbg(mc13xxx->dev, "wait for %s from %pf\n",
+ 				__func__, __builtin_return_address(0));
  
- 	struct device *dev;
- 	enum mc13xxx_id ictype;
-@@ -172,67 +174,6 @@ void mc13xxx_unlock(struct mc13xxx *mc13xxx)
+ 		mutex_lock(&mc13xxx->lock);
+ 	}
+-	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
++	dev_dbg(mc13xxx->dev, "%s from %pf\n",
+ 			__func__, __builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(mc13xxx_lock);
+ 
+ void mc13xxx_unlock(struct mc13xxx *mc13xxx)
+ {
+-	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
++	dev_dbg(mc13xxx->dev, "%s from %pf\n",
+ 			__func__, __builtin_return_address(0));
+ 	mutex_unlock(&mc13xxx->lock);
  }
  EXPORT_SYMBOL(mc13xxx_unlock);
  
--#define MC13XXX_REGOFFSET_SHIFT 25
--static int mc13xxx_spi_reg_read(struct mc13xxx *mc13xxx,
--				unsigned int offset, u32 *val)
--{
--	struct spi_transfer t;
--	struct spi_message m;
--	int ret;
--
--	*val = offset << MC13XXX_REGOFFSET_SHIFT;
--
--	memset(&t, 0, sizeof(t));
--
--	t.tx_buf = val;
--	t.rx_buf = val;
--	t.len = sizeof(u32);
--
--	spi_message_init(&m);
--	spi_message_add_tail(&t, &m);
--
--	ret = spi_sync(mc13xxx->spidev, &m);
--
--	/* error in message.status implies error return from spi_sync */
--	BUG_ON(!ret && m.status);
--
--	if (ret)
--		return ret;
--
--	*val &= 0xffffff;
--
--	return 0;
--}
--
--static int mc13xxx_spi_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
--		u32 val)
--{
--	u32 buf;
--	struct spi_transfer t;
--	struct spi_message m;
--	int ret;
--
--	buf = 1 << 31 | offset << MC13XXX_REGOFFSET_SHIFT | val;
--
--	memset(&t, 0, sizeof(t));
--
--	t.tx_buf = &buf;
--	t.rx_buf = &buf;
--	t.len = sizeof(u32);
--
--	spi_message_init(&m);
--	spi_message_add_tail(&t, &m);
--
--	ret = spi_sync(mc13xxx->spidev, &m);
--
--	BUG_ON(!ret && m.status);
--
--	if (ret)
--		return ret;
--
--	return 0;
--}
--
- int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
+ #define MC13XXX_REGOFFSET_SHIFT 25
+-int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
++static int mc13xxx_spi_reg_read(struct mc13xxx *mc13xxx,
++				unsigned int offset, u32 *val)
  {
+ 	struct spi_transfer t;
+ 	struct spi_message m;
  	int ret;
-@@ -242,7 +183,7 @@ int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
- 	if (offset > MC13XXX_NUMREGS)
- 		return -EINVAL;
  
--	ret = mc13xxx_spi_reg_read(mc13xxx, offset, val);
-+	ret = regmap_read(mc13xxx->regmap, offset, val);
- 	dev_vdbg(mc13xxx->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
+-	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
+-
+-	if (offset > MC13XXX_NUMREGS)
+-		return -EINVAL;
+-
+ 	*val = offset << MC13XXX_REGOFFSET_SHIFT;
  
- 	return ret;
-@@ -258,25 +199,19 @@ int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
- 	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
- 		return -EINVAL;
+ 	memset(&t, 0, sizeof(t));
+@@ -195,26 +201,17 @@ int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
  
--	return mc13xxx_spi_reg_write(mc13xxx, offset, val);
-+	return regmap_write(mc13xxx->regmap, offset, val);
+ 	*val &= 0xffffff;
+ 
+-	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
+-
+ 	return 0;
  }
+-EXPORT_SYMBOL(mc13xxx_reg_read);
+ 
+-int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
++static int mc13xxx_spi_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
++		u32 val)
+ {
+ 	u32 buf;
+ 	struct spi_transfer t;
+ 	struct spi_message m;
+ 	int ret;
+ 
+-	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
+-
+-	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] <- 0x%06x\n", offset, val);
+-
+-	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
+-		return -EINVAL;
+-
+ 	buf = 1 << 31 | offset << MC13XXX_REGOFFSET_SHIFT | val;
+ 
+ 	memset(&t, 0, sizeof(t));
+@@ -235,6 +232,34 @@ int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
+ 
+ 	return 0;
+ }
++
++int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
++{
++	int ret;
++
++	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
++
++	if (offset > MC13XXX_NUMREGS)
++		return -EINVAL;
++
++	ret = mc13xxx_spi_reg_read(mc13xxx, offset, val);
++	dev_vdbg(mc13xxx->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
++
++	return ret;
++}
++EXPORT_SYMBOL(mc13xxx_reg_read);
++
++int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
++{
++	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
++
++	dev_vdbg(mc13xxx->dev, "[0x%02x] <- 0x%06x\n", offset, val);
++
++	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
++		return -EINVAL;
++
++	return mc13xxx_spi_reg_write(mc13xxx, offset, val);
++}
  EXPORT_SYMBOL(mc13xxx_reg_write);
  
  int mc13xxx_reg_rmw(struct mc13xxx *mc13xxx, unsigned int offset,
- 		u32 mask, u32 val)
- {
--	int ret;
--	u32 valread;
--
-+	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
- 	BUG_ON(val & ~mask);
-+	dev_vdbg(mc13xxx->dev, "[0x%02x] <- 0x%06x (mask: 0x%06x)\n",
-+			offset, val, mask);
+@@ -439,7 +464,7 @@ static int mc13xxx_irq_handle(struct mc13xxx *mc13xxx,
+ 			if (handled == IRQ_HANDLED)
+ 				num_handled++;
+ 		} else {
+-			dev_err(&mc13xxx->spidev->dev,
++			dev_err(mc13xxx->dev,
+ 					"BUG: irq %u but no handler\n",
+ 					baseirq + irq);
  
--	ret = mc13xxx_reg_read(mc13xxx, offset, &valread);
--	if (ret)
--		return ret;
--
--	valread = (valread & ~mask) | val;
--
--	return mc13xxx_reg_write(mc13xxx, offset, valread);
-+	return regmap_update_bits(mc13xxx->regmap, offset, mask, val);
+@@ -475,25 +500,23 @@ static irqreturn_t mc13xxx_irq_thread(int irq, void *data)
+ 	return IRQ_RETVAL(handled);
  }
- EXPORT_SYMBOL(mc13xxx_reg_rmw);
  
-@@ -706,7 +641,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
+-enum mc13xxx_id {
+-	MC13XXX_ID_MC13783,
+-	MC13XXX_ID_MC13892,
+-	MC13XXX_ID_INVALID,
+-};
+-
+ static const char *mc13xxx_chipname[] = {
+ 	[MC13XXX_ID_MC13783] = "mc13783",
+ 	[MC13XXX_ID_MC13892] = "mc13892",
+ };
+ 
+ #define maskval(reg, mask)	(((reg) & (mask)) >> __ffs(mask))
+-static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
++static int mc13xxx_identify(struct mc13xxx *mc13xxx)
+ {
+ 	u32 icid;
+ 	u32 revision;
+-	const char *name;
+ 	int ret;
+ 
++	/*
++	 * Get the generation ID from register 46, as apparently some older
++	 * IC revisions only have this info at this location. Newer ICs seem to
++	 * have both.
++	 */
+ 	ret = mc13xxx_reg_read(mc13xxx, 46, &icid);
+ 	if (ret)
+ 		return ret;
+@@ -502,26 +525,23 @@ static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
+ 
+ 	switch (icid) {
+ 	case 2:
+-		*id = MC13XXX_ID_MC13783;
+-		name = "mc13783";
++		mc13xxx->ictype = MC13XXX_ID_MC13783;
+ 		break;
+ 	case 7:
+-		*id = MC13XXX_ID_MC13892;
+-		name = "mc13892";
++		mc13xxx->ictype = MC13XXX_ID_MC13892;
+ 		break;
+ 	default:
+-		*id = MC13XXX_ID_INVALID;
++		mc13xxx->ictype = MC13XXX_ID_INVALID;
+ 		break;
+ 	}
+ 
+-	if (*id == MC13XXX_ID_MC13783 || *id == MC13XXX_ID_MC13892) {
++	if (mc13xxx->ictype == MC13XXX_ID_MC13783 ||
++			mc13xxx->ictype == MC13XXX_ID_MC13892) {
+ 		ret = mc13xxx_reg_read(mc13xxx, MC13XXX_REVISION, &revision);
+-		if (ret)
+-			return ret;
+ 
+-		dev_info(&mc13xxx->spidev->dev, "%s: rev: %d.%d, "
++		dev_info(mc13xxx->dev, "%s: rev: %d.%d, "
+ 				"fin: %d, fab: %d, icid: %d/%d\n",
+-				mc13xxx_chipname[*id],
++				mc13xxx_chipname[mc13xxx->ictype],
+ 				maskval(revision, MC13XXX_REVISION_REVFULL),
+ 				maskval(revision, MC13XXX_REVISION_REVMETAL),
+ 				maskval(revision, MC13XXX_REVISION_FIN),
+@@ -530,26 +550,12 @@ static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
+ 				maskval(revision, MC13XXX_REVISION_ICIDCODE));
+ 	}
+ 
+-	if (*id != MC13XXX_ID_INVALID) {
+-		const struct spi_device_id *devid =
+-			spi_get_device_id(mc13xxx->spidev);
+-		if (!devid || devid->driver_data != *id)
+-			dev_warn(&mc13xxx->spidev->dev, "device id doesn't "
+-					"match auto detection!\n");
+-	}
+-
+-	return 0;
++	return (mc13xxx->ictype == MC13XXX_ID_INVALID) ? -ENODEV : 0;
+ }
+ 
+ static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
+ {
+-	const struct spi_device_id *devid =
+-		spi_get_device_id(mc13xxx->spidev);
+-
+-	if (!devid)
+-		return NULL;
+-
+-	return mc13xxx_chipname[devid->driver_data];
++	return mc13xxx_chipname[mc13xxx->ictype];
+ }
+ 
+ int mc13xxx_get_flags(struct mc13xxx *mc13xxx)
+@@ -589,7 +595,7 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 	};
+ 	init_completion(&adcdone_data.done);
+ 
+-	dev_dbg(&mc13xxx->spidev->dev, "%s\n", __func__);
++	dev_dbg(mc13xxx->dev, "%s\n", __func__);
+ 
+ 	mc13xxx_lock(mc13xxx);
+ 
+@@ -631,7 +637,7 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 		return -EINVAL;
+ 	}
+ 
+-	dev_dbg(&mc13xxx->spidev->dev, "%s: request irq\n", __func__);
++	dev_dbg(mc13xxx->dev, "%s: request irq\n", __func__);
+ 	mc13xxx_irq_request(mc13xxx, MC13XXX_IRQ_ADCDONE,
+ 			mc13xxx_handler_adcdone, __func__, &adcdone_data);
+ 	mc13xxx_irq_ack(mc13xxx, MC13XXX_IRQ_ADCDONE);
+@@ -689,7 +695,7 @@ static int mc13xxx_add_subdevice_pdata(struct mc13xxx *mc13xxx,
+ 	if (!cell.name)
+ 		return -ENOMEM;
+ 
+-	return mfd_add_devices(&mc13xxx->spidev->dev, -1, &cell, 1, NULL, 0);
++	return mfd_add_devices(mc13xxx->dev, -1, &cell, 1, NULL, 0);
+ }
+ 
+ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
+@@ -700,7 +706,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
  #ifdef CONFIG_OF
  static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
  {
--	struct device_node *np = mc13xxx->dev.of_node;
-+	struct device_node *np = mc13xxx->dev->of_node;
+-	struct device_node *np = mc13xxx->spidev->dev.of_node;
++	struct device_node *np = mc13xxx->dev.of_node;
  
  	if (!np)
  		return -ENODEV;
-@@ -752,6 +687,16 @@ static const struct of_device_id mc13xxx_dt_ids[] = {
+@@ -746,13 +752,17 @@ static const struct of_device_id mc13xxx_dt_ids[] = {
  };
  MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
  
-+static struct regmap_config mc13xxx_regmap_spi_config = {
-+	.reg_bits = 7,
-+	.pad_bits = 1,
-+	.val_bits = 24,
+-static int mc13xxx_probe(struct spi_device *spi)
++static int mc13xxx_common_init(struct mc13xxx *mc13xxx,
++		struct mc13xxx_platform_data *pdata, int irq);
 +
-+	.max_register = MC13XXX_NUMREGS,
++static void mc13xxx_common_cleanup(struct mc13xxx *mc13xxx);
 +
-+	.cache_type = REGCACHE_NONE,
-+};
-+
- static int mc13xxx_common_init(struct mc13xxx *mc13xxx,
- 		struct mc13xxx_platform_data *pdata, int irq);
- 
-@@ -776,10 +721,19 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
- 	dev_set_drvdata(&spi->dev, mc13xxx);
- 	spi->mode = SPI_MODE_0 | SPI_CS_HIGH;
- 	spi->bits_per_word = 32;
--	spi_setup(spi);
- 
- 	mc13xxx->dev = &spi->dev;
--	mc13xxx->spidev = spi;
-+	mutex_init(&mc13xxx->lock);
-+
-+	mc13xxx->regmap = regmap_init_spi(spi, &mc13xxx_regmap_spi_config);
-+	if (IS_ERR(mc13xxx->regmap)) {
-+		ret = PTR_ERR(mc13xxx->regmap);
-+		dev_err(mc13xxx->dev, "Failed to initialize register map: %d\n",
-+				ret);
-+		dev_set_drvdata(&spi->dev, NULL);
-+		kfree(mc13xxx);
-+		return ret;
-+	}
- 
- 	ret = mc13xxx_common_init(mc13xxx, pdata, spi->irq);
- 
-@@ -787,7 +741,7 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
- 		dev_set_drvdata(&spi->dev, NULL);
- 	} else {
- 		const struct spi_device_id *devid =
--			spi_get_device_id(mc13xxx->spidev);
-+			spi_get_device_id(spi);
- 		if (!devid || devid->driver_data != mc13xxx->ictype)
- 			dev_warn(mc13xxx->dev,
- 				"device id doesn't match auto detection!\n");
-@@ -801,7 +755,6 @@ static int mc13xxx_common_init(struct mc13xxx *mc13xxx,
++static int mc13xxx_spi_probe(struct spi_device *spi)
  {
+ 	const struct of_device_id *of_id;
+ 	struct spi_driver *sdrv = to_spi_driver(spi->dev.driver);
+ 	struct mc13xxx *mc13xxx;
+ 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
+-	enum mc13xxx_id id;
  	int ret;
  
--	mutex_init(&mc13xxx->lock);
+ 	of_id = of_match_device(mc13xxx_dt_ids, &spi->dev);
+@@ -768,13 +778,34 @@ static int mc13xxx_probe(struct spi_device *spi)
+ 	spi->bits_per_word = 32;
+ 	spi_setup(spi);
+ 
++	mc13xxx->dev = &spi->dev;
+ 	mc13xxx->spidev = spi;
+ 
++	ret = mc13xxx_common_init(mc13xxx, pdata, spi->irq);
++
++	if (ret) {
++		dev_set_drvdata(&spi->dev, NULL);
++	} else {
++		const struct spi_device_id *devid =
++			spi_get_device_id(mc13xxx->spidev);
++		if (!devid || devid->driver_data != mc13xxx->ictype)
++			dev_warn(mc13xxx->dev,
++				"device id doesn't match auto detection!\n");
++	}
++
++	return ret;
++}
++
++static int mc13xxx_common_init(struct mc13xxx *mc13xxx,
++		struct mc13xxx_platform_data *pdata, int irq)
++{
++	int ret;
++
+ 	mutex_init(&mc13xxx->lock);
  	mc13xxx_lock(mc13xxx);
  
- 	ret = mc13xxx_identify(mc13xxx);
-@@ -878,6 +831,8 @@ static void mc13xxx_common_cleanup(struct mc13xxx *mc13xxx)
+-	ret = mc13xxx_identify(mc13xxx, &id);
+-	if (ret || id == MC13XXX_ID_INVALID)
++	ret = mc13xxx_identify(mc13xxx);
++	if (ret)
+ 		goto err_revision;
  
- 	mfd_remove_devices(mc13xxx->dev);
+ 	/* mask all irqs */
+@@ -786,18 +817,19 @@ static int mc13xxx_probe(struct spi_device *spi)
+ 	if (ret)
+ 		goto err_mask;
  
-+	regmap_exit(mc13xxx->regmap);
+-	ret = request_threaded_irq(spi->irq, NULL, mc13xxx_irq_thread,
++	ret = request_threaded_irq(irq, NULL, mc13xxx_irq_thread,
+ 			IRQF_ONESHOT | IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx);
+ 
+ 	if (ret) {
+ err_mask:
+ err_revision:
+ 		mc13xxx_unlock(mc13xxx);
+-		dev_set_drvdata(&spi->dev, NULL);
+ 		kfree(mc13xxx);
+ 		return ret;
+ 	}
+ 
++	mc13xxx->irq = irq;
 +
- 	kfree(mc13xxx);
+ 	mc13xxx_unlock(mc13xxx);
+ 
+ 	if (mc13xxx_probe_flags_dt(mc13xxx) < 0 && pdata)
+@@ -831,39 +863,44 @@ err_revision:
+ 	return 0;
  }
+ 
+-static int __devexit mc13xxx_remove(struct spi_device *spi)
++static int __devexit mc13xxx_spi_remove(struct spi_device *spi)
+ {
+ 	struct mc13xxx *mc13xxx = dev_get_drvdata(&spi->dev);
+ 
+-	free_irq(mc13xxx->spidev->irq, mc13xxx);
++	mc13xxx_common_cleanup(mc13xxx);
+ 
+-	mfd_remove_devices(&spi->dev);
++	return 0;
++}
+ 
+-	kfree(mc13xxx);
++static void mc13xxx_common_cleanup(struct mc13xxx *mc13xxx)
++{
++	free_irq(mc13xxx->irq, mc13xxx);
+ 
+-	return 0;
++	mfd_remove_devices(mc13xxx->dev);
++
++	kfree(mc13xxx);
+ }
+ 
+-static struct spi_driver mc13xxx_driver = {
++static struct spi_driver mc13xxx_spi_driver = {
+ 	.id_table = mc13xxx_device_id,
+ 	.driver = {
+ 		.name = "mc13xxx",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = mc13xxx_dt_ids,
+ 	},
+-	.probe = mc13xxx_probe,
+-	.remove = __devexit_p(mc13xxx_remove),
++	.probe = mc13xxx_spi_probe,
++	.remove = __devexit_p(mc13xxx_spi_remove),
+ };
+ 
+ static int __init mc13xxx_init(void)
+ {
+-	return spi_register_driver(&mc13xxx_driver);
++	return spi_register_driver(&mc13xxx_spi_driver);
+ }
+ subsys_initcall(mc13xxx_init);
+ 
+ static void __exit mc13xxx_exit(void)
+ {
+-	spi_unregister_driver(&mc13xxx_driver);
++	spi_unregister_driver(&mc13xxx_spi_driver);
+ }
+ module_exit(mc13xxx_exit);
  
 -- 
 1.7.3.4
