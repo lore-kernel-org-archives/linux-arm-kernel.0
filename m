@@ -1,74 +1,624 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sun, 1 Apr 2012 09:39:03 +0800
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
- <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
-Message-ID: <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 1 Apr 2012 09:39:49 +0800
+Subject: [PATCH v4 1/1] ARM: imx28: add basic dt support
+In-Reply-To: <1333200417-11259-1-git-send-email-b29396@freescale.com>
+References: <1333200417-11259-1-git-send-email-b29396@freescale.com>
+Message-ID: <20120401013946.GB2395@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 1, 2012 at 3:10 AM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> On Sat, Mar 31, 2012 at 2:09 PM, Ming Lei <tom.leiming@gmail.com> wrote:
->> On Sat, Mar 31, 2012 at 2:30 PM, Shilimkar, Santosh
->>> Since you need to recompile the kernel, you can very much tweak the
->>> clocksource to use GPTIMER with sysl clock. Support for that is still
->>> in place.
->>
->> With current kernel, running 'make menuconfig' can do it, but after applying
->> Hiremath's patch[1], I have to edit the source code manually to get it, so looks
->> this kind of tweaking is not friendly enough, :-(
->>
-> It's not friendly but doable. But above can be supported I guess.
->
-> Since you are talking about doing menuconfig
-> and rebuilding kernel so what can be done is when one disable CPUIDLE
-> and PM, one can disabled 32K source as well. And then 32K clocksource
-> init should fail and fallback on gptimer clock source.
+On Sat, Mar 31, 2012 at 09:26:57PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> This patch includes basic dt support which can boot via nfs rootfs.
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+> ChangeLog v3->v4:
+>  * update to use irq_domain_add_legacy
+> ChangeLog v2->v3:
+>  * Some minor fixes suggested by Shawn Guo
+> ChangeLog v1->v2:
+>  * Some fixes addressed Rob's review comments.
+>    Remove using of OF_DEV_AUXDATA.
+>  * Remove mac address from dts file
+>    Currently we use the mac address got from uboot to work.
+>    Will submit a p separate atch using prom_update_property to fix this
+>    issue for driver based on suggestions from Grant and Lothar.
+>  * rename mxs-dt.c to mach-mxs.c which is supposed to support mx23 dt
+>    too in the future.
+>  * add compatible string "fsl,imx28" per Sascha's suggestion
+>  * add more devices in dtsi file
+>    For those devices still not in use, set the state to "disabled"
+>    by default.
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
+>  arch/arm/boot/dts/imx28-evk.dts               |   34 +++
+>  arch/arm/boot/dts/imx28.dtsi                  |  356 +++++++++++++++++++++++++
+>  arch/arm/mach-mxs/Kconfig                     |   10 +
+>  arch/arm/mach-mxs/Makefile                    |    1 +
+>  arch/arm/mach-mxs/clock-mx28.c                |    4 +
+>  arch/arm/mach-mxs/devices/Kconfig             |    1 -
+>  arch/arm/mach-mxs/mach-mxs.c                  |   68 +++++
+>  8 files changed, 477 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx28-evk.dts
+>  create mode 100644 arch/arm/boot/dts/imx28.dtsi
+>  create mode 100644 arch/arm/mach-mxs/mach-mxs.c
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index bfbc771..fecb580 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -1,6 +1,10 @@
+>  Freescale i.MX Platforms Device Tree Bindings
+>  -----------------------------------------------
+>  
+> +i.MX28 Evaluation Kit
+> +Required root node properties:
+> +    - compatible = "fsl,imx28-evk", "fsl,imx28";
+> +
+>  i.MX51 Babbage Board
+>  Required root node properties:
+>      - compatible = "fsl,imx51-babbage", "fsl,imx51";
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> new file mode 100644
+> index 0000000..57703ec
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -0,0 +1,34 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx28.dtsi"
+> +
+> +/ {
+> +	model = "Freescale i.MX28 Evaluation Kit";
+> +	compatible = "fsl,imx28-evk", "fsl,imx28";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x08000000>;
+> +	};
+> +
+> +	ahb at 80080000 {
+> +		ethernet at 800f0000 {
+> +			phy-mode = "rmii";
+> +			status = "okay";
+> +		};
+> +
+> +		ethernet at 800f4000 {
+> +			phy-mode = "rmii";
+> +			status = "okay";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> new file mode 100644
+> index 0000000..d1f4f8c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -0,0 +1,356 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	interrupt-parent = <&icoll>;
+> +
+> +	aliases {
+> +		serial0 = &duart;
 
-OK, it should work, but looks OMAP_32K_TIMER option has to be kept
-for the usage, which may be a bit divergent to the purpose of the patch set.
+This is not really needed, since there is only one instance duart.
+And it really should be reserved for auart, which gets 5 instances.
 
-So how about introducing a kernel parameter to decide if bypassing
-32K source and using gptimer source directly, and let which depend
-on PM?
+I removed it and applied the patch.  Thanks.
 
->
-> Vaibhav,
-> Can you update your patch to support above. The patch which I
-> did was doing exactly that but was not using hwmod. The problem with your
-> patch is synctimer hwmod lookup on OMAP will never fail if the hwmod
-> entry is supported.
->
-> So you might better use failure case of omap_init_clocksource_32k() for
-> fall back on gptimer source as I tried in my patch. That should support
+Regards,
+Shawn
 
-You patch still doesn't work for the usage because you removed 32K option.
-
-
-Thanks,
--- 
-Ming Lei
+> +	};
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,arm926ejs";
+> +		};
+> +	};
+> +
+> +	apb at 80000000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x80000000 0x80000>;
+> +		ranges;
+> +
+> +		apbh at 80000000 {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x80000000 0x3c900>;
+> +			ranges;
+> +
+> +			icoll: interrupt-controller at 80000000 {
+> +				compatible = "fsl,imx28-icoll", "fsl,mxs-icoll";
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +				reg = <0x80000000 0x2000>;
+> +			};
+> +
+> +			hsadc at 80002000 {
+> +				reg = <0x80002000 2000>;
+> +				interrupts = <13 87>;
+> +				status = "disabled";
+> +			};
+> +
+> +			dma-apbh at 80004000 {
+> +				reg = <0x80004000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			perfmon at 80006000 {
+> +				reg = <0x80006000 800>;
+> +				interrupts = <27>;
+> +				status = "disabled";
+> +			};
+> +
+> +			bch at 8000a000 {
+> +				reg = <0x8000a000 2000>;
+> +				interrupts = <41>;
+> +				status = "disabled";
+> +			};
+> +
+> +			gpmi at 8000c000 {
+> +				reg = <0x8000c000 2000>;
+> +				interrupts = <42 88>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssp at 80010000 {
+> +				reg = <0x80010000 2000>;
+> +				interrupts = <96 82>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssp at 80012000 {
+> +				reg = <0x80012000 2000>;
+> +				interrupts = <97 83>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssp at 80014000 {
+> +				reg = <0x80014000 2000>;
+> +				interrupts = <98 84>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssp at 80016000 {
+> +				reg = <0x80016000 2000>;
+> +				interrupts = <99 85>;
+> +				status = "disabled";
+> +			};
+> +
+> +			pinctrl at 80018000 {
+> +				reg = <0x80018000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			digctl at 8001c000 {
+> +				reg = <0x8001c000 2000>;
+> +				interrupts = <89>;
+> +				status = "disabled";
+> +			};
+> +
+> +			etm at 80022000 {
+> +				reg = <0x80022000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			dma-apbx at 80024000 {
+> +				reg = <0x80024000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			dcp at 80028000 {
+> +				reg = <0x80028000 2000>;
+> +				interrupts = <52 53 54>;
+> +				status = "disabled";
+> +			};
+> +
+> +			pxp at 8002a000 {
+> +				reg = <0x8002a000 2000>;
+> +				interrupts = <39>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ocotp at 8002c000 {
+> +				reg = <0x8002c000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			axi-ahb at 8002e000 {
+> +				reg = <0x8002e000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			lcdif at 80030000 {
+> +				reg = <0x80030000 2000>;
+> +				interrupts = <38 86>;
+> +				status = "disabled";
+> +			};
+> +
+> +			can at 80032000 {
+> +				reg = <0x80032000 2000>;
+> +				interrupts = <8>;
+> +				status = "disabled";
+> +			};
+> +
+> +			can at 80034000 {
+> +				reg = <0x80034000 2000>;
+> +				interrupts = <9>;
+> +				status = "disabled";
+> +			};
+> +
+> +			simdbg at 8003c000 {
+> +				reg = <0x8003c000 200>;
+> +				status = "disabled";
+> +			};
+> +
+> +			simgpmisel at 8003c200 {
+> +				reg = <0x8003c200 100>;
+> +				status = "disabled";
+> +			};
+> +
+> +			simsspsel at 8003c300 {
+> +				reg = <0x8003c300 100>;
+> +				status = "disabled";
+> +			};
+> +
+> +			simmemsel at 8003c400 {
+> +				reg = <0x8003c400 100>;
+> +				status = "disabled";
+> +			};
+> +
+> +			gpiomon at 8003c500 {
+> +				reg = <0x8003c500 100>;
+> +				status = "disabled";
+> +			};
+> +
+> +			simenet at 8003c700 {
+> +				reg = <0x8003c700 100>;
+> +				status = "disabled";
+> +			};
+> +
+> +			armjtag at 8003c800 {
+> +				reg = <0x8003c800 100>;
+> +				status = "disabled";
+> +			};
+> +                };
+> +
+> +		apbx at 80040000 {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x80040000 0x40000>;
+> +			ranges;
+> +
+> +			clkctl at 80040000 {
+> +				reg = <0x80040000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			saif at 80042000 {
+> +				reg = <0x80042000 2000>;
+> +				interrupts = <59 80>;
+> +				status = "disabled";
+> +			};
+> +
+> +			power at 80044000 {
+> +				reg = <0x80044000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			saif at 80046000 {
+> +				reg = <0x80046000 2000>;
+> +				interrupts = <58 81>;
+> +				status = "disabled";
+> +			};
+> +
+> +			lradc at 80050000 {
+> +				reg = <0x80050000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			spdif at 80054000 {
+> +				reg = <0x80054000 2000>;
+> +				interrupts = <45 66>;
+> +				status = "disabled";
+> +			};
+> +
+> +			rtc at 80056000 {
+> +				reg = <0x80056000 2000>;
+> +				interrupts = <28 29>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c at 80058000 {
+> +				reg = <0x80058000 2000>;
+> +				interrupts = <111 68>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c at 8005a000 {
+> +				reg = <0x8005a000 2000>;
+> +				interrupts = <110 69>;
+> +				status = "disabled";
+> +			};
+> +
+> +			pwm at 80064000 {
+> +				reg = <0x80064000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			timrot at 80068000 {
+> +				reg = <0x80068000 2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			serial at 8006a000 {
+> +				reg = <0x8006a000 0x2000>;
+> +				interrupts = <112 70 71>;
+> +				status = "disabled";
+> +			};
+> +
+> +			serial at 8006c000 {
+> +				reg = <0x8006c000 0x2000>;
+> +				interrupts = <113 72 73>;
+> +				status = "disabled";
+> +			};
+> +
+> +			serial at 8006e000 {
+> +				reg = <0x8006e000 0x2000>;
+> +				interrupts = <114 74 75>;
+> +				status = "disabled";
+> +			};
+> +
+> +			serial at 80070000 {
+> +				reg = <0x80070000 0x2000>;
+> +				interrupts = <115 76 77>;
+> +				status = "disabled";
+> +			};
+> +
+> +			serial at 80072000 {
+> +				reg = <0x80072000 0x2000>;
+> +				interrupts = <116 78 79>;
+> +				status = "disabled";
+> +			};
+> +
+> +			duart: serial at 80074000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0x80074000 0x1000>;
+> +				interrupts = <47>;
+> +			};
+> +
+> +			usbphy at 8007c000 {
+> +				reg = <0x8007c000 0x2000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbphy at 8007e000 {
+> +				reg = <0x8007e000 0x2000>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +	};
+> +
+> +	ahb at 80080000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x80080000 0x80000>;
+> +		ranges;
+> +
+> +		usbctrl at 80080000 {
+> +			reg = <0x80080000 0x10000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		usbctrl at 80090000 {
+> +			reg = <0x80090000 0x10000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		dflpt at 800c0000 {
+> +			reg = <0x800c0000 0x10000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ethernet at 800f0000 {
+> +			compatible = "fsl,imx28-fec";
+> +			reg = <0x800f0000 0x4000>;
+> +			interrupts = <101>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ethernet at 800f4000 {
+> +			compatible = "fsl,imx28-fec";
+> +			reg = <0x800f4000 0x4000>;
+> +			interrupts = <102>;
+> +			status = "disabled";
+> +		};
+> +
+> +		switch at 800f8000 {
+> +			reg = <0x800f8000 0x8000>;
+> +			status = "disabled";
+> +		};
+> +
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index c57f996..09fe0fb 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -7,16 +7,26 @@ config MXS_OCOTP
+>  
+>  config SOC_IMX23
+>  	bool
+> +	select ARM_AMBA
+>  	select CPU_ARM926T
+>  	select HAVE_PWM
+>  
+>  config SOC_IMX28
+>  	bool
+> +	select ARM_AMBA
+>  	select CPU_ARM926T
+>  	select HAVE_PWM
+>  
+>  comment "MXS platforms:"
+>  
+> +config MACH_MXS_DT
+> +	bool "Support MXS platforms from device tree"
+> +	select SOC_IMX28
+> +	select USE_OF
+> +	help
+> +	  Include support for Freescale MXS platforms(i.MX23 and i.MX28)
+> +	  using the device tree for discovery
+> +
+>  config MACH_STMP378X_DEVB
+>  	bool "Support STMP378x_devb Platform"
+>  	select SOC_IMX23
+> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> index 908bf9a..8328c45 100644
+> --- a/arch/arm/mach-mxs/Makefile
+> +++ b/arch/arm/mach-mxs/Makefile
+> @@ -7,6 +7,7 @@ obj-$(CONFIG_PM) += pm.o
+>  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o
+>  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o
+>  
+> +obj-$(CONFIG_MACH_MXS_DT) += mach-mxs.o
+>  obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
+>  obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+>  obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 7aa7ff8..a8b8462 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -648,6 +648,10 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("imx28-fb", NULL, lcdif_clk)
+>  	_REGISTER_CLOCK("mxs-saif.0", NULL, saif0_clk)
+>  	_REGISTER_CLOCK("mxs-saif.1", NULL, saif1_clk)
+> +	/* for DT */
+> +	_REGISTER_CLOCK("80074000.serial", NULL, uart_clk)
+> +	_REGISTER_CLOCK("800f0000.ethernet", NULL, fec_clk)
+> +	_REGISTER_CLOCK("800f4000.ethernet", NULL, fec_clk)
+>  };
+>  
+>  static int clk_misc_init(void)
+> diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+> index b8913df..19659de 100644
+> --- a/arch/arm/mach-mxs/devices/Kconfig
+> +++ b/arch/arm/mach-mxs/devices/Kconfig
+> @@ -1,6 +1,5 @@
+>  config MXS_HAVE_AMBA_DUART
+>  	bool
+> -	select ARM_AMBA
+>  
+>  config MXS_HAVE_PLATFORM_AUART
+>  	bool
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> new file mode 100644
+> index 0000000..5c5cba2
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -0,0 +1,68 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2012 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +#include <mach/common.h>
+> +
+> +static int __init mxs_icoll_add_irq_domain(struct device_node *np,
+> +				struct device_node *interrupt_parent)
+> +{
+> +	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id mxs_irq_match[] __initconst = {
+> +	{ .compatible = "fsl,mxs-icoll", .data = mxs_icoll_add_irq_domain, },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static void __init mxs_dt_init_irq(void)
+> +{
+> +	icoll_init_irq();
+> +	of_irq_init(mxs_irq_match);
+> +}
+> +
+> +static void __init imx28_timer_init(void)
+> +{
+> +	mx28_clocks_init();
+> +}
+> +
+> +static struct sys_timer imx28_timer = {
+> +	.init = imx28_timer_init,
+> +};
+> +
+> +static void __init mxs_machine_init(void)
+> +{
+> +	of_platform_populate(NULL, of_default_bus_match_table,
+> +				NULL, NULL);
+> +}
+> +
+> +static const char *imx28_dt_compat[] __initdata = {
+> +	"fsl,imx28-evk",
+> +	"fsl,imx28",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(IMX28, "Freescale i.MX28 (Device Tree)")
+> +	.map_io		= mx28_map_io,
+> +	.init_irq	= mxs_dt_init_irq,
+> +	.timer		= &imx28_timer,
+> +	.init_machine	= mxs_machine_init,
+> +	.dt_compat	= imx28_dt_compat,
+> +	.restart	= mxs_restart,
+> +MACHINE_END
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
