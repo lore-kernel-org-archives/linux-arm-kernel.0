@@ -1,53 +1,71 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 01 Apr 2012 00:32:32 -0400
-Subject: [PATCH 07/11] gpio: tegra: Hide tegra_gpio_enable/disable()
-In-Reply-To: <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
- (Stephen Warren's message of "Fri, 30 Mar 2012 17:00:00 -0600")
-References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
- <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <87mx6wkr6n.fsf@laptop.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sun, 1 Apr 2012 11:23:44 +0530
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
+ <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+ <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
+ <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
+ <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
+ <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
+ <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
+ <4F7570FC.8000907@ti.com>
+ <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
+ <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
+ <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+ <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+ <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
+ <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+Message-ID: <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Fri, Mar 30 2012, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Sun, Apr 1, 2012 at 7:09 AM, Ming Lei <tom.leiming@gmail.com> wrote:
+> On Sun, Apr 1, 2012 at 3:10 AM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+>> On Sat, Mar 31, 2012 at 2:09 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+>>> On Sat, Mar 31, 2012 at 2:30 PM, Shilimkar, Santosh
+>>>> Since you need to recompile the kernel, you can very much tweak the
+>>>> clocksource to use GPTIMER with sysl clock. Support for that is still
+>>>> in place.
+>>>
+>>> With current kernel, running 'make menuconfig' can do it, but after applying
+>>> Hiremath's patch[1], I have to edit the source code manually to get it, so looks
+>>> this kind of tweaking is not friendly enough, :-(
+>>>
+>> It's not friendly but doable. But above can be supported I guess.
+>>
+>> Since you are talking about doing menuconfig
+>> and rebuilding kernel so what can be done is when one disable CPUIDLE
+>> and PM, one can disabled 32K source as well. And then 32K clocksource
+>> init should fail and fallback on gptimer clock source.
 >
-> Recent pinctrl discussions concluded that gpiolib APIs should in fact do
-> whatever is required to mux a GPIO onto pins, by calling pinctrl APIs if
-> required. This change implements this for the Tegra GPIO driver, and removes
-> calls to the Tegra-specific APIs from drivers and board files.
+> OK, it should work, but looks OMAP_32K_TIMER option has to be kept
+> for the usage, which may be a bit divergent to the purpose of the patch set.
 >
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> v2: Adjusted per changes to latest version of Documentation/gpio.txt.
-> Fixed tegra_board_pinmux_bus_notify() to still check the device name,
-> so it waits for the pinmux device to be registered, not just /any/ device.
-> ---
->  arch/arm/mach-tegra/board-dt-tegra20.c        |    1 -
->  arch/arm/mach-tegra/board-harmony-pinmux.c    |   17 -----------
->  arch/arm/mach-tegra/board-paz00-pinmux.c      |   14 ---------
->  arch/arm/mach-tegra/board-pinmux.c            |   33 +++--------------------
->  arch/arm/mach-tegra/board-pinmux.h            |    5 ---
->  arch/arm/mach-tegra/board-seaboard-pinmux.c   |   32 ----------------------
->  arch/arm/mach-tegra/board-seaboard.c          |    1 -
->  arch/arm/mach-tegra/board-trimslice-pinmux.c  |   12 --------
->  arch/arm/mach-tegra/include/mach/gpio-tegra.h |    9 ------
->  arch/arm/mach-tegra/usb_phy.c                 |    1 -
->  drivers/gpio/gpio-tegra.c                     |   36 ++++++++++++------------
+> So how about introducing a kernel parameter to decide if bypassing
+> 32K source and using gptimer source directly, and let which depend
+> on PM?
+>
+We are just doing circles on this patch set. Till the dynamic clock-soucre
+switching supported for low power entry exit, the high precision clocksoucre
+selection is already broken and very much limited for use
 
-For this hunk:
+I don't personally like to add features which hardly anybody use and
+fundamentally
+broken with full kernel.
 
->  drivers/mmc/host/sdhci-tegra.c                |   24 +++-------------
+I let Tony take final call on what's appropriate.
 
-Acked-by: Chris Ball <cjb@laptop.org>
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Regards
+Santosh
