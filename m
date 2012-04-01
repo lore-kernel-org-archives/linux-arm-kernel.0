@@ -1,186 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun,  1 Apr 2012 19:58:40 +0100
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 1 Apr 2012 21:22:50 +0200
 Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
-Message-ID: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+In-Reply-To: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AMBA bus regulator support is being used to model on/off switches
-for power domains which isn't terribly idiomatic for modern kernels with
-the generic power domain code and creates integration problems on platforms
-which don't use regulators for their power domains as it's hard to tell
-the difference between a regulator that is needed but failed to be provided
-and one that isn't supposed to be there (though DT does make that easier).
+On Sun, Apr 1, 2012 at 8:58 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-Platforms that wish to use the regulator API to manage their power domains
-can indirect via the power domain interface.
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index ebc1e86..5be3248 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -2788,6 +2788,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
+> ? ? ? ? ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ? ? ? ? ?.name = "db8500-vape",
+> ? ? ? ? ? ? ? ? ? ? ? ?.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+> + ? ? ? ? ? ? ? ? ? ? ? .always_on = true,
+> ? ? ? ? ? ? ? ?},
+> ? ? ? ? ? ? ? ?.consumer_supplies = db8500_vape_consumers,
+> ? ? ? ? ? ? ? ?.num_consumer_supplies = ARRAY_SIZE(db8500_vape_consumers),
 
-This feature is only used with the vape supply of the db8500 PRCMU
-driver which supplies the UARTs and MMC controllers, none of which have
-support for managing vcore at runtime in mainline (only pl022 SPI
-controller does).  Update that supply to have an always_on constraint
-until the power domain support for the system is updated so that it is
-enabled for these users, this is likely to have no impact on practical
-systems as probably at least one of these devices will be active and
-cause AMBA to hold the supply on anyway.
+Combined with the PL022 patch this causes a power regression since
+the PL022 is hereafter always on.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
+But I guess if I fix a power domain patch to accomplish much the
+same things then nothing is really lost...
 
-Updated to add the always_on constraint for db8500-prcmu as discussed in
-the changelog.
+And I do like the change, if for nothing else so for the fact that it
+eventually pushes to power domains what belongs there, so:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
- drivers/amba/bus.c         |   42 +-----------------------------------------
- drivers/mfd/db8500-prcmu.c |    1 +
- drivers/spi/spi-pl022.c    |    2 --
- include/linux/amba/bus.h   |    8 --------
- 4 files changed, 2 insertions(+), 51 deletions(-)
+But to the defence: power domain code was not in the kernel
+when the AMBA "vcore" regulator was introduced so how else
+could we do it... except for inventing power domains...
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index 01c2cf4..cc27322 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -247,8 +247,7 @@ static int amba_pm_restore(struct device *dev)
- /*
-  * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
-  * enable/disable the bus clock at runtime PM suspend/resume as this
-- * does not result in loss of context.  However, disabling vcore power
-- * would do, so we leave that to the driver.
-+ * does not result in loss of context.
-  */
- static int amba_pm_runtime_suspend(struct device *dev)
- {
-@@ -354,39 +353,6 @@ static void amba_put_disable_pclk(struct amba_device *pcdev)
- 	clk_put(pclk);
- }
- 
--static int amba_get_enable_vcore(struct amba_device *pcdev)
--{
--	struct regulator *vcore = regulator_get(&pcdev->dev, "vcore");
--	int ret;
--
--	pcdev->vcore = vcore;
--
--	if (IS_ERR(vcore)) {
--		/* It is OK not to supply a vcore regulator */
--		if (PTR_ERR(vcore) == -ENODEV)
--			return 0;
--		return PTR_ERR(vcore);
--	}
--
--	ret = regulator_enable(vcore);
--	if (ret) {
--		regulator_put(vcore);
--		pcdev->vcore = ERR_PTR(-ENODEV);
--	}
--
--	return ret;
--}
--
--static void amba_put_disable_vcore(struct amba_device *pcdev)
--{
--	struct regulator *vcore = pcdev->vcore;
--
--	if (!IS_ERR(vcore)) {
--		regulator_disable(vcore);
--		regulator_put(vcore);
--	}
--}
--
- /*
-  * These are the device model conversion veneers; they convert the
-  * device model structures to our more specific structures.
-@@ -399,10 +365,6 @@ static int amba_probe(struct device *dev)
- 	int ret;
- 
- 	do {
--		ret = amba_get_enable_vcore(pcdev);
--		if (ret)
--			break;
--
- 		ret = amba_get_enable_pclk(pcdev);
- 		if (ret)
- 			break;
-@@ -420,7 +382,6 @@ static int amba_probe(struct device *dev)
- 		pm_runtime_put_noidle(dev);
- 
- 		amba_put_disable_pclk(pcdev);
--		amba_put_disable_vcore(pcdev);
- 	} while (0);
- 
- 	return ret;
-@@ -442,7 +403,6 @@ static int amba_remove(struct device *dev)
- 	pm_runtime_put_noidle(dev);
- 
- 	amba_put_disable_pclk(pcdev);
--	amba_put_disable_vcore(pcdev);
- 
- 	return ret;
- }
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index ebc1e86..5be3248 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2788,6 +2788,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
- 		.constraints = {
- 			.name = "db8500-vape",
- 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-+			.always_on = true,
- 		},
- 		.consumer_supplies = db8500_vape_consumers,
- 		.num_consumer_supplies = ARRAY_SIZE(db8500_vape_consumers),
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 96f0da6..09c925a 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2195,7 +2195,6 @@ static int pl022_runtime_suspend(struct device *dev)
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
- 
- 	clk_disable(pl022->clk);
--	amba_vcore_disable(pl022->adev);
- 
- 	return 0;
- }
-@@ -2204,7 +2203,6 @@ static int pl022_runtime_resume(struct device *dev)
- {
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
- 
--	amba_vcore_enable(pl022->adev);
- 	clk_enable(pl022->clk);
- 
- 	return 0;
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index 7847e19..63a59ac 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -19,7 +19,6 @@
- #include <linux/mod_devicetable.h>
- #include <linux/err.h>
- #include <linux/resource.h>
--#include <linux/regulator/consumer.h>
- 
- #define AMBA_NR_IRQS	2
- #define AMBA_CID	0xb105f00d
-@@ -30,7 +29,6 @@ struct amba_device {
- 	struct device		dev;
- 	struct resource		res;
- 	struct clk		*pclk;
--	struct regulator	*vcore;
- 	u64			dma_mask;
- 	unsigned int		periphid;
- 	unsigned int		irq[AMBA_NR_IRQS];
-@@ -75,12 +73,6 @@ void amba_release_regions(struct amba_device *);
- #define amba_pclk_disable(d)	\
- 	do { if (!IS_ERR((d)->pclk)) clk_disable((d)->pclk); } while (0)
- 
--#define amba_vcore_enable(d)	\
--	(IS_ERR((d)->vcore) ? 0 : regulator_enable((d)->vcore))
--
--#define amba_vcore_disable(d)	\
--	do { if (!IS_ERR((d)->vcore)) regulator_disable((d)->vcore); } while (0)
--
- /* Some drivers don't use the struct amba_device */
- #define AMBA_CONFIG_BITS(a) (((a) >> 24) & 0xff)
- #define AMBA_REV_BITS(a) (((a) >> 20) & 0x0f)
--- 
-1.7.9.1
+Yours,
+Linus Walleij
