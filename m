@@ -1,110 +1,53 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Sun, 01 Apr 2012 08:10:05 +0200
-Subject: Bug in v7_coherent_kern_range() ?
-In-Reply-To: <4F77C9A6.6080601@freescale.com>
-References: <4F77C9A6.6080601@freescale.com>
-Message-ID: <4F77F13D.7000402@googlemail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 1 Apr 2012 14:41:24 +0800
+Subject: [PATCH v2] video: s3c-fb: Add device tree support
+In-Reply-To: <CAH+eYFCrdtYC+v3tgqsaCS9-Y61JCwA1MLkkPtH14p=JWBbzBw@mail.gmail.com>
+References: <1333086797-1625-1-git-send-email-thomas.abraham@linaro.org>
+ <CAH+eYFCrdtYC+v3tgqsaCS9-Y61JCwA1MLkkPtH14p=JWBbzBw@mail.gmail.com>
+Message-ID: <20120401064121.GC2395@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang Shijie,
+On Fri, Mar 30, 2012 at 09:25:14PM +0530, Rabin Vincent wrote:
+> On Fri, Mar 30, 2012 at 11:23, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> > + ? ?- samsung,fimd-display: The fimd controller is interfaced with the a
+> > + ? ? ?display device such as a lcd panel. This property should specify the
+> > + ? ? ?phandle of the display device node. For a display device node that
+> > + ? ? ?represents a RGB type display interface, it is expected to specify the
+> > + ? ? ?video interface timing using the following properties.
+> > +
+> > + ? ? ?- lcd-htiming: Specifies the horizontal timing for the overlay. The
+> > + ? ? ? ?horizontal timing includes four parameters in the following order.
+> > +
+> > + ? ? ? ?- horizontal back porch (in number of lcd clocks)
+> > + ? ? ? ?- horizontal front porch (in number of lcd clocks)
+> > + ? ? ? ?- hsync pulse width (in number of lcd clocks)
+> > + ? ? ? ?- Display panels X resolution.
+> > +
+> > + ? ? ?- lcd-vtiming: Specifies the vertical timing for the overlay. The
+> > + ? ? ? ?vertical timing includes four parameters in the following order.
+> > +
+> > + ? ? ? ?- vertical back porch (in number of lcd lines)
+> > + ? ? ? ?- vertical front porch (in number of lcd lines)
+> > + ? ? ? ?- vsync pulse width (in number of lcd clocks)
+> > + ? ? ? ?- Y resolution.
+> 
+> In this old thread, it was suggested to use a raw EDID block to supply
+> timings, and since then a couple of drivers in mainline (sm501fb and
+> fsl-diu) are doing it that way:
+> 
+> http://lists.ozlabs.org/pipermail/linuxppc-dev/2010-February/080683.html
+> 
+> Shouldn't this driver be doing the same thing?  If not, shouldn't
+> whatever interface this is adding be provided in a common helper (like
+> that old patch was trying to add) so it's standardized between drivers?
 
-On 01.04.2012 05:21, Huang Shijie wrote:
-> [1] Platform:
-> freescale's IMX6Q(4 cores) , ARM CORTEX-A9
->
-> [2] kernel:
-> 3.0.15(I have cherry-picked many patches, and the arch/arm/mm/cache-v7.S
-> is same code with the latest kernel v3.4-rc1)
-> enable SMP, VIPT,
++1
 
-Could you try an unpatched, clean v3.4-rc1 instead?
+We need a generic binding for the data defined in "struct fb_videomode"
+and a generic helper function to retrieve the data from device tree,
+so that individual display driver does not have to invent their owns.
 
-What's about your 2.6.38?
-
-What's about 3.0.26? 3.0.15 seems to miss some maybe relevant patches.
-
-> [3] application:
-
-Could you share a (simple) test case?
-
-Best regards
-
-Dirk
-
-> I use our our application which will clone many threads,
-> two threads (assume as A and B) may do the same thing at the same time
-> as the following code:
->
-> In most of the time, it's ok.
-> But in some unknown situation, cacheflush() failed and one threads
-> (assume A) may hung up in the following code:
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->
-> open("/usr/lib/lib_mp3_dec_arm12_elinux.so.2.10.0", O_RDONLY) = 8
-> read(8,
-> "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\20\35\0\0004\0\0\0"...,
-> 512) = 512
-> fstat64(8, {st_mode=S_IFREG|0644, st_size=56232, ...}) = 0
-> mmap2(NULL, 88032, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 8, 0)
-> = 0x2ff0a000
-> mprotect(0x2ff18000, 28672, PROT_NONE) = 0
-> mmap2(0x2ff1f000, 4096, PROT_READ|PROT_WRITE,
-> MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 8, 0xd) = 0x2ff1f000
-> close(8) = 0
-> mprotect(0x2ff0a000, 57344, PROT_READ|PROT_WRITE) = 0
-> mprotect(0x2ff0a000, 57344, PROT_READ|PROT_EXEC) = 0
-> cacheflush(0x2ff0a000, 0x2ff18000, 0, 0x6, 0x2cd03420) = 0 // System
-> hung up here!!!
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->
->
-> [4] kernel log
-> I use "echo t>  /proc/sysrq-trigger" to show the tasks's information:
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->
-> multiqueue0:src D 804cd678 0 7328 5963 0x00000001
-> [<804cd678>] (__schedule+0x228/0x760) from [<804d0564>]
-> (__down_read+0xa8/0xe0)
-> [<804d0564>] (__down_read+0xa8/0xe0) from [<800478c4>]
-> (do_page_fault+0xbc/0x480)
-> [<800478c4>] (do_page_fault+0xbc/0x480) from [<8003841c>]
-> (do_DataAbort+0x34/0x98)
-> [<8003841c>] (do_DataAbort+0x34/0x98) from [<8003df10>]
-> (__dabt_svc+0x70/0xa0)
-> Exception stack(0xbae37ea8 to 0xbae37ef0)
-> 7ea0: 31e05000 31e1d000 00000020 0000001f 31e05000 31e1d000
-> 7ec0: bfac86b8 31e05000 31e1d000 bae36000 08100075 31e056fc 31e08000
-> bae37ef0
-> 7ee0: 800424a8 8004a1fc 800f0013 ffffffff
-> [<8003df10>] (__dabt_svc+0x70/0xa0) from [<8004a1fc>]
-> (v7_coherent_kern_range+0x20/0x80)
-> [<8004a1fc>] (v7_coherent_kern_range+0x20/0x80) from [<800424a8>]
-> (arm_syscall+0x2a0/0x2c4)
-> [<800424a8>] (arm_syscall+0x2a0/0x2c4) from [<8003e500>]
-> (ret_fast_syscall+0x0/0x3c)
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->
->
-> The do_cache_op() has already held the mm->mmap_sem, but
-> v7_coherent_kern_range()
-> cause one page fault during it flush the cache. deadlock! So it hung up
-> in the do_page_fault().
->
-> [5] questions:
-> Why the v7_coherent_kern_range() can caused the data abort?
-> Is there something wrong about the v7_coherent_kern_range()?
->
->
-> thanks
-> Huang Shijie
->
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Regards,
+Shawn
