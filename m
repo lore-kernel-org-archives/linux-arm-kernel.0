@@ -1,85 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 1 Apr 2012 19:22:46 +0200
-Subject: [PATCH/RFC] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <1333294181-27653-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1333294181-27653-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdb6+2SLm1Ojw2jNkK9ejW66fw2Pcit-b3AL67wP4Hr_ow@mail.gmail.com>
+Date: Sun, 1 Apr 2012 19:24:24 +0200
+Subject: [PATCH] ARM: ux300: Fix unimplementable regulation constraints
+In-Reply-To: <20120401101855.GA3153@opensource.wolfsonmicro.com>
+References: <1333212293-6287-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <CACRpkdaJMrO8FAkSAZEc9qMm2wFzF0F1HGjpbgAFkOEkRkzmLA@mail.gmail.com>
+ <20120401101855.GA3153@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdZ-oo4POJ0tmKLQkaeDkjO7xJcmaOpKPZeXcHUaL9VM5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 1, 2012 at 5:29 PM, Mark Brown
+On Sun, Apr 1, 2012 at 12:18 PM, Mark Brown
 <broonie@opensource.wolfsonmicro.com> wrote:
-
-> The AMBA bus regulator support is being used to model on/off switches
-> for power domains which isn't terribly idiomatic for modern kernels with
-> the generic power domain code and creates integration problems on platforms
-> which don't use regulators for their power domains as it's hard to tell
-> the difference between a regulator that is needed but failed to be provided
-> and one that isn't supposed to be there (though DT does make that easier).
+> On Sun, Apr 01, 2012 at 12:00:13PM +0200, Linus Walleij wrote:
+>> Do you want me to funnel this to ARM-SoC or will you carry it in the
+>> regulator tree?
 >
-> Platforms that wish to use the regulator API to manage their power domains
-> can indirect via the power domain interface.
+> May as well send it via ARM-SoC, there's no interdependency with the
+> regulator tree here.
 
-I don't see how this solves the problem of AMBA PrimeCell probing.
+OK I'll push this for the -rc:s.
 
-If you look at the code in bus.c, you can see that it acquires and
-enables the regulator - as it does with the clock.
-
-The reason is that is does this *before* the device can probe,
-since it needs to map up the memory to read out some magic
-values at the end to figure out what device it is in the first place.
-
-We need the current code replaced with something that
-enables a power domain before probe instead, then implement
-these power domains for the in-kernel AMBA devices that need it.
-
-Is the default behaviour of power domains such that they will
-be enabled as soon as devices are registered but before
-any buses probe()? Because that is what is needed in this case.
-
-(AMBA devices are special in this way: no other ARM things
-support auto-detection of devices using magic numbers,
-basically the DT stuff came about because noone was using
-a thing like this.)
-
-> The impact should be minimal since currently there are no mainline
-> systems which actually provide a vcore regulator so none need updating.
-
-Oh yes there are:
-drivers/mfd/db8500-prcmu.c
-
-This driver registers a number of voltage domain regulators,
-among those:
-
-static struct regulator_consumer_supply db8500_vape_consumers[] = {
-       (...)
-        REGULATOR_SUPPLY("vcore", "sdi0"),
-        REGULATOR_SUPPLY("vcore", "sdi1"),
-        REGULATOR_SUPPLY("vcore", "sdi2"),
-        REGULATOR_SUPPLY("vcore", "sdi3"),
-        REGULATOR_SUPPLY("vcore", "sdi4"),
-        (...)
-        REGULATOR_SUPPLY("vcore", "uart0"),
-        REGULATOR_SUPPLY("vcore", "uart1"),
-        REGULATOR_SUPPLY("vcore", "uart2"),
-
-(I know the supplies should probably be moved up to the
-platform but there they are.) The first array is MMC controllers
-and the second is a number of UARTs.
-
-IIRC the machine will not boot (i.e. these drivers cannot even
-probe) without these regulators in place, so they get enabled by
-the AMBA bus code.
-
-So we need something that not just removes stuff from the
-AMBA bus, but also adds a better power domain mechanism
-and fixes up taking the above regulators.
-
-That said I'm all for replacing it - but I'd need to figure out the
-details on how to do that.
-
-We do have code for ux500 power domains. If it will will be
-enough to handle this I can try to hack it up and submit it.
-
-Yours,
+Thanks,
 Linus Walleij
