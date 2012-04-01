@@ -1,84 +1,61 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sat, 31 Mar 2012 16:30:21 +0200
-Subject: [PATCH v5 04/16] pwm: Add table-based lookup for static mappings
-In-Reply-To: <20120330103840.GB961@avionic-0098.mockup.avionic-design.de>
-References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
- <1332945238-14897-5-git-send-email-thierry.reding@avionic-design.de>
- <20120329220342.GK4153@opensource.wolfsonmicro.com>
- <20120330050641.GA21823@avionic-0098.mockup.avionic-design.de>
- <20120330101800.GD21950@opensource.wolfsonmicro.com>
- <20120330103840.GB961@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120331143021.GA18382@avionic-0098.mockup.avionic-design.de>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 31 Mar 2012 22:36:57 -0400
+Subject: [PATCH] mtd/gpmi : do not include the mxs.h
+Message-ID: <1333247817-18472-1-git-send-email-shijie8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thierry Reding wrote:
-> * Mark Brown wrote:
-> > On Fri, Mar 30, 2012 at 07:06:41AM +0200, Thierry Reding wrote:
-> > > * Mark Brown wrote:
-> > 
-> > > > The clock and regulator APIs namespace the consumers by struct device -
-> > > > might this not be sensible here?  pwm_get() does already take the device
-> > > > as an argument.  It'd feel safer, and for example there's plenty of
-> > > > phones out there with two backlit displays...
-> > 
-> > > That's actually how this is supposed to work. "pwm-backlight" in the above
-> > > case is matched against the name of the struct device that you pass in to
-> > > pwm_get(). The only difference, at least as far as I can tell, to the clock
-> > > and regulator APIs is that a second name is not listed explicitly in the
-> > > lookup table.
-> > 
-> > Both clock and regulator APIs map (source) -> (dev, name).  This only
-> > has a mapping (source) -> (dev).
-> > 
-> > > So compared with the clock and regulator APIs it doesn't make too much sense
-> > > to pass both the struct device and the name to pwm_get() because it will
-> > > match the device name against the consumer name in the lookup table first and
-> > > only use the passed name if no match was found.
-> > 
-> > This is different to what the clock and regulator APIs do - they look up
-> > the name in the context of the struct device.  This is because...
-> > 
-> > > In case you have two backlight devices I would expect the following to work:
-> > 
-> > > 	static struct pwm_lookup board_pwm_lookup[] = {
-> > > 		PWM_LOOKUP("tegra-pwm", 0, "pwm-backlight.0"),
-> > > 		PWM_LOOKUP("tegra-pwm", 1, "pwm-backlight.1"),
-> > > 	};
-> > 
-> > ...if a single device uses more than one PWM then the above scheme won't
-> > work - unless I'm missing something?
-> 
-> Right, now it makes more sense. So basically if I have a single device using
-> two PWM devices, then I'll need to have something like this:
-> 
-> 	static struct pwm_lookup board_pwm_lookup[] = {
-> 		PWM_LOOKUP("tegra-pwm", 0, "pwm-foo.0", "bar"),
-> 		PWM_LOOKUP("tegra-pwm", 1, "pwm-foo.0", "baz"),
-> 	};
-> 
-> And then of course I'll need to have a second field by which the PWM device
-> can be identified. Good, I'll fix that up for the next round.
+The mxs.h does not exit in the mx6q.
+So rewrite the __mxs_clrl()/__mxs_setl() and remove the mxs.h.
 
-I've been thinking about this some more, and I can see this becoming a little
-problem with the DT bindings because the unified pwm_get() always requests
-the first PWM specified in the "pwms" property.
+Signed-off-by: Huang Shijie <shijie8@gmail.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-The best solution that I could come up with is to not pass the index into the
-of_pwm_request() function but rather forward the consumer name as passed into
-pwm_get(). The of_pwm_request() could use the "pwm-names" property to do a
-reverse lookup of the index and request that. One good thing about that would
-be that I no longer need to export the of_pwm_request() function. The "bad"
-thing is that it'll make the "pwm-names" property mandatory if more than a
-single PWM is requested.
-
-Does that sound reasonable?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120331/c7eebdaf/attachment.sig>
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+index 85e6071..649d459 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+@@ -21,7 +21,6 @@
+ #include <linux/mtd/gpmi-nand.h>
+ #include <linux/delay.h>
+ #include <linux/clk.h>
+-#include <mach/mxs.h>
+ 
+ #include "gpmi-nand.h"
+ #include "gpmi-regs.h"
+@@ -37,6 +36,8 @@ struct timing_threshod timing_default_threshold = {
+ 	.max_dll_delay_in_ns         = 16,
+ };
+ 
++#define MXS_SET_ADDR		0x4
++#define MXS_CLR_ADDR		0x8
+ /*
+  * Clear the bit and poll it cleared.  This is usually called with
+  * a reset address and mask being either SFTRST(bit 31) or CLKGATE
+@@ -47,7 +48,7 @@ static int clear_poll_bit(void __iomem *addr, u32 mask)
+ 	int timeout = 0x400;
+ 
+ 	/* clear the bit */
+-	__mxs_clrl(mask, addr);
++	writel(mask, addr + MXS_CLR_ADDR);
+ 
+ 	/*
+ 	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
+@@ -92,11 +93,11 @@ static int gpmi_reset_block(void __iomem *reset_addr, bool just_enable)
+ 		goto error;
+ 
+ 	/* clear CLKGATE */
+-	__mxs_clrl(MODULE_CLKGATE, reset_addr);
++	writel(MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
+ 
+ 	if (!just_enable) {
+ 		/* set SFTRST to reset the block */
+-		__mxs_setl(MODULE_SFTRST, reset_addr);
++		writel(MODULE_SFTRST, reset_addr + MXS_SET_ADDR);
+ 		udelay(1);
+ 
+ 		/* poll CLKGATE becoming set */
+-- 
+1.7.4.4
