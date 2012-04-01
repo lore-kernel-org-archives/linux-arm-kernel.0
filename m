@@ -1,24 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 1 Apr 2012 18:44:58 +0200
-Subject: [PATCH] serial: fix pl011 probe
-In-Reply-To: <alpine.LFD.2.02.1204011120000.24151@xanadu.home>
-References: <alpine.LFD.2.02.1204011120000.24151@xanadu.home>
-Message-ID: <CACRpkdbu+ysxMnx7F7aRoGZ=t9Q_Mb3uAWM7+-2Vh4vTVsEuoA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  1 Apr 2012 13:51:37 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6q-sabrelite: Add bootargs field
+Message-ID: <1333299098-2847-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 1, 2012 at 5:39 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+Add bootargs field.
 
-> Commit 9b96fbacda "serial: PL011: clear pending interrupts" (which is
-> also marked with Cc: stable <stable@vger.kernel.org>) oopses the kernel
-> as it uses an unitialized uap->port.membase.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Yes mea culpa.
-
-However I sent a fix-up patch "serial: PL011: move interrupt clearing"
-March 21st, we're just waiting for Greg to pick it up...
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 4663a4e..73915dc 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -17,6 +17,10 @@
+ 	model = "Freescale i.MX6 Quad SABRE Lite Board";
+ 	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+ 
++	chosen {
++		bootargs = "console=ttymxc1,115200 root=/dev/mmcblk0p3 rootwait";
++	};
++
+ 	memory {
+ 		reg = <0x10000000 0x40000000>;
+ 	};
+-- 
+1.7.1
