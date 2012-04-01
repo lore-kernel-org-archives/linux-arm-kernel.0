@@ -1,31 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  1 Apr 2012 12:12:18 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6q-arm2: Fix the console port
-In-Reply-To: <1333293138-2610-1-git-send-email-festevam@gmail.com>
-References: <1333293138-2610-1-git-send-email-festevam@gmail.com>
-Message-ID: <1333293138-2610-2-git-send-email-festevam@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 1 Apr 2012 23:20:46 +0800
+Subject: [PATCH v5 04/16] pwm: Add table-based lookup for static mappings
+In-Reply-To: <20120331143021.GA18382@avionic-0098.mockup.avionic-design.de>
+References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+ <1332945238-14897-5-git-send-email-thierry.reding@avionic-design.de>
+ <20120329220342.GK4153@opensource.wolfsonmicro.com>
+ <20120330050641.GA21823@avionic-0098.mockup.avionic-design.de>
+ <20120330101800.GD21950@opensource.wolfsonmicro.com>
+ <20120330103840.GB961@avionic-0098.mockup.avionic-design.de>
+ <20120331143021.GA18382@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120401152042.GE2395@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the imx6q-arm2 board the console port is ttymxc3.
+On Sat, Mar 31, 2012 at 04:30:21PM +0200, Thierry Reding wrote:
+...
+> The best solution that I could come up with is to not pass the index into the
+> of_pwm_request() function but rather forward the consumer name as passed into
+> pwm_get(). The of_pwm_request() could use the "pwm-names" property to do a
+> reverse lookup of the index and request that. One good thing about that would
+> be that I no longer need to export the of_pwm_request() function.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-arm2.dts |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I never understand why of_pwm_request() needs to be exported anyway.
+pwm_get() should be the only interface to pwm new/DT users, IMO.
 
-diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-index ce1c823..8b90ea1 100644
---- a/arch/arm/boot/dts/imx6q-arm2.dts
-+++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -18,7 +18,7 @@
- 	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
- 
- 	chosen {
--		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
-+		bootargs = "console=ttymxc3,115200 root=/dev/mmcblk3p3 rootwait";
- 	};
- 
- 	memory {
+> The "bad"
+> thing is that it'll make the "pwm-names" property mandatory if more than a
+> single PWM is requested.
+> 
+You do not have to make it mandatory, but anyone requesting any pwm
+other than the first on in "pwms" list should fail.
+
+> Does that sound reasonable?
+> 
+The above is exactly what clock DT does, so it sounds reasonable to me.
+
+And I would expect the next version can just turn the second parameter
+of pwm_get() into the one that will be used to identify the pwm device
+rather than adding one more parameter.  Then we have pwm API well
+aligned with clk and regulator.
+
 -- 
-1.7.1
+Regards,
+Shawn
