@@ -1,53 +1,82 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Sun,  1 Apr 2012 10:08:04 +0800
-Subject: [PATCH V3 4/4] Input: pxa27x_keypad add choice to set direct_key_mask
-In-Reply-To: <1333246084-14110-1-git-send-email-chao.xie@marvell.com>
-References: <1333246084-14110-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1333246084-14110-4-git-send-email-chao.xie@marvell.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Sun, 1 Apr 2012 11:21:10 +0800
+Subject: Bug in v7_coherent_kern_range() ?
+Message-ID: <4F77C9A6.6080601@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Direct keys usage may not start from KP_DKIN0, add a msk option
-to configure the specifics for platforms that can skip some keys.
+[1] Platform:
+freescale's IMX6Q(4 cores) , ARM CORTEX-A9
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/plat-pxa/include/plat/pxa27x_keypad.h |    2 ++
- drivers/input/keyboard/pxa27x_keypad.c         |    9 ++++++++-
- 2 files changed, 10 insertions(+), 1 deletions(-)
+[2] kernel:
+3.0.15(I have cherry-picked many patches, and the arch/arm/mm/cache-v7.S
+is same code with the latest kernel v3.4-rc1)
+enable SMP, VIPT,
 
-diff --git a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-index 7ffb16b..5ce8d5e 100644
---- a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-+++ b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-@@ -46,6 +46,8 @@ struct pxa27x_keypad_platform_data {
- 	unsigned int	direct_key_map[MAX_DIRECT_KEY_NUM];
- 	/* the key output may be low active */
- 	int		direct_key_low_active;
-+	/* give board a chance to choose the start direct key */
-+	unsigned int	direct_key_mask;
- 
- 	/* rotary encoders 0 */
- 	int		enable_rotary0;
-diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
-index a60f14e..7f7b724 100644
---- a/drivers/input/keyboard/pxa27x_keypad.c
-+++ b/drivers/input/keyboard/pxa27x_keypad.c
-@@ -391,7 +391,14 @@ static void pxa27x_keypad_config(struct pxa27x_keypad *keypad)
- 	if (pdata->direct_key_num > direct_key_num)
- 		direct_key_num = pdata->direct_key_num;
- 
--	keypad->direct_key_mask = ((1 << direct_key_num) - 1) & ~mask;
-+	/*
-+	 * Direct keys usage may not start from KP_DKIN0, check the platfrom
-+	 * mask data to config the specific.
-+	 */
-+	if (pdata->direct_key_mask)
-+		keypad->direct_key_mask = pdata->direct_key_mask;
-+	else
-+		keypad->direct_key_mask = ((1 << direct_key_num) - 1) & ~mask;
- 
- 	/* enable direct key */
- 	if (direct_key_num)
--- 
-1.7.0.4
+[3] application:
+I use our our application which will clone many threads,
+two threads (assume as A and B) may do the same thing at the same time
+as the following code:
+
+In most of the time, it's ok.
+But in some unknown situation, cacheflush() failed and one threads
+(assume A) may hung up in the following code:
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+open("/usr/lib/lib_mp3_dec_arm12_elinux.so.2.10.0", O_RDONLY) = 8
+read(8,
+"\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\20\35\0\0004\0\0\0"...,
+512) = 512
+fstat64(8, {st_mode=S_IFREG|0644, st_size=56232, ...}) = 0
+mmap2(NULL, 88032, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 8, 0)
+= 0x2ff0a000
+mprotect(0x2ff18000, 28672, PROT_NONE) = 0
+mmap2(0x2ff1f000, 4096, PROT_READ|PROT_WRITE,
+MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 8, 0xd) = 0x2ff1f000
+close(8) = 0
+mprotect(0x2ff0a000, 57344, PROT_READ|PROT_WRITE) = 0
+mprotect(0x2ff0a000, 57344, PROT_READ|PROT_EXEC) = 0
+cacheflush(0x2ff0a000, 0x2ff18000, 0, 0x6, 0x2cd03420) = 0 // System
+hung up here!!!
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+[4] kernel log
+I use "echo t > /proc/sysrq-trigger" to show the tasks's information:
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+multiqueue0:src D 804cd678 0 7328 5963 0x00000001
+[<804cd678>] (__schedule+0x228/0x760) from [<804d0564>]
+(__down_read+0xa8/0xe0)
+[<804d0564>] (__down_read+0xa8/0xe0) from [<800478c4>]
+(do_page_fault+0xbc/0x480)
+[<800478c4>] (do_page_fault+0xbc/0x480) from [<8003841c>]
+(do_DataAbort+0x34/0x98)
+[<8003841c>] (do_DataAbort+0x34/0x98) from [<8003df10>]
+(__dabt_svc+0x70/0xa0)
+Exception stack(0xbae37ea8 to 0xbae37ef0)
+7ea0: 31e05000 31e1d000 00000020 0000001f 31e05000 31e1d000
+7ec0: bfac86b8 31e05000 31e1d000 bae36000 08100075 31e056fc 31e08000
+bae37ef0
+7ee0: 800424a8 8004a1fc 800f0013 ffffffff
+[<8003df10>] (__dabt_svc+0x70/0xa0) from [<8004a1fc>]
+(v7_coherent_kern_range+0x20/0x80)
+[<8004a1fc>] (v7_coherent_kern_range+0x20/0x80) from [<800424a8>]
+(arm_syscall+0x2a0/0x2c4)
+[<800424a8>] (arm_syscall+0x2a0/0x2c4) from [<8003e500>]
+(ret_fast_syscall+0x0/0x3c)
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+The do_cache_op() has already held the mm->mmap_sem, but
+v7_coherent_kern_range()
+cause one page fault during it flush the cache. deadlock! So it hung up
+in the do_page_fault().
+
+[5] questions:
+Why the v7_coherent_kern_range() can caused the data abort?
+Is there something wrong about the v7_coherent_kern_range()?
+
+
+thanks
+Huang Shijie
