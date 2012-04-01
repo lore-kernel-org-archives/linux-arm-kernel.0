@@ -1,64 +1,20 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 01 Apr 2012 12:15:01 +0300
-Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
- MFP_LPM_KEEP_OUTPUT
-In-Reply-To: <1333196437.11228.YahooMailClassic@web29011.mail.ird.yahoo.com>
-References: <1333196437.11228.YahooMailClassic@web29011.mail.ird.yahoo.com>
-Message-ID: <4F781C95.5000004@compulab.co.il>
+From: b32955@freescale.com (Huang Shijie)
+Date: Sun, 1 Apr 2012 17:19:33 +0800
+Subject: Bug in v7_coherent_kern_range() ?
+In-Reply-To: <4F78187E.6090000@googlemail.com>
+References: <4F77C9A6.6080601@freescale.com> <4F77F13D.7000402@googlemail.com>
+ <4F77FF24.5010809@freescale.com> <4F78187E.6090000@googlemail.com>
+Message-ID: <4F781DA5.3020008@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Dirk:
+>
+> Have you tried the 3.2 based Linaro kernel? It's DT based.
+>
+not yet.
 
-On 03/31/12 15:20, Paul Parsons wrote:
-> Some MFP configurations specify MFP_LPM_KEEP_OUTPUT to preserve the gpio output
-> value (HIGH or LOW) during sleep mode. For example:
-> 
->     GPIO72_GPIO | MFP_LPM_KEEP_OUTPUT,
-> 
-> Unfortunately MFP_LPM_KEEP_OUTPUT makes no special provision for setting the
-> sleep mode gpio direction, unlike MFP_LPM_DRIVE_HIGH and MFP_LPM_DRIVE_LOW.
-> Consequently MFP configurations of the form:
-> 
->     GPIO<n>_GPIO | MFP_LPM_KEEP_OUTPUT,
-> 
-> will set the sleep mode gpio direction to INPUT.
-> 
-> This patch forces the sleep mode gpio direction to OUTPUT in cases where
-> MFP_LPM_KEEP_OUTPUT was specified. This brings MFP_LPM_KEEP_OUTPUT into line
-> with MFP_LPM_DRIVE_HIGH and MFP_LPM_DRIVE_LOW.
-> 
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> ---
-> 
-> diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
-> index b0a8428..3b443199 100644
-> --- a/arch/arm/mach-pxa/mfp-pxa2xx.c
-> +++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
-> @@ -96,6 +96,9 @@ static int __mfp_config_gpio(unsigned gpio, unsigned long c)
->  		break;
->  	}
->  
-> +	if (c & MFP_LPM_KEEP_OUTPUT)
-> +		is_out = 1;
-> +
+I will test the it.
 
-MFP_LPM_KEEP_OUTPUT does not meant to be used to setup the mfp config,
-but for pins that have been configured for output by gpio_direction_out().
-(Hint: *_KEEP_*).
-
-Also, I don't think this is a good idea, because the patch allows a pin
-be configured as output, but does not forces a value (high/low)
-and this is not safe.
-
-Why can't you use:
-GPIO<n>_GPIO | MFP_LPM_DRIVE_<level>
-?
-
->  	if (is_out ^ gpio_desc[gpio].dir_inverted)
->  		gpdr_lpm[bank] |= mask;
->  	else
-
--- 
-Regards,
-Igor.
+BR
+Huang Shijie
