@@ -1,30 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 1 Apr 2012 11:21:25 +0200
-Subject: mc13xxx: add I2C support, V5
-In-Reply-To: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-References: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20120401092125.GX15647@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 1 Apr 2012 11:54:34 +0200
+Subject: [PATCH 07/11] gpio: tegra: Hide tegra_gpio_enable/disable()
+In-Reply-To: <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
+References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
+ <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CACRpkdaVc3WJE3fo=hp1-om2kd=KLvGWNCbtSjhd0vWa7G-+rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Sat, Mar 31, 2012 at 1:00 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-On Sun, Apr 01, 2012 at 04:41:35PM +1000, Marc Reilly wrote:
-> This series (against mfd-2.6/for-next) changes the mc13xxx driver to use 
-> regmap and adds I2C support.
-> It has a compile dependency on regmap/for-next, as the spi driver uses the
-> recently added pad_bits config field.
-> 
-> Patch 2/4 has:
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Patch 4/4 has:
-> Signed-off-by: Oskar Schirmer <oskar@scara.com>
-You didn't add these tags to the respective patches. (And I think
-Signed-off-by: Oskar is wrong. Maybe this should be an Ack?)
- 
-Best regards
-Uwe
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> Recent pinctrl discussions concluded that gpiolib APIs should in fact do
+> whatever is required to mux a GPIO onto pins, by calling pinctrl APIs if
+> required. This change implements this for the Tegra GPIO driver, and removes
+> calls to the Tegra-specific APIs from drivers and board files.
+>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Good stuff. Tegra is starting to look like a role model thanks to your
+efforts Stephen.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
