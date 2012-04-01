@@ -1,81 +1,50 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sat, 31 Mar 2012 20:08:31 -0400
-Subject: ioremap to a specific virtual address
-In-Reply-To: <alpine.LFD.2.02.1203311943500.24151@xanadu.home>
-References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
- <alpine.LFD.2.02.1203222348210.24151@xanadu.home>
- <CAKON4OxVpV-2DGVswc2y+6B6LhLzkhn0ohpSEmDBCVoaNJ4vww@mail.gmail.com>
- <alpine.LFD.2.02.1203311943500.24151@xanadu.home>
-Message-ID: <CAKON4OzohgrZ2k0ddhDrOTqumRYizf-aLUhWdcZstD-7QTYYZg@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 31 Mar 2012 21:12:39 -0400
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
+ device tree support
+In-Reply-To: <4F73D3D7.1010202@samsung.com> (Kukjin Kim's message of "Wed, 28
+ Mar 2012 20:15:35 -0700")
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+ <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
+ <m239abgc32.fsf@bob.laptop.org>
+ <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
+ <m2vcn0496y.fsf@bob.laptop.org> <87k426vy9r.fsf@laptop.org>
+ <20120328095450.GA23005@sirena.org.uk> <4F73D3D7.1010202@samsung.com>
+Message-ID: <87zkawmf08.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 7:52 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Sat, 31 Mar 2012, jonsmirl at gmail.com wrote:
->
->> On Fri, Mar 23, 2012 at 12:00 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> > On Thu, 22 Mar 2012, jonsmirl at gmail.com wrote:
->> >
->> >> When iotable is used to initially map memory you can specify the
->> >> mapping address. In this case IO_SDMMC_PHYS is 0x18000000 and it gets
->> >> mapped to ?0xf1800000
->> >>
->> >> NXP has supplied this handly macro
->> >> #define io_p2v(x) (0xf0000000 | (((x) & 0xff000000) >> 4) | ((x) & 0x000fffff))
->> >>
->> >> iotable_init(lpc313x_io_desc, ARRAY_SIZE(lpc313x_io_desc));
->> >>
->> >> ? ? ? {
->> >> ? ? ? ? ? ? ? .virtual ? ? ? ?= io_p2v(IO_SDMMC_PHYS),
->> >> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(IO_SDMMC_PHYS),
->> >> ? ? ? ? ? ? ? .length ? ? ? ? = IO_SDMMC_SIZE,
->> >> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
->> >> ? ? ? },
->> >>
->> >> The supplied kernel is full of code that uses this type of addressing.
->> >> It has macros for register definition that all depend on the registers
->> >> being mapped to a well know location - io_p2v(x).
->> >>
->> >> I'd like to move the map out of the core code and into the SDMMC
->> >> device driver and then only do it if the driver loads.
->> >
->> > Why would you do that? ?Those static mappings are meant to be global and
->> > remain there. ?The handy macro is in fact not handy at all as it forces
->> > virtual addresses on you.
->> >
->> > It is OK to keep the static mappings as you can use 1MB regions and the
->> > mapping code will use first level mappings which are better with TLB
->> > usage.
+Hi Kukjin,
+
+On Wed, Mar 28 2012, Kukjin Kim wrote:
+>>> As a result I'm dropping this tree -- and all of the patches that I
+>>> have on top of it -- from mmc-next so that I can get a pull request
+>>> out.  This means that I'm dropping:
 >>
->> I switched over to 1MB mappings. 1MB map regions are implemented on
->> ARM9, right? Is there some way to see if I got the huge maps?
+> Hmm, I think, if you're ok, you can send a second pull request to
+> Linus for it and actually, it is in linux-next for a long time via mmc
+> and samsung tree.
 >
-> Once booted, you can look in /proc/vmallocinfo for the mappings in use.
->
-> There is no way to know for sure if the first level pagetable mappings
-> are actually used, unless you instrument the kernel code. ?But yes, all
-> ARM architectures with a MMU support 1MB regions.
+> Note, please don't rebase it because its resolution for conflicts is
+> in linux-next and I think Linus will use it when happens
+> conflicts...Or I can provide new tree on top of latest mainline. But
+> I'm not sure about latter.
 
-Looks good, way cleaner than my x86 desktop which is full of 8KB
-mappings. On my ARM I had about 50 regions before since I was mapping
-each device individually.
+I can't send the tree as it is to Linus now, because Arnd has asked us
+to hold off on these device tree bindings and work with the unified
+bindings he's proposing instead.  (Rebasing to drop that patch will
+introduce new conflicts.)
 
-root at OpenWrt:/proc# cat vmallocinfo
-0xc4804000-0xc4810000   49152 cramfs_uncompress_init+0x24/0x60 pages=11 vmalloc
-0xc4810000-0xc4853000  274432 jffs2_zlib_init+0x14/0xa4 pages=66 vmalloc
-0xc4853000-0xc485f000   49152 jffs2_zlib_init+0x48/0xa4 pages=11 vmalloc
-0xc485f000-0xc4886000  159744 ssd1289_probe+0x250/0x85c pages=38 vmalloc
-0xf1300000-0xf1400000 1048576 iotable_init+0x0/0xb0 phys=13000000 ioremap
-0xf1500000-0xf1600000 1048576 iotable_init+0x0/0xb0 phys=15000000 ioremap
-0xf1600000-0xf1700000 1048576 iotable_init+0x0/0xb0 phys=16000000 ioremap
-0xf1700000-0xf1800000 1048576 iotable_init+0x0/0xb0 phys=17000000 ioremap
-0xf1800000-0xf1900000 1048576 iotable_init+0x0/0xb0 phys=18000000 ioremap
-0xf1900000-0xf1a00000 1048576 iotable_init+0x0/0xb0 phys=19000000 ioremap
-0xf2000000-0xf2100000 1048576 iotable_init+0x0/0xb0 phys=20000000 ioremap
-0xf6000000-0xf6100000 1048576 iotable_init+0x0/0xb0 phys=60000000 ioremap
-0xf7000000-0xf7100000 1048576 iotable_init+0x0/0xb0 phys=70000000 ioremap
-root at OpenWrt:/proc#
+I'm going to send Mark Brown's two patches to Linus now, even though it
+will cause a conflict in -next.  The rest (other than the device tree
+bindings) are mergable after -rc1, because they're fixes, so we'll
+eventually get everything except DT in to 3.4.  I think you should
+just drop this patchset from your tree in linux-next entirely now.
 
+Thanks,
+
+- Chris.
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
