@@ -1,30 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 1 Apr 2012 12:29:49 +0100
-Subject: [PATCH v3 6/6] mmc: sdhci-s3c: Add device tree support
-In-Reply-To: <201203301845.07534.arnd@arndb.de>
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <201203301136.05038.arnd@arndb.de> <4F75D5C0.5050307@wwwdotorg.org>
- <201203301845.07534.arnd@arndb.de>
-Message-ID: <20120401112949.GA19107@sirena.org.uk>
+Date: Sun,  1 Apr 2012 12:32:39 +0100
+Subject: [PATCH 1/2] clk: Fix comment for end of CONFIG_COMMON_CLK section
+Message-ID: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 06:45:07PM +0000, Arnd Bergmann wrote:
-> On Friday 30 March 2012, Stephen Warren wrote:
+There is no else block so the #endif is for the end of the section for
+CONFIG_COMMON_CLK.
 
-> > > +- cd-inverted: when present, polarity on the wp gpio line is inverted
-> > > +- wp-inverted: when present, polarity on the wp gpio line is inverted
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ include/linux/clk.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> > I'm not sure about those two: Some of the GPIO bindings have flags in
-> > the GPIO specifier (Tegra, ARM PL061, gpio.txt mentions the possibility
-> > of polarity being in the specifier), and bit 0 of the flags is used to
-> > indicate inversion. I think that either we should rely on GPIO
-> > specifiers having such flags and remove these xxx-inverted properties
-> > from the MMC binding, or remove that flag bit from the GPIO bindings.
-
-> Maybe the GPIO maintainer can comment on this. My understanding is
-> that not all gpio controllers support this in their bindings. If they
-> do, I agree that we can remove the extra properties here.
-
-Surely it'd be better to fix this at the GPIO controller end rather than
-having a patchwork of approaches?
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index b025272..4b27d15 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -81,7 +81,7 @@ int clk_notifier_register(struct clk *clk, struct notifier_block *nb);
+ 
+ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
+ 
+-#endif /* !CONFIG_COMMON_CLK */
++#endif /* CONFIG_COMMON_CLK */
+ 
+ /**
+  * clk_get - lookup and obtain a reference to a clock producer.
+-- 
+1.7.9.1
