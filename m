@@ -1,73 +1,53 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 1 Mar 2012 05:55:43 +0100
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <20120229205901.GR14173@pengutronix.de>
-References: <20120229191209.GN14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
- <20120229194409.GO14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
- <4F4E86A1.8010506@bluewatersys.com>
- <20120229201938.GB16999@n2100.arm.linux.org.uk>
- <4F4E89A8.4080909@bluewatersys.com>
- <20120229203958.GQ14173@pengutronix.de>
- <20120229204527.GD16999@n2100.arm.linux.org.uk>
- <20120229205901.GR14173@pengutronix.de>
-Message-ID: <20120301045543.GL3318@game.jcrosoft.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 01 Apr 2012 00:32:32 -0400
+Subject: [PATCH 07/11] gpio: tegra: Hide tegra_gpio_enable/disable()
+In-Reply-To: <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
+ (Stephen Warren's message of "Fri, 30 Mar 2012 17:00:00 -0600")
+References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
+ <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <87mx6wkr6n.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:59 Wed 29 Feb     , Uwe Kleine-K?nig wrote:
-> On Wed, Feb 29, 2012 at 08:45:27PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 29, 2012 at 09:39:58PM +0100, Uwe Kleine-K?nig wrote:
-> > > I'd bet your platform has cache support in the decompressor without
-> > > knowing which platform you use. I suggest commenting out
-> > > 
-> > > 	bl	cache_on
-> > > 
-> > > in arch/arm/boot/compressed/head.S to see the difference.
-> > > 
-> > > How do you build the uImage containing the zImage? If you use the
-> > > in-kernel uImage target booting that usually means:
-> > > 
-> > > 	- move the zImage to ZRELADDR
-> > > 	- jump into zImage
-> > > 	- decompress zImage to somewhere else
-> > > 	- move decompressed image to ZRELADDR
-> > > 	- jump to ZRELADDR
-> > > 
-> > > That is you have two relocations because the first location for sure
-> > > conflicts with the decompressed image.
-> > 
-> > Actually, we do this slightly differently nowadays.  Inside zImage:
-> > 
-> > 	- if zImage location conflicts, move the decompressed data
-> s/de//
-> 
-> > 	  and decompressor to another location
-> > 	- decompress zImage to ZRELADDR
-> > 	- jump to ZRELADDR
-> > 
-> > That reduces the size required for copying.  Of course, that copy can
-> > (as it's always been the case) be totally eliminated by ensuring that
-> > you load the zImage out of the way of the decompressed image.
-> > 
-> > So, really, comparing a standard uImage produced by the standard kernel
-> > with gzipped Image is far from a fair comparison.  And that's actually
-> > another argument for getting rid of the uImage target... it may make
-> > people think a bit about what they're doing rather than accepting
-> > whatever default location someone else chose for their kernel.
-> I'm all in favour to remove the uImage target because back in 2007 we
-> already had a similar discussion[1]. (Back then I still thought that
-> improving the uImage support would be a good idea.)
-> 
-> That said I think *in general* having support for U-Boot in the kernel
-> is fine because I think U-Boot is the bootloader used most. But if you
-> need some Kconfig settings or more than one Makefile target I think just
-> building an Image or zImage and doing the U-Boot wrapping without the
-> help of Linux' build system is preferable.
-Agreed at 200%
+Hi Stephen,
 
+On Fri, Mar 30 2012, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> Recent pinctrl discussions concluded that gpiolib APIs should in fact do
+> whatever is required to mux a GPIO onto pins, by calling pinctrl APIs if
+> required. This change implements this for the Tegra GPIO driver, and removes
+> calls to the Tegra-specific APIs from drivers and board files.
+>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2: Adjusted per changes to latest version of Documentation/gpio.txt.
+> Fixed tegra_board_pinmux_bus_notify() to still check the device name,
+> so it waits for the pinmux device to be registered, not just /any/ device.
+> ---
+>  arch/arm/mach-tegra/board-dt-tegra20.c        |    1 -
+>  arch/arm/mach-tegra/board-harmony-pinmux.c    |   17 -----------
+>  arch/arm/mach-tegra/board-paz00-pinmux.c      |   14 ---------
+>  arch/arm/mach-tegra/board-pinmux.c            |   33 +++--------------------
+>  arch/arm/mach-tegra/board-pinmux.h            |    5 ---
+>  arch/arm/mach-tegra/board-seaboard-pinmux.c   |   32 ----------------------
+>  arch/arm/mach-tegra/board-seaboard.c          |    1 -
+>  arch/arm/mach-tegra/board-trimslice-pinmux.c  |   12 --------
+>  arch/arm/mach-tegra/include/mach/gpio-tegra.h |    9 ------
+>  arch/arm/mach-tegra/usb_phy.c                 |    1 -
+>  drivers/gpio/gpio-tegra.c                     |   36 ++++++++++++------------
 
-Best Regards,
-J.
+For this hunk:
+
+>  drivers/mmc/host/sdhci-tegra.c                |   24 +++-------------
+
+Acked-by: Chris Ball <cjb@laptop.org>
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
