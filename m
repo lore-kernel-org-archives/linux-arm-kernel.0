@@ -1,71 +1,58 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sun, 1 Apr 2012 11:23:44 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com> <87mx9ej8fp.fsf@ti.com>
- <CACVXFVOqmC0OhT-Dim8dL9pWnmGwO2-Awc4V2Jziyf7DHQdYcQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83181EF3F@DBDE01.ent.ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
-Message-ID: <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Sun, 01 Apr 2012 15:25:50 +0930
+Subject: [PULL] cpumask cleanups
+Message-ID: <87sjgovvvd.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 1, 2012 at 7:09 AM, Ming Lei <tom.leiming@gmail.com> wrote:
-> On Sun, Apr 1, 2012 at 3:10 AM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Sat, Mar 31, 2012 at 2:09 PM, Ming Lei <tom.leiming@gmail.com> wrote:
->>> On Sat, Mar 31, 2012 at 2:30 PM, Shilimkar, Santosh
->>>> Since you need to recompile the kernel, you can very much tweak the
->>>> clocksource to use GPTIMER with sysl clock. Support for that is still
->>>> in place.
->>>
->>> With current kernel, running 'make menuconfig' can do it, but after applying
->>> Hiremath's patch[1], I have to edit the source code manually to get it, so looks
->>> this kind of tweaking is not friendly enough, :-(
->>>
->> It's not friendly but doable. But above can be supported I guess.
->>
->> Since you are talking about doing menuconfig
->> and rebuilding kernel so what can be done is when one disable CPUIDLE
->> and PM, one can disabled 32K source as well. And then 32K clocksource
->> init should fail and fallback on gptimer clock source.
->
-> OK, it should work, but looks OMAP_32K_TIMER option has to be kept
-> for the usage, which may be a bit divergent to the purpose of the patch set.
->
-> So how about introducing a kernel parameter to decide if bypassing
-> 32K source and using gptimer source directly, and let which depend
-> on PM?
->
-We are just doing circles on this patch set. Till the dynamic clock-soucre
-switching supported for low power entry exit, the high precision clocksoucre
-selection is already broken and very much limited for use
+(Somehow forgot to send this out; it's been sitting in linux-next, and
+if you don't want it, it can sit there another cycle)
 
-I don't personally like to add features which hardly anybody use and
-fundamentally
-broken with full kernel.
+To git at github.com:rustyrussell/linux.git
+   f946eeb..615399c  master -> master
+ + 9dcbe9d...6ac67b9 for-linus -> for-linus (forced update)
+The following changes since commit b5174fa3a7f4f8f150bfa3b917c92608953dfa0f:
 
-I let Tony take final call on what's appropriate.
+  Merge tag 'mmc-merge-for-3.4-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/cjb/mmc (2012-03-28 20:59:45 -0700)
 
-Regards
-Santosh
+are available in the git repository at:
+
+  git://github.com/rustyrussell/linux.git master
+
+Rusty Russell (4):
+      remove references to cpu_*_map in arch/
+      drivers/cpufreq/db8500-cpufreq: remove references to cpu_*_map.
+      documentation: remove references to cpu_*_map.
+      cpumask: remove old cpu_*_map.
+
+ Documentation/cgroups/cpusets.txt   |    2 +-
+ Documentation/cpu-hotplug.txt       |   22 +++++++++++-----------
+ arch/alpha/kernel/smp.c             |    2 +-
+ arch/arm/kernel/kprobes.c           |    4 ++--
+ arch/arm/kernel/smp.c               |    7 ++++---
+ arch/hexagon/kernel/smp.c           |    8 ++++----
+ arch/ia64/kernel/acpi.c             |    2 +-
+ arch/mips/cavium-octeon/smp.c       |    4 ++--
+ arch/mips/kernel/mips-mt-fpaff.c    |    2 +-
+ arch/mips/kernel/proc.c             |    2 +-
+ arch/mips/kernel/smp-bmips.c        |    2 +-
+ arch/mips/kernel/smp.c              |   27 ++++++++++++---------------
+ arch/mips/kernel/smtc.c             |    2 +-
+ arch/mips/mm/c-octeon.c             |    6 +++---
+ arch/mips/netlogic/common/smp.c     |    6 +++---
+ arch/mips/pmc-sierra/yosemite/smp.c |    8 ++++----
+ arch/mips/sgi-ip27/ip27-smp.c       |    2 +-
+ arch/mips/sibyte/bcm1480/smp.c      |    7 +++----
+ arch/mips/sibyte/sb1250/smp.c       |    7 +++----
+ arch/sparc/kernel/leon_kernel.c     |    6 +++---
+ arch/tile/kernel/setup.c            |    8 ++++----
+ arch/um/kernel/skas/process.c       |    2 +-
+ arch/um/kernel/smp.c                |    9 ++++-----
+ arch/x86/xen/enlighten.c            |    2 +-
+ drivers/cpufreq/db8500-cpufreq.c    |    2 +-
+ include/linux/cpumask.h             |    6 ------
+ init/Kconfig                        |    4 ++--
+ kernel/cpuset.c                     |   10 +++++-----
+ 28 files changed, 80 insertions(+), 91 deletions(-)
+-- 
+  How could I marry someone with more hair than me?  http://baldalex.org
