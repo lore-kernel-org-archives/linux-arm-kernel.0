@@ -1,31 +1,31 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  1 Apr 2012 12:12:17 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6q-sabrelite: Add bootargs field
-Message-ID: <1333293138-2610-1-git-send-email-festevam@gmail.com>
+Date: Sun,  1 Apr 2012 12:12:18 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6q-arm2: Fix the console port
+In-Reply-To: <1333293138-2610-1-git-send-email-festevam@gmail.com>
+References: <1333293138-2610-1-git-send-email-festevam@gmail.com>
+Message-ID: <1333293138-2610-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bootargs field.
+On the imx6q-arm2 board the console port is ttymxc3.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6q-arm2.dts |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 4663a4e..73915dc 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -17,6 +17,10 @@
- 	model = "Freescale i.MX6 Quad SABRE Lite Board";
- 	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index ce1c823..8b90ea1 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -18,7 +18,7 @@
+ 	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
  
-+	chosen {
-+		bootargs = "console=ttymxc1,115200 root=/dev/mmcblk0p3 rootwait";
-+	};
-+
- 	memory {
- 		reg = <0x10000000 0x40000000>;
+ 	chosen {
+-		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
++		bootargs = "console=ttymxc3,115200 root=/dev/mmcblk3p3 rootwait";
  	};
+ 
+ 	memory {
 -- 
 1.7.1
