@@ -1,50 +1,52 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sat, 31 Mar 2012 21:12:39 -0400
-Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
- device tree support
-In-Reply-To: <4F73D3D7.1010202@samsung.com> (Kukjin Kim's message of "Wed, 28
- Mar 2012 20:15:35 -0700")
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
- <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
- <m239abgc32.fsf@bob.laptop.org>
- <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
- <m2vcn0496y.fsf@bob.laptop.org> <87k426vy9r.fsf@laptop.org>
- <20120328095450.GA23005@sirena.org.uk> <4F73D3D7.1010202@samsung.com>
-Message-ID: <87zkawmf08.fsf@laptop.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sat, 31 Mar 2012 18:22:12 -0700
+Subject: [PATCH RFC] Simplify the Linux kernel by reducing its state	space
+In-Reply-To: <20120331223200.GA32482@n2100.arm.linux.org.uk>
+References: <20120331163321.GA15809@linux.vnet.ibm.com>
+ <20120331223200.GA32482@n2100.arm.linux.org.uk>
+Message-ID: <20120401012212.GP2450@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Sat, Mar 31, 2012 at 11:32:00PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Apr 01, 2012 at 12:33:21AM +0800, Paul E. McKenney wrote:
+> > Although there have been numerous complaints about the complexity of
+> > parallel programming (especially over the past 5-10 years), the plain
+> > truth is that the incremental complexity of parallel programming over
+> > that of sequential programming is not as large as is commonly believed.
+> > Despite that you might have heard, the mind-numbing complexity of modern
+> > computer systems is not due so much to there being multiple CPUs, but
+> > rather to there being any CPUs at all.  In short, for the ultimate in
+> > computer-system simplicity, the optimal choice is NR_CPUS=0.
+> > 
+> > This commit therefore limits kernel builds to zero CPUs.  This change
+> > has the beneficial side effect of rendering all kernel bugs harmless.
+> > Furthermore, this commit enables additional beneficial changes, for
+> > example, the removal of those parts of the kernel that are not needed
+> > when there are zero CPUs.
+> > 
+> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+> 
+> Great work, but I don't think you've gone far enough with this.
+> 
+> What would really help is if you could consolidate all these NR_CPUS
+> definitions into one place so we don't have essentially the same thing
+> scattered across all these architectures.  We're already doing this on
+> ARM across our platforms, and its about time such an approach was taken
+> across the entire kernel tree.
+> 
+> It looks like the MIPS solution would be the best one to pick.
+> Could you rework your patch to do this please?
+> 
+> While you're at it, you might like to consider that having zero CPUs
+> makes all this architecture support redundant, so maybe you've missed
+> a trick there - according to my count, we could get rid of almost 3
+> million lines of code from arch.  We could replace all that with a
+> single standard implementation.
+> 
+> Bah, maybe I shouldn't have pushed that bpf_jit code for ARM after all...
 
-On Wed, Mar 28 2012, Kukjin Kim wrote:
->>> As a result I'm dropping this tree -- and all of the patches that I
->>> have on top of it -- from mmc-next so that I can get a pull request
->>> out.  This means that I'm dropping:
->>
-> Hmm, I think, if you're ok, you can send a second pull request to
-> Linus for it and actually, it is in linux-next for a long time via mmc
-> and samsung tree.
->
-> Note, please don't rebase it because its resolution for conflicts is
-> in linux-next and I think Linus will use it when happens
-> conflicts...Or I can provide new tree on top of latest mainline. But
-> I'm not sure about latter.
+;-) ;-) ;-)
 
-I can't send the tree as it is to Linus now, because Arnd has asked us
-to hold off on these device tree bindings and work with the unified
-bindings he's proposing instead.  (Rebasing to drop that patch will
-introduce new conflicts.)
-
-I'm going to send Mark Brown's two patches to Linus now, even though it
-will cause a conflict in -next.  The rest (other than the device tree
-bindings) are mergable after -rc1, because they're fixes, so we'll
-eventually get everything except DT in to 3.4.  I think you should
-just drop this patchset from your tree in linux-next entirely now.
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+							Thanx, Paul
