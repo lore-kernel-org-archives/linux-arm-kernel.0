@@ -1,34 +1,38 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun,  1 Apr 2012 18:30:41 +0300
-Subject: [PATCH] omap1: mux: add missing include
-Message-ID: <1333294241-17510-1-git-send-email-aaro.koskinen@iki.fi>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 1 Apr 2012 16:34:50 +0100
+Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
+In-Reply-To: <4F787392.5040308@codeaurora.org>
+References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <4F787392.5040308@codeaurora.org>
+Message-ID: <20120401153450.GC8971@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build breakage in v3.4-rc1:
+On Sun, Apr 01, 2012 at 08:26:10AM -0700, Stephen Boyd wrote:
+> On 4/1/2012 4:32 AM, Mark Brown wrote:
 
-arch/arm/mach-omap1/mux.c:89:1: error: 'FUNC_MUX_CTRL_9' undeclared here (not in a function)
-arch/arm/mach-omap1/mux.c:89:1: error: 'PULL_DWN_CTRL_2' undeclared here (not in a function)
-arch/arm/mach-omap1/mux.c:93:1: error: 'FUNC_MUX_CTRL_C' undeclared here (not in a function)
+> >  Documentation/driver-model/devres.txt |    3 +++
+> >  drivers/clk/clkdev.c                  |   25 +++++++++++++++++++++++++
+> >  include/linux/clk.h                   |   20 ++++++++++++++++++++
+> >  3 files changed, 48 insertions(+), 0 deletions(-)
 
-etc.
+> But why is this part of clkdev.c? devm_clk_get() should work regardless
+> of the implementation of clk_get() so can we put it into some other file
+> that is compiled if HAVE_CLK=y so everyone benefits from this and not
+> just users who select CLKDEV_LOOKUP?
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/mach-omap1/mux.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Mostly just because clk_get() is part of clkdev.c and I didn't feel like
+creating a new file, though also because I really hope that we're going
+to be moving away from open coding clock framework things so that we can
+start to push clock API usage into non-SoC code.  Things like adding new
+clocks are going to be a part of that.
 
-diff --git a/arch/arm/mach-omap1/mux.c b/arch/arm/mach-omap1/mux.c
-index 087dba0..e9cc52d 100644
---- a/arch/arm/mach-omap1/mux.c
-+++ b/arch/arm/mach-omap1/mux.c
-@@ -27,6 +27,7 @@
- #include <linux/io.h>
- #include <linux/spinlock.h>
- 
-+#include <mach/hardware.h>
- 
- #include <plat/mux.h>
- 
--- 
-1.7.2.5
+To put it another way, why would a platform want to avoid clkdev?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120401/9bba3e11/attachment-0001.sig>
