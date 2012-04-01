@@ -1,111 +1,85 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  1 Apr 2012 13:54:13 -0300
-Subject: [PATCH] ARM: dts: imx: Remove bootargs field
-Message-ID: <1333299253-2896-1-git-send-email-festevam@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 1 Apr 2012 19:22:46 +0200
+Subject: [PATCH/RFC] ARM: amba: Remove AMBA level regulator support
+In-Reply-To: <1333294181-27653-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1333294181-27653-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdb6+2SLm1Ojw2jNkK9ejW66fw2Pcit-b3AL67wP4Hr_ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove bootargs field as this information is retrieved from the bootloader.
+On Sun, Apr 1, 2012 at 5:29 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx51-babbage.dts |    4 ----
- arch/arm/boot/dts/imx53-ard.dts     |    4 ----
- arch/arm/boot/dts/imx53-evk.dts     |    4 ----
- arch/arm/boot/dts/imx53-qsb.dts     |    4 ----
- arch/arm/boot/dts/imx53-smd.dts     |    4 ----
- arch/arm/boot/dts/imx6q-arm2.dts    |    4 ----
- 6 files changed, 0 insertions(+), 24 deletions(-)
+> The AMBA bus regulator support is being used to model on/off switches
+> for power domains which isn't terribly idiomatic for modern kernels with
+> the generic power domain code and creates integration problems on platforms
+> which don't use regulators for their power domains as it's hard to tell
+> the difference between a regulator that is needed but failed to be provided
+> and one that isn't supposed to be there (though DT does make that easier).
+>
+> Platforms that wish to use the regulator API to manage their power domains
+> can indirect via the power domain interface.
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 9949e60..fd729d4 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -17,10 +17,6 @@
- 	model = "Freescale i.MX51 Babbage Board";
- 	compatible = "fsl,imx51-babbage", "fsl,imx51";
- 
--	chosen {
--		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
--	};
--
- 	memory {
- 		reg = <0x90000000 0x20000000>;
- 	};
-diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-index 2dccce4..4c61b7f 100644
---- a/arch/arm/boot/dts/imx53-ard.dts
-+++ b/arch/arm/boot/dts/imx53-ard.dts
-@@ -17,10 +17,6 @@
- 	model = "Freescale i.MX53 Automotive Reference Design Board";
- 	compatible = "fsl,imx53-ard", "fsl,imx53";
- 
--	chosen {
--		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
--	};
--
- 	memory {
- 		reg = <0x70000000 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
-index 5bac4aa..8ce5fe1 100644
---- a/arch/arm/boot/dts/imx53-evk.dts
-+++ b/arch/arm/boot/dts/imx53-evk.dts
-@@ -17,10 +17,6 @@
- 	model = "Freescale i.MX53 Evaluation Kit";
- 	compatible = "fsl,imx53-evk", "fsl,imx53";
- 
--	chosen {
--		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
--	};
--
- 	memory {
- 		reg = <0x70000000 0x80000000>;
- 	};
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 5c57c86..de34a17 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -17,10 +17,6 @@
- 	model = "Freescale i.MX53 Quick Start Board";
- 	compatible = "fsl,imx53-qsb", "fsl,imx53";
- 
--	chosen {
--		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
--	};
--
- 	memory {
- 		reg = <0x70000000 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
-index c7ee86c..a984fa5 100644
---- a/arch/arm/boot/dts/imx53-smd.dts
-+++ b/arch/arm/boot/dts/imx53-smd.dts
-@@ -17,10 +17,6 @@
- 	model = "Freescale i.MX53 Smart Mobile Reference Design Board";
- 	compatible = "fsl,imx53-smd", "fsl,imx53";
- 
--	chosen {
--		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
--	};
--
- 	memory {
- 		reg = <0x70000000 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-index ce1c823..1b2b64f 100644
---- a/arch/arm/boot/dts/imx6q-arm2.dts
-+++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -17,10 +17,6 @@
- 	model = "Freescale i.MX6 Quad Armadillo2 Board";
- 	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
- 
--	chosen {
--		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
--	};
--
- 	memory {
- 		reg = <0x10000000 0x80000000>;
- 	};
--- 
-1.7.1
+I don't see how this solves the problem of AMBA PrimeCell probing.
+
+If you look at the code in bus.c, you can see that it acquires and
+enables the regulator - as it does with the clock.
+
+The reason is that is does this *before* the device can probe,
+since it needs to map up the memory to read out some magic
+values at the end to figure out what device it is in the first place.
+
+We need the current code replaced with something that
+enables a power domain before probe instead, then implement
+these power domains for the in-kernel AMBA devices that need it.
+
+Is the default behaviour of power domains such that they will
+be enabled as soon as devices are registered but before
+any buses probe()? Because that is what is needed in this case.
+
+(AMBA devices are special in this way: no other ARM things
+support auto-detection of devices using magic numbers,
+basically the DT stuff came about because noone was using
+a thing like this.)
+
+> The impact should be minimal since currently there are no mainline
+> systems which actually provide a vcore regulator so none need updating.
+
+Oh yes there are:
+drivers/mfd/db8500-prcmu.c
+
+This driver registers a number of voltage domain regulators,
+among those:
+
+static struct regulator_consumer_supply db8500_vape_consumers[] = {
+       (...)
+        REGULATOR_SUPPLY("vcore", "sdi0"),
+        REGULATOR_SUPPLY("vcore", "sdi1"),
+        REGULATOR_SUPPLY("vcore", "sdi2"),
+        REGULATOR_SUPPLY("vcore", "sdi3"),
+        REGULATOR_SUPPLY("vcore", "sdi4"),
+        (...)
+        REGULATOR_SUPPLY("vcore", "uart0"),
+        REGULATOR_SUPPLY("vcore", "uart1"),
+        REGULATOR_SUPPLY("vcore", "uart2"),
+
+(I know the supplies should probably be moved up to the
+platform but there they are.) The first array is MMC controllers
+and the second is a number of UARTs.
+
+IIRC the machine will not boot (i.e. these drivers cannot even
+probe) without these regulators in place, so they get enabled by
+the AMBA bus code.
+
+So we need something that not just removes stuff from the
+AMBA bus, but also adds a better power domain mechanism
+and fixes up taking the above regulators.
+
+That said I'm all for replacing it - but I'd need to figure out the
+details on how to do that.
+
+We do have code for ux500 power domains. If it will will be
+enough to handle this I can try to hack it up and submit it.
+
+Yours,
+Linus Walleij
