@@ -1,53 +1,128 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 1 Apr 2012 14:41:24 +0800
-Subject: [PATCH v2] video: s3c-fb: Add device tree support
-In-Reply-To: <CAH+eYFCrdtYC+v3tgqsaCS9-Y61JCwA1MLkkPtH14p=JWBbzBw@mail.gmail.com>
-References: <1333086797-1625-1-git-send-email-thomas.abraham@linaro.org>
- <CAH+eYFCrdtYC+v3tgqsaCS9-Y61JCwA1MLkkPtH14p=JWBbzBw@mail.gmail.com>
-Message-ID: <20120401064121.GC2395@S2101-09.ap.freescale.net>
+Date: Sun, 1 Apr 2012 14:59:49 +0800
+Subject: [PATCH v2] ARM: dts: imx6q: add anatop regulators
+In-Reply-To: <1333115213-28922-1-git-send-email-paul.liu@linaro.org>
+References: <1333115213-28922-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120401065947.GD2395@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 09:25:14PM +0530, Rabin Vincent wrote:
-> On Fri, Mar 30, 2012 at 11:23, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> > + ? ?- samsung,fimd-display: The fimd controller is interfaced with the a
-> > + ? ? ?display device such as a lcd panel. This property should specify the
-> > + ? ? ?phandle of the display device node. For a display device node that
-> > + ? ? ?represents a RGB type display interface, it is expected to specify the
-> > + ? ? ?video interface timing using the following properties.
-> > +
-> > + ? ? ?- lcd-htiming: Specifies the horizontal timing for the overlay. The
-> > + ? ? ? ?horizontal timing includes four parameters in the following order.
-> > +
-> > + ? ? ? ?- horizontal back porch (in number of lcd clocks)
-> > + ? ? ? ?- horizontal front porch (in number of lcd clocks)
-> > + ? ? ? ?- hsync pulse width (in number of lcd clocks)
-> > + ? ? ? ?- Display panels X resolution.
-> > +
-> > + ? ? ?- lcd-vtiming: Specifies the vertical timing for the overlay. The
-> > + ? ? ? ?vertical timing includes four parameters in the following order.
-> > +
-> > + ? ? ? ?- vertical back porch (in number of lcd lines)
-> > + ? ? ? ?- vertical front porch (in number of lcd lines)
-> > + ? ? ? ?- vsync pulse width (in number of lcd clocks)
-> > + ? ? ? ?- Y resolution.
+On Fri, Mar 30, 2012 at 09:46:53PM +0800, Ying-Chun Liu (PaulLiu) wrote:
+> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 > 
-> In this old thread, it was suggested to use a raw EDID block to supply
-> timings, and since then a couple of drivers in mainline (sm501fb and
-> fsl-diu) are doing it that way:
+> Add anatop regulators to imx6q.dtsi for all imx6q platforms.
 > 
-> http://lists.ozlabs.org/pipermail/linuxppc-dev/2010-February/080683.html
+> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |   86 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 86 insertions(+), 0 deletions(-)
 > 
-> Shouldn't this driver be doing the same thing?  If not, shouldn't
-> whatever interface this is adding be provided in a common helper (like
-> that old patch was trying to add) so it's standardized between drivers?
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 263e8f3..79f59e7 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -346,6 +346,92 @@
+>  				compatible = "fsl,imx6q-anatop";
+>  				reg = <0x020c8000 0x1000>;
+>  				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
 
-+1
+These two lines are not needed now.  Removed them and applied the
+patch.  Thanks.
 
-We need a generic binding for the data defined in "struct fb_videomode"
-and a generic helper function to retrieve the data from device tree,
-so that individual display driver does not have to invent their owns.
-
--- 
 Regards,
 Shawn
+
+> +
+> +				regulator-1p1 at 110 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vdd1p1";
+> +					regulator-min-microvolt = <800000>;
+> +					regulator-max-microvolt = <1375000>;
+> +					regulator-always-on;
+> +					anatop-reg-offset = <0x110>;
+> +					anatop-vol-bit-shift = <8>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <4>;
+> +					anatop-min-voltage = <800000>;
+> +					anatop-max-voltage = <1375000>;
+> +				};
+> +
+> +				regulator-3p0 at 120 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vdd3p0";
+> +					regulator-min-microvolt = <2800000>;
+> +					regulator-max-microvolt = <3150000>;
+> +					regulator-always-on;
+> +					anatop-reg-offset = <0x120>;
+> +					anatop-vol-bit-shift = <8>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <0>;
+> +					anatop-min-voltage = <2625000>;
+> +					anatop-max-voltage = <3400000>;
+> +				};
+> +
+> +				regulator-2p5 at 130 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vdd2p5";
+> +					regulator-min-microvolt = <2000000>;
+> +					regulator-max-microvolt = <2750000>;
+> +					regulator-always-on;
+> +					anatop-reg-offset = <0x130>;
+> +					anatop-vol-bit-shift = <8>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <0>;
+> +					anatop-min-voltage = <2000000>;
+> +					anatop-max-voltage = <2750000>;
+> +				};
+> +
+> +				regulator-vddcore at 140 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "cpu";
+> +					regulator-min-microvolt = <725000>;
+> +					regulator-max-microvolt = <1450000>;
+> +					regulator-always-on;
+> +					anatop-reg-offset = <0x140>;
+> +					anatop-vol-bit-shift = <0>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <1>;
+> +					anatop-min-voltage = <725000>;
+> +					anatop-max-voltage = <1450000>;
+> +				};
+> +
+> +				regulator-vddpu at 140 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vddpu";
+> +					regulator-min-microvolt = <725000>;
+> +					regulator-max-microvolt = <1450000>;
+> +					regulator-always-on;
+> +					anatop-reg-offset = <0x140>;
+> +					anatop-vol-bit-shift = <9>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <1>;
+> +					anatop-min-voltage = <725000>;
+> +					anatop-max-voltage = <1450000>;
+> +				};
+> +
+> +				regulator-vddsoc at 140 {
+> +					compatible = "fsl,anatop-regulator";
+> +					regulator-name = "vddsoc";
+> +					regulator-min-microvolt = <725000>;
+> +					regulator-max-microvolt = <1450000>;
+> +					regulator-always-on;
+> +					anatop-reg-offset = <0x140>;
+> +					anatop-vol-bit-shift = <18>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <1>;
+> +					anatop-min-voltage = <725000>;
+> +					anatop-max-voltage = <1450000>;
+> +				};
+>  			};
+>  
+>  			usbphy at 020c9000 { /* USBPHY1 */
+> -- 
+> 1.7.9.1
+> 
