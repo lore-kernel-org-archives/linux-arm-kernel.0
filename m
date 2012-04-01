@@ -1,31 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun,  1 Apr 2012 15:31:23 +0100
-Subject: [PATCH] clk: Remove comment for end of CONFIG_COMMON_CLK section
-Message-ID: <1333290683-11815-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  1 Apr 2012 12:12:17 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6q-sabrelite: Add bootargs field
+Message-ID: <1333293138-2610-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The comment is inaccurate (it actually ends the CONFIG_COMMON_CLK
-section, there's no else) and given that we've just got a single level
-of ifdef isn't really needed anyway.
+Add bootargs field.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- include/linux/clk.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index b025272..c9547d9 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -81,7 +81,7 @@ int clk_notifier_register(struct clk *clk, struct notifier_block *nb);
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 4663a4e..73915dc 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -17,6 +17,10 @@
+ 	model = "Freescale i.MX6 Quad SABRE Lite Board";
+ 	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
  
- int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
- 
--#endif /* !CONFIG_COMMON_CLK */
-+#endif
- 
- /**
-  * clk_get - lookup and obtain a reference to a clock producer.
++	chosen {
++		bootargs = "console=ttymxc1,115200 root=/dev/mmcblk0p3 rootwait";
++	};
++
+ 	memory {
+ 		reg = <0x10000000 0x40000000>;
+ 	};
 -- 
-1.7.9.1
+1.7.1
