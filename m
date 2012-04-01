@@ -1,52 +1,32 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sat, 31 Mar 2012 18:22:12 -0700
-Subject: [PATCH RFC] Simplify the Linux kernel by reducing its state	space
-In-Reply-To: <20120331223200.GA32482@n2100.arm.linux.org.uk>
-References: <20120331163321.GA15809@linux.vnet.ibm.com>
- <20120331223200.GA32482@n2100.arm.linux.org.uk>
-Message-ID: <20120401012212.GP2450@linux.vnet.ibm.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 31 Mar 2012 23:43:06 -0400
+Subject: [PATCH v2 1/3] mmc: atmel-mci: correct data timeout computation
+In-Reply-To: <4F72F9A5.60900@atmel.com> (Nicolas Ferre's message of "Wed, 28
+ Mar 2012 13:44:37 +0200")
+References: <1332344483-3915-2-git-send-email-ludovic.desroches@atmel.com>
+ <1332930513-14893-1-git-send-email-ludovic.desroches@atmel.com>
+ <4F72F9A5.60900@atmel.com>
+Message-ID: <87vclkm81h.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 11:32:00PM +0100, Russell King - ARM Linux wrote:
-> On Sun, Apr 01, 2012 at 12:33:21AM +0800, Paul E. McKenney wrote:
-> > Although there have been numerous complaints about the complexity of
-> > parallel programming (especially over the past 5-10 years), the plain
-> > truth is that the incremental complexity of parallel programming over
-> > that of sequential programming is not as large as is commonly believed.
-> > Despite that you might have heard, the mind-numbing complexity of modern
-> > computer systems is not due so much to there being multiple CPUs, but
-> > rather to there being any CPUs at all.  In short, for the ultimate in
-> > computer-system simplicity, the optimal choice is NR_CPUS=0.
-> > 
-> > This commit therefore limits kernel builds to zero CPUs.  This change
-> > has the beneficial side effect of rendering all kernel bugs harmless.
-> > Furthermore, this commit enables additional beneficial changes, for
-> > example, the removal of those parts of the kernel that are not needed
-> > when there are zero CPUs.
-> > 
-> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> 
-> Great work, but I don't think you've gone far enough with this.
-> 
-> What would really help is if you could consolidate all these NR_CPUS
-> definitions into one place so we don't have essentially the same thing
-> scattered across all these architectures.  We're already doing this on
-> ARM across our platforms, and its about time such an approach was taken
-> across the entire kernel tree.
-> 
-> It looks like the MIPS solution would be the best one to pick.
-> Could you rework your patch to do this please?
-> 
-> While you're at it, you might like to consider that having zero CPUs
-> makes all this architecture support redundant, so maybe you've missed
-> a trick there - according to my count, we could get rid of almost 3
-> million lines of code from arch.  We could replace all that with a
-> single standard implementation.
-> 
-> Bah, maybe I shouldn't have pushed that bpf_jit code for ARM after all...
+Hi,
 
-;-) ;-) ;-)
+On Wed, Mar 28 2012, Nicolas Ferre wrote:
+> On 03/28/2012 12:28 PM, ludovic.desroches at atmel.com :
+>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> 
+>> The HSMCI operates at a rate of up to Master Clock divided by two.
+>> Moreover previous calculation can cause overflows and so wrong
+>> timeouts.
+>> 
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-							Thanx, Paul
+Thanks, pushed to mmc-next for 3.4.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
