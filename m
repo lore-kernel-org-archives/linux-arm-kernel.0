@@ -1,74 +1,172 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 1 Apr 2012 14:19:32 +0200
-Subject: [PATCH] ARM: amba: adapt to regulator probe deferral change
-In-Reply-To: <20120331165301.GC5012@opensource.wolfsonmicro.com>
-References: <1333115737-1654-1-git-send-email-shawn.guo@linaro.org>
- <20120330180134.GJ22981@n2100.arm.linux.org.uk>
- <20120331134215.GA5012@opensource.wolfsonmicro.com>
- <20120331143539.GB26661@n2100.arm.linux.org.uk>
- <20120331165301.GC5012@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdZUDs5pCk-zUns_0V5WDYwtJd+eOhk7129z_jbyV+pPAw@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 01 Apr 2012 15:23:58 +0300
+Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
+ MFP_LPM_KEEP_OUTPUT
+In-Reply-To: <1333277787.12023.YahooMailClassic@web29010.mail.ird.yahoo.com>
+References: <1333277787.12023.YahooMailClassic@web29010.mail.ird.yahoo.com>
+Message-ID: <4F7848DE.2080605@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 6:53 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Sat, Mar 31, 2012 at 03:35:39PM +0100, Russell King - ARM Linux wrote:
->> On Sat, Mar 31, 2012 at 02:42:15PM +0100, Mark Brown wrote:
->
->> > We need to change the AMBA bus so it does something better than what it
->> > does now and work out a good way to roll this out. ?The more I think
->> > about this the less convinced I am that AMBA should have regualtor
->> > support in the bus itself at all.
->
->> How else does it power up the peripheral to read out the IDs? ?You can't
->> bind a driver until you've read the ID, which implies that the bus layer
->> needs to have regulator support to turn the power on.
->
-> Like I said further down my mail it seems like any systems which do have
-> individual regulators for the AMBA devices probably ought to be managing
-> this via power domain code rather than by going direct to the regulator
-> API. ?If actual regulators are required the power domain code for the
-> platform would be responsible for doing that rather than AMBA itself but
-> for most SoCs it's likely to not go through the regulator API if there's
-> any sort of gating support at all.
+On 04/01/12 13:56, Paul Parsons wrote:
+> Hello Igor,
+> 
+> --- On Sun, 1/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>> Hi Paul,
+>>
+>> On 03/31/12 15:20, Paul Parsons wrote:
+>>> Some MFP configurations specify MFP_LPM_KEEP_OUTPUT to
+>> preserve the gpio output
+>>> value (HIGH or LOW) during sleep mode. For example:
+>>>
+>>>      GPIO72_GPIO |
+>> MFP_LPM_KEEP_OUTPUT,
+>>>
+>>> Unfortunately MFP_LPM_KEEP_OUTPUT makes no special
+>> provision for setting the
+>>> sleep mode gpio direction, unlike MFP_LPM_DRIVE_HIGH
+>> and MFP_LPM_DRIVE_LOW.
+>>> Consequently MFP configurations of the form:
+>>>
+>>>      GPIO<n>_GPIO |
+>> MFP_LPM_KEEP_OUTPUT,
+>>>
+>>> will set the sleep mode gpio direction to INPUT.
+>>>
+>>> This patch forces the sleep mode gpio direction to
+>> OUTPUT in cases where
+>>> MFP_LPM_KEEP_OUTPUT was specified. This brings
+>> MFP_LPM_KEEP_OUTPUT into line
+>>> with MFP_LPM_DRIVE_HIGH and MFP_LPM_DRIVE_LOW.
+>>>
+>>> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+>>> ---
+>>>
+>>> diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c
+>> b/arch/arm/mach-pxa/mfp-pxa2xx.c
+>>> index b0a8428..3b443199 100644
+>>> --- a/arch/arm/mach-pxa/mfp-pxa2xx.c
+>>> +++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+>>> @@ -96,6 +96,9 @@ static int __mfp_config_gpio(unsigned
+>> gpio, unsigned long c)
+>>>           break;
+>>>       }
+>>>   
+>>> +    if (c & MFP_LPM_KEEP_OUTPUT)
+>>> +        is_out = 1;
+>>> +
+>>
+>> MFP_LPM_KEEP_OUTPUT does not meant to be used to setup the
+>> mfp config,
+> 
+> As far as I can see, MFP_LPM_KEEP_OUTPUT is *only* used to setup the
+> mfp config:
+> 
+> % xzcat linux-3.4-rc1.tar.xz | fgrep -a MFP_LPM_KEEP_OUTPUT
+> 	GPIO13_GPIO | MFP_LPM_KEEP_OUTPUT,	/* CORGI_GPIO_LED_ORANGE */
+> 	GPIO38_GPIO | MFP_LPM_KEEP_OUTPUT,	/* CORGI_GPIO_CHRG_ON */
+> 	GPIO43_GPIO | MFP_LPM_KEEP_OUTPUT,	/* CORGI_GPIO_CHRG_UKN */
+> #define MFP_LPM_KEEP_OUTPUT	(0x1 << 25)
+> 	/* set corresponding PGSR bit of those marked MFP_LPM_KEEP_OUTPUT */
+> 		if ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
+> % 
 
-Modeling the actual switches for the power domains as regulators
-is a good idea IMO. If using the thing in drivers/base/power/domain.c
-this still results in some code that has to flip the actual switch
-somewhere, and that very switch may well be modeled as a
-regulator. Example drivers/regulator/db8500-prcmu.c
+How can you be certain that you don't break corgi, with the proposed patch?
 
-So this would turn to the question of inserting a layer of power
-domain abstraction inbetween the device/bus and the regulator.
+> 
+>> but for pins that have been configured for output by
+>> gpio_direction_out().
+>> (Hint: *_KEEP_*).
+> 
+> MFP_LPM_KEEP_OUTPUT only takes effect when the system enters sleep mode,
+> at which point the GPIO directions (GPDR registers) are forced from the
+> values privately stored in gpdr_lpm[].
 
-So the AMBA bus would instead of using regulators directly have
-to use the power domains directly to achieve the same effect.
-Then the power domain implementation would need to do the
-handling of deferred probing, if it happens to be using regulators
-to turn the voltage domain switches.
+Correct, but with your patch, the direction will be forced to output,
+but the value will be undefined...
 
-That could (on some) platforms be handled in a centralized manner
-such as done by drivers/base/power/clock_ops.c
-say a regulator_ops.c thing instead.
+> As far as I can tell MFP_LPM_KEEP_OUTPUT has no direct connection to
+> gpio_direction_output().
 
-What I think is the central question is whether it was a mistake
-after all to model power domain switches as regulators, since the
-subsystem may be developing in a way more suited for off-chip
-regulator things with complex dependency chains and isn't
-suitable for the type of "just flip a bit in a memory
-mapped register" type of voltage domain regulator.
+Well, it has... in the pxa2xx_mfp_suspend() function you've pasted below.
 
-Maybe a power domain regulator shall be something simpler
-than an ordinary regulator? I think the abstraction we get
-through having it as a regulator is essentially good but implying
-a relationship to off-chip I2C-based regulators with complex
-deferred probing may not be desireable.
+> 
+>> Also, I don't think this is a good idea, because the patch
+>> allows a pin
+>> be configured as output, but does not forces a value
+>> (high/low)
+>> and this is not safe.
+> 
+> A value does not need to be provided until the system enters sleep mode,
+> at which point the value is provided via the PGSR registers.
 
-Should we think of something like a simpler, atomic ops
-type "SoC regulator" or something like that, and then
-require power domains to use such an abstraction instead
-of the ordinary regulator?
+Yes, but you don't force the PGSR to be set...
+and that is the problem.
 
-Yours,
-Linus Walleij
+> 
+>    353	static int pxa2xx_mfp_suspend(void)
+>    354	{
+>    355		int i;
+>    356	
+>    357		/* set corresponding PGSR bit of those marked MFP_LPM_KEEP_OUTPUT */
+>    358		for (i = 0; i < pxa_last_gpio; i++) {
+>    359			if ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
+>    360			    (GPDR(i) & GPIO_bit(i))) {
+
+Look at the check above...
+the PGSR only gets set for the GPIOs configured to output
+(presumably by gpio_direction_output() function).
+
+>    361				if (GPLR(i) & GPIO_bit(i))
+>    362					PGSR(gpio_to_bank(i)) |= GPIO_bit(i);
+>    363				else
+>    364					PGSR(gpio_to_bank(i)) &= ~GPIO_bit(i);
+>    365			}
+>    366		}
+>    367	
+>    368		for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++) {
+>    369	
+>         ...
+>    375			GPDR(i * 32) = gpdr_lpm[i];
+>    376		}
+>    377		return 0;
+>    378	}
+> 
+> However looking at pxa2xx_mfp_suspend() more closely it is true that the
+> GPDR registers are set before the PGSR values take effect (when the
+> processor enters sleep mode).
+> That is no different from MFP_LPM_DRIVE_HIGH or MFP_LPM_DRIVE_LOW though.
+
+Well, it is different, because the in case of MFP_LPM_DRIVE_*,
+the PGSR is set in the __mfp_config_gpio() function and has a _known value_.
+
+> So the presumption must be that the GPIOs configured as DRIVE_HIGH,
+> DRIVER_LOW and now KEEP_OUTPUT already have a valid direction and value
+> set at the point the GPDR registers are forced.
+
+Yes. That is exactly my point here.
+MFP_LPM_DRIVE_* has the value determined and set.
+MFP_LPM_KEEP_OUTPUT does not, but with your patch it will effectively
+force the GPIO to be output in sleep mode, but with no value set!
+
+> 
+>> Why can't you use:
+>> GPIO<n>_GPIO | MFP_LPM_DRIVE_<level>
+>> ?
+> 
+> The hx4700 has a couple of charging GPIOs which we want to keep HIGH or
+> LOW during sleep mode:
+> 
+> % fgrep MFP_LPM_KEEP_OUTPUT arch/arm/mach-pxa/hx4700.c
+> 	GPIO72_GPIO | MFP_LPM_KEEP_OUTPUT,	/* BQ24022_nCHARGE_EN */
+> 	GPIO96_GPIO | MFP_LPM_KEEP_OUTPUT,	/* BQ24022_ISET2 */
+> % 
+
+I still, can't understand, why MFP_LPM_DRIVE_* does not do the job for you...
+What's the real problem with using MFP_LPM_DRIVE_*?
+Can't you specify it for those GPIO72/96?
+
+
+-- 
+Regards,
+Igor.
