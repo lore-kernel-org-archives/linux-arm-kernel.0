@@ -1,76 +1,37 @@
-From: linuxppcemb@lkmail.de (Lorenz Kolb)
-Date: Sun, 01 Apr 2012 00:19:25 +0200
-Subject: [PATCH RFC] Simplify the Linux kernel by reducing its state space
-In-Reply-To: <20120331212149.GI2450@linux.vnet.ibm.com>
-References: <20120331163321.GA15809@linux.vnet.ibm.com>
- <1333227608.2325.4054.camel@edumazet-glaptop>
- <20120331212149.GI2450@linux.vnet.ibm.com>
-Message-ID: <4F7782ED.7050407@lkmail.de>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Sun, 1 Apr 2012 09:20:58 +0800
+Subject: [PATCH 0/2] change lpj in arm smp common code
+In-Reply-To: <87sjhtec0w.fsf@ti.com>
+References: <1330499895-12364-1-git-send-email-richard.zhao@linaro.org>
+ <87sjhtec0w.fsf@ti.com>
+Message-ID: <20120401012057.GC2603@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With that patchset in mind, I am working on a really huge patch, which 
-will greatly simplify the Linux kernel  for the real problem of having 
-that number of CPUs.
+On Wed, Feb 29, 2012 at 10:21:19AM -0800, Kevin Hilman wrote:
+> Richard Zhao <richard.zhao@linaro.org> writes:
+> 
+> > The two patches were originally in [PATCH V6 0/7] add a generic cpufreq driver.
+> > I seperated them and hope they can go to upstream earlier.
+> >
+> > Richard Zhao (2):
+> >   ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
+> >   cpufreq: OMAP: remove loops_per_jiffy recalculate for smp
+> 
+> The first one should go into Russell's patch system.  Once he queues
+> that, I can queue the OMAP one for the CPUfreq maintainer.
+Hi Russel & Kevin,
 
-That patch will have a lot of changes all over the architectures, so 
-what will be the best way to post it? Should I split it architecture 
-dependend and into one generic part.
+Could you double check whether you've picked the patch searies?
+I can not find them in 3.4rc.
 
-Currently it is a large blob of millions of changes, but will greatly 
-simplify the Linux kernel.
-
-Regards,
-
-Lorenz Kolb
-
-Am 31.03.2012 23:21, schrieb Paul E. McKenney:
-> On Sat, Mar 31, 2012 at 11:00:08PM +0200, Eric Dumazet wrote:
->    
->> On Sun, 2012-04-01 at 00:33 +0800, Paul E. McKenney wrote:
->>      
->>> Although there have been numerous complaints about the complexity of
->>> parallel programming (especially over the past 5-10 years), the plain
->>> truth is that the incremental complexity of parallel programming over
->>> that of sequential programming is not as large as is commonly believed.
->>> Despite that you might have heard, the mind-numbing complexity of modern
->>> computer systems is not due so much to there being multiple CPUs, but
->>> rather to there being any CPUs at all.  In short, for the ultimate in
->>> computer-system simplicity, the optimal choice is NR_CPUS=0.
->>>
->>> This commit therefore limits kernel builds to zero CPUs.  This change
->>> has the beneficial side effect of rendering all kernel bugs harmless.
->>> Furthermore, this commit enables additional beneficial changes, for
->>> example, the removal of those parts of the kernel that are not needed
->>> when there are zero CPUs.
->>>
->>> Signed-off-by: Paul E. McKenney<paulmck@linux.vnet.ibm.com>
->>> Reviewed-by: Thomas Gleixner<tglx@linutronix.de>
->>> ---
->>>        
->> Hmm... I believe you could go one step forward and allow negative values
->> as well. Antimatter was proven to exist after all.
->>
->> Hint : nr_cpu_ids is an "int", not an "unsigned int"
->>
->> Bonus: Existing bugs become "must have" features.
->>      
-> ;-) ;-) ;-)
->
->    
->> Of course there is no hurry and this can wait 365 days.
->>      
-> James Bottomley suggested imaginary numbers of CPUs some time back,
-> and I suppose there is no reason you cannot have fractional numbers of
-> CPUs, and perhaps irrational numbers as well.  Of course, these last two
-> would require use of floating-point arithmetic (or something similar)
-> in the kernel.  So I guess we have at several years worth.  Over to you
-> for the negative numbers.  ;-)
->
-> 							Thanx, Paul
->
+Thanks
+Richard
+> 
+> Kevin
+> 
 > _______________________________________________
-> Linuxppc-dev mailing list
-> Linuxppc-dev at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/linuxppc-dev
->    
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
