@@ -1,26 +1,23 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Mon, 02 Apr 2012 23:22:36 +0200
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
-In-Reply-To: <alpine.LFD.2.02.1204022251420.2542@ionos> (Thomas Gleixner's
- message of "Mon, 2 Apr 2012 22:52:34 +0200 (CEST)")
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
- <alpine.LFD.2.02.1204022251420.2542@ionos>
-Message-ID: <m2wr5xomlf.fsf@igel.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 2 Apr 2012 22:26:26 +0100
+Subject: [PATCH] ARM: S3C64XX: Hook up new style regulator-regulator
+ supplies on Cragganmore
+In-Reply-To: <4F79F891.7050106@samsung.com>
+References: <1333366519-7900-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <4F79F891.7050106@samsung.com>
+Message-ID: <20120402212625.GB3160@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner <tglx@linutronix.de> writes:
+On Mon, Apr 02, 2012 at 12:05:53PM -0700, Kukjin Kim wrote:
 
-> Hmm. Which irq chip is handling the interrupt for that sata irq ?
+> Mark, is this needed for v3.4?
 
-It's MPIC 1.
-
-Andreas.
-
--- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+No.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/31b6c252/attachment.sig>
