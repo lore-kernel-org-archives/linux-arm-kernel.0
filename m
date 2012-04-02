@@ -1,59 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 02 Apr 2012 08:03:47 -0500
-Subject: [PULL] generic irq chip and pl061 irqdomain support
-In-Reply-To: <20120313231834.8B6AE3E050F@localhost>
-References: <4F3ADFE7.4090409@gmail.com> <4F5437FE.2000306@gmail.com>
- <4F5FD037.5000703@gmail.com> <20120313231834.8B6AE3E050F@localhost>
-Message-ID: <4F79A3B3.9040209@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 Apr 2012 13:07:15 +0000
+Subject: [PATCH 4/7] arm: mach-pnx4008: Adjust i2c.c to updated i2c-pnx.c
+In-Reply-To: <1333371364-21347-5-git-send-email-stigge@antcom.de>
+References: <1333371364-21347-1-git-send-email-stigge@antcom.de>
+ <1333371364-21347-5-git-send-email-stigge@antcom.de>
+Message-ID: <201204021307.16072.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
-
-On 03/13/2012 06:18 PM, Grant Likely wrote:
-> On Tue, 13 Mar 2012 17:54:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
->> On 03/04/2012 09:50 PM, Rob Herring wrote:
->>> Grant,
->>>
->>> On 02/14/2012 04:27 PM, Rob Herring wrote:
->>>> Grant,
->>>>
->>>> Please pull. This is based on your current branch which you have said
->>>> you plan to rebase, so feel free to rebase these as you need to. This
->>>> has been tested on highbank and i.MX5.
->>>>
->>>
->>> Ping.
->>>
->>> I've rebased onto your current tree. Updated pull request:
->>>
->>> The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
->>>
->>>   mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
->>>
->>> are available in the git repository at:
->>>   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
->>>
->>> Rob Herring (3):
->>>       ARM: kconfig: always select IRQ_DOMAIN
->>>       irq: add irq_domain support to generic-chip
->>>       gpio: pl061: enable interrupts with DT style binding
->>>
->>>  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
->>>  arch/arm/Kconfig                                   |    2 +-
->>>  arch/arm/common/Kconfig                            |    2 -
->>>  drivers/gpio/gpio-pl061.c                          |   48 ++++---
->>>  include/linux/irq.h                                |   15 ++
->>>  kernel/irq/generic-chip.c                          |  152
->>> +++++++++++++++++---
->>>  6 files changed, 186 insertions(+), 48 deletions(-)
->>>
->>
->> Ping again...
+On Monday 02 April 2012, Roland Stigge wrote:
+> The i2c bus driver i2c-pnx.c (used by mach-pnx4008 and mach-lpc32xx) was
+> updated to support device tree. In this process, the struct i2c_pnx_data was
+> eliminated. Therefore, the platform data of pnx4008 is adjusted with this patch
+> to use default resources for mem and irq. DT support for pnx4008 is still not
+> available, but i2c-pnx.c now supports both DT and non-DT.
 > 
-> Okay, I've pulled this in.  I need to do some compile testing before I push
-> it out.
+> arch/arm/mach-pnx4008/include/mach/i2c.h can safely be removed now since its
+> contents is integrated in the updated i2c-pnx.c driver and was duplicated
+> between platforms pnx4008 and lpc32xx.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-What happened to this? It's not in rc1.
+Hi Roland,
 
-Rob
+The i2c changes look ok, but the order breaks bisection through the series.
+
+Since the changes in pnx4008 are fairly localized, I would suggest merging
+all three patches through the i2c tree and reorganizing the changes so
+that each change is atomic. I would suggest an order like:
+
+1. fix suspend
+2. move contents of mach/i2c.h from pnx4008 and lpc32xx to i2c driver
+3. change driver and platform device definitions to use resources instead
+   of platform data
+4. add support for device tree based probing
+
+	Arnd
