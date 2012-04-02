@@ -1,24 +1,26 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 02 Apr 2012 12:11:15 +0530
-Subject: [PATCH-V2 2/3] ARM: OMAP2+: hwmod data: Add 32k-sync timer data
- to hwmod database
-In-Reply-To: <1333115655-28530-3-git-send-email-hvaibhav@ti.com>
-References: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
- <1333115655-28530-3-git-send-email-hvaibhav@ti.com>
-Message-ID: <4F794A0B.6080309@ti.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Mon, 02 Apr 2012 09:47:00 +0300
+Subject: [PATCH] omap1: mux: add missing include
+In-Reply-To: <1333294241-17510-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1333294241-17510-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <4F794B64.5010107@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 March 2012 07:24 PM, Vaibhav Hiremath wrote:
-> Add 32k-sync timer hwmod data to omap2 & 3 hwmod table
-> and also enable existing hwmod data for omap4 (was disabled before).
+On 04/01/2012 06:30 PM, Aaro Koskinen wrote:
+> Fix the following build breakage in v3.4-rc1:
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Ming Lei <tom.leiming@gmail.com>
+> arch/arm/mach-omap1/mux.c:89:1: error: 'FUNC_MUX_CTRL_9' undeclared here (not in a function)
+> arch/arm/mach-omap1/mux.c:89:1: error: 'PULL_DWN_CTRL_2' undeclared here (not in a function)
+> arch/arm/mach-omap1/mux.c:93:1: error: 'FUNC_MUX_CTRL_C' undeclared here (not in a function)
+> 
+> etc.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 > ---
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>  arch/arm/mach-omap1/mux.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+(happens with omap1_defconfig if CONFIG_OMAP_MUX=y)
+
+Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
