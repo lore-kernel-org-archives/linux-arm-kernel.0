@@ -1,82 +1,22 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon,  2 Apr 2012 18:17:17 -0400
-Subject: [PATCH] ARM: fix lcd power build failure in collie_defconfig
-Message-ID: <1333405037-3053-1-git-send-email-paul.gortmaker@windriver.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 2 Apr 2012 23:29:12 +0100
+Subject: [PATCH] regulator: anatop: fix 'anatop_regulator' name collision
+In-Reply-To: <1333349821-5844-1-git-send-email-shawn.guo@linaro.org>
+References: <1333349821-5844-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120402222911.GO3160@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 086ada54abaa4316e8603f02410fe8ebc9ba2de1
+On Mon, Apr 02, 2012 at 02:57:01PM +0800, Shawn Guo wrote:
+> There is a name collision between 'struct platform_driver
+> anatop_regulator' and 'struct anatop_regulator', which causes some
+> section mismatch warnings like below.
 
-  "FB: sa1100: remove global sa1100fb_.*_power function pointers"
-
-got rid of all instances but one in locomolcd.c -- which was
-conditional on CONFIG_SA1100_COLLIE.  The associated .power
-field which replaces the global is populated in mach-sa1100/collie.c
-so move the assignment there, but make it conditional on the
-locomolcd support, so use CONFIG_BACKLIGHT_LOCOMO in that file.
-
-Cc: arm at kernel.org
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
-
-[ unchanged from original Mar6 send, just adding rmk ack ]
-
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index 48885b7..c7f418b 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -313,6 +313,10 @@ static struct sa1100fb_mach_info collie_lcd_info = {
- 
- 	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
- 	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
-+
-+#ifdef CONFIG_BACKLIGHT_LOCOMO
-+	.lcd_power	= locomolcd_power
-+#endif
- };
- 
- static void __init collie_init(void)
-diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
-index 52acda7..f33679d 100644
---- a/arch/arm/mach-sa1100/include/mach/collie.h
-+++ b/arch/arm/mach-sa1100/include/mach/collie.h
-@@ -1,7 +1,7 @@
- /*
-  * arch/arm/mach-sa1100/include/mach/collie.h
-  *
-- * This file contains the hardware specific definitions for Assabet
-+ * This file contains the hardware specific definitions for Collie
-  * Only include this file from SA1100-specific files.
-  *
-  * ChangeLog:
-@@ -13,6 +13,7 @@
- #ifndef __ASM_ARCH_COLLIE_H
- #define __ASM_ARCH_COLLIE_H
- 
-+extern void locomolcd_power(int on);
- 
- #define COLLIE_SCOOP_GPIO_BASE	(GPIO_MAX + 1)
- #define COLLIE_GPIO_CHARGE_ON	(COLLIE_SCOOP_GPIO_BASE + 0)
-diff --git a/drivers/video/backlight/locomolcd.c b/drivers/video/backlight/locomolcd.c
-index be20b5c..3a6d541 100644
---- a/drivers/video/backlight/locomolcd.c
-+++ b/drivers/video/backlight/locomolcd.c
-@@ -229,14 +229,7 @@ static struct locomo_driver poodle_lcd_driver = {
- 
- static int __init locomolcd_init(void)
- {
--	int ret = locomo_driver_register(&poodle_lcd_driver);
--	if (ret)
--		return ret;
--
--#ifdef CONFIG_SA1100_COLLIE
--	sa1100fb_lcd_power = locomolcd_power;
--#endif
--	return 0;
-+	return locomo_driver_register(&poodle_lcd_driver);
- }
- 
- static void __exit locomolcd_exit(void)
--- 
-1.7.9.1
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/e7ff68c7/attachment.sig>
