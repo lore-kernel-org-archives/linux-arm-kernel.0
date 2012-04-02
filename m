@@ -1,16 +1,17 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 02 Apr 2012 14:28:48 -0600
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 2 Apr 2012 22:52:34 +0200 (CEST)
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
 In-Reply-To: <m2hax2qeqs.fsf@igel.home>
 References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
  <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
  <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
-Message-ID: <20120402202848.1EB833E02A7@localhost>
+Message-ID: <alpine.LFD.2.02.1204022251420.2542@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Apr 2012 18:29:15 +0200, Andreas Schwab <schwab@linux-m68k.org> wrote:
+On Mon, 2 Apr 2012, Andreas Schwab wrote:
+
 > Andreas Schwab <schwab@linux-m68k.org> writes:
 > 
 > > Grant Likely <grant.likely@secretlab.ca> writes:
@@ -25,28 +26,9 @@ On Mon, 02 Apr 2012 18:29:15 +0200, Andreas Schwab <schwab@linux-m68k.org> wrote
 > When I revert a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5 ("genirq: Fix
 > long-term regression in genirq irq_set_irq_type() handling") on top of
 > 3.4-rc1 the sata irq errors disappear, but I see a lot of spurious
-> interrupts.  Also the X server is broken somehow, though I don't know
-> whether that is related or a different bug.
 
-That change is:
+Hmm. Which irq chip is handling the interrupt for that sata irq ?
 
-@@ -61,8 +61,7 @@ int irq_set_irq_type(unsigned int irq, unsigned int type)
-                return -EINVAL;
- 
-        type &= IRQ_TYPE_SENSE_MASK;
--       if (type != IRQ_TYPE_NONE)
--               ret = __irq_set_trigger(desc, irq, type);
-+       ret = __irq_set_trigger(desc, irq, type);
-        irq_put_desc_busunlock(desc, flags);
-        return ret;
+Thanks,
 
-So presumably irq_set_irq_type() is getting called with type ==
-IRQ_TYPE_NONE.  From Russell's description, presumably that would mean
-the G5 sata driver isn't setting the correct type for the interrupt,
-but I have *no* idea how that intersects with the change removing the
-powerpc irq map.
-
-Can you dump out /debug/powerpc/virq_mapping from both before and
-after the irq_map patch is applied?
-
-g.
+	tglx
