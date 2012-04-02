@@ -1,71 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Apr 2012 16:45:11 +0200
-Subject: [PATCH 1/5] ARM: mx53ard: Fix smsc911x driver probe
-In-Reply-To: <1333373987-30459-1-git-send-email-fabio.estevam@freescale.com>
-References: <1333373987-30459-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120402144511.GA3852@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 2 Apr 2012 22:58:24 +0800
+Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
+ MFP_LPM_KEEP_OUTPUT
+In-Reply-To: <1333373608.57077.YahooMailClassic@web29002.mail.ird.yahoo.com>
+References: <4F799F33.4070507@compulab.co.il>
+ <1333373608.57077.YahooMailClassic@web29002.mail.ird.yahoo.com>
+Message-ID: <CAN1soZy3JLK0NNt-VmgaJ8ofq5Qj7Y2WnpDKwPxyQXxZ_Mbw2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+>> > But since DRIVE_HIGH or DRIVE_LOW currently don't
+>> prevent that,
+>>
+>> Don't prevent what?
+>
+> Don't prevent a GPIO input being changed to an output when entering
+> suspend().
+>
+PGSRx register allow for selecting the output state (the driven value)
+of each GPIO pin when the processor enters and while it is in sleep
+mode.
 
-On Mon, Apr 02, 2012 at 10:39:43AM -0300, Fabio Estevam wrote:
-> Fix smsc911x driver probe by adding a fixed dummy regulator.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Each bit of PGSRx register is named as SS (Sleep State of GPIO<n>).
 
-The series looks good, I applied it to my fixes branch. Unless no
-objections to this one come up I'll send a pull request tomorrow. Please
-check git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes and
-let me know if I have missed something.
+SS '0' -- If GPIO is programmed as an output, the pin is driven and held
+low during the transition to and while in sleep mode.
 
-Sascha
+SS '1' -- If GPIO is programmed as an output, the pin is driven and held
+high during the transition to and while in sleep mode.
 
-> ---
->  arch/arm/mach-imx/mach-mx53_ard.c |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx53_ard.c b/arch/arm/mach-imx/mach-mx53_ard.c
-> index 753f4fc..0564198 100644
-> --- a/arch/arm/mach-imx/mach-mx53_ard.c
-> +++ b/arch/arm/mach-imx/mach-mx53_ard.c
-> @@ -23,6 +23,8 @@
->  #include <linux/delay.h>
->  #include <linux/gpio.h>
->  #include <linux/smsc911x.h>
-> +#include <linux/regulator/machine.h>
-> +#include <linux/regulator/fixed.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
-> @@ -214,6 +216,11 @@ static int weim_cs_config(void)
->  	return 0;
->  }
->  
-> +static struct regulator_consumer_supply dummy_supplies[] = {
-> +	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
-> +	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-> +};
-> +
->  void __init imx53_ard_common_init(void)
->  {
->  	mxc_iomux_v3_setup_multiple_pads(mx53_ard_pads,
-> @@ -232,6 +239,7 @@ static void __init mx53_ard_board_init(void)
->  
->  	imx53_ard_common_init();
->  	mx53_ard_io_init();
-> +	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
->  	platform_add_devices(devices, ARRAY_SIZE(devices));
->  
->  	imx53_add_sdhci_esdhc_imx(0, &mx53_ard_sd1_data);
-> -- 
-> 1.7.1
-> 
-> 
-> 
+So pin must be configured to GPIO output first before entering sleep mode.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Now the issue comes. If you use the pin as input, why do you need to change
+it into output mode in run time?
+
+> By the way, there is still the issue of DRIVE_HIGH and DRIVE_LOW
+> forcing the GPIO direction to output in pxa2xx_mfp_suspend()
+> *before* the PGSR values take effect. Surely a bug?
+>
+It's evil to change pin from input mode to output mode if it's in active mode.
+
+Actually we only need to configure control pins to peripherals on pxa27x. It's
+a little different from pxa3xx. For pxa3xx, we can even configure input pin
+in low power mode. PXA3xx has standby mode that internal device keeps
+its state. PXA27x doesn't have this feature. If we want to save power while
+PXA27x is suspend, the peripheral should be shutdown too.
+
+Since we need to shutdown peripheral, control pin should always connect to
+ reset or chip select signal of peripheral, we can disable the peripheral. So
+we needn't to configure low power mode of those input pins.
+
+Thanks
+Haojian
