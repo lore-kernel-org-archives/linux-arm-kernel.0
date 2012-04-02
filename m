@@ -1,24 +1,32 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 2 Apr 2012 13:49:42 +0530
-Subject: top command shows 100% irq
-In-Reply-To: <CAJ8eaTzw3TyPZnhEOqAfq3PtGWHAwSity8QhO9ENXqZ29CQ_jw@mail.gmail.com>
-References: <CAJ8eaTza9c7TTHtz97M1QFzsm5KHf0hyjtATa3a+9iQcE1Sgow@mail.gmail.com>
- <CAJ8eaTzw3TyPZnhEOqAfq3PtGWHAwSity8QhO9ENXqZ29CQ_jw@mail.gmail.com>
-Message-ID: <CAH+eYFD-S+M9FN1VyDP+X4Qj7Tv_6x770cy7zDAkDy9nZ3NU=Q@mail.gmail.com>
+From: martin.jansa@gmail.com (Martin Jansa)
+Date: Mon,  2 Apr 2012 10:24:08 +0200
+Subject: [PATCH] ARM: pxa: pxa2xx-i2s: add io.h for IOMEM macro
+Message-ID: <1333355048-732-1-git-send-email-Martin.Jansa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 2, 2012 at 11:16, naveen yadav <yad.naveen@gmail.com> wrote:
->> So it seams to me when struct clock_event_device *evt =
->> &__get_cpu_var(percpu_clockevent); is in irq_enter() function, this
->> leads ?100% irq.
->> what may be issue.
+* fixes
+  sound/soc/pxa/pxa2xx-i2s.c:86:2: error: implicit declaration of function 'IOMEM' [-Werror=implicit-function-declaration]
+  sound/soc/pxa/pxa2xx-i2s.c:86:2: error: initializer element is not constant
+  after 23019a733bb83c8499f192fb428b7e6e81c95a34 removed IOMEM
+  definition from arch/arm/mach-pxa/include/mach/hardware.h
 
-The problem is that ipi_timer() is also called from do_local_timer()
-on older kernels.  So if you backport this patch to an older kernel,
-you need to additionally add the irq_enter() and irq_exit() calls
-around the call to ipi_timer() in do_local_timer(), since the patch
-moves them out of ipi_timer().
+Signed-off-by: Martin Jansa <Martin.Jansa@gmail.com>
+---
+ sound/soc/pxa/pxa2xx-i2s.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-do_local_timer() doesn't exist on the kernel the patch was made for,
-since the percpu irq rework removed it.
+diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
+index 609abd5..d085837 100644
+--- a/sound/soc/pxa/pxa2xx-i2s.c
++++ b/sound/soc/pxa/pxa2xx-i2s.c
+@@ -17,6 +17,7 @@
+ #include <linux/delay.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/io.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+ #include <sound/initval.h>
+-- 
+1.7.8.5
