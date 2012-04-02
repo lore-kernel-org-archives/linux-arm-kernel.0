@@ -1,60 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 02 Apr 2012 14:08:10 -0700
-Subject: [PATCH 1/6] ARM: S3C24XX: Add forgotten clock lookup table to
- S3C2443
-In-Reply-To: <201203122000.31216.heiko@sntech.de>
-References: <201203121959.32966.heiko@sntech.de>
- <201203122000.31216.heiko@sntech.de>
-Message-ID: <4F7A153A.5070701@samsung.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 03 Apr 2012 07:20:00 +1000
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
+In-Reply-To: <alpine.LFD.2.02.1204022251420.2542@ionos>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <alpine.LFD.2.02.1204022251420.2542@ionos>
+Message-ID: <1333401600.30734.56.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> When the hsmmc clock lookup was changed to be lookup tables based,
-> it seems the S3C2443 was forgotten.
->
-> As subsequent patches will want to add more lookups to it, this
-> patch adds the base table with the missing hsmmc lookup.
->
-> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
-> ---
->   arch/arm/mach-s3c24xx/clock-s3c2443.c |    5 +++++
->   1 files changed, 5 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c24xx/clock-s3c2443.c b/arch/arm/mach-s3c24xx/clock-s3c2443.c
-> index efb3ac3..bce1cd3 100644
-> --- a/arch/arm/mach-s3c24xx/clock-s3c2443.c
-> +++ b/arch/arm/mach-s3c24xx/clock-s3c2443.c
-> @@ -179,6 +179,10 @@ static struct clk *clks[] __initdata = {
->   	&clk_hsmmc,
->   };
->
-> +static struct clk_lookup s3c2443_clk_lookup[] = {
-> +	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2",&clk_hsmmc),
-> +};
-> +
->   void __init s3c2443_init_clocks(int xtal)
->   {
->   	unsigned long epllcon = __raw_readl(S3C2443_EPLLCON);
-> @@ -210,6 +214,7 @@ void __init s3c2443_init_clocks(int xtal)
->
->   	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
->   	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
-> +	clkdev_add_table(s3c2443_clk_lookup, ARRAY_SIZE(s3c2443_clk_lookup));
->
->   	s3c_pwmclk_init();
->   }
+On Mon, 2012-04-02 at 22:52 +0200, Thomas Gleixner wrote:
+> > When I revert a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5 ("genirq: Fix
+> > long-term regression in genirq irq_set_irq_type() handling") on top
+> of
+> > 3.4-rc1 the sata irq errors disappear, but I see a lot of spurious
+> 
+> Hmm. Which irq chip is handling the interrupt for that sata irq ?
 
-Uhm..how about mach-s3c24xx/common-s3c2443.c?
+MPIC. The irq is a PCI IRQ, and so should be level-low, it should have
+been mapped by the PCI code using the of_* calls.
 
-I think, we need to sort out some files in mach-s3c24xx/ and some 
-remained mach-s3c24.. directories, actually, as you know, we didn't have 
-much time to do it last time :)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cheers,
+Ben.
