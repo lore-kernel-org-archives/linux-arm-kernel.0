@@ -1,61 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Apr 2012 10:34:00 -0700
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 2 Apr 2012 18:34:12 +0100
 Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
-In-Reply-To: <20120402172133.GH24211@n2100.arm.linux.org.uk>
+In-Reply-To: <20120402170442.GF24211@n2100.arm.linux.org.uk>
 References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
  <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <4F787392.5040308@codeaurora.org>
- <20120401153450.GC8971@opensource.wolfsonmicro.com>
- <4F79D85F.4020909@codeaurora.org>
- <20120402165242.GC24211@n2100.arm.linux.org.uk>
- <4F79DC03.7020503@codeaurora.org>
- <20120402170858.GG24211@n2100.arm.linux.org.uk>
- <4F79DED3.4070007@codeaurora.org>
- <20120402172133.GH24211@n2100.arm.linux.org.uk>
-Message-ID: <4F79E308.5090208@codeaurora.org>
+ <20120402170442.GF24211@n2100.arm.linux.org.uk>
+Message-ID: <20120402172954.GH15197@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/12 10:21, Russell King - ARM Linux wrote:
-> On Mon, Apr 02, 2012 at 10:16:03AM -0700, Stephen Boyd wrote:
->> On 04/02/12 10:08, Russell King - ARM Linux wrote:
->>> Utter crap.  Deleting them makes the non-common clock implementations
->>> unsafe.  If a struct clk is provided by a module (and we do have some
->>> which are) then the module reference count has to be held.  That's
->>> what these hooks do.
->>>
->>> When these platforms get converted over to the common clock, and the
->>> issues surrounding dynamically registered and removed clocks are sane,
->>> these hooks have to be used by the common clock to deal with the
->>> refcounting so that common code knows when the structures can be freed.
->> I'm saying that when every platform is using the common clock code we
->> would only have one __clk_get() implementation and we should be able to
->> delete clkdev.h entirely.
-> No you did not, you said quite clearly that clkdev should go away and
-> be replaced by something else, because you see clkdev as just another
-> "platform specific implementation" (your words).  You were definitely
-> not talking about _just_ the backends for clkdev's clk_get().
+On Mon, Apr 02, 2012 at 06:04:43PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Apr 01, 2012 at 12:32:40PM +0100, Mark Brown wrote:
+> > Allow clk API users to simplify their cleanup paths by providing a
+> > managed version of clk_get().
 
-Sorry. I was speaking about the future when we have one struct clk
-definition. I suppose that wasn't clear because I wasn't explicit.
+> > Due to the lack of a standard struct clk to look up the device from a
+> > managed clk_put() is not provided, it would be very unusual to use this
+> > function so it's not a big loss.
 
-I do think we should improve/replace clkdev by keeping the core parts
-(device name and connection name mapping) and internalizing it in the
-common clock code. Your comment about a 1:N mapping between clocks and
-devices sounds unfortunate.
+> Err, why?  The contents of struct clk has nothing to do with clk_put().
+> You're doing something really wrong here.
 
-Ideally we should be generating struct clks at runtime when clk_get() is
-called. This way we can tie each caller of clk_get() to a different
-instance of a struct clk that eventually all maps back to the same
-struct clk_hw in the hardware layer. Right now clkdev is managing the
-mapping at too high of a level and denies any such dynamic allocation
-scheme.
+It does for a devm_clk_put().  Normally this would end up being:
 
-If we did this it would help us locate bad drivers who all share some
-clock in common. Finding which driver is keeping a clock on is annoying
-when you have to trace each clk_enable/disable call and see who is
-calling it to figure out which driver hasn't released its vote.
+	void devm_clk_put(struct clk *clk);
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+but the devres stuff needs us to have a struct device to get the
+underlying allocation/mapping and undo it.
+
+> Remember, there is not going to _ever_ be the situation where a struct clk
+> is specific to any particular struct device - it's a 1:N mapping between
+> clks and devices.
+
+Right, absolutely - to do it as above struct clk would be allocated per
+user and indirect to the actual clock implementation (which some people
+were muttering about for other reasons, though I can't remember what
+those were off the top of my head).  Probably what would actually end up
+happening is that we'd instead have a signature like:
+
+	devm_clk_put(struct device *dev, struct clk *clk);
+
+but I didn't particularly feel like making that decision right now,
+especially if we do end up going with per user allocations and can use
+the more idiomatic signature.
+
+> So, until you sort out your misunderstanding, NAK.
+
+I think I understand just fine, thanks.
+
+In any case, we'd only really need a devm_clk_put() if someone wants one
+which is a bit of a corner case in the first place so just ignoring the
+issue until that happens should be fine.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/90c172ee/attachment.sig>
