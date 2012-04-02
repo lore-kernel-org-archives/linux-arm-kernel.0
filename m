@@ -1,36 +1,55 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Mon, 02 Apr 2012 18:29:15 +0200
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
-In-Reply-To: <m2iphj3zxr.fsf@igel.home> (Andreas Schwab's message of "Sun, 01
- Apr 2012 23:27:44 +0200")
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home>
-Message-ID: <m2hax2qeqs.fsf@igel.home>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  2 Apr 2012 17:30:17 +0100
+Subject: [PATCH] ARM: DT: Add binding for GIC virtualization extentions (VGIC)
+Message-ID: <1333384217-13441-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas Schwab <schwab@linux-m68k.org> writes:
+The GICv2 can have virtualization extension support, consisting
+of an additional set of registers and interrupts. Add the necessary
+binding to the GIC DT documentation.
 
-> Grant Likely <grant.likely@secretlab.ca> writes:
->
->> This patch drops the powerpc-specific irq_map table and replaces it with
->> directly using the irq_alloc_desc()/irq_free_desc() interfaces for allocating
->> and freeing irq_desc structures.
->
-> This breaks irqs on PowerMac G5.  I see lost irq errors from the sata
-> driver.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/devicetree/bindings/arm/gic.txt |   29 +++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
 
-When I revert a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5 ("genirq: Fix
-long-term regression in genirq irq_set_irq_type() handling") on top of
-3.4-rc1 the sata irq errors disappear, but I see a lot of spurious
-interrupts.  Also the X server is broken somehow, though I don't know
-whether that is related or a different bug.
-
-Andreas.
-
+diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+index 9b4b82a..fb1b5ab 100644
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@ -57,3 +57,32 @@ Example:
+ 		      <0xfff10100 0x100>;
+ 	};
+ 
++
++* GIC virtualization extensions (VGIC)
++
++For ARM cores that support the virtualization extensions, an
++additional node describes the VGIC hardware block. Only exists if the
++GIC is the primary interrupt controller.
++
++Required properties:
++- compatible : should be one of:
++	"arm,cortex-a15-vgic"
++	"arm,cortex-a7-vgic"
++	"arm,vgic"
++
++- reg : Specifies base physical address and size of the VGIC
++  registers. The first region is the GIC virtual interface control
++  register base and size.  the 2nd region is the GIC virtual cpu
++  interface register base and size.
++
++- interrupts : VGIC maintainance interrupt. Must be relative to the
++  primary GIC.
++
++Example:
++
++	vgic at 2c004000 {
++		compatible = "arm,cortex-a15-vgic", "arm,vgic";
++		reg = <0x2c004000 0x2000>,
++		      <0x2c006000 0x2000>;
++		interrupts = <1 9 0xf04>;
++	};
 -- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+1.7.7.1
