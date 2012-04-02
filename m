@@ -1,22 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Apr 2012 22:43:50 +0100
-Subject: [PATCH] ARM: pxa: pxa2xx-i2s: add io.h for IOMEM macro
-In-Reply-To: <1333355048-732-1-git-send-email-Martin.Jansa@gmail.com>
-References: <1333355048-732-1-git-send-email-Martin.Jansa@gmail.com>
-Message-ID: <20120402214350.GF3160@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Apr 2012 22:46:14 +0100
+Subject: [BUG?] vic MULTI_IRQ_HANDLER (was [PATCH] ep93xx: Implement
+ double buffering for M2M DMA channels)
+In-Reply-To: <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
+References: <ADE657CA350FB648AAC2C43247A983F0020698409ABF@AUSP01VMBX24.collaborationhost.net>
+ <CACb=_tQ4pSXtmKnqM23p97iyRbnrdZicw6ao68t2KjL46srAuQ@mail.gmail.com>
+ <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <20120402214614.GK24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 10:24:08AM +0200, Martin Jansa wrote:
-> * fixes
+On Mon, Apr 02, 2012 at 11:00:34PM +0300, Mika Westerberg wrote:
+> Anyway it looks like handle_IRQ() enables interrupts when it is finished with
+> the current interrupt which then causes hw to interrupt second time resulting
+> failure in case of ep93xx.
 
-*Please* make some effort to use subject lines appropriate to your
-patches.  I just about deleted this unread because it doesn't mention
-anything to do with audio.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/910e04c6/attachment.sig>
+Soft IRQ processing in the irq exit path will enable interrupts, and
+this is probably where the problem is showing up.
+
+You've identified an important difference between the level 1 interrupt
+controller handlers and the chained handlers, and I suggest that folk
+re-implement their level 1 interrupt handlers in the same way as the
+assembly code was: re-read the interrupt register each time round the
+loop.
+
+Otherwise, we're going to have to move all the L1 stuff up a level,
+so that you only have one irq_enter() ... irq_exit() around the L1
+handler.  That means you'll avoid running any softirqs until you've
+cleared down all interrupts in the system, which might be bad news for
+softirq latency (and it'd be different from x86 behaviour, where softirqs
+are run after each non-nested IRQ is handled.)
