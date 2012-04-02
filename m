@@ -1,38 +1,40 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Apr 2012 18:16:42 +0100
-Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
-In-Reply-To: <4F79D85F.4020909@codeaurora.org>
-References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <4F787392.5040308@codeaurora.org>
- <20120401153450.GC8971@opensource.wolfsonmicro.com>
- <4F79D85F.4020909@codeaurora.org>
-Message-ID: <20120402171641.GF15197@opensource.wolfsonmicro.com>
+Date: Mon, 2 Apr 2012 18:19:16 +0100
+Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
+In-Reply-To: <20120402165742.GD24211@n2100.arm.linux.org.uk>
+References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
+ <CAH+eYFC+q4xFuSdRBkO9nb0XZWU4pQ_yCyinMy2X3ds9WQd1kw@mail.gmail.com>
+ <CACRpkda2zh=zR+A9bwhRXYHtQdFeUpiqG4d5g1i82mPCs1mXaQ@mail.gmail.com>
+ <20120402101427.GA3172@opensource.wolfsonmicro.com>
+ <20120402104357.GB24211@n2100.arm.linux.org.uk>
+ <20120402113413.GA7560@opensource.wolfsonmicro.com>
+ <20120402165742.GD24211@n2100.arm.linux.org.uk>
+Message-ID: <20120402171916.GG15197@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 09:48:31AM -0700, Stephen Boyd wrote:
+On Mon, Apr 02, 2012 at 05:57:42PM +0100, Russell King - ARM Linux wrote:
 
-> I hope we get a better clk_get() implementation with the unified struct
-> clk. Don't get me wrong, clkdev is a great improvement over open coding
-> clock framework stuff in each platform. But clkdev is really just
-> another platform specific implementation that most platforms decide to
-> use. Each platform has to select the option and it breaks if two
+> ARM PRIMECELL BUS SUPPORT
+> M:      Russell King <linux@arm.linux.org.uk>
+> S:      Maintained
+> F:      drivers/amba/
+> F:      include/linux/amba/bus.h
 
-> Sticking devm_clk_get() into clkdev.c is simple, no new file, smaller
-> diff. Great. But linking it to clkdev doesn't sound much better when
-> we're trying to get rid of platform specific code and this code is
-> entirely platform independent.
+> not provide enough clues?  Should I delete all my entries in that file
+> because the only people who look in there are spammers when the file is
+> published on the web?
 
-Why wouldn't we want to continue to use clkdev with the generic clock
-framework?  There's nothing particularly wrong with clkdev and we need a
-standard mechanism for doing this anyway.  Frankly I was very surprised
-when I looked just now and realised that the generic framework doesn't
-use it automatically, I might just send a patch for that...
+I did look in there and also in the git history which shows the same
+information, hence my CCing you.  Linus introduced some doubt into my
+mind that this might be something that went through arm-soc now rather
+than via your tree even if you are still maintaining it as no specific
+git tree or anything is mentioned there.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/4c2b6896/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/0df36727/attachment.sig>
