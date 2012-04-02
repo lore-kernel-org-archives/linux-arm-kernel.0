@@ -1,42 +1,109 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Mon, 02 Apr 2012 11:28:36 +0200
-Subject: [PATCH 1/3] PATA host controller driver for ep93xx
-In-Reply-To: <201204020808.34529.arnd@arndb.de>
-References: <4F7418E7.4060500@metasoft.pl> <201203302018.43681.arnd@arndb.de>
- <4F795AD1.4070101@metasoft.pl> <201204020808.34529.arnd@arndb.de>
-Message-ID: <4F797144.400@metasoft.pl>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 2 Apr 2012 17:37:05 +0800
+Subject: [PATCH V3 1/4] Input: pxa27x_keypad keep clock on as wakeup source
+In-Reply-To: <1333246084-14110-1-git-send-email-chao.xie@marvell.com>
+References: <1333246084-14110-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <CAN1soZyBPE3YExELmu5yHeMTWQf9Zs07v26F6Qz3ocKO+cXGFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-04-02 10:08, Arnd Bergmann wrote:
-> On Monday 02 April 2012, Rafal Prylowski wrote:
->>
->> I selected "PATA SFF controllers with BMDMA" list because the driver
->> inherits .ata_bmdma_port_ops (this is in libata-sff.c, which is compiled
->> only if ATA_SFF is set).
-> 
-> Ok, I see. Is it actually the right one to inherit from though?
-> 
-> You end up overriding most of the opterations that are set there again,
-> the only ones that you use are:
-> 
-> ata_bmdma_error_handler, ata_bmdma_post_internal_cmd, ata_bmdma_qc_issue,
-> ata_sff_qc_fill_rtf, ata_sff_freeze, ata_sff_thaw, ata_sff_prereset,
-> ata_sff_postreset and ata_sff_error_handler.
-> 
-> Are you sure they are all doing the righ thing on your hardware? If
-> not, it might be better to explicitly just set the ones you need and
-> see if that still uses any sff functions in the end.
-> 
-> 	Arnd
+On Sun, Apr 1, 2012 at 10:08 AM, Chao Xie <chao.xie@marvell.com> wrote:
+> When the keypad is used as wake up source, the clock can not
+> be disabled. Or it can not detect key pressing.
+> If the keypad is used as wake up source, when resume back,
+> do not enable the clock and configure it again because the
+> register content is retained.
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+> ?drivers/input/keyboard/pxa27x_keypad.c | ? 33 ++++++++++++++++++++-----------
+> ?1 files changed, 21 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+> index 29fe1b2..b07771e 100644
+> --- a/drivers/input/keyboard/pxa27x_keypad.c
+> +++ b/drivers/input/keyboard/pxa27x_keypad.c
+> @@ -399,7 +399,7 @@ static int pxa27x_keypad_open(struct input_dev *dev)
+> ? ? ? ?struct pxa27x_keypad *keypad = input_get_drvdata(dev);
+>
+> ? ? ? ?/* Enable unit clock */
+> - ? ? ? clk_enable(keypad->clk);
+> + ? ? ? clk_prepare_enable(keypad->clk);
+> ? ? ? ?pxa27x_keypad_config(keypad);
+>
+> ? ? ? ?return 0;
+> @@ -410,7 +410,7 @@ static void pxa27x_keypad_close(struct input_dev *dev)
+> ? ? ? ?struct pxa27x_keypad *keypad = input_get_drvdata(dev);
+>
+> ? ? ? ?/* Disable clock unit */
+> - ? ? ? clk_disable(keypad->clk);
+> + ? ? ? clk_disable_unprepare(keypad->clk);
+> ?}
+>
+> ?#ifdef CONFIG_PM
+> @@ -419,10 +419,14 @@ static int pxa27x_keypad_suspend(struct device *dev)
+> ? ? ? ?struct platform_device *pdev = to_platform_device(dev);
+> ? ? ? ?struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+>
+> - ? ? ? clk_disable(keypad->clk);
+> -
+> + ? ? ? /*
+> + ? ? ? ?* If the keypad is used a wake up source, clock can not be disabled.
+> + ? ? ? ?* Or it can not detect the key pressing.
+> + ? ? ? ?*/
+> ? ? ? ?if (device_may_wakeup(&pdev->dev))
+> ? ? ? ? ? ? ? ?enable_irq_wake(keypad->irq);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? clk_disable_unprepare(keypad->clk);
+>
+> ? ? ? ?return 0;
+> ?}
+> @@ -433,19 +437,24 @@ static int pxa27x_keypad_resume(struct device *dev)
+> ? ? ? ?struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+> ? ? ? ?struct input_dev *input_dev = keypad->input_dev;
+>
+> - ? ? ? if (device_may_wakeup(&pdev->dev))
+> + ? ? ? /*
+> + ? ? ? ?* If the keypad is used as wake up source, the clock is not turned
+> + ? ? ? ?* off. So do not need configure it again.
+> + ? ? ? ?*/
+> + ? ? ? if (device_may_wakeup(&pdev->dev)) {
+> ? ? ? ? ? ? ? ?disable_irq_wake(keypad->irq);
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? mutex_lock(&input_dev->mutex);
+>
+> - ? ? ? mutex_lock(&input_dev->mutex);
+> + ? ? ? ? ? ? ? if (input_dev->users) {
+> + ? ? ? ? ? ? ? ? ? ? ? /* Enable unit clock */
+> + ? ? ? ? ? ? ? ? ? ? ? clk_prepare_enable(keypad->clk);
+> + ? ? ? ? ? ? ? ? ? ? ? pxa27x_keypad_config(keypad);
+> + ? ? ? ? ? ? ? }
+>
+> - ? ? ? if (input_dev->users) {
+> - ? ? ? ? ? ? ? /* Enable unit clock */
+> - ? ? ? ? ? ? ? clk_enable(keypad->clk);
+> - ? ? ? ? ? ? ? pxa27x_keypad_config(keypad);
+> + ? ? ? ? ? ? ? mutex_unlock(&input_dev->mutex);
+> ? ? ? ?}
+>
+> - ? ? ? mutex_unlock(&input_dev->mutex);
+> -
+> ? ? ? ?return 0;
+> ?}
+>
+> --
+> 1.7.0.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I think that inheriting from .ata_bmdma_port_ops is quite reasonable.
-Another option would be to inherit from .ata_sff_port_ops and implement
-.qc_issue hook (like in pata_octeon_cf.c), but this way we end up
-reimplementing the same things from libata-sff.c, IMHO. Also, I think
-that it's not possible to write PATA driver without this SFF stuff
-(at least for me - I'm not libata expert).
-I reviewed code paths from all hooks used in ep93xx driver to make sure
-that we use only ep93xx_pata_read/ep93xx_pata_write instead of ioread/iowrite.
+Hi Dmitry,
 
-RP
+I just found that you're not looped in this mail thread. Could I merge
+them into arch-pxa tree?
+
+Best Regards
+Haojian
