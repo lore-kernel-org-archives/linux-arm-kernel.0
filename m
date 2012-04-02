@@ -1,124 +1,66 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon,  2 Apr 2012 12:15:29 -0700
-Subject: [PATCH] ARM: EXYNOS: convert irq combiner to generic irq chip
-Message-ID: <1333394129-20624-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon,  2 Apr 2012 12:17:07 -0700
+Subject: [PATCH] ARM: EXYNOS: autodetect enabled serial port in uncompress
+Message-ID: <1333394227-21986-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Cross <ccross@android.com>
 
-The irq combiner is very simple, convert it to a generic irq chip.
-Also adds a resume handler to restore the masks after suspend.
+Check the ULCON register of each serial port to determine if
+it has been enabled by the bootloader.  If only one serial port
+is found enabled, use that one.  Otherwise, use the value from
+CONFIG_S3C_LOWLEVEL_UART_PORT.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/common.c |   71 +++++++++++++++++-----------------------
- 1 files changed, 30 insertions(+), 41 deletions(-)
+ arch/arm/mach-exynos/include/mach/uncompress.h |   25 ++++++++++++++++++++++-
+ 1 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index e6cc50e..ec7680c 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -391,28 +391,6 @@ struct combiner_chip_data {
- 
- static struct combiner_chip_data combiner_data[MAX_COMBINER_NR];
- 
--static inline void __iomem *combiner_base(struct irq_data *data)
--{
--	struct combiner_chip_data *combiner_data =
--		irq_data_get_irq_chip_data(data);
--
--	return combiner_data->base;
--}
--
--static void combiner_mask_irq(struct irq_data *data)
--{
--	u32 mask = 1 << (data->irq % 32);
--
--	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
--}
--
--static void combiner_unmask_irq(struct irq_data *data)
--{
--	u32 mask = 1 << (data->irq % 32);
--
--	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_SET);
--}
--
- static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- {
- 	struct combiner_chip_data *chip_data = irq_get_handler_data(irq);
-@@ -442,12 +420,6 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
+diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
+index 2979995..0d17a43 100644
+--- a/arch/arm/mach-exynos/include/mach/uncompress.h
++++ b/arch/arm/mach-exynos/include/mach/uncompress.h
+@@ -25,6 +25,25 @@ static unsigned int __raw_readl(unsigned int ptr)
+ 	return *((volatile unsigned int *)ptr);
  }
  
--static struct irq_chip combiner_chip = {
--	.name		= "COMBINER",
--	.irq_mask	= combiner_mask_irq,
--	.irq_unmask	= combiner_unmask_irq,
--};
--
- static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
- {
- 	unsigned int max_nr;
-@@ -464,11 +436,20 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
- 	irq_set_chained_handler(irq, combiner_handle_cascade_irq);
- }
- 
-+static void combiner_resume(struct irq_data *data)
++static volatile u8 *exynos_autodetect_uart(volatile u8 *base)
 +{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
++	int i;
++	int found = 0;
++	int port;
 +
-+	__raw_writel(~gc->mask_cache, gc->reg_base + COMBINER_ENABLE_CLEAR);
-+	__raw_writel(gc->mask_cache, gc->reg_base + COMBINER_ENABLE_SET);
++	for (i = 0; i < CONFIG_SERIAL_SAMSUNG_UARTS; i++) {
++		if (__raw_readl((unsigned int)base + S3C_UART_OFFSET * i)) {
++			port = i;
++			found++;
++		}
++	}
++
++	if (found != 1)
++		port = CONFIG_S3C_LOWLEVEL_UART_PORT;
++
++	return base + S3C_UART_OFFSET * port;
 +}
 +
- static void __init combiner_init(unsigned int combiner_nr, void __iomem *base,
- 			  unsigned int irq_start)
+ static void arch_detect_cpu(void)
  {
--	unsigned int i;
- 	unsigned int max_nr;
-+	struct irq_chip_generic *gc;
-+	struct irq_chip_type *ct;
+ 	u32 chip_id = __raw_readl(EXYNOS_PA_CHIPID);
+@@ -38,9 +57,11 @@ static void arch_detect_cpu(void)
+ 	chip_id &= 0xf;
  
- 	if (soc_is_exynos5250())
- 		max_nr = EXYNOS5_MAX_COMBINER_NR;
-@@ -482,18 +463,26 @@ static void __init combiner_init(unsigned int combiner_nr, void __iomem *base,
- 	combiner_data[combiner_nr].irq_offset = irq_start;
- 	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
+ 	if (chip_id == 0x5)
+-		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
++		uart_base = (volatile u8 *)EXYNOS5_PA_UART;
+ 	else
+-		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
++		uart_base = (volatile u8 *)EXYNOS4_PA_UART;
++
++	uart_base = exynos_autodetect_uart(uart_base);
  
--	/* Disable all interrupts */
-+	if ((combiner_nr % 4) == 0) {
-+		/* Disable all interrupts */
- 
--	__raw_writel(combiner_data[combiner_nr].irq_mask,
--		     base + COMBINER_ENABLE_CLEAR);
-+		__raw_writel(IRQ_MSK(32), base + COMBINER_ENABLE_CLEAR);
- 
--	/* Setup the Linux IRQ subsystem */
-+		gc = irq_alloc_generic_chip("combiner", 1, irq_start,
-+					    base, handle_level_irq);
-+		if (!gc) {
-+			pr_err("Failed to allocate combiner irq chip\n");
-+			return;
-+		}
- 
--	for (i = irq_start; i < combiner_data[combiner_nr].irq_offset
--				+ MAX_IRQ_IN_COMBINER; i++) {
--		irq_set_chip_and_handler(i, &combiner_chip, handle_level_irq);
--		irq_set_chip_data(i, &combiner_data[combiner_nr]);
--		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-+		ct = gc->chip_types;
-+		ct->chip.irq_mask = irq_gc_mask_disable_reg;
-+		ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
-+		ct->chip.irq_resume = combiner_resume;
-+		ct->regs.enable = COMBINER_ENABLE_SET;
-+		ct->regs.disable = COMBINER_ENABLE_CLEAR;
-+		irq_setup_generic_chip(gc, IRQ_MSK(32), 0,
-+			IRQ_NOREQUEST | IRQ_NOPROBE, 0);
- 	}
- }
- 
+ 	/*
+ 	 * For preventing FIFO overrun or infinite loop of UART console,
 -- 
 1.7.2.3
