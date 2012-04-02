@@ -1,40 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Apr 2012 18:19:16 +0100
-Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <20120402165742.GD24211@n2100.arm.linux.org.uk>
-References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
- <CAH+eYFC+q4xFuSdRBkO9nb0XZWU4pQ_yCyinMy2X3ds9WQd1kw@mail.gmail.com>
- <CACRpkda2zh=zR+A9bwhRXYHtQdFeUpiqG4d5g1i82mPCs1mXaQ@mail.gmail.com>
- <20120402101427.GA3172@opensource.wolfsonmicro.com>
- <20120402104357.GB24211@n2100.arm.linux.org.uk>
- <20120402113413.GA7560@opensource.wolfsonmicro.com>
- <20120402165742.GD24211@n2100.arm.linux.org.uk>
-Message-ID: <20120402171916.GG15197@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Apr 2012 18:21:33 +0100
+Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
+In-Reply-To: <4F79DED3.4070007@codeaurora.org>
+References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <4F787392.5040308@codeaurora.org>
+ <20120401153450.GC8971@opensource.wolfsonmicro.com>
+ <4F79D85F.4020909@codeaurora.org>
+ <20120402165242.GC24211@n2100.arm.linux.org.uk>
+ <4F79DC03.7020503@codeaurora.org>
+ <20120402170858.GG24211@n2100.arm.linux.org.uk>
+ <4F79DED3.4070007@codeaurora.org>
+Message-ID: <20120402172133.GH24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 05:57:42PM +0100, Russell King - ARM Linux wrote:
+On Mon, Apr 02, 2012 at 10:16:03AM -0700, Stephen Boyd wrote:
+> On 04/02/12 10:08, Russell King - ARM Linux wrote:
+> > Utter crap.  Deleting them makes the non-common clock implementations
+> > unsafe.  If a struct clk is provided by a module (and we do have some
+> > which are) then the module reference count has to be held.  That's
+> > what these hooks do.
+> >
+> > When these platforms get converted over to the common clock, and the
+> > issues surrounding dynamically registered and removed clocks are sane,
+> > these hooks have to be used by the common clock to deal with the
+> > refcounting so that common code knows when the structures can be freed.
+> 
+> I'm saying that when every platform is using the common clock code we
+> would only have one __clk_get() implementation and we should be able to
+> delete clkdev.h entirely.
 
-> ARM PRIMECELL BUS SUPPORT
-> M:      Russell King <linux@arm.linux.org.uk>
-> S:      Maintained
-> F:      drivers/amba/
-> F:      include/linux/amba/bus.h
-
-> not provide enough clues?  Should I delete all my entries in that file
-> because the only people who look in there are spammers when the file is
-> published on the web?
-
-I did look in there and also in the git history which shows the same
-information, hence my CCing you.  Linus introduced some doubt into my
-mind that this might be something that went through arm-soc now rather
-than via your tree even if you are still maintaining it as no specific
-git tree or anything is mentioned there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/0df36727/attachment.sig>
+No you did not, you said quite clearly that clkdev should go away and
+be replaced by something else, because you see clkdev as just another
+"platform specific implementation" (your words).  You were definitely
+not talking about _just_ the backends for clkdev's clk_get().
