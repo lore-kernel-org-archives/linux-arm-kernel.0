@@ -1,41 +1,43 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 02 Apr 2012 14:21:57 +1000
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
- irq_alloc_desc() instead
-In-Reply-To: <m2iphj3zxr.fsf@igel.home>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home>
-Message-ID: <1333340517.30734.42.camel@pasglop>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 2 Apr 2012 06:50:39 +0200
+Subject: [PATCH v5 04/16] pwm: Add table-based lookup for static mappings
+In-Reply-To: <20120402004730.GA910@S2101-09.ap.freescale.net>
+References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+ <1332945238-14897-5-git-send-email-thierry.reding@avionic-design.de>
+ <20120329220342.GK4153@opensource.wolfsonmicro.com>
+ <20120330050641.GA21823@avionic-0098.mockup.avionic-design.de>
+ <20120330101800.GD21950@opensource.wolfsonmicro.com>
+ <20120330103840.GB961@avionic-0098.mockup.avionic-design.de>
+ <20120331143021.GA18382@avionic-0098.mockup.avionic-design.de>
+ <20120401152042.GE2395@S2101-09.ap.freescale.net>
+ <20120402004730.GA910@S2101-09.ap.freescale.net>
+Message-ID: <20120402045039.GA22916@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-04-01 at 23:27 +0200, Andreas Schwab wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
-> 
-> > This patch drops the powerpc-specific irq_map table and replaces it with
-> > directly using the irq_alloc_desc()/irq_free_desc() interfaces for allocating
-> > and freeing irq_desc structures.
-> 
-> This breaks irqs on PowerMac G5.  I see lost irq errors from the sata
-> driver.
-> 
-> Note that the breakage only started after the series was merged into
-> mainline.  But when transplanted upon the parent of the merge this is
-> the commit that was blamed by bisect.  So something changed between
-> v3.3-rc3 and the merge of this series that broke it.
+* Shawn Guo wrote:
+> On Sun, Apr 01, 2012 at 11:20:46PM +0800, Shawn Guo wrote:
+> > On Sat, Mar 31, 2012 at 04:30:21PM +0200, Thierry Reding wrote:
+> ...
+> > > The "bad"
+> > > thing is that it'll make the "pwm-names" property mandatory if more than a
+> > > single PWM is requested.
+> > > 
+> > You do not have to make it mandatory, but anyone requesting any pwm
+> > other than the first on in "pwms" list should fail.
+> > 
+> I should have put it this way.  If a client device does not have
+> "pwm-names" property in its node, it should fail when requesting pwm
+> with a name.  And if no name is given, the first pwm device in the
+> "pwms" list could just be returned.
 
-can you tell me more ? (What machine precisely, what .config etc...) ?
+Yes, that's how I understood it. =)
 
-I tested here on two G5's:
-
- - PowerMac7,3 aka Dual G5 AGP. This ones has U3 + K2 and
-uses cascaded MPICs
-
- - PowerMac11,2 aka Quad G5. This one has U4 + K2 and uses a single MPIC
-in the northbridge
-
-And both appear to work fine with today upstream (basically -rc1).
-
-Cheers,
-Ben.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/b14048f2/attachment.sig>
