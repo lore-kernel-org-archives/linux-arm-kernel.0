@@ -1,53 +1,33 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 2 Apr 2012 09:00:38 +0530
-Subject: [PATCH] fixup! pinctrl: Replace list_*() with get_*_count()
-In-Reply-To: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
-References: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
-Message-ID: <dbb0162aa10ba58f9630dac07d875e696862a691.1333337290.git.viresh.kumar@st.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Mon, 02 Apr 2012 09:20:04 +0530
+Subject: [alsa-devel] [PATCH 1/1] ASoC: soc-dmaengine-pcm: fix compile
+ error	since dma api is changed
+In-Reply-To: <7FE21149F4667147B645348EC6057885153794@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1333197468-3263-1-git-send-email-b29396@freescale.com>
+ <4F76EB8D.2060200@metafoo.de>
+ <7FE21149F4667147B645348EC6057885153794@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <1333338604.1610.0.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Sat, 2012-03-31 at 12:39 +0000, Dong Aisheng-B29396 wrote:
+> > > sound/soc/soc-dmaengine-pcm.c: In function
+> > 'dmaengine_pcm_prepare_and_submit':
+> > > sound/soc/soc-dmaengine-pcm.c:149: error: too few arguments to
+> function
+> > 'chan->device->device_prep_dma_cyclic'
+> > > make[2]: *** [sound/soc/soc-dmaengine-pcm.o] Error 1
+> > > make[1]: *** [sound/soc] Error 2
+> > > make: *** [sound] Error 2
+> > >
+> > 
+> > Hi,
+> > 
+> > There is already a fix for this in Mark's for-3.4 branch.
+> Okay, thanks for reminder.
+> I missed to check Mark's tree.
+> 
+This fix is there in rc1
 
-This is an incremental patch over patch mentioned in subject. Please squash it
-with earlier one while applying.
-
-ngroup check for tegra was still present at some places, that was mentioned by
-stephen.
----
- drivers/pinctrl/pinctrl-tegra.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-tegra.c b/drivers/pinctrl/pinctrl-tegra.c
-index 774f7fd..41311a2 100644
---- a/drivers/pinctrl/pinctrl-tegra.c
-+++ b/drivers/pinctrl/pinctrl-tegra.c
-@@ -158,8 +158,6 @@ static void tegra_pinctrl_disable(struct pinctrl_dev *pctldev,
- 	const struct tegra_pingroup *g;
- 	u32 val;
- 
--	if (group >= pmx->soc->ngroups)
--		return;
- 	g = &pmx->soc->groups[group];
- 
- 	if (g->mux_reg < 0)
-@@ -302,8 +300,6 @@ static int tegra_pinconf_group_get(struct pinctrl_dev *pctldev,
- 	s16 reg;
- 	u32 val, mask;
- 
--	if (group >= pmx->soc->ngroups)
--		return -EINVAL;
- 	g = &pmx->soc->groups[group];
- 
- 	ret = tegra_pinconf_reg(pmx, g, param, &bank, &reg, &bit, &width);
-@@ -331,8 +327,6 @@ static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
- 	s16 reg;
- 	u32 val, mask;
- 
--	if (group >= pmx->soc->ngroups)
--		return -EINVAL;
- 	g = &pmx->soc->groups[group];
- 
- 	ret = tegra_pinconf_reg(pmx, g, param, &bank, &reg, &bit, &width);
 -- 
-1.7.9
+~Vinod
