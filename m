@@ -1,67 +1,36 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon,  2 Apr 2012 14:56:04 +0200
-Subject: [PATCH 7/7] wdt: Device tree support for pnx4008-wdt
-In-Reply-To: <1333371364-21347-1-git-send-email-stigge@antcom.de>
-References: <1333371364-21347-1-git-send-email-stigge@antcom.de>
-Message-ID: <1333371364-21347-8-git-send-email-stigge@antcom.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 02 Apr 2012 07:58:38 -0500
+Subject: [PATCH] ARM: pxa: pxa2xx-i2s: add io.h for IOMEM macro
+In-Reply-To: <1333355048-732-1-git-send-email-Martin.Jansa@gmail.com>
+References: <1333355048-732-1-git-send-email-Martin.Jansa@gmail.com>
+Message-ID: <4F79A27E.1010509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds watchdog support to pnx4008-wdt.c
+On 04/02/2012 03:24 AM, Martin Jansa wrote:
+> * fixes
+>   sound/soc/pxa/pxa2xx-i2s.c:86:2: error: implicit declaration of function 'IOMEM' [-Werror=implicit-function-declaration]
+>   sound/soc/pxa/pxa2xx-i2s.c:86:2: error: initializer element is not constant
+>   after 23019a733bb83c8499f192fb428b7e6e81c95a34 removed IOMEM
+>   definition from arch/arm/mach-pxa/include/mach/hardware.h
+> 
+> Signed-off-by: Martin Jansa <Martin.Jansa@gmail.com>
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
----
-
- Applies to v3.4-rc1
-
- Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt |   13 +++++++++++++
- drivers/watchdog/pnx4008_wdt.c                             |   10 ++++++++++
- 2 files changed, 23 insertions(+)
-
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
-@@ -0,0 +1,13 @@
-+* NXP PNX watchdog timer
-+
-+Required properties:
-+- compatible: must be "nxp,pnx4008-wdt"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+Example:
-+
-+	watchdog at 4003C000 {
-+		compatible = "nxp,pnx4008-wdt";
-+		reg = <0x4003C000 0x1000>;
-+	};
---- linux-2.6.orig/drivers/watchdog/pnx4008_wdt.c
-+++ linux-2.6/drivers/watchdog/pnx4008_wdt.c
-@@ -32,6 +32,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <mach/hardware.h>
- 
- /* WatchDog Timer - Chapter 23 Page 207 */
-@@ -201,10 +202,19 @@ static int __devexit pnx4008_wdt_remove(
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id pnx4008_wdt_match[] = {
-+	{ .compatible = "nxp,pnx4008-wdt" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pnx4008_wdt_match);
-+#endif
-+
- static struct platform_driver platform_wdt_driver = {
- 	.driver = {
- 		.name = "pnx4008-watchdog",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(pnx4008_wdt_match),
- 	},
- 	.probe = pnx4008_wdt_probe,
- 	.remove = __devexit_p(pnx4008_wdt_remove),
+> ---
+>  sound/soc/pxa/pxa2xx-i2s.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
+> index 609abd5..d085837 100644
+> --- a/sound/soc/pxa/pxa2xx-i2s.c
+> +++ b/sound/soc/pxa/pxa2xx-i2s.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/clk.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/io.h>
+>  #include <sound/core.h>
+>  #include <sound/pcm.h>
+>  #include <sound/initval.h>
