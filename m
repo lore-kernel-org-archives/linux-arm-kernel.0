@@ -1,48 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Apr 2012 11:26:10 +0200
-Subject: [PATCH v2 2/3] i.MX27: visstrim_m10: Remove use of
- MX2_CAMERA_SWAP16.
-In-Reply-To: <1332767868-2531-3-git-send-email-javier.martin@vista-silicon.com>
-References: <1332767868-2531-1-git-send-email-javier.martin@vista-silicon.com>
- <1332767868-2531-3-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120402092610.GW26642@pengutronix.de>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Mon, 02 Apr 2012 11:28:36 +0200
+Subject: [PATCH 1/3] PATA host controller driver for ep93xx
+In-Reply-To: <201204020808.34529.arnd@arndb.de>
+References: <4F7418E7.4060500@metasoft.pl> <201203302018.43681.arnd@arndb.de>
+ <4F795AD1.4070101@metasoft.pl> <201204020808.34529.arnd@arndb.de>
+Message-ID: <4F797144.400@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2012 at 03:17:47PM +0200, Javier Martin wrote:
+On 2012-04-02 10:08, Arnd Bergmann wrote:
+> On Monday 02 April 2012, Rafal Prylowski wrote:
+>>
+>> I selected "PATA SFF controllers with BMDMA" list because the driver
+>> inherits .ata_bmdma_port_ops (this is in libata-sff.c, which is compiled
+>> only if ATA_SFF is set).
 > 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Should go via the media tree.
-
-Sascha
-
-> ---
->  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> Ok, I see. Is it actually the right one to inherit from though?
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> index 3128cfe..4db00c6 100644
-> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> @@ -164,7 +164,7 @@ static struct platform_device visstrim_tvp5150 = {
->  
->  
->  static struct mx2_camera_platform_data visstrim_camera = {
-> -	.flags = MX2_CAMERA_CCIR | MX2_CAMERA_CCIR_INTERLACE | MX2_CAMERA_SWAP16 | MX2_CAMERA_PCLK_SAMPLE_RISING,
-> +	.flags = MX2_CAMERA_CCIR | MX2_CAMERA_CCIR_INTERLACE | MX2_CAMERA_PCLK_SAMPLE_RISING,
->  	.clk = 100000,
->  };
->  
-> -- 
-> 1.7.0.4
+> You end up overriding most of the opterations that are set there again,
+> the only ones that you use are:
 > 
+> ata_bmdma_error_handler, ata_bmdma_post_internal_cmd, ata_bmdma_qc_issue,
+> ata_sff_qc_fill_rtf, ata_sff_freeze, ata_sff_thaw, ata_sff_prereset,
+> ata_sff_postreset and ata_sff_error_handler.
 > 
+> Are you sure they are all doing the righ thing on your hardware? If
+> not, it might be better to explicitly just set the ones you need and
+> see if that still uses any sff functions in the end.
+> 
+> 	Arnd
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think that inheriting from .ata_bmdma_port_ops is quite reasonable.
+Another option would be to inherit from .ata_sff_port_ops and implement
+.qc_issue hook (like in pata_octeon_cf.c), but this way we end up
+reimplementing the same things from libata-sff.c, IMHO. Also, I think
+that it's not possible to write PATA driver without this SFF stuff
+(at least for me - I'm not libata expert).
+I reviewed code paths from all hooks used in ep93xx driver to make sure
+that we use only ep93xx_pata_read/ep93xx_pata_write instead of ioread/iowrite.
+
+RP
