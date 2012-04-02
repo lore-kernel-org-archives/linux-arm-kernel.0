@@ -1,17 +1,194 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 2 Apr 2012 12:04:32 -0300
-Subject: [PATCH 1/5] ARM: mx53ard: Fix smsc911x driver probe
-In-Reply-To: <CAOMZO5CnnOzUTemkNaf41jhhWOiEgc7Jo4AU1fxPPxDBNDXdsw@mail.gmail.com>
-References: <1333373987-30459-1-git-send-email-fabio.estevam@freescale.com>
- <20120402144511.GA3852@pengutronix.de>
- <CAOMZO5CnnOzUTemkNaf41jhhWOiEgc7Jo4AU1fxPPxDBNDXdsw@mail.gmail.com>
-Message-ID: <CAOMZO5A=5Y6Lo=o2v1a=NMyfO2ffFN9Lap49XZWNSbqVvebZkQ@mail.gmail.com>
+From: jon-hunter@TI.COM (Jon Hunter)
+Date: Mon, 2 Apr 2012 10:31:20 -0500
+Subject: [PATCH-V2 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ runtime
+In-Reply-To: <79CD15C6BA57404B839C016229A409A831843008@DBDE01.ent.ti.com>
+References: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
+ <1333115655-28530-4-git-send-email-hvaibhav@ti.com> <4F75D290.8090706@ti.com>
+ <79CD15C6BA57404B839C016229A409A831843008@DBDE01.ent.ti.com>
+Message-ID: <4F79C648.5020504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 2, 2012 at 12:02 PM, Fabio Estevam <festevam@gmail.com> wrote:
+On 4/2/2012 1:06, Hiremath, Vaibhav wrote:
 
-> Please apply this one too:
-> http://patchwork.ozlabs.org/patch/144942/
+>> [...]
+>>
+>>> @@ -280,13 +265,33 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+>>>  						const char *fck_source)
+>>>  {
+>>>  	int res;
+>>> +	struct omap_hwmod *oh;
+>>> +	const char *oh_name = "counter_32k";
+>>> +
+>>> +	/*
+>>> +	 * First check for availability for 32k-sync timer.
+>>> +	 *
+>>> +	 * In case of failure in finding 32k_counter module or
+>>> +	 * registering it as clocksource, execution will fallback to
+>>> +	 * gp-timer.
+>>> +	 */
+>>> +	oh = omap_hwmod_lookup(oh_name);
+>>> +	if (oh && oh->slaves_cnt != 0) {
+>>> +		u32 pbase;
+>>> +		unsigned long size;
+>>> +
+>>> +		pbase = oh->slaves[0]->addr->pa_start + 0x10;
+>>> +		size = oh->slaves[0]->addr->pa_end -
+>>> +			oh->slaves[0]->addr->pa_start;
+>>> +		res = omap_init_clocksource_32k(pbase, size);
+>>> +		if (!res)
+>>> +			return;
+>>
+>>
+>> If omap_init_clocksource_32k() fails should we also call BUG_ON here?
+>>
+> 
+> I don't think we should do that, for following reasons,
+> 
+> 	- There will be platforms without 32k_counter modules, like am33xx.
+>         For them, this BUG_ON will miss-leading.
+> 	- pr_err is already used to provide failure in this function.
+> 	- We have safe fallback option here.
 
-Ops, I see this one on your branch now.
+
+Ok, sorry I mis-read the code. I see the return here is on success and
+not failure. So this is fine.
+
+By the way, for an AM33xx device, I assume that the omap_hwmod_lookup
+will return NULL because the module does not exist. Therefore, you would
+not even enter the if statement and so there should not be any impact.
+Which still raises the question, if omap_hwmod_lookup() finds the device
+but omap_init_clocksource_32k() fails, should we at least WARN?
+
+The fallback option is only safe for devices that are not using power
+management and don't cut the sys-clk.
+
+
+>>> +	}
+>>>
+>>> +	/* Fall back to gp-timer code */
+>>>  	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source);
+>>>  	BUG_ON(res);
+>>>
+>>> -	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+>>> -		gptimer_id, clksrc.rate);
+>>> -
+>>>  	__omap_dm_timer_load_start(&clksrc,
+>>>  			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+>>>  	setup_sched_clock(dmtimer_read_sched_clock, 32, clksrc.rate);
+>>> @@ -294,8 +299,10 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+>>>  	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
+>>>  		pr_err("Could not register clocksource %s\n",
+>>>  			clocksource_gpt.name);
+>>> +	else
+>>> +		pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+>>> +			gptimer_id, clksrc.rate);
+>>>  }
+>>> -#endif
+>>>
+>>>  #define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src,			\
+>>>  				clksrc_nr, clksrc_src)			\
+>>> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+>>> index 5068fe5..c1af18c 100644
+>>> --- a/arch/arm/plat-omap/counter_32k.c
+>>> +++ b/arch/arm/plat-omap/counter_32k.c
+>>> @@ -35,8 +35,6 @@
+>>>   */
+>>>  static void __iomem *timer_32k_base;
+>>>
+>>> -#define OMAP16XX_TIMER_32K_SYNCHRONIZED		0xfffbc410
+>>> -
+>>>  static u32 notrace omap_32k_read_sched_clock(void)
+>>>  {
+>>>  	return timer_32k_base ? __raw_readl(timer_32k_base) : 0;
+>>> @@ -68,54 +66,42 @@ void read_persistent_clock(struct timespec *ts)
+>>>  	*ts = *tsp;
+>>>  }
+>>>
+>>> -int __init omap_init_clocksource_32k(void)
+>>> +int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
+>>>  {
+>>> -	static char err[] __initdata = KERN_ERR
+>>> -			"%s: can't register clocksource!\n";
+>>> -
+>>> -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+>>> -		u32 pbase;
+>>> -		unsigned long size = SZ_4K;
+>>> -		void __iomem *base;
+>>> -		struct clk *sync_32k_ick;
+>>> -
+>>> -		if (cpu_is_omap16xx()) {
+>>> -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
+>>> -			size = SZ_1K;
+>>> -		} else if (cpu_is_omap2420())
+>>> -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
+>>> -		else if (cpu_is_omap2430())
+>>> -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
+>>> -		else if (cpu_is_omap34xx())
+>>> -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+>>> -		else if (cpu_is_omap44xx())
+>>> -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+>>> -		else
+>>> -			return -ENODEV;
+>>> -
+>>> -		/* For this to work we must have a static mapping in io.c for this area */
+>>> -		base = ioremap(pbase, size);
+>>> -		if (!base)
+>>> -			return -ENODEV;
+>>> -
+>>> -		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+>>> -		if (!IS_ERR(sync_32k_ick))
+>>> -			clk_enable(sync_32k_ick);
+>>
+>>> -
+>>
+>>> -		timer_32k_base = base;
+>>> -
+>>> -		/*
+>>> -		 * 120000 rough estimate from the calculations in
+>>> -		 * __clocksource_updatefreq_scale.
+>>> -		 */
+>>> -		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+>>> -				32768, NSEC_PER_SEC, 120000);
+>>> -
+>>> -		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+>>> -					  clocksource_mmio_readl_up))
+>>> -			printk(err, "32k_counter");
+>>> -
+>>> -		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
+>>> -	}
+>>> +	void __iomem *base;
+>>> +	struct clk *sync_32k_ick;
+>>> +
+>>> +	if (!pbase || !size)
+>>> +		return -ENODEV;
+>>> +	/*
+>>> +	 * For this to work we must have a static mapping in io.c
+>>> +	 * for this area
+>>> +	 */
+>>> +	base = ioremap(pbase, size);
+>>> +	if (!base)
+>>> +		return -ENODEV;
+>>> +
+>>> +	sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+>>> +	if (!IS_ERR(sync_32k_ick))
+>>> +		clk_enable(sync_32k_ick);
+>>
+>>
+>> I know that this is carry over from the original code, but seems that if
+>> clk_get fails we should return an error. So maybe ...
+>>
+> 
+> I thought of this before, but again the next thought came to my mind was, 
+> somebody might have done this for some specific reasons, may be OMAP1 
+> dependency or something? So I choose it to keep it as is...
+> 
+> So before doing this, I thing we should conform from the original author
+> about this implementation.
+
+
+Ok, yes good point.
+
+Cheers
+Jon
