@@ -1,169 +1,54 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  2 Apr 2012 03:21:38 +0200
-Subject: [PATCH 2/4] ARM: mxs: factor out dynamic amba device allocator
-Message-ID: <1333329698-31666-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  2 Apr 2012 03:22:01 +0200
+Subject: [PATCH 3/4] ARM: integrator: factor out dynamic amba device allocator
+Message-ID: <1333329721-31700-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Replace the local amba device allocator with the core code from
 the bus driver.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-mxs/devices-mx23.h                |   11 ++++--
- arch/arm/mach-mxs/devices-mx28.h                |   12 +++++--
- arch/arm/mach-mxs/devices.c                     |   16 ---------
- arch/arm/mach-mxs/devices/Makefile              |    1 -
- arch/arm/mach-mxs/devices/amba-duart.c          |   40 -----------------------
- arch/arm/mach-mxs/include/mach/devices-common.h |    5 ---
- 6 files changed, 17 insertions(+), 68 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/devices/amba-duart.c
+ arch/arm/mach-integrator/impd1.c |   22 +++++++---------------
+ 1 files changed, 7 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
-index 4d1329d..1feea23 100644
---- a/arch/arm/mach-mxs/devices-mx23.h
-+++ b/arch/arm/mach-mxs/devices-mx23.h
-@@ -11,10 +11,15 @@
- #include <mach/mx23.h>
- #include <mach/devices-common.h>
- #include <mach/mxsfb.h>
-+#include <linux/amba/bus.h>
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 3e538da..e428f3a 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -398,24 +398,16 @@ static int impd1_probe(struct lm_device *dev)
+ 		struct impd1_device *idev = impd1_devs + i;
+ 		struct amba_device *d;
+ 		unsigned long pc_base;
++		char devname[32];
  
--extern const struct amba_device mx23_duart_device __initconst;
--#define mx23_add_duart() \
--	mxs_add_duart(&mx23_duart_device)
-+static inline int mx23_add_duart() {
-+	struct amba_device *d;
-+
-+	d = amba_ahb_device_add(NULL, "duart", MX23_DUART_BASE_ADDR, SZ_8K,
-+				MX23_INT_DUART, 0, 0, 0);
-+	return IS_ERR(d) ? PTR_ERR(d) : 0;
-+}
+ 		pc_base = dev->resource.start + idev->offset;
+-
+-		d = amba_device_alloc(NULL, pc_base, SZ_4K);
+-		if (!d)
++		snprintf(devname, 32, "lm%x:%5.5lx", dev->id, idev->offset >> 12);
++		d = amba_ahb_device_add(&dev->dev, devname, pc_base, SZ_4K,
++					dev->irq, dev->irq,
++					idev->platform_data, idev->id);
++		if (IS_ERR(d)) {
++			dev_err(&dev->dev, "unable to register device: %ld\n", PTR_ERR(d));
+ 			continue;
+-
+-		dev_set_name(&d->dev, "lm%x:%5.5lx", dev->id, idev->offset >> 12);
+-		d->dev.parent	= &dev->dev;
+-		d->irq[0]	= dev->irq;
+-		d->irq[1]	= dev->irq;
+-		d->periphid	= idev->id;
+-		d->dev.platform_data = idev->platform_data;
+-
+-		ret = amba_device_add(d, &dev->resource);
+-		if (ret) {
+-			dev_err(&d->dev, "unable to register device: %d\n", ret);
+-			amba_device_put(d);
+ 		}
+ 	}
  
- extern const struct mxs_auart_data mx23_auart_data[] __initconst;
- #define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
-diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-index 9dbeae1..b46c6d1 100644
---- a/arch/arm/mach-mxs/devices-mx28.h
-+++ b/arch/arm/mach-mxs/devices-mx28.h
-@@ -11,10 +11,16 @@
- #include <mach/mx28.h>
- #include <mach/devices-common.h>
- #include <mach/mxsfb.h>
-+#include <linux/amba/bus.h>
-+
-+static inline int mx28_add_duart() {
-+	struct amba_device *d;
-+
-+	d = amba_ahb_device_add(NULL, "duart", MX28_DUART_BASE_ADDR, SZ_8K,
-+				MX28_INT_DUART, 0, 0, 0);
-+	return IS_ERR(d) ? PTR_ERR(d) : 0;
-+}
- 
--extern const struct amba_device mx28_duart_device __initconst;
--#define mx28_add_duart() \
--	mxs_add_duart(&mx28_duart_device)
- 
- extern const struct mxs_auart_data mx28_auart_data[] __initconst;
- #define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
-diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
-index 01faffe..cf50b5a 100644
---- a/arch/arm/mach-mxs/devices.c
-+++ b/arch/arm/mach-mxs/devices.c
-@@ -75,22 +75,6 @@ err:
- 	return pdev;
- }
- 
--int __init mxs_add_amba_device(const struct amba_device *dev)
--{
--	struct amba_device *adev = amba_device_alloc(dev->dev.init_name,
--		dev->res.start, resource_size(&dev->res));
--
--	if (!adev) {
--		pr_err("%s: failed to allocate memory", __func__);
--		return -ENOMEM;
--	}
--
--	adev->irq[0] = dev->irq[0];
--	adev->irq[1] = dev->irq[1];
--
--	return amba_device_add(adev, &iomem_resource);
--}
--
- struct device mxs_apbh_bus = {
- 	.init_name	= "mxs_apbh",
- 	.parent         = &platform_bus,
-diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-index c8f5c95..5f72d97 100644
---- a/arch/arm/mach-mxs/devices/Makefile
-+++ b/arch/arm/mach-mxs/devices/Makefile
-@@ -1,4 +1,3 @@
--obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
- obj-y += platform-dma.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
-diff --git a/arch/arm/mach-mxs/devices/amba-duart.c b/arch/arm/mach-mxs/devices/amba-duart.c
-deleted file mode 100644
-index a5479f7..0000000
---- a/arch/arm/mach-mxs/devices/amba-duart.c
-+++ /dev/null
-@@ -1,40 +0,0 @@
--/*
-- * Copyright (C) 2009-2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <asm/irq.h>
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define MXS_AMBA_DUART_DEVICE(name, soc)			\
--const struct amba_device name##_device __initconst = {		\
--	.dev = {						\
--		.init_name = "duart",				\
--	},							\
--	.res = {						\
--		.start = soc ## _DUART_BASE_ADDR,		\
--		.end = (soc ## _DUART_BASE_ADDR) + SZ_8K - 1,	\
--		.flags = IORESOURCE_MEM,			\
--	},							\
--	.irq = {soc ## _INT_DUART},				\
--}
--
--#ifdef CONFIG_SOC_IMX23
--MXS_AMBA_DUART_DEVICE(mx23_duart, MX23);
--#endif
--
--#ifdef CONFIG_SOC_IMX28
--MXS_AMBA_DUART_DEVICE(mx28_duart, MX28);
--#endif
--
--int __init mxs_add_duart(const struct amba_device *dev)
--{
--	return mxs_add_amba_device(dev);
--}
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-index f2e3839..21e45a7 100644
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -27,11 +27,6 @@ static inline struct platform_device *mxs_add_platform_device(
- 			name, id, res, num_resources, data, size_data, 0);
- }
- 
--int __init mxs_add_amba_device(const struct amba_device *dev);
--
--/* duart */
--int __init mxs_add_duart(const struct amba_device *dev);
--
- /* auart */
- struct mxs_auart_data {
- 	int id;
 -- 
 1.7.7.6
