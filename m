@@ -1,38 +1,102 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  2 Apr 2012 03:20:54 +0200
-Subject: [PATCH 0/4] amba: consolidate dynamic allocators
-Message-ID: <1333329654-31597-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  2 Apr 2012 03:21:25 +0200
+Subject: [PATCH 1/4] amba: add functions to add devices dynamically
+Message-ID: <1333329685-31631-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few platforms allocate amba_device:s dynamically using custom
-code. After remembering that Greg said that all devices should be
-dynamically allocated I realize that this is a desired design
-pattern and we should move the core code to the amba (primecell)
-bus layer.
+Add two functions to add APB and AHB devices to the amba (PrimeCell)
+bus dynamically. This is modeled after the static definition
+macros recently introduced into <linux/amba/bus.h> and can
+help us in factoring out a bunch of code across the kernel.
+Since a lot of call sites seem to be using a returned struct
+amba device* pointer, let's use that.
 
-Need help with testing the MXS, Shawn?
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/amba/bus.c       |   49 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/amba/bus.h |    8 +++++++
+ 2 files changed, 57 insertions(+), 0 deletions(-)
 
-Linus Walleij (4):
-  amba: add functions to add devices dynamically
-  ARM: mxs: factor out dynamic amba device allocator
-  ARM: integrator: factor out dynamic amba device allocator
-  ARM: ux500: factor out dynamic amba device allocator
-
- arch/arm/mach-integrator/impd1.c                |   22 +++-------
- arch/arm/mach-mxs/devices-mx23.h                |   11 ++++-
- arch/arm/mach-mxs/devices-mx28.h                |   12 ++++-
- arch/arm/mach-mxs/devices.c                     |   16 -------
- arch/arm/mach-mxs/devices/Makefile              |    1 -
- arch/arm/mach-mxs/devices/amba-duart.c          |   40 ------------------
- arch/arm/mach-mxs/include/mach/devices-common.h |    5 --
- arch/arm/mach-ux500/devices-common.c            |   33 ---------------
- arch/arm/mach-ux500/devices-common.h            |   23 +++++------
- arch/arm/mach-ux500/devices-db8500.h            |    2 +-
- drivers/amba/bus.c                              |   49 +++++++++++++++++++++++
- include/linux/amba/bus.h                        |    8 ++++
- 12 files changed, 92 insertions(+), 130 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/devices/amba-duart.c
-
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 01c2cf4..5382624 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -583,6 +583,55 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+ }
+ EXPORT_SYMBOL_GPL(amba_device_add);
+ 
++static struct amba_device *
++amba_aphb_device_add(struct device *parent, const char *name,
++		     resource_size_t base, size_t size, int irq1, int irq2,
++		     void *pdata, unsigned int periphid, u64 dma_mask)
++{
++	struct amba_device *dev;
++	int ret;
++
++	dev = amba_device_alloc(name, base, size);
++	if (!dev)
++		return ERR_PTR(-ENOMEM);
++
++	dev->dma_mask = dma_mask;
++	dev->dev.coherent_dma_mask = dma_mask;
++	dev->irq[0] = irq1;
++	dev->irq[1] = irq2;
++	dev->periphid = periphid;
++	dev->dev.platform_data = pdata;
++	dev->dev.parent = parent;
++
++	ret = amba_device_add(dev, &iomem_resource);
++	if (ret) {
++		amba_device_put(dev);
++		return ERR_PTR(ret);
++	}
++
++	return dev;
++}
++
++struct amba_device *
++amba_apb_device_add(struct device *parent, const char *name,
++		    resource_size_t base, size_t size, int irq1, int irq2,
++		    void *pdata, unsigned int periphid)
++{
++	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
++				    periphid, 0);
++}
++EXPORT_SYMBOL_GPL(amba_apb_device_add);
++
++struct amba_device *
++amba_ahb_device_add(struct device *parent, const char *name,
++		    resource_size_t base, size_t size, int irq1, int irq2,
++		    void *pdata, unsigned int periphid)
++{
++	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
++				    periphid, ~0ULL);
++}
++EXPORT_SYMBOL_GPL(amba_ahb_device_add);
++
+ static void amba_device_initialize(struct amba_device *dev, const char *name)
+ {
+ 	device_initialize(&dev->dev);
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index 7847e19..db64b0c 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -64,6 +64,14 @@ struct amba_device *amba_device_alloc(const char *, resource_size_t, size_t);
+ void amba_device_put(struct amba_device *);
+ int amba_device_add(struct amba_device *, struct resource *);
+ int amba_device_register(struct amba_device *, struct resource *);
++struct amba_device *amba_apb_device_add(struct device *parent, const char *name,
++					resource_size_t base, size_t size,
++					int irq1, int irq2, void *pdata,
++					unsigned int periphid);
++struct amba_device *amba_ahb_device_add(struct device *parent, const char *name,
++					resource_size_t base, size_t size,
++					int irq1, int irq2, void *pdata,
++					unsigned int periphid);
+ void amba_device_unregister(struct amba_device *);
+ struct amba_device *amba_find_device(const char *, struct device *, unsigned int, unsigned int);
+ int amba_request_regions(struct amba_device *, const char *);
 -- 
 1.7.7.6
