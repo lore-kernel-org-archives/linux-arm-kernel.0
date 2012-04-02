@@ -1,45 +1,55 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 02 Apr 2012 11:57:56 -0700
-Subject: [PATCH] mach-exynos: fix ISO C90 warning.
-In-Reply-To: <1333367732-28014-1-git-send-email-corone.il.han@gmail.com>
-References: <1333367732-28014-1-git-send-email-corone.il.han@gmail.com>
-Message-ID: <4F79F6B4.9080005@samsung.com>
+Date: Mon, 02 Apr 2012 12:05:53 -0700
+Subject: [PATCH] ARM: S3C64XX: Hook up new style regulator-regulator
+ supplies on Cragganmore
+In-Reply-To: <1333366519-7900-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1333366519-7900-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <4F79F891.7050106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il Han wrote:
-> ISO C90 forbids mixed declarations and code.
-> Fix it.
+Mark Brown wrote:
+> The regulator API now allows supplies used by regulators to be specified
+> as normal supplies - provide the hookup for that mechanism on Cragganmore.
 > 
-> Signed-off-by: Il Han<corone.il.han@gmail.com>
+> Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
 > ---
->   arch/arm/mach-exynos/common.c |    3 ++-
->   1 files changed, 2 insertions(+), 1 deletions(-)
+>   arch/arm/mach-s3c64xx/mach-crag6410.c |   18 ++++++++++++++++++
+>   1 files changed, 18 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index e6cc50e..8614aab 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -583,10 +583,11 @@ core_initcall(exynos_core_init);
->   #ifdef CONFIG_CACHE_L2X0
->   static int __init exynos4_l2x0_cache_init(void)
->   {
-> +	int ret;
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> index 02fd009..4ee0249 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> @@ -306,6 +306,24 @@ static struct regulator_consumer_supply wallvdd_consumers[] = {
+>   	REGULATOR_SUPPLY("SPKVDD2", "1-001a"),
+>   	REGULATOR_SUPPLY("SPKVDDL", "1-001a"),
+>   	REGULATOR_SUPPLY("SPKVDDR", "1-001a"),
 > +
->   	if (soc_is_exynos5250())
->   		return 0;
+> +	REGULATOR_SUPPLY("DC1VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("DC2VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("DC3VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO1VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO2VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO4VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO5VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO6VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO7VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO8VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO9VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO10VDD", "0-0034"),
+> +	REGULATOR_SUPPLY("LDO11VDD", "0-0034"),
+> +
+> +	REGULATOR_SUPPLY("DC1VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("DC2VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("DC3VDD", "1-0034"),
+>   };
 > 
-> -	int ret;
->   	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
->   	if (!ret) {
->   		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+>   static struct regulator_init_data wallvdd_data = {
 
-Yeah, seems happened wehn merge confilcts resolved.
+Looks ok to me, will apply.
 
-OK, will apply and if possible, please use following subject form in
-next time like others. Every ARM platfomrs use that.
-
-'ARM: EXYNOS: ...'
+Mark, is this needed for v3.4?
 
 Thanks.
 
