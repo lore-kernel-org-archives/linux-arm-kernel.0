@@ -1,219 +1,55 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon,  2 Apr 2012 20:33:06 +0200
-Subject: [PATCH v2 7/8] i2c-pnx.c: Remove duplicated i2c.h
-In-Reply-To: <1333391587-26290-1-git-send-email-stigge@antcom.de>
-References: <1333391587-26290-1-git-send-email-stigge@antcom.de>
-Message-ID: <1333391587-26290-8-git-send-email-stigge@antcom.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 02 Apr 2012 11:35:38 -0700
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+ (Santosh Shilimkar's message of "Sun, 1 Apr 2012 11:23:44 +0530")
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
+ <4F672364.3020403@ti.com>
+ <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
+ <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
+ <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
+ <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
+ <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
+ <4F7570FC.8000907@ti.com>
+ <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
+ <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
+ <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+ <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+ <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
+ <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+ <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+Message-ID: <87sjgmt211.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platforms using i2c-pnx.c both defined a duplicated i2c.h (used nowhere
-else). This patch removes those and integrates the contents into the driver
-itself.
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+[...]
 
----
+> I don't personally like to add features which hardly anybody use and
+> fundamentally broken with full kernel.
 
- Applies to v3.4-rc1
+Let's keep sane defaults, but not make it unreasonable to tweak eaither.
 
- arch/arm/mach-lpc32xx/include/mach/i2c.h |   63 ------------------------------
- arch/arm/mach-pnx4008/include/mach/i2c.h |   64 -------------------------------
- drivers/i2c/busses/i2c-pnx.c             |   49 ++++++++++++++++++++++-
- 3 files changed, 46 insertions(+), 130 deletions(-)
+I suggest what has already been mentioned.
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/i2c.h
-+++ /dev/null
-@@ -1,63 +0,0 @@
--/*
-- * PNX4008-specific tweaks for I2C IP3204 block
-- *
-- * Author: Vitaly Wool <vwool@ru.mvista.com>
-- *
-- * 2005 (c) MontaVista Software, Inc. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--
--#ifndef __ASM_ARCH_I2C_H
--#define __ASM_ARCH_I2C_H
--
--enum {
--	mstatus_tdi = 0x00000001,
--	mstatus_afi = 0x00000002,
--	mstatus_nai = 0x00000004,
--	mstatus_drmi = 0x00000008,
--	mstatus_active = 0x00000020,
--	mstatus_scl = 0x00000040,
--	mstatus_sda = 0x00000080,
--	mstatus_rff = 0x00000100,
--	mstatus_rfe = 0x00000200,
--	mstatus_tff = 0x00000400,
--	mstatus_tfe = 0x00000800,
--};
--
--enum {
--	mcntrl_tdie = 0x00000001,
--	mcntrl_afie = 0x00000002,
--	mcntrl_naie = 0x00000004,
--	mcntrl_drmie = 0x00000008,
--	mcntrl_daie = 0x00000020,
--	mcntrl_rffie = 0x00000040,
--	mcntrl_tffie = 0x00000080,
--	mcntrl_reset = 0x00000100,
--	mcntrl_cdbmode = 0x00000400,
--};
--
--enum {
--	rw_bit = 1 << 0,
--	start_bit = 1 << 8,
--	stop_bit = 1 << 9,
--};
--
--#define I2C_REG_RX(a)	((a)->ioaddr)		/* Rx FIFO reg (RO) */
--#define I2C_REG_TX(a)	((a)->ioaddr)		/* Tx FIFO reg (WO) */
--#define I2C_REG_STS(a)	((a)->ioaddr + 0x04)	/* Status reg (RO) */
--#define I2C_REG_CTL(a)	((a)->ioaddr + 0x08)	/* Ctl reg */
--#define I2C_REG_CKL(a)	((a)->ioaddr + 0x0c)	/* Clock divider low */
--#define I2C_REG_CKH(a)	((a)->ioaddr + 0x10)	/* Clock divider high */
--#define I2C_REG_ADR(a)	((a)->ioaddr + 0x14)	/* I2C address */
--#define I2C_REG_RFL(a)	((a)->ioaddr + 0x18)	/* Rx FIFO level (RO) */
--#define I2C_REG_TFL(a)	((a)->ioaddr + 0x1c)	/* Tx FIFO level (RO) */
--#define I2C_REG_RXB(a)	((a)->ioaddr + 0x20)	/* Num of bytes Rx-ed (RO) */
--#define I2C_REG_TXB(a)	((a)->ioaddr + 0x24)	/* Num of bytes Tx-ed (RO) */
--#define I2C_REG_TXS(a)	((a)->ioaddr + 0x28)	/* Tx slave FIFO (RO) */
--#define I2C_REG_STFL(a)	((a)->ioaddr + 0x2c)	/* Tx slave FIFO level (RO) */
--
--#define I2C_CHIP_NAME		"PNX4008-I2C"
--
--#endif				/* __ASM_ARCH_I2C_H */
---- linux-2.6.orig/arch/arm/mach-pnx4008/include/mach/i2c.h
-+++ /dev/null
-@@ -1,64 +0,0 @@
--/*
-- * PNX4008-specific tweaks for I2C IP3204 block
-- *
-- * Author: Vitaly Wool <vwool@ru.mvista.com>
-- *
-- * 2005 (c) MontaVista Software, Inc. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--
--#ifndef __ASM_ARCH_I2C_H__
--#define __ASM_ARCH_I2C_H__
--
--enum {
--	mstatus_tdi = 0x00000001,
--	mstatus_afi = 0x00000002,
--	mstatus_nai = 0x00000004,
--	mstatus_drmi = 0x00000008,
--	mstatus_active = 0x00000020,
--	mstatus_scl = 0x00000040,
--	mstatus_sda = 0x00000080,
--	mstatus_rff = 0x00000100,
--	mstatus_rfe = 0x00000200,
--	mstatus_tff = 0x00000400,
--	mstatus_tfe = 0x00000800,
--};
--
--enum {
--	mcntrl_tdie = 0x00000001,
--	mcntrl_afie = 0x00000002,
--	mcntrl_naie = 0x00000004,
--	mcntrl_drmie = 0x00000008,
--	mcntrl_daie = 0x00000020,
--	mcntrl_rffie = 0x00000040,
--	mcntrl_tffie = 0x00000080,
--	mcntrl_reset = 0x00000100,
--	mcntrl_cdbmode = 0x00000400,
--};
--
--enum {
--	rw_bit = 1 << 0,
--	start_bit = 1 << 8,
--	stop_bit = 1 << 9,
--};
--
--#define I2C_REG_RX(a)	((a)->ioaddr)		/* Rx FIFO reg (RO) */
--#define I2C_REG_TX(a)	((a)->ioaddr)		/* Tx FIFO reg (WO) */
--#define I2C_REG_STS(a)	((a)->ioaddr + 0x04)	/* Status reg (RO) */
--#define I2C_REG_CTL(a)	((a)->ioaddr + 0x08)	/* Ctl reg */
--#define I2C_REG_CKL(a)	((a)->ioaddr + 0x0c)	/* Clock divider low */
--#define I2C_REG_CKH(a)	((a)->ioaddr + 0x10)	/* Clock divider high */
--#define I2C_REG_ADR(a)	((a)->ioaddr + 0x14)	/* I2C address */
--#define I2C_REG_RFL(a)	((a)->ioaddr + 0x18)	/* Rx FIFO level (RO) */
--#define I2C_REG_TFL(a)	((a)->ioaddr + 0x1c)	/* Tx FIFO level (RO) */
--#define I2C_REG_RXB(a)	((a)->ioaddr + 0x20)	/* Num of bytes Rx-ed (RO) */
--#define I2C_REG_TXB(a)	((a)->ioaddr + 0x24)	/* Num of bytes Tx-ed (RO) */
--#define I2C_REG_TXS(a)	((a)->ioaddr + 0x28)	/* Tx slave FIFO (RO) */
--#define I2C_REG_STFL(a)	((a)->ioaddr + 0x2c)	/* Tx slave FIFO level (RO) */
--
--#define HCLK_MHZ		13
--#define I2C_CHIP_NAME		"PNX4008-I2C"
--
--#endif				/* __ASM_ARCH_I2C_H___ */
---- linux-2.6.orig/drivers/i2c/busses/i2c-pnx.c
-+++ linux-2.6/drivers/i2c/busses/i2c-pnx.c
-@@ -24,13 +24,56 @@
- #include <linux/clk.h>
- #include <linux/slab.h>
- 
--#include <mach/hardware.h>
--#include <mach/i2c.h>
--
- #define I2C_PNX_TIMEOUT		10 /* msec */
- #define I2C_PNX_SPEED_KHZ	100
- #define I2C_PNX_REGION_SIZE	0x100
- 
-+enum {
-+	mstatus_tdi = 0x00000001,
-+	mstatus_afi = 0x00000002,
-+	mstatus_nai = 0x00000004,
-+	mstatus_drmi = 0x00000008,
-+	mstatus_active = 0x00000020,
-+	mstatus_scl = 0x00000040,
-+	mstatus_sda = 0x00000080,
-+	mstatus_rff = 0x00000100,
-+	mstatus_rfe = 0x00000200,
-+	mstatus_tff = 0x00000400,
-+	mstatus_tfe = 0x00000800,
-+};
-+
-+enum {
-+	mcntrl_tdie = 0x00000001,
-+	mcntrl_afie = 0x00000002,
-+	mcntrl_naie = 0x00000004,
-+	mcntrl_drmie = 0x00000008,
-+	mcntrl_daie = 0x00000020,
-+	mcntrl_rffie = 0x00000040,
-+	mcntrl_tffie = 0x00000080,
-+	mcntrl_reset = 0x00000100,
-+	mcntrl_cdbmode = 0x00000400,
-+};
-+
-+enum {
-+	rw_bit = 1 << 0,
-+	start_bit = 1 << 8,
-+	stop_bit = 1 << 9,
-+};
-+
-+#define I2C_REG_RX(a)	((a)->ioaddr)		/* Rx FIFO reg (RO) */
-+#define I2C_REG_TX(a)	((a)->ioaddr)		/* Tx FIFO reg (WO) */
-+#define I2C_REG_STS(a)	((a)->ioaddr + 0x04)	/* Status reg (RO) */
-+#define I2C_REG_CTL(a)	((a)->ioaddr + 0x08)	/* Ctl reg */
-+#define I2C_REG_CKL(a)	((a)->ioaddr + 0x0c)	/* Clock divider low */
-+#define I2C_REG_CKH(a)	((a)->ioaddr + 0x10)	/* Clock divider high */
-+#define I2C_REG_ADR(a)	((a)->ioaddr + 0x14)	/* I2C address */
-+#define I2C_REG_RFL(a)	((a)->ioaddr + 0x18)	/* Rx FIFO level (RO) */
-+#define I2C_REG_TFL(a)	((a)->ioaddr + 0x1c)	/* Tx FIFO level (RO) */
-+#define I2C_REG_RXB(a)	((a)->ioaddr + 0x20)	/* Num of bytes Rx-ed (RO) */
-+#define I2C_REG_TXB(a)	((a)->ioaddr + 0x24)	/* Num of bytes Tx-ed (RO) */
-+#define I2C_REG_TXS(a)	((a)->ioaddr + 0x28)	/* Tx slave FIFO (RO) */
-+#define I2C_REG_STFL(a)	((a)->ioaddr + 0x2c)	/* Tx slave FIFO level (RO) */
-+
- static inline int wait_timeout(long timeout, struct i2c_pnx_algo_data *data)
- {
- 	while (timeout > 0 &&
+Register both timers, but have the sync timer have a higher rating.  On
+AMxxx where there is no sync timer, GPtimer will be used.
+
+For those who want to use GPtimer, they can boot using clocksource= to
+override the default.
+
+Santosh is right, GPtimer will not work on a PM enabled kernel, but
+there are lots of ways to use the cmdline to get a non-working kernel,
+so that's OK by me.
+
+Let's just ensure that the boot-defaults are sane.
+
+Kevin
