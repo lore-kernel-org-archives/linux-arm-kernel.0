@@ -1,26 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Apr 2012 18:04:43 +0100
+Date: Mon, 2 Apr 2012 18:08:58 +0100
 Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
-In-Reply-To: <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+In-Reply-To: <4F79DC03.7020503@codeaurora.org>
 References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
  <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20120402170442.GF24211@n2100.arm.linux.org.uk>
+ <4F787392.5040308@codeaurora.org>
+ <20120401153450.GC8971@opensource.wolfsonmicro.com>
+ <4F79D85F.4020909@codeaurora.org>
+ <20120402165242.GC24211@n2100.arm.linux.org.uk>
+ <4F79DC03.7020503@codeaurora.org>
+Message-ID: <20120402170858.GG24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 01, 2012 at 12:32:40PM +0100, Mark Brown wrote:
-> Allow clk API users to simplify their cleanup paths by providing a
-> managed version of clk_get().
+On Mon, Apr 02, 2012 at 10:04:03AM -0700, Stephen Boyd wrote:
+> On 04/02/12 09:52, Russell King - ARM Linux wrote:
+> > On Mon, Apr 02, 2012 at 09:48:31AM -0700, Stephen Boyd wrote:
+> >> I hope we get a better clk_get() implementation with the unified struct
+> >> clk. Don't get me wrong, clkdev is a great improvement over open coding
+> >> clock framework stuff in each platform. But clkdev is really just
+> >> another platform specific implementation
+> > Utter crap.  It is not platform specific.
 > 
-> Due to the lack of a standard struct clk to look up the device from a
-> managed clk_put() is not provided, it would be very unusual to use this
-> function so it's not a big loss.
+> It has compile-time platform hooks so it isn't entirely generic.
 
-Err, why?  The contents of struct clk has nothing to do with clk_put().
-You're doing something really wrong here.
+Compile time hooks which are necessary to ensure safety of the provided
+struct clk.  You can't implement a clk_get() which doesn't have either
+knowledge of the struct clk or some kind of hook into platform specific
+code.  That's a hard and unarguable fact.
 
-Remember, there is not going to _ever_ be the situation where a struct clk
-is specific to any particular struct device - it's a 1:N mapping between
-clks and devices.
+> >> that most platforms decide to
+> >> use. Each platform has to select the option and it breaks if two
+> >> platforms implement __clk_get()/__clk_put() in conflicting ways.
+> > They should go away with the common clock stuff: they are there to deal
+> > with the implementation specific parts of struct clk, and as the common
+> > clock stuff sorts that out, these should be provided by the common clk.
+> 
+> Agreed. They should all be deleted and only one should exist.
 
-So, until you sort out your misunderstanding, NAK.
+Utter crap.  Deleting them makes the non-common clock implementations
+unsafe.  If a struct clk is provided by a module (and we do have some
+which are) then the module reference count has to be held.  That's
+what these hooks do.
+
+When these platforms get converted over to the common clock, and the
+issues surrounding dynamically registered and removed clocks are sane,
+these hooks have to be used by the common clock to deal with the
+refcounting so that common code knows when the structures can be freed.
