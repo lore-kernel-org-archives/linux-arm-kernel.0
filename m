@@ -1,43 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Apr 2012 09:48:31 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Apr 2012 17:52:42 +0100
 Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
-In-Reply-To: <20120401153450.GC8971@opensource.wolfsonmicro.com>
+In-Reply-To: <4F79D85F.4020909@codeaurora.org>
 References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
  <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
  <4F787392.5040308@codeaurora.org>
  <20120401153450.GC8971@opensource.wolfsonmicro.com>
-Message-ID: <4F79D85F.4020909@codeaurora.org>
+ <4F79D85F.4020909@codeaurora.org>
+Message-ID: <20120402165242.GC24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/12 08:34, Mark Brown wrote:
-> On Sun, Apr 01, 2012 at 08:26:10AM -0700, Stephen Boyd wrote:
->> But why is this part of clkdev.c? devm_clk_get() should work regardless
->> of the implementation of clk_get() so can we put it into some other file
->> that is compiled if HAVE_CLK=y so everyone benefits from this and not
->> just users who select CLKDEV_LOOKUP?
-> Mostly just because clk_get() is part of clkdev.c and I didn't feel like
-> creating a new file, though also because I really hope that we're going
-> to be moving away from open coding clock framework things so that we can
-> start to push clock API usage into non-SoC code.  Things like adding new
-> clocks are going to be a part of that.
->
-> To put it another way, why would a platform want to avoid clkdev?
+On Mon, Apr 02, 2012 at 09:48:31AM -0700, Stephen Boyd wrote:
+> I hope we get a better clk_get() implementation with the unified struct
+> clk. Don't get me wrong, clkdev is a great improvement over open coding
+> clock framework stuff in each platform. But clkdev is really just
+> another platform specific implementation
 
-I hope we get a better clk_get() implementation with the unified struct
-clk. Don't get me wrong, clkdev is a great improvement over open coding
-clock framework stuff in each platform. But clkdev is really just
-another platform specific implementation that most platforms decide to
-use. Each platform has to select the option and it breaks if two
-platforms implement __clk_get()/__clk_put() in conflicting ways. Ideally
-the unified struct clk code guts clkdev and uses the core parts of it
-for its own clk_get() implementation.
+Utter crap.  It is not platform specific.
 
-Sticking devm_clk_get() into clkdev.c is simple, no new file, smaller
-diff. Great. But linking it to clkdev doesn't sound much better when
-we're trying to get rid of platform specific code and this code is
-entirely platform independent.
+> that most platforms decide to
+> use. Each platform has to select the option and it breaks if two
+> platforms implement __clk_get()/__clk_put() in conflicting ways.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+They should go away with the common clock stuff: they are there to deal
+with the implementation specific parts of struct clk, and as the common
+clock stuff sorts that out, these should be provided by the common clk.
+
+So any platform using the common clock will be compatible with any other
+platform using the common clock.
+
+If you somehow think that clkdev comes into that compatibility, you're
+wrong.  It doesn't.
+
+And if you think that a private clk implementation could have a unified
+clk_get(), you're also barking mad.
