@@ -1,33 +1,41 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 02 Apr 2012 09:20:04 +0530
-Subject: [alsa-devel] [PATCH 1/1] ASoC: soc-dmaengine-pcm: fix compile
- error	since dma api is changed
-In-Reply-To: <7FE21149F4667147B645348EC6057885153794@039-SN2MPN1-011.039d.mgd.msft.net>
-References: <1333197468-3263-1-git-send-email-b29396@freescale.com>
- <4F76EB8D.2060200@metafoo.de>
- <7FE21149F4667147B645348EC6057885153794@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <1333338604.1610.0.camel@vkoul-udesk3>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 02 Apr 2012 14:21:57 +1000
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
+In-Reply-To: <m2iphj3zxr.fsf@igel.home>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home>
+Message-ID: <1333340517.30734.42.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-03-31 at 12:39 +0000, Dong Aisheng-B29396 wrote:
-> > > sound/soc/soc-dmaengine-pcm.c: In function
-> > 'dmaengine_pcm_prepare_and_submit':
-> > > sound/soc/soc-dmaengine-pcm.c:149: error: too few arguments to
-> function
-> > 'chan->device->device_prep_dma_cyclic'
-> > > make[2]: *** [sound/soc/soc-dmaengine-pcm.o] Error 1
-> > > make[1]: *** [sound/soc] Error 2
-> > > make: *** [sound] Error 2
-> > >
-> > 
-> > Hi,
-> > 
-> > There is already a fix for this in Mark's for-3.4 branch.
-> Okay, thanks for reminder.
-> I missed to check Mark's tree.
+On Sun, 2012-04-01 at 23:27 +0200, Andreas Schwab wrote:
+> Grant Likely <grant.likely@secretlab.ca> writes:
 > 
-This fix is there in rc1
+> > This patch drops the powerpc-specific irq_map table and replaces it with
+> > directly using the irq_alloc_desc()/irq_free_desc() interfaces for allocating
+> > and freeing irq_desc structures.
+> 
+> This breaks irqs on PowerMac G5.  I see lost irq errors from the sata
+> driver.
+> 
+> Note that the breakage only started after the series was merged into
+> mainline.  But when transplanted upon the parent of the merge this is
+> the commit that was blamed by bisect.  So something changed between
+> v3.3-rc3 and the merge of this series that broke it.
 
--- 
-~Vinod
+can you tell me more ? (What machine precisely, what .config etc...) ?
+
+I tested here on two G5's:
+
+ - PowerMac7,3 aka Dual G5 AGP. This ones has U3 + K2 and
+uses cascaded MPICs
+
+ - PowerMac11,2 aka Quad G5. This one has U4 + K2 and uses a single MPIC
+in the northbridge
+
+And both appear to work fine with today upstream (basically -rc1).
+
+Cheers,
+Ben.
