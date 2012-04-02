@@ -1,40 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  2 Apr 2012 15:14:43 +0800
-Subject: [PATCH v2] ARM: amba: adapt to regulator probe deferral change
-Message-ID: <1333350883-6373-1-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 Apr 2012 07:31:14 +0000
+Subject: ioremap to a specific virtual address
+In-Reply-To: <alpine.LFD.2.02.1204012111260.24151@xanadu.home>
+References: <CAKON4Ox5YXvbGwbsYRetOPxV+HVDwmEd-mbqj2fyDfnCcBjaRA@mail.gmail.com>
+ <CAKON4OyW2t+5GNRSEFOVjsGM8OifH7iqYNoO+BEOiGsdWq56sg@mail.gmail.com>
+ <alpine.LFD.2.02.1204012111260.24151@xanadu.home>
+Message-ID: <201204020731.14506.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 04bf301 (regulator: Support driver probe deferral) changes
-regulator_get() and regulator_register() to return -EPROBE_DEFER
-instead of -ENODEV.  Adapt amba bus driver to the change, otherwise
-amba_probe() will fail on the platforms that do not have "vcore"
-regulator device.
+On Monday 02 April 2012, Nicolas Pitre wrote:
+> >  0xf1300000-0xf1a00000 is the virtual address.  0x13000000-0x21000000
+> > is the physical address.  That's a span of 224MB.  How do the page
+> > table entries work on ARM? I thought we only got 1MB per entry.  So I
+> > need seven entries to span the range with the individual maps. I'd
+> > need 224 entries to cover the entire region. Or can we make make the
+> > page table entries any size we want?
+> 
+> You can't.  Arnd probably didn't notice that the physical range is not 
+> contiguous.  What you have is pretty optimal.
 
-It fixes the boot failure on i.mx28 which uses amba-pl011 as serial
-console.
+Right, I didn't realize they were laid out like this in the physical space.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
-Changes since v1:
- * Revert the comment change
-
- drivers/amba/bus.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index 01c2cf4..380995e 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -363,7 +363,7 @@ static int amba_get_enable_vcore(struct amba_device *pcdev)
- 
- 	if (IS_ERR(vcore)) {
- 		/* It is OK not to supply a vcore regulator */
--		if (PTR_ERR(vcore) == -ENODEV)
-+		if (PTR_ERR(vcore) == -EPROBE_DEFER)
- 			return 0;
- 		return PTR_ERR(vcore);
- 	}
--- 
-1.7.5.4
+	Arnd
