@@ -1,37 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Apr 2012 17:52:42 +0100
-Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
-In-Reply-To: <4F79D85F.4020909@codeaurora.org>
-References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <4F787392.5040308@codeaurora.org>
- <20120401153450.GC8971@opensource.wolfsonmicro.com>
- <4F79D85F.4020909@codeaurora.org>
-Message-ID: <20120402165242.GC24211@n2100.arm.linux.org.uk>
+Date: Mon, 2 Apr 2012 17:57:42 +0100
+Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
+In-Reply-To: <20120402113413.GA7560@opensource.wolfsonmicro.com>
+References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
+ <CAH+eYFC+q4xFuSdRBkO9nb0XZWU4pQ_yCyinMy2X3ds9WQd1kw@mail.gmail.com>
+ <CACRpkda2zh=zR+A9bwhRXYHtQdFeUpiqG4d5g1i82mPCs1mXaQ@mail.gmail.com>
+ <20120402101427.GA3172@opensource.wolfsonmicro.com>
+ <20120402104357.GB24211@n2100.arm.linux.org.uk>
+ <20120402113413.GA7560@opensource.wolfsonmicro.com>
+Message-ID: <20120402165742.GD24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 09:48:31AM -0700, Stephen Boyd wrote:
-> I hope we get a better clk_get() implementation with the unified struct
-> clk. Don't get me wrong, clkdev is a great improvement over open coding
-> clock framework stuff in each platform. But clkdev is really just
-> another platform specific implementation
+On Mon, Apr 02, 2012 at 12:34:13PM +0100, Mark Brown wrote:
+> On Mon, Apr 02, 2012 at 11:43:57AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Apr 02, 2012 at 11:14:28AM +0100, Mark Brown wrote:
+> 
+> > > I was waiting for some pronouncement from Russell - looking at the git
+> > > logs it seems the patch tracker is the normal way to merge things.
+> 
+> > Well, this stuff was invented by Linus, so its Linus' decision about
+> > how to deal with the power control.
+> 
+> Linus already acked the patch, the question was more about how to get it
+> merged.  Since most of the AMBA changes seem to go via your tree I've
+> just submitted it to the patch system as 7366/1.
 
-Utter crap.  It is not platform specific.
+Does:
 
-> that most platforms decide to
-> use. Each platform has to select the option and it breaks if two
-> platforms implement __clk_get()/__clk_put() in conflicting ways.
+ARM PRIMECELL BUS SUPPORT
+M:      Russell King <linux@arm.linux.org.uk>
+S:      Maintained
+F:      drivers/amba/
+F:      include/linux/amba/bus.h
 
-They should go away with the common clock stuff: they are there to deal
-with the implementation specific parts of struct clk, and as the common
-clock stuff sorts that out, these should be provided by the common clk.
-
-So any platform using the common clock will be compatible with any other
-platform using the common clock.
-
-If you somehow think that clkdev comes into that compatibility, you're
-wrong.  It doesn't.
-
-And if you think that a private clk implementation could have a unified
-clk_get(), you're also barking mad.
+not provide enough clues?  Should I delete all my entries in that file
+because the only people who look in there are spammers when the file is
+published on the web?
