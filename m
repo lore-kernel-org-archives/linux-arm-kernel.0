@@ -1,19 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Apr 2012 17:00:36 +0100
-Subject: [PATCH v5 2/4] mfd: mc13xxx-core: use regmap for register access
-In-Reply-To: <1333262499-25871-3-git-send-email-marc@cpdesign.com.au>
-References: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
- <1333262499-25871-3-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20120402160036.GA29808@sirena.org.uk>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Mon, 02 Apr 2012 18:29:15 +0200
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <m2iphj3zxr.fsf@igel.home> (Andreas Schwab's message of "Sun, 01
+ Apr 2012 23:27:44 +0200")
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home>
+Message-ID: <m2hax2qeqs.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 01, 2012 at 04:41:37PM +1000, Marc Reilly wrote:
-> This change converts the mc13xxx core to use regmap rather than direct
-> spi r/w.
-> The spidev member of mc13xxx struct becomes redundant and is removed.
-> Extra debugging aids are added to mc13xxx_reg_rmw.
+Andreas Schwab <schwab@linux-m68k.org> writes:
 
-To repeat what I've said on previous versions please push this down into
-regmap.  There's already extensive diagnostic features there, let's not
-have people open coding things that are missing.
+> Grant Likely <grant.likely@secretlab.ca> writes:
+>
+>> This patch drops the powerpc-specific irq_map table and replaces it with
+>> directly using the irq_alloc_desc()/irq_free_desc() interfaces for allocating
+>> and freeing irq_desc structures.
+>
+> This breaks irqs on PowerMac G5.  I see lost irq errors from the sata
+> driver.
+
+When I revert a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5 ("genirq: Fix
+long-term regression in genirq irq_set_irq_type() handling") on top of
+3.4-rc1 the sata irq errors disappear, but I see a lot of spurious
+interrupts.  Also the X server is broken somehow, though I don't know
+whether that is related or a different bug.
+
+Andreas.
+
+-- 
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
