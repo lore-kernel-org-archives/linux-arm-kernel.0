@@ -1,336 +1,175 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 02 Apr 2012 11:39:09 +0300
-Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
- MFP_LPM_KEEP_OUTPUT
-In-Reply-To: <1333302994.55909.YahooMailClassic@web29020.mail.ird.yahoo.com>
-References: <1333302994.55909.YahooMailClassic@web29020.mail.ird.yahoo.com>
-Message-ID: <4F7965AD.9040202@compulab.co.il>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Mon, 2 Apr 2012 14:18:09 +0530
+Subject: [PATCH v2] OMAP2+: UART: Remove cpu checks for populating errata flags
+In-Reply-To: <1332325501-10467-2-git-send-email-govindraj.raja@ti.com>
+References: <1332325501-10467-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1333356489-5816-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-Can you, please, configure your mailer to _not_ wrap the text?
-It is rally hard to read it after a few replies...
+Currently the errata is populated based on cpu checks this can
+be removed and replaced with module version check of uart ip block.
+MVR reg is provided within the uart reg map use the same
+to populate the errata and thus now errata population and handling
+can be managed within the driver itself.
 
-On 04/01/12 20:56, Paul Parsons wrote:
-> Hello Igor,
-> 
-> --- On Sun, 1/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
->> On 04/01/12 13:56, Paul Parsons
->> wrote:
->>> Hello Igor,
->>>
->>> --- On Sun, 1/4/12, Igor Grinberg <grinberg@compulab.co.il>
->> wrote:
->>>> Hi Paul,
->>>>
->>>> On 03/31/12 15:20, Paul Parsons wrote:
->>>>> Some MFP configurations specify
->> MFP_LPM_KEEP_OUTPUT to
->>>> preserve the gpio output
->>>>> value (HIGH or LOW) during sleep mode. For
->> example:
->>>>>
->>>>>       GPIO72_GPIO |
->>>> MFP_LPM_KEEP_OUTPUT,
->>>>>
->>>>> Unfortunately MFP_LPM_KEEP_OUTPUT makes no
->> special
->>>> provision for setting the
->>>>> sleep mode gpio direction, unlike
->> MFP_LPM_DRIVE_HIGH
->>>> and MFP_LPM_DRIVE_LOW.
->>>>> Consequently MFP configurations of the form:
->>>>>
->>>>>       GPIO<n>_GPIO |
->>>> MFP_LPM_KEEP_OUTPUT,
->>>>>
->>>>> will set the sleep mode gpio direction to
->> INPUT.
->>>>>
->>>>> This patch forces the sleep mode gpio direction
->> to
->>>> OUTPUT in cases where
->>>>> MFP_LPM_KEEP_OUTPUT was specified. This brings
->>>> MFP_LPM_KEEP_OUTPUT into line
->>>>> with MFP_LPM_DRIVE_HIGH and MFP_LPM_DRIVE_LOW.
->>>>>
->>>>> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
->>>>> ---
->>>>>
->>>>> diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c
->>>> b/arch/arm/mach-pxa/mfp-pxa2xx.c
->>>>> index b0a8428..3b443199 100644
->>>>> --- a/arch/arm/mach-pxa/mfp-pxa2xx.c
->>>>> +++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
->>>>> @@ -96,6 +96,9 @@ static int
->> __mfp_config_gpio(unsigned
->>>> gpio, unsigned long c)
->>>>>        
->>    break;
->>>>>        }
->>>>>    
->>>>> +    if (c &
->> MFP_LPM_KEEP_OUTPUT)
->>>>> +        is_out = 1;
->>>>> +
->>>>
->>>> MFP_LPM_KEEP_OUTPUT does not meant to be used to
->> setup the
->>>> mfp config,
->>>
->>> As far as I can see, MFP_LPM_KEEP_OUTPUT is *only* used
->> to setup the
->>> mfp config:
->>>
->>> % xzcat linux-3.4-rc1.tar.xz | fgrep -a
->> MFP_LPM_KEEP_OUTPUT
->>>     GPIO13_GPIO |
->> MFP_LPM_KEEP_OUTPUT,    /*
->> CORGI_GPIO_LED_ORANGE */
->>>     GPIO38_GPIO |
->> MFP_LPM_KEEP_OUTPUT,    /* CORGI_GPIO_CHRG_ON
->> */
->>>     GPIO43_GPIO |
->> MFP_LPM_KEEP_OUTPUT,    /*
->> CORGI_GPIO_CHRG_UKN */
->>> #define MFP_LPM_KEEP_OUTPUT    (0x1
->> << 25)
->>>     /* set corresponding PGSR bit of
->> those marked MFP_LPM_KEEP_OUTPUT */
->>>         if
->> ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
->>> % 
->>
->> How can you be certain that you don't break corgi, with the
->> proposed patch?
-> 
-> On corgi, the three GPIOs configured as MFP_LPM_KEEP_OUTPUT:
->     CORGI_GPIO_LED_ORANGE
->     CORGI_GPIO_CHRG_ON
->     CORGI_GPIO_CHRG_UKN
-> are all used as outputs.
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/serial.c                  |    8 ---
+ arch/arm/plat-omap/include/plat/omap-serial.h |    1 -
+ drivers/tty/serial/omap-serial.c              |   75 ++++++++++++++++++++++++-
+ 3 files changed, 74 insertions(+), 10 deletions(-)
 
-Have you verified it, because currently MFP_LPM_KEEP_OUTPUT
-does not do a direction configuration... and IMO, it should not!
-
-> 
->>>> but for pins that have been configured for output
->> by
->>>> gpio_direction_out().
->>>> (Hint: *_KEEP_*).
->>>
->>> MFP_LPM_KEEP_OUTPUT only takes effect when the system
->> enters sleep mode,
->>> at which point the GPIO directions (GPDR registers) are
->> forced from the
->>> values privately stored in gpdr_lpm[].
->>
->> Correct, but with your patch, the direction will be forced
->> to output,
->> but the value will be undefined...
-> 
-> The values will be defined in pxa2xx_mfp_suspend() when it sets the PGSR
-> registers. Or at least they will be on corgi and hx4700, but see below...
-
-No, they will not, because the direction can be input...
-
-> 
->>> As far as I can tell MFP_LPM_KEEP_OUTPUT has no direct
->> connection to
->>> gpio_direction_output().
->>
->> Well, it has... in the pxa2xx_mfp_suspend() function you've
->> pasted below.
->>
->>>
->>>> Also, I don't think this is a good idea, because
->> the patch
->>>> allows a pin
->>>> be configured as output, but does not forces a
->> value
->>>> (high/low)
->>>> and this is not safe.
->>>
->>> A value does not need to be provided until the system
->> enters sleep mode,
->>> at which point the value is provided via the PGSR
->> registers.
->>
->> Yes, but you don't force the PGSR to be set...
->> and that is the problem.
-> 
-> OK, see below...
-> 
->>>     353    static int
->> pxa2xx_mfp_suspend(void)
->>>     354    {
->>>     355       
->> int i;
->>>     356    
->>>     357       
->> /* set corresponding PGSR bit of those marked
->> MFP_LPM_KEEP_OUTPUT */
->>>     358       
->> for (i = 0; i < pxa_last_gpio; i++) {
->>>     359       
->>     if ((gpio_desc[i].config &
->> MFP_LPM_KEEP_OUTPUT) &&
->>>     360       
->>         (GPDR(i) &
->> GPIO_bit(i))) {
->>
->> Look at the check above...
->> the PGSR only gets set for the GPIOs configured to output
->> (presumably by gpio_direction_output() function).
-> 
-> OK, I understand your objection here.
-> 
-> My feeling is that the (GPDR(i) & GPIO_bit(i)) test is unwanted because
-> the current state of GPDR (via gpio_direction_output()) does not apply in
-> sleep mode,
-
-It gets copied to PGSR in the pxa2xx_mfp_suspend() and therefore it does apply!
-That is exactly the meaning of MFP_LPM_KEEP_OUTPUT:
-_If_ the pin is output, then _keep_ it output with the _runtime_ value.
-
-> yet for some reason it is being allowed to prevent the
-> setting of PGSR in the case of GPIO inputs.
-
-Because, the PGSR is valid only for GPIO outputs!
-and has nothing to do with inputs.
-
-> 
-> Consequently the (GPDR(i) & GPIO_bit(i)) test should be removed.
-
-No, absolutely not!
-This will change the meaning of the MFP_LPM_KEEP_OUTPUT symbol!
-I have a feeling that you are trying to solve a problem that does not exist!
-
-> 
->>>     361       
->>         if (GPLR(i) &
->> GPIO_bit(i))
->>>     362       
->>            
->> PGSR(gpio_to_bank(i)) |= GPIO_bit(i);
->>>     363       
->>         else
->>>     364       
->>            
->> PGSR(gpio_to_bank(i)) &= ~GPIO_bit(i);
->>>     365       
->>     }
->>>     366       
->> }
->>>     367    
->>>     368       
->> for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++) {
->>>     369    
->>>          ...
->>>     375       
->>     GPDR(i * 32) = gpdr_lpm[i];
->>>     376       
->> }
->>>     377       
->> return 0;
->>>     378    }
->>>
->>> However looking at pxa2xx_mfp_suspend() more closely it
->> is true that the
->>> GPDR registers are set before the PGSR values take
->> effect (when the
->>> processor enters sleep mode).
->>> That is no different from MFP_LPM_DRIVE_HIGH or
->> MFP_LPM_DRIVE_LOW though.
->>
->> Well, it is different, because the in case of
->> MFP_LPM_DRIVE_*,
->> the PGSR is set in the __mfp_config_gpio() function and has
->> a _known value_.
-> 
-> KEEP_OUTPUT does the same where GPIOs are configured as outputs, as is
-> the case with corgi and hx4700.
-> Your valid objection is for cases where GPIOs are configured as inputs.
-> So I presume that removing the (GPDR(i) & GPIO_bit(i)) test will satisfy
-> your objection.
-
-again, no, because it will change the meaning of the MFP_LPM_KEEP_OUTPUT symbol!
-
-> 
->>> So the presumption must be that the GPIOs configured as
->> DRIVE_HIGH,
->>> DRIVER_LOW and now KEEP_OUTPUT already have a valid
->> direction and value
->>> set at the point the GPDR registers are forced.
->>
->> Yes. That is exactly my point here.
->> MFP_LPM_DRIVE_* has the value determined and set.
->> MFP_LPM_KEEP_OUTPUT does not, but with your patch it will
->> effectively
->> force the GPIO to be output in sleep mode, but with no value
->> set!
-> 
-> Only in cases where the GPIO is used as an input in normal mode but
-> configured to be an output in sleep mode.
-> Removing the (GPDR(i) & GPIO_bit(i)) test addresses that case.
-
-No, because, if the GPIO is input, you will configure it for output
-and set some arbitrary value that is seen on the input!
-This is bad!
-
-> 
->>>> Why can't you use:
->>>> GPIO<n>_GPIO | MFP_LPM_DRIVE_<level>
->>>> ?
->>>
->>> The hx4700 has a couple of charging GPIOs which we want
->> to keep HIGH or
->>> LOW during sleep mode:
->>>
->>> % fgrep MFP_LPM_KEEP_OUTPUT arch/arm/mach-pxa/hx4700.c
->>>     GPIO72_GPIO |
->> MFP_LPM_KEEP_OUTPUT,    /* BQ24022_nCHARGE_EN
->> */
->>>     GPIO96_GPIO |
->> MFP_LPM_KEEP_OUTPUT,    /* BQ24022_ISET2 */
->>> % 
->>
->> I still, can't understand, why MFP_LPM_DRIVE_* does not do
->> the job for you...
->> What's the real problem with using MFP_LPM_DRIVE_*?
->> Can't you specify it for those GPIO72/96?
-> 
-> The feeling was that if the unit was charging in normal mode then it
-> should remain charging in sleep mode, and if it wasn't then it should
-> remain not charging.
-
-Ok, finally we are talking about a real problem...
-I see...
-IMO, the best solution will be to add a generic GPIOx_GPIO_OUT
-(as already proposed by Haojian) definition (where x is the
-required GPIO number)for your used GPIOs and use it in MFP config
-structure for hx4700 along with MFP_LPM_KEEP_OUTPUT.
-
-
-Another solution would be (though a bit hackish):
-GPIOx_GPIO | MFP_LPM_DRIVE_LOW | MFP_LPM_KEEP_OUTPUT
-
-The above should work for you as you would expect - will set the GPIO
-to be output low by default, then you will reconfigure it to the
-appropriate level from your charger driver and the new level will be used
-by the existing logic in pxa2xx_mfp_suspend().
-
-> Actually that's an interim solution until the bootloader can take control
-> of sleep mode charging, but we're not there yet.
-
-still you don't want the turn on/off of the charger in the suspend sequence,
-so IMO, it must also be fixed in Linux.
-But, please, don't change the meaning of MFP_LPM_KEEP_OUTPUT!
-Because, currently it is safe to use it also with inputs
-and we don't want to break this assumption.
-
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 0cdd359..6affdd4 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -355,14 +355,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+ 	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
+ 	omap_up.autosuspend_timeout = info->autosuspend_timeout;
+ 
+-	/* Enable the MDR1 Errata i202 for OMAP2430/3xxx/44xx */
+-	if (!cpu_is_omap2420() && !cpu_is_ti816x())
+-		omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
+-
+-	/* Enable DMA Mode Force Idle Errata i291 for omap34xx/3630 */
+-	if (cpu_is_omap34xx() || cpu_is_omap3630())
+-		omap_up.errata |= UART_ERRATA_i291_DMA_FORCEIDLE;
+-
+ 	pdata = &omap_up;
+ 	pdata_size = sizeof(struct omap_uart_port_info);
+ 
+diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+index 9ff4444..1a52725 100644
+--- a/arch/arm/plat-omap/include/plat/omap-serial.h
++++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+@@ -65,7 +65,6 @@ struct omap_uart_port_info {
+ 	bool			dma_enabled;	/* To specify DMA Mode */
+ 	unsigned int		uartclk;	/* UART clock rate */
+ 	upf_t			flags;		/* UPF_* flags */
+-	u32			errata;
+ 	unsigned int		dma_rx_buf_size;
+ 	unsigned int		dma_rx_timeout;
+ 	unsigned int		autosuspend_timeout;
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 0121486..7d218c6 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -44,6 +44,13 @@
+ #include <plat/dmtimer.h>
+ #include <plat/omap-serial.h>
+ 
++#define UART_BUILD_REVISION(x, y)	(((x) << 8) | (y))
++
++#define OMAP_UART_REV_42 0x0402
++#define OMAP_UART_REV_46 0x0406
++#define OMAP_UART_REV_52 0x0502
++#define OMAP_UART_REV_63 0x0603
++
+ #define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
+ 
+ /* SCR register bitmasks */
+@@ -53,6 +60,18 @@
+ #define OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT		6
+ #define OMAP_UART_FCR_RX_FIFO_TRIG_MASK			(0x3 << 6)
+ 
++/* MVR register bitmasks */
++#define OMAP_UART_MVR_SCHEME_SHIFT	30
++
++#define OMAP_UART_LEGACY_MVR_MAJ_MASK	0xf0
++#define OMAP_UART_LEGACY_MVR_MAJ_SHIFT	4
++#define OMAP_UART_LEGACY_MVR_MIN_MASK	0x0f
++
++#define OMAP_UART_MVR_MAJ_MASK		0x7
++#define OMAP_UART_MVR_MAJ_SHIFT		8
++#define OMAP_UART_MVR_MIN_MASK		0x3f
++
++
+ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+ 
+ /* Forward declaration of functions */
+@@ -1346,6 +1365,59 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
+ 	return;
+ }
+ 
++static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
++{
++	u32 mvr, scheme;
++	u16 revision, major, minor;
++
++	mvr = serial_in(up, UART_OMAP_MVER);
++
++	/* Check revision register scheme */
++	scheme = mvr >> OMAP_UART_MVR_SCHEME_SHIFT;
++
++	switch (scheme) {
++	case 0: /* Legacy Scheme: OMAP2/3 */
++		/* MINOR_REV[0:4], MAJOR_REV[4:7] */
++		major = (mvr & OMAP_UART_LEGACY_MVR_MAJ_MASK) >>
++					OMAP_UART_LEGACY_MVR_MAJ_SHIFT;
++		minor = (mvr & OMAP_UART_LEGACY_MVR_MIN_MASK);
++		break;
++	case 1:
++		/* New Scheme: OMAP4+ */
++		/* MINOR_REV[0:5], MAJOR_REV[8:10] */
++		major = (mvr >> OMAP_UART_MVR_MAJ_SHIFT) &
++					OMAP_UART_MVR_MAJ_MASK;
++		minor = (mvr & OMAP_UART_MVR_MIN_MASK);
++		break;
++	default:
++		dev_warn(&up->pdev->dev,
++			"Unknown %s revision, defaulting to highest\n",
++			up->name);
++		/* highest possible revision */
++		major = 0xff;
++		minor = 0xff;
++	}
++
++	/* normalize revision for the driver */
++	revision = UART_BUILD_REVISION(major, minor);
++
++	switch (revision) {
++	case OMAP_UART_REV_46:
++		up->errata |= (UART_ERRATA_i202_MDR1_ACCESS |
++				UART_ERRATA_i291_DMA_FORCEIDLE);
++		break;
++	case OMAP_UART_REV_52:
++		up->errata |= (UART_ERRATA_i202_MDR1_ACCESS |
++				UART_ERRATA_i291_DMA_FORCEIDLE);
++		break;
++	case OMAP_UART_REV_63:
++		up->errata |= UART_ERRATA_i202_MDR1_ACCESS;
++		break;
++	default:
++		break;
++	}
++}
++
+ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
+ {
+ 	struct omap_uart_port_info *omap_up_info;
+@@ -1443,7 +1515,6 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 						"%d\n", DEFAULT_CLK_SPEED);
+ 	}
+ 	up->uart_dma.uart_base = mem->start;
+-	up->errata = omap_up_info->errata;
+ 
+ 	if (omap_up_info->dma_enabled) {
+ 		up->uart_dma.uart_dma_tx = dma_tx->start;
+@@ -1473,6 +1544,8 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	pm_runtime_enable(&pdev->dev);
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
++	omap_serial_fill_features_erratas(up);
++
+ 	ui[up->port.line] = up;
+ 	serial_omap_add_console_port(up);
+ 
 -- 
-Regards,
-Igor.
+1.7.5.4
