@@ -1,69 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Apr 2012 11:21:05 +0200
-Subject: [PATCH] efikamx: match machine descriptions with legacy
-In-Reply-To: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
-References: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
-Message-ID: <20120402092105.GA27586@pengutronix.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 02 Apr 2012 11:20:01 +0200
+Subject: Support for Iomega iConnect
+In-Reply-To: <201203302330.49834.linux@baker-net.org.uk> (Adam Baker's message
+ of "Fri, 30 Mar 2012 23:30:49 +0100")
+References: <201203302330.49834.linux@baker-net.org.uk>
+Message-ID: <87ty125w3i.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 12:09:28AM +0100, Hector Oron wrote:
->   Rename machine descriptions to match legacy descriptions distributed by
->   manufacturer BSP. This way distributions can do clean upgrades from
->   userspace scripts which check for these values to differentiate platforms
->   with single kernel binaries.
-> 
-> Signed-off-by: Hector Oron <hector.oron@gmail.com>
-> Acked-by: Matt Sealey <matt@genesi-usa.com>
+Adam Baker <linux@baker-net.org.uk> writes:
 
-Applied, thanks
+> Hi,
 
-Sascha
+Hi,
 
-> ---
->  arch/arm/mach-mx5/board-mx51_efikamx.c |    3 +--
->  arch/arm/mach-mx5/board-mx51_efikasb.c |    2 +-
->  2 files changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> index 3a5ed2d..fbfccc7 100644
-> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
-> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> @@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
->  	.init = mx51_efikamx_timer_init,
->  };
->  
-> -MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
-> -	/* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
-> +MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
->  	.atag_offset = 0x100,
->  	.map_io = mx51_map_io,
->  	.init_early = imx51_init_early,
-> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
-> index 4baf05c..dedbca5 100644
-> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
-> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
-> @@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
->  	.init	= mx51_efikasb_timer_init,
->  };
->  
-> -MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
-> +MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
->  	.atag_offset = 0x100,
->  	.map_io = mx51_map_io,
->  	.init_early = imx51_init_early,
-> -- 
-> 1.7.9
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
+> Is anyone aware of any technical reason why support for the Iomega iConnect is 
+> not included in the mainline kernel (e.g. there are significant changes 
+> happening in the area of the Kirkwood CPUs that mean now isn't a good time to 
+> include it). There are several versions floating around the internet but as far 
+> as I can see the only mention of the iConnect on this list is Russell saying 
+> he will remove it from mach types soon as there is no mainline support for it.
+>
+> Based upon work that Iomega posted to the open source code area on their web 
+> site and code that was submitted to OpenWRT with a sign off line from Wojciech 
+> Dubowik, I have patched support into the 3.2.11 kernel. If there is no 
+> objection in principle to inclusion then I will rebase the patch and submit 
+> it.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+fwiw, I'm working on getting iconnect supported in mainline. I've written a
+patch for it but it's not DT powered so I'm currently looking at
+kirkwood DT stuff in order to convert it to DT. Once it'll be done, I'll
+submit that to mainline.
+
+
+Arnaud
