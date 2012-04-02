@@ -1,24 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Apr 2012 11:43:57 +0100
-Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <20120402101427.GA3172@opensource.wolfsonmicro.com>
-References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
- <CAH+eYFC+q4xFuSdRBkO9nb0XZWU4pQ_yCyinMy2X3ds9WQd1kw@mail.gmail.com>
- <CACRpkda2zh=zR+A9bwhRXYHtQdFeUpiqG4d5g1i82mPCs1mXaQ@mail.gmail.com>
- <20120402101427.GA3172@opensource.wolfsonmicro.com>
-Message-ID: <20120402104357.GB24211@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 02 Apr 2012 14:08:45 +0300
+Subject: [PATCH 0/5] mtd: plat_nand: Add default partition parser and
+ use it
+In-Reply-To: <201203281112.48788.hartleys@visionengravers.com>
+References: <201203281112.48788.hartleys@visionengravers.com>
+Message-ID: <1333364925.5440.104.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 11:14:28AM +0100, Mark Brown wrote:
-> On Mon, Apr 02, 2012 at 12:39:11AM +0200, Linus Walleij wrote:
+On Wed, 2012-03-28 at 11:12 -0700, H Hartley Sweeten wrote:
+> This patch series adds cmdlinepart as the default partition parser for the
+> plat_nand driver and updates all the arch setup code to use it.
 > 
-> > Mark: as Rabin says the v1 patch is probably fine, are you pushing this
-> > to ARM SoC or into Russell's patch tracker?
+> Arch setup code that requires other partition parsers can still pass that
+> information as chip.part_probe_types.
 > 
-> I was waiting for some pronouncement from Russell - looking at the git
-> logs it seems the patch tracker is the normal way to merge things.
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-Well, this stuff was invented by Linus, so its Linus' decision about
-how to deal with the power control.
+Pushed the series to l2-mtd.git, thanks!
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/61fd9a90/attachment.sig>
