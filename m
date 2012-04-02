@@ -1,52 +1,46 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 2 Apr 2012 10:39:47 -0300
-Subject: [PATCH 5/5] ARM: armadillo5x0: Fix smsc911x driver probe
-In-Reply-To: <1333373987-30459-1-git-send-email-fabio.estevam@freescale.com>
-References: <1333373987-30459-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1333373987-30459-5-git-send-email-fabio.estevam@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 Apr 2012 13:45:04 +0000
+Subject: [PATCH 0/7]: arm: lpc32xx: Device tree support
+In-Reply-To: <1333371364-21347-1-git-send-email-stigge@antcom.de>
+References: <1333371364-21347-1-git-send-email-stigge@antcom.de>
+Message-ID: <201204021345.04512.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix smsc911x driver probe by adding a fixed dummy regulator.
+On Monday 02 April 2012, Roland Stigge wrote:
+> This is the first series of patches to introduce device tree support for the
+> LPC32xx SoC. This series includes patches for the various subsystems to support
+> device tree to be used later by the machine's initialization.
+> 
+> The patches apply to various subsystems:
+> 
+>  * staging/iio/adc
+>  * rtc
+>  * net
+>  * arm-soc
+>  * i2c
+>  * wdt
+> 
+> Based on v3.4-rc1
+> 
+> You can also pull from
+> 
+>   git://git.antcom.de/linux-2.6 lpc32xx/dt
+> 
+> I'm CC'ing the various subsystem maintainers and lists who can each see what's
+> going on and please pick their respective subsystem's changes. - Thanks!
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mach-armadillo5x0.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Looks good overall.
 
-diff --git a/arch/arm/mach-imx/mach-armadillo5x0.c b/arch/arm/mach-imx/mach-armadillo5x0.c
-index 27bc27e..c650145 100644
---- a/arch/arm/mach-imx/mach-armadillo5x0.c
-+++ b/arch/arm/mach-imx/mach-armadillo5x0.c
-@@ -38,6 +38,8 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
- #include <linux/delay.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -479,6 +481,11 @@ static struct platform_device *devices[] __initdata = {
- 	&armadillo5x0_smc911x_device,
- };
- 
-+static struct regulator_consumer_supply dummy_supplies[] = {
-+	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
-+	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-+};
-+
- /*
-  * Perform board specific initializations
-  */
-@@ -489,6 +496,8 @@ static void __init armadillo5x0_init(void)
- 	mxc_iomux_setup_multiple_pins(armadillo5x0_pins,
- 			ARRAY_SIZE(armadillo5x0_pins), "armadillo5x0");
- 
-+	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
-+
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 	imx_add_gpio_keys(&armadillo5x0_button_data);
- 	imx31_add_imx_i2c1(NULL);
--- 
-1.7.1
+I notice that you are missing the bindings for irq and gpio, which tend to be
+quite important. Do you have another tree that has all the lpc32xx specific
+parts or are these still under heavy development?
+
+Do you plan to add DT support in parallel to the ATAGS based board you
+already have, or do you plan to move everything over quickly?
+In the latter case, it might be helpful to get Acks from the subsystem
+maintainers and merge everything through arm-soc.
+
+	Arnd
