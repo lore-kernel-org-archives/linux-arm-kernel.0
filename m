@@ -1,115 +1,52 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Tue,  3 Apr 2012 01:00:51 +0800
-Subject: [PATCH v3] ARM: dts: imx6q: add anatop regulators
-Message-ID: <1333386051-4301-1-git-send-email-paul.liu@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 02 Apr 2012 10:04:03 -0700
+Subject: [PATCH 2/2] clkdev: Implement managed clk_get()
+In-Reply-To: <20120402165242.GC24211@n2100.arm.linux.org.uk>
+References: <1333279960-8497-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1333279960-8497-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <4F787392.5040308@codeaurora.org>
+ <20120401153450.GC8971@opensource.wolfsonmicro.com>
+ <4F79D85F.4020909@codeaurora.org>
+ <20120402165242.GC24211@n2100.arm.linux.org.uk>
+Message-ID: <4F79DC03.7020503@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+On 04/02/12 09:52, Russell King - ARM Linux wrote:
+> On Mon, Apr 02, 2012 at 09:48:31AM -0700, Stephen Boyd wrote:
+>> I hope we get a better clk_get() implementation with the unified struct
+>> clk. Don't get me wrong, clkdev is a great improvement over open coding
+>> clock framework stuff in each platform. But clkdev is really just
+>> another platform specific implementation
+> Utter crap.  It is not platform specific.
 
-Add anatop regulators to imx6q.dtsi for all imx6q platforms.
+It has compile-time platform hooks so it isn't entirely generic.
 
-Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx6q.dtsi |   84 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 84 insertions(+), 0 deletions(-)
+>
+>> that most platforms decide to
+>> use. Each platform has to select the option and it breaks if two
+>> platforms implement __clk_get()/__clk_put() in conflicting ways.
+> They should go away with the common clock stuff: they are there to deal
+> with the implementation specific parts of struct clk, and as the common
+> clock stuff sorts that out, these should be provided by the common clk.
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 263e8f3..33e1e14 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -346,6 +346,90 @@
- 				compatible = "fsl,imx6q-anatop";
- 				reg = <0x020c8000 0x1000>;
- 				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
-+
-+				regulator-1p1 at 110 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd1p1";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1375000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x110>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <4>;
-+					anatop-min-voltage = <800000>;
-+					anatop-max-voltage = <1375000>;
-+				};
-+
-+				regulator-3p0 at 120 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd3p0";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <3150000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x120>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <0>;
-+					anatop-min-voltage = <2625000>;
-+					anatop-max-voltage = <3400000>;
-+				};
-+
-+				regulator-2p5 at 130 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd2p5";
-+					regulator-min-microvolt = <2000000>;
-+					regulator-max-microvolt = <2750000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x130>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <0>;
-+					anatop-min-voltage = <2000000>;
-+					anatop-max-voltage = <2750000>;
-+				};
-+
-+				regulator-vddcore at 140 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "cpu";
-+					regulator-min-microvolt = <725000>;
-+					regulator-max-microvolt = <1450000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x140>;
-+					anatop-vol-bit-shift = <0>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <1>;
-+					anatop-min-voltage = <725000>;
-+					anatop-max-voltage = <1450000>;
-+				};
-+
-+				regulator-vddpu at 140 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vddpu";
-+					regulator-min-microvolt = <725000>;
-+					regulator-max-microvolt = <1450000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x140>;
-+					anatop-vol-bit-shift = <9>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <1>;
-+					anatop-min-voltage = <725000>;
-+					anatop-max-voltage = <1450000>;
-+				};
-+
-+				regulator-vddsoc at 140 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vddsoc";
-+					regulator-min-microvolt = <725000>;
-+					regulator-max-microvolt = <1450000>;
-+					regulator-always-on;
-+					anatop-reg-offset = <0x140>;
-+					anatop-vol-bit-shift = <18>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <1>;
-+					anatop-min-voltage = <725000>;
-+					anatop-max-voltage = <1450000>;
-+				};
- 			};
- 
- 			usbphy at 020c9000 { /* USBPHY1 */
+Agreed. They should all be deleted and only one should exist.
+
+>
+> So any platform using the common clock will be compatible with any other
+> platform using the common clock.
+>
+> If you somehow think that clkdev comes into that compatibility, you're
+> wrong.  It doesn't.
+
+I don't.
+
+>
+> And if you think that a private clk implementation could have a unified
+> clk_get(), you're also barking mad.
+
+I don't understand this. Maybe I'm barking mad already.
+
 -- 
-1.7.9.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
