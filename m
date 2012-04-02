@@ -1,32 +1,136 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Apr 2012 22:46:14 +0100
-Subject: [BUG?] vic MULTI_IRQ_HANDLER (was [PATCH] ep93xx: Implement
- double buffering for M2M DMA channels)
-In-Reply-To: <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
-References: <ADE657CA350FB648AAC2C43247A983F0020698409ABF@AUSP01VMBX24.collaborationhost.net>
- <CACb=_tQ4pSXtmKnqM23p97iyRbnrdZicw6ao68t2KjL46srAuQ@mail.gmail.com>
- <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
-Message-ID: <20120402214614.GK24211@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon,  2 Apr 2012 22:49:45 +0100
+Subject: [PATCH] clkdev: Implement managed clk_get()
+Message-ID: <1333403385-24133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 11:00:34PM +0300, Mika Westerberg wrote:
-> Anyway it looks like handle_IRQ() enables interrupts when it is finished with
-> the current interrupt which then causes hw to interrupt second time resulting
-> failure in case of ep93xx.
+Allow clk API users to simplify their cleanup paths by providing a
+managed version of clk_get() and clk_put().
 
-Soft IRQ processing in the irq exit path will enable interrupts, and
-this is probably where the problem is showing up.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ Documentation/driver-model/devres.txt |    3 ++
+ drivers/clk/clkdev.c                  |   45 +++++++++++++++++++++++++++++++++
+ include/linux/clk.h                   |   32 +++++++++++++++++++++++
+ 3 files changed, 80 insertions(+), 0 deletions(-)
 
-You've identified an important difference between the level 1 interrupt
-controller handlers and the chained handlers, and I suggest that folk
-re-implement their level 1 interrupt handlers in the same way as the
-assembly code was: re-read the interrupt register each time round the
-loop.
-
-Otherwise, we're going to have to move all the L1 stuff up a level,
-so that you only have one irq_enter() ... irq_exit() around the L1
-handler.  That means you'll avoid running any softirqs until you've
-cleared down all interrupts in the system, which might be bad news for
-softirq latency (and it'd be different from x86 behaviour, where softirqs
-are run after each non-nested IRQ is handled.)
+diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
+index 2a596a4..3a10848 100644
+--- a/Documentation/driver-model/devres.txt
++++ b/Documentation/driver-model/devres.txt
+@@ -276,3 +276,6 @@ REGULATOR
+   devm_regulator_get()
+   devm_regulator_put()
+   devm_regulator_bulk_get()
++
++CLOCK
++  devm_clk_get()
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 6db161f..a9a1137 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -89,6 +89,51 @@ void clk_put(struct clk *clk)
+ }
+ EXPORT_SYMBOL(clk_put);
+ 
++static void devm_clk_release(struct device *dev, void *res)
++{
++	clk_put(*(struct clk **)res);
++}
++
++struct clk *devm_clk_get(struct device *dev, const char *id)
++{
++	struct clk **ptr, *clk;
++
++	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	clk = clk_get(dev, id);
++	if (!IS_ERR(clk)) {
++		*ptr = clk;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return clk;
++}
++EXPORT_SYMBOL(devm_clk_get);
++
++static int devm_clk_match(struct device *dev, void *res, void *data)
++{
++	struct clk **c = res;
++	if (!c || !*c) {
++		WARN_ON(!c || !*c);
++		return 0;
++	}
++	return *c == data;
++}
++
++void devm_clk_put(struct device *dev, struct clk *clk)
++{
++	int ret;
++
++	ret = devres_destroy(dev, devm_clk_release, devm_clk_match, clk);
++
++	WARN_ON(ret);
++}
++EXPORT_SYMBOL(devm_clk_put);
++
+ void clkdev_add(struct clk_lookup *cl)
+ {
+ 	mutex_lock(&clocks_mutex);
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index c9547d9..62b0bb0 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -101,6 +101,26 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
+ struct clk *clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * devm_clk_get - lookup and obtain a managed reference to a clock producer.
++ * @dev: device for clock "consumer"
++ * @id: clock comsumer ID
++ *
++ * Returns a struct clk corresponding to the clock producer, or
++ * valid IS_ERR() condition containing errno.  The implementation
++ * uses @dev and @id to determine the clock consumer, and thereby
++ * the clock producer.  (IOW, @id may be identical strings, but
++ * clk_get may return different clock producers depending on @dev.)
++ *
++ * Drivers must assume that the clock source is not enabled.
++ *
++ * devm_clk_get should not be called from within interrupt context.
++ *
++ * The clock will automatically be freed when the device is unbound
++ * from the bus.
++ */
++struct clk *devm_clk_get(struct device *dev, const char *id);
++
++/**
+  * clk_prepare - prepare a clock source
+  * @clk: clock source
+  *
+@@ -206,6 +226,18 @@ unsigned long clk_get_rate(struct clk *clk);
+  */
+ void clk_put(struct clk *clk);
+ 
++/**
++ * clk_put	- "free" a managed clock source
++ * @dev: device used to acuqire the clock
++ * @clk: clock source acquired with devm_clk_get()
++ *
++ * Note: drivers must ensure that all clk_enable calls made on this
++ * clock source are balanced by clk_disable calls prior to calling
++ * this function.
++ *
++ * clk_put should not be called from within interrupt context.
++ */
++void devm_clk_put(struct device *dev, struct clk *clk);
+ 
+ /*
+  * The remaining APIs are optional for machine class support.
+-- 
+1.7.9.1
