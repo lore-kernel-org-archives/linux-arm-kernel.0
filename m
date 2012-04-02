@@ -1,45 +1,42 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Apr 2012 11:10:49 +0200
-Subject: [PATCH] ARM: mach-mx35_3ds: Fix build warning due to the lack of
- 'const' annotation
-In-Reply-To: <1332212998-6234-1-git-send-email-festevam@gmail.com>
-References: <1332212998-6234-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120402091049.GQ3852@pengutronix.de>
+Date: Mon, 2 Apr 2012 11:11:18 +0200
+Subject: [PATCH] MX2: Fix mx2_camera clock regression.
+In-Reply-To: <1332343181-16968-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1332343181-16968-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120402091118.GR3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2012 at 12:09:58AM -0300, Fabio Estevam wrote:
-> Fix the following build warning:
+On Wed, Mar 21, 2012 at 04:19:41PM +0100, Javier Martin wrote:
+> The following patch breaks mx2_camera driver:
+> http://git.linuxtv.org/media_tree.git?a=commitdiff;h=52f1a845e25dc0c6435153aca1a170e20b282429
 > 
-> arch/arm/mach-imx/mach-mx35_3ds.c: In function 'mx35_3ds_lcd_set_power':
-> arch/arm/mach-imx/mach-mx35_3ds.c:112: warning: passing argument 2 of 'gpiochip_find' from incompatible pointer type
-> include/asm-generic/gpio.h:145: note: expected 'int (*)(struct gpio_chip *, const void *)' but argument is of type 'int (*)(struct gpio_chip *, void *)'
+> This change fixes the problem.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 
 Applied, thanks
 
 Sascha
 
 > ---
->  arch/arm/mach-imx/mach-mx35_3ds.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/mach-imx/clock-imx27.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-> index e14291d..6ae51c6 100644
-> --- a/arch/arm/mach-imx/mach-mx35_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-> @@ -97,7 +97,7 @@ static struct i2c_board_info __initdata i2c_devices_3ds[] = {
->  static int lcd_power_gpio = -ENXIO;
->  
->  static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
-> -						     void *data)
-> +						     const void *data)
->  {
->  	return !strcmp(chip->label, data);
->  }
+> diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+> index b9a95ed..98e04f5 100644
+> --- a/arch/arm/mach-imx/clock-imx27.c
+> +++ b/arch/arm/mach-imx/clock-imx27.c
+> @@ -662,6 +662,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK(NULL, "dma", dma_clk)
+>  	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
+>  	_REGISTER_CLOCK(NULL, "brom", brom_clk)
+> +	_REGISTER_CLOCK(NULL, "emma", emma_clk)
+>  	_REGISTER_CLOCK("m2m-emmaprp.0", NULL, emma_clk)
+>  	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk)
+>  	_REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
 > -- 
-> 1.7.1
+> 1.7.0.4
 > 
 > 
 
