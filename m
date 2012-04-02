@@ -1,28 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 2 Apr 2012 19:37:54 +0000
-Subject: [PATCH v2 3/8] net: Add device tree support to LPC32xx
-In-Reply-To: <1333391587-26290-4-git-send-email-stigge@antcom.de>
+Date: Mon, 2 Apr 2012 19:39:12 +0000
+Subject: [PATCH v2 0/8]: arm: lpc32xx: Device tree support
+In-Reply-To: <1333391587-26290-1-git-send-email-stigge@antcom.de>
 References: <1333391587-26290-1-git-send-email-stigge@antcom.de>
- <1333391587-26290-4-git-send-email-stigge@antcom.de>
-Message-ID: <201204021937.54567.arnd@arndb.de>
+Message-ID: <201204021939.12731.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Monday 02 April 2012, Roland Stigge wrote:
+> This is the first series of patches to introduce device tree support for the
+> LPC32xx SoC. This series includes patches for the various subsystems to support
+> device tree to be used later by the machine's initialization.
 > 
-> +       if (pdev->dev.of_node && of_get_property(pdev->dev.of_node,
-> +                                                "use-iram", NULL))
-> +               pldat->use_iram = true;
-> +       else
-> +               pldat->use_iram = false;
-> +
+> The patches apply to various subsystems:
+> 
+>  * staging/iio/adc (1)
+>  * rtc (1)
+>  * net (1)
+>  * wdt (1)
+>  * i2c (4)
+>  * arm-soc (i2c related in the former, to be merged via i2c, as suggested by
+>             Arnd Bergmann)
 
-One more thing I just noticed:
+Looks good, please add
 
-this is equivalent to the much shorter 
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-	pldat->use_iram = of_property_read_bool(pdev->dev.of_node, "use-iram");
-
-Everything else looks good here.
+for the entire series.
 
 	Arnd
