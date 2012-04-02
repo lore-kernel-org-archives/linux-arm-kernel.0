@@ -1,194 +1,95 @@
-From: jon-hunter@TI.COM (Jon Hunter)
-Date: Mon, 2 Apr 2012 10:31:20 -0500
-Subject: [PATCH-V2 3/3] ARM: OMAP: Make OMAP clocksource source selection
- runtime
-In-Reply-To: <79CD15C6BA57404B839C016229A409A831843008@DBDE01.ent.ti.com>
-References: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
- <1333115655-28530-4-git-send-email-hvaibhav@ti.com> <4F75D290.8090706@ti.com>
- <79CD15C6BA57404B839C016229A409A831843008@DBDE01.ent.ti.com>
-Message-ID: <4F79C648.5020504@ti.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Mon, 2 Apr 2012 16:34:27 +0100 (BST)
+Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
+ MFP_LPM_KEEP_OUTPUT
+In-Reply-To: <CAN1soZy3JLK0NNt-VmgaJ8ofq5Qj7Y2WnpDKwPxyQXxZ_Mbw2w@mail.gmail.com>
+Message-ID: <1333380867.84262.YahooMailClassic@web29015.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/2/2012 1:06, Hiremath, Vaibhav wrote:
+Hello Haojian,
 
->> [...]
->>
->>> @@ -280,13 +265,33 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
->>>  						const char *fck_source)
->>>  {
->>>  	int res;
->>> +	struct omap_hwmod *oh;
->>> +	const char *oh_name = "counter_32k";
->>> +
->>> +	/*
->>> +	 * First check for availability for 32k-sync timer.
->>> +	 *
->>> +	 * In case of failure in finding 32k_counter module or
->>> +	 * registering it as clocksource, execution will fallback to
->>> +	 * gp-timer.
->>> +	 */
->>> +	oh = omap_hwmod_lookup(oh_name);
->>> +	if (oh && oh->slaves_cnt != 0) {
->>> +		u32 pbase;
->>> +		unsigned long size;
->>> +
->>> +		pbase = oh->slaves[0]->addr->pa_start + 0x10;
->>> +		size = oh->slaves[0]->addr->pa_end -
->>> +			oh->slaves[0]->addr->pa_start;
->>> +		res = omap_init_clocksource_32k(pbase, size);
->>> +		if (!res)
->>> +			return;
->>
->>
->> If omap_init_clocksource_32k() fails should we also call BUG_ON here?
->>
+--- On Mon, 2/4/12, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> >> > But since DRIVE_HIGH or
+> DRIVE_LOW currently don't
+> >> prevent that,
+> >>
+> >> Don't prevent what?
+> >
+> > Don't prevent a GPIO input being changed to an output
+> when entering
+> > suspend().
+> >
+> PGSRx register allow for selecting the output state (the
+> driven value)
+> of each GPIO pin when the processor enters and while it is
+> in sleep
+> mode.
 > 
-> I don't think we should do that, for following reasons,
+> Each bit of PGSRx register is named as SS (Sleep State of
+> GPIO<n>).
 > 
-> 	- There will be platforms without 32k_counter modules, like am33xx.
->         For them, this BUG_ON will miss-leading.
-> 	- pr_err is already used to provide failure in this function.
-> 	- We have safe fallback option here.
-
-
-Ok, sorry I mis-read the code. I see the return here is on success and
-not failure. So this is fine.
-
-By the way, for an AM33xx device, I assume that the omap_hwmod_lookup
-will return NULL because the module does not exist. Therefore, you would
-not even enter the if statement and so there should not be any impact.
-Which still raises the question, if omap_hwmod_lookup() finds the device
-but omap_init_clocksource_32k() fails, should we at least WARN?
-
-The fallback option is only safe for devices that are not using power
-management and don't cut the sys-clk.
-
-
->>> +	}
->>>
->>> +	/* Fall back to gp-timer code */
->>>  	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source);
->>>  	BUG_ON(res);
->>>
->>> -	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
->>> -		gptimer_id, clksrc.rate);
->>> -
->>>  	__omap_dm_timer_load_start(&clksrc,
->>>  			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
->>>  	setup_sched_clock(dmtimer_read_sched_clock, 32, clksrc.rate);
->>> @@ -294,8 +299,10 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
->>>  	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
->>>  		pr_err("Could not register clocksource %s\n",
->>>  			clocksource_gpt.name);
->>> +	else
->>> +		pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
->>> +			gptimer_id, clksrc.rate);
->>>  }
->>> -#endif
->>>
->>>  #define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src,			\
->>>  				clksrc_nr, clksrc_src)			\
->>> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
->>> index 5068fe5..c1af18c 100644
->>> --- a/arch/arm/plat-omap/counter_32k.c
->>> +++ b/arch/arm/plat-omap/counter_32k.c
->>> @@ -35,8 +35,6 @@
->>>   */
->>>  static void __iomem *timer_32k_base;
->>>
->>> -#define OMAP16XX_TIMER_32K_SYNCHRONIZED		0xfffbc410
->>> -
->>>  static u32 notrace omap_32k_read_sched_clock(void)
->>>  {
->>>  	return timer_32k_base ? __raw_readl(timer_32k_base) : 0;
->>> @@ -68,54 +66,42 @@ void read_persistent_clock(struct timespec *ts)
->>>  	*ts = *tsp;
->>>  }
->>>
->>> -int __init omap_init_clocksource_32k(void)
->>> +int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
->>>  {
->>> -	static char err[] __initdata = KERN_ERR
->>> -			"%s: can't register clocksource!\n";
->>> -
->>> -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
->>> -		u32 pbase;
->>> -		unsigned long size = SZ_4K;
->>> -		void __iomem *base;
->>> -		struct clk *sync_32k_ick;
->>> -
->>> -		if (cpu_is_omap16xx()) {
->>> -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
->>> -			size = SZ_1K;
->>> -		} else if (cpu_is_omap2420())
->>> -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
->>> -		else if (cpu_is_omap2430())
->>> -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
->>> -		else if (cpu_is_omap34xx())
->>> -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
->>> -		else if (cpu_is_omap44xx())
->>> -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
->>> -		else
->>> -			return -ENODEV;
->>> -
->>> -		/* For this to work we must have a static mapping in io.c for this area */
->>> -		base = ioremap(pbase, size);
->>> -		if (!base)
->>> -			return -ENODEV;
->>> -
->>> -		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
->>> -		if (!IS_ERR(sync_32k_ick))
->>> -			clk_enable(sync_32k_ick);
->>
->>> -
->>
->>> -		timer_32k_base = base;
->>> -
->>> -		/*
->>> -		 * 120000 rough estimate from the calculations in
->>> -		 * __clocksource_updatefreq_scale.
->>> -		 */
->>> -		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
->>> -				32768, NSEC_PER_SEC, 120000);
->>> -
->>> -		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
->>> -					  clocksource_mmio_readl_up))
->>> -			printk(err, "32k_counter");
->>> -
->>> -		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
->>> -	}
->>> +	void __iomem *base;
->>> +	struct clk *sync_32k_ick;
->>> +
->>> +	if (!pbase || !size)
->>> +		return -ENODEV;
->>> +	/*
->>> +	 * For this to work we must have a static mapping in io.c
->>> +	 * for this area
->>> +	 */
->>> +	base = ioremap(pbase, size);
->>> +	if (!base)
->>> +		return -ENODEV;
->>> +
->>> +	sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
->>> +	if (!IS_ERR(sync_32k_ick))
->>> +		clk_enable(sync_32k_ick);
->>
->>
->> I know that this is carry over from the original code, but seems that if
->> clk_get fails we should return an error. So maybe ...
->>
+> SS '0' -- If GPIO is programmed as an output, the pin is
+> driven and held
+> low during the transition to and while in sleep mode.
 > 
-> I thought of this before, but again the next thought came to my mind was, 
-> somebody might have done this for some specific reasons, may be OMAP1 
-> dependency or something? So I choose it to keep it as is...
+> SS '1' -- If GPIO is programmed as an output, the pin is
+> driven and held
+> high during the transition to and while in sleep mode.
 > 
-> So before doing this, I thing we should conform from the original author
-> about this implementation.
+> So pin must be configured to GPIO output first before
+> entering sleep mode.
+> 
+> Now the issue comes. If you use the pin as input, why do you
+> need to change
+> it into output mode in run time?
 
+I cannot think of a reason why you would change an input to an output.
 
-Ok, yes good point.
+But the possibility that the direction could be changed from input
+to output has been cited as a reason why KEEP_OUTPUT cannot force
+the gpio direction to output.
 
-Cheers
-Jon
+It is relatively easy to verify that KEEP_OUTPUT does not change the
+direction from input to output, because currently only 2 platforms
+use KEEP_OUTPUT, namely corgi and hx4700.
+
+It is less easy to verify that DRIVE_HIGH and DRIVE_LOW do not change
+the direction from input to output, because many more platforms use
+them; a cursory check suggests that up to 16 platforms use them.
+
+> 
+> > By the way, there is still the issue of DRIVE_HIGH and
+> DRIVE_LOW
+> > forcing the GPIO direction to output in
+> pxa2xx_mfp_suspend()
+> > *before* the PGSR values take effect. Surely a bug?
+> >
+> It's evil to change pin from input mode to output mode if
+> it's in active mode.
+
+Agreed.
+
+So pxa2xx_mfp_suspend() contains a potential bug, unless someone can
+verify that DRIVE_HIGH and DRIVE_LOW never change the direction from
+input to output.
+
+> 
+> Actually we only need to configure control pins to
+> peripherals on pxa27x. It's
+> a little different from pxa3xx. For pxa3xx, we can even
+> configure input pin
+> in low power mode. PXA3xx has standby mode that internal
+> device keeps
+> its state. PXA27x doesn't have this feature. If we want to
+> save power while
+> PXA27x is suspend, the peripheral should be shutdown too.
+> 
+> Since we need to shutdown peripheral, control pin should
+> always connect to
+>  reset or chip select signal of peripheral, we can disable
+> the peripheral. So
+> we needn't to configure low power mode of those input pins.
+
+Regards,
+Paul
