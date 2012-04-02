@@ -1,47 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  2 Apr 2012 15:31:03 +0100
-Subject: [PATCH 1/2] serial: PL011: Repair NULL pointer dereference
-Message-ID: <1333377064-8093-1-git-send-email-lee.jones@linaro.org>
+Date: Mon,  2 Apr 2012 15:31:04 +0100
+Subject: [PATCH 2/2] ARM: ux500: Fix unmet direct dependency
+In-Reply-To: <1333377064-8093-1-git-send-email-lee.jones@linaro.org>
+References: <1333377064-8093-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1333377064-8093-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pl011 driver attempts to mask and clear UART interrupts
-at probe time, which subsequently fail with a NULL pointer
-dereference error. This is due to 'uap->port.membase' being
-used uninitialised. This patch moves the offending lines
-to a point of post-initialisation.
+A recent change to a Kconfig configuration saw MACH_U8500
+remove TPS6105X selection. In doing so Kconfig stopped
+selecting REGULATORS, which is still required. This patch
+sees UX500_SOC_DB8500 implicitly select it instead.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/tty/serial/amba-pl011.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-ux500/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 0c65c9e..b5c1f0f 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1946,10 +1946,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		goto unmap;
- 	}
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 880d02e..ef7099e 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -17,6 +17,7 @@ config UX500_SOC_DB5500
+ config UX500_SOC_DB8500
+ 	bool
+ 	select MFD_DB8500_PRCMU
++	select REGULATOR
+ 	select REGULATOR_DB8500_PRCMU
+ 	select CPU_FREQ_TABLE if CPU_FREQ
  
--	/* Ensure interrupts from this UART are masked and cleared */
--	writew(0, uap->port.membase + UART011_IMSC);
--	writew(0xffff, uap->port.membase + UART011_ICR);
--
- 	uap->vendor = vendor;
- 	uap->lcrh_rx = vendor->lcrh_rx;
- 	uap->lcrh_tx = vendor->lcrh_tx;
-@@ -1965,6 +1961,11 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	uap->port.ops = &amba_pl011_pops;
- 	uap->port.flags = UPF_BOOT_AUTOCONF;
- 	uap->port.line = i;
-+
-+	/* Ensure interrupts from this UART are masked and cleared */
-+	writew(0, uap->port.membase + UART011_IMSC);
-+	writew(0xffff, uap->port.membase + UART011_ICR);
-+
- 	pl011_dma_probe(uap);
- 
- 	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
 -- 
 1.7.5.4
