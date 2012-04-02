@@ -1,159 +1,47 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon,  2 Apr 2012 16:21:04 +0200
-Subject: [PATCH RFC] gpio: Device tree support for LPC32xx
-Message-ID: <1333376464-25712-1-git-send-email-stigge@antcom.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  2 Apr 2012 15:31:03 +0100
+Subject: [PATCH 1/2] serial: PL011: Repair NULL pointer dereference
+Message-ID: <1333377064-8093-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support for gpio-lpc32xx.c
+The pl011 driver attempts to mask and clear UART interrupts
+at probe time, which subsequently fail with a NULL pointer
+dereference error. This is due to 'uap->port.membase' being
+used uninitialised. This patch moves the offending lines
+to a point of post-initialisation.
 
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
+ drivers/tty/serial/amba-pl011.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-Hi!
-
-I'm adding device tree support to the LPC32xx platform. Currently struggling
-with GPIO, see patch below.
-
-Generally, it works - GPIOs registered successfully like before:
-
-================================================================
-gpiochip_add: registered GPIOs 0 to 7 on device: gpio_p0
-gpiochip_add: registered GPIOs 8 to 31 on device: gpio_p1
-gpiochip_add: registered GPIOs 32 to 44 on device: gpio_p2
-gpiochip_add: registered GPIOs 45 to 50 on device: gpio_p3
-gpiochip_add: registered GPIOs 51 to 78 on device: gpi_p3
-gpiochip_add: registered GPIOs 79 to 102 on device: gpo_p3
-================================================================
-
-But in connection with gpio-leds which I'm using like this:
-
-        leds {
-                compatible = "gpio-leds";
-                led0 {
-                        gpios = <&gpio 0x50 1>; /* GPIO 80, active low */
-                        linux,default-trigger = "heartbeat";
-                        default-state = "keep";
-                };
-        };
-
-I get the following error:
-
-================================================================
-Skipping unavailable LED gpio -22 (led0)
-================================================================
-
-Traced it back to drivers/of/gpio.c:144: (errno: -22 == -EINVAL)
-
-When I disable the "lpc32xx_gpiochip[i].of_node = pdev->dev.of_node" in l.466,
-it changes to:
-
-================================================================
-Skipping unavailable LED gpio -19 (led0)
-================================================================
-
-which comes from drivers/of/gpio.c:52: (errno: -19 == -ENODEV)
-
-I suspect the strategy to do several gpiochip_add()s, ported from the non-DT
-platform code, doesn't work well with the of_* registration - e.g.,
-gpiochip_find() compares the static structs I'm registering with gpiochip_add()
-with another (of_node's) one not in the registeded list. Should the various
-GPIO areas be moved from lpc32xx_gpiochip[] to a dts file? So many callbacks
-and memory references in there...
-
-Any suggestions appreciated!
-
-Thanks in advance,
-
-Roland
-
-
- Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   18 ++++++++
- arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +++-
- drivers/gpio/gpio-lpc32xx.c                             |   34 +++++++++++++++-
- 3 files changed, 58 insertions(+), 3 deletions(-)
-
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
-@@ -0,0 +1,18 @@
-+NXP LPC32xx SoC GPIO controller
-+
-+Required properties:
-+- compatible : "nxp,lpc32xx-gpio"
-+- reg : Physical base address and length of the controller's registers.
-+- #gpio-cells : Should be two. The first cell is the pin number and the
-+  second cell is used to specify optional parameters:
-+  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-+- gpio-controller : Marks the device node as a GPIO controller.
-+
-+Example:
-+
-+gpio: gpio at 40028000 {
-+	compatible = "nxp,lpc32xx-gpio";
-+	reg = <0x40028000 0x1000>;
-+	#gpio-cells = <2>;
-+	gpio-controller;
-+};
---- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
-@@ -1 +1,8 @@
--/* empty */
-+#ifndef __MACH_GPIO_H
-+#define __MACH_GPIO_H
-+
-+#include "gpio-lpc32xx.h"
-+
-+#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
-+
-+#endif /* __MACH_GPIO_H */
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -21,6 +21,9 @@
- #include <linux/io.h>
- #include <linux/errno.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 0c65c9e..b5c1f0f 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1946,10 +1946,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto unmap;
+ 	}
  
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -454,10 +457,37 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 	},
- };
+-	/* Ensure interrupts from this UART are masked and cleared */
+-	writew(0, uap->port.membase + UART011_IMSC);
+-	writew(0xffff, uap->port.membase + UART011_ICR);
+-
+ 	uap->vendor = vendor;
+ 	uap->lcrh_rx = vendor->lcrh_rx;
+ 	uap->lcrh_tx = vendor->lcrh_tx;
+@@ -1965,6 +1961,11 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	uap->port.ops = &amba_pl011_pops;
+ 	uap->port.flags = UPF_BOOT_AUTOCONF;
+ 	uap->port.line = i;
++
++	/* Ensure interrupts from this UART are masked and cleared */
++	writew(0, uap->port.membase + UART011_IMSC);
++	writew(0xffff, uap->port.membase + UART011_ICR);
++
+ 	pl011_dma_probe(uap);
  
--void __init lpc32xx_gpio_init(void)
-+static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
- {
- 	int i;
- 
--	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
-+	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++) {
-+#ifdef CONFIG_OF_GPIO
-+		lpc32xx_gpiochip[i].chip.of_node = pdev->dev.of_node;
-+#endif
- 		gpiochip_add(&lpc32xx_gpiochip[i].chip);
-+	}
-+
-+	return 0;
- }
-+
-+static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
-+	{ .compatible = "nxp,lpc32xx-gpio", },
-+	{ },
-+};
-+
-+static struct platform_driver lpc32xx_gpio_driver = {
-+	.driver		= {
-+		.name	= "lpc32xx-gpio",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = lpc32xx_gpio_of_match,
-+	},
-+	.probe		= lpc32xx_gpio_probe,
-+};
-+
-+static int __init lpc32xx_gpio_init(void)
-+{
-+	return platform_driver_register(&lpc32xx_gpio_driver);
-+}
-+postcore_initcall(lpc32xx_gpio_init);
-+
+ 	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
+-- 
+1.7.5.4
