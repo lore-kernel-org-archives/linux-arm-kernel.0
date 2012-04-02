@@ -1,171 +1,207 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue,  3 Apr 2012 00:58:33 +0200
-Subject: [PATCH] gpio: Device tree support for LPC32xx
-Message-ID: <1333407513-18231-1-git-send-email-stigge@antcom.de>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Mon, 02 Apr 2012 13:21:53 -1000
+Subject: [PATCH v2 7/7] Document: devicetree: add OF documents for arch-mmp
+In-Reply-To: <1330950111-30797-8-git-send-email-haojian.zhuang@marvell.com>
+References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
+ <1330950111-30797-8-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <4F7A3491.2060003@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support for gpio-lpc32xx.c
+There are some inconsistencies in this patch as indicated in-line below:
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
 
----
+On 3/5/2012 2:21 AM, Haojian Zhuang wrote:
+> Add OF support in Document/devicetree directory.
+>
+> Signed-off-by: Haojian Zhuang<haojian.zhuang@marvell.com>
+> ---
+>   Documentation/devicetree/bindings/arm/mrvl.txt     |    6 +++
+>   .../devicetree/bindings/gpio/mrvl-gpio.txt         |   23 ++++++++++++
+>   Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   37 ++++++++++++++++++++
+>   .../devicetree/bindings/rtc/sa1100-rtc.txt         |   17 +++++++++
+>   .../devicetree/bindings/serial/mrvl-serial.txt     |    4 ++
+>   5 files changed, 87 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/mrvl.txt
+>   create mode 100644 Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+>   create mode 100644 Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+>   create mode 100644 Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+>   create mode 100644 Documentation/devicetree/bindings/serial/mrvl-serial.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/mrvl.txt b/Documentation/devicetree/bindings/arm/mrvl.txt
+> new file mode 100644
+> index 0000000..d8de933
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mrvl.txt
+> @@ -0,0 +1,6 @@
+> +Marvell Platforms Device Tree Bindings
+> +----------------------------------------------------
+> +
+> +PXA168 Aspenite Board
+> +Required root node properties:
+> +	- compatible = "mrvl,pxa168-aspenite", "mrvl,pxa168";
+> diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> new file mode 100644
+> index 0000000..1e34cfe
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> @@ -0,0 +1,23 @@
+> +* Marvell PXA GPIO controller
+> +
+> +Required properties:
+> +- compatible : Should be "mrvl,pxa-gpio" or "mrvl,mmp-gpio"
+> +- reg : Address and length of the register set for the device
+> +- interrupts : Should be the port interrupt shared by all gpio pins, if
 
- Applies to v3.4-rc1
+This sentence is incomplete.  Maybe the "one number." two lines below is 
+part of this sentence?  If so, I'm not sure I understand the meaning.  
+Did you mean to say "If a single interrupt is shared by all GPIO pins, 
+the value is a single integer." ?  What is the meaning if there are 
+multiple integers in the value?
+>
+> +- interrupt-name : Should be the name of irq resource.
 
- Can add this patch to the LPC32xx series for an update, if necessary.
+"The name" implies that there is a single value, but the example below 
+shows multiple values.
 
- Thanks to Arnd Bergmann for the help with registering GPIO via OF!
+>
+> +  one number.
 
- Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   71 ++++++++++++++++
- arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +-
- drivers/gpio/gpio-lpc32xx.c                             |   45 +++++++++-
- 3 files changed, 120 insertions(+), 5 deletions(-)
+See above.
 
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
-@@ -0,0 +1,71 @@
-+NXP LPC32xx SoC GPIO controller
-+
-+Required properties:
-+- compatible: "nxp,lpc32xx-gpio"
-+- reg: Physical base address and length of the controller's registers.
-+- #address-cells: For indexing of the subnodes (GPIO groups of the SoC)
-+- #size-cells: Always 0
-+- #gpio-cells: Should be two. The first cell is the pin number and the
-+  second cell is used to specify optional parameters:
-+  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-+
-+Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
-+- gpio-controller: Marks the device node as a GPIO controller.
-+- #gpio-cells: Should be two. The first cell is the pin number and the
-+  second cell is used to specify optional parameters:
-+  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-+- reg: Index of the GPIO group
-+- gpio-lines: Number of GPIOs in that subnode/GPIO group
-+
-+Example:
-+
-+	gpio: gpio at 40028000 {
-+		compatible = "nxp,lpc32xx-gpio";
-+		reg = <0x40028000 0x1000>;
-+		/* create a private address space for enumeration */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		#gpio-cells = <2>;
-+
-+		gpio_p0: gpio-bank at 0 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-lines = <8>;
-+			reg = <0>;
-+		};
-+
-+		gpio_p1: gpio-bank at 1 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-lines = <24>;
-+			reg = <1>;
-+		};
-+
-+		gpio_p2: gpio-bank at 2 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-lines = <13>;
-+			reg = <2>;
-+		};
-+
-+		gpio_p3: gpio-bank at 3 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-lines = <6>;
-+			reg = <3>;
-+		};
-+
-+		gpi_p3: gpio-bank at 4 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-lines = <28>;
-+			reg = <4>;
-+		};
-+
-+		gpo_p3: gpio-bank at 5 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-lines = <24>;
-+			reg = <5>;
-+		};
-+	};
---- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
-@@ -1 +1,8 @@
--/* empty */
-+#ifndef __MACH_GPIO_H
-+#define __MACH_GPIO_H
-+
-+#include "gpio-lpc32xx.h"
-+
-+#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
-+
-+#endif /* __MACH_GPIO_H */
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -21,6 +21,9 @@
- #include <linux/io.h>
- #include <linux/errno.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -454,10 +457,44 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 	},
- };
- 
--void __init lpc32xx_gpio_init(void)
-+static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
- {
--	int i;
-+	struct device_node *node;
- 
--	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
--		gpiochip_add(&lpc32xx_gpiochip[i].chip);
-+	for_each_child_of_node(pdev->dev.of_node, node) {
-+		if (of_device_is_available(node)) {
-+			u32 index;
-+			struct gpio_chip *chip;
-+			if (of_property_read_u32(node, "reg", &index) < 0)
-+				continue;
-+			if (index >= ARRAY_SIZE(lpc32xx_gpiochip))
-+				continue;
-+			chip = &lpc32xx_gpiochip[index].chip;
-+			chip->of_node = of_node_get(node);
-+			gpiochip_add(chip);
-+		}
-+	}
-+
-+	return 0;
- }
-+
-+static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
-+	{ .compatible = "nxp,lpc32xx-gpio", },
-+	{ },
-+};
-+
-+static struct platform_driver lpc32xx_gpio_driver = {
-+	.driver		= {
-+		.name	= "lpc32xx-gpio",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = lpc32xx_gpio_of_match,
-+	},
-+	.probe		= lpc32xx_gpio_probe,
-+};
-+
-+static int __init lpc32xx_gpio_init(void)
-+{
-+	return platform_driver_register(&lpc32xx_gpio_driver);
-+}
-+postcore_initcall(lpc32xx_gpio_init);
-+
+>
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +- #gpio-cells : Should be one.  It is the pin number.
+> +
+> +Example:
+> +
+> +	gpio: gpio at d4019000 {
+> +		compatible = "mrvl,mmp-gpio", "mrvl,pxa-gpio";
+
+The text above says "mrvl,pxa-gpio" *or* "mrvl,mmp-gpio", but the 
+example has both.  If both are necessary, the word "and" would be more 
+appropriate.
+
+What is the point of having both names in the device tree?  If the Linux 
+driver is known to support the MMP version of the GPIO hardware, there 
+is no need for a "fallback" to the PXA version.   Fallback names are 
+rarely needed for Linux, because new customized Linux kernels are easy 
+to develop for new hardware.  Fallback names were intended for 
+commercial operating systems where the hardware vendor must work with an 
+OS version that is already in the field.
+
+>
+> +		reg =<0xd4019000 0x1000>;
+> +		interrupts =<49>,<17>,<18>;
+> +		interrupt-name = "gpio_mux", "gpio0", "gpio1";
+> +		gpio-controller;
+> +		#gpio-cells =<1>;
+> +		interrupt-controller;
+> +		#interrupt-cells =<1>;
+
+The text above does not mention "interrupt-controller" and 
+"#interrupt-cells" properties for this node.
+
+>
+> +      };
+> diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+> new file mode 100644
+> index 0000000..071eb3c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+> @@ -0,0 +1,37 @@
+> +* I2C
+> +
+> +Required properties :
+> +
+> + - reg : Offset and length of the register set for the device
+> + - compatible : should be "mrvl,mmp-twsi" where CHIP is the name of a
+
+"CHIP" makes no sense in this sentence.  I presume that you meant to 
+refer to a template name that contains "CHIP", but "mrvl,mmp-twsi" does 
+not contain "CHIP".
+
+>
+> +   compatible processor, e.g. pxa168, pxa910, mmp2, mmp3.
+> +   For the pxa2xx/pxa3xx, an additional node "mrvl,pxa-i2c" is required
+> +   as shown in the example below.
+> +
+> +Recommended properties :
+> +
+> + - interrupts :<a b>  where a is the interrupt number and b is a
+> +   field that represents an encoding of the sense and level
+> +   information for the interrupt.  This should be encoded based on
+> +   the information in section 2) depending on the type of interrupt
+> +   controller you have.
+
+Was this text copied from somewhere else and not edited?  It doesn't 
+make sense here, and the example below has only a single number, so <a 
+b> cannot be correct.
+
+>
+> + - interrupt-parent : the phandle for the interrupt controller that
+> +   services interrupts for this device.
+
+There is no interrupt-parent property in the example below.  I presume 
+you mean to use the default where the device tree parent node is the 
+interrupt parent.  If so, you should say that.
+>
+> + - mrvl,i2c-polling : Disable interrupt of i2c controller. Polling
+> +   status register of i2c controller instead.
+> + - mrvl,i2c-fast-mode : Enable fast mode of i2c controller.
+> +
+> +Examples:
+> +	twsi1: i2c at d4011000 {
+> +		compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
+
+No need for two different values, as discussed above.
+
+>
+> +		reg =<0xd4011000 0x1000>;
+> +		interrupts =<7>;
+> +		mrvl,i2c-fast-mode;
+> +	};
+> +	
+> +	twsi2: i2c at d4025000 {
+> +		compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
+
+No need for two different values, as discussed above.
+
+>
+> +		reg =<0xd4025000 0x1000>;
+> +		interrupts =<58>;
+> +	};
+> +
+> diff --git a/Documentation/devicetree/bindings/rtc/sa1100-rtc.txt b/Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+> new file mode 100644
+> index 0000000..0cda19a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+> @@ -0,0 +1,17 @@
+> +* Marvell Real Time Clock controller
+> +
+> +Required properties:
+> +- compatible: should be "mrvl,sa1100-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: Should be two. The first interrupt number is the rtc alarm
+> +  interrupt and the second interrupt number is the rtc hz interrupt.
+> +- interrupt-names: Assign name of irq resource.
+> +
+> +Example:
+> +	rtc: rtc at d4010000 {
+> +		compatible = "mrvl,mmp-rtc";
+> +		reg =<0xd4010000 0x1000>;
+> +		interrupts =<5>,<6>;
+> +		interrupt-name = "rtc 1Hz", "rtc alarm";
+> +	};
+> diff --git a/Documentation/devicetree/bindings/serial/mrvl-serial.txt b/Documentation/devicetree/bindings/serial/mrvl-serial.txt
+> new file mode 100644
+> index 0000000..d744340
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/mrvl-serial.txt
+> @@ -0,0 +1,4 @@
+> +PXA UART controller
+> +
+> +Required properties:
+> +- compatible : should be "mrvl,mmp-uart" or "mrvl,pxa-uart".
