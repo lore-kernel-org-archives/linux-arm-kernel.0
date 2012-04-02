@@ -1,136 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon,  2 Apr 2012 22:49:45 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Apr 2012 22:53:41 +0100
 Subject: [PATCH] clkdev: Implement managed clk_get()
-Message-ID: <1333403385-24133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+In-Reply-To: <1333403385-24133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1333403385-24133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20120402215341.GL24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow clk API users to simplify their cleanup paths by providing a
-managed version of clk_get() and clk_put().
+On Mon, Apr 02, 2012 at 10:49:45PM +0100, Mark Brown wrote:
+> Allow clk API users to simplify their cleanup paths by providing a
+> managed version of clk_get() and clk_put().
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- Documentation/driver-model/devres.txt |    3 ++
- drivers/clk/clkdev.c                  |   45 +++++++++++++++++++++++++++++++++
- include/linux/clk.h                   |   32 +++++++++++++++++++++++
- 3 files changed, 80 insertions(+), 0 deletions(-)
+Much better, thanks.  One minor comment...
 
-diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
-index 2a596a4..3a10848 100644
---- a/Documentation/driver-model/devres.txt
-+++ b/Documentation/driver-model/devres.txt
-@@ -276,3 +276,6 @@ REGULATOR
-   devm_regulator_get()
-   devm_regulator_put()
-   devm_regulator_bulk_get()
-+
-+CLOCK
-+  devm_clk_get()
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 6db161f..a9a1137 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -89,6 +89,51 @@ void clk_put(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_put);
- 
-+static void devm_clk_release(struct device *dev, void *res)
-+{
-+	clk_put(*(struct clk **)res);
-+}
-+
-+struct clk *devm_clk_get(struct device *dev, const char *id)
-+{
-+	struct clk **ptr, *clk;
-+
-+	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clk = clk_get(dev, id);
-+	if (!IS_ERR(clk)) {
-+		*ptr = clk;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL(devm_clk_get);
-+
-+static int devm_clk_match(struct device *dev, void *res, void *data)
-+{
-+	struct clk **c = res;
-+	if (!c || !*c) {
-+		WARN_ON(!c || !*c);
-+		return 0;
-+	}
-+	return *c == data;
-+}
-+
-+void devm_clk_put(struct device *dev, struct clk *clk)
-+{
-+	int ret;
-+
-+	ret = devres_destroy(dev, devm_clk_release, devm_clk_match, clk);
-+
-+	WARN_ON(ret);
-+}
-+EXPORT_SYMBOL(devm_clk_put);
-+
- void clkdev_add(struct clk_lookup *cl)
- {
- 	mutex_lock(&clocks_mutex);
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index c9547d9..62b0bb0 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -101,6 +101,26 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
- struct clk *clk_get(struct device *dev, const char *id);
- 
- /**
-+ * devm_clk_get - lookup and obtain a managed reference to a clock producer.
-+ * @dev: device for clock "consumer"
-+ * @id: clock comsumer ID
-+ *
-+ * Returns a struct clk corresponding to the clock producer, or
-+ * valid IS_ERR() condition containing errno.  The implementation
-+ * uses @dev and @id to determine the clock consumer, and thereby
-+ * the clock producer.  (IOW, @id may be identical strings, but
-+ * clk_get may return different clock producers depending on @dev.)
-+ *
-+ * Drivers must assume that the clock source is not enabled.
-+ *
-+ * devm_clk_get should not be called from within interrupt context.
-+ *
-+ * The clock will automatically be freed when the device is unbound
-+ * from the bus.
-+ */
-+struct clk *devm_clk_get(struct device *dev, const char *id);
-+
-+/**
-  * clk_prepare - prepare a clock source
-  * @clk: clock source
-  *
-@@ -206,6 +226,18 @@ unsigned long clk_get_rate(struct clk *clk);
-  */
- void clk_put(struct clk *clk);
- 
-+/**
-+ * clk_put	- "free" a managed clock source
-+ * @dev: device used to acuqire the clock
-+ * @clk: clock source acquired with devm_clk_get()
-+ *
-+ * Note: drivers must ensure that all clk_enable calls made on this
-+ * clock source are balanced by clk_disable calls prior to calling
-+ * this function.
-+ *
-+ * clk_put should not be called from within interrupt context.
-+ */
-+void devm_clk_put(struct device *dev, struct clk *clk);
- 
- /*
-  * The remaining APIs are optional for machine class support.
--- 
-1.7.9.1
+> ---
+>  Documentation/driver-model/devres.txt |    3 ++
+>  drivers/clk/clkdev.c                  |   45 +++++++++++++++++++++++++++++++++
+>  include/linux/clk.h                   |   32 +++++++++++++++++++++++
+>  3 files changed, 80 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
+> index 2a596a4..3a10848 100644
+> --- a/Documentation/driver-model/devres.txt
+> +++ b/Documentation/driver-model/devres.txt
+> @@ -276,3 +276,6 @@ REGULATOR
+>    devm_regulator_get()
+>    devm_regulator_put()
+>    devm_regulator_bulk_get()
+> +
+> +CLOCK
+> +  devm_clk_get()
+
+devm_clk_put() ?
