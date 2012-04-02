@@ -1,26 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 2 Apr 2012 11:14:28 +0100
-Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <CACRpkda2zh=zR+A9bwhRXYHtQdFeUpiqG4d5g1i82mPCs1mXaQ@mail.gmail.com>
-References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <CACRpkdYRStgKo_e-4kZKA-V-OoMiV21jRS3R4g1Cq+4c+4=iQA@mail.gmail.com>
- <CAH+eYFC+q4xFuSdRBkO9nb0XZWU4pQ_yCyinMy2X3ds9WQd1kw@mail.gmail.com>
- <CACRpkda2zh=zR+A9bwhRXYHtQdFeUpiqG4d5g1i82mPCs1mXaQ@mail.gmail.com>
-Message-ID: <20120402101427.GA3172@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 02 Apr 2012 12:19:57 +0200
+Subject: [PATCH 03/12] ARM: at91/USB host: specify and handle properly
+ vbus_pin_active_low
+In-Reply-To: <4F777C6F.2070603@mvista.com>
+References: <cover.1333026637.git.nicolas.ferre@atmel.com>
+ <ce442f466ded5a4c75a0fc15700dc14fe60b91d8.1333026637.git.nicolas.ferre@atmel.com>
+ <4F777C6F.2070603@mvista.com>
+Message-ID: <4F797D4D.3060703@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 12:39:11AM +0200, Linus Walleij wrote:
+On 03/31/2012 11:51 PM, Sergei Shtylyov :
+> Hello.
+> 
+> On 29-03-2012 17:27, Nicolas Ferre wrote:
+> 
+>> Due to an error while handling vbus_pin_active_low in ohci-at91 driver,
+>> the specification of this property was not good in devices/board files.
+> 
+>> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+>> Cc: stable<stable@vger.kernel.org>          [3.2+]
+>> ---
+>>   arch/arm/mach-at91/at91sam9263_devices.c |    3 ++-
+>>   arch/arm/mach-at91/at91sam9g45_devices.c |    6 ++++--
+>>   arch/arm/mach-at91/board-sam9263ek.c     |    1 +
+>>   arch/arm/mach-at91/board-sam9m10g45ek.c  |    1 +
+>>   4 files changed, 8 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c
+>> b/arch/arm/mach-at91/at91sam9263_devices.c
+>> index 53688c4..5cdca89d 100644
+>> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+>> @@ -72,7 +72,8 @@ void __init at91_add_device_usbh(struct
+>> at91_usbh_data *data)
+>>       /* Enable VBus control for UHP ports */
+>>       for (i = 0; i<  data->ports; i++) {
+>>           if (gpio_is_valid(data->vbus_pin[i]))
+>> -            at91_set_gpio_output(data->vbus_pin[i], 0);
+>> +            at91_set_gpio_output(data->vbus_pin[i],
+>> +                         data->vbus_pin_active_low[i] ^ 0);
+> 
+>    Note that XOR with 0 is a nop, left operand doesn't change its value.
 
-> Mark: as Rabin says the v1 patch is probably fine, are you pushing this
-> to ARM SoC or into Russell's patch tracker?
+Sure I will correct that.
 
-I was waiting for some pronouncement from Russell - looking at the git
-logs it seems the patch tracker is the normal way to merge things.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120402/285b8d24/attachment.sig>
+Thanks, best regards,
+-- 
+Nicolas Ferre
