@@ -1,42 +1,45 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Apr 2012 11:11:18 +0200
-Subject: [PATCH] MX2: Fix mx2_camera clock regression.
-In-Reply-To: <1332343181-16968-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1332343181-16968-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120402091118.GR3852@pengutronix.de>
+Date: Mon, 2 Apr 2012 11:15:29 +0200
+Subject: [PATCH] ARM: 3ds_debugboard: Fix smsc911x driver probe
+In-Reply-To: <1332788037-31064-1-git-send-email-fabio.estevam@freescale.com>
+References: <1332788037-31064-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120402091529.GT3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2012 at 04:19:41PM +0100, Javier Martin wrote:
-> The following patch breaks mx2_camera driver:
-> http://git.linuxtv.org/media_tree.git?a=commitdiff;h=52f1a845e25dc0c6435153aca1a170e20b282429
+On Mon, Mar 26, 2012 at 03:53:57PM -0300, Fabio Estevam wrote:
+> Fix smsc911x id field in order to fix smsc911x driver probe error:
 > 
-> This change fixes the problem.
+> smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
+> smsc911x smsc911x.0: (unregistered net_device): couldn't get regulators -517
+> platform smsc911x.0: Driver smsc911x requests probe deferral
 > 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Applied, thanks
 
 Sascha
 
 > ---
->  arch/arm/mach-imx/clock-imx27.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+>  arch/arm/plat-mxc/3ds_debugboard.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-> index b9a95ed..98e04f5 100644
-> --- a/arch/arm/mach-imx/clock-imx27.c
-> +++ b/arch/arm/mach-imx/clock-imx27.c
-> @@ -662,6 +662,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK(NULL, "dma", dma_clk)
->  	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
->  	_REGISTER_CLOCK(NULL, "brom", brom_clk)
-> +	_REGISTER_CLOCK(NULL, "emma", emma_clk)
->  	_REGISTER_CLOCK("m2m-emmaprp.0", NULL, emma_clk)
->  	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk)
->  	_REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
+> diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
+> index d1e31fa..5cac2c5 100644
+> --- a/arch/arm/plat-mxc/3ds_debugboard.c
+> +++ b/arch/arm/plat-mxc/3ds_debugboard.c
+> @@ -80,7 +80,7 @@ static struct smsc911x_platform_config smsc911x_config = {
+>  
+>  static struct platform_device smsc_lan9217_device = {
+>  	.name = "smsc911x",
+> -	.id = 0,
+> +	.id = -1,
+>  	.dev = {
+>  		.platform_data = &smsc911x_config,
+>  	},
 > -- 
-> 1.7.0.4
+> 1.7.1
+> 
 > 
 > 
 
