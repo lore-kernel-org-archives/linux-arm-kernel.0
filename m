@@ -1,49 +1,69 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Tue, 3 Apr 2012 10:53:01 +0200
-Subject: [PATCH] ARM: at91: add support for Telit GE863-PRO3 Evaluation Kit
-In-Reply-To: <20120330142300.GC8116@game.jcrosoft.org>
-References: <1333097816-8641-1-git-send-email-fabio.porcedda@gmail.com>
- <20120330115906.GM7757@game.jcrosoft.org>
- <CAHkwnC8bErK-HX6=c_P4LY3BqncbLnoWc6=RnXaNtA8XtjHtaQ@mail.gmail.com>
- <20120330142300.GC8116@game.jcrosoft.org>
-Message-ID: <CAHkwnC_QORRK8ME4bK813pVLWrQFJM0xkwATUohJg0o448pTJg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 3 Apr 2012 10:56:23 +0200
+Subject: [PATCH] Use arm_memblock_steal
+In-Reply-To: <20120403081720.GP24211@n2100.arm.linux.org.uk>
+References: <20120403081720.GP24211@n2100.arm.linux.org.uk>
+Message-ID: <20120403085623.GH3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 4:23 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 15:01 Fri 30 Mar ? ? , Fabio Porcedda wrote:
->> On Fri, Mar 30, 2012 at 1:59 PM, Jean-Christophe PLAGNIOL-VILLARD
->> <plagnioj@jcrosoft.com> wrote:
->> > tks for the patch but now we have close the non dt board for this soc
->>
->> Thanks for the reply.
->>
->> > and for 3.5 nearly all the devices of this soc will converted to DT
->> >
->> > so you need to switch to DT too
->>
->> Ok, i will switch to DT too.
->> Do you plan to add support to any 9260 board to the board-dt.c for 3.5?
->> I think that, as far as there is a working 9260 board using DT, i can
->> work on the GE863-PRO3 support using DT.
-> you have 9g20 as 9g20 and 9260 have the same IP you can use it
+On Tue, Apr 03, 2012 at 09:17:21AM +0100, Russell King - ARM Linux wrote:
+> Use the provided function rather than re-coding this bit of code.
+> This also gets us protection against using these functions from
+> invalid contexts.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> Please test this; I've not even compile tested this.  Thanks.
 
-Ok i try with the 9g20 support.
+It compiles, so from my pov:
 
-> I don't known when I'll put one bbut it will be a Calao platform
->
-> Best Regards,
-> J.
->>
->> > As today I've not finished the pinctrl support you need to do all the pin mux
->> > in the bootlader. For 3.5 it will not be the case anymore
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-I think i wait for the 3.5 uptated dt stuff.
+However, I don't have the hardware to test it, so I hope Javier follows
+up on this.
 
->> > Best Regards,
->> > J.
+Sascha
 
-Thanks and regards
+> 
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    6 ++----
+>  1 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> index f7b074f..c27058e 100644
+> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> @@ -32,12 +32,12 @@
+>  #include <linux/delay.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/leds.h>
+> -#include <linux/memblock.h>
+>  #include <media/soc_camera.h>
+>  #include <sound/tlv320aic32x4.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+> +#include <asm/memblock.h>
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx27.h>
+>  
+> @@ -193,10 +193,8 @@ static void __init visstrim_camera_init(void)
+>  static void __init visstrim_reserve(void)
+>  {
+>  	/* reserve 4 MiB for mx2-camera */
+> -	mx2_camera_base = memblock_alloc(MX2_CAMERA_BUF_SIZE,
+> +	mx2_camera_base = arm_memblock_steal(MX2_CAMERA_BUF_SIZE,
+>  			MX2_CAMERA_BUF_SIZE);
+> -	memblock_free(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
+> -	memblock_remove(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
+>  }
+>  
+>  /* GPIOs used as events for applications */
+> 
+> 
+
 -- 
-Fabio Porcedda
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
