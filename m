@@ -1,30 +1,45 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Apr 2012 23:06:10 +0200
-Subject: [PATCH] pinctrl: Replace list_*() with get_*_count()
-In-Reply-To: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
-References: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdbr2Ais8m01PBkTzX56KfdA6q6161gET3v_kg6JmY=PHg@mail.gmail.com>
+Date: Tue, 3 Apr 2012 23:18:47 +0200
+Subject: [PATCH] pinctrl: Add SPEAr pinctrl drivers
+In-Reply-To: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
+References: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
+Message-ID: <CACRpkdZr3cZ=foqfB_r5+2N=sa_ON4=UDjrqmr0acKsc50SHRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 7:55 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On Tue, Apr 3, 2012 at 1:40 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-> Most of the SoC drivers implement list_groups() and list_functions() routines
-> for pinctrl and pinmux. These routines continue returning zero until the
-> selector argument is greater than total count of available groups or functions.
->
-> This patch replaces these list_*() routines with get_*_count() routines, which
-> returns the number of available selection for SoC driver. pinctrl layer will use
-> this value to check the range it can choose.
->
-> This patch fixes all user drivers for this change. There are other routines in
-> user drivers, which have checks to check validity of selector passed to them. It
-> is also no more required and hence removed.
->
-> Documentation updated as well.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ?drivers/pinctrl/spear/pinctrl-spear300.c ? ? ? ? ? | ?661 ++++
+> ?drivers/pinctrl/spear/pinctrl-spear310.c ? ? ? ? ? | ?384 +++
+> ?drivers/pinctrl/spear/pinctrl-spear320.c ? ? ? ? ? | 3421 ++++++++++++++++++++
+> ?drivers/pinctrl/spear/pinctrl-spear3xx.c ? ? ? ? ? | ?626 ++++
 
-Thanks, applied and fixed up...
-Yours,
+A lot of data but as we've said, it's OK if you want to do it this way.
+
+> +static struct of_device_id spear_pinctrl_of_match[] __devinitdata = {
+> +#ifdef CONFIG_PINCTRL_SPEAR300
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .compatible = "st,spear300-pinmux",
+> + ? ? ? ? ? ? ? .data = spear300_mach_init,
+> + ? ? ? },
+> +#endif
+> +#ifdef CONFIG_PINCTRL_SPEAR310
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .compatible = "st,spear310-pinmux",
+> + ? ? ? ? ? ? ? .data = spear310_mach_init,
+> + ? ? ? },
+> +#endif
+> +#ifdef CONFIG_PINCTRL_SPEAR320
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .compatible = "st,spear320-pinmux",
+> + ? ? ? ? ? ? ? .data = spear320_mach_init,
+> + ? ? ? },
+> +#endif
+
+Ugh this is not looking good, please check Arnds advice in how to restructure
+this a bit... #ifdef is ugly (and error-prone).
+
+Apart from this it looks pretty straight-forward. Make sure to rebase
+onto your own patches in linux-next for next version.
+
 Linus Walleij
