@@ -1,40 +1,66 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Apr 2012 21:32:37 +0530
-Subject: [PATCHv5 18/18] ARM: OMAP4: hwmod data: I2C: add flag for context
- restore
-In-Reply-To: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
-References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1333468957-5999-19-git-send-email-shubhrajyoti@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Apr 2012 17:07:06 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <878vicsxef.fsf@ti.com>
+References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
+ <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
+ <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
+ <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
+ <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com>
+ <878vicsxef.fsf@ti.com>
+Message-ID: <20120403160706.GP17741@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Restore of context is not done for OMAP4. This patch
-adds the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE in the OMAP4
-hwmod data which activates the restore for OMAP4.
-Currently the OMAP4 does not hit device off still the
-driver may have support for it.
+On Tue, Apr 03, 2012 at 03:27:52PM +0100, Kevin Hilman wrote:
+> Hi Will,
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Wamsley <paul@pwsan.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Hi Kevin,
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 08daa5e..cddce60 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2262,7 +2262,8 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
- };
- 
- static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
-+	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE |
-+			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
- };
- 
- /* i2c1 */
--- 
-1.7.1
+> Will Deacon <will.deacon@arm.com> writes:
+> > The problem is, trying to boot this on my pandaboard results in a hang (see
+> > dmesg below). Even worse, the problem isn't easily bisectable since rebuilding
+> > a working image can give you something that no longer boots and I haven't found
+> > a reliable way to cause the lockup.
+> >
+> > I'll take JTAG for a whirl to see where we are. If anything looks wrong in
+> > my dmesg, please shout (there are plenty of things in there that look like
+> > they've gone awry).
+> 
+> Not sure why it hangs for you, but it worked for me both with your
+> branch on v3.3 and merging with v3.4-rc1[1]
+
+Thanks for testing that. It turns out that updating my x-loader (it was
+pretty ancient) fixed the boot hang, though I'm not sure I want to know why!
+
+> # perf stat sleep 1
+> 
+>  Performance counter stats for 'sleep 1':
+> 
+>           9.582520 task-clock                #    0.009 CPUs utilized          
+>                  1 context-switches          #    0.104 K/sec                  
+>                  0 CPU-migrations            #    0.000 K/sec                  
+>                147 page-faults               #    0.015 M/sec                  
+>            5096283 cycles                    #    0.532 GHz                    
+>             607876 stalled-cycles-frontend   #   11.93% frontend cycles idle   
+>            3285045 stalled-cycles-backend    #   64.46% backend  cycles idle   
+>            2722485 instructions              #    0.53  insns per cycle        
+>                                              #    1.21  stalled cycles per insn
+>             259247 branches                  #   27.054 M/sec                  
+>              84274 branch-misses             #   32.51% of all branches        
+
+Right. Can you confirm whether the PMU/CTI interrupts fire for you please?
+Just run perf top and look at /proc/interrupts while it's running. You
+should see a couple of arm-pmu entries in there and hopefully numbers > 0.
+
+For me, my earlier mis-diagnosis has turned out to be true and I can only
+see PMU interrupts if I apply the SWSUSP patch, which Santosh says will
+break pm.
+
+Cheers,
+
+Will
