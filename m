@@ -1,69 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 3 Apr 2012 17:29:49 -0600 (MDT)
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <87ehs4pfw4.fsf@ti.com>
-References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
- <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
- <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
- <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
- <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
-Message-ID: <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 04 Apr 2012 01:39:37 +0200
+Subject: [PATCH] gpio: Device tree support for LPC32xx
+In-Reply-To: <20120403150430.EBA423E0436@localhost>
+References: <1333407513-18231-1-git-send-email-stigge@antcom.de>
+ <20120403150430.EBA423E0436@localhost>
+Message-ID: <4F7B8A39.5000701@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Grant,
 
-On Tue, 3 Apr 2012, Kevin Hilman wrote:
+thanks for your notes!
 
-> Indeed, like you, I have to change the EMU clock domain to SWSUP[1] in
-> order to see any interrupts and see anything in perf top.  This isn't
-> really a mergeable workaround, so I'll look into this a little closer
-> with Santosh to see what we can do once we fully understand the HW
-> problem.
+On 03/04/12 17:04, Grant Likely wrote:
+>> +postcore_initcall(lpc32xx_gpio_init);
+> 
+> module_platform_driver() please.  Also, now that deferred probe is
+> merged, there should no longer be any need to mess around with
+> initcall levels to get gpio drivers probed early.
 
-Part of the problem is that the clockdomain data for the emu_sys 
-clockdomain is wrong.  Here's something to try to fix it.  It might just 
-be enough to get it to work.
+With module_platform_driver(), I get a new error reported after this
+change, coming much earlier before the GPIO registration (which is
+deferred now, of course):
 
-- Paul
+===============================================================
+Error requesting gpio 50
+...
+gpiochip_add: registered GPIOs 0 to 7 on device: gpio_p0
+gpiochip_add: registered GPIOs 8 to 31 on device: gpio_p1
+gpiochip_add: registered GPIOs 32 to 44 on device: gpio_p2
+gpiochip_add: registered GPIOs 45 to 50 on device: gpio_p3
+gpiochip_add: registered GPIOs 51 to 78 on device: gpi_p3
+gpiochip_add: registered GPIOs 79 to 102 on device: gpo_p3
+===============================================================
 
-From: Paul Walmsley <paul@pwsan.com>
-Date: Tue, 3 Apr 2012 17:13:48 -0600
-Subject: [PATCH] ARM: OMAP44xx: clockdomain data: correct the emu_sys_clkdm
- CLKTRCTRL data
+Seems to be caused by this device tree:
 
-According to the 4430 ES2.0 TRM vX Table 3-744 "CM_EMU_CLKSTCTRL",
-the emu_sys clockdomain data in mainline is incorrect.
+        leds {
+                compatible = "gpio-leds";
+                led0 {  
+                        gpios = <&gpo_p3 1 1>; /* GPO_P3 1, GPIO 80, active low */
+                        linux,default-trigger = "heartbeat";
+                        default-state = "keep";
+                };
+        };
 
-The emu_sys clockdomain does not support the DISABLE_AUTO state, and
-instead it supports the FORCE_WAKEUP state.
+Are you sure that module_platform_driver() can already handle
+this in v3.4-rc1?
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Ming Lei <ming.lei@canonical.com>
----
- arch/arm/mach-omap2/clockdomains44xx_data.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks in advance,
 
-diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-index 9299ac2..bd7ed13 100644
---- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-@@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
- 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
- 	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
- 	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
--	.flags		  = CLKDM_CAN_HWSUP,
-+	.flags		  = CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP,
- };
- 
- static struct clockdomain l3_dma_44xx_clkdm = {
--- 
-1.7.9.5
+Roland
