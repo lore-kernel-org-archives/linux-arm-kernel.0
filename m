@@ -1,148 +1,86 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 03 Apr 2012 16:10:07 +0200
-Subject: [PATCHv24 02/16] mm: compaction: introduce
- isolate_migratepages_range()
+Date: Tue, 03 Apr 2012 16:10:16 +0200
+Subject: [PATCHv24 11/16] mm: extract reclaim code from
+ __alloc_pages_direct_reclaim()
 In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
 References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1333462221-3987-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1333462221-3987-12-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Nazarewicz <mina86@mina86.com>
+This patch extracts common reclaim code from __alloc_pages_direct_reclaim()
+function to separate function: __perform_reclaim() which can be later used
+by alloc_contig_range().
 
-This commit introduces isolate_migratepages_range() function which
-extracts functionality from isolate_migratepages() so that it can be
-used on arbitrary PFN ranges.
-
-isolate_migratepages() function is implemented as a simple wrapper
-around isolate_migratepages_range().
-
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Michal Nazarewicz <mina86@mina86.com>
 Acked-by: Mel Gorman <mel@csn.ul.ie>
-Reviewed-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 Tested-by: Rob Clark <rob.clark@linaro.org>
 Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
 Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 Tested-by: Robert Nelson <robertcnelson@gmail.com>
 Tested-by: Barry Song <Baohua.Song@csr.com>
 ---
- mm/compaction.c |   75 +++++++++++++++++++++++++++++++++++++++---------------
- 1 files changed, 54 insertions(+), 21 deletions(-)
+ mm/page_alloc.c |   30 +++++++++++++++++++++---------
+ 1 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/mm/compaction.c b/mm/compaction.c
-index 74a8c82..ee20fc0 100644
---- a/mm/compaction.c
-+++ b/mm/compaction.c
-@@ -250,31 +250,34 @@ typedef enum {
- 	ISOLATE_SUCCESS,	/* Pages isolated, migrate */
- } isolate_migrate_t;
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 8b19caa..5a90ada 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -2130,16 +2130,13 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
+ }
+ #endif /* CONFIG_COMPACTION */
  
--/*
-- * Isolate all pages that can be migrated from the block pointed to by
-- * the migrate scanner within compact_control.
-+/**
-+ * isolate_migratepages_range() - isolate all migrate-able pages in range.
-+ * @zone:	Zone pages are in.
-+ * @cc:		Compaction control structure.
-+ * @low_pfn:	The first PFN of the range.
-+ * @end_pfn:	The one-past-the-last PFN of the range.
-+ *
-+ * Isolate all pages that can be migrated from the range specified by
-+ * [low_pfn, end_pfn).  Returns zero if there is a fatal signal
-+ * pending), otherwise PFN of the first page that was not scanned
-+ * (which may be both less, equal to or more then end_pfn).
-+ *
-+ * Assumes that cc->migratepages is empty and cc->nr_migratepages is
-+ * zero.
-+ *
-+ * Apart from cc->migratepages and cc->nr_migratetypes this function
-+ * does not modify any cc's fields, in particular it does not modify
-+ * (or read for that matter) cc->migrate_pfn.
-  */
--static isolate_migrate_t isolate_migratepages(struct zone *zone,
--					struct compact_control *cc)
-+static unsigned long
-+isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
-+			   unsigned long low_pfn, unsigned long end_pfn)
+-/* The really slow allocator path where we enter direct reclaim */
+-static inline struct page *
+-__alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
+-	struct zonelist *zonelist, enum zone_type high_zoneidx,
+-	nodemask_t *nodemask, int alloc_flags, struct zone *preferred_zone,
+-	int migratetype, unsigned long *did_some_progress)
++/* Perform direct synchronous page reclaim */
++static int
++__perform_reclaim(gfp_t gfp_mask, unsigned int order, struct zonelist *zonelist,
++		  nodemask_t *nodemask)
  {
--	unsigned long low_pfn, end_pfn;
- 	unsigned long last_pageblock_nr = 0, pageblock_nr;
- 	unsigned long nr_scanned = 0, nr_isolated = 0;
- 	struct list_head *migratelist = &cc->migratepages;
- 	isolate_mode_t mode = ISOLATE_ACTIVE|ISOLATE_INACTIVE;
+-	struct page *page = NULL;
+ 	struct reclaim_state reclaim_state;
+-	bool drained = false;
++	int progress;
  
--	/* Do not scan outside zone boundaries */
--	low_pfn = max(cc->migrate_pfn, zone->zone_start_pfn);
--
--	/* Only scan within a pageblock boundary */
--	end_pfn = ALIGN(low_pfn + pageblock_nr_pages, pageblock_nr_pages);
--
--	/* Do not cross the free scanner or scan within a memory hole */
--	if (end_pfn > cc->free_pfn || !pfn_valid(low_pfn)) {
--		cc->migrate_pfn = end_pfn;
--		return ISOLATE_NONE;
--	}
--
- 	/*
- 	 * Ensure that there are not too many pages isolated from the LRU
- 	 * list by either parallel reclaimers or compaction. If there are,
-@@ -283,12 +286,12 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
- 	while (unlikely(too_many_isolated(zone))) {
- 		/* async migration should just abort */
- 		if (!cc->sync)
--			return ISOLATE_ABORT;
-+			return 0;
+ 	cond_resched();
  
- 		congestion_wait(BLK_RW_ASYNC, HZ/10);
+@@ -2150,7 +2147,7 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
+ 	reclaim_state.reclaimed_slab = 0;
+ 	current->reclaim_state = &reclaim_state;
  
- 		if (fatal_signal_pending(current))
--			return ISOLATE_ABORT;
-+			return 0;
- 	}
+-	*did_some_progress = try_to_free_pages(zonelist, order, gfp_mask, nodemask);
++	progress = try_to_free_pages(zonelist, order, gfp_mask, nodemask);
  
- 	/* Time to isolate some pages for migration */
-@@ -396,10 +399,40 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
- 	acct_isolated(zone, cc);
+ 	current->reclaim_state = NULL;
+ 	lockdep_clear_current_reclaim_state();
+@@ -2158,6 +2155,21 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
  
- 	spin_unlock_irq(&zone->lru_lock);
--	cc->migrate_pfn = low_pfn;
+ 	cond_resched();
  
- 	trace_mm_compaction_isolate_migratepages(nr_scanned, nr_isolated);
- 
-+	return low_pfn;
++	return progress;
 +}
 +
-+/*
-+ * Isolate all pages that can be migrated from the block pointed to by
-+ * the migrate scanner within compact_control.
-+ */
-+static isolate_migrate_t isolate_migratepages(struct zone *zone,
-+					struct compact_control *cc)
++/* The really slow allocator path where we enter direct reclaim */
++static inline struct page *
++__alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
++	struct zonelist *zonelist, enum zone_type high_zoneidx,
++	nodemask_t *nodemask, int alloc_flags, struct zone *preferred_zone,
++	int migratetype, unsigned long *did_some_progress)
 +{
-+	unsigned long low_pfn, end_pfn;
++	struct page *page = NULL;
++	bool drained = false;
 +
-+	/* Do not scan outside zone boundaries */
-+	low_pfn = max(cc->migrate_pfn, zone->zone_start_pfn);
-+
-+	/* Only scan within a pageblock boundary */
-+	end_pfn = ALIGN(low_pfn + pageblock_nr_pages, pageblock_nr_pages);
-+
-+	/* Do not cross the free scanner or scan within a memory hole */
-+	if (end_pfn > cc->free_pfn || !pfn_valid(low_pfn)) {
-+		cc->migrate_pfn = end_pfn;
-+		return ISOLATE_NONE;
-+	}
-+
-+	/* Perform the isolation */
-+	low_pfn = isolate_migratepages_range(zone, cc, low_pfn, end_pfn);
-+	if (!low_pfn)
-+		return ISOLATE_ABORT;
-+
-+	cc->migrate_pfn = low_pfn;
-+
- 	return ISOLATE_SUCCESS;
- }
++	*did_some_progress = __perform_reclaim(gfp_mask, order, zonelist,
++					       nodemask);
+ 	if (unlikely(!(*did_some_progress)))
+ 		return NULL;
  
 -- 
 1.7.1.569.g6f426
