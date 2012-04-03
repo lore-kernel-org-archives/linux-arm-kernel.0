@@ -1,110 +1,49 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 03 Apr 2012 11:48:32 +0300
-Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
- MFP_LPM_KEEP_OUTPUT
-In-Reply-To: <1333380867.84262.YahooMailClassic@web29015.mail.ird.yahoo.com>
-References: <1333380867.84262.YahooMailClassic@web29015.mail.ird.yahoo.com>
-Message-ID: <4F7AB960.1040502@compulab.co.il>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Tue, 3 Apr 2012 10:53:01 +0200
+Subject: [PATCH] ARM: at91: add support for Telit GE863-PRO3 Evaluation Kit
+In-Reply-To: <20120330142300.GC8116@game.jcrosoft.org>
+References: <1333097816-8641-1-git-send-email-fabio.porcedda@gmail.com>
+ <20120330115906.GM7757@game.jcrosoft.org>
+ <CAHkwnC8bErK-HX6=c_P4LY3BqncbLnoWc6=RnXaNtA8XtjHtaQ@mail.gmail.com>
+ <20120330142300.GC8116@game.jcrosoft.org>
+Message-ID: <CAHkwnC_QORRK8ME4bK813pVLWrQFJM0xkwATUohJg0o448pTJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/12 18:34, Paul Parsons wrote:
-> Hello Haojian,
-> 
-> --- On Mon, 2/4/12, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->>>>> But since DRIVE_HIGH or
->> DRIVE_LOW currently don't
->>>> prevent that,
->>>>
->>>> Don't prevent what?
->>>
->>> Don't prevent a GPIO input being changed to an output
->> when entering
->>> suspend().
->>>
->> PGSRx register allow for selecting the output state (the
->> driven value)
->> of each GPIO pin when the processor enters and while it is
->> in sleep
->> mode.
+On Fri, Mar 30, 2012 at 4:23 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 15:01 Fri 30 Mar ? ? , Fabio Porcedda wrote:
+>> On Fri, Mar 30, 2012 at 1:59 PM, Jean-Christophe PLAGNIOL-VILLARD
+>> <plagnioj@jcrosoft.com> wrote:
+>> > tks for the patch but now we have close the non dt board for this soc
 >>
->> Each bit of PGSRx register is named as SS (Sleep State of
->> GPIO<n>).
+>> Thanks for the reply.
 >>
->> SS '0' -- If GPIO is programmed as an output, the pin is
->> driven and held
->> low during the transition to and while in sleep mode.
+>> > and for 3.5 nearly all the devices of this soc will converted to DT
+>> >
+>> > so you need to switch to DT too
 >>
->> SS '1' -- If GPIO is programmed as an output, the pin is
->> driven and held
->> high during the transition to and while in sleep mode.
+>> Ok, i will switch to DT too.
+>> Do you plan to add support to any 9260 board to the board-dt.c for 3.5?
+>> I think that, as far as there is a working 9260 board using DT, i can
+>> work on the GE863-PRO3 support using DT.
+> you have 9g20 as 9g20 and 9260 have the same IP you can use it
+
+Ok i try with the 9g20 support.
+
+> I don't known when I'll put one bbut it will be a Calao platform
+>
+> Best Regards,
+> J.
 >>
->> So pin must be configured to GPIO output first before
->> entering sleep mode.
->>
->> Now the issue comes. If you use the pin as input, why do you
->> need to change
->> it into output mode in run time?
-> 
-> I cannot think of a reason why you would change an input to an output.
+>> > As today I've not finished the pinctrl support you need to do all the pin mux
+>> > in the bootlader. For 3.5 it will not be the case anymore
 
-One reason, I can think of is bidirectional pins:
-the direction can change several times during runtime, but
-peripheral may require the pin to be in some defined state in suspend.
+I think i wait for the 3.5 uptated dt stuff.
 
-> 
-> But the possibility that the direction could be changed from input
-> to output has been cited as a reason why KEEP_OUTPUT cannot force
-> the gpio direction to output.
+>> > Best Regards,
+>> > J.
 
-Indeed, and that's why your patch is wrong - it does exactly that,
-it enables the possibility to change the input to output and drive an
-undefined level.
-
-> 
-> It is relatively easy to verify that KEEP_OUTPUT does not change the
-> direction from input to output, because currently only 2 platforms
-> use KEEP_OUTPUT, namely corgi and hx4700.
-
-Again, with your patch it will make the change possible.
-
-> 
-> It is less easy to verify that DRIVE_HIGH and DRIVE_LOW do not change
-> the direction from input to output, because many more platforms use
-> them; a cursory check suggests that up to 16 platforms use them.
-
-DRIVE_HIGH and DRIVE_LOW are used across several _different_ SoCs
-and care must be taken while changing something related to them.
-
-The DRIVE_HIGH and DRIVE_LOW in current implementation _can_ change
-the inputs to outputs, but IMO it is the board support code
-responsibility to verify that the right thing is done.
-
-> 
->>
->>> By the way, there is still the issue of DRIVE_HIGH and
->> DRIVE_LOW
->>> forcing the GPIO direction to output in
->> pxa2xx_mfp_suspend()
->>> *before* the PGSR values take effect. Surely a bug?
->>>
->> It's evil to change pin from input mode to output mode if
->> it's in active mode.
-
-Unless, it is peripheral requirement.
-
-> 
-> Agreed.
-> 
-> So pxa2xx_mfp_suspend() contains a potential bug, unless someone can
-> verify that DRIVE_HIGH and DRIVE_LOW never change the direction from
-> input to output.
-
-They do, but I don't consider it a bug, but a flexibility.
-When you specify DRIVE_HIGH or DRIVE_LOW in the board pin config,
-you must know what you are doing and be responsible.
-
-
+Thanks and regards
 -- 
-Regards,
-Igor.
+Fabio Porcedda
