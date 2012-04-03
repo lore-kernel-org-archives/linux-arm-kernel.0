@@ -1,41 +1,20 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 03 Apr 2012 11:50:57 +1000
-Subject: [PATCH 1/3] PATA host controller driver for ep93xx
-In-Reply-To: <4F795AD1.4070101@metasoft.pl>
-References: <4F7418E7.4060500@metasoft.pl> <4F741AB1.4000107@metasoft.pl>
- <201203302018.43681.arnd@arndb.de> <4F795AD1.4070101@metasoft.pl>
-Message-ID: <4F7A5781.3000507@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 2 Apr 2012 22:57:14 -0300
+Subject: [PATCH] ARM: versatile: fix build failure in pci.c
+In-Reply-To: <CAP=VYLpim2TCMO5nDVNe0bdm9ZQ+czUWNpxxWugDzrHO6aYVAQ@mail.gmail.com>
+References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAOMZO5CUktQ78dbpqpepLvQXme7OcaxXnCcDsxZ+JahOjjEt=Q@mail.gmail.com>
+ <CAP=VYLpim2TCMO5nDVNe0bdm9ZQ+czUWNpxxWugDzrHO6aYVAQ@mail.gmail.com>
+Message-ID: <CAOMZO5A-+tcz6ewTykXL33opRVP9U4o7Ltdkbr7LLqWMBQczSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/12 17:52, Rafal Prylowski wrote:
+On Mon, Apr 2, 2012 at 10:01 PM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
 
-> On 2012-03-30 22:18, Arnd Bergmann wrote:
->>> +static u16 ep93xx_pata_read(struct ep93xx_pata_data *drv_data,
->>> +			    void *addr_io,
->>> +			    const struct ata_timing *t)
->>> +{
->>> +	unsigned long addr = (unsigned long) addr_io & 0x1f;
->>> +	void __iomem *base = drv_data->ide_base;
->>> +	u16 ret;
->>> +
->>> +	writel(IDECtrl_DIOWn | IDECtrl_DIORn | addr, base + IDECtrl);
->>> +	ndelay(t->setup);
->>> +	writel(IDECtrl_DIOWn | addr, base + IDECtrl);
->>
->> The pointer arithmetic that you do here on addr_io looks really evil.
->> Basically your registers are indirect and cannot be accessed through
->> pointer dereference. Maybe you should not be trying to do that then
->> and not use the ata_port->ioaddr structure.
-> 
-> Yes, I already prepared a version of the driver in which IDE register
-> addresses are coded as enums instead of using ata_port->ioaddr structure. 
-> I will post updated version, when I get feedback from Ryan if enums
-> or defines are preferred.
+> I see. ?Well, there weren't any follow ups to it but I would say that
+> passing both sys->resources and sys both side-by-side at the same
+> time doesn't really make sense. ?I think just passing in sys by itself
+> as I did is a cleaner way to go, wouldn't you agree?
 
-I would prefer defines, simply because it looks odd having an enum which
-has multiple names defined to the same value, and most drivers tend to
-use defines rather than enums for registers. It's not a big deal though,
-and certainly not a show stopper.
-
-~Ryan
+Yes, I agree.
