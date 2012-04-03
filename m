@@ -1,66 +1,56 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Tue, 3 Apr 2012 10:22:00 +0100
-Subject: [PATCH] ARM: DT: Add binding for GIC virtualization extentions
- (VGIC)
-In-Reply-To: <1333384217-13441-1-git-send-email-marc.zyngier@arm.com>
-References: <1333384217-13441-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4F7AC138.9020308@citrix.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Apr 2012 10:25:24 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
+References: <CAAO=S0+L2Q1YZC-pfm2Lz8jPooTeHYOMaZbtRgHYFoL_m7rvhA@mail.gmail.com>
+ <4F0B182D.7060507@us.ibm.com>
+ <20120109224945.GA23090@mudshark.cambridge.arm.com>
+ <CACVXFVMnAt_YpYNC5B6W4Vh4HvtVS3D6jRORUw0AW5a4ub5aOw@mail.gmail.com>
+ <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
+ <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
+ <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
+ <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
+Message-ID: <20120403092524.GD17741@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/12 17:30, Marc Zyngier wrote:
-> The GICv2 can have virtualization extension support, consisting
-> of an additional set of registers and interrupts. Add the necessary
-> binding to the GIC DT documentation.
+Santosh,
 
-The Xen hypervisor's device tree support is very much incomplete so I've
-not looked into this is much detail.
-
-Would it make more sense to extend the existing gic binding with the the
-additional information rather than adding a new node?
-
-David
-
+On Wed, Jan 18, 2012 at 12:33:23PM +0000, Shilimkar, Santosh wrote:
+> On Wed, Jan 18, 2012 at 1:24 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> >>> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
+> >>> b/arch/arm/mach-omap2/clockdomains44xx_data.c
+> >>> index 9299ac2..41d2260 100644
+> >>> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
+> >>> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+> >>> @@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
+> >>> ? ? ? ?.prcm_partition ? = OMAP4430_PRM_PARTITION,
+> >>> ? ? ? ?.cm_inst ? ? ? ? ?= OMAP4430_PRM_EMU_CM_INST,
+> >>> ? ? ? ?.clkdm_offs ? ? ? = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
+> >>> - ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_HWSUP,
+> >>> + ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_SWSUP,
+> >>> ?};
+> >> NAK.
+> >>
+> >> You don't need this patch. What you saw on CAMERA was indeed
+> >> a known bug but emulation domain has no such issues.
+> >>
+> >> So the accesses to emulation register should continue to work
+> >> with the clock-domain being kept under hardware supervision.
+> >
+> > But why can this patch make omap4 pmu work? ?Without the patch,
+> > there are no CTI interrupts generated for pmu irq.
+> >
+> Interesting. For me debugger works which also relies on Emulation domain.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/gic.txt |   29 +++++++++++++++++++++++++
->  1 files changed, 29 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 9b4b82a..fb1b5ab 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -57,3 +57,32 @@ Example:
->  		      <0xfff10100 0x100>;
->  	};
->  
-> +
-> +* GIC virtualization extensions (VGIC)
-> +
-> +For ARM cores that support the virtualization extensions, an
-> +additional node describes the VGIC hardware block. Only exists if the
-> +GIC is the primary interrupt controller.
-> +
-> +Required properties:
-> +- compatible : should be one of:
-> +	"arm,cortex-a15-vgic"
-> +	"arm,cortex-a7-vgic"
-> +	"arm,vgic"
-> +
-> +- reg : Specifies base physical address and size of the VGIC
-> +  registers. The first region is the GIC virtual interface control
-> +  register base and size.  the 2nd region is the GIC virtual cpu
-> +  interface register base and size.
-> +
-> +- interrupts : VGIC maintainance interrupt. Must be relative to the
-> +  primary GIC.
-> +
-> +Example:
-> +
-> +	vgic at 2c004000 {
-> +		compatible = "arm,cortex-a15-vgic", "arm,vgic";
-> +		reg = <0x2c004000 0x2000>,
-> +		      <0x2c006000 0x2000>;
-> +		interrupts = <1 9 0xf04>;
-> +	};
+> Need to see why CTI is behaving like this.
+
+Did you ever get to the bottom of this? This change really is required in
+order to generate PMU interrupts with the CTI and I don't know of any
+alternative to the above.
+
+Any suggestions?
+
+Will
