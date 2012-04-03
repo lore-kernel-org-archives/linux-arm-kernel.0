@@ -1,137 +1,355 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Tue, 03 Apr 2012 14:11:12 +0200
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
-In-Reply-To: <20120402202848.1EB833E02A7@localhost> (Grant Likely's message of
- "Mon, 02 Apr 2012 14:28:48 -0600")
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
- <20120402202848.1EB833E02A7@localhost>
-Message-ID: <m2y5qdow0v.fsf@igel.home>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Tue, 3 Apr 2012 13:30:58 +0100 (BST)
+Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
+ MFP_LPM_KEEP_OUTPUT
+In-Reply-To: <4F7AAE48.4030909@compulab.co.il>
+Message-ID: <1333456258.38206.YahooMailClassic@web29003.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@secretlab.ca> writes:
+Hello Igor,
 
-> Can you dump out /debug/powerpc/virq_mapping from both before and
-> after the irq_map patch is applied?
+--- On Tue, 3/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> On 04/02/12 16:33, Paul Parsons
+> wrote:
+> > Hello Igor,
+> > 
+> 
+> [...] Remove the unreadable stuff...
+> 
+> >>>>> On corgi, the three GPIOs configured
+> as
+> >>>> MFP_LPM_KEEP_OUTPUT:
+> >>>>>? ?
+> ???CORGI_GPIO_LED_ORANGE
+> >>>>>? ?
+> ???CORGI_GPIO_CHRG_ON
+> >>>>>? ?
+> ???CORGI_GPIO_CHRG_UKN
+> >>>>> are all used as outputs.
+> >>>>
+> >>>> Have you verified it, because currently
+> >> MFP_LPM_KEEP_OUTPUT
+> >>>> does not do a direction configuration...
+> and IMO,
+> >> it should
+> >>>> not!
+> >>>
+> >>> Yes, all 3 GPIOs are configured as outputs:
+> >>> CORGI_GPIO_LED_ORANGE in
+> drivers/leds/leds-gpio.c
+> >>> CORGI_GPIO_CHRG_ON in
+> arch/arm/mach-pxa/corgi_pm.c
+> >>> CORGI_GPIO_CHRG_UKN in
+> arch/arm/mach-pxa/corgi_pm.c
+> >>
+> >> Good, then they will be kept output also in the
+> suspend
+> >> mode,
+> >> as for current implementation.
+> 
+> Now I can see that it will not... because of the below
+> line:
+> GPDR(i * 32) = gpdr_lpm[i];
+> 
+> in the pxa2xx_mfp_suspend() function.#
 
-before:
-virq   hwirq    chip name        chip data           host name
-   16  0x00000   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   21  0x00001   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   24  0x00002   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   25  0x00019   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   26  0x0001a   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   27  0x0001b   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   28  0x0001c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   29  0x0003d   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   30  0x0001e   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   31  0x0003c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   39  0x00027   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   40  0x00028   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   41  0x00029   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   42  0x0002a   MPIC 2          0xc00000017a011000  /u3 at 0,f8000000/mpic at f8040000
-   47  0x0002f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   59  0x000fb   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   60  0x000fc   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   61  0x000fd   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   62  0x000fe   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   63  0x0003f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+Which is precisely the issue this patch addresses, namely to force
+the gpdr_lpm[] direction to output for KEEP_OUTPUT configurations.
 
-after:
-virq   hwirq    chip name        chip data           host name
-   16  0x00000   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   21  0x00001   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   24  0x00002   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   25  0x00019   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   26  0x0001a   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   27  0x0001b   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   28  0x0001c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   30  0x0001e   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   39  0x00027   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   40  0x00028   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   41  0x00029   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   42  0x0002a   MPIC 2          0xc00000017a011000  /u3 at 0,f8000000/mpic at f8040000
-   47  0x0002f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   59  0x000fb   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   60  0x000fc   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   61  0x000fd   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   62  0x000fe   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   63  0x0003f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   64  0x0003d   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
-   65  0x0003c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+> 
+> [...] remove unreadable stuff...
+> 
+> >>>
+> >>> Do you agree that KEEP_OUTPUT, DRIVE_HIGH and
+> DRIVE_LOW
+> >> should all be
+> >>> consistent in being either optional or
+> mandatory sleep
+> >> mode
+> >>> configurations?
+> >>
+> >> No, according to current implementation (and IMO,
+> it is
+> >> _not_ a bug):
+> >> DRIVE_HIGH and DRIVE_LOW are mandatory,
+> >> KEEP_OUTPUT is optional.
+> >>
+> >>>
+> >>>>
+> >>>>> yet for some reason it is being allowed
+> to
+> >> prevent the
+> >>>>> setting of PGSR in the case of GPIO
+> inputs.
+> >>>>
+> >>>> Because, the PGSR is valid only for GPIO
+> outputs!
+> >>>> and has nothing to do with inputs.
+> >>>
+> >>> I know, it makes no sense to specify
+> KEEP_OUTPUT,
+> >> DRIVE_HIGH or DRIVE_LOW
+> >>> for GPIO inputs.
+> >>
+> >> That's the point, that it does make sense for
+> certain
+> >> cases,
+> >> when you want the GPIO to be bidirectional, but
+> output in
+> >> suspend.
+> >> This allows certain flexibility.
+> >>
+> >>> But since DRIVE_HIGH or DRIVE_LOW currently
+> don't
+> >> prevent that,
+> >>
+> >> Don't prevent what?
+> > 
+> > Don't prevent a GPIO input being changed to an output
+> when entering
+> > suspend().
+> 
+> Why should they prevent that? In case of bidirectional GPIOs
+> it is
+> perfectly fine.
 
-But I have NR_IRQS=64.  Bounds checking missing?  Irqs 64/65 are related
-to the sound chip (headphone-detect and line-out-detect).
+I didn't say they should prevent that. I said they don't prevent
+that, thereby allowing the direction of an input gpio to be changed
+to output before the PGSR value is applied.
 
-When reconfiguring with NR_IRQS=128 interrupts are working again, but I
-still see a lot of spurious interrupts, and the X server is still broken
-(no input works, but I still don't know whether that is an unrelated
-bug).
+> 
+> > 
+> > By the way, there is still the issue of DRIVE_HIGH and
+> DRIVE_LOW
+> > forcing the GPIO direction to output in
+> pxa2xx_mfp_suspend()
+> > *before* the PGSR values take effect. Surely a bug?
+> 
+> No, the order is not important as the final setting is done
+> by the h/w
+> during the suspend transition.
 
-This is a sample of /proc/interrupts from 3.3 (with NR_IRQS=64):
-           CPU0       CPU1       
- 16:       2039       6070   MPIC 1    Level     sata_svw
- 21:          0          0   MPIC 1    Edge      i2sbus: i2s-a (tx)
- 22:         12         20   MPIC 1    Level   
- 23:         14         18   MPIC 1    Level   
- 24:          0          0   MPIC 1    Edge      i2sbus: i2s-a (rx)
- 25:          3          0   MPIC 1    Level     VIA-PMU
- 26:         16         62   MPIC 1    Level     keywest i2c
- 27:          0          1   MPIC 1    Level     ohci_hcd:usb2
- 28:          0          1   MPIC 1    Level     ohci_hcd:usb3
- 29:          0          0   MPIC 1    Edge      headphone-detect
- 30:          0          0   MPIC 1    Level     i2sbus: i2s-a (control)
- 31:          0          0   MPIC 1    Edge      line-output-detect
- 39:         22         64   MPIC 1    Level     pata-pci-macio
- 40:          0          2   MPIC 1    Level     firewire_ohci
- 41:         52        147   MPIC 1    Level     eth0
- 42:       1732       5053   MPIC 2    Level     keywest i2c
- 47:          0          0   MPIC 1    Level     GPIO1 ADB
- 59:          0          0   MPIC 1    Edge      ipi call function
- 60:       2064       1940   MPIC 1    Edge      ipi reschedule
- 61:       3406        945   MPIC 1    Edge      ipi call function single
- 62:          0          0   MPIC 1    Edge      ipi debugger
- 63:         39         91   MPIC 1    Level     ehci_hcd:usb1, ohci_hcd:usb4, ohci_hcd:usb5
-LOC:       3503       3719   Local timer interrupts
-SPU:          2          0   Spurious interrupts
-CNT:          0          0   Performance monitoring interrupts
-MCE:          0          0   Machine check exceptions
+No, the GPIO direction is changed by software, not hardware.
+Hardware suspend does not change the GPIO direction, it only
+drives the GPIO values from the PGSR registers.
 
-This is a sample of /proc/interrupts from 3.4-rc1 (with NR_IRQS=128):
-           CPU0       CPU1       
- 16:       2603       7596   MPIC 1    Level     sata_svw
- 21:          1          0   MPIC 1    Edge      i2sbus: i2s-a (tx)
- 22:         13         19   MPIC 1    Level   
- 23:          8         24   MPIC 1    Level   
- 24:          0          1   MPIC 1    Edge      i2sbus: i2s-a (rx)
- 25:          2          1   MPIC 1    Level     VIA-PMU
- 26:         21         57   MPIC 1    Level     keywest i2c
- 27:          0          1   MPIC 1    Level     ohci_hcd:usb2
- 28:          0          1   MPIC 1    Level     ohci_hcd:usb3
- 30:          0          0   MPIC 1    Level     i2sbus: i2s-a (control)
- 39:         39        131   MPIC 1    Level     pata-pci-macio
- 40:          2          2   MPIC 1    Level     firewire_ohci
- 41:         93        268   MPIC 1    Level     eth0
- 42:       8569      24140   MPIC 2    Level     keywest i2c
- 47:          0          0   MPIC 1    Level     GPIO1 ADB
- 60:          1          0   MPIC 1    Edge      line-output-detect
- 61:          1          0   MPIC 1    Edge      headphone-detect
- 63:        153        502   MPIC 1    Level     ehci_hcd:usb1, ohci_hcd:usb4, ohci_hcd:usb5
-123:          0          0   MPIC 1    Edge      ipi call function
-124:       1978       2349   MPIC 1    Edge      ipi reschedule
-125:       2356       1816   MPIC 1    Edge      ipi call function single
-126:          0          0   MPIC 1    Edge      ipi debugger
-LOC:       4417       7985   Local timer interrupts
-SPU:       9586      25811   Spurious interrupts
-CNT:          0          0   Performance monitoring interrupts
-MCE:          0          0   Machine check exceptions
+Thus there is a definite window between the direction being changed
+by software and the PGSR value being driven by hardware.
 
-Andreas.
+Within that window, the output values are indeterminate, at least
+as far as the suspend software is concerned.
 
--- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+So unless valid output values have already been programmed onto
+those input GPIOs beforehand, this direction/PGSR window is a bug.
+
+> 
+> > 
+> >> DRIVE_HIGH and DRIVE_LOW allow you to do
+> >> what
+> >> ever you want with the GPIO in runtime, but have it
+> strictly
+> >> configured
+> >> for the suspend.
+> >>
+> >>> the
+> >>> presumption must be that GPIOs configured as
+> DRIVE_HIGH
+> >> or DRIVE_LOW are
+> >>> being used as outputs. Likewise for
+> KEEP_OUTPUT?
+> >>
+> >> KEEP_OUTPUT only affects the GPIOs configured for
+> output in
+> >> runtime
+> >> and let you keep the last output value.
+> >>
+> >>>
+> >>>>
+> >>>>>
+> >>>>> Consequently the (GPDR(i) &
+> GPIO_bit(i))
+> >> test
+> >>>> should be removed.
+> >>>>
+> >>>> No, absolutely not!
+> >>>> This will change the meaning of the
+> >> MFP_LPM_KEEP_OUTPUT
+> >>>> symbol!
+> >>>
+> >>> Only if you interpret KEEP_OUTPUT as an
+> optional sleep
+> >> mode configuration.
+> >>
+> >> That what the current implementation does and IMO,
+> it is the
+> >> right thing.
+> >>
+> >>>
+> >>>> I have a feeling that you are trying to
+> solve a
+> >> problem that
+> >>>> does not exist!
+> >>>
+> >>> The problem is that MFP configurations of the
+> form:
+> >>>? ? ? GPIO<n>_GPIO |
+> >> MFP_LPM_KEEP_OUTPUT,
+> >>> will always set the sleep mode gpio direction
+> to
+> >> INPUT.
+> >>> That is the case with corgi and would also be
+> the case
+> >> with hx4700.
+> >>> That is the problem which needs to be solved.
+> >>
+> >> Yes, it is just there is no h/w MFP in PXA2xx and
+> all the
+> >> stuff done in s/w.
+> >> That is the reason it is a bit mess.
+> > 
+> > It's more than a mess: it's broken, per the current
+> corgi configuration.
+> 
+> Ok. Indeed it looks broken even with my meaning of
+> KEEP_OUTPUT,
+> because of the line that sets all GPDRs to gpdr_lpm values
+> in
+> pxa2xx_mfp_suspend() function.
+> 
+> > 
+> >> IMO, the cleanest solution would be to have
+> >> GPIO<n>_GPIO_OUT for each
+> >> GPIO that needs to be configured as output instead
+> of
+> >> breaking the
+> >> already fragile MFP logic.
+> > 
+> > And similarly fix the corgi configuration.
+> 
+> Please, check the attached patch.
+> It should not change the meaning of KEEP_OUTPUT, but fix the
+> bug.
+
+Yes, that fixes the KEEP_OUTPUT bug.
+
+It would be beneficial if someone could formally document the precise
+meaning of KEEP_OUTPUT.
+
+The direction/PGSR window bug is still present though.
+
+I'm starting to think it would be better for pxa2xx_mfp_suspend()
+to not touch GPDR at all, ever. Thus outputs would remain outputs,
+inputs would remain inputs. That would solve the latter bug and
+simplify PXA2xx MFP, but at the cost of making DRIVE_HIGH/DRIVE_LOW
+conditional like KEEP_OUTPUT.
+
+It would be beneficial if someone could formally document the precise
+meaning of DRIVE_HIGH/DRIVE_LOW.
+
+> 
+> [...] remove unreadable stuff...
+> 
+> >>>>> The feeling was that if the unit was
+> charging
+> >> in normal
+> >>>> mode then it
+> >>>>> should remain charging in sleep mode,
+> and if it
+> >> wasn't
+> >>>> then it should
+> >>>>> remain not charging.
+> >>>>
+> >>>> Ok, finally we are talking about a real
+> problem...
+> >>>> I see...
+> >>>> IMO, the best solution will be to add a
+> generic
+> >>>> GPIOx_GPIO_OUT
+> >>>> (as already proposed by Haojian) definition
+> (where
+> >> x is the
+> >>>> required GPIO number)for your used GPIOs
+> and use it
+> >> in MFP
+> >>>> config
+> >>>> structure for hx4700 along with
+> >> MFP_LPM_KEEP_OUTPUT.
+> >>>>
+> >>>>
+> >>>> Another solution would be (though a bit
+> hackish):
+> >>>> GPIOx_GPIO | MFP_LPM_DRIVE_LOW |
+> >> MFP_LPM_KEEP_OUTPUT
+> >>>>
+> >>>> The above should work for you as you would
+> expect -
+> >> will set
+> >>>> the GPIO
+> >>>> to be output low by default, then you will
+> >> reconfigure it to
+> >>>> the
+> >>>> appropriate level from your charger driver
+> and the
+> >> new level
+> >>>> will be used
+> >>>> by the existing logic in
+> pxa2xx_mfp_suspend().
+> >>>
+> >>> Those solutions are fair enough.
+> >>> Can we first answer the question of whether
+> >> KEEP_OUTPUT, DRIVE_HIGH and
+> >>> DRIVE_LOW are optional or mandatory sleep mode
+> >> configurations. That may
+> >>> determine the way forward.
+> >>
+> >> Well for the DRIVE_HIGH and DRIVE_LOW, the names
+> speak for
+> >> them selfs -
+> >>
+> MultiFunctionalPin_LowPowerManager_DRIVE_<HIGH|LOW>
+> >> and there is no
+> >> questions arise.
+> >> For the MFP_LPM_KEEP_OUTPUT - is PXA2xx specific,
+> apparently
+> >> it is
+> >> confusing and probably has to have a comment
+> explaining the
+> >> meaning.
+> >>
+> >> From git log:
+> >> ---------------cut---------------------
+> >> commit 1106143d7ab43ba07678c88c85417df219354ae8
+> >> Author: Eric Miao <eric.y.miao@gmail.com>
+> >> Date:???Mon Jan 11 21:25:15 2010
+> +0800
+> >>
+> >>? ???[ARM] pxa: add
+> MFP_LPM_KEEP_OUTPUT flag to pin
+> >> config
+> >>? ???
+> >>? ???Some pins are expected to
+> keep their last
+> >> level during suspend, and
+> >>? ???introduce
+> MFP_LPM_KEEP_OUTPUT for this.
+> >>? ???
+> >>? ???Signed-off-by: Eric Miao
+> <eric.y.miao@gmail.com>
+> >> ---------------cut---------------------
+> >>
+> >> The key words above are: "keep their last level".
+> > 
+> > Which is exactly what would have happened with my
+> patch, since all
+> > cases of KEEP_OUTPUT were indeed being applied to
+> outputs only.
+> 
+> No, your patch will change also the inputs to outputs.
+> Because "last level" does not apply to input pins.
+
+My point was that KEEP_OUTPUT configurations are only applied to
+GPIOs used as outputs. So no directions would be changed in practice.
+
+Regards,
+Paul
