@@ -1,52 +1,103 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue,  3 Apr 2012 09:32:48 +0200
-Subject: [PATCH v2 04/13] ARM: at91/dts: USB host vbus is active low
+Date: Tue,  3 Apr 2012 09:32:56 +0200
+Subject: [PATCH v2 12/13] ARM: at91: fix check of valid GPIO for SPI and USB
 In-Reply-To: <cover.1333437885.git.nicolas.ferre@atmel.com>
 References: <cover.1333437885.git.nicolas.ferre@atmel.com>
-Message-ID: <dddefc3c1a1f50cb193f8b071440e410e950530d.1333437885.git.nicolas.ferre@atmel.com>
+Message-ID: <e453a558cc4c5e03c5d3090e0bfb632bde885bed.1333437885.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change vbus gpio configuration in .dts files to switch to
-active low configuration.
+SPI chip select pins have to be checked by gpio_is_valid().
+The USB host overcurrent_pin checking was missing.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: stable <stable@vger.kernel.org>
 ---
- arch/arm/boot/dts/at91sam9g25ek.dts    |    4 ++--
- arch/arm/boot/dts/at91sam9m10g45ek.dts |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-at91/at91sam9260_devices.c |    3 +++
+ arch/arm/mach-at91/at91sam9261_devices.c |    3 +++
+ arch/arm/mach-at91/at91sam9263_devices.c |    3 +++
+ arch/arm/mach-at91/at91sam9g45_devices.c |    5 ++++-
+ arch/arm/mach-at91/at91sam9rl_devices.c  |    3 +++
+ 5 files changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index ac0dc00..7829a4d 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -37,8 +37,8 @@
- 		usb0: ohci at 00600000 {
- 			status = "okay";
- 			num-ports = <2>;
--			atmel,vbus-gpio = <&pioD 19 0
--					   &pioD 20 0
-+			atmel,vbus-gpio = <&pioD 19 1
-+					   &pioD 20 1
- 					  >;
- 		};
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 7e5651e..5652dde 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -598,6 +598,9 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		else
+ 			cs_pin = spi1_standard_cs[devices[i].chip_select];
  
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index c4c8ae4..6abb571 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -73,8 +73,8 @@
- 		usb0: ohci at 00700000 {
- 			status = "okay";
- 			num-ports = <2>;
--			atmel,vbus-gpio = <&pioD 1 0
--					   &pioD 3 0>;
-+			atmel,vbus-gpio = <&pioD 1 1
-+					   &pioD 3 1>;
- 		};
++		if (!gpio_is_valid(cs_pin))
++			continue;
++
+ 		if (devices[i].bus_num == 0)
+ 			enable_spi0 = 1;
+ 		else
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index 096da87..4db961a 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -415,6 +415,9 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		else
+ 			cs_pin = spi1_standard_cs[devices[i].chip_select];
  
- 		usb1: ehci at 00800000 {
++		if (!gpio_is_valid(cs_pin))
++			continue;
++
+ 		if (devices[i].bus_num == 0)
+ 			enable_spi0 = 1;
+ 		else
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 27cfce3..fe99206 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -672,6 +672,9 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		else
+ 			cs_pin = spi1_standard_cs[devices[i].chip_select];
+ 
++		if (!gpio_is_valid(cs_pin))
++			continue;
++
+ 		if (devices[i].bus_num == 0)
+ 			enable_spi0 = 1;
+ 		else
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index ddf210a..6b008ae 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -133,7 +133,7 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
+ 
+ 	/* Enable overcurrent notification */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->overcurrent_pin[i])
++		if (gpio_is_valid(data->overcurrent_pin[i]))
+ 			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+ 	}
+ 
+@@ -787,6 +787,9 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		else
+ 			cs_pin = spi1_standard_cs[devices[i].chip_select];
+ 
++		if (!gpio_is_valid(cs_pin))
++			continue;
++
+ 		if (devices[i].bus_num == 0)
+ 			enable_spi0 = 1;
+ 		else
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index eda72e8..fe4ae22 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -419,6 +419,9 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices)
+ 		else
+ 			cs_pin = spi_standard_cs[devices[i].chip_select];
+ 
++		if (!gpio_is_valid(cs_pin))
++			continue;
++
+ 		/* enable chip-select pin */
+ 		at91_set_gpio_output(cs_pin, 1);
+ 
 -- 
 1.7.9.4
