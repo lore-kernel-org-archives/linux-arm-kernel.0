@@ -1,40 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 3 Apr 2012 10:48:33 -0400 (EDT)
-Subject: [PATCH 0/4] memcpy optimized with strd/ldrd
-In-Reply-To: <008f01cd1170$cbee3dd0$63cab970$%kim@samsung.com>
-References: <03e101cd0e07$eec39f10$cc4add30$@com>
- <030501cd0e6a$03642770$0a2c7650$%kim@samsung.com>
- <alpine.LFD.2.02.1203300914510.24151@xanadu.home>
- <008f01cd1170$cbee3dd0$63cab970$%kim@samsung.com>
-Message-ID: <alpine.LFD.2.02.1204031047430.24151@xanadu.home>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Tue, 03 Apr 2012 16:48:05 +0200
+Subject: [PATCH v2 3/3] ep93xx: Add IDE support to edb93xx boards
+In-Reply-To: <4F7B0C54.8010804@metasoft.pl>
+References: <4F7B0C54.8010804@metasoft.pl>
+Message-ID: <4F7B0DA5.6080703@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Apr 2012, Boojin Kim wrote:
 
-> Nicolas Pitre wrote:
-> 
-> > > >
-> > > > Here's my version.  Lightly tested.
-> > > > I have no A15 hardware to run any performance comparison though.
-> > > >
-> > > I'm reviewing and testing your patch. But, My other work disturbs to reviewing it.
-> > > I will give you feedback soon within this week.
-> > > Wait a little more.
-> > > And, Thanks for your patches. :)
-> >
-> > FYI, it occurred to me that some corner cases might not be quite right
-> > with regards to alignment for the STRD instruction.  It seems that the
-> > hardware on which I tested it (Marvell Dove CPU) apparently copes with
-> > misaligned SDRD's when they're still 32-bit aligned.  So I need to run
-> > this code through a real validation harness on different hardware.
-> 
-> It's sad, but the performance result wasn't better after adapting your patch.
-> I think something on 1~3 patch brings performance degreasing.
+Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
 
-If you could identify which patch is responsible that would be helpful.
+---
+ arch/arm/mach-ep93xx/edb93xx.c |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Thanks.
-
-
-Nicolas
+Index: linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
+===================================================================
+--- linux-2.6.orig/arch/arm/mach-ep93xx/edb93xx.c
++++ linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
+@@ -233,6 +233,29 @@ static void __init edb93xx_register_fb(v
+ }
+ 
+ 
++/*************************************************************************
++ * EDB93xx IDE
++ *************************************************************************/
++static int __init edb93xx_has_ide(void)
++{
++	/*
++	 * Although EDB9312 and EDB9315 do have IDE capability, they have
++	 * INTRQ line wired as pull-up, which makes using IDE interface
++	 * problematic.
++	 */
++	return machine_is_edb9312() || machine_is_edb9315 ||
++	       machine_is_edb9315a();
++}
++
++static void __init edb93xx_register_ide(void)
++{
++	if (!edb93xx_has_ide())
++		return;
++
++	ep93xx_register_ide();
++}
++
++
+ static void __init edb93xx_init_machine(void)
+ {
+ 	ep93xx_init_devices();
+@@ -243,6 +266,7 @@ static void __init edb93xx_init_machine(
+ 	edb93xx_register_i2s();
+ 	edb93xx_register_pwm();
+ 	edb93xx_register_fb();
++	edb93xx_register_ide();
+ }
+ 
+ 
