@@ -1,200 +1,154 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 03 Apr 2012 16:10:09 +0200
-Subject: [PATCHv24 04/16] mm: compaction: introduce isolate_freepages_range()
-In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1333462221-3987-5-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 03 Apr 2012 16:10:05 +0200
+Subject: [PATCHv24 00/16] Contiguous Memory Allocator
+Message-ID: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Nazarewicz <mina86@mina86.com>
+Hi,
 
-This commit introduces isolate_freepages_range() function which
-generalises isolate_freepages_block() so that it can be used on
-arbitrary PFN ranges.
+This is (yet another) update of CMA patches. I've rebased them onto
+recent v3.4-rc1 kernel tree and integrated some minor bugfixes. The
+first issue has been pointed by Sandeep Patil - alloc_contig_range
+reclaimed two times too many pages, second issue (possible mismatch
+between pageblock size and MAX_ORDER pages) has been recently spotted
+by Michal Nazarewicz.
 
-isolate_freepages_block() is left with only minor changes.
+These patches are also available on my git repository:
+git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc1-cma-v24
 
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Mel Gorman <mel@csn.ul.ie>
-Reviewed-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
-Tested-by: Rob Clark <rob.clark@linaro.org>
-Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Robert Nelson <robertcnelson@gmail.com>
-Tested-by: Barry Song <Baohua.Song@csr.com>
----
- mm/compaction.c |  111 ++++++++++++++++++++++++++++++++++++++++++++++---------
- 1 files changed, 93 insertions(+), 18 deletions(-)
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
 
-diff --git a/mm/compaction.c b/mm/compaction.c
-index d9d7b35..06b198f 100644
---- a/mm/compaction.c
-+++ b/mm/compaction.c
-@@ -54,24 +54,20 @@ static unsigned long release_freepages(struct list_head *freelist)
- 	return count;
- }
- 
--/* Isolate free pages onto a private freelist. Must hold zone->lock */
--static unsigned long isolate_freepages_block(struct zone *zone,
--				unsigned long blockpfn,
--				struct list_head *freelist)
-+/*
-+ * Isolate free pages onto a private freelist. Caller must hold zone->lock.
-+ * If @strict is true, will abort returning 0 on any invalid PFNs or non-free
-+ * pages inside of the pageblock (even though it may still end up isolating
-+ * some pages).
-+ */
-+static unsigned long isolate_freepages_block(unsigned long blockpfn,
-+				unsigned long end_pfn,
-+				struct list_head *freelist,
-+				bool strict)
- {
--	unsigned long zone_end_pfn, end_pfn;
- 	int nr_scanned = 0, total_isolated = 0;
- 	struct page *cursor;
- 
--	/* Get the last PFN we should scan for free pages at */
--	zone_end_pfn = zone->zone_start_pfn + zone->spanned_pages;
--	end_pfn = min(blockpfn + pageblock_nr_pages, zone_end_pfn);
--
--	/* Find the first usable PFN in the block to initialse page cursor */
--	for (; blockpfn < end_pfn; blockpfn++) {
--		if (pfn_valid_within(blockpfn))
--			break;
--	}
- 	cursor = pfn_to_page(blockpfn);
- 
- 	/* Isolate free pages. This assumes the block is valid */
-@@ -79,15 +75,23 @@ static unsigned long isolate_freepages_block(struct zone *zone,
- 		int isolated, i;
- 		struct page *page = cursor;
- 
--		if (!pfn_valid_within(blockpfn))
-+		if (!pfn_valid_within(blockpfn)) {
-+			if (strict)
-+				return 0;
- 			continue;
-+		}
- 		nr_scanned++;
- 
--		if (!PageBuddy(page))
-+		if (!PageBuddy(page)) {
-+			if (strict)
-+				return 0;
- 			continue;
-+		}
- 
- 		/* Found a free page, break it into order-0 pages */
- 		isolated = split_free_page(page);
-+		if (!isolated && strict)
-+			return 0;
- 		total_isolated += isolated;
- 		for (i = 0; i < isolated; i++) {
- 			list_add(&page->lru, freelist);
-@@ -105,6 +109,73 @@ static unsigned long isolate_freepages_block(struct zone *zone,
- 	return total_isolated;
- }
- 
-+/**
-+ * isolate_freepages_range() - isolate free pages.
-+ * @start_pfn: The first PFN to start isolating.
-+ * @end_pfn:   The one-past-last PFN.
-+ *
-+ * Non-free pages, invalid PFNs, or zone boundaries within the
-+ * [start_pfn, end_pfn) range are considered errors, cause function to
-+ * undo its actions and return zero.
-+ *
-+ * Otherwise, function returns one-past-the-last PFN of isolated page
-+ * (which may be greater then end_pfn if end fell in a middle of
-+ * a free page).
-+ */
-+static unsigned long
-+isolate_freepages_range(unsigned long start_pfn, unsigned long end_pfn)
-+{
-+	unsigned long isolated, pfn, block_end_pfn, flags;
-+	struct zone *zone = NULL;
-+	LIST_HEAD(freelist);
-+
-+	if (pfn_valid(start_pfn))
-+		zone = page_zone(pfn_to_page(start_pfn));
-+
-+	for (pfn = start_pfn; pfn < end_pfn; pfn += isolated) {
-+		if (!pfn_valid(pfn) || zone != page_zone(pfn_to_page(pfn)))
-+			break;
-+
-+		/*
-+		 * On subsequent iterations ALIGN() is actually not needed,
-+		 * but we keep it that we not to complicate the code.
-+		 */
-+		block_end_pfn = ALIGN(pfn + 1, pageblock_nr_pages);
-+		block_end_pfn = min(block_end_pfn, end_pfn);
-+
-+		spin_lock_irqsave(&zone->lock, flags);
-+		isolated = isolate_freepages_block(pfn, block_end_pfn,
-+						   &freelist, true);
-+		spin_unlock_irqrestore(&zone->lock, flags);
-+
-+		/*
-+		 * In strict mode, isolate_freepages_block() returns 0 if
-+		 * there are any holes in the block (ie. invalid PFNs or
-+		 * non-free pages).
-+		 */
-+		if (!isolated)
-+			break;
-+
-+		/*
-+		 * If we managed to isolate pages, it is always (1 << n) *
-+		 * pageblock_nr_pages for some non-negative n.  (Max order
-+		 * page may span two pageblocks).
-+		 */
-+	}
-+
-+	/* split_free_page does not map the pages */
-+	map_pages(&freelist);
-+
-+	if (pfn < end_pfn) {
-+		/* Loop terminated early, cleanup. */
-+		release_freepages(&freelist);
-+		return 0;
-+	}
-+
-+	/* We don't use freelists for anything. */
-+	return pfn;
-+}
-+
- /* Returns true if the page is within a block suitable for migration to */
- static bool suitable_migration_target(struct page *page)
- {
-@@ -145,7 +216,7 @@ static void isolate_freepages(struct zone *zone,
- 				struct compact_control *cc)
- {
- 	struct page *page;
--	unsigned long high_pfn, low_pfn, pfn;
-+	unsigned long high_pfn, low_pfn, pfn, zone_end_pfn, end_pfn;
- 	unsigned long flags;
- 	int nr_freepages = cc->nr_freepages;
- 	struct list_head *freelist = &cc->freepages;
-@@ -165,6 +236,8 @@ static void isolate_freepages(struct zone *zone,
- 	 */
- 	high_pfn = min(low_pfn, pfn);
- 
-+	zone_end_pfn = zone->zone_start_pfn + zone->spanned_pages;
-+
- 	/*
- 	 * Isolate free pages until enough are available to migrate the
- 	 * pages on cc->migratepages. We stop searching if the migrate
-@@ -201,7 +274,9 @@ static void isolate_freepages(struct zone *zone,
- 		isolated = 0;
- 		spin_lock_irqsave(&zone->lock, flags);
- 		if (suitable_migration_target(page)) {
--			isolated = isolate_freepages_block(zone, pfn, freelist);
-+			end_pfn = min(pfn + pageblock_nr_pages, zone_end_pfn);
-+			isolated = isolate_freepages_block(pfn, end_pfn,
-+							   freelist, false);
- 			nr_freepages += isolated;
- 		}
- 		spin_unlock_irqrestore(&zone->lock, flags);
+Links to previous versions of the patchset:
+v23: <http://www.spinics.net/lists/linux-media/msg44547.html>
+v22: <http://www.spinics.net/lists/linux-media/msg44370.html>
+v21: <http://www.spinics.net/lists/linux-media/msg44155.html>
+v20: <http://www.spinics.net/lists/linux-mm/msg29145.html>
+v19: <http://www.spinics.net/lists/linux-mm/msg29145.html>
+v18: <http://www.spinics.net/lists/linux-mm/msg28125.html>
+v17: <http://www.spinics.net/lists/arm-kernel/msg148499.html>
+v16: <http://www.spinics.net/lists/linux-mm/msg25066.html>
+v15: <http://www.spinics.net/lists/linux-mm/msg23365.html>
+v14: <http://www.spinics.net/lists/linux-media/msg36536.html>
+v13: (internal, intentionally not released)
+v12: <http://www.spinics.net/lists/linux-media/msg35674.html>
+v11: <http://www.spinics.net/lists/linux-mm/msg21868.html>
+v10: <http://www.spinics.net/lists/linux-mm/msg20761.html>
+ v9: <http://article.gmane.org/gmane.linux.kernel.mm/60787>
+ v8: <http://article.gmane.org/gmane.linux.kernel.mm/56855>
+ v7: <http://article.gmane.org/gmane.linux.kernel.mm/55626>
+ v6: <http://article.gmane.org/gmane.linux.kernel.mm/55626>
+ v5: (intentionally left out as CMA v5 was identical to CMA v4)
+ v4: <http://article.gmane.org/gmane.linux.kernel.mm/52010>
+ v3: <http://article.gmane.org/gmane.linux.kernel.mm/51573>
+ v2: <http://article.gmane.org/gmane.linux.kernel.mm/50986>
+ v1: <http://article.gmane.org/gmane.linux.kernel.mm/50669>
+
+
+Changelog:
+
+v24:
+    1. fixed handling of diffrent sizes of pageblock and MAX_ORDER size
+       pages
+
+    2. fixed number of the reclaimed pages before performing the allocation
+       (thanks to Sandeep Patil for pointing this issue)
+
+    3. rebased onto Linux v3.4-rc1
+
+v23:
+    1. fixed bug spotted by Aaro Koskinen (incorrect check inside VM_BUG_ON)
+
+    2. rebased onto next-20120222 tree from
+       git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git 
+
+v22:
+    1. Fixed compilation break caused by missing fixup patch in v21
+
+    2. Fixed typos in the comments
+
+    3. Removed superfluous #include entries
+
+v21:
+    1. Fixed incorrect check which broke memory compaction code
+
+    2. Fixed hacky and racy min_free_kbytes handling
+
+    3. Added serialization patch to watermark calculation
+
+    4. Fixed typos here and there in the comments
+
+v20 and earlier - see previous patchsets.
+
+
+Patches in this patchset:
+
+Marek Szyprowski (6):
+  mm: extract reclaim code from __alloc_pages_direct_reclaim()
+  mm: trigger page reclaim in alloc_contig_range() to stabilise
+    watermarks
+  drivers: add Contiguous Memory Allocator
+  X86: integrate CMA with DMA-mapping subsystem
+  ARM: integrate CMA with DMA-mapping subsystem
+  ARM: Samsung: use CMA for 2 memory banks for s5p-mfc device
+
+Mel Gorman (1):
+  mm: Serialize access to min_free_kbytes
+
+Michal Nazarewicz (9):
+  mm: page_alloc: remove trailing whitespace
+  mm: compaction: introduce isolate_migratepages_range()
+  mm: compaction: introduce map_pages()
+  mm: compaction: introduce isolate_freepages_range()
+  mm: compaction: export some of the functions
+  mm: page_alloc: introduce alloc_contig_range()
+  mm: page_alloc: change fallbacks array handling
+  mm: mmzone: MIGRATE_CMA migration type added
+  mm: page_isolation: MIGRATE_CMA isolation functions added
+
+ Documentation/kernel-parameters.txt   |    9 +
+ arch/Kconfig                          |    3 +
+ arch/arm/Kconfig                      |    2 +
+ arch/arm/include/asm/dma-contiguous.h |   15 ++
+ arch/arm/include/asm/mach/map.h       |    1 +
+ arch/arm/kernel/setup.c               |    9 +-
+ arch/arm/mm/dma-mapping.c             |  370 ++++++++++++++++++++++++------
+ arch/arm/mm/init.c                    |   23 ++-
+ arch/arm/mm/mm.h                      |    3 +
+ arch/arm/mm/mmu.c                     |   31 ++-
+ arch/arm/plat-s5p/dev-mfc.c           |   51 +----
+ arch/x86/Kconfig                      |    1 +
+ arch/x86/include/asm/dma-contiguous.h |   13 +
+ arch/x86/include/asm/dma-mapping.h    |    4 +
+ arch/x86/kernel/pci-dma.c             |   18 ++-
+ arch/x86/kernel/pci-nommu.c           |    8 +-
+ arch/x86/kernel/setup.c               |    2 +
+ drivers/base/Kconfig                  |   89 +++++++
+ drivers/base/Makefile                 |    1 +
+ drivers/base/dma-contiguous.c         |  401 +++++++++++++++++++++++++++++++
+ include/asm-generic/dma-contiguous.h  |   28 +++
+ include/linux/device.h                |    4 +
+ include/linux/dma-contiguous.h        |  110 +++++++++
+ include/linux/gfp.h                   |   12 +
+ include/linux/mmzone.h                |   47 +++-
+ include/linux/page-isolation.h        |   18 +-
+ mm/Kconfig                            |    2 +-
+ mm/Makefile                           |    3 +-
+ mm/compaction.c                       |  418 +++++++++++++++++++++------------
+ mm/internal.h                         |   33 +++
+ mm/memory-failure.c                   |    2 +-
+ mm/memory_hotplug.c                   |    6 +-
+ mm/page_alloc.c                       |  409 ++++++++++++++++++++++++++++----
+ mm/page_isolation.c                   |   15 +-
+ mm/vmstat.c                           |    3 +
+ 35 files changed, 1791 insertions(+), 373 deletions(-)
+ create mode 100644 arch/arm/include/asm/dma-contiguous.h
+ create mode 100644 arch/x86/include/asm/dma-contiguous.h
+ create mode 100644 drivers/base/dma-contiguous.c
+ create mode 100644 include/asm-generic/dma-contiguous.h
+ create mode 100644 include/linux/dma-contiguous.h
+
 -- 
 1.7.1.569.g6f426
