@@ -1,355 +1,134 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Tue, 3 Apr 2012 13:30:58 +0100 (BST)
-Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
- MFP_LPM_KEEP_OUTPUT
-In-Reply-To: <4F7AAE48.4030909@compulab.co.il>
-Message-ID: <1333456258.38206.YahooMailClassic@web29003.mail.ird.yahoo.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Apr 2012 13:34:45 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+References: <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
+ <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
+ <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
+ <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
+ <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+Message-ID: <20120403123444.GL17741@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Igor,
+On Tue, Apr 03, 2012 at 11:01:53AM +0100, Shilimkar, Santosh wrote:
+> On Tue, Apr 3, 2012 at 3:17 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > It seems that they're both needed to get reliable PMU operation. Without the
+> > CLKDM_CAN_SWSUP fix, no interrupts are generated at all. Without the patch
+> > below ([1]), it seems that we don't generate enough. So it looks like we
+> > need them both.
+> >
+> I see. Can you please confirm if it is still the case with [1].
 
---- On Tue, 3/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> On 04/02/12 16:33, Paul Parsons
-> wrote:
-> > Hello Igor,
-> > 
-> 
-> [...] Remove the unreadable stuff...
-> 
-> >>>>> On corgi, the three GPIOs configured
-> as
-> >>>> MFP_LPM_KEEP_OUTPUT:
-> >>>>>? ?
-> ???CORGI_GPIO_LED_ORANGE
-> >>>>>? ?
-> ???CORGI_GPIO_CHRG_ON
-> >>>>>? ?
-> ???CORGI_GPIO_CHRG_UKN
-> >>>>> are all used as outputs.
-> >>>>
-> >>>> Have you verified it, because currently
-> >> MFP_LPM_KEEP_OUTPUT
-> >>>> does not do a direction configuration...
-> and IMO,
-> >> it should
-> >>>> not!
-> >>>
-> >>> Yes, all 3 GPIOs are configured as outputs:
-> >>> CORGI_GPIO_LED_ORANGE in
-> drivers/leds/leds-gpio.c
-> >>> CORGI_GPIO_CHRG_ON in
-> arch/arm/mach-pxa/corgi_pm.c
-> >>> CORGI_GPIO_CHRG_UKN in
-> arch/arm/mach-pxa/corgi_pm.c
-> >>
-> >> Good, then they will be kept output also in the
-> suspend
-> >> mode,
-> >> as for current implementation.
-> 
-> Now I can see that it will not... because of the below
-> line:
-> GPDR(i * 32) = gpdr_lpm[i];
-> 
-> in the pxa2xx_mfp_suspend() function.#
+Right, ignore my previous comment, I was using a vanilla 3.3 kernel without
+realising and therefore what I thought were PMU/CTI interrupts were actually
+just from a timer. Sorry for the confusion.
 
-Which is precisely the issue this patch addresses, namely to force
-the gpdr_lpm[] direction to output for KEEP_OUTPUT configurations.
+So I've gone back to basics. Here is a branch containing what I believe
+should be all the patches required for the OMAP4 PMU:
 
-> 
-> [...] remove unreadable stuff...
-> 
-> >>>
-> >>> Do you agree that KEEP_OUTPUT, DRIVE_HIGH and
-> DRIVE_LOW
-> >> should all be
-> >>> consistent in being either optional or
-> mandatory sleep
-> >> mode
-> >>> configurations?
-> >>
-> >> No, according to current implementation (and IMO,
-> it is
-> >> _not_ a bug):
-> >> DRIVE_HIGH and DRIVE_LOW are mandatory,
-> >> KEEP_OUTPUT is optional.
-> >>
-> >>>
-> >>>>
-> >>>>> yet for some reason it is being allowed
-> to
-> >> prevent the
-> >>>>> setting of PGSR in the case of GPIO
-> inputs.
-> >>>>
-> >>>> Because, the PGSR is valid only for GPIO
-> outputs!
-> >>>> and has nothing to do with inputs.
-> >>>
-> >>> I know, it makes no sense to specify
-> KEEP_OUTPUT,
-> >> DRIVE_HIGH or DRIVE_LOW
-> >>> for GPIO inputs.
-> >>
-> >> That's the point, that it does make sense for
-> certain
-> >> cases,
-> >> when you want the GPIO to be bidirectional, but
-> output in
-> >> suspend.
-> >> This allows certain flexibility.
-> >>
-> >>> But since DRIVE_HIGH or DRIVE_LOW currently
-> don't
-> >> prevent that,
-> >>
-> >> Don't prevent what?
-> > 
-> > Don't prevent a GPIO input being changed to an output
-> when entering
-> > suspend().
-> 
-> Why should they prevent that? In case of bidirectional GPIOs
-> it is
-> perfectly fine.
+git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4
 
-I didn't say they should prevent that. I said they don't prevent
-that, thereby allowing the direction of an input gpio to be changed
-to output before the PGSR value is applied.
+I've omitted the SWSUSP patch since you say it breaks pm, which is clearly not
+acceptable.
 
-> 
-> > 
-> > By the way, there is still the issue of DRIVE_HIGH and
-> DRIVE_LOW
-> > forcing the GPIO direction to output in
-> pxa2xx_mfp_suspend()
-> > *before* the PGSR values take effect. Surely a bug?
-> 
-> No, the order is not important as the final setting is done
-> by the h/w
-> during the suspend transition.
+The problem is, trying to boot this on my pandaboard results in a hang (see
+dmesg below). Even worse, the problem isn't easily bisectable since rebuilding
+a working image can give you something that no longer boots and I haven't found
+a reliable way to cause the lockup.
 
-No, the GPIO direction is changed by software, not hardware.
-Hardware suspend does not change the GPIO direction, it only
-drives the GPIO values from the PGSR registers.
+I'll take JTAG for a whirl to see where we are. If anything looks wrong in
+my dmesg, please shout (there are plenty of things in there that look like
+they've gone awry).
 
-Thus there is a definite window between the direction being changed
-by software and the PGSR value being driven by hardware.
+Will
 
-Within that window, the output values are indeterminate, at least
-as far as the suspend software is concerned.
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0
+[    0.000000] Linux version 3.3.0-00005-gcd122ab (will at mudshark) (gcc version 4.5.2 (Ubuntu/Linaro 4.5.2-8ubuntu3) ) #1 SMP Tue Apr 3 13:19:29 BST 2012
+[    0.000000] CPU: ARMv7 Processor [411fc092] revision 2 (ARMv7), cr=10c53c7d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+[    0.000000] Machine: OMAP4 Panda board
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Memory policy: ECC disabled, Data cache writealloc
+[    0.000000] OMAP4430 ES2.1
+[    0.000000] PERCPU: Embedded 8 pages/cpu @c1025000 s11072 r8192 d13504 u32768
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 129792
+[    0.000000] Kernel command line: console=ttyO2,115200 root=/dev/nfs nfsroot=10.1.79.58:/exports/linaro-11.11,tcp rw earlyprintk ip=dhcp
+[    0.000000] PID hash table entries: 2048 (order: 1, 8192 bytes)
+[    0.000000] Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
+[    0.000000] Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
+[    0.000000] Memory: 511MB = 511MB total
+[    0.000000] Memory: 506272k/506272k available, 18016k reserved, 0K highmem
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]     vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
+[    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc05ebf68   (6032 kB)
+[    0.000000]       .init : 0xc05ec000 - 0xc0639b40   ( 311 kB)
+[    0.000000]       .data : 0xc063a000 - 0xc06c6d50   ( 564 kB)
+[    0.000000]        .bss : 0xc06c6d74 - 0xc0c1cb5c   (5464 kB)
+[    0.000000] Hierarchical RCU implementation.
+[    0.000000] NR_IRQS:474
+[    0.000000] omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
+[    0.000000] OMAP clockevent source: GPTIMER1 at 32768 Hz
+[    0.000000] sched_clock: 32 bits at 32kHz, resolution 30517ns, wraps every 131071999ms
+[    0.000000] Console: colour dummy device 80x30
+[    0.000000] Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo Molnar
+[    0.000000] ... MAX_LOCKDEP_SUBCLASSES:  8
+[    0.000000] ... MAX_LOCK_DEPTH:          48
+[    0.000000] ... MAX_LOCKDEP_KEYS:        8191
+[    0.000000] ... CLASSHASH_SIZE:          4096
+[    0.000000] ... MAX_LOCKDEP_ENTRIES:     16384
+[    0.000000] ... MAX_LOCKDEP_CHAINS:      32768
+[    0.000000] ... CHAINHASH_SIZE:          16384
+[    0.000000]  memory used by lock dependency info: 3695 kB
+[    0.000000]  per task-struct memory footprint: 1152 bytes
+[    0.056579] Calibrating delay loop... 2007.19 BogoMIPS (lpj=7839744)
+[    0.129791] pid_max: default: 32768 minimum: 301
+[    0.135192] Security Framework initialized
+[    0.139678] Mount-cache hash table entries: 512
+[    0.147979] CPU: Testing write buffer coherency: ok
+[    0.153961] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.160278] hw perfevents: enabled with ARMv7 Cortex-A9 PMU driver, 7 counters available
+[    0.168853] Setting up static identity map for 0x8043ce60 - 0x8043ced0
+[    0.175689] L310 cache controller enabled
+[    0.179931] l2x0: 16 ways, CACHE_ID 0x410000c4, AUX_CTRL 0x7e470000, Cache size: 1048576 B
+[    0.190856] CPU1: Booted secondary processor
+[    0.254028] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.254058] CPU1: Unknown IPI message 0x1
+[    0.254180] Brought up 2 CPUs
+[    0.254180] SMP: Total of 2 processors activated (4022.78 BogoMIPS).
+[    0.286102] omap_hwmod: trace_clk_div_ck: missing clockdomain for trace_clk_div_ck.
+[    0.294067] omap_hwmod: l3_div_ck: missing clockdomain for l3_div_ck.
+[    0.303955] omap_hwmod: l3_instr: _wait_target_disable failed
+[    0.322052] omap_hwmod: debugss: softreset failed (waited 10000 usec)
+[    0.332824] omap_hwmod: mcpdm: cannot be enabled (3)
+[    0.342315] print_constraints: dummy: 
+[    0.347137] NET: Registered protocol family 16
+[    0.352264] GPMC revision 6.0
+[    0.360229] gpiochip_add: registered GPIOs 0 to 31 on device: gpio
+[    0.366912] OMAP GPIO hardware version 0.1
+[    0.371612] gpiochip_add: registered GPIOs 32 to 63 on device: gpio
+[    0.378662] gpiochip_add: registered GPIOs 64 to 95 on device: gpio
+[    0.385772] gpiochip_add: registered GPIOs 96 to 127 on device: gpio
+[    0.392913] gpiochip_add: registered GPIOs 128 to 159 on device: gpio
+[    0.400177] gpiochip_add: registered GPIOs 160 to 191 on device: gpio
+[    0.410064] omap_mux_init: Add partition: #1: core, flags: 2
+[    0.417327] omap_mux_init: Add partition: #2: wkup, flags: 2
+[    0.423339] error setting wl12xx data: -38
+[    0.430267] _omap_mux_get_by_name: Could not find signal uart1_cts.uart1_cts
+[    0.437622] _omap_mux_get_by_name: Could not find signal uart1_cts.uart1_cts
+[    0.444946] omap_hwmod_mux_init: Could not allocate device mux entry
+[    0.455047]  usbhs_omap: alias fck already exists
+[    0.463409] hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 watchpoint registers.
+[    0.471710] hw-breakpoint: maximum watchpoint size is 4 bytes.
 
-So unless valid output values have already been programmed onto
-those input GPIOs beforehand, this direction/PGSR window is a bug.
-
-> 
-> > 
-> >> DRIVE_HIGH and DRIVE_LOW allow you to do
-> >> what
-> >> ever you want with the GPIO in runtime, but have it
-> strictly
-> >> configured
-> >> for the suspend.
-> >>
-> >>> the
-> >>> presumption must be that GPIOs configured as
-> DRIVE_HIGH
-> >> or DRIVE_LOW are
-> >>> being used as outputs. Likewise for
-> KEEP_OUTPUT?
-> >>
-> >> KEEP_OUTPUT only affects the GPIOs configured for
-> output in
-> >> runtime
-> >> and let you keep the last output value.
-> >>
-> >>>
-> >>>>
-> >>>>>
-> >>>>> Consequently the (GPDR(i) &
-> GPIO_bit(i))
-> >> test
-> >>>> should be removed.
-> >>>>
-> >>>> No, absolutely not!
-> >>>> This will change the meaning of the
-> >> MFP_LPM_KEEP_OUTPUT
-> >>>> symbol!
-> >>>
-> >>> Only if you interpret KEEP_OUTPUT as an
-> optional sleep
-> >> mode configuration.
-> >>
-> >> That what the current implementation does and IMO,
-> it is the
-> >> right thing.
-> >>
-> >>>
-> >>>> I have a feeling that you are trying to
-> solve a
-> >> problem that
-> >>>> does not exist!
-> >>>
-> >>> The problem is that MFP configurations of the
-> form:
-> >>>? ? ? GPIO<n>_GPIO |
-> >> MFP_LPM_KEEP_OUTPUT,
-> >>> will always set the sleep mode gpio direction
-> to
-> >> INPUT.
-> >>> That is the case with corgi and would also be
-> the case
-> >> with hx4700.
-> >>> That is the problem which needs to be solved.
-> >>
-> >> Yes, it is just there is no h/w MFP in PXA2xx and
-> all the
-> >> stuff done in s/w.
-> >> That is the reason it is a bit mess.
-> > 
-> > It's more than a mess: it's broken, per the current
-> corgi configuration.
-> 
-> Ok. Indeed it looks broken even with my meaning of
-> KEEP_OUTPUT,
-> because of the line that sets all GPDRs to gpdr_lpm values
-> in
-> pxa2xx_mfp_suspend() function.
-> 
-> > 
-> >> IMO, the cleanest solution would be to have
-> >> GPIO<n>_GPIO_OUT for each
-> >> GPIO that needs to be configured as output instead
-> of
-> >> breaking the
-> >> already fragile MFP logic.
-> > 
-> > And similarly fix the corgi configuration.
-> 
-> Please, check the attached patch.
-> It should not change the meaning of KEEP_OUTPUT, but fix the
-> bug.
-
-Yes, that fixes the KEEP_OUTPUT bug.
-
-It would be beneficial if someone could formally document the precise
-meaning of KEEP_OUTPUT.
-
-The direction/PGSR window bug is still present though.
-
-I'm starting to think it would be better for pxa2xx_mfp_suspend()
-to not touch GPDR at all, ever. Thus outputs would remain outputs,
-inputs would remain inputs. That would solve the latter bug and
-simplify PXA2xx MFP, but at the cost of making DRIVE_HIGH/DRIVE_LOW
-conditional like KEEP_OUTPUT.
-
-It would be beneficial if someone could formally document the precise
-meaning of DRIVE_HIGH/DRIVE_LOW.
-
-> 
-> [...] remove unreadable stuff...
-> 
-> >>>>> The feeling was that if the unit was
-> charging
-> >> in normal
-> >>>> mode then it
-> >>>>> should remain charging in sleep mode,
-> and if it
-> >> wasn't
-> >>>> then it should
-> >>>>> remain not charging.
-> >>>>
-> >>>> Ok, finally we are talking about a real
-> problem...
-> >>>> I see...
-> >>>> IMO, the best solution will be to add a
-> generic
-> >>>> GPIOx_GPIO_OUT
-> >>>> (as already proposed by Haojian) definition
-> (where
-> >> x is the
-> >>>> required GPIO number)for your used GPIOs
-> and use it
-> >> in MFP
-> >>>> config
-> >>>> structure for hx4700 along with
-> >> MFP_LPM_KEEP_OUTPUT.
-> >>>>
-> >>>>
-> >>>> Another solution would be (though a bit
-> hackish):
-> >>>> GPIOx_GPIO | MFP_LPM_DRIVE_LOW |
-> >> MFP_LPM_KEEP_OUTPUT
-> >>>>
-> >>>> The above should work for you as you would
-> expect -
-> >> will set
-> >>>> the GPIO
-> >>>> to be output low by default, then you will
-> >> reconfigure it to
-> >>>> the
-> >>>> appropriate level from your charger driver
-> and the
-> >> new level
-> >>>> will be used
-> >>>> by the existing logic in
-> pxa2xx_mfp_suspend().
-> >>>
-> >>> Those solutions are fair enough.
-> >>> Can we first answer the question of whether
-> >> KEEP_OUTPUT, DRIVE_HIGH and
-> >>> DRIVE_LOW are optional or mandatory sleep mode
-> >> configurations. That may
-> >>> determine the way forward.
-> >>
-> >> Well for the DRIVE_HIGH and DRIVE_LOW, the names
-> speak for
-> >> them selfs -
-> >>
-> MultiFunctionalPin_LowPowerManager_DRIVE_<HIGH|LOW>
-> >> and there is no
-> >> questions arise.
-> >> For the MFP_LPM_KEEP_OUTPUT - is PXA2xx specific,
-> apparently
-> >> it is
-> >> confusing and probably has to have a comment
-> explaining the
-> >> meaning.
-> >>
-> >> From git log:
-> >> ---------------cut---------------------
-> >> commit 1106143d7ab43ba07678c88c85417df219354ae8
-> >> Author: Eric Miao <eric.y.miao@gmail.com>
-> >> Date:???Mon Jan 11 21:25:15 2010
-> +0800
-> >>
-> >>? ???[ARM] pxa: add
-> MFP_LPM_KEEP_OUTPUT flag to pin
-> >> config
-> >>? ???
-> >>? ???Some pins are expected to
-> keep their last
-> >> level during suspend, and
-> >>? ???introduce
-> MFP_LPM_KEEP_OUTPUT for this.
-> >>? ???
-> >>? ???Signed-off-by: Eric Miao
-> <eric.y.miao@gmail.com>
-> >> ---------------cut---------------------
-> >>
-> >> The key words above are: "keep their last level".
-> > 
-> > Which is exactly what would have happened with my
-> patch, since all
-> > cases of KEEP_OUTPUT were indeed being applied to
-> outputs only.
-> 
-> No, your patch will change also the inputs to outputs.
-> Because "last level" does not apply to input pins.
-
-My point was that KEEP_OUTPUT configurations are only applied to
-GPIOs used as outputs. So no directions would be changed in practice.
-
-Regards,
-Paul
+<hangs here. Would usually print something about "OMAP DMA" next>
