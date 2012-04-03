@@ -1,67 +1,55 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Tue, 3 Apr 2012 19:17:38 +0530
-Subject: [PATCH] arm: omap4: hsmmc: check for null pointer
-Message-ID: <1333460858-9324-1-git-send-email-balajitk@ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 3 Apr 2012 09:47:13 -0400
+Subject: [PATCH] ARM: versatile: fix build failure in pci.c
+In-Reply-To: <201204030819.48798.arnd@arndb.de>
+References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAP=VYLpim2TCMO5nDVNe0bdm9ZQ+czUWNpxxWugDzrHO6aYVAQ@mail.gmail.com>
+ <CAOMZO5A-+tcz6ewTykXL33opRVP9U4o7Ltdkbr7LLqWMBQczSQ@mail.gmail.com>
+ <201204030819.48798.arnd@arndb.de>
+Message-ID: <4F7AFF61.3070803@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_device pdev can be NULL if CONFIG_MMC_OMAP_HS is not set.
-Add check for NULL pointer
+[adding Bjorn Helgaas to CC; I overlooked doing that earlier]
 
-Fixes the following boot crash seen with omap4sdp and omap4panda
-when MMC is disabled.
+On 12-04-03 04:19 AM, Arnd Bergmann wrote:
+> On Tuesday 03 April 2012, Fabio Estevam wrote:
+>> On Mon, Apr 2, 2012 at 10:01 PM, Paul Gortmaker
+>> <paul.gortmaker@windriver.com> wrote:
+>>
+>>> I see.  Well, there weren't any follow ups to it but I would say that
+>>> passing both sys->resources and sys both side-by-side at the same
+>>> time doesn't really make sense.  I think just passing in sys by itself
+>>> as I did is a cleaner way to go, wouldn't you agree?
+>>
+>> Yes, I agree.
+> 
+> But that doesn't work: struct pci_sys_data is ARM specific, while
+> pci_add_resource_offset is common code.
 
-Unable to handle kernel NULL pointer dereference at virtual address 0000008c
-pgd = c0004000
-[0000008c] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 0    Not tainted  (3.4.0-rc1-05971-ga4dfa82 #4)
-PC is at omap_4430sdp_init+0x184/0x410
-LR is at device_add+0x1a0/0x664
+I'm not sure I'm following you here. I'm not feeding the
+struct pci_sys_data to pci_add_resource_offset.  Instead it
+is getting subfields of it, consistent with the rest of the
+original commit from Bjorn.
 
-Signed-off-by: Balaji T K <balajitk@ti.com>
-Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/board-4430sdp.c    |    6 +++++-
- arch/arm/mach-omap2/board-omap4panda.c |    6 +++++-
- 2 files changed, 10 insertions(+), 2 deletions(-)
+-	pci_add_resource_offset(resources, &io_mem, sys->io_offset);
+-	pci_add_resource_offset(resources, &non_mem, sys->mem_offset);
+-	pci_add_resource_offset(resources, &pre_mem, sys->mem_offset);
++	pci_add_resource_offset(&sys->resources, &io_mem, sys->io_offset);
++	pci_add_resource_offset(&sys->resources, &non_mem, sys->mem_offset);
++	pci_add_resource_offset(&sys->resources, &pre_mem, sys->mem_offset);
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index a39fc4b..1ce771d 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -526,8 +526,12 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 	struct omap2_hsmmc_info *c;
- 
- 	omap_hsmmc_init(controllers);
--	for (c = controllers; c->mmc; c++)
-+	for (c = controllers; c->mmc; c++) {
-+		/* pdev can be null if CONFIG_MMC_OMAP_HS is not set */
-+		if (!c->pdev)
-+			continue;
- 		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
-+	}
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index d8c0e89..104fd6d 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -278,8 +278,12 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 	struct omap2_hsmmc_info *c;
- 
- 	omap_hsmmc_init(controllers);
--	for (c = controllers; c->mmc; c++)
-+	for (c = controllers; c->mmc; c++) {
-+		/* pdev can be null if CONFIG_MMC_OMAP_HS is not set */
-+		if (!c->pdev)
-+			continue;
- 		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
-+	}
- 
- 	return 0;
- }
--- 
-1.7.0.4
+As a side note, the fact that struct pci_sys_data is ARM specific
+does make one think it would be nice if the name somehow did
+reflect that...  wonder if it is worth changing.  Anyway, that is
+a separate topic.
+
+Thanks,
+Paul.
+--
+
+> 
+> I think it would be much more sensible here to just use pci_add_resource(),
+> which is the same as the offsets are all zero for versatile.
+> 
+> 	Arnd
