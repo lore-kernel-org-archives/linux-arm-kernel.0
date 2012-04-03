@@ -1,70 +1,59 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 3 Apr 2012 12:44:16 -0500
-Subject: [PATCH v2 3/3] ep93xx: Add IDE support to edb93xx boards
-In-Reply-To: <4F7B0DA5.6080703@metasoft.pl>
-References: <4F7B0C54.8010804@metasoft.pl> <4F7B0DA5.6080703@metasoft.pl>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698409DFA@AUSP01VMBX24.collaborationhost.net>
+Date: Tue, 3 Apr 2012 12:46:40 -0500
+Subject: [BUG?] vic MULTI_IRQ_HANDLER (was [PATCH] ep93xx: Implement
+ double buffering for M2M DMA channels)
+In-Reply-To: <20120403170812.GR17741@mudshark.cambridge.arm.com>
+References: <ADE657CA350FB648AAC2C43247A983F0020698409ABF@AUSP01VMBX24.collaborationhost.net>
+ <CACb=_tQ4pSXtmKnqM23p97iyRbnrdZicw6ao68t2KjL46srAuQ@mail.gmail.com>
+ <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
+ <20120402214614.GK24211@n2100.arm.linux.org.uk>
+ <20120403170812.GR17741@mudshark.cambridge.arm.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698409E00@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 03, 2012 7:48 AM, Rafal Prylowski wrote:
+On Tuesday, April 03, 2012 10:08 AM, Will Deacon wrote:
+> On Mon, Apr 02, 2012 at 10:46:14PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Apr 02, 2012 at 11:00:34PM +0300, Mika Westerberg wrote:
+>>> Anyway it looks like handle_IRQ() enables interrupts when it is finished with
+>>> the current interrupt which then causes hw to interrupt second time resulting
+>>> failure in case of ep93xx.
+>> 
+>> Soft IRQ processing in the irq exit path will enable interrupts, and
+>> this is probably where the problem is showing up.
+>> 
+>> You've identified an important difference between the level 1 interrupt
+>> controller handlers and the chained handlers, and I suggest that folk
+>> re-implement their level 1 interrupt handlers in the same way as the
+>> assembly code was: re-read the interrupt register each time round the
+>> loop.
 >
-> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
-> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-
-Again, there should probably be a commit blurb here.
-
-> ---
->  arch/arm/mach-ep93xx/edb93xx.c |   24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+> I'm also seeing this on the Versatile AB, with spurious interrupts reported
+> from eth0.
 >
-> Index: linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-ep93xx/edb93xx.c
-> +++ linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-> @@ -233,6 +233,29 @@ static void __init edb93xx_register_fb(v
->  }
+> As you suggested, re-reading the VIC status solves the problem:
+>
+>
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index dcb004a..cb6b49a 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -441,11 +441,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+>         u32 stat, irq;
+>         int handled = 0;
 >  
->  
+> -       stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+> -       while (stat) {
+> +       while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
+>                 irq = ffs(stat) - 1;
+>                 handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+> -               stat &= ~(1 << irq);
+>                 handled = 1;
+>         }
 
-The extra whitespace line here and below is not needed... But, it exists in
-other places in this file so it's fine.
+This should be posted as a proper patch with your Signed-off-by.
 
-> +/*************************************************************************
-> + * EDB93xx IDE
-> + *************************************************************************/
-> +static int __init edb93xx_has_ide(void)
-> +{
-> +	/*
-> +	 * Although EDB9312 and EDB9315 do have IDE capability, they have
-> +	 * INTRQ line wired as pull-up, which makes using IDE interface
-> +	 * problematic.
-> +	 */
-> +	return machine_is_edb9312() || machine_is_edb9315 ||
-> +	       machine_is_edb9315a();
-> +}
-> +
-> +static void __init edb93xx_register_ide(void)
-> +{
-> +	if (!edb93xx_has_ide())
-> +		return;
-> +
-> +	ep93xx_register_ide();
-> +}
-> +
-> +
->  static void __init edb93xx_init_machine(void)
->  {
->  	ep93xx_init_devices();
-> @@ -243,6 +266,7 @@ static void __init edb93xx_init_machine(
->  	edb93xx_register_i2s();
->  	edb93xx_register_pwm();
->  	edb93xx_register_fb();
-> +	edb93xx_register_ide();
->  }
+But for what it's worth, on ep93xx:
 
-Looks good. Thanks!
- 
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
- 
