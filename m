@@ -1,26 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Apr 2012 22:51:02 +0200
-Subject: [PATCH 11/11] ARM: dt: tegra20: add pinmux to device tree
-In-Reply-To: <1333148404-17691-12-git-send-email-swarren@wwwdotorg.org>
-References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
- <1333148404-17691-12-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CACRpkda116wMmvkRqtZVD+2MshCe_fNJAA001CbWQ3ByEbK8wg@mail.gmail.com>
+Date: Tue, 3 Apr 2012 23:06:10 +0200
+Subject: [PATCH] pinctrl: Replace list_*() with get_*_count()
+In-Reply-To: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
+References: <10b8e68e37a8992646e9b84521ec48953612d83c.1333086742.git.viresh.kumar@st.com>
+Message-ID: <CACRpkdbr2Ais8m01PBkTzX56KfdA6q6161gET3v_kg6JmY=PHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 1:00 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Fri, Mar 30, 2012 at 7:55 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-> From: Stephen Warren <swarren@nvidia.com>
+> Most of the SoC drivers implement list_groups() and list_functions() routines
+> for pinctrl and pinmux. These routines continue returning zero until the
+> selector argument is greater than total count of available groups or functions.
 >
-> This adds a complete pinmux configuration to all Tegra20 device tree
-> files. This allows removal of board-dt-tegra20.c's use of the pinmux
-> board files, and the special device tree handling in board-pinmux.c.
+> This patch replaces these list_*() routines with get_*_count() routines, which
+> returns the number of available selection for SoC driver. pinctrl layer will use
+> this value to check the range it can choose.
 >
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> This patch fixes all user drivers for this change. There are other routines in
+> user drivers, which have checks to check validity of selector passed to them. It
+> is also no more required and hence removed.
+>
+> Documentation updated as well.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-Pretty cool huh? :-)
-We've come a long way the recent months.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
+Thanks, applied and fixed up...
 Yours,
 Linus Walleij
