@@ -1,79 +1,59 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 3 Apr 2012 15:35:42 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <87sjgmt211.fsf@ti.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 3 Apr 2012 11:36:23 -0400
+Subject: [PATCH] serial: PL011: move interrupt clearing
+In-Reply-To: <20120329213333.GA15231@kroah.com>
+References: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6u+KeYzWwiJ7MK7pWG444Y99CQ1LLCZP4m3R=zdYFR_pg@mail.gmail.com>
+ <20120329213333.GA15231@kroah.com>
+Message-ID: <CAP=VYLrbZNxYWT-TQt6SzXc3OpYnFVgiQqW-2pM+9V=z4LREow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2012 at 00:05:38, Hilman, Kevin wrote:
-> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
-> 
-> [...]
-> 
-> > I don't personally like to add features which hardly anybody use and
-> > fundamentally broken with full kernel.
-> 
-> Let's keep sane defaults, but not make it unreasonable to tweak eaither.
-> 
-> I suggest what has already been mentioned.
-> 
-> Register both timers, but have the sync timer have a higher rating.  On
-> AMxxx where there is no sync timer, GPtimer will be used.
-> 
+On Thu, Mar 29, 2012 at 5:33 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Thu, Mar 29, 2012 at 02:49:37PM -0600, Grant Likely wrote:
+>> On Wed, Mar 21, 2012 at 1:15 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> > Commit 360f748b204275229f8398cb2f9f53955db1503b
+>> > "serial: PL011: clear pending interrupts"
+>> > attempts to clear interrupts by writing to a
+>> > yet-unassigned memory address. This fixes the issue.
+>> >
+>> > The breaking patch is marked for stable so should be
+>> > carried along with the other patch.
+>> >
+>> > Cc: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+>> > Cc: Russell King <linux@arm.linux.org.uk>
+>> > Cc: stable <stable@vger.kernel.org>
+>> > Reported-by: Viresh Kumar <viresh.kumar@st.com>
+>> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Ugh; the original patch is obviously broken. ?How did it get applied
+>> without testing?
+>>
+>> Greg, can you get this out to Linus ASAP please? ?I have one comment
+>> below, but I don't think it should block merging this patch.
+>>
+>> Tested-by: Grant Likely <grant.likely@secretlab.ca>
+>
+> Thanks, I'll get it to him after 3.4-rc1 is out, in a few days, along
+> with other tty fixes being queued up.
 
-This is another good option, I can change the rating of both the timers.
-With below description and given understanding/discussion/usability of both
-the timers, we can reverse the rating,
+Hi Greg,
 
-32K-sync counter = 300
-GPTIMER = 250
+Just wanted to check this didn't fall through the cracks, as I don't
+see it in your tty-next or tty-linus branches.
 
-Considering the fact that, 32k-sync counter is more usable than gptimer on
-OMAP platform.
-
-
-@"include/linux/clocksource.h"
-
-* @rating:             rating value for selection (higher is better)
-*                      To avoid rating inflation the following
-*                      list should give you a guide as to how
-*                      to assign your clocksource a rating
-*                      1-99: Unfit for real use
-*                             Only available for bootup and testing purposes.
-*                      100-199: Base level usability.
-*                              Functional for real use, but not desired.
-*                      200-299: Good.
-*                              A correct and usable clocksource.
-*                      300-399: Desired.
-*                              A reasonably fast and accurate clocksource.
-*                      400-499: Perfect
-*                              The ideal clocksource. A must-use where
-*                              available.
-
+The original bad commit causes Silent Boot Death on qemu ARM
+versatile, which is kind of nasty.  It pretty much forces a bisection,
+which I did, which then led me here.
 
 Thanks,
-Vaibhav
+Paul.
+--
+
+>
+> greg k-h
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
