@@ -1,27 +1,20 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 3 Apr 2012 17:54:52 -0600 (MDT)
-Subject: [PATCH 1/2] ARM: OMAP: powerdomain: Wait for powerdomain
- transition in pwrdm_state_switch()
-In-Reply-To: <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
- <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1204031754381.8000@utopia.booyaka.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 4 Apr 2012 00:55:09 +0100 (BST)
+Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
+ MFP_LPM_KEEP_OUTPUT
+In-Reply-To: <4F7AAE48.4030909@compulab.co.il>
+Message-ID: <1333497309.20733.YahooMailClassic@web29019.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Mar 2012, Santosh Shilimkar wrote:
+Hello Igor,
 
-> Commit b1cbdb00d{OMAP: clockdomain: Wait for powerdomain to be ON
-> when using clockdomain force wakeup} was assuming that pwrdm_state_switch()
-> does wait for the powerdomain transition which is not the case.
-> 
-> Fix this API by adding the pwrdm_wait_transition().
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> CC: Rajendra Nayak <rnayak@ti.com>
-> CC: Paul Walmsley <paul@pwsan.com>
+--- On Tue, 3/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> Please, check the attached patch.
+> It should not change the meaning of KEEP_OUTPUT, but fix the
+> bug.
 
-Thanks, queued for 3.4-rc.
+Yes, your patch - pxa2xx-mfp.patch - does fix the KEEP_OUTPUT bug.
 
-
-- Paul
+Regards,
+Paul
