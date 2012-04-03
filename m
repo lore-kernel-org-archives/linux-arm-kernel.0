@@ -1,59 +1,36 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 3 Apr 2012 12:46:40 -0500
-Subject: [BUG?] vic MULTI_IRQ_HANDLER (was [PATCH] ep93xx: Implement
- double buffering for M2M DMA channels)
-In-Reply-To: <20120403170812.GR17741@mudshark.cambridge.arm.com>
-References: <ADE657CA350FB648AAC2C43247A983F0020698409ABF@AUSP01VMBX24.collaborationhost.net>
- <CACb=_tQ4pSXtmKnqM23p97iyRbnrdZicw6ao68t2KjL46srAuQ@mail.gmail.com>
- <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
- <20120402214614.GK24211@n2100.arm.linux.org.uk>
- <20120403170812.GR17741@mudshark.cambridge.arm.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698409E00@AUSP01VMBX24.collaborationhost.net>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue,  3 Apr 2012 23:19:04 +0530
+Subject: [PATCH] ARM: jump_label: fixup for rename to static_key
+Message-ID: <1333475344-18936-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 03, 2012 10:08 AM, Will Deacon wrote:
-> On Mon, Apr 02, 2012 at 10:46:14PM +0100, Russell King - ARM Linux wrote:
->> On Mon, Apr 02, 2012 at 11:00:34PM +0300, Mika Westerberg wrote:
->>> Anyway it looks like handle_IRQ() enables interrupts when it is finished with
->>> the current interrupt which then causes hw to interrupt second time resulting
->>> failure in case of ep93xx.
->> 
->> Soft IRQ processing in the irq exit path will enable interrupts, and
->> this is probably where the problem is showing up.
->> 
->> You've identified an important difference between the level 1 interrupt
->> controller handlers and the chained handlers, and I suggest that folk
->> re-implement their level 1 interrupt handlers in the same way as the
->> assembly code was: re-read the interrupt register each time round the
->> loop.
->
-> I'm also seeing this on the Versatile AB, with spurious interrupts reported
-> from eth0.
->
-> As you suggested, re-reading the VIC status solves the problem:
->
->
-> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> index dcb004a..cb6b49a 100644
-> --- a/arch/arm/common/vic.c
-> +++ b/arch/arm/common/vic.c
-> @@ -441,11 +441,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
->         u32 stat, irq;
->         int handled = 0;
->  
-> -       stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> -       while (stat) {
-> +       while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
->                 irq = ffs(stat) - 1;
->                 handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-> -               stat &= ~(1 << irq);
->                 handled = 1;
->         }
+c5905afb0 ("static keys: Introduce 'struct static_key'...") renamed
+struct jump_label_key to struct static_key.  Fixup ARM for this to
+eliminate these build warnings:
 
-This should be posted as a proper patch with your Signed-off-by.
+  include/linux/jump_label.h:113:2:
+  warning: passing argument 1 of 'arch_static_branch' from incompatible pointer type
+  include/asm/jump_label.h:17:82:
+  note: expected 'struct jump_label_key *' but argument is of type 'struct static_key *'
 
-But for what it's worth, on ep93xx:
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/include/asm/jump_label.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
+index 5c5ca2e..bfc198c 100644
+--- a/arch/arm/include/asm/jump_label.h
++++ b/arch/arm/include/asm/jump_label.h
+@@ -14,7 +14,7 @@
+ #define JUMP_LABEL_NOP	"nop"
+ #endif
+ 
+-static __always_inline bool arch_static_branch(struct jump_label_key *key)
++static __always_inline bool arch_static_branch(struct static_key *key)
+ {
+ 	asm goto("1:\n\t"
+ 		 JUMP_LABEL_NOP "\n\t"
+-- 
+1.7.9.1
