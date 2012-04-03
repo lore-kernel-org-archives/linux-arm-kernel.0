@@ -1,51 +1,39 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 03 Apr 2012 16:42:49 -0700
-Subject: [PATCH v5 09/16] pwm: tegra: Add device tree support
-In-Reply-To: <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
-References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
- <1332945238-14897-10-git-send-email-thierry.reding@avionic-design.de>
- <4F7602CD.2010808@wwwdotorg.org>
- <20120402083749.GA6576@avionic-0098.adnet.avionic-design.de>
- <4F79C8D4.2000306@wwwdotorg.org>
- <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120403234249.E292E3E03F3@localhost>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 04 Apr 2012 01:52:23 +0200
+Subject: [PATCH] gpio: Device tree support for LPC32xx
+In-Reply-To: <4F7B8A39.5000701@antcom.de>
+References: <1333407513-18231-1-git-send-email-stigge@antcom.de>
+ <20120403150430.EBA423E0436@localhost> <4F7B8A39.5000701@antcom.de>
+Message-ID: <4F7B8D37.6020306@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Apr 2012 19:55:11 +0200, Thierry Reding <thierry.reding@avionic-design.de> wrote:
-> * Stephen Warren wrote:
-> > On 04/02/2012 02:37 AM, Thierry Reding wrote:
-> > > * Stephen Warren wrote:
-> > >> On 03/28/2012 08:33 AM, Thierry Reding wrote:
-> > >>> Add auxdata to instantiate the PWFM controller from a device tree,
-> > >>> include the corresponding nodes in the dtsi files for Tegra 20 and
-> > >>> Tegra 30 and add binding documentation.
-> > >>>
-> > >>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > >>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> > >>
-> > >>> diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
-> > >> ...
-> > >>> +#ifdef CONFIG_OF
-> > >>> +static struct of_device_id tegra_pwm_of_match[] = {
-> > >>> +	{ .compatible = "nvidia,tegra20-pwm" },
-> > >>> +	{ .compatible = "nvidia,tegra30-pwm" },
-> > >>
-> > >> Could you swap those two lines, so that tegra30-pwm matches first. It
-> > >> makes no difference at present, but might in the future if the driver
-> > >> actually has to differentiate the two SoCs.
-> > > 
-> > > I thought the matching order was determined by the compatible property in the
-> > > device tree, not the OF match table of the driver.
-> > 
-> > At least logically, yes. However, of_match_device() appears to iterate
-> > over each match table entry, checking whether it matches any string in
-> > the compatible flag. Perhaps this could be considered a bug?
+On 04/04/12 01:39, Roland Stigge wrote:
+> ===============================================================
+> Error requesting gpio 50
+> ...
+> gpiochip_add: registered GPIOs 0 to 7 on device: gpio_p0
+> gpiochip_add: registered GPIOs 8 to 31 on device: gpio_p1
+> gpiochip_add: registered GPIOs 32 to 44 on device: gpio_p2
+> gpiochip_add: registered GPIOs 45 to 50 on device: gpio_p3
+> gpiochip_add: registered GPIOs 51 to 78 on device: gpi_p3
+> gpiochip_add: registered GPIOs 79 to 102 on device: gpo_p3
+> ===============================================================
 > 
-> It certainly is counter-intuitive. Maybe Grant or Rob can comment?
+> Seems to be caused by this device tree:
+> 
+>         leds {
+>                 compatible = "gpio-leds";
+>                 led0 {  
+>                         gpios = <&gpo_p3 1 1>; /* GPO_P3 1, GPIO 80, active low */
+>                         linux,default-trigger = "heartbeat";
+>                         default-state = "keep";
+>                 };
+>         };
 
-Yes, it is a bug.  The order of of_device_id should be entirely
-irrelevant, and the order in the DT compatible property should
-determine which match entry is returned.
+No, it was "another" 50 (decimal, not hex). :-) Was caused by old early
+board init code, eliminated anyway.
 
-g.
+Thanks,
+
+Roland
