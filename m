@@ -1,75 +1,137 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 03 Apr 2012 13:55:28 +0200
-Subject: [PATCH v2 00/13] at91: 3.4-rc1 fixes
-In-Reply-To: <cover.1333437885.git.nicolas.ferre@atmel.com>
-References: <cover.1333437885.git.nicolas.ferre@atmel.com>
-Message-ID: <4F7AE530.1040201@atmel.com>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Tue, 03 Apr 2012 14:11:12 +0200
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <20120402202848.1EB833E02A7@localhost> (Grant Likely's message of
+ "Mon, 02 Apr 2012 14:28:48 -0600")
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+Message-ID: <m2y5qdow0v.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2012 09:32 AM, Nicolas Ferre :
-> Here is a bunch of fixes for AT91 that will go on top of 3.4-rc1.
-> Some modifications are related to certain drivers (USB ohci-at91 for instance)
-> but are touching the core AT91 devices/board files and Device Tree files.
-> The modification of "vbus_pin_active_low" in particular cannot be separated
-> from the modification of .dts[i] and devices/board files.
-> 
-> I will have to collect "Acked-by" from USB people on the ohci-at91
-> modifications (Greg?). I will try to find them just after having posted
-> this v2 today...
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-Hi Greg,
+> Can you dump out /debug/powerpc/virq_mapping from both before and
+> after the irq_map patch is applied?
 
-I would like to send this "fixes" patch series via arm-soc. Is it
-possible for you to have a look at patches that will modify ohci-at91
-(and the tiny ehci-atmel one) and give me your "Acked-by" so that I can
-ask Arnd and Olof to queue this material for 3.4-rc?
+before:
+virq   hwirq    chip name        chip data           host name
+   16  0x00000   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   21  0x00001   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   24  0x00002   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   25  0x00019   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   26  0x0001a   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   27  0x0001b   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   28  0x0001c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   29  0x0003d   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   30  0x0001e   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   31  0x0003c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   39  0x00027   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   40  0x00028   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   41  0x00029   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   42  0x0002a   MPIC 2          0xc00000017a011000  /u3 at 0,f8000000/mpic at f8040000
+   47  0x0002f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   59  0x000fb   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   60  0x000fc   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   61  0x000fd   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   62  0x000fe   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   63  0x0003f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
 
-Here is the thread in linux-usb mainling-list:
-http://www.spinics.net/lists/linux-usb/msg60798.html
+after:
+virq   hwirq    chip name        chip data           host name
+   16  0x00000   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   21  0x00001   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   24  0x00002   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   25  0x00019   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   26  0x0001a   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   27  0x0001b   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   28  0x0001c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   30  0x0001e   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   39  0x00027   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   40  0x00028   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   41  0x00029   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   42  0x0002a   MPIC 2          0xc00000017a011000  /u3 at 0,f8000000/mpic at f8040000
+   47  0x0002f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   59  0x000fb   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   60  0x000fc   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   61  0x000fd   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   62  0x000fe   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   63  0x0003f   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   64  0x0003d   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
+   65  0x0003c   MPIC 1          0xc00000017a010000  /ht at 0,f2000000/pci at 1/mac-io at 7/mpic at 40000
 
-Thanks for your help, best regards,
+But I have NR_IRQS=64.  Bounds checking missing?  Irqs 64/65 are related
+to the sound chip (headphone-detect and line-out-detect).
 
-> Ludovic Desroches (1):
->   ARM: at91: dt: remove unit-address part for memory nodes
-> 
-> Nicolas Ferre (12):
->   ARM: at91/at91sam9x5: add clkdev entries for DMA controllers
->   USB: ohci-at91: fix vbus_pin_active_low handling
->   ARM: at91/USB host: specify and handle properly vbus_pin_active_low
->   ARM: at91/dts: USB host vbus is active low
->   USB: ohci-at91: rework and fix initialization
->   USB: ohci-at91: change maximum number of ports
->   USB: ohci-at91: coding style modifications with one-line ifs
->   USB: ohci-at91: trivial return code name change
->   ARM: at91/at91sam9x5.dtsi: fix NAND ale/cle in DT file
->   ARM: at91/NAND DT bindings: add comments
->   USB: ehci-atmel: add needed of.h header file
->   ARM: at91: fix check of valid GPIO for SPI and USB
-> 
->  .../devicetree/bindings/mtd/atmel-nand.txt         |   10 +-
->  arch/arm/boot/dts/at91sam9g20.dtsi                 |    2 +-
->  arch/arm/boot/dts/at91sam9g25ek.dts                |    4 +-
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |    2 +-
->  arch/arm/boot/dts/at91sam9m10g45ek.dts             |    6 +-
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |    6 +-
->  arch/arm/boot/dts/at91sam9x5cm.dtsi                |    2 +-
->  arch/arm/boot/dts/usb_a9g20.dts                    |    2 +-
->  arch/arm/mach-at91/at91sam9260_devices.c           |    3 +
->  arch/arm/mach-at91/at91sam9261_devices.c           |    3 +
->  arch/arm/mach-at91/at91sam9263_devices.c           |    6 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c           |   11 +-
->  arch/arm/mach-at91/at91sam9rl_devices.c            |    3 +
->  arch/arm/mach-at91/at91sam9x5.c                    |    2 +
->  arch/arm/mach-at91/board-sam9263ek.c               |    1 +
->  arch/arm/mach-at91/board-sam9m10g45ek.c            |    1 +
->  arch/arm/mach-at91/include/mach/board.h            |   13 +-
->  drivers/usb/host/ehci-atmel.c                      |    1 +
->  drivers/usb/host/ohci-at91.c                       |  159 +++++++++++---------
->  19 files changed, 135 insertions(+), 102 deletions(-)
-> 
-> Thanks, best regards,
+When reconfiguring with NR_IRQS=128 interrupts are working again, but I
+still see a lot of spurious interrupts, and the X server is still broken
+(no input works, but I still don't know whether that is an unrelated
+bug).
 
+This is a sample of /proc/interrupts from 3.3 (with NR_IRQS=64):
+           CPU0       CPU1       
+ 16:       2039       6070   MPIC 1    Level     sata_svw
+ 21:          0          0   MPIC 1    Edge      i2sbus: i2s-a (tx)
+ 22:         12         20   MPIC 1    Level   
+ 23:         14         18   MPIC 1    Level   
+ 24:          0          0   MPIC 1    Edge      i2sbus: i2s-a (rx)
+ 25:          3          0   MPIC 1    Level     VIA-PMU
+ 26:         16         62   MPIC 1    Level     keywest i2c
+ 27:          0          1   MPIC 1    Level     ohci_hcd:usb2
+ 28:          0          1   MPIC 1    Level     ohci_hcd:usb3
+ 29:          0          0   MPIC 1    Edge      headphone-detect
+ 30:          0          0   MPIC 1    Level     i2sbus: i2s-a (control)
+ 31:          0          0   MPIC 1    Edge      line-output-detect
+ 39:         22         64   MPIC 1    Level     pata-pci-macio
+ 40:          0          2   MPIC 1    Level     firewire_ohci
+ 41:         52        147   MPIC 1    Level     eth0
+ 42:       1732       5053   MPIC 2    Level     keywest i2c
+ 47:          0          0   MPIC 1    Level     GPIO1 ADB
+ 59:          0          0   MPIC 1    Edge      ipi call function
+ 60:       2064       1940   MPIC 1    Edge      ipi reschedule
+ 61:       3406        945   MPIC 1    Edge      ipi call function single
+ 62:          0          0   MPIC 1    Edge      ipi debugger
+ 63:         39         91   MPIC 1    Level     ehci_hcd:usb1, ohci_hcd:usb4, ohci_hcd:usb5
+LOC:       3503       3719   Local timer interrupts
+SPU:          2          0   Spurious interrupts
+CNT:          0          0   Performance monitoring interrupts
+MCE:          0          0   Machine check exceptions
+
+This is a sample of /proc/interrupts from 3.4-rc1 (with NR_IRQS=128):
+           CPU0       CPU1       
+ 16:       2603       7596   MPIC 1    Level     sata_svw
+ 21:          1          0   MPIC 1    Edge      i2sbus: i2s-a (tx)
+ 22:         13         19   MPIC 1    Level   
+ 23:          8         24   MPIC 1    Level   
+ 24:          0          1   MPIC 1    Edge      i2sbus: i2s-a (rx)
+ 25:          2          1   MPIC 1    Level     VIA-PMU
+ 26:         21         57   MPIC 1    Level     keywest i2c
+ 27:          0          1   MPIC 1    Level     ohci_hcd:usb2
+ 28:          0          1   MPIC 1    Level     ohci_hcd:usb3
+ 30:          0          0   MPIC 1    Level     i2sbus: i2s-a (control)
+ 39:         39        131   MPIC 1    Level     pata-pci-macio
+ 40:          2          2   MPIC 1    Level     firewire_ohci
+ 41:         93        268   MPIC 1    Level     eth0
+ 42:       8569      24140   MPIC 2    Level     keywest i2c
+ 47:          0          0   MPIC 1    Level     GPIO1 ADB
+ 60:          1          0   MPIC 1    Edge      line-output-detect
+ 61:          1          0   MPIC 1    Edge      headphone-detect
+ 63:        153        502   MPIC 1    Level     ehci_hcd:usb1, ohci_hcd:usb4, ohci_hcd:usb5
+123:          0          0   MPIC 1    Edge      ipi call function
+124:       1978       2349   MPIC 1    Edge      ipi reschedule
+125:       2356       1816   MPIC 1    Edge      ipi call function single
+126:          0          0   MPIC 1    Edge      ipi debugger
+LOC:       4417       7985   Local timer interrupts
+SPU:       9586      25811   Spurious interrupts
+CNT:          0          0   Performance monitoring interrupts
+MCE:          0          0   Machine check exceptions
+
+Andreas.
 
 -- 
-Nicolas Ferre
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
