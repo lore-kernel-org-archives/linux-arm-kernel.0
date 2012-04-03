@@ -1,73 +1,116 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Apr 2012 21:32:19 +0530
-Subject: [PATCHv5 00/18] I2C updates
-Message-ID: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
+Date: Tue, 3 Apr 2012 21:32:22 +0530
+Subject: [PATCHv5 03/18] I2C: OMAP: Recover from Bus Busy condition
+In-Reply-To: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
+References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1333468957-5999-4-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series does the following
+From: Vikram Pandita <vikram.pandita@ti.com>
 
-- Warn fixes if CONFIG_PM_RUNTIME is not selected.
-- I2C register restore only if context if the context is lost
-- Bus busy recovery mechanism.
-- the reset is not done in init.
+In case a peripheral is driving SDA bus low (ie. a start condition), provide
+a constant clock output using the test mode of the OMAP I2C controller to
+try and clear the bus. Soft reset I2C controller after attempting the bus clear
+to ensure that controller is in a good state.
 
-v2 changes
--Adds a patch to use devm_* functions
--Also checks the return type of the get_sync and in case
- of errors prevents register access.
-- In case of i2c remove register access was done without any
- get_sync fix the same.
-- Adds a pdata function pointer to do context save restore
+Based upon Vikram Pandita's patch from TI Android 3.0.
+I acknowledge the contributions and suggestions of Jon and Hemant.
 
-v3 changes
-- Split the omap_i2c_isr to increase readability
-- Adds the restore flag patch for OMAP4 to the series
-- Make the i2c use SET_RUNTIME_PM_OPS
-v4 changes
-- Folds a patch from Tasslehoff to prevent any merge conflicts.
-- Prevents the XDUF flag to be set if the underflow condition is not met.
+A couple differences from the original patch ...
+1. Add a new function for bus clear
+2. Ensure that the CON.I2C_EN bit is set when using the SYSTEST feature to
+   output a permanent clock. This bit needs to be set and typically it would
+   be set by the unidle function but this is not the case for all OMAP
+   generations.
+3. Program the SYSTEST setting only the bits we care about. However, restore
+   SYSTEST registers to there original state as some OMAP generations do not
+   implement perform a soft-reset.
+4. Clear the CON register after performing the bus clear, so when we call the
+   init function the controller is disabled and the init function will
+   re-enable later.
 
-v5 changes
-- Add consistency in the subject naming. 
+Original patch can be found here:
+http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=a2ab04192ba25e60f95ba1ff3af5601a2d7b5bd1
 
-Tested on omap4sdp and omap3sdp.
+Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |   33 ++++++++++++++++++++++++++++++---
+ 1 files changed, 30 insertions(+), 3 deletions(-)
 
-The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
-
-  Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
-
-are available in the git repository at:
-  git at gitorious.org:linus-tree/linus-tree.git i2c-v5
-
-Jon Hunter (1):
-      I2C: OMAP: Correct I2C revision for OMAP3
-
-Shubhrajyoti D (15):
-      I2C: OMAP: make omap_i2c_unidle/idle functions depend on CONFIG_PM_RUNTIME
-      I2C: OMAP: Remove reset at init
-      I2C: OMAP: I2C register restore only if context is lost
-      I2C: OMAP: Fix the interrupt clearing in OMAP4
-      I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
-      I2C: OMAP: Optimise the remove code
-      I2C: OMAP: Fix the error handling
-      I2C: OMAP: Don't check if wait_for_completion_timeout() returns less than zero
-      I2C: OMAP: use devm_* functions
-      I2C: OMAP: Fix the crash in i2c remove
-      I2C: OMAP: Handle error check for pm runtime
-      I2C: OMAP: Use SET_RUNTIME_PM_OPS
-      I2C: OMAP: make the read ready processing a separate function
-      I2C: OMAP: Do not set the XUDF if the underflow is not reached
-      ARM: OMAP4: hwmod data: I2C: add flag for context restore
-
-Tasslehoff Kjappfot (1):
-      I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
-
-Vikram Pandita (1):
-      I2C: OMAP: Recover from Bus Busy condition
-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +-
- arch/arm/plat-omap/i2c.c                   |    3 +
- drivers/i2c/busses/i2c-omap.c              |  330 +++++++++++++++-------------
- include/linux/i2c-omap.h                   |    1 +
- 4 files changed, 188 insertions(+), 149 deletions(-)
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index e402ebb..a882558 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -147,16 +147,15 @@ enum {
+ #define OMAP_I2C_SCLH_HSSCLH	8
+ 
+ /* I2C System Test Register (OMAP_I2C_SYSTEST): */
+-#ifdef DEBUG
+ #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
+ #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
+ #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
+-#define OMAP_I2C_SYSTEST_TMODE_SHIFT	(12)		/* Test mode select */
++#define OMAP_I2C_SYSTEST_TMODE_TEST	(2 << 12)	/* Test mode select */
++#define OMAP_I2C_SYSTEST_TMODE_LOOP	(3 << 12)	/* Test mode select */
+ #define OMAP_I2C_SYSTEST_SCL_I		(1 << 3)	/* SCL line sense in */
+ #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
+ #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
+ #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
+-#endif
+ 
+ /* OCP_SYSSTATUS bit definitions */
+ #define SYSS_RESETDONE_MASK		(1 << 0)
+@@ -319,6 +318,7 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ 							dev->westate);
+ 		}
+ 	}
++	return 0;
+ }
+ 
+ static int omap_i2c_init(struct omap_i2c_dev *dev)
+@@ -471,6 +471,31 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
+ }
+ 
+ /*
++ * Bus Clear
++ */
++static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
++{
++	u16 w;
++
++	/*
++	 * Per the I2C specification, if we are stuck in a bus busy state
++	 * we can attempt a bus clear to try and recover the bus by sending
++	 * at least 9 clock pulses on SCL. Put the I2C in a test mode so it
++	 * will output a continuous clock on SCL.
++	 */
++	w = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
++	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, (OMAP_I2C_SYSTEST_ST_EN
++			   | OMAP_I2C_SYSTEST_TMODE_TEST));
++	msleep(1);
++	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, w);
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
++	omap_i2c_reset(dev);
++	omap_i2c_init(dev);
++	return omap_i2c_wait_for_bb(dev);
++}
++
++/*
+  * Low level master read/write transaction.
+  */
+ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+@@ -597,6 +622,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ 	r = omap_i2c_wait_for_bb(dev);
+ 	if (r < 0)
++		r = omap_i2c_bus_clear(dev);
++	if (r < 0)
+ 		goto out;
+ 
+ 	if (dev->set_mpu_wkup_lat != NULL)
+-- 
+1.7.1
