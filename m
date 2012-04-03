@@ -1,105 +1,50 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 3 Apr 2012 13:14:23 +0200
-Subject: [PATCH v2 0/9] PM: Create the AVS class of drivers
-In-Reply-To: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
-References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
-Message-ID: <CAORVsuWJrEjUi11dyQZCnn-6BwOg9cN94G44JWpYvCtB8LbxKw@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 3 Apr 2012 17:08:23 +0530
+Subject: [PATCHv4 14/18] I2C : OMAP : Use SET_RUNTIME_PM_OPS
+In-Reply-To: <1333453107-7697-1-git-send-email-shubhrajyoti@ti.com>
+References: <1333453107-7697-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1333453107-7697-15-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, Rafael,
+Use SET_RUNTIME_PM_OPS macro to set runtime functions.
 
-Here is a gentle ping on this series.
-Do you think this can go in the next rc?
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |   11 ++++-------
+ 1 files changed, 4 insertions(+), 7 deletions(-)
 
-Regards,
-Jean
-
-On Mon, Mar 19, 2012 at 5:12 PM,  <jean.pihet@newoldbits.com> wrote:
-> From: Jean Pihet <j-pihet@ti.com>
->
-> AVS is a power management technique which controls the operating
-> voltage of a device in order to optimize (i.e. reduce) its power
-> consumption. The voltage is adapted depending on static factors
-> (chip manufacturing process) and dynamic factors (temperature
-> depending performance).
-> AVS is also called SmartReflex on OMAP devices.
->
-> To that end, create the AVS framework in drivers/power/avs and
-> move the OMAP SmartReflex code to the new directory.
->
-> In preparation to the move of the OMAP code the following changes have been
-> made:
-> - split the include files into generic and platform specific code,
-> - fill in platform data from the device initialization code and pass
-> ?it to the driver,
-> - create CONFIG_AVS* config options accordingly.
->
-> The platform integration data for SmartReflex is passed from hwmod
-> and the voltage layer to the driver using pdata.
->
->
-> Tested on OMAP3 Beagleboard using omap2plus_defconfig with the
-> CONFIG_POWER_AVS* options set.
-> Based on master branch of the l-o git tree (3.3.0-rc6) [1], commit
-> 85244e0edd240da2004bb2ab7cbcbc67a336f20d.
->
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
->
->
-> History:
-> v2: rework after the comments on MLs
-> ?. Keep the OMAP Kconfig options in the arch dir (Rafael),
-> ?. Move the shared header file from plat-omap to
-> ? ?include/linux/power/ (Tony)
->
-> v1: initial revision
->
->
-> Jean Pihet (9):
-> ?ARM: OMAP3+: voltage: export functions to plat/voltage.h
-> ?ARM: OMAP2+: SmartReflex: move the driver specific macros in
-> ? ?include/linux/power
-> ?ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
-> ?ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of
-> ? ?voltage domains.
-> ?ARM: OMAP3: hwmod: rename the smartreflex entries
-> ?ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
-> ?ARM: OMAP2+: SmartReflex: Use per-OPP data structure
-> ?ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
-> ?ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
->
-> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? | ? ?4 +-
-> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? 12 +-
-> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? ?3 +-
-> ?arch/arm/mach-omap2/pm.h ? ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-omap2/smartreflex-class3.c ? | ? 60 --
-> ?arch/arm/mach-omap2/smartreflex.c ? ? ? ? ?| 1165 ----------------------------
-> ?arch/arm/mach-omap2/smartreflex.h ? ? ? ? ?| ?256 ------
-> ?arch/arm/mach-omap2/sr_device.c ? ? ? ? ? ?| ? 38 +-
-> ?arch/arm/mach-omap2/voltage.h ? ? ? ? ? ? ?| ? ?1 -
-> ?arch/arm/mach-omap2/vp.h ? ? ? ? ? ? ? ? ? | ? ?2 -
-> ?arch/arm/plat-omap/Kconfig ? ? ? ? ? ? ? ? | ? 30 +-
-> ?arch/arm/plat-omap/include/plat/voltage.h ?| ? ?3 +
-> ?drivers/power/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?drivers/power/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?drivers/power/avs/Kconfig ? ? ? ? ? ? ? ? ?| ? 12 +
-> ?drivers/power/avs/Makefile ? ? ? ? ? ? ? ? | ? ?2 +
-> ?drivers/power/avs/smartreflex-class3.c ? ? | ? 61 ++
-> ?drivers/power/avs/smartreflex.c ? ? ? ? ? ?| 1118 ++++++++++++++++++++++++++
-> ?drivers/power/avs/smartreflex.h ? ? ? ? ? ?| ?238 ++++++
-> ?include/linux/power/smartreflex.h ? ? ? ? ?| ? 97 +++
-> ?20 files changed, 1590 insertions(+), 1518 deletions(-)
-> ?delete mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
-> ?delete mode 100644 arch/arm/mach-omap2/smartreflex.c
-> ?delete mode 100644 arch/arm/mach-omap2/smartreflex.h
-> ?create mode 100644 drivers/power/avs/Kconfig
-> ?create mode 100644 drivers/power/avs/Makefile
-> ?create mode 100644 drivers/power/avs/smartreflex-class3.c
-> ?create mode 100644 drivers/power/avs/smartreflex.c
-> ?create mode 100644 drivers/power/avs/smartreflex.h
-> ?create mode 100644 include/linux/power/smartreflex.h
->
-> --
-> 1.7.5.4
->
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 95f1b2f..a5b1ec1 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1211,15 +1211,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 
+ 	return 0;
+ }
++#endif
+ 
+ static struct dev_pm_ops omap_i2c_pm_ops = {
+-	.runtime_suspend = omap_i2c_runtime_suspend,
+-	.runtime_resume = omap_i2c_runtime_resume,
++	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
++			   omap_i2c_runtime_resume, NULL)
+ };
+-#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+-#else
+-#define OMAP_I2C_PM_OPS NULL
+-#endif
+ 
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
+@@ -1227,7 +1224,7 @@ static struct platform_driver omap_i2c_driver = {
+ 	.driver		= {
+ 		.name	= "omap_i2c",
+ 		.owner	= THIS_MODULE,
+-		.pm	= OMAP_I2C_PM_OPS,
++		.pm	= &omap_i2c_pm_ops,
+ 		.of_match_table = of_match_ptr(omap_i2c_of_match),
+ 	},
+ };
+-- 
+1.7.1
