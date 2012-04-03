@@ -1,20 +1,28 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 4 Apr 2012 00:55:09 +0100 (BST)
-Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
- MFP_LPM_KEEP_OUTPUT
-In-Reply-To: <4F7AAE48.4030909@compulab.co.il>
-Message-ID: <1333497309.20733.YahooMailClassic@web29019.mail.ird.yahoo.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 3 Apr 2012 17:58:45 -0600 (MDT)
+Subject: [PATCH 2/2] ARM: OMAP: powerdomain: Get rid off duplicate
+ pwrdm_clkdm_state_switch() API
+In-Reply-To: <1331562873-29535-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
+ <1331562873-29535-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1204031758340.8000@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Igor,
+On Mon, 12 Mar 2012, Santosh Shilimkar wrote:
 
---- On Tue, 3/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> Please, check the attached patch.
-> It should not change the meaning of KEEP_OUTPUT, but fix the
-> bug.
+> With patch 'ARM: OMAP: powerdomain: Wait for powerdomain transition
+> in pwrdm_state_switch()', the pwrdm_clkdm_state_switch() API becomes
+> duplicate of pwrdm_state_switch().
+> 
+> Get rid off duplicate pwrdm_clkdm_state_switch() and update the
+> users of it with pwrdm_state_switch()
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> CC: Rajendra Nayak <rnayak@ti.com>
+> CC: Paul Walmsley <paul@pwsan.com>
 
-Yes, your patch - pxa2xx-mfp.patch - does fix the KEEP_OUTPUT bug.
+Thanks, queued for 3.5.
 
-Regards,
-Paul
+
+- Paul
