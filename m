@@ -1,43 +1,201 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Apr 2012 17:08:27 +0530
-Subject: [PATCHv4 18/18] i2c: omap: Do not set the XUDF if the underflow is
- not reached
-In-Reply-To: <1333453107-7697-1-git-send-email-shubhrajyoti@ti.com>
-References: <1333453107-7697-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1333453107-7697-19-git-send-email-shubhrajyoti@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 03 Apr 2012 13:44:22 +0200
+Subject: [PATCH 2/4 v2] ARM: mxs: factor out dynamic amba device allocator
+In-Reply-To: <1333451358-9554-1-git-send-email-linus.walleij@linaro.org>
+References: <1333451358-9554-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4F7AE296.9040701@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in the 1.153 errata handling while waiting for transmitter
-underflow if NACK is got the XUDF flag is also set.
-Fix the same and set it after wait for the condition is over.
+On 04/03/2012 01:09 PM, Linus Walleij wrote:
+> Replace the local amba device allocator with the core code from
+> the bus driver.
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Cc: Alexander Shishkin <virtuoso@slind.org>
-Cc: Moiz Sonasath <m-sonasath@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Just nitpicking: You can make use of PTR_RET() instead of open-coding it
+(see inline).
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 51576d6..a3160d1 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -763,7 +763,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
- 			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
--			*err |= OMAP_I2C_STAT_XUDF;
- 			return -ETIMEDOUT;
- 		}
- 
-@@ -776,6 +775,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		return 0;
- 	}
- 
-+	*err |= OMAP_I2C_STAT_XUDF;
- 	return 0;
- }
- 
+regards, Marc
+
+> ---
+> ChangeLog v1->v2: fixed up the compile warnings spotted
+> by Shawn.
+> ---
+>  arch/arm/mach-mxs/devices-mx23.h                |   12 +++++--
+>  arch/arm/mach-mxs/devices-mx28.h                |   12 +++++--
+>  arch/arm/mach-mxs/devices.c                     |   16 ---------
+>  arch/arm/mach-mxs/devices/Makefile              |    1 -
+>  arch/arm/mach-mxs/devices/amba-duart.c          |   40 -----------------------
+>  arch/arm/mach-mxs/include/mach/devices-common.h |    5 ---
+>  6 files changed, 18 insertions(+), 68 deletions(-)
+>  delete mode 100644 arch/arm/mach-mxs/devices/amba-duart.c
+> 
+> diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+> index 4d1329d..9acdd63 100644
+> --- a/arch/arm/mach-mxs/devices-mx23.h
+> +++ b/arch/arm/mach-mxs/devices-mx23.h
+> @@ -11,10 +11,16 @@
+>  #include <mach/mx23.h>
+>  #include <mach/devices-common.h>
+>  #include <mach/mxsfb.h>
+> +#include <linux/amba/bus.h>
+>  
+> -extern const struct amba_device mx23_duart_device __initconst;
+> -#define mx23_add_duart() \
+> -	mxs_add_duart(&mx23_duart_device)
+> +static inline int mx23_add_duart(void)
+> +{
+> +	struct amba_device *d;
+> +
+> +	d = amba_ahb_device_add(NULL, "duart", MX23_DUART_BASE_ADDR, SZ_8K,
+> +				MX23_INT_DUART, 0, 0, 0);
+> +	return IS_ERR(d) ? PTR_ERR(d) : 0;
+
+there's a helper for that PTR_RET.
+
+> +}
+>  
+>  extern const struct mxs_auart_data mx23_auart_data[] __initconst;
+>  #define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
+> diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+> index 9dbeae1..84b2960 100644
+> --- a/arch/arm/mach-mxs/devices-mx28.h
+> +++ b/arch/arm/mach-mxs/devices-mx28.h
+> @@ -11,10 +11,16 @@
+>  #include <mach/mx28.h>
+>  #include <mach/devices-common.h>
+>  #include <mach/mxsfb.h>
+> +#include <linux/amba/bus.h>
+>  
+> -extern const struct amba_device mx28_duart_device __initconst;
+> -#define mx28_add_duart() \
+> -	mxs_add_duart(&mx28_duart_device)
+> +static inline int mx28_add_duart(void)
+> +{
+> +	struct amba_device *d;
+> +
+> +	d = amba_ahb_device_add(NULL, "duart", MX28_DUART_BASE_ADDR, SZ_8K,
+> +				MX28_INT_DUART, 0, 0, 0);
+> +	return IS_ERR(d) ? PTR_ERR(d) : 0;
+
+dito
+
+> +}
+>  
+>  extern const struct mxs_auart_data mx28_auart_data[] __initconst;
+>  #define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
+> diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
+> index 01faffe..cf50b5a 100644
+> --- a/arch/arm/mach-mxs/devices.c
+> +++ b/arch/arm/mach-mxs/devices.c
+> @@ -75,22 +75,6 @@ err:
+>  	return pdev;
+>  }
+>  
+> -int __init mxs_add_amba_device(const struct amba_device *dev)
+> -{
+> -	struct amba_device *adev = amba_device_alloc(dev->dev.init_name,
+> -		dev->res.start, resource_size(&dev->res));
+> -
+> -	if (!adev) {
+> -		pr_err("%s: failed to allocate memory", __func__);
+> -		return -ENOMEM;
+> -	}
+> -
+> -	adev->irq[0] = dev->irq[0];
+> -	adev->irq[1] = dev->irq[1];
+> -
+> -	return amba_device_add(adev, &iomem_resource);
+> -}
+> -
+>  struct device mxs_apbh_bus = {
+>  	.init_name	= "mxs_apbh",
+>  	.parent         = &platform_bus,
+> diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+> index c8f5c95..5f72d97 100644
+> --- a/arch/arm/mach-mxs/devices/Makefile
+> +++ b/arch/arm/mach-mxs/devices/Makefile
+> @@ -1,4 +1,3 @@
+> -obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
+>  obj-y += platform-dma.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
+> diff --git a/arch/arm/mach-mxs/devices/amba-duart.c b/arch/arm/mach-mxs/devices/amba-duart.c
+> deleted file mode 100644
+> index a5479f7..0000000
+> --- a/arch/arm/mach-mxs/devices/amba-duart.c
+> +++ /dev/null
+> @@ -1,40 +0,0 @@
+> -/*
+> - * Copyright (C) 2009-2010 Pengutronix
+> - * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+> - *
+> - * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> - *
+> - * This program is free software; you can redistribute it and/or modify it under
+> - * the terms of the GNU General Public License version 2 as published by the
+> - * Free Software Foundation.
+> - */
+> -#include <asm/irq.h>
+> -#include <mach/mx23.h>
+> -#include <mach/mx28.h>
+> -#include <mach/devices-common.h>
+> -
+> -#define MXS_AMBA_DUART_DEVICE(name, soc)			\
+> -const struct amba_device name##_device __initconst = {		\
+> -	.dev = {						\
+> -		.init_name = "duart",				\
+> -	},							\
+> -	.res = {						\
+> -		.start = soc ## _DUART_BASE_ADDR,		\
+> -		.end = (soc ## _DUART_BASE_ADDR) + SZ_8K - 1,	\
+> -		.flags = IORESOURCE_MEM,			\
+> -	},							\
+> -	.irq = {soc ## _INT_DUART},				\
+> -}
+> -
+> -#ifdef CONFIG_SOC_IMX23
+> -MXS_AMBA_DUART_DEVICE(mx23_duart, MX23);
+> -#endif
+> -
+> -#ifdef CONFIG_SOC_IMX28
+> -MXS_AMBA_DUART_DEVICE(mx28_duart, MX28);
+> -#endif
+> -
+> -int __init mxs_add_duart(const struct amba_device *dev)
+> -{
+> -	return mxs_add_amba_device(dev);
+> -}
+> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+> index f2e3839..21e45a7 100644
+> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
+> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+> @@ -27,11 +27,6 @@ static inline struct platform_device *mxs_add_platform_device(
+>  			name, id, res, num_resources, data, size_data, 0);
+>  }
+>  
+> -int __init mxs_add_amba_device(const struct amba_device *dev);
+> -
+> -/* duart */
+> -int __init mxs_add_duart(const struct amba_device *dev);
+> -
+>  /* auart */
+>  struct mxs_auart_data {
+>  	int id;
+
+
 -- 
-1.7.1
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120403/aa9c8790/attachment-0001.sig>
