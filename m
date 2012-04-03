@@ -1,68 +1,200 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 03 Apr 2012 16:10:15 +0200
-Subject: [PATCHv24 10/16] mm: Serialize access to min_free_kbytes
+Date: Tue, 03 Apr 2012 16:10:09 +0200
+Subject: [PATCHv24 04/16] mm: compaction: introduce isolate_freepages_range()
 In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
 References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1333462221-3987-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1333462221-3987-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mel Gorman <mgorman@suse.de>
+From: Michal Nazarewicz <mina86@mina86.com>
 
-There is a race between the min_free_kbytes sysctl, memory hotplug
-and transparent hugepage support enablement.  Memory hotplug uses a
-zonelists_mutex to avoid a race when building zonelists. Reuse it to
-serialise watermark updates.
+This commit introduces isolate_freepages_range() function which
+generalises isolate_freepages_block() so that it can be used on
+arbitrary PFN ranges.
 
-[a.p.zijlstra at chello.nl: Older patch fixed the race with spinlock]
-Signed-off-by: Mel Gorman <mgorman@suse.de>
+isolate_freepages_block() is left with only minor changes.
+
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Mel Gorman <mel@csn.ul.ie>
 Reviewed-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Tested-by: Rob Clark <rob.clark@linaro.org>
+Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Robert Nelson <robertcnelson@gmail.com>
 Tested-by: Barry Song <Baohua.Song@csr.com>
 ---
- mm/page_alloc.c |   23 +++++++++++++++--------
- 1 files changed, 15 insertions(+), 8 deletions(-)
+ mm/compaction.c |  111 ++++++++++++++++++++++++++++++++++++++++++++++---------
+ 1 files changed, 93 insertions(+), 18 deletions(-)
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 216e575..8b19caa 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -5020,14 +5020,7 @@ static void setup_per_zone_lowmem_reserve(void)
- 	calculate_totalreserve_pages();
+diff --git a/mm/compaction.c b/mm/compaction.c
+index d9d7b35..06b198f 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -54,24 +54,20 @@ static unsigned long release_freepages(struct list_head *freelist)
+ 	return count;
  }
  
--/**
-- * setup_per_zone_wmarks - called when min_free_kbytes changes
-- * or when memory is hot-{added|removed}
-- *
-- * Ensures that the watermark[min,low,high] values for each zone are set
-- * correctly with respect to min_free_kbytes.
-- */
--void setup_per_zone_wmarks(void)
-+static void __setup_per_zone_wmarks(void)
+-/* Isolate free pages onto a private freelist. Must hold zone->lock */
+-static unsigned long isolate_freepages_block(struct zone *zone,
+-				unsigned long blockpfn,
+-				struct list_head *freelist)
++/*
++ * Isolate free pages onto a private freelist. Caller must hold zone->lock.
++ * If @strict is true, will abort returning 0 on any invalid PFNs or non-free
++ * pages inside of the pageblock (even though it may still end up isolating
++ * some pages).
++ */
++static unsigned long isolate_freepages_block(unsigned long blockpfn,
++				unsigned long end_pfn,
++				struct list_head *freelist,
++				bool strict)
  {
- 	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
- 	unsigned long lowmem_pages = 0;
-@@ -5082,6 +5075,20 @@ void setup_per_zone_wmarks(void)
- 	calculate_totalreserve_pages();
+-	unsigned long zone_end_pfn, end_pfn;
+ 	int nr_scanned = 0, total_isolated = 0;
+ 	struct page *cursor;
+ 
+-	/* Get the last PFN we should scan for free pages at */
+-	zone_end_pfn = zone->zone_start_pfn + zone->spanned_pages;
+-	end_pfn = min(blockpfn + pageblock_nr_pages, zone_end_pfn);
+-
+-	/* Find the first usable PFN in the block to initialse page cursor */
+-	for (; blockpfn < end_pfn; blockpfn++) {
+-		if (pfn_valid_within(blockpfn))
+-			break;
+-	}
+ 	cursor = pfn_to_page(blockpfn);
+ 
+ 	/* Isolate free pages. This assumes the block is valid */
+@@ -79,15 +75,23 @@ static unsigned long isolate_freepages_block(struct zone *zone,
+ 		int isolated, i;
+ 		struct page *page = cursor;
+ 
+-		if (!pfn_valid_within(blockpfn))
++		if (!pfn_valid_within(blockpfn)) {
++			if (strict)
++				return 0;
+ 			continue;
++		}
+ 		nr_scanned++;
+ 
+-		if (!PageBuddy(page))
++		if (!PageBuddy(page)) {
++			if (strict)
++				return 0;
+ 			continue;
++		}
+ 
+ 		/* Found a free page, break it into order-0 pages */
+ 		isolated = split_free_page(page);
++		if (!isolated && strict)
++			return 0;
+ 		total_isolated += isolated;
+ 		for (i = 0; i < isolated; i++) {
+ 			list_add(&page->lru, freelist);
+@@ -105,6 +109,73 @@ static unsigned long isolate_freepages_block(struct zone *zone,
+ 	return total_isolated;
  }
  
 +/**
-+ * setup_per_zone_wmarks - called when min_free_kbytes changes
-+ * or when memory is hot-{added|removed}
++ * isolate_freepages_range() - isolate free pages.
++ * @start_pfn: The first PFN to start isolating.
++ * @end_pfn:   The one-past-last PFN.
 + *
-+ * Ensures that the watermark[min,low,high] values for each zone are set
-+ * correctly with respect to min_free_kbytes.
++ * Non-free pages, invalid PFNs, or zone boundaries within the
++ * [start_pfn, end_pfn) range are considered errors, cause function to
++ * undo its actions and return zero.
++ *
++ * Otherwise, function returns one-past-the-last PFN of isolated page
++ * (which may be greater then end_pfn if end fell in a middle of
++ * a free page).
 + */
-+void setup_per_zone_wmarks(void)
++static unsigned long
++isolate_freepages_range(unsigned long start_pfn, unsigned long end_pfn)
 +{
-+	mutex_lock(&zonelists_mutex);
-+	__setup_per_zone_wmarks();
-+	mutex_unlock(&zonelists_mutex);
++	unsigned long isolated, pfn, block_end_pfn, flags;
++	struct zone *zone = NULL;
++	LIST_HEAD(freelist);
++
++	if (pfn_valid(start_pfn))
++		zone = page_zone(pfn_to_page(start_pfn));
++
++	for (pfn = start_pfn; pfn < end_pfn; pfn += isolated) {
++		if (!pfn_valid(pfn) || zone != page_zone(pfn_to_page(pfn)))
++			break;
++
++		/*
++		 * On subsequent iterations ALIGN() is actually not needed,
++		 * but we keep it that we not to complicate the code.
++		 */
++		block_end_pfn = ALIGN(pfn + 1, pageblock_nr_pages);
++		block_end_pfn = min(block_end_pfn, end_pfn);
++
++		spin_lock_irqsave(&zone->lock, flags);
++		isolated = isolate_freepages_block(pfn, block_end_pfn,
++						   &freelist, true);
++		spin_unlock_irqrestore(&zone->lock, flags);
++
++		/*
++		 * In strict mode, isolate_freepages_block() returns 0 if
++		 * there are any holes in the block (ie. invalid PFNs or
++		 * non-free pages).
++		 */
++		if (!isolated)
++			break;
++
++		/*
++		 * If we managed to isolate pages, it is always (1 << n) *
++		 * pageblock_nr_pages for some non-negative n.  (Max order
++		 * page may span two pageblocks).
++		 */
++	}
++
++	/* split_free_page does not map the pages */
++	map_pages(&freelist);
++
++	if (pfn < end_pfn) {
++		/* Loop terminated early, cleanup. */
++		release_freepages(&freelist);
++		return 0;
++	}
++
++	/* We don't use freelists for anything. */
++	return pfn;
 +}
 +
- /*
-  * The inactive anon list should be small enough that the VM never has to
-  * do too much work, but large enough that each inactive page has a chance
+ /* Returns true if the page is within a block suitable for migration to */
+ static bool suitable_migration_target(struct page *page)
+ {
+@@ -145,7 +216,7 @@ static void isolate_freepages(struct zone *zone,
+ 				struct compact_control *cc)
+ {
+ 	struct page *page;
+-	unsigned long high_pfn, low_pfn, pfn;
++	unsigned long high_pfn, low_pfn, pfn, zone_end_pfn, end_pfn;
+ 	unsigned long flags;
+ 	int nr_freepages = cc->nr_freepages;
+ 	struct list_head *freelist = &cc->freepages;
+@@ -165,6 +236,8 @@ static void isolate_freepages(struct zone *zone,
+ 	 */
+ 	high_pfn = min(low_pfn, pfn);
+ 
++	zone_end_pfn = zone->zone_start_pfn + zone->spanned_pages;
++
+ 	/*
+ 	 * Isolate free pages until enough are available to migrate the
+ 	 * pages on cc->migratepages. We stop searching if the migrate
+@@ -201,7 +274,9 @@ static void isolate_freepages(struct zone *zone,
+ 		isolated = 0;
+ 		spin_lock_irqsave(&zone->lock, flags);
+ 		if (suitable_migration_target(page)) {
+-			isolated = isolate_freepages_block(zone, pfn, freelist);
++			end_pfn = min(pfn + pageblock_nr_pages, zone_end_pfn);
++			isolated = isolate_freepages_block(pfn, end_pfn,
++							   freelist, false);
+ 			nr_freepages += isolated;
+ 		}
+ 		spin_unlock_irqrestore(&zone->lock, flags);
 -- 
 1.7.1.569.g6f426
