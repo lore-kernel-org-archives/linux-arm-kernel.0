@@ -1,149 +1,254 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 3 Apr 2012 12:41:05 -0500
-Subject: [PATCH v2 2/3] ep93xx: IDE driver platform support code
-In-Reply-To: <4F7B0D6C.1010801@metasoft.pl>
-References: <4F7B0C54.8010804@metasoft.pl> <4F7B0D6C.1010801@metasoft.pl>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698409DF4@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 Apr 2012 10:43:17 -0700
+Subject: [PATCH 05/12] Add dummy smsc911x regulators to cm-t35.
+In-Reply-To: <4F72B0F5.4080705@compulab.co.il>
+References: <1332494504-10251-1-git-send-email-Russ.Dill@ti.com>
+ <1332494504-10251-6-git-send-email-Russ.Dill@ti.com>
+ <4F71E290.2050403@compulab.co.il>
+ <CA+Bv8XYiv+gr4yB+k7sWSSjdYSsYdnRJuTO3A5zZhh4bkoziXw@mail.gmail.com>
+ <4F72B0F5.4080705@compulab.co.il>
+Message-ID: <20120403174317.GE8240@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 03, 2012 7:47 AM, Rafal Prylowski wrote:
->
-> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
-> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
+* Igor Grinberg <grinberg@compulab.co.il> [120327 23:37]:
+> On 03/27/12 20:32, Russ Dill wrote:
+> > No objection.
+> 
+> 10x Russ.
 
-There should be some sort of commit blurb here..
->
-> ---
->  arch/arm/mach-ep93xx/core.c                  |   85 +++++++++++++++++
->  arch/arm/mach-ep93xx/include/mach/platform.h |    3
->  arch/arm/mach-ep93xx/soc.h                   |    1
->  3 files changed, 89 insertions(+)
->
-> Index: linux-2.6/arch/arm/mach-ep93xx/soc.h
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-ep93xx/soc.h
-> +++ linux-2.6/arch/arm/mach-ep93xx/soc.h
-> @@ -69,6 +69,7 @@
->  
->  #define EP93XX_BOOT_ROM_BASE		EP93XX_AHB_IOMEM(0x00090000)
->  
-> +#define EP93XX_IDE_PHYS_BASE		EP93XX_AHB_PHYS(0x000a0000)
->  #define EP93XX_IDE_BASE			EP93XX_AHB_IOMEM(0x000a0000)
->  
->  #define EP93XX_VIC1_BASE		EP93XX_AHB_IOMEM(0x000b0000)
-> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
-> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
-> @@ -868,6 +868,91 @@ static struct platform_device ep93xx_wdt
->  	.resource	= ep93xx_wdt_resources,
->  };
->  
-> +/*************************************************************************
-> + * EP93xx IDE
-> + *************************************************************************/
-> +static struct resource ep93xx_ide_resources[] = {
-> +	DEFINE_RES_MEM(EP93XX_IDE_PHYS_BASE, 0x38),
-> +	DEFINE_RES_IRQ(IRQ_EP93XX_EXT3),
-> +};
-> +
-> +static struct platform_device ep93xx_ide_device = {
-> +	.name		= "ep93xx-ide",
-> +	.id		= -1,
-> +	.dev		= {
-> +		.dma_mask		= &ep93xx_ide_device.dev.coherent_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
-> +	.num_resources	= ARRAY_SIZE(ep93xx_ide_resources),
-> +	.resource	= ep93xx_ide_resources,
-> +};
-> +
-> +void __init ep93xx_register_ide(void)
-> +{
-> +	platform_device_register(&ep93xx_ide_device);
-> +}
-> +
-> +int ep93xx_ide_acquire_gpio(struct platform_device *pdev)
-> +{
-> +	int err;
-> +	int i;
-> +
-> +	for (i = 2; i < 8; i++) {
-> +		err = gpio_request(EP93XX_GPIO_LINE_E(i), dev_name(&pdev->dev));
-> +		if (err)
-> +			goto fail_gpio_e;
-> +	}
-> +	for (i = 4; i < 8; i++) {
-> +		err = gpio_request(EP93XX_GPIO_LINE_G(i), dev_name(&pdev->dev));
-> +		if (err)
-> +			goto fail_gpio_g;
-> +	}
-> +	for (i = 0; i < 8; i++) {
-> +		err = gpio_request(EP93XX_GPIO_LINE_H(i), dev_name(&pdev->dev));
-> +		if (err)
-> +			goto fail_gpio_h;
-> +	}
-> +
-> +	/* GPIO ports E[7:2], G[7:4] and H used by IDE */
-> +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_EONIDE |
-> +				 EP93XX_SYSCON_DEVCFG_GONIDE |
-> +				 EP93XX_SYSCON_DEVCFG_HONIDE);
-> +	return 0;
-> +
-> +fail_gpio_h:
-> +	for (--i; i >= 0; --i)
-> +		gpio_free(EP93XX_GPIO_LINE_H(i));
-> +	i = 8;
-> +fail_gpio_g:
-> +	for (--i; i >= 4; --i)
-> +		gpio_free(EP93XX_GPIO_LINE_G(i));
-> +	i = 8;
-> +fail_gpio_e:
-> +	for (--i; i >= 2; --i)
-> +		gpio_free(EP93XX_GPIO_LINE_E(i));
-> +	return err;
-> +}
-> +EXPORT_SYMBOL(ep93xx_ide_acquire_gpio);
-> +
-> +void ep93xx_ide_release_gpio(struct platform_device *pdev)
-> +{
-> +	int i;
-> +
-> +	for (i = 2; i < 8; i++)
-> +		gpio_free(EP93XX_GPIO_LINE_E(i));
-> +	for (i = 4; i < 8; i++)
-> +		gpio_free(EP93XX_GPIO_LINE_G(i));
-> +	for (i = 0; i < 8; i++)
-> +		gpio_free(EP93XX_GPIO_LINE_H(i));
-> +
-> +
-> +	/* GPIO ports E[7:2], G[7:4] and H used by GPIO */
-> +	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_EONIDE |
-> +			       EP93XX_SYSCON_DEVCFG_GONIDE |
-> +			       EP93XX_SYSCON_DEVCFG_HONIDE);
-> +}
-> +EXPORT_SYMBOL(ep93xx_ide_release_gpio);
-> +
->  void __init ep93xx_init_devices(void)
->  {
->  	/* Disallow access to MaverickCrunch initially */
-> Index: linux-2.6/arch/arm/mach-ep93xx/include/mach/platform.h
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-ep93xx/include/mach/platform.h
-> +++ linux-2.6/arch/arm/mach-ep93xx/include/mach/platform.h
-> @@ -48,6 +48,9 @@ void ep93xx_register_i2s(void);
->  int ep93xx_i2s_acquire(void);
->  void ep93xx_i2s_release(void);
->  void ep93xx_register_ac97(void);
-> +void ep93xx_register_ide(void);
-> +int ep93xx_ide_acquire_gpio(struct platform_device *pdev);
-> +void ep93xx_ide_release_gpio(struct platform_device *pdev);
->  
->  void ep93xx_init_devices(void);
->  extern struct sys_timer ep93xx_timer;
+I've combined patches 5 - 12 into a single patch as they
+pretty much do the same thing, and to cut down
+the patch noise for fixes. Merging into fixes with the
+updated patch below.
 
-Looks good. For this ep93xx core piece:
+Regards,
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Tony
+
+
+From: Russ Dill <Russ.Dill@ti.com>
+Date: Fri, 23 Mar 2012 02:21:37 -0700
+Subject: [PATCH] ARM: OMAP2+: smsc911x: Add fixed board regulators
+
+Initialize fixed regulators in the board files. Trying to
+do this in a generic way in gpmc-smsc911x.c gets messy as
+the regulator may be provided by drivers, such as twl4030,
+for some boards.
+
+Signed-off-by: Russ Dill <russ.dill@ti.com>
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+[tony at atomide.com: combined into one patch, updated comments]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+index 41b0a2f..909a8b9 100644
+--- a/arch/arm/mach-omap2/board-cm-t35.c
++++ b/arch/arm/mach-omap2/board-cm-t35.c
+@@ -26,6 +26,7 @@
+ 
+ #include <linux/i2c/at24.h>
+ #include <linux/i2c/twl.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/mmc/host.h>
+ 
+@@ -81,8 +82,23 @@ static struct omap_smsc911x_platform_data sb_t35_smsc911x_cfg = {
+ 	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
+ };
+ 
++static struct regulator_consumer_supply cm_t35_smsc911x_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
++static struct regulator_consumer_supply sb_t35_smsc911x_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.1"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.1"),
++};
++
+ static void __init cm_t35_init_ethernet(void)
+ {
++	regulator_register_fixed(0, cm_t35_smsc911x_supplies,
++				 ARRAY_SIZE(cm_t35_smsc911x_supplies));
++	regulator_register_fixed(1, sb_t35_smsc911x_supplies,
++				 ARRAY_SIZE(sb_t35_smsc911x_supplies));
++
+ 	gpmc_smsc911x_init(&cm_t35_smsc911x_cfg);
+ 	gpmc_smsc911x_init(&sb_t35_smsc911x_cfg);
+ }
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index e558800..930c0d3 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -634,8 +634,14 @@ static void __init igep_wlan_bt_init(void)
+ static inline void __init igep_wlan_bt_init(void) { }
+ #endif
+ 
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
+ static void __init igep_init(void)
+ {
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 
+ 	/* Get IGEP2 hardware revision */
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index d50a562..1b60495 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -22,6 +22,7 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/spi/spi.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/io.h>
+@@ -410,8 +411,14 @@ static struct mtd_partition ldp_nand_partitions[] = {
+ 
+ };
+ 
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
+ static void __init omap_ldp_init(void)
+ {
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 	ldp_init_smsc911x();
+ 	omap_i2c_init();
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index b90b319..49df127 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -623,9 +623,15 @@ static void __init omap3_evm_wl12xx_init(void)
+ #endif
+ }
+ 
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
+ static void __init omap3_evm_init(void)
+ {
+ 	omap3_evm_get_revision();
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 
+ 	if (cpu_is_omap3630())
+ 		omap3_mux_init(omap36x_board_mux, OMAP_PACKAGE_CBB);
+diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+index 4a7d8c8..9b3c141 100644
+--- a/arch/arm/mach-omap2/board-omap3logic.c
++++ b/arch/arm/mach-omap2/board-omap3logic.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ 
++#include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ 
+ #include <linux/i2c/twl.h>
+@@ -188,8 +189,14 @@ static struct omap_board_mux board_mux[] __initdata = {
+ };
+ #endif
+ 
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
+ static void __init omap3logic_init(void)
+ {
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 	omap3torpedo_fix_pbias_voltage();
+ 	omap3logic_i2c_init();
+diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+index de95352..4dffc95 100644
+--- a/arch/arm/mach-omap2/board-omap3stalker.c
++++ b/arch/arm/mach-omap2/board-omap3stalker.c
+@@ -24,6 +24,7 @@
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ 
++#include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/mmc/host.h>
+@@ -410,8 +411,14 @@ static struct omap_board_mux board_mux[] __initdata = {
+ };
+ #endif
+ 
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
+ static void __init omap3_stalker_init(void)
+ {
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
+ 	omap_board_config = omap3_stalker_config;
+ 	omap_board_config_size = ARRAY_SIZE(omap3_stalker_config);
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index 668533e..33aa391 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -498,10 +498,18 @@ static struct gpio overo_bt_gpios[] __initdata = {
+ 	{ OVERO_GPIO_BT_NRESET, GPIOF_OUT_INIT_HIGH,	"lcd bl enable" },
+ };
+ 
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++	REGULATOR_SUPPLY("vddvario", "smsc911x.1"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.1"),
++};
++
+ static void __init overo_init(void)
+ {
+ 	int ret;
+ 
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 	omap_hsmmc_init(mmc);
+ 	overo_i2c_init();
+diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
+index 1e8540e..f64f441 100644
+--- a/arch/arm/mach-omap2/board-zoom-debugboard.c
++++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
+@@ -14,6 +14,9 @@
+ #include <linux/smsc911x.h>
+ #include <linux/interrupt.h>
+ 
++#include <linux/regulator/fixed.h>
++#include <linux/regulator/machine.h>
++
+ #include <plat/gpmc.h>
+ #include <plat/gpmc-smsc911x.h>
+ 
+@@ -117,11 +120,17 @@ static struct platform_device *zoom_devices[] __initdata = {
+ 	&zoom_debugboard_serial_device,
+ };
+ 
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
+ int __init zoom_debugboard_init(void)
+ {
+ 	if (!omap_zoom_debugboard_detect())
+ 		return 0;
+ 
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 	zoom_init_smsc911x();
+ 	zoom_init_quaduart();
+ 	return platform_add_devices(zoom_devices, ARRAY_SIZE(zoom_devices));
