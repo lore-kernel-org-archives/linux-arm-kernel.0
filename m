@@ -1,32 +1,68 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Tue, 3 Apr 2012 17:26:32 +0100 (BST)
-Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
- MFP_LPM_KEEP_OUTPUT
-In-Reply-To: <4F7B1273.6020003@compulab.co.il>
-Message-ID: <1333470392.66217.YahooMailClassic@web29010.mail.ird.yahoo.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 03 Apr 2012 10:19:48 -0600
+Subject: [PATCH] pinctrl: Add SPEAr pinctrl drivers
+In-Reply-To: <201204031347.35256.arnd@arndb.de>
+References: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
+ <201204031347.35256.arnd@arndb.de>
+Message-ID: <4F7B2324.8000706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Tue, 3/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> Hmmm....
-> If we change the GPSR and GPCR, the old levels should be
-> reserved, right?
-> Attached...
+On 04/03/2012 07:47 AM, Arnd Bergmann wrote:
+> On Tuesday 03 April 2012, Viresh Kumar wrote:
+>> This adds pinctrl driver for SPEAr family. Currently it contains machine/SoC
+>> drivers for SPEAr3xx family only. SPEAr13xx family drivers will follow.
+>>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> 
+> Hi Viresh,
+> 
+> This is quite a lot of data, especially for the spear320. Have you
+> tried moving some or all of the data into device tree properties?
+> 
+> I can only guess that the spear13xx file would be even larger than
+> these.
 
-Yes, that sounds right: if resume() restores the old directions then
-it makes sense for it to restore the old levels first. Otherwise it
-encounters the same problem as suspend().
+Didn't we decide (at Linaro Connect) that is was perfectly acceptable to
+put this data into the pinctrl drivers; it's just going to get parsed
+out into exactly the same tables, and the data is presumably static for
+each SoC, and hence there's little point putting it into DT.
 
-On that very subject, I notice that __mfp_config_gpio() also sets
-directions without first setting levels.
+>> +/* pingroups */
+>> +static struct spear_pingroup *spear310_pingroups[] = {
+>> +	SPEAR3XX_COMMON_PINGROUPS,
+>> +	&emi_cs_0_to_5_pingroup,
+>> +	&uart1_pingroup,
+>> +	&uart2_pingroup,
+>> +	&uart3_pingroup,
+>> +	&uart4_pingroup,
+>> +	&uart5_pingroup,
+>> +	&fsmc_pingroup,
+>> +	&rs485_0_pingroup,
+>> +	&rs485_1_pingroup,
+>> +	&tdm_pingroup,
+>> +};
+>> +
+>> +/* functions */
+>> +static struct spear_function *spear310_functions[] = {
+>> +	SPEAR3XX_COMMON_FUNCTIONS,
+>> +	&emi_cs_0_to_5_function,
+>> +	&uart1_function,
+>> +	&uart2_function,
+>> +	&uart3_function,
+>> +	&uart4_function,
+>> +	&uart5_function,
+>> +	&fsmc_function,
+>> +	&rs485_0_function,
+>> +	&rs485_1_function,
+>> +	&tdm_function,
+>> +};
+> 
+> I believe the macros like SPEAR3XX_COMMON_FUNCTIONS are not
+> needed any more, you can simply register multiple sets of pingroups
+> and functions.
 
-Problem is, it is not obvious what levels it should set.
-Perhaps it should likewise set the levels to the PGSR values, on the
-tenuous presumption that any hardware should already be in low power
-mode at the time __mfp_config_gpio() is called.
-But then again maybe not. This is more tricky.
-
-I'll give the patches a try before the end of the day.
-
-Regards,
-Paul
+For a given pin controller, there's a single set of pins, groups, and
+functions; no incremental registration. You can register multiple pin
+controllers, but that only makes sense if there really are multiple
+physically separate pin controller modules in hardware.
