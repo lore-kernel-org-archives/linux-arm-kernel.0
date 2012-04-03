@@ -1,43 +1,40 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Apr 2012 21:32:36 +0530
-Subject: [PATCHv5 17/18] I2C: OMAP: Do not set the XUDF if the underflow is
- not reached
+Date: Tue, 3 Apr 2012 21:32:37 +0530
+Subject: [PATCHv5 18/18] ARM: OMAP4: hwmod data: I2C: add flag for context
+ restore
 In-Reply-To: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
 References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1333468957-5999-18-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1333468957-5999-19-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in the 1.153 errata handling while waiting for transmitter
-underflow if NACK is got the XUDF flag is also set.
-The flag is set after wait for the condition is over.
+Restore of context is not done for OMAP4. This patch
+adds the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE in the OMAP4
+hwmod data which activates the restore for OMAP4.
+Currently the OMAP4 does not hit device off still the
+driver may have support for it.
 
-Cc: Alexander Shishkin <virtuoso@slind.org>
-Cc: Moiz Sonasath <m-sonasath@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Wamsley <paul@pwsan.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 51576d6..a3160d1 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -763,7 +763,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
- 			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
--			*err |= OMAP_I2C_STAT_XUDF;
- 			return -ETIMEDOUT;
- 		}
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 08daa5e..cddce60 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2262,7 +2262,8 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
+ };
  
-@@ -776,6 +775,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		return 0;
- 	}
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+-	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
++	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE |
++			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
+ };
  
-+	*err |= OMAP_I2C_STAT_XUDF;
- 	return 0;
- }
- 
+ /* i2c1 */
 -- 
 1.7.1
