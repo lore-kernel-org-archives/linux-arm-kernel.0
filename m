@@ -1,193 +1,40 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 03 Apr 2012 09:04:30 -0600
-Subject: [PATCH] gpio: Device tree support for LPC32xx
-In-Reply-To: <1333407513-18231-1-git-send-email-stigge@antcom.de>
-References: <1333407513-18231-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120403150430.EBA423E0436@localhost>
+Date: Tue, 03 Apr 2012 10:04:54 -0600
+Subject: Handling device shared SFR on dt platform
+In-Reply-To: <4F736A4A.6050302@gmail.com>
+References: <4F6A5853.9090809@gmail.com>
+ <20120324193200.822AD3E0B06@localhost> <4F736A4A.6050302@gmail.com>
+Message-ID: <20120403160454.BDFF23E0598@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  3 Apr 2012 00:58:33 +0200, Roland Stigge <stigge@antcom.de> wrote:
-> This patch adds device tree support for gpio-lpc32xx.c
+On Wed, 28 Mar 2012 21:45:14 +0200, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+> Hello Grant,
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> On 03/24/2012 08:32 PM, Grant Likely wrote:
+> >
+> > Generally, this is handled by having a third node for the shared
+> > register block and both device nodes holding a phandle to it.
+> > 
+> > No, there isn't any common infrastructure for implementing this, but
+> > it isn't very much code.
 > 
-> ---
+> Thank you, that sounds good. I'm just wondering how to handle the shared
+> resource access synchronisation. There is an IORESOURCE_MUXED resource type 
+> flag which could be used to prevent drivers from stomping on each others 
+> feet when accessing the shared register, if I understand the software muxed
+> resource semantics correctly. That is, using something like 
+> request_muxed_(mem_)region()/release_mem_region() for the shared register
+> protection.
 > 
->  Applies to v3.4-rc1
-> 
->  Can add this patch to the LPC32xx series for an update, if necessary.
-> 
->  Thanks to Arnd Bergmann for the help with registering GPIO via OF!
+> What concerns me, is an overhead from region request/ioremap(?)/release, just
+> to access a single 32-bit register. I'm going to see if those accesses could
+> be moved to only device driver's probe() and remove() callbacks and what might
+> be the resulting power consumption increase from that, if any.
 
-Hi Roland,
-
-Comments below.
-
-> 
->  Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   71 ++++++++++++++++
->  arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +-
->  drivers/gpio/gpio-lpc32xx.c                             |   45 +++++++++-
->  3 files changed, 120 insertions(+), 5 deletions(-)
-> 
-> --- /dev/null
-> +++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
-> @@ -0,0 +1,71 @@
-> +NXP LPC32xx SoC GPIO controller
-> +
-> +Required properties:
-> +- compatible: "nxp,lpc32xx-gpio"
-> +- reg: Physical base address and length of the controller's registers.
-> +- #address-cells: For indexing of the subnodes (GPIO groups of the SoC)
-> +- #size-cells: Always 0
-> +- #gpio-cells: Should be two. The first cell is the pin number and the
-> +  second cell is used to specify optional parameters:
-> +  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-
-Having #gpio-cells in the parent node doesn't make much sense when it
-looks like the users reference the child node banks directly and which
-have their own #gpio-cells properties.
-
-> +
-> +Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
-> +- gpio-controller: Marks the device node as a GPIO controller.
-> +- #gpio-cells: Should be two. The first cell is the pin number and the
-> +  second cell is used to specify optional parameters:
-> +  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-> +- reg: Index of the GPIO group
-> +- gpio-lines: Number of GPIOs in that subnode/GPIO group
-
-The driver doesn't appear to be using the gpio-lines property.  Is it
-really necessary?
-
-> +
-> +Example:
-> +
-> +	gpio: gpio at 40028000 {
-> +		compatible = "nxp,lpc32xx-gpio";
-> +		reg = <0x40028000 0x1000>;
-> +		/* create a private address space for enumeration */
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		#gpio-cells = <2>;
-> +
-> +		gpio_p0: gpio-bank at 0 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			gpio-lines = <8>;
-> +			reg = <0>;
-> +		};
-> +
-> +		gpio_p1: gpio-bank at 1 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			gpio-lines = <24>;
-> +			reg = <1>;
-> +		};
-> +
-> +		gpio_p2: gpio-bank at 2 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			gpio-lines = <13>;
-> +			reg = <2>;
-> +		};
-> +
-> +		gpio_p3: gpio-bank at 3 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			gpio-lines = <6>;
-> +			reg = <3>;
-> +		};
-> +
-> +		gpi_p3: gpio-bank at 4 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			gpio-lines = <28>;
-> +			reg = <4>;
-> +		};
-> +
-> +		gpo_p3: gpio-bank at 5 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			gpio-lines = <24>;
-> +			reg = <5>;
-> +		};
-> +	};
-> --- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
-> +++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
-> @@ -1 +1,8 @@
-> -/* empty */
-> +#ifndef __MACH_GPIO_H
-> +#define __MACH_GPIO_H
-> +
-> +#include "gpio-lpc32xx.h"
-> +
-> +#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
-> +
-> +#endif /* __MACH_GPIO_H */
-> --- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-> +++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-> @@ -21,6 +21,9 @@
->  #include <linux/io.h>
->  #include <linux/errno.h>
->  #include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/module.h>
->  
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
-> @@ -454,10 +457,44 @@ static struct lpc32xx_gpio_chip lpc32xx_
->  	},
->  };
->  
-> -void __init lpc32xx_gpio_init(void)
-> +static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
->  {
-> -	int i;
-> +	struct device_node *node;
->  
-> -	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
-> -		gpiochip_add(&lpc32xx_gpiochip[i].chip);
-> +	for_each_child_of_node(pdev->dev.of_node, node) {
-> +		if (of_device_is_available(node)) {
-> +			u32 index;
-> +			struct gpio_chip *chip;
-> +			if (of_property_read_u32(node, "reg", &index) < 0)
-> +				continue;
-> +			if (index >= ARRAY_SIZE(lpc32xx_gpiochip))
-> +				continue;
-> +			chip = &lpc32xx_gpiochip[index].chip;
-> +			chip->of_node = of_node_get(node);
-> +			gpiochip_add(chip);
-> +		}
-> +	}
-> +
-> +	return 0;
->  }
-> +
-> +static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
-> +	{ .compatible = "nxp,lpc32xx-gpio", },
-> +	{ },
-> +};
-> +
-> +static struct platform_driver lpc32xx_gpio_driver = {
-> +	.driver		= {
-> +		.name	= "lpc32xx-gpio",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = lpc32xx_gpio_of_match,
-> +	},
-> +	.probe		= lpc32xx_gpio_probe,
-> +};
-> +
-> +static int __init lpc32xx_gpio_init(void)
-> +{
-> +	return platform_driver_register(&lpc32xx_gpio_driver);
-> +}
-> +postcore_initcall(lpc32xx_gpio_init);
-
-module_platform_driver() please.  Also, now that deferred probe is
-merged, there should no longer be any need to mess around with
-initcall levels to get gpio drivers probed early.
+Personally, I'd just create a shared function used by both drivers to
+access the register and protect it with a spinlock.  That way the
+region only needs to be mapped once, and the overhead is as low as
+possible.
 
 g.
