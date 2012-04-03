@@ -1,87 +1,35 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue,  3 Apr 2012 09:32:47 +0200
-Subject: [PATCH v2 03/13] ARM: at91/USB host: specify and handle properly
- vbus_pin_active_low
+Date: Tue,  3 Apr 2012 09:32:52 +0200
+Subject: [PATCH v2 08/13] USB: ohci-at91: trivial return code name change
 In-Reply-To: <cover.1333437885.git.nicolas.ferre@atmel.com>
 References: <cover.1333437885.git.nicolas.ferre@atmel.com>
-Message-ID: <b03f22ebfb381eb04dbeb1e0de1cf485e4672a3c.1333437885.git.nicolas.ferre@atmel.com>
+Message-ID: <91dcb3feeab529b4d214ccb426da6fed635dd4b5.1333437885.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to an error while handling vbus_pin_active_low in ohci-at91 driver,
-the specification of this property was not good in devices/board files.
-
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: stable <stable@vger.kernel.org>         [3.2+]
 ---
- arch/arm/mach-at91/at91sam9263_devices.c |    3 ++-
- arch/arm/mach-at91/at91sam9g45_devices.c |    6 ++++--
- arch/arm/mach-at91/board-sam9263ek.c     |    1 +
- arch/arm/mach-at91/board-sam9m10g45ek.c  |    1 +
- 4 files changed, 8 insertions(+), 3 deletions(-)
+ drivers/usb/host/ohci-at91.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 53688c4..27cfce3 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -72,7 +72,8 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 	/* Enable VBus control for UHP ports */
- 	for (i = 0; i < data->ports; i++) {
- 		if (gpio_is_valid(data->vbus_pin[i]))
--			at91_set_gpio_output(data->vbus_pin[i], 0);
-+			at91_set_gpio_output(data->vbus_pin[i],
-+					     data->vbus_pin_active_low[i]);
- 	}
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index a8e0446..7e1abbd 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -552,10 +552,9 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	int			gpio;
+ 	int			ret;
  
- 	/* Enable overcurrent notification */
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 698479f..ddf210a 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -127,7 +127,8 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
- 	/* Enable VBus control for UHP ports */
- 	for (i = 0; i < data->ports; i++) {
- 		if (gpio_is_valid(data->vbus_pin[i]))
--			at91_set_gpio_output(data->vbus_pin[i], 0);
-+			at91_set_gpio_output(data->vbus_pin[i],
-+					     data->vbus_pin_active_low[i]);
- 	}
+-	i = ohci_at91_of_init(pdev);
+-
+-	if (i)
+-		return i;
++	ret = ohci_at91_of_init(pdev);
++	if (ret)
++		return ret;
  
- 	/* Enable overcurrent notification */
-@@ -188,7 +189,8 @@ void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data)
- 	/* Enable VBus control for UHP ports */
- 	for (i = 0; i < data->ports; i++) {
- 		if (gpio_is_valid(data->vbus_pin[i]))
--			at91_set_gpio_output(data->vbus_pin[i], 0);
-+			at91_set_gpio_output(data->vbus_pin[i],
-+					     data->vbus_pin_active_low[i]);
- 	}
- 
- 	usbh_ehci_data = *data;
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 66f0ddf..2ffe50f 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -74,6 +74,7 @@ static void __init ek_init_early(void)
- static struct at91_usbh_data __initdata ek_usbh_data = {
- 	.ports		= 2,
- 	.vbus_pin	= { AT91_PIN_PA24, AT91_PIN_PA21 },
-+	.vbus_pin_active_low = {1, 1},
- 	.overcurrent_pin= {-EINVAL, -EINVAL},
- };
- 
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index e1bea73..c88e908 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -71,6 +71,7 @@ static void __init ek_init_early(void)
- static struct at91_usbh_data __initdata ek_usbh_hs_data = {
- 	.ports		= 2,
- 	.vbus_pin	= {AT91_PIN_PD1, AT91_PIN_PD3},
-+	.vbus_pin_active_low = {1, 1},
- 	.overcurrent_pin= {-EINVAL, -EINVAL},
- };
+ 	pdata = pdev->dev.platform_data;
  
 -- 
 1.7.9.4
