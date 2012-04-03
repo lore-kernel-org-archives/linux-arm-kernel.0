@@ -1,56 +1,106 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 03 Apr 2012 14:43:51 -0500
-Subject: [PATCH v5 09/16] pwm: tegra: Add device tree support
-In-Reply-To: <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
-References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
- <1332945238-14897-10-git-send-email-thierry.reding@avionic-design.de>
- <4F7602CD.2010808@wwwdotorg.org>
- <20120402083749.GA6576@avionic-0098.adnet.avionic-design.de>
- <4F79C8D4.2000306@wwwdotorg.org>
- <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
-Message-ID: <4F7B52F7.5030608@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Apr 2012 20:08:00 +0000
+Subject: [PATCH v2 1/3] PATA host controller driver for ep93xx
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020698409E29@AUSP01VMBX24.collaborationhost.net>
+References: <4F7B0C54.8010804@metasoft.pl> <4F7B0CEF.2040307@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020698409E29@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <201204032008.00509.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2012 12:55 PM, Thierry Reding wrote:
-> * Stephen Warren wrote:
->> On 04/02/2012 02:37 AM, Thierry Reding wrote:
->>> * Stephen Warren wrote:
->>>> On 03/28/2012 08:33 AM, Thierry Reding wrote:
->>>>> Add auxdata to instantiate the PWFM controller from a device tree,
->>>>> include the corresponding nodes in the dtsi files for Tegra 20 and
->>>>> Tegra 30 and add binding documentation.
->>>>>
->>>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->>>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->>>>
->>>>> diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
->>>> ...
->>>>> +#ifdef CONFIG_OF
->>>>> +static struct of_device_id tegra_pwm_of_match[] = {
->>>>> +	{ .compatible = "nvidia,tegra20-pwm" },
->>>>> +	{ .compatible = "nvidia,tegra30-pwm" },
->>>>
->>>> Could you swap those two lines, so that tegra30-pwm matches first. It
->>>> makes no difference at present, but might in the future if the driver
->>>> actually has to differentiate the two SoCs.
->>>
->>> I thought the matching order was determined by the compatible property in the
->>> device tree, not the OF match table of the driver.
->>
->> At least logically, yes. However, of_match_device() appears to iterate
->> over each match table entry, checking whether it matches any string in
->> the compatible flag. Perhaps this could be considered a bug?
+On Tuesday 03 April 2012, H Hartley Sweeten wrote:
+> On Tuesday, April 03, 2012 7:45 AM, Rafal Prylowski wrote:
+> > +
+> > +     /* UDMA Debug Status Register */
+> > +     IDEUDMADEBUG                    = 0x2c,
+> > +};
 > 
-> It certainly is counter-intuitive. Maybe Grant or Rob can comment?
+> I prefer defines for these. But, the enum usage seems common in the ata drivers
+> so...
 
-I think the rule should be the match list is most specific to least
-specific and/or mutually exclusive like compatible strings. Most
-examples with multiple entries in the kernel seem to fall into the
-mutually exclusive case.
+I like the enum ;-)
 
-For this case, I think would just drop tegra30-pwm altogether and only
-add it to the driver when you need to distinguish between the 2. The dts
-should have both though for Tegra3.
+> > +
+> > +static int ep93xx_pata_check_iordy(void __iomem *base)
+> > +{
+> > +     return !!(readl(base + IDECTRL) & IDECTRL_IORDY);
+> > +}
 
-Rob
+This one could return a bool.
+
+> > +static void ep93xx_pata_wait_for_iordy(void __iomem *base)
+> > +{
+> > +     unsigned long deadline = jiffies + msecs_to_jiffies(1000);
+> > +     while (!ep93xx_pata_check_iordy(base) &&
+> > +             time_is_before_jiffies(deadline))
+> > +             cpu_relax();
+> > +}
+
+Much better for a delay than the previous version. However, it's
+still a busy wait, which is bad for realtime behavior, especially
+since this can potentially take many milliseconds. If possible,
+it should have an msleep() or at least cond_resched() instead of
+the cpu_relax(). Obviously that will only work when no spinlocks
+are held.
+
+> > +     if (is_addr) {
+> > +             ep93xx_pata_write(drv_data, tf->feature,
+> > +                     IDECTRL_ADDR_FEATURE, t);
+> > +             ep93xx_pata_write(drv_data, tf->nsect, IDECTRL_ADDR_NSECT, t);
+> > +             ep93xx_pata_write(drv_data, tf->lbal, IDECTRL_ADDR_LBAL, t);
+> > +             ep93xx_pata_write(drv_data, tf->lbam, IDECTRL_ADDR_LBAM, t);
+> > +             ep93xx_pata_write(drv_data, tf->lbah, IDECTRL_ADDR_LBAH, t);
+> > +             VPRINTK("feat 0x%X nsect 0x%X lba 0x%X 0x%X 0x%X\n",
+> > +                     tf->feature, tf->nsect, tf->lbal, tf->lbam, tf->lbah);
+> > +     }
+> > +
+> > +     if (tf->flags & ATA_TFLAG_DEVICE) {
+> > +             ep93xx_pata_write(drv_data, tf->device, IDECTRL_ADDR_DEVICE, t);
+> > +             VPRINTK("device 0x%X\n", tf->device);
+> > +     }
+
+Although VPRINTK is used in other ATA drivers, I would not recommend it
+in new drivers. Instead, I suggest you use dev_err() and similar helpers
+that are not specific to one subsystem.
+
+> > +/* Note: original code is ata_sff_data_xfer */
+> > +unsigned int ep93xx_pata_data_xfer(struct ata_device *adev, unsigned char *buf,
+> > +                                unsigned int buflen, int rw)
+
+This should be a static function. A device driver with just a single file should 
+not need any non-static symbols. Same thing for ep93xx_pata_drain_fifo and
+possibly a few others.
+
+> > +static int __devinit ep93xx_pata_probe(struct platform_device *pdev)
+> > +{
+> > +     struct ep93xx_pata_data *drv_data;
+> > +     struct ata_host *host;
+> > +     struct ata_port *ap;
+> > +     unsigned int irq;
+> > +     struct resource *mem_res;
+> > +     void __iomem *ide_base;
+> > +     int err;
+> > +
+> > +     err = ep93xx_ide_acquire_gpio(pdev);
+> > +     if (err)
+> > +             return err;
+
+Calling into platform code like this is going to make the transition to
+device tree harder. I would suggest moving the code from patch 2 here,
+and subsequently putting the gpio lines into device tree properties.
+when the driver gets converted.
+
+> > @@ -43,6 +43,7 @@ obj-$(CONFIG_PATA_CS5535)   += pata_cs5535
+> >  obj-$(CONFIG_PATA_CS5536)    += pata_cs5536.o
+> >  obj-$(CONFIG_PATA_CYPRESS)   += pata_cypress.o
+> >  obj-$(CONFIG_PATA_EFAR)              += pata_efar.o
+> > +obj-$(CONFIG_PATA_EP93XX)    += pata_ep93xx.o
+> >  obj-$(CONFIG_PATA_HPT366)    += pata_hpt366.o
+> >  obj-$(CONFIG_PATA_HPT37X)    += pata_hpt37x.o
+> >  obj-$(CONFIG_PATA_HPT3X2N)   += pata_hpt3x2n.o
+> 
+> Overall, this looks pretty good. I'll try to examine it more closely later.
+
+I agree. The driver is ok on the whole, my comments are largely nitpicking.
+
+	Arnd
