@@ -1,66 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Apr 2012 17:07:06 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <878vicsxef.fsf@ti.com>
-References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
- <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
- <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
- <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
- <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
-Message-ID: <20120403160706.GP17741@mudshark.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 3 Apr 2012 09:19:23 -0700
+Subject: [PATCH] serial: PL011: move interrupt clearing
+In-Reply-To: <CAP=VYLrbZNxYWT-TQt6SzXc3OpYnFVgiQqW-2pM+9V=z4LREow@mail.gmail.com>
+References: <1332357318-8017-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6u+KeYzWwiJ7MK7pWG444Y99CQ1LLCZP4m3R=zdYFR_pg@mail.gmail.com>
+ <20120329213333.GA15231@kroah.com>
+ <CAP=VYLrbZNxYWT-TQt6SzXc3OpYnFVgiQqW-2pM+9V=z4LREow@mail.gmail.com>
+Message-ID: <20120403161923.GB4894@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2012 at 03:27:52PM +0100, Kevin Hilman wrote:
-> Hi Will,
-
-Hi Kevin,
-
-> Will Deacon <will.deacon@arm.com> writes:
-> > The problem is, trying to boot this on my pandaboard results in a hang (see
-> > dmesg below). Even worse, the problem isn't easily bisectable since rebuilding
-> > a working image can give you something that no longer boots and I haven't found
-> > a reliable way to cause the lockup.
+On Tue, Apr 03, 2012 at 11:36:23AM -0400, Paul Gortmaker wrote:
+> On Thu, Mar 29, 2012 at 5:33 PM, Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org> wrote:
+> > On Thu, Mar 29, 2012 at 02:49:37PM -0600, Grant Likely wrote:
+> >> On Wed, Mar 21, 2012 at 1:15 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >> > Commit 360f748b204275229f8398cb2f9f53955db1503b
+> >> > "serial: PL011: clear pending interrupts"
+> >> > attempts to clear interrupts by writing to a
+> >> > yet-unassigned memory address. This fixes the issue.
+> >> >
+> >> > The breaking patch is marked for stable so should be
+> >> > carried along with the other patch.
+> >> >
+> >> > Cc: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+> >> > Cc: Russell King <linux@arm.linux.org.uk>
+> >> > Cc: stable <stable@vger.kernel.org>
+> >> > Reported-by: Viresh Kumar <viresh.kumar@st.com>
+> >> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> Ugh; the original patch is obviously broken. ?How did it get applied
+> >> without testing?
+> >>
+> >> Greg, can you get this out to Linus ASAP please? ?I have one comment
+> >> below, but I don't think it should block merging this patch.
+> >>
+> >> Tested-by: Grant Likely <grant.likely@secretlab.ca>
 > >
-> > I'll take JTAG for a whirl to see where we are. If anything looks wrong in
-> > my dmesg, please shout (there are plenty of things in there that look like
-> > they've gone awry).
+> > Thanks, I'll get it to him after 3.4-rc1 is out, in a few days, along
+> > with other tty fixes being queued up.
 > 
-> Not sure why it hangs for you, but it worked for me both with your
-> branch on v3.3 and merging with v3.4-rc1[1]
-
-Thanks for testing that. It turns out that updating my x-loader (it was
-pretty ancient) fixed the boot hang, though I'm not sure I want to know why!
-
-> # perf stat sleep 1
+> Hi Greg,
 > 
->  Performance counter stats for 'sleep 1':
+> Just wanted to check this didn't fall through the cracks, as I don't
+> see it in your tty-next or tty-linus branches.
 > 
->           9.582520 task-clock                #    0.009 CPUs utilized          
->                  1 context-switches          #    0.104 K/sec                  
->                  0 CPU-migrations            #    0.000 K/sec                  
->                147 page-faults               #    0.015 M/sec                  
->            5096283 cycles                    #    0.532 GHz                    
->             607876 stalled-cycles-frontend   #   11.93% frontend cycles idle   
->            3285045 stalled-cycles-backend    #   64.46% backend  cycles idle   
->            2722485 instructions              #    0.53  insns per cycle        
->                                              #    1.21  stalled cycles per insn
->             259247 branches                  #   27.054 M/sec                  
->              84274 branch-misses             #   32.51% of all branches        
+> The original bad commit causes Silent Boot Death on qemu ARM
+> versatile, which is kind of nasty.  It pretty much forces a bisection,
+> which I did, which then led me here.
 
-Right. Can you confirm whether the PMU/CTI interrupts fire for you please?
-Just run perf top and look at /proc/interrupts while it's running. You
-should see a couple of arm-pmu entries in there and hopefully numbers > 0.
+It's still in my "to-apply" queue, don't worry, it's not lost.
 
-For me, my earlier mis-diagnosis has turned out to be true and I can only
-see PMU interrupts if I apply the SWSUSP patch, which Santosh says will
-break pm.
-
-Cheers,
-
-Will
+greg k-h
