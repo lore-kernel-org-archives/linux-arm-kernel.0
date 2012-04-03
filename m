@@ -1,51 +1,41 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 2 Apr 2012 21:01:40 -0400
-Subject: [PATCH] ARM: versatile: fix build failure in pci.c
-In-Reply-To: <CAOMZO5CUktQ78dbpqpepLvQXme7OcaxXnCcDsxZ+JahOjjEt=Q@mail.gmail.com>
-References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
- <CAOMZO5CUktQ78dbpqpepLvQXme7OcaxXnCcDsxZ+JahOjjEt=Q@mail.gmail.com>
-Message-ID: <CAP=VYLpim2TCMO5nDVNe0bdm9ZQ+czUWNpxxWugDzrHO6aYVAQ@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 03 Apr 2012 11:50:57 +1000
+Subject: [PATCH 1/3] PATA host controller driver for ep93xx
+In-Reply-To: <4F795AD1.4070101@metasoft.pl>
+References: <4F7418E7.4060500@metasoft.pl> <4F741AB1.4000107@metasoft.pl>
+ <201203302018.43681.arnd@arndb.de> <4F795AD1.4070101@metasoft.pl>
+Message-ID: <4F7A5781.3000507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 2, 2012 at 8:03 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Paul.
->
-> On Mon, Apr 2, 2012 at 8:48 PM, Paul Gortmaker
-> <paul.gortmaker@windriver.com> wrote:
->> commit 9f786d033d025ab7d2c4d1b959aa81d935eb9e19
->>
->> ? ?"arm/PCI: get rid of device resource fixups"
->>
->> causes this failure on the versatile:
->>
->> arch/arm/mach-versatile/pci.c: In function 'pci_versatile_setup_resources':
->> arch/arm/mach-versatile/pci.c:221: error: 'sys' undeclared (first use in this function)
->>
->> because the versatile wasn't passing in the full struct pci_sys_data
->> but only the resource sub-field. ?Change it to pass in the full
->> struct so that sys will be in scope.
->>
->> Reported-by: Bruce Ashfield <bruce.ashfield@windriver.com>
->> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
->
-> I have also sent a similar patch:
-> http://marc.info/?l=linux-arm-kernel&m=133107329108262&w=2
+On 02/04/12 17:52, Rafal Prylowski wrote:
 
-I see.  Well, there weren't any follow ups to it but I would say that
-passing both sys->resources and sys both side-by-side at the same
-time doesn't really make sense.  I think just passing in sys by itself
-as I did is a cleaner way to go, wouldn't you agree?
+> On 2012-03-30 22:18, Arnd Bergmann wrote:
+>>> +static u16 ep93xx_pata_read(struct ep93xx_pata_data *drv_data,
+>>> +			    void *addr_io,
+>>> +			    const struct ata_timing *t)
+>>> +{
+>>> +	unsigned long addr = (unsigned long) addr_io & 0x1f;
+>>> +	void __iomem *base = drv_data->ide_base;
+>>> +	u16 ret;
+>>> +
+>>> +	writel(IDECtrl_DIOWn | IDECtrl_DIORn | addr, base + IDECtrl);
+>>> +	ndelay(t->setup);
+>>> +	writel(IDECtrl_DIOWn | addr, base + IDECtrl);
+>>
+>> The pointer arithmetic that you do here on addr_io looks really evil.
+>> Basically your registers are indirect and cannot be accessed through
+>> pointer dereference. Maybe you should not be trying to do that then
+>> and not use the ata_port->ioaddr structure.
+> 
+> Yes, I already prepared a version of the driver in which IDE register
+> addresses are coded as enums instead of using ata_port->ioaddr structure. 
+> I will post updated version, when I get feedback from Ryan if enums
+> or defines are preferred.
 
-Thanks,
-Paul.
+I would prefer defines, simply because it looks odd having an enum which
+has multiple names defined to the same value, and most drivers tend to
+use defines rather than enums for registers. It's not a big deal though,
+and certainly not a show stopper.
 
->
-> Regards,
->
-> Fabio Estevam
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+~Ryan
