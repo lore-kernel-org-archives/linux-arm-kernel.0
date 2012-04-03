@@ -1,40 +1,41 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 03 Apr 2012 10:32:16 +0200
-Subject: GPIO range check in drivers/of/gpio.c
-Message-ID: <4F7AB590.2090505@antcom.de>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Tue,  3 Apr 2012 17:47:15 +0900
+Subject: [PATCH 3/4] arm: davinci: use for_each_set_bit_from
+In-Reply-To: <1333442836-9947-1-git-send-email-akinobu.mita@gmail.com>
+References: <1333442836-9947-1-git-send-email-akinobu.mita@gmail.com>
+Message-ID: <1333442836-9947-3-git-send-email-akinobu.mita@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use for_each_set_bit_from to iterate over all the set bit in a memory
+region.
 
-I'm wondering about a range check in drivers/of/gpio.c:144:
+Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-davinci/dma.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-> int of_gpio_simple_xlate(struct gpio_chip *gc,
->			 const struct of_phandle_args *gpiospec, u32 *flags)
-> {
->	/*
->	 * We're discouraging gpio_cells < 2, since that way you'll have to
->	 * write your own xlate function (that will have to retrive the GPIO
->	 * number and the flags from a single gpio cell -- this is possible,
->	 * but not recommended).
->	 */
->	if (gc->of_gpio_n_cells < 2) {
->		WARN_ON(1);
->		return -EINVAL;
->	}
->
->	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
->		return -EINVAL;
->
->	if (gpiospec->args[0] > gc->ngpio)
->		return -EINVAL;
-
-Shouldn't this be rather:
-
-	if (gpiospec->args[0] >= gc->ngpio)
-
-?
-
-Thanks in advance,
-
-Roland
+diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+index fd33919..2a41339 100644
+--- a/arch/arm/mach-davinci/dma.c
++++ b/arch/arm/mach-davinci/dma.c
+@@ -557,9 +557,9 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+ 	if (i == edma_cc[ctlr]->num_slots)
+ 		stop_slot = i;
+ 
+-	for (j = start_slot; j < stop_slot; j++)
+-		if (test_bit(j, tmp_inuse))
+-			clear_bit(j, edma_cc[ctlr]->edma_inuse);
++	j = start_slot;
++	for_each_set_bit_from(j, tmp_inuse, stop_slot);
++		clear_bit(j, edma_cc[ctlr]->edma_inuse);
+ 
+ 	if (count)
+ 		return -EBUSY;
+-- 
+1.7.4.4
