@@ -1,7 +1,7 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Apr 2012 10:44:10 +0100
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 3 Apr 2012 15:17:03 +0530
 Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMQu2gw14=hrOqudWf9GU8tpvjSLj-XjiWDzPaXMBD_x48-BZA@mail.gmail.com>
+In-Reply-To: <20120403094410.GG17741@mudshark.cambridge.arm.com>
 References: <1328578047.1724.17.camel@dave-Dell-System-XPS-L502X>
  <CAMQu2gwfo5JXAqQaLUNs7C7J3TUhEO2zOcyD0Rk-D_O61Yrfag@mail.gmail.com>
  <CAMsRxfLNBbQO5XF+EHJqNsnW+s=ay3mjSV5dh=sxdwzktUu03g@mail.gmail.com>
@@ -10,26 +10,30 @@ References: <1328578047.1724.17.camel@dave-Dell-System-XPS-L502X>
  <CAMQu2gwWt6oQPjxc1YHgOoxVkHdck_q78Xf==7ncwRj0_uS-JQ@mail.gmail.com>
  <1329508513.1858.15.camel@dave-Dell-System-XPS-L502X>
  <CAMQu2gw14=hrOqudWf9GU8tpvjSLj-XjiWDzPaXMBD_x48-BZA@mail.gmail.com>
-Message-ID: <20120403094410.GG17741@mudshark.cambridge.arm.com>
+ <20120403094410.GG17741@mudshark.cambridge.arm.com>
+Message-ID: <CAMQu2gyq2yj8jEiOdEpFb7BzS8AmO8mMH9OifNtwbbH987sqbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Tue, Apr 3, 2012 at 3:14 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Santosh,
+>
+> On Sat, Feb 18, 2012 at 04:31:45AM +0000, Shilimkar, Santosh wrote:
+>> On Sat, Feb 18, 2012 at 1:25 AM, David Long <dave.long@linaro.org> wrote:
+>> > Have you determined yet whether or not the l4_wkup change we tested for you
+>> > (and found to improve the 32k timer reliability), is something that should
+>> > be made permanent?
+>> >
+>> The issue is confirmed with synctime idle. I am just waiting on for the
+>> right work around confirmation from hardware team. As soon as
+>> I have that, will post a patch.
+>
+> Any update on this? I'm keen to collect all the patches required for the
+> OMAP4 PMU to work as they're currently scattered all over the place. Can I
+> have your signed-off-by for the patch referred to above as well please?
+>
+This patch is already in Kevin's queue now. [1]
 
-On Sat, Feb 18, 2012 at 04:31:45AM +0000, Shilimkar, Santosh wrote:
-> On Sat, Feb 18, 2012 at 1:25 AM, David Long <dave.long@linaro.org> wrote:
-> > Have you determined yet whether or not the l4_wkup change we tested for you
-> > (and found to improve the 32k timer reliability), is something that should
-> > be made permanent?
-> >
-> The issue is confirmed with synctime idle. I am just waiting on for the
-> right work around confirmation from hardware team. As soon as
-> I have that, will post a patch.
-
-Any update on this? I'm keen to collect all the patches required for the
-OMAP4 PMU to work as they're currently scattered all over the place. Can I
-have your signed-off-by for the patch referred to above as well please?
-
-Thanks,
-
-Will
+regards
+Santosh
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/089679.html
