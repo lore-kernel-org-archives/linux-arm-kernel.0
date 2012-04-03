@@ -1,42 +1,43 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue,  3 Apr 2012 09:32:54 +0200
-Subject: [PATCH v2 10/13] ARM: at91/NAND DT bindings: add comments
+Date: Tue,  3 Apr 2012 09:32:46 +0200
+Subject: [PATCH v2 02/13] USB: ohci-at91: fix vbus_pin_active_low handling
 In-Reply-To: <cover.1333437885.git.nicolas.ferre@atmel.com>
 References: <cover.1333437885.git.nicolas.ferre@atmel.com>
-Message-ID: <f7a94438cf1e21b2eec044419d9dca214999a9a6.1333437885.git.nicolas.ferre@atmel.com>
+Message-ID: <9dbb6af7686b5604dec5eebbc54b39be895b1e74.1333437885.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add comments to NAND "gpios" property to make it clearer.
+The information is not properly taken into account
+for {get|set}_power() functions.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: stable <stable@vger.kernel.org>		[3.2+]
 ---
- .../devicetree/bindings/mtd/atmel-nand.txt         |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/usb/host/ohci-at91.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-index 5903ecf..a200695 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-@@ -27,13 +27,13 @@ nand0: nand at 40000000,0 {
- 	reg = <0x40000000 0x10000000
- 	       0xffffe800 0x200
- 	      >;
--	atmel,nand-addr-offset = <21>;
--	atmel,nand-cmd-offset = <22>;
-+	atmel,nand-addr-offset = <21>;	/* ale */
-+	atmel,nand-cmd-offset = <22>;	/* cle */
- 	nand-on-flash-bbt;
- 	nand-ecc-mode = "soft";
--	gpios = <&pioC 13 0
--		 &pioC 14 0
--		 0
-+	gpios = <&pioC 13 0	/* rdy */
-+		 &pioC 14 0 	/* nce */
-+		 0		/* cd */
- 		>;
- 	partition at 0 {
- 		...
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index db8963f..4d266ae 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -247,7 +247,7 @@ static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int
+ 		return;
+ 
+ 	gpio_set_value(pdata->vbus_pin[port],
+-		       !pdata->vbus_pin_active_low[port] ^ enable);
++		       pdata->vbus_pin_active_low[port] ^ enable);
+ }
+ 
+ static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
+@@ -259,7 +259,7 @@ static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
+ 		return -EINVAL;
+ 
+ 	return gpio_get_value(pdata->vbus_pin[port]) ^
+-		!pdata->vbus_pin_active_low[port];
++		pdata->vbus_pin_active_low[port];
+ }
+ 
+ /*
 -- 
 1.7.9.4
