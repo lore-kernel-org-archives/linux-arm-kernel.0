@@ -1,47 +1,53 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 3 Apr 2012 10:44:39 -0600
-Subject: [PATCH] ARM: versatile: fix build failure in pci.c
-In-Reply-To: <201204031426.22652.arnd@arndb.de>
-References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
- <201204030819.48798.arnd@arndb.de> <4F7AFF61.3070803@windriver.com>
- <201204031426.22652.arnd@arndb.de>
-Message-ID: <CAErSpo5RiDgfXHB30rOTco6CjhH4Nzovhvddifk9i=tb4QKtNQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Apr 2012 18:08:12 +0100
+Subject: [BUG?] vic MULTI_IRQ_HANDLER (was [PATCH] ep93xx: Implement
+ double buffering for M2M DMA channels)
+In-Reply-To: <20120402214614.GK24211@n2100.arm.linux.org.uk>
+References: <ADE657CA350FB648AAC2C43247A983F0020698409ABF@AUSP01VMBX24.collaborationhost.net>
+ <CACb=_tQ4pSXtmKnqM23p97iyRbnrdZicw6ao68t2KjL46srAuQ@mail.gmail.com>
+ <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
+ <20120402214614.GK24211@n2100.arm.linux.org.uk>
+Message-ID: <20120403170812.GR17741@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 3, 2012 at 8:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 03 April 2012, Paul Gortmaker wrote:
->> I'm not sure I'm following you here. I'm not feeding the
->> struct pci_sys_data to pci_add_resource_offset. ?Instead it
->> is getting subfields of it, consistent with the rest of the
->> original commit from Bjorn.
->
-> Sorry, my fault, I thought the suggestion was to pass sys into
-> pci_add_resource_offset.
->
-> However, I would still prefer just reverting the versatile
-> part of Bjorn's patch because versatile uses a zero offset.
-> I think we should only pass the offset in cases where it's
-> actually required because there are multiple buses or they
-> have interesting mappings to the physical address space.
+On Mon, Apr 02, 2012 at 10:46:14PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Apr 02, 2012 at 11:00:34PM +0300, Mika Westerberg wrote:
+> > Anyway it looks like handle_IRQ() enables interrupts when it is finished with
+> > the current interrupt which then causes hw to interrupt second time resulting
+> > failure in case of ep93xx.
+> 
+> Soft IRQ processing in the irq exit path will enable interrupts, and
+> this is probably where the problem is showing up.
+> 
+> You've identified an important difference between the level 1 interrupt
+> controller handlers and the chained handlers, and I suggest that folk
+> re-implement their level 1 interrupt handlers in the same way as the
+> assembly code was: re-read the interrupt register each time round the
+> loop.
 
-I used pci_add_resource_offset() on *all* arm platforms because the
-offsets are defined in struct pci_sys_data, which is not specific to
-any platform type, and I thought it was easier and more future-proof
-to pay attention to those offsets.
+I'm also seeing this on the Versatile AB, with spurious interrupts reported
+from eth0.
 
-I was also thinking that the actual pci_add_resource_offset() calls
-and the request_resource() or allocate_resource() calls usually found
-near them in the arm .setup() functions are really not
-platform-specific, so it might make sense to float them up into
-something like pcibios_init_hw() someday.
+As you suggested, re-reading the VIC status solves the problem:
 
-But if you prefer to use the offset only for platforms that actually
-assign non-zero values to the pci_sys_data offsets, that's fine with
-me.
 
-Since this only affects arm, do you want to handle the fix entirely in
-the arm tree?  If you want me to push something through PCI, I can do
-that, too.  Sorry for the breakage.
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index dcb004a..cb6b49a 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -441,11 +441,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+        u32 stat, irq;
+        int handled = 0;
+ 
+-       stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+-       while (stat) {
++       while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
+                irq = ffs(stat) - 1;
+                handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+-               stat &= ~(1 << irq);
+                handled = 1;
+        }
 
-Bjorn
+
+Will
