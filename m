@@ -1,58 +1,47 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Tue, 03 Apr 2012 22:02:12 +0530
-Subject: [PATCHv5 17/18] I2C: OMAP: Do not set the XUDF if the underflow
- is not reached
-In-Reply-To: <CAEgRx2ye7VLfTDmpLdsJE=6qKzDngd=zpGK3Xn8UR3moioXYQw@mail.gmail.com>
-References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>	<1333468957-5999-18-git-send-email-shubhrajyoti@ti.com>
- <CAEgRx2ye7VLfTDmpLdsJE=6qKzDngd=zpGK3Xn8UR3moioXYQw@mail.gmail.com>
-Message-ID: <4F7B260C.8070806@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 3 Apr 2012 10:44:39 -0600
+Subject: [PATCH] ARM: versatile: fix build failure in pci.c
+In-Reply-To: <201204031426.22652.arnd@arndb.de>
+References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
+ <201204030819.48798.arnd@arndb.de> <4F7AFF61.3070803@windriver.com>
+ <201204031426.22652.arnd@arndb.de>
+Message-ID: <CAErSpo5RiDgfXHB30rOTco6CjhH4Nzovhvddifk9i=tb4QKtNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Moiz,
-Thanks for your review.
+On Tue, Apr 3, 2012 at 8:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 03 April 2012, Paul Gortmaker wrote:
+>> I'm not sure I'm following you here. I'm not feeding the
+>> struct pci_sys_data to pci_add_resource_offset. ?Instead it
+>> is getting subfields of it, consistent with the rest of the
+>> original commit from Bjorn.
+>
+> Sorry, my fault, I thought the suggestion was to pass sys into
+> pci_add_resource_offset.
+>
+> However, I would still prefer just reverting the versatile
+> part of Bjorn's patch because versatile uses a zero offset.
+> I think we should only pass the offset in cases where it's
+> actually required because there are multiple buses or they
+> have interesting mappings to the physical address space.
 
-On Tuesday 03 April 2012 09:41 PM, Sonasath, Moiz wrote:
-> Shubhrajyoti,
->
-> On Tue, Apr 3, 2012 at 11:02 AM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
->
->> Currently in the 1.153 errata handling while waiting for transmitter
->> underflow if NACK is got the XUDF flag is also set.
->> The flag is set after wait for the condition is over.
->>
->> Cc: Alexander Shishkin <virtuoso@slind.org>
->> Cc: Moiz Sonasath <m-sonasath@ti.com>
->> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->> ---
->>  drivers/i2c/busses/i2c-omap.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->> index 51576d6..a3160d1 100644
->> --- a/drivers/i2c/busses/i2c-omap.c
->> +++ b/drivers/i2c/busses/i2c-omap.c
->> @@ -763,7 +763,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev
->> *dev, u16 *stat, int *err)
->>                if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
->>                        omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
->>                                                        OMAP_I2C_STAT_XDR));
->> -                       *err |= OMAP_I2C_STAT_XUDF;
->>
-> I think we should set the NACK|AL err flag here instead??
-On return of negative values there is a goto and  those flags are set there.
-Did I miss something?
+I used pci_add_resource_offset() on *all* arm platforms because the
+offsets are defined in struct pci_sys_data, which is not specific to
+any platform type, and I thought it was easier and more future-proof
+to pay attention to those offsets.
 
->
->>                        return -ETIMEDOUT;
->>                }
->>
->> @@ -776,6 +775,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev
->> *dev, u16 *stat, int *err)
->>                return 0;
->>        }
->>
->> +       *err |= OMAP_I2C_STAT_XUDF;
->>
-> Ack for this change.
-Thanks.
+I was also thinking that the actual pci_add_resource_offset() calls
+and the request_resource() or allocate_resource() calls usually found
+near them in the arm .setup() functions are really not
+platform-specific, so it might make sense to float them up into
+something like pcibios_init_hw() someday.
+
+But if you prefer to use the offset only for platforms that actually
+assign non-zero values to the pci_sys_data offsets, that's fine with
+me.
+
+Since this only affects arm, do you want to handle the fix entirely in
+the arm tree?  If you want me to push something through PCI, I can do
+that, too.  Sorry for the breakage.
+
+Bjorn
