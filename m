@@ -1,66 +1,57 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 3 Apr 2012 11:20:30 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <87sjgmt211.fsf@ti.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
-Message-ID: <CAMQu2gxYMdbdtbKUg+oyKDNOMCEWneL1FvW0TvNgDRt7gbk0cA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 3 Apr 2012 09:02:25 +0200
+Subject: [GIT PULL] i.MX fixes for rc2
+Message-ID: <20120403070225.GG3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 3, 2012 at 12:05 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
->
-> [...]
->
->> I don't personally like to add features which hardly anybody use and
->> fundamentally broken with full kernel.
->
-> Let's keep sane defaults, but not make it unreasonable to tweak eaither.
->
-Exactly. Thanks for echoing the concern.
+Hi Arnd, Olof,
 
-> I suggest what has already been mentioned.
->
-> Register both timers, but have the sync timer have a higher rating. ?On
-> AMxxx where there is no sync timer, GPtimer will be used.
->
-Technically it's a hack just from clock precision point of view but I don't mind
-this.
+Please pull the following i.MX fixes for -rc2
 
-> For those who want to use GPtimer, they can boot using clocksource= to
-> override the default.
->
-Sounds good to me.
+Sascha
 
-> Santosh is right, GPtimer will not work on a PM enabled kernel, but
-> there are lots of ways to use the cmdline to get a non-working kernel,
-> so that's OK by me.
->
-> Let's just ensure that the boot-defaults are sane.
->
-Absolutely.
+The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
 
-Regards
-Santosh
+  Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.4-rc1-imx-fixes
+
+for you to fetch changes up to 7a4302a6a123e09b26fd7eae387e88e2d4dbc8c4:
+
+  ARM: armadillo5x0: Fix smsc911x driver probe (2012-04-02 16:31:22 +0200)
+
+----------------------------------------------------------------
+Linux-3.4-rc1 i.MX fixes
+
+----------------------------------------------------------------
+Fabio Estevam (8):
+      ARM: mach-mx35_3ds: Fix build warning due to the lack of 'const' annotation
+      ARM: 3ds_debugboard: Fix smsc911x driver probe
+      ARM: mx35: Fix registration of camera clock
+      ARM: mx53ard: Fix smsc911x driver probe
+      ARM: mx31lite: Fix smsc911x driver probe
+      ARM: mx31lilly: Fix smsc911x driver probe
+      ARM: kzm_arm11_01: Fix smsc911x driver probe
+      ARM: armadillo5x0: Fix smsc911x driver probe
+
+Javier Martin (1):
+      MX2: Fix mx2_camera clock regression.
+
+ arch/arm/mach-imx/clock-imx27.c       |    1 +
+ arch/arm/mach-imx/clock-imx35.c       |    2 +-
+ arch/arm/mach-imx/mach-armadillo5x0.c |    9 +++++++++
+ arch/arm/mach-imx/mach-kzm_arm11_01.c |    9 +++++++++
+ arch/arm/mach-imx/mach-mx31lilly.c    |    9 +++++++++
+ arch/arm/mach-imx/mach-mx31lite.c     |    9 +++++++++
+ arch/arm/mach-imx/mach-mx35_3ds.c     |    2 +-
+ arch/arm/mach-imx/mach-mx53_ard.c     |    8 ++++++++
+ arch/arm/plat-mxc/3ds_debugboard.c    |    2 +-
+ 9 files changed, 48 insertions(+), 3 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
