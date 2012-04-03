@@ -1,36 +1,52 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue,  3 Apr 2012 23:19:04 +0530
-Subject: [PATCH] ARM: jump_label: fixup for rename to static_key
-Message-ID: <1333475344-18936-1-git-send-email-rabin@rab.in>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 3 Apr 2012 19:55:11 +0200
+Subject: [PATCH v5 09/16] pwm: tegra: Add device tree support
+In-Reply-To: <4F79C8D4.2000306@wwwdotorg.org>
+References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+ <1332945238-14897-10-git-send-email-thierry.reding@avionic-design.de>
+ <4F7602CD.2010808@wwwdotorg.org>
+ <20120402083749.GA6576@avionic-0098.adnet.avionic-design.de>
+ <4F79C8D4.2000306@wwwdotorg.org>
+Message-ID: <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-c5905afb0 ("static keys: Introduce 'struct static_key'...") renamed
-struct jump_label_key to struct static_key.  Fixup ARM for this to
-eliminate these build warnings:
+* Stephen Warren wrote:
+> On 04/02/2012 02:37 AM, Thierry Reding wrote:
+> > * Stephen Warren wrote:
+> >> On 03/28/2012 08:33 AM, Thierry Reding wrote:
+> >>> Add auxdata to instantiate the PWFM controller from a device tree,
+> >>> include the corresponding nodes in the dtsi files for Tegra 20 and
+> >>> Tegra 30 and add binding documentation.
+> >>>
+> >>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> >>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> >>
+> >>> diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
+> >> ...
+> >>> +#ifdef CONFIG_OF
+> >>> +static struct of_device_id tegra_pwm_of_match[] = {
+> >>> +	{ .compatible = "nvidia,tegra20-pwm" },
+> >>> +	{ .compatible = "nvidia,tegra30-pwm" },
+> >>
+> >> Could you swap those two lines, so that tegra30-pwm matches first. It
+> >> makes no difference at present, but might in the future if the driver
+> >> actually has to differentiate the two SoCs.
+> > 
+> > I thought the matching order was determined by the compatible property in the
+> > device tree, not the OF match table of the driver.
+> 
+> At least logically, yes. However, of_match_device() appears to iterate
+> over each match table entry, checking whether it matches any string in
+> the compatible flag. Perhaps this could be considered a bug?
 
-  include/linux/jump_label.h:113:2:
-  warning: passing argument 1 of 'arch_static_branch' from incompatible pointer type
-  include/asm/jump_label.h:17:82:
-  note: expected 'struct jump_label_key *' but argument is of type 'struct static_key *'
+It certainly is counter-intuitive. Maybe Grant or Rob can comment?
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/include/asm/jump_label.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
-index 5c5ca2e..bfc198c 100644
---- a/arch/arm/include/asm/jump_label.h
-+++ b/arch/arm/include/asm/jump_label.h
-@@ -14,7 +14,7 @@
- #define JUMP_LABEL_NOP	"nop"
- #endif
- 
--static __always_inline bool arch_static_branch(struct jump_label_key *key)
-+static __always_inline bool arch_static_branch(struct static_key *key)
- {
- 	asm goto("1:\n\t"
- 		 JUMP_LABEL_NOP "\n\t"
--- 
-1.7.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120403/ecd4b896/attachment.sig>
