@@ -1,60 +1,36 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Tue, 03 Apr 2012 16:48:05 +0200
-Subject: [PATCH v2 3/3] ep93xx: Add IDE support to edb93xx boards
-In-Reply-To: <4F7B0C54.8010804@metasoft.pl>
-References: <4F7B0C54.8010804@metasoft.pl>
-Message-ID: <4F7B0DA5.6080703@metasoft.pl>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 03 Apr 2012 17:04:20 +0200
+Subject: [PATCH v2 06/13] USB: ohci-at91: change maximum number of ports
+In-Reply-To: <Pine.LNX.4.44L0.1204030954590.1537-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1204030954590.1537-100000@iolanthe.rowland.org>
+Message-ID: <4F7B1174.5070300@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/03/2012 04:11 PM, Alan Stern :
+> On Tue, 3 Apr 2012, Nicolas Ferre wrote:
+> 
+>> Change number of ports to 3 for newer SoCs. Modify pdata structure
+>> and ohci-at91 code that was dealing with ports information and check
+>> of port indexes.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> 
+> Did you run this patch through scripts/checkpatch.pl?  I have the 
+> feeling that it might complain about some of the changes.
 
-Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
-Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
+Yes, definitively.
 
----
- arch/arm/mach-ep93xx/edb93xx.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+I can modify the patch to comply with error issued by checkpatch.pl: several are
+due to a bad replacement of previous code with my regular expression but others
+where existing before my modifications.
+So what do you think about:
+ - addressing all style errors in this patch (to prevent carrying them)
+ - merging this one and the following patch:
+   "[PATCH v2 07/13] USB: ohci-at91: coding style modifications with one-line ifs
+ - posting a v3 of this patch only if you agree on this...
 
-Index: linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-===================================================================
---- linux-2.6.orig/arch/arm/mach-ep93xx/edb93xx.c
-+++ linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-@@ -233,6 +233,29 @@ static void __init edb93xx_register_fb(v
- }
- 
- 
-+/*************************************************************************
-+ * EDB93xx IDE
-+ *************************************************************************/
-+static int __init edb93xx_has_ide(void)
-+{
-+	/*
-+	 * Although EDB9312 and EDB9315 do have IDE capability, they have
-+	 * INTRQ line wired as pull-up, which makes using IDE interface
-+	 * problematic.
-+	 */
-+	return machine_is_edb9312() || machine_is_edb9315 ||
-+	       machine_is_edb9315a();
-+}
-+
-+static void __init edb93xx_register_ide(void)
-+{
-+	if (!edb93xx_has_ide())
-+		return;
-+
-+	ep93xx_register_ide();
-+}
-+
-+
- static void __init edb93xx_init_machine(void)
- {
- 	ep93xx_init_devices();
-@@ -243,6 +266,7 @@ static void __init edb93xx_init_machine(
- 	edb93xx_register_i2s();
- 	edb93xx_register_pwm();
- 	edb93xx_register_fb();
-+	edb93xx_register_ide();
- }
- 
- 
+Best regards,
+-- 
+Nicolas Ferre
