@@ -1,58 +1,46 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Apr 2012 17:08:19 +0530
-Subject: [PATCHv4 10/18] I2C: OMAP: Don't check if
- wait_for_completion_timeout() returns less than zero
+Date: Tue, 3 Apr 2012 17:08:14 +0530
+Subject: [PATCHv4 05/18] OMAP: I2C: Fix the interrupt clearing in OMAP4
 In-Reply-To: <1333453107-7697-1-git-send-email-shubhrajyoti@ti.com>
 References: <1333453107-7697-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1333453107-7697-11-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1333453107-7697-6-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By definition, wait_for_completion_timeout() returns an unsigned value and
-therefore, it is not necessary to check if the return value is less than zero
-as this is not possible.
+On OMAP4 we were writing 1 to IRQENABLE_CLR which cleared only
+the arbitration lost interrupt. The patch intends to fix the same by writing 0
+to the IE register clearing all interrupts.
 
-This is based on a patch from Jon Hunter <jon-hunter@ti.com>
-Changes from his patch
-- Declare a long as the wait_for_completion_timeout returns long.
+This is based on the work done by Vikram Pandita <vikram.pandita@ti.com>.
 
-Original patch is
-http://git.omapzoom.org/?p=kernel/omap.git;a=commitdiff;h=ea02cece7b0000bc736e60c4188a11aaa74bc6e6
+The  changes from the original patch ...
+-  Does not use the IRQENABLE_CLR register to clear as it is not mentioned
+  to be legacy register IRQENABLE_CLR helps in  atomically
+  setting/clearing specific interrupts, instead use the OMAP_I2C_IE_REG as we are
+  clearing all interrupts.
 
-Cc : Jon Hunter <jon-hunter@ti.com>
+Cc: Vikram Pandita <vikram.pandita@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   10 ++++------
- 1 files changed, 4 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 959e97c..121c52e 100644
+index 45389db..2769f67 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -502,7 +502,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 			     struct i2c_msg *msg, int stop)
- {
- 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
--	int r;
-+	unsigned long timeout;
- 	u16 w;
+@@ -1179,10 +1179,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 		_dev->dev_lost_count = _dev->get_context_loss_count(dev);
  
- 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
-@@ -570,12 +570,10 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	 * REVISIT: We should abort the transfer on signals, but the bus goes
- 	 * into arbitration and we're currently unable to recover from it.
- 	 */
--	r = wait_for_completion_timeout(&dev->cmd_complete,
--					OMAP_I2C_TIMEOUT);
-+	timeout = wait_for_completion_timeout(&dev->cmd_complete,
-+						OMAP_I2C_TIMEOUT);
- 	dev->buf_len = 0;
--	if (r < 0)
--		return r;
--	if (r == 0) {
-+	if (timeout == 0) {
- 		dev_err(dev->dev, "controller timed out\n");
- 		omap_i2c_reset(dev);
- 		omap_i2c_init(dev);
+ 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+-	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
+-		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
+-	else
+-		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
++
++	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+ 
+ 	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
+ 		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
 -- 
 1.7.1
