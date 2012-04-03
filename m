@@ -1,29 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Apr 2012 08:19:48 +0000
-Subject: [PATCH] ARM: versatile: fix build failure in pci.c
-In-Reply-To: <CAOMZO5A-+tcz6ewTykXL33opRVP9U4o7Ltdkbr7LLqWMBQczSQ@mail.gmail.com>
-References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
- <CAP=VYLpim2TCMO5nDVNe0bdm9ZQ+czUWNpxxWugDzrHO6aYVAQ@mail.gmail.com>
- <CAOMZO5A-+tcz6ewTykXL33opRVP9U4o7Ltdkbr7LLqWMBQczSQ@mail.gmail.com>
-Message-ID: <201204030819.48798.arnd@arndb.de>
+Date: Tue, 3 Apr 2012 07:41:15 +0000
+Subject: [PATCH 1/3] PATA host controller driver for ep93xx
+In-Reply-To: <4F7A5781.3000507@gmail.com>
+References: <4F7418E7.4060500@metasoft.pl> <4F795AD1.4070101@metasoft.pl>
+ <4F7A5781.3000507@gmail.com>
+Message-ID: <201204030741.16596.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 April 2012, Fabio Estevam wrote:
-> On Mon, Apr 2, 2012 at 10:01 PM, Paul Gortmaker
-> <paul.gortmaker@windriver.com> wrote:
+On Tuesday 03 April 2012, Ryan Mallon wrote:
+> On 02/04/12 17:52, Rafal Prylowski wrote:
+>
+> > Yes, I already prepared a version of the driver in which IDE register
+> > addresses are coded as enums instead of using ata_port->ioaddr structure. 
+> > I will post updated version, when I get feedback from Ryan if enums
+> > or defines are preferred.
 > 
-> > I see.  Well, there weren't any follow ups to it but I would say that
-> > passing both sys->resources and sys both side-by-side at the same
-> > time doesn't really make sense.  I think just passing in sys by itself
-> > as I did is a cleaner way to go, wouldn't you agree?
-> 
-> Yes, I agree.
+> I would prefer defines, simply because it looks odd having an enum which
+> has multiple names defined to the same value, and most drivers tend to
+> use defines rather than enums for registers. It's not a big deal though,
+> and certainly not a show stopper.
 
-But that doesn't work: struct pci_sys_data is ARM specific, while
-pci_add_resource_offset is common code.
-
-I think it would be much more sensible here to just use pci_add_resource(),
-which is the same as the offsets are all zero for versatile.
+I tend to prefer enums, but I agree that it's a minor issue and I generally
+don't even mention it in reviews.
 
 	Arnd
