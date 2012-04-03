@@ -1,45 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Apr 2012 16:43:39 -0600
-Subject: [PATCH] pinctrl: Add SPEAr pinctrl drivers
-In-Reply-To: <CACRpkdZYccTvHEMa=4=-uoLZYQxEPS+932UPA7MGc+-94eLc6w@mail.gmail.com>
-References: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
- <201204031347.35256.arnd@arndb.de>
- <CACRpkdZYccTvHEMa=4=-uoLZYQxEPS+932UPA7MGc+-94eLc6w@mail.gmail.com>
-Message-ID: <4F7B7D1B.7030507@wwwdotorg.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 03 Apr 2012 09:35:37 -0600
+Subject: [PATCH] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <4F7AC8A8.9020606@arm.com>
+References: <1333384217-13441-1-git-send-email-marc.zyngier@arm.com>
+ <4F7AC138.9020308@citrix.com> <4F7AC8A8.9020606@arm.com>
+Message-ID: <20120403153538.0D1B83E044A@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2012 03:24 PM, Linus Walleij wrote:
-> On Tue, Apr 3, 2012 at 3:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, 03 Apr 2012 10:53:44 +0100, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 03/04/12 10:22, David Vrabel wrote:
 > 
->> The initialization order dependencies can now be handled using
->> the deferred probe mechanism, by returning -EPROBE_DEFER from
->> the probe() function of any driver that is loaded before its
->> pins are available.
+> Hi David,
 > 
-> So how do I as a driver writer do that?
+> > On 02/04/12 17:30, Marc Zyngier wrote:
+> >> The GICv2 can have virtualization extension support, consisting
+> >> of an additional set of registers and interrupts. Add the necessary
+> >> binding to the GIC DT documentation.
+> > 
+> > The Xen hypervisor's device tree support is very much incomplete so I've
+> > not looked into this is much detail.
+> > 
+> > Would it make more sense to extend the existing gic binding with the the
+> > additional information rather than adding a new node?
 > 
-> Example: drivers/tty/serial/sirfsoc_uart.c:
-> 
-> #include <linux/pinctrl/consumer.h>
-> 
-> probe() {
->        if (sirfport->hw_flow_ctrl) {
->                 sirfport->p = pinctrl_get_select_default(&pdev->dev);
->                 ret = IS_ERR(sirfport->p);
->                 if (ret)
->                         goto pin_err;
->         }
-> 
-> pin_err:
->     (...)
->    return ret;
-> 
-> So basically the pinctrl subsystem needs to return -EPROBE_DEFER
-> to the driver in this case, so it can escalate that further.
+> I'm actually torn between the two approaches. On one side, the VGIC is
+> part of the GIC spec, hence should be part of the GIC node. On the other
+> hand, it is logically handled by a different piece of software (the
+> hypervisor), and would normally be probed separately. Having a separate
+> node makes the probing more sensible.
 
-Yes, I believe so.
+Don't get too hung up on the software side of things.  Describe it in
+a way that makes sense for the hardware.  There is lots of precidence
+for two hunks of software initializating from the same node; either by
+probe kicking off two init hooks, or by early init code going looking
+for the node manually.
 
-There should be a couple of comments in pinctrl now (well, perhaps some
-of them aren't there yet until my DT patches are applied!) that indicate
-where -EPROBE_DEFER should be returned.
+g.
