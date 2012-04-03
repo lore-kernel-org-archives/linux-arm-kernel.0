@@ -1,30 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 2 Apr 2012 21:58:25 -0700
-Subject: [PATCH] ARM: versatile: fix build failure in pci.c
-In-Reply-To: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20120403045825.GB21904@quad.lixom.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 02 Apr 2012 22:04:43 -0700
+Subject: [PATCH 0/3] OMAP4: CPUidle: Add coupled idle support
+References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87obr9s8wk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2012 at 07:48:25PM -0400, Paul Gortmaker wrote:
-> commit 9f786d033d025ab7d2c4d1b959aa81d935eb9e19
-> 
->     "arm/PCI: get rid of device resource fixups"
-> 
-> causes this failure on the versatile:
-> 
-> arch/arm/mach-versatile/pci.c: In function 'pci_versatile_setup_resources':
-> arch/arm/mach-versatile/pci.c:221: error: 'sys' undeclared (first use in this function)
-> 
-> because the versatile wasn't passing in the full struct pci_sys_data
-> but only the resource sub-field.  Change it to pass in the full
-> struct so that sys will be in scope.
-> 
-> Reported-by: Bruce Ashfield <bruce.ashfield@windriver.com>
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Hi Santosh,
 
-Thanks, applied to fixes.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+
+> The series adds the coupled cpuidle support for OMAP4 based on the v2
+> series posted [1]. This makes OMAP4 to support SMP cpuidle and also
+> removes the hard dependency of off-lining CPU1 to trigger deeper
+> C-states.
+>
+> I have put together a branch which is based on 3.3 kernel with
+> Len Browns next branch [2] which has time keeping and other cpuidle
+> patches which will mostly get merged by 3.4-rc1 and rebased coupled
+> idle series from [1].
+
+Thanks for rebasing this.
+
+> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+> for_3.5/omap4_coupled_cpuidle-rebase
+
+This branch by itself seems to work fine.  However, when combining with
+other stuff that has merged for v3.4, it hangs during boot.  I haven't
+yet isolated the problem, but it's easy to reproduce by combining your
+branch with v3.4-rc1:
+
+  git checkout -b test/coupled-v3.4 v3.4-rc1
+  git merge -s recursive -X ours santosh/for_3.5/omap4_coupled_cpuidle-rebase [1]
+
+This hangs on boot, and it seems like a coupled state deadlock because
+commenting out the coupled states in the C-state creation of
+cpuidle44xx.c makes it boot just fine.
+
+Kevin
 
 
--Olof
+[1] There were a couple conflicts in your branch with ACPI stuff from
+    v3.4-rc1 (maybe Len updated his branch?), so I just threw them
+    away with a recursive/ours merge.
