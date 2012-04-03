@@ -1,48 +1,28 @@
-From: tdas@codeaurora.org (Taniya Das)
-Date: Tue, 03 Apr 2012 09:34:03 +0530
-Subject: arm_memblock_steal() API usage
-Message-ID: <4F7A76B3.3070405@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 2 Apr 2012 21:55:20 -0700
+Subject: [PATCH] ARM: fix lcd power build failure in collie_defconfig
+In-Reply-To: <1333405037-3053-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1333405037-3053-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20120403045520.GA21904@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi RMK,
-I have a requirement where I need around ~100 bytes of memory to save 
-contents of
-registers to a non-cached area before going into low power mode.
+On Mon, Apr 02, 2012 at 06:17:17PM -0400, Paul Gortmaker wrote:
+> Commit 086ada54abaa4316e8603f02410fe8ebc9ba2de1
+> 
+>   "FB: sa1100: remove global sa1100fb_.*_power function pointers"
+> 
+> got rid of all instances but one in locomolcd.c -- which was
+> conditional on CONFIG_SA1100_COLLIE.  The associated .power
+> field which replaces the global is populated in mach-sa1100/collie.c
+> so move the assignment there, but make it conditional on the
+> locomolcd support, so use CONFIG_BACKLIGHT_LOCOMO in that file.
+> 
+> Cc: arm at kernel.org
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-I did do some analysis on a 1GB RAM device of allocating 8 bytes using 
-the API and the below was the result
-was showing allocating only 8 bytes.
+Thanks, applied to fixes.
 
-API used : -  arm_memblock_steal(SZ_8, SZ_64K);--> physical address 
-returned is 0x3b1f0000
 
-/data/debug/memblock # cat memory
-
-0: 0x00200000..0x3b1effff
-
-1: 0x3b1f0008..0x3b1fffff [0x3b1f0000-0x3b1f0007] only 8 bytes removed.
-
-/data/debug/memblock # cat reserved
-
-0: 0x00204000..0x00c710fb
-
-1: 0x01400000..0x01429b44
-
-2: 0x0ffe0000..0x0ffeffff
-
-3: 0x2d9f3000..0x2d9fffff
-
-4: 0x3b1f0008..0x3b1fffff
-
-But before I can go ahead and use this if you could confirm that it will 
-allocate only the size requested or it
-will carve out minimum 1MB?
-Also is this API advisable for devices with low system RAM?
-
--- 
-Thanks&  Regards,
-Taniya Das.
-
-Consultant for Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
+-Olof
