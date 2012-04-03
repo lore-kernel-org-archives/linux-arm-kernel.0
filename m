@@ -1,27 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Apr 2012 08:30:54 +0100
-Subject: arm_memblock_steal() API usage
-In-Reply-To: <4F7A76B3.3070405@codeaurora.org>
-References: <4F7A76B3.3070405@codeaurora.org>
-Message-ID: <20120403073053.GO24211@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue,  3 Apr 2012 09:32:51 +0200
+Subject: [PATCH v2 07/13] USB: ohci-at91: coding style modifications with
+ one-line ifs
+In-Reply-To: <cover.1333437885.git.nicolas.ferre@atmel.com>
+References: <cover.1333437885.git.nicolas.ferre@atmel.com>
+Message-ID: <2f20710bed6a61b953ce7c898b997bcead12045f.1333437885.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2012 at 09:34:03AM +0530, Taniya Das wrote:
-> I have a requirement where I need around ~100 bytes of memory to save  
-> contents of
-> registers to a non-cached area before going into low power mode.
->
-> I did do some analysis on a 1GB RAM device of allocating 8 bytes using  
-> the API and the below was the result
-> was showing allocating only 8 bytes.
->
-> API used : -  arm_memblock_steal(SZ_8, SZ_64K);--> physical address  
-> returned is 0x3b1f0000
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/usb/host/ohci-at91.c |   12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-It's silly to use this for the above purpose.  Why not just use kmalloc
-and cache flushing to ensure that the data is pushed out to RAM?
-
-> Also is this API advisable for devices with low system RAM?
-
-No.
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 859177c..a8e0446 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -333,9 +333,8 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+ 			dev_dbg(hcd->self.controller,
+ 				"ClearPortFeature: OVER_CURRENT\n");
+ 
+-			if (valid_port(wIndex)) {
++			if (valid_port(wIndex))
+ 				pdata->overcurrent_status[wIndex] = 0;
+-			}
+ 
+ 			goto out;
+ 
+@@ -388,17 +387,14 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+ 		dev_dbg(hcd->self.controller, "GetPortStatus(%d)\n", wIndex);
+ 
+ 		if (valid_port(wIndex)) {
+-			if (! ohci_at91_usb_get_power(pdata, wIndex)) {
++			if (! ohci_at91_usb_get_power(pdata, wIndex))
+ 				*data &= ~cpu_to_le32(RH_PS_PPS);
+-			}
+ 
+-			if (pdata->overcurrent_changed[wIndex]) {
++			if (pdata->overcurrent_changed[wIndex])
+ 				*data |= cpu_to_le32(RH_PS_OCIC);
+-			}
+ 
+-			if (pdata->overcurrent_status[wIndex]) {
++			if (pdata->overcurrent_status[wIndex])
+ 				*data |= cpu_to_le32(RH_PS_POCI);
+-			}
+ 		}
+ 	}
+ 
+-- 
+1.7.9.4
