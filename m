@@ -1,32 +1,36 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 3 Apr 2012 21:39:20 +0200
-Subject: [PATCH] mtd/gpmi : do not include the mxs.h
-In-Reply-To: <1333247817-18472-1-git-send-email-shijie8@gmail.com>
-References: <1333247817-18472-1-git-send-email-shijie8@gmail.com>
-Message-ID: <20120403193920.GC2201@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Apr 2012 19:40:26 +0000
+Subject: [PATCH] ARM: versatile: fix build failure in pci.c
+In-Reply-To: <4F7B4AF0.7080208@windriver.com>
+References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAErSpo5RiDgfXHB30rOTco6CjhH4Nzovhvddifk9i=tb4QKtNQ@mail.gmail.com>
+ <4F7B4AF0.7080208@windriver.com>
+Message-ID: <201204031940.26977.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 31, 2012 at 10:36:57PM -0400, Huang Shijie wrote:
-> The mxs.h does not exit in the mx6q.
-> So rewrite the __mxs_clrl()/__mxs_setl() and remove the mxs.h.
+On Tuesday 03 April 2012, Paul Gortmaker wrote:
+> On 12-04-03 12:44 PM, Bjorn Helgaas wrote:
 > 
-> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+> [...]
+> 
+> > 
+> > Since this only affects arm, do you want to handle the fix entirely in
+> > the arm tree?  If you want me to push something through PCI, I can do
+> > that, too.  Sorry for the breakage.
+> 
+> Olof already applied my patch to fixes, so I don't
+> think there is any requirement for immediate action.
 
-I am quite sure we will have STMP devices in 3.5 which should make this patch
-obsolete. If this patch is considered a bugfix for 3.4, then OK for now.
+Yes, and this is the important part for now, making this look nice can
+wait. My preference would be to get rid of the io_offset and mem_offset
+in as many places as possible in the long run, but we don't have to do
+that for v3.4.
 
-Regards,
+> You and Arnd can work out whether you want to use
+> offsets or not on the versatile at your leisure.
 
-   Wolfram
+I have a patch set for versatile PCI that I should have sent a long
+time ago. When I resubmit that, I'll take care of this, too.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120403/8c3aa7c5/attachment-0001.sig>
+	Arnd
