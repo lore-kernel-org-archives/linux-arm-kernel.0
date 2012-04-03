@@ -1,102 +1,137 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 03 Apr 2012 07:27:52 -0700
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120403123444.GL17741@mudshark.cambridge.arm.com> (Will
- Deacon's message of "Tue, 3 Apr 2012 13:34:45 +0100")
-References: <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
- <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
- <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
- <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
- <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
- <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
- <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
-Message-ID: <878vicsxef.fsf@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 03 Apr 2012 17:42:56 +0300
+Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
+ MFP_LPM_KEEP_OUTPUT
+In-Reply-To: <1333456258.38206.YahooMailClassic@web29003.mail.ird.yahoo.com>
+References: <1333456258.38206.YahooMailClassic@web29003.mail.ird.yahoo.com>
+Message-ID: <4F7B0C70.2040005@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 04/03/12 15:30, Paul Parsons wrote:
+> Hello Igor,
 
-Will Deacon <will.deacon@arm.com> writes:
+[...]
 
-> On Tue, Apr 03, 2012 at 11:01:53AM +0100, Shilimkar, Santosh wrote:
->> On Tue, Apr 3, 2012 at 3:17 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > It seems that they're both needed to get reliable PMU operation. Without the
->> > CLKDM_CAN_SWSUP fix, no interrupts are generated at all. Without the patch
->> > below ([1]), it seems that we don't generate enough. So it looks like we
->> > need them both.
->> >
->> I see. Can you please confirm if it is still the case with [1].
->
-> Right, ignore my previous comment, I was using a vanilla 3.3 kernel without
-> realising and therefore what I thought were PMU/CTI interrupts were actually
-> just from a timer. Sorry for the confusion.
->
-> So I've gone back to basics. Here is a branch containing what I believe
-> should be all the patches required for the OMAP4 PMU:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4
->
-> I've omitted the SWSUSP patch since you say it breaks pm, which is clearly not
-> acceptable.
->
-> The problem is, trying to boot this on my pandaboard results in a hang (see
-> dmesg below). Even worse, the problem isn't easily bisectable since rebuilding
-> a working image can give you something that no longer boots and I haven't found
-> a reliable way to cause the lockup.
->
-> I'll take JTAG for a whirl to see where we are. If anything looks wrong in
-> my dmesg, please shout (there are plenty of things in there that look like
-> they've gone awry).
+>> Now I can see that it will not... because of the below
+>> line:
+>> GPDR(i * 32) = gpdr_lpm[i];
+>>
+>> in the pxa2xx_mfp_suspend() function.#
+> 
+> Which is precisely the issue this patch addresses, namely to force
+> the gpdr_lpm[] direction to output for KEEP_OUTPUT configurations.
 
-Not sure why it hangs for you, but it worked for me both with your
-branch on v3.3 and merging with v3.4-rc1[1]
+Yes, but it changes the meaning of KEEP_OUTPUT and that is not good.
 
-Below is a Kconfig snippet[2] which I append to my .config after
-building omap2plus_defconfig in order to build a perf/trace/PMU enabled
-kernel for my Panda.
+[...]
 
-Kevin
+>>> Don't prevent a GPIO input being changed to an output
+>> when entering
+>>> suspend().
+>>
+>> Why should they prevent that? In case of bidirectional GPIOs
+>> it is
+>> perfectly fine.
+> 
+> I didn't say they should prevent that. I said they don't prevent
+> that, thereby allowing the direction of an input gpio to be changed
+> to output before the PGSR value is applied.
 
-[1]
-# perf stat sleep 1
+Ok, I see.
 
- Performance counter stats for 'sleep 1':
+> 
+>>
+>>>
+>>> By the way, there is still the issue of DRIVE_HIGH and
+>> DRIVE_LOW
+>>> forcing the GPIO direction to output in
+>> pxa2xx_mfp_suspend()
+>>> *before* the PGSR values take effect. Surely a bug?
+>>
+>> No, the order is not important as the final setting is done
+>> by the h/w
+>> during the suspend transition.
+> 
+> No, the GPIO direction is changed by software, not hardware.
+> Hardware suspend does not change the GPIO direction, it only
+> drives the GPIO values from the PGSR registers.
 
-          9.582520 task-clock                #    0.009 CPUs utilized          
-                 1 context-switches          #    0.104 K/sec                  
-                 0 CPU-migrations            #    0.000 K/sec                  
-               147 page-faults               #    0.015 M/sec                  
-           5096283 cycles                    #    0.532 GHz                    
-            607876 stalled-cycles-frontend   #   11.93% frontend cycles idle   
-           3285045 stalled-cycles-backend    #   64.46% backend  cycles idle   
-           2722485 instructions              #    0.53  insns per cycle        
-                                             #    1.21  stalled cycles per insn
-            259247 branches                  #   27.054 M/sec                  
-             84274 branch-misses             #   32.51% of all branches        
+Yes, that is correct.
 
-       1.015919088 seconds time elapsed
+> 
+> Thus there is a definite window between the direction being changed
+> by software and the PGSR value being driven by hardware.
 
+Right, this is the cost of lack of the h/w MFP support :-(
 
-[2]
-CONFIG_ARCH_OMAP2=n
-CONFIG_ARCH_OMAP3=n       # need to disable OMAP3 for CPU_HAS_PMU support, needed for perf on OMAP4
-CONFIG_USB_EHCI_HCD=y
-CONFIG_USB_NET_SMSC95XX=y
+> 
+> Within that window, the output values are indeterminate, at least
+> as far as the suspend software is concerned.
+> 
+> So unless valid output values have already been programmed onto
+> those input GPIOs beforehand, this direction/PGSR window is a bug.
 
-CONFIG_PROFILING=y
-CONFIG_HW_PERF_EVENTS=y
-CONFIG_PERF_EVENTS=y
-CONFIG_PERF_COUNTERS=y
-CONFIG_TRACEPOINTS=y
-CONFIG_TRACING=y
-CONFIG_GENERIC_TRACER=y
-CONFIG_FTRACE=y
-CONFIG_FUNCTION_TRACER=y
-CONFIG_ENABLE_DEFAULT_TRACERS=y
-CONFIG_STACK_TRACER=y
-CONFIG_SCHED_TRACER=y
-CONFIG_EVENT_POWER_TRACING_DEPRECATED=n
+Yep, sounds correct.
+
+[...]
+
+>> Please, check the attached patch.
+>> It should not change the meaning of KEEP_OUTPUT, but fix the
+>> bug.
+> 
+> Yes, that fixes the KEEP_OUTPUT bug.
+
+Can this be considered as Tested-by for the formal patch?
+
+> 
+> It would be beneficial if someone could formally document the precise
+> meaning of KEEP_OUTPUT.
+
+I will try to do it along with the formal patch submission.
+
+> 
+> The direction/PGSR window bug is still present though.
+
+Yet another patch "closing windows" attached,
+care to check/test it please?
+
+> 
+> I'm starting to think it would be better for pxa2xx_mfp_suspend()
+> to not touch GPDR at all, ever. Thus outputs would remain outputs,
+> inputs would remain inputs. That would solve the latter bug and
+> simplify PXA2xx MFP, but at the cost of making DRIVE_HIGH/DRIVE_LOW
+> conditional like KEEP_OUTPUT.
+
+I don't think it is a good idea, because then DRIVE_HIGH/DRIVE_LOW will
+have different meaning between the platforms (SoCs).
+How about the attached patch to fix this "windows" thing for PXA2xx?
+
+> 
+> It would be beneficial if someone could formally document the precise
+> meaning of DRIVE_HIGH/DRIVE_LOW.
+
+I can try doing it along with the formal version of the attached patch,
+if we will consider it as a solution.
+
+[...]
+
+>> No, your patch will change also the inputs to outputs.
+>> Because "last level" does not apply to input pins.
+> 
+> My point was that KEEP_OUTPUT configurations are only applied to
+> GPIOs used as outputs. So no directions would be changed in practice.
+
+I failed to understand that from your previous posts.
+Nevertheless, the patch in the previous email fixes exactly this.
+
+-- 
+Regards,
+Igor.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pxa2xx-mfp2.patch
+Type: text/x-patch
+Size: 763 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120403/03d40497/attachment.bin>
