@@ -1,60 +1,68 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 03 Apr 2012 16:10:08 +0200
-Subject: [PATCHv24 03/16] mm: compaction: introduce map_pages()
+Date: Tue, 03 Apr 2012 16:10:06 +0200
+Subject: [PATCHv24 01/16] mm: page_alloc: remove trailing whitespace
 In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
 References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1333462221-3987-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1333462221-3987-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Michal Nazarewicz <mina86@mina86.com>
 
-This commit creates a map_pages() function which map pages freed
-using split_free_pages().  This merely moves some code from
-isolate_freepages() so that it can be reused in other places.
-
 Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Acked-by: Mel Gorman <mel@csn.ul.ie>
-Reviewed-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
-Tested-by: Robert Nelson <robertcnelson@gmail.com>
-Tested-by: Barry Song <Baohua.Song@csr.com>
 ---
- mm/compaction.c |   15 +++++++++++----
- 1 files changed, 11 insertions(+), 4 deletions(-)
+ mm/page_alloc.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/mm/compaction.c b/mm/compaction.c
-index ee20fc0..d9d7b35 100644
---- a/mm/compaction.c
-+++ b/mm/compaction.c
-@@ -127,6 +127,16 @@ static bool suitable_migration_target(struct page *page)
- 	return false;
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index a712fb9..0922308 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -513,10 +513,10 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
+  * free pages of length of (1 << order) and marked with _mapcount -2. Page's
+  * order is recorded in page_private(page) field.
+  * So when we are allocating or freeing one, we can derive the state of the
+- * other.  That is, if we allocate a small block, and both were   
+- * free, the remainder of the region must be split into blocks.   
++ * other.  That is, if we allocate a small block, and both were
++ * free, the remainder of the region must be split into blocks.
+  * If a block is freed, and its buddy is also free, then this
+- * triggers coalescing into a block of larger size.            
++ * triggers coalescing into a block of larger size.
+  *
+  * -- wli
+  */
+@@ -1061,17 +1061,17 @@ retry_reserve:
+ 	return page;
  }
  
-+static void map_pages(struct list_head *list)
-+{
-+	struct page *page;
+-/* 
++/*
+  * Obtain a specified number of elements from the buddy allocator, all under
+  * a single hold of the lock, for efficiency.  Add them to the supplied list.
+  * Returns the number of new pages which were placed@*list.
+  */
+-static int rmqueue_bulk(struct zone *zone, unsigned int order, 
++static int rmqueue_bulk(struct zone *zone, unsigned int order,
+ 			unsigned long count, struct list_head *list,
+ 			int migratetype, int cold)
+ {
+ 	int i;
+-	
 +
-+	list_for_each_entry(page, list, lru) {
-+		arch_alloc_page(page, 0);
-+		kernel_map_pages(page, 1, 1);
-+	}
-+}
+ 	spin_lock(&zone->lock);
+ 	for (i = 0; i < count; ++i) {
+ 		struct page *page = __rmqueue(zone, order, migratetype);
+@@ -4301,7 +4301,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
+ 	init_waitqueue_head(&pgdat->kswapd_wait);
+ 	pgdat->kswapd_max_order = 0;
+ 	pgdat_page_cgroup_init(pgdat);
+-	
 +
- /*
-  * Based on information in the current compact_control, find blocks
-  * suitable for isolating free pages from and then isolate them.
-@@ -206,10 +216,7 @@ static void isolate_freepages(struct zone *zone,
- 	}
- 
- 	/* split_free_page does not map the pages */
--	list_for_each_entry(page, freelist, lru) {
--		arch_alloc_page(page, 0);
--		kernel_map_pages(page, 1, 1);
--	}
-+	map_pages(freelist);
- 
- 	cc->free_pfn = high_pfn;
- 	cc->nr_freepages = nr_freepages;
+ 	for (j = 0; j < MAX_NR_ZONES; j++) {
+ 		struct zone *zone = pgdat->node_zones + j;
+ 		unsigned long size, realsize, memmap_pages;
 -- 
 1.7.1.569.g6f426
