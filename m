@@ -1,46 +1,69 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 3 Apr 2012 21:32:24 +0530
-Subject: [PATCHv5 05/18] I2C: OMAP: Fix the interrupt clearing in OMAP4
+Date: Tue, 3 Apr 2012 21:32:28 +0530
+Subject: [PATCHv5 09/18] I2C: OMAP: Correct I2C revision for OMAP3
 In-Reply-To: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
 References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1333468957-5999-6-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1333468957-5999-10-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4 we were writing 1 to IRQENABLE_CLR which cleared only
-the arbitration lost interrupt. The patch intends to fix the same by writing 0
-to the IE register clearing all interrupts.
+From: Jon Hunter <jon-hunter@ti.com>
 
-This is based on the work done by Vikram Pandita <vikram.pandita@ti.com>.
+The OMAP3530 is based upon the same silicon as the OMAP3430 and so the I2C
+revision is the same for 3430 and 3530. However, the OMAP3630 device has the
+same I2C revision as OMAP4. Correct the revision definition to reflect this.
 
-The  changes from the original patch ...
--  Does not use the IRQENABLE_CLR register to clear as it is not mentioned
-  to be legacy register IRQENABLE_CLR helps in  atomically
-  setting/clearing specific interrupts, instead use the OMAP_I2C_IE_REG as we are
-  clearing all interrupts.
+This patch is based on work done by Jon Hunter <jon-hunter@ti.com>
+Changes from his patch
+- Update OMAP_I2C_REV_ON_3430 also to reflect that it is same as 3530
 
-Cc: Vikram Pandita <vikram.pandita@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 45389db..2769f67 100644
+index a461097..959e97c 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1179,10 +1179,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
- 		_dev->dev_lost_count = _dev->get_context_loss_count(dev);
+@@ -50,8 +50,8 @@
  
- 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
--	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
--		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
--	else
--		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
-+
-+	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+ /* I2C controller revisions present on specific hardware */
+ #define OMAP_I2C_REV_ON_2430		0x36
+-#define OMAP_I2C_REV_ON_3430		0x3C
+-#define OMAP_I2C_REV_ON_3530_4430	0x40
++#define OMAP_I2C_REV_ON_3430_3530	0x3C
++#define OMAP_I2C_REV_ON_3630_4430	0x40
  
- 	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
- 		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+@@ -298,7 +298,7 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ 			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+ 					   SYSC_AUTOIDLE_MASK);
+ 
+-		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
++		} else if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
+ 			dev->syscstate = SYSC_AUTOIDLE_MASK;
+ 			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
+ 			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
+@@ -1051,7 +1051,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
+ 
+-	if (dev->rev <= OMAP_I2C_REV_ON_3430)
++	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
+ 		dev->errata |= I2C_OMAP3_1P153;
+ 
+ 	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
+@@ -1069,7 +1069,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 		dev->fifo_size = (dev->fifo_size / 2);
+ 
+-		if (dev->rev >= OMAP_I2C_REV_ON_3530_4430)
++		if (dev->rev >= OMAP_I2C_REV_ON_3630_4430)
+ 			dev->b_hw = 0; /* Disable hardware fixes */
+ 		else
+ 			dev->b_hw = 1; /* Enable hardware fixes */
 -- 
 1.7.1
