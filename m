@@ -1,8 +1,7 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 03 Apr 2012 16:14:19 -0700
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 3 Apr 2012 17:29:49 -0600 (MDT)
 Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120403160706.GP17741@mudshark.cambridge.arm.com> (Will
- Deacon's message of "Tue, 3 Apr 2012 17:07:06 +0100")
+In-Reply-To: <87ehs4pfw4.fsf@ti.com>
 References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
  <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
  <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
@@ -11,34 +10,50 @@ References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
  <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
  <20120403094749.GH17741@mudshark.cambridge.arm.com>
  <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
-Message-ID: <87ehs4pfw4.fsf@ti.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
+Message-ID: <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+Hi
 
-[...]
+On Tue, 3 Apr 2012, Kevin Hilman wrote:
 
-> Right. Can you confirm whether the PMU/CTI interrupts fire for you please?
-> Just run perf top and look at /proc/interrupts while it's running. You
-> should see a couple of arm-pmu entries in there and hopefully numbers > 0.
+> Indeed, like you, I have to change the EMU clock domain to SWSUP[1] in
+> order to see any interrupts and see anything in perf top.  This isn't
+> really a mergeable workaround, so I'll look into this a little closer
+> with Santosh to see what we can do once we fully understand the HW
+> problem.
 
-Ah, I see now (I'm a perf newbie.)
+Part of the problem is that the clockdomain data for the emu_sys 
+clockdomain is wrong.  Here's something to try to fix it.  It might just 
+be enough to get it to work.
 
-Indeed, like you, I have to change the EMU clock domain to SWSUP[1] in
-order to see any interrupts and see anything in perf top.  This isn't
-really a mergeable workaround, so I'll look into this a little closer
-with Santosh to see what we can do once we fully understand the HW
-problem.
+- Paul
 
-Kevin
+From: Paul Walmsley <paul@pwsan.com>
+Date: Tue, 3 Apr 2012 17:13:48 -0600
+Subject: [PATCH] ARM: OMAP44xx: clockdomain data: correct the emu_sys_clkdm
+ CLKTRCTRL data
 
-[1]
+According to the 4430 ES2.0 TRM vX Table 3-744 "CM_EMU_CLKSTCTRL",
+the emu_sys clockdomain data in mainline is incorrect.
+
+The emu_sys clockdomain does not support the DISABLE_AUTO state, and
+instead it supports the FORCE_WAKEUP state.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Ming Lei <ming.lei@canonical.com>
+---
+ arch/arm/mach-omap2/clockdomains44xx_data.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
 diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-index 9299ac2..41d2260 100644
+index 9299ac2..bd7ed13 100644
 --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
 +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
 @@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
@@ -46,5 +61,9 @@ index 9299ac2..41d2260 100644
  	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
  	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
 -	.flags		  = CLKDM_CAN_HWSUP,
-+	.flags		  = CLKDM_CAN_SWSUP,
++	.flags		  = CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP,
  };
+ 
+ static struct clockdomain l3_dma_44xx_clkdm = {
+-- 
+1.7.9.5
