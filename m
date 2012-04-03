@@ -1,173 +1,105 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  3 Apr 2012 13:09:18 +0200
-Subject: [PATCH 2/4 v2] ARM: mxs: factor out dynamic amba device allocator
-Message-ID: <1333451358-9554-1-git-send-email-linus.walleij@linaro.org>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 3 Apr 2012 13:14:23 +0200
+Subject: [PATCH v2 0/9] PM: Create the AVS class of drivers
+In-Reply-To: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
+References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
+Message-ID: <CAORVsuWJrEjUi11dyQZCnn-6BwOg9cN94G44JWpYvCtB8LbxKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the local amba device allocator with the core code from
-the bus driver.
+Hi Tony, Rafael,
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2: fixed up the compile warnings spotted
-by Shawn.
----
- arch/arm/mach-mxs/devices-mx23.h                |   12 +++++--
- arch/arm/mach-mxs/devices-mx28.h                |   12 +++++--
- arch/arm/mach-mxs/devices.c                     |   16 ---------
- arch/arm/mach-mxs/devices/Makefile              |    1 -
- arch/arm/mach-mxs/devices/amba-duart.c          |   40 -----------------------
- arch/arm/mach-mxs/include/mach/devices-common.h |    5 ---
- 6 files changed, 18 insertions(+), 68 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/devices/amba-duart.c
+Here is a gentle ping on this series.
+Do you think this can go in the next rc?
 
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
-index 4d1329d..9acdd63 100644
---- a/arch/arm/mach-mxs/devices-mx23.h
-+++ b/arch/arm/mach-mxs/devices-mx23.h
-@@ -11,10 +11,16 @@
- #include <mach/mx23.h>
- #include <mach/devices-common.h>
- #include <mach/mxsfb.h>
-+#include <linux/amba/bus.h>
- 
--extern const struct amba_device mx23_duart_device __initconst;
--#define mx23_add_duart() \
--	mxs_add_duart(&mx23_duart_device)
-+static inline int mx23_add_duart(void)
-+{
-+	struct amba_device *d;
-+
-+	d = amba_ahb_device_add(NULL, "duart", MX23_DUART_BASE_ADDR, SZ_8K,
-+				MX23_INT_DUART, 0, 0, 0);
-+	return IS_ERR(d) ? PTR_ERR(d) : 0;
-+}
- 
- extern const struct mxs_auart_data mx23_auart_data[] __initconst;
- #define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
-diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-index 9dbeae1..84b2960 100644
---- a/arch/arm/mach-mxs/devices-mx28.h
-+++ b/arch/arm/mach-mxs/devices-mx28.h
-@@ -11,10 +11,16 @@
- #include <mach/mx28.h>
- #include <mach/devices-common.h>
- #include <mach/mxsfb.h>
-+#include <linux/amba/bus.h>
- 
--extern const struct amba_device mx28_duart_device __initconst;
--#define mx28_add_duart() \
--	mxs_add_duart(&mx28_duart_device)
-+static inline int mx28_add_duart(void)
-+{
-+	struct amba_device *d;
-+
-+	d = amba_ahb_device_add(NULL, "duart", MX28_DUART_BASE_ADDR, SZ_8K,
-+				MX28_INT_DUART, 0, 0, 0);
-+	return IS_ERR(d) ? PTR_ERR(d) : 0;
-+}
- 
- extern const struct mxs_auart_data mx28_auart_data[] __initconst;
- #define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
-diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
-index 01faffe..cf50b5a 100644
---- a/arch/arm/mach-mxs/devices.c
-+++ b/arch/arm/mach-mxs/devices.c
-@@ -75,22 +75,6 @@ err:
- 	return pdev;
- }
- 
--int __init mxs_add_amba_device(const struct amba_device *dev)
--{
--	struct amba_device *adev = amba_device_alloc(dev->dev.init_name,
--		dev->res.start, resource_size(&dev->res));
--
--	if (!adev) {
--		pr_err("%s: failed to allocate memory", __func__);
--		return -ENOMEM;
--	}
--
--	adev->irq[0] = dev->irq[0];
--	adev->irq[1] = dev->irq[1];
--
--	return amba_device_add(adev, &iomem_resource);
--}
--
- struct device mxs_apbh_bus = {
- 	.init_name	= "mxs_apbh",
- 	.parent         = &platform_bus,
-diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-index c8f5c95..5f72d97 100644
---- a/arch/arm/mach-mxs/devices/Makefile
-+++ b/arch/arm/mach-mxs/devices/Makefile
-@@ -1,4 +1,3 @@
--obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
- obj-y += platform-dma.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
-diff --git a/arch/arm/mach-mxs/devices/amba-duart.c b/arch/arm/mach-mxs/devices/amba-duart.c
-deleted file mode 100644
-index a5479f7..0000000
---- a/arch/arm/mach-mxs/devices/amba-duart.c
-+++ /dev/null
-@@ -1,40 +0,0 @@
--/*
-- * Copyright (C) 2009-2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <asm/irq.h>
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define MXS_AMBA_DUART_DEVICE(name, soc)			\
--const struct amba_device name##_device __initconst = {		\
--	.dev = {						\
--		.init_name = "duart",				\
--	},							\
--	.res = {						\
--		.start = soc ## _DUART_BASE_ADDR,		\
--		.end = (soc ## _DUART_BASE_ADDR) + SZ_8K - 1,	\
--		.flags = IORESOURCE_MEM,			\
--	},							\
--	.irq = {soc ## _INT_DUART},				\
--}
--
--#ifdef CONFIG_SOC_IMX23
--MXS_AMBA_DUART_DEVICE(mx23_duart, MX23);
--#endif
--
--#ifdef CONFIG_SOC_IMX28
--MXS_AMBA_DUART_DEVICE(mx28_duart, MX28);
--#endif
--
--int __init mxs_add_duart(const struct amba_device *dev)
--{
--	return mxs_add_amba_device(dev);
--}
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-index f2e3839..21e45a7 100644
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -27,11 +27,6 @@ static inline struct platform_device *mxs_add_platform_device(
- 			name, id, res, num_resources, data, size_data, 0);
- }
- 
--int __init mxs_add_amba_device(const struct amba_device *dev);
--
--/* duart */
--int __init mxs_add_duart(const struct amba_device *dev);
--
- /* auart */
- struct mxs_auart_data {
- 	int id;
--- 
-1.7.7.6
+Regards,
+Jean
+
+On Mon, Mar 19, 2012 at 5:12 PM,  <jean.pihet@newoldbits.com> wrote:
+> From: Jean Pihet <j-pihet@ti.com>
+>
+> AVS is a power management technique which controls the operating
+> voltage of a device in order to optimize (i.e. reduce) its power
+> consumption. The voltage is adapted depending on static factors
+> (chip manufacturing process) and dynamic factors (temperature
+> depending performance).
+> AVS is also called SmartReflex on OMAP devices.
+>
+> To that end, create the AVS framework in drivers/power/avs and
+> move the OMAP SmartReflex code to the new directory.
+>
+> In preparation to the move of the OMAP code the following changes have been
+> made:
+> - split the include files into generic and platform specific code,
+> - fill in platform data from the device initialization code and pass
+> ?it to the driver,
+> - create CONFIG_AVS* config options accordingly.
+>
+> The platform integration data for SmartReflex is passed from hwmod
+> and the voltage layer to the driver using pdata.
+>
+>
+> Tested on OMAP3 Beagleboard using omap2plus_defconfig with the
+> CONFIG_POWER_AVS* options set.
+> Based on master branch of the l-o git tree (3.3.0-rc6) [1], commit
+> 85244e0edd240da2004bb2ab7cbcbc67a336f20d.
+>
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+>
+>
+> History:
+> v2: rework after the comments on MLs
+> ?. Keep the OMAP Kconfig options in the arch dir (Rafael),
+> ?. Move the shared header file from plat-omap to
+> ? ?include/linux/power/ (Tony)
+>
+> v1: initial revision
+>
+>
+> Jean Pihet (9):
+> ?ARM: OMAP3+: voltage: export functions to plat/voltage.h
+> ?ARM: OMAP2+: SmartReflex: move the driver specific macros in
+> ? ?include/linux/power
+> ?ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
+> ?ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of
+> ? ?voltage domains.
+> ?ARM: OMAP3: hwmod: rename the smartreflex entries
+> ?ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
+> ?ARM: OMAP2+: SmartReflex: Use per-OPP data structure
+> ?ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
+> ?ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
+>
+> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? | ? ?4 +-
+> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? 12 +-
+> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? ?3 +-
+> ?arch/arm/mach-omap2/pm.h ? ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-omap2/smartreflex-class3.c ? | ? 60 --
+> ?arch/arm/mach-omap2/smartreflex.c ? ? ? ? ?| 1165 ----------------------------
+> ?arch/arm/mach-omap2/smartreflex.h ? ? ? ? ?| ?256 ------
+> ?arch/arm/mach-omap2/sr_device.c ? ? ? ? ? ?| ? 38 +-
+> ?arch/arm/mach-omap2/voltage.h ? ? ? ? ? ? ?| ? ?1 -
+> ?arch/arm/mach-omap2/vp.h ? ? ? ? ? ? ? ? ? | ? ?2 -
+> ?arch/arm/plat-omap/Kconfig ? ? ? ? ? ? ? ? | ? 30 +-
+> ?arch/arm/plat-omap/include/plat/voltage.h ?| ? ?3 +
+> ?drivers/power/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+> ?drivers/power/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?2 +
+> ?drivers/power/avs/Kconfig ? ? ? ? ? ? ? ? ?| ? 12 +
+> ?drivers/power/avs/Makefile ? ? ? ? ? ? ? ? | ? ?2 +
+> ?drivers/power/avs/smartreflex-class3.c ? ? | ? 61 ++
+> ?drivers/power/avs/smartreflex.c ? ? ? ? ? ?| 1118 ++++++++++++++++++++++++++
+> ?drivers/power/avs/smartreflex.h ? ? ? ? ? ?| ?238 ++++++
+> ?include/linux/power/smartreflex.h ? ? ? ? ?| ? 97 +++
+> ?20 files changed, 1590 insertions(+), 1518 deletions(-)
+> ?delete mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
+> ?delete mode 100644 arch/arm/mach-omap2/smartreflex.c
+> ?delete mode 100644 arch/arm/mach-omap2/smartreflex.h
+> ?create mode 100644 drivers/power/avs/Kconfig
+> ?create mode 100644 drivers/power/avs/Makefile
+> ?create mode 100644 drivers/power/avs/smartreflex-class3.c
+> ?create mode 100644 drivers/power/avs/smartreflex.c
+> ?create mode 100644 drivers/power/avs/smartreflex.h
+> ?create mode 100644 include/linux/power/smartreflex.h
+>
+> --
+> 1.7.5.4
+>
