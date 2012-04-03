@@ -1,201 +1,75 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 03 Apr 2012 13:44:22 +0200
-Subject: [PATCH 2/4 v2] ARM: mxs: factor out dynamic amba device allocator
-In-Reply-To: <1333451358-9554-1-git-send-email-linus.walleij@linaro.org>
-References: <1333451358-9554-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4F7AE296.9040701@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 03 Apr 2012 13:55:28 +0200
+Subject: [PATCH v2 00/13] at91: 3.4-rc1 fixes
+In-Reply-To: <cover.1333437885.git.nicolas.ferre@atmel.com>
+References: <cover.1333437885.git.nicolas.ferre@atmel.com>
+Message-ID: <4F7AE530.1040201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2012 01:09 PM, Linus Walleij wrote:
-> Replace the local amba device allocator with the core code from
-> the bus driver.
+On 04/03/2012 09:32 AM, Nicolas Ferre :
+> Here is a bunch of fixes for AT91 that will go on top of 3.4-rc1.
+> Some modifications are related to certain drivers (USB ohci-at91 for instance)
+> but are touching the core AT91 devices/board files and Device Tree files.
+> The modification of "vbus_pin_active_low" in particular cannot be separated
+> from the modification of .dts[i] and devices/board files.
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> I will have to collect "Acked-by" from USB people on the ohci-at91
+> modifications (Greg?). I will try to find them just after having posted
+> this v2 today...
 
-Just nitpicking: You can make use of PTR_RET() instead of open-coding it
-(see inline).
+Hi Greg,
 
-regards, Marc
+I would like to send this "fixes" patch series via arm-soc. Is it
+possible for you to have a look at patches that will modify ohci-at91
+(and the tiny ehci-atmel one) and give me your "Acked-by" so that I can
+ask Arnd and Olof to queue this material for 3.4-rc?
 
-> ---
-> ChangeLog v1->v2: fixed up the compile warnings spotted
-> by Shawn.
-> ---
->  arch/arm/mach-mxs/devices-mx23.h                |   12 +++++--
->  arch/arm/mach-mxs/devices-mx28.h                |   12 +++++--
->  arch/arm/mach-mxs/devices.c                     |   16 ---------
->  arch/arm/mach-mxs/devices/Makefile              |    1 -
->  arch/arm/mach-mxs/devices/amba-duart.c          |   40 -----------------------
->  arch/arm/mach-mxs/include/mach/devices-common.h |    5 ---
->  6 files changed, 18 insertions(+), 68 deletions(-)
->  delete mode 100644 arch/arm/mach-mxs/devices/amba-duart.c
+Here is the thread in linux-usb mainling-list:
+http://www.spinics.net/lists/linux-usb/msg60798.html
+
+Thanks for your help, best regards,
+
+> Ludovic Desroches (1):
+>   ARM: at91: dt: remove unit-address part for memory nodes
 > 
-> diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
-> index 4d1329d..9acdd63 100644
-> --- a/arch/arm/mach-mxs/devices-mx23.h
-> +++ b/arch/arm/mach-mxs/devices-mx23.h
-> @@ -11,10 +11,16 @@
->  #include <mach/mx23.h>
->  #include <mach/devices-common.h>
->  #include <mach/mxsfb.h>
-> +#include <linux/amba/bus.h>
->  
-> -extern const struct amba_device mx23_duart_device __initconst;
-> -#define mx23_add_duart() \
-> -	mxs_add_duart(&mx23_duart_device)
-> +static inline int mx23_add_duart(void)
-> +{
-> +	struct amba_device *d;
-> +
-> +	d = amba_ahb_device_add(NULL, "duart", MX23_DUART_BASE_ADDR, SZ_8K,
-> +				MX23_INT_DUART, 0, 0, 0);
-> +	return IS_ERR(d) ? PTR_ERR(d) : 0;
-
-there's a helper for that PTR_RET.
-
-> +}
->  
->  extern const struct mxs_auart_data mx23_auart_data[] __initconst;
->  #define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
-> diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-> index 9dbeae1..84b2960 100644
-> --- a/arch/arm/mach-mxs/devices-mx28.h
-> +++ b/arch/arm/mach-mxs/devices-mx28.h
-> @@ -11,10 +11,16 @@
->  #include <mach/mx28.h>
->  #include <mach/devices-common.h>
->  #include <mach/mxsfb.h>
-> +#include <linux/amba/bus.h>
->  
-> -extern const struct amba_device mx28_duart_device __initconst;
-> -#define mx28_add_duart() \
-> -	mxs_add_duart(&mx28_duart_device)
-> +static inline int mx28_add_duart(void)
-> +{
-> +	struct amba_device *d;
-> +
-> +	d = amba_ahb_device_add(NULL, "duart", MX28_DUART_BASE_ADDR, SZ_8K,
-> +				MX28_INT_DUART, 0, 0, 0);
-> +	return IS_ERR(d) ? PTR_ERR(d) : 0;
-
-dito
-
-> +}
->  
->  extern const struct mxs_auart_data mx28_auart_data[] __initconst;
->  #define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
-> diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
-> index 01faffe..cf50b5a 100644
-> --- a/arch/arm/mach-mxs/devices.c
-> +++ b/arch/arm/mach-mxs/devices.c
-> @@ -75,22 +75,6 @@ err:
->  	return pdev;
->  }
->  
-> -int __init mxs_add_amba_device(const struct amba_device *dev)
-> -{
-> -	struct amba_device *adev = amba_device_alloc(dev->dev.init_name,
-> -		dev->res.start, resource_size(&dev->res));
-> -
-> -	if (!adev) {
-> -		pr_err("%s: failed to allocate memory", __func__);
-> -		return -ENOMEM;
-> -	}
-> -
-> -	adev->irq[0] = dev->irq[0];
-> -	adev->irq[1] = dev->irq[1];
-> -
-> -	return amba_device_add(adev, &iomem_resource);
-> -}
-> -
->  struct device mxs_apbh_bus = {
->  	.init_name	= "mxs_apbh",
->  	.parent         = &platform_bus,
-> diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-> index c8f5c95..5f72d97 100644
-> --- a/arch/arm/mach-mxs/devices/Makefile
-> +++ b/arch/arm/mach-mxs/devices/Makefile
-> @@ -1,4 +1,3 @@
-> -obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
->  obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
->  obj-y += platform-dma.o
->  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
-> diff --git a/arch/arm/mach-mxs/devices/amba-duart.c b/arch/arm/mach-mxs/devices/amba-duart.c
-> deleted file mode 100644
-> index a5479f7..0000000
-> --- a/arch/arm/mach-mxs/devices/amba-duart.c
-> +++ /dev/null
-> @@ -1,40 +0,0 @@
-> -/*
-> - * Copyright (C) 2009-2010 Pengutronix
-> - * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-> - *
-> - * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> - *
-> - * This program is free software; you can redistribute it and/or modify it under
-> - * the terms of the GNU General Public License version 2 as published by the
-> - * Free Software Foundation.
-> - */
-> -#include <asm/irq.h>
-> -#include <mach/mx23.h>
-> -#include <mach/mx28.h>
-> -#include <mach/devices-common.h>
-> -
-> -#define MXS_AMBA_DUART_DEVICE(name, soc)			\
-> -const struct amba_device name##_device __initconst = {		\
-> -	.dev = {						\
-> -		.init_name = "duart",				\
-> -	},							\
-> -	.res = {						\
-> -		.start = soc ## _DUART_BASE_ADDR,		\
-> -		.end = (soc ## _DUART_BASE_ADDR) + SZ_8K - 1,	\
-> -		.flags = IORESOURCE_MEM,			\
-> -	},							\
-> -	.irq = {soc ## _INT_DUART},				\
-> -}
-> -
-> -#ifdef CONFIG_SOC_IMX23
-> -MXS_AMBA_DUART_DEVICE(mx23_duart, MX23);
-> -#endif
-> -
-> -#ifdef CONFIG_SOC_IMX28
-> -MXS_AMBA_DUART_DEVICE(mx28_duart, MX28);
-> -#endif
-> -
-> -int __init mxs_add_duart(const struct amba_device *dev)
-> -{
-> -	return mxs_add_amba_device(dev);
-> -}
-> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-> index f2e3839..21e45a7 100644
-> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> @@ -27,11 +27,6 @@ static inline struct platform_device *mxs_add_platform_device(
->  			name, id, res, num_resources, data, size_data, 0);
->  }
->  
-> -int __init mxs_add_amba_device(const struct amba_device *dev);
-> -
-> -/* duart */
-> -int __init mxs_add_duart(const struct amba_device *dev);
-> -
->  /* auart */
->  struct mxs_auart_data {
->  	int id;
+> Nicolas Ferre (12):
+>   ARM: at91/at91sam9x5: add clkdev entries for DMA controllers
+>   USB: ohci-at91: fix vbus_pin_active_low handling
+>   ARM: at91/USB host: specify and handle properly vbus_pin_active_low
+>   ARM: at91/dts: USB host vbus is active low
+>   USB: ohci-at91: rework and fix initialization
+>   USB: ohci-at91: change maximum number of ports
+>   USB: ohci-at91: coding style modifications with one-line ifs
+>   USB: ohci-at91: trivial return code name change
+>   ARM: at91/at91sam9x5.dtsi: fix NAND ale/cle in DT file
+>   ARM: at91/NAND DT bindings: add comments
+>   USB: ehci-atmel: add needed of.h header file
+>   ARM: at91: fix check of valid GPIO for SPI and USB
+> 
+>  .../devicetree/bindings/mtd/atmel-nand.txt         |   10 +-
+>  arch/arm/boot/dts/at91sam9g20.dtsi                 |    2 +-
+>  arch/arm/boot/dts/at91sam9g25ek.dts                |    4 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |    2 +-
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts             |    6 +-
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |    6 +-
+>  arch/arm/boot/dts/at91sam9x5cm.dtsi                |    2 +-
+>  arch/arm/boot/dts/usb_a9g20.dts                    |    2 +-
+>  arch/arm/mach-at91/at91sam9260_devices.c           |    3 +
+>  arch/arm/mach-at91/at91sam9261_devices.c           |    3 +
+>  arch/arm/mach-at91/at91sam9263_devices.c           |    6 +-
+>  arch/arm/mach-at91/at91sam9g45_devices.c           |   11 +-
+>  arch/arm/mach-at91/at91sam9rl_devices.c            |    3 +
+>  arch/arm/mach-at91/at91sam9x5.c                    |    2 +
+>  arch/arm/mach-at91/board-sam9263ek.c               |    1 +
+>  arch/arm/mach-at91/board-sam9m10g45ek.c            |    1 +
+>  arch/arm/mach-at91/include/mach/board.h            |   13 +-
+>  drivers/usb/host/ehci-atmel.c                      |    1 +
+>  drivers/usb/host/ohci-at91.c                       |  159 +++++++++++---------
+>  19 files changed, 135 insertions(+), 102 deletions(-)
+> 
+> Thanks, best regards,
 
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120403/aa9c8790/attachment-0001.sig>
+Nicolas Ferre
