@@ -1,28 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Apr 2012 14:26:22 +0000
-Subject: [PATCH] ARM: versatile: fix build failure in pci.c
-In-Reply-To: <4F7AFF61.3070803@windriver.com>
-References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
- <201204030819.48798.arnd@arndb.de> <4F7AFF61.3070803@windriver.com>
-Message-ID: <201204031426.22652.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 03 Apr 2012 07:27:52 -0700
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <20120403123444.GL17741@mudshark.cambridge.arm.com> (Will
+ Deacon's message of "Tue, 3 Apr 2012 13:34:45 +0100")
+References: <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
+ <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
+ <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
+ <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
+ <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
+ <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
+ <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com>
+Message-ID: <878vicsxef.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 April 2012, Paul Gortmaker wrote:
-> I'm not sure I'm following you here. I'm not feeding the
-> struct pci_sys_data to pci_add_resource_offset.  Instead it
-> is getting subfields of it, consistent with the rest of the
-> original commit from Bjorn.
+Hi Will,
 
-Sorry, my fault, I thought the suggestion was to pass sys into
-pci_add_resource_offset.
+Will Deacon <will.deacon@arm.com> writes:
 
-However, I would still prefer just reverting the versatile
-part of Bjorn's patch because versatile uses a zero offset.
-I think we should only pass the offset in cases where it's
-actually required because there are multiple buses or they
-have interesting mappings to the physical address space.
+> On Tue, Apr 03, 2012 at 11:01:53AM +0100, Shilimkar, Santosh wrote:
+>> On Tue, Apr 3, 2012 at 3:17 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > It seems that they're both needed to get reliable PMU operation. Without the
+>> > CLKDM_CAN_SWSUP fix, no interrupts are generated at all. Without the patch
+>> > below ([1]), it seems that we don't generate enough. So it looks like we
+>> > need them both.
+>> >
+>> I see. Can you please confirm if it is still the case with [1].
+>
+> Right, ignore my previous comment, I was using a vanilla 3.3 kernel without
+> realising and therefore what I thought were PMU/CTI interrupts were actually
+> just from a timer. Sorry for the confusion.
+>
+> So I've gone back to basics. Here is a branch containing what I believe
+> should be all the patches required for the OMAP4 PMU:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4
+>
+> I've omitted the SWSUSP patch since you say it breaks pm, which is clearly not
+> acceptable.
+>
+> The problem is, trying to boot this on my pandaboard results in a hang (see
+> dmesg below). Even worse, the problem isn't easily bisectable since rebuilding
+> a working image can give you something that no longer boots and I haven't found
+> a reliable way to cause the lockup.
+>
+> I'll take JTAG for a whirl to see where we are. If anything looks wrong in
+> my dmesg, please shout (there are plenty of things in there that look like
+> they've gone awry).
 
-Those seem to be the minority on ARM anyway.
+Not sure why it hangs for you, but it worked for me both with your
+branch on v3.3 and merging with v3.4-rc1[1]
 
-	Arnd
+Below is a Kconfig snippet[2] which I append to my .config after
+building omap2plus_defconfig in order to build a perf/trace/PMU enabled
+kernel for my Panda.
+
+Kevin
+
+[1]
+# perf stat sleep 1
+
+ Performance counter stats for 'sleep 1':
+
+          9.582520 task-clock                #    0.009 CPUs utilized          
+                 1 context-switches          #    0.104 K/sec                  
+                 0 CPU-migrations            #    0.000 K/sec                  
+               147 page-faults               #    0.015 M/sec                  
+           5096283 cycles                    #    0.532 GHz                    
+            607876 stalled-cycles-frontend   #   11.93% frontend cycles idle   
+           3285045 stalled-cycles-backend    #   64.46% backend  cycles idle   
+           2722485 instructions              #    0.53  insns per cycle        
+                                             #    1.21  stalled cycles per insn
+            259247 branches                  #   27.054 M/sec                  
+             84274 branch-misses             #   32.51% of all branches        
+
+       1.015919088 seconds time elapsed
+
+
+[2]
+CONFIG_ARCH_OMAP2=n
+CONFIG_ARCH_OMAP3=n       # need to disable OMAP3 for CPU_HAS_PMU support, needed for perf on OMAP4
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_NET_SMSC95XX=y
+
+CONFIG_PROFILING=y
+CONFIG_HW_PERF_EVENTS=y
+CONFIG_PERF_EVENTS=y
+CONFIG_PERF_COUNTERS=y
+CONFIG_TRACEPOINTS=y
+CONFIG_TRACING=y
+CONFIG_GENERIC_TRACER=y
+CONFIG_FTRACE=y
+CONFIG_FUNCTION_TRACER=y
+CONFIG_ENABLE_DEFAULT_TRACERS=y
+CONFIG_STACK_TRACER=y
+CONFIG_SCHED_TRACER=y
+CONFIG_EVENT_POWER_TRACING_DEPRECATED=n
