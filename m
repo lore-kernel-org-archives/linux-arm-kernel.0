@@ -1,36 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Apr 2012 19:40:26 +0000
-Subject: [PATCH] ARM: versatile: fix build failure in pci.c
-In-Reply-To: <4F7B4AF0.7080208@windriver.com>
-References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
- <CAErSpo5RiDgfXHB30rOTco6CjhH4Nzovhvddifk9i=tb4QKtNQ@mail.gmail.com>
- <4F7B4AF0.7080208@windriver.com>
-Message-ID: <201204031940.26977.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 03 Apr 2012 14:43:51 -0500
+Subject: [PATCH v5 09/16] pwm: tegra: Add device tree support
+In-Reply-To: <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
+References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
+ <1332945238-14897-10-git-send-email-thierry.reding@avionic-design.de>
+ <4F7602CD.2010808@wwwdotorg.org>
+ <20120402083749.GA6576@avionic-0098.adnet.avionic-design.de>
+ <4F79C8D4.2000306@wwwdotorg.org>
+ <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
+Message-ID: <4F7B52F7.5030608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 April 2012, Paul Gortmaker wrote:
-> On 12-04-03 12:44 PM, Bjorn Helgaas wrote:
+On 04/03/2012 12:55 PM, Thierry Reding wrote:
+> * Stephen Warren wrote:
+>> On 04/02/2012 02:37 AM, Thierry Reding wrote:
+>>> * Stephen Warren wrote:
+>>>> On 03/28/2012 08:33 AM, Thierry Reding wrote:
+>>>>> Add auxdata to instantiate the PWFM controller from a device tree,
+>>>>> include the corresponding nodes in the dtsi files for Tegra 20 and
+>>>>> Tegra 30 and add binding documentation.
+>>>>>
+>>>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>>>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>>>>
+>>>>> diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
+>>>> ...
+>>>>> +#ifdef CONFIG_OF
+>>>>> +static struct of_device_id tegra_pwm_of_match[] = {
+>>>>> +	{ .compatible = "nvidia,tegra20-pwm" },
+>>>>> +	{ .compatible = "nvidia,tegra30-pwm" },
+>>>>
+>>>> Could you swap those two lines, so that tegra30-pwm matches first. It
+>>>> makes no difference at present, but might in the future if the driver
+>>>> actually has to differentiate the two SoCs.
+>>>
+>>> I thought the matching order was determined by the compatible property in the
+>>> device tree, not the OF match table of the driver.
+>>
+>> At least logically, yes. However, of_match_device() appears to iterate
+>> over each match table entry, checking whether it matches any string in
+>> the compatible flag. Perhaps this could be considered a bug?
 > 
-> [...]
-> 
-> > 
-> > Since this only affects arm, do you want to handle the fix entirely in
-> > the arm tree?  If you want me to push something through PCI, I can do
-> > that, too.  Sorry for the breakage.
-> 
-> Olof already applied my patch to fixes, so I don't
-> think there is any requirement for immediate action.
+> It certainly is counter-intuitive. Maybe Grant or Rob can comment?
 
-Yes, and this is the important part for now, making this look nice can
-wait. My preference would be to get rid of the io_offset and mem_offset
-in as many places as possible in the long run, but we don't have to do
-that for v3.4.
+I think the rule should be the match list is most specific to least
+specific and/or mutually exclusive like compatible strings. Most
+examples with multiple entries in the kernel seem to fall into the
+mutually exclusive case.
 
-> You and Arnd can work out whether you want to use
-> offsets or not on the versatile at your leisure.
+For this case, I think would just drop tegra30-pwm altogether and only
+add it to the driver when you need to distinguish between the 2. The dts
+should have both though for Tegra3.
 
-I have a patch set for versatile PCI that I should have sent a long
-time ago. When I resubmit that, I'll take care of this, too.
-
-	Arnd
+Rob
