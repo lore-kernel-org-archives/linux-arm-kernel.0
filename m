@@ -1,40 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 03 Apr 2012 10:04:54 -0600
-Subject: Handling device shared SFR on dt platform
-In-Reply-To: <4F736A4A.6050302@gmail.com>
-References: <4F6A5853.9090809@gmail.com>
- <20120324193200.822AD3E0B06@localhost> <4F736A4A.6050302@gmail.com>
-Message-ID: <20120403160454.BDFF23E0598@localhost>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 03 Apr 2012 16:14:19 -0700
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <20120403160706.GP17741@mudshark.cambridge.arm.com> (Will
+ Deacon's message of "Tue, 3 Apr 2012 17:07:06 +0100")
+References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
+ <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
+ <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
+ <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
+ <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com>
+ <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com>
+Message-ID: <87ehs4pfw4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Mar 2012 21:45:14 +0200, Sylwester Nawrocki <snjw23@gmail.com> wrote:
-> Hello Grant,
-> 
-> On 03/24/2012 08:32 PM, Grant Likely wrote:
-> >
-> > Generally, this is handled by having a third node for the shared
-> > register block and both device nodes holding a phandle to it.
-> > 
-> > No, there isn't any common infrastructure for implementing this, but
-> > it isn't very much code.
-> 
-> Thank you, that sounds good. I'm just wondering how to handle the shared
-> resource access synchronisation. There is an IORESOURCE_MUXED resource type 
-> flag which could be used to prevent drivers from stomping on each others 
-> feet when accessing the shared register, if I understand the software muxed
-> resource semantics correctly. That is, using something like 
-> request_muxed_(mem_)region()/release_mem_region() for the shared register
-> protection.
-> 
-> What concerns me, is an overhead from region request/ioremap(?)/release, just
-> to access a single 32-bit register. I'm going to see if those accesses could
-> be moved to only device driver's probe() and remove() callbacks and what might
-> be the resulting power consumption increase from that, if any.
+Will Deacon <will.deacon@arm.com> writes:
 
-Personally, I'd just create a shared function used by both drivers to
-access the register and protect it with a spinlock.  That way the
-region only needs to be mapped once, and the overhead is as low as
-possible.
+[...]
 
-g.
+> Right. Can you confirm whether the PMU/CTI interrupts fire for you please?
+> Just run perf top and look at /proc/interrupts while it's running. You
+> should see a couple of arm-pmu entries in there and hopefully numbers > 0.
+
+Ah, I see now (I'm a perf newbie.)
+
+Indeed, like you, I have to change the EMU clock domain to SWSUP[1] in
+order to see any interrupts and see anything in perf top.  This isn't
+really a mergeable workaround, so I'll look into this a little closer
+with Santosh to see what we can do once we fully understand the HW
+problem.
+
+Kevin
+
+[1]
+diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
+index 9299ac2..41d2260 100644
+--- a/arch/arm/mach-omap2/clockdomains44xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+@@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
+ 	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
+-	.flags		  = CLKDM_CAN_HWSUP,
++	.flags		  = CLKDM_CAN_SWSUP,
+ };
