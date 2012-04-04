@@ -1,29 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 3 Apr 2012 18:00:53 -0600 (MDT)
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120403123444.GL17741@mudshark.cambridge.arm.com>
-References: <CAMsRxfJe_MEA=anzRu6jehGcZyg49uAx44_nDQ3_FRY=WrFLoA@mail.gmail.com>
- <CACVXFVNXJ2vZM-dAxQPQ5LSOuvv5yvOrnytOB9PxURtkaSCP8w@mail.gmail.com>
- <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
- <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
- <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
- <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
- <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.00.1204031800060.8000@utopia.booyaka.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed,  4 Apr 2012 02:02:58 +0200
+Subject: [PATCH] gpio: Fix range check in of_gpio_simple_xlate()
+Message-ID: <1333497778-26925-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Apr 2012, Will Deacon wrote:
+This patch fixes a range check in of_gpio_simple_xlate() by replacing a
+"> gc->ngpio" with ">= gc->ngpio" since range is from 0 to gc->ngpio - 1
 
-> I'll take JTAG for a whirl to see where we are. If anything looks wrong in
-> my dmesg, please shout (there are plenty of things in there that look like
-> they've gone awry).
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Might be worth booting with initcall_debug on the kernel command line.  
-That will probably be easier than dealing with JTAG.
+---
 
-- Paul
+ Applies to v3.4-rc1
+
+ drivers/of/gpio.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- linux-2.6.orig/drivers/of/gpio.c
++++ linux-2.6/drivers/of/gpio.c
+@@ -140,7 +140,7 @@ int of_gpio_simple_xlate(struct gpio_chi
+ 	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
+ 		return -EINVAL;
+ 
+-	if (gpiospec->args[0] > gc->ngpio)
++	if (gpiospec->args[0] >= gc->ngpio)
+ 		return -EINVAL;
+ 
+ 	if (flags)
