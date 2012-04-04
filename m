@@ -1,148 +1,665 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  4 Apr 2012 23:10:05 +0200
-Subject: [PATCH v4 1/3] ARM: make cr_alignment read-only #ifndef
- CONFIG_CPU_CP15
+Date: Wed,  4 Apr 2012 23:10:06 +0200
+Subject: [PATCH v4 2/3] Cortex-M3: Add base support for Cortex-M3
 In-Reply-To: <20120404210838.GA23126@pengutronix.de>
 References: <20120404210838.GA23126@pengutronix.de>
-Message-ID: <1333573807-23709-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1333573807-23709-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes cr_alignment a constant 0 to break code that tries to modify
-the value as it's likely that it's built on wrong assumption when
-CONFIG_CPU_CP15 isn't defined. For code that is only reading the value 0
-is more or less a fine value to report.
+From: Catalin Marinas <catalin.marinas@arm.com>
 
+This patch adds the base support for the Cortex-M3 processor (ARMv7-M
+architecture). It consists of the corresponding arch/arm/mm/ files and
+various #ifdef's around the kernel. Exception handling is implemented by
+a subsequent patch.
+
+[ukleinek: squash in some changes originating from commit
+
+b5717ba (Cortex-M3: Add support for the Microcontroller Prototyping System)
+
+from the v2.6.33-arm1 patch stack, port to post 3.2, drop zImage
+support, drop reorganisation of pt_regs, and a few cosmetic changes]
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
 Hello,
 
-in the v3 series this patch was titled "ARM: protect usage of
-cr_alignment by #ifdef CONFIG_CPU_CP15". In response to Nicolas' review
-cr_alignment was made a #define and only the code modifying it was
-patched.
-
-Moreover I patched the cachepolicy and noalign kernel parameter handling
-to just print a warning that these are unimplemented without cp15.
+this patch was only rebased onto v3.4-rc1 and so needed some minor
+adaptions, e.g. for the asm/system.h disintegration.
 
 Best regards
 Uwe
 
- arch/arm/include/asm/cp15.h   |   11 ++++++++++-
- arch/arm/kernel/head-common.S |    9 +++++++--
- arch/arm/mm/alignment.c       |    2 ++
- arch/arm/mm/mmu.c             |   17 +++++++++++++++++
- 4 files changed, 36 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/assembler.h   |   13 ++-
+ arch/arm/include/asm/cputype.h     |    3 +
+ arch/arm/include/asm/glue-cache.h  |   24 ++++++
+ arch/arm/include/asm/glue-df.h     |    8 ++
+ arch/arm/include/asm/glue-proc.h   |    9 ++
+ arch/arm/include/asm/irqflags.h    |   51 +++++++++++-
+ arch/arm/include/asm/processor.h   |    7 ++
+ arch/arm/include/asm/ptrace.h      |   20 ++++-
+ arch/arm/include/asm/system_info.h |    1 +
+ arch/arm/kernel/asm-offsets.c      |    3 +
+ arch/arm/kernel/head-nommu.S       |    9 +-
+ arch/arm/kernel/setup.c            |   13 ++-
+ arch/arm/kernel/traps.c            |    2 +
+ arch/arm/mm/nommu.c                |    2 +
+ arch/arm/mm/proc-v7m.S             |  161 ++++++++++++++++++++++++++++++++++++
+ 15 files changed, 318 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/mm/proc-v7m.S
 
-diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-index 5ef4d80..d814435 100644
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -42,6 +42,8 @@
- #define vectors_high()	(0)
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 03fb936..705d108 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -135,7 +135,11 @@
+  * assumes FIQs are enabled, and that the processor is in SVC mode.
+  */
+ 	.macro	save_and_disable_irqs, oldcpsr
++#ifdef CONFIG_CPU_V7M
++	mrs	\oldcpsr, primask
++#else
+ 	mrs	\oldcpsr, cpsr
++#endif
+ 	disable_irq
+ 	.endm
+ 
+@@ -149,7 +153,11 @@
+  * guarantee that this will preserve the flags.
+  */
+ 	.macro	restore_irqs_notrace, oldcpsr
++#ifdef CONFIG_CPU_V7M
++	msr	primask, \oldcpsr
++#else
+ 	msr	cpsr_c, \oldcpsr
++#endif
+ 	.endm
+ 
+ 	.macro restore_irqs, oldcpsr
+@@ -228,7 +236,10 @@
+ #endif
+ 	.endm
+ 
+-#ifdef CONFIG_THUMB2_KERNEL
++#if defined(CONFIG_CPU_V7M)
++	.macro	setmode, mode, reg
++	.endm
++#elif defined(CONFIG_THUMB2_KERNEL)
+ 	.macro	setmode, mode, reg
+ 	mov	\reg, #\mode
+ 	msr	cpsr_c, \reg
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb47d28..5bd8cb6 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -46,6 +46,9 @@ extern unsigned int processor_id;
+ 		    : "cc");						\
+ 		__val;							\
+ 	})
++#elif defined(CONFIG_CPU_V7M)
++#define read_cpuid(reg) (*(unsigned int *)0xe000ed00)
++#define read_cpuid_ext(reg) 0
+ #else
+ #define read_cpuid(reg) (processor_id)
+ #define read_cpuid_ext(reg) 0
+diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
+index 7e30874..6a5fd0b 100644
+--- a/arch/arm/include/asm/glue-cache.h
++++ b/arch/arm/include/asm/glue-cache.h
+@@ -125,10 +125,34 @@
+ //# endif
  #endif
  
-+#ifdef CONFIG_CPU_CP15
++#if defined(CONFIG_CPU_V7M)
++# ifdef _CACHE
++#  error "Multi-cache not supported on ARMv7-M"
++# else
++#  define _CACHE nop
++# endif
++#endif
 +
- extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
- extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+ #if !defined(_CACHE) && !defined(MULTI_CACHE)
+ #error Unknown cache maintenance model
+ #endif
  
-@@ -82,6 +84,13 @@ static inline void set_copro_access(unsigned int val)
- 	isb();
++#ifndef __ASSEMBLER__
++static inline void nop_flush_icache_all(void) { }
++static inline void nop_flush_kern_cache_all(void) { }
++static inline void nop_flush_user_cache_all(void) { }
++static inline void nop_flush_user_cache_range(unsigned long a, unsigned long b, unsigned int c) { }
++
++static inline void nop_coherent_kern_range(unsigned long a, unsigned long b) { }
++static inline void nop_coherent_user_range(unsigned long a, unsigned long b) { }
++static inline void nop_flush_kern_dcache_area(void *a, size_t s) { }
++
++static inline void nop_dma_flush_range(const void *a, const void *b) { }
++
++static inline void nop_dma_map_area(const void *s, size_t l, int f) { }
++static inline void nop_dma_unmap_area(const void *s, size_t l, int f) { }
++#endif
++
+ #ifndef MULTI_CACHE
+ #define __cpuc_flush_icache_all		__glue(_CACHE,_flush_icache_all)
+ #define __cpuc_flush_kern_all		__glue(_CACHE,_flush_kern_cache_all)
+diff --git a/arch/arm/include/asm/glue-df.h b/arch/arm/include/asm/glue-df.h
+index 354d571..26be71c 100644
+--- a/arch/arm/include/asm/glue-df.h
++++ b/arch/arm/include/asm/glue-df.h
+@@ -103,6 +103,14 @@
+ # endif
+ #endif
+ 
++#ifdef CONFIG_CPU_ABRT_NOMMU
++# ifdef CPU_DABORT_HANDLER
++#  define MULTI_DABORT 1
++# else
++#  define CPU_DABORT_HANDLER nommu_early_abort
++# endif
++#endif
++
+ #ifndef CPU_DABORT_HANDLER
+ #error Unknown data abort handler type
+ #endif
+diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
+index e2be7f1..8f9991b 100644
+--- a/arch/arm/include/asm/glue-proc.h
++++ b/arch/arm/include/asm/glue-proc.h
+@@ -248,6 +248,15 @@
+ # endif
+ #endif
+ 
++#ifdef CONFIG_CPU_V7M
++# ifdef CPU_NAME
++#  undef  MULTI_CPU
++#  define MULTI_CPU
++# else
++#  define CPU_NAME cpu_v7m
++# endif
++#endif
++
+ #ifndef MULTI_CPU
+ #define cpu_proc_init			__glue(CPU_NAME,_proc_init)
+ #define cpu_proc_fin			__glue(CPU_NAME,_proc_fin)
+diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
+index 1e6cca5..ac4d548 100644
+--- a/arch/arm/include/asm/irqflags.h
++++ b/arch/arm/include/asm/irqflags.h
+@@ -10,6 +10,18 @@
+  */
+ #if __LINUX_ARM_ARCH__ >= 6
+ 
++#ifdef CONFIG_CPU_V7M
++static inline unsigned long arch_local_irq_save(void)
++{
++	unsigned long flags;
++
++	asm volatile(
++		"	mrs	%0, primask	@ arch_local_irq_save\n"
++		"	cpsid	i"
++		: "=r" (flags) : : "memory", "cc");
++	return flags;
++}
++#else
+ static inline unsigned long arch_local_irq_save(void)
+ {
+ 	unsigned long flags;
+@@ -20,6 +32,7 @@ static inline unsigned long arch_local_irq_save(void)
+ 		: "=r" (flags) : : "memory", "cc");
+ 	return flags;
+ }
++#endif
+ 
+ static inline void arch_local_irq_enable(void)
+ {
+@@ -122,6 +135,38 @@ static inline void arch_local_irq_disable(void)
+ 
+ #endif
+ 
++#ifdef CONFIG_CPU_V7M
++/*
++ * Save the current interrupt enable state.
++ */
++static inline unsigned long arch_local_save_flags(void)
++{
++	unsigned long flags;
++	asm volatile(
++		"	mrs	%0, primask	@ local_save_flags"
++		: "=r" (flags) : : "memory", "cc");
++	return flags;
++}
++
++/*
++ * restore saved IRQ & FIQ state
++ */
++static inline void arch_local_irq_restore(unsigned long flags)
++{
++	asm volatile(
++		"	msr	primask, %0	@ local_irq_restore"
++		:
++		: "r" (flags)
++		: "memory", "cc");
++}
++
++static inline int arch_irqs_disabled_flags(unsigned long flags)
++{
++	return flags & 1;
++}
++
++#else /* ifdef CONFIG_CPU_V7M */
++
+ /*
+  * Save the current interrupt enable state.
+  */
+@@ -151,5 +196,7 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ 	return flags & PSR_I_BIT;
  }
  
 -#endif
-+#else /* ifdef CONFIG_CPU_CP15 */
+-#endif
++#endif /* ifdef CONFIG_CPU_V7M / else */
 +
-+#define cr_no_alignment	UL(0)
-+#define cr_alignment	UL(0)
-+
-+#endif /* ifdef CONFIG_CPU_CP15 / else */
-+
-+#endif /* ifndef __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index 854bd22..2f560c5 100644
---- a/arch/arm/kernel/head-common.S
-+++ b/arch/arm/kernel/head-common.S
-@@ -98,8 +98,9 @@ __mmap_switched:
- 	str	r9, [r4]			@ Save processor ID
- 	str	r1, [r5]			@ Save machine type
- 	str	r2, [r6]			@ Save atags pointer
--	bic	r4, r0, #CR_A			@ Clear 'A' bit
--	stmia	r7, {r0, r4}			@ Save control register values
-+	cmp	r7, #0
-+	bicne	r4, r0, #CR_A			@ Clear 'A' bit
-+	stmneia	r7, {r0, r4}			@ Save control register values
- 	b	start_kernel
- ENDPROC(__mmap_switched)
- 
-@@ -113,7 +114,11 @@ __mmap_switched_data:
- 	.long	processor_id			@ r4
- 	.long	__machine_arch_type		@ r5
- 	.long	__atags_pointer			@ r6
-+#ifdef CONFIG_CPU_CP15
- 	.long	cr_alignment			@ r7
++#endif /* ifdef __KERNEL__ */
++#endif /* ifndef __ASM_ARM_IRQFLAGS_H */
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index 5ac8d3d..850710e 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -49,7 +49,14 @@ struct thread_struct {
+ #ifdef CONFIG_MMU
+ #define nommu_start_thread(regs) do { } while (0)
+ #else
++#ifndef CONFIG_CPU_V7M
+ #define nommu_start_thread(regs) regs->ARM_r10 = current->mm->start_data
 +#else
-+	.long	0
++#define nommu_start_thread(regs) do {					\
++	regs->ARM_r10 = current->mm->start_data;			\
++	regs->ARM_EXC_RET = 0xfffffffdL;				\
++} while (0)
 +#endif
- 	.long	init_thread_union + THREAD_START_SP @ sp
- 	.size	__mmap_switched_data, . - __mmap_switched_data
- 
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 9107231..7df07d1 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -962,12 +962,14 @@ static int __init alignment_init(void)
- 		return -ENOMEM;
  #endif
  
-+#ifdef CONFIG_CPU_CP15
- 	if (cpu_is_v6_unaligned()) {
- 		cr_alignment &= ~CR_A;
- 		cr_no_alignment &= ~CR_A;
- 		set_cr(cr_alignment);
- 		ai_usermode = safe_usermode(ai_usermode, false);
- 	}
+ #define start_thread(regs,pc,sp)					\
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index 451808b..696bbf4 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -39,16 +39,25 @@
+ #define FIQ26_MODE	0x00000001
+ #define IRQ26_MODE	0x00000002
+ #define SVC26_MODE	0x00000003
++#ifndef CONFIG_CPU_V7M
+ #define USR_MODE	0x00000010
++#define SVC_MODE	0x00000013
++#else
++#define USR_MODE	0x00000000
++#define SVC_MODE	0x00000000
++#endif
+ #define FIQ_MODE	0x00000011
+ #define IRQ_MODE	0x00000012
+-#define SVC_MODE	0x00000013
+ #define ABT_MODE	0x00000017
+ #define UND_MODE	0x0000001b
+ #define SYSTEM_MODE	0x0000001f
+ #define MODE32_BIT	0x00000010
+ #define MODE_MASK	0x0000001f
++#ifndef CONFIG_CPU_V7M
+ #define PSR_T_BIT	0x00000020
++#else
++#define PSR_T_BIT	0x01000000
++#endif
+ #define PSR_F_BIT	0x00000040
+ #define PSR_I_BIT	0x00000080
+ #define PSR_A_BIT	0x00000100
+@@ -106,7 +115,11 @@ struct pt_regs {
+ };
+ #else /* __KERNEL__ */
+ struct pt_regs {
++#ifdef CONFIG_CPU_V7M
++	unsigned long uregs[20];
++#else
+ 	unsigned long uregs[18];
++#endif
+ };
+ #endif /* __KERNEL__ */
+ 
+@@ -128,6 +141,7 @@ struct pt_regs {
+ #define ARM_r1		uregs[1]
+ #define ARM_r0		uregs[0]
+ #define ARM_ORIG_r0	uregs[17]
++#define ARM_EXC_RET	uregs[18]
+ 
+ /*
+  * The size of the user-visible VFP state as seen by PTRACE_GET/SETVFPREGS
+@@ -165,6 +179,7 @@ struct pt_regs {
+  */
+ static inline int valid_user_regs(struct pt_regs *regs)
+ {
++#ifndef CONFIG_CPU_V7M
+ 	unsigned long mode = regs->ARM_cpsr & MODE_MASK;
+ 
+ 	/*
+@@ -187,6 +202,9 @@ static inline int valid_user_regs(struct pt_regs *regs)
+ 		regs->ARM_cpsr |= USR_MODE;
+ 
+ 	return 0;
++#else /* ifndef CONFIG_CPU_V7M */
++	return 1;
++#endif
+ }
+ 
+ static inline long regs_return_value(struct pt_regs *regs)
+diff --git a/arch/arm/include/asm/system_info.h b/arch/arm/include/asm/system_info.h
+index dfd386d..720ea03 100644
+--- a/arch/arm/include/asm/system_info.h
++++ b/arch/arm/include/asm/system_info.h
+@@ -11,6 +11,7 @@
+ #define CPU_ARCH_ARMv5TEJ	7
+ #define CPU_ARCH_ARMv6		8
+ #define CPU_ARCH_ARMv7		9
++#define CPU_ARCH_ARMv7M		10
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 1429d89..6f6b5b6 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -91,6 +91,9 @@ int main(void)
+   DEFINE(S_PC,			offsetof(struct pt_regs, ARM_pc));
+   DEFINE(S_PSR,			offsetof(struct pt_regs, ARM_cpsr));
+   DEFINE(S_OLD_R0,		offsetof(struct pt_regs, ARM_ORIG_r0));
++#ifdef CONFIG_CPU_V7M
++  DEFINE(S_EXC_RET,		offsetof(struct pt_regs, ARM_EXC_RET));
++#endif
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
+ #ifdef CONFIG_CACHE_L2X0
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index 278cfc1..c391c05 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -44,10 +44,13 @@ ENTRY(stext)
+ 
+ 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
+ 						@ and irqs disabled
+-#ifndef CONFIG_CPU_CP15
+-	ldr	r9, =CONFIG_PROCESSOR_ID
+-#else
++#if defined(CONFIG_CPU_CP15)
+ 	mrc	p15, 0, r9, c0, c0		@ get processor id
++#elif defined(CONFIG_CPU_V7M)
++	ldr	r9, =0xe000ed00			@ CPUID register address
++	ldr	r9, [r9]
++#else
++	ldr	r9, =CONFIG_PROCESSOR_ID
+ #endif
+ 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+ 	movs	r10, r5				@ invalid processor (r5=0)?
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index b914113..7eb44c9 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -134,7 +134,9 @@ struct stack {
+ 	u32 und[3];
+ } ____cacheline_aligned;
+ 
++#ifndef CONFIG_CPU_V7M
+ static struct stack stacks[NR_CPUS];
 +#endif
  
- 	hook_fault_code(FAULT_CODE_ALIGNMENT, do_alignment, SIGBUS, BUS_ADRALN,
- 			"alignment exception");
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b86f893..b78d47a 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -96,6 +96,7 @@ static struct cachepolicy cache_policies[] __initdata = {
- 	}
+ char elf_platform[ELF_PLATFORM_SIZE];
+ EXPORT_SYMBOL(elf_platform);
+@@ -214,7 +216,7 @@ static const char *proc_arch[] = {
+ 	"5TEJ",
+ 	"6TEJ",
+ 	"7",
+-	"?(11)",
++	"7M",
+ 	"?(12)",
+ 	"?(13)",
+ 	"?(14)",
+@@ -223,6 +225,12 @@ static const char *proc_arch[] = {
+ 	"?(17)",
  };
  
-+#ifdef CONFIG_CPU_CP15
- /*
-  * These are useful for identifying cache coherency
-  * problems by allowing the cache or the cache and
-@@ -194,6 +195,22 @@ void adjust_cr(unsigned long mask, unsigned long set)
- }
- #endif
- 
++#ifdef CONFIG_CPU_V7M
++static int __get_cpu_architecture(void)
++{
++	return CPU_ARCH_ARMv7M;
++}
 +#else
-+
-+static int __init early_cachepolicy(char *p)
-+{
-+	pr_warning("cachepolicy kernel parameter not supported without cp15\n");
-+}
-+early_param("cachepolicy", early_cachepolicy);
-+
-+static int __init noalign_setup(char *__unused)
-+{
-+	pr_warning("noalign kernel parameter not supported without cp15\n");
-+}
-+__setup("noalign", noalign_setup);
-+
-+#endif
-+
- #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
- #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+ static int __get_cpu_architecture(void)
+ {
+ 	int cpu_arch;
+@@ -255,6 +263,7 @@ static int __get_cpu_architecture(void)
  
+ 	return cpu_arch;
+ }
++#endif
+ 
+ int __pure cpu_architecture(void)
+ {
+@@ -382,6 +391,7 @@ static void __init feat_v6_fixup(void)
+  */
+ void cpu_init(void)
+ {
++#ifndef CONFIG_CPU_V7M
+ 	unsigned int cpu = smp_processor_id();
+ 	struct stack *stk = &stacks[cpu];
+ 
+@@ -426,6 +436,7 @@ void cpu_init(void)
+ 	      "I" (offsetof(struct stack, und[0])),
+ 	      PLC (PSR_F_BIT | PSR_I_BIT | SVC_MODE)
+ 	    : "r14");
++#endif
+ }
+ 
+ int __cpu_logical_map[NR_CPUS];
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 7784547..d66da90 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -791,6 +791,7 @@ static void __init kuser_get_tls_init(unsigned long vectors)
+ 
+ void __init early_trap_init(void *vectors_base)
+ {
++#ifndef CONFIG_CPU_V7M
+ 	unsigned long vectors = (unsigned long)vectors_base;
+ 	extern char __stubs_start[], __stubs_end[];
+ 	extern char __vectors_start[], __vectors_end[];
+@@ -824,4 +825,5 @@ void __init early_trap_init(void *vectors_base)
+ 
+ 	flush_icache_range(vectors, vectors + PAGE_SIZE);
+ 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
++#endif
+ }
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 6486d2f..5960a32 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -19,12 +19,14 @@
+ 
+ void __init arm_mm_memblock_reserve(void)
+ {
++#ifndef CONFIG_CPU_V7M
+ 	/*
+ 	 * Register the exception vector page.
+ 	 * some architectures which the DRAM is the exception vector to trap,
+ 	 * alloc_page breaks with error, although it is not NULL, but "0."
+ 	 */
+ 	memblock_reserve(CONFIG_VECTORS_BASE, PAGE_SIZE);
++#endif
+ }
+ 
+ void __init sanity_check_meminfo(void)
+diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+new file mode 100644
+index 0000000..2b8eb97
+--- /dev/null
++++ b/arch/arm/mm/proc-v7m.S
+@@ -0,0 +1,161 @@
++/*
++ *  linux/arch/arm/mm/proc-v7m.S
++ *
++ *  Copyright (C) 2008 ARM Ltd.
++ *  Copyright (C) 2001 Deep Blue Solutions Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ *  This is the "shell" of the ARMv7-M processor support.
++ */
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++ENTRY(cpu_v7m_proc_init)
++	mov	pc, lr
++ENDPROC(cpu_v7m_proc_init)
++
++ENTRY(cpu_v7m_proc_fin)
++	mov	pc, lr
++ENDPROC(cpu_v7m_proc_fin)
++
++/*
++ *	cpu_v7m_reset(loc)
++ *
++ *	Perform a soft reset of the system.  Put the CPU into the
++ *	same state as it would be if it had been reset, and branch
++ *	to what would be the reset vector.
++ *
++ *	- loc   - location to jump to for soft reset
++ */
++	.align	5
++ENTRY(cpu_v7m_reset)
++	mov	pc, r0
++ENDPROC(cpu_v7m_reset)
++
++/*
++ *	cpu_v7m_do_idle()
++ *
++ *	Idle the processor (eg, wait for interrupt).
++ *
++ *	IRQs are already disabled.
++ */
++ENTRY(cpu_v7m_do_idle)
++	wfi
++	mov	pc, lr
++ENDPROC(cpu_v7m_do_idle)
++
++ENTRY(cpu_v7m_dcache_clean_area)
++	mov	pc, lr
++ENDPROC(cpu_v7m_dcache_clean_area)
++
++/*
++ * There is no MMU, so here is nothing to do.
++ */
++ENTRY(cpu_v7m_switch_mm)
++	mov	pc, lr
++ENDPROC(cpu_v7m_switch_mm)
++
++cpu_v7m_name:
++	.ascii	"ARMv7-M Processor"
++	.align
++
++	.section ".text.init", #alloc, #execinstr
++
++/*
++ *	__v7m_setup
++ *
++ *	This should be able to cover all ARMv7-M cores.
++ */
++__v7m_setup:
++	@ Configure the vector table base address
++	ldr	r0, =0xe000ed08		@ vector table base address
++	ldr	r12, =vector_table
++	str	r12, [r0]
++
++	@ Lower the priority of the SVC and PendSV exceptions
++	ldr	r0, =0xe000ed1c
++	mov	r5, #0x80000000
++	str	r5, [r0]		@ set SVC priority
++	ldr	r0, =0xe000ed20
++	mov	r5, #0x00800000
++	str	r5, [r0]		@ set PendSV priority
++
++	@ SVC to run the kernel in this mode
++	adr	r0, BSYM(1f)
++	ldr	r5, [r12, #11 * 4]	@ read the SVC vector entry
++	str	r0, [r12, #11 * 4]	@ write the temporary SVC vector entry
++	mov	r6, lr			@ save LR
++	mov	r7, sp			@ save SP
++	ldr	sp, =__v7m_setup_stack_top
++	cpsie	i
++	svc	#0
++1:	cpsid	i
++	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
++	mov	lr, r6			@ restore LR
++	mov	sp, r7			@ restore SP
++
++	@ Special-purpose control register
++	mov	r0, #1
++	msr	control, r0		@ Thread mode has unpriviledged access
++
++	@ Configure the System Control Register
++	ldr	r0, =0xe000ed14		@ system control register
++	ldr	r12, [r0]
++	orr	r12, #1 << 9		@ STKALIGN
++	str	r12, [r0]
++	mov	pc, lr
++ENDPROC(__v7m_setup)
++
++	.align	2
++	.type	v7m_processor_functions, #object
++ENTRY(v7m_processor_functions)
++	.word	nommu_early_abort
++	.word	cpu_v7m_proc_init
++	.word	cpu_v7m_proc_fin
++	.word	cpu_v7m_reset
++	.word	cpu_v7m_do_idle
++	.word	cpu_v7m_dcache_clean_area
++	.word	cpu_v7m_switch_mm
++	.word	0			@ cpu_v7m_set_pte_ext
++	.word	legacy_pabort
++	.size	v7m_processor_functions, . - v7m_processor_functions
++
++	.type	cpu_arch_name, #object
++cpu_arch_name:
++	.asciz	"armv7m"
++	.size	cpu_arch_name, . - cpu_arch_name
++
++	.type	cpu_elf_name, #object
++cpu_elf_name:
++	.asciz	"v7m"
++	.size	cpu_elf_name, . - cpu_elf_name
++	.align
++
++	.section ".proc.info.init", #alloc, #execinstr
++
++	/*
++	 * Match any ARMv7-M processor core.
++	 */
++	.type	__v7m_proc_info, #object
++__v7m_proc_info:
++	.long	0x000f0000		@ Required ID value
++	.long	0x000f0000		@ Mask for ID
++	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
++	.long   0			@ proc_info_list.__cpu_io_mmu_flags
++	b	__v7m_setup		@ proc_info_list.__cpu_flush
++	.long	cpu_arch_name
++	.long	cpu_elf_name
++	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
++	.long	cpu_v7m_name
++	.long	v7m_processor_functions	@ proc_info_list.proc
++	.long	0			@ proc_info_list.tlb
++	.long	0			@ proc_info_list.user
++	.long	0			@ proc_info_list.cache
++	.size	__v7m_proc_info, . - __v7m_proc_info
++
++__v7m_setup_stack:
++	.space	4 * 8				@ 8 registers
++__v7m_setup_stack_top:
 -- 
 1.7.9.5
