@@ -1,348 +1,227 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue,  3 Apr 2012 20:33:59 -0500
-Subject: [PATCH 1/5] ARM: remove ixp23xx and ixp2000 platforms
-Message-ID: <1333503243-7702-1-git-send-email-robherring2@gmail.com>
+Date: Tue,  3 Apr 2012 20:34:01 -0500
+Subject: [PATCH 3/5] i2c: remove ixp2000 driver
+In-Reply-To: <1333503243-7702-1-git-send-email-robherring2@gmail.com>
+References: <1333503243-7702-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1333503243-7702-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-ixp2xxx platforms have had no real changes since ~2006 and the maintainer
-has said on irc that they can be removed:
-
-13:05 < nico> do you still care about ixp2000?
-13:22 < lennert> not really, no
-13:58 < nico> do you think we could remove it from the kernel tree?
-14:01 < lennert> go for it, and remove ixp23xx too while you're at it
-
-Removing will help simplify ARM consolidation in general and PCI re-work
-specifically.
+The platform is removed, so there are no users of this driver.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Randy Dunlap <rdunlap@xenotime.net>
+Cc: "Jean Delvare (PC drivers, core)" <khali@linux-fr.org>
+Cc: "Ben Dooks (embedded platforms)" <ben-linux@fluff.org>
+Cc: "Wolfram Sang (embedded platforms)" <w.sang@pengutronix.de>
+Cc: linux-i2c at vger.kernel.org
 ---
- Documentation/arm/00-INDEX                        |    2 -
- Documentation/arm/IXP2000                         |   69 ---
- MAINTAINERS                                       |   17 -
- arch/arm/Kconfig                                  |   26 -
- arch/arm/Makefile                                 |    2 -
- arch/arm/boot/compressed/head-xscale.S            |    7 -
- arch/arm/common/Makefile                          |    2 -
- arch/arm/common/uengine.c                         |  507 --------------------
- arch/arm/configs/ixp2000_defconfig                |   99 ----
- arch/arm/configs/ixp23xx_defconfig                |  105 -----
- arch/arm/include/asm/hardware/uengine.h           |   62 ---
- arch/arm/mach-ixp2000/Kconfig                     |   72 ---
- arch/arm/mach-ixp2000/Makefile                    |   14 -
- arch/arm/mach-ixp2000/Makefile.boot               |    3 -
- arch/arm/mach-ixp2000/core.c                      |  520 ---------------------
- arch/arm/mach-ixp2000/enp2611.c                   |  265 -----------
- arch/arm/mach-ixp2000/include/mach/debug-macro.S  |   25 -
- arch/arm/mach-ixp2000/include/mach/enp2611.h      |   46 --
- arch/arm/mach-ixp2000/include/mach/entry-macro.S  |   54 ---
- arch/arm/mach-ixp2000/include/mach/gpio-ixp2000.h |   48 --
- arch/arm/mach-ixp2000/include/mach/hardware.h     |   36 --
- arch/arm/mach-ixp2000/include/mach/io.h           |  133 ------
- arch/arm/mach-ixp2000/include/mach/irqs.h         |  207 --------
- arch/arm/mach-ixp2000/include/mach/ixdp2x00.h     |   92 ----
- arch/arm/mach-ixp2000/include/mach/ixdp2x01.h     |   57 ---
- arch/arm/mach-ixp2000/include/mach/ixp2000-regs.h |  451 ------------------
- arch/arm/mach-ixp2000/include/mach/memory.h       |   31 --
- arch/arm/mach-ixp2000/include/mach/platform.h     |  153 ------
- arch/arm/mach-ixp2000/include/mach/timex.h        |   13 -
- arch/arm/mach-ixp2000/include/mach/uncompress.h   |   47 --
- arch/arm/mach-ixp2000/ixdp2400.c                  |  180 -------
- arch/arm/mach-ixp2000/ixdp2800.c                  |  295 ------------
- arch/arm/mach-ixp2000/ixdp2x00.c                  |  306 ------------
- arch/arm/mach-ixp2000/ixdp2x01.c                  |  483 -------------------
- arch/arm/mach-ixp2000/pci.c                       |  252 ----------
- arch/arm/mach-ixp23xx/Kconfig                     |   25 -
- arch/arm/mach-ixp23xx/Makefile                    |   11 -
- arch/arm/mach-ixp23xx/Makefile.boot               |    2 -
- arch/arm/mach-ixp23xx/core.c                      |  455 ------------------
- arch/arm/mach-ixp23xx/espresso.c                  |   93 ----
- arch/arm/mach-ixp23xx/include/mach/debug-macro.S  |   25 -
- arch/arm/mach-ixp23xx/include/mach/entry-macro.S  |   31 --
- arch/arm/mach-ixp23xx/include/mach/hardware.h     |   32 --
- arch/arm/mach-ixp23xx/include/mach/io.h           |   22 -
- arch/arm/mach-ixp23xx/include/mach/irqs.h         |  223 ---------
- arch/arm/mach-ixp23xx/include/mach/ixdp2351.h     |   89 ----
- arch/arm/mach-ixp23xx/include/mach/ixp23xx.h      |  298 ------------
- arch/arm/mach-ixp23xx/include/mach/memory.h       |   34 --
- arch/arm/mach-ixp23xx/include/mach/platform.h     |   58 ---
- arch/arm/mach-ixp23xx/include/mach/time.h         |    3 -
- arch/arm/mach-ixp23xx/include/mach/timex.h        |    7 -
- arch/arm/mach-ixp23xx/include/mach/uncompress.h   |   40 --
- arch/arm/mach-ixp23xx/ixdp2351.c                  |  347 --------------
- arch/arm/mach-ixp23xx/pci.c                       |  294 ------------
- arch/arm/mach-ixp23xx/roadrunner.c                |  180 -------
- 55 files changed, 0 insertions(+), 6950 deletions(-)
- delete mode 100644 Documentation/arm/IXP2000
- delete mode 100644 arch/arm/common/uengine.c
- delete mode 100644 arch/arm/configs/ixp2000_defconfig
- delete mode 100644 arch/arm/configs/ixp23xx_defconfig
- delete mode 100644 arch/arm/include/asm/hardware/uengine.h
- delete mode 100644 arch/arm/mach-ixp2000/Kconfig
- delete mode 100644 arch/arm/mach-ixp2000/Makefile
- delete mode 100644 arch/arm/mach-ixp2000/Makefile.boot
- delete mode 100644 arch/arm/mach-ixp2000/core.c
- delete mode 100644 arch/arm/mach-ixp2000/enp2611.c
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/enp2611.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/gpio-ixp2000.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/io.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/ixdp2x00.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/ixdp2x01.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/ixp2000-regs.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/memory.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/platform.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/timex.h
- delete mode 100644 arch/arm/mach-ixp2000/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-ixp2000/ixdp2400.c
- delete mode 100644 arch/arm/mach-ixp2000/ixdp2800.c
- delete mode 100644 arch/arm/mach-ixp2000/ixdp2x00.c
- delete mode 100644 arch/arm/mach-ixp2000/ixdp2x01.c
- delete mode 100644 arch/arm/mach-ixp2000/pci.c
- delete mode 100644 arch/arm/mach-ixp23xx/Kconfig
- delete mode 100644 arch/arm/mach-ixp23xx/Makefile
- delete mode 100644 arch/arm/mach-ixp23xx/Makefile.boot
- delete mode 100644 arch/arm/mach-ixp23xx/core.c
- delete mode 100644 arch/arm/mach-ixp23xx/espresso.c
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/io.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/ixdp2351.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/ixp23xx.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/memory.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/platform.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/time.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/timex.h
- delete mode 100644 arch/arm/mach-ixp23xx/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-ixp23xx/ixdp2351.c
- delete mode 100644 arch/arm/mach-ixp23xx/pci.c
- delete mode 100644 arch/arm/mach-ixp23xx/roadrunner.c
+ drivers/i2c/busses/Kconfig       |   14 ----
+ drivers/i2c/busses/Makefile      |    1 -
+ drivers/i2c/busses/i2c-ixp2000.c |  157 --------------------------------------
+ 3 files changed, 0 insertions(+), 172 deletions(-)
+ delete mode 100644 drivers/i2c/busses/i2c-ixp2000.c
 
-diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
-index 91c24a1..36420e1 100644
---- a/Documentation/arm/00-INDEX
-+++ b/Documentation/arm/00-INDEX
-@@ -4,8 +4,6 @@ Booting
- 	- requirements for booting
- Interrupts
- 	- ARM Interrupt subsystem documentation
--IXP2000
--	- Release Notes for Linux on Intel's IXP2000 Network Processor
- msm
- 	- MSM specific documentation
- Netwinder
-diff --git a/Documentation/arm/IXP2000 b/Documentation/arm/IXP2000
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index d2c5095..188543d 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -445,20 +445,6 @@ config I2C_IOP3XX
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called i2c-iop3xx.
+ 
+-config I2C_IXP2000
+-	tristate "IXP2000 GPIO-Based I2C Interface (DEPRECATED)"
+-	depends on ARCH_IXP2000
+-	select I2C_ALGOBIT
+-	help
+-	  Say Y here if you have an Intel IXP2000 (2400, 2800, 2850) based
+-	  system and are using GPIO lines for an I2C bus.
+-
+-	  This support is also available as a module. If so, the module
+-	  will be called i2c-ixp2000.
+-
+-	  This driver is deprecated and will be dropped soon. Use i2c-gpio
+-	  instead.
+-
+ config I2C_MPC
+ 	tristate "MPC107/824x/85xx/512x/52xx/83xx/86xx"
+ 	depends on PPC
+diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+index 569567b..ce3c2be 100644
+--- a/drivers/i2c/busses/Makefile
++++ b/drivers/i2c/busses/Makefile
+@@ -44,7 +44,6 @@ obj-$(CONFIG_I2C_IBM_IIC)	+= i2c-ibm_iic.o
+ obj-$(CONFIG_I2C_IMX)		+= i2c-imx.o
+ obj-$(CONFIG_I2C_INTEL_MID)	+= i2c-intel-mid.o
+ obj-$(CONFIG_I2C_IOP3XX)	+= i2c-iop3xx.o
+-obj-$(CONFIG_I2C_IXP2000)	+= i2c-ixp2000.o
+ obj-$(CONFIG_I2C_MPC)		+= i2c-mpc.o
+ obj-$(CONFIG_I2C_MV64XXX)	+= i2c-mv64xxx.o
+ obj-$(CONFIG_I2C_MXS)		+= i2c-mxs.o
+diff --git a/drivers/i2c/busses/i2c-ixp2000.c b/drivers/i2c/busses/i2c-ixp2000.c
 deleted file mode 100644
-index 68d21d9..0000000
---- a/Documentation/arm/IXP2000
+index 5d263f90..0000000
+--- a/drivers/i2c/busses/i2c-ixp2000.c
 +++ /dev/null
-@@ -1,69 +0,0 @@
+@@ -1,157 +0,0 @@
+-/*
+- * drivers/i2c/busses/i2c-ixp2000.c
+- *
+- * I2C adapter for IXP2000 systems using GPIOs for I2C bus
+- *
+- * Author: Deepak Saxena <dsaxena@plexity.net>
+- * Based on IXDP2400 code by: Naeem M. Afzal <naeem.m.afzal@intel.com>
+- * Made generic by: Jeff Daly <jeffrey.daly@intel.com>
+- *
+- * Copyright (c) 2003-2004 MontaVista Software Inc.
+- *
+- * This file is licensed under  the terms of the GNU General Public 
+- * License version 2. This program is licensed "as is" without any 
+- * warranty of any kind, whether express or implied.
+- *
+- * From Jeff Daly:
+- *
+- * I2C adapter driver for Intel IXDP2xxx platforms. This should work for any
+- * IXP2000 platform if it uses the HW GPIO in the same manner.  Basically, 
+- * SDA and SCL GPIOs have external pullups.  Setting the respective GPIO to 
+- * an input will make the signal a '1' via the pullup.  Setting them to 
+- * outputs will pull them down. 
+- *
+- * The GPIOs are open drain signals and are used as configuration strap inputs
+- * during power-up so there's generally a buffer on the board that needs to be 
+- * 'enabled' to drive the GPIOs.
+- */
 -
---------------------------------------------------------------------------
--Release Notes for Linux on Intel's IXP2000 Network Processor
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/module.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c-algo-bit.h>
+-#include <linux/slab.h>
 -
--Maintained by Deepak Saxena <dsaxena@plexity.net>
---------------------------------------------------------------------------
+-#include <mach/hardware.h>	/* Pick up IXP2000-specific bits */
+-#include <mach/gpio-ixp2000.h>
 -
--1. Overview
+-static inline int ixp2000_scl_pin(void *data)
+-{
+-	return ((struct ixp2000_i2c_pins*)data)->scl_pin;
+-}
 -
--Intel's IXP2000 family of NPUs (IXP2400, IXP2800, IXP2850) is designed
--for high-performance network applications such high-availability
--telecom systems. In addition to an XScale core, it contains up to 8
--"MicroEngines" that run special code, several high-end networking 
--interfaces (UTOPIA, SPI, etc), a PCI host bridge, one serial port,
--flash interface, and some other odds and ends. For more information, see:
+-static inline int ixp2000_sda_pin(void *data)
+-{
+-	return ((struct ixp2000_i2c_pins*)data)->sda_pin;
+-}
 -
--http://developer.intel.com
 -
--2. Linux Support
+-static void ixp2000_bit_setscl(void *data, int val)
+-{
+-	int i = 5000;
 -
--Linux currently supports the following features on the IXP2000 NPUs:
+-	if (val) {
+-		gpio_line_config(ixp2000_scl_pin(data), GPIO_IN);
+-		while(!gpio_line_get(ixp2000_scl_pin(data)) && i--);
+-	} else {
+-		gpio_line_config(ixp2000_scl_pin(data), GPIO_OUT);
+-	}
+-}
 -
--- On-chip serial
--- PCI
--- Flash (MTD/JFFS2)
--- I2C through GPIO
--- Timers (watchdog, OS)
+-static void ixp2000_bit_setsda(void *data, int val)
+-{
+-	if (val) {
+-		gpio_line_config(ixp2000_sda_pin(data), GPIO_IN);
+-	} else {
+-		gpio_line_config(ixp2000_sda_pin(data), GPIO_OUT);
+-	}
+-}
 -
--That is about all we can support under Linux ATM b/c the core networking
--components of the chip are accessed via Intel's closed source SDK. 
--Please contact Intel directly on issues with using those. There is
--also a mailing list run by some folks at Princeton University that might
--be of help:  https://lists.cs.princeton.edu/mailman/listinfo/ixp2xxx
+-static int ixp2000_bit_getscl(void *data)
+-{
+-	return gpio_line_get(ixp2000_scl_pin(data));
+-}
 -
--WHATEVER YOU DO, DO NOT POST EMAIL TO THE LINUX-ARM OR LINUX-ARM-KERNEL
--MAILING LISTS REGARDING THE INTEL SDK.
+-static int ixp2000_bit_getsda(void *data)
+-{
+-	return gpio_line_get(ixp2000_sda_pin(data));
+-}
 -
--3. Supported Platforms
+-struct ixp2000_i2c_data {
+-	struct ixp2000_i2c_pins *gpio_pins;
+-	struct i2c_adapter adapter;
+-	struct i2c_algo_bit_data algo_data;
+-};
 -
--- Intel IXDP2400 Reference Platform
--- Intel IXDP2800 Reference Platform
--- Intel IXDP2401 Reference Platform
--- Intel IXDP2801 Reference Platform
--- RadiSys ENP-2611
+-static int ixp2000_i2c_remove(struct platform_device *plat_dev)
+-{
+-	struct ixp2000_i2c_data *drv_data = platform_get_drvdata(plat_dev);
 -
--4. Usage Notes
+-	platform_set_drvdata(plat_dev, NULL);
 -
--- The IXP2000 platforms usually have rather complex PCI bus topologies
--  with large memory space requirements. In addition, b/c of the way the
--  Intel SDK is designed, devices are enumerated in a very specific
--  way. B/c of this this, we use "pci=firmware" option in the kernel
--  command line so that we do not re-enumerate the bus.
+-	i2c_del_adapter(&drv_data->adapter);
 -
--- IXDP2x01 systems have variable clock tick rates that we cannot determine 
--  via HW registers. The "ixdp2x01_clk=XXX" cmd line options allow you
--  to pass the clock rate to the board port.
+-	kfree(drv_data);
 -
--5. Thanks
+-	return 0;
+-}
 -
--The IXP2000 work has been funded by Intel Corp. and MontaVista Software, Inc.
+-static int ixp2000_i2c_probe(struct platform_device *plat_dev)
+-{
+-	int err;
+-	struct ixp2000_i2c_pins *gpio = plat_dev->dev.platform_data;
+-	struct ixp2000_i2c_data *drv_data = 
+-		kzalloc(sizeof(struct ixp2000_i2c_data), GFP_KERNEL);
 -
--The following people have contributed patches/comments/etc:
+-	if (!drv_data)
+-		return -ENOMEM;
+-	drv_data->gpio_pins = gpio;
 -
--Naeem F. Afzal
--Lennert Buytenhek
--Jeffrey Daly
+-	drv_data->algo_data.data = gpio;
+-	drv_data->algo_data.setsda = ixp2000_bit_setsda;
+-	drv_data->algo_data.setscl = ixp2000_bit_setscl;
+-	drv_data->algo_data.getsda = ixp2000_bit_getsda;
+-	drv_data->algo_data.getscl = ixp2000_bit_getscl;
+-	drv_data->algo_data.udelay = 6;
+-	drv_data->algo_data.timeout = HZ;
 -
---------------------------------------------------------------------------
--Last Update: 8/09/2004
-diff --git a/MAINTAINERS b/MAINTAINERS
-index eecf344..defc06a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -640,13 +640,6 @@ S:	Maintained
- F:	drivers/amba/
- F:	include/linux/amba/bus.h
- 
--ARM/ADI ROADRUNNER MACHINE SUPPORT
--M:	Lennert Buytenhek <kernel@wantstofly.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--S:	Maintained
--F:	arch/arm/mach-ixp23xx/
--F:	arch/arm/mach-ixp23xx/include/mach/
+-	strlcpy(drv_data->adapter.name, plat_dev->dev.driver->name,
+-		sizeof(drv_data->adapter.name));
+-	drv_data->adapter.algo_data = &drv_data->algo_data,
 -
- ARM/ADS SPHERE MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-@@ -859,21 +852,11 @@ M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
--ARM/INTEL IXP2000 ARM ARCHITECTURE
--M:	Lennert Buytenhek <kernel@wantstofly.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--S:	Maintained
+-	drv_data->adapter.dev.parent = &plat_dev->dev;
 -
- ARM/INTEL IXDP2850 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
--ARM/INTEL IXP23XX ARM ARCHITECTURE
--M:	Lennert Buytenhek <kernel@wantstofly.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--S:	Maintained
+-	gpio_line_config(gpio->sda_pin, GPIO_IN);
+-	gpio_line_config(gpio->scl_pin, GPIO_IN);
+-	gpio_line_set(gpio->scl_pin, 0);
+-	gpio_line_set(gpio->sda_pin, 0);
 -
- ARM/INTEL IXP4XX ARM ARCHITECTURE
- M:	Imre Kaloz <kaloz@openwrt.org>
- M:	Krzysztof Halasa <khc@pm.waw.pl>
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9318084..6b242f4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -527,28 +527,6 @@ config ARCH_IOP33X
- 	help
- 	  Support for Intel's IOP33X (XScale) family of processors.
- 
--config ARCH_IXP23XX
-- 	bool "IXP23XX-based"
--	depends on MMU
--	select CPU_XSC3
-- 	select PCI
--	select ARCH_USES_GETTIMEOFFSET
--	select NEED_MACH_IO_H
--	select NEED_MACH_MEMORY_H
--	help
--	  Support for Intel's IXP23xx (XScale) family of processors.
+-	if ((err = i2c_bit_add_bus(&drv_data->adapter)) != 0) {
+-		dev_err(&plat_dev->dev, "Could not install, error %d\n", err);
+-		kfree(drv_data);
+-		return err;
+-	} 
 -
--config ARCH_IXP2000
--	bool "IXP2400/2800-based"
--	depends on MMU
--	select CPU_XSCALE
--	select PCI
--	select ARCH_USES_GETTIMEOFFSET
--	select NEED_MACH_IO_H
--	select NEED_MACH_MEMORY_H
--	help
--	  Support for Intel's IXP2400/2800 (XScale) family of processors.
+-	platform_set_drvdata(plat_dev, drv_data);
 -
- config ARCH_IXP4XX
- 	bool "IXP4xx-based"
- 	depends on MMU
-@@ -1045,10 +1023,6 @@ source "arch/arm/mach-iop13xx/Kconfig"
- 
- source "arch/arm/mach-ixp4xx/Kconfig"
- 
--source "arch/arm/mach-ixp2000/Kconfig"
+-	return 0;
+-}
 -
--source "arch/arm/mach-ixp23xx/Kconfig"
+-static struct platform_driver ixp2000_i2c_driver = {
+-	.probe		= ixp2000_i2c_probe,
+-	.remove		= ixp2000_i2c_remove,
+-	.driver		= {
+-		.name	= "IXP2000-I2C",
+-		.owner	= THIS_MODULE,
+-	},
+-};
 -
- source "arch/arm/mach-kirkwood/Kconfig"
- 
- source "arch/arm/mach-ks8695/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 047a207..a0c40a0 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -149,8 +149,6 @@ machine-$(CONFIG_ARCH_INTEGRATOR)	:= integrator
- machine-$(CONFIG_ARCH_IOP13XX)		:= iop13xx
- machine-$(CONFIG_ARCH_IOP32X)		:= iop32x
- machine-$(CONFIG_ARCH_IOP33X)		:= iop33x
--machine-$(CONFIG_ARCH_IXP2000)		:= ixp2000
--machine-$(CONFIG_ARCH_IXP23XX)		:= ixp23xx
- machine-$(CONFIG_ARCH_IXP4XX)		:= ixp4xx
- machine-$(CONFIG_ARCH_KIRKWOOD)		:= kirkwood
- machine-$(CONFIG_ARCH_KS8695)		:= ks8695
-diff --git a/arch/arm/boot/compressed/head-xscale.S b/arch/arm/boot/compressed/head-xscale.S
-index aa5ee49..6ab0599 100644
---- a/arch/arm/boot/compressed/head-xscale.S
-+++ b/arch/arm/boot/compressed/head-xscale.S
-@@ -32,10 +32,3 @@ __XScale_start:
- 		bic	r0, r0, #0x1000		@ clear Icache
- 		mcr	p15, 0, r0, c1, c0, 0
- 
--#ifdef CONFIG_ARCH_IXP2000
--		mov	r1, #-1
--		mov	r0, #0xd6000000
--		str	r1, [r0, #0x14]
--		str	r1, [r0, #0x18]
--#endif
+-module_platform_driver(ixp2000_i2c_driver);
 -
-diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index 215816f..e8a4e58 100644
---- a/arch/arm/common/Makefile
-+++ b/arch/arm/common/Makefile
-@@ -11,7 +11,5 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
- obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
- obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
- obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
--obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
--obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
- obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
- obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
-
-[snip]
-
-The rest of the patch is just deleted files and too big to get thru the
-lists, so I cut it out.
-
-Rob
+-MODULE_AUTHOR ("Deepak Saxena <dsaxena@plexity.net>");
+-MODULE_DESCRIPTION("IXP2000 GPIO-based I2C bus driver");
+-MODULE_LICENSE("GPL");
+-MODULE_ALIAS("platform:IXP2000-I2C");
+-
+-- 
+1.7.5.4
