@@ -1,118 +1,145 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 4 Apr 2012 22:54:45 +0530
-Subject: [PATCH] clk: clk-private: Add DEFINE_CLK macro
-Message-ID: <CAOh2x=kT9OpRy345qqqaKqG=YB01=Bn2j_=BfmJzpMYsXDqcNQ@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 4 Apr 2012 10:42:22 -0700
+Subject: [PATCH] arm: ep93xx: use gpio_led_register_device
+Message-ID: <201204041042.22674.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viresh Kumar <viresh.kumar@st.com>
+Use gpio_led_register_device to register the two leds connected to
+the ep93xx.
 
-All macros used for creating different kind of clocks have similar code for
-initializing struct clk. This patch removes those redundant lines and create
-another macro DEFINE_CLK.
+Add a SOC_EP93XX Kconfig option for common options needed by ep93xx
+and use that option to select LEDS_GPIO_REGISTER.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+
 ---
- include/linux/clk-private.h |   59 ++++++++++++++----------------------------
- 1 files changed, 20 insertions(+), 39 deletions(-)
 
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 5e4312b..0164a45 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -55,6 +55,18 @@ struct clk {
-  * alternative macro for static initialization
-  */
+ arch/arm/mach-ep93xx/Kconfig |   12 ++++++++++++
+ arch/arm/mach-ep93xx/core.c  |   16 ++++------------
+ 2 files changed, 16 insertions(+), 12 deletions(-)
 
-+#define DEFINE_CLK(_name, _ops, _flags, _parent_names,		\
-+		_parents)					\
-+	static struct clk _name = {				\
-+		.name = #_name,					\
-+		.ops = &_ops,					\
-+		.hw = &_name##_hw.hw,				\
-+		.parent_names = _parent_names,			\
-+		.num_parents = ARRAY_SIZE(_parent_names),	\
-+		.parents = _parents,				\
-+		.flags = _flags,				\
-+	}
+diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+index 97a2493..b27a8ad 100644
+--- a/arch/arm/mach-ep93xx/Kconfig
++++ b/arch/arm/mach-ep93xx/Kconfig
+@@ -2,6 +2,10 @@ if ARCH_EP93XX
+ 
+ menu "Cirrus EP93xx Implementation Options"
+ 
++config SOC_EP93XX
++	bool
++	select LEDS_GPIO_REGISTER
 +
- extern struct clk_ops clk_fixed_rate_ops;
-
- #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
-@@ -68,15 +80,8 @@ extern struct clk_ops clk_fixed_rate_ops;
- 		.fixed_rate = _rate,				\
- 		.flags = _fixed_rate_flags,			\
- 	};							\
--	static struct clk _name = {				\
--		.name = #_name,					\
--		.ops = &clk_fixed_rate_ops,			\
--		.hw = &_name##_hw.hw,				\
--		.parent_names = _name##_parent_names,		\
--		.num_parents =					\
--			ARRAY_SIZE(_name##_parent_names),	\
--		.flags = _flags,				\
--	};
-+	DEFINE_CLK(_name, clk_fixed_rate_ops, _flags,		\
-+			_name##_parent_names, NULL);
-
- extern struct clk_ops clk_gate_ops;
-
-@@ -99,16 +104,8 @@ extern struct clk_ops clk_gate_ops;
- 		.flags = _gate_flags,				\
- 		.lock = _lock,					\
- 	};							\
--	static struct clk _name = {				\
--		.name = #_name,					\
--		.ops = &clk_gate_ops,				\
--		.hw = &_name##_hw.hw,				\
--		.parent_names = _name##_parent_names,		\
--		.num_parents =					\
--			ARRAY_SIZE(_name##_parent_names),	\
--		.parents = _name##_parents,			\
--		.flags = _flags,				\
--	};
-+	DEFINE_CLK(_name, clk_gate_ops, _flags,			\
-+			_name##_parent_names, _name##_parents);
-
- extern struct clk_ops clk_divider_ops;
-
-@@ -132,16 +129,8 @@ extern struct clk_ops clk_divider_ops;
- 		.flags = _divider_flags,			\
- 		.lock = _lock,					\
- 	};							\
--	static struct clk _name = {				\
--		.name = #_name,					\
--		.ops = &clk_divider_ops,			\
--		.hw = &_name##_hw.hw,				\
--		.parent_names = _name##_parent_names,		\
--		.num_parents =					\
--			ARRAY_SIZE(_name##_parent_names),	\
--		.parents = _name##_parents,			\
--		.flags = _flags,				\
--	};
-+	DEFINE_CLK(_name, clk_divider_ops, _flags,		\
-+			_name##_parent_names, _name##_parents);
-
- extern struct clk_ops clk_mux_ops;
-
-@@ -159,16 +148,8 @@ extern struct clk_ops clk_mux_ops;
- 		.flags = _mux_flags,				\
- 		.lock = _lock,					\
- 	};							\
--	static struct clk _name = {				\
--		.name = #_name,					\
--		.ops = &clk_mux_ops,				\
--		.hw = &_name##_hw.hw,				\
--		.parent_names = _parent_names,			\
--		.num_parents =					\
--			ARRAY_SIZE(_parent_names),		\
--		.parents = _parents,				\
--		.flags = _flags,				\
--	};
-+	DEFINE_CLK(_name, clk_mux_ops, _flags, _parent_names,	\
-+			_parents);
-
- /**
-  * __clk_init - initialize the data structures in a struct clk
--- 
-1.7.9
+ config CRUNCH
+ 	bool "Support for MaverickCrunch"
+ 	help
+@@ -48,12 +52,14 @@ endchoice
+ config MACH_ADSSPHERE
+ 	bool "Support ADS Sphere"
+ 	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
++	select SOC_EP93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the ADS
+ 	  Sphere board.
+ 
+ config MACH_EDB93XX
+ 	bool
++	select SOC_EP93XX
+ 
+ config MACH_EDB9301
+ 	bool "Support Cirrus Logic EDB9301"
+@@ -122,12 +128,14 @@ config MACH_EDB9315A
+ config MACH_GESBC9312
+ 	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	bool "Support Glomation GESBC-9312-sx"
++	select SOC_EP93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Glomation
+ 	  GESBC-9312-sx board.
+ 
+ config MACH_MICRO9
+ 	bool
++	select SOC_EP93XX
+ 
+ config MACH_MICRO9H
+ 	bool "Support Contec Micro9-High"
+@@ -164,6 +172,7 @@ config MACH_MICRO9S
+ config MACH_SIM_ONE
+         bool "Support Simplemachines Sim.One board"
+         depends on EP93XX_SDCE0_PHYS_OFFSET
++	select SOC_EP93XX
+         help
+           Say 'Y' here if you want your kernel to support the
+           Simplemachines Sim.One board.
+@@ -171,6 +180,7 @@ config MACH_SIM_ONE
+ config MACH_SNAPPER_CL15
+ 	bool "Support Bluewater Systems Snapper CL15 Module"
+ 	depends on EP93XX_SDCE0_PHYS_OFFSET
++	select SOC_EP93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Bluewater
+ 	  Systems Snapper CL15 Module.
+@@ -178,6 +188,7 @@ config MACH_SNAPPER_CL15
+ config MACH_TS72XX
+ 	bool "Support Technologic Systems TS-72xx SBC"
+ 	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
++	select SOC_EP93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Technologic Systems TS-72xx board.
+@@ -185,6 +196,7 @@ config MACH_TS72XX
+ config MACH_VISION_EP9307
+ 	bool "Support Vision Engraving Systems EP9307 SoM"
+ 	depends on EP93XX_SDCE0_PHYS_OFFSET
++	select SOC_EP93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Vision Engraving Systems EP9307 SoM.
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 8d25895..257a124 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -513,7 +513,7 @@ void __init ep93xx_register_spi(struct ep93xx_spi_info *info,
+ /*************************************************************************
+  * EP93xx LEDs
+  *************************************************************************/
+-static struct gpio_led ep93xx_led_pins[] = {
++static const struct gpio_led ep93xx_led_pins[] __initconst = {
+ 	{
+ 		.name	= "platform:grled",
+ 		.gpio	= EP93XX_GPIO_LINE_GRLED,
+@@ -523,20 +523,11 @@ static struct gpio_led ep93xx_led_pins[] = {
+ 	},
+ };
+ 
+-static struct gpio_led_platform_data ep93xx_led_data = {
++static const struct gpio_led_platform_data ep93xx_led_data __initconst = {
+ 	.num_leds	= ARRAY_SIZE(ep93xx_led_pins),
+ 	.leds		= ep93xx_led_pins,
+ };
+ 
+-static struct platform_device ep93xx_leds = {
+-	.name		= "leds-gpio",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &ep93xx_led_data,
+-	},
+-};
+-
+-
+ /*************************************************************************
+  * EP93xx pwm peripheral handling
+  *************************************************************************/
+@@ -889,8 +880,9 @@ void __init ep93xx_init_devices(void)
+ 
+ 	platform_device_register(&ep93xx_rtc_device);
+ 	platform_device_register(&ep93xx_ohci_device);
+-	platform_device_register(&ep93xx_leds);
+ 	platform_device_register(&ep93xx_wdt_device);
++
++	gpio_led_register_device(-1, &ep93xx_led_data);
+ }
+ 
+ void ep93xx_restart(char mode, const char *cmd)
