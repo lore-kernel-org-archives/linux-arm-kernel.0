@@ -1,38 +1,28 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 04 Apr 2012 13:08:04 +0200
-Subject: [PATCH v2] gpio: Device tree support for LPC32xx
-In-Reply-To: <201204040848.39376.arnd@arndb.de>
-References: <1333497518-25838-1-git-send-email-stigge@antcom.de>
- <201204040848.39376.arnd@arndb.de>
-Message-ID: <4F7C2B94.8090601@antcom.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 4 Apr 2012 12:13:24 +0100
+Subject: [PATCH] gpio: Device tree support for LPC32xx
+In-Reply-To: <4F7B8A39.5000701@antcom.de>
+References: <1333407513-18231-1-git-send-email-stigge@antcom.de>
+ <20120403150430.EBA423E0436@localhost> <4F7B8A39.5000701@antcom.de>
+Message-ID: <20120404111323.GA9457@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2012 10:48 AM, Arnd Bergmann wrote:
->> +#ifdef CONFIG_OF
->> +static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
->> +	{ .compatible = "nxp,lpc32xx-gpio", },
->> +	{ },
->> +};
->> +#endif
->> +
->> +static struct platform_driver lpc32xx_gpio_driver = {
->> +	.driver		= {
->> +		.name	= "lpc32xx-gpio",
->> +		.owner	= THIS_MODULE,
->> +		.of_match_table = lpc32xx_gpio_of_match,
->> +	},
->> +	.probe		= lpc32xx_gpio_probe,
->> +};
-> 
-> The #ifdef above is not helpful, it will cause a build error in the
-> of_match_table= assignment. Since the plan for this driver is to
-> be devicetree-only, it would be appropriate to just remove the
-> #ifdef, but adding of_match_ptr() is ok too.
+On Wed, Apr 04, 2012 at 01:39:37AM +0200, Roland Stigge wrote:
+> On 03/04/12 17:04, Grant Likely wrote:
 
-I think I just forgot the of_match_ptr(). Will post an update with a
-repo for gpio to pull from.
+> >> +postcore_initcall(lpc32xx_gpio_init);
 
-Thanks for the note!
+> ===============================================================
+> Error requesting gpio 50
+> ...
+> gpiochip_add: registered GPIOs 0 to 7 on device: gpio_p0
 
-Roland
+> Are you sure that module_platform_driver() can already handle
+> this in v3.4-rc1?
+
+For the present moment it needs explicit handling in each GPIO user to
+translate a failure to get a GPIO into -EPROBE_DEFER.  I sent a patch
+which would change the default return code for failed GPIO lookups to
+that which should get most users doing the right thing but I've had no
+response to that patch so far so it's not in any tree.
