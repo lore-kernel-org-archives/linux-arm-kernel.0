@@ -1,48 +1,50 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Wed, 04 Apr 2012 17:16:30 +0200
-Subject: [PATCH v2 1/3] PATA host controller driver for ep93xx
-In-Reply-To: <4F7C64B8.5000909@metasoft.pl>
-References: <4F7B0C54.8010804@metasoft.pl> <201204032008.00509.arnd@arndb.de>
- <4F7C4142.1010709@metasoft.pl> <201204041323.36695.arnd@arndb.de>
- <4F7C64B8.5000909@metasoft.pl>
-Message-ID: <4F7C65CE.6000309@metasoft.pl>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 4 Apr 2012 09:22:58 -0600 (MDT)
+Subject: [PATCH] OMAP: clock: fix race in disable all clocks
+In-Reply-To: <1331835871-13328-1-git-send-email-nm@ti.com>
+References: <1331835871-13328-1-git-send-email-nm@ti.com>
+Message-ID: <alpine.DEB.2.00.1204040922140.8000@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-04-04 17:11, Rafal Prylowski wrote:
-> On 2012-04-04 15:23, Arnd Bergmann wrote:
->> On Wednesday 04 April 2012, Rafal Prylowski wrote:
->>> On 2012-04-03 22:08, Arnd Bergmann wrote:
->>>>>> +static void ep93xx_pata_wait_for_iordy(void __iomem *base)
->>>>>> +{
->>>>>> +     unsigned long deadline = jiffies + msecs_to_jiffies(1000);
->>>>>> +     while (!ep93xx_pata_check_iordy(base) &&
->>>>>> +             time_is_before_jiffies(deadline))
->>>>>> +             cpu_relax();
->>>>>> +}
->>>>
->>>> Much better for a delay than the previous version. However, it's
->>>> still a busy wait, which is bad for realtime behavior, especially
->>>> since this can potentially take many milliseconds. If possible,
->>>> it should have an msleep() or at least cond_resched() instead of
->>>> the cpu_relax(). Obviously that will only work when no spinlocks
->>>> are held.
->>>>
->>>
->>> Unfortunately, we can't use msleep() or cond_resched() here
->>> - ep93xx_pata_wait_for_iordy() is called from interrupt handler.
->>
->> Well, it also seems inappropriate to have a one second delay timeout
->> inside of the interrupt handler.
->>
->> I suppose if you are emulating what a regular read of the status
->> register does, there isn't much to improve here though.
->>
->> 	Arnd
+cc Todd
+
+On Thu, 15 Mar 2012, Nishanth Menon wrote:
+
+> clk_disable_unused is invoked when CONFIG_OMAP_RESET_CLOCKS=y.
+> Since clk_disable_unused is called as lateinitcall, there can
+> be more than a few workqueues executing off secondary CPU(s).
+> The current code does the following:
+> a) checks if clk is unused
+> b) holds lock
+> c) disables clk
+> d) unlocks
 > 
-> According to ATA specification, maximum IORDY pulse width is 1250ns,
-> so I'll set timeout to 2ms (I should check this before posting the driver..).
+> Between (a) and (b) being executed on CPU0, It is possible to
+> have a driver executing on CPU1 which could do a get_sync->clk_get
+> (and increase the use_count) of the clock which was just about
+> to be disabled by clk_disable_unused.
+> 
+> We ensure instead that the entire list traversal is protected by
+> the lock allowing for parent child clock traversal which could be
+> potentially be done by runtime operations to be safe as well.
+> 
+> Reported-by: Todd Poynor <toddpoynor@google.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> To confirm this in reality happens, I setup a trap as follows:
+>   @@ -450,6 +450,8 @@ static int __init clk_disable_unused(void)
+>   			continue;
+>   
+>   		spin_lock_irqsave(&clockfw_lock, flags);
+>  +		WARN(ck->usecount, "XXXX->RACECONDITION FOR CLOCK %s\n",
+>  +			ck->name);
+>   		arch_clock->clk_disable_unused(ck);
+>   		spin_unlock_irqrestore(&clockfw_lock, flags);
+>   	}
+> Resultant log: http://pastebin.pandaboard.org/index.php/view/66400792
 
-2ms is far too big value... Should be 2us.
+Thanks Nishanth & Todd, queued for 3.4-rc.
 
-RP
+
+- Paul
