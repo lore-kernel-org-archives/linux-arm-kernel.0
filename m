@@ -1,61 +1,41 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 4 Apr 2012 12:05:05 +0100 (BST)
-Subject: [PATCH] ARM: fix __io macro for PCMCIA
-In-Reply-To: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1333537505.61255.YahooMailClassic@web29019.mail.ird.yahoo.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Apr 2012 12:07:17 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <alpine.DEB.2.00.1204031800060.8000@utopia.booyaka.com>
+References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
+ <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
+ <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
+ <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
+ <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.00.1204031800060.8000@utopia.booyaka.com>
+Message-ID: <20120404110717.GE32505@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Wed, 4/4/12, Rob Herring <robherring2@gmail.com> wrote:
-> With commit c334bc1 (ARM: make mach/io.h include optional),
-> PCMCIA was
-> broken as PCMCIA depends on __io() being just a cast. This
-> needs a better
-> fix with a fixed i/o address mapping, but for now we just
-> restore things
-> to the previous behavior.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Joachim Eastwood <joachim.eastwood@jotron.com>
-> Cc: Paul Parsons <lost.distance@yahoo.com>
-> ---
->  arch/arm/include/asm/io.h |? ? 6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/io.h
-> b/arch/arm/include/asm/io.h
-> index df0ac0b..00262a4 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -118,6 +118,8 @@ static inline void __iomem
-> *__typesafe_io(unsigned long addr)
-> ? */
->  #ifdef CONFIG_NEED_MACH_IO_H
->  #include <mach/io.h>
-> +#elif defined(CONFIG_PCCARD)
-> +#define __io(a)??? ???
-> __typesafe_io(a)
->  #else
->  #define __io(a)??? ??? ({
-> (void)(a); __typesafe_io(0); })
->  #endif
-> @@ -134,9 +136,9 @@ static inline void __iomem
-> *__typesafe_io(unsigned long addr)
-> ? * readb() et.al. on such platforms.
-> ? */
->  #ifndef IO_SPACE_LIMIT
-> -#if defined(CONFIG_PCMCIA_SOC_COMMON) ||
-> defined(CONFIG_PCMCIA_SOC_COMMON_MODULE)
-> +#if defined(CONFIG_PCCARD)
->  #define IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
-> -#elif defined(CONFIG_PCI) || defined(CONFIG_ISA) ||
-> defined(CONFIG_PCCARD)
-> +#elif defined(CONFIG_PCI) || defined(CONFIG_ISA)
->  #define IO_SPACE_LIMIT ((resource_size_t)0xffff)
->  #else
->  #define IO_SPACE_LIMIT ((resource_size_t)0)
-> -- 
+Hi Paul,
 
-This works for me on my hx4700 (PXA270) running linux-3.4-rc1.
+On Wed, Apr 04, 2012 at 01:00:53AM +0100, Paul Walmsley wrote:
+> On Tue, 3 Apr 2012, Will Deacon wrote:
+> 
+> > I'll take JTAG for a whirl to see where we are. If anything looks wrong in
+> > my dmesg, please shout (there are plenty of things in there that look like
+> > they've gone awry).
+> 
+> Might be worth booting with initcall_debug on the kernel command line.  
+> That will probably be easier than dealing with JTAG.
 
-Tested-by: Paul Parsons <lost.distance@yahoo.com>
+JTAG is unusable anyway because it requires a new MLO, which makes the
+problem disappear.
+
+Using initcall_debug I tracked the hang down to cti_unlock:
+
+	val = __raw_readl(base + LOCKSTATUS);
+
+causes the board to die, presumably because CoreSight isn't in a fit state
+to be poked.
+
+Will
