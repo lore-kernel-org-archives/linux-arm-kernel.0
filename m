@@ -1,78 +1,26 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 Apr 2012 09:46:51 -0600 (MDT)
-Subject: [PATCH 2/2] ARM: OMAP4: hwmod_data: Name the common irq for
- McBSP ports
-In-Reply-To: <1332169966-25400-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1332169966-25400-1-git-send-email-peter.ujfalusi@ti.com>
- <1332169966-25400-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <alpine.DEB.2.00.1204040946230.8000@utopia.booyaka.com>
+Date: Wed, 4 Apr 2012 09:53:23 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP2+: hwmod: Fix wrong SYSC_TYPE1_XXX_MASK bit
+ definitions
+In-Reply-To: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
+References: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.00.1204040953120.8000@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Beno?t
+On Fri, 17 Feb 2012, Vaibhav Hiremath wrote:
 
-Hi Beno?t
-
-On Mon, 19 Mar 2012, Peter Ujfalusi wrote:
-
-> Use 'common' as name for the common irq number in hwmod data for the McBSP
-> ports. The same name already in use for OMAP2430, and OMAP3.
+> In the SYSC_TYPE1_XXX_MASK configuration, SYSC_XXX_SHIFT macro
+> is used which is not defined anywhere in the kernel.
+> Until now the build was going through successfully, since it
+> is not being used anywhere in kernel.
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-care to Ack this one for 3.5?
-
-
-- Paul
-
-
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
+> This bug got introduced by the commit
+> 358f0e630d5409ab3837b86db3595560eae773b6 ("OMAP3: hwmod: support
+> to specify the offset position of various SYSCONFIG register bits.")
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index ef0524c..f8058b7 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -2942,7 +2942,7 @@ static struct omap_hwmod_class omap44xx_mcbsp_hwmod_class = {
->  /* mcbsp1 */
->  static struct omap_hwmod omap44xx_mcbsp1_hwmod;
->  static struct omap_hwmod_irq_info omap44xx_mcbsp1_irqs[] = {
-> -	{ .irq = 17 + OMAP44XX_IRQ_GIC_START },
-> +	{ .name = "common", .irq = 17 + OMAP44XX_IRQ_GIC_START },
->  	{ .irq = -1 }
->  };
->  
-> @@ -3017,7 +3017,7 @@ static struct omap_hwmod omap44xx_mcbsp1_hwmod = {
->  /* mcbsp2 */
->  static struct omap_hwmod omap44xx_mcbsp2_hwmod;
->  static struct omap_hwmod_irq_info omap44xx_mcbsp2_irqs[] = {
-> -	{ .irq = 22 + OMAP44XX_IRQ_GIC_START },
-> +	{ .name = "common", .irq = 22 + OMAP44XX_IRQ_GIC_START },
->  	{ .irq = -1 }
->  };
->  
-> @@ -3092,7 +3092,7 @@ static struct omap_hwmod omap44xx_mcbsp2_hwmod = {
->  /* mcbsp3 */
->  static struct omap_hwmod omap44xx_mcbsp3_hwmod;
->  static struct omap_hwmod_irq_info omap44xx_mcbsp3_irqs[] = {
-> -	{ .irq = 23 + OMAP44XX_IRQ_GIC_START },
-> +	{ .name = "common", .irq = 23 + OMAP44XX_IRQ_GIC_START },
->  	{ .irq = -1 }
->  };
->  
-> @@ -3167,7 +3167,7 @@ static struct omap_hwmod omap44xx_mcbsp3_hwmod = {
->  /* mcbsp4 */
->  static struct omap_hwmod omap44xx_mcbsp4_hwmod;
->  static struct omap_hwmod_irq_info omap44xx_mcbsp4_irqs[] = {
-> -	{ .irq = 16 + OMAP44XX_IRQ_GIC_START },
-> +	{ .name = "common", .irq = 16 + OMAP44XX_IRQ_GIC_START },
->  	{ .irq = -1 }
->  };
->  
-> -- 
-> 1.7.8.5
-> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 
+Thanks, queued for 3.4-rc.
 
 - Paul
