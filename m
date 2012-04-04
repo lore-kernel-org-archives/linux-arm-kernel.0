@@ -1,62 +1,55 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 4 Apr 2012 11:32:00 -0500
-Subject: [PATCHv5 16/18] I2C: OMAP: fix missing handling of errata
- I2C_OMAP3_1P153
-In-Reply-To: <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
-References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
- <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <4F7C7780.7040807@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 04 Apr 2012 09:39:30 -0700
+Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
+In-Reply-To: <20120404150353.GB24211@n2100.arm.linux.org.uk>
+References: <20120213094940.GA15338@n2100.arm.linux.org.uk>
+ <4F3CF3DA.7000806@samsung.com>
+ <20120216160250.GP13673@n2100.arm.linux.org.uk>
+ <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
+ <20120327074931.GK5611@n2100.arm.linux.org.uk> <4F73B3E1.4080807@samsung.com>
+ <20120404145204.GA24211@n2100.arm.linux.org.uk>
+ <20120404145917.GB1929@redhat.com>
+ <20120404150353.GB24211@n2100.arm.linux.org.uk>
+Message-ID: <4F7C7942.2000006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shubhro,
+On 04/04/12 08:03, Russell King - ARM Linux wrote:
+> On Wed, Apr 04, 2012 at 10:59:17AM -0400, 'Dave Jones' wrote:
+>> On Wed, Apr 04, 2012 at 03:52:04PM +0100, Russell King - ARM Linux wrote:
+>>   >  On Wed, Mar 28, 2012 at 05:59:13PM -0700, Kukjin Kim wrote:
+>>   >  >  Russell King wrote:
+>>   >  >>  As predicted, this is breaking other ARM platforms.  Please fix this
+>>   >  >>  yourself before your crappy code gets pushed into mainline.  Thanks.
+>>   >  >>
+>>   >  >  I fixed it.
+>>   >
+>>   >  When will we see patches or the fix in mainline?
+>>
+>> Just send it to Linus directly.
+>
+> 'it'... well, that implies that someone already has a patch.  I've asked
+> Kukjin to fix the problem which he introduced because exynos is getting
+> rather complicated, and he'll know what the dependencies should be.  So
+> far I've yet to see any kind of patch fixing this stuff.
+>
+Well, I already submitted its fix and it was including your e-mail. See 
+below.
 
-On 04/03/2012 11:02 AM, Shubhrajyoti D wrote:
-> From: Tasslehoff Kjappfot<tasskjapp@gmail.com>
->
-> i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
-> Move the errata handling to i2c_probe.
->
-> Signed-off-by: Tasslehoff Kjappfot<tasskjapp@gmail.com>
-> Signed-off-by: Shubhrajyoti D<shubhrajyoti@ti.com>
-> ---
->   drivers/i2c/busses/i2c-omap.c |   10 +++++-----
->   1 files changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index c113f41..51576d6 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -431,11 +431,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->   	/* Take the I2C module out of reset: */
->   	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
->
-> -	dev->errata = 0;
-> -
-> -	if (dev->flags&  OMAP_I2C_FLAG_APPLY_ERRATA_I207)
-> -		dev->errata |= I2C_OMAP_ERRATA_I207;
-> -
->   	/* Enable interrupts */
->   	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
->   			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
-> @@ -1056,6 +1051,11 @@ omap_i2c_probe(struct platform_device *pdev)
->
->   	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG)&  0xff;
->
-> +	dev->errata = 0;
-> +
-> +	if (dev->flags&  OMAP_I2C_FLAG_APPLY_ERRATA_I207)
-> +		dev->errata |= I2C_OMAP_ERRATA_I207;
-> +
->   	if (dev->rev<= OMAP_I2C_REV_ON_3430_3530)
->   		dev->errata |= I2C_OMAP3_1P153;
+http://www.spinics.net/lists/cpufreq/msg03080.html
 
-The errata ID is not correct. I believe that 1P153 is referring to the 
-section number in the errata doc and not the errata ID. The errata ID 
-should be i451 in the latest OMAP34xx and OMAP36xx docs.
+> Meanwhile I'm seeing failing randconfig builds for non-exynos ARM for
+> about a week due to the lack of dependencies.
+>
 
-Please can you update this? The section number changed in the latest 
-errata docs and it took me a minute to find this.
+Yeah, the failure from cpufreq exynos4x12 and exynos5250 has been 
+introduced from last merge window and you know exynos4210 has been fixed 
+by your patch last time.
 
-Cheers
-Jon
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
