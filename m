@@ -1,42 +1,38 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed,  4 Apr 2012 19:15:15 +0200
-Subject: [PATCH] ARM: at91: Export at91_st_base
-Message-ID: <1333559715-28649-1-git-send-email-joachim.eastwood@jotron.com>
+From: davej@redhat.com ('Dave Jones')
+Date: Wed, 4 Apr 2012 13:22:48 -0400
+Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
+In-Reply-To: <4F7C7F68.7090000@samsung.com>
+References: <20120213094940.GA15338@n2100.arm.linux.org.uk>
+ <4F3CF3DA.7000806@samsung.com>
+ <20120216160250.GP13673@n2100.arm.linux.org.uk>
+ <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
+ <20120327074931.GK5611@n2100.arm.linux.org.uk>
+ <4F73B3E1.4080807@samsung.com>
+ <20120404145204.GA24211@n2100.arm.linux.org.uk>
+ <20120404145917.GB1929@redhat.com> <4F7C7F68.7090000@samsung.com>
+Message-ID: <20120404172248.GA21113@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 5e9cf5e18d4b "ARM: at91: make ST (System Timer) soc independent"
-building at91rm9200_wdt as a module fails with following message
-  ERROR: "at91_st_base" [drivers/watchdog/at91rm9200_wdt.ko] undefined!
-  make[1]: *** [__modpost] Error 1
-  make: *** [modules] Error 2
+On Wed, Apr 04, 2012 at 10:05:44AM -0700, Kukjin Kim wrote:
+ > On 04/04/12 07:59, 'Dave Jones' wrote:
+ > > On Wed, Apr 04, 2012 at 03:52:04PM +0100, Russell King - ARM Linux wrote:
+ > >   >  On Wed, Mar 28, 2012 at 05:59:13PM -0700, Kukjin Kim wrote:
+ > >   >  >  Russell King wrote:
+ > >   >  >>  As predicted, this is breaking other ARM platforms.  Please fix this
+ > >   >  >>  yourself before your crappy code gets pushed into mainline.  Thanks.
+ > >   >  >>
+ > >   >  >  I fixed it.
+ > >   >
+ > >   >  When will we see patches or the fix in mainline?
+ > >
+ > > Just send it to Linus directly.
+ > >
+ > 
+ > Hi Dave,
+ > 
+ > OK, so may I send this to Linus with your ack?
 
-Export symbol to allow wdt driver to be built as a module again.
+sure.
 
-Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
----
- arch/arm/mach-at91/at91rm9200_time.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index dd7f782..bb0e7fd 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -23,6 +23,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/clockchips.h>
-+#include <linux/export.h>
- 
- #include <asm/mach/time.h>
- 
-@@ -176,6 +177,7 @@ static struct clock_event_device clkevt = {
- };
- 
- void __iomem *at91_st_base;
-+EXPORT_SYMBOL(at91_st_base);
- 
- void __init at91rm9200_ioremap_st(u32 addr)
- {
--- 
-1.7.9.6
+	Dave
