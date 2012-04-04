@@ -1,79 +1,46 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 4 Apr 2012 11:42:30 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
-References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
- <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
- <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
- <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
- <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
-Message-ID: <CACVXFVOxCx-mwLqeM_yDrJDhQrpo6axOWuUvX7eoj87PoMTEsw@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 4 Apr 2012 09:44:38 +0530
+Subject: [PATCH] pinctrl: Add SPEAr pinctrl drivers
+In-Reply-To: <201204031933.56131.arnd@arndb.de>
+References: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
+ <CAOh2x=mk3PeozELWNGrJzjTjF6_T4f0uWgwP9rALD9xOHd=9zQ@mail.gmail.com>
+ <CAOh2x==ZbB5L=susFvsjmDRVKtfDiXd4Bq+MPnPVegnPAPmGsg@mail.gmail.com>
+ <201204031933.56131.arnd@arndb.de>
+Message-ID: <4F7BCAAE.9050306@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2012 at 7:29 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi
->
-> On Tue, 3 Apr 2012, Kevin Hilman wrote:
->
->> Indeed, like you, I have to change the EMU clock domain to SWSUP[1] in
->> order to see any interrupts and see anything in perf top. ?This isn't
->> really a mergeable workaround, so I'll look into this a little closer
->> with Santosh to see what we can do once we fully understand the HW
->> problem.
->
-> Part of the problem is that the clockdomain data for the emu_sys
-> clockdomain is wrong. ?Here's something to try to fix it. ?It might just
-> be enough to get it to work.
->
-> - Paul
->
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Tue, 3 Apr 2012 17:13:48 -0600
-> Subject: [PATCH] ARM: OMAP44xx: clockdomain data: correct the emu_sys_clkdm
-> ?CLKTRCTRL data
->
-> According to the 4430 ES2.0 TRM vX Table 3-744 "CM_EMU_CLKSTCTRL",
-> the emu_sys clockdomain data in mainline is incorrect.
->
-> The emu_sys clockdomain does not support the DISABLE_AUTO state, and
-> instead it supports the FORCE_WAKEUP state.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Ming Lei <ming.lei@canonical.com>
-> ---
-> ?arch/arm/mach-omap2/clockdomains44xx_data.c | ? ?2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> index 9299ac2..bd7ed13 100644
-> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> @@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
-> ? ? ? ?.prcm_partition ? = OMAP4430_PRM_PARTITION,
-> ? ? ? ?.cm_inst ? ? ? ? ?= OMAP4430_PRM_EMU_CM_INST,
-> ? ? ? ?.clkdm_offs ? ? ? = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
-> - ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_HWSUP,
-> + ? ? ? .flags ? ? ? ? ? ?= CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP,
+On 4/4/2012 1:03 AM, Arnd Bergmann wrote:
+> Maybe I wasn't clear enough. I did not mean that code should be duplicated
+> here. Instead, you should keep the probe function and export it, with some
+> modifications, and do the same for the other common functions. This works
+> well for a lot of other drivers in a similar situation. It would result
+> in a function like
 
-I tested the patch just now, but unfortunately, the change still doesn't make
-PMU to generate IRQs.
+No. You were very clear earlier too. :)
 
-Mark the flags as CLKDM_CAN_SWSUP may work, but PMU will stop producing
-IRQs after resuming from suspend.
+> static int __devinit spear320_pinctrl_probe(struct platform_device *pdev)
+> {
+> 	return spear3xx_pinctrl_init(pdev, &spear320_machdata);
+> }
+> 
+> static struct of_device_id spear_pinctrl_of_match[] __devinitdata = {
+>        { .compatible = "st,spear320-pinmux" },
+>        {},
+> };
+> 
+> static struct platform_driver spear_pinctrl_driver = {
+>        .driver = {
+>                .name = DRIVER_NAME,
+>                .owner = THIS_MODULE,
+>                .of_match_table = spear_pinctrl_of_match,
+>        },
+>        .probe = spear320_pinctrl_probe,
+>        .remove = __devexit_p(spear_pinctrl_remove),
+> };
 
+I was worrying about duplicating above code. :)
+Anyway, i have already fixed up my code as you suggested.
 
-Thanks
---
-Ming Lei
+-- 
+viresh
