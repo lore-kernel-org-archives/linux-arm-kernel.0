@@ -1,145 +1,41 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 4 Apr 2012 10:42:22 -0700
-Subject: [PATCH] arm: ep93xx: use gpio_led_register_device
-Message-ID: <201204041042.22674.hartleys@visionengravers.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Wed, 4 Apr 2012 23:15:19 +0530
+Subject: [PATCHv5 16/18] I2C: OMAP: fix missing handling of errata
+ I2C_OMAP3_1P153
+In-Reply-To: <4F7C7780.7040807@ti.com>
+References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
+ <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
+ <4F7C7780.7040807@ti.com>
+Message-ID: <CAM=Q2cu8k8n2w8_=8VCFcFTTgywqc_Vk_eM_DDTap3YeYyAH2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use gpio_led_register_device to register the two leds connected to
-the ep93xx.
+Hi Jon,
 
-Add a SOC_EP93XX Kconfig option for common options needed by ep93xx
-and use that option to select LEDS_GPIO_REGISTER.
 
-Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
+>> + ? ? ? if (dev->flags& ?OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+>>
+>> + ? ? ? ? ? ? ? dev->errata |= I2C_OMAP_ERRATA_I207;
+>> +
+>> ? ? ? ?if (dev->rev<= OMAP_I2C_REV_ON_3430_3530)
+>> ? ? ? ? ? ? ? ?dev->errata |= I2C_OMAP3_1P153;
+>
+>
+> The errata ID is not correct. I believe that 1P153 is referring to the
+> section number in the errata doc and not the errata ID. The errata ID should
+> be i451 in the latest OMAP34xx and OMAP36xx docs.
+>
+> Please can you update this? The section number changed in the latest errata
+> docs and it took me a minute to find this.
 
----
+Do you mind if that is a separate patch?
 
- arch/arm/mach-ep93xx/Kconfig |   12 ++++++++++++
- arch/arm/mach-ep93xx/core.c  |   16 ++++------------
- 2 files changed, 16 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
-index 97a2493..b27a8ad 100644
---- a/arch/arm/mach-ep93xx/Kconfig
-+++ b/arch/arm/mach-ep93xx/Kconfig
-@@ -2,6 +2,10 @@ if ARCH_EP93XX
- 
- menu "Cirrus EP93xx Implementation Options"
- 
-+config SOC_EP93XX
-+	bool
-+	select LEDS_GPIO_REGISTER
-+
- config CRUNCH
- 	bool "Support for MaverickCrunch"
- 	help
-@@ -48,12 +52,14 @@ endchoice
- config MACH_ADSSPHERE
- 	bool "Support ADS Sphere"
- 	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
-+	select SOC_EP93XX
- 	help
- 	  Say 'Y' here if you want your kernel to support the ADS
- 	  Sphere board.
- 
- config MACH_EDB93XX
- 	bool
-+	select SOC_EP93XX
- 
- config MACH_EDB9301
- 	bool "Support Cirrus Logic EDB9301"
-@@ -122,12 +128,14 @@ config MACH_EDB9315A
- config MACH_GESBC9312
- 	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
- 	bool "Support Glomation GESBC-9312-sx"
-+	select SOC_EP93XX
- 	help
- 	  Say 'Y' here if you want your kernel to support the Glomation
- 	  GESBC-9312-sx board.
- 
- config MACH_MICRO9
- 	bool
-+	select SOC_EP93XX
- 
- config MACH_MICRO9H
- 	bool "Support Contec Micro9-High"
-@@ -164,6 +172,7 @@ config MACH_MICRO9S
- config MACH_SIM_ONE
-         bool "Support Simplemachines Sim.One board"
-         depends on EP93XX_SDCE0_PHYS_OFFSET
-+	select SOC_EP93XX
-         help
-           Say 'Y' here if you want your kernel to support the
-           Simplemachines Sim.One board.
-@@ -171,6 +180,7 @@ config MACH_SIM_ONE
- config MACH_SNAPPER_CL15
- 	bool "Support Bluewater Systems Snapper CL15 Module"
- 	depends on EP93XX_SDCE0_PHYS_OFFSET
-+	select SOC_EP93XX
- 	help
- 	  Say 'Y' here if you want your kernel to support the Bluewater
- 	  Systems Snapper CL15 Module.
-@@ -178,6 +188,7 @@ config MACH_SNAPPER_CL15
- config MACH_TS72XX
- 	bool "Support Technologic Systems TS-72xx SBC"
- 	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
-+	select SOC_EP93XX
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  Technologic Systems TS-72xx board.
-@@ -185,6 +196,7 @@ config MACH_TS72XX
- config MACH_VISION_EP9307
- 	bool "Support Vision Engraving Systems EP9307 SoM"
- 	depends on EP93XX_SDCE0_PHYS_OFFSET
-+	select SOC_EP93XX
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  Vision Engraving Systems EP9307 SoM.
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 8d25895..257a124 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -513,7 +513,7 @@ void __init ep93xx_register_spi(struct ep93xx_spi_info *info,
- /*************************************************************************
-  * EP93xx LEDs
-  *************************************************************************/
--static struct gpio_led ep93xx_led_pins[] = {
-+static const struct gpio_led ep93xx_led_pins[] __initconst = {
- 	{
- 		.name	= "platform:grled",
- 		.gpio	= EP93XX_GPIO_LINE_GRLED,
-@@ -523,20 +523,11 @@ static struct gpio_led ep93xx_led_pins[] = {
- 	},
- };
- 
--static struct gpio_led_platform_data ep93xx_led_data = {
-+static const struct gpio_led_platform_data ep93xx_led_data __initconst = {
- 	.num_leds	= ARRAY_SIZE(ep93xx_led_pins),
- 	.leds		= ep93xx_led_pins,
- };
- 
--static struct platform_device ep93xx_leds = {
--	.name		= "leds-gpio",
--	.id		= -1,
--	.dev		= {
--		.platform_data	= &ep93xx_led_data,
--	},
--};
--
--
- /*************************************************************************
-  * EP93xx pwm peripheral handling
-  *************************************************************************/
-@@ -889,8 +880,9 @@ void __init ep93xx_init_devices(void)
- 
- 	platform_device_register(&ep93xx_rtc_device);
- 	platform_device_register(&ep93xx_ohci_device);
--	platform_device_register(&ep93xx_leds);
- 	platform_device_register(&ep93xx_wdt_device);
-+
-+	gpio_led_register_device(-1, &ep93xx_led_data);
- }
- 
- void ep93xx_restart(char mode, const char *cmd)
+>
+> Cheers
+> Jon
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
