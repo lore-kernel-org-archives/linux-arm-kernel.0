@@ -1,35 +1,40 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Wed, 04 Apr 2012 22:35:50 +0200
-Subject: Handling device shared SFR on dt platform
-In-Reply-To: <20120403160454.BDFF23E0598@localhost>
-References: <4F6A5853.9090809@gmail.com>
- <20120324193200.822AD3E0B06@localhost> <4F736A4A.6050302@gmail.com>
- <20120403160454.BDFF23E0598@localhost>
-Message-ID: <4F7CB0A6.7010809@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 4 Apr 2012 23:08:38 +0200
+Subject: [PATCH v4 0/3] ARM: Initial support for Cortex-M3
+Message-ID: <20120404210838.GA23126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2012 06:04 PM, Grant Likely wrote:
->> What concerns me, is an overhead from region request/ioremap(?)/release, 
->> just to access a single 32-bit register. I'm going to see if those accesses
->> could be moved to only device driver's probe() and remove() callbacks and 
->> what might be the resulting power consumption increase from that, if any.
-> 
-> Personally, I'd just create a shared function used by both drivers to
-> access the register and protect it with a spinlock.  That way the
-> region only needs to be mapped once, and the overhead is as low as
-> possible.
+Hello,
 
-Hmm, that's what I originally started with. I've just removed function 
-callback from the platform data struct in favour of having the drivers 
-using directly the function exported by plat-s5p. Then I started devising
-something alternative, in hope to get rid of the drivers compilation 
-dependency on PLAT_S5P. There seems little point in that though, since 
-the chance to have those IP blocks available on other archs or ARM sub-archs,
-than Samsung S5P/Exynos, are extremely low. 
+I rebased the series to 3.4-rc1. Apart from the asm/system.h
+disintegration this was trivial and git did it just right for me.
 
-I'll post finally some patches for review. Thank you.
+I dropped patch 3 (ARM: force branch instructions to use long distance
+encoding) as I don't need that anymore for reasons I didn't try to find
+out. With the rework of patch 1 (ARM: protect usage of cr_alignment by
+#ifdef CONFIG_CPU_CP15 -> ARM: make cr_alignment read-only #ifndef
+CONFIG_CPU_CP15) patch 2 isn't needed anymore, too.
 
----
-Regards,
-Sylwester
+The patches are available via git at
+
+	git://git.pengutronix.de/git/ukl/linux.git cortexm3
+
+I also updated the efm32 branch in the same repository that additionally
+contains support for Energymicro's efm32 processor. The patches in this
+series were tested on such a machine.
+
+As before interrupt support and Makefile/Kconfig glue are missing. The
+former needs some more love as I think it should be possible to
+support the Cortex M3's nvic using common/gic.c. I plan to address this
+when this series made it into Linus' tree.
+
+See the mails with the respective patches for some more details about
+what changed compared to v3.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
