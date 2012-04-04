@@ -1,35 +1,28 @@
-From: tsoni@codeaurora.org (Trilok Soni)
-Date: Thu, 05 Apr 2012 00:40:01 +0530
-Subject: [PATCH 2/9] ARM: OMAP2+: SmartReflex: move the driver specific
- macros in include/linux/power
-In-Reply-To: <1332173578-27422-3-git-send-email-j-pihet@ti.com>
-References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
- <1332173578-27422-3-git-send-email-j-pihet@ti.com>
-Message-ID: <4F7C9C89.9080605@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 4 Apr 2012 12:14:35 -0700
+Subject: [PATCH 11/11] ARM: dt: tegra20: add pinmux to device tree
+In-Reply-To: <1333148404-17691-12-git-send-email-swarren@wwwdotorg.org>
+References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
+ <1333148404-17691-12-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120404191435.GC10603@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+On Fri, Mar 30, 2012 at 05:00:04PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> This adds a complete pinmux configuration to all Tegra20 device tree
+> files. This allows removal of board-dt-tegra20.c's use of the pinmux
+> board files, and the special device tree handling in board-pinmux.c.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-On 3/19/2012 9:42 PM, jean.pihet at newoldbits.com wrote:
-> From: Jean Pihet<j-pihet@ti.com>
->
-> Move the driver specific macros from the smartreflex header file
-> (arch/arm/mach-omap2/smartreflex.h) in a new header file
-> include/linux/power/smartreflex.h.
->
-> This change makes the SmartReflex implementation ready for the move
-> to drivers/.
+Acked-by: Olof Johansson <olof@lixom.net>
 
-I wonder why someone would need a new directory under drivers/power 
-where the code is not about introducing new and generic AVS framework
-but it is all about OMAP specific code. What if tomorrow new generic
-AVS framework comes from different chip vendor? I am sure this kind
-of technology would be common in newer embedded chips.
+It would be nice to do a more compact representation in the device tree, but
+this buys us enough that I'm quite happy with the way it turned out anyway.
 
----Trilok Soni
+Once we have some sort of preprocessor support maybe. :-)
 
--- 
---
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+-Olof
