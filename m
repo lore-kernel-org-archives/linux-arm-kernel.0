@@ -1,45 +1,91 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 4 Apr 2012 11:59:11 -0700
-Subject: [PATCH 04/11] gpio: tegra: Iterate over the correct number of
- banks
-In-Reply-To: <4F7C95F2.2050808@wwwdotorg.org>
-References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
- <1333148404-17691-5-git-send-email-swarren@wwwdotorg.org>
- <20120404175829.GD29919@quad.lixom.net>
- <4F7C95F2.2050808@wwwdotorg.org>
-Message-ID: <20120404185911.GB10603@quad.lixom.net>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 4 Apr 2012 21:06:22 +0200
+Subject: [PATCH 2/2] ARM: OMAP4: hwmod_data: Name the common irq for McBSP
+ ports
+In-Reply-To: <alpine.DEB.2.00.1204040946230.8000@utopia.booyaka.com>
+References: <1332169966-25400-1-git-send-email-peter.ujfalusi@ti.com>
+ <1332169966-25400-2-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.00.1204040946230.8000@utopia.booyaka.com>
+Message-ID: <4F7C9BAE.1030601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 12:41:54PM -0600, Stephen Warren wrote:
-> On 04/04/2012 11:58 AM, Olof Johansson wrote:
-> > On Fri, Mar 30, 2012 at 04:59:57PM -0600, Stephen Warren wrote:
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> When Tegra30 support was added to the Tegra GPIO driver, a few places
-> >> which iterated over all banks were not converted to use the variable
-> >> tegra_gpio_bank_count rather than hard-coding the bank count. Fix this.
-> >>
-> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > 
-> > Acked-by: Olof Johansson <olof@lixom.net>
-> > 
-> > Should this be fixed in 3.4 as well? Given the need for some of the other
-> > patches in this series I suppose gpio isn't really working on tegra30 there
-> > though, so it's not technically a regression...
-> 
-> It's probably not a bad idea, even if we don't expect many users; the
-> code may as well be correct. I assume since 3.4 is still in the rc
-> stage, I would send an explicit pull request to arm-soc for that rather
-> than just Cc: stable.
+Hi Paul,
 
-Correct.
+On 4/4/2012 5:46 PM, Paul Walmsley wrote:
+> + Beno?t
+>
+> Hi Beno?t
+>
+> On Mon, 19 Mar 2012, Peter Ujfalusi wrote:
+>
+>> Use 'common' as name for the common irq number in hwmod data for the McBSP
+>> ports. The same name already in use for OMAP2430, and OMAP3.
+>>
+>> Signed-off-by: Peter Ujfalusi<peter.ujfalusi@ti.com>
+>
+> care to Ack this one for 3.5?
 
-> I wonder if "gpio: tegra: fix register address calculations for Tegra30"
-> shouldn't be applied (after addressing your comments) for 3.4 too? It
-> might be a little large of a change?
+That looks good to me.
 
-Yep, that one too.
+Acked-by: Benoit Cousson <b-cousson@ti.com>
+
+Regards,
+Benoit
 
 
--Olof
+>
+>
+> - Paul
+>
+>
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 ++++----
+>>   1 files changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> index ef0524c..f8058b7 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> @@ -2942,7 +2942,7 @@ static struct omap_hwmod_class omap44xx_mcbsp_hwmod_class = {
+>>   /* mcbsp1 */
+>>   static struct omap_hwmod omap44xx_mcbsp1_hwmod;
+>>   static struct omap_hwmod_irq_info omap44xx_mcbsp1_irqs[] = {
+>> -	{ .irq = 17 + OMAP44XX_IRQ_GIC_START },
+>> +	{ .name = "common", .irq = 17 + OMAP44XX_IRQ_GIC_START },
+>>   	{ .irq = -1 }
+>>   };
+>>
+>> @@ -3017,7 +3017,7 @@ static struct omap_hwmod omap44xx_mcbsp1_hwmod = {
+>>   /* mcbsp2 */
+>>   static struct omap_hwmod omap44xx_mcbsp2_hwmod;
+>>   static struct omap_hwmod_irq_info omap44xx_mcbsp2_irqs[] = {
+>> -	{ .irq = 22 + OMAP44XX_IRQ_GIC_START },
+>> +	{ .name = "common", .irq = 22 + OMAP44XX_IRQ_GIC_START },
+>>   	{ .irq = -1 }
+>>   };
+>>
+>> @@ -3092,7 +3092,7 @@ static struct omap_hwmod omap44xx_mcbsp2_hwmod = {
+>>   /* mcbsp3 */
+>>   static struct omap_hwmod omap44xx_mcbsp3_hwmod;
+>>   static struct omap_hwmod_irq_info omap44xx_mcbsp3_irqs[] = {
+>> -	{ .irq = 23 + OMAP44XX_IRQ_GIC_START },
+>> +	{ .name = "common", .irq = 23 + OMAP44XX_IRQ_GIC_START },
+>>   	{ .irq = -1 }
+>>   };
+>>
+>> @@ -3167,7 +3167,7 @@ static struct omap_hwmod omap44xx_mcbsp3_hwmod = {
+>>   /* mcbsp4 */
+>>   static struct omap_hwmod omap44xx_mcbsp4_hwmod;
+>>   static struct omap_hwmod_irq_info omap44xx_mcbsp4_irqs[] = {
+>> -	{ .irq = 16 + OMAP44XX_IRQ_GIC_START },
+>> +	{ .name = "common", .irq = 16 + OMAP44XX_IRQ_GIC_START },
+>>   	{ .irq = -1 }
+>>   };
+>>
+>> --
+>> 1.7.8.5
+>>
+>
+>
+> - Paul
