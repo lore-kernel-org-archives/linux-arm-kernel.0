@@ -1,27 +1,27 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Wed, 04 Apr 2012 14:51:32 +0200
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
-In-Reply-To: <1333489422.3040.11.camel@pasglop> (Benjamin Herrenschmidt's
- message of "Wed, 04 Apr 2012 07:43:42 +1000")
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
- <20120402202848.1EB833E02A7@localhost> <m2y5qdow0v.fsf@igel.home>
- <1333489422.3040.11.camel@pasglop>
-Message-ID: <m2ehs3vewb.fsf@igel.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Apr 2012 13:56:24 +0100
+Subject: [PATCH] ARM: fix __io macro for PCMCIA
+In-Reply-To: <201204041027.30353.arnd@arndb.de>
+References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+ <20120404090335.GQ24211@n2100.arm.linux.org.uk>
+ <201204041027.30353.arnd@arndb.de>
+Message-ID: <20120404125624.GT24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
+On Wed, Apr 04, 2012 at 10:27:30AM +0000, Arnd Bergmann wrote:
+> On Wednesday 04 April 2012, Russell King - ARM Linux wrote:
+> > On Tue, Apr 03, 2012 at 10:11:52PM -0500, Rob Herring wrote:
+> > > With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
+> > > broken as PCMCIA depends on __io() being just a cast. This needs a better
+> > > fix with a fixed i/o address mapping, but for now we just restore things
+> > > to the previous behavior.
+> > 
+> > And what about systems with PCI IO at non-zero offsets with cardbus/pcmcia?
+> > This is broken and your assumption above is wrong.
+> 
+> I would think they all still use their own mach/io.h. Which ones are you
+> thinking of?
 
-> Do you see a relevant difference in the X log ?
-
-Nothing at all.
-
-Andreas.
-
--- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+But they don't need the IO_SPACE_LIMIT messed around with - it should
+remain at 64K not 4GB.
