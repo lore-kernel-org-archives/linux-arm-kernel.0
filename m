@@ -1,26 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 Apr 2012 09:53:23 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix wrong SYSC_TYPE1_XXX_MASK bit
- definitions
-In-Reply-To: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
-References: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1204040953120.8000@utopia.booyaka.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 4 Apr 2012 12:07:01 -0400 (EDT)
+Subject: [PATCH v3 06/12] USB: ohci-at91: change maximum number of ports
+In-Reply-To: <1333467033-29124-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <Pine.LNX.4.44L0.1204041205190.1543-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Feb 2012, Vaibhav Hiremath wrote:
+On Tue, 3 Apr 2012, Nicolas Ferre wrote:
 
-> In the SYSC_TYPE1_XXX_MASK configuration, SYSC_XXX_SHIFT macro
-> is used which is not defined anywhere in the kernel.
-> Until now the build was going through successfully, since it
-> is not being used anywhere in kernel.
+> Change number of ports to 3 for newer SoCs. Modify pdata structure
+> and ohci-at91 code that was dealing with ports information and check
+> of port indexes.
+> Several coding style errors have been addresses as the patch was touching
+> affected lines of code and was producing errors while run through
+> checkpatch.pl.
 > 
-> This bug got introduced by the commit
-> 358f0e630d5409ab3837b86db3595560eae773b6 ("OMAP3: hwmod: support
-> to specify the offset position of various SYSCONFIG register bits.")
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+> v3: - address all style errors in this patch (to prevent carrying them)
+>     - merge following patch about one-line ifs
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> v2: - use of AT91_MAX_USBH_PORTS instead of ARRAY_SIZE()
+>     - modify wIndex ohci_at91_hub_control() for simpler code
 
-Thanks, queued for 3.4-rc.
+This is better.  For this patch and the other ones in this series
+affecting ohci-at91 and ehci-at91:
 
-- Paul
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
