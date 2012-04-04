@@ -1,68 +1,32 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Apr 2012 12:32:04 -0600
-Subject: [PATCH v5 09/16] pwm: tegra: Add device tree support
-In-Reply-To: <20120404050054.GA30807@avionic-0098.adnet.avionic-design.de>
-References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
- <1332945238-14897-10-git-send-email-thierry.reding@avionic-design.de>
- <4F7602CD.2010808@wwwdotorg.org>
- <20120402083749.GA6576@avionic-0098.adnet.avionic-design.de>
- <4F79C8D4.2000306@wwwdotorg.org>
- <20120403175511.GA26399@avionic-0098.mockup.avionic-design.de>
- <20120403234249.E292E3E03F3@localhost>
- <20120404050054.GA30807@avionic-0098.adnet.avionic-design.de>
-Message-ID: <4F7C93A4.5000906@wwwdotorg.org>
+Date: Wed, 04 Apr 2012 12:33:14 -0600
+Subject: [PATCH v4 07/10] pwm: tegra: Add device tree support
+In-Reply-To: <20120404070432.GF7264@S2101-09.ap.freescale.net>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-8-git-send-email-thierry.reding@avionic-design.de>
+ <4F67EE9A.6080101@wwwdotorg.org>
+ <20120404070432.GF7264@S2101-09.ap.freescale.net>
+Message-ID: <4F7C93EA.2010105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2012 11:00 PM, Thierry Reding wrote:
-> * Grant Likely wrote:
->> On Tue, 3 Apr 2012 19:55:11 +0200, Thierry Reding <thierry.reding@avionic-design.de> wrote:
->>> * Stephen Warren wrote:
->>>> On 04/02/2012 02:37 AM, Thierry Reding wrote:
->>>>> * Stephen Warren wrote:
->>>>>> On 03/28/2012 08:33 AM, Thierry Reding wrote:
->>>>>>> Add auxdata to instantiate the PWFM controller from a device tree,
->>>>>>> include the corresponding nodes in the dtsi files for Tegra 20 and
->>>>>>> Tegra 30 and add binding documentation.
->>>>>>>
->>>>>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->>>>>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->>>>>>
->>>>>>> diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
->>>>>> ...
->>>>>>> +#ifdef CONFIG_OF
->>>>>>> +static struct of_device_id tegra_pwm_of_match[] = {
->>>>>>> +	{ .compatible = "nvidia,tegra20-pwm" },
->>>>>>> +	{ .compatible = "nvidia,tegra30-pwm" },
->>>>>>
->>>>>> Could you swap those two lines, so that tegra30-pwm matches first. It
->>>>>> makes no difference at present, but might in the future if the driver
->>>>>> actually has to differentiate the two SoCs.
->>>>>
->>>>> I thought the matching order was determined by the compatible property in the
->>>>> device tree, not the OF match table of the driver.
->>>>
->>>> At least logically, yes. However, of_match_device() appears to iterate
->>>> over each match table entry, checking whether it matches any string in
->>>> the compatible flag. Perhaps this could be considered a bug?
+On 04/04/2012 01:04 AM, Shawn Guo wrote:
+> On Mon, Mar 19, 2012 at 08:42:34PM -0600, Stephen Warren wrote:
+>> On 03/14/2012 09:56 AM, Thierry Reding wrote:
+>>> Add auxdata to instantiate the PWFM controller from a device tree,
+>>> include the corresponding nodes in the dtsi files for Tegra 20 and
+>>> Tegra 30 and add binding documentation.
 >>>
->>> It certainly is counter-intuitive. Maybe Grant or Rob can comment?
+>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 >>
->> Yes, it is a bug.  The order of of_device_id should be entirely
->> irrelevant, and the order in the DT compatible property should
->> determine which match entry is returned.
+>>> +++ b/Documentation/devicetree/bindings/pwm/tegra-pwm.txt
+>>
+>> Can this please be named nvidia,tegra20-pwm.txt so that if we need
 > 
-> I've had a look at the code and it looks like a fix will not be entirely
-> trivial. I think moving out the compatible check out of the while loop in
-> of_match_node() and separately iterate over all strings in the compatible
-> property would be the easiest. That will also prioritize the compatible
-> match over matches by name and type but I think that's exactly what we
-> want. From a quick look it certainly seems like the large majority of
-> drivers match by compatible anyway.
-> 
-> Do you want me to prepare a patch or can you take care of it?
-> 
-> Stephen: Can I assume that you're fine with this Tegra PWM patch if such
-> a change to the matching function is committed?
+> Is it necessary to have even the vendor prefix in the file name?  The
+> file will look exceptional among all these binding documents under
+> Documentation/devicetree/bindings.
 
-Yes.
+It would look exceptional now, but I've had it in the back of my mind to
+suggest renaming all the binding docs in line with their full compatible
+value. Then, it'd just look consistent ;-P.
