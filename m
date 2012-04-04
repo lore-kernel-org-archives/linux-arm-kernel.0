@@ -1,42 +1,35 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed,  4 Apr 2012 22:12:51 +0200
-Subject: [PATCH 17/17][V2] ARM: OMAP3: cpuidle - set global variables static
-In-Reply-To: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1333570371-1389-18-git-send-email-daniel.lezcano@linaro.org>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Wed, 04 Apr 2012 22:35:50 +0200
+Subject: Handling device shared SFR on dt platform
+In-Reply-To: <20120403160454.BDFF23E0598@localhost>
+References: <4F6A5853.9090809@gmail.com>
+ <20120324193200.822AD3E0B06@localhost> <4F736A4A.6050302@gmail.com>
+ <20120403160454.BDFF23E0598@localhost>
+Message-ID: <4F7CB0A6.7010809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-and check the powerdomain lookup is successful.
+On 04/03/2012 06:04 PM, Grant Likely wrote:
+>> What concerns me, is an overhead from region request/ioremap(?)/release, 
+>> just to access a single 32-bit register. I'm going to see if those accesses
+>> could be moved to only device driver's probe() and remove() callbacks and 
+>> what might be the resulting power consumption increase from that, if any.
+> 
+> Personally, I'd just create a shared function used by both drivers to
+> access the register and protect it with a spinlock.  That way the
+> region only needs to be mapped once, and the overhead is as low as
+> possible.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Jean Pihet <j-pihet@ti.com>
+Hmm, that's what I originally started with. I've just removed function 
+callback from the platform data struct in favour of having the drivers 
+using directly the function exported by plat-s5p. Then I started devising
+something alternative, in hope to get rid of the drivers compilation 
+dependency on PLAT_S5P. There seems little point in that though, since 
+the chance to have those IP blocks available on other archs or ARM sub-archs,
+than Samsung S5P/Exynos, are extremely low. 
+
+I'll post finally some patches for review. Thank you.
+
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 882d349..413aac4 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -75,7 +75,7 @@ static struct omap3_idle_statedata omap3_idle_data[OMAP3_NUM_STATES] = {
- 	},
- };
- 
--struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
-+static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
- 
- static int _cpuidle_allow_idle(struct powerdomain *pwrdm,
- 				struct clockdomain *clkdm)
-@@ -364,6 +364,9 @@ int __init omap3_idle_init(void)
- 	per_pd = pwrdm_lookup("per_pwrdm");
- 	cam_pd = pwrdm_lookup("cam_pwrdm");
- 
-+	if (!mpu_pd || !core_pd || !per_pd || !cam_pd)
-+		return -ENODEV;
-+
- 	/*
- 	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
- 	 * enable OFF mode in a stable form for previous revisions.
--- 
-1.7.5.4
+Regards,
+Sylwester
