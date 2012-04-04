@@ -1,25 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 4 Apr 2012 20:21:02 +0100
-Subject: [PATCH] clkdev: Implement managed clk_get()
-In-Reply-To: <20120404174828.GA27171@avionic-0098.adnet.avionic-design.de>
-References: <1333403385-24133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20120402215341.GL24211@n2100.arm.linux.org.uk>
- <20120402215927.GG3160@opensource.wolfsonmicro.com>
- <20120404174828.GA27171@avionic-0098.adnet.avionic-design.de>
-Message-ID: <20120404192102.GA10787@opensource.wolfsonmicro.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 4 Apr 2012 14:22:07 -0500
+Subject: [PATCHv5 16/18] I2C: OMAP: fix missing handling of errata
+ I2C_OMAP3_1P153
+In-Reply-To: <CAM=Q2cu8k8n2w8_=8VCFcFTTgywqc_Vk_eM_DDTap3YeYyAH2g@mail.gmail.com>
+References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
+ <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
+ <4F7C7780.7040807@ti.com>
+ <CAM=Q2cu8k8n2w8_=8VCFcFTTgywqc_Vk_eM_DDTap3YeYyAH2g@mail.gmail.com>
+Message-ID: <4F7C9F5F.8010206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 07:48:28PM +0200, Thierry Reding wrote:
+Hi Shubhro,
 
-> The kerneldoc comment for devm_clk_put() also needs updating in case you
-> haven't fixed it already.
+On 04/04/2012 12:45 PM, Shubhrajyoti Datta wrote:
+> Hi Jon,
+>
+>
+>>> +       if (dev->flags&    OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+>>>
+>>> +               dev->errata |= I2C_OMAP_ERRATA_I207;
+>>> +
+>>>         if (dev->rev<= OMAP_I2C_REV_ON_3430_3530)
+>>>                 dev->errata |= I2C_OMAP3_1P153;
+>>
+>>
+>> The errata ID is not correct. I believe that 1P153 is referring to the
+>> section number in the errata doc and not the errata ID. The errata ID should
+>> be i451 in the latest OMAP34xx and OMAP36xx docs.
+>>
+>> Please can you update this? The section number changed in the latest errata
+>> docs and it took me a minute to find this.
+>
+> Do you mind if that is a separate patch?
 
-Got that, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120404/64c9a3f9/attachment.sig>
+Not at all and in fact it probably should be.
+
+Thanks
+Jon
