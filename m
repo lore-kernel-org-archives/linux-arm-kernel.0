@@ -1,64 +1,93 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 4 Apr 2012 10:39:54 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
- <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83184715A@DBDE01.ent.ti.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 4 Apr 2012 11:43:22 +0100 (BST)
+Subject: linux-3.4-rc1 PXA2xx PCMCIA possible regression
+In-Reply-To: <4F7BB707.8000701@gmail.com>
+Message-ID: <1333536202.79962.YahooMailClassic@web29016.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 14:34:09, Shilimkar, Santosh wrote:
-> On Tue, Apr 3, 2012 at 9:05 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> > On Tue, Apr 03, 2012 at 00:05:38, Hilman, Kevin wrote:
-> >> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
-> >>
-> >> [...]
-> >>
-> >> > I don't personally like to add features which hardly anybody use and
-> >> > fundamentally broken with full kernel.
-> >>
-> >> Let's keep sane defaults, but not make it unreasonable to tweak eaither.
-> >>
-> >> I suggest what has already been mentioned.
-> >>
-> >> Register both timers, but have the sync timer have a higher rating. ?On
-> >> AMxxx where there is no sync timer, GPtimer will be used.
-> >>
-> >
-> > This is another good option, I can change the rating of both the timers.
-> > With below description and given understanding/discussion/usability of both
-> > the timers, we can reverse the rating,
-> >
-> Btw, if we are going with this path, then there won't any need of commandline
-> option since clock-source can be switched from user space as well.
-> 
+Hello Rob,
 
-Yes, both the options will be open now and its upto user how he want to 
-choose it (either bootargs or sysfs).
+--- On Wed, 4/4/12, Rob Herring <robherring2@gmail.com> wrote:
+> On 04/03/2012 08:57 PM, Paul Parsons
+> wrote:
+> > On linux-3.3 the PCMCIA/CF on my hx4700 worked OK.
+> > 
+> > On linux-3.4-rc1 the PCMCIA/CF has stopped working:
+> > 
+> > pcmcia_socket pcmcia_socket0: pccard: PCMCIA card
+> inserted into slot 0
+> > pcmcia 0.0: pcmcia: registering new device pcmcia0.0
+> (IRQ: 156)
+> > pata_pcmcia: probe of 0.0 failed with error -12
+> > 
+> > I've traced the -ENOMEM error back to pcmcia_init_one()
+> in
+> > drivers/ata/pata_pcmcia.c:
+> > 
+> >? ? 237??? ???
+> /* iomap */
+> >? ? 238??? ???
+> ret = -ENOMEM;
+> >? ? 239??? ???
+> io_addr = devm_ioport_map(&pdev->dev, io_base, 8);
+> >? ? 240??? ???
+> ctl_addr = devm_ioport_map(&pdev->dev, ctl_base, 1);
+> >? ? 241??? ???
+> if (!io_addr || !ctl_addr)
+> >? ? 242??? ???
+> ??? goto failed;
+> > 
+> > Both calls to devm_ioport_map() return NULL.
+> > 
+> > The ultimate source of both NULL values appears to be
+> __io() and
+> > thence __typesafe_io(), both defined in
+> arch/arm/include/asm/io.h
+> 
+> I broke it with the io.h clean-up. It seems PCMCIA drivers
+> rely on
+> __io() just being a cast. The easy fix is just restore that
+> behavior for
+> PCMCIA:
+> 
+> diff --git a/arch/arm/include/asm/io.h
+> b/arch/arm/include/asm/io.h
+> index df0ac0b..1b50c28 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -118,6 +118,8 @@ static inline void __iomem
+> *__typesafe_io(unsigned
+> long addr)
+> ? */
+>  #ifdef CONFIG_NEED_MACH_IO_H
+>  #include <mach/io.h>
+> +#elif defined(CONFIG_PCMCIA)
+> +#define __io(a)? ? ? ? ? ?
+> ? ? __typesafe_io(a)
+>  #else
+>  #define __io(a)? ? ? ? ? ?
+> ? ? ({ (void)(a); __typesafe_io(0); })
+>  #endif
+> 
+> 
+> Can you please test this change. This is what we'll have to
+> do for 3.4,
+> but this is not really the right solution. io_base should
+> not be a
+> virtual address here, but an i/o address in the range of
+> 0-64K. We need
+> to move PCMCIA to the fixed i/o mapping I've posted:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg162547.html
+> 
+> I've been trying to get PCMCIA to work on spitz in QEMU to
+> test out
+> fixes, but haven't had much luck. I'm not getting a card
+> detected even
+> though QEMU thinks one is present.
+
+Yes, this change fixes the PCMCIA/CF on my hx4700 (PXA270).
 
 Thanks,
-Vaibhav
+Paul
