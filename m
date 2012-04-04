@@ -1,184 +1,88 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 4 Apr 2012 09:10:21 -0500
-Subject: [PATCH v3] OMAP2+: UART: Remove cpu checks for populating errata
- flags
-In-Reply-To: <1333460554-7356-1-git-send-email-govindraj.raja@ti.com>
-References: <1333356489-5816-1-git-send-email-govindraj.raja@ti.com>
- <1333460554-7356-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <4F7C564D.6050602@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Apr 2012 15:16:04 +0100
+Subject: [PATCH] ARM: fix __io macro for PCMCIA
+In-Reply-To: <4F7C50D8.6060102@gmail.com>
+References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+ <20120404090335.GQ24211@n2100.arm.linux.org.uk>
+ <201204041027.30353.arnd@arndb.de>
+ <20120404125624.GT24211@n2100.arm.linux.org.uk>
+ <20120404130401.GU24211@n2100.arm.linux.org.uk> <4F7C50D8.6060102@gmail.com>
+Message-ID: <20120404141604.GW24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Govindraj,
+On Wed, Apr 04, 2012 at 08:47:04AM -0500, Rob Herring wrote:
+> On 04/04/2012 08:04 AM, Russell King - ARM Linux wrote:
+> > On Wed, Apr 04, 2012 at 01:56:24PM +0100, Russell King - ARM Linux wrote:
+> >> On Wed, Apr 04, 2012 at 10:27:30AM +0000, Arnd Bergmann wrote:
+> >>> On Wednesday 04 April 2012, Russell King - ARM Linux wrote:
+> >>>> On Tue, Apr 03, 2012 at 10:11:52PM -0500, Rob Herring wrote:
+> >>>>> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
+> >>>>> broken as PCMCIA depends on __io() being just a cast. This needs a better
+> >>>>> fix with a fixed i/o address mapping, but for now we just restore things
+> >>>>> to the previous behavior.
+> >>>>
+> >>>> And what about systems with PCI IO at non-zero offsets with cardbus/pcmcia?
+> >>>> This is broken and your assumption above is wrong.
+> >>>
+> >>> I would think they all still use their own mach/io.h. Which ones are you
+> >>> thinking of?
+> >>
+> >> But they don't need the IO_SPACE_LIMIT messed around with - it should
+> >> remain at 64K not 4GB.
+> > 
+> > Actually, we've done the whole io.h removal in totally the wrong bloody
+> > order - because in removing all these so-called unnecessary io.h headers,
+> > we've removed all those IO_SPACE_LIMIT definitions which overrode the
+> > generic ones.
+> > 
+> > What we should have done is sorted out the PCMCIA/PCI/ISA IO space _first_
+> > before removing any mach/io.h headers.
+> > 
+> > The fix for this is to restore those io.h headers which defined
+> > IO_SPACE_LIMIT to something else other than the asm/io.h default until
+> > the proper process in the above paragraph has been followed, and not
+> > to work around it by buggering with the generic - and correct -
+> > definition.
+> > 
+> 
+> If you look at who defined IO_SPACE_LIMIT, you'll see most were just
+> wrong (i.e. 0xffffffff and no PCMCIA/ISA/PCI). Is there any PCMCIA
+> enabled ARM platform that doesn't require IO_SPACE_LIMIT to be 0xffffffff?
 
-On 04/03/2012 08:42 AM, Govindraj.R wrote:
-> From: "Govindraj.R"<govindraj.raja@ti.com>
->
-> Currently the errata is populated based on cpu checks this can
-> be removed and replaced with module version check of uart ip block.
-> MVR reg is provided within the uart reg map use the same
-> to populate the errata and thus now errata population and handling
-> can be managed within the driver itself.
->
-> Cc: Jon Hunter<jon-hunter@ti.com>
-> Cc: Paul Walmsley<paul@pwsan.com>
-> Cc: Kevin Hilman<khilman@ti.com>
-> Signed-off-by: Felipe Balbi<balbi@ti.com>
-> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
-> ---
->   arch/arm/mach-omap2/serial.c                  |    8 ---
->   arch/arm/plat-omap/include/plat/omap-serial.h |    1 -
->   drivers/tty/serial/omap-serial.c              |   74 ++++++++++++++++++++++++-
->   3 files changed, 73 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index 0cdd359..6affdd4 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -355,14 +355,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->   	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
->   	omap_up.autosuspend_timeout = info->autosuspend_timeout;
->
-> -	/* Enable the MDR1 Errata i202 for OMAP2430/3xxx/44xx */
-> -	if (!cpu_is_omap2420()&&  !cpu_is_ti816x())
-> -		omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
-> -
-> -	/* Enable DMA Mode Force Idle Errata i291 for omap34xx/3630 */
-> -	if (cpu_is_omap34xx() || cpu_is_omap3630())
-> -		omap_up.errata |= UART_ERRATA_i291_DMA_FORCEIDLE;
-> -
->   	pdata =&omap_up;
->   	pdata_size = sizeof(struct omap_uart_port_info);
->
-> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-> index 9ff4444..1a52725 100644
-> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
-> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-> @@ -65,7 +65,6 @@ struct omap_uart_port_info {
->   	bool			dma_enabled;	/* To specify DMA Mode */
->   	unsigned int		uartclk;	/* UART clock rate */
->   	upf_t			flags;		/* UPF_* flags */
-> -	u32			errata;
->   	unsigned int		dma_rx_buf_size;
->   	unsigned int		dma_rx_timeout;
->   	unsigned int		autosuspend_timeout;
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 0121486..0555c96 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -44,6 +44,13 @@
->   #include<plat/dmtimer.h>
->   #include<plat/omap-serial.h>
->
-> +#define UART_BUILD_REVISION(x, y)	(((x)<<  8) | (y))
-> +
-> +#define OMAP_UART_REV_42 0x0402
-> +#define OMAP_UART_REV_46 0x0406
-> +#define OMAP_UART_REV_52 0x0502
-> +#define OMAP_UART_REV_63 0x0603
-> +
->   #define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
->
->   /* SCR register bitmasks */
-> @@ -53,6 +60,17 @@
->   #define OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT		6
->   #define OMAP_UART_FCR_RX_FIFO_TRIG_MASK			(0x3<<  6)
->
-> +/* MVR register bitmasks */
-> +#define OMAP_UART_MVR_SCHEME_SHIFT	30
-> +
-> +#define OMAP_UART_LEGACY_MVR_MAJ_MASK	0xf0
-> +#define OMAP_UART_LEGACY_MVR_MAJ_SHIFT	4
-> +#define OMAP_UART_LEGACY_MVR_MIN_MASK	0x0f
-> +
-> +#define OMAP_UART_MVR_MAJ_MASK		0x700
-> +#define OMAP_UART_MVR_MAJ_SHIFT		8
-> +#define OMAP_UART_MVR_MIN_MASK		0x3f
-> +
->   static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
->
->   /* Forward declaration of functions */
-> @@ -1346,6 +1364,59 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
->   	return;
->   }
->
-> +static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
-> +{
-> +	u32 mvr, scheme;
-> +	u16 revision, major, minor;
-> +
-> +	mvr = serial_in(up, UART_OMAP_MVER);
-> +
-> +	/* Check revision register scheme */
-> +	scheme = mvr>>  OMAP_UART_MVR_SCHEME_SHIFT;
-> +
-> +	switch (scheme) {
-> +	case 0: /* Legacy Scheme: OMAP2/3 */
-> +		/* MINOR_REV[0:4], MAJOR_REV[4:7] */
-> +		major = (mvr&  OMAP_UART_LEGACY_MVR_MAJ_MASK)>>
-> +					OMAP_UART_LEGACY_MVR_MAJ_SHIFT;
-> +		minor = (mvr&  OMAP_UART_LEGACY_MVR_MIN_MASK);
-> +		break;
-> +	case 1:
-> +		/* New Scheme: OMAP4+ */
-> +		/* MINOR_REV[0:5], MAJOR_REV[8:10] */
-> +		major = (mvr&  OMAP_UART_MVR_MAJ_MASK)>>
-> +					OMAP_UART_MVR_MAJ_SHIFT;
-> +		minor = (mvr&  OMAP_UART_MVR_MIN_MASK);
-> +		break;
-> +	default:
-> +		dev_warn(&up->pdev->dev,
-> +			"Unknown %s revision, defaulting to highest\n",
-> +			up->name);
-> +		/* highest possible revision */
-> +		major = 0xff;
-> +		minor = 0xff;
-> +	}
-> +
-> +	/* normalize revision for the driver */
-> +	revision = UART_BUILD_REVISION(major, minor);
-> +
-> +	switch (revision) {
-> +	case OMAP_UART_REV_46:
-> +		up->errata |= (UART_ERRATA_i202_MDR1_ACCESS |
-> +				UART_ERRATA_i291_DMA_FORCEIDLE);
-> +		break;
-> +	case OMAP_UART_REV_52:
-> +		up->errata |= (UART_ERRATA_i202_MDR1_ACCESS |
-> +				UART_ERRATA_i291_DMA_FORCEIDLE);
-> +		break;
-> +	case OMAP_UART_REV_63:
-> +		up->errata |= UART_ERRATA_i202_MDR1_ACCESS;
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +}
-> +
->   static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
->   {
->   	struct omap_uart_port_info *omap_up_info;
-> @@ -1443,7 +1514,6 @@ static int serial_omap_probe(struct platform_device *pdev)
->   						"%d\n", DEFAULT_CLK_SPEED);
->   	}
->   	up->uart_dma.uart_base = mem->start;
-> -	up->errata = omap_up_info->errata;
->
->   	if (omap_up_info->dma_enabled) {
->   		up->uart_dma.uart_dma_tx = dma_tx->start;
-> @@ -1473,6 +1543,8 @@ static int serial_omap_probe(struct platform_device *pdev)
->   	pm_runtime_enable(&pdev->dev);
->   	pm_runtime_get_sync(&pdev->dev);
->
-> +	omap_serial_fill_features_erratas(up);
-> +
->   	ui[up->port.line] = up;
->   	serial_omap_add_console_port(up);
->
+I thought I'd pointed that out already and why you're wrong above.
+Think: what if you have PCI IO space at 0x7c000000 and you have a cardbus
+bridge on your PCI bus.  Hint: ARM platforms have exactly this.
 
-Thanks!
+You're going to end up setting their IO_SPACE_LIMIT to 4GB instead of
+the _correct_ 64K which they've had for _years_.
 
-Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+You're not making this better with this stuff, you're making things worse
+in the name of 'less files, oh that must be good'.  No, it isn't good
+if you end up breaking stuff in the process.
 
-Cheers
-Jon
+> CONFIG_PCMCIA_SOC_COMMON is pretty much specific to PXA and SA11xx and
+> we already have a special case for it in asm/io.h. I'm simply extending
+> that to the few other platforms using PCMCIA. So it's not really any
+> more buggered than it already was.
+
+Which is wrong, as I've already pointed out in this thread.
+
+The generic definitions in asm/io.h are _correct_.  PCMCIA without
+soc-common is standard PCMCIA, which has a single 64K IO window
+unless the platform is using some special code.
+
+PCMCIA with soc-common is indeterminant, and we default to a 4GB
+_until_ the platforms are all fixed to use proper IO windows.
+
+> Also, with this patch, building a PCMCIA enabled platform and non-PCMCIA
+> platform together are compatible. Adding io.h will mean any PCMCIA
+> platform could not be part of a single kernel build (other issues aside).
+
+Look, it's pretty simple.  The kernel was working just fine before your
+conversion.  Your conversion happened.  The kernel stops working on certain
+platforms.  That means your conversion to remove mach/io.h was incorrect
+and your analysis of what was required was wrong.
+
+If that wasn't the case, there wouldn't be this fundamental issue that's
+caused this breakage.
