@@ -1,31 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Apr 2012 11:25:20 +0100
-Subject: [BUG?] vic MULTI_IRQ_HANDLER (was [PATCH] ep93xx: Implement
- double buffering for M2M DMA channels)
-In-Reply-To: <CACb=_tTaW7O+9AwaroRYvhw-gcKEO_GrufzmDs76P=YBmZ+S1A@mail.gmail.com>
-References: <ADE657CA350FB648AAC2C43247A983F0020698409ABF@AUSP01VMBX24.collaborationhost.net>
- <CACb=_tQ4pSXtmKnqM23p97iyRbnrdZicw6ao68t2KjL46srAuQ@mail.gmail.com>
- <20120402200034.GL5812@mwesterb-mobl.ger.corp.intel.com>
- <20120402214614.GK24211@n2100.arm.linux.org.uk>
- <20120403170812.GR17741@mudshark.cambridge.arm.com>
- <ADE657CA350FB648AAC2C43247A983F0020698409E00@AUSP01VMBX24.collaborationhost.net>
- <20120404091110.GB19889@mudshark.cambridge.arm.com>
- <CACb=_tTaW7O+9AwaroRYvhw-gcKEO_GrufzmDs76P=YBmZ+S1A@mail.gmail.com>
-Message-ID: <20120404102520.GF19889@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Apr 2012 08:48:38 +0000
+Subject: [PATCH v2] gpio: Device tree support for LPC32xx
+In-Reply-To: <1333497518-25838-1-git-send-email-stigge@antcom.de>
+References: <1333497518-25838-1-git-send-email-stigge@antcom.de>
+Message-ID: <201204040848.39376.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 10:12:56AM +0100, Jamie Iles wrote:
-> On 4 April 2012 10:11, Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > If Jamie's happy with the change, I'll repost.
+On Tuesday 03 April 2012, Roland Stigge wrote:
+> This patch adds device tree support for gpio-lpc32xx.c
 > 
-> Sure, lgtm.
-> 
-> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Cheers Jamie, I've posted the patch individually here:
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-April/092698.html
+Just one more comment:
 
-Will
+> +#ifdef CONFIG_OF
+> +static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
+> +	{ .compatible = "nxp,lpc32xx-gpio", },
+> +	{ },
+> +};
+> +#endif
+> +
+> +static struct platform_driver lpc32xx_gpio_driver = {
+> +	.driver		= {
+> +		.name	= "lpc32xx-gpio",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = lpc32xx_gpio_of_match,
+> +	},
+> +	.probe		= lpc32xx_gpio_probe,
+> +};
+
+The #ifdef above is not helpful, it will cause a build error in the
+of_match_table= assignment. Since the plan for this driver is to
+be devicetree-only, it would be appropriate to just remove the
+#ifdef, but adding of_match_ptr() is ok too.
+
+	Arnd
