@@ -1,23 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 4 Apr 2012 10:52:01 -0700
-Subject: [PATCH 02/11] ARM: tegra: Remove VBUS_GPIO handling from board
- files
-In-Reply-To: <1333148404-17691-3-git-send-email-swarren@wwwdotorg.org>
+Date: Wed, 4 Apr 2012 10:57:22 -0700
+Subject: [PATCH 03/11] gpio: tegra: fix register address calculations for
+ Tegra30
+In-Reply-To: <1333148404-17691-4-git-send-email-swarren@wwwdotorg.org>
 References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
- <1333148404-17691-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120404175201.GB29919@quad.lixom.net>
+ <1333148404-17691-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120404175722.GC29919@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 04:59:55PM -0600, Stephen Warren wrote:
+On Fri, Mar 30, 2012 at 04:59:56PM -0600, Stephen Warren wrote:
 > From: Stephen Warren <swarren@nvidia.com>
 > 
-> Instead of having board files manually request and initialize USB VBUS
-> GPIOs, fill in the USB driver's platform data and have it do it.
+> Tegra20 and Tegra30 share the same register layout within registers, but
+> the addresses of the registers is a little different. Fix the driver to
+> cope with this.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> @@ -333,6 +336,26 @@ static struct irq_chip tegra_gpio_irq_chip = {
+>  #endif
+>  };
+>  
+> +struct tegra_gpio_soc_config {
+> +	u32 bank_stride;
+> +	u32 upper_offset;
+> +};
+> +
+> +static struct tegra_gpio_soc_config tegra20_gpio_config = {
+> +	.bank_stride = 0x80,
+> +	.upper_offset = 0x800,
+> +};
+> +
+> +static struct tegra_gpio_soc_config tegra30_gpio_config = {
+> +	.bank_stride = 0x100,
+> +	.upper_offset = 0x80,
+> +};
 
-Acked-by: Olof Johansson <olof@lixom.net>                                                                    
+Hmm. I wonder if this would be better to just describe in the device tree
+bindings for the gpio controller? Perhaps split the reg property in a higher
+and lower to take care of the offset, and add a nvidia,bank-stride=<x>
+property?
 
 
 -Olof
