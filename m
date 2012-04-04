@@ -1,33 +1,33 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 4 Apr 2012 09:53:08 -0400
-Subject: [PATCH] ARM: versatile: fix build failure in pci.c
-In-Reply-To: <20120404090754.GR24211@n2100.arm.linux.org.uk>
-References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
- <CAP=VYLpim2TCMO5nDVNe0bdm9ZQ+czUWNpxxWugDzrHO6aYVAQ@mail.gmail.com>
- <CAOMZO5A-+tcz6ewTykXL33opRVP9U4o7Ltdkbr7LLqWMBQczSQ@mail.gmail.com>
- <201204030819.48798.arnd@arndb.de> <4F7AFF61.3070803@windriver.com>
- <20120404090754.GR24211@n2100.arm.linux.org.uk>
-Message-ID: <4F7C5244.4040700@windriver.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 4 Apr 2012 14:55:21 +0100 (BST)
+Subject: linux-3.4-rc1 PXA2xx PCMCIA possible regression
+In-Reply-To: <20120404130803.GV24211@n2100.arm.linux.org.uk>
+Message-ID: <1333547721.81557.YahooMailClassic@web29008.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-04-04 05:07 AM, Russell King - ARM Linux wrote:
-> On Tue, Apr 03, 2012 at 09:47:13AM -0400, Paul Gortmaker wrote:
->> As a side note, the fact that struct pci_sys_data is ARM specific
->> does make one think it would be nice if the name somehow did
->> reflect that...  wonder if it is worth changing.  Anyway, that is
->> a separate topic.
+Hello Russell,
+
+--- On Wed, 4/4/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Wed, Apr 04, 2012 at 02:57:22AM
+> +0100, Paul Parsons wrote:
+> > On linux-3.3 the PCMCIA/CF on my hx4700 worked OK.
+> > 
+> > On linux-3.4-rc1 the PCMCIA/CF has stopped working:
+> > 
+> > pcmcia_socket pcmcia_socket0: pccard: PCMCIA card
+> inserted into slot 0
+> > pcmcia 0.0: pcmcia: registering new device pcmcia0.0
+> (IRQ: 156)
+> > pata_pcmcia: probe of 0.0 failed with error -12
 > 
-> And what's wrong with the existing name when it's limited to only
-> ARM specific files?
+> I see no PCMCIA support for HX4700 in mainline.? Where
+> is it?
 
-Just in the context of Arnd's original comment, he thought I
-screwed up by feeding an ARM specific struct into generic
-PCI code, because I wasn't aware it was ARM specific.
+It is languishing in pending patch land:
 
-That wasn't the case, but he's right that something like that
-could happen  A minor nit, sure, but if it was something like
-pci_arm_data, the name itself would convey it was arm specific,
-even in reduced context scenarios (like grep output etc).
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/089266.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/088988.html
 
-P.
+Regards,
+Paul
