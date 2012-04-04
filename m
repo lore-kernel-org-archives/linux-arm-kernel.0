@@ -1,55 +1,47 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 04 Apr 2012 09:39:30 -0700
-Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
-In-Reply-To: <20120404150353.GB24211@n2100.arm.linux.org.uk>
-References: <20120213094940.GA15338@n2100.arm.linux.org.uk>
- <4F3CF3DA.7000806@samsung.com>
- <20120216160250.GP13673@n2100.arm.linux.org.uk>
- <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
- <20120327074931.GK5611@n2100.arm.linux.org.uk> <4F73B3E1.4080807@samsung.com>
- <20120404145204.GA24211@n2100.arm.linux.org.uk>
- <20120404145917.GB1929@redhat.com>
- <20120404150353.GB24211@n2100.arm.linux.org.uk>
-Message-ID: <4F7C7942.2000006@samsung.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 4 Apr 2012 11:43:07 -0500
+Subject: [PATCH v2 2/3] ep93xx: IDE driver platform support code
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F002069840A08A@AUSP01VMBX24.collaborationhost.net>
+References: <4F7B0C54.8010804@metasoft.pl> <4F7B0D6C.1010801@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020698409DF4@AUSP01VMBX24.collaborationhost.net>
+ <4F7C0922.1070200@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F002069840A08A@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F002069840A0A8@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/12 08:03, Russell King - ARM Linux wrote:
-> On Wed, Apr 04, 2012 at 10:59:17AM -0400, 'Dave Jones' wrote:
->> On Wed, Apr 04, 2012 at 03:52:04PM +0100, Russell King - ARM Linux wrote:
->>   >  On Wed, Mar 28, 2012 at 05:59:13PM -0700, Kukjin Kim wrote:
->>   >  >  Russell King wrote:
->>   >  >>  As predicted, this is breaking other ARM platforms.  Please fix this
->>   >  >>  yourself before your crappy code gets pushed into mainline.  Thanks.
->>   >  >>
->>   >  >  I fixed it.
->>   >
->>   >  When will we see patches or the fix in mainline?
+On Wednesday, April 04, 2012 9:20 AM, H Hartley Sweeten wrote:
+> On Wednesday, April 04, 2012 1:41 AM, Rafal Prylowski wrote:
+>> On 2012-04-03 19:41, H Hartley Sweeten wrote:
+>> [not related to my patch, but ep93xx keypad]:
+>> Isn't ep93xx_keypad_acquire_gpio be more correct if we apply the following patch:
 >>
->> Just send it to Linus directly.
+>> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
+>> ===================================================================
+>> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
+>> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
+>> @@ -734,7 +734,7 @@ int ep93xx_keypad_acquire_gpio(struct pl
+>>  fail_gpio_d:
+>>  	gpio_free(EP93XX_GPIO_LINE_C(i));
+>>  fail_gpio_c:
+>> -	for ( ; i >= 0; --i) {
+>> +	for (--i; i >= 0; --i) {
+>>  		gpio_free(EP93XX_GPIO_LINE_C(i));
+>>  		gpio_free(EP93XX_GPIO_LINE_D(i));
+>>  	}
+>>
+>> This way we don't double free EP93XX_GPIO_LINE_C(i), and don't free lines which were not
+>> successfully acquired (I noticed this when writing my patch, which is based on
+>> ep93xx_keypad_acquire/release_gpio).
 >
-> 'it'... well, that implies that someone already has a patch.  I've asked
-> Kukjin to fix the problem which he introduced because exynos is getting
-> rather complicated, and he'll know what the dependencies should be.  So
-> far I've yet to see any kind of patch fixing this stuff.
+> You are correct... ;-)
 >
-Well, I already submitted its fix and it was including your e-mail. See 
-below.
+> Care to submit an actual patch?
 
-http://www.spinics.net/lists/cpufreq/msg03080.html
+Note, if/when the devm_gpio_request patch gets into the kernel tree we can use
+that and get rid of the gpio_free's completely.
 
-> Meanwhile I'm seeing failing randconfig builds for non-exynos ARM for
-> about a week due to the lack of dependencies.
->
+Sorry, I don't have a link to that patch...
 
-Yeah, the failure from cpufreq exynos4x12 and exynos5250 has been 
-introduced from last merge window and you know exynos4210 has been fixed 
-by your patch last time.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards,
+Hartley
