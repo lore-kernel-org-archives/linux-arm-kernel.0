@@ -1,40 +1,30 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 4 Apr 2012 14:23:35 +0200
-Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
-In-Reply-To: <CAMiH66EC7=x0sRYhE3hpEyBemDGSRS19xguQUqKj2kuPw5Tifw@mail.gmail.com>
-References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
- <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
- <CAMiH66EC7=x0sRYhE3hpEyBemDGSRS19xguQUqKj2kuPw5Tifw@mail.gmail.com>
-Message-ID: <20120404122335.GD17187@pengutronix.de>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Wed, 4 Apr 2012 14:25:40 +0200
+Subject: [PATCH 2/5] net: remove ixp2000 ethernet driver
+In-Reply-To: <1333534857.3046.33.camel@jtkirshe-mobl>
+References: <1333503243-7702-1-git-send-email-robherring2@gmail.com>
+ <1333503243-7702-2-git-send-email-robherring2@gmail.com>
+ <1333534857.3046.33.camel@jtkirshe-mobl>
+Message-ID: <20120404122540.GA28523@wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 04, 2012 at 03:20:57AM -0700, Jeff Kirsher wrote:
 
-> Could you provide an API such as gpmi_reset_block()?
-> It will much helpful to me.
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > The platform is removed, so there are no users of this driver.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
+> > Cc: Jesse Brandeburg <jesse.brandeburg@intel.com>
+> > Cc: Bruce Allan <bruce.w.allan@intel.com>
+> > Cc: Carolyn Wyborny <carolyn.wyborny@intel.com>
+> > Cc: Don Skidmore <donald.c.skidmore@intel.com>
+> > Cc: Greg Rose <gregory.v.rose@intel.com>
+> > Cc: Peter P Waskiewicz Jr <peter.p.waskiewicz.jr@intel.com>
+> > Cc: Alex Duyck <alexander.h.duyck@intel.com>
+> > Cc: John Ronciak <john.ronciak@intel.com>
+> > Cc: netdev at vger.kernel.org
 
-Ah, that's what you meant in the other thread. Well, this can be added
-later. My suggestion
-
-1) get this mainline to remove mach dependencies
-2) convert the drivers
-3) do proper timeout mechanisms
-4) add features
-
-where 2-4 can probably happen more or less simultaneously.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120404/564fdad5/attachment.sig>
+Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
