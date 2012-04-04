@@ -1,40 +1,23 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 4 Apr 2012 14:22:07 -0500
-Subject: [PATCHv5 16/18] I2C: OMAP: fix missing handling of errata
- I2C_OMAP3_1P153
-In-Reply-To: <CAM=Q2cu8k8n2w8_=8VCFcFTTgywqc_Vk_eM_DDTap3YeYyAH2g@mail.gmail.com>
-References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
- <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
- <4F7C7780.7040807@ti.com>
- <CAM=Q2cu8k8n2w8_=8VCFcFTTgywqc_Vk_eM_DDTap3YeYyAH2g@mail.gmail.com>
-Message-ID: <4F7C9F5F.8010206@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 04 Apr 2012 13:29:51 -0600
+Subject: [GIT PULL] Tegra fixes for v3.4-rc2
+Message-ID: <4F7CA12F.10708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shubhro,
+The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+  Linus Torvalds (1):
+        Linux 3.4-rc1
 
-On 04/04/2012 12:45 PM, Shubhrajyoti Datta wrote:
-> Hi Jon,
->
->
->>> +       if (dev->flags&    OMAP_I2C_FLAG_APPLY_ERRATA_I207)
->>>
->>> +               dev->errata |= I2C_OMAP_ERRATA_I207;
->>> +
->>>         if (dev->rev<= OMAP_I2C_REV_ON_3430_3530)
->>>                 dev->errata |= I2C_OMAP3_1P153;
->>
->>
->> The errata ID is not correct. I believe that 1P153 is referring to the
->> section number in the errata doc and not the errata ID. The errata ID should
->> be i451 in the latest OMAP34xx and OMAP36xx docs.
->>
->> Please can you update this? The section number changed in the latest errata
->> docs and it took me a minute to find this.
->
-> Do you mind if that is a separate patch?
+are available in the git repository at:
 
-Not at all and in fact it probably should be.
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+for-3.4/fixes-for-rc2
 
-Thanks
-Jon
+Stephen Warren (2):
+      gpio: tegra: fix register address calculations for Tegra30
+      gpio: tegra: Iterate over the correct number of banks
+
+ drivers/gpio/gpio-tegra.c |   59
++++++++++++++++++++++++++++++++++-----------
+ 1 files changed, 44 insertions(+), 15 deletions(-)
