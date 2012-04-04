@@ -1,54 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 4 Apr 2012 14:54:46 +0800
-Subject: [PATCH v5 08/16] pwm: Add NVIDIA Tegra SoC support
-In-Reply-To: <1332945238-14897-9-git-send-email-thierry.reding@avionic-design.de>
-References: <1332945238-14897-1-git-send-email-thierry.reding@avionic-design.de>
- <1332945238-14897-9-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120404065444.GE7264@S2101-09.ap.freescale.net>
+Date: Wed, 4 Apr 2012 15:04:35 +0800
+Subject: [PATCH v4 07/10] pwm: tegra: Add device tree support
+In-Reply-To: <4F67EE9A.6080101@wwwdotorg.org>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-8-git-send-email-thierry.reding@avionic-design.de>
+ <4F67EE9A.6080101@wwwdotorg.org>
+Message-ID: <20120404070432.GF7264@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2012 at 04:33:50PM +0200, Thierry Reding wrote:
-...
-> +static struct pwm_ops tegra_pwm_ops = {
+On Mon, Mar 19, 2012 at 08:42:34PM -0600, Stephen Warren wrote:
+> On 03/14/2012 09:56 AM, Thierry Reding wrote:
+> > Add auxdata to instantiate the PWFM controller from a device tree,
+> > include the corresponding nodes in the dtsi files for Tegra 20 and
+> > Tegra 30 and add binding documentation.
+> > 
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> 
+> > +++ b/Documentation/devicetree/bindings/pwm/tegra-pwm.txt
+> 
+> Can this please be named nvidia,tegra20-pwm.txt so that if we need
 
-const
+Is it necessary to have even the vendor prefix in the file name?  The
+file will look exceptional among all these binding documents under
+Documentation/devicetree/bindings.
 
-> +	.config = tegra_pwm_config,
-> +	.enable = tegra_pwm_enable,
-> +	.disable = tegra_pwm_disable,
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +static int tegra_pwm_probe(struct platform_device *pdev)
-> +{
-> +	struct tegra_pwm_chip *pwm;
-> +	struct resource *r;
-> +	int ret;
-> +
-> +	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-> +	if (!pwm) {
-> +		dev_err(&pdev->dev, "failed to allocate memory\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	pwm->dev = &pdev->dev;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!r) {
-> +		dev_err(&pdev->dev, "no memory resources defined\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	pwm->mmio_base = devm_request_and_ioremap(&pdev->dev, r);
-> +	if (!pwm->mmio_base) {
-> +		dev_err(&pdev->dev, "failed to ioremap() region\n");
-> +		return -ENODEV;
-
-The kernel doc of devm_request_and_ioremap() suggests -EADDRNOTAVAIL.
-
-> +	}
-> +
+> different bindings for any future Tegra PWM, we won't have any filename
+> conflicts?
 
 -- 
 Regards,
