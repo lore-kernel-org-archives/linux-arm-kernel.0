@@ -1,38 +1,60 @@
-From: davej@redhat.com ('Dave Jones')
-Date: Wed, 4 Apr 2012 13:22:48 -0400
-Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
-In-Reply-To: <4F7C7F68.7090000@samsung.com>
-References: <20120213094940.GA15338@n2100.arm.linux.org.uk>
- <4F3CF3DA.7000806@samsung.com>
- <20120216160250.GP13673@n2100.arm.linux.org.uk>
- <00aa01ccf084$93c98a70$bb5c9f50$%kim@samsung.com>
- <20120327074931.GK5611@n2100.arm.linux.org.uk>
- <4F73B3E1.4080807@samsung.com>
- <20120404145204.GA24211@n2100.arm.linux.org.uk>
- <20120404145917.GB1929@redhat.com> <4F7C7F68.7090000@samsung.com>
-Message-ID: <20120404172248.GA21113@redhat.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 4 Apr 2012 22:57:59 +0530
+Subject: [PATCH] clk: Update comment for clk_round_rate()
+Message-ID: <CAOh2x=nTSvOrJa2uB2zTvYh1SUO2YpEpnLcL189itJ=_e+MPog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 10:05:44AM -0700, Kukjin Kim wrote:
- > On 04/04/12 07:59, 'Dave Jones' wrote:
- > > On Wed, Apr 04, 2012 at 03:52:04PM +0100, Russell King - ARM Linux wrote:
- > >   >  On Wed, Mar 28, 2012 at 05:59:13PM -0700, Kukjin Kim wrote:
- > >   >  >  Russell King wrote:
- > >   >  >>  As predicted, this is breaking other ARM platforms.  Please fix this
- > >   >  >>  yourself before your crappy code gets pushed into mainline.  Thanks.
- > >   >  >>
- > >   >  >  I fixed it.
- > >   >
- > >   >  When will we see patches or the fix in mainline?
- > >
- > > Just send it to Linus directly.
- > >
- > 
- > Hi Dave,
- > 
- > OK, so may I send this to Linus with your ack?
+From: Viresh Kumar <viresh.kumar@st.com>
 
-sure.
+clk_round_rate() must not provide rate greater than requested rate, as hardware
+may not work at it. This wasn't clear from documentation of clk_round_rate().
 
-	Dave
+This patch updates documentation for this.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+
+Mike,
+
+I don't know if this holds true for common clock framework or not?
+But it looks more logical to me and this is how it was implemented for SPEAr.
+
+ drivers/clk/clk.c   |    6 +++---
+ include/linux/clk.h |    3 ++-
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 9cf6f59..2f58455 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -603,9 +603,9 @@ unsigned long __clk_round_rate(struct clk *clk,
+unsigned long rate)
+  * @clk: the clk for which we are rounding a rate
+  * @rate: the rate which is to be rounded
+  *
+- * Takes in a rate as input and rounds it to a rate that the clk can actually
+- * use which is then returned.  If clk doesn't support round_rate operation
+- * then the parent rate is returned.
++ * Takes in a rate as input and rounds it to a rate <= input rate that the clk
++ * can actually use which is then returned.  If clk doesn't support round_rate
++ * operation then the parent rate is returned.
+  */
+ long clk_round_rate(struct clk *clk, unsigned long rate)
+ {
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index b025272..19d31ef 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -213,7 +213,8 @@ void clk_put(struct clk *clk);
+
+
+ /**
+- * clk_round_rate - adjust a rate to the exact rate a clock can provide
++ * clk_round_rate - adjust a rate to the exact rate a clock can provide. Output
++ *		    clock rate should be <= requested rate
+  * @clk: clock source
+  * @rate: desired clock rate in Hz
+  *
+-- 
+1.7.9
