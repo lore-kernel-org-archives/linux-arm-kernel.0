@@ -1,577 +1,302 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 4 Apr 2012 17:05:34 +0530
-Subject: [PATCH V2 2/4] pinctrl: Add SPEAr pinctrl drivers
+Date: Wed, 4 Apr 2012 17:05:36 +0530
+Subject: [PATCH V2 4/4] SPEAr3xx: Add pinctrl support for boards
 In-Reply-To: <cover.1333538869.git.viresh.kumar@st.com>
 References: <cover.1333538869.git.viresh.kumar@st.com>
-Message-ID: <d931a52be65ad0b6354cb5de21cd2006ab100ea0.1333538870.git.viresh.kumar@st.com>
+Message-ID: <1ac94a157f9b15d0eabce4768ff83338cbd4ff4a.1333538870.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds pinctrl driver for SPEAr platform. It also updates MAINTAINERS file
-for SPEAr pinctrl drivers.
-
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- MAINTAINERS                           |   23 +--
- drivers/pinctrl/Kconfig               |    2 +
- drivers/pinctrl/Makefile              |    2 +
- drivers/pinctrl/spear/Kconfig         |   14 ++
- drivers/pinctrl/spear/Makefile        |    3 +
- drivers/pinctrl/spear/pinctrl-spear.c |  301 +++++++++++++++++++++++++++++++++
- drivers/pinctrl/spear/pinctrl-spear.h |  142 ++++++++++++++++
- 7 files changed, 472 insertions(+), 15 deletions(-)
- create mode 100644 drivers/pinctrl/spear/Kconfig
- create mode 100644 drivers/pinctrl/spear/Makefile
- create mode 100644 drivers/pinctrl/spear/pinctrl-spear.c
- create mode 100644 drivers/pinctrl/spear/pinctrl-spear.h
+ arch/arm/boot/dts/spear300-evb.dts |    4 ++++
+ arch/arm/boot/dts/spear300.dtsi    |    5 +++++
+ arch/arm/boot/dts/spear310.dtsi    |    5 +++++
+ arch/arm/boot/dts/spear320-evb.dts |    4 ++++
+ arch/arm/boot/dts/spear320.dtsi    |    7 ++++++-
+ arch/arm/mach-spear3xx/Kconfig     |    3 +++
+ arch/arm/mach-spear3xx/spear300.c  |   25 +++++++++++++++++++++++++
+ arch/arm/mach-spear3xx/spear310.c  |   30 ++++++++++++++++++++++++++++++
+ arch/arm/mach-spear3xx/spear320.c  |   29 +++++++++++++++++++++++++++++
+ arch/arm/plat-spear/Kconfig        |    1 +
+ 10 files changed, 112 insertions(+), 1 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e247af8..78782ea 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5238,6 +5238,14 @@ M:	Linus Walleij <linus.walleij@linaro.org>
- S:	Maintained
- F:	drivers/pinctrl/
+diff --git a/arch/arm/boot/dts/spear300-evb.dts b/arch/arm/boot/dts/spear300-evb.dts
+index eaecc29..219cdaf 100644
+--- a/arch/arm/boot/dts/spear300-evb.dts
++++ b/arch/arm/boot/dts/spear300-evb.dts
+@@ -25,6 +25,10 @@
+ 	};
  
-+PIN CONTROLLER - ST SPEAR
-+M:	Viresh Kumar <viresh.kumar@st.com>
-+L:	spear-devel at list.st.com
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+W:	http://www.st.com/spear
-+S:	Maintained
-+F:	driver/pinctrl/spear/
+ 	ahb {
++		pinmux at 99000000 {
++			st,pinmux-mode=<2>;
++		};
 +
- PKTCDVD DRIVER
- M:	Peter Osterlund <petero2@telia.com>
- S:	Maintained
-@@ -6331,21 +6339,6 @@ F:	arch/arm/mach-spear*/clock.c
- F:	arch/arm/plat-spear/clock.c
- F:	arch/arm/plat-spear/include/plat/clock.h
+ 		clcd at 60000000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
+index f9fcbf4..01c5e35 100644
+--- a/arch/arm/boot/dts/spear300.dtsi
++++ b/arch/arm/boot/dts/spear300.dtsi
+@@ -21,6 +21,11 @@
+ 		ranges = <0x60000000 0x60000000 0x50000000
+ 			  0xd0000000 0xd0000000 0x30000000>;
  
--SPEAR PAD MULTIPLEXING SUPPORT
--M:	Viresh Kumar <viresh.kumar@st.com>
--L:	spear-devel at list.st.com
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.st.com/spear
--S:	Maintained
--F:	arch/arm/plat-spear/include/plat/padmux.h
--F:	arch/arm/plat-spear/padmux.c
--F:	arch/arm/mach-spear*/spear*xx.c
--F:	arch/arm/mach-spear*/include/mach/generic.h
--F:	arch/arm/mach-spear3xx/spear3*0.c
--F:	arch/arm/mach-spear3xx/spear3*0_evb.c
--F:	arch/arm/mach-spear6xx/spear600.c
--F:	arch/arm/mach-spear6xx/spear600_evb.c
--
- SPI SUBSYSTEM
- M:	Grant Likely <grant.likely@secretlab.ca>
- L:	spi-devel-general at lists.sourceforge.net
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index abfb964..b25ac41 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -84,6 +84,8 @@ config PINCTRL_COH901
- 	  COH 901 335 and COH 901 571/3. They contain 3, 5 or 7
- 	  ports of 8 GPIO pins each.
- 
-+source "drivers/pinctrl/spear/Kconfig"
++		pinmux at 99000000 {
++			compatible = "st,spear300-pinmux";
++			reg = <0x99000000 0x1000>;
++		};
 +
+ 		clcd at 60000000 {
+ 			compatible = "arm,clcd-pl110", "arm,primecell";
+ 			reg = <0x60000000 0x1000>;
+diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
+index dc7fa14..e47081c 100644
+--- a/arch/arm/boot/dts/spear310.dtsi
++++ b/arch/arm/boot/dts/spear310.dtsi
+@@ -22,6 +22,11 @@
+ 			  0xb0000000 0xb0000000 0x10000000
+ 			  0xd0000000 0xd0000000 0x30000000>;
+ 
++		pinmux at b4000000 {
++			compatible = "st,spear310-pinmux";
++			reg = <0xb4000000 0x1000>;
++		};
++
+ 		fsmc: flash at 44000000 {
+ 			compatible = "st,spear600-fsmc-nand";
+ 			#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
+index d43de71..d675057 100644
+--- a/arch/arm/boot/dts/spear320-evb.dts
++++ b/arch/arm/boot/dts/spear320-evb.dts
+@@ -25,6 +25,10 @@
+ 	};
+ 
+ 	ahb {
++		pinmux at b3000000 {
++			st,pinmux-mode=<3>;
++		};
++
+ 		clcd at 90000000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
+index 9a0267a..5372ca3 100644
+--- a/arch/arm/boot/dts/spear320.dtsi
++++ b/arch/arm/boot/dts/spear320.dtsi
+@@ -18,9 +18,14 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "simple-bus";
+-		ranges = <0x40000000 0x40000000 0x70000000
++		ranges = <0x40000000 0x40000000 0x80000000
+ 			  0xd0000000 0xd0000000 0x30000000>;
+ 
++		pinmux at b3000000 {
++			compatible = "st,spear320-pinmux";
++			reg = <0xb3000000 0x1000>;
++		};
++
+ 		clcd at 90000000 {
+ 			compatible = "arm,clcd-pl110", "arm,primecell";
+ 			reg = <0x90000000 0x1000>;
+diff --git a/arch/arm/mach-spear3xx/Kconfig b/arch/arm/mach-spear3xx/Kconfig
+index d9fe11c..8bd3729 100644
+--- a/arch/arm/mach-spear3xx/Kconfig
++++ b/arch/arm/mach-spear3xx/Kconfig
+@@ -7,16 +7,19 @@ if ARCH_SPEAR3XX
+ menu "SPEAr3xx Implementations"
+ config MACH_SPEAR300
+ 	bool "SPEAr300 Machine support with Device Tree"
++	select PINCTRL_SPEAR300
+ 	help
+ 	  Supports ST SPEAr300 machine configured via the device-tree
+ 
+ config MACH_SPEAR310
+ 	bool "SPEAr310 Machine support with Device Tree"
++	select PINCTRL_SPEAR310
+ 	help
+ 	  Supports ST SPEAr310 machine configured via the device-tree
+ 
+ config MACH_SPEAR320
+ 	bool "SPEAr320 Machine support with Device Tree"
++	select PINCTRL_SPEAR320
+ 	help
+ 	  Supports ST SPEAr320 machine configured via the device-tree
  endmenu
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 2db0bd1..a08eccd 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -15,6 +15,7 @@
  
- endif
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 6d4150b..2febd76 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -16,3 +16,5 @@ obj-$(CONFIG_PINCTRL_TEGRA20)	+= pinctrl-tegra20.o
- obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
- obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
- obj-$(CONFIG_PINCTRL_COH901)	+= pinctrl-coh901.o
+ #include <linux/amba/pl08x.h>
+ #include <linux/of_platform.h>
++#include <linux/pinctrl/machine.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/mach/arch.h>
+ #include <plat/shirq.h>
+@@ -270,6 +271,24 @@ static struct of_dev_auxdata spear300_auxdata_lookup[] __initdata = {
+ 	{}
+ };
+ 
++static struct pinctrl_map __initdata spear300_evb_pmx_map[] = {
++	/* spear3xx per-device maps */
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "i2c0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "ssp0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "mii0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "uart0"),
 +
-+obj-$(CONFIG_PLAT_SPEAR)	+= spear/
-diff --git a/drivers/pinctrl/spear/Kconfig b/drivers/pinctrl/spear/Kconfig
-new file mode 100644
-index 0000000..47a0e295
---- /dev/null
-+++ b/drivers/pinctrl/spear/Kconfig
-@@ -0,0 +1,14 @@
-+#
-+# ST Microelectronics SPEAr PINCTRL drivers
-+#
++	/* spear310 per-device maps */
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "clcd_pfmode_grp",
++			"clcd"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "sdhci_4bit_grp",
++			"sdhci"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "gpio1_0_to_3_grp",
++			"gpio"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "gpio1_4_to_7_grp",
++			"gpio"),
++};
 +
-+if PLAT_SPEAR
+ static void __init spear300_dt_init(void)
+ {
+ 	int ret;
+@@ -287,6 +306,12 @@ static void __init spear300_dt_init(void)
+ 		if (ret)
+ 			pr_err("Error registering Shared IRQ\n");
+ 	}
 +
-+config PINCTRL_SPEAR
-+	bool
-+	depends on OF
-+	select PINMUX
-+	help
-+	  This enables pin control drivers for SPEAr Platform
-+
-+endif
-diff --git a/drivers/pinctrl/spear/Makefile b/drivers/pinctrl/spear/Makefile
-new file mode 100644
-index 0000000..69c1a51
---- /dev/null
-+++ b/drivers/pinctrl/spear/Makefile
-@@ -0,0 +1,3 @@
-+# SPEAr pinmux support
-+
-+obj-$(CONFIG_PINCTRL_SPEAR)	+= pinctrl-spear.o
-diff --git a/drivers/pinctrl/spear/pinctrl-spear.c b/drivers/pinctrl/spear/pinctrl-spear.c
-new file mode 100644
-index 0000000..38eec3d
---- /dev/null
-+++ b/drivers/pinctrl/spear/pinctrl-spear.c
-@@ -0,0 +1,301 @@
-+/*
-+ * Driver for the ST Microelectronics SPEAr pinmux
-+ *
-+ * Copyright (C) 2012 ST Microelectronics
-+ * Viresh Kumar <viresh.kumar@st.com>
-+ *
-+ * Inspired from:
-+ * - U300 Pinctl drivers
-+ * - Tegra Pinctl drivers
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
-+#include <linux/platform_device.h>
-+
-+#include "pinctrl-spear.h"
-+
-+#define DRIVER_NAME "spear-pinmux"
-+
-+static inline u32 pmx_readl(struct spear_pmx *pmx, u32 reg)
-+{
-+	return readl_relaxed(pmx->vbase + reg);
-+}
-+
-+static inline void pmx_writel(struct spear_pmx *pmx, u32 val, u32 reg)
-+{
-+	writel_relaxed(val, pmx->vbase + reg);
-+}
-+
-+static int set_mode(struct spear_pmx *pmx, int mode)
-+{
-+	struct spear_pmx_mode *pmx_mode = NULL;
-+	int i;
-+	u32 val;
-+
-+	if (!pmx->machdata->pmx_modes || !pmx->machdata->npmx_modes)
-+		return -EINVAL;
-+
-+	for (i = 0; i < pmx->machdata->npmx_modes; i++) {
-+		if (pmx->machdata->pmx_modes[i]->mode == (1 << mode)) {
-+			pmx_mode = pmx->machdata->pmx_modes[i];
-+			break;
-+		}
++	if (of_machine_is_compatible("st,spear300-evb")) {
++		if (pinctrl_register_mappings(spear300_evb_pmx_map,
++					ARRAY_SIZE(spear300_evb_pmx_map)))
++			pr_err("Error registering pinmux map\n");
 +	}
+ }
+ 
+ static const char * const spear300_dt_board_compat[] = {
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index aec07c9..848ab78 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -16,6 +16,7 @@
+ #include <linux/amba/pl08x.h>
+ #include <linux/amba/serial.h>
+ #include <linux/of_platform.h>
++#include <linux/pinctrl/machine.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/mach/arch.h>
+ #include <plat/shirq.h>
+@@ -369,6 +370,29 @@ static struct of_dev_auxdata spear310_auxdata_lookup[] __initdata = {
+ 	{}
+ };
+ 
++static struct pinctrl_map __initdata spear310_evb_pmx_map[] = {
++	/* spear3xx per-device maps */
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "gpio0_pin0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "gpio0_pin1"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "gpio0_pin2"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "gpio0_pin3"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "gpio0_pin4"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "gpio0_pin5"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "i2c0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "mii0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "ssp0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "uart0"),
 +
-+	if (!pmx_mode)
-+		return -EINVAL;
++	/* spear310 per-device maps */
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "emi"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "fsmc"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "uart1"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "uart2"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "uart3"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "uart4"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b4000000.pinmux", NULL, "uart5"),
++};
 +
-+	val = pmx_readl(pmx, pmx_mode->reg);
-+	val &= ~pmx_mode->mask;
-+	val |= pmx_mode->val;
-+	pmx_writel(pmx, val, pmx_mode->reg);
+ static void __init spear310_dt_init(void)
+ {
+ 	void __iomem *base;
+@@ -407,6 +431,12 @@ static void __init spear310_dt_init(void)
+ 		if (ret)
+ 			pr_err("Error registering Shared IRQ 4\n");
+ 	}
 +
-+	pmx->machdata->mode = pmx_mode->mode;
-+	dev_info(pmx->dev, "Configured Mode: %s with id: %x\n\n",
-+			pmx_mode->name ? pmx_mode->name : "no_name",
-+			pmx_mode->reg);
-+
-+	return 0;
-+}
-+
-+void __devinit pmx_init_addr(struct spear_pinctrl_machdata *machdata, u16 reg)
-+{
-+	struct spear_pingroup *pgroup;
-+	struct spear_modemux *modemux;
-+	int i, j, group;
-+
-+	for (group = 0; group < machdata->ngroups; group++) {
-+		pgroup = machdata->groups[group];
-+
-+		for (i = 0; i < pgroup->nmodemuxs; i++) {
-+			modemux = &pgroup->modemuxs[i];
-+
-+			for (j = 0; j < modemux->nmuxregs; j++)
-+				if (modemux->muxregs[j].reg == 0xFFFF)
-+					modemux->muxregs[j].reg = reg;
-+		}
++	if (of_machine_is_compatible("st,spear310-evb")) {
++		if (pinctrl_register_mappings(spear310_evb_pmx_map,
++					ARRAY_SIZE(spear310_evb_pmx_map)))
++			pr_err("Error registering pinmux map\n");
 +	}
-+}
+ }
+ 
+ static const char * const spear310_dt_board_compat[] = {
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 4812c69..67a8a8a 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -17,6 +17,7 @@
+ #include <linux/amba/pl08x.h>
+ #include <linux/amba/serial.h>
+ #include <linux/of_platform.h>
++#include <linux/pinctrl/machine.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/mach/arch.h>
+ #include <plat/shirq.h>
+@@ -381,6 +382,28 @@ static struct of_dev_auxdata spear320_auxdata_lookup[] __initdata = {
+ 	{}
+ };
+ 
++static struct pinctrl_map __initdata spear320_evb_pmx_map[] = {
++	/* spear3xx per-device maps */
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "i2c0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "mii0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "ssp0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "uart0"),
 +
-+static int spear_pinctrl_get_groups_cnt(struct pinctrl_dev *pctldev)
-+{
-+	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return pmx->machdata->ngroups;
-+}
-+
-+static const char *spear_pinctrl_get_group_name(struct pinctrl_dev *pctldev,
-+		unsigned group)
-+{
-+	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return pmx->machdata->groups[group]->name;
-+}
-+
-+static int spear_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
-+		unsigned group, const unsigned **pins, unsigned *num_pins)
-+{
-+	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
-+
-+	*pins = pmx->machdata->groups[group]->pins;
-+	*num_pins = pmx->machdata->groups[group]->npins;
-+
-+	return 0;
-+}
-+
-+static void spear_pinctrl_pin_dbg_show(struct pinctrl_dev *pctldev,
-+		struct seq_file *s, unsigned offset)
-+{
-+	seq_printf(s, " " DRIVER_NAME);
-+}
-+
-+static struct pinctrl_ops spear_pinctrl_ops = {
-+	.get_groups_count = spear_pinctrl_get_groups_cnt,
-+	.get_group_name = spear_pinctrl_get_group_name,
-+	.get_group_pins = spear_pinctrl_get_group_pins,
-+	.pin_dbg_show = spear_pinctrl_pin_dbg_show,
++	/* spear320 per-device maps */
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", "sdhci_cd_51_grp",
++			"sdhci"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "i2s"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "uart1"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "uart2"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "can0"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "can1"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", NULL, "mii2"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", "pwm0_1_pin_14_15_grp",
++			"pwm0_1"),
++	PIN_MAP_MUX_GROUP_HOG_DEFAULT("b3000000.pinmux", "pwm2_pin_13_grp",
++			"pwm2"),
 +};
 +
-+static int spear_pinctrl_get_funcs_count(struct pinctrl_dev *pctldev)
-+{
-+	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ static void __init spear320_dt_init(void)
+ {
+ 	void __iomem *base;
+@@ -413,6 +436,12 @@ static void __init spear320_dt_init(void)
+ 		if (ret)
+ 			pr_err("Error registering Shared IRQ 4\n");
+ 	}
 +
-+	return pmx->machdata->nfunctions;
-+}
-+
-+static const char *spear_pinctrl_get_func_name(struct pinctrl_dev *pctldev,
-+		unsigned function)
-+{
-+	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return pmx->machdata->functions[function]->name;
-+}
-+
-+static int spear_pinctrl_get_func_groups(struct pinctrl_dev *pctldev,
-+		unsigned function, const char *const **groups,
-+		unsigned * const ngroups)
-+{
-+	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
-+
-+	*groups = pmx->machdata->functions[function]->groups;
-+	*ngroups = pmx->machdata->functions[function]->ngroups;
-+
-+	return 0;
-+}
-+
-+static int spear_pinctrl_endisable(struct pinctrl_dev *pctldev,
-+		unsigned function, unsigned group, bool enable)
-+{
-+	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
-+	const struct spear_pingroup *pgroup;
-+	const struct spear_modemux *modemux;
-+	struct spear_muxreg *muxreg;
-+	u32 val, temp;
-+	int i, j;
-+	bool found = false;
-+
-+	pgroup = pmx->machdata->groups[group];
-+
-+	for (i = 0; i < pgroup->nmodemuxs; i++) {
-+		modemux = &pgroup->modemuxs[i];
-+
-+		/* SoC have any modes */
-+		if (pmx->machdata->modes_supported) {
-+			if (!(pmx->machdata->mode & modemux->modes))
-+				continue;
-+		}
-+
-+		found = true;
-+		for (j = 0; j < modemux->nmuxregs; j++) {
-+			muxreg = &modemux->muxregs[j];
-+
-+			val = pmx_readl(pmx, muxreg->reg);
-+			val &= ~muxreg->mask;
-+
-+			if (enable)
-+				temp = muxreg->val;
-+			else
-+				temp = ~muxreg->val;
-+
-+			val |= temp;
-+			pmx_writel(pmx, val, muxreg->reg);
-+		}
++	if (of_machine_is_compatible("st,spear320-evb")) {
++		if (pinctrl_register_mappings(spear320_evb_pmx_map,
++					ARRAY_SIZE(spear320_evb_pmx_map)))
++			pr_err("Error registering pinmux map\n");
 +	}
-+
-+	if (!found) {
-+		dev_err(pmx->dev, "pinmux group: %s not supported\n",
-+				pgroup->name);
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static int spear_pinctrl_enable(struct pinctrl_dev *pctldev, unsigned function,
-+		unsigned group)
-+{
-+	return spear_pinctrl_endisable(pctldev, function, group, true);
-+}
-+
-+static void spear_pinctrl_disable(struct pinctrl_dev *pctldev,
-+		unsigned function, unsigned group)
-+{
-+	spear_pinctrl_endisable(pctldev, function, group, false);
-+}
-+
-+static struct pinmux_ops spear_pinmux_ops = {
-+	.get_functions_count = spear_pinctrl_get_funcs_count,
-+	.get_function_name = spear_pinctrl_get_func_name,
-+	.get_function_groups = spear_pinctrl_get_func_groups,
-+	.enable = spear_pinctrl_enable,
-+	.disable = spear_pinctrl_disable,
-+};
-+
-+static struct pinctrl_desc spear_pinctrl_desc = {
-+	.name = DRIVER_NAME,
-+	.pctlops = &spear_pinctrl_ops,
-+	.pmxops = &spear_pinmux_ops,
-+	.owner = THIS_MODULE,
-+};
-+
-+int __devinit spear_pinctrl_probe(struct platform_device *pdev,
-+		struct spear_pinctrl_machdata *machdata)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct resource *res;
-+	struct spear_pmx *pmx;
-+
-+	if (!machdata)
-+		return -ENODEV;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Missing MEM resource\n");
-+		return -ENODEV;
-+	}
-+
-+	pmx = devm_kzalloc(&pdev->dev, sizeof(*pmx), GFP_KERNEL);
-+	if (!pmx) {
-+		dev_err(&pdev->dev, "Can't alloc spear_pmx\n");
-+		return -ENOMEM;
-+	}
-+
-+	pmx->dev = &pdev->dev;
-+	pmx->machdata = machdata;
-+
-+	pmx->vbase = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-+	if (!pmx->vbase) {
-+		dev_err(&pdev->dev, "Couldn't ioremap base %x\n", res->start);
-+		return -ENODEV;
-+	}
-+
-+	/* configure mode, if supported by SoC */
-+	if (machdata->modes_supported) {
-+		int mode = 0;
-+
-+		if (of_property_read_u32(np, "st,pinmux-mode", &mode)) {
-+			dev_err(&pdev->dev, "OF: pinmux mode not passed\n");
-+			return -EINVAL;
-+		}
-+
-+		if (set_mode(pmx, mode)) {
-+			dev_err(&pdev->dev, "OF: Couldn't configure mode: %x\n",
-+					mode);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	spear_pinctrl_desc.pins = machdata->pins;
-+	spear_pinctrl_desc.npins = machdata->npins;
-+	pmx->pctl = pinctrl_register(&spear_pinctrl_desc, &pdev->dev, pmx);
-+	if (IS_ERR(pmx->pctl)) {
-+		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
-+		return PTR_ERR(pmx->pctl);
-+	}
-+
-+	platform_set_drvdata(pdev, pmx);
-+
-+	dev_info(&pdev->dev, "Registered with virtual address 0x%08x, physical address 0x%08x\n",
-+			(u32)pmx->vbase, res->start);
-+
-+	return 0;
-+}
-+
-+int __devexit spear_pinctrl_remove(struct platform_device *pdev)
-+{
-+	struct spear_pmx *pmx = platform_get_drvdata(pdev);
-+
-+	platform_set_drvdata(pdev, NULL);
-+	pinctrl_unregister(pmx->pctl);
-+
-+	return 0;
-+}
-diff --git a/drivers/pinctrl/spear/pinctrl-spear.h b/drivers/pinctrl/spear/pinctrl-spear.h
-new file mode 100644
-index 0000000..47a6b5b
---- /dev/null
-+++ b/drivers/pinctrl/spear/pinctrl-spear.h
-@@ -0,0 +1,142 @@
-+/*
-+ * Driver header file for the ST Microelectronics SPEAr pinmux
-+ *
-+ * Copyright (C) 2012 ST Microelectronics
-+ * Viresh Kumar <viresh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __PINMUX_SPEAR_H__
-+#define __PINMUX_SPEAR_H__
-+
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/types.h>
-+
-+struct platform_device;
-+struct device;
-+
-+/**
-+ * struct spear_pmx_mode - SPEAr pmx mode
-+ * @name: name of pmx mode
-+ * @mode: mode id
-+ * @reg: register for configuring this mode
-+ * @mask: mask of this mode in reg
-+ * @val: val to be configured at reg after doing (val & mask)
-+ */
-+struct spear_pmx_mode {
-+	const char *const name;
-+	u16 mode;
-+	u16 reg;
-+	u16 mask;
-+	u32 val;
-+};
-+
-+/**
-+ * struct spear_muxreg - SPEAr mux reg configuration
-+ * @reg: register offset
-+ * @mask: mask bits
-+ * @val: val to be written on mask bits
-+ */
-+struct spear_muxreg {
-+	u16 reg;
-+	u32 mask;
-+	u32 val;
-+};
-+
-+/**
-+ * struct spear_modemux - SPEAr mode mux configuration
-+ * @modes: mode ids supported by this group of muxregs
-+ * @nmuxregs: number of muxreg configurations to be done for modes
-+ * @muxregs: array of muxreg configurations to be done for modes
-+ */
-+struct spear_modemux {
-+	u16 modes;
-+	u8 nmuxregs;
-+	struct spear_muxreg *muxregs;
-+};
-+
-+/**
-+ * struct spear_pingroup - SPEAr pin group configurations
-+ * @name: name of pin group
-+ * @pins: array containing pin numbers
-+ * @npins: size of pins array
-+ * @modemuxs: array of modemux configurations for this pin group
-+ * @nmodemuxs: size of array modemuxs
-+ *
-+ * A representation of a group of pins in the SPEAr pin controller. Each group
-+ * allows some parameter or parameters to be configured.
-+ */
-+struct spear_pingroup {
-+	const char *name;
-+	const unsigned *pins;
-+	unsigned npins;
-+	struct spear_modemux *modemuxs;
-+	unsigned nmodemuxs;
-+};
-+
-+/**
-+ * struct spear_function - SPEAr pinctrl mux function
-+ * @name: The name of the function, exported to pinctrl core.
-+ * @groups: An array of pin groups that may select this function.
-+ * @ngroups: The number of entries in @groups.
-+ */
-+struct spear_function {
-+	const char *name;
-+	const char *const *groups;
-+	unsigned ngroups;
-+};
-+
-+/**
-+ * struct spear_pinctrl_machdata - SPEAr pin controller machine driver
-+ *	configuration
-+ * @pins: An array describing all pins the pin controller affects.
-+ *	All pins which are also GPIOs must be listed first within the *array,
-+ *	and be numbered identically to the GPIO controller's *numbering.
-+ * @npins: The numbmer of entries in @pins.
-+ * @functions: An array describing all mux functions the SoC supports.
-+ * @nfunctions: The numbmer of entries in @functions.
-+ * @groups: An array describing all pin groups the pin SoC supports.
-+ * @ngroups: The numbmer of entries in @groups.
-+ *
-+ * @modes_supported: Does SoC support modes
-+ * @mode: mode configured from probe
-+ * @pmx_modes: array of modes supported by SoC
-+ * @npmx_modes: number of entries in pmx_modes.
-+ */
-+struct spear_pinctrl_machdata {
-+	const struct pinctrl_pin_desc *pins;
-+	unsigned npins;
-+	struct spear_function **functions;
-+	unsigned nfunctions;
-+	struct spear_pingroup **groups;
-+	unsigned ngroups;
-+
-+	bool modes_supported;
-+	u16 mode;
-+	struct spear_pmx_mode **pmx_modes;
-+	unsigned npmx_modes;
-+};
-+
-+/**
-+ * struct spear_pmx - SPEAr pinctrl mux
-+ * @dev: pointer to struct dev of platform_device registered
-+ * @pctl: pointer to struct pinctrl_dev
-+ * @machdata: pointer to SoC or machine specific structure
-+ * @vbase: virtual base address of pinmux controller
-+ */
-+struct spear_pmx {
-+	struct device *dev;
-+	struct pinctrl_dev *pctl;
-+	struct spear_pinctrl_machdata *machdata;
-+	void __iomem *vbase;
-+};
-+
-+/* exported routines */
-+void __devinit pmx_init_addr(struct spear_pinctrl_machdata *machdata, u16 reg);
-+int __devinit spear_pinctrl_probe(struct platform_device *pdev,
-+		struct spear_pinctrl_machdata *machdata);
-+int __devexit spear_pinctrl_remove(struct platform_device *pdev);
-+#endif /* __PINMUX_SPEAR_H__ */
+ }
+ 
+ static const char * const spear320_dt_board_compat[] = {
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 6c066fc..387655b 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -13,6 +13,7 @@ config ARCH_SPEAR3XX
+ 	select ARM_VIC
+ 	select CPU_ARM926T
+ 	select USE_OF
++	select PINCTRL
+ 	help
+ 	  Supports for ARM's SPEAR3XX family
+ 
 -- 
 1.7.9
