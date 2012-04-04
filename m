@@ -1,58 +1,20 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 4 Apr 2012 14:34:09 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <CACVXFVP4J8N271Tww77Btm9fGNiP17MepjswBJ0V-8Z4sNt8Eg@mail.gmail.com>
- <4F672364.3020403@ti.com>
- <79CD15C6BA57404B839C016229A409A83182386C@DBDE01.ent.ti.com>
- <CAMQu2gyFNXgx87Fsq5is88DOkOx-nWK6ohwyFV-CY2uTkZCGMA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EA54@DBDE01.ent.ti.com>
- <CAMQu2gyF83HJOE9Rf-fZXXMt=p_WFjFf3DpAeW8L8+htR4E6-g@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83183EB47@DBDE01.ent.ti.com>
- <CAMQu2gzYULK+=6-WKQnnQDpzTYW7xKAOZo7obyu2q178jtNE-Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840C2E@DBDE01.ent.ti.com>
- <CAMQu2gw7aceHSYSd+UMVS6kHQMqy0_maf8QTJaUMzp9z8822rQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A831840E0C@DBDE01.ent.ti.com>
- <4F7570FC.8000907@ti.com>
- <79CD15C6BA57404B839C016229A409A831840F82@DBDE01.ent.ti.com>
- <CAMQu2gzOkE6LD0WZ_9bKe3J-=Dv89rWaMzvWWvJHPMSPe6MzNg@mail.gmail.com>
- <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
-Message-ID: <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Apr 2012 10:07:54 +0100
+Subject: [PATCH] ARM: versatile: fix build failure in pci.c
+In-Reply-To: <4F7AFF61.3070803@windriver.com>
+References: <1333410505-17257-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAP=VYLpim2TCMO5nDVNe0bdm9ZQ+czUWNpxxWugDzrHO6aYVAQ@mail.gmail.com>
+ <CAOMZO5A-+tcz6ewTykXL33opRVP9U4o7Ltdkbr7LLqWMBQczSQ@mail.gmail.com>
+ <201204030819.48798.arnd@arndb.de> <4F7AFF61.3070803@windriver.com>
+Message-ID: <20120404090754.GR24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 3, 2012 at 9:05 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> On Tue, Apr 03, 2012 at 00:05:38, Hilman, Kevin wrote:
->> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
->>
->> [...]
->>
->> > I don't personally like to add features which hardly anybody use and
->> > fundamentally broken with full kernel.
->>
->> Let's keep sane defaults, but not make it unreasonable to tweak eaither.
->>
->> I suggest what has already been mentioned.
->>
->> Register both timers, but have the sync timer have a higher rating. ?On
->> AMxxx where there is no sync timer, GPtimer will be used.
->>
->
-> This is another good option, I can change the rating of both the timers.
-> With below description and given understanding/discussion/usability of both
-> the timers, we can reverse the rating,
->
-Btw, if we are going with this path, then there won't any need of commandline
-option since clock-source can be switched from user space as well.
+On Tue, Apr 03, 2012 at 09:47:13AM -0400, Paul Gortmaker wrote:
+> As a side note, the fact that struct pci_sys_data is ARM specific
+> does make one think it would be nice if the name somehow did
+> reflect that...  wonder if it is worth changing.  Anyway, that is
+> a separate topic.
 
-Regards
-santosh
+And what's wrong with the existing name when it's limited to only
+ARM specific files?
