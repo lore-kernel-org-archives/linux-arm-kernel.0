@@ -1,32 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Apr 2012 12:33:14 -0600
-Subject: [PATCH v4 07/10] pwm: tegra: Add device tree support
-In-Reply-To: <20120404070432.GF7264@S2101-09.ap.freescale.net>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-8-git-send-email-thierry.reding@avionic-design.de>
- <4F67EE9A.6080101@wwwdotorg.org>
- <20120404070432.GF7264@S2101-09.ap.freescale.net>
-Message-ID: <4F7C93EA.2010105@wwwdotorg.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed,  4 Apr 2012 20:36:25 +0200
+Subject: [RESEND PATCH 1/2] ARM: OMAP2+: nand: Make board_onenand_init()
+ visible to board code
+Message-ID: <1333564586-3259-1-git-send-email-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2012 01:04 AM, Shawn Guo wrote:
-> On Mon, Mar 19, 2012 at 08:42:34PM -0600, Stephen Warren wrote:
->> On 03/14/2012 09:56 AM, Thierry Reding wrote:
->>> Add auxdata to instantiate the PWFM controller from a device tree,
->>> include the corresponding nodes in the dtsi files for Tegra 20 and
->>> Tegra 30 and add binding documentation.
->>>
->>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->>
->>> +++ b/Documentation/devicetree/bindings/pwm/tegra-pwm.txt
->>
->> Can this please be named nvidia,tegra20-pwm.txt so that if we need
-> 
-> Is it necessary to have even the vendor prefix in the file name?  The
-> file will look exceptional among all these binding documents under
-> Documentation/devicetree/bindings.
+board_onenand_init() and board_nand_init() initialization functions are
+used to initialize OneNAND and NAND memories respectively. But only
+board_nand_init() was visible to be used from board code. This patch makes
+possible to initialize a OneNAND flash memory within platform code.
 
-It would look exceptional now, but I've had it in the back of my mind to
-suggest renaming all the binding docs in line with their full compatible
-value. Then, it'd just look consistent ;-P.
+Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+---
+ arch/arm/mach-omap2/board-flash.c |    4 ++--
+ arch/arm/mach-omap2/board-flash.h |   11 +++++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
+index 0349fd2..70a81f9 100644
+--- a/arch/arm/mach-omap2/board-flash.c
++++ b/arch/arm/mach-omap2/board-flash.c
+@@ -87,7 +87,7 @@ static struct omap_onenand_platform_data board_onenand_data = {
+ 	.dma_channel	= -1,   /* disable DMA in OMAP OneNAND driver */
+ };
+ 
+-static void
++void
+ __init board_onenand_init(struct mtd_partition *onenand_parts,
+ 				u8 nr_parts, u8 cs)
+ {
+@@ -98,7 +98,7 @@ __init board_onenand_init(struct mtd_partition *onenand_parts,
+ 	gpmc_onenand_init(&board_onenand_data);
+ }
+ #else
+-static void
++void
+ __init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
+ {
+ }
+diff --git a/arch/arm/mach-omap2/board-flash.h b/arch/arm/mach-omap2/board-flash.h
+index d25503a..c44b70d 100644
+--- a/arch/arm/mach-omap2/board-flash.h
++++ b/arch/arm/mach-omap2/board-flash.h
+@@ -47,3 +47,14 @@ static inline void board_nand_init(struct mtd_partition *nand_parts,
+ {
+ }
+ #endif
++
++#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
++		defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
++extern void board_onenand_init(struct mtd_partition *nand_parts,
++					u8 nr_parts, u8 cs);
++#else
++static inline void board_onenand_init(struct mtd_partition *nand_parts,
++					u8 nr_parts, u8 cs)
++{
++}
++#endif
+-- 
+1.7.7.6
