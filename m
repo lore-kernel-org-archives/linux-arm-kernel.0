@@ -1,20 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Apr 2012 07:45:28 +0000
-Subject: [PATCH] pinctrl: Add SPEAr pinctrl drivers
-In-Reply-To: <CACRpkdZYccTvHEMa=4=-uoLZYQxEPS+932UPA7MGc+-94eLc6w@mail.gmail.com>
-References: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
- <201204031347.35256.arnd@arndb.de>
- <CACRpkdZYccTvHEMa=4=-uoLZYQxEPS+932UPA7MGc+-94eLc6w@mail.gmail.com>
-Message-ID: <201204040745.29187.arnd@arndb.de>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Wed, 04 Apr 2012 09:47:56 +0200
+Subject: [PATCH v2 1/3] PATA host controller driver for ep93xx
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020698409E51@AUSP01VMBX24.collaborationhost.net>
+References: <4F7B0C54.8010804@metasoft.pl> <4F7B0CEF.2040307@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020698409E51@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F7BFCAC.2060300@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 April 2012, Linus Walleij wrote:
-> Shall we go in and patch not just pinctrl but also regulator,
-> clk etc to return this if the subsystem is not yet up and no maps
-> and drivers at all have been yet been registered?
+On 2012-04-03 20:55, H Hartley Sweeten wrote:
+> 
+> If the dma init fails does the driver fall back to pio mode correctly?
+> 
 
-Regulators already do it, IIRC, but a patch for clk and other things
-you notice would be nice.
+Yes, udma_mask of ata_port is set only if we successfully requested dma
+channels. Otherwise, we are limited to PIO4.
 
-	Arnd
+>> +	.bmdma_setup		= ep93xx_pata_dma_setup,
+>> +	.bmdma_start		= ep93xx_pata_dma_start,
+>> +	.bmdma_stop		= ep93xx_pata_dma_stop,
+>> +	.bmdma_status		= ep93xx_pata_dma_status,
+> 
+> The bmdma ops pointers are still set if the dma init failed. Should they
+> be set to NULL?
+> 
+
+I think it's not needed. Libata will not call them if udma_mask = 0.
+
+> There are only two m2m dma channels on the ep93xx. They could be already in
+> use by the spi driver. I just want to make sure that the ide driver will fall back to
+> pio mode if they are not available.
+> 
+
+I tested this by enabling ep93xx spi in dma mode. In this case, pata driver
+works in PIO4 mode.
+
+Thanks,
+RP
