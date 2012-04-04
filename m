@@ -1,91 +1,66 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 4 Apr 2012 21:06:22 +0200
-Subject: [PATCH 2/2] ARM: OMAP4: hwmod_data: Name the common irq for McBSP
- ports
-In-Reply-To: <alpine.DEB.2.00.1204040946230.8000@utopia.booyaka.com>
-References: <1332169966-25400-1-git-send-email-peter.ujfalusi@ti.com>
- <1332169966-25400-2-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.00.1204040946230.8000@utopia.booyaka.com>
-Message-ID: <4F7C9BAE.1030601@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 4 Apr 2012 14:07:34 -0500
+Subject: [PATCH] ARM: vic: re-read status register before dispatching
+ each IRQ handler
+In-Reply-To: <1333533912-30813-1-git-send-email-will.deacon@arm.com>
+References: <1333533912-30813-1-git-send-email-will.deacon@arm.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F002069840A167@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Wednesday, April 04, 2012 3:05 AM, Will Deacon wrote:
+>
+> handle_IRQ may briefly cause interrupts to be re-enabled during soft IRQ
+> processing on the exit path, leading to nested handling of VIC interrupts.
+>
+> Since the current code does not re-read the VIC_IRQ_STATUS register, this
+> can lead to multiple invocations of the same interrupt handler and
+> spurious interrupts to be reported.
+>
+> This patch changes the VIC interrupt dispatching code to re-read the
+> status register each time, avoiding duplicate invocations of the same
+> handler.
+>
+> Acked-and-tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>
+> Taken against v3.4-rc1 and tested on Versatile AB 926 (+ PL011 NULL
+> pointer fix). I'll put this in the patch system tomorrow if there aren't
+> any objections.
+>
+>  arch/arm/common/vic.c |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 7a66311..6b1de5d 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -435,11 +435,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+>  	u32 stat, irq;
+>  	int handled = 0;
+>  
+> -	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+> -	while (stat) {
+> +	while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
+>  		irq = ffs(stat) - 1;
+>  		handle_IRQ(irq_find_mapping(vic->domain, irq), regs);
+> -		stat &= ~(1 << irq);
+>  		handled = 1;
+>  	}
 
-On 4/4/2012 5:46 PM, Paul Walmsley wrote:
-> + Beno?t
->
-> Hi Beno?t
->
-> On Mon, 19 Mar 2012, Peter Ujfalusi wrote:
->
->> Use 'common' as name for the common irq number in hwmod data for the McBSP
->> ports. The same name already in use for OMAP2430, and OMAP3.
->>
->> Signed-off-by: Peter Ujfalusi<peter.ujfalusi@ti.com>
->
-> care to Ack this one for 3.5?
+You probably should fix the comment above the function:
 
-That looks good to me.
+/*
+ * Handle each interrupt in a single VIC.  Returns non-zero if we've
+ * handled at least one interrupt.  This does a single read of the
+ * status register and handles all interrupts in order from LSB first.
+ */
 
-Acked-by: Benoit Cousson <b-cousson@ti.com>
+You are no longer doing a single read. You might mention the problem
+caused by the single read so that no one tries to "optimize" the loop
+and reintroduce the problem.
 
 Regards,
-Benoit
-
-
->
->
-> - Paul
->
->
->> ---
->>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 ++++----
->>   1 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> index ef0524c..f8058b7 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> @@ -2942,7 +2942,7 @@ static struct omap_hwmod_class omap44xx_mcbsp_hwmod_class = {
->>   /* mcbsp1 */
->>   static struct omap_hwmod omap44xx_mcbsp1_hwmod;
->>   static struct omap_hwmod_irq_info omap44xx_mcbsp1_irqs[] = {
->> -	{ .irq = 17 + OMAP44XX_IRQ_GIC_START },
->> +	{ .name = "common", .irq = 17 + OMAP44XX_IRQ_GIC_START },
->>   	{ .irq = -1 }
->>   };
->>
->> @@ -3017,7 +3017,7 @@ static struct omap_hwmod omap44xx_mcbsp1_hwmod = {
->>   /* mcbsp2 */
->>   static struct omap_hwmod omap44xx_mcbsp2_hwmod;
->>   static struct omap_hwmod_irq_info omap44xx_mcbsp2_irqs[] = {
->> -	{ .irq = 22 + OMAP44XX_IRQ_GIC_START },
->> +	{ .name = "common", .irq = 22 + OMAP44XX_IRQ_GIC_START },
->>   	{ .irq = -1 }
->>   };
->>
->> @@ -3092,7 +3092,7 @@ static struct omap_hwmod omap44xx_mcbsp2_hwmod = {
->>   /* mcbsp3 */
->>   static struct omap_hwmod omap44xx_mcbsp3_hwmod;
->>   static struct omap_hwmod_irq_info omap44xx_mcbsp3_irqs[] = {
->> -	{ .irq = 23 + OMAP44XX_IRQ_GIC_START },
->> +	{ .name = "common", .irq = 23 + OMAP44XX_IRQ_GIC_START },
->>   	{ .irq = -1 }
->>   };
->>
->> @@ -3167,7 +3167,7 @@ static struct omap_hwmod omap44xx_mcbsp3_hwmod = {
->>   /* mcbsp4 */
->>   static struct omap_hwmod omap44xx_mcbsp4_hwmod;
->>   static struct omap_hwmod_irq_info omap44xx_mcbsp4_irqs[] = {
->> -	{ .irq = 16 + OMAP44XX_IRQ_GIC_START },
->> +	{ .name = "common", .irq = 16 + OMAP44XX_IRQ_GIC_START },
->>   	{ .irq = -1 }
->>   };
->>
->> --
->> 1.7.8.5
->>
->
->
-> - Paul
+Hartley
