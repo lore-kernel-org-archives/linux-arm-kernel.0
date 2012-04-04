@@ -1,146 +1,89 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 Apr 2012 09:39:02 -0600 (MDT)
-Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
- modules.
-In-Reply-To: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
-References: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <alpine.DEB.2.00.1204040937590.8000@utopia.booyaka.com>
+Date: Wed, 4 Apr 2012 09:41:02 -0600 (MDT)
+Subject: [PATCH 1/2] ARM: omap: hwmod: Restore sysc after a reset
+In-Reply-To: <1331646928-31119-2-git-send-email-rnayak@ti.com>
+References: <1331646928-31119-1-git-send-email-rnayak@ti.com>
+ <1331646928-31119-2-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1204040939300.8000@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Mar 2012, Govindraj.R wrote:
+On Tue, 13 Mar 2012, Rajendra Nayak wrote:
 
-> From: "Govindraj.R" <govindraj.raja@ti.com>
+> After a softreset, make sure the sysc settings are correctly
+> restored.
 > 
-> Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available
-> (ex: usb host uhh module) in absence of this flag
-> omap_hwmod_enable/disable_wakeup avoids configuring
-> pad mux wakeup capability.
-> 
-> Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
-> try enabling/disabling wakeup from mux_pad pins.
-> 
+> Reported-by: Anand Gadiyar <gadiyar@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
 > Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-Thanks, queued for 3.4-rc.  The kerneldoc documentation on the functions 
-has been updated to match reality; modified patch follows.
+Thanks, this patch has been modified a bit to consolidate the SYSCONFIG 
+reload after _reset() into the _reset() function itself.  This should 
+hopefully avoid future mistakes and avoid some code duplication.  Modified 
+patch follows, queued for 3.4-rc.
 
 
 - Paul
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
-Date: Wed, 4 Apr 2012 09:05:41 -0600
-Subject: [PATCH] ARM: OMAP2+: omap_hwmod: Allow io_ring wakeup
- configuration for all modules
 
-Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available (ex: usb
-host uhh module) in absence of this flag
-omap_hwmod_enable/disable_wakeup avoids configuring pad mux wakeup
-capability.
+From: Rajendra Nayak <rnayak@ti.com>
+Date: Tue, 13 Mar 2012 22:55:23 +0530
+Subject: [PATCH] ARM: OMAP2+: hwmod: Restore sysc after a reset
 
-Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
-try enabling/disabling wakeup from mux_pad pins.
+After a softreset, make sure the sysc settings are correctly
+restored.
 
+Reported-by: Anand Gadiyar <gadiyar@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-[paul at pwsan.com: updated function kerneldoc documentation]
+Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
+[paul at pwsan.com: combined post-reset SYSCONFIG reload code into the
+ _reset() function to avoid duplication and future mistakes]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   56 ++++++++++++++++++++------------------
- 1 file changed, 30 insertions(+), 26 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index eba6cd3..5a68010 100644
+index 5a68010..d32c1ce 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2463,26 +2463,28 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
-  * @oh: struct omap_hwmod *
-  *
-  * Sets the module OCP socket ENAWAKEUP bit to allow the module to
-- * send wakeups to the PRCM.  Eventually this should sets PRCM wakeup
-- * registers to cause the PRCM to receive wakeup events from the
-- * module.  Does not set any wakeup routing registers beyond this
-- * point - if the module is to wake up any other module or subsystem,
-- * that must be set separately.  Called by omap_device code.  Returns
-- * -EINVAL on error or 0 upon success.
-+ * send wakeups to the PRCM, and enable I/O ring wakeup events for
-+ * this IP block if it has dynamic mux entries.  Eventually this
-+ * should set PRCM wakeup registers to cause the PRCM to receive
-+ * wakeup events from the module.  Does not set any wakeup routing
-+ * registers beyond this point - if the module is to wake up any other
-+ * module or subsystem, that must be set separately.  Called by
-+ * omap_device code.  Returns -EINVAL on error or 0 upon success.
-  */
- int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- {
- 	unsigned long flags;
- 	u32 v;
+@@ -1477,6 +1477,11 @@ static int _reset(struct omap_hwmod *oh)
  
--	if (!oh->class->sysc ||
--	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
--		return -EINVAL;
--
- 	spin_lock_irqsave(&oh->_lock, flags);
--	v = oh->_sysc_cache;
--	_enable_wakeup(oh, &v);
--	_write_sysconfig(v, oh);
-+
-+	if (oh->class->sysc &&
-+	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-+		v = oh->_sysc_cache;
-+		_enable_wakeup(oh, &v);
-+		_write_sysconfig(v, oh);
+ 	ret = (oh->class->reset) ? oh->class->reset(oh) : _ocp_softreset(oh);
+ 
++	if (oh->class->sysc) {
++		_update_sysc_cache(oh);
++		_enable_sysc(oh);
 +	}
 +
- 	_set_idle_ioring_wakeup(oh, true);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 	return ret;
+ }
  
-@@ -2494,26 +2496,28 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
-  * @oh: struct omap_hwmod *
-  *
-  * Clears the module OCP socket ENAWAKEUP bit to prevent the module
-- * from sending wakeups to the PRCM.  Eventually this should clear
-- * PRCM wakeup registers to cause the PRCM to ignore wakeup events
-- * from the module.  Does not set any wakeup routing registers beyond
-- * this point - if the module is to wake up any other module or
-- * subsystem, that must be set separately.  Called by omap_device
-- * code.  Returns -EINVAL on error or 0 upon success.
-+ * from sending wakeups to the PRCM, and disable I/O ring wakeup
-+ * events for this IP block if it has dynamic mux entries.  Eventually
-+ * this should clear PRCM wakeup registers to cause the PRCM to ignore
-+ * wakeup events from the module.  Does not set any wakeup routing
-+ * registers beyond this point - if the module is to wake up any other
-+ * module or subsystem, that must be set separately.  Called by
-+ * omap_device code.  Returns -EINVAL on error or 0 upon success.
-  */
- int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- {
- 	unsigned long flags;
- 	u32 v;
+@@ -1786,20 +1791,9 @@ static int _setup(struct omap_hwmod *oh, void *data)
+ 		return 0;
+ 	}
  
--	if (!oh->class->sysc ||
--	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
--		return -EINVAL;
+-	if (!(oh->flags & HWMOD_INIT_NO_RESET)) {
++	if (!(oh->flags & HWMOD_INIT_NO_RESET))
+ 		_reset(oh);
+ 
+-		/*
+-		 * OCP_SYSCONFIG bits need to be reprogrammed after a softreset.
+-		 * The _enable() function should be split to
+-		 * avoid the rewrite of the OCP_SYSCONFIG register.
+-		 */
+-		if (oh->class->sysc) {
+-			_update_sysc_cache(oh);
+-			_enable_sysc(oh);
+-		}
+-	}
 -
- 	spin_lock_irqsave(&oh->_lock, flags);
--	v = oh->_sysc_cache;
--	_disable_wakeup(oh, &v);
--	_write_sysconfig(v, oh);
-+
-+	if (oh->class->sysc &&
-+	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-+		v = oh->_sysc_cache;
-+		_disable_wakeup(oh, &v);
-+		_write_sysconfig(v, oh);
-+	}
-+
- 	_set_idle_ioring_wakeup(oh, false);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
+ 	postsetup_state = oh->_postsetup_state;
+ 	if (postsetup_state == _HWMOD_STATE_UNKNOWN)
+ 		postsetup_state = _HWMOD_STATE_ENABLED;
 -- 
 1.7.9.5
