@@ -1,7 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed,  4 Apr 2012 10:33:42 +0800
-Subject: [PATCH] pwm: add pwm-mxs support
-Message-ID: <1333506822-8349-1-git-send-email-shawn.guo@linaro.org>
+Date: Wed,  4 Apr 2012 10:50:52 +0800
+Subject: [PATCH RESEND] pwm: add pwm-mxs support
+In-Reply-To: <1333506822-8349-1-git-send-email-shawn.guo@linaro.org>
+References: <1333506822-8349-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1333507852-8509-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +13,39 @@ Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
 
-Hi Thierry,
+Resend to add binding document.
 
-This patch is based on your "Add PWM framework and device tree
-support" series v5.  Could you consider to fold it into your series
-if it looks good to you?
-
-Regards,
-Shawn
-
- drivers/pwm/Kconfig   |    9 ++
- drivers/pwm/Makefile  |    1 +
- drivers/pwm/pwm-mxs.c |  207 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 217 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/pwm/mxs-pwm.txt |   17 ++
+ drivers/pwm/Kconfig                               |    9 +
+ drivers/pwm/Makefile                              |    1 +
+ drivers/pwm/pwm-mxs.c                             |  207 +++++++++++++++++++++
+ 4 files changed, 234 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/mxs-pwm.txt
  create mode 100644 drivers/pwm/pwm-mxs.c
 
+diff --git a/Documentation/devicetree/bindings/pwm/mxs-pwm.txt b/Documentation/devicetree/bindings/pwm/mxs-pwm.txt
+new file mode 100644
+index 0000000..48ead0d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/mxs-pwm.txt
+@@ -0,0 +1,17 @@
++Freescale MXS PWM controller
++
++Required properties:
++- compatible: should be "fsl,mxs-pwm"
++- reg: physical base address and length of the controller's registers
++- #pwm-cells: should be 2.  The first cell specifies the per-chip index
++  of the PWM to use and the second cell is the duty cycle in nanoseconds.
++- fsl,pwm-number: the number of PWM devices
++
++Example:
++
++pwm: pwm at 80064000 {
++	compatible = "fsl,imx28-pwm", "fsl,mxs-pwm";
++	reg = <0x80064000 2000>;
++	#pwm-cells = <2>;
++	fsl,pwm-number = <8>;
++};
 diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
 index a93feff..39bdebc 100644
 --- a/drivers/pwm/Kconfig
