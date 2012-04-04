@@ -1,24 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Apr 2012 12:50:32 +0000
-Subject: [PATCH v2 1/3] PATA host controller driver for ep93xx
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020698409EBF@AUSP01VMBX24.collaborationhost.net>
-References: <4F7B0C54.8010804@metasoft.pl> <201204032008.00509.arnd@arndb.de>
- <ADE657CA350FB648AAC2C43247A983F0020698409EBF@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <201204041250.32344.arnd@arndb.de>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Wed, 04 Apr 2012 14:51:32 +0200
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <1333489422.3040.11.camel@pasglop> (Benjamin Herrenschmidt's
+ message of "Wed, 04 Apr 2012 07:43:42 +1000")
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost> <m2y5qdow0v.fsf@igel.home>
+ <1333489422.3040.11.camel@pasglop>
+Message-ID: <m2ehs3vewb.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 April 2012, H Hartley Sweeten wrote:
-> The SYSCON stuff is not exposed outside of the arch specific mach-ep93xx
-> directory. I would prefer this stay like it is for now. If/when ep93xx gets
-> converted to device tree we can address this.
+Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
 
-Ok, fair enough.
+> Do you see a relevant difference in the X log ?
 
-> I have been looking over the drivers/pinctrl stuff to see if it's worth creating
-> a pinctrl-ep93xx.c driver. If I end up doing one, the function above could
-> probably be replaced with something from the pin mux api.
+Nothing at all.
 
-Yes, that sounds like a good long-term plan.
+Andreas.
 
-	Arnd
+-- 
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
