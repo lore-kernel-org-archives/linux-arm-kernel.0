@@ -1,72 +1,184 @@
-From: joancarles@fqingenieria.es (joancarles)
-Date: Wed, 04 Apr 2012 15:56:25 +0200
-Subject: [3.3] vfs_read oops in
- arm/arch/plat-mxc/audmux-v2.c:audmux_read_file() in sysfs
-Message-ID: <2d33222231d2b5e5b07a63ae117048c9@mail.fqingenieria.es>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 4 Apr 2012 09:10:21 -0500
+Subject: [PATCH v3] OMAP2+: UART: Remove cpu checks for populating errata
+ flags
+In-Reply-To: <1333460554-7356-1-git-send-email-govindraj.raja@ti.com>
+References: <1333356489-5816-1-git-send-email-govindraj.raja@ti.com>
+ <1333460554-7356-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <4F7C564D.6050602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Govindraj,
 
-A 'cat /sys/kernel/debug/audmux/ssi7' causes following oops to be 
-printed by the kernel:
+On 04/03/2012 08:42 AM, Govindraj.R wrote:
+> From: "Govindraj.R"<govindraj.raja@ti.com>
+>
+> Currently the errata is populated based on cpu checks this can
+> be removed and replaced with module version check of uart ip block.
+> MVR reg is provided within the uart reg map use the same
+> to populate the errata and thus now errata population and handling
+> can be managed within the driver itself.
+>
+> Cc: Jon Hunter<jon-hunter@ti.com>
+> Cc: Paul Walmsley<paul@pwsan.com>
+> Cc: Kevin Hilman<khilman@ti.com>
+> Signed-off-by: Felipe Balbi<balbi@ti.com>
+> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
+> ---
+>   arch/arm/mach-omap2/serial.c                  |    8 ---
+>   arch/arm/plat-omap/include/plat/omap-serial.h |    1 -
+>   drivers/tty/serial/omap-serial.c              |   74 ++++++++++++++++++++++++-
+>   3 files changed, 73 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index 0cdd359..6affdd4 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -355,14 +355,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+>   	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
+>   	omap_up.autosuspend_timeout = info->autosuspend_timeout;
+>
+> -	/* Enable the MDR1 Errata i202 for OMAP2430/3xxx/44xx */
+> -	if (!cpu_is_omap2420()&&  !cpu_is_ti816x())
+> -		omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
+> -
+> -	/* Enable DMA Mode Force Idle Errata i291 for omap34xx/3630 */
+> -	if (cpu_is_omap34xx() || cpu_is_omap3630())
+> -		omap_up.errata |= UART_ERRATA_i291_DMA_FORCEIDLE;
+> -
+>   	pdata =&omap_up;
+>   	pdata_size = sizeof(struct omap_uart_port_info);
+>
+> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+> index 9ff4444..1a52725 100644
+> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
+> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+> @@ -65,7 +65,6 @@ struct omap_uart_port_info {
+>   	bool			dma_enabled;	/* To specify DMA Mode */
+>   	unsigned int		uartclk;	/* UART clock rate */
+>   	upf_t			flags;		/* UPF_* flags */
+> -	u32			errata;
+>   	unsigned int		dma_rx_buf_size;
+>   	unsigned int		dma_rx_timeout;
+>   	unsigned int		autosuspend_timeout;
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 0121486..0555c96 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -44,6 +44,13 @@
+>   #include<plat/dmtimer.h>
+>   #include<plat/omap-serial.h>
+>
+> +#define UART_BUILD_REVISION(x, y)	(((x)<<  8) | (y))
+> +
+> +#define OMAP_UART_REV_42 0x0402
+> +#define OMAP_UART_REV_46 0x0406
+> +#define OMAP_UART_REV_52 0x0502
+> +#define OMAP_UART_REV_63 0x0603
+> +
+>   #define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
+>
+>   /* SCR register bitmasks */
+> @@ -53,6 +60,17 @@
+>   #define OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT		6
+>   #define OMAP_UART_FCR_RX_FIFO_TRIG_MASK			(0x3<<  6)
+>
+> +/* MVR register bitmasks */
+> +#define OMAP_UART_MVR_SCHEME_SHIFT	30
+> +
+> +#define OMAP_UART_LEGACY_MVR_MAJ_MASK	0xf0
+> +#define OMAP_UART_LEGACY_MVR_MAJ_SHIFT	4
+> +#define OMAP_UART_LEGACY_MVR_MIN_MASK	0x0f
+> +
+> +#define OMAP_UART_MVR_MAJ_MASK		0x700
+> +#define OMAP_UART_MVR_MAJ_SHIFT		8
+> +#define OMAP_UART_MVR_MIN_MASK		0x3f
+> +
+>   static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+>
+>   /* Forward declaration of functions */
+> @@ -1346,6 +1364,59 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
+>   	return;
+>   }
+>
+> +static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
+> +{
+> +	u32 mvr, scheme;
+> +	u16 revision, major, minor;
+> +
+> +	mvr = serial_in(up, UART_OMAP_MVER);
+> +
+> +	/* Check revision register scheme */
+> +	scheme = mvr>>  OMAP_UART_MVR_SCHEME_SHIFT;
+> +
+> +	switch (scheme) {
+> +	case 0: /* Legacy Scheme: OMAP2/3 */
+> +		/* MINOR_REV[0:4], MAJOR_REV[4:7] */
+> +		major = (mvr&  OMAP_UART_LEGACY_MVR_MAJ_MASK)>>
+> +					OMAP_UART_LEGACY_MVR_MAJ_SHIFT;
+> +		minor = (mvr&  OMAP_UART_LEGACY_MVR_MIN_MASK);
+> +		break;
+> +	case 1:
+> +		/* New Scheme: OMAP4+ */
+> +		/* MINOR_REV[0:5], MAJOR_REV[8:10] */
+> +		major = (mvr&  OMAP_UART_MVR_MAJ_MASK)>>
+> +					OMAP_UART_MVR_MAJ_SHIFT;
+> +		minor = (mvr&  OMAP_UART_MVR_MIN_MASK);
+> +		break;
+> +	default:
+> +		dev_warn(&up->pdev->dev,
+> +			"Unknown %s revision, defaulting to highest\n",
+> +			up->name);
+> +		/* highest possible revision */
+> +		major = 0xff;
+> +		minor = 0xff;
+> +	}
+> +
+> +	/* normalize revision for the driver */
+> +	revision = UART_BUILD_REVISION(major, minor);
+> +
+> +	switch (revision) {
+> +	case OMAP_UART_REV_46:
+> +		up->errata |= (UART_ERRATA_i202_MDR1_ACCESS |
+> +				UART_ERRATA_i291_DMA_FORCEIDLE);
+> +		break;
+> +	case OMAP_UART_REV_52:
+> +		up->errata |= (UART_ERRATA_i202_MDR1_ACCESS |
+> +				UART_ERRATA_i291_DMA_FORCEIDLE);
+> +		break;
+> +	case OMAP_UART_REV_63:
+> +		up->errata |= UART_ERRATA_i202_MDR1_ACCESS;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+>   static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
+>   {
+>   	struct omap_uart_port_info *omap_up_info;
+> @@ -1443,7 +1514,6 @@ static int serial_omap_probe(struct platform_device *pdev)
+>   						"%d\n", DEFAULT_CLK_SPEED);
+>   	}
+>   	up->uart_dma.uart_base = mem->start;
+> -	up->errata = omap_up_info->errata;
+>
+>   	if (omap_up_info->dma_enabled) {
+>   		up->uart_dma.uart_dma_tx = dma_tx->start;
+> @@ -1473,6 +1543,8 @@ static int serial_omap_probe(struct platform_device *pdev)
+>   	pm_runtime_enable(&pdev->dev);
+>   	pm_runtime_get_sync(&pdev->dev);
+>
+> +	omap_serial_fill_features_erratas(up);
+> +
+>   	ui[up->port.line] = up;
+>   	serial_omap_add_console_port(up);
+>
 
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.320886] Unhandled fault: 
-external abort on non-linefetch (0x008) at 0xf53b003c
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.328511] Internal error: : 
-8 [#1] PREEMPT
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.332802] Modules linked in:
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.335895] CPU: 0    Not 
-tainted  (3.3.0-00033-gecc726e-dirty #307)
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.342309] PC is at 
-audmux_read_file+0x68/0x2f4
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.346960] LR is at 
-clk_enable+0x3c/0x48
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.350997] pc : [<c001b8c8>]  
-  lr : [<c00190a0>]    psr: a0000013
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.351013] sp : c3ad3f38  ip 
-: c30a4000  fp : 00000003
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.362519] r10: 00001000  r9 
-: be83fb00  r8 : c3ad3f80
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.367766] r7 : c3ad3f80  r6 
-: 00000007  r5 : 00031010  r4 : c30a5000
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.374318] r3 : f53b0000  r2 
-: 0000003c  r1 : 380fa100  r0 : c068dda0
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.380873] Flags: NzCv  IRQs 
-on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.388033] Control: 0005317f  
-Table: 83034000  DAC: 00000015
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.393802] Process cat (pid: 
-1042, stack limit = 0xc3ad2270)
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.399573] Stack: (0xc3ad3f38 
-to 0xc3ad4000)
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.403956] 3f20:              
-                                         c3139180 00000000
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.412176] 3f40: c3bc6500 
-00001000 be83fb00 c3ad3f80 00001000 c3ad2000 00000000 c0095f3c
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.420395] 3f60: 00000003 
-c3bc6508 c3bc6500 be83fb00 00000000 00000000 00001000 c0096010
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.428615] 3f80: 00000000 
-00000000 b6fe2050 00000000 00001000 be83fb00 00000003 00000003
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.436835] 3fa0: c000eb88 
-c000e9e0 00001000 be83fb00 00000003 be83fb00 00001000 00000000
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.445052] 3fc0: 00001000 
-be83fb00 00000003 00000003 00000001 00000001 00000000 00000003
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.453272] 3fe0: 000bec8c 
-be83fae0 0000f808 b6ea8d5c 60000010 00000003 7dff7ede 749bedf1
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.461531] [<c001b8c8>] 
-(audmux_read_file+0x68/0x2f4) from [<c0095f3c>] (vfs_read+0xb0/0x144)
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.470196] [<c0095f3c>] 
-(vfs_read+0xb0/0x144) from [<c0096010>] (sys_read+0x40/0x70)
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.478084] [<c0096010>] 
-(sys_read+0x40/0x70) from [<c000e9e0>] (ret_fast_syscall+0x0/0x2c)
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.486481] Code: e1a02186 
-e2822004 e3500000 e7935186 (e7937002)
-Feb 17 11:12:55 192.168.1.221 kernel: [  444.503119] ---[ end trace 
-4d046e31309023de ]---
+Thanks!
 
-Maybe someone wants to pick this up.
+Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
-Regards
--- 
-Joan C. Abelaira
+Cheers
+Jon
