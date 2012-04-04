@@ -1,45 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Apr 2012 16:11:31 -0600
-Subject: [PATCH V2 2/4] pinctrl: Add SPEAr pinctrl drivers
-In-Reply-To: <d931a52be65ad0b6354cb5de21cd2006ab100ea0.1333538870.git.viresh.kumar@st.com>
-References: <cover.1333538869.git.viresh.kumar@st.com>
- <d931a52be65ad0b6354cb5de21cd2006ab100ea0.1333538870.git.viresh.kumar@st.com>
-Message-ID: <4F7CC713.8040409@wwwdotorg.org>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 04 Apr 2012 18:09:54 -0400 (EDT)
+Subject: [PATCH 2/5] net: remove ixp2000 ethernet driver
+In-Reply-To: <20120404122540.GA28523@wantstofly.org>
+References: <1333503243-7702-2-git-send-email-robherring2@gmail.com>
+ <1333534857.3046.33.camel@jtkirshe-mobl>
+ <20120404122540.GA28523@wantstofly.org>
+Message-ID: <20120404.180954.2161890302149782420.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2012 05:35 AM, Viresh Kumar wrote:
-> This adds pinctrl driver for SPEAr platform. It also updates MAINTAINERS file
-> for SPEAr pinctrl drivers.
+From: Lennert Buytenhek <buytenh@wantstofly.org>
+Date: Wed, 4 Apr 2012 14:25:40 +0200
 
-> +int __devinit spear_pinctrl_probe(struct platform_device *pdev,
-> +		struct spear_pinctrl_machdata *machdata)
-> +{
-...
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-...
-> +	pmx->vbase = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> On Wed, Apr 04, 2012 at 03:20:57AM -0700, Jeff Kirsher wrote:
+> 
+>> > From: Rob Herring <rob.herring@calxeda.com>
+>> > 
+>> > The platform is removed, so there are no users of this driver.
+>> > 
+>> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> > Cc: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
+>> > Cc: Jesse Brandeburg <jesse.brandeburg@intel.com>
+>> > Cc: Bruce Allan <bruce.w.allan@intel.com>
+>> > Cc: Carolyn Wyborny <carolyn.wyborny@intel.com>
+>> > Cc: Don Skidmore <donald.c.skidmore@intel.com>
+>> > Cc: Greg Rose <gregory.v.rose@intel.com>
+>> > Cc: Peter P Waskiewicz Jr <peter.p.waskiewicz.jr@intel.com>
+>> > Cc: Alex Duyck <alexander.h.duyck@intel.com>
+>> > Cc: John Ronciak <john.ronciak@intel.com>
+>> > Cc: netdev at vger.kernel.org
+> 
+> Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
 
-If this driver is DT-only, you can replace those two calls with of_iomap().
-
-> +	platform_set_drvdata(pdev, pmx);
-
-This should probably before the pinctrl_register() call, just in case
-pinctrl_register() starts calling the pinctrl driver ops immediately,
-and the drvdata is needed by the callbacks.
-
-(Yes, I should fix up the Tegra driver for both of those)
-
-> +	dev_info(&pdev->dev, "Registered with virtual address 0x%08x, physical address 0x%08x\n",
-> +			(u32)pmx->vbase, res->start);
-
-Is that useful?
-
-> +int __devexit spear_pinctrl_remove(struct platform_device *pdev)
-> +{
-> +	struct spear_pmx *pmx = platform_get_drvdata(pdev);
-> +
-> +	platform_set_drvdata(pdev, NULL);
-
-You don't need to do that; nothing should be touching the drvdata once
-the driver has been removed, so the value doesn't matter.
+Applied to net-next, thanks.
