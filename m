@@ -1,63 +1,50 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 4 Apr 2012 12:02:30 +0200
-Subject: [PATCH] ARM: fix __io macro for PCMCIA
-In-Reply-To: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
-References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAGhQ9Vw_Bz3NW3maAt-epP5Bd3svUALBG=1dfg2_tuD0a=PtRA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  4 Apr 2012 11:05:12 +0100
+Subject: [PATCH] ARM: vic: re-read status register before dispatching each IRQ
+ handler
+Message-ID: <1333533912-30813-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2012 at 5:11 AM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
-> broken as PCMCIA depends on __io() being just a cast. This needs a better
-> fix with a fixed i/o address mapping, but for now we just restore things
-> to the previous behavior.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Joachim Eastwood <joachim.eastwood@jotron.com>
-> Cc: Paul Parsons <lost.distance@yahoo.com>
-> ---
-> ?arch/arm/include/asm/io.h | ? ?6 ++++--
-> ?1 files changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index df0ac0b..00262a4 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -118,6 +118,8 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
-> ?*/
-> ?#ifdef CONFIG_NEED_MACH_IO_H
-> ?#include <mach/io.h>
-> +#elif defined(CONFIG_PCCARD)
-> +#define __io(a) ? ? ? ? ? ? ? ?__typesafe_io(a)
-> ?#else
-> ?#define __io(a) ? ? ? ? ? ? ? ?({ (void)(a); __typesafe_io(0); })
-> ?#endif
-> @@ -134,9 +136,9 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
-> ?* readb() et.al. on such platforms.
-> ?*/
-> ?#ifndef IO_SPACE_LIMIT
-> -#if defined(CONFIG_PCMCIA_SOC_COMMON) || defined(CONFIG_PCMCIA_SOC_COMMON_MODULE)
-> +#if defined(CONFIG_PCCARD)
-> ?#define IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
-> -#elif defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-> +#elif defined(CONFIG_PCI) || defined(CONFIG_ISA)
-> ?#define IO_SPACE_LIMIT ((resource_size_t)0xffff)
-> ?#else
-> ?#define IO_SPACE_LIMIT ((resource_size_t)0)
-> --
-> 1.7.5.4
+handle_IRQ may briefly cause interrupts to be re-enabled during soft IRQ
+processing on the exit path, leading to nested handling of VIC interrupts.
 
-This doesn't work on my AT91RM9200 board. It still fails with the same
-error as without this patch.
-  [   80.500000] pata_pcmcia: probe of 0.0 failed with error -12
+Since the current code does not re-read the VIC_IRQ_STATUS register, this
+can lead to multiple invocations of the same interrupt handler and
+spurious interrupts to be reported.
 
-regards
-Joachim Eastwood
+This patch changes the VIC interrupt dispatching code to re-read the
+status register each time, avoiding duplicate invocations of the same
+handler.
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-and-tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+Taken against v3.4-rc1 and tested on Versatile AB 926 (+ PL011 NULL
+pointer fix). I'll put this in the patch system tomorrow if there aren't
+any objections.
+
+ arch/arm/common/vic.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index 7a66311..6b1de5d 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -435,11 +435,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+ 	u32 stat, irq;
+ 	int handled = 0;
+ 
+-	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+-	while (stat) {
++	while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
+ 		irq = ffs(stat) - 1;
+ 		handle_IRQ(irq_find_mapping(vic->domain, irq), regs);
+-		stat &= ~(1 << irq);
+ 		handled = 1;
+ 	}
+ 
+-- 
+1.7.4.1
