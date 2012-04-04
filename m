@@ -1,66 +1,35 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 4 Apr 2012 14:07:34 -0500
-Subject: [PATCH] ARM: vic: re-read status register before dispatching
- each IRQ handler
-In-Reply-To: <1333533912-30813-1-git-send-email-will.deacon@arm.com>
-References: <1333533912-30813-1-git-send-email-will.deacon@arm.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F002069840A167@AUSP01VMBX24.collaborationhost.net>
+From: tsoni@codeaurora.org (Trilok Soni)
+Date: Thu, 05 Apr 2012 00:40:01 +0530
+Subject: [PATCH 2/9] ARM: OMAP2+: SmartReflex: move the driver specific
+ macros in include/linux/power
+In-Reply-To: <1332173578-27422-3-git-send-email-j-pihet@ti.com>
+References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
+ <1332173578-27422-3-git-send-email-j-pihet@ti.com>
+Message-ID: <4F7C9C89.9080605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 04, 2012 3:05 AM, Will Deacon wrote:
->
-> handle_IRQ may briefly cause interrupts to be re-enabled during soft IRQ
-> processing on the exit path, leading to nested handling of VIC interrupts.
->
-> Since the current code does not re-read the VIC_IRQ_STATUS register, this
-> can lead to multiple invocations of the same interrupt handler and
-> spurious interrupts to be reported.
->
-> This patch changes the VIC interrupt dispatching code to re-read the
-> status register each time, avoiding duplicate invocations of the same
-> handler.
->
-> Acked-and-tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->
-> Taken against v3.4-rc1 and tested on Versatile AB 926 (+ PL011 NULL
-> pointer fix). I'll put this in the patch system tomorrow if there aren't
-> any objections.
->
->  arch/arm/common/vic.c |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> index 7a66311..6b1de5d 100644
-> --- a/arch/arm/common/vic.c
-> +++ b/arch/arm/common/vic.c
-> @@ -435,11 +435,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
->  	u32 stat, irq;
->  	int handled = 0;
->  
-> -	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> -	while (stat) {
-> +	while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
->  		irq = ffs(stat) - 1;
->  		handle_IRQ(irq_find_mapping(vic->domain, irq), regs);
-> -		stat &= ~(1 << irq);
->  		handled = 1;
->  	}
+Hi Jean,
 
-You probably should fix the comment above the function:
+On 3/19/2012 9:42 PM, jean.pihet at newoldbits.com wrote:
+> From: Jean Pihet<j-pihet@ti.com>
+>
+> Move the driver specific macros from the smartreflex header file
+> (arch/arm/mach-omap2/smartreflex.h) in a new header file
+> include/linux/power/smartreflex.h.
+>
+> This change makes the SmartReflex implementation ready for the move
+> to drivers/.
 
-/*
- * Handle each interrupt in a single VIC.  Returns non-zero if we've
- * handled at least one interrupt.  This does a single read of the
- * status register and handles all interrupts in order from LSB first.
- */
+I wonder why someone would need a new directory under drivers/power 
+where the code is not about introducing new and generic AVS framework
+but it is all about OMAP specific code. What if tomorrow new generic
+AVS framework comes from different chip vendor? I am sure this kind
+of technology would be common in newer embedded chips.
 
-You are no longer doing a single read. You might mention the problem
-caused by the single read so that no one tries to "optimize" the loop
-and reintroduce the problem.
+---Trilok Soni
 
-Regards,
-Hartley
+-- 
+--
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
