@@ -1,52 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 04 Apr 2012 15:20:22 -0700
-Subject: [PATCH] cpufreq: OMAP: fix build errors: depends on ARCH_OMAP2PLUS
-In-Reply-To: <1332807568-638-1-git-send-email-khilman@ti.com>
-References: <1332807568-638-1-git-send-email-khilman@ti.com>
-Message-ID: <4F7CC926.5050300@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 04 Apr 2012 16:26:05 -0600
+Subject: [PATCH V2 3/4] pinctrl: Add SPEAr3xx pinctrl drivers
+In-Reply-To: <2a78bbfab59b531adef0820f34f683dd736d3a3a.1333538870.git.viresh.kumar@st.com>
+References: <cover.1333538869.git.viresh.kumar@st.com>
+ <2a78bbfab59b531adef0820f34f683dd736d3a3a.1333538870.git.viresh.kumar@st.com>
+Message-ID: <4F7CCA7D.7070601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On 04/04/2012 05:35 AM, Viresh Kumar wrote:
+> This adds pinctrl driver for SPEAr3xx family. SPEAr3xx family supports three
+> families: SPEAr300, SPEAr310 and SPEAr320.
 
-On 03/26/2012 05:19 PM, Kevin Hilman wrote:
-> The OMAP driver needs a 'depends on ARCH_OMAP2PLUS' since it only
-> builds for OMAP2+ platforms.
->
-> This 'depends on' was in the original patch from Russell King, but was
-> erroneously removed by me when making this option user-selectable in
-> commit b09db45c (cpufreq: OMAP driver depends CPUfreq tables.)  This
-> patch remedies that.
->
-> Apologies to Russell King for breaking his originally working patch.
->
-> Also, thanks to Grazvydas Ignotas for reporting the same problem.
->
-> Cc: Russell King<rmk+kernel@arm.linux.org.uk>
-> Cc: Grazvydas Ignotas<notasas@gmail.com>
-> Signed-off-by: Kevin Hilman<khilman@ti.com>
-> ---
-> Dave, this applies on top of your current fixes branch, and fixes a
-> problem introduced there by me.  Please merge for v3.4-rc.  Thanks.
+> +++ b/Documentation/devicetree/bindings/pinmux/pinmux_spear.txt
 
-Can you pick this up for v3.4-rc?
+> +- st,pinmux-mode: Mandatory for SPEAr300 and SPEAr320
+> +	- Its values for SPEAr300:
+> +		- NAND_MODE		: <0>
+> +		- NOR_MODE		: <1>
+> +		- PHOTO_FRAME_MODE	: <2>
+> +		- LEND_IP_PHONE_MODE	: <3>
+> +		- HEND_IP_PHONE_MODE	: <4>
+> +		- LEND_WIFI_PHONE_MODE	: <5>
+> +		- HEND_WIFI_PHONE_MODE	: <6>
+> +		- ATA_PABX_WI2S_MODE	: <7>
+> +		- ATA_PABX_I2S_MODE	: <8>
+> +		- CAML_LCDW_MODE	: <9>
+> +		- CAMU_LCD_MODE		: <10>
+> +		- CAMU_WLCD_MODE	: <11>
+> +		- CAML_LCD_MODE		: <12>
+> +	- Its values for SPEAr320:
+> +		- AUTO_NET_SMII_MODE	: <0>
+> +		- AUTO_NET_MII_MODE	: <1>
+> +		- AUTO_EXP_MODE		: <2>
+> +		- SMALL_PRINTERS_MODE	: <3>
+> +		- EXTENDED_MODE		: <4>
 
-Thanks,
-
-Kevin
-
->   drivers/cpufreq/Kconfig.arm |    1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 82f1aa9..555a57b 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -4,6 +4,7 @@
->
->   config ARM_OMAP2PLUS_CPUFREQ
->   	bool "TI OMAP2+"
-> +	depends on ARCH_OMAP2PLUS
->   	default ARCH_OMAP2PLUS
->   	select CPU_FREQ_TABLE
->
+I'm not sure what this is. Is it representing packaging options on the
+SoC or something like that? I'd personally expect the pinctrl driver to
+expose the raw pinmux HW module's capabilities and each board's .dts
+file to pick how to configure each option, rather than providing canned
+options, but I guess not everyone agrees. Looking at the data in the
+rest of the patch though, it looks like you have plenty of
+pin/group/function definitions in the driver files though, so this
+probably isn't a problem.
