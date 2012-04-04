@@ -1,46 +1,45 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Apr 2012 16:26:05 -0600
-Subject: [PATCH V2 3/4] pinctrl: Add SPEAr3xx pinctrl drivers
-In-Reply-To: <2a78bbfab59b531adef0820f34f683dd736d3a3a.1333538870.git.viresh.kumar@st.com>
+Date: Wed, 04 Apr 2012 16:32:05 -0600
+Subject: [PATCH V2 4/4] SPEAr3xx: Add pinctrl support for boards
+In-Reply-To: <1ac94a157f9b15d0eabce4768ff83338cbd4ff4a.1333538870.git.viresh.kumar@st.com>
 References: <cover.1333538869.git.viresh.kumar@st.com>
- <2a78bbfab59b531adef0820f34f683dd736d3a3a.1333538870.git.viresh.kumar@st.com>
-Message-ID: <4F7CCA7D.7070601@wwwdotorg.org>
+ <1ac94a157f9b15d0eabce4768ff83338cbd4ff4a.1333538870.git.viresh.kumar@st.com>
+Message-ID: <4F7CCBE5.8020703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/04/2012 05:35 AM, Viresh Kumar wrote:
-> This adds pinctrl driver for SPEAr3xx family. SPEAr3xx family supports three
-> families: SPEAr300, SPEAr310 and SPEAr320.
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-> +++ b/Documentation/devicetree/bindings/pinmux/pinmux_spear.txt
+> +++ b/arch/arm/mach-spear3xx/spear300.c
 
-> +- st,pinmux-mode: Mandatory for SPEAr300 and SPEAr320
-> +	- Its values for SPEAr300:
-> +		- NAND_MODE		: <0>
-> +		- NOR_MODE		: <1>
-> +		- PHOTO_FRAME_MODE	: <2>
-> +		- LEND_IP_PHONE_MODE	: <3>
-> +		- HEND_IP_PHONE_MODE	: <4>
-> +		- LEND_WIFI_PHONE_MODE	: <5>
-> +		- HEND_WIFI_PHONE_MODE	: <6>
-> +		- ATA_PABX_WI2S_MODE	: <7>
-> +		- ATA_PABX_I2S_MODE	: <8>
-> +		- CAML_LCDW_MODE	: <9>
-> +		- CAMU_LCD_MODE		: <10>
-> +		- CAMU_WLCD_MODE	: <11>
-> +		- CAML_LCD_MODE		: <12>
-> +	- Its values for SPEAr320:
-> +		- AUTO_NET_SMII_MODE	: <0>
-> +		- AUTO_NET_MII_MODE	: <1>
-> +		- AUTO_EXP_MODE		: <2>
-> +		- SMALL_PRINTERS_MODE	: <3>
-> +		- EXTENDED_MODE		: <4>
+> +static struct pinctrl_map __initdata spear300_evb_pmx_map[] = {
+> +	/* spear3xx per-device maps */
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "i2c0"),
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "ssp0"),
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "mii0"),
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", NULL, "uart0"),
+> +
+> +	/* spear310 per-device maps */
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "clcd_pfmode_grp",
+> +			"clcd"),
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "sdhci_4bit_grp",
+> +			"sdhci"),
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "gpio1_0_to_3_grp",
+> +			"gpio"),
+> +	PIN_MAP_MUX_GROUP_HOG_DEFAULT("99000000.pinmux", "gpio1_4_to_7_grp",
+> +			"gpio"),
+> +};
+>
+>  static void __init spear300_dt_init(void)
+...
+> +
+> +	if (of_machine_is_compatible("st,spear300-evb")) {
+> +		if (pinctrl_register_mappings(spear300_evb_pmx_map,
+> +					ARRAY_SIZE(spear300_evb_pmx_map)))
+> +			pr_err("Error registering pinmux map\n");
+> +	}
 
-I'm not sure what this is. Is it representing packaging options on the
-SoC or something like that? I'd personally expect the pinctrl driver to
-expose the raw pinmux HW module's capabilities and each board's .dts
-file to pick how to configure each option, rather than providing canned
-options, but I guess not everyone agrees. Looking at the data in the
-rest of the patch though, it looks like you have plenty of
-pin/group/function definitions in the driver files though, so this
-probably isn't a problem.
+It'd be nice to put those mapping tables into device tree from the
+start. Hopefully the core pinctrl support for DT will be in linux-next
+today/tomorrow.
