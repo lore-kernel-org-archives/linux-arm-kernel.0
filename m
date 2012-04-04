@@ -1,29 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Apr 2012 07:55:04 +0000
-Subject: [PATCH] ARM: fix __io macro for PCMCIA
-In-Reply-To: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
-References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201204040755.04517.arnd@arndb.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 4 Apr 2012 09:57:48 +0200
+Subject: [PATCH] mtd/gpmi : do not include the mxs.h
+In-Reply-To: <CAMiH66FhFFi1Kd7t6uK4S46Yt=g1kxxCUZywCNAmy14E1AHH1A@mail.gmail.com>
+References: <1333247817-18472-1-git-send-email-shijie8@gmail.com>
+ <20120403193920.GC2201@pengutronix.de>
+ <CAMiH66FhFFi1Kd7t6uK4S46Yt=g1kxxCUZywCNAmy14E1AHH1A@mail.gmail.com>
+Message-ID: <20120404075748.GA9073@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 April 2012, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
-> broken as PCMCIA depends on __io() being just a cast. This needs a better
-> fix with a fixed i/o address mapping, but for now we just restore things
-> to the previous behavior.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Joachim Eastwood <joachim.eastwood@jotron.com>
-> Cc: Paul Parsons <lost.distance@yahoo.com>
+Hi,
 
-Yes, I suppose it's the only sane way for v3.4.
+> Do you mean your patch "lib: add support for stmp-style devices" ?
+> or some other patch?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Yes, it adds the SET and CLR macros. writel() then need to be modified again.
+Nothing major, though.
 
-Russell, do you want to take it in your tree? Otherwise I'll put it into
-arm-soc since that is where things broke.
+> Your patch "lib: add support for stmp-style devices" does not give me the API
+> to remove this code as i ever wished to.
 
-	Arnd
+Then please speak up. The only comment I can find from you is the requested
+move to a fsl-directory, but this is nothing about API?
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120404/d3f8f34d/attachment.sig>
