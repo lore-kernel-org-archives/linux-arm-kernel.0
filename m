@@ -1,40 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Apr 2012 08:48:38 +0000
-Subject: [PATCH v2] gpio: Device tree support for LPC32xx
-In-Reply-To: <1333497518-25838-1-git-send-email-stigge@antcom.de>
-References: <1333497518-25838-1-git-send-email-stigge@antcom.de>
-Message-ID: <201204040848.39376.arnd@arndb.de>
+Date: Wed, 4 Apr 2012 10:27:30 +0000
+Subject: [PATCH] ARM: fix __io macro for PCMCIA
+In-Reply-To: <20120404090335.GQ24211@n2100.arm.linux.org.uk>
+References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+ <20120404090335.GQ24211@n2100.arm.linux.org.uk>
+Message-ID: <201204041027.30353.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 April 2012, Roland Stigge wrote:
-> This patch adds device tree support for gpio-lpc32xx.c
+On Wednesday 04 April 2012, Russell King - ARM Linux wrote:
+> On Tue, Apr 03, 2012 at 10:11:52PM -0500, Rob Herring wrote:
+> > With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
+> > broken as PCMCIA depends on __io() being just a cast. This needs a better
+> > fix with a fixed i/o address mapping, but for now we just restore things
+> > to the previous behavior.
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> And what about systems with PCI IO at non-zero offsets with cardbus/pcmcia?
+> This is broken and your assumption above is wrong.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-Just one more comment:
-
-> +#ifdef CONFIG_OF
-> +static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
-> +	{ .compatible = "nxp,lpc32xx-gpio", },
-> +	{ },
-> +};
-> +#endif
-> +
-> +static struct platform_driver lpc32xx_gpio_driver = {
-> +	.driver		= {
-> +		.name	= "lpc32xx-gpio",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = lpc32xx_gpio_of_match,
-> +	},
-> +	.probe		= lpc32xx_gpio_probe,
-> +};
-
-The #ifdef above is not helpful, it will cause a build error in the
-of_match_table= assignment. Since the plan for this driver is to
-be devicetree-only, it would be appropriate to just remove the
-#ifdef, but adding of_match_ptr() is ok too.
+I would think they all still use their own mach/io.h. Which ones are you
+thinking of?
 
 	Arnd
