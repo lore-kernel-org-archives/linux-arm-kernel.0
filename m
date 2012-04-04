@@ -1,25 +1,22 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 4 Apr 2012 15:48:19 +0200
+Date: Wed, 4 Apr 2012 15:51:38 +0200
 Subject: [PATCH 1/2] arm/dts: omap4-sdp: Add keypad data
 In-Reply-To: <1333546221-19700-2-git-send-email-sourav.poddar@ti.com>
 References: <1333546221-19700-1-git-send-email-sourav.poddar@ti.com>
  <1333546221-19700-2-git-send-email-sourav.poddar@ti.com>
-Message-ID: <4F7C5123.9050106@ti.com>
+Message-ID: <4F7C51EA.1040902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Sourav,
 
 On 4/4/2012 3:30 PM, Sourav Poddar wrote:
 > This patch add keypad data node in omap4 device tree
 > file.
 
-Nit: You should adapt first the driver to DT and document the binding 
-before using it.
+Nit #2: Never write "this patch" in a patch changelog... Because at some 
+point it will become a commit in a GIT tree.
 
-So this patch should be the second one.
+I think AKPM wrote something on that.
 
-Regards,
 Benoit
 
 >
