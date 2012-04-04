@@ -1,24 +1,17 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 04 Apr 2012 04:39:52 -0400 (EDT)
-Subject: [PATCH v3 3/8] net: Add device tree support to LPC32xx
-In-Reply-To: <1333528480-17134-4-git-send-email-stigge@antcom.de>
-References: <1333528480-17134-1-git-send-email-stigge@antcom.de>
- <1333528480-17134-4-git-send-email-stigge@antcom.de>
-Message-ID: <20120404.043952.1333187975072018080.davem@davemloft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Apr 2012 10:03:35 +0100
+Subject: [PATCH] ARM: fix __io macro for PCMCIA
+In-Reply-To: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120404090335.GQ24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roland Stigge <stigge@antcom.de>
-Date: Wed,  4 Apr 2012 10:34:35 +0200
+On Tue, Apr 03, 2012 at 10:11:52PM -0500, Rob Herring wrote:
+> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
+> broken as PCMCIA depends on __io() being just a cast. This needs a better
+> fix with a fixed i/o address mapping, but for now we just restore things
+> to the previous behavior.
 
-> This patch adds device tree support for lpc_eth.c.
-> 
-> The runtime option for MII/RMII is solved via the "phy-mode" property, SRAM
-> ("IRAM") usage for DMA can be chosen via "use-iram".
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-Feel free to merge this in via one of the ARM trees.
-
-Acked-by: David S. Miller <davem@davemloft.net>
+And what about systems with PCI IO at non-zero offsets with cardbus/pcmcia?
+This is broken and your assumption above is wrong.
