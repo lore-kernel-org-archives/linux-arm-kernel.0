@@ -1,34 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Apr 2012 12:15:25 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
-References: <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
- <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
-Message-ID: <20120404111524.GF32505@mudshark.cambridge.arm.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Wed, 4 Apr 2012 07:19:20 -0400
+Subject: [PATCH] mtd/gpmi : do not include the mxs.h
+In-Reply-To: <20120404075748.GA9073@pengutronix.de>
+References: <1333247817-18472-1-git-send-email-shijie8@gmail.com>
+ <20120403193920.GC2201@pengutronix.de>
+ <CAMiH66FhFFi1Kd7t6uK4S46Yt=g1kxxCUZywCNAmy14E1AHH1A@mail.gmail.com>
+ <20120404075748.GA9073@pengutronix.de>
+Message-ID: <CAMiH66EPYQiiSOtnt=e9RpcrWKOUoH6=H5B0uJw14hZaHMLjEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
-> 
-> Part of the problem is that the clockdomain data for the emu_sys 
-> clockdomain is wrong.  Here's something to try to fix it.  It might just 
-> be enough to get it to work.
+On Wed, Apr 4, 2012 at 3:57 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> Hi,
+>
+>> Do you mean your patch "lib: add support for stmp-style devices" ?
+>> or some other patch?
+>
+> Yes, it adds the SET and CLR macros. writel() then need to be modified again.
+> Nothing major, though.
 
-Hmm, doesn't seem to work but I do see the following in dmesg when I try to
-use perf:
+The two macros are not needed if you give me a two arguments API such
+as gpmi_reset_block().
+I wish I can remove the gpmi_reset_block(), and use your code. :)
 
- powerdomain: waited too long for powerdomain emu_pwrdm to complete transition
+>
+>> Your patch "lib: add support for stmp-style devices" does not give me the API
+>> to remove this code as i ever wished to.
+>
+> Then please speak up. The only comment I can find from you is the requested
+> move to a fsl-directory, but this is nothing about API?
+yes.
+I will send new comments about your patch.
 
-which is new with your patch.
 
-Cheers,
+ thanks.
 
-Will
+Huang Shijie
+
+>
+> Regards,
+>
+> ? Wolfram
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
