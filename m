@@ -1,40 +1,62 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 4 Apr 2012 11:20:05 -0500
-Subject: [PATCH v2 2/3] ep93xx: IDE driver platform support code
-In-Reply-To: <4F7C0922.1070200@metasoft.pl>
-References: <4F7B0C54.8010804@metasoft.pl> <4F7B0D6C.1010801@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F0020698409DF4@AUSP01VMBX24.collaborationhost.net>
- <4F7C0922.1070200@metasoft.pl>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F002069840A08A@AUSP01VMBX24.collaborationhost.net>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 4 Apr 2012 11:32:00 -0500
+Subject: [PATCHv5 16/18] I2C: OMAP: fix missing handling of errata
+ I2C_OMAP3_1P153
+In-Reply-To: <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
+References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
+ <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <4F7C7780.7040807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 04, 2012 1:41 AM, Rafal Prylowski wrote:
-> On 2012-04-03 19:41, H Hartley Sweeten wrote:
-> [not related to my patch, but ep93xx keypad]:
-> Isn't ep93xx_keypad_acquire_gpio be more correct if we apply the following patch:
+Hi Shubhro,
+
+On 04/03/2012 11:02 AM, Shubhrajyoti D wrote:
+> From: Tasslehoff Kjappfot<tasskjapp@gmail.com>
 >
-> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
-> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
-> @@ -734,7 +734,7 @@ int ep93xx_keypad_acquire_gpio(struct pl
->  fail_gpio_d:
->  	gpio_free(EP93XX_GPIO_LINE_C(i));
->  fail_gpio_c:
-> -	for ( ; i >= 0; --i) {
-> +	for (--i; i >= 0; --i) {
->  		gpio_free(EP93XX_GPIO_LINE_C(i));
->  		gpio_free(EP93XX_GPIO_LINE_D(i));
->  	}
+> i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
+> Move the errata handling to i2c_probe.
 >
-> This way we don't double free EP93XX_GPIO_LINE_C(i), and don't free lines which were not
-> successfully acquired (I noticed this when writing my patch, which is based on
-> ep93xx_keypad_acquire/release_gpio).
+> Signed-off-by: Tasslehoff Kjappfot<tasskjapp@gmail.com>
+> Signed-off-by: Shubhrajyoti D<shubhrajyoti@ti.com>
+> ---
+>   drivers/i2c/busses/i2c-omap.c |   10 +++++-----
+>   1 files changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index c113f41..51576d6 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -431,11 +431,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>   	/* Take the I2C module out of reset: */
+>   	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+>
+> -	dev->errata = 0;
+> -
+> -	if (dev->flags&  OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+> -		dev->errata |= I2C_OMAP_ERRATA_I207;
+> -
+>   	/* Enable interrupts */
+>   	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+>   			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
+> @@ -1056,6 +1051,11 @@ omap_i2c_probe(struct platform_device *pdev)
+>
+>   	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG)&  0xff;
+>
+> +	dev->errata = 0;
+> +
+> +	if (dev->flags&  OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+> +		dev->errata |= I2C_OMAP_ERRATA_I207;
+> +
+>   	if (dev->rev<= OMAP_I2C_REV_ON_3430_3530)
+>   		dev->errata |= I2C_OMAP3_1P153;
 
-You are correct... ;-)
+The errata ID is not correct. I believe that 1P153 is referring to the 
+section number in the errata doc and not the errata ID. The errata ID 
+should be i451 in the latest OMAP34xx and OMAP36xx docs.
 
-Care to submit an actual patch?
+Please can you update this? The section number changed in the latest 
+errata docs and it took me a minute to find this.
 
-Regards,
-Hartley
+Cheers
+Jon
