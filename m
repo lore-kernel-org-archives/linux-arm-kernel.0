@@ -1,41 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Apr 2012 12:07:17 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <alpine.DEB.2.00.1204031800060.8000@utopia.booyaka.com>
-References: <CACVXFVMH9WZDqs-mVjxL=1FY12uHyQAJMTCQuU5ru1wQT+YnZg@mail.gmail.com>
- <CAMQu2gzW706YbOzHa4Am0=X17T0G3zBhOmWUd8eC6GY9F6OBog@mail.gmail.com>
- <CACVXFVPb-McJj1oi284RW37Pe08cAXSw-jteFwfNVPpCJx5EaQ@mail.gmail.com>
- <CAMQu2gwvgPfZv_LnB6GnYs=Wt+wj9GFPEDYiDK6C8TiTag3gTg@mail.gmail.com>
- <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <alpine.DEB.2.00.1204031800060.8000@utopia.booyaka.com>
-Message-ID: <20120404110717.GE32505@mudshark.cambridge.arm.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 04 Apr 2012 13:08:04 +0200
+Subject: [PATCH v2] gpio: Device tree support for LPC32xx
+In-Reply-To: <201204040848.39376.arnd@arndb.de>
+References: <1333497518-25838-1-git-send-email-stigge@antcom.de>
+ <201204040848.39376.arnd@arndb.de>
+Message-ID: <4F7C2B94.8090601@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Wed, Apr 04, 2012 at 01:00:53AM +0100, Paul Walmsley wrote:
-> On Tue, 3 Apr 2012, Will Deacon wrote:
+On 04/04/2012 10:48 AM, Arnd Bergmann wrote:
+>> +#ifdef CONFIG_OF
+>> +static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
+>> +	{ .compatible = "nxp,lpc32xx-gpio", },
+>> +	{ },
+>> +};
+>> +#endif
+>> +
+>> +static struct platform_driver lpc32xx_gpio_driver = {
+>> +	.driver		= {
+>> +		.name	= "lpc32xx-gpio",
+>> +		.owner	= THIS_MODULE,
+>> +		.of_match_table = lpc32xx_gpio_of_match,
+>> +	},
+>> +	.probe		= lpc32xx_gpio_probe,
+>> +};
 > 
-> > I'll take JTAG for a whirl to see where we are. If anything looks wrong in
-> > my dmesg, please shout (there are plenty of things in there that look like
-> > they've gone awry).
-> 
-> Might be worth booting with initcall_debug on the kernel command line.  
-> That will probably be easier than dealing with JTAG.
+> The #ifdef above is not helpful, it will cause a build error in the
+> of_match_table= assignment. Since the plan for this driver is to
+> be devicetree-only, it would be appropriate to just remove the
+> #ifdef, but adding of_match_ptr() is ok too.
 
-JTAG is unusable anyway because it requires a new MLO, which makes the
-problem disappear.
+I think I just forgot the of_match_ptr(). Will post an update with a
+repo for gpio to pull from.
 
-Using initcall_debug I tracked the hang down to cti_unlock:
+Thanks for the note!
 
-	val = __raw_readl(base + LOCKSTATUS);
-
-causes the board to die, presumably because CoreSight isn't in a fit state
-to be poked.
-
-Will
+Roland
