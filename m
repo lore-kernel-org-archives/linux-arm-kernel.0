@@ -1,1951 +1,355 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 4 Apr 2012 17:05:33 +0530
-Subject: [PATCH V2 1/4] SPEAr: Remove existing padmux support for SPEAr
-In-Reply-To: <cover.1333538869.git.viresh.kumar@st.com>
-References: <cover.1333538869.git.viresh.kumar@st.com>
-Message-ID: <9f536ac8b695674183ce31e8d5f894d19f607625.1333538869.git.viresh.kumar@st.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 04 Apr 2012 07:18:51 -0500
+Subject: [PATCH 1/5] ARM: remove ixp23xx and ixp2000 platforms
+In-Reply-To: <1333503243-7702-1-git-send-email-robherring2@gmail.com>
+References: <1333503243-7702-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4F7C3C2B.2050208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must use pinctrl framework instead of defining per SoC pinmux drivers. This
-patch removes existing padmux support present for SPEAr platform.
+Doh! Forgot to cc Lennert.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/mach-spear3xx/include/mach/generic.h |  128 --------
- arch/arm/mach-spear3xx/spear300.c             |  389 +----------------------
- arch/arm/mach-spear3xx/spear310.c             |  161 +----------
- arch/arm/mach-spear3xx/spear320.c             |  403 +-----------------------
- arch/arm/mach-spear3xx/spear3xx.c             |  425 -------------------------
- arch/arm/plat-spear/Makefile                  |    2 +-
- arch/arm/plat-spear/include/plat/padmux.h     |   92 ------
- arch/arm/plat-spear/padmux.c                  |  164 ----------
- 8 files changed, 4 insertions(+), 1760 deletions(-)
- delete mode 100644 arch/arm/plat-spear/include/plat/padmux.h
- delete mode 100644 arch/arm/plat-spear/padmux.c
+Rob
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index a756958..9603bf4 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -20,7 +20,6 @@
- #include <linux/amba/bus.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <plat/padmux.h>
- 
- /* spear3xx declarations */
- /*
-@@ -43,147 +42,20 @@ void __init spear3xx_dt_init_irq(void);
- 
- void spear_restart(char, const char *);
- 
--/* pad mux declarations */
--#define PMX_FIRDA_MASK		(1 << 14)
--#define PMX_I2C_MASK		(1 << 13)
--#define PMX_SSP_CS_MASK		(1 << 12)
--#define PMX_SSP_MASK		(1 << 11)
--#define PMX_MII_MASK		(1 << 10)
--#define PMX_GPIO_PIN0_MASK	(1 << 9)
--#define PMX_GPIO_PIN1_MASK	(1 << 8)
--#define PMX_GPIO_PIN2_MASK	(1 << 7)
--#define PMX_GPIO_PIN3_MASK	(1 << 6)
--#define PMX_GPIO_PIN4_MASK	(1 << 5)
--#define PMX_GPIO_PIN5_MASK	(1 << 4)
--#define PMX_UART0_MODEM_MASK	(1 << 3)
--#define PMX_UART0_MASK		(1 << 2)
--#define PMX_TIMER_3_4_MASK	(1 << 1)
--#define PMX_TIMER_1_2_MASK	(1 << 0)
--
--/* pad mux devices */
--extern struct pmx_dev spear3xx_pmx_firda;
--extern struct pmx_dev spear3xx_pmx_i2c;
--extern struct pmx_dev spear3xx_pmx_ssp_cs;
--extern struct pmx_dev spear3xx_pmx_ssp;
--extern struct pmx_dev spear3xx_pmx_mii;
--extern struct pmx_dev spear3xx_pmx_gpio_pin0;
--extern struct pmx_dev spear3xx_pmx_gpio_pin1;
--extern struct pmx_dev spear3xx_pmx_gpio_pin2;
--extern struct pmx_dev spear3xx_pmx_gpio_pin3;
--extern struct pmx_dev spear3xx_pmx_gpio_pin4;
--extern struct pmx_dev spear3xx_pmx_gpio_pin5;
--extern struct pmx_dev spear3xx_pmx_uart0_modem;
--extern struct pmx_dev spear3xx_pmx_uart0;
--extern struct pmx_dev spear3xx_pmx_timer_3_4;
--extern struct pmx_dev spear3xx_pmx_timer_1_2;
--
--#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--/* padmux plgpio devices */
--extern struct pmx_dev spear3xx_pmx_plgpio_0_1;
--extern struct pmx_dev spear3xx_pmx_plgpio_2_3;
--extern struct pmx_dev spear3xx_pmx_plgpio_4_5;
--extern struct pmx_dev spear3xx_pmx_plgpio_6_9;
--extern struct pmx_dev spear3xx_pmx_plgpio_10_27;
--extern struct pmx_dev spear3xx_pmx_plgpio_28;
--extern struct pmx_dev spear3xx_pmx_plgpio_29;
--extern struct pmx_dev spear3xx_pmx_plgpio_30;
--extern struct pmx_dev spear3xx_pmx_plgpio_31;
--extern struct pmx_dev spear3xx_pmx_plgpio_32;
--extern struct pmx_dev spear3xx_pmx_plgpio_33;
--extern struct pmx_dev spear3xx_pmx_plgpio_34_36;
--extern struct pmx_dev spear3xx_pmx_plgpio_37_42;
--extern struct pmx_dev spear3xx_pmx_plgpio_43_44_47_48;
--extern struct pmx_dev spear3xx_pmx_plgpio_45_46_49_50;
--#endif
--
- /* spear300 declarations */
- #ifdef CONFIG_MACH_SPEAR300
--/* pad mux modes */
--extern struct pmx_mode spear300_nand_mode;
--extern struct pmx_mode spear300_nor_mode;
--extern struct pmx_mode spear300_photo_frame_mode;
--extern struct pmx_mode spear300_lend_ip_phone_mode;
--extern struct pmx_mode spear300_hend_ip_phone_mode;
--extern struct pmx_mode spear300_lend_wifi_phone_mode;
--extern struct pmx_mode spear300_hend_wifi_phone_mode;
--extern struct pmx_mode spear300_ata_pabx_wi2s_mode;
--extern struct pmx_mode spear300_ata_pabx_i2s_mode;
--extern struct pmx_mode spear300_caml_lcdw_mode;
--extern struct pmx_mode spear300_camu_lcd_mode;
--extern struct pmx_mode spear300_camu_wlcd_mode;
--extern struct pmx_mode spear300_caml_lcd_mode;
--
--/* pad mux devices */
--extern struct pmx_dev spear300_pmx_fsmc_2_chips;
--extern struct pmx_dev spear300_pmx_fsmc_4_chips;
--extern struct pmx_dev spear300_pmx_keyboard;
--extern struct pmx_dev spear300_pmx_clcd;
--extern struct pmx_dev spear300_pmx_telecom_gpio;
--extern struct pmx_dev spear300_pmx_telecom_tdm;
--extern struct pmx_dev spear300_pmx_telecom_spi_cs_i2c_clk;
--extern struct pmx_dev spear300_pmx_telecom_camera;
--extern struct pmx_dev spear300_pmx_telecom_dac;
--extern struct pmx_dev spear300_pmx_telecom_i2s;
--extern struct pmx_dev spear300_pmx_telecom_boot_pins;
--extern struct pmx_dev spear300_pmx_telecom_sdhci_4bit;
--extern struct pmx_dev spear300_pmx_telecom_sdhci_8bit;
--extern struct pmx_dev spear300_pmx_gpio1;
--
--/* Add spear300 machine declarations here */
- void __init spear300_clk_init(void);
- 
- #endif /* CONFIG_MACH_SPEAR300 */
- 
- /* spear310 declarations */
- #ifdef CONFIG_MACH_SPEAR310
--/* pad mux devices */
--extern struct pmx_dev spear310_pmx_emi_cs_0_1_4_5;
--extern struct pmx_dev spear310_pmx_emi_cs_2_3;
--extern struct pmx_dev spear310_pmx_uart1;
--extern struct pmx_dev spear310_pmx_uart2;
--extern struct pmx_dev spear310_pmx_uart3_4_5;
--extern struct pmx_dev spear310_pmx_fsmc;
--extern struct pmx_dev spear310_pmx_rs485_0_1;
--extern struct pmx_dev spear310_pmx_tdm0;
--
--/* Add spear310 machine declarations here */
- void __init spear310_clk_init(void);
- 
- #endif /* CONFIG_MACH_SPEAR310 */
- 
- /* spear320 declarations */
- #ifdef CONFIG_MACH_SPEAR320
--/* pad mux modes */
--extern struct pmx_mode spear320_auto_net_smii_mode;
--extern struct pmx_mode spear320_auto_net_mii_mode;
--extern struct pmx_mode spear320_auto_exp_mode;
--extern struct pmx_mode spear320_small_printers_mode;
--
--/* pad mux devices */
--extern struct pmx_dev spear320_pmx_clcd;
--extern struct pmx_dev spear320_pmx_emi;
--extern struct pmx_dev spear320_pmx_fsmc;
--extern struct pmx_dev spear320_pmx_spp;
--extern struct pmx_dev spear320_pmx_sdhci;
--extern struct pmx_dev spear320_pmx_i2s;
--extern struct pmx_dev spear320_pmx_uart1;
--extern struct pmx_dev spear320_pmx_uart1_modem;
--extern struct pmx_dev spear320_pmx_uart2;
--extern struct pmx_dev spear320_pmx_touchscreen;
--extern struct pmx_dev spear320_pmx_can;
--extern struct pmx_dev spear320_pmx_sdhci_led;
--extern struct pmx_dev spear320_pmx_pwm0;
--extern struct pmx_dev spear320_pmx_pwm1;
--extern struct pmx_dev spear320_pmx_pwm2;
--extern struct pmx_dev spear320_pmx_pwm3;
--extern struct pmx_dev spear320_pmx_ssp1;
--extern struct pmx_dev spear320_pmx_ssp2;
--extern struct pmx_dev spear320_pmx_mii1;
--extern struct pmx_dev spear320_pmx_smii0;
--extern struct pmx_dev spear320_pmx_smii1;
--extern struct pmx_dev spear320_pmx_i2c1;
--
--/* Add spear320 machine declarations here */
- void __init spear320_clk_init(void);
- 
- #endif /* CONFIG_MACH_SPEAR320 */
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index f46fc26..2db0bd1 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -21,357 +21,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* muxing registers */
--#define PAD_MUX_CONFIG_REG	0x00
--#define MODE_CONFIG_REG		0x04
--
--/* modes */
--#define NAND_MODE			(1 << 0)
--#define NOR_MODE			(1 << 1)
--#define PHOTO_FRAME_MODE		(1 << 2)
--#define LEND_IP_PHONE_MODE		(1 << 3)
--#define HEND_IP_PHONE_MODE		(1 << 4)
--#define LEND_WIFI_PHONE_MODE		(1 << 5)
--#define HEND_WIFI_PHONE_MODE		(1 << 6)
--#define ATA_PABX_WI2S_MODE		(1 << 7)
--#define ATA_PABX_I2S_MODE		(1 << 8)
--#define CAML_LCDW_MODE			(1 << 9)
--#define CAMU_LCD_MODE			(1 << 10)
--#define CAMU_WLCD_MODE			(1 << 11)
--#define CAML_LCD_MODE			(1 << 12)
--#define ALL_MODES			0x1FFF
--
--struct pmx_mode spear300_nand_mode = {
--	.id = NAND_MODE,
--	.name = "nand mode",
--	.mask = 0x00,
--};
--
--struct pmx_mode spear300_nor_mode = {
--	.id = NOR_MODE,
--	.name = "nor mode",
--	.mask = 0x01,
--};
--
--struct pmx_mode spear300_photo_frame_mode = {
--	.id = PHOTO_FRAME_MODE,
--	.name = "photo frame mode",
--	.mask = 0x02,
--};
--
--struct pmx_mode spear300_lend_ip_phone_mode = {
--	.id = LEND_IP_PHONE_MODE,
--	.name = "lend ip phone mode",
--	.mask = 0x03,
--};
--
--struct pmx_mode spear300_hend_ip_phone_mode = {
--	.id = HEND_IP_PHONE_MODE,
--	.name = "hend ip phone mode",
--	.mask = 0x04,
--};
--
--struct pmx_mode spear300_lend_wifi_phone_mode = {
--	.id = LEND_WIFI_PHONE_MODE,
--	.name = "lend wifi phone mode",
--	.mask = 0x05,
--};
--
--struct pmx_mode spear300_hend_wifi_phone_mode = {
--	.id = HEND_WIFI_PHONE_MODE,
--	.name = "hend wifi phone mode",
--	.mask = 0x06,
--};
--
--struct pmx_mode spear300_ata_pabx_wi2s_mode = {
--	.id = ATA_PABX_WI2S_MODE,
--	.name = "ata pabx wi2s mode",
--	.mask = 0x07,
--};
--
--struct pmx_mode spear300_ata_pabx_i2s_mode = {
--	.id = ATA_PABX_I2S_MODE,
--	.name = "ata pabx i2s mode",
--	.mask = 0x08,
--};
--
--struct pmx_mode spear300_caml_lcdw_mode = {
--	.id = CAML_LCDW_MODE,
--	.name = "caml lcdw mode",
--	.mask = 0x0C,
--};
--
--struct pmx_mode spear300_camu_lcd_mode = {
--	.id = CAMU_LCD_MODE,
--	.name = "camu lcd mode",
--	.mask = 0x0D,
--};
--
--struct pmx_mode spear300_camu_wlcd_mode = {
--	.id = CAMU_WLCD_MODE,
--	.name = "camu wlcd mode",
--	.mask = 0x0E,
--};
--
--struct pmx_mode spear300_caml_lcd_mode = {
--	.id = CAML_LCD_MODE,
--	.name = "caml lcd mode",
--	.mask = 0x0F,
--};
--
--/* devices */
--static struct pmx_dev_mode pmx_fsmc_2_chips_modes[] = {
--	{
--		.ids = NAND_MODE | NOR_MODE | PHOTO_FRAME_MODE |
--			ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_fsmc_2_chips = {
--	.name = "fsmc_2_chips",
--	.modes = pmx_fsmc_2_chips_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_2_chips_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_fsmc_4_chips_modes[] = {
--	{
--		.ids = NAND_MODE | NOR_MODE | PHOTO_FRAME_MODE |
--			ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE,
--		.mask = PMX_FIRDA_MASK | PMX_UART0_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_fsmc_4_chips = {
--	.name = "fsmc_4_chips",
--	.modes = pmx_fsmc_4_chips_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_4_chips_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_keyboard_modes[] = {
--	{
--		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE |
--			LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE |
--			CAML_LCDW_MODE | CAMU_LCD_MODE | CAMU_WLCD_MODE |
--			CAML_LCD_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear300_pmx_keyboard = {
--	.name = "keyboard",
--	.modes = pmx_keyboard_modes,
--	.mode_count = ARRAY_SIZE(pmx_keyboard_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_clcd_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK ,
--	}, {
--		.ids = HEND_IP_PHONE_MODE | HEND_WIFI_PHONE_MODE |
--			CAMU_LCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_clcd = {
--	.name = "clcd",
--	.modes = pmx_clcd_modes,
--	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_gpio_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | CAMU_LCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_MII_MASK,
--	}, {
--		.ids = LEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	}, {
--		.ids = ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_WLCD_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_3_4_MASK,
--	}, {
--		.ids = HEND_IP_PHONE_MODE | HEND_WIFI_PHONE_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK,
--	}, {
--		.ids = ATA_PABX_WI2S_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK
--			| PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_gpio = {
--	.name = "telecom_gpio",
--	.modes = pmx_telecom_gpio_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_gpio_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_tdm_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
--			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE
--			| HEND_WIFI_PHONE_MODE | ATA_PABX_WI2S_MODE
--			| ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
--			| CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_UART0_MODEM_MASK | PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_tdm = {
--	.name = "telecom_tdm",
--	.modes = pmx_telecom_tdm_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_tdm_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_spi_cs_i2c_clk_modes[] = {
--	{
--		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE |
--			LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE
--			| ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE |
--			CAML_LCDW_MODE | CAML_LCD_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_spi_cs_i2c_clk = {
--	.name = "telecom_spi_cs_i2c_clk",
--	.modes = pmx_telecom_spi_cs_i2c_clk_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_spi_cs_i2c_clk_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_camera_modes[] = {
--	{
--		.ids = CAML_LCDW_MODE | CAML_LCD_MODE,
--		.mask = PMX_MII_MASK,
--	}, {
--		.ids = CAMU_LCD_MODE | CAMU_WLCD_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK | PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_camera = {
--	.name = "telecom_camera",
--	.modes = pmx_telecom_camera_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_camera_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_dac_modes[] = {
--	{
--		.ids = ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
--			| CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_dac = {
--	.name = "telecom_dac",
--	.modes = pmx_telecom_dac_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_dac_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_i2s_modes[] = {
--	{
--		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE
--			| LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE |
--			ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
--			| CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_i2s = {
--	.name = "telecom_i2s",
--	.modes = pmx_telecom_i2s_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_i2s_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_boot_pins_modes[] = {
--	{
--		.ids = NAND_MODE | NOR_MODE,
--		.mask = PMX_UART0_MODEM_MASK | PMX_TIMER_1_2_MASK |
--			PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_boot_pins = {
--	.name = "telecom_boot_pins",
--	.modes = pmx_telecom_boot_pins_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_boot_pins_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_sdhci_4bit_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
--			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
--			HEND_WIFI_PHONE_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE |
--			CAMU_WLCD_MODE | CAML_LCD_MODE | ATA_PABX_WI2S_MODE |
--			ATA_PABX_I2S_MODE,
--		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK |
--			PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
--			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_sdhci_4bit = {
--	.name = "telecom_sdhci_4bit",
--	.modes = pmx_telecom_sdhci_4bit_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_4bit_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_sdhci_8bit_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
--			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
--			HEND_WIFI_PHONE_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE |
--			CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK |
--			PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
--			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK | PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_sdhci_8bit = {
--	.name = "telecom_sdhci_8bit",
--	.modes = pmx_telecom_sdhci_8bit_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_8bit_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_gpio1_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE,
--		.mask = PMX_UART0_MODEM_MASK | PMX_TIMER_1_2_MASK |
--			PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_gpio1 = {
--	.name = "arm gpio1",
--	.modes = pmx_gpio1_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio1_modes),
--	.enb_on_reset = 1,
--};
--
--/* pmx driver structure */
--static struct pmx_driver pmx_driver = {
--	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x0000000f},
--	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
--};
--
- /* spear3xx shared irq */
- static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -425,22 +74,6 @@ static struct spear_shirq shirq_ras1 = {
- 	},
- };
- 
--/* padmux devices to enable */
--static struct pmx_dev *spear300_evb_pmx_devs[] = {
--	/* spear3xx specific devices */
--	&spear3xx_pmx_i2c,
--	&spear3xx_pmx_ssp_cs,
--	&spear3xx_pmx_ssp,
--	&spear3xx_pmx_mii,
--	&spear3xx_pmx_uart0,
--
--	/* spear300 specific devices */
--	&spear300_pmx_fsmc_2_chips,
--	&spear300_pmx_clcd,
--	&spear300_pmx_telecom_sdhci_4bit,
--	&spear300_pmx_gpio1,
--};
--
- /* DMAC platform data's slave info */
- struct pl08x_channel_data spear300_dma_info[] = {
- 	{
-@@ -639,7 +272,7 @@ static struct of_dev_auxdata spear300_auxdata_lookup[] __initdata = {
- 
- static void __init spear300_dt_init(void)
- {
--	int ret = -EINVAL;
-+	int ret;
- 
- 	pl080_plat_data.slave_channels = spear300_dma_info;
- 	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear300_dma_info);
-@@ -654,26 +287,6 @@ static void __init spear300_dt_init(void)
- 		if (ret)
- 			pr_err("Error registering Shared IRQ\n");
- 	}
--
--	if (of_machine_is_compatible("st,spear300-evb")) {
--		/* pmx initialization */
--		pmx_driver.mode = &spear300_photo_frame_mode;
--		pmx_driver.devs = spear300_evb_pmx_devs;
--		pmx_driver.devs_count = ARRAY_SIZE(spear300_evb_pmx_devs);
--
--		pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE, SZ_4K);
--		if (pmx_driver.base) {
--			ret = pmx_register(&pmx_driver);
--			if (ret)
--				pr_err("padmux: registration failed. err no: %d\n",
--						ret);
--			/* Free Mapping, device selection already done */
--			iounmap(pmx_driver.base);
--		}
--
--		if (ret)
--			pr_err("Initialization Failed");
--	}
- }
- 
- static const char * const spear300_dt_board_compat[] = {
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 063e7da..aec07c9 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -22,128 +22,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* muxing registers */
--#define PAD_MUX_CONFIG_REG	0x08
--
--/* devices */
--static struct pmx_dev_mode pmx_emi_cs_0_1_4_5_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_emi_cs_0_1_4_5 = {
--	.name = "emi_cs_0_1_4_5",
--	.modes = pmx_emi_cs_0_1_4_5_modes,
--	.mode_count = ARRAY_SIZE(pmx_emi_cs_0_1_4_5_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_emi_cs_2_3_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_emi_cs_2_3 = {
--	.name = "emi_cs_2_3",
--	.modes = pmx_emi_cs_2_3_modes,
--	.mode_count = ARRAY_SIZE(pmx_emi_cs_2_3_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart1_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_uart1 = {
--	.name = "uart1",
--	.modes = pmx_uart1_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart2_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_uart2 = {
--	.name = "uart2",
--	.modes = pmx_uart2_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart3_4_5_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_uart3_4_5 = {
--	.name = "uart3_4_5",
--	.modes = pmx_uart3_4_5_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart3_4_5_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_fsmc_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_fsmc = {
--	.name = "fsmc",
--	.modes = pmx_fsmc_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_rs485_0_1_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_rs485_0_1 = {
--	.name = "rs485_0_1",
--	.modes = pmx_rs485_0_1_modes,
--	.mode_count = ARRAY_SIZE(pmx_rs485_0_1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_tdm0_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_tdm0 = {
--	.name = "tdm0",
--	.modes = pmx_tdm0_modes,
--	.mode_count = ARRAY_SIZE(pmx_tdm0_modes),
--	.enb_on_reset = 1,
--};
--
--/* pmx driver structure */
--static struct pmx_driver pmx_driver = {
--	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
--};
--
- /* spear3xx shared irq */
- static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -260,30 +138,6 @@ static struct spear_shirq shirq_intrcomm_ras = {
- 	},
- };
- 
--/* padmux devices to enable */
--static struct pmx_dev *spear310_evb_pmx_devs[] = {
--	/* spear3xx specific devices */
--	&spear3xx_pmx_i2c,
--	&spear3xx_pmx_ssp,
--	&spear3xx_pmx_gpio_pin0,
--	&spear3xx_pmx_gpio_pin1,
--	&spear3xx_pmx_gpio_pin2,
--	&spear3xx_pmx_gpio_pin3,
--	&spear3xx_pmx_gpio_pin4,
--	&spear3xx_pmx_gpio_pin5,
--	&spear3xx_pmx_uart0,
--
--	/* spear310 specific devices */
--	&spear310_pmx_emi_cs_0_1_4_5,
--	&spear310_pmx_emi_cs_2_3,
--	&spear310_pmx_uart1,
--	&spear310_pmx_uart2,
--	&spear310_pmx_uart3_4_5,
--	&spear310_pmx_fsmc,
--	&spear310_pmx_rs485_0_1,
--	&spear310_pmx_tdm0,
--};
--
- /* DMAC platform data's slave info */
- struct pl08x_channel_data spear310_dma_info[] = {
- 	{
-@@ -518,7 +372,7 @@ static struct of_dev_auxdata spear310_auxdata_lookup[] __initdata = {
- static void __init spear310_dt_init(void)
- {
- 	void __iomem *base;
--	int ret = 0;
-+	int ret;
- 
- 	pl080_plat_data.slave_channels = spear310_dma_info;
- 	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear310_dma_info);
-@@ -553,19 +407,6 @@ static void __init spear310_dt_init(void)
- 		if (ret)
- 			pr_err("Error registering Shared IRQ 4\n");
- 	}
--
--	if (of_machine_is_compatible("st,spear310-evb")) {
--		/* pmx initialization */
--		pmx_driver.base = base;
--		pmx_driver.mode = NULL;
--		pmx_driver.devs = spear310_evb_pmx_devs;
--		pmx_driver.devs_count = ARRAY_SIZE(spear310_evb_pmx_devs);
--
--		ret = pmx_register(&pmx_driver);
--		if (ret)
--			pr_err("padmux: registration failed. err no: %d\n",
--					ret);
--	}
- }
- 
- static const char * const spear310_dt_board_compat[] = {
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 1e74031..4812c69 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -23,373 +23,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* muxing registers */
--#define PAD_MUX_CONFIG_REG	0x0C
--#define MODE_CONFIG_REG		0x10
--
--/* modes */
--#define AUTO_NET_SMII_MODE	(1 << 0)
--#define AUTO_NET_MII_MODE	(1 << 1)
--#define AUTO_EXP_MODE		(1 << 2)
--#define SMALL_PRINTERS_MODE	(1 << 3)
--#define ALL_MODES		0xF
--
--struct pmx_mode spear320_auto_net_smii_mode = {
--	.id = AUTO_NET_SMII_MODE,
--	.name = "Automation Networking SMII Mode",
--	.mask = 0x00,
--};
--
--struct pmx_mode spear320_auto_net_mii_mode = {
--	.id = AUTO_NET_MII_MODE,
--	.name = "Automation Networking MII Mode",
--	.mask = 0x01,
--};
--
--struct pmx_mode spear320_auto_exp_mode = {
--	.id = AUTO_EXP_MODE,
--	.name = "Automation Expanded Mode",
--	.mask = 0x02,
--};
--
--struct pmx_mode spear320_small_printers_mode = {
--	.id = SMALL_PRINTERS_MODE,
--	.name = "Small Printers Mode",
--	.mask = 0x03,
--};
--
--/* devices */
--static struct pmx_dev_mode pmx_clcd_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_clcd = {
--	.name = "clcd",
--	.modes = pmx_clcd_modes,
--	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_emi_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_emi = {
--	.name = "emi",
--	.modes = pmx_emi_modes,
--	.mode_count = ARRAY_SIZE(pmx_emi_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_fsmc_modes[] = {
--	{
--		.ids = ALL_MODES,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_fsmc = {
--	.name = "fsmc",
--	.modes = pmx_fsmc_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_spp_modes[] = {
--	{
--		.ids = SMALL_PRINTERS_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_spp = {
--	.name = "spp",
--	.modes = pmx_spp_modes,
--	.mode_count = ARRAY_SIZE(pmx_spp_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_sdhci_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE |
--			SMALL_PRINTERS_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_sdhci = {
--	.name = "sdhci",
--	.modes = pmx_sdhci_modes,
--	.mode_count = ARRAY_SIZE(pmx_sdhci_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_i2s_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_i2s = {
--	.name = "i2s",
--	.modes = pmx_i2s_modes,
--	.mode_count = ARRAY_SIZE(pmx_i2s_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart1_modes[] = {
--	{
--		.ids = ALL_MODES,
--		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_uart1 = {
--	.name = "uart1",
--	.modes = pmx_uart1_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart1_modem_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK |
--			PMX_SSP_CS_MASK,
--	}, {
--		.ids = SMALL_PRINTERS_MODE,
--		.mask = PMX_GPIO_PIN3_MASK | PMX_GPIO_PIN4_MASK |
--			PMX_GPIO_PIN5_MASK | PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_uart1_modem = {
--	.name = "uart1_modem",
--	.modes = pmx_uart1_modem_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart1_modem_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart2_modes[] = {
--	{
--		.ids = ALL_MODES,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_uart2 = {
--	.name = "uart2",
--	.modes = pmx_uart2_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_touchscreen_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_touchscreen = {
--	.name = "touchscreen",
--	.modes = pmx_touchscreen_modes,
--	.mode_count = ARRAY_SIZE(pmx_touchscreen_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_can_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE | AUTO_EXP_MODE,
--		.mask = PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
--			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_can = {
--	.name = "can",
--	.modes = pmx_can_modes,
--	.mode_count = ARRAY_SIZE(pmx_can_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_sdhci_led_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_sdhci_led = {
--	.name = "sdhci_led",
--	.modes = pmx_sdhci_led_modes,
--	.mode_count = ARRAY_SIZE(pmx_sdhci_led_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm0_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	}, {
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm0 = {
--	.name = "pwm0",
--	.modes = pmx_pwm0_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm0_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm1_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	}, {
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm1 = {
--	.name = "pwm1",
--	.modes = pmx_pwm1_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm2_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_SSP_CS_MASK,
--	}, {
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm2 = {
--	.name = "pwm2",
--	.modes = pmx_pwm2_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm3_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE | AUTO_NET_SMII_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm3 = {
--	.name = "pwm3",
--	.modes = pmx_pwm3_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm3_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_ssp1_modes[] = {
--	{
--		.ids = SMALL_PRINTERS_MODE | AUTO_NET_SMII_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_ssp1 = {
--	.name = "ssp1",
--	.modes = pmx_ssp1_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_ssp2_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_ssp2 = {
--	.name = "ssp2",
--	.modes = pmx_ssp2_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_mii1_modes[] = {
--	{
--		.ids = AUTO_NET_MII_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_mii1 = {
--	.name = "mii1",
--	.modes = pmx_mii1_modes,
--	.mode_count = ARRAY_SIZE(pmx_mii1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_smii0_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_smii0 = {
--	.name = "smii0",
--	.modes = pmx_smii0_modes,
--	.mode_count = ARRAY_SIZE(pmx_smii0_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_smii1_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_smii1 = {
--	.name = "smii1",
--	.modes = pmx_smii1_modes,
--	.mode_count = ARRAY_SIZE(pmx_smii1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_i2c1_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_i2c1 = {
--	.name = "i2c1",
--	.modes = pmx_i2c1_modes,
--	.mode_count = ARRAY_SIZE(pmx_i2c1_modes),
--	.enb_on_reset = 1,
--};
--
--/* pmx driver structure */
--static struct pmx_driver pmx_driver = {
--	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x00000007},
--	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
--};
--
- /* spear3xx shared irq */
- static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -514,27 +147,6 @@ static struct spear_shirq shirq_intrcomm_ras = {
- 	},
- };
- 
--/* padmux devices to enable */
--static struct pmx_dev *spear320_evb_pmx_devs[] = {
--	/* spear3xx specific devices */
--	&spear3xx_pmx_i2c,
--	&spear3xx_pmx_ssp,
--	&spear3xx_pmx_mii,
--	&spear3xx_pmx_uart0,
--
--	/* spear320 specific devices */
--	&spear320_pmx_fsmc,
--	&spear320_pmx_sdhci,
--	&spear320_pmx_i2s,
--	&spear320_pmx_uart1,
--	&spear320_pmx_uart2,
--	&spear320_pmx_can,
--	&spear320_pmx_pwm0,
--	&spear320_pmx_pwm1,
--	&spear320_pmx_pwm2,
--	&spear320_pmx_mii1,
--};
--
- /* DMAC platform data's slave info */
- struct pl08x_channel_data spear320_dma_info[] = {
- 	{
-@@ -772,7 +384,7 @@ static struct of_dev_auxdata spear320_auxdata_lookup[] __initdata = {
- static void __init spear320_dt_init(void)
- {
- 	void __iomem *base;
--	int ret = 0;
-+	int ret;
- 
- 	pl080_plat_data.slave_channels = spear320_dma_info;
- 	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear320_dma_info);
-@@ -801,19 +413,6 @@ static void __init spear320_dt_init(void)
- 		if (ret)
- 			pr_err("Error registering Shared IRQ 4\n");
- 	}
--
--	if (of_machine_is_compatible("st,spear320-evb")) {
--		/* pmx initialization */
--		pmx_driver.base = base;
--		pmx_driver.mode = &spear320_auto_net_mii_mode;
--		pmx_driver.devs = spear320_evb_pmx_devs;
--		pmx_driver.devs_count = ARRAY_SIZE(spear320_evb_pmx_devs);
--
--		ret = pmx_register(&pmx_driver);
--		if (ret)
--			pr_err("padmux: registration failed. err no: %d\n",
--					ret);
--	}
- }
- 
- static const char * const spear320_dt_board_compat[] = {
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 17d4ac9..12bf879 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -23,431 +23,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* devices */
--static struct pmx_dev_mode pmx_firda_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_firda = {
--	.name = "firda",
--	.modes = pmx_firda_modes,
--	.mode_count = ARRAY_SIZE(pmx_firda_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_i2c_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_I2C_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_i2c = {
--	.name = "i2c",
--	.modes = pmx_i2c_modes,
--	.mode_count = ARRAY_SIZE(pmx_i2c_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_ssp_cs_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_ssp_cs = {
--	.name = "ssp_chip_selects",
--	.modes = pmx_ssp_cs_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp_cs_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_ssp_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_SSP_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_ssp = {
--	.name = "ssp",
--	.modes = pmx_ssp_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_mii_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_mii = {
--	.name = "mii",
--	.modes = pmx_mii_modes,
--	.mode_count = ARRAY_SIZE(pmx_mii_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin0_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin0 = {
--	.name = "gpio_pin0",
--	.modes = pmx_gpio_pin0_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin0_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin1_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN1_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin1 = {
--	.name = "gpio_pin1",
--	.modes = pmx_gpio_pin1_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin1_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin2_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin2 = {
--	.name = "gpio_pin2",
--	.modes = pmx_gpio_pin2_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin2_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin3_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN3_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin3 = {
--	.name = "gpio_pin3",
--	.modes = pmx_gpio_pin3_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin3_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin4_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin4 = {
--	.name = "gpio_pin4",
--	.modes = pmx_gpio_pin4_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin4_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin5_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin5 = {
--	.name = "gpio_pin5",
--	.modes = pmx_gpio_pin5_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin5_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_uart0_modem_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_uart0_modem = {
--	.name = "uart0_modem",
--	.modes = pmx_uart0_modem_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart0_modem_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_uart0_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_UART0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_uart0 = {
--	.name = "uart0",
--	.modes = pmx_uart0_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart0_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_timer_3_4_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_timer_3_4 = {
--	.name = "timer_3_4",
--	.modes = pmx_timer_3_4_modes,
--	.mode_count = ARRAY_SIZE(pmx_timer_3_4_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_timer_1_2_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_timer_1_2 = {
--	.name = "timer_1_2",
--	.modes = pmx_timer_1_2_modes,
--	.mode_count = ARRAY_SIZE(pmx_timer_1_2_modes),
--	.enb_on_reset = 0,
--};
--
--#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--/* plgpios devices */
--static struct pmx_dev_mode pmx_plgpio_0_1_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_0_1 = {
--	.name = "plgpio 0 and 1",
--	.modes = pmx_plgpio_0_1_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_0_1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_2_3_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_UART0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_2_3 = {
--	.name = "plgpio 2 and 3",
--	.modes = pmx_plgpio_2_3_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_2_3_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_4_5_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_I2C_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_4_5 = {
--	.name = "plgpio 4 and 5",
--	.modes = pmx_plgpio_4_5_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_4_5_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_6_9_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_SSP_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_6_9 = {
--	.name = "plgpio 6 to 9",
--	.modes = pmx_plgpio_6_9_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_6_9_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_10_27_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_10_27 = {
--	.name = "plgpio 10 to 27",
--	.modes = pmx_plgpio_10_27_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_10_27_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_28_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_28 = {
--	.name = "plgpio 28",
--	.modes = pmx_plgpio_28_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_28_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_29_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN1_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_29 = {
--	.name = "plgpio 29",
--	.modes = pmx_plgpio_29_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_29_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_30_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_30 = {
--	.name = "plgpio 30",
--	.modes = pmx_plgpio_30_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_30_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_31_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN3_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_31 = {
--	.name = "plgpio 31",
--	.modes = pmx_plgpio_31_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_31_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_32_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_32 = {
--	.name = "plgpio 32",
--	.modes = pmx_plgpio_32_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_32_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_33_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_33 = {
--	.name = "plgpio 33",
--	.modes = pmx_plgpio_33_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_33_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_34_36_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_34_36 = {
--	.name = "plgpio 34 to 36",
--	.modes = pmx_plgpio_34_36_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_34_36_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_37_42_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_37_42 = {
--	.name = "plgpio 37 to 42",
--	.modes = pmx_plgpio_37_42_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_37_42_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_43_44_47_48_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_43_44_47_48 = {
--	.name = "plgpio 43, 44, 47 and 48",
--	.modes = pmx_plgpio_43_44_47_48_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_43_44_47_48_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_45_46_49_50_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_45_46_49_50 = {
--	.name = "plgpio 45, 46, 49 and 50",
--	.modes = pmx_plgpio_45_46_49_50_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_45_46_49_50_modes),
--	.enb_on_reset = 1,
--};
--#endif /* CONFIG_MACH_SPEAR310 || CONFIG_MACH_SPEAR320 */
--
- /* ssp device registration */
- struct pl022_ssp_controller pl022_plat_data = {
- 	.bus_id = 0,
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 4af6258..7744802 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -5,4 +5,4 @@
- # Common support
- obj-y	:= clock.o restart.o time.o pl080.o
- 
--obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
-+obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o
-diff --git a/arch/arm/plat-spear/include/plat/padmux.h b/arch/arm/plat-spear/include/plat/padmux.h
-deleted file mode 100644
-index 877f3ad..0000000
---- a/arch/arm/plat-spear/include/plat/padmux.h
-+++ /dev/null
-@@ -1,92 +0,0 @@
--/*
-- * arch/arm/plat-spear/include/plat/padmux.h
-- *
-- * SPEAr platform specific gpio pads muxing file
-- *
-- * Copyright (C) 2009 ST Microelectronics
-- * Viresh Kumar<viresh.kumar@st.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#ifndef __PLAT_PADMUX_H
--#define __PLAT_PADMUX_H
--
--#include <linux/types.h>
--
--/*
-- * struct pmx_reg: configuration structure for mode reg and mux reg
-- *
-- * offset: offset of mode reg
-- * mask: mask of mode reg
-- */
--struct pmx_reg {
--	u32 offset;
--	u32 mask;
--};
--
--/*
-- * struct pmx_dev_mode: configuration structure every group of modes of a device
-- *
-- * ids: all modes for this configuration
-- * mask: mask for supported mode
-- */
--struct pmx_dev_mode {
--	u32 ids;
--	u32 mask;
--};
--
--/*
-- * struct pmx_mode: mode definition structure
-- *
-- * name: mode name
-- * mask: mode mask
-- */
--struct pmx_mode {
--	char *name;
--	u32 id;
--	u32 mask;
--};
--
--/*
-- * struct pmx_dev: device definition structure
-- *
-- * name: device name
-- * modes: device configuration array for different modes supported
-- * mode_count: size of modes array
-- * is_active: is peripheral active/enabled
-- * enb_on_reset: if 1, mask bits to be cleared in reg otherwise to be set in reg
-- */
--struct pmx_dev {
--	char *name;
--	struct pmx_dev_mode *modes;
--	u8 mode_count;
--	bool is_active;
--	bool enb_on_reset;
--};
--
--/*
-- * struct pmx_driver: driver definition structure
-- *
-- * mode: mode to be set
-- * devs: array of pointer to pmx devices
-- * devs_count: ARRAY_SIZE of devs
-- * base: base address of soc config registers
-- * mode_reg: structure of mode config register
-- * mux_reg: structure of device mux config register
-- */
--struct pmx_driver {
--	struct pmx_mode *mode;
--	struct pmx_dev **devs;
--	u8 devs_count;
--	u32 *base;
--	struct pmx_reg mode_reg;
--	struct pmx_reg mux_reg;
--};
--
--/* pmx functions */
--int pmx_register(struct pmx_driver *driver);
--
--#endif /* __PLAT_PADMUX_H */
-diff --git a/arch/arm/plat-spear/padmux.c b/arch/arm/plat-spear/padmux.c
-deleted file mode 100644
-index 555eec6..0000000
---- a/arch/arm/plat-spear/padmux.c
-+++ /dev/null
-@@ -1,164 +0,0 @@
--/*
-- * arch/arm/plat-spear/include/plat/padmux.c
-- *
-- * SPEAr platform specific gpio pads muxing source file
-- *
-- * Copyright (C) 2009 ST Microelectronics
-- * Viresh Kumar<viresh.kumar@st.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/err.h>
--#include <linux/io.h>
--#include <linux/slab.h>
--#include <plat/padmux.h>
--
--/*
-- * struct pmx: pmx definition structure
-- *
-- * base: base address of configuration registers
-- * mode_reg: mode configurations
-- * mux_reg: muxing configurations
-- * active_mode: pointer to current active mode
-- */
--struct pmx {
--	u32 base;
--	struct pmx_reg mode_reg;
--	struct pmx_reg mux_reg;
--	struct pmx_mode *active_mode;
--};
--
--static struct pmx *pmx;
--
--/**
-- * pmx_mode_set - Enables an multiplexing mode
-- * @mode - pointer to pmx mode
-- *
-- * It will set mode of operation in hardware.
-- * Returns -ve on Err otherwise 0
-- */
--static int pmx_mode_set(struct pmx_mode *mode)
--{
--	u32 val;
--
--	if (!mode->name)
--		return -EFAULT;
--
--	pmx->active_mode = mode;
--
--	val = readl(pmx->base + pmx->mode_reg.offset);
--	val &= ~pmx->mode_reg.mask;
--	val |= mode->mask & pmx->mode_reg.mask;
--	writel(val, pmx->base + pmx->mode_reg.offset);
--
--	return 0;
--}
--
--/**
-- * pmx_devs_enable - Enables list of devices
-- * @devs - pointer to pmx device array
-- * @count - number of devices to enable
-- *
-- * It will enable pads for all required peripherals once and only once.
-- * If peripheral is not supported by current mode then request is rejected.
-- * Conflicts between peripherals are not handled and peripherals will be
-- * enabled in the order they are present in pmx_dev array.
-- * In case of conflicts last peripheral enabled will be present.
-- * Returns -ve on Err otherwise 0
-- */
--static int pmx_devs_enable(struct pmx_dev **devs, u8 count)
--{
--	u32 val, i, mask;
--
--	if (!count)
--		return -EINVAL;
--
--	val = readl(pmx->base + pmx->mux_reg.offset);
--	for (i = 0; i < count; i++) {
--		u8 j = 0;
--
--		if (!devs[i]->name || !devs[i]->modes) {
--			printk(KERN_ERR "padmux: dev name or modes is null\n");
--			continue;
--		}
--		/* check if peripheral exists in active mode */
--		if (pmx->active_mode) {
--			bool found = false;
--			for (j = 0; j < devs[i]->mode_count; j++) {
--				if (devs[i]->modes[j].ids &
--						pmx->active_mode->id) {
--					found = true;
--					break;
--				}
--			}
--			if (found == false) {
--				printk(KERN_ERR "%s device not available in %s"\
--						"mode\n", devs[i]->name,
--						pmx->active_mode->name);
--				continue;
--			}
--		}
--
--		/* enable peripheral */
--		mask = devs[i]->modes[j].mask & pmx->mux_reg.mask;
--		if (devs[i]->enb_on_reset)
--			val &= ~mask;
--		else
--			val |= mask;
--
--		devs[i]->is_active = true;
--	}
--	writel(val, pmx->base + pmx->mux_reg.offset);
--	kfree(pmx);
--
--	/* this will ensure that multiplexing can't be changed now */
--	pmx = (struct pmx *)-1;
--
--	return 0;
--}
--
--/**
-- * pmx_register - registers a platform requesting pad mux feature
-- * @driver - pointer to driver structure containing driver specific parameters
-- *
-- * Also this must be called only once. This will allocate memory for pmx
-- * structure, will call pmx_mode_set, will call pmx_devs_enable.
-- * Returns -ve on Err otherwise 0
-- */
--int pmx_register(struct pmx_driver *driver)
--{
--	int ret = 0;
--
--	if (pmx)
--		return -EPERM;
--	if (!driver->base || !driver->devs)
--		return -EFAULT;
--
--	pmx = kzalloc(sizeof(*pmx), GFP_KERNEL);
--	if (!pmx)
--		return -ENOMEM;
--
--	pmx->base = (u32)driver->base;
--	pmx->mode_reg.offset = driver->mode_reg.offset;
--	pmx->mode_reg.mask = driver->mode_reg.mask;
--	pmx->mux_reg.offset = driver->mux_reg.offset;
--	pmx->mux_reg.mask = driver->mux_reg.mask;
--
--	/* choose mode to enable */
--	if (driver->mode) {
--		ret = pmx_mode_set(driver->mode);
--		if (ret)
--			goto pmx_fail;
--	}
--	ret = pmx_devs_enable(driver->devs, driver->devs_count);
--	if (ret)
--		goto pmx_fail;
--
--	return 0;
--
--pmx_fail:
--	return ret;
--}
--- 
-1.7.9
+On 04/03/2012 08:33 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> ixp2xxx platforms have had no real changes since ~2006 and the maintainer
+> has said on irc that they can be removed:
+> 
+> 13:05 < nico> do you still care about ixp2000?
+> 13:22 < lennert> not really, no
+> 13:58 < nico> do you think we could remove it from the kernel tree?
+> 14:01 < lennert> go for it, and remove ixp23xx too while you're at it
+> 
+> Removing will help simplify ARM consolidation in general and PCI re-work
+> specifically.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Randy Dunlap <rdunlap@xenotime.net>
+> ---
+>  Documentation/arm/00-INDEX                        |    2 -
+>  Documentation/arm/IXP2000                         |   69 ---
+>  MAINTAINERS                                       |   17 -
+>  arch/arm/Kconfig                                  |   26 -
+>  arch/arm/Makefile                                 |    2 -
+>  arch/arm/boot/compressed/head-xscale.S            |    7 -
+>  arch/arm/common/Makefile                          |    2 -
+>  arch/arm/common/uengine.c                         |  507 --------------------
+>  arch/arm/configs/ixp2000_defconfig                |   99 ----
+>  arch/arm/configs/ixp23xx_defconfig                |  105 -----
+>  arch/arm/include/asm/hardware/uengine.h           |   62 ---
+>  arch/arm/mach-ixp2000/Kconfig                     |   72 ---
+>  arch/arm/mach-ixp2000/Makefile                    |   14 -
+>  arch/arm/mach-ixp2000/Makefile.boot               |    3 -
+>  arch/arm/mach-ixp2000/core.c                      |  520 ---------------------
+>  arch/arm/mach-ixp2000/enp2611.c                   |  265 -----------
+>  arch/arm/mach-ixp2000/include/mach/debug-macro.S  |   25 -
+>  arch/arm/mach-ixp2000/include/mach/enp2611.h      |   46 --
+>  arch/arm/mach-ixp2000/include/mach/entry-macro.S  |   54 ---
+>  arch/arm/mach-ixp2000/include/mach/gpio-ixp2000.h |   48 --
+>  arch/arm/mach-ixp2000/include/mach/hardware.h     |   36 --
+>  arch/arm/mach-ixp2000/include/mach/io.h           |  133 ------
+>  arch/arm/mach-ixp2000/include/mach/irqs.h         |  207 --------
+>  arch/arm/mach-ixp2000/include/mach/ixdp2x00.h     |   92 ----
+>  arch/arm/mach-ixp2000/include/mach/ixdp2x01.h     |   57 ---
+>  arch/arm/mach-ixp2000/include/mach/ixp2000-regs.h |  451 ------------------
+>  arch/arm/mach-ixp2000/include/mach/memory.h       |   31 --
+>  arch/arm/mach-ixp2000/include/mach/platform.h     |  153 ------
+>  arch/arm/mach-ixp2000/include/mach/timex.h        |   13 -
+>  arch/arm/mach-ixp2000/include/mach/uncompress.h   |   47 --
+>  arch/arm/mach-ixp2000/ixdp2400.c                  |  180 -------
+>  arch/arm/mach-ixp2000/ixdp2800.c                  |  295 ------------
+>  arch/arm/mach-ixp2000/ixdp2x00.c                  |  306 ------------
+>  arch/arm/mach-ixp2000/ixdp2x01.c                  |  483 -------------------
+>  arch/arm/mach-ixp2000/pci.c                       |  252 ----------
+>  arch/arm/mach-ixp23xx/Kconfig                     |   25 -
+>  arch/arm/mach-ixp23xx/Makefile                    |   11 -
+>  arch/arm/mach-ixp23xx/Makefile.boot               |    2 -
+>  arch/arm/mach-ixp23xx/core.c                      |  455 ------------------
+>  arch/arm/mach-ixp23xx/espresso.c                  |   93 ----
+>  arch/arm/mach-ixp23xx/include/mach/debug-macro.S  |   25 -
+>  arch/arm/mach-ixp23xx/include/mach/entry-macro.S  |   31 --
+>  arch/arm/mach-ixp23xx/include/mach/hardware.h     |   32 --
+>  arch/arm/mach-ixp23xx/include/mach/io.h           |   22 -
+>  arch/arm/mach-ixp23xx/include/mach/irqs.h         |  223 ---------
+>  arch/arm/mach-ixp23xx/include/mach/ixdp2351.h     |   89 ----
+>  arch/arm/mach-ixp23xx/include/mach/ixp23xx.h      |  298 ------------
+>  arch/arm/mach-ixp23xx/include/mach/memory.h       |   34 --
+>  arch/arm/mach-ixp23xx/include/mach/platform.h     |   58 ---
+>  arch/arm/mach-ixp23xx/include/mach/time.h         |    3 -
+>  arch/arm/mach-ixp23xx/include/mach/timex.h        |    7 -
+>  arch/arm/mach-ixp23xx/include/mach/uncompress.h   |   40 --
+>  arch/arm/mach-ixp23xx/ixdp2351.c                  |  347 --------------
+>  arch/arm/mach-ixp23xx/pci.c                       |  294 ------------
+>  arch/arm/mach-ixp23xx/roadrunner.c                |  180 -------
+>  55 files changed, 0 insertions(+), 6950 deletions(-)
+>  delete mode 100644 Documentation/arm/IXP2000
+>  delete mode 100644 arch/arm/common/uengine.c
+>  delete mode 100644 arch/arm/configs/ixp2000_defconfig
+>  delete mode 100644 arch/arm/configs/ixp23xx_defconfig
+>  delete mode 100644 arch/arm/include/asm/hardware/uengine.h
+>  delete mode 100644 arch/arm/mach-ixp2000/Kconfig
+>  delete mode 100644 arch/arm/mach-ixp2000/Makefile
+>  delete mode 100644 arch/arm/mach-ixp2000/Makefile.boot
+>  delete mode 100644 arch/arm/mach-ixp2000/core.c
+>  delete mode 100644 arch/arm/mach-ixp2000/enp2611.c
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/debug-macro.S
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/enp2611.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/entry-macro.S
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/gpio-ixp2000.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/hardware.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/io.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/irqs.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/ixdp2x00.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/ixdp2x01.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/ixp2000-regs.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/memory.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/platform.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/timex.h
+>  delete mode 100644 arch/arm/mach-ixp2000/include/mach/uncompress.h
+>  delete mode 100644 arch/arm/mach-ixp2000/ixdp2400.c
+>  delete mode 100644 arch/arm/mach-ixp2000/ixdp2800.c
+>  delete mode 100644 arch/arm/mach-ixp2000/ixdp2x00.c
+>  delete mode 100644 arch/arm/mach-ixp2000/ixdp2x01.c
+>  delete mode 100644 arch/arm/mach-ixp2000/pci.c
+>  delete mode 100644 arch/arm/mach-ixp23xx/Kconfig
+>  delete mode 100644 arch/arm/mach-ixp23xx/Makefile
+>  delete mode 100644 arch/arm/mach-ixp23xx/Makefile.boot
+>  delete mode 100644 arch/arm/mach-ixp23xx/core.c
+>  delete mode 100644 arch/arm/mach-ixp23xx/espresso.c
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/debug-macro.S
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/entry-macro.S
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/hardware.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/io.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/irqs.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/ixdp2351.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/ixp23xx.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/memory.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/platform.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/time.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/timex.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/include/mach/uncompress.h
+>  delete mode 100644 arch/arm/mach-ixp23xx/ixdp2351.c
+>  delete mode 100644 arch/arm/mach-ixp23xx/pci.c
+>  delete mode 100644 arch/arm/mach-ixp23xx/roadrunner.c
+> 
+> diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
+> index 91c24a1..36420e1 100644
+> --- a/Documentation/arm/00-INDEX
+> +++ b/Documentation/arm/00-INDEX
+> @@ -4,8 +4,6 @@ Booting
+>  	- requirements for booting
+>  Interrupts
+>  	- ARM Interrupt subsystem documentation
+> -IXP2000
+> -	- Release Notes for Linux on Intel's IXP2000 Network Processor
+>  msm
+>  	- MSM specific documentation
+>  Netwinder
+> diff --git a/Documentation/arm/IXP2000 b/Documentation/arm/IXP2000
+> deleted file mode 100644
+> index 68d21d9..0000000
+> --- a/Documentation/arm/IXP2000
+> +++ /dev/null
+> @@ -1,69 +0,0 @@
+> -
+> --------------------------------------------------------------------------
+> -Release Notes for Linux on Intel's IXP2000 Network Processor
+> -
+> -Maintained by Deepak Saxena <dsaxena@plexity.net>
+> --------------------------------------------------------------------------
+> -
+> -1. Overview
+> -
+> -Intel's IXP2000 family of NPUs (IXP2400, IXP2800, IXP2850) is designed
+> -for high-performance network applications such high-availability
+> -telecom systems. In addition to an XScale core, it contains up to 8
+> -"MicroEngines" that run special code, several high-end networking 
+> -interfaces (UTOPIA, SPI, etc), a PCI host bridge, one serial port,
+> -flash interface, and some other odds and ends. For more information, see:
+> -
+> -http://developer.intel.com
+> -
+> -2. Linux Support
+> -
+> -Linux currently supports the following features on the IXP2000 NPUs:
+> -
+> -- On-chip serial
+> -- PCI
+> -- Flash (MTD/JFFS2)
+> -- I2C through GPIO
+> -- Timers (watchdog, OS)
+> -
+> -That is about all we can support under Linux ATM b/c the core networking
+> -components of the chip are accessed via Intel's closed source SDK. 
+> -Please contact Intel directly on issues with using those. There is
+> -also a mailing list run by some folks at Princeton University that might
+> -be of help:  https://lists.cs.princeton.edu/mailman/listinfo/ixp2xxx
+> -
+> -WHATEVER YOU DO, DO NOT POST EMAIL TO THE LINUX-ARM OR LINUX-ARM-KERNEL
+> -MAILING LISTS REGARDING THE INTEL SDK.
+> -
+> -3. Supported Platforms
+> -
+> -- Intel IXDP2400 Reference Platform
+> -- Intel IXDP2800 Reference Platform
+> -- Intel IXDP2401 Reference Platform
+> -- Intel IXDP2801 Reference Platform
+> -- RadiSys ENP-2611
+> -
+> -4. Usage Notes
+> -
+> -- The IXP2000 platforms usually have rather complex PCI bus topologies
+> -  with large memory space requirements. In addition, b/c of the way the
+> -  Intel SDK is designed, devices are enumerated in a very specific
+> -  way. B/c of this this, we use "pci=firmware" option in the kernel
+> -  command line so that we do not re-enumerate the bus.
+> -
+> -- IXDP2x01 systems have variable clock tick rates that we cannot determine 
+> -  via HW registers. The "ixdp2x01_clk=XXX" cmd line options allow you
+> -  to pass the clock rate to the board port.
+> -
+> -5. Thanks
+> -
+> -The IXP2000 work has been funded by Intel Corp. and MontaVista Software, Inc.
+> -
+> -The following people have contributed patches/comments/etc:
+> -
+> -Naeem F. Afzal
+> -Lennert Buytenhek
+> -Jeffrey Daly
+> -
+> --------------------------------------------------------------------------
+> -Last Update: 8/09/2004
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index eecf344..defc06a 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -640,13 +640,6 @@ S:	Maintained
+>  F:	drivers/amba/
+>  F:	include/linux/amba/bus.h
+>  
+> -ARM/ADI ROADRUNNER MACHINE SUPPORT
+> -M:	Lennert Buytenhek <kernel@wantstofly.org>
+> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -S:	Maintained
+> -F:	arch/arm/mach-ixp23xx/
+> -F:	arch/arm/mach-ixp23xx/include/mach/
+> -
+>  ARM/ADS SPHERE MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> @@ -859,21 +852,11 @@ M:	Dan Williams <dan.j.williams@intel.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  
+> -ARM/INTEL IXP2000 ARM ARCHITECTURE
+> -M:	Lennert Buytenhek <kernel@wantstofly.org>
+> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -S:	Maintained
+> -
+>  ARM/INTEL IXDP2850 MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  
+> -ARM/INTEL IXP23XX ARM ARCHITECTURE
+> -M:	Lennert Buytenhek <kernel@wantstofly.org>
+> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -S:	Maintained
+> -
+>  ARM/INTEL IXP4XX ARM ARCHITECTURE
+>  M:	Imre Kaloz <kaloz@openwrt.org>
+>  M:	Krzysztof Halasa <khc@pm.waw.pl>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9318084..6b242f4 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -527,28 +527,6 @@ config ARCH_IOP33X
+>  	help
+>  	  Support for Intel's IOP33X (XScale) family of processors.
+>  
+> -config ARCH_IXP23XX
+> - 	bool "IXP23XX-based"
+> -	depends on MMU
+> -	select CPU_XSC3
+> - 	select PCI
+> -	select ARCH_USES_GETTIMEOFFSET
+> -	select NEED_MACH_IO_H
+> -	select NEED_MACH_MEMORY_H
+> -	help
+> -	  Support for Intel's IXP23xx (XScale) family of processors.
+> -
+> -config ARCH_IXP2000
+> -	bool "IXP2400/2800-based"
+> -	depends on MMU
+> -	select CPU_XSCALE
+> -	select PCI
+> -	select ARCH_USES_GETTIMEOFFSET
+> -	select NEED_MACH_IO_H
+> -	select NEED_MACH_MEMORY_H
+> -	help
+> -	  Support for Intel's IXP2400/2800 (XScale) family of processors.
+> -
+>  config ARCH_IXP4XX
+>  	bool "IXP4xx-based"
+>  	depends on MMU
+> @@ -1045,10 +1023,6 @@ source "arch/arm/mach-iop13xx/Kconfig"
+>  
+>  source "arch/arm/mach-ixp4xx/Kconfig"
+>  
+> -source "arch/arm/mach-ixp2000/Kconfig"
+> -
+> -source "arch/arm/mach-ixp23xx/Kconfig"
+> -
+>  source "arch/arm/mach-kirkwood/Kconfig"
+>  
+>  source "arch/arm/mach-ks8695/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 047a207..a0c40a0 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -149,8 +149,6 @@ machine-$(CONFIG_ARCH_INTEGRATOR)	:= integrator
+>  machine-$(CONFIG_ARCH_IOP13XX)		:= iop13xx
+>  machine-$(CONFIG_ARCH_IOP32X)		:= iop32x
+>  machine-$(CONFIG_ARCH_IOP33X)		:= iop33x
+> -machine-$(CONFIG_ARCH_IXP2000)		:= ixp2000
+> -machine-$(CONFIG_ARCH_IXP23XX)		:= ixp23xx
+>  machine-$(CONFIG_ARCH_IXP4XX)		:= ixp4xx
+>  machine-$(CONFIG_ARCH_KIRKWOOD)		:= kirkwood
+>  machine-$(CONFIG_ARCH_KS8695)		:= ks8695
+> diff --git a/arch/arm/boot/compressed/head-xscale.S b/arch/arm/boot/compressed/head-xscale.S
+> index aa5ee49..6ab0599 100644
+> --- a/arch/arm/boot/compressed/head-xscale.S
+> +++ b/arch/arm/boot/compressed/head-xscale.S
+> @@ -32,10 +32,3 @@ __XScale_start:
+>  		bic	r0, r0, #0x1000		@ clear Icache
+>  		mcr	p15, 0, r0, c1, c0, 0
+>  
+> -#ifdef CONFIG_ARCH_IXP2000
+> -		mov	r1, #-1
+> -		mov	r0, #0xd6000000
+> -		str	r1, [r0, #0x14]
+> -		str	r1, [r0, #0x18]
+> -#endif
+> -
+> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> index 215816f..e8a4e58 100644
+> --- a/arch/arm/common/Makefile
+> +++ b/arch/arm/common/Makefile
+> @@ -11,7 +11,5 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+>  obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+>  obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+>  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+> -obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
+> -obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
+>  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>  obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+> 
+> [snip]
+> 
+> The rest of the patch is just deleted files and too big to get thru the
+> lists, so I cut it out.
+> 
+> Rob
