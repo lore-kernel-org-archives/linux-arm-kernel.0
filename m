@@ -1,39 +1,65 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 4 Apr 2012 09:57:48 +0200
-Subject: [PATCH] mtd/gpmi : do not include the mxs.h
-In-Reply-To: <CAMiH66FhFFi1Kd7t6uK4S46Yt=g1kxxCUZywCNAmy14E1AHH1A@mail.gmail.com>
-References: <1333247817-18472-1-git-send-email-shijie8@gmail.com>
- <20120403193920.GC2201@pengutronix.de>
- <CAMiH66FhFFi1Kd7t6uK4S46Yt=g1kxxCUZywCNAmy14E1AHH1A@mail.gmail.com>
-Message-ID: <20120404075748.GA9073@pengutronix.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed,  4 Apr 2012 10:34:32 +0200
+Subject: [PATCH v3 0/8] arm: lpc32xx: Device tree support
+Message-ID: <1333528480-17134-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is the first series of patches to introduce device tree support for the
+LPC32xx SoC. This series includes patches for the various subsystems to support
+device tree to be used later by the machine's initialization.
 
-> Do you mean your patch "lib: add support for stmp-style devices" ?
-> or some other patch?
+The patches apply to various subsystems:
 
-Yes, it adds the SET and CLR macros. writel() then need to be modified again.
-Nothing major, though.
+ * staging/iio/adc (1)
+ * rtc (1)
+ * net (1)
+ * wdt (1)
+ * i2c (4)
+ * arm-soc (i2c related in the former, to be merged via i2c, as suggested by
+	    Arnd Bergmann)
 
-> Your patch "lib: add support for stmp-style devices" does not give me the API
-> to remove this code as i ever wished to.
+Based on v3.4-rc1
 
-Then please speak up. The only comment I can find from you is the requested
-move to a fsl-directory, but this is nothing about API?
+You can also pull from
 
-Regards,
+  git://git.antcom.de/linux-2.6 lpc32xx/dt
 
-   Wolfram
+I'm CC'ing the various subsystem maintainers and lists who can each see what's
+going on and please pick their respective subsystem's changes. - Thanks!
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120404/d3f8f34d/attachment.sig>
+Changes since patch v2:
+ * net: Use of_property_read_bool()
+ * net: Fixed breakage with non-DT board (iram and mii options)
+
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+
+--
+
+Roland Stigge (8):
+ iio: Add device tree support to LPC32xx ADC
+ rtc: Add device tree support for LPC32xx
+ net: Add device tree support to LPC32xx
+ wdt: Device tree support for pnx4008-wdt
+ i2c-pnx.c: Fix suspend
+ i2c-pnx.c: Use resources in platforms
+ i2c-pnx.c: Remove duplicated i2c.h
+ i2c: Add device tree support to i2c-pnx.c
+
+ Documentation/devicetree/bindings/i2c/pnx.txt                     |   40 ++
+ Documentation/devicetree/bindings/net/lpc-eth.txt                 |   24 +
+ Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt             |   15 
+ Documentation/devicetree/bindings/staging/iio/adc/lpc32xx-adc.txt |   16 
+ Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt        |   13 
+ arch/arm/mach-lpc32xx/common.c                                    |   75 ++--
+ arch/arm/mach-lpc32xx/include/mach/i2c.h                          |   63 ---
+ arch/arm/mach-pnx4008/i2c.c                                       |   64 ++-
+ arch/arm/mach-pnx4008/include/mach/i2c.h                          |   64 ---
+ drivers/i2c/busses/i2c-pnx.c                                      |  164 +++++++---
+ drivers/net/ethernet/nxp/lpc_eth.c                                |   73 ++--
+ drivers/rtc/rtc-lpc32xx.c                                         |   12 
+ drivers/staging/iio/adc/lpc32xx_adc.c                             |   10 
+ drivers/watchdog/pnx4008_wdt.c                                    |   10 
+ include/linux/i2c-pnx.h                                           |   10 
+ 15 files changed, 512 insertions(+), 268 deletions(-)
