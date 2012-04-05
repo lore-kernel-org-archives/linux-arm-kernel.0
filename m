@@ -1,29 +1,20 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 05 Apr 2012 08:10:17 -0700
-Subject: [PATCH] ARM: S3C24XX: fix missing common.h in mach-s3c24xx/
-In-Reply-To: <CAP=VYLp-FwEu2AY9wWY7vygmjtZ30AMD=0h8+VtuNVZF2xtTYw@mail.gmail.com>
-References: <1332980074-4614-1-git-send-email-kgene.kim@samsung.com>
- <CAP=VYLp-FwEu2AY9wWY7vygmjtZ30AMD=0h8+VtuNVZF2xtTYw@mail.gmail.com>
-Message-ID: <4F7DB5D9.4080106@samsung.com>
+Date: Thu, 05 Apr 2012 08:30:23 -0700
+Subject: [GIT PULL] Samsung fixes-1 for v3.4
+Message-ID: <4F7DBA8F.2010903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/12 15:33, Paul Gortmaker wrote:
-> Hi,
->
-> On Wed, Mar 28, 2012 at 8:14 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->> This patch fixes missing mach-s3c24xx/common.h which has been
->> lost when regarding s3c24xx directories merged.
->
-> Just checking that the updated version of this patch is headed
-> in for 3.4 -- we are still seeing the failure in linux-next builds
-> and it would be nice to close out the build regressions in there
-> as quickly as possible, since they tend to mask other regressions
-> from being seen.
->
-Hi Paul,
+Hi Arnd, Olof
 
-Yeah right and I updated it in my -next.
+Please pull samsung-fixes-1 for v3.4 from:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+v3.4-samsung-fixes-1
+
+They are for fix uart stuff on exynos, build warning and omission file 
+happened during resolving merge conflict on s3c24xx.
+
+If any problems, please let me know.
 
 Thanks.
 
@@ -32,3 +23,34 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+
+   Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+v3.4-samsung-fixes-1
+
+Colin Cross (1):
+       ARM: EXYNOS: fix CONFIG_DEBUG_LL
+
+Dima Zavin (1):
+       ARM: EXYNOS: use chip_id reg in uncompress to select uart base phys
+
+Il Han (1):
+       ARM: EXYNOS: fix ISO C90 warning
+
+Kukjin Kim (1):
+       ARM: S3C24XX: fix missing common.h in mach-s3c24xx/
+
+Sachin Kamat (1):
+       ARM: EXYNOS: Fix compiler warning in dma.c file
+
+  arch/arm/mach-exynos/common.c                   |    3 ++-
+  arch/arm/mach-exynos/dma.c                      |    2 --
+  arch/arm/mach-exynos/include/mach/debug-macro.S |    7 +++----
+  arch/arm/mach-exynos/include/mach/uncompress.h  |   17 ++++++++++++++++-
+  arch/arm/mach-s3c24xx/common.h                  |   18 ++++++++++++++++++
+  5 files changed, 39 insertions(+), 8 deletions(-)
+  create mode 100644 arch/arm/mach-s3c24xx/common.h
