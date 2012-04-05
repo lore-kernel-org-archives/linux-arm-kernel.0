@@ -1,60 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Apr 2012 10:46:23 +0100
-Subject: RFC: setting up a pci-to-amba bridge device
-In-Reply-To: <20120405093152.GA24229@mail.gnudd.com>
-References: <20120405093152.GA24229@mail.gnudd.com>
-Message-ID: <20120405094623.GF24211@n2100.arm.linux.org.uk>
+Date: Thu, 5 Apr 2012 10:52:21 +0100
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to
+ check presence of 32k timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+ <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+ <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
+ <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+ <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+ <87sjgmt211.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
+ <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+Message-ID: <20120405095221.GC25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 11:31:52AM +0200, Alessandro Rubini wrote:
-> * CONFIG_ARM_AMBA: Russell, you suggested to rename to
-> CONFIG_ARM_PRIMECELL, for a good reason.  Shall I take over this
-> and submit patches or is just a theoretical idea?
+On Thu, Apr 05, 2012 at 09:36:00AM +0000, Hiremath, Vaibhav wrote:
+> There seems to be limitation for ARM architecture, it is restricted by
+> sched_clock implementation present in "arch/arm/kernel/sched_clock.c".
+> Natively, clocksource framework does support change in rate/frequency for
+> registered timer, using,
 
-Yes please.
+Any kind of switching of timing sources introduces loss of time issues
+by the mere fact that you can't instantly know the counter values of
+both timing sources at precisely the same instant - because CPUs can
+only do one thing at a time.  So any kind of repeated dynamic switching
+_will_ result in a gradual loss of time - which will be indeterminant
+as it depends on the frequency of the switching and the relative delta
+between the two.
 
-> * <asm/sizes.h> I submitted patches to move to <linux/sizes.h> as you
-> suggested but got no feedback. This was on March 1st, in a patch set
-> with other stuff that was not good.  Should I re-run the procedure,
-> with a sizes.h-only patch set?  If so, who is responsible to merge
-> this change which is somewhat multi-arch?  If I do it, I'd leave the
-> asm/ headers in place to not disturb current users, coming back to
-> this after a few months to add a #warning so users can fix themselves,
-> to then remove the asm/ headers after other few months. Ok?
+To put it another way - it is not possible to maintain high precision
+and accuracy while dynamically switching your timing sources.
 
-It's been moved to asm-generic.h, and we now use:
-generic-y += sizes.h
-
-in our arch/arm/include/asm/Kbuild.  Even so, I think if everyone starts
-to use it, it should be in include/linux.
-
-> * clk API: you suggested to wait for the unified implementation
-> to be merged and that's fine (I haven't checked recently the status,
-> but I'm going to do my homework here).
-
-This is now in mainline.
-
-> * memory areas (this is a new point, not present in my older message).
-> When amba/bus.c requests the device resources, it fails because of
-> the hosting PCI bus:
-> 
->    [    6.866591] request [mem 0xcec00000-0xcec00fff]
->    [    6.871110] conflict [mem 0xc7f00000-0xdfffffff]
-> 
-> This is the current /proc/iomem, after ignoring the error:
-> 
->    c7f00000-dfffffff : PCI Bus 0000:00
->      ce000000-dfffffff : PCI Bus 0000:01
->        ce000000-dfffffff : PCI Bus 0000:02
->          ce000000-d1ffffff : PCI Bus 0000:03
->            cec00000-cec00fff : uart-pl011
-> 
-> Any suggestion about a good solution to this "ownership" problem of memory
-> areas?
-
-That's because we're wanting the parent resource, not &iomem_resource
-to be passed.  If you do that it should work fine.  I'm no fan of
-insert_resource() - I've seen it screw up the resource tree by
-misplacing or swapping the order of device resources when they should've
-actually failed.
+I'm not about to lift the restriction that there's only one source for
+sched_clock() just for OMAP.  That'd require a lot of additional code -
+it's not just about adjusting the multiplier and shift, you also have to
+correct the returned ns value as well, which means synchronizing against
+two counters.  (And as I've pointed out above, that's impossible to do
+accurately.)
