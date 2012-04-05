@@ -1,19 +1,79 @@
-From: p2@debian.org (Peter 'p2' De Schrijver)
-Date: Thu, 5 Apr 2012 15:03:53 +0300
-Subject: [RFC PATCH] cpuidle: allow per cpu latencies
-In-Reply-To: <1333625136-22630-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1333625136-22630-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20120405120352.GL6489@apfelkorn>
+From: samgandhi9@gmail.com (Sam Gandhi)
+Date: Thu, 5 Apr 2012 05:03:54 -0700
+Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
+In-Reply-To: <4F7D3DB8.6080009@freescale.com>
+References: <CAOdLEarFOdmDBS0iDmafLeBU=NNWxWjejTvJ-eEkQjRO12+VYg@mail.gmail.com>
+ <20120404070157.GB24930@pengutronix.de>
+ <CAOdLEaqXyvHzTRSq2=RquZLqEO6kMEp11rjKJ+UtSqtF4nr-EA@mail.gmail.com>
+ <20120404183314.GF17187@pengutronix.de>
+ <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
+ <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
+ <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
+ <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
+ <4F7D3DB8.6080009@freescale.com>
+Message-ID: <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-04-05 14:25:23 (+0300), Peter De Schrijver <pdeschrijver@nvidia.com> wrote:
-> On some systems (eg Tegra30) latencies for a given C state are not equal for
-> all CPUs. Therefore we introduce a new per CPU structure which contains
-> those parameters.
+2012/4/4 Huang Shijie <b32955@freescale.com>:
+> Hi All:
+>> On Wed, Apr 4, 2012 at 7:07 PM, Sam Gandhi<samgandhi9@gmail.com> ?wrote:
+>>
+>>> I reverted that commit and I still see following ?error!
+>> Huang,
+>>
+>> Are you able to use gpmi on mx28 running 3.4-rc1?
+>>
+> I also meet the same problem today.
+>
+>
+>>> flash_erase /dev/mtd1 0 0
+>>> Erasing 1------------[ cut here ]------------
+>>> kernel BUG at /home/sam/linux/drivers/dma/dmaengine.h:53!
+> the mxs-dma has added some patches about the cookie.
+> The bug is in the dmaengine.h.
+>
+> So let more people know this bug.
+>
+> BR
+> Huang Shijie
+>
+>
+FWIW, Just a data point.
 
-Sorry for sending this several times.
+I coverted BUG_ON in dmaengine.h to printk as shown below. With this
+change I was able to format nand, create UBI partition. I have been
+running UBI torture test called integck on my board that does lot of
+I/O, mounting/unmounting of filesystem for close to 8 hour now without
+crash. But I do see those printks. I haven't followed logic of
+tx->cookie well enough to figure out what the appropriate change
+should be. Note this is with commit
+00292bbf769620dea923dbd906afd88955f7ea19 reverted in my tree.
 
-Cheers,
+Cookie 0  completed 102118268 DMA_MIN 1
+Cookie 0  completed 102120401 DMA_MIN 1
+Cookie 0  completed 102237726 DMA_MIN 1
 
-Peter.
+git diff drivers/dma/dmaengine.h
+diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
+index 17f983a..3d10a70 100644
+--- a/drivers/dma/dmaengine.h
++++ b/drivers/dma/dmaengine.h
+@@ -50,7 +50,11 @@ static inline dma_cookie_t dma_cookie_assign(struct
+dma_async_tx_descriptor *tx)
+  */
+ static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
+ {
+-       BUG_ON(tx->cookie < DMA_MIN_COOKIE);
++       if ( tx->cookie < DMA_MIN_COOKIE)
++               printk(KERN_ERR "Cookie %d,  completed %d DMA_MIN %d
+",tx->cookie,
++               tx->chan->completed_cookie,
++               DMA_MIN_COOKIE);
++       /* BUG_ON(tx->cookie < DMA_MIN_COOKIE); */
+        tx->chan->completed_cookie = tx->cookie;
+        tx->cookie = 0;
+ }
+
+Regards,
+-Sam
