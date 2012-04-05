@@ -1,31 +1,58 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 5 Apr 2012 01:43:45 -0300
-Subject: [3.3] vfs_read oops in
- arm/arch/plat-mxc/audmux-v2.c:audmux_read_file() in sysfs
-In-Reply-To: <2d33222231d2b5e5b07a63ae117048c9@mail.fqingenieria.es>
-References: <2d33222231d2b5e5b07a63ae117048c9@mail.fqingenieria.es>
-Message-ID: <CAOMZO5A6kQ2_-tbfyiigE3K9B2e3CM74OBfsDq4uT3kOgheiiA@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 5 Apr 2012 10:26:26 +0530
+Subject: [PATCH V2 2/4] pinctrl: Add SPEAr pinctrl drivers
+In-Reply-To: <4F7CC713.8040409@wwwdotorg.org>
+References: <cover.1333538869.git.viresh.kumar@st.com>
+ <d931a52be65ad0b6354cb5de21cd2006ab100ea0.1333538870.git.viresh.kumar@st.com>
+ <4F7CC713.8040409@wwwdotorg.org>
+Message-ID: <4F7D25FA.8040501@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2012 at 10:56 AM, joancarles <joancarles@fqingenieria.es> wrote:
-> Hi
->
-> A 'cat /sys/kernel/debug/audmux/ssi7' causes following oops to be printed by
-> the kernel:
+On 4/5/2012 3:41 AM, Stephen Warren wrote:
+> On 04/04/2012 05:35 AM, Viresh Kumar wrote:
+>> +int __devinit spear_pinctrl_probe(struct platform_device *pdev,
+>> +		struct spear_pinctrl_machdata *machdata)
+>> +{
+> ...
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> ...
+>> +	pmx->vbase = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> 
+> If this driver is DT-only, you can replace those two calls with of_iomap().
 
-Hmm, ssi7 should not exist.
+Ya. This is DT-only. Will do that.
 
-Please try this:
+>> +	platform_set_drvdata(pdev, pmx);
+> 
+> This should probably before the pinctrl_register() call, just in case
+> pinctrl_register() starts calling the pinctrl driver ops immediately,
+> and the drvdata is needed by the callbacks.
 
---- a/sound/soc/imx/imx-audmux.c
-+++ b/sound/soc/imx/imx-audmux.c
-@@ -158,7 +158,7 @@ static void __init audmux_debugfs_init(void)
-                return;
-        }
+I don't use platform_get_drvdata in ops. Only used in remove routine.
+Still would move it up.
 
--       for (i = 1; i < 8; i++) {
-+       for (i = 0; i < 6; i++) {
-                snprintf(buf, sizeof(buf), "ssi%d", i);
-                if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
-                                         (void *)i, &audmux_debugfs_fops))
+> (Yes, I should fix up the Tegra driver for both of those)
+
+:)
+
+>> +	dev_info(&pdev->dev, "Registered with virtual address 0x%08x, physical address 0x%08x\n",
+>> +			(u32)pmx->vbase, res->start);
+> 
+> Is that useful?
+
+It does. Can easily check from boot prints that everything worked as planned.
+
+>> +int __devexit spear_pinctrl_remove(struct platform_device *pdev)
+>> +{
+>> +	struct spear_pmx *pmx = platform_get_drvdata(pdev);
+>> +
+>> +	platform_set_drvdata(pdev, NULL);
+> 
+> You don't need to do that; nothing should be touching the drvdata once
+> the driver has been removed, so the value doesn't matter.
+
+Why do most of the drivers do this? What can get called for them?
+
+-- 
+viresh
