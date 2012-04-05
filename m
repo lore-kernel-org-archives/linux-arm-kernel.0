@@ -1,53 +1,71 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu,  5 Apr 2012 14:20:37 -0700
-Subject: [PATCH] ARM: OMAP2+: PRM: fix compile for OMAP4-only build
-Message-ID: <1333660837-23249-1-git-send-email-khilman@ti.com>
+Date: Thu, 05 Apr 2012 14:33:01 -0700
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
+ presence of 32k timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
+ (Vaibhav Hiremath's message of "Thu, 5 Apr 2012 10:31:34 +0000")
+References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+ <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+ <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
+ <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+ <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+ <87sjgmt211.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
+ <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+ <20120405095221.GC25053@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
+Message-ID: <87hawxkgoi.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For OMAP4 only builds, the omap2_prm_* functions have dummy wrappers
-to detect incorrect usage.  However, several unrelated omap3 PRM
-functions have made it inside the #else clause of the #ifdef wrapping
-the omap2_prm stubs, causing them to disappear on OMAP4-only builds.
+"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
 
-This was unnoticed until the IO chain support was added and introduced
-a new function in this section which is referenced by omap_hwmod.c:
+> On Thu, Apr 05, 2012 at 15:22:21, Russell King - ARM Linux wrote:
+>> On Thu, Apr 05, 2012 at 09:36:00AM +0000, Hiremath, Vaibhav wrote:
+>> > There seems to be limitation for ARM architecture, it is restricted by
+>> > sched_clock implementation present in "arch/arm/kernel/sched_clock.c".
+>> > Natively, clocksource framework does support change in rate/frequency for
+>> > registered timer, using,
+>> 
+>> Any kind of switching of timing sources introduces loss of time issues
+>> by the mere fact that you can't instantly know the counter values of
+>> both timing sources at precisely the same instant - because CPUs can
+>> only do one thing at a time.  So any kind of repeated dynamic switching
+>> _will_ result in a gradual loss of time - which will be indeterminant
+>> as it depends on the frequency of the switching and the relative delta
+>> between the two.
+>> 
+>> To put it another way - it is not possible to maintain high precision
+>> and accuracy while dynamically switching your timing sources.
+>> 
+>> I'm not about to lift the restriction that there's only one source for
+>> sched_clock() just for OMAP.  That'd require a lot of additional code -
+>> it's not just about adjusting the multiplier and shift, you also have to
+>> correct the returned ns value as well, which means synchronizing against
+>> two counters.  (And as I've pointed out above, that's impossible to do
+>> accurately.)
+>> 
+>
+> Thanks a ton Russell for confirming on this,
+>
+> I understand, we also have to adjust ns value and such confirmation is what exactly I was looking for.
+>
+> So this means, we have to use compile time option, as existing
+> implementation in "arch/arm/mach-omap2/timer.c".
 
-/work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c: In function '_reconfigure_io_chain':
-/work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c:1665:3: error: implicit declaration of function 'omap3xxx_prm_reconfigure_io_chain' [-Werror=implicit-fungiction-declaration]
+Not exactly.  A compile time option isn't (yet) the only option.
 
-Fix by using the #ifdef to only wrap the omap2_prm functions that
-need stubs on OMAP4-only builds.
+Russell points out the various problems with dynamic switching of
+clocksources, which is true.  However, we're not trying to dynamically
+switch clocksources.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Paul, this patch applies on top your io_chain_devel_3.5 branch.
+What we need is only one-time selection at boot based on presence (or
+not) of various timers.  IOW, we still only ever need to call
+setup_sched_clock() once based on which HW timers are available.
 
- arch/arm/mach-omap2/prm2xxx_3xxx.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Why not just delay the setup_sched_clock() until the clocksource is
+decided?
 
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-index 1ba3d65..a8c946f 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-@@ -303,6 +303,8 @@ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
- extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
- extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
- 
-+#endif	/* CONFIG_ARCH_OMAP4 */
-+
- /* OMAP3-specific VP functions */
- u32 omap3_prm_vp_check_txdone(u8 vp_id);
- void omap3_prm_vp_clear_txdone(u8 vp_id);
-@@ -323,8 +325,6 @@ extern void omap3xxx_prm_ocp_barrier(void);
- extern void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask);
- extern void omap3xxx_prm_restore_irqen(u32 *saved_mask);
- 
--#endif	/* CONFIG_ARCH_OMAP4 */
--
- #endif
- 
- /*
--- 
-1.7.9.2
+Kevin
