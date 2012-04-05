@@ -1,86 +1,200 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Apr 2012 10:23:54 +0100
-Subject: [PATCH] ARM: vic: re-read status register before dispatching
- each IRQ handler
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F002069840A167@AUSP01VMBX24.collaborationhost.net>
-References: <1333533912-30813-1-git-send-email-will.deacon@arm.com>
- <ADE657CA350FB648AAC2C43247A983F002069840A167@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20120405092354.GA22446@mudshark.cambridge.arm.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 5 Apr 2012 14:43:52 +0530
+Subject: [PATCH v2] arm: da850: change ASYNC/PLL0_SYSCLK3 clock rate with DVFS
+Message-ID: <1333617232-27967-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 08:07:34PM +0100, H Hartley Sweeten wrote:
-> On Wednesday, April 04, 2012 3:05 AM, Will Deacon wrote:
-> > diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> > index 7a66311..6b1de5d 100644
-> > --- a/arch/arm/common/vic.c
-> > +++ b/arch/arm/common/vic.c
-> > @@ -435,11 +435,9 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
-> >  	u32 stat, irq;
-> >  	int handled = 0;
-> >  
-> > -	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > -	while (stat) {
-> > +	while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
-> >  		irq = ffs(stat) - 1;
-> >  		handle_IRQ(irq_find_mapping(vic->domain, irq), regs);
-> > -		stat &= ~(1 << irq);
-> >  		handled = 1;
-> >  	}
-> 
-> You probably should fix the comment above the function:
+Clock for EMIF is derived from ASYNC clock domain(PLL0_SYSCLK3) and was
+configured with fixed divider as there was no significant performance
+degradation with existing NAND/NOR EMIF devices if it is not
+reconfigured accordingly at different OPPs.
 
-Sorry, missed that. v2 below.
+On systems where devices other than NAND/NOR are interfaced through
+EMIF, such performance degradation may not be desirable. So change the
+PLL0_SYSCLK3 output frequency for different OPPs by re-configuring
+the divider value.
 
-Thanks,
+Also add Kconfig option to support platforms requiring fixed EMIF clock
+rate.
 
-Will
+Configured values are as per rates specified in OMAP-L138 Data sheet
+(http://www.ti.com/lit/ds/symlink/omap-l138.pdf, Table 5-5).
 
+Patch addresses concerns raised in below thread of Linux-DaVinci-community:
+http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg22535.html
 
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Wed Apr 4 10:13:49 2012 +0100
+Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+---
+Since v1:
+Have option to configure fixed EMIF clock rate via Kconfig option.
 
-    ARM: vic: re-read status register before dispatching each IRQ handler
-    
-    handle_IRQ may briefly cause interrupts to be re-enabled during soft IRQ
-    processing on the exit path, leading to nested handling of VIC interrupts.
-    
-    Since the current code does not re-read the VIC_IRQ_STATUS register, this
-    can lead to multiple invocations of the same interrupt handler and
-    spurious interrupts to be reported.
-    
-    This patch changes the VIC interrupt dispatching code to re-read the
-    status register each time, avoiding duplicate invocations of the same
-    handler.
-    
-    Acked-and-tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-    Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
+ arch/arm/mach-davinci/Kconfig                |    9 ++++++
+ arch/arm/mach-davinci/board-da850-evm.c      |   22 ++++++++++++++++
+ arch/arm/mach-davinci/cpufreq.c              |    2 +-
+ arch/arm/mach-davinci/da850.c                |   36 ++++++++++++++++++++++++-
+ arch/arm/mach-davinci/include/mach/cpufreq.h |    1 +
+ 5 files changed, 67 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-index 7a66311..7e288f9 100644
---- a/arch/arm/common/vic.c
-+++ b/arch/arm/common/vic.c
-@@ -427,19 +427,18 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 32d837d..0a2fb6c 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -192,6 +192,15 @@ config DA850_UI_RMII
  
- /*
-  * Handle each interrupt in a single VIC.  Returns non-zero if we've
-- * handled at least one interrupt.  This does a single read of the
-- * status register and handles all interrupts in order from LSB first.
-+ * handled at least one interrupt.  This reads the status register
-+ * before handling each interrupt, which is necessary given that
-+ * handle_IRQ may briefly re-enable interrupts for soft IRQ handling.
+ endchoice
+ 
++config DA850_FIX_PLL0_SYSCLK3RATE
++	int "PLL0_SYSCLK3 rate"
++	depends on ARCH_DAVINCI_DA850
++	range 0 148000000
++	default 0
++	help
++	  Set this value with desired EMIF clock rate, Otherwise EMIF clock
++          rate is decided based on OPP value.
++
+ config DA850_WL12XX
+ 	bool "AM18x wl1271 daughter board"
+ 	depends on MACH_DAVINCI_DA850_EVM
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index a70de24..1fb3050 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -13,6 +13,7 @@
   */
- static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
- {
-        u32 stat, irq;
-        int handled = 0;
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/clk.h>
+ #include <linux/console.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/at24.h>
+@@ -1253,6 +1254,17 @@ static __init int da850_wl12xx_init(void)
  
--       stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
--       while (stat) {
-+       while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
-                irq = ffs(stat) - 1;
-                handle_IRQ(irq_find_mapping(vic->domain, irq), regs);
--               stat &= ~(1 << irq);
-                handled = 1;
-        }
+ #endif /* CONFIG_DA850_WL12XX */
+ 
++static __init int da850_set_emif_clk_rate(void)
++{
++	struct clk *emif_clk;
++
++	emif_clk = clk_get(NULL, "pll0_sysclk3");
++	if (WARN(IS_ERR(emif_clk), "Unable to get emif clock\n"))
++		return PTR_ERR(emif_clk);
++
++	return clk_set_rate(emif_clk, CONFIG_DA850_FIX_PLL0_SYSCLK3RATE);
++}
++
+ #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
+ 
+ static __init void da850_evm_init(void)
+@@ -1264,6 +1276,16 @@ static __init void da850_evm_init(void)
+ 		pr_warning("da850_evm_init: TPS65070 PMIC init failed: %d\n",
+ 				ret);
+ 
++	/*
++	 * Though bootloader takes care to set emif clock at allowed
++	 * possible rate. Kernel needs to reconfigure this rate to
++	 * support platforms requiring fixed emif clock rate.
++	 */
++	ret = da850_set_emif_clk_rate();
++	if (ret)
++		pr_warning("da850_evm_init: Failed to set rate of pll0_sysclk3/emif clock: %d\n",
++				ret);
++
+ 	ret = da850_register_edma(da850_edma_rsv);
+ 	if (ret)
+ 		pr_warning("da850_evm_init: edma registration failed: %d\n",
+diff --git a/arch/arm/mach-davinci/cpufreq.c b/arch/arm/mach-davinci/cpufreq.c
+index 031048f..1f14cbe 100644
+--- a/arch/arm/mach-davinci/cpufreq.c
++++ b/arch/arm/mach-davinci/cpufreq.c
+@@ -216,7 +216,7 @@ static int __init davinci_cpufreq_probe(struct platform_device *pdev)
+ 	asyncclk = clk_get(cpufreq.dev, "async");
+ 	if (!IS_ERR(asyncclk)) {
+ 		cpufreq.asyncclk = asyncclk;
+-		cpufreq.asyncrate = clk_get_rate(asyncclk);
++		cpufreq.asyncrate = pdata->emif_rate;
+ 	}
+ 
+ 	return cpufreq_register_driver(&davinci_driver);
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index b44dc84..692203c 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -49,6 +49,7 @@
+ static int da850_set_armrate(struct clk *clk, unsigned long rate);
+ static int da850_round_armrate(struct clk *clk, unsigned long rate);
+ static int da850_set_pll0rate(struct clk *clk, unsigned long armrate);
++static int da850_set_pll0sysclk3_rate(struct clk *clk, unsigned long rate);
+ 
+ static struct pll_data pll0_data = {
+ 	.num		= 1,
+@@ -88,8 +89,8 @@ static struct clk pll0_sysclk3 = {
+ 	.parent		= &pll0_clk,
+ 	.flags		= CLK_PLL,
+ 	.div_reg	= PLLDIV3,
+-	.set_rate	= davinci_set_sysclk_rate,
+-	.maxrate	= 100000000,
++	.set_rate	= da850_set_pll0sysclk3_rate,
++	.maxrate	= 148000000,
+ };
+ 
+ static struct clk pll0_sysclk4 = {
+@@ -799,6 +800,36 @@ static void da850_set_async3_src(int pllnum)
+ 	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+ }
+ 
++static int da850_set_pll0sysclk3_rate(struct clk *clk, unsigned long rate)
++{
++	struct clk *arm_clk;
++	unsigned long sys_clk3_rate = 148000000;
++	int ret;
++
++	arm_clk = clk_get(NULL, "arm");
++	if (WARN(IS_ERR(arm_clk), "Unable to get ARM clock\n"))
++		return PTR_ERR(arm_clk);
++
++	/* Set EMIF clock based on OPPs */
++	switch (clk_get_rate(arm_clk)) {
++	case 200000000:
++		sys_clk3_rate = 75000000;
++		break;
++	case 96000000:
++		sys_clk3_rate = 50000000;
++		break;
++	}
++
++	if (rate)
++		sys_clk3_rate = min(sys_clk3_rate, rate);
++
++	ret = davinci_set_sysclk_rate(clk, sys_clk3_rate);
++	if (WARN_ON(ret))
++		return ret;
++
++	return 0;
++}
++
+ #ifdef CONFIG_CPU_FREQ
+ /*
+  * Notes:
+@@ -900,6 +931,7 @@ static struct davinci_cpufreq_config cpufreq_info = {
+ 	.init = da850_regulator_init,
+ 	.set_voltage = da850_set_voltage,
+ #endif
++	.emif_rate = CONFIG_DA850_FIX_PLL0_SYSCLK3RATE,
+ };
+ 
+ #ifdef CONFIG_REGULATOR
+diff --git a/arch/arm/mach-davinci/include/mach/cpufreq.h b/arch/arm/mach-davinci/include/mach/cpufreq.h
+index 3c089cf..3f58b71 100644
+--- a/arch/arm/mach-davinci/include/mach/cpufreq.h
++++ b/arch/arm/mach-davinci/include/mach/cpufreq.h
+@@ -21,6 +21,7 @@ struct davinci_cpufreq_config {
+ 	struct cpufreq_frequency_table *freq_table;
+ 	int (*set_voltage) (unsigned int index);
+ 	int (*init) (void);
++	unsigned int emif_rate;
+ };
+ 
+ #endif
+-- 
+1.7.1
