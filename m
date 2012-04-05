@@ -1,26 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Apr 2012 09:02:37 -0600
-Subject: [PATCH 1/1] pinctrl: fix compile error if not select PINMUX
- support
-In-Reply-To: <1333616843-3607-1-git-send-email-b29396@freescale.com>
-References: <1333616843-3607-1-git-send-email-b29396@freescale.com>
-Message-ID: <4F7DB40D.20300@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 05 Apr 2012 08:10:17 -0700
+Subject: [PATCH] ARM: S3C24XX: fix missing common.h in mach-s3c24xx/
+In-Reply-To: <CAP=VYLp-FwEu2AY9wWY7vygmjtZ30AMD=0h8+VtuNVZF2xtTYw@mail.gmail.com>
+References: <1332980074-4614-1-git-send-email-kgene.kim@samsung.com>
+ <CAP=VYLp-FwEu2AY9wWY7vygmjtZ30AMD=0h8+VtuNVZF2xtTYw@mail.gmail.com>
+Message-ID: <4F7DB5D9.4080106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2012 03:07 AM, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> The pinctrl_register_mappings is defined in core.c, so change the dependent
-> macro from CONFIG_MUX to CONFIG_PINCTRL.
-> 
-> The compile error message is:
-> drivers/pinctrl/core.c:886: error: redefinition of 'pinctrl_register_mappings'
-> include/linux/pinctrl/machine.h:160: note: previous definition of 'pinctrl_register_mappings' was here
-> make[2]: *** [drivers/pinctrl/core.o] Error 1
-> make[1]: *** [drivers/pinctrl] Error 2
-> make: *** [drivers] Error 2
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+On 04/03/12 15:33, Paul Gortmaker wrote:
+> Hi,
+>
+> On Wed, Mar 28, 2012 at 8:14 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>> This patch fixes missing mach-s3c24xx/common.h which has been
+>> lost when regarding s3c24xx directories merged.
+>
+> Just checking that the updated version of this patch is headed
+> in for 3.4 -- we are still seeing the failure in linux-next builds
+> and it would be nice to close out the build regressions in there
+> as quickly as possible, since they tend to mask other regressions
+> from being seen.
+>
+Hi Paul,
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Yeah right and I updated it in my -next.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
