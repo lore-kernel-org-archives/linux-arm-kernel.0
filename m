@@ -1,52 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Apr 2012 11:19:00 -0700
-Subject: [GIT PULL] omap fixes for v3.4-rc1
-In-Reply-To: <CAOesGMg7DWDH4ix30fh23YZ1hg207S7oQ05njrfEBkaYPjKWDQ@mail.gmail.com>
-References: <20120405004256.GB10780@atomide.com>
- <CAOesGMg7DWDH4ix30fh23YZ1hg207S7oQ05njrfEBkaYPjKWDQ@mail.gmail.com>
-Message-ID: <20120405181900.GE3785@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Apr 2012 11:29:06 -0700
+Subject: [PATCH v2] ARM: fix __io macro for PCMCIA
+In-Reply-To: <1333579684-31466-1-git-send-email-robherring2@gmail.com>
+References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+ <1333579684-31466-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120405182906.GA29262@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [120405 10:51]:
-> Hi,
+On Wed, Apr 04, 2012 at 05:48:04PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> On Wed, Apr 4, 2012 at 5:42 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > Hi Arnd & Olof,
-> >
-> > Please pull omap fixes from:
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
-> >
-> > Note that this also contains a set of fixes that are not regressions
-> > or oopses to properly deal with the smsc911x regulator issue.
-> >
-> > Basically the regulators must be per board file as the regulators
-> > can also come from drivers, such as twl4030. So it's best to dumb
-> > down gpmc-smsc911x.c to not even care about the regulators.
-> >
-> > Regards,
-> >
-> > Tony
-> >
-> >
-> > The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
-> > ?Linus Torvalds (1):
-> > ? ? ? ?Linux 3.4-rc1
-> >
-> > are available in the git repository at:
-> >
-> > ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
+> broken. PCMCIA depends on __io() returning a valid i/o address, and most
+> ARM platforms require IO_SPACE_LIMIT be set to 0xffffffff for PCMCIA. This
+> needs a better fix with a fixed i/o address mapping, but for now we just
+> restore things to the previous behavior.
 > 
+> This fixes at91, omap1, pxa and sa11xx. pxa needs io.h if PCI is enabled,
+> but PCMCIA is not. sa11xx already has IO_SPACE_LIMIT set to 0xffffffff,
+> so it doesn't need an io.h.
 > 
-> Thanks, pulled.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Joachim Eastwood <joachim.eastwood@jotron.com>
+> Cc: Paul Parsons <lost.distance@yahoo.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-Thanks.
- 
-> Feel free to start sending these as signed tags with the above in the
-> tag description, so it's carried forward in the git history without
-> any work for us. :-)
+Thanks, applied to fixes.
 
-OK will do.
 
-Tony
+-Olof
