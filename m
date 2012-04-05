@@ -1,96 +1,83 @@
-From: ru@gnudd.com (Alessandro Rubini)
-Date: Thu, 5 Apr 2012 11:31:52 +0200
-Subject: RFC: setting up a pci-to-amba bridge device
-Message-ID: <20120405093152.GA24229@mail.gnudd.com>
+From: tsoni@codeaurora.org (Trilok Soni)
+Date: Thu, 05 Apr 2012 15:05:02 +0530
+Subject: [PATCH 2/9] ARM: OMAP2+: SmartReflex: move the driver specific
+ macros in include/linux/power
+In-Reply-To: <CAORVsuVt5uj5NAsqsce+7f=xMXC9-nck5cPUCOEC8QP3VkxYyA@mail.gmail.com>
+References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
+ <1332173578-27422-3-git-send-email-j-pihet@ti.com>
+ <4F7C9C89.9080605@codeaurora.org> <4F7CA3E1.2050809@ti.com>
+ <4F7D4165.2060101@codeaurora.org>
+ <CAORVsuVt5uj5NAsqsce+7f=xMXC9-nck5cPUCOEC8QP3VkxYyA@mail.gmail.com>
+Message-ID: <4F7D6746.9020504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    [This goes to Russell King and linux-arm-kernel because of amba.
-    Cc: Giancarlo Asnaghi (chip manufacturer), Alan Cox (appointed
-    reviewer of my patch-set for the chip), Linus Walleij who stated
-    on-list to be happy to help with the review. Feel free to add
-    other interested parties]
+Hi Jean,
 
+>
+> The initial motivation is to provide a generic framework for this type
+> of drivers, by cleaning up the current OMAP code and by providing as
+> much generic code as possible.
+>
+> Cf. the patch sets I submitted before this very one:
+> - the SR code clean-up [1], which is needed to make the code ready for
+> the integration of new features,
+> - the SR class support [2], which is needed for new SR classes to be
+> implemented.
+>
+>  From the maintainer point of view it made more sense to move the code
+> before cleaning it up and so it should happen before [1] and [2].
+> The result is that [1] and [2] will need to be rebased when the move
+> is accepted and merged in.
+>
+> [1] http://marc.info/?l=linux-omap&m=133055488908132&w=2
+> [2] http://marc.info/?l=linux-omap&m=133163445926544&w=2
 
-Hello all.
+I am going through your patches and including some wiki pages. I 
+understand the SR can be connected in two ways - intelligent and dumb :)
+For intelligent I mean you just configure SR and it will and program 
+PMIC, whereas in dumb scenarios application processor gets the 
+notification and then it goes and writes into PMIC based on some 
+floor/ceiling values. In the first case not much of apps. s/w but in the 
+later case whole lot.
 
-I sent a similar message on 2012-02-22, but things have proceeded
-meanwhile, so I'm doing it again with a fresh new message. No context
-assumed in readers, but I consider previous feedback I got while
-drafting the trailing list of pending issues.
+>
+>>>
+>>> Where will you put that otherwise?
+>>
+>>
+>> Couple of suggestions:
+>>
+>> drivers/platform/omap/avs?
+>> drivers/misc/omap/avs?
+>>
+>> I prefer first one.
+> Those paths are for OMAP specific code and not for a generic framework.
+>
+>>>
+>>> IIRC, David Brownell was referring to the rule of three for such case.
+>>> Meaning that it worth having a generic fmwk when at least three
+>>> different drivers are doing the same kind of things.
+>
+> Do OMAP v1 and OMAP v2 implementations count as 2 drivers? ;-)
+> More seriously, the OMAP code for SmartReflex is far from complete in
+> mainline. There is a plan to provide the following features:
+> - OMAP v1 IP,
+> - OMAP v2 IP,
+> - class 1.5,
+> - class 3,
+> - class 3.5,
+> - and more support for the upcoming chipsets.
 
+I don't understand much of these versions right now, but hopefully after 
+going through all these docs. My only contention point is to not create 
+any directory into the drivers/power, unless it is generic fwk and then 
+build up "client" drivers on top of it. Meanwhile we could move this 
+driver into above options as I have suggested.
 
-I'm working on a chip (called STA2X11) that is an I/O Hub for pc-class
-computers. In practice it's an ARM SoC with its usual complete set of
-peripherals; it has a PCIe bridge so the main CPU can use the
-peripherals directly.  A number of them are AMBA (i.e. PrimeCell)
-logic blocks, so for example the serial console is PL011, while the
-SATA controller is no.  I suspect this path will be followed by other
-manufactures as well in the upcoming years, so I'd love the thing
-to be done cleanly and possibly merged.
+---Trilok Soni
 
-There already is published code for those drivers, but all primecell
-device code have been duplicated and then modified (or, worse
-sometimes "#include"d from a pci driver, #ifdeffing out the amba
-probe/release code).
-
-Links: (http://sourceforge.net/projects/
-http://sourceforge.net/projects/sta2x11/files/2.6.39/rel_20120309/sta2x11_RC4_20120309_2.6.39.4_patches.tgz/download)
-
-What I'm doing, instead, is make a trivial pci driver that simply
-registers an amba device every time its probe method is called.  The
-amba driver, then, works by itself.  Where sourceforge code has
-52kB of code, mine is 3kB (1kB compiled size):
-
-  mine: -rw-rw-r-- 1 rubini staff   2990 Apr  4 13:08 amba-pl011-pci.c
-  orig: -rw-rw-r-- 1 rubini staff  53698 Apr  4 18:03 amba-pl011.c
-  sf:   -rw-rw-r-- 1 rubini staff  51381 Apr  4 13:08 pl011-pci.c
-
-The I/O hub has a number of such devices, that can be supported with
-minimal efforts by the bridge. This is the list of amba devices and
-the status of internal code:
-
-     UART ports (working as tty, also as console, also with DMA)
-     DMA engine (working, thanks to Davide Ciminaghi)
-     SPI (being worked on by Federico Vaga)
-     MMCI (working, thanks to Davide, still not with DMA at this point)
-
-This is the list of issues that are pending:
-
-* CONFIG_ARM_AMBA: Russell, you suggested to rename to
-CONFIG_ARM_PRIMECELL, for a good reason.  Shall I take over this
-and submit patches or is just a theoretical idea?
-
-* <asm/sizes.h> I submitted patches to move to <linux/sizes.h> as you
-suggested but got no feedback. This was on March 1st, in a patch set
-with other stuff that was not good.  Should I re-run the procedure,
-with a sizes.h-only patch set?  If so, who is responsible to merge
-this change which is somewhat multi-arch?  If I do it, I'd leave the
-asm/ headers in place to not disturb current users, coming back to
-this after a few months to add a #warning so users can fix themselves,
-to then remove the asm/ headers after other few months. Ok?
-
-* clk API: you suggested to wait for the unified implementation
-to be merged and that's fine (I haven't checked recently the status,
-but I'm going to do my homework here).
-
-* memory areas (this is a new point, not present in my older message).
-When amba/bus.c requests the device resources, it fails because of
-the hosting PCI bus:
-
-   [    6.866591] request [mem 0xcec00000-0xcec00fff]
-   [    6.871110] conflict [mem 0xc7f00000-0xdfffffff]
-
-This is the current /proc/iomem, after ignoring the error:
-
-   c7f00000-dfffffff : PCI Bus 0000:00
-     ce000000-dfffffff : PCI Bus 0000:01
-       ce000000-dfffffff : PCI Bus 0000:02
-         ce000000-d1ffffff : PCI Bus 0000:03
-           cec00000-cec00fff : uart-pl011
-
-Any suggestion about a good solution to this "ownership" problem of memory
-areas?
-
-Thanks a lot
-/alessandro
+-- 
+--
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
