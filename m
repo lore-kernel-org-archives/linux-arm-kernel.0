@@ -1,34 +1,179 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Apr 2012 09:42:24 -0700
-Subject: [GIT PULL] ARM: OMAP: clock, powerdomain, clockdomain, hwmod
- fixes for early v3.4-rc
-In-Reply-To: <alpine.DEB.2.00.1204050246410.10302@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1204041658200.7161@utopia.booyaka.com>
- <20120405004139.GA10780@atomide.com>
- <alpine.DEB.2.00.1204042007140.10302@utopia.booyaka.com>
- <alpine.DEB.2.00.1204050246410.10302@utopia.booyaka.com>
-Message-ID: <20120405164223.GA3785@atomide.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Thu, 5 Apr 2012 17:42:56 +0100 (BST)
+Subject: [PATCH 1/3 v7] ARM: pxa: hx4700: Add PCMCIA/CF support
+Message-ID: <1333644176.63998.YahooMailClassic@web29003.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120405 01:53]:
-> On Wed, 4 Apr 2012, Paul Walmsley wrote:
-> 
-> > On Wed, 4 Apr 2012, Tony Lindgren wrote:
-> > 
-> > > Thanks, looks like two of these patches I already merged into
-> > > fixes yesterday from your earlier pull request. So merging this
-> > > in would cause duplicate commits. Can you please update your
-> > > branch to remove those two commits?
-> > 
-> > Do you happen to recall which ones they are?
-> 
-> Anyway, am guessing that you are planning to pull these into your 
-> 'fixes' branch?  If so then probably the conflicts are with the 
-> misc_devel_3.4 branch patches.  Will post another pull request for you 
-> with those two patches dropped.  But if you're pulling these into a 
-> different branch, please let me know...
+This patch adds support for the HP iPAQ hx4700 to the existing
+pxa2xx-pcmcia driver.
 
-Yes it's the fixes branch I was talking about, thanks for updating it.
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Cc: Philipp Zabel <philipp.zabel@gmail.com>
+---
 
-Tony
+V7:
+Separated drivers/mfd/asic3.c changes into a separate patch, to avoid crossing
+maintainer boundaries.
+Rebased from linux-3.3-rc6 to linux-3.4-rc1.
+
+ drivers/pcmcia/Kconfig         |    2 +-
+ drivers/pcmcia/Makefile        |    1 +
+ drivers/pcmcia/pxa2xx_hx4700.c |  121 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 123 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/pcmcia/pxa2xx_hx4700.c
+
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index bba3ab2..8fd255f 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -217,7 +217,7 @@ config PCMCIA_PXA2XX
+ 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
+ 		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2 \
+ 		    || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI \
+-		    || MACH_COLIBRI320)
++		    || MACH_COLIBRI320 || MACH_H4700)
+ 	select PCMCIA_SA1111 if ARCH_LUBBOCK && SA1111
+ 	select PCMCIA_SOC_COMMON
+ 	help
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index 47525de..7745b51 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -69,6 +69,7 @@ pxa2xx-obj-$(CONFIG_MACH_VPAC270)		+= pxa2xx_vpac270.o
+ pxa2xx-obj-$(CONFIG_MACH_BALLOON3)		+= pxa2xx_balloon3.o
+ pxa2xx-obj-$(CONFIG_MACH_COLIBRI)		+= pxa2xx_colibri.o
+ pxa2xx-obj-$(CONFIG_MACH_COLIBRI320)		+= pxa2xx_colibri.o
++pxa2xx-obj-$(CONFIG_MACH_H4700)			+= pxa2xx_hx4700.o
+ 
+ obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o $(pxa2xx-obj-y)
+ 
+diff --git a/drivers/pcmcia/pxa2xx_hx4700.c b/drivers/pcmcia/pxa2xx_hx4700.c
+new file mode 100644
+index 0000000..7dfef3e
+--- /dev/null
++++ b/drivers/pcmcia/pxa2xx_hx4700.c
+@@ -0,0 +1,121 @@
++/*
++ *  Copyright (C) 2012 Paul Parsons <lost.distance@yahoo.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/irq.h>
++
++#include <asm/mach-types.h>
++#include <mach/hx4700.h>
++
++#include "soc_common.h"
++
++static struct gpio gpios[] = {
++	{ GPIO114_HX4700_CF_RESET,    GPIOF_OUT_INIT_LOW,   "CF reset"        },
++	{ EGPIO4_CF_3V3_ON,           GPIOF_OUT_INIT_LOW,   "CF 3.3V enable"  },
++};
++
++static int hx4700_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
++{
++	int ret;
++
++	ret = gpio_request_array(gpios, ARRAY_SIZE(gpios));
++	if (ret)
++		goto out;
++
++	/*
++	 * IRQ type must be set before soc_pcmcia_hw_init() calls request_irq().
++	 * The asic3 default IRQ type is level trigger low level detect, exactly
++	 * the the signal present on GPIOD4_CF_nCD when a CF card is inserted.
++	 * If the IRQ type is not changed, the asic3 interrupt handler will loop
++	 * repeatedly because it is unable to clear the level trigger interrupt.
++	 */
++	irq_set_irq_type(gpio_to_irq(GPIOD4_CF_nCD), IRQ_TYPE_EDGE_BOTH);
++
++	skt->stat[SOC_STAT_CD].gpio = GPIOD4_CF_nCD;
++	skt->stat[SOC_STAT_CD].name = "PCMCIA CD";
++	skt->stat[SOC_STAT_RDY].gpio = GPIO60_HX4700_CF_RNB;
++	skt->stat[SOC_STAT_RDY].name = "PCMCIA Ready";
++
++out:
++	return ret;
++}
++
++static void hx4700_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
++{
++	gpio_free_array(gpios, ARRAY_SIZE(gpios));
++}
++
++static void hx4700_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
++	struct pcmcia_state *state)
++{
++	state->vs_3v = 1;
++	state->vs_Xv = 0;
++}
++
++static int hx4700_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
++	const socket_state_t *state)
++{
++	switch (state->Vcc) {
++	case 0:
++		gpio_set_value(EGPIO4_CF_3V3_ON, 0);
++		break;
++	case 33:
++		gpio_set_value(EGPIO4_CF_3V3_ON, 1);
++		break;
++	default:
++		printk(KERN_ERR "pcmcia: Unsupported Vcc: %d\n", state->Vcc);
++		return -EINVAL;
++	}
++
++	gpio_set_value(GPIO114_HX4700_CF_RESET, (state->flags & SS_RESET) != 0);
++
++	return 0;
++}
++
++static struct pcmcia_low_level hx4700_pcmcia_ops = {
++	.owner          = THIS_MODULE,
++	.nr             = 1,
++	.hw_init        = hx4700_pcmcia_hw_init,
++	.hw_shutdown    = hx4700_pcmcia_hw_shutdown,
++	.socket_state   = hx4700_pcmcia_socket_state,
++	.configure_socket = hx4700_pcmcia_configure_socket,
++};
++
++static struct platform_device *hx4700_pcmcia_device;
++
++static int __init hx4700_pcmcia_init(void)
++{
++	struct platform_device *pdev;
++
++	if (!machine_is_h4700())
++		return -ENODEV;
++
++	pdev = platform_device_register_data(NULL, "pxa2xx-pcmcia", -1,
++		&hx4700_pcmcia_ops, sizeof(hx4700_pcmcia_ops));
++	if (IS_ERR(pdev))
++		return PTR_ERR(pdev);
++
++	hx4700_pcmcia_device = pdev;
++
++	return 0;
++}
++
++static void __exit hx4700_pcmcia_exit(void)
++{
++	platform_device_unregister(hx4700_pcmcia_device);
++}
++
++module_init(hx4700_pcmcia_init);
++module_exit(hx4700_pcmcia_exit);
++
++MODULE_AUTHOR("Paul Parsons <lost.distance@yahoo.com>");
++MODULE_DESCRIPTION("HP iPAQ hx4700 PCMCIA driver");
++MODULE_LICENSE("GPL");
+-- 
+1.7.3.4
