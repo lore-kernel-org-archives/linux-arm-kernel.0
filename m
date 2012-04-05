@@ -1,36 +1,24 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 5 Apr 2012 15:33:32 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP2+: PRM: fix compile for OMAP4-only build
-In-Reply-To: <1333660837-23249-1-git-send-email-khilman@ti.com>
-References: <1333660837-23249-1-git-send-email-khilman@ti.com>
-Message-ID: <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 05 Apr 2012 23:07:36 +0100
+Subject: [PATCH 4/7 v4] ARM: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <0032addd7e94c5d4d1a3a0be77fe79bcffee53db.1331601448.git.jason@lakedaemon.net>
+References: <cover.1331601448.git.jason@lakedaemon.net>
+ <0032addd7e94c5d4d1a3a0be77fe79bcffee53db.1331601448.git.jason@lakedaemon.net>
+Message-ID: <1333663656.12209.62.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Apr 2012, Kevin Hilman wrote:
+On Tue, 2012-03-13 at 01:57 +0000, Jason Cooper wrote:
+> +DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)") 
 
-> For OMAP4 only builds, the omap2_prm_* functions have dummy wrappers
-> to detect incorrect usage.  However, several unrelated omap3 PRM
-> functions have made it inside the #else clause of the #ifdef wrapping
-> the omap2_prm stubs, causing them to disappear on OMAP4-only builds.
-> 
-> This was unnoticed until the IO chain support was added and introduced
-> a new function in this section which is referenced by omap_hwmod.c:
-> 
-> /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c: In function '_reconfigure_io_chain':
-> /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c:1665:3: error: implicit declaration of function 'omap3xxx_prm_reconfigure_io_chain' [-Werror=implicit-fungiction-declaration]
-> 
-> Fix by using the #ifdef to only wrap the omap2_prm functions that
-> need stubs on OMAP4-only builds.
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Paul, this patch applies on top your io_chain_devel_3.5 branch.
+This ends up as Machine: in /proc/cpuinfo, which seems to be normal?
 
-Thanks, Tony reported this too.  Any objections to me rolling this into 
-the offending patch?
-> 
+Would it be worth trying to dynamically modify the machine string based
+on the actual hardware the kernel is running on?
+
+Ian.
+-- 
+Ian Campbell
 
 
-- Paul
+Genius is ten percent inspiration and fifty percent capital gains.
