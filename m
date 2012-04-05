@@ -1,30 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Apr 2012 15:12:49 +0200
-Subject: Query: clk: Defining new struct clk_foo types
-In-Reply-To: <4F7D76A8.3080904@st.com>
-References: <4F7D443E.3010800@st.com> <20120405095835.GB20478@pengutronix.de>
- <4F7D705D.7050004@st.com> <20120405103039.GC3852@pengutronix.de>
- <4F7D76A8.3080904@st.com>
-Message-ID: <20120405131249.GD3852@pengutronix.de>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 5 Apr 2012 14:15:57 +0100
+Subject: [PATCH] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <4F7D974C.9050506@arm.com>
+References: <1333384217-13441-1-git-send-email-marc.zyngier@arm.com>
+ <4F7AC138.9020308@citrix.com> <4F7AC8A8.9020606@arm.com>
+ <20120403153538.0D1B83E044A@localhost> <4F7D974C.9050506@arm.com>
+Message-ID: <4F7D9B0D.7020009@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 04:10:40PM +0530, Viresh Kumar wrote:
-> On 4/5/2012 4:00 PM, Sascha Hauer wrote:
-> > Besides, I don't  recommend using the DEFINE_CLK_* macros. You should
-> > really consider using clk_register_* instead.
+On 05/04/12 13:59, Marc Zyngier wrote:
 > 
-> Can you point me to some users of this clock framework, with such
-> runtime stuff? That would be really helpful.
+> How about this?
+> 
+> 	gic: interrupt-controller at 2c001000 {
+> 		compatible = "arm,cortex-a15-gic";
+> 		#interrupt-cells = <3>;
+> 		#address-cells = <1>;
+> 		#size-cells = <1>;
+> 		interrupt-controller;
+> 		reg = <0x2c001000 0x1000>,
+> 		      <0x2c002000 0x100>;
+> 
+> 		vgic at 2c004000 {
+> 			compatible = "arm,cortex-a15-vgic", "arm,vgic";
+> 			reg = <0x2c004000 0x2000>,
+> 			      <0x2c006000 0x2000>;
+> 			interrupts = <1 9 0xf04>;
+> 		};
+> 	};
+> 
+> It cleanly separate the extension from the core GIC, and still make it
+> part of the GIC node.
 
-See this branch:
+This looks sensible to me.
 
-git://git.pengutronix.de/git/imx/linux-2.6.git work/v3.4-rc1-imx-clk
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+David
