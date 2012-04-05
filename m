@@ -1,48 +1,40 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 5 Apr 2012 11:21:45 -0500
-Subject: [PATCHv5 16/18] I2C: OMAP: fix missing handling of errata
- I2C_OMAP3_1P153
-In-Reply-To: <4F7C9F5F.8010206@ti.com>
-References: <1333468957-5999-1-git-send-email-shubhrajyoti@ti.com>
- <1333468957-5999-17-git-send-email-shubhrajyoti@ti.com>
- <4F7C7780.7040807@ti.com>
- <CAM=Q2cu8k8n2w8_=8VCFcFTTgywqc_Vk_eM_DDTap3YeYyAH2g@mail.gmail.com>
- <4F7C9F5F.8010206@ti.com>
-Message-ID: <4F7DC699.8000609@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 5 Apr 2012 11:39:31 -0500
+Subject: [PATCH] arm: ep93xx: Don't try to release not acquired GPIO lines
+In-Reply-To: <4F7D8587.5020205@metasoft.pl>
+References: <4F7D8587.5020205@metasoft.pl>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F002069840A362@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/04/2012 02:22 PM, Jon Hunter wrote:
-> Hi Shubhro,
+On Thursday, April 05, 2012 4:44 AM, Rafal Prylowski wrote:
+> Fail path of ep93xx_keypad_acquire_gpio() tries to release
+> GPIO lines not acquired successfully before. Fix this.
 >
-> On 04/04/2012 12:45 PM, Shubhrajyoti Datta wrote:
->> Hi Jon,
->>
->>
->>>> + if (dev->flags& OMAP_I2C_FLAG_APPLY_ERRATA_I207)
->>>>
->>>> + dev->errata |= I2C_OMAP_ERRATA_I207;
->>>> +
->>>> if (dev->rev<= OMAP_I2C_REV_ON_3430_3530)
->>>> dev->errata |= I2C_OMAP3_1P153;
->>>
->>>
->>> The errata ID is not correct. I believe that 1P153 is referring to the
->>> section number in the errata doc and not the errata ID. The errata ID
->>> should
->>> be i451 in the latest OMAP34xx and OMAP36xx docs.
->>>
->>> Please can you update this? The section number changed in the latest
->>> errata
->>> docs and it took me a minute to find this.
->>
->> Do you mind if that is a separate patch?
+> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
 >
-> Not at all and in fact it probably should be.
+> ---
+> Patch applies to v3.4rc1.
+>
+>  arch/arm/mach-ep93xx/core.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
+> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
+> @@ -734,7 +734,7 @@ int ep93xx_keypad_acquire_gpio(struct pl
+>  fail_gpio_d:
+>  	gpio_free(EP93XX_GPIO_LINE_C(i));
+>  fail_gpio_c:
+> -	for ( ; i >= 0; --i) {
+> +	for (--i; i >= 0; --i) {
+>  		gpio_free(EP93XX_GPIO_LINE_C(i));
+>  		gpio_free(EP93XX_GPIO_LINE_D(i));
+>  	}
 
-Sorry the erratum ID is not i451 but i462!
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-Cheers
-Jon
+Thanks!
