@@ -1,92 +1,31 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 05 Apr 2012 12:41:26 +0530
-Subject: [PATCH 1/2] ARM: omap: hwmod: Restore sysc after a reset
-In-Reply-To: <alpine.DEB.2.00.1204040939300.8000@utopia.booyaka.com>
-References: <1331646928-31119-1-git-send-email-rnayak@ti.com>
- <1331646928-31119-2-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204040939300.8000@utopia.booyaka.com>
-Message-ID: <4F7D459E.3090902@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Apr 2012 09:26:05 +0200
+Subject: [PATCH] clk: Update comment for clk_round_rate()
+In-Reply-To: <4F7D44AC.6040605@st.com>
+References: <CAOh2x=nTSvOrJa2uB2zTvYh1SUO2YpEpnLcL189itJ=_e+MPog@mail.gmail.com>
+ <CAJOA=zOPn0FcwO0McSb8-18h7LiJndRD2nmCCvxUEEm+fakvKg@mail.gmail.com>
+ <4F7D299E.1050307@st.com> <20120405070324.GB27274@pengutronix.de>
+ <4F7D44AC.6040605@st.com>
+Message-ID: <20120405072605.GC27274@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 April 2012 09:11 PM, Paul Walmsley wrote:
-> On Tue, 13 Mar 2012, Rajendra Nayak wrote:
->
->> After a softreset, make sure the sysc settings are correctly
->> restored.
->>
->> Reported-by: Anand Gadiyar<gadiyar@ti.com>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> Cc: Benoit Cousson<b-cousson@ti.com>
->> Cc: Paul Walmsley<paul@pwsan.com>
->> Cc: Shubhrajyoti D<shubhrajyoti@ti.com>
->
-> Thanks, this patch has been modified a bit to consolidate the SYSCONFIG
-> reload after _reset() into the _reset() function itself.  This should
-> hopefully avoid future mistakes and avoid some code duplication.  Modified
-> patch follows, queued for 3.4-rc.
+On Thu, Apr 05, 2012 at 12:37:24PM +0530, Viresh Kumar wrote:
+> On 4/5/2012 12:33 PM, Uwe Kleine-K?nig wrote:
+> > It depends on your scenario. E.g. for an UART clock it might be better
+> > to choose 130. Here choosing the frequency is not about a fixed maximum
+> > but to match the sample rate of the device connect to your UART.
+> 
+> My point was: we can almost always guarantee that device will still
+> be operational at any frequency below the one requested. But it may
+> not work at any freq above the requested one. So, giving 130 here may
+> break it.
+It depends. If for satisfying a request for 115200 Bd you have the choice
+between 115202 Bd and 57601 Bd, I'd recommend the former.
 
-Thanks, changes look good.
+Best regards
+Uwe
 
->
->
-> - Paul
->
->
-> From: Rajendra Nayak<rnayak@ti.com>
-> Date: Tue, 13 Mar 2012 22:55:23 +0530
-> Subject: [PATCH] ARM: OMAP2+: hwmod: Restore sysc after a reset
->
-> After a softreset, make sure the sysc settings are correctly
-> restored.
->
-> Reported-by: Anand Gadiyar<gadiyar@ti.com>
-> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-> Cc: Benoit Cousson<b-cousson@ti.com>
-> Cc: Paul Walmsley<paul@pwsan.com>
-> Cc: Shubhrajyoti D<shubhrajyoti@ti.com>
-> [paul at pwsan.com: combined post-reset SYSCONFIG reload code into the
->   _reset() function to avoid duplication and future mistakes]
-> Signed-off-by: Paul Walmsley<paul@pwsan.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod.c |   18 ++++++------------
->   1 file changed, 6 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 5a68010..d32c1ce 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -1477,6 +1477,11 @@ static int _reset(struct omap_hwmod *oh)
->
->   	ret = (oh->class->reset) ? oh->class->reset(oh) : _ocp_softreset(oh);
->
-> +	if (oh->class->sysc) {
-> +		_update_sysc_cache(oh);
-> +		_enable_sysc(oh);
-> +	}
-> +
->   	return ret;
->   }
->
-> @@ -1786,20 +1791,9 @@ static int _setup(struct omap_hwmod *oh, void *data)
->   		return 0;
->   	}
->
-> -	if (!(oh->flags&  HWMOD_INIT_NO_RESET)) {
-> +	if (!(oh->flags&  HWMOD_INIT_NO_RESET))
->   		_reset(oh);
->
-> -		/*
-> -		 * OCP_SYSCONFIG bits need to be reprogrammed after a softreset.
-> -		 * The _enable() function should be split to
-> -		 * avoid the rewrite of the OCP_SYSCONFIG register.
-> -		 */
-> -		if (oh->class->sysc) {
-> -			_update_sysc_cache(oh);
-> -			_enable_sysc(oh);
-> -		}
-> -	}
-> -
->   	postsetup_state = oh->_postsetup_state;
->   	if (postsetup_state == _HWMOD_STATE_UNKNOWN)
->   		postsetup_state = _HWMOD_STATE_ENABLED;
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
