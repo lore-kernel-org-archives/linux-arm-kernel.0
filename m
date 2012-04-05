@@ -1,38 +1,22 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Apr 2012 13:23:46 -0600
-Subject: Point-to-point bus in device tree
-In-Reply-To: <20120405181509.GA28693@codeaurora.org>
-References: <20120405181509.GA28693@codeaurora.org>
-Message-ID: <4F7DF142.5050601@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 5 Apr 2012 13:50:51 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP: clock, powerdomain, clockdomain, hwmod
+ fixes for early v3.4-rc
+In-Reply-To: <20120405164223.GA3785@atomide.com>
+References: <alpine.DEB.2.00.1204041658200.7161@utopia.booyaka.com>
+ <20120405004139.GA10780@atomide.com>
+ <alpine.DEB.2.00.1204042007140.10302@utopia.booyaka.com>
+ <alpine.DEB.2.00.1204050246410.10302@utopia.booyaka.com>
+ <20120405164223.GA3785@atomide.com>
+Message-ID: <alpine.DEB.2.00.1204051350410.10302@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2012 12:15 PM, David Brown wrote:
-> Some MSM SoCs have a small serial-type "bus" that is used to
-> communicate with the PMIC devices.  This interface is always
-> point-to-point.  I'm doing a device-tree conversion of the driver that
-> Ken Heitke posted last year <https://lkml.org/lkml/2011/2/17/503>.
-> 
-> A naive conversion to device tree, would result in something like
-> this:
-> 
-> 	qcom,ssbi at 500000 {
-> 		compatible = "qcom,ssbi";
-> 		reg = <0x500000 0x1000>;
-> 		qcom,controller-type = "ssbi";
-> 
-> 		qcom,pmic8058 at 0 {
-> 			reg = <0x0 0x01>;
-> 			...
-> 		}
-> 	}
-> 
-> There would end up being an extraneous register for the device on the
-> other end (there are no addresses), and there would need to be code in
-> the ssbi driver to traverse this small tree to find these nodes.
+On Thu, 5 Apr 2012, Tony Lindgren wrote:
 
-Isn't that extra code simply:
+> Yes it's the fixes branch I was talking about, thanks for updating it.
 
-of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+Thanks -- sorry about the confusion...
 
-That seems like pretty low overhead.
+
+- Paul
