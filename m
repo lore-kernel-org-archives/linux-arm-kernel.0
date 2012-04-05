@@ -1,22 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Apr 2012 13:36:42 +0100
-Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
- variants
-In-Reply-To: <1333619748-16126-7-git-send-email-lee.jones@linaro.org>
-References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
- <1333619748-16126-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120405123642.GG24211@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 05 Apr 2012 13:59:56 +0100
+Subject: [PATCH] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <20120403153538.0D1B83E044A@localhost>
+References: <1333384217-13441-1-git-send-email-marc.zyngier@arm.com>
+ <4F7AC138.9020308@citrix.com> <4F7AC8A8.9020606@arm.com>
+ <20120403153538.0D1B83E044A@localhost>
+Message-ID: <4F7D974C.9050506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 10:55:47AM +0100, Lee Jones wrote:
-> +	of_property_read_u32(np, "clock-frequency", &pdata->f_max);
-> +	if (!pdata->f_max)
-> +		pr_warn("%s has no 'clock-frequency' property\n", np->full_name);
+On 03/04/12 16:35, Grant Likely wrote:
 
-To be anal about this (which is what we should be about DT bindings)
-this is not a 'clock frequency' but a maximum clock frequency for the
-bus.  Or to put it another way, a clock frequency limit.
+Hi Grant,
 
-A 'clock-frequency' property suggests (at least to me) that it's
-specifying the rate of the MCLK signal, which is not what it's doing.
+> On Tue, 03 Apr 2012 10:53:44 +0100, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 03/04/12 10:22, David Vrabel wrote:
+>>
+>> Hi David,
+>>
+>>> On 02/04/12 17:30, Marc Zyngier wrote:
+>>>> The GICv2 can have virtualization extension support, consisting
+>>>> of an additional set of registers and interrupts. Add the necessary
+>>>> binding to the GIC DT documentation.
+>>>
+>>> The Xen hypervisor's device tree support is very much incomplete so I've
+>>> not looked into this is much detail.
+>>>
+>>> Would it make more sense to extend the existing gic binding with the the
+>>> additional information rather than adding a new node?
+>>
+>> I'm actually torn between the two approaches. On one side, the VGIC is
+>> part of the GIC spec, hence should be part of the GIC node. On the other
+>> hand, it is logically handled by a different piece of software (the
+>> hypervisor), and would normally be probed separately. Having a separate
+>> node makes the probing more sensible.
+> 
+> Don't get too hung up on the software side of things.  Describe it in
+> a way that makes sense for the hardware.  There is lots of precidence
+> for two hunks of software initializating from the same node; either by
+> probe kicking off two init hooks, or by early init code going looking
+> for the node manually.
+
+What I'm trying to avoid is a royal mess in the future if we get some
+other extension to the GIC.
+
+Let's say we implement the following:
+
+	gic: interrupt-controller at 2c001000 {
+		compatible = "arm,cortex-a15-gic";
+		#interrupt-cells = <3>;
+		#address-cells = <1>;
+		interrupt-controller;
+		reg = <0x2c001000 0x1000>,
+		      <0x2c002000 0x100>,
+		      <0x2c004000 0x2000>,
+		      <0x2c006000 0x2000>;
+		interrupts = <1 9 0xf04>;
+	};
+
+It's all fine (the two last regions and the interrupt are for VGIC),
+until someone comes up with extension FOO which requires two new regions
+and am interrupt. It is then impossible to distinguish between the two,
+short of adding more attributes.
+
+How about this?
+
+	gic: interrupt-controller at 2c001000 {
+		compatible = "arm,cortex-a15-gic";
+		#interrupt-cells = <3>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		interrupt-controller;
+		reg = <0x2c001000 0x1000>,
+		      <0x2c002000 0x100>;
+
+		vgic at 2c004000 {
+			compatible = "arm,cortex-a15-vgic", "arm,vgic";
+			reg = <0x2c004000 0x2000>,
+			      <0x2c006000 0x2000>;
+			interrupts = <1 9 0xf04>;
+		};
+	};
+
+It cleanly separate the extension from the core GIC, and still make it
+part of the GIC node.
+
+What do you think?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
