@@ -1,34 +1,57 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 5 Apr 2012 15:43:49 +0530
-Subject: Query: clk: Defining new struct clk_foo types
-In-Reply-To: <20120405095835.GB20478@pengutronix.de>
-References: <4F7D443E.3010800@st.com> <20120405095835.GB20478@pengutronix.de>
-Message-ID: <4F7D705D.7050004@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  5 Apr 2012 11:25:28 +0100
+Subject: [PATCH 1/7] ARM: ux500: New DT:ed snowball_platform_devs for
+ one-by-one device enablement
+Message-ID: <1333621534-29627-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/5/2012 3:28 PM, Sascha Hauer wrote:
-> If you have a gate and a divider then register a gate and a divider.
-> We don't need clk providers for combination of these, the clock
-> framework will handle it just fine.
+During Device Tree enablement it is necessary to remove
+snowball_<device>* platform_data segments one at at time,
+as and when particular devices are DT enabled. This patch
+provides a temporary solution. Once this new struct is
+empty it will be removed again.
 
-Thanks Sashca, but i didn't get your reply completely.
-Lets see if i can understand it with help of an example:
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |   18 ++++++++++++++++--
+ 1 files changed, 16 insertions(+), 2 deletions(-)
 
-I have uart's clock that can be gated and its rate derived as a divider.
-So to define static clock structures, i do following:
-
-DEFINE_CLK_GATE(uart_gate_clk, "uart_parent", &uart_parent_clk,	0,
-	0xd0000000, 5, 0, NULL);
-DEFINE_CLK_DIVIDER(uart_divider_clk, "uart_parent", &uart_parent_clk,
-	0, 0xd0000080, 4, 2, 0, NULL);
-
-You are suggesting this?
-
-If yes, I don't know how it will work. How will clk get work
-with dev_id: "uart0". Which one will it pick?
-
-Confused. :(
-
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 77d03c1..29e0ade 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -609,6 +609,13 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ 	&ab8500_device,
+ };
+ 
++static struct platform_device *snowball_of_platform_devs[] __initdata = {
++	&snowball_led_dev,
++	&snowball_key_dev,
++	&snowball_sbnet_dev,
++	&ab8500_device,
++};
++
+ static void __init mop500_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+@@ -786,8 +793,15 @@ static void __init u8500_init_machine(void)
+ 		mop500_sdi_init(parent);
+ 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+ 		snowball_pins_init();
+-		platform_add_devices(snowball_platform_devs,
+-				ARRAY_SIZE(snowball_platform_devs));
++
++		/* Devices to be DT:ed:
++		     snowball_led_dev   = todo
++		     snowball_key_dev   = todo
++		     snowball_sbnet_dev = todo
++		     ab8500_device      = todo
++		*/
++		platform_add_devices(snowball_of_platform_devs,
++				ARRAY_SIZE(snowball_of_platform_devs));
+ 
+ 		snowball_sdi_init(parent);
+ 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
 -- 
-viresh
+1.7.9.1
