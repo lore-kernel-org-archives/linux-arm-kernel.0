@@ -1,448 +1,623 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  5 Apr 2012 18:01:21 +0200
-Subject: [PATCH 2/5] ARM: AT91: IIO: Add AT91 ADC driver.
+Date: Thu,  5 Apr 2012 18:01:24 +0200
+Subject: [PATCH 5/5] IIO: AT91: Add support for hardware triggers for the ADC
 In-Reply-To: <1333641684-20325-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1333641684-20325-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1333641684-20325-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1333641684-20325-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the IIO driver for the AT91 ADCs. It only supports and has
-been tested on the SAM9G20 evaluation boards, but support for
-other boards will come eventually.
-
-This ADC is a multi-channel ADC with support for both hardware
-and software triggers.
-
-This first version only supports software triggers.
+This patch adds support for the hardware triggers for both the
+AT91SAM9G20-EK and AT91SAM9M10G45-EK evaluation board from Atmel.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jonathan Cameron <jic23@cam.ac.uk>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/staging/iio/adc/Kconfig    |    6 +
- drivers/staging/iio/adc/Makefile   |    1 +
- drivers/staging/iio/adc/at91_adc.c |  382 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 389 insertions(+), 0 deletions(-)
- create mode 100644 drivers/staging/iio/adc/at91_adc.c
+ arch/arm/mach-at91/at91sam9260_devices.c |    3 +
+ arch/arm/mach-at91/at91sam9g45_devices.c |    3 +
+ arch/arm/mach-at91/board-sam9g20ek.c     |    1 +
+ arch/arm/mach-at91/board-sam9m10g45ek.c  |    1 +
+ drivers/staging/iio/adc/Kconfig          |    3 +
+ drivers/staging/iio/adc/at91_adc.c       |  390 +++++++++++++++++++++++++++++-
+ include/linux/platform_data/at91_adc.h   |    2 +
+ 7 files changed, 396 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 08464fe..66df43a 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -1412,6 +1412,9 @@ void __init at91_add_device_adc(struct at91_adc_data *data)
+ 	if (test_bit(3, &data->channels_used))
+ 		at91_set_A_periph(AT91_PIN_PC3, 0);
+ 
++	if (data->use_external)
++		at91_set_A_periph(AT91_PIN_PA22, 0);
++
+ 	adc_data = *data;
+ 	platform_device_register(&at91_adc_device);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 7827139..13ac3932 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -1255,6 +1255,9 @@ void __init at91_add_device_adc(struct at91_adc_data *data)
+ 	if (test_bit(7, &data->channels_used))
+ 		at91_set_gpio_input(AT91_PIN_PD27, 0);
+ 
++	if (data->use_external)
++		at91_set_A_periph(AT91_PIN_PD28, 0);
++
+ 	adc_data = *data;
+ 	platform_device_register(&at91_adc_device);
+ }
+diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+index 2ce4e26..3bb6e4d 100644
+--- a/arch/arm/mach-at91/board-sam9g20ek.c
++++ b/arch/arm/mach-at91/board-sam9g20ek.c
+@@ -326,6 +326,7 @@ static void __init ek_add_device_buttons(void) {}
+ 
+ static struct at91_adc_data ek_adc_data = {
+ 	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3),
++	.use_external = true,
+ 	.vref = 3300,
+ };
+ 
+diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+index dca46c8..9a89afc 100644
+--- a/arch/arm/mach-at91/board-sam9m10g45ek.c
++++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+@@ -321,6 +321,7 @@ static struct at91_tsadcc_data ek_tsadcc_data = {
+  */
+ static struct at91_adc_data ek_adc_data = {
+ 	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7),
++	.use_external = true,
+ 	.vref = 3300,
+ };
+ 
 diff --git a/drivers/staging/iio/adc/Kconfig b/drivers/staging/iio/adc/Kconfig
-index 592eabd..1494838 100644
+index 1494838..9ee7ed9 100644
 --- a/drivers/staging/iio/adc/Kconfig
 +++ b/drivers/staging/iio/adc/Kconfig
-@@ -169,6 +169,12 @@ config AD7280
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called ad7280a
+@@ -172,6 +172,9 @@ config AD7280
+ config AT91_ADC
+ 	tristate "Atmel AT91 ADC"
+ 	depends on SYSFS && ARCH_AT91
++	select IIO_BUFFER
++	select IIO_SW_RING
++	select IIO_TRIGGER
+ 	help
+ 	  Say yes here to build support for Atmel AT91 ADC.
  
-+config AT91_ADC
-+	tristate "Atmel AT91 ADC"
-+	depends on SYSFS && ARCH_AT91
-+	help
-+	  Say yes here to build support for Atmel AT91 ADC.
-+
- config MAX1363
- 	tristate "Maxim max1363 ADC driver"
- 	depends on I2C
-diff --git a/drivers/staging/iio/adc/Makefile b/drivers/staging/iio/adc/Makefile
-index f83ab95..8cb6d1c 100644
---- a/drivers/staging/iio/adc/Makefile
-+++ b/drivers/staging/iio/adc/Makefile
-@@ -38,3 +38,4 @@ obj-$(CONFIG_ADT7310) += adt7310.o
- obj-$(CONFIG_ADT7410) += adt7410.o
- obj-$(CONFIG_AD7280) += ad7280a.o
- obj-$(CONFIG_LPC32XX_ADC) += lpc32xx_adc.o
-+obj-$(CONFIG_AT91_ADC) += at91_adc.o
 diff --git a/drivers/staging/iio/adc/at91_adc.c b/drivers/staging/iio/adc/at91_adc.c
-new file mode 100644
-index 0000000..c76516a
---- /dev/null
+index 04bac43..57e2161 100644
+--- a/drivers/staging/iio/adc/at91_adc.c
 +++ b/drivers/staging/iio/adc/at91_adc.c
-@@ -0,0 +1,382 @@
-+/*
-+ * Driver for the ADC present in the Atmel AT91 evaluation boards.
-+ *
-+ * Copyright 2011 Free Electrons
-+ *
-+ * Licensed under the GPLv2 or later.
-+ */
+@@ -23,9 +23,33 @@
+ #include "../iio.h"
+ #include <linux/platform_data/at91_adc.h>
+ 
++#include "../buffer.h"
++#include "../ring_sw.h"
++#include "../trigger.h"
++#include "../trigger_consumer.h"
 +
-+#include <linux/bitmap.h>
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/jiffies.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/wait.h>
-+
-+#include "../iio.h"
-+#include <linux/platform_data/at91_adc.h>
-+
-+#include <mach/at91_adc.h>
-+#include <mach/cpu.h>
+ #include <mach/at91_adc.h>
+ #include <mach/cpu.h>
+ 
++#define AT91_TSADCC_TRGR		(0x08)
++#define AT91_TSADCC_TRGMOD_EXT_RISING	(1 << 0)
++#define AT91_TSADCC_TRGMOD_EXT_FALLING	(1 << 1)
++#define AT91_TSADCC_TRGMOD_EXT_ANY	(AT91_TSADCC_TRGMOD_EXT_RISING | AT91_TSADCC_TRGMOD_EXT_FALLING)
++#define AT91_TSADCC_TRGMOD_CONTINUOUS	(3 << 1)
 +
 +/**
-+ * struct at91_adc_desc - description of the ADC on the board
-+ * @clock:		ADC clock as specified by the datasheet, in Hz.
-+ * @clock_name		Name of the ADC clock as defined in the clock tree
-+ * @num_channels:	global number of channels available on the board (to
-+			specify which channels are indeed in use on the
-+			board, see the channels_used bitmask in the platform
-+			data)
-+ * @startup_time:	startup time of the ADC in microseconds
++ * struct at91_adc_trigger - description of triggers
++ * @name:		name of the trigger advertised to the user
++ * @value:		value to set in the ADC's mode register to enable
++			the trigger
++ * @is_external:	is the trigger relies on an external pin ?
 + */
-+struct at91_adc_desc {
-+	u32			clock;
-+	char			*clock_name;
-+	u8			num_channels;
-+	u8			startup_time;
++struct at91_adc_trigger {
++	char	*name;
++	u8	value;
++	bool	is_external;
 +};
 +
-+struct at91_adc_state {
-+	unsigned long		channels_mask;
-+	struct clk		*clk;
-+	bool			done;
-+	struct at91_adc_desc	*desc;
-+	int			irq;
-+	u16			last_value;
-+	struct mutex		lock;
-+	void __iomem		*reg_base;
-+	u32			vref_mv;
-+	wait_queue_head_t	wq_data_avail;
+ /**
+  * struct at91_adc_desc - description of the ADC on the board
+  * @clock:		ADC clock as specified by the datasheet, in Hz.
+@@ -35,32 +59,93 @@
+ 			board, see the channels_used bitmask in the platform
+ 			data)
+  * @startup_time:	startup time of the ADC in microseconds
++ * @triggers:		array of the triggers available on the board
++ * @trigger_register:	index of the register managing the hardware triggers
+  */
+ struct at91_adc_desc {
+ 	u32			clock;
+ 	char			*clock_name;
+ 	u8			num_channels;
+ 	u8			startup_time;
++	struct at91_adc_trigger	*triggers;
++	u8			trigger_register;
+ };
+ 
+ struct at91_adc_state {
++	u16			*buffer;
+ 	unsigned long		channels_mask;
+ 	struct clk		*clk;
+ 	bool			done;
+ 	struct at91_adc_desc	*desc;
+ 	int			irq;
++	bool			irq_enabled;
+ 	u16			last_value;
+ 	struct mutex		lock;
+ 	void __iomem		*reg_base;
++	struct iio_trigger	**trig;
+ 	u32			vref_mv;
+ 	wait_queue_head_t	wq_data_avail;
+ };
+ 
++static struct at91_adc_trigger at91_adc_trigger_sam9g45[] = {
++	[0] = {
++		.name = "external-rising",
++		.value = AT91_TSADCC_TRGMOD_EXT_RISING,
++		.is_external = true,
++	},
++	[1] = {
++		.name = "external-falling",
++		.value = AT91_TSADCC_TRGMOD_EXT_FALLING,
++		.is_external = true,
++	},
++	[2] = {
++		.name = "external-any",
++		.value = AT91_TSADCC_TRGMOD_EXT_ANY,
++		.is_external = true,
++	},
++	[3] = {
++		.name = "continuous",
++		.value = AT91_TSADCC_TRGMOD_CONTINUOUS,
++		.is_external = false,
++	},
++	[4] = {
++		.name = NULL,
++	},
 +};
 +
-+static struct at91_adc_desc at91_adc_desc_sam9g20 = {
-+	.clock = 5000000,
-+	.clock_name = "adc_clk",
-+	.num_channels = 4,
-+	.startup_time = 10,
+ static struct at91_adc_desc at91_adc_desc_sam9g45 = {
+ 	.clock = 13200000,
+ 	.clock_name = "tsc_clk",
+ 	.num_channels = 8,
+ 	.startup_time = 40,
++	.triggers = at91_adc_trigger_sam9g45,
++	.trigger_register = AT91_TSADCC_TRGR,
 +};
 +
-+static int at91_adc_select_soc(struct at91_adc_state *st)
++static struct at91_adc_trigger at91_adc_trigger_sam9g20[] = {
++	[0] = {
++		.name = "timer-counter-0",
++		.value = AT91_ADC_TRGSEL_TC0 | AT91_ADC_TRGEN,
++		.is_external = false,
++	},
++	[1] = {
++		.name = "timer-counter-1",
++		.value = AT91_ADC_TRGSEL_TC1 | AT91_ADC_TRGEN,
++		.is_external = false,
++	},
++	[2] = {
++		.name = "timer-counter-2",
++		.value = AT91_ADC_TRGSEL_TC2 | AT91_ADC_TRGEN,
++		.is_external = false,
++	},
++	[3] = {
++		.name = "external",
++		.value = AT91_ADC_TRGSEL_EXTERNAL | AT91_ADC_TRGEN,
++		.is_external = true,
++	},
++	[4] = {
++		.name = NULL,
++	},
+ };
+ 
+ static struct at91_adc_desc at91_adc_desc_sam9g20 = {
+@@ -68,6 +153,8 @@ static struct at91_adc_desc at91_adc_desc_sam9g20 = {
+ 	.clock_name = "adc_clk",
+ 	.num_channels = 4,
+ 	.startup_time = 10,
++	.triggers = at91_adc_trigger_sam9g20,
++	.trigger_register = AT91_ADC_MR,
+ };
+ 
+ static int at91_adc_select_soc(struct at91_adc_state *st)
+@@ -98,6 +185,48 @@ static inline void at91_adc_reg_write(struct at91_adc_state *st,
+ 	writel_relaxed(val, st->reg_base + reg);
+ }
+ 
++static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
 +{
-+	if (cpu_is_at91sam9g20()) {
-+		st->desc = &at91_adc_desc_sam9g20;
-+		return 0;
-+	}
-+
-+	return -ENODEV;
-+}
-+
-+static inline u32 at91_adc_reg_read(struct at91_adc_state *st,
-+				    u8 reg)
-+{
-+	return readl_relaxed(st->reg_base + reg);
-+}
-+
-+static inline void at91_adc_reg_write(struct at91_adc_state *st,
-+				      u8 reg,
-+				      u32 val)
-+{
-+	writel_relaxed(val, st->reg_base + reg);
-+}
-+
-+static irqreturn_t at91_adc_eoc_trigger(int irq, void *private)
-+{
-+	struct iio_dev *idev = private;
++	struct iio_poll_func *pf = p;
++	struct iio_dev *idev = pf->indio_dev;
 +	struct at91_adc_state *st = iio_priv(idev);
-+	unsigned int status = at91_adc_reg_read(st, AT91_ADC_SR);
++	struct iio_buffer *buffer = idev->buffer;
++	int len = 0;
 +
-+	if (!(status & AT91_ADC_DRDY))
-+		return IRQ_HANDLED;
-+
-+	if (status & st->channels_mask) {
-+		st->done = true;
-+		st->last_value = at91_adc_reg_read(st, AT91_ADC_LCDR);
++	if (!bitmap_empty(idev->active_scan_mask, idev->masklength)) {
++		int i, j;
++		for (i = 0, j = 0;
++		     i < bitmap_weight(idev->active_scan_mask,
++				       idev->masklength);
++		     i++) {
++			j = find_next_bit(buffer->scan_mask,
++					  idev->masklength,
++					  j);
++			st->buffer[i] = at91_adc_reg_read(st, AT91_ADC_CHR(j));
++			j++;
++			len += 2;
++		}
 +	}
 +
-+	wake_up_interruptible(&st->wq_data_avail);
++	if (buffer->scan_timestamp) {
++		s64 *timestamp = (s64 *)((u8 *)st->buffer + ALIGN(len,
++								  sizeof(s64)));
++		*timestamp = pf->timestamp;
++	}
++
++	buffer->access->store_to(buffer, (u8 *)st->buffer, pf->timestamp);
++
++	iio_trigger_notify_done(idev->trig);
++	st->irq_enabled = true;
++
++	/* Needed to ACK the DRDY interruption */
++	at91_adc_reg_read(st, AT91_ADC_LCDR);
++
++	enable_irq(st->irq);
 +
 +	return IRQ_HANDLED;
 +}
 +
-+static int at91_adc_channel_init(struct iio_dev *idev,
+ static irqreturn_t at91_adc_eoc_trigger(int irq, void *private)
+ {
+ 	struct iio_dev *idev = private;
+@@ -107,13 +236,16 @@ static irqreturn_t at91_adc_eoc_trigger(int irq, void *private)
+ 	if (!(status & AT91_ADC_DRDY))
+ 		return IRQ_HANDLED;
+ 
+-	if (status & st->channels_mask) {
+-		st->done = true;
++	if (iio_buffer_enabled(idev)) {
++		disable_irq_nosync(irq);
++		st->irq_enabled = false;
++		iio_trigger_poll(idev->trig, iio_get_time_ns());
++	} else {
+ 		st->last_value = at91_adc_reg_read(st, AT91_ADC_LCDR);
++		st->done = true;
++		wake_up_interruptible(&st->wq_data_avail);
+ 	}
+ 
+-	wake_up_interruptible(&st->wq_data_avail);
+-
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -125,8 +257,9 @@ static int at91_adc_channel_init(struct iio_dev *idev,
+ 	int bit, idx = 0;
+ 
+ 	idev->num_channels = bitmap_weight(&pdata->channels_used,
+-					   st->desc->num_channels);
+-	chan_array = kcalloc(idev->num_channels, sizeof(struct iio_chan_spec),
++					   st->desc->num_channels) + 1;
++	chan_array = kcalloc(idev->num_channels + 1,
++			     sizeof(struct iio_chan_spec),
+ 			     GFP_KERNEL);
+ 
+ 	if (chan_array == NULL)
+@@ -137,6 +270,7 @@ static int at91_adc_channel_init(struct iio_dev *idev,
+ 		chan->type = IIO_VOLTAGE;
+ 		chan->indexed = 1;
+ 		chan->channel = bit;
++		chan->scan_index = idx;
+ 		chan->scan_type.sign = 'u';
+ 		chan->scan_type.realbits = 10;
+ 		chan->scan_type.storagebits = 16;
+@@ -144,6 +278,13 @@ static int at91_adc_channel_init(struct iio_dev *idev,
+ 		idx++;
+ 	}
+ 
++	(chan_array + idx)->type = IIO_TIMESTAMP;
++	(chan_array + idx)->channel = -1;
++	(chan_array + idx)->scan_index = idx;
++	(chan_array + idx)->scan_type.sign = 's';
++	(chan_array + idx)->scan_type.realbits = 64;
++	(chan_array + idx)->scan_type.storagebits = 64;
++
+ 	idev->channels = chan_array;
+ 	return idev->num_channels;
+ }
+@@ -153,6 +294,223 @@ static void at91_adc_channel_remove(struct iio_dev *idev)
+ 	kfree(idev->channels);
+ }
+ 
++static u8 at91_adc_get_trigger_value_by_name(struct iio_dev *idev,
++					     struct at91_adc_trigger *triggers,
++					     const char *trigger_name)
++{
++	u8 value = 0;
++	int i;
++
++	for (i = 0; (triggers + i) != NULL; i++) {
++		char *name = kasprintf(GFP_KERNEL,
++				"%s-dev%d-%s",
++				idev->name,
++				idev->id,
++				triggers[i].name);
++		if (name == NULL)
++			return -ENOMEM;
++
++		if (strcmp(trigger_name, name) == 0) {
++			value = triggers[i].value;
++			kfree(name);
++			break;
++		}
++
++		kfree(name);
++	}
++
++	return value;
++}
++
++static int at91_adc_configure_trigger(struct iio_trigger *trig, bool state)
++{
++	struct iio_dev *idev = trig->private_data;
++	struct at91_adc_state *st = iio_priv(idev);
++	struct iio_buffer *buffer = idev->buffer;
++	u32 status = at91_adc_reg_read(st, st->desc->trigger_register);
++	u8 value;
++	u8 bit;
++
++	value = at91_adc_get_trigger_value_by_name(idev,
++						   st->desc->triggers,
++						   idev->trig->name);
++	if (value == 0)
++		return -EINVAL;
++
++	if (state) {
++		size_t datasize = buffer->access->get_bytes_per_datum(buffer);
++
++		st->buffer = kmalloc(datasize, GFP_KERNEL);
++		if (st->buffer == NULL)
++			return -ENOMEM;
++
++		at91_adc_reg_write(st,
++				   st->desc->trigger_register,
++				   status | value);
++
++		for_each_set_bit(bit, buffer->scan_mask,
++				 st->desc->num_channels) {
++			struct iio_chan_spec const *chan = idev->channels + bit;
++			at91_adc_reg_write(st, AT91_ADC_CHER,
++					   AT91_ADC_CH(chan->channel));
++		}
++
++		at91_adc_reg_write(st, AT91_ADC_IER, AT91_ADC_DRDY);
++
++	} else {
++		at91_adc_reg_write(st, AT91_ADC_IDR, AT91_ADC_DRDY);
++
++		at91_adc_reg_write(st, st->desc->trigger_register,
++				   status & ~value);
++
++		for_each_set_bit(bit, buffer->scan_mask,
++				 st->desc->num_channels) {
++			struct iio_chan_spec const *chan = idev->channels + bit;
++			at91_adc_reg_write(st, AT91_ADC_CHDR,
++					   AT91_ADC_CH(chan->channel));
++		}
++		kfree(st->buffer);
++	}
++
++	return 0;
++}
++
++static const struct iio_trigger_ops at91_adc_trigger_ops = {
++	.owner = THIS_MODULE,
++	.set_trigger_state = &at91_adc_configure_trigger,
++};
++
++static struct iio_trigger *at91_adc_allocate_trigger(struct iio_dev *idev,
++						     struct at91_adc_trigger *trigger)
++{
++	struct iio_trigger *trig = iio_allocate_trigger("%s-dev%d-%s",
++							idev->name,
++							idev->id,
++							trigger->name);
++	int ret;
++
++	if (trig == NULL)
++		return NULL;
++
++	trig->dev.parent = idev->dev.parent;
++	trig->private_data = idev;
++	trig->ops = &at91_adc_trigger_ops;
++
++	ret = iio_trigger_register(trig);
++	if (ret < 0)
++		return NULL;
++
++	return trig;
++}
++
++static int at91_adc_trigger_init(struct iio_dev *idev,
 +				 struct at91_adc_data *pdata)
 +{
 +	struct at91_adc_state *st = iio_priv(idev);
-+	struct iio_chan_spec *chan_array;
-+	int bit, idx = 0;
++	int i, ret;
 +
-+	idev->num_channels = bitmap_weight(&pdata->channels_used,
-+					   st->desc->num_channels);
-+	chan_array = kcalloc(idev->num_channels, sizeof(struct iio_chan_spec),
-+			     GFP_KERNEL);
++	st->trig = kcalloc(sizeof(st->desc->triggers),
++			   sizeof(st->trig),
++			   GFP_KERNEL);
 +
-+	if (chan_array == NULL)
-+		return -ENOMEM;
-+
-+	for_each_set_bit(bit, &pdata->channels_used, st->desc->num_channels) {
-+		struct iio_chan_spec *chan = chan_array + idx;
-+		chan->type = IIO_VOLTAGE;
-+		chan->indexed = 1;
-+		chan->channel = bit;
-+		chan->scan_type.sign = 'u';
-+		chan->scan_type.realbits = 10;
-+		chan->scan_type.storagebits = 16;
-+		chan->info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT;
-+		idx++;
-+	}
-+
-+	idev->channels = chan_array;
-+	return idev->num_channels;
-+}
-+
-+static void at91_adc_channel_remove(struct iio_dev *idev)
-+{
-+	kfree(idev->channels);
-+}
-+
-+static int at91_adc_read_raw(struct iio_dev *idev,
-+			     struct iio_chan_spec const *chan,
-+			     int *val, int *val2, long mask)
-+{
-+	struct at91_adc_state *st = iio_priv(idev);
-+	int ret;
-+
-+	switch (mask) {
-+	case 0:
-+		mutex_lock(&st->lock);
-+
-+		at91_adc_reg_write(st, AT91_ADC_CHER,
-+				  AT91_ADC_CH(chan->channel));
-+		at91_adc_reg_write(st, AT91_ADC_IER,
-+				  AT91_ADC_EOC(chan->channel));
-+		at91_adc_reg_write(st, AT91_ADC_CR, AT91_ADC_START);
-+
-+		ret = wait_event_interruptible_timeout(st->wq_data_avail,
-+						       st->done,
-+						       msecs_to_jiffies(1000));
-+		if (ret == 0)
-+			return -ETIMEDOUT;
-+		else if (ret < 0)
-+			return ret;
-+
-+		*val = st->last_value;
-+
-+		at91_adc_reg_write(st, AT91_ADC_CHDR,
-+				  AT91_ADC_CH(chan->channel));
-+		at91_adc_reg_write(st, AT91_ADC_IDR,
-+				  AT91_ADC_EOC(chan->channel));
-+
-+		st->last_value = 0;
-+		st->done = false;
-+		mutex_unlock(&st->lock);
-+		return IIO_VAL_INT;
-+
-+	case IIO_CHAN_INFO_SCALE:
-+		*val = (st->vref_mv * 1000) >> chan->scan_type.realbits;
-+		*val2 = 0;
-+		return IIO_VAL_INT_PLUS_MICRO;
-+	default:
-+		break;
-+	}
-+	return -EINVAL;
-+}
-+
-+static const struct iio_info at91_adc_info = {
-+	.driver_module = THIS_MODULE,
-+	.read_raw = &at91_adc_read_raw,
-+};
-+
-+static int __devinit at91_adc_probe(struct platform_device *pdev)
-+{
-+	unsigned int prsc, mstrclk, ticks;
-+	int ret;
-+	struct iio_dev *idev;
-+	struct at91_adc_state *st;
-+	struct resource *res;
-+	struct at91_adc_data *pdata = pdev->dev.platform_data;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "No resource defined\n");
-+		ret = -ENXIO;
-+		goto error_ret;
-+	}
-+
-+	idev = iio_allocate_device(sizeof(struct at91_adc_state));
-+	if (idev == NULL) {
++	if (st->trig == NULL) {
 +		ret = -ENOMEM;
 +		goto error_ret;
 +	}
 +
-+	platform_set_drvdata(pdev, idev);
++	for (i = 0; st->desc->triggers[i].name != NULL; i++) {
++		if (st->desc->triggers[i].is_external && !(pdata->use_external))
++			continue;
 +
-+	idev->dev.parent = &pdev->dev;
-+	idev->name = dev_name(&pdev->dev);
-+	idev->modes = INDIO_DIRECT_MODE;
-+	idev->info = &at91_adc_info;
-+
-+	st = iio_priv(idev);
-+	ret = at91_adc_select_soc(st);
-+	if (ret) {
-+		dev_err(&pdev->dev, "SoC unknown\n");
-+		goto error_free_device;
-+	}
-+
-+	st->irq = platform_get_irq(pdev, 0);
-+	if (st->irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ ID is designated\n");
-+		ret = -ENODEV;
-+		goto error_free_device;
-+	}
-+
-+	if (!request_mem_region(res->start, resource_size(res),
-+				"AT91 adc registers")) {
-+		dev_err(&pdev->dev, "Resources are unavailable.\n");
-+		ret = -EBUSY;
-+		goto error_free_device;
-+	}
-+
-+	st->reg_base = ioremap(res->start, resource_size(res));
-+	if (!st->reg_base) {
-+		dev_err(&pdev->dev, "Failed to map registers.\n");
-+		ret = -ENOMEM;
-+		goto error_release_mem;
-+	}
-+
-+	/*
-+	 * Disable all IRQs before setting up the handler
-+	 */
-+	at91_adc_reg_write(st, AT91_ADC_CR, AT91_ADC_SWRST);
-+	at91_adc_reg_write(st, AT91_ADC_IDR, 0xFFFFFFFF);
-+	ret = request_irq(st->irq,
-+			  at91_adc_eoc_trigger,
-+			  0,
-+			  pdev->dev.driver->name,
-+			  idev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to allocate IRQ.\n");
-+		goto error_unmap_reg;
-+	}
-+
-+	st->clk = clk_get(&pdev->dev, st->desc->clock_name);
-+	if (IS_ERR(st->clk)) {
-+		dev_err(&pdev->dev, "Failed to get the clock.\n");
-+		ret = PTR_ERR(st->clk);
-+		goto error_free_irq;
-+	}
-+
-+	clk_enable(st->clk);
-+	mstrclk = clk_get_rate(st->clk);
-+
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "No platform data available.\n");
-+		ret = -EINVAL;
-+		goto error_free_clk;
-+	}
-+
-+	if (!st->desc->clock) {
-+		dev_err(&pdev->dev, "No ADCClock available.\n");
-+		ret = -EINVAL;
-+		goto error_free_clk;
-+	}
-+
-+	/*
-+	 * Prescaler rate computation using the formula from the Atmel's
-+	 * datasheet : ADC Clock = MCK / ((Prescaler + 1) * 2), ADC Clock being
-+	 * specified by the electrical characteristics of the board.
-+	 */
-+	prsc = (mstrclk / (2 * st->desc->clock)) - 1;
-+
-+	if (!st->desc->startup_time) {
-+		dev_err(&pdev->dev, "No startup time available.\n");
-+		ret = -EINVAL;
-+		goto error_free_clk;
-+	}
-+
-+	/*
-+	 * Number of ticks needed to cover the startup time of the ADC as
-+	 * defined in the electrical characteristics of the board, divided by 8.
-+	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
-+	 */
-+	ticks = round_up((st->desc->startup_time * st->desc->clock /
-+			  1000000) - 1, 8) / 8;
-+	at91_adc_reg_write(st, AT91_ADC_MR,
-+			  (AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
-+			  (AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
-+
-+	/* Setup the ADC channels available on the board */
-+	ret = at91_adc_channel_init(idev, pdata);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Couldn't initialize the channels.\n");
-+		goto error_free_clk;
-+	}
-+
-+	init_waitqueue_head(&st->wq_data_avail);
-+	mutex_init(&st->lock);
-+
-+	st->vref_mv = pdata->vref;
-+	st->channels_mask = pdata->channels_used;
-+
-+	ret = iio_device_register(idev);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Couldn't register the device.\n");
-+		goto error_free_channels;
++		st->trig[i] = at91_adc_allocate_trigger(idev,
++							st->desc->triggers + i);
++		if (st->trig[i] == NULL) {
++			dev_err(&idev->dev,
++				"Could not allocate trigger %d\n", i);
++			ret = -ENOMEM;
++			goto error_trigger;
++		}
 +	}
 +
 +	return 0;
 +
-+error_free_channels:
-+	at91_adc_channel_remove(idev);
-+error_free_clk:
-+	clk_disable(st->clk);
-+	clk_put(st->clk);
-+error_free_irq:
-+	free_irq(st->irq, idev);
-+error_unmap_reg:
-+	iounmap(st->reg_base);
-+error_release_mem:
-+	release_mem_region(res->start, resource_size(res));
-+error_free_device:
-+	iio_free_device(idev);
++error_trigger:
++	for (i--; i >= 0; i--) {
++		iio_trigger_unregister(st->trig[i]);
++		iio_free_trigger(st->trig[i]);
++	}
++	kfree(st->trig);
 +error_ret:
 +	return ret;
 +}
 +
-+static int __devexit at91_adc_remove(struct platform_device *pdev)
++static void at91_adc_trigger_remove(struct iio_dev *idev)
 +{
-+	struct iio_dev *idev = platform_get_drvdata(pdev);
-+	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	struct at91_adc_state *st = iio_priv(idev);
++	int i;
 +
-+	iio_device_unregister(idev);
-+	at91_adc_channel_remove(idev);
-+	clk_disable(st->clk);
-+	clk_put(st->clk);
-+	free_irq(st->irq, idev);
-+	iounmap(st->reg_base);
-+	release_mem_region(res->start, resource_size(res));
-+	iio_free_device(idev);
++	for (i = 0; st->desc->triggers[i].name != NULL; i++) {
++		iio_trigger_unregister(st->trig[i]);
++		iio_free_trigger(st->trig[i]);
++	}
 +
-+	return 0;
++	kfree(st->trig);
 +}
 +
-+static struct platform_driver at91_adc_driver = {
-+	.probe = at91_adc_probe,
-+	.remove = __devexit_p(at91_adc_remove),
-+	.driver = {
-+		   .name = "at91_adc",
-+	},
++static const struct iio_buffer_setup_ops at91_adc_buffer_ops = {
++	.preenable = &iio_sw_buffer_preenable,
++	.postenable = &iio_triggered_buffer_postenable,
++	.predisable = &iio_triggered_buffer_predisable,
 +};
 +
-+module_platform_driver(at91_adc_driver);
++static int at91_adc_buffer_init(struct iio_dev *idev)
++{
++	int ret;
 +
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Atmel AT91 ADC Driver");
-+MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
++	idev->buffer = iio_sw_rb_allocate(idev);
++	if (!idev->buffer) {
++		ret = -ENOMEM;
++		goto error_ret;
++	}
++
++	idev->pollfunc = iio_alloc_pollfunc(&iio_pollfunc_store_time,
++					    &at91_adc_trigger_handler,
++					    IRQF_ONESHOT,
++					    idev,
++					    "%s-consumer%d",
++					    idev->name,
++					    idev->id);
++	if (idev->pollfunc == NULL) {
++		ret = -ENOMEM;
++		goto error_pollfunc;
++	}
++
++	idev->setup_ops = &at91_adc_buffer_ops;
++	idev->modes |= INDIO_BUFFER_TRIGGERED;
++
++	ret = iio_buffer_register(idev,
++				  idev->channels,
++				  idev->num_channels);
++	if (ret)
++		goto error_register;
++
++	return 0;
++
++error_register:
++	iio_dealloc_pollfunc(idev->pollfunc);
++error_pollfunc:
++	iio_sw_rb_free(idev->buffer);
++error_ret:
++	return ret;
++}
++
++static void at91_adc_buffer_remove(struct iio_dev *idev)
++{
++	iio_buffer_unregister(idev);
++	iio_dealloc_pollfunc(idev->pollfunc);
++	iio_sw_rb_free(idev->buffer);
++}
++
+ static int at91_adc_read_raw(struct iio_dev *idev,
+ 			     struct iio_chan_spec const *chan,
+ 			     int *val, int *val2, long mask)
+@@ -336,14 +694,30 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 	st->vref_mv = pdata->vref;
+ 	st->channels_mask = pdata->channels_used;
+ 
++	ret = at91_adc_buffer_init(idev);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Couldn't initialize the buffer.\n");
++		goto error_free_channels;
++	}
++
++	ret = at91_adc_trigger_init(idev, pdata);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Couldn't setup the triggers.\n");
++		goto error_unregister_buffer;
++	}
++
+ 	ret = iio_device_register(idev);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Couldn't register the device.\n");
+-		goto error_free_channels;
++		goto error_remove_triggers;
+ 	}
+ 
+ 	return 0;
+ 
++error_remove_triggers:
++	at91_adc_trigger_remove(idev);
++error_unregister_buffer:
++	at91_adc_buffer_remove(idev);
+ error_free_channels:
+ 	at91_adc_channel_remove(idev);
+ error_free_clk:
+@@ -368,6 +742,8 @@ static int __devexit at91_adc_remove(struct platform_device *pdev)
+ 	struct at91_adc_state *st = iio_priv(idev);
+ 
+ 	iio_device_unregister(idev);
++	at91_adc_trigger_remove(idev);
++	at91_adc_buffer_remove(idev);
+ 	at91_adc_channel_remove(idev);
+ 	clk_disable(st->clk);
+ 	clk_put(st->clk);
+diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
+index 1f71510..5e063b3 100644
+--- a/include/linux/platform_data/at91_adc.h
++++ b/include/linux/platform_data/at91_adc.h
+@@ -11,10 +11,12 @@
+ /**
+  * struct at91_adc_data - platform data for ADC driver
+  * @channels_used:	channels in use on the board as a bitmask
++ * @use_external:	does the board has external triggers availables
+  * @vref:		Reference voltage for the ADC in millivolts
+  */
+ struct at91_adc_data {
+ 	unsigned long	channels_used;
++	bool		use_external;
+ 	u16		vref;
+ };
+ 
 -- 
 1.7.5.4
