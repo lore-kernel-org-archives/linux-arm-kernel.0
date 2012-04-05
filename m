@@ -1,22 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 4 Apr 2012 21:45:31 -0300
-Subject: [PATCH v8 4/4] ARM: mxs/mx28evk: add GPMI-NAND device
-In-Reply-To: <CAOMZO5D_ACi73J0QfXoJmvyw6fBMrQfyoKLkK2P+-kMm5EzaDQ@mail.gmail.com>
-References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
- <1314169643-23425-5-git-send-email-b32955@freescale.com>
- <CAOMZO5D_ACi73J0QfXoJmvyw6fBMrQfyoKLkK2P+-kMm5EzaDQ@mail.gmail.com>
-Message-ID: <CAOMZO5BWutKg0uPyeBsWJNb42ZbT_whMsm95A1-u5kVoGk40nA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Apr 2012 17:47:58 -0700
+Subject: [PATCH v2] ARM: fix __io macro for PCMCIA
+In-Reply-To: <1333579684-31466-1-git-send-email-robherring2@gmail.com>
+References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+ <1333579684-31466-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120405004757.GC10780@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2012 at 9:44 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Shawn,
->
-> On Wed, Aug 24, 2011 at 4:07 AM, Huang Shijie <b32955@freescale.com> wrote:
->> add GPMI-NAND device for mx28evk board.
->>
->> Signed-off-by: Huang Shijie <b32955@freescale.com>
->
-> Can this one be applied now?
+* Rob Herring <robherring2@gmail.com> [120404 15:51]:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
+> broken. PCMCIA depends on __io() returning a valid i/o address, and most
+> ARM platforms require IO_SPACE_LIMIT be set to 0xffffffff for PCMCIA. This
+> needs a better fix with a fixed i/o address mapping, but for now we just
+> restore things to the previous behavior.
+> 
+> This fixes at91, omap1, pxa and sa11xx. pxa needs io.h if PCI is enabled,
+> but PCMCIA is not. sa11xx already has IO_SPACE_LIMIT set to 0xffffffff,
+> so it doesn't need an io.h.
 
-Adding Shawn.
+Acked-by: Tony Lindgren <tony@atomide.com>
