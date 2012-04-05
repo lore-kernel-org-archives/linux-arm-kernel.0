@@ -1,183 +1,53 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Thu,  5 Apr 2012 22:12:00 +0100
-Subject: [PATCH V4.1 1/3] mtd: Add orion_nand devicetree bindings
-In-Reply-To: <1333201985-2222-2-git-send-email-jm@lentin.co.uk>
-References: <1333201985-2222-2-git-send-email-jm@lentin.co.uk>
-Message-ID: <1333660320-29898-1-git-send-email-jm@lentin.co.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu,  5 Apr 2012 14:20:37 -0700
+Subject: [PATCH] ARM: OMAP2+: PRM: fix compile for OMAP4-only build
+Message-ID: <1333660837-23249-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a NAND chip using the orion_nand driver to be described using devicetree.
+For OMAP4 only builds, the omap2_prm_* functions have dummy wrappers
+to detect incorrect usage.  However, several unrelated omap3 PRM
+functions have made it inside the #else clause of the #ifdef wrapping
+the omap2_prm stubs, causing them to disappear on OMAP4-only builds.
 
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+This was unnoticed until the IO chain support was added and introduced
+a new function in this section which is referenced by omap_hwmod.c:
+
+/work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c: In function '_reconfigure_io_chain':
+/work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c:1665:3: error: implicit declaration of function 'omap3xxx_prm_reconfigure_io_chain' [-Werror=implicit-fungiction-declaration]
+
+Fix by using the #ifdef to only wrap the omap2_prm functions that
+need stubs on OMAP4-only builds.
+
+Cc: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
-* WARN when bank-width is out of range, as suggested by Andrew Lunn 
+Paul, this patch applies on top your io_chain_devel_3.5 branch.
 
-* Document all parameters.
-* Convert bank-width to be in bytes
-* Add explicit defaults for cle, ale and bank-width
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++++++++++++++++++
- drivers/mtd/nand/orion_nand.c                      |   45 +++++++++++++++++-
- 2 files changed, 93 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
-
-diff --git a/Documentation/devicetree/bindings/mtd/orion-nand.txt b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-new file mode 100644
-index 0000000..b2356b7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-@@ -0,0 +1,50 @@
-+NAND support for Marvell Orion SoC platforms
-+
-+Required properties:
-+- compatible : "mrvl,orion-nand".
-+- reg : Base physical address of the NAND and length of memory mapped
-+	region
-+
-+Optional properties:
-+- cle : Address line number connected to CLE. Default is 0
-+- ale : Address line number connected to ALE. Default is 1
-+- bank-width : Width in bytes of the device. Default is 1
-+- chip-delay : Chip dependent delay for transferring data from array to read
-+               registers in usecs
-+
-+The device tree may optionally contain sub-nodes describing partitions of the
-+address space. See partition.txt for more detail.
-+
-+Example:
-+
-+nand at f4000000 {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	cle = <0>;
-+	ale = <1>;
-+	bank-width = <1>;
-+	chip-delay = <25>;
-+	compatible = "mrvl,orion-nand";
-+	reg = <0xf4000000 0x400>;
-+
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0000000 0x100000>;
-+		read-only;
-+	};
-+
-+	partition at 100000 {
-+		label = "uImage";
-+		reg = <0x0100000 0x200000>;
-+	};
-+
-+	partition at 300000 {
-+		label = "dtb";
-+		reg = <0x0300000 0x100000>;
-+	};
-+
-+	partition at 400000 {
-+		label = "root";
-+		reg = <0x0400000 0x7d00000>;
-+	};
-+};
-diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-index 29f505a..678ba73 100644
---- a/drivers/mtd/nand/orion_nand.c
-+++ b/drivers/mtd/nand/orion_nand.c
-@@ -13,6 +13,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-@@ -74,11 +75,13 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- static int __init orion_nand_probe(struct platform_device *pdev)
- {
- 	struct mtd_info *mtd;
-+	struct mtd_part_parser_data ppdata = {};
- 	struct nand_chip *nc;
- 	struct orion_nand_data *board;
- 	struct resource *res;
- 	void __iomem *io_base;
- 	int ret = 0;
-+	u32 val = 0;
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index 1ba3d65..a8c946f 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -303,6 +303,8 @@ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+ extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
+ extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
  
- 	nc = kzalloc(sizeof(struct nand_chip) + sizeof(struct mtd_info), GFP_KERNEL);
- 	if (!nc) {
-@@ -101,7 +104,32 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 		goto no_res;
- 	}
- 
--	board = pdev->dev.platform_data;
-+	if (pdev->dev.of_node) {
-+		board = devm_kzalloc(&pdev->dev, sizeof(struct orion_nand_data),
-+					GFP_KERNEL);
-+		if (!board) {
-+			printk(KERN_ERR "orion_nand: failed to allocate board structure.\n");
-+			ret = -ENOMEM;
-+			goto no_res;
-+		}
-+		if (!of_property_read_u32(pdev->dev.of_node, "cle", &val))
-+			board->cle = (u8)val;
-+		else
-+			board->cle = 0;
-+		if (!of_property_read_u32(pdev->dev.of_node, "ale", &val))
-+			board->ale = (u8)val;
-+		else
-+			board->ale = 1;
-+		if (!of_property_read_u32(pdev->dev.of_node,
-+						"bank-width", &val))
-+			board->width = (u8)val * 8;
-+		else
-+			board->width = 8;
-+		if (!of_property_read_u32(pdev->dev.of_node,
-+						"chip-delay", &val))
-+			board->chip_delay = (u8)val;
-+	} else
-+		board = pdev->dev.platform_data;
- 
- 	mtd->priv = nc;
- 	mtd->owner = THIS_MODULE;
-@@ -115,6 +143,10 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	if (board->chip_delay)
- 		nc->chip_delay = board->chip_delay;
- 
-+	WARN(board->width > 16,
-+		"%d bit bus width out of range (devicetree bank-width specified in bytes)",
-+		board->width);
++#endif	/* CONFIG_ARCH_OMAP4 */
 +
- 	if (board->width == 16)
- 		nc->options |= NAND_BUSWIDTH_16;
+ /* OMAP3-specific VP functions */
+ u32 omap3_prm_vp_check_txdone(u8 vp_id);
+ void omap3_prm_vp_clear_txdone(u8 vp_id);
+@@ -323,8 +325,6 @@ extern void omap3xxx_prm_ocp_barrier(void);
+ extern void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask);
+ extern void omap3xxx_prm_restore_irqen(u32 *saved_mask);
  
-@@ -129,7 +161,8 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	}
+-#endif	/* CONFIG_ARCH_OMAP4 */
+-
+ #endif
  
- 	mtd->name = "orion_nand";
--	ret = mtd_device_parse_register(mtd, NULL, 0,
-+	ppdata.of_node = pdev->dev.of_node;
-+	ret = mtd_device_parse_register(mtd, NULL, &ppdata,
- 			board->parts, board->nr_parts);
- 	if (ret) {
- 		nand_release(mtd);
-@@ -161,11 +194,19 @@ static int __devexit orion_nand_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id orion_nand_of_match_table[] = {
-+	{ .compatible = "mrvl,orion-nand", },
-+	{},
-+};
-+#endif
-+
- static struct platform_driver orion_nand_driver = {
- 	.remove		= __devexit_p(orion_nand_remove),
- 	.driver		= {
- 		.name	= "orion_nand",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(orion_nand_of_match_table),
- 	},
- };
- 
+ /*
 -- 
-1.7.9.1
+1.7.9.2
