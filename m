@@ -1,58 +1,53 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 5 Apr 2012 10:31:34 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
- presence of 32k timer
-In-Reply-To: <20120405095221.GC25053@n2100.arm.linux.org.uk>
-References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
- <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
- <20120405095221.GC25053@n2100.arm.linux.org.uk>
-Message-ID: <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 05 Apr 2012 11:33:30 +0100
+Subject: [PATCH 1/2] serial: PL011: Repair NULL pointer dereference
+In-Reply-To: <1333377064-8093-1-git-send-email-lee.jones@linaro.org>
+References: <1333377064-8093-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1333622010.2328.3.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 15:22:21, Russell King - ARM Linux wrote:
-> On Thu, Apr 05, 2012 at 09:36:00AM +0000, Hiremath, Vaibhav wrote:
-> > There seems to be limitation for ARM architecture, it is restricted by
-> > sched_clock implementation present in "arch/arm/kernel/sched_clock.c".
-> > Natively, clocksource framework does support change in rate/frequency for
-> > registered timer, using,
+On Mon, 2012-04-02 at 15:31 +0100, Lee Jones wrote:
+> The pl011 driver attempts to mask and clear UART interrupts
+> at probe time, which subsequently fail with a NULL pointer
+> dereference error. This is due to 'uap->port.membase' being
+> used uninitialised. This patch moves the offending lines
+> to a point of post-initialisation.
 > 
-> Any kind of switching of timing sources introduces loss of time issues
-> by the mere fact that you can't instantly know the counter values of
-> both timing sources at precisely the same instant - because CPUs can
-> only do one thing at a time.  So any kind of repeated dynamic switching
-> _will_ result in a gradual loss of time - which will be indeterminant
-> as it depends on the frequency of the switching and the relative delta
-> between the two.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Tested-by: Jon Medhurst <tixy@linaro.org>
+
+This fixes vexpress boot on v3.4-rc1.
+
+> ---
+>  drivers/tty/serial/amba-pl011.c |    9 +++++----
+>  1 files changed, 5 insertions(+), 4 deletions(-)
 > 
-> To put it another way - it is not possible to maintain high precision
-> and accuracy while dynamically switching your timing sources.
-> 
-> I'm not about to lift the restriction that there's only one source for
-> sched_clock() just for OMAP.  That'd require a lot of additional code -
-> it's not just about adjusting the multiplier and shift, you also have to
-> correct the returned ns value as well, which means synchronizing against
-> two counters.  (And as I've pointed out above, that's impossible to do
-> accurately.)
-> 
-
-Thanks a ton Russell for confirming on this,
-
-I understand, we also have to adjust ns value and such confirmation is what exactly I was looking for.
-
-So this means, we have to use compile time option, as existing
-implementation in "arch/arm/mach-omap2/timer.c".
-
-Thanks again, I will repost patches shortly with the code changes (mentioned 
-in my last email)
-
-Thanks,
-Vaibhav
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 0c65c9e..b5c1f0f 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1946,10 +1946,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>  		goto unmap;
+>  	}
+>  
+> -	/* Ensure interrupts from this UART are masked and cleared */
+> -	writew(0, uap->port.membase + UART011_IMSC);
+> -	writew(0xffff, uap->port.membase + UART011_ICR);
+> -
+>  	uap->vendor = vendor;
+>  	uap->lcrh_rx = vendor->lcrh_rx;
+>  	uap->lcrh_tx = vendor->lcrh_tx;
+> @@ -1965,6 +1961,11 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>  	uap->port.ops = &amba_pl011_pops;
+>  	uap->port.flags = UPF_BOOT_AUTOCONF;
+>  	uap->port.line = i;
+> +
+> +	/* Ensure interrupts from this UART are masked and cleared */
+> +	writew(0, uap->port.membase + UART011_IMSC);
+> +	writew(0xffff, uap->port.membase + UART011_ICR);
+> +
+>  	pl011_dma_probe(uap);
+>  
+>  	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
