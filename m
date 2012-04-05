@@ -1,51 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 5 Apr 2012 15:52:07 -0700
-Subject: CONFIG_EARLY_PRINTK on versatile broken in mainline
-Message-ID: <CACxGe6twdkkQaN+ieZoFpjvQAect7-6mUz+N8yULDzwtwHoW1Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Apr 2012 15:53:45 -0700
+Subject: [PATCH] ARM: OMAP2+: PRM: fix compile for OMAP4-only build
+In-Reply-To: <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com>
+References: <1333660837-23249-1-git-send-email-khilman@ti.com>
+ <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com>
+Message-ID: <20120405225345.GJ3785@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Has anyone else had problems with CONFIG_EARLY_PRINTK on current
-mainline?  ARM versatile fails to boot on qemu when it is selected.
-I've just started bisecting.  v3.3 is okay, but current mainline is
-broken.  Output stops after dumping out the memblock regions, and
-__log_buf stops at the same place.
+* Paul Walmsley <paul@pwsan.com> [120405 14:36]:
+> On Thu, 5 Apr 2012, Kevin Hilman wrote:
+> 
+> > For OMAP4 only builds, the omap2_prm_* functions have dummy wrappers
+> > to detect incorrect usage.  However, several unrelated omap3 PRM
+> > functions have made it inside the #else clause of the #ifdef wrapping
+> > the omap2_prm stubs, causing them to disappear on OMAP4-only builds.
+> > 
+> > This was unnoticed until the IO chain support was added and introduced
+> > a new function in this section which is referenced by omap_hwmod.c:
+> > 
+> > /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c: In function '_reconfigure_io_chain':
+> > /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c:1665:3: error: implicit declaration of function 'omap3xxx_prm_reconfigure_io_chain' [-Werror=implicit-fungiction-declaration]
+> > 
+> > Fix by using the #ifdef to only wrap the omap2_prm functions that
+> > need stubs on OMAP4-only builds.
+> > 
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Signed-off-by: Kevin Hilman <khilman@ti.com>
+> > ---
+> > Paul, this patch applies on top your io_chain_devel_3.5 branch.
+> 
+> Thanks, Tony reported this too.  Any objections to me rolling this into 
+> the offending patch?
 
-/home/grant/hacking/qemu/arm-softmmu/qemu-system-arm -M versatilepb
--nographic -kernel
-/home/grant/hacking/linux/.build/arm/arch/arm/boot/zImage -append
-memblock=debug earlyprintk console=ttyAMA0 console=tty0 debug -dtb
-/home/grant/hacking/linux/.build/arm/arch/arm/boot/versatile-pb.dtb
--initrd /home/grant/hacking/images/versatile.rootfs.ext2
-Uncompressing Linux... done, booting the kernel.
-Booting Linux on physical CPU 0
-Linux version 3.4.0-rc1+ (grant at ponder) (gcc version 4.6.3
-(Ubuntu/Linaro 4.6.3-1ubuntu3) ) #383 Thu Apr 5 15:50:47 PDT 2012
-CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00093177
-CPU: VIVT data cache, VIVT instruction cache
-Machine: ARM-Versatile (Device Tree Support), model: ARM Versatile PB
-bootconsole [earlycon0] enabled
-memblock_reserve: [0x00000000008400-0x000000003995f8]
-arm_memblock_init+0x4c/0x150
-memblock_reserve: [0x00000000d00000-0x0000000122f000]
-arm_memblock_init+0xcc/0x150
-memblock_reserve: [0x00000000004000-0x00000000008000]
-arm_memblock_init+0xf0/0x150
-memblock_reserve: [0x0000000122f000-0x00000001235fd2]
-arm_dt_memblock_reserve+0x30/0xb4
-MEMBLOCK configuration:
- memory size = 0x8000000 reserved size = 0x8cb1ca
- memory.cnt  = 0x1
- memory[0x0]    [0x00000000000000-0x00000007ffffff], 0x8000000 bytes
- reserved.cnt  = 0x3
- reserved[0x0]  [0x00000000004000-0x00000000007fff], 0x4000 bytes
- reserved[0x1]  [0x00000000008400-0x000000003995f7], 0x3911f8 bytes
- reserved[0x2]  [0x00000000d00000-0x00000001235fd1], 0x535fd2 bytes
-Memory policy: ECC disabled, Data cache writeback
-memblock_reserve: [0x00000007fff000-0x00000008000000]
-memblock_alloc_base_nid+0x44/0x58
+I heard of this first from Kevin before I started hitting it with
+my compiles..
 
+Anyways, can you also check that we don't have a similar issue
+with omap44xx_prm_reconfigure_io_chain for omap3 only builds?
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Regards,
+
+Tony
