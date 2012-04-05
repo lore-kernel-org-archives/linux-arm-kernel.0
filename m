@@ -1,43 +1,80 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Thu, 5 Apr 2012 13:26:17 +0100
-Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
-In-Reply-To: <CAMrsUd+_coW7ebuN_o=yZbbSVKnkx5R6=yHjUEUc0EcQGtgSRQ@mail.gmail.com>
-References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
- <CAMrsUd+_coW7ebuN_o=yZbbSVKnkx5R6=yHjUEUc0EcQGtgSRQ@mail.gmail.com>
-Message-ID: <20120405132617.76e04217@bob.linux.org.uk>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Thu, 05 Apr 2012 14:15:55 +0200
+Subject: [PATCH v2 2/3] ep93xx: IDE driver platform support code
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F002069840A0CF@AUSP01VMBX24.collaborationhost.net>
+References: <4F7B0C54.8010804@metasoft.pl> <4F7B0D6C.1010801@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F0020698409DF4@AUSP01VMBX24.collaborationhost.net>
+ <4F7C0922.1070200@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F002069840A08A@AUSP01VMBX24.collaborationhost.net>
+ <ADE657CA350FB648AAC2C43247A983F002069840A0A8@AUSP01VMBX24.collaborationhost.net>
+ <ADE657CA350FB648AAC2C43247A983F002069840A0CF@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F7D8CFB.70100@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Apr 2012 16:54:03 +0530
-"Raja, Govindraj" <govindraj.raja@ti.com> wrote:
+[linux-ide mailing list removed from Cc, because topic is not related to IDE/libata]
 
-> On Wed, Mar 21, 2012 at 3:54 PM, Govindraj.R <govindraj.raja@ti.com>
-> wrote:
-> > From: "Govindraj.R" <govindraj.raja@ti.com>
-> >
-> > Based on Linux-OMAP tree uart branch.
-> > (git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-> > remotes/origin/uart)
-> >
-> > * Removes the cpu checks wherever possible and use version reg
-> > ?for populating features and errata's
-> > * enable tx wakeup available in wer reg for applicable
-> > ?module revision's
-> >
-> > Govindraj.R (3):
-> > ?OMAP2+: UART: Remove cpu checks for populating errata flags
-> > ?OMAP2+: UART: enable tx wakeup bit for wer reg
-> > ?OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
-> >
-> > ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 13 +----
-> > ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?8 +++-
-> > ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 71
-> > ++++++++++++++++++++++++- 3 files changed, 78 insertions(+), 14
-> > deletions(-)
-> 
-> Alan / Greg,
-> 
-> With you ack on tty parts can this series be upstreamed from
-> omap tree ?
+On 2012-04-04 19:11, H Hartley Sweeten wrote:
+> On Wednesday, April 04, 2012 9:43 AM, H Hartley Sweeten wrote:
+>> On Wednesday, April 04, 2012 9:20 AM, H Hartley Sweeten wrote:
+>>> On Wednesday, April 04, 2012 1:41 AM, Rafal Prylowski wrote:
+>>>> On 2012-04-03 19:41, H Hartley Sweeten wrote:
+>>>> [not related to my patch, but ep93xx keypad]:
+>>>> Isn't ep93xx_keypad_acquire_gpio be more correct if we apply the following patch:
+>>>>
+>>>> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
+>>>> ===================================================================
+>>>> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
+>>>> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
+>>>> @@ -734,7 +734,7 @@ int ep93xx_keypad_acquire_gpio(struct pl
+>>>>  fail_gpio_d:
+>>>>  	gpio_free(EP93XX_GPIO_LINE_C(i));
+>>>>  fail_gpio_c:
+>>>> -	for ( ; i >= 0; --i) {
+>>>> +	for (--i; i >= 0; --i) {
+>>>>  		gpio_free(EP93XX_GPIO_LINE_C(i));
+>>>>  		gpio_free(EP93XX_GPIO_LINE_D(i));
+>>>>  	}
+>>>>
+>>>> This way we don't double free EP93XX_GPIO_LINE_C(i), and don't free lines which were not
+>>>> successfully acquired (I noticed this when writing my patch, which is based on
+>>>> ep93xx_keypad_acquire/release_gpio).
+>>>
+>>> You are correct... ;-)
+>>>
+>>> Care to submit an actual patch?
 
-Fine by me - this seems primarily to be architectural details.
+Yes, patch should be on LAKML already.
+
+>>
+>> Note, if/when the devm_gpio_request patch gets into the kernel tree we can use
+>> that and get rid of the gpio_free's completely.
+
+I doubt if using devm_gpio_request() would help here. We need to call both
+ep93xx_*_acquire and ep93xx_*_release_gpio in drivers, because it also sets up
+some registers, etc. If ep93xx_*_acquire_gpio fails, then gpio lines should be
+freed immediately and not when the driver unloads (because the driver might
+want to use them in some other way..).
+
+>>
+>> Sorry, I don't have a link to that patch...
+> 
+> I just pulled linux-next. It looks like the devm_gpio_* stuff is now in.
+> 
+> commit 1a0703ede4493bd74f9c6b53f782b749e175a88e
+> Author: John Crispin <blogic@openwrt.org>
+> Date:   Tue Dec 20 21:40:21 2011 +0100
+> 
+>     GPIO: add bindings for managed devices
+>     
+>     This patch adds 2 functions that allow managed devices to request GPIOs.
+>     These GPIOs will then be managed by drivers/base/devres.c.
+>     
+>     Signed-off-by: John Crispin <blogic@openwrt.org>
+>     Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> 
+
+I see that this is also in v3.4rc1 :)
+
+Regards,
+RP
