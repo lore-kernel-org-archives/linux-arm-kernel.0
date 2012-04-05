@@ -1,80 +1,103 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Thu, 05 Apr 2012 14:15:55 +0200
-Subject: [PATCH v2 2/3] ep93xx: IDE driver platform support code
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F002069840A0CF@AUSP01VMBX24.collaborationhost.net>
-References: <4F7B0C54.8010804@metasoft.pl> <4F7B0D6C.1010801@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F0020698409DF4@AUSP01VMBX24.collaborationhost.net>
- <4F7C0922.1070200@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F002069840A08A@AUSP01VMBX24.collaborationhost.net>
- <ADE657CA350FB648AAC2C43247A983F002069840A0A8@AUSP01VMBX24.collaborationhost.net>
- <ADE657CA350FB648AAC2C43247A983F002069840A0CF@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4F7D8CFB.70100@metasoft.pl>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Thu, 05 Apr 2012 17:57:41 +0530
+Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
+In-Reply-To: <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
+References: <CAOdLEarFOdmDBS0iDmafLeBU=NNWxWjejTvJ-eEkQjRO12+VYg@mail.gmail.com>
+ <20120404070157.GB24930@pengutronix.de>
+ <CAOdLEaqXyvHzTRSq2=RquZLqEO6kMEp11rjKJ+UtSqtF4nr-EA@mail.gmail.com>
+ <20120404183314.GF17187@pengutronix.de>
+ <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
+ <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
+ <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
+ <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
+ <4F7D3DB8.6080009@freescale.com>
+ <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
+Message-ID: <1333628861.31825.22.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[linux-ide mailing list removed from Cc, because topic is not related to IDE/libata]
-
-On 2012-04-04 19:11, H Hartley Sweeten wrote:
-> On Wednesday, April 04, 2012 9:43 AM, H Hartley Sweeten wrote:
->> On Wednesday, April 04, 2012 9:20 AM, H Hartley Sweeten wrote:
->>> On Wednesday, April 04, 2012 1:41 AM, Rafal Prylowski wrote:
->>>> On 2012-04-03 19:41, H Hartley Sweeten wrote:
->>>> [not related to my patch, but ep93xx keypad]:
->>>> Isn't ep93xx_keypad_acquire_gpio be more correct if we apply the following patch:
->>>>
->>>> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
->>>> ===================================================================
->>>> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
->>>> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
->>>> @@ -734,7 +734,7 @@ int ep93xx_keypad_acquire_gpio(struct pl
->>>>  fail_gpio_d:
->>>>  	gpio_free(EP93XX_GPIO_LINE_C(i));
->>>>  fail_gpio_c:
->>>> -	for ( ; i >= 0; --i) {
->>>> +	for (--i; i >= 0; --i) {
->>>>  		gpio_free(EP93XX_GPIO_LINE_C(i));
->>>>  		gpio_free(EP93XX_GPIO_LINE_D(i));
->>>>  	}
->>>>
->>>> This way we don't double free EP93XX_GPIO_LINE_C(i), and don't free lines which were not
->>>> successfully acquired (I noticed this when writing my patch, which is based on
->>>> ep93xx_keypad_acquire/release_gpio).
->>>
->>> You are correct... ;-)
->>>
->>> Care to submit an actual patch?
-
-Yes, patch should be on LAKML already.
-
->>
->> Note, if/when the devm_gpio_request patch gets into the kernel tree we can use
->> that and get rid of the gpio_free's completely.
-
-I doubt if using devm_gpio_request() would help here. We need to call both
-ep93xx_*_acquire and ep93xx_*_release_gpio in drivers, because it also sets up
-some registers, etc. If ep93xx_*_acquire_gpio fails, then gpio lines should be
-freed immediately and not when the driver unloads (because the driver might
-want to use them in some other way..).
-
->>
->> Sorry, I don't have a link to that patch...
+On Thu, 2012-04-05 at 05:03 -0700, Sam Gandhi wrote:
+> 2012/4/4 Huang Shijie <b32955@freescale.com>:
+> > Hi All:
+> >> On Wed, Apr 4, 2012 at 7:07 PM, Sam Gandhi<samgandhi9@gmail.com>  wrote:
+> >>
+> >>> I reverted that commit and I still see following  error!
+> >> Huang,
+> >>
+> >> Are you able to use gpmi on mx28 running 3.4-rc1?
+> >>
+> > I also meet the same problem today.
+> >
+> >
+> >>> flash_erase /dev/mtd1 0 0
+> >>> Erasing 1------------[ cut here ]------------
+> >>> kernel BUG at /home/sam/linux/drivers/dma/dmaengine.h:53!
+> > the mxs-dma has added some patches about the cookie.
+> > The bug is in the dmaengine.h.
+> >
+> > So let more people know this bug.
+> >
+> > BR
+> > Huang Shijie
+> >
+> >
+> FWIW, Just a data point.
 > 
-> I just pulled linux-next. It looks like the devm_gpio_* stuff is now in.
+> I coverted BUG_ON in dmaengine.h to printk as shown below. With this
+> change I was able to format nand, create UBI partition. I have been
+> running UBI torture test called integck on my board that does lot of
+> I/O, mounting/unmounting of filesystem for close to 8 hour now without
+> crash. But I do see those printks. I haven't followed logic of
+> tx->cookie well enough to figure out what the appropriate change
+> should be. Note this is with commit
+> 00292bbf769620dea923dbd906afd88955f7ea19 reverted in my tree.
 > 
-> commit 1a0703ede4493bd74f9c6b53f782b749e175a88e
-> Author: John Crispin <blogic@openwrt.org>
-> Date:   Tue Dec 20 21:40:21 2011 +0100
+> Cookie 0  completed 102118268 DMA_MIN 1
+> Cookie 0  completed 102120401 DMA_MIN 1
+> Cookie 0  completed 102237726 DMA_MIN 1
 > 
->     GPIO: add bindings for managed devices
->     
->     This patch adds 2 functions that allow managed devices to request GPIOs.
->     These GPIOs will then be managed by drivers/base/devres.c.
->     
->     Signed-off-by: John Crispin <blogic@openwrt.org>
->     Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> 
+> git diff drivers/dma/dmaengine.h
+> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
+> index 17f983a..3d10a70 100644
+> --- a/drivers/dma/dmaengine.h
+> +++ b/drivers/dma/dmaengine.h
+> @@ -50,7 +50,11 @@ static inline dma_cookie_t dma_cookie_assign(struct
+> dma_async_tx_descriptor *tx)
+>   */
+>  static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
+>  {
+> -       BUG_ON(tx->cookie < DMA_MIN_COOKIE);
+> +       if ( tx->cookie < DMA_MIN_COOKIE)
+> +               printk(KERN_ERR "Cookie %d,  completed %d DMA_MIN %d
+> ",tx->cookie,
+> +               tx->chan->completed_cookie,
+> +               DMA_MIN_COOKIE);
+> +       /* BUG_ON(tx->cookie < DMA_MIN_COOKIE); */
+>         tx->chan->completed_cookie = tx->cookie;
+>         tx->cookie = 0;
+>  }
+This means you are trying to mark a cookie complete when it is already
+marked so!, hence dmaengine screams.
+The bug is is mxs-dma.
+Let me know if below fixes it (assuming you are not using cyclic API,
+that would need fixup as well)
 
-I see that this is also in v3.4rc1 :)
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index c81ef7e..5ddd84e 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -399,6 +399,10 @@ static struct dma_async_tx_descriptor
+*mxs_dma_prep_slave_sg(
+ 		ccw->bits &= ~CCW_DEC_SEM;
+ 	} else {
+ 		idx = 0;
++		/* assign cookie here,
++		 * hopefully for above case we dont need it
++		 */
++		dma_cookie_assign(&mxs_chan->desc);
+ 	}
+ 
+ 	if (direction == DMA_TRANS_NONE) {
 
-Regards,
-RP
+-- 
+~Vinod
