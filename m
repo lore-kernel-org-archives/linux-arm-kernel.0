@@ -1,35 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Apr 2012 10:44:13 -0700
-Subject: [GIT PULL] at91: 3.4-rc1 fixes
-In-Reply-To: <4F7C7EDF.4000702@atmel.com>
-References: <4F7C7EDF.4000702@atmel.com>
-Message-ID: <CAOesGMiEBBiZ1Q3RjT=KxCR+kJWhoVPGdMRFPN=nObjZuvzgWg@mail.gmail.com>
+Date: Thu, 5 Apr 2012 10:48:39 -0700
+Subject: [GIT PULL] omap fixes for v3.4-rc1
+In-Reply-To: <20120405004256.GB10780@atomide.com>
+References: <20120405004256.GB10780@atomide.com>
+Message-ID: <CAOesGMg7DWDH4ix30fh23YZ1hg207S7oQ05njrfEBkaYPjKWDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2012 at 10:03 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof,
+Hi,
+
+On Wed, Apr 4, 2012 at 5:42 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Arnd & Olof,
 >
-> I would like you to integrate this fist batch of AT91 related fixes. They
-> are covering DT and USB related issues that we have seen on top of 3.4-rc1.
+> Please pull omap fixes from:
 >
-> I have also included modifications of the OHCI USB driver because they
-> are also touching the core AT91 devices/board files and Device Tree files.
-> The modification of "vbus_pin_active_low" in particular cannot be separated
-> from the modification of .dts[i] and devices/board files.
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
 >
-> Alan Stern for USB OHCI/EHCI and Grant Likely for DT gave me their "Acked-by"
-> on concerned patches (thanks a lot guys!).
+> Note that this also contains a set of fixes that are not regressions
+> or oopses to properly deal with the smsc911x regulator issue.
+>
+> Basically the regulators must be per board file as the regulators
+> can also come from drivers, such as twl4030. So it's best to dumb
+> down gpmc-smsc911x.c to not even care about the regulators.
+>
+> Regards,
+>
+> Tony
+>
 >
 > The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
->
-> ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+> ?Linus Torvalds (1):
+> ? ? ? ?Linux 3.4-rc1
 >
 > are available in the git repository at:
 >
-> ?git://github.com/at91linux/linux-at91.git at91-fixes
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+
 
 Thanks, pulled.
+
+Feel free to start sending these as signed tags with the above in the
+tag description, so it's carried forward in the git history without
+any work for us. :-)
 
 
 -Olof
