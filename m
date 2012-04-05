@@ -1,36 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Apr 2012 11:29:06 -0700
-Subject: [PATCH v2] ARM: fix __io macro for PCMCIA
-In-Reply-To: <1333579684-31466-1-git-send-email-robherring2@gmail.com>
-References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
- <1333579684-31466-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120405182906.GA29262@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Apr 2012 13:23:46 -0600
+Subject: Point-to-point bus in device tree
+In-Reply-To: <20120405181509.GA28693@codeaurora.org>
+References: <20120405181509.GA28693@codeaurora.org>
+Message-ID: <4F7DF142.5050601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 05:48:04PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 04/05/2012 12:15 PM, David Brown wrote:
+> Some MSM SoCs have a small serial-type "bus" that is used to
+> communicate with the PMIC devices.  This interface is always
+> point-to-point.  I'm doing a device-tree conversion of the driver that
+> Ken Heitke posted last year <https://lkml.org/lkml/2011/2/17/503>.
 > 
-> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
-> broken. PCMCIA depends on __io() returning a valid i/o address, and most
-> ARM platforms require IO_SPACE_LIMIT be set to 0xffffffff for PCMCIA. This
-> needs a better fix with a fixed i/o address mapping, but for now we just
-> restore things to the previous behavior.
+> A naive conversion to device tree, would result in something like
+> this:
 > 
-> This fixes at91, omap1, pxa and sa11xx. pxa needs io.h if PCI is enabled,
-> but PCMCIA is not. sa11xx already has IO_SPACE_LIMIT set to 0xffffffff,
-> so it doesn't need an io.h.
+> 	qcom,ssbi at 500000 {
+> 		compatible = "qcom,ssbi";
+> 		reg = <0x500000 0x1000>;
+> 		qcom,controller-type = "ssbi";
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Joachim Eastwood <joachim.eastwood@jotron.com>
-> Cc: Paul Parsons <lost.distance@yahoo.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tony Lindgren <tony@atomide.com>
+> 		qcom,pmic8058 at 0 {
+> 			reg = <0x0 0x01>;
+> 			...
+> 		}
+> 	}
+> 
+> There would end up being an extraneous register for the device on the
+> other end (there are no addresses), and there would need to be code in
+> the ssbi driver to traverse this small tree to find these nodes.
 
-Thanks, applied to fixes.
+Isn't that extra code simply:
 
+of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 
--Olof
+That seems like pretty low overhead.
