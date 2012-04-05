@@ -1,56 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Apr 2012 10:55:46 +0100
-Subject: [PATCH 5/7] ARM: ux500: Rename gpio_keys in the Device Tree file
+Date: Thu,  5 Apr 2012 10:55:48 +0100
+Subject: [PATCH 7/7] MMC: mmci: Add required documentation for Device Tree
+ bindings
 In-Reply-To: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
 References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1333619748-16126-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1333619748-16126-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure each button is individually identifiable by using
-their correct unique given device names.
+This provides full documentation detailing each compulsory,
+optional and device (variant) specific properties available
+for use within the MMCI Device Tree.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/snowball.dts |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/mmc/mmci.txt |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mmci.txt
 
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 738959d..0cec47b 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -36,28 +36,28 @@
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <3>;
--			label = "userpb";
-+			label = "extkb1";
- 			gpios = <&gpio4 23 0>;
- 		};
- 		button at 3 {
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <4>;
--			label = "userpb";
-+			label = "extkb2";
- 			gpios = <&gpio4 24 0>;
- 		};
- 		button at 4 {
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <5>;
--			label = "userpb";
-+			label = "extkb3";
- 			gpios = <&gpio5 1 0>;
- 		};
- 		button at 5 {
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <6>;
--			label = "userpb";
-+			label = "extkb4";
- 			gpios = <&gpio5 2 0>;
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+new file mode 100644
+index 0000000..16502a2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+@@ -0,0 +1,19 @@
++* ARM PrimeCell MultiMedia Card Interface (MMCI) PL180/1
++
++The ARM PrimeCell MMCI PL180 and PL181 provides and interface for
++reading and writing to MultiMedia and SD cards alike.
++
++Required properties:
++- compatible             : contains "arm,pl18x", "arm,primecell".
++- reg                    : contains pl18x registers and length.
++- interrupts             : contains the device IRQ(s).
++- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
++
++Optional properties:
++- wp-gpios               : contains any write protect (ro) gpios
++- cd-gpios               : contains any card detection gpios
++- cd-inverted            : indicates whether the cd gpio is inverted
++- clock-frequency        : contains the maximum operating frequency
++- bus-width              : Number of data lines, can be <1>, <4>, or <8>
++- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable
++- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable
 -- 
 1.7.9.1
