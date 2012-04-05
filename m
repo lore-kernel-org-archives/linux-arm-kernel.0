@@ -1,67 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Apr 2012 10:02:56 -0700
-Subject: [RESEND PATCH] ARM :OMAP2+: UART: Remove some of uart default pads
-In-Reply-To: <20120405165811.GB3785@atomide.com>
-References: <1332324149-16058-1-git-send-email-govindraj.raja@ti.com>
- <20120403181925.GH8240@atomide.com>
- <CAMrsUdLrpyGrhggi820WcR+DoHJVB8GQ1THUOO-C4LqUQtAxWQ@mail.gmail.com>
- <20120405165811.GB3785@atomide.com>
-Message-ID: <20120405170255.GC3785@atomide.com>
+From: gfm@funxed.com (George McBay)
+Date: Thu, 5 Apr 2012 10:30:43 -0700
+Subject: question about i.mx21ads support
+Message-ID: <CAEqTKjUyiA_fCfboifSXXj-h_B6rGQpAM9nGnen=0mKi-w=J9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120405 10:01]:
-> * Raja, Govindraj <govindraj.raja@ti.com> [120403 23:18]:
-> > On Tue, Apr 3, 2012 at 11:49 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > > * Govindraj.R <govindraj.raja@ti.com> [120321 03:06]:
-> > >> From: "Govindraj.R" <govindraj.raja@ti.com>
-> > >>
-> > >> The following commit:
-> > >> (7496ba3 ?ARM: OMAP2+: UART: Add default mux for all uarts)
-> > >> added default pads for all uarts. But not all boards tend to
-> > >> use all uarts and most of unused uart pins are muxed for
-> > >> other purpose. This commit breaks the modules which where trying
-> > >> to use unused uart pins on their boards.
-> > >>
-> > >> So remove all default pads except uart1/3 as most boards
-> > >> tend to use either uart1/3 as console port and use only tx/rx
-> > >> lines, declare only those pads for uart1/3.
-> > >> If any boards tend to use any other uart other uart1/3
-> > >> the mux data should to passed from board file and init individual
-> > >> uart port using omap_serial_init_port api.
-> > >
-> > > This is still wrong. We can't mux any serial pins unless specifically
-> > > requested from the board-*.c files. So please do a fix to get back to
-> > > v3.2 behaviour where you basically revert 7496ba3.
-> > 
-> > How to do we fix the rx pin wakeup capability?
-> > The mux data has the info about the rx pin wakeup
-> > 
-> > Without rx pin wakeup PM will be broken.
-> 
-> Let's first make things work reliably before even getting started
-> about PM being broken.
-> 
-> > Fix all board files with duplicated data for uart3 or
-> > uart1 having rx pin marked as wakeup capable?
-> 
-> And how do you know which pins to mux? You don't, unless you look
-> at the schematics for all the boards.
-> 
-> The only safe option without looking at the schematics is to
-> make omap_serial_init not do any muxing. If you want muxing and
-> PM wake-up events, then use omap_serial_init_port for those ports
-> with board specific pins.
+I'm attempting to revive an old i.mx21ads board (Freescale dev board,
+M9328MX21ADS Rev E) with a newish Linux kernel but haven't had yet had
+luck getting a build after version 3.1.10 to boot successfully.  Given
+the age of this platform, it seems entirely plausible that nobody is
+actually runtime testing against this board, though I suppose it may
+also come down to something specific in my board revision.
 
-Something that might be doable is to read the pin settings for the
-uart in question in omap_serial_init. And then bail out for that
-port if the rx or tx pin is not already muxed to uart in question.
-Only if the rx and tx pin is muxed for uart, then you can enable
-the wake-up events.
+My basic question is, is anyone able to successfully boot a kernel
+version higher than 3.1.10 on a Freescale imx21ads board?   While I
+know this isn't a general support list, it seems like one of the most
+likely places to find someone who might be doing this.
 
-So basically doing remuxing in serial.c is only safe when
-omap_serial_init_port with mux data is being used.
+In my experience thus far versions up to 3.2.14 boot somewhat but
+throw an Oops on drivers/mtd/maps/physmap.c:141.  In the loop where
+that occurs my board is reporting one device named physmap-flash.0 and
+on the newer builds the info->map[0] structure looks like this:
 
-Regards,
+info->map[0].name: physmap-flash.0
+info->map[0].phys: 0xc8000000
+info->map[0].size: 0x2000000
+info->map[0].bankwidth: 0x4
+info->map[0].set_vpp: 0xc0171070
+info->map[0].pfow_base: 0x0
+info->map[0].map_priv_1: 0xc032a618
+info->map[0].virt: 0xc5000000
 
-Tony
+On older kernels which work that struct looks similar, but the set_vpp
+member points to NULL (I haven't done much linux kernel hacking, so I
+still have some poking around to do to figure out what this even
+points to):
+
+info->map[0].set_vpp: 0x0
+
+As of 3.3-rc1 or so, after the merge-down to imx_v4_v5_defconfig as
+opposed to the old mx21_defconfig the kernel
+hangs prior to displaying anything to serial.
+
+In my tests across the various kernel versions I've been disabling
+NAND support in the kernel build and flashing to NOR on this board.
+
+I intent to continue to digging into the code the determine what the
+issues are, but I think it may be helpful to know if anyone is
+successfully booting these newer kernels on this platform to help
+narrow the issue down to a specific revision or config set.
+
+I may end up just using the older version, but in that case I'm going
+to have to backport some of the device support that was put into the
+newer kernels (for CS89x0 ethernet, SDHC, etc)
+
+Thanks in advance for any pointers and thanks for all the work put
+into the arm SoC kernels.
