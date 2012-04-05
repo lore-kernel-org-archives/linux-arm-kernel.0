@@ -1,22 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 Apr 2012 20:07:39 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP: clock, powerdomain, clockdomain, hwmod
- fixes for early v3.4-rc
-In-Reply-To: <20120405004139.GA10780@atomide.com>
-References: <alpine.DEB.2.00.1204041658200.7161@utopia.booyaka.com>
- <20120405004139.GA10780@atomide.com>
-Message-ID: <alpine.DEB.2.00.1204042007140.10302@utopia.booyaka.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 5 Apr 2012 01:43:45 -0300
+Subject: [3.3] vfs_read oops in
+ arm/arch/plat-mxc/audmux-v2.c:audmux_read_file() in sysfs
+In-Reply-To: <2d33222231d2b5e5b07a63ae117048c9@mail.fqingenieria.es>
+References: <2d33222231d2b5e5b07a63ae117048c9@mail.fqingenieria.es>
+Message-ID: <CAOMZO5A6kQ2_-tbfyiigE3K9B2e3CM74OBfsDq4uT3kOgheiiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Apr 2012, Tony Lindgren wrote:
+On Wed, Apr 4, 2012 at 10:56 AM, joancarles <joancarles@fqingenieria.es> wrote:
+> Hi
+>
+> A 'cat /sys/kernel/debug/audmux/ssi7' causes following oops to be printed by
+> the kernel:
 
-> Thanks, looks like two of these patches I already merged into
-> fixes yesterday from your earlier pull request. So merging this
-> in would cause duplicate commits. Can you please update your
-> branch to remove those two commits?
+Hmm, ssi7 should not exist.
 
-Do you happen to recall which ones they are?
+Please try this:
 
+--- a/sound/soc/imx/imx-audmux.c
++++ b/sound/soc/imx/imx-audmux.c
+@@ -158,7 +158,7 @@ static void __init audmux_debugfs_init(void)
+                return;
+        }
 
-- Paul
+-       for (i = 1; i < 8; i++) {
++       for (i = 0; i < 6; i++) {
+                snprintf(buf, sizeof(buf), "ssi%d", i);
+                if (!debugfs_create_file(buf, 0444, audmux_debugfs_root,
+                                         (void *)i, &audmux_debugfs_fops))
