@@ -1,46 +1,38 @@
-From: tsoni@codeaurora.org (Trilok Soni)
-Date: Thu, 05 Apr 2012 12:23:25 +0530
-Subject: [PATCH 2/9] ARM: OMAP2+: SmartReflex: move the driver specific
- macros in include/linux/power
-In-Reply-To: <4F7CA3E1.2050809@ti.com>
-References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
- <1332173578-27422-3-git-send-email-j-pihet@ti.com>
- <4F7C9C89.9080605@codeaurora.org> <4F7CA3E1.2050809@ti.com>
-Message-ID: <4F7D4165.2060101@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Apr 2012 09:03:24 +0200
+Subject: [PATCH] clk: Update comment for clk_round_rate()
+In-Reply-To: <4F7D299E.1050307@st.com>
+References: <CAOh2x=nTSvOrJa2uB2zTvYh1SUO2YpEpnLcL189itJ=_e+MPog@mail.gmail.com>
+ <CAJOA=zOPn0FcwO0McSb8-18h7LiJndRD2nmCCvxUEEm+fakvKg@mail.gmail.com>
+ <4F7D299E.1050307@st.com>
+Message-ID: <20120405070324.GB27274@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hello,
 
->
-> The main motivation is that it's a driver and thus does not have
-> anything to do inside mach-omap2.
+On Thu, Apr 05, 2012 at 10:41:58AM +0530, Viresh Kumar wrote:
+> On 4/4/2012 11:37 PM, Turquette, Mike wrote:
+> > The common clk framework doesn't enforce any policy like this, nor do
+> > I think it should.  The clk framework is far from complete and I
+> > wouldn't be surprised if we see folks who want their rounded rate to
+> > represent a minimum value (instead of a maximum as your patch states).
+> 
+> Ok. Just for example, suppose foo_clk can have following rates:
+> 100, 110, 120, 130, 140.
+> 
+> And we call round_rate with a value of 126.
+> 
+> Now i can't visualize why would anybody want it to return 130 (above the
+> limits requested)? I agree both 100 and 120 can be returned, based on
+> your below logic.
+It depends on your scenario. E.g. for an UART clock it might be better
+to choose 130. Here choosing the frequency is not about a fixed maximum
+but to match the sample rate of the device connect to your UART.
 
-Right, I understood that. mach-omap2 is not suitable for full fledged 
-drivers.
-
->
-> Where will you put that otherwise?
-
-Couple of suggestions:
-
-drivers/platform/omap/avs?
-drivers/misc/omap/avs?
-
-I prefer first one.
-
->
-> IIRC, David Brownell was referring to the rule of three for such case.
-> Meaning that it worth having a generic fmwk when at least three
-> different drivers are doing the same kind of things.
-
-Yes, I remember that rule, but that's not stopping us to create a fwk, 
-may be others will rise once they see the framework and contribute
-if their h/w architecture requirements are not addressed?
-
----Trilok Soni
+Best regards
+Uwe
 
 -- 
---
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
