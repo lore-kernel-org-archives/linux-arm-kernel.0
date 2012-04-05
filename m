@@ -1,55 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Apr 2012 12:30:39 +0200
-Subject: Query: clk: Defining new struct clk_foo types
-In-Reply-To: <4F7D705D.7050004@st.com>
-References: <4F7D443E.3010800@st.com> <20120405095835.GB20478@pengutronix.de>
- <4F7D705D.7050004@st.com>
-Message-ID: <20120405103039.GC3852@pengutronix.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 5 Apr 2012 10:31:34 +0000
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
+ presence of 32k timer
+In-Reply-To: <20120405095221.GC25053@n2100.arm.linux.org.uk>
+References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+ <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+ <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
+ <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+ <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+ <87sjgmt211.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
+ <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+ <20120405095221.GC25053@n2100.arm.linux.org.uk>
+Message-ID: <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 03:43:49PM +0530, Viresh Kumar wrote:
-> On 4/5/2012 3:28 PM, Sascha Hauer wrote:
-> > If you have a gate and a divider then register a gate and a divider.
-> > We don't need clk providers for combination of these, the clock
-> > framework will handle it just fine.
+On Thu, Apr 05, 2012 at 15:22:21, Russell King - ARM Linux wrote:
+> On Thu, Apr 05, 2012 at 09:36:00AM +0000, Hiremath, Vaibhav wrote:
+> > There seems to be limitation for ARM architecture, it is restricted by
+> > sched_clock implementation present in "arch/arm/kernel/sched_clock.c".
+> > Natively, clocksource framework does support change in rate/frequency for
+> > registered timer, using,
 > 
-> Thanks Sashca, but i didn't get your reply completely.
-> Lets see if i can understand it with help of an example:
+> Any kind of switching of timing sources introduces loss of time issues
+> by the mere fact that you can't instantly know the counter values of
+> both timing sources at precisely the same instant - because CPUs can
+> only do one thing at a time.  So any kind of repeated dynamic switching
+> _will_ result in a gradual loss of time - which will be indeterminant
+> as it depends on the frequency of the switching and the relative delta
+> between the two.
 > 
-> I have uart's clock that can be gated and its rate derived as a divider.
-> So to define static clock structures, i do following:
+> To put it another way - it is not possible to maintain high precision
+> and accuracy while dynamically switching your timing sources.
 > 
-> DEFINE_CLK_GATE(uart_gate_clk, "uart_parent", &uart_parent_clk,	0,
-> 	0xd0000000, 5, 0, NULL);
-> DEFINE_CLK_DIVIDER(uart_divider_clk, "uart_parent", &uart_parent_clk,
-> 	0, 0xd0000080, 4, 2, 0, NULL);
+> I'm not about to lift the restriction that there's only one source for
+> sched_clock() just for OMAP.  That'd require a lot of additional code -
+> it's not just about adjusting the multiplier and shift, you also have to
+> correct the returned ns value as well, which means synchronizing against
+> two counters.  (And as I've pointed out above, that's impossible to do
+> accurately.)
 > 
-> You are suggesting this?
 
-No, more like this:
+Thanks a ton Russell for confirming on this,
 
-DEFINE_CLK_DIVIDER(uart_divider_clk, "uart_parent", &uart_parent_clk,
-       0, 0xd0000080, 4, 2, 0, NULL);
-DEFINE_CLK_GATE(uart_gate_clk, "uart_divider_clk", &uart_divider_clk,
-	CLK_SET_RATE_PARENT, 0xd0000000, 5, 0, NULL);
+I understand, we also have to adjust ns value and such confirmation is what exactly I was looking for.
 
-So the divider is the parent of the gate and a set_rate call to the gate
-will propagate up to the divider.
-You could make the gate the parent of the divider if that's how your
-hardware really is built, but for the software it makes no difference in
-this case.
+So this means, we have to use compile time option, as existing
+implementation in "arch/arm/mach-omap2/timer.c".
 
-Besides, I don't  recommend using the DEFINE_CLK_* macros. You should
-really consider using clk_register_* instead.
+Thanks again, I will repost patches shortly with the code changes (mentioned 
+in my last email)
 
-Grmpf. These DEFINE_CLK_* macros are so omnipresent and huge in
-clk-private.h that people *must* think they are the way to go.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Vaibhav
