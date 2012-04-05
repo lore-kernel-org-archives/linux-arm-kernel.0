@@ -1,33 +1,30 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 5 Apr 2012 16:27:52 -0700
-Subject: CONFIG_EARLY_PRINTK on versatile broken in mainline
-In-Reply-To: <CACxGe6sQ9YR-i4BJOsB0uE7U7gP7Y4Q12rjiEhqQnJGX+FEgfw@mail.gmail.com>
-References: <CACxGe6twdkkQaN+ieZoFpjvQAect7-6mUz+N8yULDzwtwHoW1Q@mail.gmail.com>
- <CAOMZO5DFmqz0Rp9oFR7tyofQ9iAfNWXTEYOFVcYvxWPcf6DDMQ@mail.gmail.com>
- <CACxGe6sQ9YR-i4BJOsB0uE7U7gP7Y4Q12rjiEhqQnJGX+FEgfw@mail.gmail.com>
-Message-ID: <CACxGe6tCbnA+tvo3S=m+XjaXXiGF+bLy98CByz7RymH=bfimhg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 5 Apr 2012 17:37:53 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP2+: PRM: fix compile for OMAP4-only build
+In-Reply-To: <20120405225345.GJ3785@atomide.com>
+References: <1333660837-23249-1-git-send-email-khilman@ti.com>
+ <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com>
+ <20120405225345.GJ3785@atomide.com>
+Message-ID: <alpine.DEB.2.00.1204051734560.10302@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2012 at 4:19 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, Apr 5, 2012 at 4:08 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> On Thu, Apr 5, 2012 at 7:52 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> Has anyone else had problems with CONFIG_EARLY_PRINTK on current
->>> mainline? ?ARM versatile fails to boot on qemu when it is selected.
->>> I've just started bisecting. ?v3.3 is okay, but current mainline is
->>> broken. ?Output stops after dumping out the memblock regions, and
->>> __log_buf stops at the same place.
->>
->> Please try this patch:
->> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/158694
->
-> I've already had that fix applied. ?This is a different issue. ?The
-> kernel boots fine if CONFIG_EARLY_PRINTK isn't defined.
+On Thu, 5 Apr 2012, Tony Lindgren wrote:
 
-Update: I'm still investigating, but it bisects out to this commit:
+> I heard of this first from Kevin before I started hitting it with
+> my compiles..
 
-commit 94e5a85b3be0ce109d26aa6812b2a02c518a0e4b
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Wed Jan 18 15:32:49 2012 +0000
+Okay.
 
-    ARM: earlier initialization of vectors page
+> Anyways, can you also check that we don't have a similar issue
+> with omap44xx_prm_reconfigure_io_chain for omap3 only builds?
+
+Will do.  Clearly I need to be running the full build-test suite on all of 
+my branches, as I was doing before the arm-soc transition.
+
+Future pull requests from me will be test-built with a large variety of 
+kernel .configs, and will contain a 'size' report for each generated 
+binary in the pull request.
+
+
+- Paul
