@@ -1,42 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Apr 2012 10:54:42 -0700
-Subject: [GIT PULL] Samsung fixes-1 for v3.4
-In-Reply-To: <4F7DBA8F.2010903@samsung.com>
-References: <4F7DBA8F.2010903@samsung.com>
-Message-ID: <CAOesGMhnVHyZHMT-gTCZFzLQPkGOuC+_by2q=f7kAKHv=j-6yA@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 5 Apr 2012 11:15:09 -0700
+Subject: Point-to-point bus in device tree
+Message-ID: <20120405181509.GA28693@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2012 at 8:30 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd, Olof
->
-> Please pull samsung-fixes-1 for v3.4 from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.4-samsung-fixes-1
->
-> They are for fix uart stuff on exynos, build warning and omission file
-> happened during resolving merge conflict on s3c24xx.
->
-> If any problems, please let me know.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
->
-> ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
->
-> are available in the git repository at:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.4-samsung-fixes-1
+Some MSM SoCs have a small serial-type "bus" that is used to
+communicate with the PMIC devices.  This interface is always
+point-to-point.  I'm doing a device-tree conversion of the driver that
+Ken Heitke posted last year <https://lkml.org/lkml/2011/2/17/503>.
 
+A naive conversion to device tree, would result in something like
+this:
 
-Thanks, pulled.
+	qcom,ssbi at 500000 {
+		compatible = "qcom,ssbi";
+		reg = <0x500000 0x1000>;
+		qcom,controller-type = "ssbi";
 
+		qcom,pmic8058 at 0 {
+			reg = <0x0 0x01>;
+			...
+		}
+	}
 
--Olof
+There would end up being an extraneous register for the device on the
+other end (there are no addresses), and there would need to be code in
+the ssbi driver to traverse this small tree to find these nodes.
+
+Another approach would be to make the pmic driver the actual device,
+and just have it use the ssbi code as a library.  Something like:
+
+	qcom,pmic8058 at 500000 {
+		compatible = "qcom,pmic8058";
+		reg = <0x500000 0x1000>;
+		qcom,ssbi-type = "ssbi";
+		...
+	}
+
+This is a lot cleaner, takes less code, but doesn't technically
+represent how the hardware is really structured.
+
+Does anyone have strong (or weak) feelings about this?
+
+Thanks,
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
