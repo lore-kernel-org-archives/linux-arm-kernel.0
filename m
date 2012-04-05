@@ -1,35 +1,46 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Thu, 5 Apr 2012 12:15:06 +0100 (BST)
-Subject: [PATCH] ARM: pxa: mfp: Force gpio direction for
- MFP_LPM_KEEP_OUTPUT
-In-Reply-To: <4F7D54D6.70206@compulab.co.il>
-Message-ID: <1333624506.83658.YahooMailClassic@web29010.mail.ird.yahoo.com>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Thu, 5 Apr 2012 16:54:03 +0530
+Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
+In-Reply-To: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <CAMrsUd+_coW7ebuN_o=yZbbSVKnkx5R6=yHjUEUc0EcQGtgSRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Igor,
+On Wed, Mar 21, 2012 at 3:54 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+>
+> Based on Linux-OMAP tree uart branch.
+> (git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+> remotes/origin/uart)
+>
+> * Removes the cpu checks wherever possible and use version reg
+> ?for populating features and errata's
+> * enable tx wakeup available in wer reg for applicable
+> ?module revision's
+>
+> Govindraj.R (3):
+> ?OMAP2+: UART: Remove cpu checks for populating errata flags
+> ?OMAP2+: UART: enable tx wakeup bit for wer reg
+> ?OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
+>
+> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 13 +----
+> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?8 +++-
+> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 71 ++++++++++++++++++++++++-
+> ?3 files changed, 78 insertions(+), 14 deletions(-)
 
---- On Thu, 5/4/12, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> >> Please, check the attached patch.
-> >> It should not change the meaning of KEEP_OUTPUT,
-> but fix the
-> >> bug.
-> > 
-> > Yes, your patch - pxa2xx-mfp.patch - does fix the
-> KEEP_OUTPUT bug.
-> 
-> Looking at it one more time, we setup the GPDR with values
-> from gpdr_lpm,
-> and afterwards we setup them once again to update for
-> KEEP_CONFIG.
-> This can introduce a kind of spike on the GPIO (depending on
-> how fast
-> the system runs).
-> So, fixed patch attached. Can you please test it once more
-> and I will
-> submit it properly?
+Alan / Greg,
 
-Yes, I've tested it and this new patch fixes the KEEP_OUTPUT bug.
+With you ack on tty parts can this series be upstreamed from
+omap tree ?
 
-Regards,
-Paul
+
+Tony,
+
+Can you take these series into your uart fixes branch for 3.4-rc
+(Let me know if you need a pull request with patches based on
+linux-omap tree uart branch)
+
+--
+Thanks,
+Govindraj.R
