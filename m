@@ -1,79 +1,43 @@
-From: samgandhi9@gmail.com (Sam Gandhi)
-Date: Thu, 5 Apr 2012 05:03:54 -0700
-Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
-In-Reply-To: <4F7D3DB8.6080009@freescale.com>
-References: <CAOdLEarFOdmDBS0iDmafLeBU=NNWxWjejTvJ-eEkQjRO12+VYg@mail.gmail.com>
- <20120404070157.GB24930@pengutronix.de>
- <CAOdLEaqXyvHzTRSq2=RquZLqEO6kMEp11rjKJ+UtSqtF4nr-EA@mail.gmail.com>
- <20120404183314.GF17187@pengutronix.de>
- <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
- <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
- <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
- <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
- <4F7D3DB8.6080009@freescale.com>
-Message-ID: <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
+From: alan@linux.intel.com (Alan Cox)
+Date: Thu, 5 Apr 2012 13:26:17 +0100
+Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
+In-Reply-To: <CAMrsUd+_coW7ebuN_o=yZbbSVKnkx5R6=yHjUEUc0EcQGtgSRQ@mail.gmail.com>
+References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+ <CAMrsUd+_coW7ebuN_o=yZbbSVKnkx5R6=yHjUEUc0EcQGtgSRQ@mail.gmail.com>
+Message-ID: <20120405132617.76e04217@bob.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/4/4 Huang Shijie <b32955@freescale.com>:
-> Hi All:
->> On Wed, Apr 4, 2012 at 7:07 PM, Sam Gandhi<samgandhi9@gmail.com> ?wrote:
->>
->>> I reverted that commit and I still see following ?error!
->> Huang,
->>
->> Are you able to use gpmi on mx28 running 3.4-rc1?
->>
-> I also meet the same problem today.
->
->
->>> flash_erase /dev/mtd1 0 0
->>> Erasing 1------------[ cut here ]------------
->>> kernel BUG at /home/sam/linux/drivers/dma/dmaengine.h:53!
-> the mxs-dma has added some patches about the cookie.
-> The bug is in the dmaengine.h.
->
-> So let more people know this bug.
->
-> BR
-> Huang Shijie
->
->
-FWIW, Just a data point.
+On Thu, 5 Apr 2012 16:54:03 +0530
+"Raja, Govindraj" <govindraj.raja@ti.com> wrote:
 
-I coverted BUG_ON in dmaengine.h to printk as shown below. With this
-change I was able to format nand, create UBI partition. I have been
-running UBI torture test called integck on my board that does lot of
-I/O, mounting/unmounting of filesystem for close to 8 hour now without
-crash. But I do see those printks. I haven't followed logic of
-tx->cookie well enough to figure out what the appropriate change
-should be. Note this is with commit
-00292bbf769620dea923dbd906afd88955f7ea19 reverted in my tree.
+> On Wed, Mar 21, 2012 at 3:54 PM, Govindraj.R <govindraj.raja@ti.com>
+> wrote:
+> > From: "Govindraj.R" <govindraj.raja@ti.com>
+> >
+> > Based on Linux-OMAP tree uart branch.
+> > (git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+> > remotes/origin/uart)
+> >
+> > * Removes the cpu checks wherever possible and use version reg
+> > ?for populating features and errata's
+> > * enable tx wakeup available in wer reg for applicable
+> > ?module revision's
+> >
+> > Govindraj.R (3):
+> > ?OMAP2+: UART: Remove cpu checks for populating errata flags
+> > ?OMAP2+: UART: enable tx wakeup bit for wer reg
+> > ?OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
+> >
+> > ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 13 +----
+> > ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?8 +++-
+> > ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 71
+> > ++++++++++++++++++++++++- 3 files changed, 78 insertions(+), 14
+> > deletions(-)
+> 
+> Alan / Greg,
+> 
+> With you ack on tty parts can this series be upstreamed from
+> omap tree ?
 
-Cookie 0  completed 102118268 DMA_MIN 1
-Cookie 0  completed 102120401 DMA_MIN 1
-Cookie 0  completed 102237726 DMA_MIN 1
-
-git diff drivers/dma/dmaengine.h
-diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
-index 17f983a..3d10a70 100644
---- a/drivers/dma/dmaengine.h
-+++ b/drivers/dma/dmaengine.h
-@@ -50,7 +50,11 @@ static inline dma_cookie_t dma_cookie_assign(struct
-dma_async_tx_descriptor *tx)
-  */
- static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
- {
--       BUG_ON(tx->cookie < DMA_MIN_COOKIE);
-+       if ( tx->cookie < DMA_MIN_COOKIE)
-+               printk(KERN_ERR "Cookie %d,  completed %d DMA_MIN %d
-",tx->cookie,
-+               tx->chan->completed_cookie,
-+               DMA_MIN_COOKIE);
-+       /* BUG_ON(tx->cookie < DMA_MIN_COOKIE); */
-        tx->chan->completed_cookie = tx->cookie;
-        tx->cookie = 0;
- }
-
-Regards,
--Sam
+Fine by me - this seems primarily to be architectural details.
