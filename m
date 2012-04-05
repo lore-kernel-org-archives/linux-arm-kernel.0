@@ -1,44 +1,26 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 5 Apr 2012 16:31:30 +0200
-Subject: [PATCH] ARM: at91: Export at91_st_base
-In-Reply-To: <1333559715-28649-1-git-send-email-joachim.eastwood@jotron.com>
-References: <1333559715-28649-1-git-send-email-joachim.eastwood@jotron.com>
-Message-ID: <20120405143130.GA16641@game.jcrosoft.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Apr 2012 09:02:37 -0600
+Subject: [PATCH 1/1] pinctrl: fix compile error if not select PINMUX
+ support
+In-Reply-To: <1333616843-3607-1-git-send-email-b29396@freescale.com>
+References: <1333616843-3607-1-git-send-email-b29396@freescale.com>
+Message-ID: <4F7DB40D.20300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:15 Wed 04 Apr     , Joachim Eastwood wrote:
-> After commit 5e9cf5e18d4b "ARM: at91: make ST (System Timer) soc independent"
-> building at91rm9200_wdt as a module fails with following message
->   ERROR: "at91_st_base" [drivers/watchdog/at91rm9200_wdt.ko] undefined!
->   make[1]: *** [__modpost] Error 1
->   make: *** [modules] Error 2
+On 04/05/2012 03:07 AM, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> Export symbol to allow wdt driver to be built as a module again.
+> The pinctrl_register_mappings is defined in core.c, so change the dependent
+> macro from CONFIG_MUX to CONFIG_PINCTRL.
 > 
-> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
-> ---
->  arch/arm/mach-at91/at91rm9200_time.c |    2 ++
->  1 file changed, 2 insertions(+)
+> The compile error message is:
+> drivers/pinctrl/core.c:886: error: redefinition of 'pinctrl_register_mappings'
+> include/linux/pinctrl/machine.h:160: note: previous definition of 'pinctrl_register_mappings' was here
+> make[2]: *** [drivers/pinctrl/core.o] Error 1
+> make[1]: *** [drivers/pinctrl] Error 2
+> make: *** [drivers] Error 2
 > 
-> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-> index dd7f782..bb0e7fd 100644
-> --- a/arch/arm/mach-at91/at91rm9200_time.c
-> +++ b/arch/arm/mach-at91/at91rm9200_time.c
-> @@ -23,6 +23,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
->  #include <linux/clockchips.h>
-> +#include <linux/export.h>
->  
->  #include <asm/mach/time.h>
->  
-> @@ -176,6 +177,7 @@ static struct clock_event_device clkevt = {
->  };
->  
->  void __iomem *at91_st_base;
-> +EXPORT_SYMBOL(at91_st_base);
-EXPORT_SYMBOL_GPL
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Best Regards,
-J.
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
