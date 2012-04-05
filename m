@@ -1,55 +1,56 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Apr 2012 10:55:45 +0100
-Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation for
- Device Tree bindings
+Date: Thu,  5 Apr 2012 10:55:46 +0100
+Subject: [PATCH 5/7] ARM: ux500: Rename gpio_keys in the Device Tree file
 In-Reply-To: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
 References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1333619748-16126-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1333619748-16126-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required documentation for specific gpio-nomadik DT bindings.
+Ensure each button is individually identifiable by using
+their correct unique given device names.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../devicetree/bindings/gpio/gpio-nmk.txt          |   29 ++++++++++++++++++++
- 1 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+ arch/arm/boot/dts/snowball.dts |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-new file mode 100644
-index 0000000..1555029
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-@@ -0,0 +1,29 @@
-+Nomadik GPIO controller
-+
-+Required properties:
-+- compatible           : Should be "stmicroelectronics,nomadik-gpio".
-+- reg                  : Physical base address and length of the controller's registers.
-+- interrupts           : The interrupt outputs from the controller.
-+- #gpio-cells          : Should be two:
-+                           The first cell is the pin number.
-+                           The second cell is used to specify optional parameters:
-+                             - bits[3:0] trigger type and level flags:
-+                                 1 = low-to-high edge triggered.
-+                                 2 = high-to-low edge triggered.
-+                                 4 = active high level-sensitive.
-+                                 8 = active low level-sensitive.
-+- gpio-controller      : Marks the device node as a GPIO controller.
-+- supports-sleepmode   : Specifies whether controller can sleep or not
-+- gpio-bank            : Specifies which bank a controller owns.
-+
-+Example:
-+
-+                gpio1: gpio at 8012e080 {
-+                        compatible = "stmicroelectronics,nomadik-gpio";
-+                        reg =  <0x8012e080 0x80>;
-+                        interrupts = <0 120 0x4>;
-+                        #gpio-cells = <2>;
-+                        gpio-controller;
-+                        supports-sleepmode;
-+                        gpio-bank = <1>;
-+                };
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 738959d..0cec47b 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -36,28 +36,28 @@
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <3>;
+-			label = "userpb";
++			label = "extkb1";
+ 			gpios = <&gpio4 23 0>;
+ 		};
+ 		button at 3 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <4>;
+-			label = "userpb";
++			label = "extkb2";
+ 			gpios = <&gpio4 24 0>;
+ 		};
+ 		button at 4 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <5>;
+-			label = "userpb";
++			label = "extkb3";
+ 			gpios = <&gpio5 1 0>;
+ 		};
+ 		button at 5 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <6>;
+-			label = "userpb";
++			label = "extkb4";
+ 			gpios = <&gpio5 2 0>;
+ 		};
+ 	};
 -- 
 1.7.9.1
