@@ -1,119 +1,153 @@
-From: samgandhi9@gmail.com (Sam Gandhi)
-Date: Thu, 5 Apr 2012 07:38:09 -0700
-Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
-In-Reply-To: <1333633703.31825.25.camel@vkoul-udesk3>
-References: <CAOdLEarFOdmDBS0iDmafLeBU=NNWxWjejTvJ-eEkQjRO12+VYg@mail.gmail.com>
- <20120404070157.GB24930@pengutronix.de>
- <CAOdLEaqXyvHzTRSq2=RquZLqEO6kMEp11rjKJ+UtSqtF4nr-EA@mail.gmail.com>
- <20120404183314.GF17187@pengutronix.de>
- <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
- <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
- <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
- <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
- <4F7D3DB8.6080009@freescale.com>
- <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
- <1333628861.31825.22.camel@vkoul-udesk3>
- <CAOdLEaqceT5u=N5Jx-BApXiTGPUoDAwmgs6qxKwipm_ac3nFeg@mail.gmail.com>
- <1333633703.31825.25.camel@vkoul-udesk3>
-Message-ID: <CAOdLEaottc8WzmkBDmrFORJohje_F2RC8a=h0RJgwyQjAVxv_g@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 5 Apr 2012 14:46:51 +0000
+Subject: [PATCH-V2 3/3] ARM: OMAP: Make OMAP clocksource source
+ selection runtime
+In-Reply-To: <4F794D8B.6030703@ti.com>
+References: <1333115655-28530-1-git-send-email-hvaibhav@ti.com>
+ <1333115655-28530-4-git-send-email-hvaibhav@ti.com> <4F794D8B.6030703@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A831848AC2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2012 at 6:48 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> On Thu, 2012-04-05 at 06:02 -0700, Sam Gandhi wrote:
->> Vinod,
->>
->> On Thu, Apr 5, 2012 at 5:27 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
->> > On Thu, 2012-04-05 at 05:03 -0700, Sam Gandhi wrote:
->> >> 2012/4/4 Huang Shijie <b32955@freescale.com>:
->> >> > Hi All:
->> >> >> On Wed, Apr 4, 2012 at 7:07 PM, Sam Gandhi<samgandhi9@gmail.com> ?wrote:
->> >> >>
->> >> >>> I reverted that commit and I still see following ?error!
->> >> >> Huang,
->> >> >>
->> >> >> Are you able to use gpmi on mx28 running 3.4-rc1?
->> >> >>
->> >> > I also meet the same problem today.
->> >> >
->> >> >
->> >> >>> flash_erase /dev/mtd1 0 0
->> >> >>> Erasing 1------------[ cut here ]------------
->> >> >>> kernel BUG at /home/sam/linux/drivers/dma/dmaengine.h:53!
->> >> > the mxs-dma has added some patches about the cookie.
->> >> > The bug is in the dmaengine.h.
->> >> >
->> >> > So let more people know this bug.
->> >> >
->> >> > BR
->> >> > Huang Shijie
->> >> >
->> >> >
->> >> FWIW, Just a data point.
->> >>
->> >> I coverted BUG_ON in dmaengine.h to printk as shown below. With this
->> >> change I was able to format nand, create UBI partition. I have been
->> >> running UBI torture test called integck on my board that does lot of
->> >> I/O, mounting/unmounting of filesystem for close to 8 hour now without
->> >> crash. But I do see those printks. I haven't followed logic of
->> >> tx->cookie well enough to figure out what the appropriate change
->> >> should be. Note this is with commit
->> >> 00292bbf769620dea923dbd906afd88955f7ea19 reverted in my tree.
->> >>
->> >> Cookie 0 ?completed 102118268 DMA_MIN 1
->> >> Cookie 0 ?completed 102120401 DMA_MIN 1
->> >> Cookie 0 ?completed 102237726 DMA_MIN 1
->> >>
->> >> git diff drivers/dma/dmaengine.h
->> >> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
->> >> index 17f983a..3d10a70 100644
->> >> --- a/drivers/dma/dmaengine.h
->> >> +++ b/drivers/dma/dmaengine.h
->> >> @@ -50,7 +50,11 @@ static inline dma_cookie_t dma_cookie_assign(struct
->> >> dma_async_tx_descriptor *tx)
->> >> ? */
->> >> ?static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
->> >> ?{
->> >> - ? ? ? BUG_ON(tx->cookie < DMA_MIN_COOKIE);
->> >> + ? ? ? if ( tx->cookie < DMA_MIN_COOKIE)
->> >> + ? ? ? ? ? ? ? printk(KERN_ERR "Cookie %d, ?completed %d DMA_MIN %d
->> >> ",tx->cookie,
->> >> + ? ? ? ? ? ? ? tx->chan->completed_cookie,
->> >> + ? ? ? ? ? ? ? DMA_MIN_COOKIE);
->> >> + ? ? ? /* BUG_ON(tx->cookie < DMA_MIN_COOKIE); */
->> >> ? ? ? ? tx->chan->completed_cookie = tx->cookie;
->> >> ? ? ? ? tx->cookie = 0;
->> >> ?}
->> > This means you are trying to mark a cookie complete when it is already
->> > marked so!, hence dmaengine screams.
->> > The bug is is mxs-dma.
->> > Let me know if below fixes it (assuming you are not using cyclic API,
->> > that would need fixup as well)
->> >
->> > diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
->> > index c81ef7e..5ddd84e 100644
->> > --- a/drivers/dma/mxs-dma.c
->> > +++ b/drivers/dma/mxs-dma.c
->> > @@ -399,6 +399,10 @@ static struct dma_async_tx_descriptor
->> > *mxs_dma_prep_slave_sg(
->> > ? ? ? ? ? ? ? ?ccw->bits &= ~CCW_DEC_SEM;
->> > ? ? ? ?} else {
->> > ? ? ? ? ? ? ? ?idx = 0;
->> > + ? ? ? ? ? ? ? /* assign cookie here,
->> > + ? ? ? ? ? ? ? ?* hopefully for above case we dont need it
->> > + ? ? ? ? ? ? ? ?*/
->> > + ? ? ? ? ? ? ? dma_cookie_assign(&mxs_chan->desc);
->> > ? ? ? ?}
->> >
->> > ? ? ? ?if (direction == DMA_TRANS_NONE) {
->> >
->> I applied your suggested change and don't hit the BUG_ON in
->> dmaengine.h with this change UBI torture test has run for last 30 min
->> or so I will let it run for a day. [ I will let mxs-dma authors
->> comment if this is a right change.. ]
-> Good I will apply this and send to Linus.
-> Care to give your tested-by.
+On Mon, Apr 02, 2012 at 12:26:11, Shilimkar, Santosh wrote:
+> On Friday 30 March 2012 07:24 PM, Vaibhav Hiremath wrote:
+> > Current OMAP code supports couple of clocksource options based
+> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+> > So there can be 3 options -
+> > 
+> > 1. 32KHz sync-timer
+> > 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+> > 3. 32KHz based gptimer.
+> > 
+> > The optional gptimer based clocksource was added so that it can
+> > give the high precision than sync-timer, so expected usage was 2
+> > and not 3.
+> > Unfortunately option 2, clocksource doesn't meet the requirement of
+> > free-running clock as per clocksource need. It stops in low power states
+> > when sys_clock is cut. That makes gptimer based clocksource option
+> > useless for OMAP2/3/4 devices with sys_clock as a clock input.
+> > Option 3 will still work but it is no better than 32K sync-timer
+> > based clocksource.
+> > 
+> > So ideally we can kill the gptimer based clocksource option but there
+> > are some OMAP based derivative SoCs like AM33XX which doesn't have
+> > 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
+> > clocksource.
+> > Considering above, make sync-timer and gptimer clocksource runtime
+> > selectable so that both OMAP and AMXXXX continue to use the same code.
+> > 
+> > Use hwmod database lookup mechanism, through which at run-time
+> > we can identify availability of 32k-sync timer on the device,
+> > else fall back to gptimer.
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> > Cc: Ming Lei <tom.leiming@gmail.com>
+> > ---
+> 
+> Thanks for the change log update Vaibhav.
+> Some more comments.
+> 
+> 
+> >  arch/arm/mach-omap1/timer32k.c           |    6 ++-
+> >  arch/arm/mach-omap2/timer.c              |   45 +++++++++-------
+> >  arch/arm/plat-omap/counter_32k.c         |   86 ++++++++++++-----------------
+> >  arch/arm/plat-omap/include/plat/common.h |    2 +-
+> >  4 files changed, 68 insertions(+), 71 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap1/timer32k.c b/arch/arm/mach-omap1/timer32k.c
+> > index a2e6d07..3f96a00 100644
+> > --- a/arch/arm/mach-omap1/timer32k.c
+> > +++ b/arch/arm/mach-omap1/timer32k.c
+> > @@ -72,6 +72,7 @@
+> > 
+> >  /* 16xx specific defines */
+> >  #define OMAP1_32K_TIMER_BASE		0xfffb9000
+> > +#define OMAP1_32KSYNC_TIMER_BASE	0xfffbc410
+> Shouldn't you just update OMAP1_32K_TIMER_BASE ?
+> 
 
-Sure.
+No, they are different. First one is normal timer base address
+and next one is 32k-sync timer base address.
 
--Sam (samgandhi9 at gmail.com )
+> >  #define OMAP1_32K_TIMER_CR		0x08
+> >  #define OMAP1_32K_TIMER_TVR		0x00
+> >  #define OMAP1_32K_TIMER_TCR		0x04
+> > @@ -185,7 +186,10 @@ static __init void omap_init_32k_timer(void)
+> >   */
+> >  bool __init omap_32k_timer_init(void)
+> >  {
+> > -	omap_init_clocksource_32k();
+> > +	u32 pbase;
+> > +
+> > +	pbase = cpu_is_omap16xx() ? OMAP1_32KSYNC_TIMER_BASE : NULL;
+> > +	omap_init_clocksource_32k(pbase, SZ_1K);
+> If pbase is NULL, you might not want to call the init.
+> 
+
+First check we do in _init function is, check for NULL, so you
+can ignore it.
+
+> >  	omap_init_32k_timer();
+> > 
+> >  	return true;
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index 5c9acea..f35db1a 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -234,21 +234,6 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
+> >  }
+> > 
+> >  /* Clocksource code */
+> > -
+> > -#ifdef CONFIG_OMAP_32K_TIMER
+> > -/*
+> > - * When 32k-timer is enabled, don't use GPTimer for clocksource
+> > - * instead, just leave default clocksource which uses the 32k
+> > - * sync counter.  See clocksource setup in plat-omap/counter_32k.c
+> > - */
+> > -
+> > -static void __init omap2_gp_clocksource_init(int unused, const char *dummy)
+> > -{
+> > -	omap_init_clocksource_32k();
+> > -}
+> > -
+> > -#else
+> > -
+> >  static struct omap_dm_timer clksrc;
+> > 
+> >  /*
+> > @@ -280,13 +265,33 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+> >  						const char *fck_source)
+> >  {
+> >  	int res;
+> > +	struct omap_hwmod *oh;
+> > +	const char *oh_name = "counter_32k";
+> > +
+> > +	/*
+> > +	 * First check for availability for 32k-sync timer.
+> > +	 *
+> > +	 * In case of failure in finding 32k_counter module or
+> > +	 * registering it as clocksource, execution will fallback to
+> > +	 * gp-timer.
+> > +	 */
+> > +	oh = omap_hwmod_lookup(oh_name);
+> > +	if (oh && oh->slaves_cnt != 0) {
+> > +		u32 pbase;
+> > +		unsigned long size;
+> > +
+> > +		pbase = oh->slaves[0]->addr->pa_start + 0x10;
+> Don't hardcode the offset here. This is error prone when the IP
+> changes so use the register define.
+> 
+
+Ok, I will define macro for this and use it.
+
+Thanks,
+Vaibhav
