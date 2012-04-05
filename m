@@ -1,31 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 5 Apr 2012 02:50:08 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP: clock, powerdomain, clockdomain, hwmod
- fixes for early v3.4-rc
-In-Reply-To: <alpine.DEB.2.00.1204042007140.10302@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1204041658200.7161@utopia.booyaka.com>
- <20120405004139.GA10780@atomide.com>
- <alpine.DEB.2.00.1204042007140.10302@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1204050246410.10302@utopia.booyaka.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 5 Apr 2012 17:07:23 +0800
+Subject: [PATCH 1/1] pinctrl: fix compile error if not select PINMUX support
+Message-ID: <1333616843-3607-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Apr 2012, Paul Walmsley wrote:
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-> On Wed, 4 Apr 2012, Tony Lindgren wrote:
-> 
-> > Thanks, looks like two of these patches I already merged into
-> > fixes yesterday from your earlier pull request. So merging this
-> > in would cause duplicate commits. Can you please update your
-> > branch to remove those two commits?
-> 
-> Do you happen to recall which ones they are?
+The pinctrl_register_mappings is defined in core.c, so change the dependent
+macro from CONFIG_MUX to CONFIG_PINCTRL.
 
-Anyway, am guessing that you are planning to pull these into your 
-'fixes' branch?  If so then probably the conflicts are with the 
-misc_devel_3.4 branch patches.  Will post another pull request for you 
-with those two patches dropped.  But if you're pulling these into a 
-different branch, please let me know...
+The compile error message is:
+drivers/pinctrl/core.c:886: error: redefinition of 'pinctrl_register_mappings'
+include/linux/pinctrl/machine.h:160: note: previous definition of 'pinctrl_register_mappings' was here
+make[2]: *** [drivers/pinctrl/core.o] Error 1
+make[1]: *** [drivers/pinctrl] Error 2
+make: *** [drivers] Error 2
 
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ include/linux/pinctrl/machine.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-- Paul
+diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
+index 226444e..e4d1de7 100644
+--- a/include/linux/pinctrl/machine.h
++++ b/include/linux/pinctrl/machine.h
+@@ -150,7 +150,7 @@ struct pinctrl_map {
+ #define PIN_MAP_CONFIGS_GROUP_HOG_DEFAULT(dev, grp, cfgs)		\
+ 	PIN_MAP_CONFIGS_GROUP(dev, PINCTRL_STATE_DEFAULT, dev, grp, cfgs)
+ 
+-#ifdef CONFIG_PINMUX
++#ifdef CONFIG_PINCTRL
+ 
+ extern int pinctrl_register_mappings(struct pinctrl_map const *map,
+ 				unsigned num_maps);
+-- 
+1.7.0.4
