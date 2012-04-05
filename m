@@ -1,260 +1,183 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 5 Apr 2012 15:34:23 -0500
-Subject: [PATCH v3 1/9] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <4F7DFED5.4030000@ti.com>
-References: <cover.1333640054.git.afzal@ti.com>
- <cefbe934da40f0a169b1e3a75c46451e5546a8bd.1333640054.git.afzal@ti.com>
- <4F7DFED5.4030000@ti.com>
-Message-ID: <4F7E01CF.3040203@ti.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Thu,  5 Apr 2012 22:12:00 +0100
+Subject: [PATCH V4.1 1/3] mtd: Add orion_nand devicetree bindings
+In-Reply-To: <1333201985-2222-2-git-send-email-jm@lentin.co.uk>
+References: <1333201985-2222-2-git-send-email-jm@lentin.co.uk>
+Message-ID: <1333660320-29898-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+Allow a NAND chip using the orion_nand driver to be described using devicetree.
 
-On 04/05/2012 03:21 PM, Jon Hunter wrote:
-> Hi Afzal,
->
-> On 04/05/2012 10:45 AM, Afzal Mohammed wrote:
->
-> [...]
->
->> +struct gpmc_irq {
->> + unsigned irq;
->> + u32 regval;
->
-> Are you using regval to indicate the bit-mask? If so, maybe call it
-> "bitmask" instead.
->
-> [...]
->
->> +static __devinit
->> +int gpmc_setup_cs_irq(struct gpmc *gpmc, struct gpmc_device_pdata *gdp,
->> + struct gpmc_cs_data *cs, struct resource *res)
->> +{
->> + int i, n, val;
->> +
->> + for (i = 0, n = 0; i< gpmc->num_irq; i++)
->> + if (gpmc->irq[i].regval& cs->irq_flags) {
->> + res[n].start = res[n].end = gpmc->irq[i].irq;
->> + res[n].flags = IORESOURCE_IRQ;
->> +
->> + dev_info(gpmc->dev, "resource irq %u for %s "
->> + "(on CS %d) [bit: %x]\n", res[n].start,
->> + gdp->name, cs->cs, __ffs(gpmc->irq[i].regval));
->> +
->> + switch (gpmc->irq[i].regval) {
->> + case GPMC_IRQ_WAIT0EDGEDETECTION:
->> + case GPMC_IRQ_WAIT1EDGEDETECTION:
->> + case GPMC_IRQ_WAIT2EDGEDETECTION:
->> + case GPMC_IRQ_WAIT3EDGEDETECTION:
->> + val = __ffs(gpmc->irq[i].regval);
->> + val -= __ffs(GPMC_IRQ_WAIT0EDGEDETECTION);
->> + gpmc_cs_configure(cs->cs,
->> + GPMC_CONFIG_WAITPIN, val);
->
-> Why is the configuration of the wait pin done here? It is possible to
-> use the wait pin may be used without enabling the interrupt.
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+---
+* WARN when bank-width is out of range, as suggested by Andrew Lunn 
 
-Sorry very bad english here on my part. I meant "it is possible to use a 
-wait pin, without enabling the interrupt".
+* Document all parameters.
+* Convert bank-width to be in bytes
+* Add explicit defaults for cle, ale and bank-width
 
-> Where do you handle allocating the wait pins to ensure two devices don't
-> attempt to use the same one? Like how the CS are managed.
->
-> Also, where you you configure the polarity of the wait pins? I would
-> have thought it would make sense to have the wait pin configured as part
-> of the cs configuration.
->
->> + }
->> + n++;
->> + }
->> +
->> + return n;
->> +}
->> +
->> +static __devinit int gpmc_setup_device(struct gpmc_device_pdata *gdp,
->> + struct gpmc_device *dev, struct gpmc *gpmc)
->> +{
->> + int i, j, n;
->> + struct gpmc_cs_data *cs;
->> +
->> + for (i = 0, n = 0, cs = gdp->cs_data; i< gdp->num_cs; i++, cs++)
->> + n += hweight32(cs->irq_flags& GPMC_IRQ_MASK);
->> +
->> + n += gdp->num_cs;
->> +
->> + dev->gpmc_res = devm_kzalloc(gpmc->dev, sizeof(*dev->gpmc_res) * n,
->> + GFP_KERNEL);
->> + if (dev->gpmc_res == NULL) {
->> + dev_err(gpmc->dev, "error: memory allocation\n");
->> + return -ENOMEM;
->> + }
->> +
->> + for (i = 0, j = 0, cs = gdp->cs_data; i< gdp->num_cs; cs++, i++) {
->> + dev->gpmc_res[j] = gpmc_setup_cs_mem(cs, gdp, gpmc);
->> + if (dev->gpmc_res[j++].flags& IORESOURCE_MEM)
->> + j += gpmc_setup_cs_irq(gpmc, gdp, cs,
->> + dev->gpmc_res + j);
->> + else {
->> + dev_err(gpmc->dev, "error: setup for %s\n", gdp->name);
->> + devm_kfree(gpmc->dev, dev->gpmc_res);
->> + dev->gpmc_res = NULL;
->> + dev->num_gpmc_res = 0;
->> + return -EINVAL;
->> + }
->> }
->
-> This section of code is not straight-forward to read. I see what you are
-> doing, but I am wondering if this could be improved.
->
-> First of all, returning a structure from a function is making this code
-> harder to read. Per the CodingStyle document in the kernel, it is
-> preferred for a function to return success or failure if the function is
-> an action, like a setup.
->
-> Secondly, do you need to pass cs, gdp and gpmc to gpmc_setup_cs_mem()?
-> It appears that gdp and gpmc are only used for prints. You could
-> probably avoid passing gdp and move the print to outside this function.
->
->> + dev->num_gpmc_res = j;
->>
->> - ret = request_irq(gpmc_irq,
->> - gpmc_handle_irq, IRQF_SHARED, "gpmc", gpmc_base);
->> - if (ret)
->> - pr_err("gpmc: irq-%d could not claim: err %d\n",
->> - gpmc_irq, ret);
->> - return ret;
->> + dev->name = gdp->name;
->> + dev->id = gdp->id;
->> + dev->pdata = gdp->pdata;
->> + dev->pdata_size = gdp->pdata_size;
->> + dev->per_res = gdp->per_res;
->> + dev->num_per_res = gdp->num_per_res;
->> +
->> + return 0;
->> +}
->> +
->> +static __devinit
->> +struct platform_device *gpmc_create_device(struct gpmc_device *p,
->> + struct gpmc *gpmc)
->> +{
->> + int num = p->num_per_res + p->num_gpmc_res;
->> + struct resource *res;
->> + struct platform_device *pdev;
->> +
->> + res = devm_kzalloc(gpmc->dev, sizeof(struct resource) * num,
->> + GFP_KERNEL);
->> + if (!res) {
->> + dev_err(gpmc->dev, "error: allocating memory\n");
->> + return NULL;
->> + }
->> +
->> + memcpy((char *)res, (const char *) p->gpmc_res,
->> + sizeof(struct resource) * p->num_gpmc_res);
->> + memcpy((char *)(res + p->num_gpmc_res), (const char *)p->per_res,
->> + sizeof(struct resource) * p->num_per_res);
->> +
->> + pdev = platform_device_register_resndata(gpmc->dev, p->name, p->id,
->> + res, num, p->pdata, p->pdata_size);
->> +
->> + devm_kfree(gpmc->dev, res);
->> +
->> + return pdev;
->> }
->> -postcore_initcall(gpmc_init);
->>
->> static irqreturn_t gpmc_handle_irq(int irq, void *dev)
->> {
->> - u8 cs;
->> + int i;
->> + u32 regval;
->> + struct gpmc *gpmc = dev;
->>
->> - /* check cs to invoke the irq */
->> - cs = ((gpmc_read_reg(GPMC_PREFETCH_CONFIG1))>> CS_NUM_SHIFT)& 0x7;
->> - if (OMAP_GPMC_IRQ_BASE+cs<= OMAP_GPMC_IRQ_END)
->> - generic_handle_irq(OMAP_GPMC_IRQ_BASE+cs);
->> + regval = gpmc_read_reg(GPMC_IRQSTATUS);
->> +
->> +
->> + for (i = 0; i< gpmc->num_irq; i++)
->> + if (regval& gpmc->irq[i].regval)
->> + generic_handle_irq(gpmc->irq[i].irq);
->> + gpmc_write_reg(GPMC_IRQSTATUS, regval);
->>
->> return IRQ_HANDLED;
->> }
->>
->> +static int gpmc_irq_endis(struct irq_data *p, bool endis)
->> +{
->> + struct gpmc *gpmc = irq_data_get_irq_chip_data(p);
->> + int i;
->> + u32 regval;
->> +
->> + for (i = 0; i< gpmc->num_irq; i++)
->> + if (p->irq == gpmc->irq[i].irq) {
->> + regval = gpmc_read_reg(GPMC_IRQENABLE);
->> + if (endis)
->> + regval |= gpmc->irq[i].regval;
->> + else
->> + regval&= ~gpmc->irq[i].regval;
->> + gpmc_write_reg(GPMC_IRQENABLE, regval);
->> + break;
->> + }
->> +
->> + return 0;
->> +}
->> +
->> +static void gpmc_irq_disable(struct irq_data *p)
->> +{
->> + gpmc_irq_endis(p, false);
->> +}
->> +
->> +static void gpmc_irq_enable(struct irq_data *p)
->> +{
->> + gpmc_irq_endis(p, true);
->> +}
->> +
->> +static void gpmc_irq_noop(struct irq_data *data) { }
->> +
->> +static unsigned int gpmc_irq_noop_ret(struct irq_data *data) { return
->> 0; }
->> +
->> +static __devinit int gpmc_setup_irq(struct gpmc *gpmc)
->> +{
->> + int i;
->> + u32 regval;
->> +
->> + if (!gpmc->master_irq)
->> + return -EINVAL;
->> +
->> + if (gpmc->num_irq< GPMC_NR_IRQ) {
->> + dev_warn(gpmc->dev, "Insufficient interrupts for device\n");
->> + return -EINVAL;
->> + } else if (gpmc->num_irq> GPMC_NR_IRQ)
->> + gpmc->num_irq = GPMC_NR_IRQ;
->
-> Hmmm ... why not just have ...
->
-> if (gpmc->num_irq != GPMC_NR_IRQ) {
-> dev_warn(...);
-> return -EINVAL;
-> }
->
-> This also raises the question why bother passing num_irq if we always
-> want it to be GPMC_NR_IRQ? Why not always initialise them all driver?
->
->> + gpmc->irq[0].regval = GPMC_IRQ_FIFOEVENT;
->> + gpmc->irq[1].regval = GPMC_IRQ_TERMINALCOUNT;
->> + gpmc->irq[2].regval = GPMC_IRQ_WAIT0EDGEDETECTION;
->> + gpmc->irq[3].regval = GPMC_IRQ_WAIT1EDGEDETECTION;
->> + gpmc->irq[4].regval = GPMC_IRQ_WAIT2EDGEDETECTION;
->> + gpmc->irq[5].regval = GPMC_IRQ_WAIT3EDGEDETECTION;
+ .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++++++++++++++++++
+ drivers/mtd/nand/orion_nand.c                      |   45 +++++++++++++++++-
+ 2 files changed, 93 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
 
-We need to be careful here, OMAP4 and OMAP5 devices only have 3 wait 
-pins. Hence, one less interrupt.
-
-We may need to add a check on GPMC IP revision here.
-
-Cheers
-Jon
+diff --git a/Documentation/devicetree/bindings/mtd/orion-nand.txt b/Documentation/devicetree/bindings/mtd/orion-nand.txt
+new file mode 100644
+index 0000000..b2356b7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/orion-nand.txt
+@@ -0,0 +1,50 @@
++NAND support for Marvell Orion SoC platforms
++
++Required properties:
++- compatible : "mrvl,orion-nand".
++- reg : Base physical address of the NAND and length of memory mapped
++	region
++
++Optional properties:
++- cle : Address line number connected to CLE. Default is 0
++- ale : Address line number connected to ALE. Default is 1
++- bank-width : Width in bytes of the device. Default is 1
++- chip-delay : Chip dependent delay for transferring data from array to read
++               registers in usecs
++
++The device tree may optionally contain sub-nodes describing partitions of the
++address space. See partition.txt for more detail.
++
++Example:
++
++nand at f4000000 {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	cle = <0>;
++	ale = <1>;
++	bank-width = <1>;
++	chip-delay = <25>;
++	compatible = "mrvl,orion-nand";
++	reg = <0xf4000000 0x400>;
++
++	partition at 0 {
++		label = "u-boot";
++		reg = <0x0000000 0x100000>;
++		read-only;
++	};
++
++	partition at 100000 {
++		label = "uImage";
++		reg = <0x0100000 0x200000>;
++	};
++
++	partition at 300000 {
++		label = "dtb";
++		reg = <0x0300000 0x100000>;
++	};
++
++	partition at 400000 {
++		label = "root";
++		reg = <0x0400000 0x7d00000>;
++	};
++};
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index 29f505a..678ba73 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -13,6 +13,7 @@
+ #include <linux/slab.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
+@@ -74,11 +75,13 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ static int __init orion_nand_probe(struct platform_device *pdev)
+ {
+ 	struct mtd_info *mtd;
++	struct mtd_part_parser_data ppdata = {};
+ 	struct nand_chip *nc;
+ 	struct orion_nand_data *board;
+ 	struct resource *res;
+ 	void __iomem *io_base;
+ 	int ret = 0;
++	u32 val = 0;
+ 
+ 	nc = kzalloc(sizeof(struct nand_chip) + sizeof(struct mtd_info), GFP_KERNEL);
+ 	if (!nc) {
+@@ -101,7 +104,32 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+ 		goto no_res;
+ 	}
+ 
+-	board = pdev->dev.platform_data;
++	if (pdev->dev.of_node) {
++		board = devm_kzalloc(&pdev->dev, sizeof(struct orion_nand_data),
++					GFP_KERNEL);
++		if (!board) {
++			printk(KERN_ERR "orion_nand: failed to allocate board structure.\n");
++			ret = -ENOMEM;
++			goto no_res;
++		}
++		if (!of_property_read_u32(pdev->dev.of_node, "cle", &val))
++			board->cle = (u8)val;
++		else
++			board->cle = 0;
++		if (!of_property_read_u32(pdev->dev.of_node, "ale", &val))
++			board->ale = (u8)val;
++		else
++			board->ale = 1;
++		if (!of_property_read_u32(pdev->dev.of_node,
++						"bank-width", &val))
++			board->width = (u8)val * 8;
++		else
++			board->width = 8;
++		if (!of_property_read_u32(pdev->dev.of_node,
++						"chip-delay", &val))
++			board->chip_delay = (u8)val;
++	} else
++		board = pdev->dev.platform_data;
+ 
+ 	mtd->priv = nc;
+ 	mtd->owner = THIS_MODULE;
+@@ -115,6 +143,10 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+ 	if (board->chip_delay)
+ 		nc->chip_delay = board->chip_delay;
+ 
++	WARN(board->width > 16,
++		"%d bit bus width out of range (devicetree bank-width specified in bytes)",
++		board->width);
++
+ 	if (board->width == 16)
+ 		nc->options |= NAND_BUSWIDTH_16;
+ 
+@@ -129,7 +161,8 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	mtd->name = "orion_nand";
+-	ret = mtd_device_parse_register(mtd, NULL, 0,
++	ppdata.of_node = pdev->dev.of_node;
++	ret = mtd_device_parse_register(mtd, NULL, &ppdata,
+ 			board->parts, board->nr_parts);
+ 	if (ret) {
+ 		nand_release(mtd);
+@@ -161,11 +194,19 @@ static int __devexit orion_nand_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id orion_nand_of_match_table[] = {
++	{ .compatible = "mrvl,orion-nand", },
++	{},
++};
++#endif
++
+ static struct platform_driver orion_nand_driver = {
+ 	.remove		= __devexit_p(orion_nand_remove),
+ 	.driver		= {
+ 		.name	= "orion_nand",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(orion_nand_of_match_table),
+ 	},
+ };
+ 
+-- 
+1.7.9.1
