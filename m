@@ -1,80 +1,43 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 05 Apr 2012 16:16:35 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
- presence of 32k timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
-References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
- <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
- <20120405095221.GC25053@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
-Message-ID: <4F7D780B.9070201@ti.com>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Thu, 05 Apr 2012 12:51:27 +0200
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <20120404154020.40C513E09D5@localhost> (Grant Likely's message of
+ "Wed, 04 Apr 2012 08:40:20 -0700")
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost> <m2y5qdow0v.fsf@igel.home>
+ <20120404154020.40C513E09D5@localhost>
+Message-ID: <m21uo2v4cw.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 April 2012 04:01 PM, Hiremath, Vaibhav wrote:
-> On Thu, Apr 05, 2012 at 15:22:21, Russell King - ARM Linux wrote:
->> On Thu, Apr 05, 2012 at 09:36:00AM +0000, Hiremath, Vaibhav wrote:
->>> There seems to be limitation for ARM architecture, it is restricted by
->>> sched_clock implementation present in "arch/arm/kernel/sched_clock.c".
->>> Natively, clocksource framework does support change in rate/frequency for
->>> registered timer, using,
->>
->> Any kind of switching of timing sources introduces loss of time issues
->> by the mere fact that you can't instantly know the counter values of
->> both timing sources at precisely the same instant - because CPUs can
->> only do one thing at a time.  So any kind of repeated dynamic switching
->> _will_ result in a gradual loss of time - which will be indeterminant
->> as it depends on the frequency of the switching and the relative delta
->> between the two.
->>
->> To put it another way - it is not possible to maintain high precision
->> and accuracy while dynamically switching your timing sources.
->>
->> I'm not about to lift the restriction that there's only one source for
->> sched_clock() just for OMAP.  That'd require a lot of additional code -
->> it's not just about adjusting the multiplier and shift, you also have to
->> correct the returned ns value as well, which means synchronizing against
->> two counters.  (And as I've pointed out above, that's impossible to do
->> accurately.)
->>
-> 
-> Thanks a ton Russell for confirming on this,
-> 
-> I understand, we also have to adjust ns value and such confirmation is what exactly I was looking for.
-> 
-> So this means, we have to use compile time option, as existing
-> implementation in "arch/arm/mach-omap2/timer.c".
-> 
-> Thanks again, I will repost patches shortly with the code changes (mentioned 
-> in my last email)
-> 
-I suggest you wait for Kevin and Tony to look at it.
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-Am still going back to what I proposed initially.
-Why not the conditional way as shown in the patch [1] I proposed or
-your initial patch with some updates?  Something like this.
+> I bet it is NR_IRQS related.  You have SPARSE_IRQ enabled, which means
+> the maximum number of irq_descs is IRQ_BITMAP_BITS (NR_IRQS + 8192).
 
-if(commandline.clksource == gpt)
-	omap2_gptimer_clocksource_init(gptimer_id, fck_source);
-else if (omap_init_clocksource_32k())
-	omap2_gptimer_clocksource_init(gptimer_id, fck_source);
+The actual definition uses NR_IRQS + 8196.  Guess that's a typo.  (Does
+it really make sense to add NR_IRQS here?)
 
-This won't need compile time option and gives you all everybody wants.
+> diff --git a/arch/powerpc/include/asm/irq.h b/arch/powerpc/include/asm/irq.h
+> index cf417e51..9edf499 100644
+> --- a/arch/powerpc/include/asm/irq.h
+> +++ b/arch/powerpc/include/asm/irq.h
+> @@ -20,7 +20,7 @@
+>  
+>  /* Define a way to iterate across irqs. */
+>  #define for_each_irq(i) \
+> -       for ((i) = 0; (i) < NR_IRQS; ++(i))
+> +       for ((i) = 0; (i) < nr_irqs; ++(i))
 
-1. Ability to use gpt as a clock-source for perf like stuff
-2. Hardware like AMXX where 32K synctimer doesn't exist which means
-omap_init_clocksource_32k() will fail and use gptimer.
-3. For OMAP, it will continue to use 32K sync timer.
+There are exactly two uses of for_each_irq, one is related to cpu
+hotplug, the other to kexec, so that cannot make any difference.
 
-What am I missing Vaibhav?
+Andreas.
 
-Regards
-Santosh
+-- 
+Andreas Schwab, schwab@linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
