@@ -1,22 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 5 Apr 2012 13:50:51 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP: clock, powerdomain, clockdomain, hwmod
- fixes for early v3.4-rc
-In-Reply-To: <20120405164223.GA3785@atomide.com>
-References: <alpine.DEB.2.00.1204041658200.7161@utopia.booyaka.com>
- <20120405004139.GA10780@atomide.com>
- <alpine.DEB.2.00.1204042007140.10302@utopia.booyaka.com>
- <alpine.DEB.2.00.1204050246410.10302@utopia.booyaka.com>
- <20120405164223.GA3785@atomide.com>
-Message-ID: <alpine.DEB.2.00.1204051350410.10302@utopia.booyaka.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 5 Apr 2012 16:52:38 -0300
+Subject: question about i.mx21ads support
+In-Reply-To: <CAEqTKjUyiA_fCfboifSXXj-h_B6rGQpAM9nGnen=0mKi-w=J9w@mail.gmail.com>
+References: <CAEqTKjUyiA_fCfboifSXXj-h_B6rGQpAM9nGnen=0mKi-w=J9w@mail.gmail.com>
+Message-ID: <CAOMZO5BWiQoRL3HJy7wgWUjA=FtnJJ9vqt5oau-0n6_SJT_AFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Apr 2012, Tony Lindgren wrote:
+On Thu, Apr 5, 2012 at 2:30 PM, George McBay <gfm@funxed.com> wrote:
+> I'm attempting to revive an old i.mx21ads board (Freescale dev board,
+> M9328MX21ADS Rev E) with a newish Linux kernel but haven't had yet had
+> luck getting a build after version 3.1.10 to boot successfully. ?Given
+> the age of this platform, it seems entirely plausible that nobody is
+> actually runtime testing against this board, though I suppose it may
+> also come down to something specific in my board revision.
 
-> Yes it's the fixes branch I was talking about, thanks for updating it.
+Please try 3.3 kernel instead.
 
-Thanks -- sorry about the confusion...
+You are probably missing this patch:
+http://git.kernel.org/?p=linux/kernel/git/stable/linux-stable.git;a=commitdiff;h=1a96571db0a80dbbb935dee26589dd528da0ed06;hp=039d7ba4bcfb1e0040be6f7812a410e6744ce69e
 
+I do not have access to a mx21ads, but Jaccon on Cc has submitted some
+mx21ads related patches recently.
 
-- Paul
+Regards,
+
+Fabio Estevam
