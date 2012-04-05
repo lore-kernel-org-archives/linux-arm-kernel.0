@@ -1,31 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 5 Apr 2012 09:26:05 +0200
-Subject: [PATCH] clk: Update comment for clk_round_rate()
-In-Reply-To: <4F7D44AC.6040605@st.com>
-References: <CAOh2x=nTSvOrJa2uB2zTvYh1SUO2YpEpnLcL189itJ=_e+MPog@mail.gmail.com>
- <CAJOA=zOPn0FcwO0McSb8-18h7LiJndRD2nmCCvxUEEm+fakvKg@mail.gmail.com>
- <4F7D299E.1050307@st.com> <20120405070324.GB27274@pengutronix.de>
- <4F7D44AC.6040605@st.com>
-Message-ID: <20120405072605.GC27274@pengutronix.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 05 Apr 2012 10:34:18 +0300
+Subject: [PATCH 05/12] Add dummy smsc911x regulators to cm-t35.
+In-Reply-To: <20120403174317.GE8240@atomide.com>
+References: <1332494504-10251-1-git-send-email-Russ.Dill@ti.com>
+ <1332494504-10251-6-git-send-email-Russ.Dill@ti.com>
+ <4F71E290.2050403@compulab.co.il>
+ <CA+Bv8XYiv+gr4yB+k7sWSSjdYSsYdnRJuTO3A5zZhh4bkoziXw@mail.gmail.com>
+ <4F72B0F5.4080705@compulab.co.il> <20120403174317.GE8240@atomide.com>
+Message-ID: <4F7D4AFA.1060600@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 12:37:24PM +0530, Viresh Kumar wrote:
-> On 4/5/2012 12:33 PM, Uwe Kleine-K?nig wrote:
-> > It depends on your scenario. E.g. for an UART clock it might be better
-> > to choose 130. Here choosing the frequency is not about a fixed maximum
-> > but to match the sample rate of the device connect to your UART.
-> 
-> My point was: we can almost always guarantee that device will still
-> be operational at any frequency below the one requested. But it may
-> not work at any freq above the requested one. So, giving 130 here may
-> break it.
-It depends. If for satisfying a request for 115200 Bd you have the choice
-between 115202 Bd and 57601 Bd, I'd recommend the former.
 
-Best regards
-Uwe
+
+On 04/03/12 20:43, Tony Lindgren wrote:
+> * Igor Grinberg <grinberg@compulab.co.il> [120327 23:37]:
+>> On 03/27/12 20:32, Russ Dill wrote:
+>>> No objection.
+>>
+>> 10x Russ.
+> 
+> I've combined patches 5 - 12 into a single patch as they
+> pretty much do the same thing, and to cut down
+> the patch noise for fixes. Merging into fixes with the
+> updated patch below.
+
+10x, looks good!
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Igor.
