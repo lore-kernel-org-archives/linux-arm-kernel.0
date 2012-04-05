@@ -1,41 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Apr 2012 11:58:35 +0200
-Subject: Query: clk: Defining new struct clk_foo types
-In-Reply-To: <4F7D443E.3010800@st.com>
-References: <4F7D443E.3010800@st.com>
-Message-ID: <20120405095835.GB20478@pengutronix.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 5 Apr 2012 12:10:53 +0200
+Subject: [PATCH v2] ARM: fix __io macro for PCMCIA
+In-Reply-To: <1333579684-31466-1-git-send-email-robherring2@gmail.com>
+References: <1333509112-1555-1-git-send-email-robherring2@gmail.com>
+ <1333579684-31466-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAGhQ9Vw3RfGWU6MLAq_duc_hg7t0Lps+L0rxVUdNek2y-7c7BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 12:35:34PM +0530, Viresh Kumar wrote:
-> Hi Mike,
-> 
-> I am doing SPEAr SoCs clock port with common clock framework.
-> 
-> Currently there are following type of clk_foo implementations present:
-> - clk_gate
-> - clk_divider
-> - clk_fixed_rate
-> - clk_mux
-> 
-> I have few more in my SoC:
-> clk with:
-> - gate + divider
-> - gate + fixed_rate
-> - gate + mux
-> ...
-> 
-> How should i go ahead in my implementation for these?
-> Should i create SPEAr specific structures or enhance drivers/clk for this?
+On Thu, Apr 5, 2012 at 12:48 AM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> With commit c334bc1 (ARM: make mach/io.h include optional), PCMCIA was
+> broken. PCMCIA depends on __io() returning a valid i/o address, and most
+> ARM platforms require IO_SPACE_LIMIT be set to 0xffffffff for PCMCIA. This
+> needs a better fix with a fixed i/o address mapping, but for now we just
+> restore things to the previous behavior.
+>
+> This fixes at91, omap1, pxa and sa11xx. pxa needs io.h if PCI is enabled,
+> but PCMCIA is not. sa11xx already has IO_SPACE_LIMIT set to 0xffffffff,
+> so it doesn't need an io.h.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Joachim Eastwood <joachim.eastwood@jotron.com>
+> Cc: Paul Parsons <lost.distance@yahoo.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-If you have a gate and a divider then register a gate and a divider.
-We don't need clk providers for combination of these, the clock
-framework will handle it just fine.
+Works for me on AT91RM9200 using at91_cf and pata_pcmcia.
 
-Sascha
+Tested-by: Joachim Eastwood <joachim.eastwood@jotron.com>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
