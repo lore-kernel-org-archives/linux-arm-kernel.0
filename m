@@ -1,57 +1,48 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Thu, 5 Apr 2012 17:44:01 +0100 (BST)
-Subject: [PATCH 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
-Message-ID: <1333644241.54055.YahooMailClassic@web29001.mail.ird.yahoo.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 5 Apr 2012 09:47:11 -0700
+Subject: [PATCH 0/3] OMAP2+: UART: Enable tx wakeup + remove cpu checks
+In-Reply-To: <20120405132617.76e04217@bob.linux.org.uk>
+References: <1332325501-10467-1-git-send-email-govindraj.raja@ti.com>
+ <CAMrsUd+_coW7ebuN_o=yZbbSVKnkx5R6=yHjUEUc0EcQGtgSRQ@mail.gmail.com>
+ <20120405132617.76e04217@bob.linux.org.uk>
+Message-ID: <20120405164711.GC16688@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is part of a set which adds PCMCIA/CF support for the hx4700.
-This patch modifies asic3_gpio_config[] as follows:
-1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
-2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
+On Thu, Apr 05, 2012 at 01:26:17PM +0100, Alan Cox wrote:
+> On Thu, 5 Apr 2012 16:54:03 +0530
+> "Raja, Govindraj" <govindraj.raja@ti.com> wrote:
+> 
+> > On Wed, Mar 21, 2012 at 3:54 PM, Govindraj.R <govindraj.raja@ti.com>
+> > wrote:
+> > > From: "Govindraj.R" <govindraj.raja@ti.com>
+> > >
+> > > Based on Linux-OMAP tree uart branch.
+> > > (git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+> > > remotes/origin/uart)
+> > >
+> > > * Removes the cpu checks wherever possible and use version reg
+> > > ?for populating features and errata's
+> > > * enable tx wakeup available in wer reg for applicable
+> > > ?module revision's
+> > >
+> > > Govindraj.R (3):
+> > > ?OMAP2+: UART: Remove cpu checks for populating errata flags
+> > > ?OMAP2+: UART: enable tx wakeup bit for wer reg
+> > > ?OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
+> > >
+> > > ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 13 +----
+> > > ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?8 +++-
+> > > ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 71
+> > > ++++++++++++++++++++++++- 3 files changed, 78 insertions(+), 14
+> > > deletions(-)
+> > 
+> > Alan / Greg,
+> > 
+> > With you ack on tty parts can this series be upstreamed from
+> > omap tree ?
+> 
+> Fine by me - this seems primarily to be architectural details.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-Cc: Philipp Zabel <philipp.zabel@gmail.com>
----
-
-V6:
-Rebased from linux-3.3-rc6 to linux-3.4-rc1.
-
- arch/arm/mach-pxa/hx4700.c |    2 +-
- include/linux/mfd/asic3.h  |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 75ce812..de01277 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -231,7 +231,6 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC0_LED0,		/* red */
- 	ASIC3_GPIOC1_LED1,		/* green */
- 	ASIC3_GPIOC2_LED2,		/* blue */
--	ASIC3_GPIOC4_CF_nCD,
- 	ASIC3_GPIOC5_nCIOW,
- 	ASIC3_GPIOC6_nCIOR,
- 	ASIC3_GPIOC7_nPCE_1,
-@@ -245,6 +244,7 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC15_nPIOR,
- 
- 	/* GPIOD: input GPIOs, CF */
-+	ASIC3_GPIOD4_CF_nCD,
- 	ASIC3_GPIOD11_nCIOIS16,
- 	ASIC3_GPIOD12_nCWAIT,
- 	ASIC3_GPIOD15_nPIOW,
-diff --git a/include/linux/mfd/asic3.h b/include/linux/mfd/asic3.h
-index ed793b7..ef6faa5 100644
---- a/include/linux/mfd/asic3.h
-+++ b/include/linux/mfd/asic3.h
-@@ -138,6 +138,7 @@ struct asic3_platform_data {
- #define ASIC3_GPIOC13_nPWAIT		ASIC3_CONFIG_GPIO(45, 1, 1, 0)
- #define ASIC3_GPIOC14_nPIOIS16		ASIC3_CONFIG_GPIO(46, 1, 1, 0)
- #define ASIC3_GPIOC15_nPIOR		ASIC3_CONFIG_GPIO(47, 1, 0, 0)
-+#define ASIC3_GPIOD4_CF_nCD		ASIC3_CONFIG_GPIO(52, 1, 0, 0)
- #define ASIC3_GPIOD11_nCIOIS16		ASIC3_CONFIG_GPIO(59, 1, 0, 0)
- #define ASIC3_GPIOD12_nCWAIT		ASIC3_CONFIG_GPIO(60, 1, 0, 0)
- #define ASIC3_GPIOD15_nPIOW		ASIC3_CONFIG_GPIO(63, 1, 0, 0)
--- 
-1.7.3.4
+Fine by me as well:
+	Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
