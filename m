@@ -1,179 +1,57 @@
 From: lost.distance@yahoo.com (Paul Parsons)
-Date: Thu, 5 Apr 2012 17:42:56 +0100 (BST)
-Subject: [PATCH 1/3 v7] ARM: pxa: hx4700: Add PCMCIA/CF support
-Message-ID: <1333644176.63998.YahooMailClassic@web29003.mail.ird.yahoo.com>
+Date: Thu, 5 Apr 2012 17:44:01 +0100 (BST)
+Subject: [PATCH 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
+Message-ID: <1333644241.54055.YahooMailClassic@web29001.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the HP iPAQ hx4700 to the existing
-pxa2xx-pcmcia driver.
+This patch is part of a set which adds PCMCIA/CF support for the hx4700.
+This patch modifies asic3_gpio_config[] as follows:
+1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
+2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
 
 Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 Cc: Philipp Zabel <philipp.zabel@gmail.com>
 ---
 
-V7:
-Separated drivers/mfd/asic3.c changes into a separate patch, to avoid crossing
-maintainer boundaries.
+V6:
 Rebased from linux-3.3-rc6 to linux-3.4-rc1.
 
- drivers/pcmcia/Kconfig         |    2 +-
- drivers/pcmcia/Makefile        |    1 +
- drivers/pcmcia/pxa2xx_hx4700.c |  121 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 123 insertions(+), 1 deletions(-)
- create mode 100644 drivers/pcmcia/pxa2xx_hx4700.c
+ arch/arm/mach-pxa/hx4700.c |    2 +-
+ include/linux/mfd/asic3.h  |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-index bba3ab2..8fd255f 100644
---- a/drivers/pcmcia/Kconfig
-+++ b/drivers/pcmcia/Kconfig
-@@ -217,7 +217,7 @@ config PCMCIA_PXA2XX
- 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
- 		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2 \
- 		    || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI \
--		    || MACH_COLIBRI320)
-+		    || MACH_COLIBRI320 || MACH_H4700)
- 	select PCMCIA_SA1111 if ARCH_LUBBOCK && SA1111
- 	select PCMCIA_SOC_COMMON
- 	help
-diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-index 47525de..7745b51 100644
---- a/drivers/pcmcia/Makefile
-+++ b/drivers/pcmcia/Makefile
-@@ -69,6 +69,7 @@ pxa2xx-obj-$(CONFIG_MACH_VPAC270)		+= pxa2xx_vpac270.o
- pxa2xx-obj-$(CONFIG_MACH_BALLOON3)		+= pxa2xx_balloon3.o
- pxa2xx-obj-$(CONFIG_MACH_COLIBRI)		+= pxa2xx_colibri.o
- pxa2xx-obj-$(CONFIG_MACH_COLIBRI320)		+= pxa2xx_colibri.o
-+pxa2xx-obj-$(CONFIG_MACH_H4700)			+= pxa2xx_hx4700.o
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index 75ce812..de01277 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -231,7 +231,6 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOC0_LED0,		/* red */
+ 	ASIC3_GPIOC1_LED1,		/* green */
+ 	ASIC3_GPIOC2_LED2,		/* blue */
+-	ASIC3_GPIOC4_CF_nCD,
+ 	ASIC3_GPIOC5_nCIOW,
+ 	ASIC3_GPIOC6_nCIOR,
+ 	ASIC3_GPIOC7_nPCE_1,
+@@ -245,6 +244,7 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOC15_nPIOR,
  
- obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o $(pxa2xx-obj-y)
- 
-diff --git a/drivers/pcmcia/pxa2xx_hx4700.c b/drivers/pcmcia/pxa2xx_hx4700.c
-new file mode 100644
-index 0000000..7dfef3e
---- /dev/null
-+++ b/drivers/pcmcia/pxa2xx_hx4700.c
-@@ -0,0 +1,121 @@
-+/*
-+ *  Copyright (C) 2012 Paul Parsons <lost.distance@yahoo.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/gpio.h>
-+#include <linux/irq.h>
-+
-+#include <asm/mach-types.h>
-+#include <mach/hx4700.h>
-+
-+#include "soc_common.h"
-+
-+static struct gpio gpios[] = {
-+	{ GPIO114_HX4700_CF_RESET,    GPIOF_OUT_INIT_LOW,   "CF reset"        },
-+	{ EGPIO4_CF_3V3_ON,           GPIOF_OUT_INIT_LOW,   "CF 3.3V enable"  },
-+};
-+
-+static int hx4700_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
-+{
-+	int ret;
-+
-+	ret = gpio_request_array(gpios, ARRAY_SIZE(gpios));
-+	if (ret)
-+		goto out;
-+
-+	/*
-+	 * IRQ type must be set before soc_pcmcia_hw_init() calls request_irq().
-+	 * The asic3 default IRQ type is level trigger low level detect, exactly
-+	 * the the signal present on GPIOD4_CF_nCD when a CF card is inserted.
-+	 * If the IRQ type is not changed, the asic3 interrupt handler will loop
-+	 * repeatedly because it is unable to clear the level trigger interrupt.
-+	 */
-+	irq_set_irq_type(gpio_to_irq(GPIOD4_CF_nCD), IRQ_TYPE_EDGE_BOTH);
-+
-+	skt->stat[SOC_STAT_CD].gpio = GPIOD4_CF_nCD;
-+	skt->stat[SOC_STAT_CD].name = "PCMCIA CD";
-+	skt->stat[SOC_STAT_RDY].gpio = GPIO60_HX4700_CF_RNB;
-+	skt->stat[SOC_STAT_RDY].name = "PCMCIA Ready";
-+
-+out:
-+	return ret;
-+}
-+
-+static void hx4700_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
-+{
-+	gpio_free_array(gpios, ARRAY_SIZE(gpios));
-+}
-+
-+static void hx4700_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
-+	struct pcmcia_state *state)
-+{
-+	state->vs_3v = 1;
-+	state->vs_Xv = 0;
-+}
-+
-+static int hx4700_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
-+	const socket_state_t *state)
-+{
-+	switch (state->Vcc) {
-+	case 0:
-+		gpio_set_value(EGPIO4_CF_3V3_ON, 0);
-+		break;
-+	case 33:
-+		gpio_set_value(EGPIO4_CF_3V3_ON, 1);
-+		break;
-+	default:
-+		printk(KERN_ERR "pcmcia: Unsupported Vcc: %d\n", state->Vcc);
-+		return -EINVAL;
-+	}
-+
-+	gpio_set_value(GPIO114_HX4700_CF_RESET, (state->flags & SS_RESET) != 0);
-+
-+	return 0;
-+}
-+
-+static struct pcmcia_low_level hx4700_pcmcia_ops = {
-+	.owner          = THIS_MODULE,
-+	.nr             = 1,
-+	.hw_init        = hx4700_pcmcia_hw_init,
-+	.hw_shutdown    = hx4700_pcmcia_hw_shutdown,
-+	.socket_state   = hx4700_pcmcia_socket_state,
-+	.configure_socket = hx4700_pcmcia_configure_socket,
-+};
-+
-+static struct platform_device *hx4700_pcmcia_device;
-+
-+static int __init hx4700_pcmcia_init(void)
-+{
-+	struct platform_device *pdev;
-+
-+	if (!machine_is_h4700())
-+		return -ENODEV;
-+
-+	pdev = platform_device_register_data(NULL, "pxa2xx-pcmcia", -1,
-+		&hx4700_pcmcia_ops, sizeof(hx4700_pcmcia_ops));
-+	if (IS_ERR(pdev))
-+		return PTR_ERR(pdev);
-+
-+	hx4700_pcmcia_device = pdev;
-+
-+	return 0;
-+}
-+
-+static void __exit hx4700_pcmcia_exit(void)
-+{
-+	platform_device_unregister(hx4700_pcmcia_device);
-+}
-+
-+module_init(hx4700_pcmcia_init);
-+module_exit(hx4700_pcmcia_exit);
-+
-+MODULE_AUTHOR("Paul Parsons <lost.distance@yahoo.com>");
-+MODULE_DESCRIPTION("HP iPAQ hx4700 PCMCIA driver");
-+MODULE_LICENSE("GPL");
+ 	/* GPIOD: input GPIOs, CF */
++	ASIC3_GPIOD4_CF_nCD,
+ 	ASIC3_GPIOD11_nCIOIS16,
+ 	ASIC3_GPIOD12_nCWAIT,
+ 	ASIC3_GPIOD15_nPIOW,
+diff --git a/include/linux/mfd/asic3.h b/include/linux/mfd/asic3.h
+index ed793b7..ef6faa5 100644
+--- a/include/linux/mfd/asic3.h
++++ b/include/linux/mfd/asic3.h
+@@ -138,6 +138,7 @@ struct asic3_platform_data {
+ #define ASIC3_GPIOC13_nPWAIT		ASIC3_CONFIG_GPIO(45, 1, 1, 0)
+ #define ASIC3_GPIOC14_nPIOIS16		ASIC3_CONFIG_GPIO(46, 1, 1, 0)
+ #define ASIC3_GPIOC15_nPIOR		ASIC3_CONFIG_GPIO(47, 1, 0, 0)
++#define ASIC3_GPIOD4_CF_nCD		ASIC3_CONFIG_GPIO(52, 1, 0, 0)
+ #define ASIC3_GPIOD11_nCIOIS16		ASIC3_CONFIG_GPIO(59, 1, 0, 0)
+ #define ASIC3_GPIOD12_nCWAIT		ASIC3_CONFIG_GPIO(60, 1, 0, 0)
+ #define ASIC3_GPIOD15_nPIOW		ASIC3_CONFIG_GPIO(63, 1, 0, 0)
 -- 
 1.7.3.4
