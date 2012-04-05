@@ -1,118 +1,51 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 5 Apr 2012 13:43:25 +0530
-Subject: [PATCH] clk: clk-gate: Create clk_gate_endisable()
-Message-ID: <4ebf23ae95f3c404668583b6c7e2ff1dc186e984.1333613520.git.viresh.kumar@st.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Thu, 5 Apr 2012 10:48:08 +0200
+Subject: common clk: fix clk_register_fixed_rate() under memory pressure
+Message-ID: <20120405084808.GA21060@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch tries to remove duplicate code for clk_gate clocks. This creates
-another routine clk_gate_endisable() which will take care of enable/disable
-clock with knowledge of CLK_GATE_SET_TO_DISABLE flag.
+From: Domenico Andreoli <cavokz@gmail.com>
 
-It works on following logic:
+Under memory pressure clk_register_fixed_rate() fails to manage
+allocation errors and prepares land for a later WARN_ON at best.
 
-For enabling clock, enable = 1
-	set2dis = 1	-> clear bit	-> set = 0
-	set2dis = 0	-> set bit	-> set = 1
+This fix leaves parent_names correctly initialized or NULL, intermediate
+half initialized states are cleaned up and not propagated to the clock
+framework.
 
-For disabling clock, enable = 0
-	set2dis = 1	-> set bit	-> set = 1
-	set2dis = 0	-> clear bit	-> set = 0
+Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Arnd Bergman <arnd.bergmann@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
 
-So, result is always: enable xor set2dis.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/clk-gate.c |   54 ++++++++++++++++++++++-------------------------
- 1 files changed, 25 insertions(+), 29 deletions(-)
+ drivers/clk/clk-fixed-rate.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index b5902e2..b35eef9 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -28,32 +28,38 @@
+Index: b/drivers/clk/clk-fixed-rate.c
+===================================================================
+--- a/drivers/clk/clk-fixed-rate.c
++++ b/drivers/clk/clk-fixed-rate.c
+@@ -67,8 +67,11 @@ struct clk *clk_register_fixed_rate(stru
  
- #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+ 		parent_names[0] = kmalloc(len, GFP_KERNEL);
  
--static void clk_gate_set_bit(struct clk_gate *gate)
-+/*
-+ * It works on following logic:
-+ *
-+ * For enabling clock, enable = 1
-+ *	set2dis = 1	-> clear bit	-> set = 0
-+ *	set2dis = 0	-> set bit	-> set = 1
-+ *
-+ * For disabling clock, enable = 0
-+ *	set2dis = 1	-> set bit	-> set = 1
-+ *	set2dis = 0	-> clear bit	-> set = 0
-+ *
-+ * So, result is always: enable xor set2dis.
-+ */
-+static void clk_gate_endisable(struct clk_hw *hw, int enable)
- {
--	u32 reg;
-+	struct clk_gate *gate = to_clk_gate(hw);
-+	int set = gate->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
- 	unsigned long flags = 0;
-+	u32 reg;
-+
-+	set ^= enable;
+-		if (!parent_names[0])
++		if (!parent_names[0]) {
++			kfree(parent_names);
++			parent_names = NULL;
+ 			goto out;
++		}
  
- 	if (gate->lock)
- 		spin_lock_irqsave(gate->lock, flags);
- 
- 	reg = readl(gate->reg);
--	reg |= BIT(gate->bit_idx);
--	writel(reg, gate->reg);
--
--	if (gate->lock)
--		spin_unlock_irqrestore(gate->lock, flags);
--}
--
--static void clk_gate_clear_bit(struct clk_gate *gate)
--{
--	u32 reg;
--	unsigned long flags = 0;
- 
--	if (gate->lock)
--		spin_lock_irqsave(gate->lock, flags);
-+	if (set)
-+		reg |= BIT(gate->bit_idx);
-+	else
-+		reg &= ~BIT(gate->bit_idx);
- 
--	reg = readl(gate->reg);
--	reg &= ~BIT(gate->bit_idx);
- 	writel(reg, gate->reg);
- 
- 	if (gate->lock)
-@@ -62,12 +68,7 @@ static void clk_gate_clear_bit(struct clk_gate *gate)
- 
- static int clk_gate_enable(struct clk_hw *hw)
- {
--	struct clk_gate *gate = to_clk_gate(hw);
--
--	if (gate->flags & CLK_GATE_SET_TO_DISABLE)
--		clk_gate_clear_bit(gate);
--	else
--		clk_gate_set_bit(gate);
-+	clk_gate_endisable(hw, 1);
- 
- 	return 0;
+ 		strncpy(parent_names[0], parent_name, len);
+ 	}
+@@ -77,6 +80,6 @@ out:
+ 	return clk_register(dev, name,
+ 			&clk_fixed_rate_ops, &fixed->hw,
+ 			parent_names,
+-			(parent_name ? 1 : 0),
++			(parent_names ? 1 : 0),
+ 			flags);
  }
-@@ -75,12 +76,7 @@ EXPORT_SYMBOL_GPL(clk_gate_enable);
- 
- static void clk_gate_disable(struct clk_hw *hw)
- {
--	struct clk_gate *gate = to_clk_gate(hw);
--
--	if (gate->flags & CLK_GATE_SET_TO_DISABLE)
--		clk_gate_set_bit(gate);
--	else
--		clk_gate_clear_bit(gate);
-+	clk_gate_endisable(hw, 0);
- }
- EXPORT_SYMBOL_GPL(clk_gate_disable);
- 
--- 
-1.7.9
