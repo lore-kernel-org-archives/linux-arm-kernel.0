@@ -1,39 +1,39 @@
-From: joancarles@fqingenieria.es (joancarles)
-Date: Thu, 05 Apr 2012 15:43:17 +0200
-Subject: [PATCH] mx25: fix typo in memory size selector for keypad driver
-Message-ID: <8f943264186703f0190c91f8b78b5a63@mail.fqingenieria.es>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 05 Apr 2012 14:45:02 +0100
+Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
+ variants
+In-Reply-To: <20120405123642.GG24211@n2100.arm.linux.org.uk>
+References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
+ <1333619748-16126-7-git-send-email-lee.jones@linaro.org>
+ <20120405123642.GG24211@n2100.arm.linux.org.uk>
+Message-ID: <4F7DA1DE.2030203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While adding support for the keypad platform driver on a custom device, 
-I have found a small inconsistency in the memory region setup for the 
-keypad driver for MX25 based devices. Attached is a patch to address 
-this typo. Please review
-and stage for mainline inclusion in the next round of mx25 fixes.
+On 05/04/12 13:36, Russell King - ARM Linux wrote:
+> On Thu, Apr 05, 2012 at 10:55:47AM +0100, Lee Jones wrote:
+>> +	of_property_read_u32(np, "clock-frequency",&pdata->f_max);
+>> +	if (!pdata->f_max)
+>> +		pr_warn("%s has no 'clock-frequency' property\n", np->full_name);
+>
+> To be anal about this (which is what we should be about DT bindings)
+> this is not a 'clock frequency' but a maximum clock frequency for the
+> bus.  Or to put it another way, a clock frequency limit.
+>
+> A 'clock-frequency' property suggests (at least to me) that it's
+> specifying the rate of the MCLK signal, which is not what it's doing.
 
-Signed-off-by: Joan Carles <joancarles@fqingenieria.es>
-Signed-off-by: Roberto Nibali <rnibali@gmail.com>
----
-  arch/arm/plat-mxc/devices/platform-imx-keypad.c |    2 +-
-  1 files changed, 1 insertions(+), 1 deletions(-)
+Sounds sensible.
 
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-keypad.c 
-b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
-index 479c3e9..4645f21 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-keypad.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-keypad.c
-@@ -23,7 +23,7 @@ const struct imx_imx_keypad_data 
-imx21_imx_keypad_data __initconst =
+I initially had it as 'f-max', but was told to change it to 
+'clock-frequency'. I'm happy to take other suggestions however.
 
-  #ifdef CONFIG_SOC_IMX25
-  const struct imx_imx_keypad_data imx25_imx_keypad_data __initconst =
--	imx_imx_keypad_data_entry_single(MX25, SZ_16K);
-+	imx_imx_keypad_data_entry_single(MX25, SZ_16);
-  #endif /* ifdef CONFIG_SOC_IMX25 */
-
-  #ifdef CONFIG_SOC_IMX27
--- 
-1.7.4.1
+Kind regards,
+Lee
 
 -- 
-Joan C. Abelaira
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
