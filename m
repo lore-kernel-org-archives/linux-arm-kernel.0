@@ -1,39 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 05 Apr 2012 21:14:01 -0700
-Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
- variants
-In-Reply-To: <4F7DA1DE.2030203@linaro.org>
-References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
- <1333619748-16126-7-git-send-email-lee.jones@linaro.org>
- <20120405123642.GG24211@n2100.arm.linux.org.uk> <4F7DA1DE.2030203@linaro.org>
-Message-ID: <20120406041401.28A993E0BC4@localhost>
+From: samgandhi9@gmail.com (Sam Gandhi)
+Date: Fri, 6 Apr 2012 07:53:06 -0700
+Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
+In-Reply-To: <4F7EC6AF.6000603@freescale.com>
+References: <20120404070157.GB24930@pengutronix.de>
+ <CAOdLEaqXyvHzTRSq2=RquZLqEO6kMEp11rjKJ+UtSqtF4nr-EA@mail.gmail.com>
+ <20120404183314.GF17187@pengutronix.de>
+ <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
+ <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
+ <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
+ <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
+ <4F7D3DB8.6080009@freescale.com>
+ <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
+ <1333628861.31825.22.camel@vkoul-udesk3>
+ <20120406022305.GJ7264@S2101-09.ap.freescale.net>
+ <4F7EC6AF.6000603@freescale.com>
+Message-ID: <CAOdLEapBs-5RqUN_tjO+pOp9OvGh0YnusOpLz9MoxBLBgSPY2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Apr 2012 14:45:02 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> On 05/04/12 13:36, Russell King - ARM Linux wrote:
-> > On Thu, Apr 05, 2012 at 10:55:47AM +0100, Lee Jones wrote:
-> >> +	of_property_read_u32(np, "clock-frequency",&pdata->f_max);
-> >> +	if (!pdata->f_max)
-> >> +		pr_warn("%s has no 'clock-frequency' property\n", np->full_name);
-> >
-> > To be anal about this (which is what we should be about DT bindings)
-> > this is not a 'clock frequency' but a maximum clock frequency for the
-> > bus.  Or to put it another way, a clock frequency limit.
-> >
-> > A 'clock-frequency' property suggests (at least to me) that it's
-> > specifying the rate of the MCLK signal, which is not what it's doing.
-> 
-> Sounds sensible.
-> 
-> I initially had it as 'f-max', but was told to change it to 
-> 'clock-frequency'. I'm happy to take other suggestions however.
+> I tested the following code :
+> ==============================================================
+>
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index 5978113..0f5b09a 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -202,10 +202,12 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct
+> dma_cha
+> static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+> {
+> struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
+> + dma_cookie_t c;
+>
+> + c = dma_cookie_assign(tx);
+> mxs_dma_enable_chan(mxs_chan);
+>
+> - return dma_cookie_assign(tx);
+> + return c;
+> }
+>
+> static void mxs_dma_tasklet(unsigned long data)
+>
+>
+Ack on testing.
 
-Yes, "clock-frequency" already has established usage as an exact clock
-specification.  If it is a maximum as you say then something like
-"max-frequency" makes more sense.
+I reverted the change that Vinod had suggested earlier, and applied
+Huang's suggested change and it fixed the issue. Successfully erased
+NAND, made UBI partitions and ran integck tests for several hours.
 
-Someone was working on a common MMC DT binding.  Really all of the MMC
-drivers should use the same binding for the common bits.
-
-g.
+-Sam
