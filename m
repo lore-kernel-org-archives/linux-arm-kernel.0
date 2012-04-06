@@ -1,55 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Apr 2012 20:49:41 +0800
-Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
-In-Reply-To: <4F7EC6AF.6000603@freescale.com>
-References: <20120404183314.GF17187@pengutronix.de>
- <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
- <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
- <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
- <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
- <4F7D3DB8.6080009@freescale.com>
- <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
- <1333628861.31825.22.camel@vkoul-udesk3>
- <20120406022305.GJ7264@S2101-09.ap.freescale.net>
- <4F7EC6AF.6000603@freescale.com>
-Message-ID: <20120406124938.GP7264@S2101-09.ap.freescale.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 06 Apr 2012 14:49:23 +0200
+Subject: [PATCH] ARM: at91: remove empty at91_init_serial function
+In-Reply-To: <1333715779-1485-1-git-send-email-joachim.eastwood@jotron.com>
+References: <1333715779-1485-1-git-send-email-joachim.eastwood@jotron.com>
+Message-ID: <4F7EE653.6010604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2012 at 06:34:23PM +0800, Huang Shijie wrote:
-...
-> It's maybe too late to assign the DMA cookie after
-> mxs_dma_enable_chan() in mxs_dma_tx_submit().
-> The interrupt may arise before the dma_cookie_assign() finishes.
+On 04/06/2012 02:36 PM, Joachim Eastwood :
+> The real function is long gone and the empty one will generate warnings when configured without Atmel serial.
+>   arch/arm/mach-at91/at91rm9200_devices.c:1176: warning: 'struct at91_uart_config' declared inside parameter list
+>   arch/arm/mach-at91/at91rm9200_devices.c:1176: warning: its scope is only this definition or declaration, which is probably not what you want
 > 
-> Why mmc/audio do not have this bug? their interrupt arise too slow.
-> 
-> I tested the following code :
+> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
 
-Great.  Send a formal patch to Vinod?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Regards,
-Shawn
+queue in at91-fixes for 3.4-rc
 
-> ==============================================================
+Thanks,
+
+> ---
+>  arch/arm/mach-at91/at91rm9200_devices.c |    1 -
+>  1 file changed, 1 deletion(-)
 > 
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index 5978113..0f5b09a 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -202,10 +202,12 @@ static struct mxs_dma_chan
-> *to_mxs_dma_chan(struct dma_cha
-> static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-> {
-> struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
-> + dma_cookie_t c;
-> 
-> + c = dma_cookie_assign(tx);
-> mxs_dma_enable_chan(mxs_chan);
-> 
-> - return dma_cookie_assign(tx);
-> + return c;
-> }
-> 
-> static void mxs_dma_tasklet(unsigned long data)
-> 
+> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+> index 99ce5c9..05774e5 100644
+> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+> @@ -1173,7 +1173,6 @@ void __init at91_add_device_serial(void)
+>  		printk(KERN_INFO "AT91: No default serial console defined.\n");
+>  }
+>  #else
+> -void __init __deprecated at91_init_serial(struct at91_uart_config *config) {}
+>  void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
+>  void __init at91_set_serial_console(unsigned portnr) {}
+>  void __init at91_add_device_serial(void) {}
+
+
+-- 
+Nicolas Ferre
