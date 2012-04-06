@@ -1,31 +1,43 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 06 Apr 2012 18:43:30 -0700
-Subject: [PATCH v2 13/13] ARM: at91: dt: remove unit-address part for
- memory nodes
-In-Reply-To: <20120404191754.GE10603@quad.lixom.net>
-References: <cover.1333437885.git.nicolas.ferre@atmel.com>
- <1db62b280314855c35cb7a3188fc9d9cb8501948.1333437885.git.nicolas.ferre@atmel.com>
- <20120404191754.GE10603@quad.lixom.net>
-Message-ID: <20120407014330.B6D4E3E22DF@localhost>
+Date: Fri, 06 Apr 2012 16:43:13 -0700
+Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
+ DNS-325
+In-Reply-To: <201203280820.00139.arnd@arndb.de>
+References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
+ <1332885255-8304-2-git-send-email-jm@lentin.co.uk>
+ <201203280820.00139.arnd@arndb.de>
+Message-ID: <20120406234313.A040E3E127F@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Apr 2012 12:17:54 -0700, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Apr 03, 2012 at 09:32:57AM +0200, Nicolas Ferre wrote:
-> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Wed, 28 Mar 2012 08:19:59 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 27 March 2012, Jamie Lentin wrote:
+> > Add support for the DNS-320 and DNS-325. Describe as much as currently possible
+> > in the devicetree files, create a board-dnskw.c for everything else.
 > > 
-> > Having a unit-address different from 0 causes bad memory node detection
-> > during early_init_dt_scan_memory.
+> > Use IEEE-compliant "okay", rather than "ok"
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> > ---
 > 
-> Sounds like a bug in the generic code to me? But specifying a unit
-> address on a non-ambiguous device node isn't necessary anyway, so this
-> patch is still a reasonable thing to do.
+> One small note about changeset comments: The part about differences from the previous
+> version of the same patch normally goes below the '---' line, in front of the diffstat,
+> to prevent it from going into the git changelog. Otherwise people will have no idea
+> what it's about.
 
-It's actually a 'feature' of the way we're including skeleton.dtsi.
-skeleton.dtsi has already set the node name, so if the next file
-doesn't use exactly the same node name then the .dtb ends up with two
-memory nodes, which is really bad.
+Counter point on that.  I ask submitters to put the changelog before
+the --- because I want it in the commit text.  It is actually helpful
+when trying to determine exactly which iteration of a patch series got
+committed.
 
-It real problem is the dtc tooling.
+But, different maintainers have different policies so there really
+isn't much submitters can do here except ask the maintainer they are
+submitting to which approach they prefer.
 
 g.
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
