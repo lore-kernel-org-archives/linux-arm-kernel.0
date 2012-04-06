@@ -1,51 +1,44 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 6 Apr 2012 20:18:09 +0800
-Subject: [PATCH 1/1] pinctrl: fix pinmux_check_ops error checking
-Message-ID: <1333714689-22450-1-git-send-email-b29396@freescale.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri,  6 Apr 2012 14:21:22 +0200
+Subject: [PATCH v2] ARM: at91: Export at91_st_base
+Message-ID: <1333714882-1286-1-git-send-email-joachim.eastwood@jotron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+After commit 5e9cf5e18d4b "ARM: at91: make ST (System Timer) soc independent"
+building at91rm9200_wdt as a module fails with following message
+  ERROR: "at91_st_base" [drivers/watchdog/at91rm9200_wdt.ko] undefined!
+  make[1]: *** [__modpost] Error 1
+  make: *** [modules] Error 2
 
-Do not use get_functions_count before checking.
+Export symbol to allow wdt driver to be built as a module again.
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
 ---
- drivers/pinctrl/pinmux.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+v2: Changed symbol export to GPL as per request from Jean-Christophe PLAGNIOL-VILLARD.
 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 375b214..8849830 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -33,11 +33,12 @@
- int pinmux_check_ops(struct pinctrl_dev *pctldev)
+ arch/arm/mach-at91/at91rm9200_time.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
+index dd7f782..104ca40 100644
+--- a/arch/arm/mach-at91/at91rm9200_time.c
++++ b/arch/arm/mach-at91/at91rm9200_time.c
+@@ -23,6 +23,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/clockchips.h>
++#include <linux/export.h>
+ 
+ #include <asm/mach/time.h>
+ 
+@@ -176,6 +177,7 @@ static struct clock_event_device clkevt = {
+ };
+ 
+ void __iomem *at91_st_base;
++EXPORT_SYMBOL_GPL(at91_st_base);
+ 
+ void __init at91rm9200_ioremap_st(u32 addr)
  {
- 	const struct pinmux_ops *ops = pctldev->desc->pmxops;
--	unsigned nfuncs = ops->get_functions_count(pctldev);
-+	unsigned nfuncs;
- 	unsigned selector = 0;
- 
- 	/* Check that we implement required operations */
--	if (!ops->get_functions_count ||
-+	if (!ops ||
-+	    !ops->get_functions_count ||
- 	    !ops->get_function_name ||
- 	    !ops->get_function_groups ||
- 	    !ops->enable ||
-@@ -45,11 +46,12 @@ int pinmux_check_ops(struct pinctrl_dev *pctldev)
- 		return -EINVAL;
- 
- 	/* Check that all functions registered have names */
-+	nfuncs = ops->get_functions_count(pctldev);
- 	while (selector < nfuncs) {
- 		const char *fname = ops->get_function_name(pctldev,
- 							   selector);
- 		if (!fname) {
--			pr_err("pinmux ops has no name for function%u\n",
-+			dev_err(pctldev->dev, "pinmux ops has no name for function%u\n",
- 				selector);
- 			return -EINVAL;
- 		}
 -- 
-1.7.0.4
+1.7.9.6
