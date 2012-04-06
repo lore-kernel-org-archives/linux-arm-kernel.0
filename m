@@ -1,56 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 06 Apr 2012 14:43:08 +0200
-Subject: [PATCH v2] ARM: at91: Export at91_st_base
-In-Reply-To: <1333714882-1286-1-git-send-email-joachim.eastwood@jotron.com>
-References: <1333714882-1286-1-git-send-email-joachim.eastwood@jotron.com>
-Message-ID: <4F7EE4DC.9010402@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Apr 2012 20:49:41 +0800
+Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
+In-Reply-To: <4F7EC6AF.6000603@freescale.com>
+References: <20120404183314.GF17187@pengutronix.de>
+ <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
+ <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
+ <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
+ <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
+ <4F7D3DB8.6080009@freescale.com>
+ <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
+ <1333628861.31825.22.camel@vkoul-udesk3>
+ <20120406022305.GJ7264@S2101-09.ap.freescale.net>
+ <4F7EC6AF.6000603@freescale.com>
+Message-ID: <20120406124938.GP7264@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2012 02:21 PM, Joachim Eastwood :
-> After commit 5e9cf5e18d4b "ARM: at91: make ST (System Timer) soc independent"
-> building at91rm9200_wdt as a module fails with following message
->   ERROR: "at91_st_base" [drivers/watchdog/at91rm9200_wdt.ko] undefined!
->   make[1]: *** [__modpost] Error 1
->   make: *** [modules] Error 2
+On Fri, Apr 06, 2012 at 06:34:23PM +0800, Huang Shijie wrote:
+...
+> It's maybe too late to assign the DMA cookie after
+> mxs_dma_enable_chan() in mxs_dma_tx_submit().
+> The interrupt may arise before the dma_cookie_assign() finishes.
 > 
-> Export symbol to allow wdt driver to be built as a module again.
+> Why mmc/audio do not have this bug? their interrupt arise too slow.
 > 
-> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+> I tested the following code :
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Great.  Send a formal patch to Vinod?
 
-I will carry it in our next at91-fixes batch for 3.4.
+Regards,
+Shawn
 
-Thanks a lot. Best regards,
-
-> ---
-> v2: Changed symbol export to GPL as per request from Jean-Christophe PLAGNIOL-VILLARD.
+> ==============================================================
 > 
->  arch/arm/mach-at91/at91rm9200_time.c |    2 ++
->  1 file changed, 2 insertions(+)
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index 5978113..0f5b09a 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -202,10 +202,12 @@ static struct mxs_dma_chan
+> *to_mxs_dma_chan(struct dma_cha
+> static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+> {
+> struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
+> + dma_cookie_t c;
 > 
-> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-> index dd7f782..104ca40 100644
-> --- a/arch/arm/mach-at91/at91rm9200_time.c
-> +++ b/arch/arm/mach-at91/at91rm9200_time.c
-> @@ -23,6 +23,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
->  #include <linux/clockchips.h>
-> +#include <linux/export.h>
->  
->  #include <asm/mach/time.h>
->  
-> @@ -176,6 +177,7 @@ static struct clock_event_device clkevt = {
->  };
->  
->  void __iomem *at91_st_base;
-> +EXPORT_SYMBOL_GPL(at91_st_base);
->  
->  void __init at91rm9200_ioremap_st(u32 addr)
->  {
-
-
--- 
-Nicolas Ferre
+> + c = dma_cookie_assign(tx);
+> mxs_dma_enable_chan(mxs_chan);
+> 
+> - return dma_cookie_assign(tx);
+> + return c;
+> }
+> 
+> static void mxs_dma_tasklet(unsigned long data)
+> 
