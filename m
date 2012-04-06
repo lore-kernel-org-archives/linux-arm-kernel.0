@@ -1,12 +1,35 @@
-From: langenat@21cn.com (langenat at 21cn.com)
-Date: Fri, 6 Apr 2012 19:34:47 +0800 (CST)
-Subject: =?UTF-8?Q?=E5=A6=82=E4=BD=95=E8=AE=A9=E5=B7=A8?=
- =?UTF-8?Q?=E9=87=8F=E5=8F=91=E9=80=81=E7=9A=84e?=
- =?UTF-8?Q?ma!l=E6=88=90=E5=8A=9F=E5=88=B0=E8=BE=BE=E5=AE=A2=E6=88=B7?=
- =?UTF-8?Q?=E6=89=8B=E4=B8=AD__linux-arm-kernel?=
-Message-ID: <527968664.55971333712094591.JavaMail.root@webmail2>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Fri, 06 Apr 2012 13:51:14 +0200
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <1333409927.30734.62.camel@pasglop> (Benjamin Herrenschmidt's
+ message of "Tue, 03 Apr 2012 09:38:47 +1000")
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+ <20120402215524.GM24211@n2100.arm.linux.org.uk>
+ <1333406005.30734.61.camel@pasglop>
+ <20120402225223.GN24211@n2100.arm.linux.org.uk>
+ <1333409927.30734.62.camel@pasglop>
+Message-ID: <m24nsx9iz1.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120406/82e312e0/attachment.html>
+Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
+
+> Ok. Doesn't matter anyway, this shouldn't be the problem in this
+> specific case. IE. we shouldn't be setting that interrupt to NONE.
+
+After removinge the call to irq_set_irq_type in mpic_host_map the irq
+problem disappears.
+
+Instead of the irq_set_irq_type(,NONE) calls from mpic_host_map I see
+corresponding irq_set_irq_type(,LEVEL_LOW) calls now.
+
+Andreas.
+
+-- 
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
