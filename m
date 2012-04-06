@@ -1,190 +1,56 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 06 Apr 2012 10:00:50 +0200
-Subject: [PATCH] ARM: Exynos4: add support for GATE BLOCK clocks
-Message-ID: <1333699250-16420-1-git-send-email-m.szyprowski@samsung.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Fri, 06 Apr 2012 09:52:24 +0100
+Subject: [PATCH 4/7 v4] ARM: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <20120405224143.GL817@titan.lakedaemon.net>
+References: <cover.1331601448.git.jason@lakedaemon.net>
+ <0032addd7e94c5d4d1a3a0be77fe79bcffee53db.1331601448.git.jason@lakedaemon.net>
+ <1333663656.12209.62.camel@dagon.hellion.org.uk>
+ <20120405224143.GL817@titan.lakedaemon.net>
+Message-ID: <1333702344.12209.70.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXYNOS4_CLKGATE_BLOCK register can be used to disable the respective
-multimedia block hardware planes. It acts similar to the power domains.
-This patch adds transparent support for this method of gating of
-multimedia blocks. New clocks are added as parents to the respective
-block bus clocks. This patch has been tested on NURI and UniversalC210
-boards, which have bootloader which disable all multimedia blocks with
-both GATE BLOCK method and power domains.
+On Thu, 2012-04-05 at 18:41 -0400, Jason Cooper wrote:
+> On Thu, Apr 05, 2012 at 11:07:36PM +0100, Ian Campbell wrote:
+> > On Tue, 2012-03-13 at 01:57 +0000, Jason Cooper wrote:
+> > > +DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)") 
+> > 
+> > This ends up as Machine: in /proc/cpuinfo, which seems to be normal?
+> > 
+> > Would it be worth trying to dynamically modify the machine string based
+> > on the actual hardware the kernel is running on?
+> 
+> With CONFIG_PROC_DEVICETREE=y I get the following:
+> 
+> $ cat /proc/device-tree/model
+> Globalscale Technologies Dreamplug
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/clock-exynos4.c |   54 ++++++++++++++++++++++++++++++++++
- 1 files changed, 54 insertions(+), 0 deletions(-)
+Yes, I just found that, thanks.
 
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index 4287311..a2f8b2e 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -213,6 +213,11 @@ static int exynos4_clk_dac_ctrl(struct clk *clk, int enable)
- 	return s5p_gatectrl(S5P_DAC_PHY_CONTROL, clk, enable);
- }
- 
-+static int exynos4_clk_gate_block_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(EXYNOS4_CLKGATE_BLOCK, clk, enable);
-+}
-+
- /* Core list of CMU_CPU side */
- 
- static struct clksrc_clk exynos4_clk_mout_apll = {
-@@ -459,6 +464,37 @@ static struct clksrc_clk exynos4_clk_sclk_vpll = {
- 	.reg_src = { .reg = EXYNOS4_CLKSRC_TOP0, .shift = 8, .size = 1 },
- };
- 
-+static struct clk exynos4_clk_gate_cam = {
-+	.name		= "cam",
-+	.enable		= exynos4_clk_gate_block_ctrl,
-+	.ctrlbit	= (1 << 0),
-+};
-+
-+static struct clk exynos4_clk_gate_tv = {
-+	.name		= "tv",
-+	.enable		= exynos4_clk_gate_block_ctrl,
-+	.ctrlbit	= (1 << 1),
-+};
-+
-+static struct clk exynos4_clk_gate_mfc = {
-+	.name		= "mfc",
-+	.enable		= exynos4_clk_gate_block_ctrl,
-+	.ctrlbit	= (1 << 2),
-+};
-+
-+static struct clk exynos4_clk_gate_lcd0 = {
-+	.name		= "lcd0",
-+	.enable		= exynos4_clk_gate_block_ctrl,
-+	.ctrlbit	= (1 << 4),
-+};
-+
-+static struct clk *exynos4_gate_clocks[] = {
-+	&exynos4_clk_gate_cam,
-+	&exynos4_clk_gate_tv,
-+	&exynos4_clk_gate_mfc,
-+	&exynos4_clk_gate_lcd0,
-+};
-+
- static struct clk exynos4_init_clocks_off[] = {
- 	{
- 		.name		= "timers",
-@@ -470,36 +506,43 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.devname	= "s5p-mipi-csis.0",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 4),
-+		.parent		= &exynos4_clk_gate_cam,
- 	}, {
- 		.name		= "csis",
- 		.devname	= "s5p-mipi-csis.1",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 5),
-+		.parent		= &exynos4_clk_gate_cam,
- 	}, {
- 		.name		= "jpeg",
- 		.id		= 0,
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 6),
-+		.parent		= &exynos4_clk_gate_cam,
- 	}, {
- 		.name		= "fimc",
- 		.devname	= "exynos4-fimc.0",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 0),
-+		.parent		= &exynos4_clk_gate_cam,
- 	}, {
- 		.name		= "fimc",
- 		.devname	= "exynos4-fimc.1",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 1),
-+		.parent		= &exynos4_clk_gate_cam,
- 	}, {
- 		.name		= "fimc",
- 		.devname	= "exynos4-fimc.2",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 2),
-+		.parent		= &exynos4_clk_gate_cam,
- 	}, {
- 		.name		= "fimc",
- 		.devname	= "exynos4-fimc.3",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 3),
-+		.parent		= &exynos4_clk_gate_cam,
- 	}, {
- 		.name		= "hsmmc",
- 		.devname	= "s3c-sdhci.0",
-@@ -534,31 +577,37 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.devname	= "s5p-sdo",
- 		.enable		= exynos4_clk_ip_tv_ctrl,
- 		.ctrlbit	= (1 << 2),
-+		.parent		= &exynos4_clk_gate_tv,
- 	}, {
- 		.name		= "mixer",
- 		.devname	= "s5p-mixer",
- 		.enable		= exynos4_clk_ip_tv_ctrl,
- 		.ctrlbit	= (1 << 1),
-+		.parent		= &exynos4_clk_gate_tv,
- 	}, {
- 		.name		= "vp",
- 		.devname	= "s5p-mixer",
- 		.enable		= exynos4_clk_ip_tv_ctrl,
- 		.ctrlbit	= (1 << 0),
-+		.parent		= &exynos4_clk_gate_tv,
- 	}, {
- 		.name		= "hdmi",
- 		.devname	= "exynos4-hdmi",
- 		.enable		= exynos4_clk_ip_tv_ctrl,
- 		.ctrlbit	= (1 << 3),
-+		.parent		= &exynos4_clk_gate_tv,
- 	}, {
- 		.name		= "hdmiphy",
- 		.devname	= "exynos4-hdmi",
- 		.enable		= exynos4_clk_hdmiphy_ctrl,
- 		.ctrlbit	= (1 << 0),
-+		.parent		= &exynos4_clk_gate_tv,
- 	}, {
- 		.name		= "dacphy",
- 		.devname	= "s5p-sdo",
- 		.enable		= exynos4_clk_dac_ctrl,
- 		.ctrlbit	= (1 << 0),
-+		.parent		= &exynos4_clk_gate_tv,
- 	}, {
- 		.name		= "adc",
- 		.enable		= exynos4_clk_ip_peril_ctrl,
-@@ -623,11 +672,13 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.name		= "fimg2d",
- 		.enable		= exynos4_clk_ip_image_ctrl,
- 		.ctrlbit	= (1 << 0),
-+		.parent		= &exynos4_clk_gate_lcd0,
- 	}, {
- 		.name		= "mfc",
- 		.devname	= "s5p-mfc",
- 		.enable		= exynos4_clk_ip_mfc_ctrl,
- 		.ctrlbit	= (1 << 0),
-+		.parent		= &exynos4_clk_gate_mfc,
- 	}, {
- 		.name		= "i2c",
- 		.devname	= "s3c2440-i2c.0",
-@@ -795,6 +846,7 @@ static struct clk exynos4_clk_fimd0 = {
- 	.devname	= "exynos4-fb.0",
- 	.enable		= exynos4_clk_ip_lcd0_ctrl,
- 	.ctrlbit	= (1 << 0),
-+	.parent		= &exynos4_clk_gate_lcd0,
- };
- 
- struct clk *exynos4_clkset_group_list[] = {
-@@ -1565,6 +1617,8 @@ void __init exynos4_register_clocks(void)
- 	s3c_register_clksrc(exynos4_clksrcs, ARRAY_SIZE(exynos4_clksrcs));
- 	s3c_register_clocks(exynos4_init_clocks_on, ARRAY_SIZE(exynos4_init_clocks_on));
- 
-+	s3c24xx_register_clocks(exynos4_gate_clocks, ARRAY_SIZE(exynos4_gate_clocks));
-+
- 	s3c24xx_register_clocks(exynos4_clk_cdev, ARRAY_SIZE(exynos4_clk_cdev));
- 	for (ptr = 0; ptr < ARRAY_SIZE(exynos4_clk_cdev); ptr++)
- 		s3c_disable_clocks(exynos4_clk_cdev[ptr], 1);
+BTW the impetus for my asking was http://bugs.debian.org/667681 against
+the flash-kernel tool which uses /proc/cpuinfo to know what magic runes
+are required for the particular board it is being run on.
+
+> It seems to me (I have no strong opinion here, just playing devil's
+> advocate) that /proc/cpuinfo is indeed telling us about the processor
+> (Marvell Kirkwood ...) Should it really be describing the board?
+
+The field is actually called "Hardware:" (not "Machine:" as I said
+above). Processor is actually covered separately ("Feroceon 88FR131 rev
+1 (v5l)" in this case). I'd expect Hardware: to say something more
+specific about the h/w platform, the string from /proc/device-tree/model
+is exactly what I think I would have expected.
+
+Ian.
+
+> 
+> thx,
+> 
+> Jason.
+> 
+
 -- 
-1.7.1.569.g6f426
+Ian Campbell
+
+
+Nostalgia isn't what it used to be.
