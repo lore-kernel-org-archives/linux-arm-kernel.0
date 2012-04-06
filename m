@@ -1,93 +1,163 @@
 From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 6 Apr 2012 15:15:05 -0700
-Subject: [PATCH 01/18] led-triggers: create a trigger for CPU activity
-In-Reply-To: <1333108713-12707-2-git-send-email-bryan.wu@canonical.com>
-References: <1333108713-12707-1-git-send-email-bryan.wu@canonical.com>
- <1333108713-12707-2-git-send-email-bryan.wu@canonical.com>
-Message-ID: <20120406151505.4eeb01ba.akpm@linux-foundation.org>
+Date: Fri, 6 Apr 2012 16:17:20 -0700
+Subject: [PATCH v3 1/2] backlight: lcd: add driver for raster-type lcd's
+ with gpio controlled panel reset
+In-Reply-To: <1332751600-11371-2-git-send-email-thomas.abraham@linaro.org>
+References: <1332751600-11371-1-git-send-email-thomas.abraham@linaro.org>
+ <1332751600-11371-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20120406161720.cf464c39.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Mar 2012 19:58:16 +0800
-Bryan Wu <bryan.wu@canonical.com> wrote:
 
-> Attempting to consolidate the ARM LED code, this removes the
-> custom RealView LED trigger code to turn LEDs on and off in
-> response to CPU activity and replace it with a standard trigger.
+> Cc: rpurdie at rpsys.net, florianSchandinat at gmx.de, devicetree-discuss at lists.ozlabs.org, linux-fbdev at vger.kernel.org, linux-samsung-soc at vger.kernel.org, grant.likely at secretlab.ca, rob.herring at calxeda.com, kgene.kim at samsung.com, jg1.han at samsung.com, broonie at opensource.wolfsonmicro.com, kyungmin.park at samsung.com, augulis.darius at gmail.com, ben-linux at fluff.org, lars at metafoo.de, patches at linaro.org
+
+Poor me.  When someone sends a patch like this, I need to go and hunt
+down everyone's real names to nicely add them to the changelog's Cc:
+list.  I prefer that you do this ;)
+
+You can add Cc:'s to the changelog yourself, of course.  Often that
+works out better than having me try to work out who might be
+interested in the patch.
+
+On Mon, 26 Mar 2012 14:16:39 +0530
+Thomas Abraham <thomas.abraham@linaro.org> wrote:
+
+> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
+> controlled panel reset. The driver controls the nRESET line of the panel
+> using a gpio connected from the host system. The Vcc supply to the panel
+> is (optionally) controlled using a voltage regulator. This driver excludes
+> support for lcd panels that use a serial command interface or direct
+> memory mapped IO interface.
 > 
-> (bryan.wu at canonical.com:
-> It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
-> It also provides ledtrig_cpu trigger event stub in <linux/leds.h>.
-> Although it was inspired by ARM work, it can be used in other arch.)
-> 
 >
 > ...
 >
-> +#include <linux/percpu.h>
-> +#include <linux/syscore_ops.h>
-> +#include "leds.h"
+> +struct lcd_pwrctrl {
+> +	struct device		*dev;
+> +	struct lcd_device	*lcd;
+> +	struct lcd_pwrctrl_data	*pdata;
+> +	struct regulator	*regulator;
+> +	unsigned int		power;
+> +	bool			suspended;
+> +	bool			pwr_en;
+
+Generally kernel code will avoid these unpronounceable abbreviations. 
+So we do
+
+pwr -> power
+en -> enable
+ctrl -> control
+
+etc.  It results in longer identifiers, but the code is more readable
+and, more importantly, more *rememberable*.  
+
+> +};
 > +
-> +#define MAX_NAME_LEN	8
+> +static int lcd_pwrctrl_get_power(struct lcd_device *lcd)
+> +{
+> +	struct lcd_pwrctrl *lp = lcd_get_data(lcd);
+> +	return lp->power;
+> +}
+> +
+> +static int lcd_pwrctrl_set_power(struct lcd_device *lcd, int power)
 
-The kernel already has at least eight different definitions of
-MAX_NAME_LEN.  I guess a ninth won't hurt ;)
+See, shouldn't that have been lcd_pwrctrl_set_pwr?
 
+If we avoid the abbreviations, such issues do not arise.
+
+> +{
+> +	struct lcd_pwrctrl *lp = lcd_get_data(lcd);
+> +	struct lcd_pwrctrl_data *pd = lp->pdata;
+> +	bool lcd_enable;
+> +	int lcd_reset, ret = 0;
+> +
+> +	lcd_enable = (power == FB_BLANK_POWERDOWN || lp->suspended) ? 0 : 1;
+
+This isn't how to use `bool'.  We can use
+
+	lcd_enable = (power == FB_BLANK_POWERDOWN) || lp->suspended;
+
+
+> +	lcd_reset = (pd->invert) ? !lcd_enable : lcd_enable;
+> +
+> +	if (lp->pwr_en == lcd_enable)
+> +		return 0;
+> +
+> +	if (!IS_ERR_OR_NULL(lp->regulator)) {
+> +		if (lcd_enable) {
+> +			if (regulator_enable(lp->regulator)) {
+> +				dev_info(lp->dev, "regulator enable failed\n");
+> +				ret = -EPERM;
+> +			}
+> +		} else {
+> +			if (regulator_disable(lp->regulator)) {
+> +				dev_info(lp->dev, "regulator disable failed\n");
+> +				ret = -EPERM;
+> +			}
+> +		}
+> +	}
+> +
+> +	gpio_direction_output(lp->pdata->gpio, lcd_reset);
+> +	lp->power = power;
+> +	lp->pwr_en = lcd_enable;
+
+Again, this could have been any of
+
+	lp->[power|pwr] = [power|pwr];
+	lp->[power|pwr]_[en|enable] = lcd_[en|enable];
+
+zillions of combinations!  If we just avoid the abbreviations, there is
+only one combination.
+
+> +	return ret;
+> +}
+> +
 >
 > ...
 >
-> +static void __init ledtrig_cpu_register(void)
+> +static int __devinit lcd_pwrctrl_probe(struct platform_device *pdev)
 > +{
-> +	int cpuid = smp_processor_id();
-> +	struct led_trigger *trig;
-> +	char *name = __get_cpu_var(trig_name);
+> +	struct lcd_pwrctrl *lp;
+> +	struct lcd_pwrctrl_data *pdata = pdev->dev.platform_data;
+> +	struct device *dev = &pdev->dev;
+> +	int err;
 > +
-> +	snprintf(name, MAX_NAME_LEN, "cpu%d", cpuid);
-> +	led_trigger_register_simple(name, &trig);
+> +#ifdef CONFIG_OF
+> +	if (dev->of_node) {
+> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+> +		if (!pdata) {
+> +			dev_err(dev, "memory allocation for pdata failed\n");
+> +			return -ENOMEM;
+> +		}
+> +		lcd_pwrctrl_parse_dt(dev, pdata);
+> +	}
+> +#endif
 > +
-> +	pr_info("LED trigger %s indicate activity on CPU %d\n",
-> +		trig->name, cpuid);
+> +	if (!pdata) {
+> +		dev_err(dev, "platform data not available\n");
+> +		return -EINVAL;
+> +	}
 > +
-> +	__get_cpu_var(cpu_trig) = trig;
-> +}
-> +
-> +static void __exit ledtrig_cpu_unregister(void)
-> +{
-> +	struct led_trigger *trig = __get_cpu_var(cpu_trig);
-> +	char *name = __get_cpu_var(trig_name);
-> +
-> +	led_trigger_unregister_simple(trig);
-> +	__get_cpu_var(cpu_trig) = NULL;
-> +	memset(name, 0, MAX_NAME_LEN);
-> +}
-> +
-> +static int __init ledtrig_cpu_init(void)
-> +{
-> +	int cpu;
-> +
-> +	for_each_possible_cpu(cpu)
-> +		ledtrig_cpu_register();
-> +
-> +	register_syscore_ops(&ledtrig_cpu_syscore_ops);
-> +
-> +	return 0;
-> +}
-> +module_init(ledtrig_cpu_init);
+> +	lp = devm_kzalloc(dev, sizeof(struct lcd_pwrctrl), GFP_KERNEL);
 
-This all looks horridly broken.  We call ledtrig_cpu_register() once
-for each CPU, but we call it on the same CPU each time, and it uses
-smp_processor_id() which a) is wrong and b) will emit a runtime
-preemption-is-enabled warning.
+Nit: I prefer sizeof(*lp) here, so I don't have to scroll back and
+check the type of lp.
 
-I'm assuming this wasn't tested on SMP.  It needs to be, please.
-
-Also, the code uses for_each_possible_cpu, ignoring CPU hotplug. 
-That's probably justifiable for this small storage size and not-hotpath
-code, but the decision should be given prominence and justified in the
-changelog or, better, in code comments please.
-
+> +	if (!lp) {
+> +		dev_err(dev, "memory allocation failed for private data\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	err = gpio_request(pdata->gpio, "LCD-nRESET");
+> +	if (err) {
+> +		dev_err(dev, "gpio [%d] request failed\n", pdata->gpio);
+> +		return err;
+> +	}
+> +
 >
 > ...
 >
 
-The patchset is basically an ARM thing.  Is there some ARM tree via
-which we can get it merged?
+The code looks OK to me, but I do think the naming decisions should be
+revisited, please.
