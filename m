@@ -1,54 +1,39 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 06 Apr 2012 21:45:06 +0400
-Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
-In-Reply-To: <1333717838.12209.83.camel@dagon.hellion.org.uk>
-References: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
- <4F7EE6AE.4020909@mvista.com>
- <1333717838.12209.83.camel@dagon.hellion.org.uk>
-Message-ID: <4F7F2BA2.9040308@mvista.com>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Fri, 6 Apr 2012 10:53:38 -0700
+Subject: [PATCH] arm: Add extra clobber registers for assembly in kernel_execve
+Message-ID: <4F7F2DA2.4040805@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2012 05:10 PM, Ian Campbell wrote:
 
->>> Fixes build the following error when CONFIG_KEXEC is enabled:
+The inline assembly in kernel_execve() uses r8 and r9.  Since this
+code sequence does not return, it usually doesn't matter if the
+register clobber list is accurate.  However, I saw a case where a
+particular version of gcc used r8 as an intermediate for the value
+eventually passed to r9.  Because r8 is used in the inline
+assembly, and not mentioned in the clobber list, r9 was set
+to an incorrect value.
 
->>      Maybe "the following build error" instead?
+This resulted in a kernel panic on execution of the first user-space
+program in the system.  r9 is used in ret_to_user as the thread_info
+pointer, and if it's wrong, bad things happen.
 
-> Done.
+Signed off by: Tim Bird <tim.bird@am.sony.com>
+---
+ arch/arm/kernel/sys_arm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-   Not quite. Still "fixes build the following...". :-)
+diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
+index 62e7c61..0264ab4 100644
+--- a/arch/arm/kernel/sys_arm.c
++++ b/arch/arm/kernel/sys_arm.c
+@@ -115,7 +115,7 @@ int kernel_execve(const char *filename,
+ 		  "Ir" (THREAD_START_SP - sizeof(regs)),
+ 		  "r" (&regs),
+ 		  "Ir" (sizeof(regs))
+-		: "r0", "r1", "r2", "r3", "ip", "lr", "memory");
++		: "r0", "r1", "r2", "r3", "r8", "r9", "ip", "lr", "memory");
 
->>>     CC      arch/arm/mach-kirkwood/board-dt.o
->>> arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
->>> arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
->>> arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
-
->>> kexec.h also needs string.h.
-
->>      Why it doesn't include it?
-
-> Not sure, but actually I should be using linux/kexec.h not asm/kexec.h
-> anyway which solves the problem too:
-
-> 8<------------------------------
-
->  From 76ef56286c1ceeceaa4c6c5ba867d9504e175382 Mon Sep 17 00:00:00 2001
-> From: Ian Campbell<ijc@hellion.org.uk>
-> Date: Fri, 6 Apr 2012 13:27:23 +0100
-> Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
-
-> Fixes build the following build error when CONFIG_KEXEC is enabled:
-
-    What I meant was "Fixes the following build error when CONFIG_KEXEC is 
-enabled:".
-
->    CC      arch/arm/mach-kirkwood/board-dt.o
-> arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
-> arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
-> arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
-
-> Signed-off-by: Ian Campbell<ijc@hellion.org.uk>
-> [v2, using linux/kexec.h not asm/kexec.h]
-
-WBR, Sergei
+  out:
+ 	return ret;
+-- 
