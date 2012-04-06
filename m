@@ -1,43 +1,55 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 06 Apr 2012 16:50:54 +0400
-Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
-In-Reply-To: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
-References: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
-Message-ID: <4F7EE6AE.4020909@mvista.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 06 Apr 2012 14:56:45 +0200
+Subject: [PATCH] ARM: at91: Export at91_ramc_base
+In-Reply-To: <4f761fd8.8843cc0a.22b0.6caa@mx.google.com>
+References: <4f761fd8.8843cc0a.22b0.6caa@mx.google.com>
+Message-ID: <4F7EE80D.1000905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.04.2012 16:30, Ian Campbell wrote:
-> Fixes build the following error when CONFIG_KEXEC is enabled:
+On 03/30/2012 11:03 PM, manabian at gmail.com :
+> From: Joachim Eastwood <joachim.eastwood@jotron.com>
+> 
+> After commit f363c407b42c4 building at91_cf as a module fails with:
+>   ERROR: "at91_ramc_base" [drivers/pcmcia/at91_cf.ko] undefined!
+>   make[1]: *** [__modpost] Error 1
+>   make: *** [modules] Error 2
+> 
+> Export at91_ramc_base symbol to allow drivers using at91_ramc_*
+> functions to be built as modules again.
+> 
+> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
 
-    Maybe "the following build error" instead?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
->    CC      arch/arm/mach-kirkwood/board-dt.o
-> arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
-> arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
-> arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
+and queued in at91-fixes for 3.4
 
-> kexec.h also needs string.h.
+(I modified commit message in relation with Sergei's comment).
 
-    Why it doesn't include it?
+Thanks, best regards,
 
-> Signed-off-by: Ian Campbell<ijc@hellion.org.uk>
+
 > ---
->   arch/arm/mach-kirkwood/board-dt.c |    2 ++
->   1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 1c672d9..5868b71 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -14,6 +14,8 @@
->   #include<linux/init.h>
->   #include<linux/of.h>
->   #include<linux/of_platform.h>
-> +#include<linux/string.h>
-> +#include<asm/kexec.h>
->   #include<asm/mach/arch.h>
->   #include<asm/mach/map.h>
->   #include<mach/bridge-regs.h>
+> 
+> This makes at91_cf compile again but it still doesn't work. Still
+> trying to figure out why.
+> 
+>  arch/arm/mach-at91/setup.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index 1083739..aa010a9 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -53,6 +53,7 @@ void __init at91_init_interrupts(unsigned int *priority)
+>  }
+>  
+>  void __iomem *at91_ramc_base[2];
+> +EXPORT_SYMBOL(at91_ramc_base);
+>  
+>  void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+>  {
 
-WBR, Sergei
+
+-- 
+Nicolas Ferre
