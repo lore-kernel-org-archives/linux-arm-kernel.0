@@ -1,53 +1,34 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 6 Apr 2012 11:35:09 +0800
-Subject: Bug in v7_coherent_kern_range() ?
-In-Reply-To: <20120402111240.GG19011@mudshark.cambridge.arm.com>
-References: <4F77C9A6.6080601@freescale.com>
- <20120402111240.GG19011@mudshark.cambridge.arm.com>
-Message-ID: <4F7E646D.6000302@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Apr 2012 11:35:20 +0800
+Subject: [PATCH v8 4/4] ARM: mxs/mx28evk: add GPMI-NAND device
+In-Reply-To: <C7A5B00EFC707A46AB67997D0215216701B5C28A@mx1.grid-net.com>
+References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
+ <1314169643-23425-5-git-send-email-b32955@freescale.com>
+ <CAOMZO5D_ACi73J0QfXoJmvyw6fBMrQfyoKLkK2P+-kMm5EzaDQ@mail.gmail.com>
+ <20120405010829.GG7264@S2101-09.ap.freescale.net>
+ <CAOMZO5ACk06aFWmmH0ZXCf6XoLaShwUaoAW0jHKmDTsJ0v027A@mail.gmail.com>
+ <20120405012343.GH7264@S2101-09.ap.freescale.net>
+ <CAOMZO5D2v4-ZoUXEhn7-Z7oSJ190egpkWGLkbaVzkjU5=HCNVA@mail.gmail.com>
+ <20120406023121.GK7264@S2101-09.ap.freescale.net>
+ <C7A5B00EFC707A46AB67997D0215216701B5C28A@mx1.grid-net.com>
+Message-ID: <20120406033517.GL7264@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will:
-> On Sun, Apr 01, 2012 at 04:21:10AM +0100, Huang Shijie wrote:
->> But in some unknown situation, cacheflush() failed and one threads
->> (assume A) may hung up in the following code:
-> [...]
->
->> multiqueue0:src D 804cd678 0 7328 5963 0x00000001
->> [<804cd678>] (__schedule+0x228/0x760) from [<804d0564>]
->> (__down_read+0xa8/0xe0)
->> [<804d0564>] (__down_read+0xa8/0xe0) from [<800478c4>]
->> (do_page_fault+0xbc/0x480)
->> [<800478c4>] (do_page_fault+0xbc/0x480) from [<8003841c>]
->> (do_DataAbort+0x34/0x98)
->> [<8003841c>] (do_DataAbort+0x34/0x98) from [<8003df10>]
->> (__dabt_svc+0x70/0xa0)
->> Exception stack(0xbae37ea8 to 0xbae37ef0)
->> 7ea0: 31e05000 31e1d000 00000020 0000001f 31e05000 31e1d000
->> 7ec0: bfac86b8 31e05000 31e1d000 bae36000 08100075 31e056fc 31e08000
->> bae37ef0
->> 7ee0: 800424a8 8004a1fc 800f0013 ffffffff
->> [<8003df10>] (__dabt_svc+0x70/0xa0) from [<8004a1fc>]
->> (v7_coherent_kern_range+0x20/0x80)
->> [<8004a1fc>] (v7_coherent_kern_range+0x20/0x80) from [<800424a8>]
->> (arm_syscall+0x2a0/0x2c4)
->> [<800424a8>] (arm_syscall+0x2a0/0x2c4) from [<8003e500>]
->> (ret_fast_syscall+0x0/0x3c)
-> Please can you try the patch posted here:?
->
-> http://lists.arm.linux.org.uk/lurker/message/20111107.173344.f738392e.en.html
-I tested this patch.  It fixed this bug. This bug did not occur any more.
-But my system still hung at futex. I think the futex issue is another 
-bug.(will this patch affect the futex?)
+On Thu, Apr 05, 2012 at 08:08:52PM -0700, Subodh Nijsure wrote:
+> 
+> Hello Shawn,
+> 
+> You also have to consider that folks who are using MX28 based design might be just now shifting from freescale provided 2.6.35 SDK to the latest 3.4-rcX train on their own (my case). To make them wait for 3.5 to get all the iMX driver seems like hard thing to do.
+>  
+I'm pretty sure that even 3.5 will not have all the imx28 drivers
+support.  Also freezing board file update does not block anyone adding
+new driver support in any way.  I do not understand what your argument
+is.
 
-So :
-Tested-by: Huang Shijie <b32955@freescale.com>
+Please note, the gpmi nand mx28evk board patch was not accept because
+it has pin confliction issue to be resolved.
 
-BR
-Huang Shijie
-
-> If it fixes your problem, please consider giving a tested-by.
->
-> Will
->
+-- 
+Regards,
+Shawn
