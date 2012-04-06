@@ -1,43 +1,39 @@
-From: gfm@funxed.com (George McBay)
-Date: Fri, 6 Apr 2012 00:55:26 -0700
-Subject: question about i.mx21ads support
-In-Reply-To: <CAOMZO5BWiQoRL3HJy7wgWUjA=FtnJJ9vqt5oau-0n6_SJT_AFQ@mail.gmail.com>
-References: <CAEqTKjUyiA_fCfboifSXXj-h_B6rGQpAM9nGnen=0mKi-w=J9w@mail.gmail.com>
- <CAOMZO5BWiQoRL3HJy7wgWUjA=FtnJJ9vqt5oau-0n6_SJT_AFQ@mail.gmail.com>
-Message-ID: <CAEqTKjUVrm894Bw62hLNRjfEr2eNVY9aTa1bUM-R3wr1KTRXBg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 06 Apr 2012 10:00:22 +0200
+Subject: [PATCH] ARM: Exynos4: read initial state of power domain from hw
+ registers
+Message-ID: <1333699222-16270-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Fabio, this helped point me in the right direction.
+Some bootloadered disable unused power domains, so kernel code should
+read the actual state from the hardware registers instead of assuming
+that their initial state is 'on'.
 
-This patch applied to 3.2.14 and with a couple of other config changes
-in the same area (had to enable support for 2-chip flash interleave,
-disable Intel/Sharp and enable ADM/Fujitsu/Spansion flash chips) got
-that kernel booting past the Oops I was hitting before.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/pm_domains.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Unfortunately these changes applied to 3.3 series kernels don't help
-with the no-output kernel hang I am seeing with those versions on my
-imx21ads board, but this gives me a solid starting point for trying to
-find the change that is making the 3.3 kernels hang on this hardware.
-
-
-On Thu, Apr 5, 2012 at 12:52 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Thu, Apr 5, 2012 at 2:30 PM, George McBay <gfm@funxed.com> wrote:
->> I'm attempting to revive an old i.mx21ads board (Freescale dev board,
->> M9328MX21ADS Rev E) with a newish Linux kernel but haven't had yet had
->> luck getting a build after version 3.1.10 to boot successfully. ?Given
->> the age of this platform, it seems entirely plausible that nobody is
->> actually runtime testing against this board, though I suppose it may
->> also come down to something specific in my board revision.
->
-> Please try 3.3 kernel instead.
->
-> You are probably missing this patch:
-> http://git.kernel.org/?p=linux/kernel/git/stable/linux-stable.git;a=commitdiff;h=1a96571db0a80dbbb935dee26589dd528da0ed06;hp=039d7ba4bcfb1e0040be6f7812a410e6744ce69e
->
-> I do not have access to a mx21ads, but Jaccon on Cc has submitted some
-> mx21ads related patches recently.
->
-> Regards,
->
-> Fabio Estevam
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 13b3068..b5b92e8 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -151,9 +151,11 @@ static __init int exynos4_pm_init_power_domain(void)
+ 	if (of_have_populated_dt())
+ 		return exynos_pm_dt_parse_domains();
+ 
+-	for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++)
+-		pm_genpd_init(&exynos4_pm_domains[idx]->pd, NULL,
+-				exynos4_pm_domains[idx]->is_off);
++	for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++) {
++		struct exynos_pm_domain *pd = exynos4_pm_domains[idx];
++		int on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
++		pm_genpd_init(&pd->pd, NULL, !on);
++	}
+ 
+ #ifdef CONFIG_S5P_DEV_FIMD0
+ 	exynos_pm_add_dev_to_genpd(&s5p_device_fimd0, &exynos4_pd_lcd0);
+-- 
+1.7.1.569.g6f426
