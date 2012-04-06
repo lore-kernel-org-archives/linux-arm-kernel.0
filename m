@@ -1,42 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 06 Apr 2012 14:49:23 +0200
-Subject: [PATCH] ARM: at91: remove empty at91_init_serial function
-In-Reply-To: <1333715779-1485-1-git-send-email-joachim.eastwood@jotron.com>
-References: <1333715779-1485-1-git-send-email-joachim.eastwood@jotron.com>
-Message-ID: <4F7EE653.6010604@atmel.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 06 Apr 2012 16:50:54 +0400
+Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
+In-Reply-To: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
+References: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
+Message-ID: <4F7EE6AE.4020909@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2012 02:36 PM, Joachim Eastwood :
-> The real function is long gone and the empty one will generate warnings when configured without Atmel serial.
->   arch/arm/mach-at91/at91rm9200_devices.c:1176: warning: 'struct at91_uart_config' declared inside parameter list
->   arch/arm/mach-at91/at91rm9200_devices.c:1176: warning: its scope is only this definition or declaration, which is probably not what you want
-> 
-> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+On 06.04.2012 16:30, Ian Campbell wrote:
+> Fixes build the following error when CONFIG_KEXEC is enabled:
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+    Maybe "the following build error" instead?
 
-queue in at91-fixes for 3.4-rc
+>    CC      arch/arm/mach-kirkwood/board-dt.o
+> arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
+> arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
+> arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
 
-Thanks,
+> kexec.h also needs string.h.
 
+    Why it doesn't include it?
+
+> Signed-off-by: Ian Campbell<ijc@hellion.org.uk>
 > ---
->  arch/arm/mach-at91/at91rm9200_devices.c |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-> index 99ce5c9..05774e5 100644
-> --- a/arch/arm/mach-at91/at91rm9200_devices.c
-> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
-> @@ -1173,7 +1173,6 @@ void __init at91_add_device_serial(void)
->  		printk(KERN_INFO "AT91: No default serial console defined.\n");
->  }
->  #else
-> -void __init __deprecated at91_init_serial(struct at91_uart_config *config) {}
->  void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
->  void __init at91_set_serial_console(unsigned portnr) {}
->  void __init at91_add_device_serial(void) {}
+>   arch/arm/mach-kirkwood/board-dt.c |    2 ++
+>   1 files changed, 2 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 1c672d9..5868b71 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -14,6 +14,8 @@
+>   #include<linux/init.h>
+>   #include<linux/of.h>
+>   #include<linux/of_platform.h>
+> +#include<linux/string.h>
+> +#include<asm/kexec.h>
+>   #include<asm/mach/arch.h>
+>   #include<asm/mach/map.h>
+>   #include<mach/bridge-regs.h>
 
-
--- 
-Nicolas Ferre
+WBR, Sergei
