@@ -1,105 +1,50 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 6 Apr 2012 05:21:52 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
- presence of 32k timer
-In-Reply-To: <87hawxkgoi.fsf@ti.com>
-References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
- <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
- <20120405095221.GC25053@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
- <87hawxkgoi.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 6 Apr 2012 02:49:05 -0300
+Subject: [PATCH v8 4/4] ARM: mxs/mx28evk: add GPMI-NAND device
+In-Reply-To: <20120406023121.GK7264@S2101-09.ap.freescale.net>
+References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
+ <1314169643-23425-5-git-send-email-b32955@freescale.com>
+ <CAOMZO5D_ACi73J0QfXoJmvyw6fBMrQfyoKLkK2P+-kMm5EzaDQ@mail.gmail.com>
+ <20120405010829.GG7264@S2101-09.ap.freescale.net>
+ <CAOMZO5ACk06aFWmmH0ZXCf6XoLaShwUaoAW0jHKmDTsJ0v027A@mail.gmail.com>
+ <20120405012343.GH7264@S2101-09.ap.freescale.net>
+ <CAOMZO5D2v4-ZoUXEhn7-Z7oSJ190egpkWGLkbaVzkjU5=HCNVA@mail.gmail.com>
+ <20120406023121.GK7264@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5Dr+qVMOpG6T03L-+i6qYkJRPUPT87hcJAs6DxHs+EcmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2012 at 03:03:01, Hilman, Kevin wrote:
-> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-> 
-> > On Thu, Apr 05, 2012 at 15:22:21, Russell King - ARM Linux wrote:
-> >> On Thu, Apr 05, 2012 at 09:36:00AM +0000, Hiremath, Vaibhav wrote:
-> >> > There seems to be limitation for ARM architecture, it is restricted by
-> >> > sched_clock implementation present in "arch/arm/kernel/sched_clock.c".
-> >> > Natively, clocksource framework does support change in rate/frequency for
-> >> > registered timer, using,
-> >> 
-> >> Any kind of switching of timing sources introduces loss of time issues
-> >> by the mere fact that you can't instantly know the counter values of
-> >> both timing sources at precisely the same instant - because CPUs can
-> >> only do one thing at a time.  So any kind of repeated dynamic switching
-> >> _will_ result in a gradual loss of time - which will be indeterminant
-> >> as it depends on the frequency of the switching and the relative delta
-> >> between the two.
-> >> 
-> >> To put it another way - it is not possible to maintain high precision
-> >> and accuracy while dynamically switching your timing sources.
-> >> 
-> >> I'm not about to lift the restriction that there's only one source for
-> >> sched_clock() just for OMAP.  That'd require a lot of additional code -
-> >> it's not just about adjusting the multiplier and shift, you also have to
-> >> correct the returned ns value as well, which means synchronizing against
-> >> two counters.  (And as I've pointed out above, that's impossible to do
-> >> accurately.)
-> >> 
-> >
-> > Thanks a ton Russell for confirming on this,
-> >
-> > I understand, we also have to adjust ns value and such confirmation is what exactly I was looking for.
-> >
-> > So this means, we have to use compile time option, as existing
-> > implementation in "arch/arm/mach-omap2/timer.c".
-> 
-> Not exactly.  A compile time option isn't (yet) the only option.
-> 
-> Russell points out the various problems with dynamic switching of
-> clocksources, which is true.  However, we're not trying to dynamically
-> switch clocksources.
-> 
-> What we need is only one-time selection at boot based on presence (or
-> not) of various timers.  IOW, we still only ever need to call
-> setup_sched_clock() once based on which HW timers are available.
-> 
-> Why not just delay the setup_sched_clock() until the clocksource is
-> decided?
-> 
+On Thu, Apr 5, 2012 at 11:31 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Kevin,
+> I have to do that to motivate people to add DT support for the drivers
+> they submit from the beginning.
 
-I liked Santosh's idea in using command line argument "clocksource=" and 
-make decision based on this. I have implemented it and tried it on both
-OMAP3EVM and beaglebone and it works great.
+Understand your point for new drivers.
 
-I have introduced something like this in mach-omap2/timer.c,
+If you take the GPMI driver for example: it has been available for a
+long time and there is no board using it in mainline.
 
-static int __init omap2_override_clocksource(char* str)
-{
-	if (!str)
-		return 0;
-	/*
-	 * For OMAP architecture, we only have two options
-	 *    - sync_32k (default)
-	 *    - gp timer
-	 */
-	if (!strcmp(str, "gp timer"))
-		use_gptimer_clksrc = true;
+So how can people easily test it and find bugs with this driver?
+Patching their own trees themselves? Sam Gandhi did extensive tests on
+NAND and found some DMA issues with it.
 
-	return 0;
-}
-early_param("clocksource", omap2_override_clocksource);
+If we could have mx28evk supporting GPMI driver today it would
+estimulate people to use it and more issues can be found and fixed.
 
+Waiting for DT support to be in place is just blocking the progress for mx28.
 
-It solves all issues what we have been trying address.
+Please note that right now there is no dt support for mx28 in mainline.
 
-Thanks,
+If what blocks this patch "ARM: mxs/mx28evk: add GPMI-NAND device" to
+be accepted is the pin mux conflict, that would be easy to fix and
+Huang could do a v5 if you agree.
 
-Vaibhav
+> Also I do not see much point to keep patching board files which are
+> to be removed.
 
-> Kevin
-> 
+I understand your point, but again, right now there is no dt support,
+so the only mechanism we have to register driver is via board files
+for mx28.
+
+So it would be nice if you could still accept patches for mx28 while
+mx28 dt does not show up in mainline.
