@@ -1,48 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Apr 2012 11:15:57 -0700
-Subject: [RESEND PATCH] ARM :OMAP2+: UART: Remove some of uart default pads
-In-Reply-To: <CAMrsUdJEY2o2CWjzSg5dabVEkpk48O5njtDU55Z3Jq2vViNJgQ@mail.gmail.com>
-References: <1332324149-16058-1-git-send-email-govindraj.raja@ti.com>
- <20120403181925.GH8240@atomide.com>
- <CAMrsUdLrpyGrhggi820WcR+DoHJVB8GQ1THUOO-C4LqUQtAxWQ@mail.gmail.com>
- <20120405165811.GB3785@atomide.com>
- <CAMrsUdJEY2o2CWjzSg5dabVEkpk48O5njtDU55Z3Jq2vViNJgQ@mail.gmail.com>
-Message-ID: <20120406181556.GC15734@atomide.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 6 Apr 2012 20:21:22 +0200
+Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
+In-Reply-To: <CAMiH66GM0RxP-z=HNkOhhPaaXCZLKPvWFy=_+aGbbGSdrsg+iQ@mail.gmail.com>
+References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
+ <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+ <CAMiH66EC7=x0sRYhE3hpEyBemDGSRS19xguQUqKj2kuPw5Tifw@mail.gmail.com>
+ <20120404122335.GD17187@pengutronix.de>
+ <CAMiH66GM0RxP-z=HNkOhhPaaXCZLKPvWFy=_+aGbbGSdrsg+iQ@mail.gmail.com>
+Message-ID: <20120406182122.GA13649@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Raja, Govindraj <govindraj.raja@ti.com> [120405 23:08]:
-> On Thu, Apr 5, 2012 at 10:28 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > Hmm I don't think any muxing was done automatically unless
-> > omap_serial_init_port was being called with pins.
-> 
-> Muxing was happening even if we don't call omap_serial_init_port
-> rx pin was muxed for wakeup capability for all uart pins
 
-OK, but that was only for the wake-up muxing? That sounds risky
-too for some boards as the board may be using alternative uart
-pins instead of the default ones.
- 
-> omap_uart_idle_init => was populating padconf offset value for ech uart
-> which was used in omap_uart_enable/disable_wakeup functions.
-> This mechanism was keeping PM happening for all boards.
+> > where 2-4 can probably happen more or less simultaneously.
+> I wish you could send out the new patch as soon as possible. :)
 
-OK, that's safe if we also bail out for the cases where the default
-uart pins are not muxed to serial functionality to start with.
+Is a new version needed? I thought that this version could go in...
 
-So to summarize, the right fix is to:
-
-1. Only do muxing of uarts from other modes to uart mode if
-   omap_serial_init_port is being called with the board specific
-   mux options for the port in question.
-
-2. Bail out early in omap_serial_init for each port that does not
-   have it's default uart pins already muxed to uart functionality.
-
-3. For the uart ports configured in #1 or #2 above, allow dynamic
-   remuxing of the wake-up capability but don't touch the others.
-
-Regards,
-
-Tony
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120406/437d0124/attachment.sig>
