@@ -1,73 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 5 Apr 2012 17:07:58 -0700
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 5 Apr 2012 20:19:57 -0400 (EDT)
 Subject: CONFIG_EARLY_PRINTK on versatile broken in mainline
-In-Reply-To: <CACxGe6tCbnA+tvo3S=m+XjaXXiGF+bLy98CByz7RymH=bfimhg@mail.gmail.com>
+In-Reply-To: <CACxGe6vF7AP99yJaTiqGMRUmgMOwgoM_B=AQFaPxrAfsQyHS9A@mail.gmail.com>
 References: <CACxGe6twdkkQaN+ieZoFpjvQAect7-6mUz+N8yULDzwtwHoW1Q@mail.gmail.com>
  <CAOMZO5DFmqz0Rp9oFR7tyofQ9iAfNWXTEYOFVcYvxWPcf6DDMQ@mail.gmail.com>
  <CACxGe6sQ9YR-i4BJOsB0uE7U7gP7Y4Q12rjiEhqQnJGX+FEgfw@mail.gmail.com>
  <CACxGe6tCbnA+tvo3S=m+XjaXXiGF+bLy98CByz7RymH=bfimhg@mail.gmail.com>
-Message-ID: <CACxGe6vF7AP99yJaTiqGMRUmgMOwgoM_B=AQFaPxrAfsQyHS9A@mail.gmail.com>
+ <CACxGe6vF7AP99yJaTiqGMRUmgMOwgoM_B=AQFaPxrAfsQyHS9A@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1204052015360.16314@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2012 at 4:27 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, Apr 5, 2012 at 4:19 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Thu, Apr 5, 2012 at 4:08 PM, Fabio Estevam <festevam@gmail.com> wrote:
->>> On Thu, Apr 5, 2012 at 7:52 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>>> Has anyone else had problems with CONFIG_EARLY_PRINTK on current
->>>> mainline? ?ARM versatile fails to boot on qemu when it is selected.
->>>> I've just started bisecting. ?v3.3 is okay, but current mainline is
->>>> broken. ?Output stops after dumping out the memblock regions, and
->>>> __log_buf stops at the same place.
->>>
->>> Please try this patch:
->>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/158694
->>
->> I've already had that fix applied. ?This is a different issue. ?The
->> kernel boots fine if CONFIG_EARLY_PRINTK isn't defined.
->
-> Update: I'm still investigating, but it bisects out to this commit:
->
-> commit 94e5a85b3be0ce109d26aa6812b2a02c518a0e4b
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date: ? Wed Jan 18 15:32:49 2012 +0000
->
-> ? ?ARM: earlier initialization of vectors page
+On Thu, 5 Apr 2012, Grant Likely wrote:
 
-The following patch makes it boot.  Calling printch() to output a
-character right after early_trap_init() seems to unblock whatever was
-wedging the system.  A delay or a printk with "" format string doesn't
-have any effect, it seems it must be a character output.  This may be
-a problem in the simulator.  I've not been able to run this on real
-hardware.
+> On Thu, Apr 5, 2012 at 4:27 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > On Thu, Apr 5, 2012 at 4:19 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> >> On Thu, Apr 5, 2012 at 4:08 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> >>> On Thu, Apr 5, 2012 at 7:52 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> >>>> Has anyone else had problems with CONFIG_EARLY_PRINTK on current
+> >>>> mainline? ?ARM versatile fails to boot on qemu when it is selected.
+> >>>> I've just started bisecting. ?v3.3 is okay, but current mainline is
+> >>>> broken. ?Output stops after dumping out the memblock regions, and
+> >>>> __log_buf stops at the same place.
+> >>>
+> >>> Please try this patch:
+> >>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/158694
+> >>
+> >> I've already had that fix applied. ?This is a different issue. ?The
+> >> kernel boots fine if CONFIG_EARLY_PRINTK isn't defined.
+> >
+> > Update: I'm still investigating, but it bisects out to this commit:
+> >
+> > commit 94e5a85b3be0ce109d26aa6812b2a02c518a0e4b
+> > Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Date: ? Wed Jan 18 15:32:49 2012 +0000
+> >
+> > ? ?ARM: earlier initialization of vectors page
+> 
+> The following patch makes it boot.  Calling printch() to output a
+> character right after early_trap_init() seems to unblock whatever was
+> wedging the system.  A delay or a printk with "" format string doesn't
+> have any effect, it seems it must be a character output.  This may be
+> a problem in the simulator.  I've not been able to run this on real
+> hardware.
 
-g.
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b86f893..a6dafb1 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -995,6 +995,7 @@ void __init arm_mm_memblock_reserve(void)
-  * called function.  This means you can't use any function or debugging
-  * method which may touch any device, otherwise the kernel _will_ crash.
-  */
-+extern void printch(int);
- static void __init devicemaps_init(struct machine_desc *mdesc)
- {
-        struct map_desc map;
-@@ -1007,6 +1008,7 @@ static void __init devicemaps_init(struct
-machine_desc *mdesc)
-        vectors = early_alloc(PAGE_SIZE);
-
-        early_trap_init(vectors);
-+       printch('c');
-
-        for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
-                pmd_clear(pmd_off_k(addr));
+FWIW, I have no problem booting v3.4-rc1 for vexpress on the ARM A15 
+Fast Model, given the patch referenced above is applied.
 
 
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Nicolas
