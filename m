@@ -1,24 +1,48 @@
-From: paul.s.schilling@gmail.com (Paul Schilling)
-Date: Fri, 6 Apr 2012 13:12:59 -0500
-Subject: Samsung S3C2416 framebuffer corruption.
-Message-ID: <CAC=G6sww1eUv=jo6AftxDn5wPsoWG=G+VF7dJYRU6OAxTPHt1w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Apr 2012 11:15:57 -0700
+Subject: [RESEND PATCH] ARM :OMAP2+: UART: Remove some of uart default pads
+In-Reply-To: <CAMrsUdJEY2o2CWjzSg5dabVEkpk48O5njtDU55Z3Jq2vViNJgQ@mail.gmail.com>
+References: <1332324149-16058-1-git-send-email-govindraj.raja@ti.com>
+ <20120403181925.GH8240@atomide.com>
+ <CAMrsUdLrpyGrhggi820WcR+DoHJVB8GQ1THUOO-C4LqUQtAxWQ@mail.gmail.com>
+ <20120405165811.GB3785@atomide.com>
+ <CAMrsUdJEY2o2CWjzSg5dabVEkpk48O5njtDU55Z3Jq2vViNJgQ@mail.gmail.com>
+Message-ID: <20120406181556.GC15734@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am having issues with the frame buffer on the S3C2416.  The issue
-that I seem to be having is that certain colors especially for some
-reason X console screens that are white with black font corrupt the
-frame buffer.  It appears that LCD lines get shoved down a number of
-lines and will even get wrapped back around from the  bottom to the
-top.  I have a Qt app with a solid blue background with no problems.
-With this bug the screen is constantly jittering,  I have seen some
-times in X where the pointer will cause this screen corruption across
-the entire row for as tall as the pointer is on screen.
+* Raja, Govindraj <govindraj.raja@ti.com> [120405 23:08]:
+> On Thu, Apr 5, 2012 at 10:28 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > Hmm I don't think any muxing was done automatically unless
+> > omap_serial_init_port was being called with pins.
+> 
+> Muxing was happening even if we don't call omap_serial_init_port
+> rx pin was muxed for wakeup capability for all uart pins
 
-Second in Linux what would it take to get some video acceleration
-support from the 2D accelerator in the S3C2416.  I know there has been
-some work done recently on the exynos platform.  I know that the
-exynos has 3D accelerator also.
+OK, but that was only for the wake-up muxing? That sounds risky
+too for some boards as the board may be using alternative uart
+pins instead of the default ones.
+ 
+> omap_uart_idle_init => was populating padconf offset value for ech uart
+> which was used in omap_uart_enable/disable_wakeup functions.
+> This mechanism was keeping PM happening for all boards.
 
-Thanks,
-Paul
+OK, that's safe if we also bail out for the cases where the default
+uart pins are not muxed to serial functionality to start with.
+
+So to summarize, the right fix is to:
+
+1. Only do muxing of uarts from other modes to uart mode if
+   omap_serial_init_port is being called with the board specific
+   mux options for the port in question.
+
+2. Bail out early in omap_serial_init for each port that does not
+   have it's default uart pins already muxed to uart functionality.
+
+3. For the uart ports configured in #1 or #2 above, allow dynamic
+   remuxing of the wake-up capability but don't touch the others.
+
+Regards,
+
+Tony
