@@ -1,194 +1,24 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 06 Apr 2012 13:12:27 -0500
-Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <4F7F320B.8080608@gmail.com>
+From: paul.s.schilling@gmail.com (Paul Schilling)
+Date: Fri, 6 Apr 2012 13:12:59 -0500
+Subject: Samsung S3C2416 framebuffer corruption.
+Message-ID: <CAC=G6sww1eUv=jo6AftxDn5wPsoWG=G+VF7dJYRU6OAxTPHt1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2012 01:58 PM, Mark Brown wrote:
-> The AMBA bus regulator support is being used to model on/off switches
-> for power domains which isn't terribly idiomatic for modern kernels with
-> the generic power domain code and creates integration problems on platforms
-> which don't use regulators for their power domains as it's hard to tell
-> the difference between a regulator that is needed but failed to be provided
-> and one that isn't supposed to be there (though DT does make that easier).
-> 
-> Platforms that wish to use the regulator API to manage their power domains
-> can indirect via the power domain interface.
-> 
-> This feature is only used with the vape supply of the db8500 PRCMU
-> driver which supplies the UARTs and MMC controllers, none of which have
-> support for managing vcore at runtime in mainline (only pl022 SPI
-> controller does).  Update that supply to have an always_on constraint
-> until the power domain support for the system is updated so that it is
-> enabled for these users, this is likely to have no impact on practical
-> systems as probably at least one of these devices will be active and
-> cause AMBA to hold the supply on anyway.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
+I am having issues with the frame buffer on the S3C2416.  The issue
+that I seem to be having is that certain colors especially for some
+reason X console screens that are white with black font corrupt the
+frame buffer.  It appears that LCD lines get shoved down a number of
+lines and will even get wrapped back around from the  bottom to the
+top.  I have a Qt app with a solid blue background with no problems.
+With this bug the screen is constantly jittering,  I have seen some
+times in X where the pointer will cause this screen corruption across
+the entire row for as tall as the pointer is on screen.
 
-This and pl011 fixes are needed to get highbank working with 3.4, so:
+Second in Linux what would it take to get some video acceleration
+support from the 2D accelerator in the S3C2416.  I know there has been
+some work done recently on the exynos platform.  I know that the
+exynos has 3D accelerator also.
 
-Tested-by: Rob Herring <rob.herring@calxeda.com>
-
-Rob
-
-> 
-> Updated to add the always_on constraint for db8500-prcmu as discussed in
-> the changelog.
-> 
->  drivers/amba/bus.c         |   42 +-----------------------------------------
->  drivers/mfd/db8500-prcmu.c |    1 +
->  drivers/spi/spi-pl022.c    |    2 --
->  include/linux/amba/bus.h   |    8 --------
->  4 files changed, 2 insertions(+), 51 deletions(-)
-> 
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index 01c2cf4..cc27322 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -247,8 +247,7 @@ static int amba_pm_restore(struct device *dev)
->  /*
->   * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
->   * enable/disable the bus clock at runtime PM suspend/resume as this
-> - * does not result in loss of context.  However, disabling vcore power
-> - * would do, so we leave that to the driver.
-> + * does not result in loss of context.
->   */
->  static int amba_pm_runtime_suspend(struct device *dev)
->  {
-> @@ -354,39 +353,6 @@ static void amba_put_disable_pclk(struct amba_device *pcdev)
->  	clk_put(pclk);
->  }
->  
-> -static int amba_get_enable_vcore(struct amba_device *pcdev)
-> -{
-> -	struct regulator *vcore = regulator_get(&pcdev->dev, "vcore");
-> -	int ret;
-> -
-> -	pcdev->vcore = vcore;
-> -
-> -	if (IS_ERR(vcore)) {
-> -		/* It is OK not to supply a vcore regulator */
-> -		if (PTR_ERR(vcore) == -ENODEV)
-> -			return 0;
-> -		return PTR_ERR(vcore);
-> -	}
-> -
-> -	ret = regulator_enable(vcore);
-> -	if (ret) {
-> -		regulator_put(vcore);
-> -		pcdev->vcore = ERR_PTR(-ENODEV);
-> -	}
-> -
-> -	return ret;
-> -}
-> -
-> -static void amba_put_disable_vcore(struct amba_device *pcdev)
-> -{
-> -	struct regulator *vcore = pcdev->vcore;
-> -
-> -	if (!IS_ERR(vcore)) {
-> -		regulator_disable(vcore);
-> -		regulator_put(vcore);
-> -	}
-> -}
-> -
->  /*
->   * These are the device model conversion veneers; they convert the
->   * device model structures to our more specific structures.
-> @@ -399,10 +365,6 @@ static int amba_probe(struct device *dev)
->  	int ret;
->  
->  	do {
-> -		ret = amba_get_enable_vcore(pcdev);
-> -		if (ret)
-> -			break;
-> -
->  		ret = amba_get_enable_pclk(pcdev);
->  		if (ret)
->  			break;
-> @@ -420,7 +382,6 @@ static int amba_probe(struct device *dev)
->  		pm_runtime_put_noidle(dev);
->  
->  		amba_put_disable_pclk(pcdev);
-> -		amba_put_disable_vcore(pcdev);
->  	} while (0);
->  
->  	return ret;
-> @@ -442,7 +403,6 @@ static int amba_remove(struct device *dev)
->  	pm_runtime_put_noidle(dev);
->  
->  	amba_put_disable_pclk(pcdev);
-> -	amba_put_disable_vcore(pcdev);
->  
->  	return ret;
->  }
-> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> index ebc1e86..5be3248 100644
-> --- a/drivers/mfd/db8500-prcmu.c
-> +++ b/drivers/mfd/db8500-prcmu.c
-> @@ -2788,6 +2788,7 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
->  		.constraints = {
->  			.name = "db8500-vape",
->  			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-> +			.always_on = true,
->  		},
->  		.consumer_supplies = db8500_vape_consumers,
->  		.num_consumer_supplies = ARRAY_SIZE(db8500_vape_consumers),
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index 96f0da6..09c925a 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2195,7 +2195,6 @@ static int pl022_runtime_suspend(struct device *dev)
->  	struct pl022 *pl022 = dev_get_drvdata(dev);
->  
->  	clk_disable(pl022->clk);
-> -	amba_vcore_disable(pl022->adev);
->  
->  	return 0;
->  }
-> @@ -2204,7 +2203,6 @@ static int pl022_runtime_resume(struct device *dev)
->  {
->  	struct pl022 *pl022 = dev_get_drvdata(dev);
->  
-> -	amba_vcore_enable(pl022->adev);
->  	clk_enable(pl022->clk);
->  
->  	return 0;
-> diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-> index 7847e19..63a59ac 100644
-> --- a/include/linux/amba/bus.h
-> +++ b/include/linux/amba/bus.h
-> @@ -19,7 +19,6 @@
->  #include <linux/mod_devicetable.h>
->  #include <linux/err.h>
->  #include <linux/resource.h>
-> -#include <linux/regulator/consumer.h>
->  
->  #define AMBA_NR_IRQS	2
->  #define AMBA_CID	0xb105f00d
-> @@ -30,7 +29,6 @@ struct amba_device {
->  	struct device		dev;
->  	struct resource		res;
->  	struct clk		*pclk;
-> -	struct regulator	*vcore;
->  	u64			dma_mask;
->  	unsigned int		periphid;
->  	unsigned int		irq[AMBA_NR_IRQS];
-> @@ -75,12 +73,6 @@ void amba_release_regions(struct amba_device *);
->  #define amba_pclk_disable(d)	\
->  	do { if (!IS_ERR((d)->pclk)) clk_disable((d)->pclk); } while (0)
->  
-> -#define amba_vcore_enable(d)	\
-> -	(IS_ERR((d)->vcore) ? 0 : regulator_enable((d)->vcore))
-> -
-> -#define amba_vcore_disable(d)	\
-> -	do { if (!IS_ERR((d)->vcore)) regulator_disable((d)->vcore); } while (0)
-> -
->  /* Some drivers don't use the struct amba_device */
->  #define AMBA_CONFIG_BITS(a) (((a) >> 24) & 0xff)
->  #define AMBA_REV_BITS(a) (((a) >> 20) & 0x0f)
+Thanks,
+Paul
