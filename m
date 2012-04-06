@@ -1,39 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Apr 2012 22:21:53 +0800
-Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
-In-Reply-To: <CAOdLEaontAAN71LkHET7thE5a30wa0EiXPg9b84EOW_GgGoQJg@mail.gmail.com>
-References: <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
- <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
- <4F7D3DB8.6080009@freescale.com>
- <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
- <1333628861.31825.22.camel@vkoul-udesk3>
- <20120406022305.GJ7264@S2101-09.ap.freescale.net>
- <4F7EC6AF.6000603@freescale.com>
- <CAOdLEaoD2sezmXbOoBdZ4h4E+A2rqf-2K9P-Y6aUt+zeASZQrw@mail.gmail.com>
- <20120406135929.GR7264@S2101-09.ap.freescale.net>
- <CAOdLEaontAAN71LkHET7thE5a30wa0EiXPg9b84EOW_GgGoQJg@mail.gmail.com>
-Message-ID: <20120406142151.GS7264@S2101-09.ap.freescale.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 05 Apr 2012 21:20:54 -0700
+Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation for
+ Device Tree bindings
+In-Reply-To: <1333619748-16126-5-git-send-email-lee.jones@linaro.org>
+References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
+ <1333619748-16126-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120406042054.C0C433E0C86@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2012 at 07:06:41AM -0700, Sam Gandhi wrote:
-...
-> Well then change the name of the function
-> mxs_assign_cookie_enable_chan(), my point still stands.
+On Thu,  5 Apr 2012 10:55:45 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> Add required documentation for specific gpio-nomadik DT bindings.
 > 
-I just do not see the need of such churn.
-
-> As the case illustrates  cookie needs to assigned before enabling the
-> channel then why not do it in that function itself.
-
-It's simply because cookie is cookie and channel is channel.
-
-> At worst please
-> put a comment in mxs_assign_cookie_enable() that says cookie must be
-> assigned prior to calling enable channel.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  .../devicetree/bindings/gpio/gpio-nmk.txt          |   29 ++++++++++++++++++++
+>  1 files changed, 29 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-nmk.txt
 > 
-It's the best rather than worst to me. 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+> new file mode 100644
+> index 0000000..1555029
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+> @@ -0,0 +1,29 @@
+> +Nomadik GPIO controller
+> +
+> +Required properties:
+> +- compatible           : Should be "stmicroelectronics,nomadik-gpio".
+
+"stmicroelectronics," is a really long prefix.  You can use simply
+"st," here since it has already been defined and documented in
+Documentation/devicetree/bindings/vendor-prefixes.txt
+
+> +- reg                  : Physical base address and length of the controller's registers.
+> +- interrupts           : The interrupt outputs from the controller.
+> +- #gpio-cells          : Should be two:
+> +                           The first cell is the pin number.
+> +                           The second cell is used to specify optional parameters:
+> +                             - bits[3:0] trigger type and level flags:
+> +                                 1 = low-to-high edge triggered.
+> +                                 2 = high-to-low edge triggered.
+> +                                 4 = active high level-sensitive.
+> +                                 8 = active low level-sensitive.
+
+Those look like interrupt flags, not gpio flags.  If the gpio lines
+can be used as generic irq input lines, then this node should also
+declare itself as an interrupt controller.
+
+> +- gpio-controller      : Marks the device node as a GPIO controller.
+> +- supports-sleepmode   : Specifies whether controller can sleep or not
+
+Typically, custom properites that are for a specific device should be
+prefixed with the manufacturer name.  So, something like:
+"st,has-sleepmode".
+
+> +- gpio-bank            : Specifies which bank a controller owns.
+
+What is this for (how is it used)?  It shouldn't be needed to specify
+a bank number.
+
+> +
+> +Example:
+> +
+> +                gpio1: gpio at 8012e080 {
+> +                        compatible = "stmicroelectronics,nomadik-gpio";
+> +                        reg =  <0x8012e080 0x80>;
+> +                        interrupts = <0 120 0x4>;
+> +                        #gpio-cells = <2>;
+> +                        gpio-controller;
+> +                        supports-sleepmode;
+> +                        gpio-bank = <1>;
+> +                };
+> -- 
+> 1.7.9.1
+> 
 
 -- 
-Regards,
-Shawn
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
