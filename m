@@ -1,30 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 5 Apr 2012 17:37:53 -0600 (MDT)
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 05 Apr 2012 17:07:31 -0700
 Subject: [PATCH] ARM: OMAP2+: PRM: fix compile for OMAP4-only build
-In-Reply-To: <20120405225345.GJ3785@atomide.com>
+In-Reply-To: <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com> (Paul
+ Walmsley's message of "Thu, 5 Apr 2012 15:33:32 -0600 (MDT)")
 References: <1333660837-23249-1-git-send-email-khilman@ti.com>
  <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com>
- <20120405225345.GJ3785@atomide.com>
-Message-ID: <alpine.DEB.2.00.1204051734560.10302@utopia.booyaka.com>
+Message-ID: <87fwchhge4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Apr 2012, Tony Lindgren wrote:
+Paul Walmsley <paul@pwsan.com> writes:
 
-> I heard of this first from Kevin before I started hitting it with
-> my compiles..
+> On Thu, 5 Apr 2012, Kevin Hilman wrote:
+>
+>> For OMAP4 only builds, the omap2_prm_* functions have dummy wrappers
+>> to detect incorrect usage.  However, several unrelated omap3 PRM
+>> functions have made it inside the #else clause of the #ifdef wrapping
+>> the omap2_prm stubs, causing them to disappear on OMAP4-only builds.
+>> 
+>> This was unnoticed until the IO chain support was added and introduced
+>> a new function in this section which is referenced by omap_hwmod.c:
+>> 
+>> /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c: In function '_reconfigure_io_chain':
+>> /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c:1665:3: error: implicit declaration of function 'omap3xxx_prm_reconfigure_io_chain' [-Werror=implicit-fungiction-declaration]
+>> 
+>> Fix by using the #ifdef to only wrap the omap2_prm functions that
+>> need stubs on OMAP4-only builds.
+>> 
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> Paul, this patch applies on top your io_chain_devel_3.5 branch.
+>
+> Thanks, Tony reported this too.  Any objections to me rolling this into 
+> the offending patch?
 
-Okay.
+No objections.
 
-> Anyways, can you also check that we don't have a similar issue
-> with omap44xx_prm_reconfigure_io_chain for omap3 only builds?
-
-Will do.  Clearly I need to be running the full build-test suite on all of 
-my branches, as I was doing before the arm-soc transition.
-
-Future pull requests from me will be test-built with a large variety of 
-kernel .configs, and will contain a 'size' report for each generated 
-binary in the pull request.
-
-
-- Paul
+Kevin
