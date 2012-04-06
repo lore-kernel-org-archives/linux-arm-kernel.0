@@ -1,68 +1,236 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 6 Apr 2012 10:16:48 -0300
-Subject: [PATCH v8 4/4] ARM: mxs/mx28evk: add GPMI-NAND device
-In-Reply-To: <20120406065302.GN7264@S2101-09.ap.freescale.net>
-References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
- <1314169643-23425-5-git-send-email-b32955@freescale.com>
- <CAOMZO5D_ACi73J0QfXoJmvyw6fBMrQfyoKLkK2P+-kMm5EzaDQ@mail.gmail.com>
- <20120405010829.GG7264@S2101-09.ap.freescale.net>
- <CAOMZO5ACk06aFWmmH0ZXCf6XoLaShwUaoAW0jHKmDTsJ0v027A@mail.gmail.com>
- <20120405012343.GH7264@S2101-09.ap.freescale.net>
- <CAOMZO5D2v4-ZoUXEhn7-Z7oSJ190egpkWGLkbaVzkjU5=HCNVA@mail.gmail.com>
- <20120406023121.GK7264@S2101-09.ap.freescale.net>
- <CAOMZO5Dr+qVMOpG6T03L-+i6qYkJRPUPT87hcJAs6DxHs+EcmA@mail.gmail.com>
- <20120406065302.GN7264@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5Ab=cdOevjBhEyQtxVo3mEuoq7xy0auGinUoyh-TddTDw@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 06 Apr 2012 18:56:41 +0530
+Subject: [PATCH RESEND] Input: omap-keypad: dynamically handle register
+ offsets
+In-Reply-To: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
+References: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <4F7EEF11.7050200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 6, 2012 at 3:53 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+ Hi Sourav,
+Some suggestions/ doubts.
 
-> Look, people can still test and find issue with no board in mainline
-> using it.
-
-Sure they can, then you need to assume that everyone who uses the
-kernel is a kernel developer, which is not the case.
-
-Please think on a user's perspective too, where people want just to
-get the kernel from kernel.org and use it without doing any hacks to
-it.
-
->> If we could have mx28evk supporting GPMI driver today it would
->> estimulate people to use it and more issues can be found and fixed.
->>
->> Waiting for DT support to be in place is just blocking the progress for mx28.
->>
-> Please tell me what are exactly being blocked there.
-
-The whole point of this discussion started when you stated the reasons
-for not applying this patch of the thread:
-
-"1) The pin confliction between gpmi and lcdif remains.
-2) I intend to freeze the board file updates, as we are on the way to
-  device tree."
-
-1) is easily understood and can be fixed
-
-2) is what we have been discussing.
-
-So not accepting patches to mx28 board files while mx28 dt is not in
-place will at least block: GPMI and SPI for mx28.
-
->> Please note that right now there is no dt support for mx28 in mainline.
+On Tuesday 03 April 2012 10:52 AM, Sourav Poddar wrote:
+> From: G, Manjunath Kondaiah <manjugk@ti.com>
 >
-> There are still no spi-mxs driver in mainline, why are you sending me
-> spi board file patches?
+> Keypad controller register offsets are different for omap4
+> and omap5. Handle these offsets through static mapping and
+> assign these mappings during run time.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+> Test Info
+>  - Tested on omap4 sdp with 3.4-rc1
+>  - Tested on omap5430evm with 3.1 custom kernel.
+>  drivers/input/keyboard/Kconfig        |    6 +-
+>  drivers/input/keyboard/omap4-keypad.c |  120 ++++++++++++++++++++++++++------
+>  2 files changed, 100 insertions(+), 26 deletions(-)
+>
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index f354813..9a0e1a9 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -511,10 +511,10 @@ config KEYBOARD_OMAP
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called omap-keypad.
+>  
+> -config KEYBOARD_OMAP4
+> -	tristate "TI OMAP4 keypad support"
+> +config KEYBOARD_OMAP4+
+> +	tristate "TI OMAP4+ keypad support"
+>  	help
+> -	  Say Y here if you want to use the OMAP4 keypad.
+> +	  Say Y here if you want to use the OMAP4+ keypad.
+>  
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called omap4-keypad.
+> diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
+> index e809ac0..742e1e3 100644
+> --- a/drivers/input/keyboard/omap4-keypad.c
+> +++ b/drivers/input/keyboard/omap4-keypad.c
+> @@ -68,6 +68,11 @@
+>  
+>  #define OMAP4_MASK_IRQSTATUSDISABLE	0xFFFF
+>  
+> +enum {
+> +	KBD_REVISION_OMAP4 = 0,
+> +	KBD_REVISION_OMAP5,
+> +};
+> +
+>  struct omap4_keypad {
+>  	struct input_dev *input;
+>  
+> @@ -76,11 +81,66 @@ struct omap4_keypad {
+>  
+>  	unsigned int rows;
+>  	unsigned int cols;
+> +	unsigned int revision;
+> +	u32 irqstatus;
+> +	u32 irqenable;
+>  	unsigned int row_shift;
+>  	unsigned char key_state[8];
+>  	unsigned short keymap[];
+>  };
+>  
+> +static int kbd_read_irqstatus(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> +	return __raw_readl(keypad_data->base + offset);
+> +}
+> +
+> +static int kbd_write_irqstatus(struct omap4_keypad *keypad_data,
+> +						u32 offset, u32 value)
+> +{
+> +	return __raw_writel(value, keypad_data->base + offset);
+> +}
+> +
+> +static int kbd_write_irqenable(struct omap4_keypad *keypad_data,
+> +						u32 offset, u32 value)
+> +{
+> +	return __raw_writel(value, keypad_data->base + offset);
+> +}
+The functions
 
-I have it locally and I was ready to submit it till I read this
-thread. I haven't made the mxs spi driver dt aware.
+kbd_write_irqenable and kbd_write_irqstatus look identical.
+Could we optimise it? 
+ 
+Feel free to ignore such trivial comments.
 
-Since there is no dt support for mx28 yet, I cannot submit it now, so
-this will have to wait.
+> +
+> +static int kbd_readl(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> +	if (keypad_data->revision == KBD_REVISION_OMAP4)
+> +		return __raw_readl(keypad_data->base + offset);
+> +	else if (keypad_data->revision == KBD_REVISION_OMAP5)
+> +		return __raw_readl(keypad_data->base + offset + 0x10);
+> +
+> +	return -ENODEV;
+> +}
+> +
+> +static void kbd_writel(struct omap4_keypad *keypad_data, u32 offset, u32 value)
+> +{
+> +	if (keypad_data->revision == KBD_REVISION_OMAP4)
+> +		__raw_writel(value, keypad_data->base + offset);
+> +	else if (keypad_data->revision == KBD_REVISION_OMAP5)
+> +		__raw_writel(value, keypad_data->base + offset + 0x10);
+> +}
+> +
+> +static int kbd_read_revision(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> +	int reg;
+Can this be unsigned?
 
-It is like the "chicken-and-egg problem".
-
-> I could accept your spi board file patch when spi-mxs driver hit
-> mainline while mx28 dt does not.
-
-Excellent, that's good news and we come to an agreement  :-) Thanks!
+> +	reg = __raw_readl(keypad_data->base + offset);
+> +	reg &= 0x03 << 30;
+> +	reg >>= 30;
+> +
+> +	switch (reg) {
+> +	case 1:
+> +		return KBD_REVISION_OMAP5;
+> +	case 0:
+> +		return KBD_REVISION_OMAP4;
+> +	default:
+> +		return -ENODEV;
+> +	}
+> +}
+> +
+>  /* Interrupt handler */
+>  static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+>  {
+> @@ -91,12 +151,11 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+>  	u32 *new_state = (u32 *) key_state;
+>  
+>  	/* Disable interrupts */
+> -	__raw_writel(OMAP4_VAL_IRQDISABLE,
+> -		     keypad_data->base + OMAP4_KBD_IRQENABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +			OMAP4_VAL_IRQDISABLE);
+>  
+> -	*new_state = __raw_readl(keypad_data->base + OMAP4_KBD_FULLCODE31_0);
+> -	*(new_state + 1) = __raw_readl(keypad_data->base
+> -						+ OMAP4_KBD_FULLCODE63_32);
+> +	*new_state = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE31_0);
+In the error case a negative value is returned.
+Could we prevent writing in that cases.
+> +	*(new_state + 1) = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE63_32);
+>  
+>  	for (row = 0; row < keypad_data->rows; row++) {
+>  		changed = key_state[row] ^ keypad_data->key_state[row];
+> @@ -121,12 +180,13 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+>  		sizeof(keypad_data->key_state));
+>  
+>  	/* clear pending interrupts */
+> -	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+> -			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> +	kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
+> +		kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
+>  
+>  	/* enable interrupts */
+> -	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
+> -			keypad_data->base + OMAP4_KBD_IRQENABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +		OMAP4_DEF_IRQENABLE_EVENTEN |
+> +			OMAP4_DEF_IRQENABLE_LONGKEY);
+>  
+>  	return IRQ_HANDLED;
+>  }
+> @@ -139,16 +199,30 @@ static int omap4_keypad_open(struct input_dev *input)
+>  
+>  	disable_irq(keypad_data->irq);
+>  
+> -	__raw_writel(OMAP4_VAL_FUNCTIONALCFG,
+> -			keypad_data->base + OMAP4_KBD_CTRL);
+> -	__raw_writel(OMAP4_VAL_DEBOUNCINGTIME,
+> -			keypad_data->base + OMAP4_KBD_DEBOUNCINGTIME);
+> -	__raw_writel(OMAP4_VAL_IRQDISABLE,
+> -			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> -	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
+> -			keypad_data->base + OMAP4_KBD_IRQENABLE);
+> -	__raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
+> -			keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
+> +	keypad_data->revision = kbd_read_revision(keypad_data,
+> +			OMAP4_KBD_REVISION);
+> +	if (keypad_data->revision == KBD_REVISION_OMAP4) {
+> +		keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS;
+> +		keypad_data->irqenable = OMAP4_KBD_IRQENABLE;
+> +	} else if (keypad_data->revision == KBD_REVISION_OMAP5) {
+> +		keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS + 0x0c;
+> +		keypad_data->irqenable = OMAP4_KBD_IRQENABLE + 0x0c;
+> +	} else {
+> +		pr_err("Omap keypad not found\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	kbd_writel(keypad_data, OMAP4_KBD_CTRL,
+> +			OMAP4_VAL_FUNCTIONALCFG);
+> +	kbd_writel(keypad_data, OMAP4_KBD_DEBOUNCINGTIME,
+> +			OMAP4_VAL_DEBOUNCINGTIME);
+> +	kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
+> +			OMAP4_VAL_IRQDISABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +			OMAP4_DEF_IRQENABLE_EVENTEN |
+> +				OMAP4_DEF_IRQENABLE_LONGKEY);
+> +	kbd_writel(keypad_data, OMAP4_KBD_WAKEUPENABLE,
+> +			OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA);
+>  
+>  	enable_irq(keypad_data->irq);
+>  
+> @@ -162,12 +236,12 @@ static void omap4_keypad_close(struct input_dev *input)
+>  	disable_irq(keypad_data->irq);
+>  
+>  	/* Disable interrupts */
+> -	__raw_writel(OMAP4_VAL_IRQDISABLE,
+> -		     keypad_data->base + OMAP4_KBD_IRQENABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +			OMAP4_VAL_IRQDISABLE);
+>  
+>  	/* clear pending interrupts */
+> -	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+> -			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> +	kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
+> +		kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
+>  
+>  	enable_irq(keypad_data->irq);
+>  
