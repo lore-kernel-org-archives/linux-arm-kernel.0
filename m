@@ -1,35 +1,51 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Fri, 06 Apr 2012 13:51:14 +0200
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
-In-Reply-To: <1333409927.30734.62.camel@pasglop> (Benjamin Herrenschmidt's
- message of "Tue, 03 Apr 2012 09:38:47 +1000")
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
- <20120402202848.1EB833E02A7@localhost>
- <20120402215524.GM24211@n2100.arm.linux.org.uk>
- <1333406005.30734.61.camel@pasglop>
- <20120402225223.GN24211@n2100.arm.linux.org.uk>
- <1333409927.30734.62.camel@pasglop>
-Message-ID: <m24nsx9iz1.fsf@igel.home>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 6 Apr 2012 20:18:09 +0800
+Subject: [PATCH 1/1] pinctrl: fix pinmux_check_ops error checking
+Message-ID: <1333714689-22450-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-> Ok. Doesn't matter anyway, this shouldn't be the problem in this
-> specific case. IE. we shouldn't be setting that interrupt to NONE.
+Do not use get_functions_count before checking.
 
-After removinge the call to irq_set_irq_type in mpic_host_map the irq
-problem disappears.
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ drivers/pinctrl/pinmux.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Instead of the irq_set_irq_type(,NONE) calls from mpic_host_map I see
-corresponding irq_set_irq_type(,LEVEL_LOW) calls now.
-
-Andreas.
-
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 375b214..8849830 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -33,11 +33,12 @@
+ int pinmux_check_ops(struct pinctrl_dev *pctldev)
+ {
+ 	const struct pinmux_ops *ops = pctldev->desc->pmxops;
+-	unsigned nfuncs = ops->get_functions_count(pctldev);
++	unsigned nfuncs;
+ 	unsigned selector = 0;
+ 
+ 	/* Check that we implement required operations */
+-	if (!ops->get_functions_count ||
++	if (!ops ||
++	    !ops->get_functions_count ||
+ 	    !ops->get_function_name ||
+ 	    !ops->get_function_groups ||
+ 	    !ops->enable ||
+@@ -45,11 +46,12 @@ int pinmux_check_ops(struct pinctrl_dev *pctldev)
+ 		return -EINVAL;
+ 
+ 	/* Check that all functions registered have names */
++	nfuncs = ops->get_functions_count(pctldev);
+ 	while (selector < nfuncs) {
+ 		const char *fname = ops->get_function_name(pctldev,
+ 							   selector);
+ 		if (!fname) {
+-			pr_err("pinmux ops has no name for function%u\n",
++			dev_err(pctldev->dev, "pinmux ops has no name for function%u\n",
+ 				selector);
+ 			return -EINVAL;
+ 		}
 -- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+1.7.0.4
