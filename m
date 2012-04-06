@@ -1,56 +1,98 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Fri, 06 Apr 2012 09:52:24 +0100
-Subject: [PATCH 4/7 v4] ARM: kirkwood: add dreamplug (fdt) support.
-In-Reply-To: <20120405224143.GL817@titan.lakedaemon.net>
-References: <cover.1331601448.git.jason@lakedaemon.net>
- <0032addd7e94c5d4d1a3a0be77fe79bcffee53db.1331601448.git.jason@lakedaemon.net>
- <1333663656.12209.62.camel@dagon.hellion.org.uk>
- <20120405224143.GL817@titan.lakedaemon.net>
-Message-ID: <1333702344.12209.70.camel@dagon.hellion.org.uk>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 6 Apr 2012 18:34:23 +0800
+Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
+In-Reply-To: <20120406022305.GJ7264@S2101-09.ap.freescale.net>
+References: <20120404070157.GB24930@pengutronix.de>
+ <CAOdLEaqXyvHzTRSq2=RquZLqEO6kMEp11rjKJ+UtSqtF4nr-EA@mail.gmail.com>
+ <20120404183314.GF17187@pengutronix.de>
+ <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
+ <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
+ <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
+ <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
+ <4F7D3DB8.6080009@freescale.com>
+ <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
+ <1333628861.31825.22.camel@vkoul-udesk3>
+ <20120406022305.GJ7264@S2101-09.ap.freescale.net>
+Message-ID: <4F7EC6AF.6000603@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-04-05 at 18:41 -0400, Jason Cooper wrote:
-> On Thu, Apr 05, 2012 at 11:07:36PM +0100, Ian Campbell wrote:
-> > On Tue, 2012-03-13 at 01:57 +0000, Jason Cooper wrote:
-> > > +DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)") 
-> > 
-> > This ends up as Machine: in /proc/cpuinfo, which seems to be normal?
-> > 
-> > Would it be worth trying to dynamically modify the machine string based
-> > on the actual hardware the kernel is running on?
-> 
-> With CONFIG_PROC_DEVICETREE=y I get the following:
-> 
-> $ cat /proc/device-tree/model
-> Globalscale Technologies Dreamplug
+? 2012?04?06? 10:23, Shawn Guo ??:
+> On Thu, Apr 05, 2012 at 05:57:41PM +0530, Vinod Koul wrote:
+>> On Thu, 2012-04-05 at 05:03 -0700, Sam Gandhi wrote:
+>>> 2012/4/4 Huang Shijie<b32955@freescale.com>:
+> ...
+>>>>>> flash_erase /dev/mtd1 0 0
+>>>>>> Erasing 1------------[ cut here ]------------
+>>>>>> kernel BUG at /home/sam/linux/drivers/dma/dmaengine.h:53!
+>>>> the mxs-dma has added some patches about the cookie.
+>>>> The bug is in the dmaengine.h.
+>>>>
+>>>> So let more people know this bug.
+>>>>
+> I'm still trying to understand why I did run into the BUG_ON when I
+> test it with mxs mmc and sound drivers.
+>
+> ...
+>
+>> This means you are trying to mark a cookie complete when it is already
+>> marked so!, hence dmaengine screams.
+>> The bug is is mxs-dma.
+>> Let me know if below fixes it (assuming you are not using cyclic API,
+>> that would need fixup as well)
+>>
+>> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+>> index c81ef7e..5ddd84e 100644
+>> --- a/drivers/dma/mxs-dma.c
+>> +++ b/drivers/dma/mxs-dma.c
+>> @@ -399,6 +399,10 @@ static struct dma_async_tx_descriptor
+>> *mxs_dma_prep_slave_sg(
+>>   		ccw->bits&= ~CCW_DEC_SEM;
+>>   	} else {
+>>   		idx = 0;
+>> +		/* assign cookie here,
+>> +		 * hopefully for above case we dont need it
+>> +		 */
+>> +		dma_cookie_assign(&mxs_chan->desc);
+> Isn't it done in mxs_dma_tx_submit() already? The gpmi driver somehow
 
-Yes, I just found that, thanks.
+It's maybe too late to assign the DMA cookie after mxs_dma_enable_chan() 
+in mxs_dma_tx_submit().
+The interrupt may arise before the dma_cookie_assign() finishes.
 
-BTW the impetus for my asking was http://bugs.debian.org/667681 against
-the flash-kernel tool which uses /proc/cpuinfo to know what magic runes
-are required for the particular board it is being run on.
+Why mmc/audio do not have this bug? their interrupt arise too slow.
 
-> It seems to me (I have no strong opinion here, just playing devil's
-> advocate) that /proc/cpuinfo is indeed telling us about the processor
-> (Marvell Kirkwood ...) Should it really be describing the board?
+I tested the following code :
+==============================================================
 
-The field is actually called "Hardware:" (not "Machine:" as I said
-above). Processor is actually covered separately ("Feroceon 88FR131 rev
-1 (v5l)" in this case). I'd expect Hardware: to say something more
-specific about the h/w platform, the string from /proc/device-tree/model
-is exactly what I think I would have expected.
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 5978113..0f5b09a 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -202,10 +202,12 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct 
+dma_cha
+static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+{
+struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
++ dma_cookie_t c;
 
-Ian.
++ c = dma_cookie_assign(tx);
+mxs_dma_enable_chan(mxs_chan);
 
-> 
-> thx,
-> 
-> Jason.
-> 
+- return dma_cookie_assign(tx);
++ return c;
+}
 
--- 
-Ian Campbell
+static void mxs_dma_tasklet(unsigned long data)
 
 
-Nostalgia isn't what it used to be.
+> misses the call to dmaengine_submit() for some case?
+>
+> Regards,
+> Shawn
+>
+>>   	}
+>>
+>>   	if (direction == DMA_TRANS_NONE) {
+>>
+>> -- 
