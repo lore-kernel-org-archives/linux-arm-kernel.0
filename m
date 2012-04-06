@@ -1,33 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 6 Apr 2012 11:35:20 +0800
-Subject: [PATCH v8 4/4] ARM: mxs/mx28evk: add GPMI-NAND device
-In-Reply-To: <C7A5B00EFC707A46AB67997D0215216701B5C28A@mx1.grid-net.com>
-References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
- <1314169643-23425-5-git-send-email-b32955@freescale.com>
- <CAOMZO5D_ACi73J0QfXoJmvyw6fBMrQfyoKLkK2P+-kMm5EzaDQ@mail.gmail.com>
- <20120405010829.GG7264@S2101-09.ap.freescale.net>
- <CAOMZO5ACk06aFWmmH0ZXCf6XoLaShwUaoAW0jHKmDTsJ0v027A@mail.gmail.com>
- <20120405012343.GH7264@S2101-09.ap.freescale.net>
- <CAOMZO5D2v4-ZoUXEhn7-Z7oSJ190egpkWGLkbaVzkjU5=HCNVA@mail.gmail.com>
- <20120406023121.GK7264@S2101-09.ap.freescale.net>
- <C7A5B00EFC707A46AB67997D0215216701B5C28A@mx1.grid-net.com>
-Message-ID: <20120406033517.GL7264@S2101-09.ap.freescale.net>
+Date: Fri, 6 Apr 2012 11:45:48 +0800
+Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
+In-Reply-To: <4F7E58B3.4050408@freescale.com>
+References: <20120404183314.GF17187@pengutronix.de>
+ <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
+ <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
+ <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
+ <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
+ <4F7D3DB8.6080009@freescale.com>
+ <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
+ <1333628861.31825.22.camel@vkoul-udesk3>
+ <20120406022305.GJ7264@S2101-09.ap.freescale.net>
+ <4F7E58B3.4050408@freescale.com>
+Message-ID: <20120406034542.GM7264@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2012 at 08:08:52PM -0700, Subodh Nijsure wrote:
+On Fri, Apr 06, 2012 at 10:45:07AM +0800, Huang Shijie wrote:
+> hi,
+> >Isn't it done in mxs_dma_tx_submit() already? The gpmi driver somehow
+> >misses the call to dmaengine_submit() for some case?
+> >
+> I checked the code again. It seems I do not miss the call to
+> dmaengine_submit().
 > 
-> Hello Shawn,
-> 
-> You also have to consider that folks who are using MX28 based design might be just now shifting from freescale provided 2.6.35 SDK to the latest 3.4-rcX train on their own (my case). To make them wait for 3.5 to get all the iMX driver seems like hard thing to do.
->  
-I'm pretty sure that even 3.5 will not have all the imx28 drivers
-support.  Also freezing board file update does not block anyone adding
-new driver support in any way.  I do not understand what your argument
-is.
-
-Please note, the gpmi nand mx28evk board patch was not accept because
-it has pin confliction issue to be resolved.
+I do not have nand device to play.  Maybe you want to have a check
+if dma_cookie_assign (dmaengine_submit) and dma_cookie_complete
+(via mxs_dma_int_handler) are being called as a pair for gpmi.
 
 -- 
 Regards,
