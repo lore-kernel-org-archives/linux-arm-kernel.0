@@ -1,169 +1,71 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 6 Apr 2012 06:52:03 +0000
-Subject: [PATCH v3 1/9] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <4F7DFED5.4030000@ti.com>
-References: <cover.1333640054.git.afzal@ti.com>
- <cefbe934da40f0a169b1e3a75c46451e5546a8bd.1333640054.git.afzal@ti.com>
- <4F7DFED5.4030000@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317C5E58@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 6 Apr 2012 14:53:05 +0800
+Subject: [PATCH v8 4/4] ARM: mxs/mx28evk: add GPMI-NAND device
+In-Reply-To: <CAOMZO5Dr+qVMOpG6T03L-+i6qYkJRPUPT87hcJAs6DxHs+EcmA@mail.gmail.com>
+References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
+ <1314169643-23425-5-git-send-email-b32955@freescale.com>
+ <CAOMZO5D_ACi73J0QfXoJmvyw6fBMrQfyoKLkK2P+-kMm5EzaDQ@mail.gmail.com>
+ <20120405010829.GG7264@S2101-09.ap.freescale.net>
+ <CAOMZO5ACk06aFWmmH0ZXCf6XoLaShwUaoAW0jHKmDTsJ0v027A@mail.gmail.com>
+ <20120405012343.GH7264@S2101-09.ap.freescale.net>
+ <CAOMZO5D2v4-ZoUXEhn7-Z7oSJ190egpkWGLkbaVzkjU5=HCNVA@mail.gmail.com>
+ <20120406023121.GK7264@S2101-09.ap.freescale.net>
+ <CAOMZO5Dr+qVMOpG6T03L-+i6qYkJRPUPT87hcJAs6DxHs+EcmA@mail.gmail.com>
+Message-ID: <20120406065302.GN7264@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Fri, Apr 06, 2012 at 01:51:41, Hunter, Jon wrote:
-> > +struct gpmc_irq	{
-> > +	unsigned		irq;
-> > +	u32			regval;
+On Fri, Apr 06, 2012 at 02:49:05AM -0300, Fabio Estevam wrote:
+> On Thu, Apr 5, 2012 at 11:31 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > 
-> Are you using regval to indicate the bit-mask? If so, maybe call it 
-> "bitmask" instead.
-
-Yes, bitmask would be better.
-
-> > +			switch (gpmc->irq[i].regval) {
-> > +			case GPMC_IRQ_WAIT0EDGEDETECTION:
-> > +			case GPMC_IRQ_WAIT1EDGEDETECTION:
-> > +			case GPMC_IRQ_WAIT2EDGEDETECTION:
-> > +			case GPMC_IRQ_WAIT3EDGEDETECTION:
-> > +				val = __ffs(gpmc->irq[i].regval);
-> > +				val -= __ffs(GPMC_IRQ_WAIT0EDGEDETECTION);
-> > +				gpmc_cs_configure(cs->cs,
-> > +					GPMC_CONFIG_WAITPIN, val);
+> > I have to do that to motivate people to add DT support for the drivers
+> > they submit from the beginning.
 > 
-> Why is the configuration of the wait pin done here? It is possible to 
-> use the wait pin may be used without enabling the interrupt.
+> Understand your point for new drivers.
 > 
-> Where do you handle allocating the wait pins to ensure two devices don't 
-> attempt to use the same one? Like how the CS are managed.
+> If you take the GPMI driver for example: it has been available for a
+> long time and there is no board using it in mainline.
 > 
-> Also, where you you configure the polarity of the wait pins? I would 
-> have thought it would make sense to have the wait pin configured as part 
-> of the cs configuration.
-
-I will revisit waitpin configurations.
-
-> > +	for (i = 0, j = 0, cs = gdp->cs_data; i<  gdp->num_cs; cs++, i++) {
-> > +		dev->gpmc_res[j] = gpmc_setup_cs_mem(cs, gdp, gpmc);
-> > +		if (dev->gpmc_res[j++].flags&  IORESOURCE_MEM)
-> > +			j += gpmc_setup_cs_irq(gpmc, gdp, cs,
-> > +						dev->gpmc_res + j);
-> > +		else {
-> > +			dev_err(gpmc->dev, "error: setup for %s\n", gdp->name);
-> > +			devm_kfree(gpmc->dev, dev->gpmc_res);
-> > +			dev->gpmc_res = NULL;
-> > +			dev->num_gpmc_res = 0;
-> > +			return -EINVAL;
-> > +		}
-> >   	}
+> So how can people easily test it and find bugs with this driver?
+> Patching their own trees themselves? Sam Gandhi did extensive tests on
+> NAND and found some DMA issues with it.
 > 
-> This section of code is not straight-forward to read. I see what you are 
-> doing, but I am wondering if this could be improved.
+Look, people can still test and find issue with no board in mainline
+using it.
+
+> If we could have mx28evk supporting GPMI driver today it would
+> estimulate people to use it and more issues can be found and fixed.
 > 
-> First of all, returning a structure from a function is making this code 
-> harder to read. Per the CodingStyle document in the kernel, it is 
-> preferred for a function to return success or failure if the function is 
-> an action, like a setup.
+> Waiting for DT support to be in place is just blocking the progress for mx28.
 > 
-> Secondly, do you need to pass cs, gdp and gpmc to gpmc_setup_cs_mem()? 
-> It appears that gdp and gpmc are only used for prints. You could 
-> probably avoid passing gdp and move the print to outside this function.
+Please tell me what are exactly being blocked there.
 
-This section will be modified to make it clearer.
-
-> > +	if (gpmc->num_irq<  GPMC_NR_IRQ) {
-> > +		dev_warn(gpmc->dev, "Insufficient interrupts for device\n");
-> > +		return -EINVAL;
-> > +	} else if (gpmc->num_irq>  GPMC_NR_IRQ)
-> > +		gpmc->num_irq = GPMC_NR_IRQ;
+> Please note that right now there is no dt support for mx28 in mainline.
 > 
-> Hmmm ... why not just have ...
+There are still no spi-mxs driver in mainline, why are you sending me
+spi board file patches?
+
+> If what blocks this patch "ARM: mxs/mx28evk: add GPMI-NAND device" to
+> be accepted is the pin mux conflict, that would be easy to fix and
+> Huang could do a v5 if you agree.
 > 
-> 	if (gpmc->num_irq != GPMC_NR_IRQ) {
-> 		dev_warn(...);
-> 		return -EINVAL;
-> 	}
+We had the discussion and agreed that migrating to pinctrl subsystem is
+the right solution.  I will be more than happy to accept if someone
+send me mxs pinctrl support rather than any "easy" fix.
 
-This will cause irq setup to fail if num_irq > GPMC_NR_IRQ, even though
-irq setup could have been done w/o any problem, only because platform
-indicated willingness to accommodate more number of interrupts than
-actually required for this device.
-
-> This also raises the question why bother passing num_irq if we always 
-> want it to be GPMC_NR_IRQ? Why not always initialise them all driver?
-
-Because num_irq (or available irqs for fictitious irq chip) is platform specific.
-
-> > +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> > +	if (res == NULL)
-> > +		dev_warn(gpmc->dev, "Failed to get resource: irq\n");
-> > +	else
-> > +		gpmc->master_irq = res->start;
+> > Also I do not see much point to keep patching board files which are
+> > to be removed.
 > 
-> Why not return an error if the IRQ is not found? We don't know if anyone 
-> will be trying to use them.
-
-Why do you want to do that ?
-
-If someone (say NAND) wants to work with irq, and if interrupt is not
-available, NAND driver can fail, and suppose smsc911x ethernet is present
-and he is not using gpmc irq, if we fail here, smsc911x also would
-not work, which would have worked otherwise.
-
-It is a different matter that even NAND setup will happen properly,
-even if interrupt is not available, it is only when NAND is told to
-work with IRQ, it fails, please see nand patches.
-
-And as of now in mainline (with the code as is), there is not a single
-board that will need gpmc irq for gpmc peripherals to work.
-
-I feel we should try to get more devices working rather than preventing
-more devices from working, when it could have.
-
-> > +	for (gdq = gp->device_pdata, gd = gpmc->device; *gdq; gdq++, i++) {
-> > +		ret = gpmc_setup_device(*gdq, gd, gpmc);
-> > +		if (IS_ERR_VALUE(ret))
-> > +			dev_err(gpmc->dev, "gpmc setup on %s failed\n",
-> > +								(*gdq)->name);
-> > +		else
-> > +			gd++;
-> > +	}
+> I understand your point, but again, right now there is no dt support,
+> so the only mechanism we have to register driver is via board files
+> for mx28.
 > 
-> Would a while loop be simpler?
+> So it would be nice if you could still accept patches for mx28 while
+> mx28 dt does not show up in mainline.
 
-My preference is to go with "for"
+I could accept your spi board file patch when spi-mxs driver hit
+mainline while mx28 dt does not.
 
-> 
-> The above loop appears to terminate when *gdq == 0. Is this always 
-> guaranteed? In other words, safe?
-
-This is a standard idiom for array of pointers
-
-> 
-> I see that "i" is not being used in the above loop either.
-
-That was left over code, it will be removed.
-
-> > +struct gpmc_cs_data {
-> > +	unsigned		cs;
-> > +	unsigned long		mem_size;
-> > +	unsigned long		mem_start;
-> > +	unsigned long		mem_offset;
-> > +	struct gpmc_config	*config;
-> > +	unsigned		num_config;
-> > +	struct gpmc_timings	*timing;
-> > +	unsigned		irq_flags;
-> 
-> I found the name irq_flags a bit unclear. This appears to be a mask for 
-> the interrupts used. So may be this should be "irq_mask" or just "irqs".
-
-Probably, this confusion arose as an attempt was made to club irq bit fields
-with irq capability, so as to reduce additional macro definitions.
-
-Here my preference is to keep irq_flags (or can be irq_capabilities), define
-a new set of macros, and use bitmask in struct gpmc_irq
-
-Thanks for the comments.
-
-Regards
-Afzal
+-- 
+Regards,
+Shawn
