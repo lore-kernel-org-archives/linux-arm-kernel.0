@@ -1,96 +1,49 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 06 Apr 2012 00:04:22 -0400
-Subject: [PATCH v7 09/11] ARM: pxa: change gpio to platform device
-In-Reply-To: <1320806851-13928-10-git-send-email-haojian.zhuang@marvell.com>
- (Haojian Zhuang's message of "Wed, 9 Nov 2011 10:47:29 +0800")
-References: <1320806851-13928-1-git-send-email-haojian.zhuang@marvell.com>
- <1320806851-13928-10-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <87pqbl5wvt.fsf@laptop.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Apr 2012 21:45:12 -0700
+Subject: [GIT PULL] ARM: OMAP: clock, powerdomain, clockdomain, hwmod
+ fixes for early v3.4-rc (misc_devel_3.4 patches dropped)
+In-Reply-To: <20120405224658.GI3785@atomide.com>
+References: <alpine.DEB.2.00.1204050339510.10302@utopia.booyaka.com>
+ <20120405224658.GI3785@atomide.com>
+Message-ID: <CAOesGMjnKzA=BMPVHw0Jtsr2Lz+_ggAihaAyyVO3hWifUPd8Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
-
-On Tue, Nov 08 2011, Haojian Zhuang wrote:
-> Remove most gpio macros and change gpio driver to platform driver.
+On Thu, Apr 5, 2012 at 3:46 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Olof,
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> * Paul Walmsley <paul@pwsan.com> [120405 02:45]:
+>> Hi Tony,
+>>
+>> The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+>>
+>> ? Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+>>
+>> are available in the git repository at:
+>>
+>> ? git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending tags/omap-fixes-a2-for-3.4rc
+>>
+>> for you to fetch changes up to a9dd31b744a033b4324c93cec4ecb4c74061e2cf:
+>>
+>> ? Merge branches 'clock_fixes_3.4rc', 'clockdomain_fixes_3.4rc', 'hsmmc_erratum_2_1_1_128_refine_3.4rc1', 'hwmod_data_fixes_a_3.4rc', 'hwmod_fixes_a2_3.4rc' and 'powerdomain_fixes_a_3.4rc' into omap-fixes-a2-for-3.4rc-branch (2012-04-05 03:00:22 -0600)
+>>
+>> This version is intended to merge cleanly into your 'fixes' branch.
+>
+> If not too late for this round of fixes, can you please pull this
+> set of fixes directly from Paul?
+>
+> I was planning on including this into my fixes yesterday, but
+> two patches had to be dropped that Paul did last night.
+>
+> This one already has the signed tag ;)
 
-Please could you help me understand how this patch (which was merged
-in 3.2) relates to mach-mmp's use of gpio-pxa?  The patch changes
-pxa_gpio_probe() to check for gpio0/gpio1/gpio_mux in platform data:
+Thanks, pulled.
 
-[..]
-> +static int __devinit pxa_gpio_probe(struct platform_device *pdev)
->  {
->  	struct pxa_gpio_chip *c;
-> +	struct resource *res;
->  	int gpio, irq;
-> +	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
->  
->  	pxa_last_gpio = pxa_gpio_nums();
->  	if (!pxa_last_gpio)
-> -		return;
-> +		return -EINVAL;
-> +
-> +	irq0 = platform_get_irq_byname(pdev, "gpio0");
-> +	irq1 = platform_get_irq_byname(pdev, "gpio1");
-> +	irq_mux = platform_get_irq_byname(pdev, "gpio_mux");
-> +	if ((irq0 > 0 && irq1 <= 0) || (irq0 <= 0 && irq1 > 0)
-> +		|| (irq_mux <= 0))
-> +		return -EINVAL;
+Paul, thanks for using a signed tag with an overview. There's no need
+to list the changes in the signed tag though -- "git pull --log" will
+include them in the merge commit instead. In general Linus tends to
+not like seeing redundant info in the tag text that can be derived
+from the branch contents instead.
 
-But the patch only adds these resources to arch/arm/mach-pxa/devices.c:
 
-[..]
-> diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-> index 2e04254..5bc1312 100644
-> --- a/arch/arm/mach-pxa/devices.c
-> +++ b/arch/arm/mach-pxa/devices.c
-> @@ -1051,6 +1051,36 @@ struct platform_device pxa3xx_device_ssp4 = {
->  };
->  #endif /* CONFIG_PXA3xx || CONFIG_PXA95x */
->  
-> +struct resource pxa_resource_gpio[] = {
-> +	{
-> +		.start	= 0x40e00000,
-> +		.end	= 0x40e0ffff,
-> +		.flags	= IORESOURCE_MEM,
-> +	}, {
-> +		.start	= IRQ_GPIO0,
-> +		.end	= IRQ_GPIO0,
-> +		.name	= "gpio0",
-> +		.flags	= IORESOURCE_IRQ,
-> +	}, {
-> +		.start	= IRQ_GPIO1,
-> +		.end	= IRQ_GPIO1,
-> +		.name	= "gpio1",
-> +		.flags	= IORESOURCE_IRQ,
-> +	}, {
-> +		.start	= IRQ_GPIO_2_x,
-> +		.end	= IRQ_GPIO_2_x,
-> +		.name	= "gpio_mux",
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +struct platform_device pxa_device_gpio = {
-> +	.name		= "pxa-gpio",
-> +	.id		= -1,
-> +	.num_resources	= ARRAY_SIZE(pxa_resource_gpio),
-> +	.resource	= pxa_resource_gpio,
-> +};
-
-and not anywhere under arch/arm/mach-mmp, which means that when we look
-for these names on a mach-mmp device (in my case, OLPC XO-1.75/MMP2),
-we hit the "return -EINVAL" above due to the missing platform resources.
-Using gpio-pxa on mach-mmp devices worked fine on kernels before 3.2.
-
-How is this supposed to work for mach-mmp boards?
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+-Olof
