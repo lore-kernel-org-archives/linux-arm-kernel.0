@@ -1,64 +1,77 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 06 Apr 2012 09:43:25 +0200
-Subject: [PATCH 3/4] ARM: Exynos4: set fix xusbxti clock for NURI and
- Universal210 boards
+Date: Fri, 06 Apr 2012 09:43:26 +0200
+Subject: [PATCH 4/4] ARM: Exynos4: Remove broken config values for touchscren
+ for NURI board
 In-Reply-To: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
 References: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1333698206-12348-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1333698206-12348-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some versions of NURI and UniversalC210 boards, camera clocks are
-routed directly to xusbxti clock source. This patch sets the correct
-value for this clock to let usb and camera sensors to work correctly and
-avoid division by zero on driver's probe.
+The atmel_mxt_ts driver has been extended to support more 'configuration
+objects' in commit 81c88a711 ("Input: atmel_mxt_ts - update object list"),
+what broke the configuration values for NURI board. These values are
+optional anyway, so remove them to get the driver working correctly.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/mach-nuri.c           |    2 +-
- arch/arm/mach-exynos/mach-universal_c210.c |    2 ++
- 2 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-exynos/mach-nuri.c |   42 --------------------------------------
+ 1 files changed, 0 insertions(+), 42 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index 88a3b5c3..d55298d 100644
+index d55298d..3009a86 100644
 --- a/arch/arm/mach-exynos/mach-nuri.c
 +++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -1348,6 +1348,7 @@ static struct platform_device *nuri_devices[] __initdata = {
+@@ -308,49 +308,7 @@ static struct i2c_board_info i2c1_devs[] __initdata = {
+ };
  
- static void __init nuri_map_io(void)
- {
-+	clk_xusbxti.rate = 24000000;
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
-@@ -1380,7 +1381,6 @@ static void __init nuri_machine_init(void)
- 	nuri_camera_init();
- 
- 	nuri_ehci_init();
--	clk_xusbxti.rate = 24000000;
- 
- 	/* Last */
- 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index e10c87f..a6f13ce 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -29,6 +29,7 @@
- #include <asm/mach-types.h>
- 
- #include <plat/regs-serial.h>
-+#include <plat/clock.h>
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/iic.h>
-@@ -1058,6 +1059,7 @@ static struct platform_device *universal_devices[] __initdata = {
- 
- static void __init universal_map_io(void)
- {
-+	clk_xusbxti.rate = 24000000;
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
+ /* TSP */
+-static u8 mxt_init_vals[] = {
+-	/* MXT_GEN_COMMAND(6) */
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	/* MXT_GEN_POWER(7) */
+-	0x20, 0xff, 0x32,
+-	/* MXT_GEN_ACQUIRE(8) */
+-	0x0a, 0x00, 0x05, 0x00, 0x00, 0x00, 0x09, 0x23,
+-	/* MXT_TOUCH_MULTI(9) */
+-	0x00, 0x00, 0x00, 0x13, 0x0b, 0x00, 0x00, 0x00, 0x02, 0x00,
+-	0x00, 0x01, 0x01, 0x0e, 0x0a, 0x0a, 0x0a, 0x0a, 0x00, 0x00,
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	0x00,
+-	/* MXT_TOUCH_KEYARRAY(15) */
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
+-	0x00,
+-	/* MXT_SPT_GPIOPWM(19) */
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	/* MXT_PROCI_GRIPFACE(20) */
+-	0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x28, 0x04,
+-	0x0f, 0x0a,
+-	/* MXT_PROCG_NOISE(22) */
+-	0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x23, 0x00,
+-	0x00, 0x05, 0x0f, 0x19, 0x23, 0x2d, 0x03,
+-	/* MXT_TOUCH_PROXIMITY(23) */
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	0x00, 0x00, 0x00, 0x00, 0x00,
+-	/* MXT_PROCI_ONETOUCH(24) */
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	/* MXT_SPT_SELFTEST(25) */
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	0x00, 0x00, 0x00, 0x00,
+-	/* MXT_PROCI_TWOTOUCH(27) */
+-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+-	/* MXT_SPT_CTECONFIG(28) */
+-	0x00, 0x00, 0x02, 0x08, 0x10, 0x00,
+-};
+-
+ static struct mxt_platform_data mxt_platform_data = {
+-	.config			= mxt_init_vals,
+-	.config_length		= ARRAY_SIZE(mxt_init_vals),
+-
+ 	.x_line			= 18,
+ 	.y_line			= 11,
+ 	.x_size			= 1024,
 -- 
 1.7.1.569.g6f426
