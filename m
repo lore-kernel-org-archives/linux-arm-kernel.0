@@ -1,51 +1,56 @@
-From: samgandhi9@gmail.com (Sam Gandhi)
-Date: Fri, 6 Apr 2012 07:53:06 -0700
-Subject: Using GPMI-NAND driver on iMX28 using 3.4-rc1?
-In-Reply-To: <4F7EC6AF.6000603@freescale.com>
-References: <20120404070157.GB24930@pengutronix.de>
- <CAOdLEaqXyvHzTRSq2=RquZLqEO6kMEp11rjKJ+UtSqtF4nr-EA@mail.gmail.com>
- <20120404183314.GF17187@pengutronix.de>
- <CAOdLEaoboQowyx3T9ONjv-Y3q1JfFRb4ahS8CNrzeJi3N8Dczg@mail.gmail.com>
- <CAOMZO5AsbFDXHs3JRLC5=1MjZ7QrxciqV25xpZQL1Yvk3boQmw@mail.gmail.com>
- <CAOdLEaoEDr7fnswwV-Gs8tZF9Zj-RFnRa9Z=eqRFd0==OgV10Q@mail.gmail.com>
- <CAOMZO5AoFnM=cCR-kS4A1k2xY_bRd9+gN1p9bFxdyPS2-UdbkQ@mail.gmail.com>
- <4F7D3DB8.6080009@freescale.com>
- <CAOdLEaoy8ARS=awimR6fN8EcX+FrqxaSr3VUG3rP3zrNLOf+Gw@mail.gmail.com>
- <1333628861.31825.22.camel@vkoul-udesk3>
- <20120406022305.GJ7264@S2101-09.ap.freescale.net>
- <4F7EC6AF.6000603@freescale.com>
-Message-ID: <CAOdLEapBs-5RqUN_tjO+pOp9OvGh0YnusOpLz9MoxBLBgSPY2A@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 6 Apr 2012 08:16:10 -0700
+Subject: Point-to-point bus in device tree
+In-Reply-To: <20120405200829.GA29747@codeaurora.org>
+References: <20120405181509.GA28693@codeaurora.org>
+ <4F7DF142.5050601@wwwdotorg.org>
+ <20120405200829.GA29747@codeaurora.org>
+Message-ID: <20120406151610.GA12888@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I tested the following code :
-> ==============================================================
->
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index 5978113..0f5b09a 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -202,10 +202,12 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct
-> dma_cha
-> static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-> {
-> struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
-> + dma_cookie_t c;
->
-> + c = dma_cookie_assign(tx);
-> mxs_dma_enable_chan(mxs_chan);
->
-> - return dma_cookie_assign(tx);
-> + return c;
-> }
->
-> static void mxs_dma_tasklet(unsigned long data)
->
->
-Ack on testing.
+On Thu, Apr 05, 2012 at 01:08:29PM -0700, David Brown wrote:
+> On Thu, Apr 05, 2012 at 01:23:46PM -0600, Stephen Warren wrote:
+> > On 04/05/2012 12:15 PM, David Brown wrote:
+> > > Some MSM SoCs have a small serial-type "bus" that is used to
+> > > communicate with the PMIC devices.  This interface is always
+> > > point-to-point.  I'm doing a device-tree conversion of the driver that
+> > > Ken Heitke posted last year <https://lkml.org/lkml/2011/2/17/503>.
+> > > 
+> > > A naive conversion to device tree, would result in something like
+> > > this:
+> > > 
+> > > 	qcom,ssbi at 500000 {
+> > > 		compatible = "qcom,ssbi";
+> > > 		reg = <0x500000 0x1000>;
+> > > 		qcom,controller-type = "ssbi";
+> > > 
+> > > 		qcom,pmic8058 at 0 {
+> > > 			reg = <0x0 0x01>;
+> > > 			...
+> > > 		}
+> > > 	}
+> > > 
+> > > There would end up being an extraneous register for the device on the
+> > > other end (there are no addresses), and there would need to be code in
+> > > the ssbi driver to traverse this small tree to find these nodes.
+> > 
+> > Isn't that extra code simply:
+> > 
+> > of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> > 
+> > That seems like pretty low overhead.
+> 
+> True, but it still bothers me to have to have a bogus register.
 
-I reverted the change that Vinod had suggested earlier, and applied
-Huang's suggested change and it fixed the issue. Successfully erased
-NAND, made UBI partitions and ran integck tests for several hours.
+Ok, not sure where I got that idea, but I don't appear to actually
+need a register in the pmic8058 node for of_platform_populate to
+create a platform device.  It only needs a compatible field.  So, it
+look like that matches just what I need.
 
--Sam
+Thanks,
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
