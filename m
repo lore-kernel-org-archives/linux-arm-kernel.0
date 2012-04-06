@@ -1,38 +1,12 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 6 Apr 2012 13:28:38 +0200 (CEST)
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
- irq_alloc_desc() instead
-In-Reply-To: <m2bon59k68.fsf@igel.home>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
- <20120402202848.1EB833E02A7@localhost> <m2y5qdow0v.fsf@igel.home>
- <20120404154020.40C513E09D5@localhost> <m2r4w1akz4.fsf@igel.home>
- <alpine.LFD.2.02.1204061315040.2542@ionos> <m2bon59k68.fsf@igel.home>
-Message-ID: <alpine.LFD.2.02.1204061327080.2542@ionos>
+From: langenat@21cn.com (langenat at 21cn.com)
+Date: Fri, 6 Apr 2012 19:34:47 +0800 (CST)
+Subject: =?UTF-8?Q?=E5=A6=82=E4=BD=95=E8=AE=A9=E5=B7=A8?=
+ =?UTF-8?Q?=E9=87=8F=E5=8F=91=E9=80=81=E7=9A=84e?=
+ =?UTF-8?Q?ma!l=E6=88=90=E5=8A=9F=E5=88=B0=E8=BE=BE=E5=AE=A2=E6=88=B7?=
+ =?UTF-8?Q?=E6=89=8B=E4=B8=AD__linux-arm-kernel?=
+Message-ID: <527968664.55971333712094591.JavaMail.root@webmail2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Fri, 6 Apr 2012, Andreas Schwab wrote:
-
-> Thomas Gleixner <tglx@linutronix.de> writes:
-> 
-> > And it looks like the irqdomain code is the real culprit.
-> >
-> > void irq_set_virq_count(unsigned int count)
-> > {
-> >         pr_debug("irq: Trying to set virq count to %d\n", count);
-> >
-> >         BUG_ON(count < NUM_ISA_INTERRUPTS);
-> >         if (count < NR_IRQS)
-> >                 irq_virq_count = count;
-> > }
-> >
-> > That looks simply wrong.....
-> 
-> There is a single use of irq_set_virq_count, which is only relevant to
-> the PS3.
-
-Though irq_virq_count is statically initialized to NR_IRQS and it's
-used in the code more than once.
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120406/82e312e0/attachment.html>
