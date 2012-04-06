@@ -1,55 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 06 Apr 2012 14:56:45 +0200
-Subject: [PATCH] ARM: at91: Export at91_ramc_base
-In-Reply-To: <4f761fd8.8843cc0a.22b0.6caa@mx.google.com>
-References: <4f761fd8.8843cc0a.22b0.6caa@mx.google.com>
-Message-ID: <4F7EE80D.1000905@atmel.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Fri, 06 Apr 2012 14:10:38 +0100
+Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
+In-Reply-To: <4F7EE6AE.4020909@mvista.com>
+References: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
+ <4F7EE6AE.4020909@mvista.com>
+Message-ID: <1333717838.12209.83.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2012 11:03 PM, manabian at gmail.com :
-> From: Joachim Eastwood <joachim.eastwood@jotron.com>
+On Fri, 2012-04-06 at 16:50 +0400, Sergei Shtylyov wrote:
+> On 06.04.2012 16:30, Ian Campbell wrote:
+> > Fixes build the following error when CONFIG_KEXEC is enabled:
 > 
-> After commit f363c407b42c4 building at91_cf as a module fails with:
->   ERROR: "at91_ramc_base" [drivers/pcmcia/at91_cf.ko] undefined!
->   make[1]: *** [__modpost] Error 1
->   make: *** [modules] Error 2
+>     Maybe "the following build error" instead?
+
+Done.
+
+> >    CC      arch/arm/mach-kirkwood/board-dt.o
+> > arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
+> > arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
+> > arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
 > 
-> Export at91_ramc_base symbol to allow drivers using at91_ramc_*
-> functions to be built as modules again.
+> > kexec.h also needs string.h.
 > 
-> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+>     Why it doesn't include it?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Not sure, but actually I should be using linux/kexec.h not asm/kexec.h
+anyway which solves the problem too:
 
-and queued in at91-fixes for 3.4
+8<------------------------------
 
-(I modified commit message in relation with Sergei's comment).
+>From 76ef56286c1ceeceaa4c6c5ba867d9504e175382 Mon Sep 17 00:00:00 2001
+From: Ian Campbell <ijc@hellion.org.uk>
+Date: Fri, 6 Apr 2012 13:27:23 +0100
+Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
 
-Thanks, best regards,
+Fixes build the following build error when CONFIG_KEXEC is enabled:
+  CC      arch/arm/mach-kirkwood/board-dt.o
+arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
+arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
+arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
 
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+[v2, using linux/kexec.h not asm/kexec.h]
+---
+ arch/arm/mach-kirkwood/board-dt.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-> ---
-> 
-> This makes at91_cf compile again but it still doesn't work. Still
-> trying to figure out why.
-> 
->  arch/arm/mach-at91/setup.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index 1083739..aa010a9 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -53,6 +53,7 @@ void __init at91_init_interrupts(unsigned int *priority)
->  }
->  
->  void __iomem *at91_ramc_base[2];
-> +EXPORT_SYMBOL(at91_ramc_base);
->  
->  void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
->  {
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 1c672d9..f7fe1b9 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -14,6 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/kexec.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <mach/bridge-regs.h>
+-- 
+1.7.8.3
 
 
 -- 
-Nicolas Ferre
+Ian Campbell
