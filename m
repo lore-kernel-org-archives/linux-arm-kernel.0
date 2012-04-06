@@ -1,35 +1,32 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 06 Apr 2012 09:43:22 +0200
-Subject: [PATCH 0/4] ARM: Exynos4: NURI and UniversalC210 fixes for v3.4-rc2
-Message-ID: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
+Date: Fri, 06 Apr 2012 09:43:24 +0200
+Subject: [PATCH 2/4] ARM: Exynos4: fix regulator name for NURI board
+In-Reply-To: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
+References: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1333698206-12348-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Regulator names should not contain slash to avoid issues with debugfs.
 
-I've just checked the support for Samsung NURI and UniversalC210 boards
-in v3.4-rc1 and found some issues. The attached patches fixes the
-leftovers from missing s3c-sdhci driver changes, fixes division by
-zero caused by missing initial value for xusbxti clock and removes broken
-optional configuration entries for touch screen driver. It would be great
-if the attached patches will get merged to v3.4-rcX series.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/mach-nuri.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Best regards,
-Marek Szyprowski
-
-
-Patch summary:
-
-Marek Szyprowski (4):
-  ARM: Exynos4: fix SDHCI support on NURI & UniversalC210 boards
-  ARM: Exynos4: fix regulator name for NURI board
-  ARM: Exynos4: set fix xusbxti clock for NURI and Universal210 boards
-  ARM: Exynos4: Remove broken config values for touchscren for NURI
-    board
-
- arch/arm/mach-exynos/mach-nuri.c           |   51 +++-------------------------
- arch/arm/mach-exynos/mach-universal_c210.c |    5 ++-
- 2 files changed, 9 insertions(+), 47 deletions(-)
-
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index b3966f0..88a3b5c3 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -572,7 +572,7 @@ static struct regulator_init_data __initdata max8997_ldo7_data = {
+ 
+ static struct regulator_init_data __initdata max8997_ldo8_data = {
+ 	.constraints	= {
+-		.name		= "VUSB/VDAC_3.3V_C210",
++		.name		= "VUSB+VDAC_3.3V_C210",
+ 		.min_uV		= 3300000,
+ 		.max_uV		= 3300000,
+ 		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
 -- 
 1.7.1.569.g6f426
