@@ -1,30 +1,42 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 6 Apr 2012 16:02:37 +0530
-Subject: [RFC PATCH] cpuidle: allow per cpu latencies
-In-Reply-To: <4F7DA009.4010802@linux.intel.com>
-References: <1333619620-21201-1-git-send-email-pdeschrijver@nvidia.com>
- <4F7DA009.4010802@linux.intel.com>
-Message-ID: <CAMQu2gzwe0F3qcaTqASEPUASdG1SjpUxrBrSp-RrYLgy3W24OQ@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 6 Apr 2012 13:12:52 +0200 (CEST)
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
+In-Reply-To: <m21uo2v4cw.fsf@igel.home>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost> <m2y5qdow0v.fsf@igel.home>
+ <20120404154020.40C513E09D5@localhost> <m21uo2v4cw.fsf@igel.home>
+Message-ID: <alpine.LFD.2.02.1204061312210.2542@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
+On Thu, 5 Apr 2012, Andreas Schwab wrote:
+> Grant Likely <grant.likely@secretlab.ca> writes:
+> 
+> > I bet it is NR_IRQS related.  You have SPARSE_IRQ enabled, which means
+> > the maximum number of irq_descs is IRQ_BITMAP_BITS (NR_IRQS + 8192).
+> 
+> The actual definition uses NR_IRQS + 8196.  Guess that's a typo.  (Does
+> it really make sense to add NR_IRQS here?)
+> 
+> > diff --git a/arch/powerpc/include/asm/irq.h b/arch/powerpc/include/asm/irq.h
+> > index cf417e51..9edf499 100644
+> > --- a/arch/powerpc/include/asm/irq.h
+> > +++ b/arch/powerpc/include/asm/irq.h
+> > @@ -20,7 +20,7 @@
+> >  
+> >  /* Define a way to iterate across irqs. */
+> >  #define for_each_irq(i) \
+> > -       for ((i) = 0; (i) < NR_IRQS; ++(i))
+> > +       for ((i) = 0; (i) < nr_irqs; ++(i))
+> 
+> There are exactly two uses of for_each_irq, one is related to cpu
+> hotplug, the other to kexec, so that cannot make any difference.
 
-On Thu, Apr 5, 2012 at 7:07 PM, Arjan van de Ven <arjan@linux.intel.com> wrote:
-> On 4/5/2012 2:53 AM, Peter De Schrijver wrote:
->> This patch doesn't update all cpuidle device registrations. I will do that
->
-> question is if you want to do per cpu latencies, or if you want to have
-> both types of C state in one big table, and have each of the tegra cpyu
-> types pick half of them...
->
->
-Indeed !! That should work.
-I thought the C-states are always per CPU based and during the
-cpuidle registration you can register C-state accordingly based on the
-specific CPU types with different latencies if needed.
+Though that wants to be fixed nevertheless.
 
-Am I missing something ?
+Thanks,
 
-Regards
-Santosh
+	tglx
