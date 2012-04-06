@@ -1,71 +1,61 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Fri, 06 Apr 2012 19:32:22 +0100
-Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
-In-Reply-To: <4F7F2BA2.9040308@mvista.com>
-References: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
- <4F7EE6AE.4020909@mvista.com>
- <1333717838.12209.83.camel@dagon.hellion.org.uk>
- <4F7F2BA2.9040308@mvista.com>
-Message-ID: <1333737142.12209.97.camel@dagon.hellion.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 06 Apr 2012 14:18:47 -0700
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
+ presence of 32k timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
+ (Vaibhav Hiremath's message of "Fri, 6 Apr 2012 05:21:52 +0000")
+References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
+ <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
+ <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
+ <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
+ <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+ <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+ <87sjgmt211.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
+ <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+ <20120405095221.GC25053@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
+ <87hawxkgoi.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
+Message-ID: <874nswftjc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-04-06 at 21:45 +0400, Sergei Shtylyov wrote:
-> On 04/06/2012 05:10 PM, Ian Campbell wrote:
-> 
-> >>> Fixes build the following error when CONFIG_KEXEC is enabled:
-> 
-> >>      Maybe "the following build error" instead?
-> 
-> > Done.
-> 
->    Not quite. Still "fixes build the following...". :-)
+"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
 
-Duh, yeah, of course.
+[...]
 
-Lets try again...
+> I liked Santosh's idea in using command line argument "clocksource=" and 
+> make decision based on this. I have implemented it and tried it on both
+> OMAP3EVM and beaglebone and it works great.
+>
+> I have introduced something like this in mach-omap2/timer.c,
+>
+> static int __init omap2_override_clocksource(char* str)
+> {
+> 	if (!str)
+> 		return 0;
+> 	/*
+> 	 * For OMAP architecture, we only have two options
+> 	 *    - sync_32k (default)
+> 	 *    - gp timer
+> 	 */
+> 	if (!strcmp(str, "gp timer"))
+> 		use_gptimer_clksrc = true;
+>
+> 	return 0;
+> }
+> early_param("clocksource", omap2_override_clocksource);
 
-8<--------------------------------------------
+How does this interact with the existing clocksource cmdline parameter
+already in kernel/time/clocksource.c? (c.f. boot_override_clocksource()) 
 
->From e8437c14cb0dc23cc8db30a0f596d0cc8dbd28ef Mon Sep 17 00:00:00 2001
-From: Ian Campbell <ijc@hellion.org.uk>
-Date: Fri, 6 Apr 2012 13:27:23 +0100
-Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
+IMO, this duplicates that functionality but less elegantly.
 
-Fixes the following build error when CONFIG_KEXEC is enabled:
+What should happen is to let clocksource selection happen normally
+(based on presence or lack of HW, or cmdline override.)  Once that has
+happened, you can then setup_sched_clock() with parameters from querying
+the clocksource itself.
 
-  CC      arch/arm/mach-kirkwood/board-dt.o
-arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
-arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
-arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
-
-Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-[v3, speak actual English in the commit message, thanks Sergei Shtylyov]
-[v2, using linux/kexec.h not asm/kexec.h]
----
- arch/arm/mach-kirkwood/board-dt.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index d3cf5e6..23da042 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -14,6 +14,7 @@
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/kexec.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <mach/bridge-regs.h>
--- 
-1.7.8.3
-
-
--- 
-Ian Campbell
-
-
-Whenever I date a guy, I think, is this the man I want my children
-to spend their weekends with?
-		-- Rita Rudner
+Kevin
