@@ -1,40 +1,73 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 05 Apr 2012 17:07:31 -0700
-Subject: [PATCH] ARM: OMAP2+: PRM: fix compile for OMAP4-only build
-In-Reply-To: <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com> (Paul
- Walmsley's message of "Thu, 5 Apr 2012 15:33:32 -0600 (MDT)")
-References: <1333660837-23249-1-git-send-email-khilman@ti.com>
- <alpine.DEB.2.00.1204051533110.10302@utopia.booyaka.com>
-Message-ID: <87fwchhge4.fsf@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 5 Apr 2012 17:07:58 -0700
+Subject: CONFIG_EARLY_PRINTK on versatile broken in mainline
+In-Reply-To: <CACxGe6tCbnA+tvo3S=m+XjaXXiGF+bLy98CByz7RymH=bfimhg@mail.gmail.com>
+References: <CACxGe6twdkkQaN+ieZoFpjvQAect7-6mUz+N8yULDzwtwHoW1Q@mail.gmail.com>
+ <CAOMZO5DFmqz0Rp9oFR7tyofQ9iAfNWXTEYOFVcYvxWPcf6DDMQ@mail.gmail.com>
+ <CACxGe6sQ9YR-i4BJOsB0uE7U7gP7Y4Q12rjiEhqQnJGX+FEgfw@mail.gmail.com>
+ <CACxGe6tCbnA+tvo3S=m+XjaXXiGF+bLy98CByz7RymH=bfimhg@mail.gmail.com>
+Message-ID: <CACxGe6vF7AP99yJaTiqGMRUmgMOwgoM_B=AQFaPxrAfsQyHS9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
-
-> On Thu, 5 Apr 2012, Kevin Hilman wrote:
+On Thu, Apr 5, 2012 at 4:27 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Thu, Apr 5, 2012 at 4:19 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Thu, Apr 5, 2012 at 4:08 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>>> On Thu, Apr 5, 2012 at 7:52 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>>> Has anyone else had problems with CONFIG_EARLY_PRINTK on current
+>>>> mainline? ?ARM versatile fails to boot on qemu when it is selected.
+>>>> I've just started bisecting. ?v3.3 is okay, but current mainline is
+>>>> broken. ?Output stops after dumping out the memblock regions, and
+>>>> __log_buf stops at the same place.
+>>>
+>>> Please try this patch:
+>>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/158694
+>>
+>> I've already had that fix applied. ?This is a different issue. ?The
+>> kernel boots fine if CONFIG_EARLY_PRINTK isn't defined.
 >
->> For OMAP4 only builds, the omap2_prm_* functions have dummy wrappers
->> to detect incorrect usage.  However, several unrelated omap3 PRM
->> functions have made it inside the #else clause of the #ifdef wrapping
->> the omap2_prm stubs, causing them to disappear on OMAP4-only builds.
->> 
->> This was unnoticed until the IO chain support was added and introduced
->> a new function in this section which is referenced by omap_hwmod.c:
->> 
->> /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c: In function '_reconfigure_io_chain':
->> /work/kernel/omap/dev/arch/arm/mach-omap2/omap_hwmod.c:1665:3: error: implicit declaration of function 'omap3xxx_prm_reconfigure_io_chain' [-Werror=implicit-fungiction-declaration]
->> 
->> Fix by using the #ifdef to only wrap the omap2_prm functions that
->> need stubs on OMAP4-only builds.
->> 
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> Paul, this patch applies on top your io_chain_devel_3.5 branch.
+> Update: I'm still investigating, but it bisects out to this commit:
 >
-> Thanks, Tony reported this too.  Any objections to me rolling this into 
-> the offending patch?
+> commit 94e5a85b3be0ce109d26aa6812b2a02c518a0e4b
+> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> Date: ? Wed Jan 18 15:32:49 2012 +0000
+>
+> ? ?ARM: earlier initialization of vectors page
 
-No objections.
+The following patch makes it boot.  Calling printch() to output a
+character right after early_trap_init() seems to unblock whatever was
+wedging the system.  A delay or a printk with "" format string doesn't
+have any effect, it seems it must be a character output.  This may be
+a problem in the simulator.  I've not been able to run this on real
+hardware.
 
-Kevin
+g.
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b86f893..a6dafb1 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -995,6 +995,7 @@ void __init arm_mm_memblock_reserve(void)
+  * called function.  This means you can't use any function or debugging
+  * method which may touch any device, otherwise the kernel _will_ crash.
+  */
++extern void printch(int);
+ static void __init devicemaps_init(struct machine_desc *mdesc)
+ {
+        struct map_desc map;
+@@ -1007,6 +1008,7 @@ static void __init devicemaps_init(struct
+machine_desc *mdesc)
+        vectors = early_alloc(PAGE_SIZE);
+
+        early_trap_init(vectors);
++       printch('c');
+
+        for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
+                pmd_clear(pmd_off_k(addr));
+
+
+
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
