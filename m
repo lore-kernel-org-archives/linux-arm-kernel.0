@@ -1,163 +1,45 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 6 Apr 2012 16:17:20 -0700
-Subject: [PATCH v3 1/2] backlight: lcd: add driver for raster-type lcd's
- with gpio controlled panel reset
-In-Reply-To: <1332751600-11371-2-git-send-email-thomas.abraham@linaro.org>
-References: <1332751600-11371-1-git-send-email-thomas.abraham@linaro.org>
- <1332751600-11371-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120406161720.cf464c39.akpm@linux-foundation.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 07 Apr 2012 09:37:50 +1000
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
+In-Reply-To: <m24nsx9iz1.fsf@igel.home>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+ <20120402215524.GM24211@n2100.arm.linux.org.uk>
+ <1333406005.30734.61.camel@pasglop>
+ <20120402225223.GN24211@n2100.arm.linux.org.uk>
+ <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
+Message-ID: <1333755470.3040.38.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Cc: rpurdie at rpsys.net, florianSchandinat at gmx.de, devicetree-discuss at lists.ozlabs.org, linux-fbdev at vger.kernel.org, linux-samsung-soc at vger.kernel.org, grant.likely at secretlab.ca, rob.herring at calxeda.com, kgene.kim at samsung.com, jg1.han at samsung.com, broonie at opensource.wolfsonmicro.com, kyungmin.park at samsung.com, augulis.darius at gmail.com, ben-linux at fluff.org, lars at metafoo.de, patches at linaro.org
-
-Poor me.  When someone sends a patch like this, I need to go and hunt
-down everyone's real names to nicely add them to the changelog's Cc:
-list.  I prefer that you do this ;)
-
-You can add Cc:'s to the changelog yourself, of course.  Often that
-works out better than having me try to work out who might be
-interested in the patch.
-
-On Mon, 26 Mar 2012 14:16:39 +0530
-Thomas Abraham <thomas.abraham@linaro.org> wrote:
-
-> Add a lcd panel driver for simple raster-type lcd's which uses a gpio
-> controlled panel reset. The driver controls the nRESET line of the panel
-> using a gpio connected from the host system. The Vcc supply to the panel
-> is (optionally) controlled using a voltage regulator. This driver excludes
-> support for lcd panels that use a serial command interface or direct
-> memory mapped IO interface.
+On Fri, 2012-04-06 at 13:51 +0200, Andreas Schwab wrote:
+> Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
 > 
->
-> ...
->
-> +struct lcd_pwrctrl {
-> +	struct device		*dev;
-> +	struct lcd_device	*lcd;
-> +	struct lcd_pwrctrl_data	*pdata;
-> +	struct regulator	*regulator;
-> +	unsigned int		power;
-> +	bool			suspended;
-> +	bool			pwr_en;
+> > Ok. Doesn't matter anyway, this shouldn't be the problem in this
+> > specific case. IE. we shouldn't be setting that interrupt to NONE.
+> 
+> After removinge the call to irq_set_irq_type in mpic_host_map the irq
+> problem disappears.
+> 
+> Instead of the irq_set_irq_type(,NONE) calls from mpic_host_map I see
+> corresponding irq_set_irq_type(,LEVEL_LOW) calls now.
 
-Generally kernel code will avoid these unpronounceable abbreviations. 
-So we do
+It's arguable that this irq_set_irq_type(,NONE) shouln't be there but
+still ... it's been around for ever and things worked :-) So something
+-else- is causing the problem and I'd like to understand what exactly.
 
-pwr -> power
-en -> enable
-ctrl -> control
+(When I say arguable, I do mean it. There are some reasons to keep it
+even if we agree that it's not "setting a default" but marking the
+interrupt as somewhat disabled as Russell wants, that's fine with me, an
+MPIC external interrupt should -always- have a proper type set before
+being used).
 
-etc.  It results in longer identifiers, but the code is more readable
-and, more importantly, more *rememberable*.  
+First we need to fix that business with NR_IRQS/nr_irqs everywhere, then
+if the problem persists, check why we aren't calling the proper
+irq_set_irq_type() after the mapping is established (we should be).
 
-> +};
-> +
-> +static int lcd_pwrctrl_get_power(struct lcd_device *lcd)
-> +{
-> +	struct lcd_pwrctrl *lp = lcd_get_data(lcd);
-> +	return lp->power;
-> +}
-> +
-> +static int lcd_pwrctrl_set_power(struct lcd_device *lcd, int power)
-
-See, shouldn't that have been lcd_pwrctrl_set_pwr?
-
-If we avoid the abbreviations, such issues do not arise.
-
-> +{
-> +	struct lcd_pwrctrl *lp = lcd_get_data(lcd);
-> +	struct lcd_pwrctrl_data *pd = lp->pdata;
-> +	bool lcd_enable;
-> +	int lcd_reset, ret = 0;
-> +
-> +	lcd_enable = (power == FB_BLANK_POWERDOWN || lp->suspended) ? 0 : 1;
-
-This isn't how to use `bool'.  We can use
-
-	lcd_enable = (power == FB_BLANK_POWERDOWN) || lp->suspended;
-
-
-> +	lcd_reset = (pd->invert) ? !lcd_enable : lcd_enable;
-> +
-> +	if (lp->pwr_en == lcd_enable)
-> +		return 0;
-> +
-> +	if (!IS_ERR_OR_NULL(lp->regulator)) {
-> +		if (lcd_enable) {
-> +			if (regulator_enable(lp->regulator)) {
-> +				dev_info(lp->dev, "regulator enable failed\n");
-> +				ret = -EPERM;
-> +			}
-> +		} else {
-> +			if (regulator_disable(lp->regulator)) {
-> +				dev_info(lp->dev, "regulator disable failed\n");
-> +				ret = -EPERM;
-> +			}
-> +		}
-> +	}
-> +
-> +	gpio_direction_output(lp->pdata->gpio, lcd_reset);
-> +	lp->power = power;
-> +	lp->pwr_en = lcd_enable;
-
-Again, this could have been any of
-
-	lp->[power|pwr] = [power|pwr];
-	lp->[power|pwr]_[en|enable] = lcd_[en|enable];
-
-zillions of combinations!  If we just avoid the abbreviations, there is
-only one combination.
-
-> +	return ret;
-> +}
-> +
->
-> ...
->
-> +static int __devinit lcd_pwrctrl_probe(struct platform_device *pdev)
-> +{
-> +	struct lcd_pwrctrl *lp;
-> +	struct lcd_pwrctrl_data *pdata = pdev->dev.platform_data;
-> +	struct device *dev = &pdev->dev;
-> +	int err;
-> +
-> +#ifdef CONFIG_OF
-> +	if (dev->of_node) {
-> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> +		if (!pdata) {
-> +			dev_err(dev, "memory allocation for pdata failed\n");
-> +			return -ENOMEM;
-> +		}
-> +		lcd_pwrctrl_parse_dt(dev, pdata);
-> +	}
-> +#endif
-> +
-> +	if (!pdata) {
-> +		dev_err(dev, "platform data not available\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	lp = devm_kzalloc(dev, sizeof(struct lcd_pwrctrl), GFP_KERNEL);
-
-Nit: I prefer sizeof(*lp) here, so I don't have to scroll back and
-check the type of lp.
-
-> +	if (!lp) {
-> +		dev_err(dev, "memory allocation failed for private data\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	err = gpio_request(pdata->gpio, "LCD-nRESET");
-> +	if (err) {
-> +		dev_err(dev, "gpio [%d] request failed\n", pdata->gpio);
-> +		return err;
-> +	}
-> +
->
-> ...
->
-
-The code looks OK to me, but I do think the naming decisions should be
-revisited, please.
+Cheers,
+Ben.
