@@ -1,41 +1,40 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Fri, 6 Apr 2012 19:21:40 +0200
-Subject: [PATCH 0/1] Renaming AMBA to PRIMECELL
-In-Reply-To: <4F7F20DE.3040009@gmail.com>
-References: <4F7F20DE.3040009@gmail.com>
- <cover.1333663714.git.rubini@gnudd.com>
-Message-ID: <20120406172140.GA16326@mail.gnudd.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat,  7 Apr 2012 01:29:35 -0400
+Subject: [PATCH] mxs-dma : assign the dma cookie before we enable the dma
+ channel
+Message-ID: <1333776575-3462-1-git-send-email-shijie8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank your Rob for replying.
-I acknowledge the reasoning has not been discussed.
+The dma chain may finished very fast, so an interrupt may arises before
+we assign the dma cookie. In this case, the mxs_dma_int_handler() may
+hit the BUG_ON() in dma_cookie_complete().
 
-> While I agree this is a more correct name, I think this is pointless
-> churn and as you highlight above incomplete.
+So assign the dma cookie before we enable the dma channel.
 
-I don't know. I can't evaluate the "pointless" bit.  I leave this
-decision to people more involved with the fpga/asic/cpu environment.
+Acked-by: Sam Gandhi <samgandhi9@gmail.com>
+Signed-off-by: Huang Shijie <shijie8@gmail.com>
+---
+ drivers/dma/mxs-dma.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-> What's the reasoning for this other than rmk suggested it?
-
-My aim is using primecell for x86: my target chip is a pci-e bridge
-that exposes a number of amba devices to the PC; some of those are
-PrimeCell devices for which the existing drivers work fine after you
-set up stuff correctly.  While touching this stuff I"ve been asked to
-make the rename, and for me "rmk suggested it" is strong enough a
-reason.
-
-I suspect this misnaming may be disturbing in some technical
-environments; it's known that amba is being used in many
-environments without primecell logic blocks, and it's now spreading
-fast to non-arm SoC's. It may happen that a new user base may
-be confused by a misnaming (e.g., my ata is under amba, but it's not
-a primecell block, so it's not including <linux/amba.h>).
-
-It's not unlike how IDE became ATA over time.  If there's agreement
-about its usefulness I can deal with the move, before submitting the
-bridge.  Otherwise I'm also fine with using the old naming in my
-patches.
-
-/alessandro, feeling flame alert, thus maybe too verbose
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index a1e2d00..1e16d0e 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -210,10 +210,12 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+ static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+ {
+ 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
++	dma_cookie_t cookie;
+ 
++	cookie = dma_cookie_assign(tx);
+ 	mxs_dma_enable_chan(mxs_chan);
+ 
+-	return dma_cookie_assign(tx);
++	return cookie;
+ }
+ 
+ static void mxs_dma_tasklet(unsigned long data)
+-- 
+1.7.4.4
