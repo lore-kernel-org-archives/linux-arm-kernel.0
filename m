@@ -1,31 +1,204 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Sat, 07 Apr 2012 22:06:02 +0530
-Subject: [PATCH] mxs-dma : assign the dma cookie before we enable the
- dma channel
-In-Reply-To: <20120407081359.GT7264@S2101-09.ap.freescale.net>
-References: <1333776575-3462-1-git-send-email-shijie8@gmail.com>
- <20120407081359.GT7264@S2101-09.ap.freescale.net>
-Message-ID: <1333816562.31825.26.camel@vkoul-udesk3>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sat, 7 Apr 2012 13:17:46 -0400
+Subject: [PATCH v2] gpio: Device tree support for LPC32xx
+In-Reply-To: <4F80460E.50605@antcom.de>
+References: <1333497518-25838-1-git-send-email-stigge@antcom.de>
+ <20120407035327.9D7923E246E@localhost> <4F80460E.50605@antcom.de>
+Message-ID: <CAKON4OxuP6AytcJDtDvbTaho4vFvUTQ0VfJiBnN5QEbK1xo1XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-04-07 at 16:14 +0800, Shawn Guo wrote:
-> On Sat, Apr 07, 2012 at 01:29:35AM -0400, Huang Shijie wrote:
-> > The dma chain may finished very fast, so an interrupt may arises before
-> > we assign the dma cookie. In this case, the mxs_dma_int_handler() may
-> > hit the BUG_ON() in dma_cookie_complete().
-> > 
-> > So assign the dma cookie before we enable the dma channel.
-> > 
-> > Acked-by: Sam Gandhi <samgandhi9@gmail.com>
-> > Signed-off-by: Huang Shijie <shijie8@gmail.com>
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaor.org>
-> 
-> The mxs mmc and audio still works with the change.
-> 
-Thanks, I will apply this on 4/18.
-I am away till then :-)
+On Sat, Apr 7, 2012 at 9:50 AM, Roland Stigge <stigge@antcom.de> wrote:
+> Hi Grant,
+>
+> thanks for your suggestions about LPC32xx GPIO DT.
+>
+> Regarding the numbering:
+>
+> On 07/04/12 05:53, Grant Likely wrote:
+>>> +Required properties:
+>>> +- compatible: "nxp,lpc32xx-gpio"
+>>> +- reg: Physical base address and length of the controller's registers.
+>>> +- #address-cells: Always 1, for indexing of the subnodes (GPIO groups of the
+>>> + ?SoC)
+>>> +- #size-cells: Always 0
+>>> +
+>>> +Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
+>>> +- gpio-controller: Marks the device node as a GPIO controller.
+>>> +- #gpio-cells: Should be two. The first cell is the pin number and the
+>>> + ?second cell is used to specify optional parameters:
+>>> + ?- bit 0 specifies polarity (0 for normal, 1 for inverted)
+>>> +- reg: Index of the GPIO group
+>>
+>> If these are merely contiguous register banks of 32 gpio lines, then
+>> established convention is pretty much to only use one node and make
+>> the translate function decode bank and bit out of the gpio specifier.
+>> There isn't a whole lot of value it having all the sub nodes when
+>> there isn't anything significantly different between them.
+>
+> Please consider how the groups are specified in
+> drivers/gpio/gpio-lpc32xx.c. They each have different numbers of lines
+> and GPIO / GPI / GPO functionality. So they also have different callback
+> sets, and we need to do separate gpiochip_add()s which leads to the
+> separate gpio-bank specifications in the dtsi file. Separate enabling of
+> those banks via OF are a nice by-product.
+
+When you have six banks of 32b registers with sparse, active GPIOs in
+the banks, is there any advantage to saying bank one has 8 gpios, bank
+2 has 14, bank 3 has 2, etc in the gpiochip?  Or just just register
+them as six banks of 32 GPIOs without indicating which are
+valid/invalid?   Maybe add a way for the DT to indicate the sparse map
+of valid GPIOs?
+
+We're introducing a lot of complexity around invalid GPIO numbers that
+shouldn't matter in a working system.
+
+LPC31xx is even worse. I have 12 banks of sparse GPIOs.
+
+>
+> So I would like to keep it that way.
+>
+> What do you think?
+>
+> Thanks in advance,
+>
+> Roland
+>
+>>> + ? ?gpio: gpio at 40028000 {
+>>> + ? ? ? ? ? ?compatible = "nxp,lpc32xx-gpio";
+>>> + ? ? ? ? ? ?reg = <0x40028000 0x1000>;
+>>> + ? ? ? ? ? ?/* create a private address space for enumeration */
+>>> + ? ? ? ? ? ?#address-cells = <1>;
+>>> + ? ? ? ? ? ?#size-cells = <0>;
+>>> +
+>>> + ? ? ? ? ? ?gpio_p0: gpio-bank at 0 {
+>>> + ? ? ? ? ? ? ? ? ? ?gpio-controller;
+>>> + ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
+>>> + ? ? ? ? ? ? ? ? ? ?reg = <0>;
+>>> + ? ? ? ? ? ?};
+>>> +
+>>> + ? ? ? ? ? ?gpio_p1: gpio-bank at 1 {
+>>> + ? ? ? ? ? ? ? ? ? ?gpio-controller;
+>>> + ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
+>>> + ? ? ? ? ? ? ? ? ? ?reg = <1>;
+>>> + ? ? ? ? ? ?};
+>>> +
+>>> + ? ? ? ? ? ?gpio_p2: gpio-bank at 2 {
+>>> + ? ? ? ? ? ? ? ? ? ?gpio-controller;
+>>> + ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
+>>> + ? ? ? ? ? ? ? ? ? ?reg = <2>;
+>>> + ? ? ? ? ? ?};
+>>> +
+>>> + ? ? ? ? ? ?gpio_p3: gpio-bank at 3 {
+>>> + ? ? ? ? ? ? ? ? ? ?gpio-controller;
+>>> + ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
+>>> + ? ? ? ? ? ? ? ? ? ?reg = <3>;
+>>> + ? ? ? ? ? ?};
+>>> +
+>>> + ? ? ? ? ? ?gpi_p3: gpio-bank at 4 {
+>>> + ? ? ? ? ? ? ? ? ? ?gpio-controller;
+>>> + ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
+>>> + ? ? ? ? ? ? ? ? ? ?reg = <4>;
+>>> + ? ? ? ? ? ?};
+>>> +
+>>> + ? ? ? ? ? ?gpo_p3: gpio-bank at 5 {
+>>> + ? ? ? ? ? ? ? ? ? ?gpio-controller;
+>>> + ? ? ? ? ? ? ? ? ? ?#gpio-cells = <2>;
+>>> + ? ? ? ? ? ? ? ? ? ?reg = <5>;
+>>> + ? ? ? ? ? ?};
+>>> + ? ?};
+>>> --- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
+>>> +++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
+>>> @@ -1 +1,8 @@
+>>> -/* empty */
+>>> +#ifndef __MACH_GPIO_H
+>>> +#define __MACH_GPIO_H
+>>> +
+>>> +#include "gpio-lpc32xx.h"
+>>> +
+>>> +#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
+>>> +
+>>> +#endif /* __MACH_GPIO_H */
+>>> --- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
+>>> +++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+>>> @@ -21,6 +21,9 @@
+>>> ?#include <linux/io.h>
+>>> ?#include <linux/errno.h>
+>>> ?#include <linux/gpio.h>
+>>> +#include <linux/of_gpio.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/module.h>
+>>>
+>>> ?#include <mach/hardware.h>
+>>> ?#include <mach/platform.h>
+>>> @@ -454,10 +457,55 @@ static struct lpc32xx_gpio_chip lpc32xx_
+>>> ? ? ?},
+>>> ?};
+>>>
+>>> +/* Empty now, can be removed later when mach-lpc32xx is finally switched over
+>>> + * to DT support
+>>> + */
+>>> ?void __init lpc32xx_gpio_init(void)
+>>> ?{
+>>> +}
+>>> +
+>>> +static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
+>>> +{
+>>> + ? ?struct device_node *node;
+>>> ? ? ?int i;
+>>>
+>>> - ? ?for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
+>>> - ? ? ? ? ? ?gpiochip_add(&lpc32xx_gpiochip[i].chip);
+>>> + ? ?if (pdev->dev.of_node) {
+>>> + ? ? ? ? ? ?for_each_child_of_node(pdev->dev.of_node, node) {
+>>> + ? ? ? ? ? ? ? ? ? ?if (of_device_is_available(node)) {
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 index;
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct gpio_chip *chip;
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?if (of_property_read_u32(node,
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "reg", &index) < ?0)
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?continue;
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?if (index >= ARRAY_SIZE(lpc32xx_gpiochip))
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?continue;
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?chip = &lpc32xx_gpiochip[index].chip;
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?chip->of_node = of_node_get(node);
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?gpiochip_add(chip);
+>>> + ? ? ? ? ? ? ? ? ? ?}
+>>> + ? ? ? ? ? ?}
+>>> + ? ?} else {
+>>> + ? ? ? ? ? ?for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
+>>> + ? ? ? ? ? ? ? ? ? ?gpiochip_add(&lpc32xx_gpiochip[i].chip);
+>>> + ? ?}
+>>> +
+>>> + ? ?return 0;
+>>> ?}
+>>> +
+>>> +#ifdef CONFIG_OF
+>>> +static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
+>>> + ? ?{ .compatible = "nxp,lpc32xx-gpio", },
+>>> + ? ?{ },
+>>> +};
+>>> +#endif
+>>> +
+>>> +static struct platform_driver lpc32xx_gpio_driver = {
+>>> + ? ?.driver ? ? ? ? = {
+>>> + ? ? ? ? ? ?.name ? = "lpc32xx-gpio",
+>>> + ? ? ? ? ? ?.owner ?= THIS_MODULE,
+>>> + ? ? ? ? ? ?.of_match_table = lpc32xx_gpio_of_match,
+>>> + ? ?},
+>>> + ? ?.probe ? ? ? ? ?= lpc32xx_gpio_probe,
+>>> +};
+>>> +
+>>> +module_platform_driver(lpc32xx_gpio_driver);
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+
+
 
 -- 
-~Vinod
+Jon Smirl
+jonsmirl at gmail.com
