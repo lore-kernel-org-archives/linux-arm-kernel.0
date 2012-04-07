@@ -1,33 +1,29 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 07 Apr 2012 19:45:37 +0200
-Subject: [PATCH v2] gpio: Device tree support for LPC32xx
-In-Reply-To: <CAKON4OxuP6AytcJDtDvbTaho4vFvUTQ0VfJiBnN5QEbK1xo1XQ@mail.gmail.com>
-References: <1333497518-25838-1-git-send-email-stigge@antcom.de>
- <20120407035327.9D7923E246E@localhost> <4F80460E.50605@antcom.de>
- <CAKON4OxuP6AytcJDtDvbTaho4vFvUTQ0VfJiBnN5QEbK1xo1XQ@mail.gmail.com>
-Message-ID: <4F807D41.5000008@antcom.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 07 Apr 2012 21:46:25 +0400
+Subject: [PATCH] ARM: orion5x: Fix GPIO enable bits for MPP9
+In-Reply-To: <1333771725.7150.32.camel@deadeye>
+References: <1333771725.7150.32.camel@deadeye>
+Message-ID: <4F807D71.1090209@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/12 19:17, jonsmirl at gmail.com wrote:
->> Please consider how the groups are specified in
->> drivers/gpio/gpio-lpc32xx.c. They each have different numbers of lines
->> and GPIO / GPI / GPO functionality. So they also have different callback
->> sets, and we need to do separate gpiochip_add()s which leads to the
->> separate gpio-bank specifications in the dtsi file. Separate enabling of
->> those banks via OF are a nice by-product.
-> 
-> When you have six banks of 32b registers with sparse, active GPIOs in
-> the banks, is there any advantage to saying bank one has 8 gpios, bank
-> 2 has 14, bank 3 has 2, etc in the gpiochip?  Or just just register
-> them as six banks of 32 GPIOs without indicating which are
-> valid/invalid?
+Hello.
 
-I think it is a good idea to only register GPIOs that are real when we
-already have many (~100) instead of registering hundreds of invalid
-extra ones (that will _always_ be invalid for this very driver).
+On 07-04-2012 8:08, Ben Hutchings wrote:
 
-Also corresponds nicely to the hardware specs when there are banks of
-odd sizes which can be found registered accordingly in the kernel.
+> Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 seems to have
 
-Roland
+    Please also specify that commit's summary in parens.
+
+> accidentally inverted the GPIO valid bits for MPP9 (only).  For the
+> mv2120 platform which uses MPP9 as a GPIO LED device, this results in
+> the error:
+
+> [   12.711476] leds-gpio: probe of leds-gpio failed with error -22
+
+> Reported-by: Henry von Tresckow<hvontres@gmail.com>
+> References: http://bugs.debian.org/667446
+> Signed-off-by: Ben Hutchings<ben@decadent.org.uk>
+> Cc: stable at vger.kernel.org [v3.0+]
+
+WBR, Sergei
