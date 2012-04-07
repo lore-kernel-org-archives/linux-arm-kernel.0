@@ -1,44 +1,42 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Sat, 07 Apr 2012 05:08:45 +0100
-Subject: [PATCH] ARM: orion5x: Fix GPIO enable bits for MPP9
-Message-ID: <1333771725.7150.32.camel@deadeye>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 06 Apr 2012 20:45:30 -0700
+Subject: [PATCH] gpio: Fix range check in of_gpio_simple_xlate()
+In-Reply-To: <1333497778-26925-1-git-send-email-stigge@antcom.de>
+References: <1333497778-26925-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120407034530.373A13E23DE@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 seems to have
-accidentally inverted the GPIO valid bits for MPP9 (only).  For the
-mv2120 platform which uses MPP9 as a GPIO LED device, this results in
-the error:
+On Wed,  4 Apr 2012 02:02:58 +0200, Roland Stigge <stigge@antcom.de> wrote:
+> This patch fixes a range check in of_gpio_simple_xlate() by replacing a
+> "> gc->ngpio" with ">= gc->ngpio" since range is from 0 to gc->ngpio - 1
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-[   12.711476] leds-gpio: probe of leds-gpio failed with error -22
+Applied, thanks.
 
-Reported-by: Henry von Tresckow <hvontres@gmail.com>
-References: http://bugs.debian.org/667446
-Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-Cc: stable at vger.kernel.org [v3.0+]
----
-I know nothing about this platform, and this is totally untested.  But
-it does look quite straightforward...
+g.
 
-Ben.
+> 
+> ---
+> 
+>  Applies to v3.4-rc1
+> 
+>  drivers/of/gpio.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- linux-2.6.orig/drivers/of/gpio.c
+> +++ linux-2.6/drivers/of/gpio.c
+> @@ -140,7 +140,7 @@ int of_gpio_simple_xlate(struct gpio_chi
+>  	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
+>  		return -EINVAL;
+>  
+> -	if (gpiospec->args[0] > gc->ngpio)
+> +	if (gpiospec->args[0] >= gc->ngpio)
+>  		return -EINVAL;
+>  
+>  	if (flags)
 
- arch/arm/mach-orion5x/mpp.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
-index eac6897..db70e79 100644
---- a/arch/arm/mach-orion5x/mpp.h
-+++ b/arch/arm/mach-orion5x/mpp.h
-@@ -65,8 +65,8 @@
- #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
- 
- #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
--#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
--#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
-+#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
-+#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
- 
- #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
- #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
 -- 
-1.7.9.5
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
