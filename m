@@ -1,43 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 06 Apr 2012 16:43:13 -0700
-Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
- DNS-325
-In-Reply-To: <201203280820.00139.arnd@arndb.de>
-References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
- <1332885255-8304-2-git-send-email-jm@lentin.co.uk>
- <201203280820.00139.arnd@arndb.de>
-Message-ID: <20120406234313.A040E3E127F@localhost>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Fri, 6 Apr 2012 22:30:48 -0400
+Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
+In-Reply-To: <20120406182122.GA13649@pengutronix.de>
+References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
+ <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+ <CAMiH66EC7=x0sRYhE3hpEyBemDGSRS19xguQUqKj2kuPw5Tifw@mail.gmail.com>
+ <20120404122335.GD17187@pengutronix.de>
+ <CAMiH66GM0RxP-z=HNkOhhPaaXCZLKPvWFy=_+aGbbGSdrsg+iQ@mail.gmail.com>
+ <20120406182122.GA13649@pengutronix.de>
+Message-ID: <CAMiH66GxZoT-PDfkqBOFfn2jXi6n7B0jiDmMUV9GpT09J3z2yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Mar 2012 08:19:59 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 27 March 2012, Jamie Lentin wrote:
-> > Add support for the DNS-320 and DNS-325. Describe as much as currently possible
-> > in the devicetree files, create a board-dnskw.c for everything else.
-> > 
-> > Use IEEE-compliant "okay", rather than "ok"
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> > ---
-> 
-> One small note about changeset comments: The part about differences from the previous
-> version of the same patch normally goes below the '---' line, in front of the diffstat,
-> to prevent it from going into the git changelog. Otherwise people will have no idea
-> what it's about.
+Hi,
 
-Counter point on that.  I ask submitters to put the changelog before
-the --- because I want it in the commit text.  It is actually helpful
-when trying to determine exactly which iteration of a patch series got
-committed.
+On Fri, Apr 6, 2012 at 2:21 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>
+>> > where 2-4 can probably happen more or less simultaneously.
+>> I wish you could send out the new patch as soon as possible. :)
+>
+> Is a new version needed? I thought that this version could go in...
 
-But, different maintainers have different policies so there really
-isn't much submitters can do here except ask the maintainer they are
-submitting to which approach they prefer.
+emm..
+If you think this version is ok, I will ask Artem to accept another patch:
+"  mtd/gpmi : do not include the mxs.h".
 
-g.
+My other patches depend on this patch. And they have been delayed for some time.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+thanks
+Huang Shijie
+
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
