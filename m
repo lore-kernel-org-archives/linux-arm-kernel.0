@@ -1,27 +1,25 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 07 Apr 2012 16:19:04 +0200
-Subject: [PATCH v2] gpio: Device tree support for LPC32xx
-In-Reply-To: <4F80460E.50605@antcom.de>
-References: <1333497518-25838-1-git-send-email-stigge@antcom.de>
- <20120407035327.9D7923E246E@localhost> <4F80460E.50605@antcom.de>
-Message-ID: <4F804CD8.70803@antcom.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat, 7 Apr 2012 17:18:35 +0200
+Subject: [PATCH 0/2] ARM: ixp4xx: fix compilation and oops
+In-Reply-To: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+Message-ID: <20120407151834.GA18732@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/12 15:50, Roland Stigge wrote:
-> Hi Grant,
-...
+On Wed, Feb 08, 2012 at 08:24:27PM +0100, Marc Kleine-Budde wrote:
+> Hello,
+> 
+> this patch series targets current linus master (v3.3-rc2-230-gc2e50e3). It
+> fixes compilation of several boards of the ARM ixp4xx architecture and
+> a boot oops.
+> 
+> With these patches applied I my nslu boots fine.
+> 
+> Please consider to applpy this series to the upcoming v3.3 kernel.
 
-> Please consider how the groups are specified in
-> drivers/gpio/gpio-lpc32xx.c. They each have different numbers of lines
-> and GPIO / GPI / GPO functionality. So they also have different callback
-> sets, and we need to do separate gpiochip_add()s which leads to the
-> separate gpio-bank specifications in the dtsi file. Separate enabling of
-> those banks via OF are a nice by-product.
+I see patch #2 as a3c1e3b732b3708a80e4035b9d845f3f7c7dd0c9, but what
+happened to the first patch?
 
-And BTW: This also corresponds nicely with how the LPC32xx hardware
-calls its GPIOs, e.g. GPO 3 for GPO #3 in the gpo group.
-
-Thanks for considering,
-
-Roland
+Thanks,
+Richard
