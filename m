@@ -1,37 +1,48 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 06 Apr 2012 18:41:47 -0700
-Subject: Handling device shared SFR on dt platform
-In-Reply-To: <4F7CB0A6.7010809@gmail.com>
-References: <4F6A5853.9090809@gmail.com>
- <20120324193200.822AD3E0B06@localhost> <4F736A4A.6050302@gmail.com>
- <20120403160454.BDFF23E0598@localhost> <4F7CB0A6.7010809@gmail.com>
-Message-ID: <20120407014147.D35EE3E226F@localhost>
+Date: Fri, 06 Apr 2012 18:29:42 -0700
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <alpine.LFD.2.02.1204061315040.2542@ionos>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost> <m2y5qdow0v.fsf@igel.home>
+ <20120404154020.40C513E09D5@localhost> <m2r4w1akz4.fsf@igel.home>
+ <alpine.LFD.2.02.1204061315040.2542@ionos>
+Message-ID: <20120407012942.6EAD23E2083@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Apr 2012 22:35:50 +0200, Sylwester Nawrocki <snjw23@gmail.com> wrote:
-> On 04/03/2012 06:04 PM, Grant Likely wrote:
-> >> What concerns me, is an overhead from region request/ioremap(?)/release, 
-> >> just to access a single 32-bit register. I'm going to see if those accesses
-> >> could be moved to only device driver's probe() and remove() callbacks and 
-> >> what might be the resulting power consumption increase from that, if any.
-> > 
-> > Personally, I'd just create a shared function used by both drivers to
-> > access the register and protect it with a spinlock.  That way the
-> > region only needs to be mapped once, and the overhead is as low as
-> > possible.
+On Fri, 6 Apr 2012 13:17:04 +0200 (CEST), Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 6 Apr 2012, Andreas Schwab wrote:
 > 
-> Hmm, that's what I originally started with. I've just removed function 
-> callback from the platform data struct in favour of having the drivers 
-> using directly the function exported by plat-s5p. Then I started devising
-> something alternative, in hope to get rid of the drivers compilation 
-> dependency on PLAT_S5P. There seems little point in that though, since 
-> the chance to have those IP blocks available on other archs or ARM sub-archs,
-> than Samsung S5P/Exynos, are extremely low. 
+> > Grant Likely <grant.likely@secretlab.ca> writes:
+> > 
+> > > Can you attach console output logs for each of configs above and also
+> > > with NR_IRQS=128?  That might give me some clues as to which specific
+> > > code is causing the issues.
+> > 
+> > It really looks like the issue starts when irq_expand_nr_irqs is called
+> > the first time to make nr_irqs bigger than NR_IRQS.
+> 
+> And it looks like the irqdomain code is the real culprit.
+> 
+> void irq_set_virq_count(unsigned int count)
+> {
+>         pr_debug("irq: Trying to set virq count to %d\n", count);
+> 
+>         BUG_ON(count < NUM_ISA_INTERRUPTS);
+>         if (count < NR_IRQS)
+>                 irq_virq_count = count;
+> }
+> 
+> That looks simply wrong.....
+> 
+> s/NR_IRQS/nr_irqs/ should do the trick.
 
-As long as everything remains multiplatform friendly, I'm fine with
-this.  It will need to change though if ever there needs to be
-multiple definitions of that helper function because that means only
-one platform can be enabled at a time.
+Yeah, that code is wrong and I'll fix it, but the only purpose of that
+code is to support the direct mapping on hardware that has limit on
+the largest irq number that it can handle.  That shouldn't be the
+problem here.
 
 g.
