@@ -1,112 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 7 Apr 2012 05:34:49 +0200
-Subject: [PATCH 5/5] IIO: AT91: Add support for hardware triggers for
- the ADC
-In-Reply-To: <1333641684-20325-6-git-send-email-maxime.ripard@free-electrons.com>
-References: <1333641684-20325-1-git-send-email-maxime.ripard@free-electrons.com>
- <1333641684-20325-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120407033449.GG16641@game.jcrosoft.org>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sat, 07 Apr 2012 05:08:45 +0100
+Subject: [PATCH] ARM: orion5x: Fix GPIO enable bits for MPP9
+Message-ID: <1333771725.7150.32.camel@deadeye>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  
-> +static struct at91_adc_trigger at91_adc_trigger_sam9g45[] = {
-> +	[0] = {
-> +		.name = "external-rising",
-> +		.value = AT91_TSADCC_TRGMOD_EXT_RISING,
-> +		.is_external = true,
-> +	},
-> +	[1] = {
-> +		.name = "external-falling",
-> +		.value = AT91_TSADCC_TRGMOD_EXT_FALLING,
-> +		.is_external = true,
-> +	},
-> +	[2] = {
-> +		.name = "external-any",
-> +		.value = AT91_TSADCC_TRGMOD_EXT_ANY,
-> +		.is_external = true,
-> +	},
-> +	[3] = {
-> +		.name = "continuous",
-> +		.value = AT91_TSADCC_TRGMOD_CONTINUOUS,
-> +		.is_external = false,
-> +	},
-> +	[4] = {
-> +		.name = NULL,
-> +	},
-> +};
-> +
->  static struct at91_adc_desc at91_adc_desc_sam9g45 = {
->  	.clock = 13200000,
->  	.clock_name = "tsc_clk",
->  	.num_channels = 8,
->  	.startup_time = 40,
-> +	.triggers = at91_adc_trigger_sam9g45,
-> +	.trigger_register = AT91_TSADCC_TRGR,
-> +};
-> +
-> +static struct at91_adc_trigger at91_adc_trigger_sam9g20[] = {
-> +	[0] = {
-> +		.name = "timer-counter-0",
-> +		.value = AT91_ADC_TRGSEL_TC0 | AT91_ADC_TRGEN,
-> +		.is_external = false,
-> +	},
-> +	[1] = {
-> +		.name = "timer-counter-1",
-> +		.value = AT91_ADC_TRGSEL_TC1 | AT91_ADC_TRGEN,
-> +		.is_external = false,
-> +	},
-> +	[2] = {
-> +		.name = "timer-counter-2",
-> +		.value = AT91_ADC_TRGSEL_TC2 | AT91_ADC_TRGEN,
-> +		.is_external = false,
-> +	},
-> +	[3] = {
-> +		.name = "external",
-> +		.value = AT91_ADC_TRGSEL_EXTERNAL | AT91_ADC_TRGEN,
-> +		.is_external = true,
-> +	},
-> +	[4] = {
-> +		.name = NULL,
-> +	},
->  };
->  
->  static struct at91_adc_desc at91_adc_desc_sam9g20 = {
-> @@ -68,6 +153,8 @@ static struct at91_adc_desc at91_adc_desc_sam9g20 = {
->  	.clock_name = "adc_clk",
->  	.num_channels = 4,
->  	.startup_time = 10,
-> +	.triggers = at91_adc_trigger_sam9g20,
-> +	.trigger_register = AT91_ADC_MR,
->  };
-same comment as before this soc specific
+Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 seems to have
+accidentally inverted the GPIO valid bits for MPP9 (only).  For the
+mv2120 platform which uses MPP9 as a GPIO LED device, this results in
+the error:
 
-Best Regards,
-J.
->  
-> @@ -125,8 +257,9 @@ static int at91_adc_channel_init(struct iio_dev *idev,
->  	int bit, idx = 0;
->  
->  	idev->num_channels = bitmap_weight(&pdata->channels_used,
-> -					   st->desc->num_channels);
-> -	chan_array = kcalloc(idev->num_channels, sizeof(struct iio_chan_spec),
-> +					   st->desc->num_channels) + 1;
-> +	chan_array = kcalloc(idev->num_channels + 1,
-> +			     sizeof(struct iio_chan_spec),
->  			     GFP_KERNEL);
-devm_kzalloc
->  
->  	if (chan_array == NULL)
-> @@ -137,6 +270,7 @@ static int at91_adc_channel_init(struct iio_dev *idev,
->  		chan->type = IIO_VOLTAGE;
->  		chan->indexed = 1;
->  		chan->channel = bit;
-> +		chan->scan_index = idx;
->  		chan->scan_type.sign = 'u';
->  		chan->scan_type.realbits = 10;
->  		chan->scan_type.storagebits = 16;
-> @@ -144,6 +278,13 @@ static int at91_adc_channel_init(struct iio_dev *idev,
->  		idx++;
->  	}
-Best Regards,
-J.
+[   12.711476] leds-gpio: probe of leds-gpio failed with error -22
+
+Reported-by: Henry von Tresckow <hvontres@gmail.com>
+References: http://bugs.debian.org/667446
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+Cc: stable at vger.kernel.org [v3.0+]
+---
+I know nothing about this platform, and this is totally untested.  But
+it does look quite straightforward...
+
+Ben.
+
+ arch/arm/mach-orion5x/mpp.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
+index eac6897..db70e79 100644
+--- a/arch/arm/mach-orion5x/mpp.h
++++ b/arch/arm/mach-orion5x/mpp.h
+@@ -65,8 +65,8 @@
+ #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
+ 
+ #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
+-#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
+-#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
++#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
++#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
+ 
+ #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
+ #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
+-- 
+1.7.9.5
