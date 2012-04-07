@@ -1,41 +1,81 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 06 Apr 2012 20:45:30 -0700
-Subject: [PATCH] gpio: Fix range check in of_gpio_simple_xlate()
-In-Reply-To: <1333497778-26925-1-git-send-email-stigge@antcom.de>
-References: <1333497778-26925-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120407034530.373A13E23DE@localhost>
+Date: Fri, 06 Apr 2012 22:26:01 -0600
+Subject: [PATCH 5/7] dt/clock: add a simple provider get function
+In-Reply-To: <1331680947-29861-6-git-send-email-robherring2@gmail.com>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-6-git-send-email-robherring2@gmail.com>
+Message-ID: <20120407042601.7642C3E303C@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  4 Apr 2012 02:02:58 +0200, Roland Stigge <stigge@antcom.de> wrote:
-> This patch fixes a range check in of_gpio_simple_xlate() by replacing a
-> "> gc->ngpio" with ">= gc->ngpio" since range is from 0 to gc->ngpio - 1
+On Tue, 13 Mar 2012 18:22:25 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-
-Applied, thanks.
-
-g.
-
+> For simple cases, the clock provider data can simply be the struct clk ptr.
 > 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > ---
+>  drivers/of/clock.c |   18 +++++++++++-------
+>  1 files changed, 11 insertions(+), 7 deletions(-)
 > 
->  Applies to v3.4-rc1
-> 
->  drivers/of/gpio.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- linux-2.6.orig/drivers/of/gpio.c
-> +++ linux-2.6/drivers/of/gpio.c
-> @@ -140,7 +140,7 @@ int of_gpio_simple_xlate(struct gpio_chi
->  	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
->  		return -EINVAL;
+> diff --git a/drivers/of/clock.c b/drivers/of/clock.c
+> index 06fd5ad..f4a0965 100644
+> --- a/drivers/of/clock.c
+> +++ b/drivers/of/clock.c
+> @@ -33,6 +33,12 @@ struct of_clk_provider {
+>  static LIST_HEAD(of_clk_providers);
+>  static DEFINE_MUTEX(of_clk_lock);
 >  
-> -	if (gpiospec->args[0] > gc->ngpio)
-> +	if (gpiospec->args[0] >= gc->ngpio)
->  		return -EINVAL;
+> +static struct clk *of_clk_simple_get(struct of_phandle_args *clkspec,
+> +				     void *data)
+> +{
+> +	return data;
+> +}
+> +
+>  /**
+>   * of_clk_add_provider() - Register a clock provider for a node
+>   * @np: Device node pointer associated with clock provider
+> @@ -52,7 +58,10 @@ int of_clk_add_provider(struct device_node *np,
 >  
->  	if (flags)
+>  	cp->node = of_node_get(np);
+>  	cp->data = data;
+> -	cp->get = clk_src_get;
+> +	if (clk_src_get)
+> +		cp->get = clk_src_get;
+> +	else
+> +		cp->get = of_clk_simple_get;
+
+Personally, I would prefer callers to be explicit about the
+translation functions they need, but it isn't a big enough concern for
+me to make a big deal about it.
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+>  
+>  	mutex_lock(&of_clk_lock);
+>  	list_add(&cp->link, &of_clk_providers);
+> @@ -183,11 +192,6 @@ void __init of_clk_init(const struct of_device_id *matches)
+>  	}
+>  }
+>  
+> -static struct clk *of_fixed_clk_get(struct of_phandle_args *a, void *data)
+> -{
+> -	return data;
+> -}
+> -
+>  /**
+>   * of_fixed_clk_setup() - Setup function for simple fixed rate clock
+>   */
+> @@ -204,5 +208,5 @@ void __init of_fixed_clk_setup(struct device_node *node)
+>  
+>  	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
+>  	if (clk)
+> -		of_clk_add_provider(node, of_fixed_clk_get, clk);
+> +		of_clk_add_provider(node, NULL, clk);
+>  }
+> -- 
+> 1.7.5.4
+> 
 
 -- 
 Grant Likely, B.Sc, P.Eng.
