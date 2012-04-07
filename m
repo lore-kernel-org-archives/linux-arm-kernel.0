@@ -1,34 +1,33 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Sat, 07 Apr 2012 14:27:19 +0200
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
- use irq_alloc_desc() instead
-In-Reply-To: <1333755470.3040.38.camel@pasglop> (Benjamin Herrenschmidt's
- message of "Sat, 07 Apr 2012 09:37:50 +1000")
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
- <20120402202848.1EB833E02A7@localhost>
- <20120402215524.GM24211@n2100.arm.linux.org.uk>
- <1333406005.30734.61.camel@pasglop>
- <20120402225223.GN24211@n2100.arm.linux.org.uk>
- <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
- <1333755470.3040.38.camel@pasglop>
-Message-ID: <m2aa2n7mmw.fsf@igel.home>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 7 Apr 2012 21:45:37 +0800
+Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
+In-Reply-To: <20120407080032.GA17369@pengutronix.de>
+References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
+ <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+ <CAMiH66EC7=x0sRYhE3hpEyBemDGSRS19xguQUqKj2kuPw5Tifw@mail.gmail.com>
+ <20120404122335.GD17187@pengutronix.de>
+ <CAMiH66GM0RxP-z=HNkOhhPaaXCZLKPvWFy=_+aGbbGSdrsg+iQ@mail.gmail.com>
+ <20120406182122.GA13649@pengutronix.de>
+ <CAMiH66GxZoT-PDfkqBOFfn2jXi6n7B0jiDmMUV9GpT09J3z2yQ@mail.gmail.com>
+ <20120407080032.GA17369@pengutronix.de>
+Message-ID: <CAMiH66F4ev=M12Bav+kO6vYBdDkGFpBAPCwkgf5jRJHbRj=bpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
+On Sat, Apr 7, 2012 at 4:00 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>> emm..
+>> If you think this version is ok, I will ask Artem to accept another patch:
+>> " ?mtd/gpmi : do not include the mxs.h".
+>>
+>> My other patches depend on this patch. And they have been delayed for some time.
+>
+> Please wait at least somebody acknowledged that this has been picked up.
+> linux-next will break otherwise.
+>
 
-> It's arguable that this irq_set_irq_type(,NONE) shouln't be there but
-> still ... it's been around for ever and things worked :-) So something
-> -else- is causing the problem and I'd like to understand what exactly.
+ok, thanks.
 
-AFAICS before a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5
-irq_set_irq_type(,NONE) was actually a no-op.
-
-Andreas.
-
--- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+Huang Shijie
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
