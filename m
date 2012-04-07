@@ -1,27 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 7 Apr 2012 16:14:03 +0800
-Subject: [PATCH] mxs-dma : assign the dma cookie before we enable the dma
- channel
-In-Reply-To: <1333776575-3462-1-git-send-email-shijie8@gmail.com>
-References: <1333776575-3462-1-git-send-email-shijie8@gmail.com>
-Message-ID: <20120407081359.GT7264@S2101-09.ap.freescale.net>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Sat, 07 Apr 2012 14:27:19 +0200
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <1333755470.3040.38.camel@pasglop> (Benjamin Herrenschmidt's
+ message of "Sat, 07 Apr 2012 09:37:50 +1000")
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+ <20120402215524.GM24211@n2100.arm.linux.org.uk>
+ <1333406005.30734.61.camel@pasglop>
+ <20120402225223.GN24211@n2100.arm.linux.org.uk>
+ <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
+ <1333755470.3040.38.camel@pasglop>
+Message-ID: <m2aa2n7mmw.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 07, 2012 at 01:29:35AM -0400, Huang Shijie wrote:
-> The dma chain may finished very fast, so an interrupt may arises before
-> we assign the dma cookie. In this case, the mxs_dma_int_handler() may
-> hit the BUG_ON() in dma_cookie_complete().
-> 
-> So assign the dma cookie before we enable the dma channel.
-> 
-> Acked-by: Sam Gandhi <samgandhi9@gmail.com>
-> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
 
-Acked-by: Shawn Guo <shawn.guo@linaor.org>
+> It's arguable that this irq_set_irq_type(,NONE) shouln't be there but
+> still ... it's been around for ever and things worked :-) So something
+> -else- is causing the problem and I'd like to understand what exactly.
 
-The mxs mmc and audio still works with the change.
+AFAICS before a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5
+irq_set_irq_type(,NONE) was actually a no-op.
+
+Andreas.
 
 -- 
-Regards,
-Shawn
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
