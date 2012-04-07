@@ -1,74 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 07 Apr 2012 14:04:37 -0500
-Subject: [PATCH 2/7] of: add clock providers
-In-Reply-To: <20120407041841.054AE3E2F59@localhost>
-References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
- <1331680947-29861-3-git-send-email-robherring2@gmail.com>
- <20120407041841.054AE3E2F59@localhost>
-Message-ID: <4F808FC5.6090601@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 7 Apr 2012 13:32:31 -0700
+Subject: [PATCH] Input: eeti_ts: Mark as CONFIG_BROKEN
+In-Reply-To: <4F8089A9.6080704@raumfeld.com>
+References: <1333777207-4151-1-git-send-email-olof@lixom.net>
+ <20120407070206.GA17623@core.coreip.homeip.net>
+ <4F8089A9.6080704@raumfeld.com>
+Message-ID: <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2012 11:18 PM, Grant Likely wrote:
-> On Tue, 13 Mar 2012 18:22:22 -0500, Rob Herring <robherring2@gmail.com> wrote:
->> From: Grant Likely <grant.likely@secretlab.ca>
+On Sat, Apr 7, 2012 at 11:38 AM, Sven Neumann <s.neumann@raumfeld.com> wrote:
+> Hi,
+>
+>
+> On 07.04.12 09:02, Dmitry Torokhov wrote:
 >>
->> Based on work by Ben Herrenschmidt and Jeremy Kerr, this patch adds an
->> of_clk_get function to allow platforms to retrieve clock data from the
->> device tree.
+>> On Fri, Apr 06, 2012 at 10:40:07PM -0700, Olof Johansson wrote:
+>>>
+>>> This seems to have been broken since 2010, so obviously noone actually
+>>> cares about the driver:
+>>>
+>>> make[4]: *** [drivers/input/touchscreen/eeti_ts.o] Error 1
+>>> drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
+>>> drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of
+>>> function 'irq_to_gpio' [-Werror=implicit-function-declaration]
+>>>
+>>> irq_to_gpio isn't available on most platforms today, so the driver
+>>> will need some rework by someone who has hardware access and can test
+>>> (to make sure that, for example, switching to level interrupts and just
+>>> keep taking them while there's more to process works).
+>>>
+>>> I guess it could just be scheduled for removal, but let's start with
+>>> marking it CONFIG_BROKEN.
 >>
->> Platform register a provider through of_clk_add_provider, which will be
->> called when a device references the provider's OF node for a clock
->> reference.
 >>
->> v3: - Clarified documentation
->>
->> v2: - fixed errant ';' causing compile error
->>     - Editorial fixes from Shawn Guo
->>     - merged in adding lookup to clkdev
->>     - changed property names to match established convention. After
->>       working with the binding a bit it really made more sense to follow the
->>       lead of 'reg', 'gpios' and 'interrupts' by making the input simply
->>       'clocks' & 'clock-names' instead of 'clock-input-*', and to only use
->>       clock-output* for the producer nodes. (Sorry Shawn, this will mean
->>       you need to change some code, but it should be trivial)
->>     - Add ability to inherit clocks from parent nodes by using an empty
->>       'clock-ranges' property.  Useful for busses.  I could use some feedback
->>       on the new property name, 'clock-ranges' doesn't feel right to me.
->>
->> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->> Reviewed-by: Shawn Guo <shawn.guo@freescale.com>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->> Cc: Mike Turquette <mturquette@ti.com>
-> 
-> Hi Rob,
-> 
-> Thanks for respinning this patch.  Since you're actually using it, do
-> you want to take over getting it into mainline?
-> 
+>> Well, it probably works quite well on arches that do have irq_to_gpio(),
+>> let's ask Daniel and Sven if they still have this hardware and if they
+>> can try the patch below that implements what you suggested.
+>
+>
+> This hardware is still in use and we also still follow kernel development
+> and try to update our customer devices to recent kernel versions regularly.
+> Currently we are at 3.1.10 and the touchscreen works well with that. I'll
+> try to update to a more recent kernel next week and will try your patch.
 
-Yes. Is what you have on your public tree the latest?
+Ah, you're right, and this was my bad. Looks like this change was
+introduced in 3.2 and broke this and one more driver (ezx-pcap):
 
->> ---
->>  .../devicetree/bindings/clock/clock-bindings.txt   |  116 ++++++++++++++
->>  .../devicetree/bindings/clock/fixed-clock.txt      |   21 +++
->>  drivers/clk/clkdev.c                               |    9 +
->>  drivers/of/Kconfig                                 |    6 +
->>  drivers/of/Makefile                                |    1 +
->>  drivers/of/clock.c                                 |  165 ++++++++++++++++++++
-> 
-> I would actually like to see this file moved into drivers/clk.  I
-> don't think there is any need anymore to collect OF support code into
-> drivers/of.  I plan to move the spi and gpio support code into
-> drivers/spi and drivers/gpio respectively.
-> 
+Author:     Haojian Zhuang <haojian.zhuang@marvell.com>
+AuthorDate: Mon Oct 10 16:03:51 2011 +0800
+Commit:     Haojian Zhuang <haojian.zhuang@marvell.com>
+CommitDate: Mon Nov 14 21:07:59 2011 +0800
 
-You keep saying that and if you recall, the i2c maintainers objected to
-doing that. I'd imagine you'll find the spi and gpio maintainer more
-agreeable. ;)
+    ARM: pxa: rename gpio_to_irq and irq_to_gpio
 
-I'll have to think about how to split it as much of it is really clkdev
-code.
+    Avoid to define gpio_to_irq() and irq_to_gpio() for potential name
+    confliction since multiple architecture will be built together.
 
-Rob
+    Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+
+
+Haojian, I think it was probably premature to do the multiplatform
+change like that, since it means that a PXA-only kernel has no mapping
+from irq_to_gpio to pxa_irq_to_gpio. Can you please address this as a
+fix for 3.4?
+
+
+Thanks,
+
+-Olof
