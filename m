@@ -1,93 +1,43 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 7 Apr 2012 23:04:54 +0200
-Subject: [PATCH] Input: eeti_ts: Mark as CONFIG_BROKEN
-In-Reply-To: <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
-References: <1333777207-4151-1-git-send-email-olof@lixom.net>
- <20120407070206.GA17623@core.coreip.homeip.net>
- <4F8089A9.6080704@raumfeld.com>
- <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
-Message-ID: <CAGhQ9VwBBF97uM7kjfLz_VH12P7HpoKajBoF26vH7QAmQFDcFw@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sun, 08 Apr 2012 05:18:53 +0100
+Subject: [PATCHv2] ARM: orion5x: Fix GPIO enable bits for MPP9
+Message-ID: <1333858733.7150.115.camel@deadeye>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 7, 2012 at 10:32 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sat, Apr 7, 2012 at 11:38 AM, Sven Neumann <s.neumann@raumfeld.com> wrote:
->> Hi,
->>
->>
->> On 07.04.12 09:02, Dmitry Torokhov wrote:
->>>
->>> On Fri, Apr 06, 2012 at 10:40:07PM -0700, Olof Johansson wrote:
->>>>
->>>> This seems to have been broken since 2010, so obviously noone actually
->>>> cares about the driver:
->>>>
->>>> make[4]: *** [drivers/input/touchscreen/eeti_ts.o] Error 1
->>>> drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
->>>> drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of
->>>> function 'irq_to_gpio' [-Werror=implicit-function-declaration]
->>>>
->>>> irq_to_gpio isn't available on most platforms today, so the driver
->>>> will need some rework by someone who has hardware access and can test
->>>> (to make sure that, for example, switching to level interrupts and just
->>>> keep taking them while there's more to process works).
->>>>
->>>> I guess it could just be scheduled for removal, but let's start with
->>>> marking it CONFIG_BROKEN.
->>>
->>>
->>> Well, it probably works quite well on arches that do have irq_to_gpio(),
->>> let's ask Daniel and Sven if they still have this hardware and if they
->>> can try the patch below that implements what you suggested.
->>
->>
->> This hardware is still in use and we also still follow kernel development
->> and try to update our customer devices to recent kernel versions regularly.
->> Currently we are at 3.1.10 and the touchscreen works well with that. I'll
->> try to update to a more recent kernel next week and will try your patch.
->
-> Ah, you're right, and this was my bad. Looks like this change was
-> introduced in 3.2 and broke this and one more driver (ezx-pcap):
->
-> Author: ? ? Haojian Zhuang <haojian.zhuang@marvell.com>
-> AuthorDate: Mon Oct 10 16:03:51 2011 +0800
-> Commit: ? ? Haojian Zhuang <haojian.zhuang@marvell.com>
-> CommitDate: Mon Nov 14 21:07:59 2011 +0800
->
-> ? ?ARM: pxa: rename gpio_to_irq and irq_to_gpio
->
-> ? ?Avoid to define gpio_to_irq() and irq_to_gpio() for potential name
-> ? ?confliction since multiple architecture will be built together.
->
-> ? ?Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->
->
-> Haojian, I think it was probably premature to do the multiplatform
-> change like that, since it means that a PXA-only kernel has no mapping
-> from irq_to_gpio to pxa_irq_to_gpio. Can you please address this as a
-> fix for 3.4?
->
->
-> Thanks,
->
-> -Olof
+Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 ('ARM: orion5x: Refactor
+mpp code to use common orion platform mpp.') seems to have accidentally
+inverted the GPIO valid bits for MPP9 (only).  For the mv2120 platform
+which uses MPP9 as a GPIO LED device, this results in the error:
 
-It's the same story with AT91. Here irq_to_gpio was also removed some
-time ago. I believe it's the same for a lot of other ARM architectures
-also.
-Currently there 7 drivers that uses irq_to_gpio, these are obviously
-broken on architectures that not provide the function.
+[   12.711476] leds-gpio: probe of leds-gpio failed with error -22
 
-I think it would be better to fix the drivers rather than resurrect
-irq_to_gpio on the individual architectures.
+Reported-by: Henry von Tresckow <hvontres@gmail.com>
+References: http://bugs.debian.org/667446
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+Cc: stable at vger.kernel.org [v3.0+]
+---
+v2: Add subject of the earlier commit
 
-Users of irq_to_gpio in drivers:
-pata_rb532_cf, eeti_ts, egalax_ts, ezx-pcap, db1xxx_ss, tosa_battery, lis3l02dq
+Ben.
 
-regards
-Joachim Eastwood
+ arch/arm/mach-orion5x/mpp.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
+index eac6897..db70e79 100644
+--- a/arch/arm/mach-orion5x/mpp.h
++++ b/arch/arm/mach-orion5x/mpp.h
+@@ -65,8 +65,8 @@
+ #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
+ 
+ #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
+-#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
+-#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
++#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
++#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
+ 
+ #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
+ #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
+-- 
+1.7.9.5
