@@ -1,90 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun,  8 Apr 2012 14:18:40 -0700
-Subject: [PATCH] dma: pl330: fix a couple of compilation warnings
-Message-ID: <1333919920-25481-1-git-send-email-olof@lixom.net>
+From: hskinnemoen@gmail.com (=?ISO-8859-1?Q?H=E5vard_Skinnemoen?=)
+Date: Sun, 8 Apr 2012 14:21:49 -0700
+Subject: [PATCH RFC] ARM: at91: remove at91_register_uart_fns and headers
+In-Reply-To: <20120408180906.GA13348@samfundet.no>
+References: <1333728149-32711-1-git-send-email-joachim.eastwood@jotron.com>
+ <20120408180906.GA13348@samfundet.no>
+Message-ID: <CAF8ieYVvWJDEkVheGrCuQ+4Ucx_WV-M3qXia1-Y97vqCmeeETQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move a couple of tests and do a minor refactor to avoid:
+On Sun, Apr 8, 2012 at 11:09 AM, Hans-Christian Egtvedt
+<egtvedt@samfundet.no> wrote:
+> Around Fri 06 Apr 2012 18:02:29 +0200 or thereabout, Joachim Eastwood wrote:
+>> No AT91/AVR32 boards currently use at91_register_uart_fns so let's remove it.
+>>
+>> The only other mach in the kernel that has a *_register_uart_fns function
+>> is SA1100 so the demand for this functionality is not great.
+>
+> I agree with your statement, and I've never used this functionality. I'll
+> leave it to Nicolas to decide, AFAIK there are no AVR32 users of these
+> functions, if there are, they've never submitted any board code upstream.
 
-drivers/dma/pl330.c: In function 'pl330_probe':
-drivers/dma/pl330.c:2929:215: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-drivers/dma/pl330.c: In function 'pl330_tasklet':
-drivers/dma/pl330.c:2250:8: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
-drivers/dma/pl330.c:2228:25: note: 'pch' was declared here
-drivers/dma/pl330.c:2277:130: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
-drivers/dma/pl330.c:2260:25: note: 'pch' was declared here
+Yeah, as far as I know, nobody ever used this functionality on AVR32.
+In fact, I can't even think of a reason to use it.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- drivers/dma/pl330.c |   23 +++++++++++++----------
- 1 file changed, 13 insertions(+), 10 deletions(-)
+But I seem to recall submitting a patch to remove this functionality a
+long time ago, and it was struck down. I don't remember the reason,
+but there's a chance it might still be valid. The AT91 people should
+know.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 282caf11..ee0de4b 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2225,12 +2225,9 @@ static inline void free_desc_list(struct list_head *list)
- {
- 	struct dma_pl330_dmac *pdmac;
- 	struct dma_pl330_desc *desc;
--	struct dma_pl330_chan *pch;
-+	struct dma_pl330_chan *pch = NULL;
- 	unsigned long flags;
- 
--	if (list_empty(list))
--		return;
--
- 	/* Finish off the work list */
- 	list_for_each_entry(desc, list, node) {
- 		dma_async_tx_callback callback;
-@@ -2247,6 +2244,10 @@ static inline void free_desc_list(struct list_head *list)
- 		desc->pchan = NULL;
- 	}
- 
-+	/* pch will be unset if list was empty */
-+	if (!pch)
-+		return;
-+
- 	pdmac = pch->dmac;
- 
- 	spin_lock_irqsave(&pdmac->pool_lock, flags);
-@@ -2257,12 +2258,9 @@ static inline void free_desc_list(struct list_head *list)
- static inline void handle_cyclic_desc_list(struct list_head *list)
- {
- 	struct dma_pl330_desc *desc;
--	struct dma_pl330_chan *pch;
-+	struct dma_pl330_chan *pch = NULL;
- 	unsigned long flags;
- 
--	if (list_empty(list))
--		return;
--
- 	list_for_each_entry(desc, list, node) {
- 		dma_async_tx_callback callback;
- 
-@@ -2274,6 +2272,10 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
- 			callback(desc->txd.callback_param);
- 	}
- 
-+	/* pch will be unset if list was empty */
-+	if (!pch)
-+		return;
-+
- 	spin_lock_irqsave(&pch->lock, flags);
- 	list_splice_tail_init(list, &pch->work_list);
- 	spin_unlock_irqrestore(&pch->lock, flags);
-@@ -2926,8 +2928,9 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	INIT_LIST_HEAD(&pd->channels);
- 
- 	/* Initialize channel parameters */
--	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
--			(u8)pi->pcfg.num_chan);
-+	num_chan = max_t(int, pdat ? pdat->nr_valid_peri :
-+				     pi->pcfg.num_peri,
-+			      pi->pcfg.num_chan);
- 	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
- 
- 	for (i = 0; i < num_chan; i++) {
--- 
-1.7.9.2.359.gebfc2
+>> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+>
+> Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+
+Acked-by: Havard Skinnemoen <hskinnemoen@gmail.com>
