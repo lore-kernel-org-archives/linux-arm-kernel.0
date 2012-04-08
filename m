@@ -1,43 +1,54 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Sun, 08 Apr 2012 05:18:53 +0100
-Subject: [PATCHv2] ARM: orion5x: Fix GPIO enable bits for MPP9
-Message-ID: <1333858733.7150.115.camel@deadeye>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 08 Apr 2012 09:48:27 -0500
+Subject: [PATCH 4/7] dt/clock: Add handling for fixed clocks and a clock
+ node setup iterator
+In-Reply-To: <20120314075930.GF21337@S2101-09.ap.freescale.net>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-5-git-send-email-robherring2@gmail.com>
+ <20120314075930.GF21337@S2101-09.ap.freescale.net>
+Message-ID: <4F81A53B.7020804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 ('ARM: orion5x: Refactor
-mpp code to use common orion platform mpp.') seems to have accidentally
-inverted the GPIO valid bits for MPP9 (only).  For the mv2120 platform
-which uses MPP9 as a GPIO LED device, this results in the error:
+Shawn,
 
-[   12.711476] leds-gpio: probe of leds-gpio failed with error -22
+On 03/14/2012 02:59 AM, Shawn Guo wrote:
+> On Tue, Mar 13, 2012 at 06:22:24PM -0500, Rob Herring wrote:
+> ...
+>> +/**
+>> + * of_fixed_clk_setup() - Setup function for simple fixed rate clock
+>> + */
+>> +void __init of_fixed_clk_setup(struct device_node *node)
+>> +{
+>> +	struct clk *clk;
+>> +	const char *clk_name = node->name;
+>> +	u32 rate;
+>> +
+>> +	if (of_property_read_u32(node, "clock-frequency", &rate))
+>> +		return;
+>> +
+>> +	of_property_read_string(node, "clock-output-names", &clk_name);
+>> +
+>> +	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
+>> +	if (clk)
+>> +		of_clk_add_provider(node, of_fixed_clk_get, clk);
+>> +}
+> 
+> It seems my comment[1] did not get addressed in this post.
+> 
+> Regards,
+> Shawn
+> 
+> [1] http://article.gmane.org/gmane.linux.drivers.devicetree/10589
 
-Reported-by: Henry von Tresckow <hvontres@gmail.com>
-References: http://bugs.debian.org/667446
-Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-Cc: stable at vger.kernel.org [v3.0+]
----
-v2: Add subject of the earlier commit
+So I started implementing support for multiple outputs, but ran into a
+complication. If you have multiple clocks on a node, then you have to
+have a clk_src_get function to translate the clock cell value to a
+struct clk. This would also require allocating an array of struct clk's
+to do the lookup. This is all doable, but I don't see the benefit over
+having a single node per fixed clock. We're not likely to have *lots* of
+fixed clocks. I think we should leave fixed-clock defined as a single
+output. If you really see the benefit, you can add a new binding
+"multiple-fixed-clocks" or something platform specific.
 
-Ben.
-
- arch/arm/mach-orion5x/mpp.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
-index eac6897..db70e79 100644
---- a/arch/arm/mach-orion5x/mpp.h
-+++ b/arch/arm/mach-orion5x/mpp.h
-@@ -65,8 +65,8 @@
- #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
- 
- #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
--#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
--#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
-+#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
-+#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
- 
- #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
- #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
--- 
-1.7.9.5
+Rob
