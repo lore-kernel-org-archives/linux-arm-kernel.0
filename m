@@ -1,35 +1,90 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun,  8 Apr 2012 23:23:30 +0300
-Subject: [PATCH RESEND] omap1: mux: add missing include
-Message-ID: <1333916610-7451-1-git-send-email-aaro.koskinen@iki.fi>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun,  8 Apr 2012 14:18:40 -0700
+Subject: [PATCH] dma: pl330: fix a couple of compilation warnings
+Message-ID: <1333919920-25481-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build breakage in v3.4-rc2:
+Move a couple of tests and do a minor refactor to avoid:
 
-arch/arm/mach-omap1/mux.c:89:1: error: 'FUNC_MUX_CTRL_9' undeclared here (not in a function)
-arch/arm/mach-omap1/mux.c:89:1: error: 'PULL_DWN_CTRL_2' undeclared here (not in a function)
-arch/arm/mach-omap1/mux.c:93:1: error: 'FUNC_MUX_CTRL_C' undeclared here (not in a function)
+drivers/dma/pl330.c: In function 'pl330_probe':
+drivers/dma/pl330.c:2929:215: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+drivers/dma/pl330.c: In function 'pl330_tasklet':
+drivers/dma/pl330.c:2250:8: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
+drivers/dma/pl330.c:2228:25: note: 'pch' was declared here
+drivers/dma/pl330.c:2277:130: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
+drivers/dma/pl330.c:2260:25: note: 'pch' was declared here
 
-etc.
-
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-omap1/mux.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/dma/pl330.c |   23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/mux.c b/arch/arm/mach-omap1/mux.c
-index 087dba0..e9cc52d 100644
---- a/arch/arm/mach-omap1/mux.c
-+++ b/arch/arm/mach-omap1/mux.c
-@@ -27,6 +27,7 @@
- #include <linux/io.h>
- #include <linux/spinlock.h>
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 282caf11..ee0de4b 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2225,12 +2225,9 @@ static inline void free_desc_list(struct list_head *list)
+ {
+ 	struct dma_pl330_dmac *pdmac;
+ 	struct dma_pl330_desc *desc;
+-	struct dma_pl330_chan *pch;
++	struct dma_pl330_chan *pch = NULL;
+ 	unsigned long flags;
  
-+#include <mach/hardware.h>
+-	if (list_empty(list))
+-		return;
+-
+ 	/* Finish off the work list */
+ 	list_for_each_entry(desc, list, node) {
+ 		dma_async_tx_callback callback;
+@@ -2247,6 +2244,10 @@ static inline void free_desc_list(struct list_head *list)
+ 		desc->pchan = NULL;
+ 	}
  
- #include <plat/mux.h>
++	/* pch will be unset if list was empty */
++	if (!pch)
++		return;
++
+ 	pdmac = pch->dmac;
  
+ 	spin_lock_irqsave(&pdmac->pool_lock, flags);
+@@ -2257,12 +2258,9 @@ static inline void free_desc_list(struct list_head *list)
+ static inline void handle_cyclic_desc_list(struct list_head *list)
+ {
+ 	struct dma_pl330_desc *desc;
+-	struct dma_pl330_chan *pch;
++	struct dma_pl330_chan *pch = NULL;
+ 	unsigned long flags;
+ 
+-	if (list_empty(list))
+-		return;
+-
+ 	list_for_each_entry(desc, list, node) {
+ 		dma_async_tx_callback callback;
+ 
+@@ -2274,6 +2272,10 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
+ 			callback(desc->txd.callback_param);
+ 	}
+ 
++	/* pch will be unset if list was empty */
++	if (!pch)
++		return;
++
+ 	spin_lock_irqsave(&pch->lock, flags);
+ 	list_splice_tail_init(list, &pch->work_list);
+ 	spin_unlock_irqrestore(&pch->lock, flags);
+@@ -2926,8 +2928,9 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	INIT_LIST_HEAD(&pd->channels);
+ 
+ 	/* Initialize channel parameters */
+-	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
+-			(u8)pi->pcfg.num_chan);
++	num_chan = max_t(int, pdat ? pdat->nr_valid_peri :
++				     pi->pcfg.num_peri,
++			      pi->pcfg.num_chan);
+ 	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
+ 
+ 	for (i = 0; i < num_chan; i++) {
 -- 
-1.7.2.5
+1.7.9.2.359.gebfc2
