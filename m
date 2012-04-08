@@ -1,376 +1,291 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  8 Apr 2012 17:40:04 +0200
-Subject: [PATCH 08/10] ARN: at91: introduce SOC_AT91xxx define to allow to
- compile SoC core support
+Date: Sun,  8 Apr 2012 17:40:01 +0200
+Subject: [PATCH 05/10] ARM: at91: move at91_init_leds to board init
 In-Reply-To: <20120408151236.GH16641@game.jcrosoft.org>
 References: <20120408151236.GH16641@game.jcrosoft.org>
-Message-ID: <1333899606-30518-8-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1333899606-30518-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now compile all SoC core support together and DT boards.
-We still can not compile together the non DT board.
-So We keep the ARCH_AT91xxx for the non DT board and for backward defconfig
-compatibility. This will enable the plaform_device ressources.
+This will also allow to finally move the gpio driver to platform device/driver.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/configs/at91rm9200_defconfig |    1 +
- arch/arm/mach-at91/Kconfig            |   86 ++++++++++++++++++++++----------
- arch/arm/mach-at91/Makefile           |   25 ++++++----
- arch/arm/mach-at91/include/mach/cpu.h |   28 ++++-------
- arch/arm/mach-at91/pm.h               |    2 +-
- arch/arm/mach-at91/pm_slowclock.S     |    2 +-
- arch/arm/mach-at91/soc.h              |   14 +++---
- 7 files changed, 96 insertions(+), 62 deletions(-)
+ arch/arm/mach-at91/board-csb337.c     |    5 ++---
+ arch/arm/mach-at91/board-ecbat91.c    |    6 +++---
+ arch/arm/mach-at91/board-eco920.c     |    5 ++---
+ arch/arm/mach-at91/board-kafa.c       |    6 +++---
+ arch/arm/mach-at91/board-kb9202.c     |    6 +++---
+ arch/arm/mach-at91/board-rm9200dk.c   |    6 +++---
+ arch/arm/mach-at91/board-rm9200ek.c   |    6 +++---
+ arch/arm/mach-at91/board-rsi-ews.c    |    6 +++---
+ arch/arm/mach-at91/board-sam9-l9260.c |    6 +++---
+ arch/arm/mach-at91/board-sam9261ek.c  |    6 +++---
+ arch/arm/mach-at91/board-yl-9200.c    |    6 +++---
+ 11 files changed, 31 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/configs/at91rm9200_defconfig b/arch/arm/configs/at91rm9200_defconfig
-index bbe4e1a..d54e2ac 100644
---- a/arch/arm/configs/at91rm9200_defconfig
-+++ b/arch/arm/configs/at91rm9200_defconfig
-@@ -14,6 +14,7 @@ CONFIG_MODULE_SRCVERSION_ALL=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_AT91=y
-+CONFIG_ARCH_AT91RM9200=y
- CONFIG_MACH_ONEARM=y
- CONFIG_ARCH_AT91RM9200DK=y
- CONFIG_MACH_AT91RM9200EK=y
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 40e31c7..80e8d61 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -24,68 +24,61 @@ config SOC_AT91SAM9
- 
- menu "Atmel AT91 System-on-Chip"
- 
--choice
--	prompt "Atmel AT91 Processor"
-+comment "Atmel AT91 Processor"
- 
--config ARCH_AT91RM9200
-+config SOC_AT91SAM9
-+	bool
-+	select CPU_ARM926T
-+	select AT91_SAM9_TIME
-+	select AT91_SAM9_SMC
-+
-+config SOC_AT91RM9200
- 	bool "AT91RM9200"
- 	select CPU_ARM920T
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_DBGU0
- 
--config ARCH_AT91SAM9260
--	bool "AT91SAM9260 or AT91SAM9XE"
-+config SOC_AT91SAM9260
-+	bool "AT91SAM9260 or AT91SAM9XE or AT91SAM9G20"
- 	select SOC_AT91SAM9
- 	select HAVE_AT91_DBGU0
- 	select HAVE_NET_MACB
- 
--config ARCH_AT91SAM9261
--	bool "AT91SAM9261"
--	select SOC_AT91SAM9
--	select HAVE_FB_ATMEL
--	select HAVE_AT91_DBGU0
+diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
+index ad7f9f0..cd81336 100644
+--- a/arch/arm/mach-at91/board-csb337.c
++++ b/arch/arm/mach-at91/board-csb337.c
+@@ -47,9 +47,6 @@ static void __init csb337_init_early(void)
+ {
+ 	/* Initialize processor: 3.6864 MHz crystal */
+ 	at91_initialize(3686400);
 -
--config ARCH_AT91SAM9G10
--	bool "AT91SAM9G10"
-+config SOC_AT91SAM9261
-+	bool "AT91SAM9261 or AT91SAM9G10"
- 	select SOC_AT91SAM9
- 	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 
--config ARCH_AT91SAM9263
-+config SOC_AT91SAM9263
- 	bool "AT91SAM9263"
- 	select SOC_AT91SAM9
-+	select HAVE_AT91_DBGU1
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
--	select HAVE_AT91_DBGU1
- 
--config ARCH_AT91SAM9RL
-+config SOC_AT91SAM9RL
- 	bool "AT91SAM9RL"
- 	select SOC_AT91SAM9
--	select HAVE_FB_ATMEL
- 	select HAVE_AT91_DBGU0
-+	select HAVE_FB_ATMEL
- 
--config ARCH_AT91SAM9G20
--	bool "AT91SAM9G20"
--	select SOC_AT91SAM9
--	select HAVE_AT91_DBGU0
--	select HAVE_NET_MACB
--
--config ARCH_AT91SAM9G45
-+config SOC_AT91SAM9G45
- 	bool "AT91SAM9G45 or AT91SAM9M10 families"
- 	select SOC_AT91SAM9
-+	select HAVE_AT91_DBGU1
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
--	select HAVE_AT91_DBGU1
- 	help
- 	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
- 	  This support covers AT91SAM9G45, AT91SAM9G46, AT91SAM9M10 and AT91SAM9M11.
- 
--config ARCH_AT91SAM9X5
-+config SOC_AT91SAM9X5
- 	bool "AT91SAM9x5 family"
- 	select SOC_AT91SAM9
-+	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
--	select HAVE_AT91_DBGU0
- 	help
- 	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
- 	  This means that your SAM9 name finishes with a '5' (except if it is
-@@ -93,8 +86,47 @@ config ARCH_AT91SAM9X5
- 	  This support covers AT91SAM9G15, AT91SAM9G25, AT91SAM9X25, AT91SAM9G35
- 	  and AT91SAM9X35.
- 
-+choice
-+	prompt "Atmel AT91 Processor Devices for non DT baards"
-+
-+config ARCH_AT91_NONE
-+	bool "None"
-+
-+config ARCH_AT91RM9200
-+	bool "AT91RM9200"
-+	select SOC_AT91RM9200
-+
-+config ARCH_AT91SAM9260
-+	bool "AT91SAM9260 or AT91SAM9XE"
-+	select SOC_AT91SAM9260
-+
-+config ARCH_AT91SAM9261
-+	bool "AT91SAM9261"
-+	select SOC_AT91SAM9261
-+
-+config ARCH_AT91SAM9G10
-+	bool "AT91SAM9G10"
-+	select SOC_AT91SAM9261
-+
-+config ARCH_AT91SAM9263
-+	bool "AT91SAM9263"
-+	select SOC_AT91SAM9263
-+
-+config ARCH_AT91SAM9RL
-+	bool "AT91SAM9RL"
-+	select SOC_AT91SAM9RL
-+
-+config ARCH_AT91SAM9G20
-+	bool "AT91SAM9G20"
-+	select SOC_AT91SAM9260
-+
-+config ARCH_AT91SAM9G45
-+	bool "AT91SAM9G45"
-+	select SOC_AT91SAM9G45
-+
- config ARCH_AT91X40
- 	bool "AT91x40"
-+	depends on !MMU
- 	select ARCH_USES_GETTIMEOFFSET
- 
- endchoice
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index d97d0f4..79d0f60 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -13,15 +13,22 @@ obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
- obj-$(CONFIG_SOC_AT91SAM9)	+= at91sam926x_time.o sam9_smc.o
- 
- # CPU-specific support
--obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o at91rm9200_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam9260_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam9261_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam9261_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam9263_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam9rl_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam9260_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam9g45_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9X5)	+= at91sam9x5.o
-+obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
-+obj-$(CONFIG_SOC_AT91SAM9260)	+= at91sam9260.o
-+obj-$(CONFIG_SOC_AT91SAM9261)	+= at91sam9261.o
-+obj-$(CONFIG_SOC_AT91SAM9263)	+= at91sam9263.o
-+obj-$(CONFIG_SOC_AT91SAM9G45)	+= at91sam9g45.o
-+obj-$(CONFIG_SOC_AT91SAM9X5)	+= at91sam9x5.o
-+obj-$(CONFIG_SOC_AT91SAM9RL)	+= at91sam9rl.o
-+
-+obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45_devices.o
- obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
- 
- # AT91RM9200 board-specific support
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index 0118c33..73d2fd2 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -54,6 +54,7 @@
- #define ARCH_REVISON_9200_BGA	(0 << 0)
- #define ARCH_REVISON_9200_PQFP	(1 << 0)
- 
-+#ifndef __ASSEMBLY__
- enum at91_soc_type {
- 	/* 920T */
- 	AT91_SOC_RM9200,
-@@ -106,7 +107,7 @@ static inline int at91_soc_is_detected(void)
- 	return at91_soc_initdata.type != AT91_SOC_NONE;
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
  }
  
--#ifdef CONFIG_ARCH_AT91RM9200
-+#ifdef CONFIG_SOC_AT91RM9200
- #define cpu_is_at91rm9200()	(at91_soc_initdata.type == AT91_SOC_RM9200)
- #define cpu_is_at91rm9200_bga()	(at91_soc_initdata.subtype == AT91_SOC_RM9200_BGA)
- #define cpu_is_at91rm9200_pqfp() (at91_soc_initdata.subtype == AT91_SOC_RM9200_PQFP)
-@@ -116,45 +117,37 @@ static inline int at91_soc_is_detected(void)
- #define cpu_is_at91rm9200_pqfp() (0)
- #endif
+ static struct macb_platform_data __initdata csb337_eth_data = {
+@@ -222,6 +219,8 @@ static struct gpio_led csb_leds[] = {
  
--#ifdef CONFIG_ARCH_AT91SAM9260
-+#ifdef CONFIG_SOC_AT91SAM9260
- #define cpu_is_at91sam9xe()	(at91_soc_initdata.subtype == AT91_SOC_SAM9XE)
- #define cpu_is_at91sam9260()	(at91_soc_initdata.type == AT91_SOC_SAM9260)
-+#define cpu_is_at91sam9g20()	(at91_soc_initdata.type == AT91_SOC_SAM9G20)
- #else
- #define cpu_is_at91sam9xe()	(0)
- #define cpu_is_at91sam9260()	(0)
--#endif
+ static void __init csb337_board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
+ 	/* Serial */
+ 	/* DBGU on ttyS0 */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
+index 2510825..89cc372 100644
+--- a/arch/arm/mach-at91/board-ecbat91.c
++++ b/arch/arm/mach-at91/board-ecbat91.c
+@@ -50,9 +50,6 @@ static void __init ecb_at91init_early(void)
+ 
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
 -
--#ifdef CONFIG_ARCH_AT91SAM9G20
--#define cpu_is_at91sam9g20()	(at91_soc_initdata.type == AT91_SOC_SAM9G20)
--#else
- #define cpu_is_at91sam9g20()	(0)
- #endif
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PC7, AT91_PIN_PC7);
+ }
  
--#ifdef CONFIG_ARCH_AT91SAM9261
-+#ifdef CONFIG_SOC_AT91SAM9261
- #define cpu_is_at91sam9261()	(at91_soc_initdata.type == AT91_SOC_SAM9261)
--#else
--#define cpu_is_at91sam9261()	(0)
--#endif
+ static struct macb_platform_data __initdata ecb_at91eth_data = {
+@@ -142,6 +139,9 @@ static struct spi_board_info __initdata ecb_at91spi_devices[] = {
+ 
+ static void __init ecb_at91board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PC7, AT91_PIN_PC7);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
+index bebeae8..558546c 100644
+--- a/arch/arm/mach-at91/board-eco920.c
++++ b/arch/arm/mach-at91/board-eco920.c
+@@ -37,9 +37,6 @@ static void __init eco920_init_early(void)
+ 	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+ 
+ 	at91_initialize(18432000);
 -
--#ifdef CONFIG_ARCH_AT91SAM9G10
- #define cpu_is_at91sam9g10()	(at91_soc_initdata.type == AT91_SOC_SAM9G10)
- #else
-+#define cpu_is_at91sam9261()	(0)
- #define cpu_is_at91sam9g10()	(0)
- #endif
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
+ }
  
--#ifdef CONFIG_ARCH_AT91SAM9263
-+#ifdef CONFIG_SOC_AT91SAM9263
- #define cpu_is_at91sam9263()	(at91_soc_initdata.type == AT91_SOC_SAM9263)
- #else
- #define cpu_is_at91sam9263()	(0)
- #endif
+ static struct macb_platform_data __initdata eco920_eth_data = {
+@@ -97,6 +94,8 @@ static struct spi_board_info eco920_spi_devices[] = {
  
--#ifdef CONFIG_ARCH_AT91SAM9RL
-+#ifdef CONFIG_SOC_AT91SAM9RL
- #define cpu_is_at91sam9rl()	(at91_soc_initdata.type == AT91_SOC_SAM9RL)
- #else
- #define cpu_is_at91sam9rl()	(0)
- #endif
+ static void __init eco920_board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
+ 	/* DBGU on ttyS0. (Rx & Tx only */
+ 	at91_register_uart(0, 0, 0);
+ 	at91_add_device_serial();
+diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
+index f46b3eb..f260657 100644
+--- a/arch/arm/mach-at91/board-kafa.c
++++ b/arch/arm/mach-at91/board-kafa.c
+@@ -47,9 +47,6 @@ static void __init kafa_init_early(void)
  
--#ifdef CONFIG_ARCH_AT91SAM9G45
-+#ifdef CONFIG_SOC_AT91SAM9G45
- #define cpu_is_at91sam9g45()	(at91_soc_initdata.type == AT91_SOC_SAM9G45)
- #define cpu_is_at91sam9g45es()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G45ES)
- #define cpu_is_at91sam9m10()	(at91_soc_initdata.subtype == AT91_SOC_SAM9M10)
-@@ -168,7 +161,7 @@ static inline int at91_soc_is_detected(void)
- #define cpu_is_at91sam9m11()	(0)
- #endif
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
+-
+-	/* Set up the LEDs */
+-	at91_init_leds(AT91_PIN_PB4, AT91_PIN_PB4);
+ }
  
--#ifdef CONFIG_ARCH_AT91SAM9X5
-+#ifdef CONFIG_SOC_AT91SAM9X5
- #define cpu_is_at91sam9x5()	(at91_soc_initdata.type == AT91_SOC_SAM9X5)
- #define cpu_is_at91sam9g15()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G15)
- #define cpu_is_at91sam9g35()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G35)
-@@ -189,5 +182,6 @@ static inline int at91_soc_is_detected(void)
-  * definitions may reduce clutter in common drivers.
+ static struct macb_platform_data __initdata kafa_eth_data = {
+@@ -70,6 +67,9 @@ static struct at91_udc_data __initdata kafa_udc_data = {
+ 
+ static void __init kafa_board_init(void)
+ {
++	/* Set up the LEDs */
++	at91_init_leds(AT91_PIN_PB4, AT91_PIN_PB4);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
+index e71b9e1..ba39db5 100644
+--- a/arch/arm/mach-at91/board-kb9202.c
++++ b/arch/arm/mach-at91/board-kb9202.c
+@@ -50,9 +50,6 @@ static void __init kb9202_init_early(void)
+ 
+ 	/* Initialize processor: 10 MHz crystal */
+ 	at91_initialize(10000000);
+-
+-	/* Set up the LEDs */
+-	at91_init_leds(AT91_PIN_PC19, AT91_PIN_PC18);
+ }
+ 
+ static struct macb_platform_data __initdata kb9202_eth_data = {
+@@ -100,6 +97,9 @@ static struct atmel_nand_data __initdata kb9202_nand_data = {
+ 
+ static void __init kb9202_board_init(void)
+ {
++	/* Set up the LEDs */
++	at91_init_leds(AT91_PIN_PC19, AT91_PIN_PC18);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
+index 4a0b097..afd7a47 100644
+--- a/arch/arm/mach-at91/board-rm9200dk.c
++++ b/arch/arm/mach-at91/board-rm9200dk.c
+@@ -50,9 +50,6 @@ static void __init dk_init_early(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
+-
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PB2, AT91_PIN_PB2);
+ }
+ 
+ static struct macb_platform_data __initdata dk_eth_data = {
+@@ -179,6 +176,9 @@ static struct gpio_led dk_leds[] = {
+ 
+ static void __init dk_board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PB2, AT91_PIN_PB2);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
+index b687261..78ffc83 100644
+--- a/arch/arm/mach-at91/board-rm9200ek.c
++++ b/arch/arm/mach-at91/board-rm9200ek.c
+@@ -50,9 +50,6 @@ static void __init ek_init_early(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
+-
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PB1, AT91_PIN_PB2);
+ }
+ 
+ static struct macb_platform_data __initdata ek_eth_data = {
+@@ -150,6 +147,9 @@ static struct gpio_led ek_leds[] = {
+ 
+ static void __init ek_board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PB1, AT91_PIN_PB2);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
+index 10d8730..24ab9be 100644
+--- a/arch/arm/mach-at91/board-rsi-ews.c
++++ b/arch/arm/mach-at91/board-rsi-ews.c
+@@ -35,9 +35,6 @@ static void __init rsi_ews_init_early(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
+-
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PB6, AT91_PIN_PB9);
+ }
+ 
+ /*
+@@ -187,6 +184,9 @@ static struct platform_device rsiews_nor_flash = {
   */
- #define cpu_is_at32ap7000()	(0)
-+#endif /* __ASSEMBLY__ */
- 
- #endif /* __MACH_CPU_H__ */
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 1b4865e..38f467c 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -70,7 +70,7 @@ static inline void at91sam9g45_standby(void)
- 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+ static void __init rsi_ews_board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PB6, AT91_PIN_PB9);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	/* This one is for debugging */
+diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
+index 5343dab..cdd21f2 100644
+--- a/arch/arm/mach-at91/board-sam9-l9260.c
++++ b/arch/arm/mach-at91/board-sam9-l9260.c
+@@ -48,9 +48,6 @@ static void __init ek_init_early(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
+-
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PA9, AT91_PIN_PA6);
  }
  
--#ifdef CONFIG_ARCH_AT91SAM9263
-+#ifdef CONFIG_SOC_AT91SAM9263
  /*
-  * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-  * handle those cases both here and in the Suspend-To-RAM support.
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index db54521..098c28d 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -18,7 +18,7 @@
- #include <mach/at91_ramc.h>
+@@ -170,6 +167,9 @@ static struct at91_mmc_data __initdata ek_mmc_data = {
  
- 
--#ifdef CONFIG_ARCH_AT91SAM9263
-+#ifdef CONFIG_SOC_AT91SAM9263
- /*
-  * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-  * handle those cases both here and in the Suspend-To-RAM support.
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index 5db4aa4..683dddf 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -26,30 +26,30 @@ static inline int at91_soc_is_enabled(void)
- 	return at91_boot_soc.init != NULL;
+ static void __init ek_board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PA9, AT91_PIN_PA6);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index 4406f6b..065b5ee 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -58,9 +58,6 @@ static void __init ek_init_early(void)
+ {
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
+-
+-	/* Setup the LEDs */
+-	at91_init_leds(AT91_PIN_PA13, AT91_PIN_PA14);
  }
  
--#if !defined(CONFIG_ARCH_AT91RM9200)
-+#if !defined(CONFIG_SOC_AT91RM9200)
- #define at91rm9200_soc	at91_boot_soc
- #endif
+ /*
+@@ -570,6 +567,9 @@ static struct gpio_led ek_leds[] = {
  
--#if !(defined(CONFIG_ARCH_AT91SAM9260) || defined(CONFIG_ARCH_AT91SAM9G20))
-+#if !defined(CONFIG_SOC_AT91SAM9260)
- #define at91sam9260_soc	at91_boot_soc
- #endif
+ static void __init ek_board_init(void)
+ {
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PA13, AT91_PIN_PA14);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
+diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
+index db8d25c..d56665e 100644
+--- a/arch/arm/mach-at91/board-yl-9200.c
++++ b/arch/arm/mach-at91/board-yl-9200.c
+@@ -58,9 +58,6 @@ static void __init yl9200_init_early(void)
  
--#if !(defined(CONFIG_ARCH_AT91SAM9261) || defined(CONFIG_ARCH_AT91SAM9G10))
-+#if !defined(CONFIG_SOC_AT91SAM9261)
- #define at91sam9261_soc	at91_boot_soc
- #endif
+ 	/* Initialize processor: 18.432 MHz crystal */
+ 	at91_initialize(18432000);
+-
+-	/* Setup the LEDs D2=PB17 (timer), D3=PB16 (cpu) */
+-	at91_init_leds(AT91_PIN_PB16, AT91_PIN_PB17);
+ }
  
--#if !defined(CONFIG_ARCH_AT91SAM9263)
-+#if !defined(CONFIG_SOC_AT91SAM9263)
- #define at91sam9263_soc	at91_boot_soc
- #endif
+ /*
+@@ -543,6 +540,9 @@ void __init yl9200_add_device_video(void) {}
  
--#if !defined(CONFIG_ARCH_AT91SAM9G45)
-+#if !defined(CONFIG_SOC_AT91SAM9G45)
- #define at91sam9g45_soc	at91_boot_soc
- #endif
- 
--#if !defined(CONFIG_ARCH_AT91SAM9RL)
-+#if !defined(CONFIG_SOC_AT91SAM9RL)
- #define at91sam9rl_soc	at91_boot_soc
- #endif
- 
--#if !defined(CONFIG_ARCH_AT91SAM9X5)
-+#if !defined(CONFIG_SOC_AT91SAM9X5)
- #define at91sam9x5_soc	at91_boot_soc
- #endif
+ static void __init yl9200_board_init(void)
+ {
++	/* Setup the LEDs D2=PB17 (timer), D3=PB16 (cpu) */
++	at91_init_leds(AT91_PIN_PB16, AT91_PIN_PB17);
++
+ 	/* Serial */
+ 	/* DBGU on ttyS0. (Rx & Tx only) */
+ 	at91_register_uart(0, 0, 0);
 -- 
 1.7.9.1
