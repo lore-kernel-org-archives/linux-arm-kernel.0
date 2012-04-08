@@ -1,137 +1,51 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  8 Apr 2012 17:40:03 +0200
-Subject: [PATCH 07/10] ARM: at91: add SOC_AT91SAM9 kconfig option to factorise
- select
+Date: Sun,  8 Apr 2012 17:40:05 +0200
+Subject: [PATCH 09/10] ARM: at91/dt: do not specify the board any more
 In-Reply-To: <20120408151236.GH16641@game.jcrosoft.org>
 References: <20120408151236.GH16641@game.jcrosoft.org>
-Message-ID: <1333899606-30518-7-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1333899606-30518-9-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow to simplify the switch to multi soc in the same kernel.
+This will allow to add any board to a compiled kernel by just passing the DTB.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/Kconfig  |   29 +++++++++++++----------------
- arch/arm/mach-at91/Makefile |   17 +++++++++--------
- 2 files changed, 22 insertions(+), 24 deletions(-)
+ arch/arm/mach-at91/board-dt.c |   14 +++++---------
+ 1 files changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 885fdb9..40e31c7 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -17,6 +17,11 @@ config AT91_SAM9G45_RESET
- 	bool
- 	default !ARCH_AT91X40
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index c18d4d3..78a4a61 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -1,12 +1,10 @@
+ /*
+- *  Setup code for AT91SAM Evaluation Kits with Device Tree support
++ * Setup code for AT91SAM Evaluation Kits with Device Tree support
+  *
+- *  Covers: * AT91SAM9G45-EKES  board
+- *          * AT91SAM9M10-EKES  board
+- *          * AT91SAM9M10G45-EK board
++ * Copyright (C) 2011-2012 Atmel,
++ *		 2011-2012 Nicolas Ferre <nicolas.ferre@atmel.com>
+  *
+- *  Copyright (C) 2011 Atmel,
+- *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
++ * Copyright (C) 2011-2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+  *
+  * Licensed under GPLv2 or later.
+  */
+@@ -49,9 +47,7 @@ static void __init at91_dt_device_init(void)
+ }
  
-+config SOC_AT91SAM9
-+	bool
-+	select GENERIC_CLOCKEVENTS
-+	select CPU_ARM926T
-+
- menu "Atmel AT91 System-on-Chip"
+ static const char *at91_dt_board_compat[] __initdata = {
+-	"atmel,at91sam9m10g45ek",
+-	"atmel,at91sam9x5ek",
+-	"calao,usb-a9g20",
++	"atmel,at91sam9",
+ 	NULL
+ };
  
- choice
-@@ -30,51 +35,44 @@ config ARCH_AT91RM9200
- 
- config ARCH_AT91SAM9260
- 	bool "AT91SAM9260 or AT91SAM9XE"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_AT91_DBGU0
- 	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9261
- 	bool "AT91SAM9261"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_FB_ATMEL
- 	select HAVE_AT91_DBGU0
- 
- config ARCH_AT91SAM9G10
- 	bool "AT91SAM9G10"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 
- config ARCH_AT91SAM9263
- 	bool "AT91SAM9263"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
- 	select HAVE_AT91_DBGU1
- 
- config ARCH_AT91SAM9RL
- 	bool "AT91SAM9RL"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_FB_ATMEL
- 	select HAVE_AT91_DBGU0
- 
- config ARCH_AT91SAM9G20
- 	bool "AT91SAM9G20"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_AT91_DBGU0
- 	select HAVE_NET_MACB
- 
- config ARCH_AT91SAM9G45
- 	bool "AT91SAM9G45 or AT91SAM9M10 families"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
- 	select HAVE_AT91_DBGU1
-@@ -84,8 +82,7 @@ config ARCH_AT91SAM9G45
- 
- config ARCH_AT91SAM9X5
- 	bool "AT91SAM9x5 family"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
-+	select SOC_AT91SAM9
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
- 	select HAVE_AT91_DBGU0
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 8512e53..d97d0f4 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -10,17 +10,18 @@ obj-		:=
- obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
- obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
- obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
-+obj-$(CONFIG_SOC_AT91SAM9)	+= at91sam926x_time.o sam9_smc.o
- 
- # CPU-specific support
- obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o at91rm9200_devices.o
--obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9X5)	+= at91sam9x5.o at91sam926x_time.o sam9_smc.o
-+obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam9260_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam9261_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam9261_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam9263_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam9rl_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam9260_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam9g45_devices.o
-+obj-$(CONFIG_ARCH_AT91SAM9X5)	+= at91sam9x5.o
- obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
- 
- # AT91RM9200 board-specific support
 -- 
 1.7.9.1
