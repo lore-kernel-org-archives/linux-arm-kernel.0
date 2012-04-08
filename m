@@ -1,1408 +1,451 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  8 Apr 2012 17:40:00 +0200
-Subject: [PATCH 04/10] ARM: at91: do not pin mux the UARTs in init_early
-In-Reply-To: <20120408151236.GH16641@game.jcrosoft.org>
-References: <20120408151236.GH16641@game.jcrosoft.org>
-Message-ID: <1333899606-30518-4-git-send-email-plagnioj@jcrosoft.com>
+Date: Sun, 8 Apr 2012 17:42:46 +0200
+Subject: [PATCH 7/9] usb: add Atmel USBA UDC DT support
+In-Reply-To: <20120314092707.GM18320@game.jcrosoft.org>
+References: <20120307084924.GK21255@game.jcrosoft.org>
+ <1331111746-21393-7-git-send-email-plagnioj@jcrosoft.com>
+ <20120314092707.GM18320@game.jcrosoft.org>
+Message-ID: <20120408154246.GI16641@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to pinmux the UART so early in the kernel.
-Move it to the board init.
+On 10:27 Wed 14 Mar     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Hi,
+> 
+> 	except the boolean that I need to update is it ok?
+Grant is it ok?
 
-This will also allow to finally move the gpio driver to platform device/driver.
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/board-1arm.c         |   21 +++++-----
- arch/arm/mach-at91/board-afeb-9260v1.c  |   25 +++++------
- arch/arm/mach-at91/board-cam60.c        |    5 +-
- arch/arm/mach-at91/board-carmeva.c      |   15 +++----
- arch/arm/mach-at91/board-cpu9krea.c     |   49 +++++++++++-----------
- arch/arm/mach-at91/board-cpuat91.c      |   37 ++++++++---------
- arch/arm/mach-at91/board-csb337.c       |    5 +-
- arch/arm/mach-at91/board-csb637.c       |    5 +-
- arch/arm/mach-at91/board-eb9200.c       |   21 +++++-----
- arch/arm/mach-at91/board-ecbat91.c      |   11 ++---
- arch/arm/mach-at91/board-eco920.c       |    5 +-
- arch/arm/mach-at91/board-flexibity.c    |    5 +-
- arch/arm/mach-at91/board-foxg20.c       |   68 +++++++++++++++----------------
- arch/arm/mach-at91/board-gsia18s.c      |   63 ++++++++++++++--------------
- arch/arm/mach-at91/board-kafa.c         |   11 ++---
- arch/arm/mach-at91/board-kb9202.c       |   23 +++++-----
- arch/arm/mach-at91/board-neocore926.c   |   11 ++---
- arch/arm/mach-at91/board-pcontrol-g20.c |   21 +++++-----
- arch/arm/mach-at91/board-picotux200.c   |   15 +++----
- arch/arm/mach-at91/board-qil-a9260.c    |   27 ++++++------
- arch/arm/mach-at91/board-rm9200dk.c     |   15 +++----
- arch/arm/mach-at91/board-rm9200ek.c     |   15 +++----
- arch/arm/mach-at91/board-rsi-ews.c      |   27 ++++++------
- arch/arm/mach-at91/board-sam9-l9260.c   |   21 +++++-----
- arch/arm/mach-at91/board-sam9260ek.c    |   21 +++++-----
- arch/arm/mach-at91/board-sam9261ek.c    |    5 +-
- arch/arm/mach-at91/board-sam9263ek.c    |   11 ++---
- arch/arm/mach-at91/board-sam9g20ek.c    |   21 +++++-----
- arch/arm/mach-at91/board-sam9m10g45ek.c |   13 +++---
- arch/arm/mach-at91/board-sam9rlek.c     |   11 ++---
- arch/arm/mach-at91/board-snapper9260.c  |   17 ++++----
- arch/arm/mach-at91/board-stamp9g20.c    |   61 +++++++++++-----------------
- arch/arm/mach-at91/board-usb-a926x.c    |    5 +-
- arch/arm/mach-at91/board-yl-9200.c      |   27 ++++++------
- 34 files changed, 333 insertions(+), 380 deletions(-)
-
-diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-index f43ad91..271f994 100644
---- a/arch/arm/mach-at91/board-1arm.c
-+++ b/arch/arm/mach-at91/board-1arm.c
-@@ -47,17 +47,6 @@ static void __init onearm_init_early(void)
- 
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
--
--	/* USART1 on ttyS2 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
- }
- 
- static struct macb_platform_data __initdata onearm_eth_data = {
-@@ -79,6 +68,16 @@ static struct at91_udc_data __initdata onearm_udc_data = {
- static void __init onearm_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+
-+	/* USART1 on ttyS2 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&onearm_eth_data);
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index 7c7c682..b7d8aa7 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -52,19 +52,6 @@ static void __init afeb9260_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
--			     ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR
--			   | ATMEL_UART_DCD | ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
--			ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -180,6 +167,18 @@ static struct at91_cf_data afeb9260_cf_data = {
- static void __init afeb9260_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+			     ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR
-+			   | ATMEL_UART_DCD | ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+			ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&afeb9260_usbh_data);
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index 871717d..29d3ef0 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -49,9 +49,6 @@ static void __init cam60_init_early(void)
- {
- 	/* Initialize processor: 10 MHz crystal */
- 	at91_initialize(10000000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
- }
- 
- /*
-@@ -172,6 +169,8 @@ static void __init cam60_add_device_nand(void)
- static void __init cam60_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* SPI */
- 	at91_add_device_spi(cam60_spi_devices, ARRAY_SIZE(cam60_spi_devices));
-diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
-index 168b3fa..44328a6 100644
---- a/arch/arm/mach-at91/board-carmeva.c
-+++ b/arch/arm/mach-at91/board-carmeva.c
-@@ -44,14 +44,6 @@ static void __init carmeva_init_early(void)
- {
- 	/* Initialize processor: 20.000 MHz crystal */
- 	at91_initialize(20000000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
- }
- 
- static struct macb_platform_data __initdata carmeva_eth_data = {
-@@ -136,6 +128,13 @@ static struct gpio_led carmeva_leds[] = {
- static void __init carmeva_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&carmeva_eth_data);
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 4073e30..69951ec 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -52,31 +52,6 @@ static void __init cpu9krea_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DGBU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS |
--		ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
--		ATMEL_UART_DCD | ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS |
--		ATMEL_UART_RTS);
--
--	/* USART2 on ttyS3. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS |
--		ATMEL_UART_RTS);
--
--	/* USART3 on ttyS4. (Rx, Tx) */
--	at91_register_uart(AT91SAM9260_ID_US3, 4, 0);
--
--	/* USART4 on ttyS5. (Rx, Tx) */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
--
--	/* USART5 on ttyS6. (Rx, Tx) */
--	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
- }
- 
- /*
-@@ -349,6 +324,30 @@ static void __init cpu9krea_board_init(void)
- 	/* NOR */
- 	cpu9krea_add_device_nor();
- 	/* Serial */
-+	/* DGBU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS |
-+		ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
-+		ATMEL_UART_DCD | ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS |
-+		ATMEL_UART_RTS);
-+
-+	/* USART2 on ttyS3. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS |
-+		ATMEL_UART_RTS);
-+
-+	/* USART3 on ttyS4. (Rx, Tx) */
-+	at91_register_uart(AT91SAM9260_ID_US3, 4, 0);
-+
-+	/* USART4 on ttyS5. (Rx, Tx) */
-+	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+
-+	/* USART5 on ttyS6. (Rx, Tx) */
-+	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&cpu9krea_usbh_data);
-diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
-index 76c62ed..895cf2d 100644
---- a/arch/arm/mach-at91/board-cpuat91.c
-+++ b/arch/arm/mach-at91/board-cpuat91.c
-@@ -59,25 +59,6 @@ static void __init cpuat91_init_early(void)
- 
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS |
--		ATMEL_UART_RTS);
--
--	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS |
--		ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
--		ATMEL_UART_DCD | ATMEL_UART_RI);
--
--	/* USART2 on ttyS3 (Rx, Tx) */
--	at91_register_uart(AT91RM9200_ID_US2, 3, 0);
--
--	/* USART3 on ttyS4 (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US3, 4, ATMEL_UART_CTS |
--		ATMEL_UART_RTS);
- }
- 
- static struct macb_platform_data __initdata cpuat91_eth_data = {
-@@ -158,6 +139,24 @@ static struct platform_device *platform_devices[] __initdata = {
- static void __init cpuat91_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS |
-+		ATMEL_UART_RTS);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS |
-+		ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
-+		ATMEL_UART_DCD | ATMEL_UART_RI);
-+
-+	/* USART2 on ttyS3 (Rx, Tx) */
-+	at91_register_uart(AT91RM9200_ID_US2, 3, 0);
-+
-+	/* USART3 on ttyS4 (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91RM9200_ID_US3, 4, ATMEL_UART_CTS |
-+		ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* LEDs. */
- 	at91_gpio_leds(cpuat91_leds, ARRAY_SIZE(cpuat91_leds));
-diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index d984435..ad7f9f0 100644
---- a/arch/arm/mach-at91/board-csb337.c
-+++ b/arch/arm/mach-at91/board-csb337.c
-@@ -50,9 +50,6 @@ static void __init csb337_init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
--
--	/* DBGU on ttyS0 */
--	at91_register_uart(0, 0, 0);
- }
- 
- static struct macb_platform_data __initdata csb337_eth_data = {
-@@ -226,6 +223,8 @@ static struct gpio_led csb_leds[] = {
- static void __init csb337_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0 */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&csb337_eth_data);
-diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
-index 0c9935d..7c8b05a 100644
---- a/arch/arm/mach-at91/board-csb637.c
-+++ b/arch/arm/mach-at91/board-csb637.c
-@@ -44,9 +44,6 @@ static void __init csb637_init_early(void)
- {
- 	/* Initialize processor: 3.6864 MHz crystal */
- 	at91_initialize(3686400);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
- }
- 
- static struct macb_platform_data __initdata csb637_eth_data = {
-@@ -115,6 +112,8 @@ static void __init csb637_board_init(void)
- 	/* LED(s) */
- 	at91_gpio_leds(csb_leds, ARRAY_SIZE(csb_leds));
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&csb637_eth_data);
-diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
-index a189b9f..bd10172 100644
---- a/arch/arm/mach-at91/board-eb9200.c
-+++ b/arch/arm/mach-at91/board-eb9200.c
-@@ -44,17 +44,6 @@ static void __init eb9200_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			| ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			| ATMEL_UART_RI);
--
--	/* USART2 on ttyS2. (Rx, Tx) - IRDA */
--	at91_register_uart(AT91RM9200_ID_US2, 2, 0);
- }
- 
- static struct macb_platform_data __initdata eb9200_eth_data = {
-@@ -98,6 +87,16 @@ static struct i2c_board_info __initdata eb9200_i2c_devices[] = {
- static void __init eb9200_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			| ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			| ATMEL_UART_RI);
-+
-+	/* USART2 on ttyS2. (Rx, Tx) - IRDA */
-+	at91_register_uart(AT91RM9200_ID_US2, 2, 0);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&eb9200_eth_data);
-diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-index 307c530..2510825 100644
---- a/arch/arm/mach-at91/board-ecbat91.c
-+++ b/arch/arm/mach-at91/board-ecbat91.c
-@@ -53,12 +53,6 @@ static void __init ecb_at91init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PC7, AT91_PIN_PC7);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx & Tx only) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, 0);
- }
- 
- static struct macb_platform_data __initdata ecb_at91eth_data = {
-@@ -149,6 +143,11 @@ static struct spi_board_info __initdata ecb_at91spi_devices[] = {
- static void __init ecb_at91board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx & Tx only) */
-+	at91_register_uart(AT91RM9200_ID_US0, 1, 0);
- 	at91_add_device_serial();
- 
- 	/* Ethernet */
-diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
-index 7df6a9b..bebeae8 100644
---- a/arch/arm/mach-at91/board-eco920.c
-+++ b/arch/arm/mach-at91/board-eco920.c
-@@ -40,9 +40,6 @@ static void __init eco920_init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
--
--	/* DBGU on ttyS0. (Rx & Tx only */
--	at91_register_uart(0, 0, 0);
- }
- 
- static struct macb_platform_data __initdata eco920_eth_data = {
-@@ -100,6 +97,8 @@ static struct spi_board_info eco920_spi_devices[] = {
- 
- static void __init eco920_board_init(void)
- {
-+	/* DBGU on ttyS0. (Rx & Tx only */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	at91_add_device_eth(&eco920_eth_data);
- 	at91_add_device_usbh(&eco920_usbh_data);
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index 6dcc962..47658f7 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -41,9 +41,6 @@ static void __init flexibity_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
- }
- 
- /* USB Host port */
-@@ -140,6 +137,8 @@ static struct gpio_led flexibity_leds[] = {
- static void __init flexibity_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&flexibity_usbh_data);
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-index bb07807..33411e6 100644
---- a/arch/arm/mach-at91/board-foxg20.c
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -61,41 +61,6 @@ static void __init foxg20_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
--				ATMEL_UART_CTS
--				| ATMEL_UART_RTS
--				| ATMEL_UART_DTR
--				| ATMEL_UART_DSR
--				| ATMEL_UART_DCD
--				| ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
--		ATMEL_UART_CTS
--		| ATMEL_UART_RTS);
--
--	/* USART2 on ttyS3. (Rx & Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
--
--	/* USART3 on ttyS4. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US3, 4,
--		ATMEL_UART_CTS
--		| ATMEL_UART_RTS);
--
--	/* USART4 on ttyS5. (Rx & Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
--
--	/* USART5 on ttyS6. (Rx & Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
--
--	/* Set the internal pull-up resistor on DRXD */
--	at91_set_A_periph(AT91_PIN_PB14, 1);
--
- }
- 
- /*
-@@ -238,6 +203,39 @@ static struct i2c_board_info __initdata foxg20_i2c_devices[] = {
- static void __init foxg20_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+				ATMEL_UART_CTS
-+				| ATMEL_UART_RTS
-+				| ATMEL_UART_DTR
-+				| ATMEL_UART_DSR
-+				| ATMEL_UART_DCD
-+				| ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+		ATMEL_UART_CTS
-+		| ATMEL_UART_RTS);
-+
-+	/* USART2 on ttyS3. (Rx & Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
-+
-+	/* USART3 on ttyS4. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US3, 4,
-+		ATMEL_UART_CTS
-+		| ATMEL_UART_RTS);
-+
-+	/* USART4 on ttyS5. (Rx & Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+
-+	/* USART5 on ttyS6. (Rx & Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
-+
-+	/* Set the internal pull-up resistor on DRXD */
-+	at91_set_A_periph(AT91_PIN_PB14, 1);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&foxg20_usbh_data);
-diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
-index 230e719..3e0dfa6 100644
---- a/arch/arm/mach-at91/board-gsia18s.c
-+++ b/arch/arm/mach-at91/board-gsia18s.c
-@@ -41,38 +41,6 @@
- static void __init gsia18s_init_early(void)
- {
- 	stamp9g20_init_early();
--
--	/*
--	 * USART0 on ttyS1 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI).
--	 * Used for Internal Analog Modem.
--	 */
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
--				ATMEL_UART_CTS | ATMEL_UART_RTS |
--				ATMEL_UART_DTR | ATMEL_UART_DSR |
--				ATMEL_UART_DCD | ATMEL_UART_RI);
--	/*
--	 * USART1 on ttyS2 (Rx, Tx, CTS, RTS).
--	 * Used for GPS or WiFi or Data stream.
--	 */
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
--				ATMEL_UART_CTS | ATMEL_UART_RTS);
--	/*
--	 * USART2 on ttyS3 (Rx, Tx, CTS, RTS).
--	 * Used for External Modem.
--	 */
--	at91_register_uart(AT91SAM9260_ID_US2, 3,
--				ATMEL_UART_CTS | ATMEL_UART_RTS);
--	/*
--	 * USART3 on ttyS4 (Rx, Tx, RTS).
--	 * Used for RS-485.
--	 */
--	at91_register_uart(AT91SAM9260_ID_US3, 4, ATMEL_UART_RTS);
--
--	/*
--	 * USART4 on ttyS5 (Rx, Tx).
--	 * Used for TRX433 Radio Module.
--	 */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
- }
- 
- /*
-@@ -558,6 +526,37 @@ static int __init gsia18s_power_off_init(void)
- 
- static void __init gsia18s_board_init(void)
- {
-+	/*
-+	 * USART0 on ttyS1 (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI).
-+	 * Used for Internal Analog Modem.
-+	 */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+				ATMEL_UART_CTS | ATMEL_UART_RTS |
-+				ATMEL_UART_DTR | ATMEL_UART_DSR |
-+				ATMEL_UART_DCD | ATMEL_UART_RI);
-+	/*
-+	 * USART1 on ttyS2 (Rx, Tx, CTS, RTS).
-+	 * Used for GPS or WiFi or Data stream.
-+	 */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+				ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	/*
-+	 * USART2 on ttyS3 (Rx, Tx, CTS, RTS).
-+	 * Used for External Modem.
-+	 */
-+	at91_register_uart(AT91SAM9260_ID_US2, 3,
-+				ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	/*
-+	 * USART3 on ttyS4 (Rx, Tx, RTS).
-+	 * Used for RS-485.
-+	 */
-+	at91_register_uart(AT91SAM9260_ID_US3, 4, ATMEL_UART_RTS);
-+
-+	/*
-+	 * USART4 on ttyS5 (Rx, Tx).
-+	 * Used for TRX433 Radio Module.
-+	 */
-+	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
- 	stamp9g20_board_init();
- 	at91_add_device_usbh(&usbh_data);
- 	at91_add_device_udc(&udc_data);
-diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-index 3e858ed..f46b3eb 100644
---- a/arch/arm/mach-at91/board-kafa.c
-+++ b/arch/arm/mach-at91/board-kafa.c
-@@ -50,12 +50,6 @@ static void __init kafa_init_early(void)
- 
- 	/* Set up the LEDs */
- 	at91_init_leds(AT91_PIN_PB4, AT91_PIN_PB4);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- static struct macb_platform_data __initdata kafa_eth_data = {
-@@ -77,6 +71,11 @@ static struct at91_udc_data __initdata kafa_udc_data = {
- static void __init kafa_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1 (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91RM9200_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&kafa_eth_data);
-diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index ccbc8be..e71b9e1 100644
---- a/arch/arm/mach-at91/board-kb9202.c
-+++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -53,18 +53,6 @@ static void __init kb9202_init_early(void)
- 
- 	/* Set up the LEDs */
- 	at91_init_leds(AT91_PIN_PC19, AT91_PIN_PC18);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1 (Rx & Tx only) */
--	at91_register_uart(AT91RM9200_ID_US0, 1, 0);
--
--	/* USART1 on ttyS2 (Rx & Tx only) - IRDA (optional) */
--	at91_register_uart(AT91RM9200_ID_US1, 2, 0);
--
--	/* USART3 on ttyS3 (Rx, Tx, CTS, RTS) - RS485 (optional) */
--	at91_register_uart(AT91RM9200_ID_US3, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- static struct macb_platform_data __initdata kb9202_eth_data = {
-@@ -113,6 +101,17 @@ static struct atmel_nand_data __initdata kb9202_nand_data = {
- static void __init kb9202_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1 (Rx & Tx only) */
-+	at91_register_uart(AT91RM9200_ID_US0, 1, 0);
-+
-+	/* USART1 on ttyS2 (Rx & Tx only) - IRDA (optional) */
-+	at91_register_uart(AT91RM9200_ID_US1, 2, 0);
-+
-+	/* USART3 on ttyS3 (Rx, Tx, CTS, RTS) - RS485 (optional) */
-+	at91_register_uart(AT91RM9200_ID_US3, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&kb9202_eth_data);
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index c456fdc..d2f4cc1 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -55,12 +55,6 @@ static void __init neocore926_init_early(void)
- {
- 	/* Initialize processor: 20 MHz crystal */
- 	at91_initialize(20000000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9263_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -338,6 +332,11 @@ static struct ac97c_platform_data neocore926_ac97_data = {
- static void __init neocore926_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9263_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 
- 	/* USB Host */
-diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
-index b4a12fc..7fe6383 100644
---- a/arch/arm/mach-at91/board-pcontrol-g20.c
-+++ b/arch/arm/mach-at91/board-pcontrol-g20.c
-@@ -40,17 +40,6 @@
- static void __init pcontrol_g20_init_early(void)
- {
- 	stamp9g20_init_early();
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) piggyback  A2 */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS
--						| ATMEL_UART_RTS);
--
--	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) isolated RS485  X5 */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS
--						| ATMEL_UART_RTS);
--
--	/* USART2 on ttyS3. (Rx, Tx)  9bit-Bus  Multidrop-mode  X4 */
--	at91_register_uart(AT91SAM9260_ID_US4, 3, 0);
- }
- 
- static struct sam9_smc_config __initdata pcontrol_smc_config[2] = { {
-@@ -199,6 +188,16 @@ static struct spi_board_info pcontrol_g20_spi_devices[] = {
- 
- static void __init pcontrol_g20_board_init(void)
- {
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) piggyback  A2 */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS
-+						| ATMEL_UART_RTS);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) isolated RS485  X5 */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS
-+						| ATMEL_UART_RTS);
-+
-+	/* USART2 on ttyS3. (Rx, Tx)  9bit-Bus  Multidrop-mode  X4 */
-+	at91_register_uart(AT91SAM9260_ID_US4, 3, 0);
- 	stamp9g20_board_init();
- 	at91_add_device_usbh(&usbh_data);
- 	at91_add_device_eth(&macb_data);
-diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
-index 4ca56cd..b45c0a5 100644
---- a/arch/arm/mach-at91/board-picotux200.c
-+++ b/arch/arm/mach-at91/board-picotux200.c
-@@ -48,14 +48,6 @@ static void __init picotux200_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			  | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			  | ATMEL_UART_RI);
- }
- 
- static struct macb_platform_data __initdata picotux200_eth_data = {
-@@ -103,6 +95,13 @@ static struct platform_device picotux200_flash = {
- static void __init picotux200_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			  | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			  | ATMEL_UART_RI);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&picotux200_eth_data);
-diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-index 189d3fe..0c61bf0 100644
---- a/arch/arm/mach-at91/board-qil-a9260.c
-+++ b/arch/arm/mach-at91/board-qil-a9260.c
-@@ -52,20 +52,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
- 	at91_initialize(12000000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
--
--	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -231,6 +217,19 @@ static struct gpio_led ek_leds[] = {
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+
-+	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
-diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index d5ce630..4a0b097 100644
---- a/arch/arm/mach-at91/board-rm9200dk.c
-+++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -53,14 +53,6 @@ static void __init dk_init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB2, AT91_PIN_PB2);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
- }
- 
- static struct macb_platform_data __initdata dk_eth_data = {
-@@ -188,6 +180,13 @@ static struct gpio_led dk_leds[] = {
- static void __init dk_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&dk_eth_data);
-diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index 32d35cb..b687261 100644
---- a/arch/arm/mach-at91/board-rm9200ek.c
-+++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -53,14 +53,6 @@ static void __init ek_init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB1, AT91_PIN_PB2);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
- }
- 
- static struct macb_platform_data __initdata ek_eth_data = {
-@@ -159,6 +151,13 @@ static struct gpio_led ek_leds[] = {
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&ek_eth_data);
-diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
-index 2c84463..10d8730 100644
---- a/arch/arm/mach-at91/board-rsi-ews.c
-+++ b/arch/arm/mach-at91/board-rsi-ews.c
-@@ -38,20 +38,6 @@ static void __init rsi_ews_init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB6, AT91_PIN_PB9);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	/* This one is for debugging */
--	at91_register_uart(0, 0, 0);
--
--	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	/* Dialin/-out modem interface */
--	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
--
--	/* USART3 on ttyS4. (Rx, Tx, RTS) */
--	/* RS485 communication */
--	at91_register_uart(AT91RM9200_ID_US3, 4, ATMEL_UART_RTS);
- }
- 
- /*
-@@ -202,6 +188,19 @@ static struct platform_device rsiews_nor_flash = {
- static void __init rsi_ews_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	/* This one is for debugging */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	/* Dialin/-out modem interface */
-+	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
-+
-+	/* USART3 on ttyS4. (Rx, Tx, RTS) */
-+	/* RS485 communication */
-+	at91_register_uart(AT91RM9200_ID_US3, 4, ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	at91_set_gpio_output(AT91_PIN_PA21, 0);
- 	/* Ethernet */
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index dee44cb..5343dab 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -51,17 +51,6 @@ static void __init ek_init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PA9, AT91_PIN_PA6);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -182,6 +171,16 @@ static struct at91_mmc_data __initdata ek_mmc_data = {
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index 6da17b5..7b3c391 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -54,17 +54,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -317,6 +306,16 @@ static void __init ek_add_device_buttons(void) {}
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index e91c4af..4406f6b 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -61,9 +61,6 @@ static void __init ek_init_early(void)
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PA13, AT91_PIN_PA14);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
- }
- 
- /*
-@@ -574,6 +571,8 @@ static struct gpio_led ek_leds[] = {
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 4424873..983cb98 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -57,12 +57,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 16.367 MHz crystal */
- 	at91_initialize(16367660);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9263_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -409,6 +403,11 @@ static struct at91_can_data ek_can_data = {
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9263_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 05f8467..3d61553 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -65,17 +65,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			   | ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -369,6 +358,16 @@ static struct i2c_board_info __initdata ek_i2c_devices[] = {
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			   | ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index be2ca19..9a87f0b 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -53,13 +53,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
- 	at91_initialize(12000000);
--
--	/* DGBU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 not connected on the -EK board */
--	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
--	at91_register_uart(AT91SAM9G45_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -454,6 +447,12 @@ static struct platform_device *devices[] __initdata = {
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DGBU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 not connected on the -EK board */
-+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9G45_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB HS Host */
- 	at91_add_device_usbh_ohci(&ek_usbh_hs_data);
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 23f383a..be3239f 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -42,12 +42,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
- 	at91_initialize(12000000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9RL_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- }
- 
- /*
-@@ -293,6 +287,11 @@ static void __init ek_add_device_buttons(void) {}
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91SAM9RL_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* USB HS */
- 	at91_add_device_usba(&ek_usba_udc_data);
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 1a6774a..9d446f1 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -43,15 +43,6 @@
- static void __init snapper9260_init_early(void)
- {
- 	at91_initialize(18432000);
--
--	/* Debug on ttyS0 */
--	at91_register_uart(0, 0, 0);
--
--	at91_register_uart(AT91SAM9260_ID_US0, 1,
--			   ATMEL_UART_CTS | ATMEL_UART_RTS);
--	at91_register_uart(AT91SAM9260_ID_US1, 2,
--			   ATMEL_UART_CTS | ATMEL_UART_RTS);
--	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
- }
- 
- static struct at91_usbh_data __initdata snapper9260_usbh_data = {
-@@ -167,6 +158,14 @@ static void __init snapper9260_board_init(void)
- 	snapper9260_i2c_isl1208.irq = gpio_to_irq(AT91_PIN_PA31);
- 	i2c_register_board_info(0, &snapper9260_i2c_isl1208, 1);
- 
-+	/* Debug on ttyS0 */
-+	at91_register_uart(0, 0, 0);
-+
-+	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+			   ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+			   ATMEL_UART_CTS | ATMEL_UART_RTS);
-+	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
- 	at91_add_device_serial();
- 	at91_add_device_usbh(&snapper9260_usbh_data);
- 	at91_add_device_udc(&snapper9260_udc_data);
-diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-index 38a7ca5..ee86f9d 100644
---- a/arch/arm/mach-at91/board-stamp9g20.c
-+++ b/arch/arm/mach-at91/board-stamp9g20.c
-@@ -36,41 +36,6 @@ void __init stamp9g20_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
--
--	/* DGBU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--}
--
--static void __init stamp9g20evb_init_early(void)
--{
--	stamp9g20_init_early();
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--						| ATMEL_UART_DTR | ATMEL_UART_DSR
--						| ATMEL_UART_DCD | ATMEL_UART_RI);
--}
--
--static void __init portuxg20_init_early(void)
--{
--	stamp9g20_init_early();
--
--	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--						| ATMEL_UART_DTR | ATMEL_UART_DSR
--						| ATMEL_UART_DCD | ATMEL_UART_RI);
--
--	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
--
--	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
--	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
--
--	/* USART4 on ttyS5. (Rx, Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
--
--	/* USART5 on ttyS6. (Rx, Tx only) */
--	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
- }
- 
- /*
-@@ -251,6 +216,8 @@ void add_w1(void)
- void __init stamp9g20_board_init(void)
- {
- 	/* Serial */
-+	/* DGBU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* NAND */
- 	add_device_nand();
-@@ -266,6 +233,22 @@ void __init stamp9g20_board_init(void)
- 
- static void __init portuxg20_board_init(void)
- {
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+						| ATMEL_UART_DTR | ATMEL_UART_DSR
-+						| ATMEL_UART_DCD | ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+
-+	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
-+	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+
-+	/* USART4 on ttyS5. (Rx, Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+
-+	/* USART5 on ttyS6. (Rx, Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
- 	stamp9g20_board_init();
- 	/* USB Host */
- 	at91_add_device_usbh(&usbh_data);
-@@ -283,6 +266,10 @@ static void __init portuxg20_board_init(void)
- 
- static void __init stamp9g20evb_board_init(void)
- {
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+						| ATMEL_UART_DTR | ATMEL_UART_DSR
-+						| ATMEL_UART_DCD | ATMEL_UART_RI);
- 	stamp9g20_board_init();
- 	/* USB Host */
- 	at91_add_device_usbh(&usbh_data);
-@@ -300,7 +287,7 @@ MACHINE_START(PORTUXG20, "taskit PortuxG20")
- 	/* Maintainer: taskit GmbH */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
--	.init_early	= portuxg20_init_early,
-+	.init_early	= stamp9g20_init_early,
- 	.init_irq	= at91_init_irq_default,
- 	.init_machine	= portuxg20_board_init,
- MACHINE_END
-@@ -309,7 +296,7 @@ MACHINE_START(STAMP9G20, "taskit Stamp9G20")
- 	/* Maintainer: taskit GmbH */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
--	.init_early	= stamp9g20evb_init_early,
-+	.init_early	= stamp9g20_init_early,
- 	.init_irq	= at91_init_irq_default,
- 	.init_machine	= stamp9g20evb_board_init,
- MACHINE_END
-diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
-index ee482eb..332ecd4 100644
---- a/arch/arm/mach-at91/board-usb-a926x.c
-+++ b/arch/arm/mach-at91/board-usb-a926x.c
-@@ -53,9 +53,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 12.00 MHz crystal */
- 	at91_initialize(12000000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
- }
- 
- /*
-@@ -322,6 +319,8 @@ static void __init ek_add_device_leds(void)
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index e94a04e..db8d25c 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -61,20 +61,6 @@ static void __init yl9200_init_early(void)
- 
- 	/* Setup the LEDs D2=PB17 (timer), D3=PB16 (cpu) */
- 	at91_init_leds(AT91_PIN_PB16, AT91_PIN_PB17);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
--	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
--			| ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
--			| ATMEL_UART_RI);
--
--	/* USART0 on ttyS2. (Rx & Tx only to JP3) */
--	at91_register_uart(AT91RM9200_ID_US0, 2, 0);
--
--	/* USART3 on ttyS3. (Rx, Tx, RTS - RS485 interface) */
--	at91_register_uart(AT91RM9200_ID_US3, 3, ATMEL_UART_RTS);
- }
- 
- /*
-@@ -558,6 +544,19 @@ void __init yl9200_add_device_video(void) {}
- static void __init yl9200_board_init(void)
- {
- 	/* Serial */
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
-+			| ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
-+			| ATMEL_UART_RI);
-+
-+	/* USART0 on ttyS2. (Rx & Tx only to JP3) */
-+	at91_register_uart(AT91RM9200_ID_US0, 2, 0);
-+
-+	/* USART3 on ttyS3. (Rx, Tx, RTS - RS485 interface) */
-+	at91_register_uart(AT91RM9200_ID_US3, 3, ATMEL_UART_RTS);
- 	at91_add_device_serial();
- 	/* Ethernet */
- 	at91_add_device_eth(&yl9200_eth_data);
--- 
-1.7.9.1
+Best Regards,
+J.
+> On 10:15 Wed 07 Mar     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > Allow to compile the driver all the time if AT91 enabled.
+> > 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Cc: linux-usb at vger.kernel.org
+> > ---
+> > Hi Greg
+> > 
+> > 	if it's ok with you I apply with the rest of the USB patch series via
+> > 	at91
+> > 
+> > Best Regards,
+> > J. .../devicetree/bindings/usb/atmel-usb.txt          |   86 ++++++++
+> >  drivers/usb/gadget/Kconfig                         |    2 +-
+> >  drivers/usb/gadget/atmel_usba_udc.c                |  209 +++++++++++++++-----
+> >  drivers/usb/gadget/atmel_usba_udc.h                |    1 +
+> >  4 files changed, 248 insertions(+), 50 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+> > index 60bd215..b44f87e 100644
+> > --- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
+> > +++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+> > @@ -47,3 +47,89 @@ usb1: gadget at fffa4000 {
+> >  	interrupts = <10 4>;
+> >  	atmel,vbus-gpio = <&pioC 5 0>;
+> >  };
+> > +
+> > +Atmel High-Speed USB device controller
+> > +
+> > +Required properties:
+> > + - compatible: Should be "atmel,at91sam9rl-udc"
+> > + - reg: Address and length of the register set for the device
+> > + - interrupts: Should contain macb interrupt
+> > + - ep childnode: To specifiy the number of endpoints and their properties.
+> > +
+> > +Optional properties:
+> > + - atmel,vbus-gpio: If present, specifies a gpio that needs to be
+> > +   activated for the bus to be powered.
+> > +
+> > +Required child node properties:
+> > + - name: Name of the endpoint.
+> > + - reg: Num of the endpoint.
+> > + - atmel,fifo-size: Size of the fifo.
+> > + - atmel,nb-banks: Number of banks.
+> > + - atmel,can-dma: Boolean to specify if the endpoint support DMA.
+> > + - atmel,can-isoc: Boolean to specify if the endpoint support ISOC.
+> > +
+> > +usb2: gadget at fff78000 {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <0>;
+> > +	compatible = "atmel,at91sam9rl-udc";
+> > +	reg = <0x00600000 0x80000
+> > +	       0xfff78000 0x400>;
+> > +	interrupts = <27 4>;
+> > +	atmel,vbus-gpio = <&pioB 19 0>;
+> > +
+> > +	ep0 {
+> > +		reg = <0>;
+> > +		atmel,fifo-size = <64>;
+> > +		atmel,nb-banks = <1>;
+> > +		atmel,can-dma = <0>;
+> > +		atmel,can-isoc = <0>;
+> > +	};
+> > +
+> > +	ep1 {
+> > +		reg = <1>;
+> > +		atmel,fifo-size = <1024>;
+> > +		atmel,nb-banks = <2>;
+> > +		atmel,can-dma = <1>;
+> > +		atmel,can-isoc = <1>;
+> > +	};
+> > +
+> > +	ep2 {
+> > +		reg = <2>;
+> > +		atmel,fifo-size = <1024>;
+> > +		atmel,nb-banks = <2>;
+> > +		atmel,can-dma = <1>;
+> > +		atmel,can-isoc = <1>;
+> > +	};
+> > +
+> > +	ep3 {
+> > +		reg = <3>;
+> > +		atmel,fifo-size = <1024>;
+> > +		atmel,nb-banks = <3>;
+> > +		atmel,can-dma = <1>;
+> > +		atmel,can-isoc = <0>;
+> > +	};
+> > +
+> > +	ep4 {
+> > +		reg = <4>;
+> > +		atmel,fifo-size = <1024>;
+> > +		atmel,nb-banks = <3>;
+> > +		atmel,can-dma = <1>;
+> > +		atmel,can-isoc = <0>;
+> > +	};
+> > +
+> > +	ep5 {
+> > +		reg = <5>;
+> > +		atmel,fifo-size = <1024>;
+> > +		atmel,nb-banks = <3>;
+> > +		atmel,can-dma = <1>;
+> > +		atmel,can-isoc = <1>;
+> > +	};
+> > +
+> > +	ep6 {
+> > +		reg = <6>;
+> > +		atmel,fifo-size = <1024>;
+> > +		atmel,nb-banks = <3>;
+> > +		atmel,can-dma = <1>;
+> > +		atmel,can-isoc = <1>;
+> > +	};
+> > +};
+> > diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+> > index edf1144..1dbba6c 100644
+> > --- a/drivers/usb/gadget/Kconfig
+> > +++ b/drivers/usb/gadget/Kconfig
+> > @@ -150,7 +150,7 @@ config USB_AT91
+> >  config USB_ATMEL_USBA
+> >  	tristate "Atmel USBA"
+> >  	select USB_GADGET_DUALSPEED
+> > -	depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+> > +	depends on AVR32 || ARCH_AT91
+> >  	help
+> >  	  USBA is the integrated high-speed USB Device controller on
+> >  	  the AT32AP700x, some AT91SAM9 and AT91CAP9 processors from Atmel.
+> > diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+> > index ce9dffb..234eabb 100644
+> > --- a/drivers/usb/gadget/atmel_usba_udc.c
+> > +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> > @@ -21,6 +21,8 @@
+> >  #include <linux/usb/gadget.h>
+> >  #include <linux/usb/atmel_usba_udc.h>
+> >  #include <linux/delay.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_gpio.h>
+> >  
+> >  #include <asm/gpio.h>
+> >  #include <mach/board.h>
+> > @@ -1885,9 +1887,143 @@ static int atmel_usba_stop(struct usb_gadget_driver *driver)
+> >  	return 0;
+> >  }
+> >  
+> > -static int __init usba_udc_probe(struct platform_device *pdev)
+> > +#ifdef CONFIG_OF
+> > +static struct usba_ep * __devinit atmel_udc_of_init(struct platform_device *pdev,
+> > +						    struct usba_udc *udc)
+> > +{
+> > +	u32 val;
+> > +	const char *name;
+> > +	enum of_gpio_flags flags;
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	struct device_node *pp;
+> > +	int i, ret;
+> > +	struct usba_ep *eps, *ep;
+> > +
+> > +	udc->num_ep = 0;
+> > +
+> > +	udc->vbus_pin = of_get_named_gpio_flags(np, "atmel,vbus-gpio", 0,
+> > +						&flags);
+> > +	udc->vbus_pin_inverted = (flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0;
+> > +
+> > +	pp = NULL;
+> > +	while ((pp = of_get_next_child(np, pp)))
+> > +		udc->num_ep++;
+> > +
+> > +	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
+> > +			   GFP_KERNEL);
+> > +	if (!eps)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	udc->gadget.ep0 = &eps[0].ep;
+> > +
+> > +	INIT_LIST_HEAD(&eps[0].ep.ep_list);
+> > +
+> > +	pp = NULL;
+> > +	i = 0;
+> > +	while ((pp = of_get_next_child(np, pp))) {
+> > +		ep = &eps[i];
+> > +
+> > +		ret = of_property_read_u32(pp, "reg", &val);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "of_probe: reg error(%d)\n", ret);
+> > +			goto err;
+> > +		}
+> > +		ep->index = val;
+> > +
+> > +		ret = of_property_read_u32(pp, "atmel,fifo-size", &val);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
+> > +			goto err;
+> > +		}
+> > +		ep->fifo_size = val;
+> > +
+> > +		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
+> > +			goto err;
+> > +		}
+> > +		ep->nr_banks = val;
+> > +
+> > +		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
+> > +		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
+> > +
+> > +		ret = of_property_read_string(pp, "name", &name);
+> > +		ep->ep.name = name;
+> > +
+> > +		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
+> > +		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
+> > +		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
+> > +		ep->ep.ops = &usba_ep_ops;
+> > +		ep->ep.maxpacket = ep->fifo_size;
+> > +		ep->udc = udc;
+> > +		INIT_LIST_HEAD(&ep->queue);
+> > +
+> > +		if (i)
+> > +			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+> > +
+> > +		i++;
+> > +	}
+> > +
+> > +	return eps;
+> > +err:
+> > +	return ERR_PTR(ret);
+> > +}
+> > +#else
+> > +static struct usba_ep * __devinit atmel_udc_of_init(struct platform_device *pdev,
+> > +						    struct usba_udc *udc)
+> > +{
+> > +	return ERR_PTR(-ENOSYS);
+> > +}
+> > +#endif
+> > +
+> > +static struct usba_ep * __devinit usba_udc_pdata(struct platform_device *pdev,
+> > +						 struct usba_udc *udc)
+> >  {
+> >  	struct usba_platform_data *pdata = pdev->dev.platform_data;
+> > +	struct usba_ep *eps;
+> > +	int i;
+> > +
+> > +	if (!pdata)
+> > +		return ERR_PTR(-ENXIO);
+> > +
+> > +	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * pdata->num_ep,
+> > +			   GFP_KERNEL);
+> > +	if (!eps)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	udc->gadget.ep0 = &eps[0].ep;
+> > +
+> > +	udc->vbus_pin = pdata->vbus_pin;
+> > +	udc->vbus_pin_inverted = pdata->vbus_pin_inverted;
+> > +	udc->num_ep = pdata->num_ep;
+> > +
+> > +	INIT_LIST_HEAD(&eps[0].ep.ep_list);
+> > +
+> > +	for (i = 0; i < pdata->num_ep; i++) {
+> > +		struct usba_ep *ep = &eps[i];
+> > +
+> > +		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
+> > +		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
+> > +		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
+> > +		ep->ep.ops = &usba_ep_ops;
+> > +		ep->ep.name = pdata->ep[i].name;
+> > +		ep->fifo_size = ep->ep.maxpacket = pdata->ep[i].fifo_size;
+> > +		ep->udc = udc;
+> > +		INIT_LIST_HEAD(&ep->queue);
+> > +		ep->nr_banks = pdata->ep[i].nr_banks;
+> > +		ep->index = pdata->ep[i].index;
+> > +		ep->can_dma = pdata->ep[i].can_dma;
+> > +		ep->can_isoc = pdata->ep[i].can_isoc;
+> > +
+> > +		if (i)
+> > +			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+> > +	}
+> > +
+> > +	return eps;
+> > +}
+> > +
+> > +static int __init usba_udc_probe(struct platform_device *pdev)
+> > +{
+> >  	struct resource *regs, *fifo;
+> >  	struct clk *pclk, *hclk;
+> >  	struct usba_udc *udc = &the_udc;
+> > @@ -1895,7 +2031,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+> >  
+> >  	regs = platform_get_resource(pdev, IORESOURCE_MEM, CTRL_IOMEM_ID);
+> >  	fifo = platform_get_resource(pdev, IORESOURCE_MEM, FIFO_IOMEM_ID);
+> > -	if (!regs || !fifo || !pdata)
+> > +	if (!regs || !fifo)
+> >  		return -ENXIO;
+> >  
+> >  	irq = platform_get_irq(pdev, 0);
+> > @@ -1945,46 +2081,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+> >  	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
+> >  	clk_disable(pclk);
+> >  
+> > -	usba_ep = kzalloc(sizeof(struct usba_ep) * pdata->num_ep,
+> > -			  GFP_KERNEL);
+> > -	if (!usba_ep)
+> > -		goto err_alloc_ep;
+> > -
+> > -	the_udc.gadget.ep0 = &usba_ep[0].ep;
+> > -
+> > -	INIT_LIST_HEAD(&usba_ep[0].ep.ep_list);
+> > -	usba_ep[0].ep_regs = udc->regs + USBA_EPT_BASE(0);
+> > -	usba_ep[0].dma_regs = udc->regs + USBA_DMA_BASE(0);
+> > -	usba_ep[0].fifo = udc->fifo + USBA_FIFO_BASE(0);
+> > -	usba_ep[0].ep.ops = &usba_ep_ops;
+> > -	usba_ep[0].ep.name = pdata->ep[0].name;
+> > -	usba_ep[0].ep.maxpacket = pdata->ep[0].fifo_size;
+> > -	usba_ep[0].udc = &the_udc;
+> > -	INIT_LIST_HEAD(&usba_ep[0].queue);
+> > -	usba_ep[0].fifo_size = pdata->ep[0].fifo_size;
+> > -	usba_ep[0].nr_banks = pdata->ep[0].nr_banks;
+> > -	usba_ep[0].index = pdata->ep[0].index;
+> > -	usba_ep[0].can_dma = pdata->ep[0].can_dma;
+> > -	usba_ep[0].can_isoc = pdata->ep[0].can_isoc;
+> > -
+> > -	for (i = 1; i < pdata->num_ep; i++) {
+> > -		struct usba_ep *ep = &usba_ep[i];
+> > -
+> > -		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
+> > -		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
+> > -		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
+> > -		ep->ep.ops = &usba_ep_ops;
+> > -		ep->ep.name = pdata->ep[i].name;
+> > -		ep->ep.maxpacket = pdata->ep[i].fifo_size;
+> > -		ep->udc = &the_udc;
+> > -		INIT_LIST_HEAD(&ep->queue);
+> > -		ep->fifo_size = pdata->ep[i].fifo_size;
+> > -		ep->nr_banks = pdata->ep[i].nr_banks;
+> > -		ep->index = pdata->ep[i].index;
+> > -		ep->can_dma = pdata->ep[i].can_dma;
+> > -		ep->can_isoc = pdata->ep[i].can_isoc;
+> > +	if (pdev->dev.of_node)
+> > +		usba_ep = atmel_udc_of_init(pdev, udc);
+> > +	else
+> > +		usba_ep = usba_udc_pdata(pdev, udc);
+> >  
+> > -		list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+> > +	if (IS_ERR(usba_ep)) {
+> > +		ret = PTR_ERR(usba_ep);
+> > +		goto err_alloc_ep;
+> >  	}
+> >  
+> >  	ret = request_irq(irq, usba_udc_irq, 0, "atmel_usba_udc", udc);
+> > @@ -2001,10 +2105,8 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+> >  		goto err_device_add;
+> >  	}
+> >  
+> > -	if (gpio_is_valid(pdata->vbus_pin)) {
+> > -		if (!gpio_request(pdata->vbus_pin, "atmel_usba_udc")) {
+> > -			udc->vbus_pin = pdata->vbus_pin;
+> > -			udc->vbus_pin_inverted = pdata->vbus_pin_inverted;
+> > +	if (gpio_is_valid(udc->vbus_pin)) {
+> > +		if (!gpio_request(udc->vbus_pin, "atmel_usba_udc")) {
+> >  
+> >  			ret = request_irq(gpio_to_irq(udc->vbus_pin),
+> >  					usba_vbus_irq, 0,
+> > @@ -2029,13 +2131,13 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+> >  		goto err_add_udc;
+> >  
+> >  	usba_init_debugfs(udc);
+> > -	for (i = 1; i < pdata->num_ep; i++)
+> > +	for (i = 1; i < udc->num_ep; i++)
+> >  		usba_ep_init_debugfs(udc, &usba_ep[i]);
+> >  
+> >  	return 0;
+> >  
+> >  err_add_udc:
+> > -	if (gpio_is_valid(pdata->vbus_pin)) {
+> > +	if (gpio_is_valid(udc->vbus_pin)) {
+> >  		free_irq(gpio_to_irq(udc->vbus_pin), udc);
+> >  		gpio_free(udc->vbus_pin);
+> >  	}
+> > @@ -2064,13 +2166,12 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
+> >  {
+> >  	struct usba_udc *udc;
+> >  	int i;
+> > -	struct usba_platform_data *pdata = pdev->dev.platform_data;
+> >  
+> >  	udc = platform_get_drvdata(pdev);
+> >  
+> >  	usb_del_gadget_udc(&udc->gadget);
+> >  
+> > -	for (i = 1; i < pdata->num_ep; i++)
+> > +	for (i = 1; i < udc->num_ep; i++)
+> >  		usba_ep_cleanup_debugfs(&usba_ep[i]);
+> >  	usba_cleanup_debugfs(udc);
+> >  
+> > @@ -2091,11 +2192,21 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
+> >  	return 0;
+> >  }
+> >  
+> > +#if defined(CONFIG_OF)
+> > +static const struct of_device_id atmel_udc_dt_ids[] = {
+> > +	{ .compatible = "atmel,at91sam9rl-udc" },
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +MODULE_DEVICE_TABLE(of, atmel_udc_dt_ids);
+> > +#endif
+> > +
+> >  static struct platform_driver udc_driver = {
+> >  	.remove		= __exit_p(usba_udc_remove),
+> >  	.driver		= {
+> >  		.name		= "atmel_usba_udc",
+> >  		.owner		= THIS_MODULE,
+> > +		.of_match_table	= of_match_ptr(atmel_udc_dt_ids),
+> >  	},
+> >  };
+> >  
+> > diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
+> > index 88a2e07..2c068e7 100644
+> > --- a/drivers/usb/gadget/atmel_usba_udc.h
+> > +++ b/drivers/usb/gadget/atmel_usba_udc.h
+> > @@ -324,6 +324,7 @@ struct usba_udc {
+> >  	int irq;
+> >  	int vbus_pin;
+> >  	int vbus_pin_inverted;
+> > +	int num_ep;
+> >  	struct clk *pclk;
+> >  	struct clk *hclk;
+> >  
+> > -- 
+> > 1.7.7
+> > 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
