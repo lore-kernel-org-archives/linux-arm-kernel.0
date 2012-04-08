@@ -1,92 +1,137 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  8 Apr 2012 17:40:02 +0200
-Subject: [PATCH 06/10] ARM: at91: pm select memory controler at runtime
+Date: Sun,  8 Apr 2012 17:40:03 +0200
+Subject: [PATCH 07/10] ARM: at91: add SOC_AT91SAM9 kconfig option to factorise
+ select
 In-Reply-To: <20120408151236.GH16641@game.jcrosoft.org>
 References: <20120408151236.GH16641@game.jcrosoft.org>
-Message-ID: <1333899606-30518-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1333899606-30518-7-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/pm.c |   12 ++++++++----
- arch/arm/mach-at91/pm.h |   13 -------------
- 2 files changed, 8 insertions(+), 17 deletions(-)
+This will allow to simplify the switch to multi soc in the same kernel.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f630250..1bfaad6 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -261,7 +261,12 @@ static int at91_pm_enter(suspend_state_t state)
- 			 * For ARM 926 based chips, this requirement is weaker
- 			 * as at91sam9 can access a RAM in self-refresh mode.
- 			 */
--			at91_standby();
-+			if (cpu_is_at91rm9200())
-+				at91rm9200_standby();
-+			else if (cpu_is_at91sam9g45())
-+				at91sam9g45_standby();
-+			else
-+				at91sam9_standby();
- 			break;
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/Kconfig  |   29 +++++++++++++----------------
+ arch/arm/mach-at91/Makefile |   17 +++++++++--------
+ 2 files changed, 22 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 885fdb9..40e31c7 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -17,6 +17,11 @@ config AT91_SAM9G45_RESET
+ 	bool
+ 	default !ARCH_AT91X40
  
- 		case PM_SUSPEND_ON:
-@@ -307,10 +312,9 @@ static int __init at91_pm_init(void)
++config SOC_AT91SAM9
++	bool
++	select GENERIC_CLOCKEVENTS
++	select CPU_ARM926T
++
+ menu "Atmel AT91 System-on-Chip"
  
- 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+ choice
+@@ -30,51 +35,44 @@ config ARCH_AT91RM9200
  
--#ifdef CONFIG_ARCH_AT91RM9200
- 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
--	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
--#endif
-+	if (cpu_is_at91rm9200())
-+		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+ config ARCH_AT91SAM9260
+ 	bool "AT91SAM9260 or AT91SAM9XE"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_NET_MACB
  
- 	suspend_set_ops(&at91_pm_ops);
+ config ARCH_AT91SAM9261
+ 	bool "AT91SAM9261"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_AT91_DBGU0
  
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 89f56f3..1b4865e 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -12,7 +12,6 @@
- #define __ARCH_ARM_MACH_AT91_PM
+ config ARCH_AT91SAM9G10
+ 	bool "AT91SAM9G10"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
  
- #include <mach/at91_ramc.h>
--#ifdef CONFIG_ARCH_AT91RM9200
- #include <mach/at91rm9200_sdramc.h>
+ config ARCH_AT91SAM9263
+ 	bool "AT91SAM9263"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
+ 	select HAVE_AT91_DBGU1
  
- /*
-@@ -43,10 +42,6 @@ static inline void at91rm9200_standby(void)
- 		  "r" (lpr));
- }
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_AT91_DBGU0
  
--#define at91_standby at91rm9200_standby
--
--#elif defined(CONFIG_ARCH_AT91SAM9G45)
--
- /* We manage both DDRAM/SDRAM controllers, we need more than one value to
-  * remember.
-  */
-@@ -75,10 +70,6 @@ static inline void at91sam9g45_standby(void)
- 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
- }
+ config ARCH_AT91SAM9G20
+ 	bool "AT91SAM9G20"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_NET_MACB
  
--#define at91_standby at91sam9g45_standby
--
--#else
--
- #ifdef CONFIG_ARCH_AT91SAM9263
- /*
-  * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-@@ -102,8 +93,4 @@ static inline void at91sam9_standby(void)
- 	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
- }
+ config ARCH_AT91SAM9G45
+ 	bool "AT91SAM9G45 or AT91SAM9M10 families"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
+ 	select HAVE_AT91_DBGU1
+@@ -84,8 +82,7 @@ config ARCH_AT91SAM9G45
  
--#define at91_standby at91sam9_standby
--
--#endif
--
- #endif
+ config ARCH_AT91SAM9X5
+ 	bool "AT91SAM9x5 family"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
++	select SOC_AT91SAM9
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
+ 	select HAVE_AT91_DBGU0
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 8512e53..d97d0f4 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -10,17 +10,18 @@ obj-		:=
+ obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
+ obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
+ obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
++obj-$(CONFIG_SOC_AT91SAM9)	+= at91sam926x_time.o sam9_smc.o
+ 
+ # CPU-specific support
+ obj-$(CONFIG_ARCH_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o at91rm9200_devices.o
+-obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9X5)	+= at91sam9x5.o at91sam926x_time.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9260)	+= at91sam9260.o at91sam9260_devices.o
++obj-$(CONFIG_ARCH_AT91SAM9261)	+= at91sam9261.o at91sam9261_devices.o
++obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam9261_devices.o
++obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam9263_devices.o
++obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam9rl_devices.o
++obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam9260_devices.o
++obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam9g45_devices.o
++obj-$(CONFIG_ARCH_AT91SAM9X5)	+= at91sam9x5.o
+ obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
+ 
+ # AT91RM9200 board-specific support
 -- 
 1.7.9.1
