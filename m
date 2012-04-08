@@ -1,35 +1,38 @@
-From: hskinnemoen@gmail.com (=?ISO-8859-1?Q?H=E5vard_Skinnemoen?=)
-Date: Sun, 8 Apr 2012 14:21:49 -0700
-Subject: [PATCH RFC] ARM: at91: remove at91_register_uart_fns and headers
-In-Reply-To: <20120408180906.GA13348@samfundet.no>
-References: <1333728149-32711-1-git-send-email-joachim.eastwood@jotron.com>
- <20120408180906.GA13348@samfundet.no>
-Message-ID: <CAF8ieYVvWJDEkVheGrCuQ+4Ucx_WV-M3qXia1-Y97vqCmeeETQ@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 08 Apr 2012 14:40:46 -0700
+Subject: [PATCH] dma: pl330: fix a couple of compilation warnings
+In-Reply-To: <1333919920-25481-1-git-send-email-olof@lixom.net>
+References: <1333919920-25481-1-git-send-email-olof@lixom.net>
+Message-ID: <1333921246.2508.8.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 8, 2012 at 11:09 AM, Hans-Christian Egtvedt
-<egtvedt@samfundet.no> wrote:
-> Around Fri 06 Apr 2012 18:02:29 +0200 or thereabout, Joachim Eastwood wrote:
->> No AT91/AVR32 boards currently use at91_register_uart_fns so let's remove it.
->>
->> The only other mach in the kernel that has a *_register_uart_fns function
->> is SA1100 so the demand for this functionality is not great.
->
-> I agree with your statement, and I've never used this functionality. I'll
-> leave it to Nicolas to decide, AFAIK there are no AVR32 users of these
-> functions, if there are, they've never submitted any board code upstream.
+On Sun, 2012-04-08 at 14:18 -0700, Olof Johansson wrote:
+> Move a couple of tests and do a minor refactor to avoid:
+[]
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+[]
+> @@ -2926,8 +2928,9 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  	INIT_LIST_HEAD(&pd->channels);
+>  
+>  	/* Initialize channel parameters */
+> -	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
+> -			(u8)pi->pcfg.num_chan);
+> +	num_chan = max_t(int, pdat ? pdat->nr_valid_peri :
+> +				     pi->pcfg.num_peri,
+> +			      pi->pcfg.num_chan);
+>  	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
 
-Yeah, as far as I know, nobody ever used this functionality on AVR32.
-In fact, I can't even think of a reason to use it.
+Few trivial things:
 
-But I seem to recall submitting a patch to remove this functionality a
-long time ago, and it was struck down. I don't remember the reason,
-but there's a chance it might still be valid. The AT91 people should
-know.
+There's no error checking for a malloc failure
+This should probably be kcalloc
+The alignment here is not nice
 
->> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
->
-> Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Maybe:
 
-Acked-by: Havard Skinnemoen <hskinnemoen@gmail.com>
+	num_chan = max_t(size_t, pdat ? pdat->nr_valid_peri : pi->pcfg.num_peri,
+			 pi->pcfg.num_chan);
+	pdmac->peripherals = kcalloc(num_chan, sizeof(*pch), GFP_KERNEL);
+	if (!pdmac->peripherals)
+		goto some_err;
