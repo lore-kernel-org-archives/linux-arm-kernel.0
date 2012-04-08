@@ -1,451 +1,223 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 8 Apr 2012 17:42:46 +0200
-Subject: [PATCH 7/9] usb: add Atmel USBA UDC DT support
-In-Reply-To: <20120314092707.GM18320@game.jcrosoft.org>
-References: <20120307084924.GK21255@game.jcrosoft.org>
- <1331111746-21393-7-git-send-email-plagnioj@jcrosoft.com>
- <20120314092707.GM18320@game.jcrosoft.org>
-Message-ID: <20120408154246.GI16641@game.jcrosoft.org>
+Date: Sun,  8 Apr 2012 17:40:06 +0200
+Subject: [PATCH 10/10] ARM: at91: add defconfig for device tree
+In-Reply-To: <20120408151236.GH16641@game.jcrosoft.org>
+References: <20120408151236.GH16641@game.jcrosoft.org>
+Message-ID: <1333899606-30518-10-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:27 Wed 14 Mar     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Hi,
-> 
-> 	except the boolean that I need to update is it ok?
-Grant is it ok?
+This will enable all the current soc support on DT (9260, 9g20, 9g45 family
+and 9x5 family)
 
-Best Regards,
-J.
-> On 10:15 Wed 07 Mar     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > Allow to compile the driver all the time if AT91 enabled.
-> > 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Cc: linux-usb at vger.kernel.org
-> > ---
-> > Hi Greg
-> > 
-> > 	if it's ok with you I apply with the rest of the USB patch series via
-> > 	at91
-> > 
-> > Best Regards,
-> > J. .../devicetree/bindings/usb/atmel-usb.txt          |   86 ++++++++
-> >  drivers/usb/gadget/Kconfig                         |    2 +-
-> >  drivers/usb/gadget/atmel_usba_udc.c                |  209 +++++++++++++++-----
-> >  drivers/usb/gadget/atmel_usba_udc.h                |    1 +
-> >  4 files changed, 248 insertions(+), 50 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-> > index 60bd215..b44f87e 100644
-> > --- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
-> > +++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-> > @@ -47,3 +47,89 @@ usb1: gadget at fffa4000 {
-> >  	interrupts = <10 4>;
-> >  	atmel,vbus-gpio = <&pioC 5 0>;
-> >  };
-> > +
-> > +Atmel High-Speed USB device controller
-> > +
-> > +Required properties:
-> > + - compatible: Should be "atmel,at91sam9rl-udc"
-> > + - reg: Address and length of the register set for the device
-> > + - interrupts: Should contain macb interrupt
-> > + - ep childnode: To specifiy the number of endpoints and their properties.
-> > +
-> > +Optional properties:
-> > + - atmel,vbus-gpio: If present, specifies a gpio that needs to be
-> > +   activated for the bus to be powered.
-> > +
-> > +Required child node properties:
-> > + - name: Name of the endpoint.
-> > + - reg: Num of the endpoint.
-> > + - atmel,fifo-size: Size of the fifo.
-> > + - atmel,nb-banks: Number of banks.
-> > + - atmel,can-dma: Boolean to specify if the endpoint support DMA.
-> > + - atmel,can-isoc: Boolean to specify if the endpoint support ISOC.
-> > +
-> > +usb2: gadget at fff78000 {
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +	compatible = "atmel,at91sam9rl-udc";
-> > +	reg = <0x00600000 0x80000
-> > +	       0xfff78000 0x400>;
-> > +	interrupts = <27 4>;
-> > +	atmel,vbus-gpio = <&pioB 19 0>;
-> > +
-> > +	ep0 {
-> > +		reg = <0>;
-> > +		atmel,fifo-size = <64>;
-> > +		atmel,nb-banks = <1>;
-> > +		atmel,can-dma = <0>;
-> > +		atmel,can-isoc = <0>;
-> > +	};
-> > +
-> > +	ep1 {
-> > +		reg = <1>;
-> > +		atmel,fifo-size = <1024>;
-> > +		atmel,nb-banks = <2>;
-> > +		atmel,can-dma = <1>;
-> > +		atmel,can-isoc = <1>;
-> > +	};
-> > +
-> > +	ep2 {
-> > +		reg = <2>;
-> > +		atmel,fifo-size = <1024>;
-> > +		atmel,nb-banks = <2>;
-> > +		atmel,can-dma = <1>;
-> > +		atmel,can-isoc = <1>;
-> > +	};
-> > +
-> > +	ep3 {
-> > +		reg = <3>;
-> > +		atmel,fifo-size = <1024>;
-> > +		atmel,nb-banks = <3>;
-> > +		atmel,can-dma = <1>;
-> > +		atmel,can-isoc = <0>;
-> > +	};
-> > +
-> > +	ep4 {
-> > +		reg = <4>;
-> > +		atmel,fifo-size = <1024>;
-> > +		atmel,nb-banks = <3>;
-> > +		atmel,can-dma = <1>;
-> > +		atmel,can-isoc = <0>;
-> > +	};
-> > +
-> > +	ep5 {
-> > +		reg = <5>;
-> > +		atmel,fifo-size = <1024>;
-> > +		atmel,nb-banks = <3>;
-> > +		atmel,can-dma = <1>;
-> > +		atmel,can-isoc = <1>;
-> > +	};
-> > +
-> > +	ep6 {
-> > +		reg = <6>;
-> > +		atmel,fifo-size = <1024>;
-> > +		atmel,nb-banks = <3>;
-> > +		atmel,can-dma = <1>;
-> > +		atmel,can-isoc = <1>;
-> > +	};
-> > +};
-> > diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-> > index edf1144..1dbba6c 100644
-> > --- a/drivers/usb/gadget/Kconfig
-> > +++ b/drivers/usb/gadget/Kconfig
-> > @@ -150,7 +150,7 @@ config USB_AT91
-> >  config USB_ATMEL_USBA
-> >  	tristate "Atmel USBA"
-> >  	select USB_GADGET_DUALSPEED
-> > -	depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-> > +	depends on AVR32 || ARCH_AT91
-> >  	help
-> >  	  USBA is the integrated high-speed USB Device controller on
-> >  	  the AT32AP700x, some AT91SAM9 and AT91CAP9 processors from Atmel.
-> > diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-> > index ce9dffb..234eabb 100644
-> > --- a/drivers/usb/gadget/atmel_usba_udc.c
-> > +++ b/drivers/usb/gadget/atmel_usba_udc.c
-> > @@ -21,6 +21,8 @@
-> >  #include <linux/usb/gadget.h>
-> >  #include <linux/usb/atmel_usba_udc.h>
-> >  #include <linux/delay.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_gpio.h>
-> >  
-> >  #include <asm/gpio.h>
-> >  #include <mach/board.h>
-> > @@ -1885,9 +1887,143 @@ static int atmel_usba_stop(struct usb_gadget_driver *driver)
-> >  	return 0;
-> >  }
-> >  
-> > -static int __init usba_udc_probe(struct platform_device *pdev)
-> > +#ifdef CONFIG_OF
-> > +static struct usba_ep * __devinit atmel_udc_of_init(struct platform_device *pdev,
-> > +						    struct usba_udc *udc)
-> > +{
-> > +	u32 val;
-> > +	const char *name;
-> > +	enum of_gpio_flags flags;
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	struct device_node *pp;
-> > +	int i, ret;
-> > +	struct usba_ep *eps, *ep;
-> > +
-> > +	udc->num_ep = 0;
-> > +
-> > +	udc->vbus_pin = of_get_named_gpio_flags(np, "atmel,vbus-gpio", 0,
-> > +						&flags);
-> > +	udc->vbus_pin_inverted = (flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0;
-> > +
-> > +	pp = NULL;
-> > +	while ((pp = of_get_next_child(np, pp)))
-> > +		udc->num_ep++;
-> > +
-> > +	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
-> > +			   GFP_KERNEL);
-> > +	if (!eps)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	udc->gadget.ep0 = &eps[0].ep;
-> > +
-> > +	INIT_LIST_HEAD(&eps[0].ep.ep_list);
-> > +
-> > +	pp = NULL;
-> > +	i = 0;
-> > +	while ((pp = of_get_next_child(np, pp))) {
-> > +		ep = &eps[i];
-> > +
-> > +		ret = of_property_read_u32(pp, "reg", &val);
-> > +		if (ret) {
-> > +			dev_err(&pdev->dev, "of_probe: reg error(%d)\n", ret);
-> > +			goto err;
-> > +		}
-> > +		ep->index = val;
-> > +
-> > +		ret = of_property_read_u32(pp, "atmel,fifo-size", &val);
-> > +		if (ret) {
-> > +			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
-> > +			goto err;
-> > +		}
-> > +		ep->fifo_size = val;
-> > +
-> > +		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
-> > +		if (ret) {
-> > +			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
-> > +			goto err;
-> > +		}
-> > +		ep->nr_banks = val;
-> > +
-> > +		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
-> > +		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
-> > +
-> > +		ret = of_property_read_string(pp, "name", &name);
-> > +		ep->ep.name = name;
-> > +
-> > +		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
-> > +		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
-> > +		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
-> > +		ep->ep.ops = &usba_ep_ops;
-> > +		ep->ep.maxpacket = ep->fifo_size;
-> > +		ep->udc = udc;
-> > +		INIT_LIST_HEAD(&ep->queue);
-> > +
-> > +		if (i)
-> > +			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
-> > +
-> > +		i++;
-> > +	}
-> > +
-> > +	return eps;
-> > +err:
-> > +	return ERR_PTR(ret);
-> > +}
-> > +#else
-> > +static struct usba_ep * __devinit atmel_udc_of_init(struct platform_device *pdev,
-> > +						    struct usba_udc *udc)
-> > +{
-> > +	return ERR_PTR(-ENOSYS);
-> > +}
-> > +#endif
-> > +
-> > +static struct usba_ep * __devinit usba_udc_pdata(struct platform_device *pdev,
-> > +						 struct usba_udc *udc)
-> >  {
-> >  	struct usba_platform_data *pdata = pdev->dev.platform_data;
-> > +	struct usba_ep *eps;
-> > +	int i;
-> > +
-> > +	if (!pdata)
-> > +		return ERR_PTR(-ENXIO);
-> > +
-> > +	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * pdata->num_ep,
-> > +			   GFP_KERNEL);
-> > +	if (!eps)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	udc->gadget.ep0 = &eps[0].ep;
-> > +
-> > +	udc->vbus_pin = pdata->vbus_pin;
-> > +	udc->vbus_pin_inverted = pdata->vbus_pin_inverted;
-> > +	udc->num_ep = pdata->num_ep;
-> > +
-> > +	INIT_LIST_HEAD(&eps[0].ep.ep_list);
-> > +
-> > +	for (i = 0; i < pdata->num_ep; i++) {
-> > +		struct usba_ep *ep = &eps[i];
-> > +
-> > +		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
-> > +		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
-> > +		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
-> > +		ep->ep.ops = &usba_ep_ops;
-> > +		ep->ep.name = pdata->ep[i].name;
-> > +		ep->fifo_size = ep->ep.maxpacket = pdata->ep[i].fifo_size;
-> > +		ep->udc = udc;
-> > +		INIT_LIST_HEAD(&ep->queue);
-> > +		ep->nr_banks = pdata->ep[i].nr_banks;
-> > +		ep->index = pdata->ep[i].index;
-> > +		ep->can_dma = pdata->ep[i].can_dma;
-> > +		ep->can_isoc = pdata->ep[i].can_isoc;
-> > +
-> > +		if (i)
-> > +			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
-> > +	}
-> > +
-> > +	return eps;
-> > +}
-> > +
-> > +static int __init usba_udc_probe(struct platform_device *pdev)
-> > +{
-> >  	struct resource *regs, *fifo;
-> >  	struct clk *pclk, *hclk;
-> >  	struct usba_udc *udc = &the_udc;
-> > @@ -1895,7 +2031,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
-> >  
-> >  	regs = platform_get_resource(pdev, IORESOURCE_MEM, CTRL_IOMEM_ID);
-> >  	fifo = platform_get_resource(pdev, IORESOURCE_MEM, FIFO_IOMEM_ID);
-> > -	if (!regs || !fifo || !pdata)
-> > +	if (!regs || !fifo)
-> >  		return -ENXIO;
-> >  
-> >  	irq = platform_get_irq(pdev, 0);
-> > @@ -1945,46 +2081,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
-> >  	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
-> >  	clk_disable(pclk);
-> >  
-> > -	usba_ep = kzalloc(sizeof(struct usba_ep) * pdata->num_ep,
-> > -			  GFP_KERNEL);
-> > -	if (!usba_ep)
-> > -		goto err_alloc_ep;
-> > -
-> > -	the_udc.gadget.ep0 = &usba_ep[0].ep;
-> > -
-> > -	INIT_LIST_HEAD(&usba_ep[0].ep.ep_list);
-> > -	usba_ep[0].ep_regs = udc->regs + USBA_EPT_BASE(0);
-> > -	usba_ep[0].dma_regs = udc->regs + USBA_DMA_BASE(0);
-> > -	usba_ep[0].fifo = udc->fifo + USBA_FIFO_BASE(0);
-> > -	usba_ep[0].ep.ops = &usba_ep_ops;
-> > -	usba_ep[0].ep.name = pdata->ep[0].name;
-> > -	usba_ep[0].ep.maxpacket = pdata->ep[0].fifo_size;
-> > -	usba_ep[0].udc = &the_udc;
-> > -	INIT_LIST_HEAD(&usba_ep[0].queue);
-> > -	usba_ep[0].fifo_size = pdata->ep[0].fifo_size;
-> > -	usba_ep[0].nr_banks = pdata->ep[0].nr_banks;
-> > -	usba_ep[0].index = pdata->ep[0].index;
-> > -	usba_ep[0].can_dma = pdata->ep[0].can_dma;
-> > -	usba_ep[0].can_isoc = pdata->ep[0].can_isoc;
-> > -
-> > -	for (i = 1; i < pdata->num_ep; i++) {
-> > -		struct usba_ep *ep = &usba_ep[i];
-> > -
-> > -		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
-> > -		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
-> > -		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
-> > -		ep->ep.ops = &usba_ep_ops;
-> > -		ep->ep.name = pdata->ep[i].name;
-> > -		ep->ep.maxpacket = pdata->ep[i].fifo_size;
-> > -		ep->udc = &the_udc;
-> > -		INIT_LIST_HEAD(&ep->queue);
-> > -		ep->fifo_size = pdata->ep[i].fifo_size;
-> > -		ep->nr_banks = pdata->ep[i].nr_banks;
-> > -		ep->index = pdata->ep[i].index;
-> > -		ep->can_dma = pdata->ep[i].can_dma;
-> > -		ep->can_isoc = pdata->ep[i].can_isoc;
-> > +	if (pdev->dev.of_node)
-> > +		usba_ep = atmel_udc_of_init(pdev, udc);
-> > +	else
-> > +		usba_ep = usba_udc_pdata(pdev, udc);
-> >  
-> > -		list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
-> > +	if (IS_ERR(usba_ep)) {
-> > +		ret = PTR_ERR(usba_ep);
-> > +		goto err_alloc_ep;
-> >  	}
-> >  
-> >  	ret = request_irq(irq, usba_udc_irq, 0, "atmel_usba_udc", udc);
-> > @@ -2001,10 +2105,8 @@ static int __init usba_udc_probe(struct platform_device *pdev)
-> >  		goto err_device_add;
-> >  	}
-> >  
-> > -	if (gpio_is_valid(pdata->vbus_pin)) {
-> > -		if (!gpio_request(pdata->vbus_pin, "atmel_usba_udc")) {
-> > -			udc->vbus_pin = pdata->vbus_pin;
-> > -			udc->vbus_pin_inverted = pdata->vbus_pin_inverted;
-> > +	if (gpio_is_valid(udc->vbus_pin)) {
-> > +		if (!gpio_request(udc->vbus_pin, "atmel_usba_udc")) {
-> >  
-> >  			ret = request_irq(gpio_to_irq(udc->vbus_pin),
-> >  					usba_vbus_irq, 0,
-> > @@ -2029,13 +2131,13 @@ static int __init usba_udc_probe(struct platform_device *pdev)
-> >  		goto err_add_udc;
-> >  
-> >  	usba_init_debugfs(udc);
-> > -	for (i = 1; i < pdata->num_ep; i++)
-> > +	for (i = 1; i < udc->num_ep; i++)
-> >  		usba_ep_init_debugfs(udc, &usba_ep[i]);
-> >  
-> >  	return 0;
-> >  
-> >  err_add_udc:
-> > -	if (gpio_is_valid(pdata->vbus_pin)) {
-> > +	if (gpio_is_valid(udc->vbus_pin)) {
-> >  		free_irq(gpio_to_irq(udc->vbus_pin), udc);
-> >  		gpio_free(udc->vbus_pin);
-> >  	}
-> > @@ -2064,13 +2166,12 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
-> >  {
-> >  	struct usba_udc *udc;
-> >  	int i;
-> > -	struct usba_platform_data *pdata = pdev->dev.platform_data;
-> >  
-> >  	udc = platform_get_drvdata(pdev);
-> >  
-> >  	usb_del_gadget_udc(&udc->gadget);
-> >  
-> > -	for (i = 1; i < pdata->num_ep; i++)
-> > +	for (i = 1; i < udc->num_ep; i++)
-> >  		usba_ep_cleanup_debugfs(&usba_ep[i]);
-> >  	usba_cleanup_debugfs(udc);
-> >  
-> > @@ -2091,11 +2192,21 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > +#if defined(CONFIG_OF)
-> > +static const struct of_device_id atmel_udc_dt_ids[] = {
-> > +	{ .compatible = "atmel,at91sam9rl-udc" },
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> > +MODULE_DEVICE_TABLE(of, atmel_udc_dt_ids);
-> > +#endif
-> > +
-> >  static struct platform_driver udc_driver = {
-> >  	.remove		= __exit_p(usba_udc_remove),
-> >  	.driver		= {
-> >  		.name		= "atmel_usba_udc",
-> >  		.owner		= THIS_MODULE,
-> > +		.of_match_table	= of_match_ptr(atmel_udc_dt_ids),
-> >  	},
-> >  };
-> >  
-> > diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
-> > index 88a2e07..2c068e7 100644
-> > --- a/drivers/usb/gadget/atmel_usba_udc.h
-> > +++ b/drivers/usb/gadget/atmel_usba_udc.h
-> > @@ -324,6 +324,7 @@ struct usba_udc {
-> >  	int irq;
-> >  	int vbus_pin;
-> >  	int vbus_pin_inverted;
-> > +	int num_ep;
-> >  	struct clk *pclk;
-> >  	struct clk *hclk;
-> >  
-> > -- 
-> > 1.7.7
-> > 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/at91_dt_defconfig |  196 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 196 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/at91_dt_defconfig
+
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+new file mode 100644
+index 0000000..67bc571
+--- /dev/null
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -0,0 +1,196 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_AT91=y
++CONFIG_SOC_AT91SAM9260=y
++CONFIG_SOC_AT91SAM9263=y
++CONFIG_SOC_AT91SAM9G45=y
++CONFIG_SOC_AT91SAM9X5=y
++CONFIG_MACH_AT91SAM_DT=y
++CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
++CONFIG_AT91_TIMER_HZ=128
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_LEDS=y
++CONFIG_LEDS_CPU=y
++CONFIG_UACCESS_WITH_MEMCPY=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CMDLINE="mem=128M console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
++CONFIG_KEXEC=y
++CONFIG_AUTO_ZRELADDR=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_DIAG is not set
++CONFIG_IPV6=y
++# CONFIG_INET6_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET6_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET6_XFRM_MODE_BEET is not set
++CONFIG_IPV6_SIT_6RD=y
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_ATMEL=y
++CONFIG_MTD_UBI=y
++CONFIG_MTD_UBI_GLUEBI=y
++CONFIG_PROC_DEVICETREE=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=4
++CONFIG_BLK_DEV_RAM_SIZE=8192
++CONFIG_ATMEL_PWM=y
++CONFIG_ATMEL_TCLIB=y
++CONFIG_EEPROM_93CX6=m
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_SCSI_MULTI_LUN=y
++# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_NETDEVICES=y
++CONFIG_MII=y
++CONFIG_MACB=y
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CHELSIO is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++CONFIG_DAVICOM_PHY=y
++CONFIG_MICREL_PHY=y
++# CONFIG_WLAN is not set
++CONFIG_INPUT_POLLDEV=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=480
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=272
++CONFIG_INPUT_JOYDEV=y
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++# CONFIG_SERIO is not set
++CONFIG_LEGACY_PTY_COUNT=4
++CONFIG_SERIAL_ATMEL=y
++CONFIG_SERIAL_ATMEL_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
++CONFIG_SPI=y
++CONFIG_SPI_ATMEL=y
++# CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_AT91SAM9X_WATCHDOG=y
++CONFIG_SSB=m
++CONFIG_FB=y
++CONFIG_FB_MODE_HELPERS=y
++CONFIG_FB_ATMEL=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++# CONFIG_LCD_CLASS_DEVICE is not set
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_ATMEL_LCDC=y
++# CONFIG_BACKLIGHT_GENERIC is not set
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++CONFIG_FONTS=y
++CONFIG_FONT_8x8=y
++CONFIG_FONT_ACORN_8x8=y
++CONFIG_FONT_MINI_4x6=y
++CONFIG_LOGO=y
++# CONFIG_HID_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
++CONFIG_USB_DEVICEFS=y
++# CONFIG_USB_DEVICE_CLASS is not set
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_ACM=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_SERIAL=y
++CONFIG_USB_SERIAL_GENERIC=y
++CONFIG_USB_SERIAL_FTDI_SIO=y
++CONFIG_USB_SERIAL_PL2303=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_AT91=m
++CONFIG_USB_ATMEL_USBA=m
++CONFIG_USB_ETH=m
++CONFIG_USB_GADGETFS=m
++CONFIG_USB_CDC_COMPOSITE=m
++CONFIG_USB_G_ACM_MS=m
++CONFIG_USB_G_MULTI=m
++CONFIG_USB_G_MULTI_CDC=y
++CONFIG_MMC=y
++CONFIG_MMC_ATMELMCI=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_GPIO=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_AT91RM9200=y
++CONFIG_RTC_DRV_AT91SAM9=y
++CONFIG_DMADEVICES=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_FANOTIFY=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_CODEPAGE_850=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_STRIP_ASM_SYMS=y
++CONFIG_DEBUG_FS=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++CONFIG_CRYPTO=y
++CONFIG_CRYPTO_ECB=y
++CONFIG_CRYPTO_AES=y
++CONFIG_CRYPTO_ARC4=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++CONFIG_CRYPTO_USER_API_HASH=m
++CONFIG_CRYPTO_USER_API_SKCIPHER=m
++# CONFIG_CRYPTO_HW is not set
++CONFIG_CRC_CCITT=m
++CONFIG_CRC_ITU_T=m
++CONFIG_CRC7=m
++CONFIG_AVERAGE=y
+-- 
+1.7.9.1
