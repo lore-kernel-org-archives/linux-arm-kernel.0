@@ -1,43 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Apr 2012 07:27:25 +0800
-Subject: [PATCH 4/7] dt/clock: Add handling for fixed clocks and a clock
- node setup iterator
-In-Reply-To: <4F82EFB3.80402@gmail.com>
-References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
- <1331680947-29861-5-git-send-email-robherring2@gmail.com>
- <20120314075930.GF21337@S2101-09.ap.freescale.net>
- <4F81A53B.7020804@gmail.com>
- <20120409084930.GA18692@S2101-09.ap.freescale.net>
- <4F82EFB3.80402@gmail.com>
-Message-ID: <20120409232723.GD18692@S2101-09.ap.freescale.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 09 Apr 2012 16:35:40 -0700
+Subject: [linux-pm] [PATCHv2 0/5] coupled cpuidle state support
+In-Reply-To: <4F828BAB.5010302@ti.com> (Santosh Shilimkar's message of "Mon,
+ 09 Apr 2012 12:41:39 +0530")
+References: <1331749794-8056-1-git-send-email-ccross@android.com>
+ <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
+ <4F75ACCA.4090009@ti.com> <4F828BAB.5010302@ti.com>
+Message-ID: <87mx6k7a2b.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2012 at 09:18:27AM -0500, Rob Herring wrote:
-...
-> You still haven't given any benefits of supporting multiple clocks. It's
-> slightly fewer dts lines, but not really anything else.
-> 
-What's more important than fewer dts lines is fewer nodes.  Isn't it
-the whole point of #clock-cells?  In the real imx example I gave, with
-#clock-cells support, I can have only one node to represent 3 fixed
-clocks.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-...
-> I don't think people are going to define clocks generically in DT at the
-> mux, clk gate and divider level anyway. If you only have a few clocks
-> then you may, and 1 clock output per node is probably okay. If you have
-> hundreds of clocks then you probably won't, and will have a SOC specific
-> binding anyway.
-> 
-Why?
+> On Friday 30 March 2012 06:23 PM, Santosh Shilimkar wrote:
+>> Colin,
+>> 
+>> On Friday 16 March 2012 05:07 AM, Colin Cross wrote:
+>>> On Wed, Mar 14, 2012 at 11:29 AM, Colin Cross <ccross@android.com> wrote:
+>> 
+>> [...]
+>> 
+>>>>
+>>>> v2:
+>>>>   * removed the coupled lock, replacing it with atomic counters
+>>>>   * added a check for outstanding pokes before beginning the
+>>>>     final transition to avoid extra wakeups
+>>>>   * made the cpuidle_coupled struct completely private
+>>>>   * fixed kerneldoc comment formatting
+>>>>   * added a patch with a helper function for resynchronizing
+>>>>     cpus after aborting idle
+>>>>   * added a patch (not for merging) to add trace events for
+>>>>     verification and performance testing
+>>>
+>>> I forgot to mention, this patch series is on v3.3-rc7, and will
+>>> conflict with the cpuidle timekeeping patches.  If those go in first
+>>> (which is likely), I will rework this series on top of it.  I left it
+>>> on v3.3-rc7 now to make testing easier.
+>> 
+>> I have re-based your series against Len Browns
+>> next branch [1] which has time keeping and other cpuidle patches.
+>> Have also folded the CPU hotplug fix which I posted in the
+>> original coupled idle patch.
+>> 
+> As you know, we have been playing around this series for OMAP
+> for last few weeks. This version series seems to work as intended
+> and found it pretty stable in my testing. Apart from the cpu
+> hotplug fix and the trace event comment, series looks fine
+> to me.
+>
+> FWIW,
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>	
 
-Take a look at clk-imx6q.c[1], you will find except pll and pfd, all
-the imx6q clocks are represented as gate, divider and mux, and we
-should not need a SoC specific binding for them.
+Also
 
--- 
-Regards,
-Shawn
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
 
-[1] http://git.pengutronix.de/?p=imx/linux-2.6.git;a=blob;f=arch/arm/mach-imx/clk-imx6q.c;h=d5aaced3496439653238f18a399c466fc7264f4e;hb=1a9cf33bf1df7336b75235ae22fde83c6341c38e
+as I've been working with Santosh on getting this stabilized on OMAP and
+we are very keen to see this functionality merged.
+
+Thanks,
+
+Kevin
