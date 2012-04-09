@@ -1,67 +1,83 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 9 Apr 2012 14:52:15 -0700
-Subject: common clk: fix clk_register_fixed_rate() under memory pressure
-In-Reply-To: <20120405084808.GA21060@glitch>
-References: <20120405084808.GA21060@glitch>
-Message-ID: <CAJOA=zNt7V_LNLAyXxJU2oS3vTEhvZ1JUWAx+hqQM1t=Whjr6w@mail.gmail.com>
+Date: Mon, 9 Apr 2012 15:00:53 -0700
+Subject: [PATCH 10/10] clk: copy parent_names in clk-mux registration
+In-Reply-To: <1332833009-4121-11-git-send-email-shawn.guo@linaro.org>
+References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
+ <1332833009-4121-11-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAJOA=zNcRGgetBdgi85GtGLTd82GpWsqqQOFdRmc1obDROyWZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2012 at 1:48 AM, Domenico Andreoli <cavokz@gmail.com> wrote:
-> From: Domenico Andreoli <cavokz@gmail.com>
+On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Just like what all other basic clks do, copy parent_names in clk-mux
+> registration, so that clock driver can mark the parent_names
+> __initconst.
 >
-> Under memory pressure clk_register_fixed_rate() fails to manage
-> allocation errors and prepares land for a later WARN_ON at best.
->
-> This fix leaves parent_names correctly initialized or NULL, intermediate
-> half initialized states are cleaned up and not propagated to the clock
-> framework.
->
-> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks for the patch Domenico.  I did a big cleanup of the
-registration code for all of the basic clock types and a fix for this
-has already been rolled in to that branch, so I won't be taking this
-patch.  I'll Cc you on the fixes when I send them to the list
-(probably tomorrow).
+Hi Shawn,
+
+As discussed in the other thread, I've moved the parent string copies
+into clk_register; that makes this patch unnecessary (and you can
+still mark the parent_names as __initdata).
+
+I'll publish my fixes either today or tomorrow.
 
 Regards,
 Mike
 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
->
 > ---
-> ?drivers/clk/clk-fixed-rate.c | ? ?7 +++++--
-> ?1 file changed, 5 insertions(+), 2 deletions(-)
+> ?drivers/clk/clk-mux.c | ? 29 +++++++++++++++++++++++++++--
+> ?1 files changed, 27 insertions(+), 2 deletions(-)
 >
-> Index: b/drivers/clk/clk-fixed-rate.c
-> ===================================================================
-> --- a/drivers/clk/clk-fixed-rate.c
-> +++ b/drivers/clk/clk-fixed-rate.c
-> @@ -67,8 +67,11 @@ struct clk *clk_register_fixed_rate(stru
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 1ff90a6..353fcb7 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -94,6 +94,9 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?u8 clk_mux_flags, spinlock_t *lock)
+> ?{
+> ? ? ? ?struct clk_mux *mux;
+> + ? ? ? struct clk *clk;
+> + ? ? ? const char **parents = NULL;
+> + ? ? ? int i = 0;
 >
-> ? ? ? ? ? ? ? ?parent_names[0] = kmalloc(len, GFP_KERNEL);
+> ? ? ? ?mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
 >
-> - ? ? ? ? ? ? ? if (!parent_names[0])
-> + ? ? ? ? ? ? ? if (!parent_names[0]) {
-> + ? ? ? ? ? ? ? ? ? ? ? kfree(parent_names);
-> + ? ? ? ? ? ? ? ? ? ? ? parent_names = NULL;
-> ? ? ? ? ? ? ? ? ? ? ? ?goto out;
+> @@ -109,6 +112,28 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+> ? ? ? ?mux->flags = clk_mux_flags;
+> ? ? ? ?mux->lock = lock;
+>
+> - ? ? ? return clk_register(dev, name, &clk_mux_ops, &mux->hw,
+> - ? ? ? ? ? ? ? ? ? ? ? parent_names, num_parents, flags);
+> + ? ? ? if (num_parents) {
+> + ? ? ? ? ? ? ? parents = kzalloc(sizeof(char *) * num_parents, GFP_KERNEL);
+> + ? ? ? ? ? ? ? if (!parents)
+> + ? ? ? ? ? ? ? ? ? ? ? goto out;
+> +
+> + ? ? ? ? ? ? ? for (i = 0; i < num_parents; i++) {
+> + ? ? ? ? ? ? ? ? ? ? ? parents[i] = kstrdup(parent_names[i], GFP_KERNEL);
+> + ? ? ? ? ? ? ? ? ? ? ? if (!parents[i])
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
 > + ? ? ? ? ? ? ? }
->
-> ? ? ? ? ? ? ? ?strncpy(parent_names[0], parent_name, len);
-> ? ? ? ?}
-> @@ -77,6 +80,6 @@ out:
-> ? ? ? ?return clk_register(dev, name,
-> ? ? ? ? ? ? ? ? ? ? ? ?&clk_fixed_rate_ops, &fixed->hw,
-> ? ? ? ? ? ? ? ? ? ? ? ?parent_names,
-> - ? ? ? ? ? ? ? ? ? ? ? (parent_name ? 1 : 0),
-> + ? ? ? ? ? ? ? ? ? ? ? (parent_names ? 1 : 0),
-> ? ? ? ? ? ? ? ? ? ? ? ?flags);
+> + ? ? ? }
+> +
+> + ? ? ? clk = ?clk_register(dev, name, &clk_mux_ops, &mux->hw,
+> + ? ? ? ? ? ? ? ? ? ? ? parents, num_parents, flags);
+> + ? ? ? if (clk)
+> + ? ? ? ? ? ? ? return clk;
+> +
+> +out:
+> + ? ? ? for (i--; i >= 0; i--)
+> + ? ? ? ? ? ? ? kfree(parents[i]);
+> + ? ? ? kfree(parents);
+> + ? ? ? kfree(mux);
+> +
+> + ? ? ? return NULL;
 > ?}
+> --
+> 1.7.5.4
+>
 >
 > _______________________________________________
 > linux-arm-kernel mailing list
