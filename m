@@ -1,38 +1,34 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 09 Apr 2012 15:40:49 -0700
-Subject: [PATCH 07/17][V2] ARM: OMAP4: cpuidle - remove omap4_idle_data
- initialization at boot time
-In-Reply-To: <1333570371-1389-8-git-send-email-daniel.lezcano@linaro.org>
- (Daniel Lezcano's message of "Wed, 4 Apr 2012 22:12:41 +0200")
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
- <1333570371-1389-8-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <87ehrwa5qm.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Apr 2012 15:49:47 -0700
+Subject: [PATCH] ARM: OMAP: sram: fix BUG in dpll code for !PM case
+In-Reply-To: <1333749201-23255-1-git-send-email-notasas@gmail.com>
+References: <1333749201-23255-1-git-send-email-notasas@gmail.com>
+Message-ID: <20120409224946.GC6487@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+* Grazvydas Ignotas <notasas@gmail.com> [120406 14:56]:
+> _omap3_sram_configure_core_dpll is called when SDRC is reprogrammed,
+> which is done regardless of CONFIG_PM setting, so we always need it's
+> setup code too. Without this, we hit a BUG() on OMAP3 when kernel is
+> built without CONFIG_PM:
+> 
+> Reprogramming SDRC clock to 332000000 Hz
+> ------------[ cut here ]------------
+> kernel BUG at arch/arm/plat-omap/sram.c:342!
+> Internal error: Oops - BUG: 0 [#1] ARM
+> ...
+> [<c001c694>] (omap3_configure_core_dpll+0x68/0x6c) from [<c001b2dc>] (omap3_core_dpll_m2_set_rate+0x1)
+> [<c001b2dc>] (omap3_core_dpll_m2_set_rate+0x138/0x1b0) from [<c001a478>] (omap2_clk_set_rate+0x14/0x2)
+> [<c001a478>] (omap2_clk_set_rate+0x14/0x20) from [<c001c9dc>] (clk_set_rate+0x54/0x74)
+> [<c001c9dc>] (clk_set_rate+0x54/0x74) from [<c022b9c8>] (omap_sdrc_init+0x70/0x90)
+> [<c022b9c8>] (omap_sdrc_init+0x70/0x90) from [<c022f178>] (omap3pandora_init+0x11c/0x164)
+> [<c022f178>] (omap3pandora_init+0x11c/0x164) from [<c022849c>] (customize_machine+0x20/0x28)
+> [<c022849c>] (customize_machine+0x20/0x28) from [<c0225810>] (do_one_initcall+0xa0/0x16c)
+> [<c0225810>] (do_one_initcall+0xa0/0x16c) from [<c02259e0>] (kernel_init+0x104/0x1ac)
+> [<c02259e0>] (kernel_init+0x104/0x1ac) from [<c0009cec>] (kernel_thread_exit+0x0/0x8)
 
-> We initialized it at compile time, no need to do that at boot
-> time.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Reviewed-by: Jean Pihet <j-pihet@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/cpuidle44xx.c |   26 +-------------------------
->  1 files changed, 1 insertions(+), 25 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-> index b82f9fe..b0dd220 100644
-> --- a/arch/arm/mach-omap2/cpuidle44xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-> @@ -33,7 +33,7 @@ struct omap4_idle_statedata {
->  
->  #define OMAP4_NUM_STATES 3
->  
-> -static struct omap4_idle_statedata omap4_idle_data[] = {
-> +static struct omap4_idle_statedata omap4_idle_data[OMAP4_NUM_STATES] = {
+Looks like this was caused by the added ifdef CONFIG_PM from
+commit 3231fc88 (OMAP3: PM: restore SRAM functions after off-mode).
 
-You removed OMAP4_NUM_STATES usage in patch 5, why add it back here?
-
-Kevin
+Tony
