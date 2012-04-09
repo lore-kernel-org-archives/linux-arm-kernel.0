@@ -1,60 +1,58 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 09 Apr 2012 12:41:39 +0530
-Subject: [PATCHv2 0/5] coupled cpuidle state support
-In-Reply-To: <4F75ACCA.4090009@ti.com>
-References: <1331749794-8056-1-git-send-email-ccross@android.com>
- <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
- <4F75ACCA.4090009@ti.com>
-Message-ID: <4F828BAB.5010302@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Apr 2012 16:49:33 +0800
+Subject: [PATCH 4/7] dt/clock: Add handling for fixed clocks and a clock
+ node setup iterator
+In-Reply-To: <4F81A53B.7020804@gmail.com>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-5-git-send-email-robherring2@gmail.com>
+ <20120314075930.GF21337@S2101-09.ap.freescale.net>
+ <4F81A53B.7020804@gmail.com>
+Message-ID: <20120409084930.GA18692@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 March 2012 06:23 PM, Santosh Shilimkar wrote:
-> Colin,
-> 
-> On Friday 16 March 2012 05:07 AM, Colin Cross wrote:
->> On Wed, Mar 14, 2012 at 11:29 AM, Colin Cross <ccross@android.com> wrote:
-> 
-> [...]
-> 
->>>
->>> v2:
->>>   * removed the coupled lock, replacing it with atomic counters
->>>   * added a check for outstanding pokes before beginning the
->>>     final transition to avoid extra wakeups
->>>   * made the cpuidle_coupled struct completely private
->>>   * fixed kerneldoc comment formatting
->>>   * added a patch with a helper function for resynchronizing
->>>     cpus after aborting idle
->>>   * added a patch (not for merging) to add trace events for
->>>     verification and performance testing
->>
->> I forgot to mention, this patch series is on v3.3-rc7, and will
->> conflict with the cpuidle timekeeping patches.  If those go in first
->> (which is likely), I will rework this series on top of it.  I left it
->> on v3.3-rc7 now to make testing easier.
-> 
-> I have re-based your series against Len Browns
-> next branch [1] which has time keeping and other cpuidle patches.
-> Have also folded the CPU hotplug fix which I posted in the
-> original coupled idle patch.
-> 
-As you know, we have been playing around this series for OMAP
-for last few weeks. This version series seems to work as intended
-and found it pretty stable in my testing. Apart from the cpu
-hotplug fix and the trace event comment, series looks fine
-to me.
+On Sun, Apr 08, 2012 at 09:48:27AM -0500, Rob Herring wrote:
+...
+> So I started implementing support for multiple outputs, but ran into a
+> complication. If you have multiple clocks on a node, then you have to
+> have a clk_src_get function to translate the clock cell value to a
+> struct clk.
 
-FWIW,
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>	
+So this is how clk_src_get looks like.
 
-An updated version of this series along with OMAP cpuidle
-driver updates against 3.4-rc2 is available here [1] in
-case some body is interested looking at it.
+struct clk *clk_src_get(struct of_phandle_args *a, void *data)
+{
+        struct clk **clks = data;
+        return clks[a->args[0]];
+}
 
-Regards
-Santosh
+> This would also require allocating an array of struct clk's
+> to do the lookup.
 
-[1] git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
-for_3.5/coupled_cpuidle-rebase
+And this how allocating looks like.
+
+        clks = kzalloc(sizeof(*clks)  * num, GFP_KERNEL);
+        if (!clks)
+                return -ENOMEM;
+
+Seriously, not a big complication, right?
+
+> This is all doable, but I don't see the benefit over
+> having a single node per fixed clock. We're not likely to have *lots* of
+> fixed clocks. I think we should leave fixed-clock defined as a single
+> output.
+
+The problem is there is nothing specific to fixed-clock.  If you have
+some reason to not support blob node for fixed-clock, the reason will
+apply on clk_gate, clk_divider and clk_mux too.  Then, which clocks
+will support the #clock-cells in the binding document?
+
+So to me, you need to either have it implemented or remove it from the
+binding document completely.
+
+Regards,
+Shawn
+
+> If you really see the benefit, you can add a new binding
+> "multiple-fixed-clocks" or something platform specific.
+> 
