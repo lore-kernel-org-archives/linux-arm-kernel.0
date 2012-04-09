@@ -1,29 +1,21 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 09 Apr 2012 15:56:54 -0700
-Subject: [PATCH 06/17][V2] ARM: OMAP4: cpuidle - use the omap4_idle_data
- variable directly
-In-Reply-To: <1333570371-1389-7-git-send-email-daniel.lezcano@linaro.org>
- (Daniel Lezcano's message of "Wed, 4 Apr 2012 22:12:40 +0200")
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
- <1333570371-1389-7-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <87r4vw8qfd.fsf@ti.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 9 Apr 2012 16:04:16 -0700
+Subject: COMMON_CLK_DISABLE_UNUSED
+In-Reply-To: <20120409222903.GA31622@lunn.ch>
+References: <20120409222903.GA31622@lunn.ch>
+Message-ID: <CAJOA=zP8XFTN1mcAyUky3ovrx4Dg1zb9zaB5r8zUYE46Ec-tMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On Mon, Apr 9, 2012 at 3:29 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> I think it would be good to consider deleting this config option and
+> just have the code always enabled.
 
-> We are storing the 'omap4_idle_data' in the private data field
-> of the cpuidle device. As we are using this variable only in this file,
-> that does not really make sense. Let's use the global variable directly
-> instead dereferencing pointers in an idle critical loop.
+I agree.  We already support the CLK_IGNORE_UNUSED flag, so any
+platforms that don't want this functionality wholesale can set that
+bit for every clock.
 
-Did you notice a performance impact before this change?   
+I'll pull out that option.
 
-> Also, that simplfies the code.
-
-possibly, but at the expense of clean abstractions which IMO helps readability.
-
-Unless there is a real performance hit here (which I doubt), I'd prefer
-to leave this as is.
-
-Kevin
+Regards,
+Mike
