@@ -1,35 +1,72 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 10 Apr 2012 00:29:03 +0200
-Subject: COMMON_CLK_DISABLE_UNUSED
-Message-ID: <20120409222903.GA31622@lunn.ch>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 09 Apr 2012 15:37:24 -0700
+Subject: [PATCH 02/17][V2] ARM: OMAP4: cpuidle - Declare the states with
+ the driver declaration
+In-Reply-To: <1333570371-1389-3-git-send-email-daniel.lezcano@linaro.org>
+ (Daniel Lezcano's message of "Wed, 4 Apr 2012 22:12:36 +0200")
+References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
+ <1333570371-1389-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <87vcl8a5wb.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-I've been thinking about:
+> The cpuidle API allows to declare statically the states in the driver
+> structure. Let's use it.
+> We do no longer need the fill_cstate function called at runtime and
+> by the way adding more instructions at boot time.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Reviewed-by: Jean Pihet <j-pihet@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/cpuidle44xx.c |   57 +++++++++++++++++++++---------------
+>  1 files changed, 33 insertions(+), 24 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+> index ee0bc50..6d86b59 100644
+> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+> @@ -132,21 +132,39 @@ struct cpuidle_driver omap4_idle_driver = {
+>  	.name				= "omap4_idle",
+>  	.owner				= THIS_MODULE,
+>  	.en_core_tk_irqen		= 1,
+> +	.states = {
+> +		{
+> +			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
+> +			.exit_latency = 2 + 2,
+> +			.target_residency = 5,
+> +			.flags = CPUIDLE_FLAG_TIME_VALID,
+> +			.enter = omap4_enter_idle,
+> +			.name = "C1",
+> +			.desc = "MPUSS ON"
+> +		},
+> +		{
+> +                        /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+> +			.exit_latency = 328 + 440,
+> +			.target_residency = 960,
+> +			.flags = CPUIDLE_FLAG_TIME_VALID,
+> +			.enter = omap4_enter_idle,
+> +			.name = "C2",
+> +			.desc = "MPUSS CSWR",
+> +		},
+> +		{
+> +			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+> +			.exit_latency = 460 + 518,
+> +			.target_residency = 1100,
+> +			.flags = CPUIDLE_FLAG_TIME_VALID,
+> +			.enter = omap4_enter_idle,
+> +			.name = "C3",
+> +			.desc = "MPUSS OSWR",
+> +		},
+> +	},
+> +	.state_count = OMAP4_NUM_STATES,
 
-config COMMON_CLK_DISABLE_UNUSED
-        bool "Disabled unused clocks at boot"
-        depends on COMMON_CLK
-        ---help---
-          Traverses the entire clock tree and disables any clocks that are
-          enabled in hardware but have not been enabled by any device drivers.
-          This saves power and keeps the software model of the clock in line
-          with reality.
+I think you can drop OMAP4_NUM_STATES here, and just use:
 
-          If in doubt, say "N".
+	.state_count = ARRAY_SIZE(omap4_idle_driver.states),
 
-I think in the long run, having this as an option is going to cause
-problems, in particular for the One ARM Kernel. Some platforms are
-going to want it enabled, others will want it disabled. Depending on
-who looses out, there are going to be power regressions, or clocks
-unexpectedly turned off.
+Then drop OMAP4_NUM_STATES all together in patch 3.
 
-I think it would be good to consider deleting this config option and
-just have the code always enabled.
-
-What do you think?
-
-     Thanks
-	Andrew
+Kevin
