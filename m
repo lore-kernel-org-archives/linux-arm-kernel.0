@@ -1,63 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Apr 2012 22:13:50 +0800
-Subject: [PATCH 2/7] of: add clock providers
-In-Reply-To: <4F82E9A3.1030606@gmail.com>
-References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
- <1331680947-29861-3-git-send-email-robherring2@gmail.com>
- <20120409115549.GB18692@S2101-09.ap.freescale.net>
- <4F82E9A3.1030606@gmail.com>
-Message-ID: <20120409141347.GC18692@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Apr 2012 14:14:28 +0000
+Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
+ DNS-325
+In-Reply-To: <alpine.DEB.2.00.1204091418400.23719@marmot.wormnet.eu>
+References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
+ <20120406234955.840F73E1323@localhost>
+ <alpine.DEB.2.00.1204091418400.23719@marmot.wormnet.eu>
+Message-ID: <201204091414.28918.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2012 at 08:52:35AM -0500, Rob Herring wrote:
-> On 04/09/2012 06:55 AM, Shawn Guo wrote:
-> > On Tue, Mar 13, 2012 at 06:22:22PM -0500, Rob Herring wrote:
-> > ...
-> >> +==Clock consumers==
-> >> +
-> >> +Required properties:
-> >> +clocks:		List of phandle and clock specifier pairs, one pair
-> >> +		for each clock input to the device.  Note: if the
-> >> +		clock provider specifies '0' for #clock-cells, then
-> >> +		only the phandle portion of the pair will appear.
-> > 
-> > Per discussion[1], the parent of the clock could be reasonably
-> > represented in C code instead of in device tree.  Then how can
-> > this "clocks" property be "Required"?  Or to put it another way,
-> > if this is "Required", the whole clock tree will have to be represented
-> > in device tree, no?
-> > 
+On Monday 09 April 2012, Jamie Lentin wrote:
+> On Fri, 6 Apr 2012, Grant Likely wrote:
+> > These two lines are dangerous.  It is not safe to 'select' Kconfig
+> > symbols that have 'depends' constraints.  Otherwise, the symbol will
+> > get forced on without it's dependencies.
+> >
+> > Typically other code handles this by creating blank "HAVE_*" symbols
+> > that the needed symbol can do something like "default y if HAVE_*"
+> >
 > 
-> I'm not sure I follow. All of this only applies if you are doing clock
-> setup from DT. Whether you represent all clocks or only the outputs to
-> devices in DT is up to you. So you could have a CCM node for imx with 50
-> clock outputs and all the intermediate clocks within the CCM are
-> represented with C code.
+> Okay I didn't realise this, thanks. The options in question aren't
+> hard dependencies per-se, but no serial or NAND support is probably a
+> mistake, so added them here to avoid a certain amount of shooting in foot.
 > 
-Ok, now I have uart clock being one of the 50 clocks represented in
-device tree, while the parent of uart clock ipg_per is represented in
-C code.  That said, I do not have a ipg_per clock node in device tree.
-My question is how I should give that required "clocks" property for
-the uart clock node.
+> What's the etiquette in this situation? Adding HAVE_* seems excessive,
+> would selecting them in kirkwood_defconfig make more sense? Or would it
+> simply be covered by having a reasonable config on my website or suchlike?
 
-	uart_serial_clk: uart-baud {
-		compatible = "fsl,imx6q-clock";
-		#clock-cells = <0>;
-		/* clocks = <&ipg_per_clk>; */
-		clocks = <???>;
-	};
+Either way works. We don't prevent people from shooting themselves in the
+foot in Kconfig, there are plenty of ways to do that already (e.g. disabling
+network support on a headless system). There should be a defconfig
+for each platform, so just make sure 'make kirkwood_defconfig' enables
+everything you need and works on your system, it should be the
+superset of all kirkwood based systems and users can disable the
+stuff they don't need.
 
-	uart: serial at 02020000 {
-		compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
-		reg = <0x02020000 0x4000>;
-		interrupts = <0 26 0x04>;
-		clocks = <&uart_serial_clk>
-	}
-
-Regards,
-Shawn
-
-> In other words, at minimum you are just replacing the clkdev lookup with
-> a DT lookup.
-> 
+	Arnd
