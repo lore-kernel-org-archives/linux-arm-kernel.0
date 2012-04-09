@@ -1,49 +1,37 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Sun, 08 Apr 2012 21:09:08 -0400
-Subject: [PATCH 07/11] gpio: tegra: Hide tegra_gpio_enable/disable()
-In-Reply-To: <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
- (Stephen Warren's message of "Fri, 30 Mar 2012 17:00:00 -0600")
-References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
- <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <87mx6l1zkb.fsf@laptop.org>
+Date: Sun, 08 Apr 2012 21:26:19 -0400
+Subject: [PATCH v7 09/11] ARM: pxa: change gpio to platform device
+In-Reply-To: <CAN1soZxOX9LE2+93kKvnmLx2JpmCDWX0pDA8Cf9r4=oncdB+Yw@mail.gmail.com>
+ (Haojian Zhuang's message of "Fri, 6 Apr 2012 13:55:34 +0800")
+References: <1320806851-13928-1-git-send-email-haojian.zhuang@marvell.com>
+ <1320806851-13928-10-git-send-email-haojian.zhuang@marvell.com>
+ <87pqbl5wvt.fsf@laptop.org> <874nsx4g8d.fsf@laptop.org>
+ <CAN1soZxOX9LE2+93kKvnmLx2JpmCDWX0pDA8Cf9r4=oncdB+Yw@mail.gmail.com>
+Message-ID: <878vi51yro.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Mar 30 2012, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Recent pinctrl discussions concluded that gpiolib APIs should in fact do
-> whatever is required to mux a GPIO onto pins, by calling pinctrl APIs if
-> required. This change implements this for the Tegra GPIO driver, and removes
-> calls to the Tegra-specific APIs from drivers and board files.
->
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> v2: Adjusted per changes to latest version of Documentation/gpio.txt.
-> Fixed tegra_board_pinmux_bus_notify() to still check the device name,
-> so it waits for the pinmux device to be registered, not just /any/ device.
-> ---
->  arch/arm/mach-tegra/board-dt-tegra20.c        |    1 -
->  arch/arm/mach-tegra/board-harmony-pinmux.c    |   17 -----------
->  arch/arm/mach-tegra/board-paz00-pinmux.c      |   14 ---------
->  arch/arm/mach-tegra/board-pinmux.c            |   33 +++--------------------
->  arch/arm/mach-tegra/board-pinmux.h            |    5 ---
->  arch/arm/mach-tegra/board-seaboard-pinmux.c   |   32 ----------------------
->  arch/arm/mach-tegra/board-seaboard.c          |    1 -
->  arch/arm/mach-tegra/board-trimslice-pinmux.c  |   12 --------
->  arch/arm/mach-tegra/include/mach/gpio-tegra.h |    9 ------
->  arch/arm/mach-tegra/usb_phy.c                 |    1 -
->  drivers/gpio/gpio-tegra.c                     |   36 ++++++++++++------------
->  drivers/mmc/host/sdhci-tegra.c                |   24 +++-------------
->  12 files changed, 27 insertions(+), 158 deletions(-)
+On Fri, Apr 06 2012, Haojian Zhuang wrote:
+>> Ah, I eventually found your "ARM: mmp: append irq name of gpio device"
+>> patch, which was merged in 3.4-rc1 and fixes gpio-pxa on mach-mmp.
+>> I think this patch should go to stable@, since the regression is
+>> still unfixed in 3.2 and 3.3.
+>>
+> Who or which mailing list should I cc for this fix on 3.2 and 3.3?
 
-For the MMC change:
+For how to get patches included in stable releases, see
+Documentation/stable_kernel_rules.txt:
 
-Acked-by: Chris Ball <cjb@laptop.org>
+  Procedure for submitting patches to the -stable tree:
+
+   - Send the patch, after verifying that it follows the above rules, to
+     stable at vger.kernel.org.  You must note the upstream commit ID in the
+     changelog of your submission, as well as the kernel version you wish
+     it to be applied to.
+
+Thanks,
 
 - Chris.
 -- 
