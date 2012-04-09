@@ -1,61 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 09 Apr 2012 08:52:35 -0500
-Subject: [PATCH 2/7] of: add clock providers
-In-Reply-To: <20120409115549.GB18692@S2101-09.ap.freescale.net>
-References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
- <1331680947-29861-3-git-send-email-robherring2@gmail.com>
- <20120409115549.GB18692@S2101-09.ap.freescale.net>
-Message-ID: <4F82E9A3.1030606@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 9 Apr 2012 14:09:04 +0000
+Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
+ DNS-325
+In-Reply-To: <20120406234313.A040E3E127F@localhost>
+References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
+ <201203280820.00139.arnd@arndb.de> <20120406234313.A040E3E127F@localhost>
+Message-ID: <201204091409.04927.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2012 06:55 AM, Shawn Guo wrote:
-> On Tue, Mar 13, 2012 at 06:22:22PM -0500, Rob Herring wrote:
-> ...
->> +==Clock consumers==
->> +
->> +Required properties:
->> +clocks:		List of phandle and clock specifier pairs, one pair
->> +		for each clock input to the device.  Note: if the
->> +		clock provider specifies '0' for #clock-cells, then
->> +		only the phandle portion of the pair will appear.
+On Friday 06 April 2012, Grant Likely wrote:
+> On Wed, 28 Mar 2012 08:19:59 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 27 March 2012, Jamie Lentin wrote:
+> > > Add support for the DNS-320 and DNS-325. Describe as much as currently possible
+> > > in the devicetree files, create a board-dnskw.c for everything else.
+> > > 
+> > > Use IEEE-compliant "okay", rather than "ok"
+> > > 
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> > > ---
+> > 
+> > One small note about changeset comments: The part about differences from the previous
+> > version of the same patch normally goes below the '---' line, in front of the diffstat,
+> > to prevent it from going into the git changelog. Otherwise people will have no idea
+> > what it's about.
 > 
-> Per discussion[1], the parent of the clock could be reasonably
-> represented in C code instead of in device tree.  Then how can
-> this "clocks" property be "Required"?  Or to put it another way,
-> if this is "Required", the whole clock tree will have to be represented
-> in device tree, no?
-> 
+> Counter point on that.  I ask submitters to put the changelog before
+> the --- because I want it in the commit text.  It is actually helpful
+> when trying to determine exactly which iteration of a patch series got
+> committed.
 
-I'm not sure I follow. All of this only applies if you are doing clock
-setup from DT. Whether you represent all clocks or only the outputs to
-devices in DT is up to you. So you could have a CCM node for imx with 50
-clock outputs and all the intermediate clocks within the CCM are
-represented with C code.
+Fair enough, but I think in this case it was written in a confusing way. I don't
+mind if a list of review comments are included and more text is usally better
+in the changeset comment, but it would be nice to give some background, either
+by prefixing it with something "Addressed review comments from xxx:" or changing
+it to 'This version uses the IEEE-compliant "okay", rather than "ok"'.
 
-In other words, at minimum you are just replacing the clkdev lookup with
-a DT lookup.
-
-Rob
-
->> +
->> +Optional properties:
->> +clock-names:	List of clock input name strings sorted in the same
->> +		order as the clocks property.  Consumers drivers
->> +		will use clock-names to match clock input names
->> +		with clocks specifiers.
->> +clock-ranges:	Empty property indicating that child nodes can inherit named
->> +		clocks from this node. Useful for bus nodes to provide a
->> +		clock to their children.
->> +
->> +For example:
->> +
->> +    device {
->> +        clocks = <&osc 1>, <&ref 0>;
->> +        clock-names = "baud", "register";
->> +    };
-> 
-> Regards,
-> Shawn
-> 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/139414/focus=1216423
+	Arnd
