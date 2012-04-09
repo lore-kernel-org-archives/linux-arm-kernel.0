@@ -1,76 +1,27 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 9 Apr 2012 10:28:42 +0800
-Subject: [PATCH] Input: eeti_ts: Mark as CONFIG_BROKEN
-In-Reply-To: <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
-References: <1333777207-4151-1-git-send-email-olof@lixom.net>
- <20120407070206.GA17623@core.coreip.homeip.net>
- <4F8089A9.6080704@raumfeld.com>
- <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
-Message-ID: <CAN1soZzxQAykNaptaptCcQ22smT-U0tmATFBde5ohkzq7xYA4g@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 9 Apr 2012 09:01:03 +0530
+Subject: [PATCH 1/1] pinctrl: fix pinmux_check_ops error checking
+In-Reply-To: <4F7F0C7E.6030407@wwwdotorg.org>
+References: <1333714689-22450-1-git-send-email-b29396@freescale.com>
+ <4F7F0C7E.6030407@wwwdotorg.org>
+Message-ID: <4F8257F7.60302@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 8, 2012 at 4:32 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Sat, Apr 7, 2012 at 11:38 AM, Sven Neumann <s.neumann@raumfeld.com> wrote:
->> Hi,
->>
->>
->> On 07.04.12 09:02, Dmitry Torokhov wrote:
->>>
->>> On Fri, Apr 06, 2012 at 10:40:07PM -0700, Olof Johansson wrote:
->>>>
->>>> This seems to have been broken since 2010, so obviously noone actually
->>>> cares about the driver:
->>>>
->>>> make[4]: *** [drivers/input/touchscreen/eeti_ts.o] Error 1
->>>> drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
->>>> drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of
->>>> function 'irq_to_gpio' [-Werror=implicit-function-declaration]
->>>>
->>>> irq_to_gpio isn't available on most platforms today, so the driver
->>>> will need some rework by someone who has hardware access and can test
->>>> (to make sure that, for example, switching to level interrupts and just
->>>> keep taking them while there's more to process works).
->>>>
->>>> I guess it could just be scheduled for removal, but let's start with
->>>> marking it CONFIG_BROKEN.
->>>
->>>
->>> Well, it probably works quite well on arches that do have irq_to_gpio(),
->>> let's ask Daniel and Sven if they still have this hardware and if they
->>> can try the patch below that implements what you suggested.
->>
->>
->> This hardware is still in use and we also still follow kernel development
->> and try to update our customer devices to recent kernel versions regularly.
->> Currently we are at 3.1.10 and the touchscreen works well with that. I'll
->> try to update to a more recent kernel next week and will try your patch.
->
-> Ah, you're right, and this was my bad. Looks like this change was
-> introduced in 3.2 and broke this and one more driver (ezx-pcap):
->
-> Author: ? ? Haojian Zhuang <haojian.zhuang@marvell.com>
-> AuthorDate: Mon Oct 10 16:03:51 2011 +0800
-> Commit: ? ? Haojian Zhuang <haojian.zhuang@marvell.com>
-> CommitDate: Mon Nov 14 21:07:59 2011 +0800
->
-> ? ?ARM: pxa: rename gpio_to_irq and irq_to_gpio
->
-> ? ?Avoid to define gpio_to_irq() and irq_to_gpio() for potential name
-> ? ?confliction since multiple architecture will be built together.
->
-> ? ?Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->
->
-> Haojian, I think it was probably premature to do the multiplatform
-> change like that, since it means that a PXA-only kernel has no mapping
-> from irq_to_gpio to pxa_irq_to_gpio. Can you please address this as a
-> fix for 3.4?
->
->
-I tried to fix ezx-pcap before. Since there's some codebase confliction, the
-patch wasn't merged. I'll format patch again. And I'll try to fix other patches
-that are covered in arch-pxa if they exist.
+On 4/6/2012 9:02 PM, Stephen Warren wrote:
+> On 04/06/2012 06:18 AM, Dong Aisheng wrote:
+>> > From: Dong Aisheng <dong.aisheng@linaro.org>
+>> > 
+>> > Do not use get_functions_count before checking.
+>> > 
+>> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> 
+> IIRC, Viresh added some other get_*_count() functions in the same patch.
+> Do we need any more fixes similar to the this for those too?
 
-Best Regards
-Haojian
+Might not be required as this patch handles the pinmux_check_ops() routine.
+At other places ops is guaranteed to have correct value.
+
+-- 
+viresh
