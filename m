@@ -1,94 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun,  8 Apr 2012 16:26:19 -0700
-Subject: [PATCH v2] dma: pl330: fix a couple of compilation warnings
-In-Reply-To: <1333919920-25481-1-git-send-email-olof@lixom.net>
-References: <1333919920-25481-1-git-send-email-olof@lixom.net>
-Message-ID: <1333927579-16999-1-git-send-email-olof@lixom.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 08 Apr 2012 21:09:08 -0400
+Subject: [PATCH 07/11] gpio: tegra: Hide tegra_gpio_enable/disable()
+In-Reply-To: <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
+ (Stephen Warren's message of "Fri, 30 Mar 2012 17:00:00 -0600")
+References: <1333148404-17691-1-git-send-email-swarren@wwwdotorg.org>
+ <1333148404-17691-8-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <87mx6l1zkb.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move a couple of tests and do a minor refactor to avoid:
+Hi,
 
-drivers/dma/pl330.c: In function 'pl330_probe':
-drivers/dma/pl330.c:2929:215: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-drivers/dma/pl330.c: In function 'pl330_tasklet':
-drivers/dma/pl330.c:2250:8: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
-drivers/dma/pl330.c:2228:25: note: 'pch' was declared here
-drivers/dma/pl330.c:2277:130: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
-drivers/dma/pl330.c:2260:25: note: 'pch' was declared here
+On Fri, Mar 30 2012, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> Recent pinctrl discussions concluded that gpiolib APIs should in fact do
+> whatever is required to mux a GPIO onto pins, by calling pinctrl APIs if
+> required. This change implements this for the Tegra GPIO driver, and removes
+> calls to the Tegra-specific APIs from drivers and board files.
+>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2: Adjusted per changes to latest version of Documentation/gpio.txt.
+> Fixed tegra_board_pinmux_bus_notify() to still check the device name,
+> so it waits for the pinmux device to be registered, not just /any/ device.
+> ---
+>  arch/arm/mach-tegra/board-dt-tegra20.c        |    1 -
+>  arch/arm/mach-tegra/board-harmony-pinmux.c    |   17 -----------
+>  arch/arm/mach-tegra/board-paz00-pinmux.c      |   14 ---------
+>  arch/arm/mach-tegra/board-pinmux.c            |   33 +++--------------------
+>  arch/arm/mach-tegra/board-pinmux.h            |    5 ---
+>  arch/arm/mach-tegra/board-seaboard-pinmux.c   |   32 ----------------------
+>  arch/arm/mach-tegra/board-seaboard.c          |    1 -
+>  arch/arm/mach-tegra/board-trimslice-pinmux.c  |   12 --------
+>  arch/arm/mach-tegra/include/mach/gpio-tegra.h |    9 ------
+>  arch/arm/mach-tegra/usb_phy.c                 |    1 -
+>  drivers/gpio/gpio-tegra.c                     |   36 ++++++++++++------------
+>  drivers/mmc/host/sdhci-tegra.c                |   24 +++-------------
+>  12 files changed, 27 insertions(+), 158 deletions(-)
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- drivers/dma/pl330.c |   25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+For the MMC change:
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 282caf11..2ee6e23 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2225,12 +2225,9 @@ static inline void free_desc_list(struct list_head *list)
- {
- 	struct dma_pl330_dmac *pdmac;
- 	struct dma_pl330_desc *desc;
--	struct dma_pl330_chan *pch;
-+	struct dma_pl330_chan *pch = NULL;
- 	unsigned long flags;
- 
--	if (list_empty(list))
--		return;
--
- 	/* Finish off the work list */
- 	list_for_each_entry(desc, list, node) {
- 		dma_async_tx_callback callback;
-@@ -2247,6 +2244,10 @@ static inline void free_desc_list(struct list_head *list)
- 		desc->pchan = NULL;
- 	}
- 
-+	/* pch will be unset if list was empty */
-+	if (!pch)
-+		return;
-+
- 	pdmac = pch->dmac;
- 
- 	spin_lock_irqsave(&pdmac->pool_lock, flags);
-@@ -2257,12 +2258,9 @@ static inline void free_desc_list(struct list_head *list)
- static inline void handle_cyclic_desc_list(struct list_head *list)
- {
- 	struct dma_pl330_desc *desc;
--	struct dma_pl330_chan *pch;
-+	struct dma_pl330_chan *pch = NULL;
- 	unsigned long flags;
- 
--	if (list_empty(list))
--		return;
--
- 	list_for_each_entry(desc, list, node) {
- 		dma_async_tx_callback callback;
- 
-@@ -2274,6 +2272,10 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
- 			callback(desc->txd.callback_param);
- 	}
- 
-+	/* pch will be unset if list was empty */
-+	if (!pch)
-+		return;
-+
- 	spin_lock_irqsave(&pch->lock, flags);
- 	list_splice_tail_init(list, &pch->work_list);
- 	spin_unlock_irqrestore(&pch->lock, flags);
-@@ -2926,8 +2928,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	INIT_LIST_HEAD(&pd->channels);
- 
- 	/* Initialize channel parameters */
--	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
--			(u8)pi->pcfg.num_chan);
-+	if (pdat)
-+		num_chan = max_t(int, pdat->nr_valid_peri, pi->pcfg.num_chan);
-+	else
-+		num_chan = max_t(int, pi->pcfg.num_peri, pi->pcfg.num_chan);
-+
- 	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
- 
- 	for (i = 0; i < num_chan; i++) {
+Acked-by: Chris Ball <cjb@laptop.org>
+
+- Chris.
 -- 
-1.7.9.2.359.gebfc2
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
