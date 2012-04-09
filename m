@@ -1,80 +1,48 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 9 Apr 2012 15:18:22 -0500
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
- presence of 32k timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83184ABEF@DBDE01.ent.ti.com>
-References: <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
- <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
- <20120405095221.GC25053@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
- <87hawxkgoi.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
- <20120406180452.GB15734@atomide.com>
- <79CD15C6BA57404B839C016229A409A83184ABEF@DBDE01.ent.ti.com>
-Message-ID: <4F83440E.70502@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon,  9 Apr 2012 15:24:57 -0500
+Subject: [PATCH 0/4] DT clock binding support
+Message-ID: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+From: Rob Herring <rob.herring@calxeda.com>
 
-On 04/09/2012 01:19 AM, Hiremath, Vaibhav wrote:
+This is yet another post of DT clock binding support. This adds support for
+parsing clock data from DT and initializing clock trees using the common
+clk infrastructure.
 
-[...]
+Functionally, this is mostly unchanged from the previous version. The major
+change is the move of everything from drivers/of/clock.c and of_clk.h into
+appropriate places in the core clock infrastructure. I've also squashed my
+changes into Grant's original patches.
 
-> Let me summarize it here again,
->
-> Currently, the timer code is using config option CONFIG_OMAP_32K_TIMER,
-> to choose between 32ksync counter and gptimer; it is compile time option.
-> If user wants to use gptimer for HR ticks, he must build the kernel without
-> CONFIG_OMAP_32K_TIMER option.
->
-> AM335x family of devices doesn't have 32ksync_counter available, only option
-> here is to use gptimer for kernel clocksource and clockevents.
->
-> So in order to support, multi-omap build including devices like AM335x, we
-> must get rid of this option CONFIG_OMAP_32K_TIMER, atleast from clocksource
-> registration perspective.
->
-> So that means, we need to have some mechanism to handle or detect available
-> clocksource runtime. Options would be,
->
->   - Use HWMOD to detect availability of 32ksync_counter, else fallback
->     to gptimer. [This was my original patch]
->
->     But this restricts the use of gptimer completely on omap architecture,
->     where we have 32ksync counter module.
+The highbank clock support is unchanged except for includes, so I have not
+reposted it here.
 
-True, but we would always want to use the 32k timer if CONFIG_PM is 
-specified. So what I am saying is that if a device has a 32ksync timer 
-and CONFIG_PM is defined, we always want to use the 32ksync timer and a 
-gptimer should never be used.
+The previous series is here:
+http://www.spinics.net/lists/arm-kernel/msg164892.html
 
-So we should/must restrict the use of a gptimer is CONFIG_PM is enabled 
-for devices that have the 32ksync timer.
+Rob
 
->   - So the next solution is to still keep compile time option, so that user
->     will get to use gptimer atleast just changing the kernel config option.
->
->     But, still, this is going to be kernel rebuild.
->
->   - Next option came up was, register both the timers and override using
->     kernel parameter.
->
->     This will work only if, both the timers run at same rate/frequency; since
->     we have one more layer here setup_sched_clock(), which actually can be
->     called only once.
->
->   - Next option suggested by Santosh, is to use kernel parameter as in parse
->     it early, to make decision on if user wants to override default
->     clocksource (32ksync)
->
->     This is something will work for us and solves all above issues.
+Grant Likely (2):
+  clk: add DT clock binding support
+  clk: add DT fixed-clock binding support
 
-What happens if PM is enabled? Can you still override the default? I 
-don't think this should be allowed for devices with a 32ksync timer.
+Rob Herring (2):
+  clk: select CLKDEV_LOOKUP for COMMON_CLK
+  clk: remove trailing whitespace from clk.h
 
-Jon
+ .../devicetree/bindings/clock/clock-bindings.txt   |  117 ++++++++++++++++
+ .../devicetree/bindings/clock/fixed-clock.txt      |   22 +++
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/clk-fixed-rate.c                       |   23 ++++
+ drivers/clk/clk.c                                  |  140 ++++++++++++++++++++
+ drivers/clk/clkdev.c                               |   77 +++++++++++
+ include/linux/clk-provider.h                       |   16 +++
+ include/linux/clk.h                                |   23 +++-
+ 8 files changed, 417 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
+
+-- 
+1.7.5.4
