@@ -1,75 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  9 Apr 2012 15:25:01 -0500
-Subject: [PATCH 4/4] clk: add DT fixed-clock binding support
-In-Reply-To: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
-References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1334003101-17274-5-git-send-email-robherring2@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Apr 2012 13:36:51 -0700
+Subject: [RESEND PATCH] ARM :OMAP2+: UART: Remove some of uart default pads
+In-Reply-To: <CA+Bv8XZgKg-Om9S=CcJEDWRan0pMZ_t1aCVT31q3REmcgLntBw@mail.gmail.com>
+References: <1332324149-16058-1-git-send-email-govindraj.raja@ti.com>
+ <20120403181925.GH8240@atomide.com>
+ <CAMrsUdLrpyGrhggi820WcR+DoHJVB8GQ1THUOO-C4LqUQtAxWQ@mail.gmail.com>
+ <20120405165811.GB3785@atomide.com>
+ <CAMrsUdJEY2o2CWjzSg5dabVEkpk48O5njtDU55Z3Jq2vViNJgQ@mail.gmail.com>
+ <20120406181556.GC15734@atomide.com>
+ <CAMrsUdKs21qtrWX0i44fvm7U2JW0L=2NgmZBHAZGmwp03XFm6w@mail.gmail.com>
+ <CA+Bv8XZgKg-Om9S=CcJEDWRan0pMZ_t1aCVT31q3REmcgLntBw@mail.gmail.com>
+Message-ID: <20120409203651.GB6487@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grant Likely <grant.likely@secretlab.ca>
+* Russ Dill <russ.dill@gmail.com> [120409 09:59]:
+> > From: "Govindraj.R" <govindraj.raja@ti.com>
+> > Date: Mon, 9 Apr 2012 15:16:52 +0530
+> > Subject: [PATCH] ARM: OMAP2+: UART: Fix usage of default uart pads.
 
-Add support for DT "fixed-clock" binding to the common fixed rate clock
-support.
+> > -static int __init
+> > +int __init
+> > ?omap_mux_get_by_name(const char *muxname,
+> > ? ? ? ? ? ? ? ? ? ? ? ?struct omap_mux_partition **found_partition,
+> > ? ? ? ? ? ? ? ? ? ? ? ?struct omap_mux **found_mux)
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-[Rob Herring] Rework and move into common clock infrastructure
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- drivers/clk/clk-fixed-rate.c |   23 +++++++++++++++++++++++
- include/linux/clk-provider.h |    2 ++
- 2 files changed, 25 insertions(+), 0 deletions(-)
+This can now be one one line:
 
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index 90c79fb..72bd083 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -14,6 +14,7 @@
- #include <linux/slab.h>
- #include <linux/io.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- 
- /*
-  * DOC: basic fixed-rate clock that cannot gate
-@@ -80,3 +81,25 @@ out:
- 			(parent_name ? 1 : 0),
- 			flags);
- }
-+
-+#ifdef CONFIG_OF
-+/**
-+ * of_fixed_clk_setup() - Setup function for simple fixed rate clock
-+ */
-+void __init of_fixed_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	const char *clk_name = node->name;
-+	u32 rate;
-+
-+	if (of_property_read_u32(node, "clock-frequency", &rate))
-+		return;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
-+	if (clk)
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
-+#endif
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 0aab294..038d312 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -153,6 +153,8 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate);
- 
-+void of_fixed_clk_setup(struct device_node *np);
-+
- /**
-  * struct clk_gate - gating clock
-  *
--- 
-1.7.5.4
+int __init omap_mux_get_by_name(const char *muxname,
+...
+
+
+> > + ? ? ? ? ? ? ? u16 tx_mode, rx_mode;
+> > +
+> > + ? ? ? ? ? ? ? tx_mode = omap_mux_read(tx_partition, tx_mux->reg_offset);
+> > + ? ? ? ? ? ? ? rx_mode = omap_mux_read(rx_partition, rx_mux->reg_offset);
+> > +
+> > + ? ? ? ? ? ? ? if (!(rx_mode & 0x07) && !(tx_mode & 0x07)) {
+> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].name = rx_pad_name;
+> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].flags ?=
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP;
+> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
+> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].idle = OMAP_PIN_INPUT |
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
+> > +
+> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[1].name = tx_pad_name;
+> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
+> > + ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap_uart_pads;
+> 
+> You are assigning this variable to a structure on the stack.
+> 
+> > + ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_omap_uart_pads);
+
+Also, maybe make that into a separate function with comments added that
+we check that the default pins are muxed to uart rx and tx mode to start
+with. Otherwise it's a bit hard to figure out what's going on here.
+
+Then please split it into two patches: First one removes all the unsafe
+muxing, then the second one enables wake-up events for the ports already
+in uart rx/tx mode.
+
+Regards,
+
+Tony
