@@ -1,85 +1,35 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 9 Apr 2012 15:00:53 -0700
-Subject: [PATCH 10/10] clk: copy parent_names in clk-mux registration
-In-Reply-To: <1332833009-4121-11-git-send-email-shawn.guo@linaro.org>
-References: <1332833009-4121-1-git-send-email-shawn.guo@linaro.org>
- <1332833009-4121-11-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAJOA=zNcRGgetBdgi85GtGLTd82GpWsqqQOFdRmc1obDROyWZg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 10 Apr 2012 00:29:03 +0200
+Subject: COMMON_CLK_DISABLE_UNUSED
+Message-ID: <20120409222903.GA31622@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2012 at 12:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Just like what all other basic clks do, copy parent_names in clk-mux
-> registration, so that clock driver can mark the parent_names
-> __initconst.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Hi Mike
 
-Hi Shawn,
+I've been thinking about:
 
-As discussed in the other thread, I've moved the parent string copies
-into clk_register; that makes this patch unnecessary (and you can
-still mark the parent_names as __initdata).
+config COMMON_CLK_DISABLE_UNUSED
+        bool "Disabled unused clocks at boot"
+        depends on COMMON_CLK
+        ---help---
+          Traverses the entire clock tree and disables any clocks that are
+          enabled in hardware but have not been enabled by any device drivers.
+          This saves power and keeps the software model of the clock in line
+          with reality.
 
-I'll publish my fixes either today or tomorrow.
+          If in doubt, say "N".
 
-Regards,
-Mike
+I think in the long run, having this as an option is going to cause
+problems, in particular for the One ARM Kernel. Some platforms are
+going to want it enabled, others will want it disabled. Depending on
+who looses out, there are going to be power regressions, or clocks
+unexpectedly turned off.
 
-> ---
-> ?drivers/clk/clk-mux.c | ? 29 +++++++++++++++++++++++++++--
-> ?1 files changed, 27 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 1ff90a6..353fcb7 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -94,6 +94,9 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?u8 clk_mux_flags, spinlock_t *lock)
-> ?{
-> ? ? ? ?struct clk_mux *mux;
-> + ? ? ? struct clk *clk;
-> + ? ? ? const char **parents = NULL;
-> + ? ? ? int i = 0;
->
-> ? ? ? ?mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
->
-> @@ -109,6 +112,28 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-> ? ? ? ?mux->flags = clk_mux_flags;
-> ? ? ? ?mux->lock = lock;
->
-> - ? ? ? return clk_register(dev, name, &clk_mux_ops, &mux->hw,
-> - ? ? ? ? ? ? ? ? ? ? ? parent_names, num_parents, flags);
-> + ? ? ? if (num_parents) {
-> + ? ? ? ? ? ? ? parents = kzalloc(sizeof(char *) * num_parents, GFP_KERNEL);
-> + ? ? ? ? ? ? ? if (!parents)
-> + ? ? ? ? ? ? ? ? ? ? ? goto out;
-> +
-> + ? ? ? ? ? ? ? for (i = 0; i < num_parents; i++) {
-> + ? ? ? ? ? ? ? ? ? ? ? parents[i] = kstrdup(parent_names[i], GFP_KERNEL);
-> + ? ? ? ? ? ? ? ? ? ? ? if (!parents[i])
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> + ? ? ? clk = ?clk_register(dev, name, &clk_mux_ops, &mux->hw,
-> + ? ? ? ? ? ? ? ? ? ? ? parents, num_parents, flags);
-> + ? ? ? if (clk)
-> + ? ? ? ? ? ? ? return clk;
-> +
-> +out:
-> + ? ? ? for (i--; i >= 0; i--)
-> + ? ? ? ? ? ? ? kfree(parents[i]);
-> + ? ? ? kfree(parents);
-> + ? ? ? kfree(mux);
-> +
-> + ? ? ? return NULL;
-> ?}
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I think it would be good to consider deleting this config option and
+just have the code always enabled.
+
+What do you think?
+
+     Thanks
+	Andrew
