@@ -1,54 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  9 Apr 2012 23:03:30 +0200
-Subject: [PATCH] ARM: mmci: add support for the Nomadik MMCI variant
-Message-ID: <1334005410-20539-1-git-send-email-linus.walleij@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Apr 2012 22:27:48 +0100
+Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
+ DNS-325
+In-Reply-To: <20120406234955.840F73E1323@localhost>
+References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
+ <1332885255-8304-2-git-send-email-jm@lentin.co.uk>
+ <20120406234955.840F73E1323@localhost>
+Message-ID: <20120409212748.GJ24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nomadik variant is somewhere inbetween the U300 and the Ux500
-variant, its actually expose the same primecell ID as the U300
-but had different characteristics so it needs a small revision
-bump and hard-coding from the board/device tree. After this it
-works just fine.
+On Fri, Apr 06, 2012 at 04:49:55PM -0700, Grant Likely wrote:
+> On Tue, 27 Mar 2012 22:54:11 +0100, Jamie Lentin <jm@lentin.co.uk> wrote:
+> > +config MACH_DNS320_DT
+> > +	bool "D-Link DNS-320 (Flattened Device Tree)"
+> > +	select ARCH_KIRKWOOD_DT
+> > +	select MACH_DNSKW_DT
+> > +	select CONFIG_MTD_OF_PARTS
+> > +	select CONFIG_SERIAL_OF_PLATFORM
+> 
+> These two lines are dangerous.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/mmc/host/mmci.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+No they aren't - at least not as the above patch is written.  There are
+no configuration variables called CONFIG_CONFIG_MTD_OF_PARTS nor
+CONFIG_CONFIG_SERIAL_OF_PLATFORM.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 032b847..d115916 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -94,6 +94,17 @@ static struct variant_data variant_u300 = {
- 	.signal_direction	= true,
- };
- 
-+static struct variant_data variant_nomadik = {
-+	.fifosize		= 16 * 4,
-+	.fifohalfsize		= 8 * 4,
-+	.clkreg			= MCI_CLK_ENABLE,
-+	.datalength_bits	= 24,
-+	.sdio			= true,
-+	.st_clkdiv		= true,
-+	.pwrreg_powerup		= MCI_PWR_ON,
-+	.signal_direction	= true,
-+};
-+
- static struct variant_data variant_ux500 = {
- 	.fifosize		= 30 * 4,
- 	.fifohalfsize		= 8 * 4,
-@@ -1569,6 +1580,11 @@ static struct amba_id mmci_ids[] = {
- 		.data	= &variant_u300,
- 	},
- 	{
-+		.id     = 0x10180180,
-+		.mask   = 0xf0ffffff,
-+		.data	= &variant_nomadik,
-+	},
-+	{
- 		.id     = 0x00280180,
- 		.mask   = 0x00ffffff,
- 		.data	= &variant_u300,
--- 
-1.7.7.6
+Kconfig won't warn about that, and if we assume that this patch has been
+properly tested, it would appear that these two select statements just
+aren't required (because they're effective no-ops as they currently stand).
