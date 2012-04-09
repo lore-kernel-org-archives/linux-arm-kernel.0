@@ -1,65 +1,56 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 09 Apr 2012 16:35:40 -0700
-Subject: [linux-pm] [PATCHv2 0/5] coupled cpuidle state support
-In-Reply-To: <4F828BAB.5010302@ti.com> (Santosh Shilimkar's message of "Mon,
- 09 Apr 2012 12:41:39 +0530")
-References: <1331749794-8056-1-git-send-email-ccross@android.com>
- <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
- <4F75ACCA.4090009@ti.com> <4F828BAB.5010302@ti.com>
-Message-ID: <87mx6k7a2b.fsf@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 10 Apr 2012 07:42:47 +0800
+Subject: [PATCH 2/7] of: add clock providers
+In-Reply-To: <4F82F386.7080303@gmail.com>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-3-git-send-email-robherring2@gmail.com>
+ <20120409115549.GB18692@S2101-09.ap.freescale.net>
+ <4F82E9A3.1030606@gmail.com>
+ <20120409141347.GC18692@S2101-09.ap.freescale.net>
+ <4F82F386.7080303@gmail.com>
+Message-ID: <20120409234241.GE18692@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Mon, Apr 09, 2012 at 09:34:46AM -0500, Rob Herring wrote:
+> On 04/09/2012 09:13 AM, Shawn Guo wrote:
+...
+> >
+> > 	uart_serial_clk: uart-baud {
+> > 		compatible = "fsl,imx6q-clock";
+> > 		#clock-cells = <0>;
+> > 		/* clocks = <&ipg_per_clk>; */
+> > 		clocks = <???>;
+> 
+> This is a provider node not a consumer, so you don't have a clocks
+> property.
 
-> On Friday 30 March 2012 06:23 PM, Santosh Shilimkar wrote:
->> Colin,
->> 
->> On Friday 16 March 2012 05:07 AM, Colin Cross wrote:
->>> On Wed, Mar 14, 2012 at 11:29 AM, Colin Cross <ccross@android.com> wrote:
->> 
->> [...]
->> 
->>>>
->>>> v2:
->>>>   * removed the coupled lock, replacing it with atomic counters
->>>>   * added a check for outstanding pokes before beginning the
->>>>     final transition to avoid extra wakeups
->>>>   * made the cpuidle_coupled struct completely private
->>>>   * fixed kerneldoc comment formatting
->>>>   * added a patch with a helper function for resynchronizing
->>>>     cpus after aborting idle
->>>>   * added a patch (not for merging) to add trace events for
->>>>     verification and performance testing
->>>
->>> I forgot to mention, this patch series is on v3.3-rc7, and will
->>> conflict with the cpuidle timekeeping patches.  If those go in first
->>> (which is likely), I will rework this series on top of it.  I left it
->>> on v3.3-rc7 now to make testing easier.
->> 
->> I have re-based your series against Len Browns
->> next branch [1] which has time keeping and other cpuidle patches.
->> Have also folded the CPU hotplug fix which I posted in the
->> original coupled idle patch.
->> 
-> As you know, we have been playing around this series for OMAP
-> for last few weeks. This version series seems to work as intended
-> and found it pretty stable in my testing. Apart from the cpu
-> hotplug fix and the trace event comment, series looks fine
-> to me.
->
-> FWIW,
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>	
+To me, any clock except root is not only a provider but also a consumer.
+If "clocks" property is required for a consumer ...
 
-Also
+> You could, but then you need the parent clock defined in the DT.
+> 
+..., then we need to define the entire clock tree in the DT.
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
+> The compatible property here looks too generic. In the CCM code, how do
+> you match it to the uart baud clock? You shouldn't be using the name.
+> 
+The code was copied from my early implementation which gets the entire
+clock tree and every clock (reg, bits, shift) represented in DT, and I
+do not need to map it to CCM code at all.
 
-as I've been working with Santosh on getting this stabilized on OMAP and
-we are very keen to see this functionality merged.
+> You need to first decide if you are going to define each clock in the DT
 
-Thanks,
+That was my preference, but it brings too many clock nodes into DT.
 
-Kevin
+> or just the whole CCM as a node.
+> You can't really do something in the
+> middle or be evolving it over time. You could perhaps make the PLLs be
+> separate nodes and inputs to the CCM. As they really are separate h/w
+> blocks.
+
+I do not understand this part.
+
+-- 
+Regards,
+Shawn
