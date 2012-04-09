@@ -1,49 +1,60 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 08 Apr 2012 22:02:29 -0700
-Subject: [PATCH] dma: pl330: fix a couple of compilation warnings
-In-Reply-To: <CAOesGMgav3iqqNBtc1DccKKvRSpnNnDaCZmKBsdHj4feq-ns_A@mail.gmail.com>
-References: <1333919920-25481-1-git-send-email-olof@lixom.net>
- <1333921246.2508.8.camel@joe2Laptop>
- <CAOesGMgav3iqqNBtc1DccKKvRSpnNnDaCZmKBsdHj4feq-ns_A@mail.gmail.com>
-Message-ID: <1333947749.4172.4.camel@joe2Laptop>
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Mon, 09 Apr 2012 07:58:26 +0200
+Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <20111117112508.GA20412@arm.com>
+References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+ <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+ <20111116235024.GH9581@n2100.arm.linux.org.uk>
+ <20111117102205.GF4748@arm.com>
+ <20111117104245.GL9581@n2100.arm.linux.org.uk>
+ <20111117105935.GH4748@arm.com>
+ <20111117110339.GO9581@n2100.arm.linux.org.uk>
+ <20111117112508.GA20412@arm.com>
+Message-ID: <4F827A82.4000407@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-04-08 at 16:24 -0700, Olof Johansson wrote:
-> On Sun, Apr 8, 2012 at 2:40 PM, Joe Perches <joe@perches.com> wrote:
-> > On Sun, 2012-04-08 at 14:18 -0700, Olof Johansson wrote:
-> >> Move a couple of tests and do a minor refactor to avoid:
-> > []
-> >> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > []
-> >> @@ -2926,8 +2928,9 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
-> >>       INIT_LIST_HEAD(&pd->channels);
-> >>
-> >>       /* Initialize channel parameters */
-> >> -     num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
-> >> -                     (u8)pi->pcfg.num_chan);
-> >> +     num_chan = max_t(int, pdat ? pdat->nr_valid_peri :
-> >> +                                  pi->pcfg.num_peri,
-> >> +                           pi->pcfg.num_chan);
-> >>       pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
-> >
-> > Few trivial things:
-> >
-> > There's no error checking for a malloc failure
-> > This should probably be kcalloc
-> 
-> Yes, this driver could do with further cleanups, congratulations on
-> your observations.
-> 
-> All of that is completely unrelated to this patch. Feel free to submit
-> your own changes to clean up the driver further.
+On 17.11.2011 12:25, Catalin Marinas wrote:
+> On Thu, Nov 17, 2011 at 11:03:39AM +0000, Russell King - ARM Linux wrote:
+>> On Thu, Nov 17, 2011 at 10:59:36AM +0000, Catalin Marinas wrote:
+>>> On Thu, Nov 17, 2011 at 10:42:46AM +0000, Russell King - ARM Linux wrote:
+>>>> On Thu, Nov 17, 2011 at 10:22:05AM +0000, Catalin Marinas wrote:
+>>>>> BTW, we could even go a step further an remove the vma checks entirely,
+>>>>> just use access_ok() since __cpuc_coherent_user_range() can handle
+>>>>> unmapped ranges properly (though it may introduce some latency if some
+>>>>> user app passes a 3G range but we can change the fixup code to abort the
+>>>>> operation when it gets a fault that can't be fixed up).
+>>>>
+>>>> So, do you think that it is acceptable to be able to pass into this from
+>>>> userspace the arguments '0', '~0', '0' and have the kernel spin over the
+>>>> entire 4G space, including IO space on any of the supported architectures.
+>>>
+>>> We have access_ok() to check for user only space.
+>>>
+>>>> Note that pre-ARMv6 CPUs will spin over that range in 32-byte steps
+>>>> whether or not there's a page present.
+>>>
+>>> You are right, the pre-v6 hardware would not trigger a fault. So if we
+>>> don't want another #ifdef in this function, we just keep the vma checks
+>>> for all architecture versions.
+>>>
+>>> But I consider that the original patch is still valid.
+>>
+>> You thinks it's safe to walk the vma list with no locks held?
+>
+> No, I don't, but the patch only releases the semaphore when calling the
+> cache flushing function. The vmas are walked with the semaphore held.
+>
+> Please read the patch I posted properly.
 
-No thanks.  It's adjacent to the lines you modify
-which is the only reason I noticed.  You might
-also notice any patch I submit against the current
-tree would conflict with your changes.
+In an other thread
 
-It'd be better if you actually fix problems with
-the code and not simply make compiler warnings be
-silenced when the problem is fundamentally that
-the compiler is needs improvements.
+http://lists.arm.linux.org.uk/lurker/message/20120406.033509.ca9fe8cf.en.html
+
+it seems that we have an additional user where this patch fixed an issue.
+
+So would it be possible to talk about this patch, again?
+
+Many thanks
+
+Dirk
