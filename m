@@ -1,56 +1,52 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 9 Apr 2012 20:56:04 +0200
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <4F830A4F.4040909@grid-net.com>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <201204070334.20650.marek.vasut@gmail.com> <4F830A4F.4040909@grid-net.com>
-Message-ID: <201204092056.04269.marek.vasut@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 10 Apr 2012 00:35:57 +0530
+Subject: [PATCH v2] arm: da850: change ASYNC/PLL0_SYSCLK3 clock rate with
+ DVFS
+In-Reply-To: <1333617232-27967-1-git-send-email-prakash.pm@ti.com>
+References: <1333617232-27967-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <4F833315.1050109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Subodh Nijsure,
+Hi Prakash,
 
-> On 04/06/2012 06:34 PM, Marek Vasut wrote:
-> > Dear Marek Vasut,
-> > 
-> >> Dear Chen Peter-B29397,
-> >> 
-> >>>> On Wed, Mar 14, 2012 at 12:30 AM, Chen Peter-B29397
-> >>>> 
-> >>>> <B29397@freescale.com>  wrote:
-> >>>>> According to sascha's suggestion, it is better to re-submit after we
-> >>>> 
-> >>>> have
-> >>>> 
-> >>>>> a generic USB PHY Layer in mainline.
-> >>>>> 
-> >>>>> Currently, Heikki's split PHY from OTG structure patches have
-> >>>>> mainlined, next step is to submit a generic USB PHY driver.
-> >>>> 
-> >>>> Just for my understanding: is there someone working on this generic
-> >>>> USB PHY driver?
-> >>> 
-> >>> Add related people.
-> >>> 
-> >>> I have much internal stuff on hands now, and have not bandwidth to do
-> >>> it right now.
-> >> 
-> >> It's in my queue to look into this too, but it's still low prio biz.
-> > 
-> > Ok, it just became high-prio biz ...
-> > 
-> > I have the code in prototype phase, will submit it once customer signs
-> > the contract (likely next week).
+On 4/5/2012 2:43 PM, Manjunathappa, Prakash wrote:
+> Clock for EMIF is derived from ASYNC clock domain(PLL0_SYSCLK3) and was
+> configured with fixed divider as there was no significant performance
+> degradation with existing NAND/NOR EMIF devices if it is not
+> reconfigured accordingly at different OPPs.
+
+This is not correct AFAICT. The divider is not fixed in current code.
+There is an attempt to adjust the async1 (PLL0 SYSCLK3 rate) and keep it
+constant at 100MHz by adjusting the divider at each OPP transition (see
+the call to clock_set_rate() on async clock in cpufreq.c). This was
+based on an earlier understanding that PLL0_SYSCLK3 can support 100MHz
+at all OPPs and all AEMIF modes. Looking at the datasheet now, it is
+clear that that assumption is not true.
+
 > 
-> We have ported USB driver from Freescale's 2.6.35 implementation to
-> 3.1-rc5 kernel. We are migrating from 3.1-rc5 to 3.4-rc1 so I am
-> starting to look at this. Let me know if I can be of any help. I would
-> be more than happy to test stuff you have.
+> On systems where devices other than NAND/NOR are interfaced through
+> EMIF, such performance degradation may not be desirable. So change the
+> PLL0_SYSCLK3 output frequency for different OPPs by re-configuring
+> the divider value.
 
-Well, I already have this implemented via the generic phy framework, I don't 
-think FSL has this too. I'll be more than happy if you helped testing though ;-)
+This again is not the point. The issue is that depending on what mode
+you have AEMIF running in *and* depending on what OPP you are at, a
+particular value of ASYNC1 clock is required to get maximum performance
+out of AEMIF.
 
-> -Subodh
+> 
+> Also add Kconfig option to support platforms requiring fixed EMIF clock
+> rate.
 
-Best regards,
-Marek Vasut
+This breaks single image support for all DA850 boards. Kconfig in this
+case is not an option.
+
+Why not make the OPP table board specific while maintain a sane (and
+safe) default in SoC file so there is something to fall back upon in
+case a board does not need to define its own? This should also address
+Christian's concern in the other e-mail thread about board specific OPP
+values being hardcoded in SoC file with no way to override them.
+
+Thanks,
+Sekhar
