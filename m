@@ -1,67 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Apr 2012 13:36:51 -0700
-Subject: [RESEND PATCH] ARM :OMAP2+: UART: Remove some of uart default pads
-In-Reply-To: <CA+Bv8XZgKg-Om9S=CcJEDWRan0pMZ_t1aCVT31q3REmcgLntBw@mail.gmail.com>
-References: <1332324149-16058-1-git-send-email-govindraj.raja@ti.com>
- <20120403181925.GH8240@atomide.com>
- <CAMrsUdLrpyGrhggi820WcR+DoHJVB8GQ1THUOO-C4LqUQtAxWQ@mail.gmail.com>
- <20120405165811.GB3785@atomide.com>
- <CAMrsUdJEY2o2CWjzSg5dabVEkpk48O5njtDU55Z3Jq2vViNJgQ@mail.gmail.com>
- <20120406181556.GC15734@atomide.com>
- <CAMrsUdKs21qtrWX0i44fvm7U2JW0L=2NgmZBHAZGmwp03XFm6w@mail.gmail.com>
- <CA+Bv8XZgKg-Om9S=CcJEDWRan0pMZ_t1aCVT31q3REmcgLntBw@mail.gmail.com>
-Message-ID: <20120409203651.GB6487@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Apr 2012 22:50:51 +0200
+Subject: [PATCH V2 0/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
+In-Reply-To: <CAGOxZ52w1nn8g4d_vuNAzjA9qYZ1=yEfihFvSOK+pBz=ZD=J7Q@mail.gmail.com>
+References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
+ <CACRpkdZC8LOOLkWbrPbXN_nKaw-WvueusYDyrX48Q1Pcdwv3Aw@mail.gmail.com>
+ <CAGOxZ52w1nn8g4d_vuNAzjA9qYZ1=yEfihFvSOK+pBz=ZD=J7Q@mail.gmail.com>
+Message-ID: <CACRpkdamy4sb_yfkreTCE2jjZLwXGTG80hkA7qxe1EoRjXQHtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russ Dill <russ.dill@gmail.com> [120409 09:59]:
-> > From: "Govindraj.R" <govindraj.raja@ti.com>
-> > Date: Mon, 9 Apr 2012 15:16:52 +0530
-> > Subject: [PATCH] ARM: OMAP2+: UART: Fix usage of default uart pads.
+On Thu, Dec 8, 2011 at 2:03 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
 
-> > -static int __init
-> > +int __init
-> > ?omap_mux_get_by_name(const char *muxname,
-> > ? ? ? ? ? ? ? ? ? ? ? ?struct omap_mux_partition **found_partition,
-> > ? ? ? ? ? ? ? ? ? ? ? ?struct omap_mux **found_mux)
+> Hello Linus,
+> sorry for the delay in submitting V3 of the pl080 patches for s3c64xx.
+> I am very busy with my current assignment.
+> I will come back to my patch series incorporating yours and Viresh
+> suggestions in v3.
 
-This can now be one one line:
+Ping!
 
-int __init omap_mux_get_by_name(const char *muxname,
-...
-
-
-> > + ? ? ? ? ? ? ? u16 tx_mode, rx_mode;
-> > +
-> > + ? ? ? ? ? ? ? tx_mode = omap_mux_read(tx_partition, tx_mux->reg_offset);
-> > + ? ? ? ? ? ? ? rx_mode = omap_mux_read(rx_partition, rx_mux->reg_offset);
-> > +
-> > + ? ? ? ? ? ? ? if (!(rx_mode & 0x07) && !(tx_mode & 0x07)) {
-> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].name = rx_pad_name;
-> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].flags ?=
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP;
-> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
-> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].idle = OMAP_PIN_INPUT |
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[1].name = tx_pad_name;
-> > + ? ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
-> > + ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap_uart_pads;
-> 
-> You are assigning this variable to a structure on the stack.
-> 
-> > + ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_omap_uart_pads);
-
-Also, maybe make that into a separate function with comments added that
-we check that the default pins are muxed to uart rx and tx mode to start
-with. Otherwise it's a bit hard to figure out what's going on here.
-
-Then please split it into two patches: First one removes all the unsafe
-muxing, then the second one enables wake-up events for the ports already
-in uart rx/tx mode.
-
-Regards,
-
-Tony
+Yours,
+Linus Walleij
