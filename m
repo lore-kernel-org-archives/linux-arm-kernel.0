@@ -1,77 +1,70 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 9 Apr 2012 06:25:48 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
- presence of 32k timer
-In-Reply-To: <874nswftjc.fsf@ti.com>
-References: <CACVXFVPbU2OqTN=S0AZCD10KuSBYxqyyRH_xee+WTaCD6VSmMQ@mail.gmail.com>
- <CAMQu2gzuQ-q+3RHsW0=U305jCF-td5-PEXkGZ6WnQTqA1K8oAQ@mail.gmail.com>
- <CACVXFVPu1GEQy+sCgXMB8JCszPBBs8zHRVm94TYb1-y2afkqgw@mail.gmail.com>
- <CAMQu2gwuRpZ133962r3N4Y4K3oQ88ySa=SyoS6v=sSHGA=SGKw@mail.gmail.com>
- <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
- <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
- <87sjgmt211.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
- <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
- <20120405095221.GC25053@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
- <87hawxkgoi.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
- <874nswftjc.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83184AC0A@DBDE01.ent.ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 9 Apr 2012 12:21:08 +0530
+Subject: spi-s3c64xx: problems with SPI_MODE_3 transfers
+In-Reply-To: <201204082039.34325.heiko@sntech.de>
+References: <201204082039.34325.heiko@sntech.de>
+Message-ID: <CABb+yY3_YAk_V5ZVJ1ntKEhvsL4BcC+YSnu_-6v=dHCMZ6ZmHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 07, 2012 at 02:48:47, Hilman, Kevin wrote:
-> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-> 
-> [...]
-> 
-> > I liked Santosh's idea in using command line argument "clocksource=" and 
-> > make decision based on this. I have implemented it and tried it on both
-> > OMAP3EVM and beaglebone and it works great.
-> >
-> > I have introduced something like this in mach-omap2/timer.c,
-> >
-> > static int __init omap2_override_clocksource(char* str)
-> > {
-> > 	if (!str)
-> > 		return 0;
-> > 	/*
-> > 	 * For OMAP architecture, we only have two options
-> > 	 *    - sync_32k (default)
-> > 	 *    - gp timer
-> > 	 */
-> > 	if (!strcmp(str, "gp timer"))
-> > 		use_gptimer_clksrc = true;
-> >
-> > 	return 0;
-> > }
-> > early_param("clocksource", omap2_override_clocksource);
-> 
-> How does this interact with the existing clocksource cmdline parameter
-> already in kernel/time/clocksource.c? (c.f. boot_override_clocksource()) 
-> 
+On Mon, Apr 9, 2012 at 12:09 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> [@jassi: I know that you do not work at this stuff any longer, but I included
+> you in the list of recipients in the hope that you might be able to give me a
+> pointer on where to look for the culprit of the problem :-) ]
+>
+>
+> Hi,
+>
+> while working on the beginnings of a wireless driver connected via SPI [1],
+> the s3c64xx-spi-driver produced strange problems while doing MODE_3 ?(CPOL |
+> CPHA) transfers: [2]
+>
+> [write] spi cur_bpw: 8: ?0x00 0x00 0x04 0x00
+> [read] ?spi cur_bpw: 8: ?0x00 0x00 0x00 0x00
+> [read] ?spi cur_bpw: 8: ?0x00 0x00 0x00 0x00
+> (chip_id = 0x0000, chip_rev = 0x00)
+> mapped channel 24 to 0
+> mapped channel 23 to 1
+> [write] spi cur_bpw: 8: ?0x00 0x00 0x04 0x00
+> [read] ?spi cur_bpw: 8: ?0x00 0x00 0x00 0x00
+> [read] ?spi cur_bpw: 8: ?0x00 0x00 0x00 0x00
+> CIR: 0
+> [write] spi cur_bpw: 8: ?0x00 0x00 0x04 0x00
+> [read] ?spi cur_bpw: 8: ?0x00 0x00 0x00 0x00
+> mt592x_spi spi0.0: I/O Error: rx-1 tx-0 res:rx-f tx-p len-4
+> CIR: 0
+> [write] spi cur_bpw: 8: ?0x00 0x00 0x04 0x00
+> mt592x_spi spi0.0: I/O Error: rx-0 tx-1 res:rx-p tx-f len-4
+> CIR: 0
+> [write] spi cur_bpw: 8: ?0x00 0x00 0x04 0x00
+> mt592x_spi spi0.0: I/O Error: rx-0 tx-1 res:rx-p tx-f len-4
+> CIR: 0
+> [write] spi cur_bpw: 8: ?0x00 0x00 0x04 0x00
+> mt592x_spi spi0.0: I/O Error: rx-0 tx-1 res:rx-p tx-f len-4
+> CIR: 0
+>
+> where the expected result would be:
+>
+> [write] spi cur_bpw: 8: ?0x00 0x00 0x04 0x00
+> [read] ?spi cur_bpw: 8: ?0x00 0x00 0x00 0x00
+> [read] ?spi cur_bpw: 8: ?0x21 0x59 0x91 0x00
+>
+> The pattern of either empty results or read errors also varies with each
+> invocation, i.e. sometimes all fail or all result in wrong values and so on.
+>
+>
+> In contrast when doing this with the spi-gpio driver, everything works as
+> expected and I get the expected results.
+>
+> Also the device-family I'm working on contains a variant with a Marvell 8686
+> wlan chip [= the rest of the system is the same]. Using the spi-s3c64xx with
+> the libertas driver (MODE_0) works as expected.
+>
+>
+> As I'm not sure where I should look for errors in the driver, I would be glad
+> to get pointers in the right direction.
+>
+You might want to play around tuning the 'fb_delay' and maybe signal
+strength too.
 
-Not really, it doesn't interact with existing clocksource parameter
-Already present in kernel/time/clocksource.c.
-
-Both works independently...
-
-> IMO, this duplicates that functionality but less elegantly.
-> 
-> What should happen is to let clocksource selection happen normally
-> (based on presence or lack of HW, or cmdline override.)  Once that has
-> happened, you can then setup_sched_clock() with parameters from querying
-> the clocksource itself.
-> 
-
-After Russell's response, it is clear that we should not change the 
-clocksource dynamically, its not useful. So I do not see any benefits
-following that feature (as of now).
-
-We just need to make sure that, we detect our clocksource and call
-setup_sched_clock() with appropriate rating.
-
-Thanks,
-Vaibhav
+-j
