@@ -1,38 +1,158 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  9 Apr 2012 22:53:21 +0200
-Subject: [PATCH 1/2] dma/amba-pl08x: check for terminal count status only
-Message-ID: <1334004801-20185-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  9 Apr 2012 22:53:36 +0200
+Subject: [PATCH 2/2] dma/amba-pl08x: add support for the Nomadik variant
+Message-ID: <1334004816-20219-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some reason I can't figure out we're reading the PL080_INT_STATUS
-register instead of PL080_TC_STATUS when checking for the terminal
-count. The PL080_INT_STATUS is a logical OR between the error and
-terminal count status register and may not report what we want it
-to, especially if there is an error and a terminal count at the same
-time and the former is not lowered in time for the check in the TC
-register. Make sure we read what we're actually interested in.
+The Nomadik PL080 variant has some extra protection bits that
+may be set, so we need to check these bits to see if the
+channels are actually available for the DMAengine to use.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Viresh Kumar <viresh.kumar@st.com>
 Cc: Alim Akhtar <alim.akhtar@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/amba-pl08x.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/hardware/pl080.h |    2 +
+ drivers/dma/amba-pl08x.c              |   43 +++++++++++++++++++++++++++++----
+ include/linux/amba/pl08x.h            |    3 ++
+ 3 files changed, 43 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/include/asm/hardware/pl080.h b/arch/arm/include/asm/hardware/pl080.h
+index 33c78d7..4eea210 100644
+--- a/arch/arm/include/asm/hardware/pl080.h
++++ b/arch/arm/include/asm/hardware/pl080.h
+@@ -102,6 +102,8 @@
+ #define PL080_WIDTH_16BIT			(0x1)
+ #define PL080_WIDTH_32BIT			(0x2)
+ 
++#define PL080N_CONFIG_ITPROT			(1 << 20)
++#define PL080N_CONFIG_SECPROT			(1 << 19)
+ #define PL080_CONFIG_HALT			(1 << 18)
+ #define PL080_CONFIG_ACTIVE			(1 << 17)  /* RO */
+ #define PL080_CONFIG_LOCK			(1 << 16)
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index c301a8e..08589c6 100644
+index 08589c6..f2a8d32 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -1615,7 +1615,7 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
- 			__func__, err);
- 		writel(err, pl08x->base + PL080_ERR_CLEAR);
- 	}
--	tc = readl(pl08x->base + PL080_INT_STATUS);
-+	tc = readl(pl08x->base + PL080_TC_STATUS);
- 	if (tc)
- 		writel(tc, pl08x->base + PL080_TC_CLEAR);
+@@ -95,10 +95,14 @@ static struct amba_driver pl08x_amba_driver;
+  * struct vendor_data - vendor-specific config parameters for PL08x derivatives
+  * @channels: the number of channels available in this variant
+  * @dualmaster: whether this version supports dual AHB masters or not.
++ * @nomadik: whether the channels have Nomadik security extension bits
++ *	that need to be checked for permission before use and some registers are
++ *	missing
+  */
+ struct vendor_data {
+ 	u8 channels;
+ 	bool dualmaster;
++	bool nomadik;
+ };
  
+ /*
+@@ -385,7 +389,7 @@ pl08x_get_phy_channel(struct pl08x_driver_data *pl08x,
+ 
+ 		spin_lock_irqsave(&ch->lock, flags);
+ 
+-		if (!ch->serving) {
++		if (!ch->locked && !ch->serving) {
+ 			ch->serving = virt_chan;
+ 			ch->signal = -1;
+ 			spin_unlock_irqrestore(&ch->lock, flags);
+@@ -1483,6 +1487,9 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
+  */
+ static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
+ {
++	/* The Nomadik variant does not have the config register */
++	if (pl08x->vd->nomadik)
++		return;
+ 	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
+ }
+ 
+@@ -1772,8 +1779,10 @@ static int pl08x_debugfs_show(struct seq_file *s, void *data)
+ 		spin_lock_irqsave(&ch->lock, flags);
+ 		virt_chan = ch->serving;
+ 
+-		seq_printf(s, "%d\t\t%s\n",
+-			   ch->id, virt_chan ? virt_chan->name : "(none)");
++		seq_printf(s, "%d\t\t%s%s\n",
++			   ch->id,
++			   virt_chan ? virt_chan->name : "(none)",
++			   ch->locked ? " LOCKED" : "");
+ 
+ 		spin_unlock_irqrestore(&ch->lock, flags);
+ 	}
+@@ -1934,6 +1943,24 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 		spin_lock_init(&ch->lock);
+ 		ch->serving = NULL;
+ 		ch->signal = -1;
++
++		/*
++		 * Nomadik variants can have channels that are locked
++		 * down for the secure world only. Lock up these channels
++		 * by perpetually serving a dummy virtual channel.
++		 */
++		if (vd->nomadik) {
++			u32 val;
++
++			val = readl(ch->base + PL080_CH_CONFIG);
++			if (val & (PL080N_CONFIG_ITPROT | PL080N_CONFIG_SECPROT)) {
++				dev_info(&adev->dev, "physical channel %d reserved "
++					 "for secure access only\n", i);
++				ch->locked = true;
++			} else
++				ch->locked = false;
++		}
++
+ 		dev_dbg(&adev->dev, "physical channel %d is %s\n",
+ 			i, pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+ 	}
+@@ -2016,6 +2043,12 @@ static struct vendor_data vendor_pl080 = {
+ 	.dualmaster = true,
+ };
+ 
++static struct vendor_data vendor_nomadik = {
++	.channels = 8,
++	.dualmaster = true,
++	.nomadik = true,
++};
++
+ static struct vendor_data vendor_pl081 = {
+ 	.channels = 2,
+ 	.dualmaster = false,
+@@ -2036,9 +2069,9 @@ static struct amba_id pl08x_ids[] = {
+ 	},
+ 	/* Nomadik 8815 PL080 variant */
+ 	{
+-		.id	= 0x00280880,
++		.id	= 0x00280080,
+ 		.mask	= 0x00ffffff,
+-		.data	= &vendor_pl080,
++		.data	= &vendor_nomadik,
+ 	},
+ 	{ 0, 0 },
+ };
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index e64ce2c..0254901 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -92,6 +92,8 @@ struct pl08x_bus_data {
+  * right now
+  * @serving: the virtual channel currently being served by this physical
+  * channel
++ * @locked: channel unavailable for the system, e.g. dedicated to secure
++ * world
+  */
+ struct pl08x_phy_chan {
+ 	unsigned int id;
+@@ -99,6 +101,7 @@ struct pl08x_phy_chan {
+ 	spinlock_t lock;
+ 	int signal;
+ 	struct pl08x_dma_chan *serving;
++	bool locked;
+ };
+ 
+ /**
 -- 
 1.7.7.6
