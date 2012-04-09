@@ -1,158 +1,109 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  9 Apr 2012 22:53:36 +0200
-Subject: [PATCH 2/2] dma/amba-pl08x: add support for the Nomadik variant
-Message-ID: <1334004816-20219-1-git-send-email-linus.walleij@linaro.org>
+From: alexandre.belloni@piout.net (Alexandre Belloni)
+Date: Mon, 9 Apr 2012 22:56:53 +0200
+Subject: [alexandre.belloni@piout.net: AT91SAM9261-EK still broken ?]
+In-Reply-To: <20120409192055.GA7092@piout.net>
+References: <20120409192055.GA7092@piout.net>
+Message-ID: <20120409205653.GA10737@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nomadik PL080 variant has some extra protection bits that
-may be set, so we need to check these bits to see if the
-channels are actually available for the DMAengine to use.
+Hi again,
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Viresh Kumar <viresh.kumar@st.com>
-Cc: Alim Akhtar <alim.akhtar@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/include/asm/hardware/pl080.h |    2 +
- drivers/dma/amba-pl08x.c              |   43 +++++++++++++++++++++++++++++----
- include/linux/amba/pl08x.h            |    3 ++
- 3 files changed, 43 insertions(+), 5 deletions(-)
+More info, I get almost the same behavior while booting from nand.
+ts_calibrate and ubiattach seem to trigger the issue.
 
-diff --git a/arch/arm/include/asm/hardware/pl080.h b/arch/arm/include/asm/hardware/pl080.h
-index 33c78d7..4eea210 100644
---- a/arch/arm/include/asm/hardware/pl080.h
-+++ b/arch/arm/include/asm/hardware/pl080.h
-@@ -102,6 +102,8 @@
- #define PL080_WIDTH_16BIT			(0x1)
- #define PL080_WIDTH_32BIT			(0x2)
- 
-+#define PL080N_CONFIG_ITPROT			(1 << 20)
-+#define PL080N_CONFIG_SECPROT			(1 << 19)
- #define PL080_CONFIG_HALT			(1 << 18)
- #define PL080_CONFIG_ACTIVE			(1 << 17)  /* RO */
- #define PL080_CONFIG_LOCK			(1 << 16)
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 08589c6..f2a8d32 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -95,10 +95,14 @@ static struct amba_driver pl08x_amba_driver;
-  * struct vendor_data - vendor-specific config parameters for PL08x derivatives
-  * @channels: the number of channels available in this variant
-  * @dualmaster: whether this version supports dual AHB masters or not.
-+ * @nomadik: whether the channels have Nomadik security extension bits
-+ *	that need to be checked for permission before use and some registers are
-+ *	missing
-  */
- struct vendor_data {
- 	u8 channels;
- 	bool dualmaster;
-+	bool nomadik;
- };
- 
- /*
-@@ -385,7 +389,7 @@ pl08x_get_phy_channel(struct pl08x_driver_data *pl08x,
- 
- 		spin_lock_irqsave(&ch->lock, flags);
- 
--		if (!ch->serving) {
-+		if (!ch->locked && !ch->serving) {
- 			ch->serving = virt_chan;
- 			ch->signal = -1;
- 			spin_unlock_irqrestore(&ch->lock, flags);
-@@ -1483,6 +1487,9 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
-  */
- static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
- {
-+	/* The Nomadik variant does not have the config register */
-+	if (pl08x->vd->nomadik)
-+		return;
- 	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
- }
- 
-@@ -1772,8 +1779,10 @@ static int pl08x_debugfs_show(struct seq_file *s, void *data)
- 		spin_lock_irqsave(&ch->lock, flags);
- 		virt_chan = ch->serving;
- 
--		seq_printf(s, "%d\t\t%s\n",
--			   ch->id, virt_chan ? virt_chan->name : "(none)");
-+		seq_printf(s, "%d\t\t%s%s\n",
-+			   ch->id,
-+			   virt_chan ? virt_chan->name : "(none)",
-+			   ch->locked ? " LOCKED" : "");
- 
- 		spin_unlock_irqrestore(&ch->lock, flags);
- 	}
-@@ -1934,6 +1943,24 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 		spin_lock_init(&ch->lock);
- 		ch->serving = NULL;
- 		ch->signal = -1;
-+
-+		/*
-+		 * Nomadik variants can have channels that are locked
-+		 * down for the secure world only. Lock up these channels
-+		 * by perpetually serving a dummy virtual channel.
-+		 */
-+		if (vd->nomadik) {
-+			u32 val;
-+
-+			val = readl(ch->base + PL080_CH_CONFIG);
-+			if (val & (PL080N_CONFIG_ITPROT | PL080N_CONFIG_SECPROT)) {
-+				dev_info(&adev->dev, "physical channel %d reserved "
-+					 "for secure access only\n", i);
-+				ch->locked = true;
-+			} else
-+				ch->locked = false;
-+		}
-+
- 		dev_dbg(&adev->dev, "physical channel %d is %s\n",
- 			i, pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
- 	}
-@@ -2016,6 +2043,12 @@ static struct vendor_data vendor_pl080 = {
- 	.dualmaster = true,
- };
- 
-+static struct vendor_data vendor_nomadik = {
-+	.channels = 8,
-+	.dualmaster = true,
-+	.nomadik = true,
-+};
-+
- static struct vendor_data vendor_pl081 = {
- 	.channels = 2,
- 	.dualmaster = false,
-@@ -2036,9 +2069,9 @@ static struct amba_id pl08x_ids[] = {
- 	},
- 	/* Nomadik 8815 PL080 variant */
- 	{
--		.id	= 0x00280880,
-+		.id	= 0x00280080,
- 		.mask	= 0x00ffffff,
--		.data	= &vendor_pl080,
-+		.data	= &vendor_nomadik,
- 	},
- 	{ 0, 0 },
- };
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index e64ce2c..0254901 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -92,6 +92,8 @@ struct pl08x_bus_data {
-  * right now
-  * @serving: the virtual channel currently being served by this physical
-  * channel
-+ * @locked: channel unavailable for the system, e.g. dedicated to secure
-+ * world
-  */
- struct pl08x_phy_chan {
- 	unsigned int id;
-@@ -99,6 +101,7 @@ struct pl08x_phy_chan {
- 	spinlock_t lock;
- 	int signal;
- 	struct pl08x_dma_chan *serving;
-+	bool locked;
- };
- 
- /**
+ifconfig eth0 192.168.1.222
+dm9000 dm9000.0: eth0: link down
+# dm9000 dm9000.0: eth0: link up, 100Mbps, full-duplex, lpa 0x45E1
+ping 192.168.1.1
+PING 192.168.1.1 (192.168.1.1): 56 data bytes
+64 bytes from 192.168.1.1: seq=0 ttl=64 time=12.184 ms
+[...]
+--- 192.168.1.1 ping statistics ---
+28 packets transmitted, 28 packets received, 0% packet loss
+round-trip min/avg/max = 0.471/5.027/14.160 ms
+# ts_calibrate 
+xres = 240, yres = 320
+signal 2 caught
+# ping 192.168.1.1
+PING 192.168.1.1 (192.168.1.1): 56 data bytes
+------------[ cut here ]------------
+WARNING: at net/sched/sch_generic.c:256 dev_watchdog+0x258/0x278()
+NETDEV WATCHDOG: eth0 (dm9000): transmit queue 0 timed out
+Modules linked in:
+[<c0012614>] (unwind_backtrace+0x0/0xf0) from [<c0019f98>] (warn_slowpath_common+0x4c/0x64)
+[<c0019f98>] (warn_slowpath_common+0x4c/0x64) from [<c001a044>] (warn_slowpath_fmt+0x30/0x40)
+[<c001a044>] (warn_slowpath_fmt+0x30/0x40) from [<c0250010>] (dev_watchdog+0x258/0x278)
+[<c0250010>] (dev_watchdog+0x258/0x278) from [<c002370c>] (run_timer_softirq+0xf8/0x230)
+[<c002370c>] (run_timer_softirq+0xf8/0x230) from [<c001f140>] (__do_softirq+0x90/0x120)
+[<c001f140>] (__do_softirq+0x90/0x120) from [<c001f534>] (irq_exit+0x48/0x50)
+[<c001f534>] (irq_exit+0x48/0x50) from [<c000e980>] (handle_IRQ+0x44/0x98)
+[<c000e980>] (handle_IRQ+0x44/0x98) from [<c000dd78>] (__irq_svc+0x38/0x60)
+[<c000dd78>] (__irq_svc+0x38/0x60) from [<c000eacc>] (default_idle+0x24/0x40)
+[<c000eacc>] (default_idle+0x24/0x40) from [<c000ec90>] (cpu_idle+0x84/0xbc)
+[<c000ec90>] (cpu_idle+0x84/0xbc) from [<c03f76e0>] (start_kernel+0x24c/0x290)
+---[ end trace 93ffb7dfd2d10fb0 ]---
+--- 192.168.1.1 ping statistics ---
+9 packets transmitted, 0 packets received, 100% packet loss
+
+
+On Mon, Apr 09, 2012 at 09:20:55PM +0200, Alexandre Belloni wrote :
+> Hum, I got the wrong list...
+> 
+> ----- Forwarded message from Alexandre Belloni <alexandre.belloni@piout.net> -----
+> 
+> Date: Mon, 9 Apr 2012 21:10:25 +0200
+> From: Alexandre Belloni <alexandre.belloni@piout.net>
+> To: linux-arm-kernel at lists.arm.linux.org.uk
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Subject: AT91SAM9261-EK still broken ?
+> User-Agent: Mutt/1.5.21 (2010-09-15)
+> 
+> Hi Jean-Christophe,
+> 
+> I'm using linux 3.4-rc2 and it seems I'm running in the same issue that
+> was described there: https://lkml.org/lkml/2011/8/8/355
+> 
+> I didn't have a deep look into it but when I try to use ts_calibrate or
+> ts_test, the network interface is freezing. As I'm using nfs to boot, I
+> can't do anything anymore...
+> 
+> Kernel message:
+> 
+> # ts_calibrate 
+> ------------[ cut here ]------------
+> WARNING: at net/sched/sch_generic.c:256 dev_watchdog+0x258/0x278()
+> NETDEV WATCHDOG: eth0 (dm9000): transmit queue 0 timed out
+> Modules linked in:
+> [<c0012614>] (unwind_backtrace+0x0/0xf0) from [<c0019f98>] (warn_slowpath_common+0x4c/0x64)
+> [<c0019f98>] (warn_slowpath_common+0x4c/0x64) from [<c001a044>] (warn_slowpath_fmt+0x30/0x40)
+> [<c001a044>] (warn_slowpath_fmt+0x30/0x40) from [<c023fb70>] (dev_watchdog+0x258/0x278)
+> [<c023fb70>] (dev_watchdog+0x258/0x278) from [<c002370c>] (run_timer_softirq+0xf8/0x230)
+> [<c002370c>] (run_timer_softirq+0xf8/0x230) from [<c001f140>] (__do_softirq+0x90/0x120)
+> [<c001f140>] (__do_softirq+0x90/0x120) from [<c001f534>] (irq_exit+0x48/0x50)
+> [<c001f534>] (irq_exit+0x48/0x50) from [<c000e980>] (handle_IRQ+0x44/0x98)
+> [<c000e980>] (handle_IRQ+0x44/0x98) from [<c000dd78>] (__irq_svc+0x38/0x60)
+> [<c000dd78>] (__irq_svc+0x38/0x60) from [<c000eacc>] (default_idle+0x24/0x40)
+> [<c000eacc>] (default_idle+0x24/0x40) from [<c000ec90>] (cpu_idle+0x84/0xbc)
+> [<c000ec90>] (cpu_idle+0x84/0xbc) from [<c03e16e0>] (start_kernel+0x24c/0x290)
+> ---[ end trace e6a4b7e1afc454c3 ]---
+> nfs: server 192.168.1.1 not responding, still trying
+> 
+> Regards,
+> 
+> -- 
+> Alexandre Belloni
+> 
+> ----- End forwarded message -----
+> 
+> -- 
+> Alexandre Belloni
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.7.6
+Alexandre Belloni
