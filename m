@@ -1,41 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 9 Apr 2012 14:09:04 +0000
-Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
- DNS-325
-In-Reply-To: <20120406234313.A040E3E127F@localhost>
-References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
- <201203280820.00139.arnd@arndb.de> <20120406234313.A040E3E127F@localhost>
-Message-ID: <201204091409.04927.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Apr 2012 22:13:50 +0800
+Subject: [PATCH 2/7] of: add clock providers
+In-Reply-To: <4F82E9A3.1030606@gmail.com>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-3-git-send-email-robherring2@gmail.com>
+ <20120409115549.GB18692@S2101-09.ap.freescale.net>
+ <4F82E9A3.1030606@gmail.com>
+Message-ID: <20120409141347.GC18692@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 April 2012, Grant Likely wrote:
-> On Wed, 28 Mar 2012 08:19:59 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 27 March 2012, Jamie Lentin wrote:
-> > > Add support for the DNS-320 and DNS-325. Describe as much as currently possible
-> > > in the devicetree files, create a board-dnskw.c for everything else.
-> > > 
-> > > Use IEEE-compliant "okay", rather than "ok"
-> > > 
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> > > ---
+On Mon, Apr 09, 2012 at 08:52:35AM -0500, Rob Herring wrote:
+> On 04/09/2012 06:55 AM, Shawn Guo wrote:
+> > On Tue, Mar 13, 2012 at 06:22:22PM -0500, Rob Herring wrote:
+> > ...
+> >> +==Clock consumers==
+> >> +
+> >> +Required properties:
+> >> +clocks:		List of phandle and clock specifier pairs, one pair
+> >> +		for each clock input to the device.  Note: if the
+> >> +		clock provider specifies '0' for #clock-cells, then
+> >> +		only the phandle portion of the pair will appear.
 > > 
-> > One small note about changeset comments: The part about differences from the previous
-> > version of the same patch normally goes below the '---' line, in front of the diffstat,
-> > to prevent it from going into the git changelog. Otherwise people will have no idea
-> > what it's about.
+> > Per discussion[1], the parent of the clock could be reasonably
+> > represented in C code instead of in device tree.  Then how can
+> > this "clocks" property be "Required"?  Or to put it another way,
+> > if this is "Required", the whole clock tree will have to be represented
+> > in device tree, no?
+> > 
 > 
-> Counter point on that.  I ask submitters to put the changelog before
-> the --- because I want it in the commit text.  It is actually helpful
-> when trying to determine exactly which iteration of a patch series got
-> committed.
+> I'm not sure I follow. All of this only applies if you are doing clock
+> setup from DT. Whether you represent all clocks or only the outputs to
+> devices in DT is up to you. So you could have a CCM node for imx with 50
+> clock outputs and all the intermediate clocks within the CCM are
+> represented with C code.
+> 
+Ok, now I have uart clock being one of the 50 clocks represented in
+device tree, while the parent of uart clock ipg_per is represented in
+C code.  That said, I do not have a ipg_per clock node in device tree.
+My question is how I should give that required "clocks" property for
+the uart clock node.
 
-Fair enough, but I think in this case it was written in a confusing way. I don't
-mind if a list of review comments are included and more text is usally better
-in the changeset comment, but it would be nice to give some background, either
-by prefixing it with something "Addressed review comments from xxx:" or changing
-it to 'This version uses the IEEE-compliant "okay", rather than "ok"'.
+	uart_serial_clk: uart-baud {
+		compatible = "fsl,imx6q-clock";
+		#clock-cells = <0>;
+		/* clocks = <&ipg_per_clk>; */
+		clocks = <???>;
+	};
 
-	Arnd
+	uart: serial at 02020000 {
+		compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+		reg = <0x02020000 0x4000>;
+		interrupts = <0 26 0x04>;
+		clocks = <&uart_serial_clk>
+	}
+
+Regards,
+Shawn
+
+> In other words, at minimum you are just replacing the clkdev lookup with
+> a DT lookup.
+> 
