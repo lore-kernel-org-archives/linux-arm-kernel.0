@@ -1,28 +1,76 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 9 Apr 2012 10:04:02 +0800
-Subject: [PATCH v2 5/7] ARM: mmp: append OF support on pxa168
-In-Reply-To: <87hawtzn8z.fsf@laptop.org>
-References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
- <1330950111-30797-6-git-send-email-haojian.zhuang@marvell.com>
- <87y5q5znx8.fsf@laptop.org>
- <CAN1soZyXH_fpwOdDESB600MAm0FL_aanhnVKaLke0O+6B_v9dg@mail.gmail.com>
- <87hawtzn8z.fsf@laptop.org>
-Message-ID: <CAN1soZy55KhL-pkK4QHsaumk+0d9P6Qj_+8f8OvakHF5qZWe7w@mail.gmail.com>
+Date: Mon, 9 Apr 2012 10:28:42 +0800
+Subject: [PATCH] Input: eeti_ts: Mark as CONFIG_BROKEN
+In-Reply-To: <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
+References: <1333777207-4151-1-git-send-email-olof@lixom.net>
+ <20120407070206.GA17623@core.coreip.homeip.net>
+ <4F8089A9.6080704@raumfeld.com>
+ <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
+Message-ID: <CAN1soZzxQAykNaptaptCcQ22smT-U0tmATFBde5ohkzq7xYA4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 9, 2012 at 9:51 AM, Chris Ball <cjb@laptop.org> wrote:
-> Hi,
+On Sun, Apr 8, 2012 at 4:32 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Apr 7, 2012 at 11:38 AM, Sven Neumann <s.neumann@raumfeld.com> wrote:
+>> Hi,
+>>
+>>
+>> On 07.04.12 09:02, Dmitry Torokhov wrote:
+>>>
+>>> On Fri, Apr 06, 2012 at 10:40:07PM -0700, Olof Johansson wrote:
+>>>>
+>>>> This seems to have been broken since 2010, so obviously noone actually
+>>>> cares about the driver:
+>>>>
+>>>> make[4]: *** [drivers/input/touchscreen/eeti_ts.o] Error 1
+>>>> drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
+>>>> drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of
+>>>> function 'irq_to_gpio' [-Werror=implicit-function-declaration]
+>>>>
+>>>> irq_to_gpio isn't available on most platforms today, so the driver
+>>>> will need some rework by someone who has hardware access and can test
+>>>> (to make sure that, for example, switching to level interrupts and just
+>>>> keep taking them while there's more to process works).
+>>>>
+>>>> I guess it could just be scheduled for removal, but let's start with
+>>>> marking it CONFIG_BROKEN.
+>>>
+>>>
+>>> Well, it probably works quite well on arches that do have irq_to_gpio(),
+>>> let's ask Daniel and Sven if they still have this hardware and if they
+>>> can try the patch below that implements what you suggested.
+>>
+>>
+>> This hardware is still in use and we also still follow kernel development
+>> and try to update our customer devices to recent kernel versions regularly.
+>> Currently we are at 3.1.10 and the touchscreen works well with that. I'll
+>> try to update to a more recent kernel next week and will try your patch.
 >
-> On Sun, Apr 08 2012, Haojian Zhuang wrote:
->> There's a typo error in comments. MMP_DT is only for PXA168 & PXA910.
->> We need to append MMP2_DT for ARMv7 in arch-mmp directory. Since we
->> are not intended to build ARMv5 and ARMv7 together.
+> Ah, you're right, and this was my bad. Looks like this change was
+> introduced in 3.2 and broke this and one more driver (ezx-pcap):
 >
-> Okay. ?In that case, you should make sure that MMP_DT cannot be selected
-> when CPU_MMP2 is selected, by encoding that dependency in the Kconfig.
+> Author: ? ? Haojian Zhuang <haojian.zhuang@marvell.com>
+> AuthorDate: Mon Oct 10 16:03:51 2011 +0800
+> Commit: ? ? Haojian Zhuang <haojian.zhuang@marvell.com>
+> CommitDate: Mon Nov 14 21:07:59 2011 +0800
 >
-Sure. I'll protect it in Kconfig.
+> ? ?ARM: pxa: rename gpio_to_irq and irq_to_gpio
+>
+> ? ?Avoid to define gpio_to_irq() and irq_to_gpio() for potential name
+> ? ?confliction since multiple architecture will be built together.
+>
+> ? ?Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>
+>
+> Haojian, I think it was probably premature to do the multiplatform
+> change like that, since it means that a PXA-only kernel has no mapping
+> from irq_to_gpio to pxa_irq_to_gpio. Can you please address this as a
+> fix for 3.4?
+>
+>
+I tried to fix ezx-pcap before. Since there's some codebase confliction, the
+patch wasn't merged. I'll format patch again. And I'll try to fix other patches
+that are covered in arch-pxa if they exist.
 
-Thanks
+Best Regards
 Haojian
