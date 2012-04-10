@@ -1,65 +1,88 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 10 Apr 2012 05:30:58 +0000
-Subject: [PATCH v2] arm: da850: change ASYNC/PLL0_SYSCLK3 clock rate
- with DVFS
-In-Reply-To: <4F833315.1050109@ti.com>
-References: <1333617232-27967-1-git-send-email-prakash.pm@ti.com>
- <4F833315.1050109@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC317A594E@DBDE01.ent.ti.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 10 Apr 2012 05:42:54 +0000
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to	check
+ presence of 32k timer
+In-Reply-To: <4F83440E.70502@ti.com>
+References: <CACVXFVMjSPhF_+CfbF2vD5ts+WtZGjofEWmknB0D1OpTM7geZw@mail.gmail.com>
+ <CAMQu2gyEUhDyyng+_oC5NpXHzWMaTGsnCSTTZcMUi2pLV0z8RQ@mail.gmail.com>
+ <87sjgmt211.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A8318461E8@DBDE01.ent.ti.com>
+ <CAMQu2gxuFsovKTPK8wFOO8vMeiyMFnTqNDRZYgAcCsVWytpOTA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+ <20120405095221.GC25053@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
+ <87hawxkgoi.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
+ <20120406180452.GB15734@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83184ABEF@DBDE01.ent.ti.com>
+ <4F83440E.70502@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83184D9D2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Tue, Apr 10, 2012 at 01:48:22, Hunter, Jon wrote:
+> Hi Vaibhav,
+> 
+> On 04/09/2012 01:19 AM, Hiremath, Vaibhav wrote:
+> 
+> [...]
+> 
+> > Let me summarize it here again,
+> >
+> > Currently, the timer code is using config option CONFIG_OMAP_32K_TIMER,
+> > to choose between 32ksync counter and gptimer; it is compile time option.
+> > If user wants to use gptimer for HR ticks, he must build the kernel without
+> > CONFIG_OMAP_32K_TIMER option.
+> >
+> > AM335x family of devices doesn't have 32ksync_counter available, only option
+> > here is to use gptimer for kernel clocksource and clockevents.
+> >
+> > So in order to support, multi-omap build including devices like AM335x, we
+> > must get rid of this option CONFIG_OMAP_32K_TIMER, atleast from clocksource
+> > registration perspective.
+> >
+> > So that means, we need to have some mechanism to handle or detect available
+> > clocksource runtime. Options would be,
+> >
+> >   - Use HWMOD to detect availability of 32ksync_counter, else fallback
+> >     to gptimer. [This was my original patch]
+> >
+> >     But this restricts the use of gptimer completely on omap architecture,
+> >     where we have 32ksync counter module.
+> 
+> True, but we would always want to use the 32k timer if CONFIG_PM is 
+> specified. So what I am saying is that if a device has a 32ksync timer 
+> and CONFIG_PM is defined, we always want to use the 32ksync timer and a 
+> gptimer should never be used.
+> 
+> So we should/must restrict the use of a gptimer is CONFIG_PM is enabled 
+> for devices that have the 32ksync timer.
+> 
+> >   - So the next solution is to still keep compile time option, so that user
+> >     will get to use gptimer atleast just changing the kernel config option.
+> >
+> >     But, still, this is going to be kernel rebuild.
+> >
+> >   - Next option came up was, register both the timers and override using
+> >     kernel parameter.
+> >
+> >     This will work only if, both the timers run at same rate/frequency; since
+> >     we have one more layer here setup_sched_clock(), which actually can be
+> >     called only once.
+> >
+> >   - Next option suggested by Santosh, is to use kernel parameter as in parse
+> >     it early, to make decision on if user wants to override default
+> >     clocksource (32ksync)
+> >
+> >     This is something will work for us and solves all above issues.
+> 
+> What happens if PM is enabled? Can you still override the default? I 
+> don't think this should be allowed for devices with a 32ksync timer.
+> 
 
-On Tue, Apr 10, 2012 at 00:35:57, Nori, Sekhar wrote:
-> Hi Prakash,
-> 
-> On 4/5/2012 2:43 PM, Manjunathappa, Prakash wrote:
-> > Clock for EMIF is derived from ASYNC clock domain(PLL0_SYSCLK3) and was
-> > configured with fixed divider as there was no significant performance
-> > degradation with existing NAND/NOR EMIF devices if it is not
-> > reconfigured accordingly at different OPPs.
-> 
-> This is not correct AFAICT. The divider is not fixed in current code.
-> There is an attempt to adjust the async1 (PLL0 SYSCLK3 rate) and keep it
-> constant at 100MHz by adjusting the divider at each OPP transition (see
-> the call to clock_set_rate() on async clock in cpufreq.c). This was
-> based on an earlier understanding that PLL0_SYSCLK3 can support 100MHz
-> at all OPPs and all AEMIF modes. Looking at the datasheet now, it is
-> clear that that assumption is not true.
-> 
-
-I will correct this.
- 
-> > 
-> > On systems where devices other than NAND/NOR are interfaced through
-> > EMIF, such performance degradation may not be desirable. So change the
-> > PLL0_SYSCLK3 output frequency for different OPPs by re-configuring
-> > the divider value.
-> 
-> This again is not the point. The issue is that depending on what mode
-> you have AEMIF running in *and* depending on what OPP you are at, a
-> particular value of ASYNC1 clock is required to get maximum performance
-> out of AEMIF.
-> 
-
-Correct, I will reword it to convey the same.
-
-> > 
-> > Also add Kconfig option to support platforms requiring fixed EMIF clock
-> > rate.
-> 
-> This breaks single image support for all DA850 boards. Kconfig in this
-> case is not an option.
-> 
-> Why not make the OPP table board specific while maintain a sane (and
-> safe) default in SoC file so there is something to fall back upon in
-> case a board does not need to define its own? This should also address
-> Christian's concern in the other e-mail thread about board specific OPP
-> values being hardcoded in SoC file with no way to override them.
-> 
-
-Ok, I will look at this option and try to implement. 
+If user is overriding it explicitly, that itself means he knows what he
+is doing here. I too much to ask for...and unnecessary thing or expectation
+from SW.
 
 Thanks,
-Prakash
+Vaibhav
