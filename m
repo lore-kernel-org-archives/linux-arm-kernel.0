@@ -1,298 +1,339 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:38 +0200
-Subject: [PATCH v6 15/17] pwm: add pwm-mxs support
+Date: Tue, 10 Apr 2012 17:06:39 +0200
+Subject: [PATCH v6 16/17] pwm-backlight: Add rudimentary device tree support
 In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-16-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1334070400-25013-17-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+This commit adds very basic support for device tree probing. Currently,
+only a PWM and a list of distinct brightness levels can be specified.
+Enabling or disabling backlight power via GPIOs is not yet supported.
 
-Add generic PWM framework driver (DT only) for Freescale MXS.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v6:
-- adopt patch by Shawn Guo
+- don't pass consumer name to pwm_get() because we don't need multiple
+  PWM devices
+- drop num-brightness-levels property because it can be derived from
+  the brightness-levels property itself
 
- Documentation/devicetree/bindings/pwm/mxs-pwm.txt |   17 ++
- drivers/pwm/Kconfig                               |    9 +
- drivers/pwm/Makefile                              |    1 +
- drivers/pwm/pwm-mxs.c                             |  207 +++++++++++++++++++++
- 4 files changed, 234 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/mxs-pwm.txt
- create mode 100644 drivers/pwm/pwm-mxs.c
+Changes in v5:
+- use "pwms" fixed property name
+- document brightness-levels and default-brightness-level properties
+- check default-brightness-level against brightness-levels
+- use new PWM API (pwm_get() and pwm_put()), legacy API (pwm_request())
+  as fallback
 
-diff --git a/Documentation/devicetree/bindings/pwm/mxs-pwm.txt b/Documentation/devicetree/bindings/pwm/mxs-pwm.txt
+Changes in v4:
+- store a PWM requested with of_pwm_request() in the platform data
+
+Changes in v3:
+- use a list of distinct brightness levels instead of a linear range
+  as discussed with Stephen Warren and Mitch Bradley
+
+Changes in v2:
+- avoid oops by keeping a reference to the platform-specific exit()
+  callback
+
+TODO:
+- add fixed-regulator support for backlight enable/disable
+
+ .../bindings/video/backlight/pwm-backlight         |   28 ++++
+ drivers/video/backlight/Kconfig                    |    2 +-
+ drivers/video/backlight/pwm_bl.c                   |  149 +++++++++++++++++---
+ include/linux/pwm_backlight.h                      |    1 +
+ 4 files changed, 159 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/backlight/pwm-backlight
+
+diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
 new file mode 100644
-index 0000000..48ead0d
+index 0000000..1e4fc72
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/mxs-pwm.txt
-@@ -0,0 +1,17 @@
-+Freescale MXS PWM controller
++++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
+@@ -0,0 +1,28 @@
++pwm-backlight bindings
 +
 +Required properties:
-+- compatible: should be "fsl,mxs-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-+  of the PWM to use and the second cell is the duty cycle in nanoseconds.
-+- fsl,pwm-number: the number of PWM devices
++  - compatible: "pwm-backlight"
++  - pwms: OF device-tree PWM specification (see PWM binding[0])
++  - brightness-levels: Array of distinct brightness levels. Typically these
++      are in the range from 0 to 255, but any range starting at 0 will do.
++      The actual brightness level (PWM duty cycle) will be interpolated
++      from these values. 0 means a 0% duty cycle (darkest/off), while the
++      last value in the array represents a 100% duty cycle (brightest).
++  - default-brightness-level: the default brightness level (index into the
++      array defined by the "brightness-levels" property)
++
++Optional properties:
++  - pwm-names: a list of names for the PWM devices specified in the
++               "pwms" property (see PWM binding[0])
++
++[0]: Documentation/devicetree/bindings/pwm/pwm.txt
 +
 +Example:
 +
-+pwm: pwm at 80064000 {
-+	compatible = "fsl,imx28-pwm", "fsl,mxs-pwm";
-+	reg = <0x80064000 2000>;
-+	#pwm-cells = <2>;
-+	fsl,pwm-number = <8>;
-+};
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index a93feff..39bdebc 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -27,6 +27,15 @@ config PWM_IMX
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-imx.
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0 5000000>;
++
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++	};
+diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+index 7ed9991..cd77e79 100644
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -233,7 +233,7 @@ config BACKLIGHT_CARILLO_RANCH
  
-+config PWM_MXS
-+	tristate "Freescale MXS PWM support"
-+	depends on ARCH_MXS && OF
-+	help
-+	  Generic PWM framework driver for Freescale MXS.
+ config BACKLIGHT_PWM
+ 	tristate "Generic PWM based Backlight Driver"
+-	depends on HAVE_PWM
++	depends on PWM
+ 	help
+ 	  If you have a LCD backlight adjustable by PWM, say Y to enable
+ 	  this driver.
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 342b7d7..057389d 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -26,11 +26,13 @@ struct pwm_bl_data {
+ 	struct device		*dev;
+ 	unsigned int		period;
+ 	unsigned int		lth_brightness;
++	unsigned int		*levels;
+ 	int			(*notify)(struct device *,
+ 					  int brightness);
+ 	void			(*notify_after)(struct device *,
+ 					int brightness);
+ 	int			(*check_fb)(struct device *, struct fb_info *);
++	void			(*exit)(struct device *);
+ };
+ 
+ static int pwm_backlight_update_status(struct backlight_device *bl)
+@@ -52,6 +54,11 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
+ 		pwm_config(pb->pwm, 0, pb->period);
+ 		pwm_disable(pb->pwm);
+ 	} else {
++		if (pb->levels) {
++			brightness = pb->levels[brightness];
++			max = pb->levels[max];
++		}
 +
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-mxs.
-+
- config PWM_PXA
- 	tristate "PXA PWM support"
- 	depends on ARCH_PXA
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index b7c0fcf..cec2500 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
-+obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
- obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
- obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
- obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
-new file mode 100644
-index 0000000..ebf91da
---- /dev/null
-+++ b/drivers/pwm/pwm-mxs.c
-@@ -0,0 +1,207 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
-+#include <mach/common.h>
-+
-+#define SET	0x4
-+#define CLR	0x8
-+#define TOG	0xc
-+
-+#define PWM_CTRL		0x0
-+#define PWM_ACTIVE0		0x10
-+#define PWM_PERIOD0		0x20
-+#define  PERIOD_PERIOD(p)	((p) & 0xffff)
-+#define  PERIOD_PERIOD_MAX	0x10000
-+#define  PERIOD_ACTIVE_HIGH	(3 << 16)
-+#define  PERIOD_INACTIVE_LOW	(2 << 18)
-+#define  PERIOD_CDIV(div)	(((div) & 0x7) << 20)
-+#define  PERIOD_CDIV_MAX	8
-+
-+struct mxs_pwm_chip {
-+	struct pwm_chip chip;
-+	struct device *dev;
-+	struct clk *clk;
-+	void __iomem *base;
-+};
-+
-+#define to_mxs_pwm_chip(_chip) container_of(_chip, struct mxs_pwm_chip, chip)
-+
-+static int mxs_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			  int duty_ns, int period_ns)
+ 		brightness = pb->lth_brightness +
+ 			(brightness * (pb->period - pb->lth_brightness) / max);
+ 		pwm_config(pb->pwm, brightness, pb->period);
+@@ -83,17 +90,98 @@ static const struct backlight_ops pwm_backlight_ops = {
+ 	.check_fb	= pwm_backlight_check_fb,
+ };
+ 
++#ifdef CONFIG_OF
++static int pwm_backlight_parse_dt(struct device *dev,
++				  struct platform_pwm_backlight_data *data)
 +{
-+	struct mxs_pwm_chip *mxs = to_mxs_pwm_chip(chip);
-+	int ret, div = 0;
-+	unsigned int period_cycles, duty_cycles;
-+	unsigned long rate;
-+	unsigned long long c;
++	struct device_node *node = dev->of_node;
++	struct property *prop;
++	int length;
++	u32 value;
++	int ret;
 +
-+	rate = clk_get_rate(mxs->clk);
-+	while (1) {
-+		c = rate / (1 << div);
-+		c = c * period_ns;
-+		do_div(c, 1000000000);
-+		if (c < PERIOD_PERIOD_MAX)
-+			break;
-+		div++;
-+		if (div > PERIOD_CDIV_MAX)
-+			return -EINVAL;
-+	}
++	if (!node)
++		return -ENODEV;
 +
-+	period_cycles = c;
-+	c *= duty_ns;
-+	do_div(c, period_ns);
-+	duty_cycles = c;
++	memset(data, 0, sizeof(*data));
 +
-+	/*
-+	 * If the PWM channel is disabled, make sure to turn on the clock
-+	 * before writing the register. Otherwise, keep it enabled.
-+	 */
-+	if (!test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		ret = clk_prepare_enable(mxs->clk);
-+		if (ret)
++	/* determine the number of brightness levels */
++	prop = of_find_property(node, "brightness-levels", &length);
++	if (!prop)
++		return -EINVAL;
++
++	data->max_brightness = length / sizeof(u32);
++
++	/* read brightness levels from DT property */
++	if (data->max_brightness > 0) {
++		size_t size = sizeof(*data->levels) * data->max_brightness;
++
++		data->levels = devm_kzalloc(dev, size, GFP_KERNEL);
++		if (!data->levels)
++			return -ENOMEM;
++
++		ret = of_property_read_u32_array(node, "brightness-levels",
++						 data->levels,
++						 data->max_brightness);
++		if (ret < 0)
 +			return ret;
-+	}
 +
-+	writel(duty_cycles << 16,
-+			mxs->base + PWM_ACTIVE0 + pwm->hwpwm * 0x20);
-+	writel(PERIOD_PERIOD(period_cycles) | PERIOD_ACTIVE_HIGH |
-+	       PERIOD_INACTIVE_LOW | PERIOD_CDIV(div),
-+			mxs->base + PWM_PERIOD0 + pwm->hwpwm * 0x20);
++		ret = of_property_read_u32(node, "default-brightness-level",
++					   &value);
++		if (ret < 0)
++			return ret;
++
++		if (value >= data->max_brightness) {
++			dev_warn(dev, "invalid default brightness level: %u, using %u\n",
++				 value, data->max_brightness - 1);
++			value = data->max_brightness - 1;
++		}
++
++		data->dft_brightness = value;
++		data->max_brightness--;
++	}
 +
 +	/*
-+	 * If the PWM is not enabled, turn the clock off again to save power.
++	 * TODO: Most users of this driver use a number of GPIOs to control
++	 *       backlight power. Support for specifying these needs to be
++	 *       added.
 +	 */
-+	if (!test_bit(PWMF_ENABLED, &pwm->flags))
-+		clk_disable_unprepare(mxs->clk);
 +
 +	return 0;
 +}
 +
-+static int mxs_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct mxs_pwm_chip *mxs = to_mxs_pwm_chip(chip);
-+	int ret;
-+
-+	ret = clk_prepare_enable(mxs->clk);
-+	if (ret)
-+		return ret;
-+
-+	writel(1 << pwm->hwpwm, mxs->base + PWM_CTRL + SET);
-+
-+	return 0;
-+}
-+
-+static void mxs_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct mxs_pwm_chip *mxs = to_mxs_pwm_chip(chip);
-+
-+	writel(1 << pwm->hwpwm, mxs->base + PWM_CTRL + CLR);
-+
-+	clk_disable_unprepare(mxs->clk);
-+}
-+
-+static const struct pwm_ops mxs_pwm_ops = {
-+	.config = mxs_pwm_config,
-+	.enable = mxs_pwm_enable,
-+	.disable = mxs_pwm_disable,
-+	.owner = THIS_MODULE,
++static struct of_device_id pwm_backlight_of_match[] = {
++	{ .compatible = "pwm-backlight" },
++	{ }
 +};
 +
-+static int mxs_pwm_probe(struct platform_device *pdev)
++MODULE_DEVICE_TABLE(of, pwm_backlight_of_match);
++#else
++static int pwm_backlight_parse_dt(struct device *dev,
++				  struct platform_pwm_backlight_data *data)
 +{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct mxs_pwm_chip *mxs;
-+	int ret;
-+
-+	mxs = devm_kzalloc(&pdev->dev, sizeof(*mxs), GFP_KERNEL);
-+	if (!mxs)
-+		return -ENOMEM;
-+
-+	mxs->base = of_iomap(np, 0);
-+	if (!mxs->base)
-+		return -EADDRNOTAVAIL;
-+
-+	mxs->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(mxs->clk)) {
-+		ret = PTR_ERR(mxs->clk);
-+		goto iounmap;
-+	}
-+
-+	mxs->chip.dev = &pdev->dev;
-+	mxs->chip.ops = &mxs_pwm_ops;
-+	mxs->chip.base = -1;
-+	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
-+		goto clk_put;
-+	}
-+
-+	ret = pwmchip_add(&mxs->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
-+		goto clk_put;
-+	}
-+
-+	mxs->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, mxs);
-+
-+	mxs_reset_block(mxs->base);
-+
-+	return 0;
-+
-+clk_put:
-+	clk_put(mxs->clk);
-+iounmap:
-+	iounmap(mxs->base);
-+	return ret;
++	return -ENODEV;
 +}
++#endif
 +
-+static int __devexit mxs_pwm_remove(struct platform_device *pdev)
-+{
-+	struct mxs_pwm_chip *mxs = platform_get_drvdata(pdev);
+ static int pwm_backlight_probe(struct platform_device *pdev)
+ {
+-	struct backlight_properties props;
+ 	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
++	struct platform_pwm_backlight_data defdata;
++	struct backlight_properties props;
+ 	struct backlight_device *bl;
+ 	struct pwm_bl_data *pb;
++	unsigned int max;
+ 	int ret;
+ 
+ 	if (!data) {
+-		dev_err(&pdev->dev, "failed to find platform data\n");
+-		return -EINVAL;
++		ret = pwm_backlight_parse_dt(&pdev->dev, &defdata);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "failed to find platform data\n");
++			return ret;
++		}
 +
-+	pwmchip_remove(&mxs->chip);
-+	clk_put(mxs->clk);
-+	iounmap(mxs->base);
++		data = &defdata;
+ 	}
+ 
+ 	if (data->init) {
+@@ -109,21 +197,42 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 		goto err_alloc;
+ 	}
+ 
+-	pb->period = data->pwm_period_ns;
++	if (data->levels) {
++		max = data->levels[data->max_brightness];
++		pb->levels = data->levels;
++	} else
++		max = data->max_brightness;
 +
-+	return 0;
-+}
+ 	pb->notify = data->notify;
+ 	pb->notify_after = data->notify_after;
+ 	pb->check_fb = data->check_fb;
+-	pb->lth_brightness = data->lth_brightness *
+-		(data->pwm_period_ns / data->max_brightness);
++	pb->exit = data->exit;
+ 	pb->dev = &pdev->dev;
+ 
+-	pb->pwm = pwm_request(data->pwm_id, "backlight");
++	pb->pwm = pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pb->pwm)) {
+-		dev_err(&pdev->dev, "unable to request PWM for backlight\n");
+-		ret = PTR_ERR(pb->pwm);
+-		goto err_alloc;
+-	} else
+-		dev_dbg(&pdev->dev, "got pwm for backlight\n");
++		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
 +
-+static struct of_device_id mxs_pwm_dt_ids[] = {
-+	{ .compatible = "fsl,mxs-pwm", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_pwm_of_match);
++		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
++		if (IS_ERR(pb->pwm)) {
++			dev_err(&pdev->dev, "unable to request legacy PWM\n");
++			ret = PTR_ERR(pb->pwm);
++			goto err_alloc;
++		}
++	}
 +
-+static struct platform_driver mxs_pwm_driver = {
-+	.driver = {
-+		.name = "mxs-pwm",
-+		.of_match_table = of_match_ptr(mxs_pwm_dt_ids),
-+	},
-+	.probe = mxs_pwm_probe,
-+	.remove = __devexit_p(mxs_pwm_remove),
-+};
-+module_platform_driver(mxs_pwm_driver);
++	dev_dbg(&pdev->dev, "got pwm for backlight\n");
 +
-+MODULE_ALIAS("platform:mxs-pwm");
-+MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
-+MODULE_DESCRIPTION("Freescale MXS PWM Driver");
-+MODULE_LICENSE("GPL v2");
++	/*
++	 * The DT case will set the pwm_period_ns field to 0 and store the
++	 * period, parsed from the DT, in the PWM device. For the non-DT case,
++	 * set the period from platform data.
++	 */
++	if (data->pwm_period_ns > 0)
++		pwm_set_period(pb->pwm, data->pwm_period_ns);
++
++	pb->period = pwm_get_period(pb->pwm);
++	pb->lth_brightness = data->lth_brightness * (pb->period / max);
+ 
+ 	memset(&props, 0, sizeof(struct backlight_properties));
+ 	props.type = BACKLIGHT_RAW;
+@@ -143,7 +252,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ err_bl:
+-	pwm_free(pb->pwm);
++	pwm_put(pb->pwm);
+ err_alloc:
+ 	if (data->exit)
+ 		data->exit(&pdev->dev);
+@@ -152,16 +261,15 @@ err_alloc:
+ 
+ static int pwm_backlight_remove(struct platform_device *pdev)
+ {
+-	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
+ 	struct backlight_device *bl = platform_get_drvdata(pdev);
+ 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
+ 
+ 	backlight_device_unregister(bl);
+ 	pwm_config(pb->pwm, 0, pb->period);
+ 	pwm_disable(pb->pwm);
+-	pwm_free(pb->pwm);
+-	if (data->exit)
+-		data->exit(&pdev->dev);
++	pwm_put(pb->pwm);
++	if (pb->exit)
++		pb->exit(&pdev->dev);
+ 	return 0;
+ }
+ 
+@@ -195,11 +303,12 @@ static SIMPLE_DEV_PM_OPS(pwm_backlight_pm_ops, pwm_backlight_suspend,
+ 
+ static struct platform_driver pwm_backlight_driver = {
+ 	.driver		= {
+-		.name	= "pwm-backlight",
+-		.owner	= THIS_MODULE,
++		.name		= "pwm-backlight",
++		.owner		= THIS_MODULE,
+ #ifdef CONFIG_PM
+-		.pm	= &pwm_backlight_pm_ops,
++		.pm		= &pwm_backlight_pm_ops,
+ #endif
++		.of_match_table	= of_match_ptr(pwm_backlight_of_match),
+ 	},
+ 	.probe		= pwm_backlight_probe,
+ 	.remove		= pwm_backlight_remove,
+diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
+index 63d2df4..56f4a86 100644
+--- a/include/linux/pwm_backlight.h
++++ b/include/linux/pwm_backlight.h
+@@ -12,6 +12,7 @@ struct platform_pwm_backlight_data {
+ 	unsigned int dft_brightness;
+ 	unsigned int lth_brightness;
+ 	unsigned int pwm_period_ns;
++	unsigned int *levels;
+ 	int (*init)(struct device *dev);
+ 	int (*notify)(struct device *dev, int brightness);
+ 	void (*notify_after)(struct device *dev, int brightness);
 -- 
 1.7.9.6
