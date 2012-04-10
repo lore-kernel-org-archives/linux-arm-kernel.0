@@ -1,35 +1,113 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 10 Apr 2012 12:24:43 +0300
-Subject: [PATCH RESEND] Input: omap-keypad: dynamically handle register
- offsets
-In-Reply-To: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
-References: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20120410092441.GB20616@arwen.pp.htv.fi>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Apr 2012 10:26:29 +0100
+Subject: [PATCH 1/7] ARM: ux500: New DT:ed snowball_platform_devs for
+ one-by-one device enablement
+In-Reply-To: <CACRpkdYVxQjJCQO3YY9=Orv-vLJJBzs4APPhCMHjR-3AGAbshg@mail.gmail.com>
+References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
+ <1333619748-16126-2-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYVxQjJCQO3YY9=Orv-vLJJBzs4APPhCMHjR-3AGAbshg@mail.gmail.com>
+Message-ID: <4F83FCC5.9040103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2012 at 10:52:26AM +0530, Sourav Poddar wrote:
-> +static int kbd_write_irqstatus(struct omap4_keypad *keypad_data,
-> +						u32 offset, u32 value)
-> +{
-> +	return __raw_writel(value, keypad_data->base + offset);
-> +}
-> +
-> +static int kbd_write_irqenable(struct omap4_keypad *keypad_data,
-> +						u32 offset, u32 value)
-> +{
-> +	return __raw_writel(value, keypad_data->base + offset);
-> +}
+On 10/04/12 10:03, Linus Walleij wrote:
+> On Thu, Apr 5, 2012 at 11:55 AM, Lee Jones<lee.jones@linaro.org>  wrote:
+>
+>> During Device Tree enablement it is necessary to remove
+>> snowball_<device>* platform_data segments one at at time,
+>> as and when particular devices are DT enabled. This patch
+>> provides a temporary solution. Once this new struct is
+>> empty it will be removed again.
+>>
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+>
+> This is not exactly elegant and I cannot quite see how the pieces
+> fit together.
+>
+>> ---
+>>   arch/arm/mach-ux500/board-mop500.c |   18 ++++++++++++++++--
+>>   1 files changed, 16 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+>> index 77d03c1..29e0ade 100644
+>> --- a/arch/arm/mach-ux500/board-mop500.c
+>> +++ b/arch/arm/mach-ux500/board-mop500.c
+>> @@ -609,6 +609,13 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+>>         &ab8500_device,
+>>   };
+>>
+>> +static struct platform_device *snowball_of_platform_devs[] __initdata = {
+>> +&snowball_led_dev,
+>> +&snowball_key_dev,
+>> +&snowball_sbnet_dev,
+>> +&ab8500_device,
+>> +};
+>
+> So above this array is an identical array which is going to become
+> unused, then why
+> not just rename the other array with _of_ or just skip the whole
+> business altogether?
 
-if this only writes to irqenable, why do you pass offset as an argument?
-likewise for irqstatus.
+Eh? No, that won't help. The other array needs to be kept fully intact 
+for non-DT boots. The idea is that each element from the DT array will 
+be removed sequentially as they are DT enabled. For instance, I already 
+have a patch with enables the SMSC911x chip, which also removes the 
+&snowball_sbnet_dev entry. After that something else will be enabled and 
+its cohort will be subsequently removed too. Only when all these devices 
+have been DT enabled can the struct be removed.
+
+>> +
+>>   static void __init mop500_init_machine(void)
+>>   {
+>>         struct device *parent = NULL;
+>> @@ -786,8 +793,15 @@ static void __init u8500_init_machine(void)
+>>                 mop500_sdi_init(parent);
+>>         } else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+>>                 snowball_pins_init();
+>> -               platform_add_devices(snowball_platform_devs,
+>> -                               ARRAY_SIZE(snowball_platform_devs));
+>
+> So first you remove ths use of that array...
+>
+>> +
+>> +               /* Devices to be DT:ed:
+>> +                    snowball_led_dev   = todo
+>> +                    snowball_key_dev   = todo
+>> +                    snowball_sbnet_dev = todo
+>> +                    ab8500_device      = todo
+>> +               */
+>
+> /*
+>   * Comment style
+>   */
+
+No problem, I'll fix that.
+
+>> +               platform_add_devices(snowball_of_platform_devs,
+>> +                               ARRAY_SIZE(snowball_of_platform_devs));
+>
+> And insert an identical array?
+>
+> The only change is that you now have an *unused* array with all it's
+> parents set and then an array with all parents set to NULL which you
+> use. I don't get it ...
+
+Nothing is unused. When DT is disabled snowball_platform_devs will be 
+used to add the platform devices. This is, and will remain fully 
+populated for non-DT boots. The DT'ed version will decrease in size 
+until the final element is removed along with the definition.
+
+I have ran this past Arnd, who thought this was a good idea. It's only a 
+temporary solution which well aide us in enabling devices spanned over 
+multiple submissions, rather than attempting to enable everything in a 
+single patch-set - which isn't going to happen.
+
+Kind regards,
+Lee
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120410/8f295da2/attachment-0001.sig>
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
