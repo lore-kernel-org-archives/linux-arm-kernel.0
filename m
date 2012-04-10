@@ -1,51 +1,192 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 18:11:42 +0200
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120410143055.GT24211@n2100.arm.linux.org.uk>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
- <20120410143055.GT24211@n2100.arm.linux.org.uk>
-Message-ID: <20120410161142.GG3852@pengutronix.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 10 Apr 2012 09:23:54 -0700
+Subject: [PATCH RESEND] Input: omap-keypad: dynamically handle register
+ offsets
+In-Reply-To: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
+References: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120410162353.GA6217@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 03:30:55PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 10, 2012 at 03:45:14PM +0200, Sascha Hauer wrote:
-> > With the generic clock framework we do not necessarily have
-> > a pointer to the struct clk we want to register a lookup
-> > for, so add a const char *clkname field to struct clk_lookup
-> > so that a lookup can be registered with a clock name.
-> 
-> All this silly names all over the place is getting to be utterly
-> rediculous. Why do we need to name clocks and look them up by name
-> when we have a perfectly good way (clkdev) to do this already?  Yes,
-> it takes a struct clk pointer but that's exactly because that's what
-> it has to return.
-> 
-> Why do we want to have another idiotic string to look up a clock which
-> is named using an idiotic scheme to find out its pointer to only then
-> register that with clkdev?
-> 
-> I think this clk stuff has gone totally insane wrt names recently.
+Hi Sourav,
 
-clk names and clk lookups are two different things. The former is a
-unique identifier for a clock whereas the latter associates a clock
-to a device. Multiple lookups can point to the same clock, so they can't
-be used to identify a particular clock. I know I'm not telling anything
-new to you here, so I think your question goes down to why we need a
-unique identifier string for clocks.
+On Tue, Apr 03, 2012 at 10:52:26AM +0530, Sourav Poddar wrote:
+> From: G, Manjunath Kondaiah <manjugk@ti.com>
+> 
+> Keypad controller register offsets are different for omap4
+> and omap5. Handle these offsets through static mapping and
+> assign these mappings during run time.
+> 
 
-For me the big advantage for clocks having unique names is that I do not
-have to have a struct clk * to pass the (possible) parents of a clock to
-the clock framework during registration. Also it makes us independent of
-the registration order of the clock tree (no need to register the
-parents before the children). The debugfs representation of the clock
-tree also makes use of the names.
+In addition to Felipe's comments.
 
-Sascha
+> @@ -76,11 +81,66 @@ struct omap4_keypad {
+>  
+>  	unsigned int rows;
+>  	unsigned int cols;
+> +	unsigned int revision;
+> +	u32 irqstatus;
+> +	u32 irqenable;
+
+	u32 reg_offset;
+
+and you probably won't need revision field.
+
+>  	unsigned int row_shift;
+>  	unsigned char key_state[8];
+>  	unsigned short keymap[];
+>  };
+>  
+> +static int kbd_readl(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> +	if (keypad_data->revision == KBD_REVISION_OMAP4)
+> +		return __raw_readl(keypad_data->base + offset);
+> +	else if (keypad_data->revision == KBD_REVISION_OMAP5)
+> +		return __raw_readl(keypad_data->base + offset + 0x10);
+> +
+> +	return -ENODEV;
+
+Instead do:
+
+	return __raw_readl(keypad_data->base + keypad_data->reg_offset +
+			   offset);
+> +}
+> +
+> +static void kbd_writel(struct omap4_keypad *keypad_data, u32 offset, u32 value)
+> +{
+> +	if (keypad_data->revision == KBD_REVISION_OMAP4)
+> +		__raw_writel(value, keypad_data->base + offset);
+> +	else if (keypad_data->revision == KBD_REVISION_OMAP5)
+> +		__raw_writel(value, keypad_data->base + offset + 0x10);
+
+	__raw_writel(value,
+		     keypad_data->base + keypad_data->reg_offset + offset);
+
+> +}
+> +
+> +static int kbd_read_revision(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> +	int reg;
+> +	reg = __raw_readl(keypad_data->base + offset);
+> +	reg &= 0x03 << 30;
+> +	reg >>= 30;
+> +
+> +	switch (reg) {
+> +	case 1:
+> +		return KBD_REVISION_OMAP5;
+> +	case 0:
+> +		return KBD_REVISION_OMAP4;
+> +	default:
+> +		return -ENODEV;
+
+-EINVAL? -EIO?
+
+> +	}
+> +}
+> +
+>  /* Interrupt handler */
+>  static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+>  {
+> @@ -91,12 +151,11 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+>  	u32 *new_state = (u32 *) key_state;
+>  
+>  	/* Disable interrupts */
+> -	__raw_writel(OMAP4_VAL_IRQDISABLE,
+> -		     keypad_data->base + OMAP4_KBD_IRQENABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +			OMAP4_VAL_IRQDISABLE);
+>  
+> -	*new_state = __raw_readl(keypad_data->base + OMAP4_KBD_FULLCODE31_0);
+> -	*(new_state + 1) = __raw_readl(keypad_data->base
+> -						+ OMAP4_KBD_FULLCODE63_32);
+> +	*new_state = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE31_0);
+> +	*(new_state + 1) = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE63_32);
+>  
+>  	for (row = 0; row < keypad_data->rows; row++) {
+>  		changed = key_state[row] ^ keypad_data->key_state[row];
+> @@ -121,12 +180,13 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+>  		sizeof(keypad_data->key_state));
+>  
+>  	/* clear pending interrupts */
+> -	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+> -			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> +	kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
+> +		kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
+>  
+>  	/* enable interrupts */
+> -	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
+> -			keypad_data->base + OMAP4_KBD_IRQENABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +		OMAP4_DEF_IRQENABLE_EVENTEN |
+> +			OMAP4_DEF_IRQENABLE_LONGKEY);
+>  
+>  	return IRQ_HANDLED;
+>  }
+> @@ -139,16 +199,30 @@ static int omap4_keypad_open(struct input_dev *input)
+>  
+>  	disable_irq(keypad_data->irq);
+>  
+> -	__raw_writel(OMAP4_VAL_FUNCTIONALCFG,
+> -			keypad_data->base + OMAP4_KBD_CTRL);
+> -	__raw_writel(OMAP4_VAL_DEBOUNCINGTIME,
+> -			keypad_data->base + OMAP4_KBD_DEBOUNCINGTIME);
+> -	__raw_writel(OMAP4_VAL_IRQDISABLE,
+> -			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> -	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
+> -			keypad_data->base + OMAP4_KBD_IRQENABLE);
+> -	__raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
+> -			keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
+> +	keypad_data->revision = kbd_read_revision(keypad_data,
+> +			OMAP4_KBD_REVISION);
+
+	switch()
+> +	if (keypad_data->revision == KBD_REVISION_OMAP4) {
+> +		keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS;
+> +		keypad_data->irqenable = OMAP4_KBD_IRQENABLE;
+> +	} else if (keypad_data->revision == KBD_REVISION_OMAP5) {
+> +		keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS + 0x0c;
+> +		keypad_data->irqenable = OMAP4_KBD_IRQENABLE + 0x0c;
+> +	} else {
+> +		pr_err("Omap keypad not found\n");
+> +		return -ENODEV;
+
+Hmm, this is in open() but should probably be in probe().
+
+> +	}
+> +
+> +	kbd_writel(keypad_data, OMAP4_KBD_CTRL,
+> +			OMAP4_VAL_FUNCTIONALCFG);
+> +	kbd_writel(keypad_data, OMAP4_KBD_DEBOUNCINGTIME,
+> +			OMAP4_VAL_DEBOUNCINGTIME);
+> +	kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
+> +			OMAP4_VAL_IRQDISABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +			OMAP4_DEF_IRQENABLE_EVENTEN |
+> +				OMAP4_DEF_IRQENABLE_LONGKEY);
+> +	kbd_writel(keypad_data, OMAP4_KBD_WAKEUPENABLE,
+> +			OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA);
+>  
+>  	enable_irq(keypad_data->irq);
+>  
+> @@ -162,12 +236,12 @@ static void omap4_keypad_close(struct input_dev *input)
+>  	disable_irq(keypad_data->irq);
+>  
+>  	/* Disable interrupts */
+> -	__raw_writel(OMAP4_VAL_IRQDISABLE,
+> -		     keypad_data->base + OMAP4_KBD_IRQENABLE);
+> +	kbd_write_irqenable(keypad_data, keypad_data->irqenable,
+> +			OMAP4_VAL_IRQDISABLE);
+>  
+>  	/* clear pending interrupts */
+> -	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+> -			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> +	kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
+> +		kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
+>  
+>  	enable_irq(keypad_data->irq);
+>  
+
+Thanks.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Dmitry
