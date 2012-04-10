@@ -1,57 +1,76 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 10 Apr 2012 11:27:10 +0100
-Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
-In-Reply-To: <20120410100038.GP24211@n2100.arm.linux.org.uk>
-References: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
- <4F7EE6AE.4020909@mvista.com>
- <1333717838.12209.83.camel@dagon.hellion.org.uk>
- <20120410100038.GP24211@n2100.arm.linux.org.uk>
-Message-ID: <1334053630.12209.180.camel@dagon.hellion.org.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 10 Apr 2012 13:28:57 +0300
+Subject: [RFC PATCH] cpuidle: allow per cpu latencies
+In-Reply-To: <4F7F0D52.8080305@linaro.org>
+References: <1333619620-21201-1-git-send-email-pdeschrijver@nvidia.com>
+ <4F7DA009.4010802@linux.intel.com>
+ <CAMQu2gzwe0F3qcaTqASEPUASdG1SjpUxrBrSp-RrYLgy3W24OQ@mail.gmail.com>
+ <4F7F0D52.8080305@linaro.org>
+Message-ID: <20120410102857.GA22721@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-04-10 at 11:00 +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 06, 2012 at 02:10:38PM +0100, Ian Campbell wrote:
-> > On Fri, 2012-04-06 at 16:50 +0400, Sergei Shtylyov wrote:
-> > > On 06.04.2012 16:30, Ian Campbell wrote:
-> > > > Fixes build the following error when CONFIG_KEXEC is enabled:
-> > > 
-> > >     Maybe "the following build error" instead?
-> > 
-> > Done.
-> > 
-> > > >    CC      arch/arm/mach-kirkwood/board-dt.o
-> > > > arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
-> > > > arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
-> > > > arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
-> > > 
-> > > > kexec.h also needs string.h.
-> > > 
-> > >     Why it doesn't include it?
-> > 
-> > Not sure, but actually I should be using linux/kexec.h not asm/kexec.h
-> > anyway which solves the problem too:
+On Fri, Apr 06, 2012 at 05:35:46PM +0200, Daniel Lezcano wrote:
+> On 04/06/2012 12:32 PM, Shilimkar, Santosh wrote:
+> > Peter,
+> >
+> > On Thu, Apr 5, 2012 at 7:07 PM, Arjan van de Ven<arjan@linux.intel.com>  wrote:
+> >> On 4/5/2012 2:53 AM, Peter De Schrijver wrote:
+> >>> This patch doesn't update all cpuidle device registrations. I will do that
+> >>
+> >> question is if you want to do per cpu latencies, or if you want to have
+> >> both types of C state in one big table, and have each of the tegra cpyu
+> >> types pick half of them...
+> >>
+> >>
+> > Indeed !! That should work.
+> > I thought the C-states are always per CPU based and during the
+> > cpuidle registration you can register C-state accordingly based on the
+> > specific CPU types with different latencies if needed.
+> >
+> > Am I missing something ?
 > 
-> Because you should not be using asm/kexec.h directly but using linux/kexec.h
-> instead,
-
-Agreed.
-
->  which will include it via this path:
+> That was the case before the cpuidle_state were moved from the 
+> cpuidle_device to the cpuidle_driver structure [1].
 > 
-> linux/kexec.h -> linux/compat.h -> linux/sem.h -> linux/rcupdate.h
->  -> linux/cpumask.h -> linux/bitmap.h -> linux/string.h
+> That had the benefit of using a single latencies array instead of 
+> multiple copy of the same array, which was the case until today.
 > 
-> checkpatch has been nobbled not to complain by default about using asm/%.h
-> includes when linux/%.h includes are also present, which is a backwards
-> step imho.
+> I looked at the white paper for the tegra3 and understand this is no 
+> longer true because of the 4-plus-1 architecture [2].
+> 
 
-Yes, I'm not sure what the point of that test would be if it isn't
-complaining about that case...
+The reason is not so much 4-plus-1, but in 4 CPU mode, only CPUs 1 - 3 can
+be powergated individually. To turn off CPU0, the external regulator for
+the entire cluster is turned off. This means latencies for CPU0 are different
+from the other CPUs.
 
--- 
-Ian Campbell
+> With the increasing number of SoCs, we have a lot of new cpuidle drivers 
+> and each time we modify something in the cpuidle core, that impacts all 
+> the cpuidle drivers.
+> 
+> My feeling is we are going back and forth when patching the cpuidle core 
+> and may be it is time to define a clear semantic before patching again 
+> the cpuidle, no ?
+> 
+> What could nice is to have:
+> 
+>   * in case of the same latencies for all cpus, use a single array
+> 
+>   * in case of different latencies, group the same latencies into a 
+> single array (I assume this is the case for 4-plus-1, right ?)
+> 
+> May be we can move the cpuidle_state to a per_cpu pointer like 
+> cpuidle_devices in cpuidle.c and then add:
+> 
+> register_latencies(struct cpuidle_latencies l, int cpu);
+> 
+> If we have the same latencies for all the cpus, then we can register the 
+> same array, which is only a pointer.
 
+Maybe we also want to make the 'disabled' flag per CPU then or provide some
+other way the number of C states can be different per CPU?
 
-MS-DOS, you can't live with it, you can live without it.
-		-- from Lars Wirzenius' .sig
+Cheers,
+
+Peter.
