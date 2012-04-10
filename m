@@ -1,165 +1,151 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:39 +0200
-Subject: [PATCH 26/40] ARM i.MX3: Make ccm base address a variable
+Date: Tue, 10 Apr 2012 15:45:15 +0200
+Subject: [PATCH 02/40] clk: add a fixed factor clock
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-27-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having a cpu_is_* in each ccm register access it
-is mor efficient to make it a variable.
+Having fixed factors/dividers in hardware is a common pattern, so
+add a basic clock type doing this. It basically describes a fixed
+factor clock using a nominator and a denominator.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/crmregs-imx3.h |   79 +++++++++++++++++++-------------------
- arch/arm/mach-imx/mm-imx3.c      |    6 +++
- arch/arm/mach-imx/pm-imx3.c      |    4 +-
- 3 files changed, 47 insertions(+), 42 deletions(-)
+ drivers/clk/Makefile           |    2 +-
+ drivers/clk/clk-fixed-factor.c |   97 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h   |    4 ++
+ 3 files changed, 102 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/clk-fixed-factor.c
 
-diff --git a/arch/arm/mach-imx/crmregs-imx3.h b/arch/arm/mach-imx/crmregs-imx3.h
-index 5314127..a1dfde5 100644
---- a/arch/arm/mach-imx/crmregs-imx3.h
-+++ b/arch/arm/mach-imx/crmregs-imx3.h
-@@ -24,48 +24,47 @@
- #define CKIH_CLK_FREQ_27MHZ     27000000
- #define CKIL_CLK_FREQ           32768
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 1f736bc..24aa714 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -1,4 +1,4 @@
  
--#define MXC_CCM_BASE		(cpu_is_mx31() ? \
--MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR) : MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR))
-+extern void __iomem *mx3_ccm_base;
- 
- /* Register addresses */
--#define MXC_CCM_CCMR		(MXC_CCM_BASE + 0x00)
--#define MXC_CCM_PDR0		(MXC_CCM_BASE + 0x04)
--#define MXC_CCM_PDR1		(MXC_CCM_BASE + 0x08)
--#define MX35_CCM_PDR2		(MXC_CCM_BASE + 0x0C)
--#define MXC_CCM_RCSR		(MXC_CCM_BASE + 0x0C)
--#define MX35_CCM_PDR3		(MXC_CCM_BASE + 0x10)
--#define MXC_CCM_MPCTL		(MXC_CCM_BASE + 0x10)
--#define MX35_CCM_PDR4		(MXC_CCM_BASE + 0x14)
--#define MXC_CCM_UPCTL		(MXC_CCM_BASE + 0x14)
--#define MX35_CCM_RCSR		(MXC_CCM_BASE + 0x18)
--#define MXC_CCM_SRPCTL		(MXC_CCM_BASE + 0x18)
--#define MX35_CCM_MPCTL		(MXC_CCM_BASE + 0x1C)
--#define MXC_CCM_COSR		(MXC_CCM_BASE + 0x1C)
--#define MX35_CCM_PPCTL		(MXC_CCM_BASE + 0x20)
--#define MXC_CCM_CGR0		(MXC_CCM_BASE + 0x20)
--#define MX35_CCM_ACMR		(MXC_CCM_BASE + 0x24)
--#define MXC_CCM_CGR1		(MXC_CCM_BASE + 0x24)
--#define MX35_CCM_COSR		(MXC_CCM_BASE + 0x28)
--#define MXC_CCM_CGR2		(MXC_CCM_BASE + 0x28)
--#define MX35_CCM_CGR0		(MXC_CCM_BASE + 0x2C)
--#define MXC_CCM_WIMR		(MXC_CCM_BASE + 0x2C)
--#define MX35_CCM_CGR1		(MXC_CCM_BASE + 0x30)
--#define MXC_CCM_LDC		(MXC_CCM_BASE + 0x30)
--#define MX35_CCM_CGR2		(MXC_CCM_BASE + 0x34)
--#define MXC_CCM_DCVR0		(MXC_CCM_BASE + 0x34)
--#define MX35_CCM_CGR3		(MXC_CCM_BASE + 0x38)
--#define MXC_CCM_DCVR1		(MXC_CCM_BASE + 0x38)
--#define MXC_CCM_DCVR2		(MXC_CCM_BASE + 0x3C)
--#define MXC_CCM_DCVR3		(MXC_CCM_BASE + 0x40)
--#define MXC_CCM_LTR0		(MXC_CCM_BASE + 0x44)
--#define MXC_CCM_LTR1		(MXC_CCM_BASE + 0x48)
--#define MXC_CCM_LTR2		(MXC_CCM_BASE + 0x4C)
--#define MXC_CCM_LTR3		(MXC_CCM_BASE + 0x50)
--#define MXC_CCM_LTBR0		(MXC_CCM_BASE + 0x54)
--#define MXC_CCM_LTBR1		(MXC_CCM_BASE + 0x58)
--#define MXC_CCM_PMCR0		(MXC_CCM_BASE + 0x5C)
--#define MXC_CCM_PMCR1		(MXC_CCM_BASE + 0x60)
--#define MXC_CCM_PDR2		(MXC_CCM_BASE + 0x64)
-+#define MXC_CCM_CCMR		0x00
-+#define MXC_CCM_PDR0		0x04
-+#define MXC_CCM_PDR1		0x08
-+#define MX35_CCM_PDR2		0x0C
-+#define MXC_CCM_RCSR		0x0C
-+#define MX35_CCM_PDR3		0x10
-+#define MXC_CCM_MPCTL		0x10
-+#define MX35_CCM_PDR4		0x14
-+#define MXC_CCM_UPCTL		0x14
-+#define MX35_CCM_RCSR		0x18
-+#define MXC_CCM_SRPCTL		0x18
-+#define MX35_CCM_MPCTL		0x1C
-+#define MXC_CCM_COSR		0x1C
-+#define MX35_CCM_PPCTL		0x20
-+#define MXC_CCM_CGR0		0x20
-+#define MX35_CCM_ACMR		0x24
-+#define MXC_CCM_CGR1		0x24
-+#define MX35_CCM_COSR		0x28
-+#define MXC_CCM_CGR2		0x28
-+#define MX35_CCM_CGR0		0x2C
-+#define MXC_CCM_WIMR		0x2C
-+#define MX35_CCM_CGR1		0x30
-+#define MXC_CCM_LDC		0x30
-+#define MX35_CCM_CGR2		0x34
-+#define MXC_CCM_DCVR0		0x34
-+#define MX35_CCM_CGR3		0x38
-+#define MXC_CCM_DCVR1		0x38
-+#define MXC_CCM_DCVR2		0x3C
-+#define MXC_CCM_DCVR3		0x40
-+#define MXC_CCM_LTR0		0x44
-+#define MXC_CCM_LTR1		0x48
-+#define MXC_CCM_LTR2		0x4C
-+#define MXC_CCM_LTR3		0x50
-+#define MXC_CCM_LTBR0		0x54
-+#define MXC_CCM_LTBR1		0x58
-+#define MXC_CCM_PMCR0		0x5C
-+#define MXC_CCM_PMCR1		0x60
-+#define MXC_CCM_PDR2		0x64
- 
- /* Register bit definitions */
- #define MXC_CCM_CCMR_WBEN                       (1 << 27)
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 7412738..57b39f8 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -31,6 +31,10 @@
- #include <mach/iomux-v3.h>
- #include <mach/irqs.h>
- 
-+#include "crmregs-imx3.h"
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+-				   clk-mux.o clk-divider.o
++				   clk-mux.o clk-divider.o clk-fixed-factor.o
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+new file mode 100644
+index 0000000..7c5e1fc
+--- /dev/null
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Standard functionality for the common clock API.
++ */
++#include <linux/module.h>
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/err.h>
 +
-+void __iomem *mx3_ccm_base;
++struct clk_fixed_factor {
++	struct clk_hw	hw;
++	unsigned int	mult;
++	unsigned int	div;
++	char		*parent[1];
++};
 +
- static void imx3_idle(void)
- {
- 	unsigned long reg = 0;
-@@ -137,6 +141,7 @@ void __init imx31_init_early(void)
- 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
- 	arch_ioremap_caller = imx3_ioremap_caller;
- 	arm_pm_idle = imx3_idle;
-+	mx3_ccm_base = MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR);
- }
++#define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
++
++static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
++
++	return (parent_rate / fix->div) * fix->mult;
++}
++
++static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
++{
++	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
++
++	if (prate) {
++		unsigned long best_parent;
++		best_parent = (rate / fix->mult) * fix->div;
++		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
++				best_parent);
++		return (*prate / fix->div) * fix->mult;
++	} else {
++		return (__clk_get_rate(__clk_get_parent(hw->clk)) / fix->div) * fix->mult;
++	}
++}
++
++static int clk_factor_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	return 0;
++}
++
++struct clk_ops clk_fixed_factor_ops = {
++	.round_rate = clk_factor_round_rate,
++	.set_rate = clk_factor_set_rate,
++	.recalc_rate = clk_factor_recalc_rate,
++};
++EXPORT_SYMBOL_GPL(clk_fixed_factor_ops);
++
++struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		unsigned int mult, unsigned int div)
++{
++	struct clk_fixed_factor *fix;
++	struct clk *clk;
++
++	fix = kmalloc(sizeof(struct clk_gate), GFP_KERNEL);
++
++	if (!fix) {
++		pr_err("%s: could not allocate gated clk\n", __func__);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	/* struct clk_gate assignments */
++	fix->mult = mult;
++	fix->div = div;
++
++	if (parent_name) {
++		fix->parent[0] = kstrdup(parent_name, GFP_KERNEL);
++		if (!fix->parent[0])
++			goto out;
++	}
++
++	clk = clk_register(dev, name,
++			&clk_fixed_factor_ops, &fix->hw,
++			fix->parent,
++			(parent_name ? 1 : 0),
++			flags);
++	if (clk)
++		return clk;
++
++out:
++	kfree(fix->parent[0]);
++	kfree(fix);
++
++	return NULL;
++}
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5508897..21ca2f8 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -257,6 +257,10 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		void __iomem *reg, u8 shift, u8 width,
+ 		u8 clk_mux_flags, spinlock_t *lock);
  
- void __init mx31_init_irq(void)
-@@ -210,6 +215,7 @@ void __init imx35_init_early(void)
- 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
- 	arm_pm_idle = imx3_idle;
- 	arch_ioremap_caller = imx3_ioremap_caller;
-+	mx3_ccm_base = MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR);
- }
- 
- void __init mx35_init_irq(void)
-diff --git a/arch/arm/mach-imx/pm-imx3.c b/arch/arm/mach-imx/pm-imx3.c
-index b375243..822103b 100644
---- a/arch/arm/mach-imx/pm-imx3.c
-+++ b/arch/arm/mach-imx/pm-imx3.c
-@@ -21,14 +21,14 @@
-  */
- void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode)
- {
--	int reg = __raw_readl(MXC_CCM_CCMR);
-+	int reg = __raw_readl(mx3_ccm_base + MXC_CCM_CCMR);
- 	reg &= ~MXC_CCM_CCMR_LPM_MASK;
- 
- 	switch (mode) {
- 	case MX3_WAIT:
- 		if (cpu_is_mx35())
- 			reg |= MXC_CCM_CCMR_LPM_WAIT_MX35;
--		__raw_writel(reg, MXC_CCM_CCMR);
-+		__raw_writel(reg, mx3_ccm_base + MXC_CCM_CCMR);
- 		break;
- 	default:
- 		pr_err("Unknown cpu power mode: %d\n", mode);
++struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		unsigned int mult, unsigned int div);
++
+ /**
+  * clk_register - allocate a new clock, register it and return an opaque cookie
+  * @dev: device that is registering this clock
 -- 
 1.7.9.5
