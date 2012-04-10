@@ -1,24 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Apr 2012 12:24:24 +0000
-Subject: [PATCHv8 07/10] ARM: dma-mapping: move all dma bounce code to
- separate dma ops structure
-In-Reply-To: <1334055852-19500-8-git-send-email-m.szyprowski@samsung.com>
-References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
- <1334055852-19500-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201204101224.24959.arnd@arndb.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 10 Apr 2012 14:34:42 +0200 (CEST)
+Subject: mx3fb overlay support
+In-Reply-To: <CAJP5LRNwPXx_sQ=uX4AZDz9HvLdF_nRcoVXBkAWmidVpbdby9g@mail.gmail.com>
+References: <CAJP5LRNwPXx_sQ=uX4AZDz9HvLdF_nRcoVXBkAWmidVpbdby9g@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1204101420050.7641@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 April 2012, Marek Szyprowski wrote:
-> This patch removes dma bounce hooks from the common dma mapping
-> implementation on ARM architecture and creates a separate set of
-> dma_map_ops for dma bounce devices.
+Hi Alex
+
+On Tue, 10 Apr 2012, alex gershgorin wrote:
+
+> Hi Guennadi,
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> In mx3fb current version overlay does not supporting,
+> I came across a patch 3/4 v4 i.MX31: framebuffer driver that you submitted
+> in 2008,
+> there was support Overlay, but for some reason in the next versions overlay
+> support has been removed.
+> 
+> As you understand this is necessary if we want to use the foreground and
+> background Planes.
+> in my case, one has to display live video, and other graphics.
+> 
+> I would like to hear your opinion, if may reuse a part of this patch,
+> and add overlay support to mx3fb current version.
 
-I could be misunderstanding something, but it looks like this
-one should come before patch 6, where you remove
-some of the dmabounce functions. Can you clarify?
+Maybe this note in the original commit message explains the reason: 
+"Overlay support is included but has never been tested." ;-)
 
-	Arnd
+> if necessary, I am ready to provide any assistance :-)
+
+Sure, please, re-add it, test, fix, any improvements are welcome.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
