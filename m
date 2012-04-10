@@ -1,9 +1,9 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:36 +0200
-Subject: [PATCH v6 13/17] ARM Samsung: Move s3c pwm driver to pwm framework
+Date: Tue, 10 Apr 2012 17:06:35 +0200
+Subject: [PATCH v6 12/17] ARM i.MX: Move i.MX pwm driver to pwm framework
 In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-14-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1334070400-25013-13-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,125 +12,220 @@ From: Sascha Hauer <s.hauer@pengutronix.de>
 Move the driver to drivers/pwm/ and convert it to use the framework.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v5:
-- adopt patch by Sascha Hauer to move s3c driver to PWM framework
-- This driver could use some cleanups and rework to actually take advantage
-  of the multiple PWM devices per PWM chip feature. Currently, information
-  about the controlling timers is passed via platform resources but is not
-  used. Perhaps the corresponding information can be passed in a better way
-  via platform data?
+- adopt patch by Sascha Hauer to move i.MX driver to PWM framework
+- rename to imx_pwm internally
 
- arch/arm/plat-samsung/Makefile                     |    4 -
- drivers/pwm/Kconfig                                |    9 +
- drivers/pwm/Makefile                               |    1 +
- .../pwm.c => drivers/pwm/pwm-samsung.c             |  228 ++++++++------------
- 4 files changed, 97 insertions(+), 145 deletions(-)
- rename arch/arm/plat-samsung/pwm.c => drivers/pwm/pwm-samsung.c (58%)
+ arch/arm/plat-mxc/Kconfig                        |    6 -
+ arch/arm/plat-mxc/Makefile                       |    1 -
+ drivers/pwm/Kconfig                              |    9 ++
+ drivers/pwm/Makefile                             |    1 +
+ arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c |  182 +++++++++-------------
+ 5 files changed, 81 insertions(+), 118 deletions(-)
+ rename arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c (58%)
 
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 6012366..f09a7cf 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -50,7 +50,3 @@ obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
- # PD support
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index c722f9c..baf9064 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -47,12 +47,6 @@ config MXC_TZIC
+ config MXC_AVIC
+ 	bool
  
- obj-$(CONFIG_SAMSUNG_PD)	+= pd.o
+-config MXC_PWM
+-	tristate "Enable PWM driver"
+-	select HAVE_PWM
+-	help
+-	  Enable support for the i.MX PWM controller(s).
 -
--# PWM support
--
--obj-$(CONFIG_HAVE_PWM)		+= pwm.o
+ config MXC_DEBUG_BOARD
+ 	bool "Enable MXC debug board(for 3-stack)"
+ 	help
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index e81290c..46ba8de 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -11,7 +11,6 @@ obj-$(CONFIG_MXC_AVIC) += avic.o
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+ obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
+-obj-$(CONFIG_MXC_PWM)  += pwm.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
 diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index a9a9715..0d9aa92 100644
+index 0ef4f30..a9a9715 100644
 --- a/drivers/pwm/Kconfig
 +++ b/drivers/pwm/Kconfig
-@@ -36,6 +36,15 @@ config PWM_PXA
+@@ -18,6 +18,15 @@ config PWM_BFIN
  	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-pxa.
+ 	  will be called pwm-bfin.
  
-+config PWM_SAMSUNG
-+	tristate "Samsung pwm support"
-+	depends on PLAT_SAMSUNG
++config PWM_IMX
++	tristate "i.MX pwm support"
++	depends on ARCH_MXC
 +	help
-+	  Generic PWM framework driver for Samsung.
++	  Generic PWM framework driver for i.MX.
 +
 +	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-samsung.
++	  will be called pwm-imx.
 +
- config PWM_TEGRA
- 	tristate "NVIDIA Tegra PWM support"
- 	depends on ARCH_TEGRA
+ config PWM_PXA
+ 	tristate "PXA PWM support"
+ 	depends on ARCH_PXA
 diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 3dd1b83..a1d87b1 100644
+index e859c51..3dd1b83 100644
 --- a/drivers/pwm/Makefile
 +++ b/drivers/pwm/Makefile
-@@ -2,4 +2,5 @@ obj-$(CONFIG_PWM)		+= core.o
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_PWM)		+= core.o
  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
++obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
  obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
-+obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-diff --git a/arch/arm/plat-samsung/pwm.c b/drivers/pwm/pwm-samsung.c
+diff --git a/arch/arm/plat-mxc/pwm.c b/drivers/pwm/pwm-imx.c
 similarity index 58%
-rename from arch/arm/plat-samsung/pwm.c
-rename to drivers/pwm/pwm-samsung.c
-index c559d84..631edf0 100644
---- a/arch/arm/plat-samsung/pwm.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -24,8 +24,7 @@
+rename from arch/arm/plat-mxc/pwm.c
+rename to drivers/pwm/pwm-imx.c
+index c0cab22..ef9c51b 100644
+--- a/arch/arm/plat-mxc/pwm.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -39,33 +39,28 @@
+ #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
+ #define MX3_PWMCR_EN              (1 << 0)
  
- #include <plat/regs-timer.h>
- 
+-
+-
 -struct pwm_device {
--	struct list_head	 list;
-+struct s3c_chip {
- 	struct platform_device	*pdev;
+-	struct list_head	node;
+-	struct platform_device *pdev;
+-
+-	const char	*label;
++struct imx_chip {
+ 	struct clk	*clk;
  
- 	struct clk		*clk_div;
-@@ -36,117 +35,65 @@ struct pwm_device {
- 	unsigned int		 duty_ns;
+ 	int		clk_enabled;
+ 	void __iomem	*mmio_base;
  
- 	unsigned char		 tcon_base;
--	unsigned char		 running;
--	unsigned char		 use_count;
- 	unsigned char		 pwm_id;
-+	struct pwm_chip		 chip;
+-	unsigned int	use_count;
+-	unsigned int	pwm_id;
++	struct pwm_chip	chip;
  };
  
-+#define to_s3c_chip(chip)	container_of(chip, struct s3c_chip, chip)
+-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++#define to_imx_chip(chip)	container_of(chip, struct imx_chip, chip)
 +
- #define pwm_dbg(_pwm, msg...) dev_dbg(&(_pwm)->pdev->dev, msg)
++static int imx_pwm_config(struct pwm_chip *chip,
++		struct pwm_device *pwm, int duty_ns, int period_ns)
+ {
+-	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
+-		return -EINVAL;
++	struct imx_chip *imx = to_imx_chip(chip);
  
- static struct clk *clk_scaler[2];
+ 	if (!(cpu_is_mx1() || cpu_is_mx21())) {
+ 		unsigned long long c;
+ 		unsigned long period_cycles, duty_cycles, prescale;
+ 		u32 cr;
  
--static inline int pwm_is_tdiv(struct pwm_device *pwm)
+-		c = clk_get_rate(pwm->clk);
++		c = clk_get_rate(imx->clk);
+ 		c = c * period_ns;
+ 		do_div(c, 1000000000);
+ 		period_cycles = c;
+@@ -86,8 +81,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 		else
+ 			period_cycles = 0;
+ 
+-		writel(duty_cycles, pwm->mmio_base + MX3_PWMSAR);
+-		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
++		writel(duty_cycles, imx->mmio_base + MX3_PWMSAR);
++		writel(period_cycles, imx->mmio_base + MX3_PWMPR);
+ 
+ 		cr = MX3_PWMCR_PRESCALER(prescale) |
+ 			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
+@@ -98,7 +93,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 		else
+ 			cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
+ 
+-		writel(cr, pwm->mmio_base + MX3_PWMCR);
++		writel(cr, imx->mmio_base + MX3_PWMCR);
+ 	} else if (cpu_is_mx1() || cpu_is_mx21()) {
+ 		/* The PWM subsystem allows for exact frequencies. However,
+ 		 * I cannot connect a scope on my device to the PWM line and
+@@ -116,110 +111,72 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 		 * both the prescaler (/1 .. /128) and then by CLKSEL
+ 		 * (/2 .. /16).
+ 		 */
+-		u32 max = readl(pwm->mmio_base + MX1_PWMP);
++		u32 max = readl(imx->mmio_base + MX1_PWMP);
+ 		u32 p = max * duty_ns / period_ns;
+-		writel(max - p, pwm->mmio_base + MX1_PWMS);
++		writel(max - p, imx->mmio_base + MX1_PWMS);
+ 	} else {
+ 		BUG();
+ 	}
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL(pwm_config);
+ 
+-int pwm_enable(struct pwm_device *pwm)
++static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
++	struct imx_chip *imx = to_imx_chip(chip);
+ 	int rc = 0;
+ 
+-	if (!pwm->clk_enabled) {
+-		rc = clk_prepare_enable(pwm->clk);
++	if (!imx->clk_enabled) {
++		rc = clk_prepare_enable(imx->clk);
+ 		if (!rc)
+-			pwm->clk_enabled = 1;
++			imx->clk_enabled = 1;
+ 	}
+ 	return rc;
+ }
+-EXPORT_SYMBOL(pwm_enable);
+-
+-void pwm_disable(struct pwm_device *pwm)
 -{
--	return clk_get_parent(pwm->clk) == pwm->clk_div;
+-	writel(0, pwm->mmio_base + MX3_PWMCR);
+-
+-	if (pwm->clk_enabled) {
+-		clk_disable_unprepare(pwm->clk);
+-		pwm->clk_enabled = 0;
+-	}
 -}
+-EXPORT_SYMBOL(pwm_disable);
 -
 -static DEFINE_MUTEX(pwm_lock);
 -static LIST_HEAD(pwm_list);
--
+ 
 -struct pwm_device *pwm_request(int pwm_id, const char *label)
--{
++static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
 -	struct pwm_device *pwm;
 -	int found = 0;
--
++	struct imx_chip *imx = to_imx_chip(chip);
+ 
 -	mutex_lock(&pwm_lock);
--
--	list_for_each_entry(pwm, &pwm_list, list) {
++	writel(0, imx->mmio_base + MX3_PWMCR);
+ 
+-	list_for_each_entry(pwm, &pwm_list, node) {
 -		if (pwm->pwm_id == pwm_id) {
 -			found = 1;
 -			break;
 -		}
--	}
++	if (imx->clk_enabled) {
++		clk_disable_unprepare(imx->clk);
++		imx->clk_enabled = 0;
+ 	}
 -
 -	if (found) {
 -		if (pwm->use_count == 0) {
--			pwm->use_count = 1;
+-			pwm->use_count++;
 -			pwm->label = label;
 -		} else
 -			pwm = ERR_PTR(-EBUSY);
@@ -139,368 +234,169 @@ index c559d84..631edf0 100644
 -
 -	mutex_unlock(&pwm_lock);
 -	return pwm;
--}
--
+ }
 -EXPORT_SYMBOL(pwm_request);
 -
--
 -void pwm_free(struct pwm_device *pwm)
-+static inline int pwm_is_tdiv(struct s3c_chip *chip)
- {
+-{
 -	mutex_lock(&pwm_lock);
 -
 -	if (pwm->use_count) {
 -		pwm->use_count--;
 -		pwm->label = NULL;
 -	} else
--		printk(KERN_ERR "PWM%d device already freed\n", pwm->pwm_id);
--
+-		pr_warning("PWM device already freed\n");
+ 
 -	mutex_unlock(&pwm_lock);
-+	return clk_get_parent(chip->clk) == chip->clk_div;
- }
- 
--EXPORT_SYMBOL(pwm_free);
--
- #define pwm_tcon_start(pwm) (1 << (pwm->tcon_base + 0))
- #define pwm_tcon_invert(pwm) (1 << (pwm->tcon_base + 2))
- #define pwm_tcon_autoreload(pwm) (1 << (pwm->tcon_base + 3))
- #define pwm_tcon_manulupdate(pwm) (1 << (pwm->tcon_base + 1))
- 
--int pwm_enable(struct pwm_device *pwm)
-+static int s3c_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
-+	struct s3c_chip *s3c = to_s3c_chip(chip);
- 	unsigned long flags;
- 	unsigned long tcon;
- 
- 	local_irq_save(flags);
- 
- 	tcon = __raw_readl(S3C2410_TCON);
--	tcon |= pwm_tcon_start(pwm);
-+	tcon |= pwm_tcon_start(s3c);
- 	__raw_writel(tcon, S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- 
--	pwm->running = 1;
- 	return 0;
- }
- 
--EXPORT_SYMBOL(pwm_enable);
--
--void pwm_disable(struct pwm_device *pwm)
-+static void s3c_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
-+	struct s3c_chip *s3c = to_s3c_chip(chip);
- 	unsigned long flags;
- 	unsigned long tcon;
- 
- 	local_irq_save(flags);
- 
- 	tcon = __raw_readl(S3C2410_TCON);
--	tcon &= ~pwm_tcon_start(pwm);
-+	tcon &= ~pwm_tcon_start(s3c);
- 	__raw_writel(tcon, S3C2410_TCON);
- 
- 	local_irq_restore(flags);
--
--	pwm->running = 0;
- }
- 
--EXPORT_SYMBOL(pwm_disable);
--
--static unsigned long pwm_calc_tin(struct pwm_device *pwm, unsigned long freq)
-+static unsigned long pwm_calc_tin(struct s3c_chip *s3c, unsigned long freq)
- {
- 	unsigned long tin_parent_rate;
- 	unsigned int div;
- 
--	tin_parent_rate = clk_get_rate(clk_get_parent(pwm->clk_div));
--	pwm_dbg(pwm, "tin parent at %lu\n", tin_parent_rate);
-+	tin_parent_rate = clk_get_rate(clk_get_parent(s3c->clk_div));
-+	pwm_dbg(s3c, "tin parent at %lu\n", tin_parent_rate);
- 
- 	for (div = 2; div <= 16; div *= 2) {
- 		if ((tin_parent_rate / (div << 16)) < freq)
-@@ -158,8 +105,10 @@ static unsigned long pwm_calc_tin(struct pwm_device *pwm, unsigned long freq)
- 
- #define NS_IN_HZ (1000000000UL)
- 
--int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-+static int s3c_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+		int duty_ns, int period_ns)
- {
-+	struct s3c_chip *s3c = to_s3c_chip(chip);
- 	unsigned long tin_rate;
- 	unsigned long tin_ns;
- 	unsigned long period;
-@@ -178,38 +127,38 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	if (duty_ns > period_ns)
- 		return -EINVAL;
- 
--	if (period_ns == pwm->period_ns &&
--	    duty_ns == pwm->duty_ns)
-+	if (period_ns == s3c->period_ns &&
-+	    duty_ns == s3c->duty_ns)
- 		return 0;
- 
- 	/* The TCMP and TCNT can be read without a lock, they're not
- 	 * shared between the timers. */
- 
--	tcmp = __raw_readl(S3C2410_TCMPB(pwm->pwm_id));
--	tcnt = __raw_readl(S3C2410_TCNTB(pwm->pwm_id));
-+	tcmp = __raw_readl(S3C2410_TCMPB(s3c->pwm_id));
-+	tcnt = __raw_readl(S3C2410_TCNTB(s3c->pwm_id));
- 
- 	period = NS_IN_HZ / period_ns;
- 
--	pwm_dbg(pwm, "duty_ns=%d, period_ns=%d (%lu)\n",
-+	pwm_dbg(s3c, "duty_ns=%d, period_ns=%d (%lu)\n",
- 		duty_ns, period_ns, period);
- 
- 	/* Check to see if we are changing the clock rate of the PWM */
- 
--	if (pwm->period_ns != period_ns) {
--		if (pwm_is_tdiv(pwm)) {
--			tin_rate = pwm_calc_tin(pwm, period);
--			clk_set_rate(pwm->clk_div, tin_rate);
-+	if (s3c->period_ns != period_ns) {
-+		if (pwm_is_tdiv(s3c)) {
-+			tin_rate = pwm_calc_tin(s3c, period);
-+			clk_set_rate(s3c->clk_div, tin_rate);
- 		} else
--			tin_rate = clk_get_rate(pwm->clk);
-+			tin_rate = clk_get_rate(s3c->clk);
- 
--		pwm->period_ns = period_ns;
-+		s3c->period_ns = period_ns;
- 
--		pwm_dbg(pwm, "tin_rate=%lu\n", tin_rate);
-+		pwm_dbg(s3c, "tin_rate=%lu\n", tin_rate);
- 
- 		tin_ns = NS_IN_HZ / tin_rate;
- 		tcnt = period_ns / tin_ns;
- 	} else
--		tin_ns = NS_IN_HZ / clk_get_rate(pwm->clk);
-+		tin_ns = NS_IN_HZ / clk_get_rate(s3c->clk);
- 
- 	/* Note, counters count down */
- 
-@@ -220,7 +169,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	if (tcmp == tcnt)
- 		tcmp--;
- 
--	pwm_dbg(pwm, "tin_ns=%lu, tcmp=%ld/%lu\n", tin_ns, tcmp, tcnt);
-+	pwm_dbg(s3c, "tin_ns=%lu, tcmp=%ld/%lu\n", tin_ns, tcmp, tcnt);
- 
- 	if (tcmp < 0)
- 		tcmp = 0;
-@@ -229,15 +178,15 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 
- 	local_irq_save(flags);
- 
--	__raw_writel(tcmp, S3C2410_TCMPB(pwm->pwm_id));
--	__raw_writel(tcnt, S3C2410_TCNTB(pwm->pwm_id));
-+	__raw_writel(tcmp, S3C2410_TCMPB(s3c->pwm_id));
-+	__raw_writel(tcnt, S3C2410_TCNTB(s3c->pwm_id));
- 
- 	tcon = __raw_readl(S3C2410_TCON);
--	tcon |= pwm_tcon_manulupdate(pwm);
--	tcon |= pwm_tcon_autoreload(pwm);
-+	tcon |= pwm_tcon_manulupdate(s3c);
-+	tcon |= pwm_tcon_autoreload(s3c);
- 	__raw_writel(tcon, S3C2410_TCON);
- 
--	tcon &= ~pwm_tcon_manulupdate(pwm);
-+	tcon &= ~pwm_tcon_manulupdate(s3c);
- 	__raw_writel(tcon, S3C2410_TCON);
- 
- 	local_irq_restore(flags);
-@@ -245,24 +194,17 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	return 0;
- }
- 
--EXPORT_SYMBOL(pwm_config);
--
--static int pwm_register(struct pwm_device *pwm)
--{
--	pwm->duty_ns = -1;
--	pwm->period_ns = -1;
--
--	mutex_lock(&pwm_lock);
--	list_add_tail(&pwm->list, &pwm_list);
--	mutex_unlock(&pwm_lock);
--
--	return 0;
 -}
-+static struct pwm_ops s3c_pwm_ops = {
-+	.enable = s3c_pwm_enable,
-+	.disable = s3c_pwm_disable,
-+	.config = s3c_pwm_config,
+-EXPORT_SYMBOL(pwm_free);
++static struct pwm_ops imx_pwm_ops = {
++	.enable = imx_pwm_enable,
++	.disable = imx_pwm_disable,
++	.config = imx_pwm_config,
 +	.owner = THIS_MODULE,
 +};
  
- static int s3c_pwm_probe(struct platform_device *pdev)
+-static int __devinit mxc_pwm_probe(struct platform_device *pdev)
++static int __devinit imx_pwm_probe(struct platform_device *pdev)
  {
- 	struct device *dev = &pdev->dev;
 -	struct pwm_device *pwm;
-+	struct s3c_chip *s3c;
- 	unsigned long flags;
- 	unsigned long tcon;
- 	unsigned int id = pdev->id;
-@@ -273,83 +215,87 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
++	struct imx_chip *imx;
+ 	struct resource *r;
+ 	int ret = 0;
  
 -	pwm = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
 -	if (pwm == NULL) {
-+	s3c = kzalloc(sizeof(*s3c), GFP_KERNEL);
-+	if (s3c == NULL) {
- 		dev_err(dev, "failed to allocate pwm_device\n");
++	imx = kzalloc(sizeof(*imx), GFP_KERNEL);
++	if (imx == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate memory\n");
  		return -ENOMEM;
  	}
  
--	pwm->pdev = pdev;
--	pwm->pwm_id = id;
--
- 	/* calculate base of control bits in TCON */
--	pwm->tcon_base = id == 0 ? 0 : (id * 4) + 4;
-+	s3c->tcon_base = id == 0 ? 0 : (id * 4) + 4;
-+	s3c->chip.ops = &s3c_pwm_ops;
-+	s3c->chip.base = -1;
-+	s3c->chip.npwm = 1;
+-	pwm->clk = clk_get(&pdev->dev, "pwm");
++	imx->clk = clk_get(&pdev->dev, "pwm");
  
--	pwm->clk = clk_get(dev, "pwm-tin");
 -	if (IS_ERR(pwm->clk)) {
-+	s3c->clk = clk_get(dev, "pwm-tin");
-+	if (IS_ERR(s3c->clk)) {
- 		dev_err(dev, "failed to get pwm tin clk\n");
 -		ret = PTR_ERR(pwm->clk);
-+		ret = PTR_ERR(s3c->clk);
- 		goto err_alloc;
++	if (IS_ERR(imx->clk)) {
++		ret = PTR_ERR(imx->clk);
+ 		goto err_free;
  	}
  
--	pwm->clk_div = clk_get(dev, "pwm-tdiv");
--	if (IS_ERR(pwm->clk_div)) {
-+	s3c->clk_div = clk_get(dev, "pwm-tdiv");
-+	if (IS_ERR(s3c->clk_div)) {
- 		dev_err(dev, "failed to get pwm tdiv clk\n");
--		ret = PTR_ERR(pwm->clk_div);
-+		ret = PTR_ERR(s3c->clk_div);
- 		goto err_clk_tin;
+-	pwm->clk_enabled = 0;
++	imx->chip.ops = &imx_pwm_ops;
++	imx->chip.base = -1;
++	imx->chip.npwm = 1;
+ 
+-	pwm->use_count = 0;
+-	pwm->pwm_id = pdev->id;
+-	pwm->pdev = pdev;
++	imx->clk_enabled = 0;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+@@ -235,72 +192,75 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
+ 		goto err_free_clk;
  	}
  
--	clk_enable(pwm->clk);
--	clk_enable(pwm->clk_div);
-+	clk_enable(s3c->clk);
-+	clk_enable(s3c->clk_div);
- 
- 	local_irq_save(flags);
- 
- 	tcon = __raw_readl(S3C2410_TCON);
--	tcon |= pwm_tcon_invert(pwm);
-+	tcon |= pwm_tcon_invert(s3c);
- 	__raw_writel(tcon, S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- 
--
--	ret = pwm_register(pwm);
-+	ret = pwmchip_add(&s3c->chip);
- 	if (ret) {
- 		dev_err(dev, "failed to register pwm\n");
- 		goto err_clk_tdiv;
+-	pwm->mmio_base = ioremap(r->start, resource_size(r));
+-	if (pwm->mmio_base == NULL) {
++	imx->mmio_base = ioremap(r->start, resource_size(r));
++	if (imx->mmio_base == NULL) {
+ 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
+ 		ret = -ENODEV;
+ 		goto err_free_mem;
  	}
  
--	pwm_dbg(pwm, "config bits %02x\n",
--		(__raw_readl(S3C2410_TCON) >> pwm->tcon_base) & 0x0f);
-+	pwm_dbg(s3c, "config bits %02x\n",
-+		(__raw_readl(S3C2410_TCON) >> s3c->tcon_base) & 0x0f);
- 
- 	dev_info(dev, "tin at %lu, tdiv at %lu, tin=%sclk, base %d\n",
--		 clk_get_rate(pwm->clk),
--		 clk_get_rate(pwm->clk_div),
--		 pwm_is_tdiv(pwm) ? "div" : "ext", pwm->tcon_base);
-+		 clk_get_rate(s3c->clk),
-+		 clk_get_rate(s3c->clk_div),
-+		 pwm_is_tdiv(s3c) ? "div" : "ext", s3c->tcon_base);
+-	mutex_lock(&pwm_lock);
+-	list_add_tail(&pwm->node, &pwm_list);
+-	mutex_unlock(&pwm_lock);
++	ret = pwmchip_add(&imx->chip);
++	if (ret)
++		goto err_iounmap;
  
 -	platform_set_drvdata(pdev, pwm);
-+	platform_set_drvdata(pdev, s3c);
++	platform_set_drvdata(pdev, imx);
  	return 0;
  
-  err_clk_tdiv:
--	clk_disable(pwm->clk_div);
--	clk_disable(pwm->clk);
--	clk_put(pwm->clk_div);
-+	clk_disable(s3c->clk_div);
-+	clk_disable(s3c->clk);
-+	clk_put(s3c->clk_div);
- 
-  err_clk_tin:
++err_iounmap:
++	iounmap(imx->mmio_base);
+ err_free_mem:
+ 	release_mem_region(r->start, resource_size(r));
+ err_free_clk:
 -	clk_put(pwm->clk);
-+	clk_put(s3c->clk);
- 
-  err_alloc:
++	clk_put(imx->clk);
+ err_free:
 -	kfree(pwm);
-+	kfree(s3c);
++	kfree(imx);
  	return ret;
  }
  
- static int __devexit s3c_pwm_remove(struct platform_device *pdev)
+-static int __devexit mxc_pwm_remove(struct platform_device *pdev)
++static int __devexit imx_pwm_remove(struct platform_device *pdev)
  {
--	struct pwm_device *pwm = platform_get_drvdata(pdev);
-+	struct s3c_chip *s3c = platform_get_drvdata(pdev);
-+	int err;
-+
-+	err = pwmchip_remove(&s3c->chip);
-+	if (err < 0)
-+		return err;
+-	struct pwm_device *pwm;
++	struct imx_chip *imx;
+ 	struct resource *r;
++	int ret;
  
--	clk_disable(pwm->clk_div);
--	clk_disable(pwm->clk);
--	clk_put(pwm->clk_div);
+-	pwm = platform_get_drvdata(pdev);
+-	if (pwm == NULL)
++	imx = platform_get_drvdata(pdev);
++	if (imx == NULL)
+ 		return -ENODEV;
+ 
+-	mutex_lock(&pwm_lock);
+-	list_del(&pwm->node);
+-	mutex_unlock(&pwm_lock);
++	ret = pwmchip_remove(&imx->chip);
++	if (ret)
++		return ret;
+ 
+-	iounmap(pwm->mmio_base);
++	iounmap(imx->mmio_base);
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(r->start, resource_size(r));
+ 
 -	clk_put(pwm->clk);
++	clk_put(imx->clk);
+ 
 -	kfree(pwm);
-+	clk_disable(s3c->clk_div);
-+	clk_disable(s3c->clk);
-+	clk_put(s3c->clk_div);
-+	clk_put(s3c->clk);
-+	kfree(s3c);
- 
- 	return 0;
- }
-@@ -357,26 +303,26 @@ static int __devexit s3c_pwm_remove(struct platform_device *pdev)
- #ifdef CONFIG_PM
- static int s3c_pwm_suspend(struct platform_device *pdev, pm_message_t state)
- {
--	struct pwm_device *pwm = platform_get_drvdata(pdev);
-+	struct s3c_chip *s3c = platform_get_drvdata(pdev);
- 
- 	/* No one preserve these values during suspend so reset them
- 	 * Otherwise driver leaves PWM unconfigured if same values
- 	 * passed to pwm_config
- 	 */
--	pwm->period_ns = 0;
--	pwm->duty_ns = 0;
-+	s3c->period_ns = 0;
-+	s3c->duty_ns = 0;
- 
++	kfree(imx);
  	return 0;
  }
  
- static int s3c_pwm_resume(struct platform_device *pdev)
+-static struct platform_driver mxc_pwm_driver = {
++static struct platform_driver imx_pwm_driver = {
+ 	.driver		= {
+ 		.name	= "mxc_pwm",
+ 	},
+-	.probe		= mxc_pwm_probe,
+-	.remove		= __devexit_p(mxc_pwm_remove),
++	.probe		= imx_pwm_probe,
++	.remove		= __devexit_p(imx_pwm_remove),
+ };
+ 
+-static int __init mxc_pwm_init(void)
++static int __init imx_pwm_init(void)
  {
--	struct pwm_device *pwm = platform_get_drvdata(pdev);
-+	struct s3c_chip *s3c = platform_get_drvdata(pdev);
- 	unsigned long tcon;
+-	return platform_driver_register(&mxc_pwm_driver);
++	return platform_driver_register(&imx_pwm_driver);
+ }
+-arch_initcall(mxc_pwm_init);
++arch_initcall(imx_pwm_init);
  
- 	/* Restore invertion */
- 	tcon = __raw_readl(S3C2410_TCON);
--	tcon |= pwm_tcon_invert(pwm);
-+	tcon |= pwm_tcon_invert(s3c);
- 	__raw_writel(tcon, S3C2410_TCON);
+-static void __exit mxc_pwm_exit(void)
++static void __exit imx_pwm_exit(void)
+ {
+-	platform_driver_unregister(&mxc_pwm_driver);
++	platform_driver_unregister(&imx_pwm_driver);
+ }
+-module_exit(mxc_pwm_exit);
++module_exit(imx_pwm_exit);
  
- 	return 0;
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
 -- 
 1.7.9.6
