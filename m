@@ -1,70 +1,112 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 10 Apr 2012 17:37:41 -0400
-Subject: [PATCH v3 6/6] mmc: sdhci-s3c: Add device tree support
-In-Reply-To: <201203301136.05038.arnd@arndb.de> (Arnd Bergmann's message of
- "Fri, 30 Mar 2012 11:36:04 +0000")
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <201203271619.13320.arnd@arndb.de> <4F7553D1.4030008@st.com>
- <201203301136.05038.arnd@arndb.de>
-Message-ID: <87wr5ntgii.fsf@laptop.org>
+From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
+Date: Wed, 11 Apr 2012 00:13:00 +0200
+Subject: [PATCH 1/5] ARM: remove ixp23xx and ixp2000 platforms
+In-Reply-To: <201204041235.32648.arnd@arndb.de>
+References: <1333503243-7702-1-git-send-email-robherring2@gmail.com>
+ <201204041235.32648.arnd@arndb.de>
+Message-ID: <CAGzjT4ehXa5vY8+7SP-k7kMCvEDZaGGd6NzFMkSVpgp0tDkm+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Arnd,
 
-(Diff truncated to show relevant hunks.)
+Op 4 april 2012 14:35 heeft Arnd Bergmann <arnd@arndb.de> het volgende
+geschreven:
+> On Wednesday 04 April 2012, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> ixp2xxx platforms have had no real changes since ~2006 and the maintainer
+>> has said on irc that they can be removed:
+>>
+>> 13:05 < nico> do you still care about ixp2000?
+>> 13:22 < lennert> not really, no
+>> 13:58 < nico> do you think we could remove it from the kernel tree?
+>> 14:01 < lennert> go for it, and remove ixp23xx too while you're at it
+>>
+>> Removing will help simplify ARM consolidation in general and PCI re-work
+>> specifically.
+>
+> This will let us kill another bit of ugly code:
+> 8<-----
+> [PATCH] net: cs89x0: remove ixp2xxx specific hacks
+>
+> The IXDP2351 and IXDP2X01 machines are getting removed from the kernel, so there
+> is no longer a need to special-case them in the cs89x0 driver.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> ?drivers/net/ethernet/cirrus/cs89x0.c | ? 36 ----------------------------------
+> ?1 files changed, 0 insertions(+), 36 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
+> index b9406cb..6b92080 100644
+> --- a/drivers/net/ethernet/cirrus/cs89x0.c
+> +++ b/drivers/net/ethernet/cirrus/cs89x0.c
+> @@ -173,21 +173,11 @@ static char version[] __initdata =
+> ?/* The cs8900 has 4 IRQ pins, software selectable. cs8900_irq_map maps
+> ? ?them to system IRQ numbers. This mapping is card specific and is set to
+> ? ?the configuration of the Cirrus Eval board for this chip. */
+> -#if defined(CONFIG_MACH_IXDP2351)
+> -#define CS89x0_NONISA_IRQ
+> -static unsigned int netcard_portlist[] __used __initdata = {IXDP2351_VIRT_CS8900_BASE, 0};
+> -static unsigned int cs8900_irq_map[] = {IRQ_IXDP2351_CS8900, 0, 0, 0};
+> -#elif defined(CONFIG_ARCH_IXDP2X01)
+> -#define CS89x0_NONISA_IRQ
+> -static unsigned int netcard_portlist[] __used __initdata = {IXDP2X01_CS8900_VIRT_BASE, 0};
+> -static unsigned int cs8900_irq_map[] = {IRQ_IXDP2X01_CS8900, 0, 0, 0};
+> -#else
+> ?#ifndef CONFIG_CS89x0_PLATFORM
+> ?static unsigned int netcard_portlist[] __used __initdata =
+> ? ?{ 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
+> ?static unsigned int cs8900_irq_map[] = {10,11,12,5};
+> ?#endif
+> -#endif
+>
+> ?#if DEBUGGING
+> ?static unsigned int net_debug = DEBUGGING;
+> @@ -345,31 +335,6 @@ out:
+> ?#endif
+> ?#endif
+>
+> -#if defined(CONFIG_MACH_IXDP2351)
+> -static u16
+> -readword(unsigned long base_addr, int portno)
+> -{
+> - ? ? ? return __raw_readw(base_addr + (portno << 1));
+> -}
+> -
+> -static void
+> -writeword(unsigned long base_addr, int portno, u16 value)
+> -{
+> - ? ? ? __raw_writew(value, base_addr + (portno << 1));
+> -}
+> -#elif defined(CONFIG_ARCH_IXDP2X01)
+> -static u16
+> -readword(unsigned long base_addr, int portno)
+> -{
+> - ? ? ? return __raw_readl(base_addr + (portno << 1));
+> -}
+> -
+> -static void
+> -writeword(unsigned long base_addr, int portno, u16 value)
+> -{
+> - ? ? ? __raw_writel(value, base_addr + (portno << 1));
+> -}
+> -#else
+> ?static u16
+> ?readword(unsigned long base_addr, int portno)
+> ?{
+> @@ -381,7 +346,6 @@ writeword(unsigned long base_addr, int portno, u16 value)
+> ?{
+> ? ? ? ?outw(value, base_addr + portno);
+> ?}
+> -#endif
+>
+> ?static void
+> ?readwords(unsigned long base_addr, int portno, void *buf, int length)
 
-On Fri, Mar 30 2012, Arnd Bergmann wrote:
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index dbd4368..90b86e5 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -15,10 +15,10 @@ Optional properties:
->  ti,dual-volt: boolean, supports dual voltage cards
->  <supply-name>-supply: phandle to the regulator device tree node
->  "supply-name" examples are "vmmc", "vmmc_aux" etc
-> -ti,bus-width: Number of data lines, default assumed is 1 if the property is missing.
-> +bus-width: Number of data lines, default assumed is 1 if the property is missing.
->  cd-gpios: GPIOs for card detection
->  wp-gpios: GPIOs for write protection
-> -ti,non-removable: non-removable slot (like eMMC)
-> +non-removable: non-removable slot (like eMMC)
->  ti,needs-special-reset: Requires a special softreset sequence
->  
->  Example:
-> @@ -27,7 +27,7 @@ Example:
->  		reg = <0x4809c000 0x400>;
->  		ti,hwmods = "mmc1";
->  		ti,dual-volt;
-> -		ti,bus-width = <4>;
-> +		bus-width = <4>;
->  		vmmc-supply = <&vmmc>; /* phandle to regulator node */
->  		ti,non-removable;
->  	};
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 47adb16..ae48fc7 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1766,7 +1766,7 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
->  		pdata->slots[0].nonremovable = true;
->  		pdata->slots[0].no_regulator_off_init = true;
->  	}
-> -	of_property_read_u32(np, "ti,bus-width", &bus_width);
-> +	of_property_read_u32(np, "bus-width", &bus_width);
->  	if (bus_width == 4)
->  		pdata->slots[0].caps |= MMC_CAP_4_BIT_DATA;
->  	else if (bus_width == 8)
+You can now also remove all the uses of CS89x0_NONISA_IRQ, since those
+are only used for the IXDP specific parts of the CS89x0 driver.
 
-Here you change "ti,non-removable" to "non-removable" in the properties
-section of ti-omap-hsmmc.txt without changing it in the example section
-of that document, or in the code or shipped .dts files.
-
-(Presumably you decided to preserve it for backwards compatibility, so
-the bindings documentation shouldn't be changed.)
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Regards
+  Jaccon
