@@ -1,113 +1,110 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Apr 2012 10:26:29 +0100
-Subject: [PATCH 1/7] ARM: ux500: New DT:ed snowball_platform_devs for
- one-by-one device enablement
-In-Reply-To: <CACRpkdYVxQjJCQO3YY9=Orv-vLJJBzs4APPhCMHjR-3AGAbshg@mail.gmail.com>
-References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
- <1333619748-16126-2-git-send-email-lee.jones@linaro.org>
- <CACRpkdYVxQjJCQO3YY9=Orv-vLJJBzs4APPhCMHjR-3AGAbshg@mail.gmail.com>
-Message-ID: <4F83FCC5.9040103@linaro.org>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Tue, 10 Apr 2012 11:26:59 +0200
+Subject: [PATCH 1/2] Visstrim_M10: Add board version detection.
+Message-ID: <1334050019-21549-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/12 10:03, Linus Walleij wrote:
-> On Thu, Apr 5, 2012 at 11:55 AM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> During Device Tree enablement it is necessary to remove
->> snowball_<device>* platform_data segments one at at time,
->> as and when particular devices are DT enabled. This patch
->> provides a temporary solution. Once this new struct is
->> empty it will be removed again.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->
-> This is not exactly elegant and I cannot quite see how the pieces
-> fit together.
->
->> ---
->>   arch/arm/mach-ux500/board-mop500.c |   18 ++++++++++++++++--
->>   1 files changed, 16 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
->> index 77d03c1..29e0ade 100644
->> --- a/arch/arm/mach-ux500/board-mop500.c
->> +++ b/arch/arm/mach-ux500/board-mop500.c
->> @@ -609,6 +609,13 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
->>         &ab8500_device,
->>   };
->>
->> +static struct platform_device *snowball_of_platform_devs[] __initdata = {
->> +&snowball_led_dev,
->> +&snowball_key_dev,
->> +&snowball_sbnet_dev,
->> +&ab8500_device,
->> +};
->
-> So above this array is an identical array which is going to become
-> unused, then why
-> not just rename the other array with _of_ or just skip the whole
-> business altogether?
+Visstrim_M10 boards have 3 gpios to detect the
+expansion board version attached and other 3 to
+detect the motherboard revision.
 
-Eh? No, that won't help. The other array needs to be kept fully intact 
-for non-DT boots. The idea is that each element from the DT array will 
-be removed sequentially as they are DT enabled. For instance, I already 
-have a patch with enables the SMSC911x chip, which also removes the 
-&snowball_sbnet_dev entry. After that something else will be enabled and 
-its cohort will be subsequently removed too. Only when all these devices 
-have been DT enabled can the struct be removed.
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   55 +++++++++++++++++++++++++++
+ 1 files changed, 55 insertions(+), 0 deletions(-)
 
->> +
->>   static void __init mop500_init_machine(void)
->>   {
->>         struct device *parent = NULL;
->> @@ -786,8 +793,15 @@ static void __init u8500_init_machine(void)
->>                 mop500_sdi_init(parent);
->>         } else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
->>                 snowball_pins_init();
->> -               platform_add_devices(snowball_platform_devs,
->> -                               ARRAY_SIZE(snowball_platform_devs));
->
-> So first you remove ths use of that array...
->
->> +
->> +               /* Devices to be DT:ed:
->> +                    snowball_led_dev   = todo
->> +                    snowball_key_dev   = todo
->> +                    snowball_sbnet_dev = todo
->> +                    ab8500_device      = todo
->> +               */
->
-> /*
->   * Comment style
->   */
-
-No problem, I'll fix that.
-
->> +               platform_add_devices(snowball_of_platform_devs,
->> +                               ARRAY_SIZE(snowball_of_platform_devs));
->
-> And insert an identical array?
->
-> The only change is that you now have an *unused* array with all it's
-> parents set and then an array with all parents set to NULL which you
-> use. I don't get it ...
-
-Nothing is unused. When DT is disabled snowball_platform_devs will be 
-used to add the platform devices. This is, and will remain fully 
-populated for non-DT boots. The DT'ed version will decrease in size 
-until the final element is removed along with the definition.
-
-I have ran this past Arnd, who thought this was a good idea. It's only a 
-temporary solution which well aide us in enabling devices spanned over 
-multiple submissions, rather than attempting to enable everything in a 
-single patch-set - which isn't going to happen.
-
-Kind regards,
-Lee
-
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index f9aa657..adbadf1 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -38,6 +38,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
++#include <asm/system.h>
+ #include <mach/common.h>
+ #include <mach/iomux-mx27.h>
+ 
+@@ -48,6 +49,14 @@
+ #define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
+ #define SDHC1_IRQ IRQ_GPIOB(25)
+ 
++#define MOTHERBOARD_BIT2	(GPIO_PORTD + 31)
++#define MOTHERBOARD_BIT1	(GPIO_PORTD + 30)
++#define MOTHERBOARD_BIT0	(GPIO_PORTD + 29)
++
++#define EXPBOARD_BIT2		(GPIO_PORTD + 25)
++#define EXPBOARD_BIT1		(GPIO_PORTD + 27)
++#define EXPBOARD_BIT0		(GPIO_PORTD + 28)
++
+ static const int visstrim_m10_pins[] __initconst = {
+ 	/* UART1 (console) */
+ 	PE12_PF_UART1_TXD,
+@@ -119,6 +128,23 @@ static const int visstrim_m10_pins[] __initconst = {
+ 	PB19_PF_CSI_D7,
+ 	PB20_PF_CSI_VSYNC,
+ 	PB21_PF_CSI_HSYNC,
++	/* mother board version */
++	MOTHERBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
++	MOTHERBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
++	MOTHERBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
++	/* expansion board version */
++	EXPBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
++	EXPBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
++	EXPBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
++};
++
++static struct gpio visstrim_m10_version_gpios[] = {
++	{ EXPBOARD_BIT0, GPIOF_IN, "exp-version-0" },
++	{ EXPBOARD_BIT1, GPIOF_IN, "exp-version-1" },
++	{ EXPBOARD_BIT2, GPIOF_IN, "exp-version-2" },
++	{ MOTHERBOARD_BIT0, GPIOF_IN, "mother-version-0" },
++	{ MOTHERBOARD_BIT1, GPIOF_IN, "mother-version-1" },
++	{ MOTHERBOARD_BIT2, GPIOF_IN, "mother-version-2" },
+ };
+ 
+ /* Camera */
+@@ -399,11 +425,40 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
+ 	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
+ };
+ 
++static void __init visstrim_m10_revision(void)
++{
++	int exp_version = 0;
++	int mo_version = 0;
++	int ret;
++
++	ret = gpio_request_array(visstrim_m10_version_gpios,
++				 ARRAY_SIZE(visstrim_m10_version_gpios));
++	if (ret) {
++		pr_err("Failed to request version gpios");
++		return;
++	}
++
++	/* Get expansion board version (negative logic) */
++	exp_version |= !gpio_get_value(EXPBOARD_BIT2) << 2;
++	exp_version |= !gpio_get_value(EXPBOARD_BIT1) << 1;
++	exp_version |= !gpio_get_value(EXPBOARD_BIT0);
++
++	/* Get mother board version (negative logic) */
++	mo_version |= !gpio_get_value(MOTHERBOARD_BIT2) << 2;
++	mo_version |= !gpio_get_value(MOTHERBOARD_BIT1) << 1;
++	mo_version |= !gpio_get_value(MOTHERBOARD_BIT0);
++
++	system_rev = 0x27000;
++	system_rev |= (mo_version << 4);
++	system_rev |= exp_version;
++}
++
+ static void __init visstrim_m10_board_init(void)
+ {
+ 	int ret;
+ 
+ 	imx27_soc_init();
++	visstrim_m10_revision();
+ 
+ 	ret = mxc_gpio_setup_multiple_pins(visstrim_m10_pins,
+ 			ARRAY_SIZE(visstrim_m10_pins), "VISSTRIM_M10");
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.0.4
