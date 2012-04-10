@@ -1,33 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Apr 2012 09:47:02 +0100
-Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <20120410083543.GC3149@opensource.wolfsonmicro.com>
-References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20120406074942.GO7264@S2101-09.ap.freescale.net>
- <20120410083130.GK24211@n2100.arm.linux.org.uk>
- <20120410083543.GC3149@opensource.wolfsonmicro.com>
-Message-ID: <20120410084702.GM24211@n2100.arm.linux.org.uk>
+From: domenico.andreoli@tomtom.com (Domenico Andreoli)
+Date: Tue, 10 Apr 2012 10:48:33 +0200
+Subject: [PATCH] ARM: fix amba_get_enable_vcore()'s handling of probe deferral
+Message-ID: <20120410084833.GA13120@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 09:35:43AM +0100, Mark Brown wrote:
-> On Tue, Apr 10, 2012 at 09:31:30AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Apr 06, 2012 at 03:49:45PM +0800, Shawn Guo wrote:
-> > > I believe this patch fixes the amba probe failure that impacts any
-> > > AMBA platform build with CONFIG_REGULATOR enabled.  Could you consider
-> > > to send the fix for -rc soon?
-> 
-> > No idea.  I don't have Mark's patch in the patch system.
-> 
-> It's there as far as I can tell - it's 7366/1, which is visible in the
-> web interface at:
-> 
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7366/1
-> 
-> Is there something else I need to do?
+From: Domenico Andreoli <domenico.andreoli@linux.com>
 
-Ok, I thought 7366/1 and 7367/1 were part of the same looking at just the
-index.
+With v3.4-rc1 my board's console started to have problems. earlyprintk
+revealed that the PL011 serial driver deferred the initialization and
+never attempted it again. This resulted in console not being bound to
+any physical device.
 
-In any case, what would really help is if people would discard patches
-they no longer want applying.
+The error in probing the serial was due to amba_get_enable_vcore()
+not ignoring the -EPROBE_DEFER got from regulator_get(), which has
+been recently updated to ask for probe deferral in case the regulator
+is not available (yet).
+
+This fix makes amba_get_enable_vcore() consistently handle the new
+-EPROBE_DEFER error case.
+
+Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+
+---
+ drivers/amba/bus.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: b/drivers/amba/bus.c
+===================================================================
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -363,7 +363,7 @@ static int amba_get_enable_vcore(struct
+ 
+ 	if (IS_ERR(vcore)) {
+ 		/* It is OK not to supply a vcore regulator */
+-		if (PTR_ERR(vcore) == -ENODEV)
++		if (PTR_ERR(vcore) == -EPROBE_DEFER)
+ 			return 0;
+ 		return PTR_ERR(vcore);
+ 	}
