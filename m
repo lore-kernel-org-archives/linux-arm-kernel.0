@@ -1,20 +1,28 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 10 Apr 2012 14:48:26 +0530
-Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
-In-Reply-To: <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
-References: <4F793C56.2030605@st.com>
- <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
- <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
-Message-ID: <4F83FAE2.8020107@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Apr 2012 10:22:14 +0100
+Subject: Bug in v7_coherent_kern_range() ?
+In-Reply-To: <4F7E646D.6000302@freescale.com>
+References: <4F77C9A6.6080601@freescale.com>
+ <20120402111240.GG19011@mudshark.cambridge.arm.com>
+ <4F7E646D.6000302@freescale.com>
+Message-ID: <20120410092214.GA2620@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/10/2012 2:12 PM, Linus Walleij wrote:
-> Will there be conflicts between this patch set and the stuff you're
-> submitting for pinctrl? Or is it just runtime problems?
+On Fri, Apr 06, 2012 at 04:35:09AM +0100, Huang Shijie wrote:
+> >
+> > http://lists.arm.linux.org.uk/lurker/message/20111107.173344.f738392e.en.html
+> I tested this patch.  It fixed this bug. This bug did not occur any more.
+> But my system still hung at futex. I think the futex issue is another 
+> bug.(will this patch affect the futex?)
 
-Yes. There will be conflicts. I have touched dts files in pinctrl patches
-that got added in this patchset.
+If you're on an SMP system, can you check that you have df77abca ("ARM:
+7099/1: futex: preserve oldval in SMP __futex_atomic_op") applied?
 
--- 
-viresh
+> So :
+> Tested-by: Huang Shijie <b32955@freescale.com>
+
+Ok, thanks. It looks that has briefly revived the discussion over there at
+least.
+
+Will
