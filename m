@@ -1,9 +1,9 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:19 +0200
-Subject: [PATCH 06/40] video imxfb: do not depend on grouped clocks
+Date: Tue, 10 Apr 2012 15:45:23 +0200
+Subject: [PATCH 10/40] serial i.MX: do not depend on grouped clocks
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-11-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,119 +23,95 @@ are converted to the generic clock framework
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/video/imxfb.c |   50 ++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 35 insertions(+), 15 deletions(-)
+ drivers/tty/serial/imx.c |   38 +++++++++++++++++++++++---------------
+ 1 file changed, 23 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index f135dbe..caad368 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -131,7 +131,9 @@ struct imxfb_rgb {
- struct imxfb_info {
- 	struct platform_device  *pdev;
- 	void __iomem		*regs;
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index e7fecee..267ec6d 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -204,7 +204,8 @@ struct imx_port {
+ 	unsigned int		irda_inv_rx:1;
+ 	unsigned int		irda_inv_tx:1;
+ 	unsigned short		trcv_delay; /* transceiver delay */
 -	struct clk		*clk;
 +	struct clk		*clk_ipg;
-+	struct clk		*clk_ahb;
 +	struct clk		*clk_per;
+ 	struct imx_uart_data	*devdata;
+ };
  
- 	/*
- 	 * These are the addresses we mapped
-@@ -340,7 +342,7 @@ static int imxfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
- 
- 	pr_debug("var->bits_per_pixel=%d\n", var->bits_per_pixel);
- 
--	lcd_clk = clk_get_rate(fbi->clk);
-+	lcd_clk = clk_get_rate(fbi->clk_per);
- 
- 	tmp = var->pixclock * (unsigned long long)lcd_clk;
- 
-@@ -455,11 +457,17 @@ static int imxfb_bl_update_status(struct backlight_device *bl)
- 
- 	fbi->pwmr = (fbi->pwmr & ~0xFF) | brightness;
- 
--	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
--		clk_enable(fbi->clk);
-+	if (bl->props.fb_blank != FB_BLANK_UNBLANK) {
-+		clk_prepare_enable(fbi->clk_ipg);
-+		clk_prepare_enable(fbi->clk_ahb);
-+		clk_prepare_enable(fbi->clk_per);
-+	}
- 	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
--	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
--		clk_disable(fbi->clk);
-+	if (bl->props.fb_blank != FB_BLANK_UNBLANK) {
-+		clk_disable_unprepare(fbi->clk_per);
-+		clk_disable_unprepare(fbi->clk_ahb);
-+		clk_disable_unprepare(fbi->clk_ipg);
-+	}
- 
- 	return 0;
- }
-@@ -522,7 +530,9 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+@@ -672,7 +673,7 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+ 	 * RFDIV is set such way to satisfy requested uartclk value
  	 */
- 	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
+ 	val = TXTL << 10 | RXTL;
+-	ufcr_rfdiv = (clk_get_rate(sport->clk) + sport->port.uartclk / 2)
++	ufcr_rfdiv = (clk_get_rate(sport->clk_per) + sport->port.uartclk / 2)
+ 			/ sport->port.uartclk;
  
--	clk_enable(fbi->clk);
-+	clk_prepare_enable(fbi->clk_ipg);
-+	clk_prepare_enable(fbi->clk_ahb);
-+	clk_prepare_enable(fbi->clk_per);
+ 	if(!ufcr_rfdiv)
+@@ -1285,7 +1286,7 @@ imx_console_get_options(struct imx_port *sport, int *baud,
+ 		else
+ 			ucfr_rfdiv = 6 - ucfr_rfdiv;
  
- 	if (fbi->backlight_power)
- 		fbi->backlight_power(1);
-@@ -539,7 +549,9 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
- 	if (fbi->lcd_power)
- 		fbi->lcd_power(0);
+-		uartclk = clk_get_rate(sport->clk);
++		uartclk = clk_get_rate(sport->clk_per);
+ 		uartclk /= ucfr_rfdiv;
  
--	clk_disable(fbi->clk);
-+	clk_disable_unprepare(fbi->clk_per);
-+	clk_disable_unprepare(fbi->clk_ipg);
-+	clk_disable_unprepare(fbi->clk_ahb);
+ 		{	/*
+@@ -1503,14 +1504,22 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 	sport->timer.function = imx_timeout;
+ 	sport->timer.data     = (unsigned long)sport;
  
- 	writel(0, fbi->regs + LCDC_RMCR);
- }
-@@ -770,10 +782,21 @@ static int __init imxfb_probe(struct platform_device *pdev)
- 		goto failed_req;
+-	sport->clk = clk_get(&pdev->dev, "uart");
+-	if (IS_ERR(sport->clk)) {
+-		ret = PTR_ERR(sport->clk);
++	sport->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
++	if (IS_ERR(sport->clk_ipg)) {
++		ret = PTR_ERR(sport->clk_ipg);
+ 		goto unmap;
  	}
+-	clk_prepare_enable(sport->clk);
  
--	fbi->clk = clk_get(&pdev->dev, NULL);
--	if (IS_ERR(fbi->clk)) {
--		ret = PTR_ERR(fbi->clk);
--		dev_err(&pdev->dev, "unable to get clock: %d\n", ret);
-+	fbi->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(fbi->clk_ipg)) {
-+		ret = PTR_ERR(fbi->clk_ipg);
-+		goto failed_getclock;
+-	sport->port.uartclk = clk_get_rate(sport->clk);
++	sport->clk_per = devm_clk_get(&pdev->dev, "per");
++	if (IS_ERR(sport->clk_per)) {
++		ret = PTR_ERR(sport->clk_per);
++		goto unmap;
 +	}
 +
-+	fbi->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(fbi->clk_ahb)) {
-+		ret = PTR_ERR(fbi->clk_ahb);
-+		goto failed_getclock;
-+	}
++	clk_prepare_enable(sport->clk_per);
++	clk_prepare_enable(sport->clk_ipg);
 +
-+	fbi->clk_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(fbi->clk_per)) {
-+		ret = PTR_ERR(fbi->clk_per);
- 		goto failed_getclock;
- 	}
++	sport->port.uartclk = clk_get_rate(sport->clk_per);
  
-@@ -858,7 +881,6 @@ failed_platform_init:
- failed_map:
- 	iounmap(fbi->regs);
- failed_ioremap:
--	clk_put(fbi->clk);
- failed_getclock:
- 	release_mem_region(res->start, resource_size(res));
- failed_req:
-@@ -895,8 +917,6 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
+ 	imx_ports[sport->port.line] = sport;
  
- 	iounmap(fbi->regs);
- 	release_mem_region(res->start, resource_size(res));
--	clk_disable(fbi->clk);
--	clk_put(fbi->clk);
+@@ -1531,8 +1540,8 @@ deinit:
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(pdev);
+ clkput:
+-	clk_disable_unprepare(sport->clk);
+-	clk_put(sport->clk);
++	clk_disable_unprepare(sport->clk_per);
++	clk_disable_unprepare(sport->clk_ipg);
+ unmap:
+ 	iounmap(sport->port.membase);
+ free:
+@@ -1550,11 +1559,10 @@ static int serial_imx_remove(struct platform_device *pdev)
  
  	platform_set_drvdata(pdev, NULL);
  
+-	if (sport) {
+-		uart_remove_one_port(&imx_reg, &sport->port);
+-		clk_disable_unprepare(sport->clk);
+-		clk_put(sport->clk);
+-	}
++	uart_remove_one_port(&imx_reg, &sport->port);
++
++	clk_disable_unprepare(sport->clk_per);
++	clk_disable_unprepare(sport->clk_ipg);
+ 
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(pdev);
 -- 
 1.7.9.5
