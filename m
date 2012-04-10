@@ -1,27 +1,38 @@
-From: psandeep.s@gmail.com (Sandeep Patil)
-Date: Tue, 10 Apr 2012 10:19:56 -0700
-Subject: [PATCHv24 00/16] Contiguous Memory Allocator
-In-Reply-To: <alpine.DEB.2.00.1204101528390.9354@kernel.research.nokia.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
- <alpine.DEB.2.00.1204101528390.9354@kernel.research.nokia.com>
-Message-ID: <CA+K6fF5TbhYX_XYXL33h5s8cnSogSna4Cq2-vM4MfX4igSyozg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 10 Apr 2012 10:22:27 -0700
+Subject: [PATCH] gpio: samsung: refactor gpiolib init for exynos4/5
+In-Reply-To: <1333913007-16032-1-git-send-email-olof@lixom.net>
+References: <1333913007-16032-1-git-send-email-olof@lixom.net>
+Message-ID: <4F846C53.1070407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> This is (yet another) update of CMA patches.
+Olof Johansson wrote:
+> Only code move, no functional change.
 >
+> Main reason to do this was to get rid of the warnings:
 >
-> How well CMA is supposed to work if you have mlocked processes? I've
-> been testing these patches, and noticed that by creating a small mlocked
-> process you start to get plenty of test_pages_isolated() failure warnings,
-> and bigger allocations will always fail.
+> drivers/gpio/gpio-samsung.c: In function 'samsung_gpiolib_init':
+> drivers/gpio/gpio-samsung.c:2974:1: warning: label 'err_ioremap4' defined but not used [-Wunused-label]
+> drivers/gpio/gpio-samsung.c:2722:47: warning: unused variable 'gpio_base4' [-Wunused-variable]
+>
+> without adding more ifdef mess.
+>
+> I think this whole file would do well being coverted over to a platform
+> driver and moving most of the tables out to SoC code and/or device trees,
+> but since that changes init ordering it needs to be done with some care,
+> i.e. not at this time.
+>
+> Signed-off-by: Olof Johansson<olof@lixom.net>
 
-CMIIW, I think mlocked pages are never migrated. The reason is because
-__isolate_lru_pages() does not isolate Unevictable pages right now.
+Looks ok to me :)
 
-Minchan added support to allow this but the patch was dropped.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-See the discussion at : https://lkml.org/lkml/2011/8/29/295
+Thanks.
 
-Sandeep
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
