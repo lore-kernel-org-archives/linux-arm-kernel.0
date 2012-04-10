@@ -1,38 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:26 +0200
-Subject: [PATCH 13/40] w1 i.MX: prepare/unprepare clock
-In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-14-git-send-email-s.hauer@pengutronix.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 10 Apr 2012 10:12:36 -0400
+Subject: [PATCH 1/3] ARM i.MX27: Add devicetree support
+In-Reply-To: <20120410091715.GA3852@pengutronix.de> (Sascha Hauer's message of
+ "Tue, 10 Apr 2012 11:17:15 +0200")
+References: <1330503654-2197-1-git-send-email-s.hauer@pengutronix.de>
+ <1330503654-2197-2-git-send-email-s.hauer@pengutronix.de>
+ <87lim5zne5.fsf@laptop.org> <20120410091715.GA3852@pengutronix.de>
+Message-ID: <87iph7wu97.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/w1/masters/mxc_w1.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Hi,
 
-diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
-index a3b6a74..1cc61a7 100644
---- a/drivers/w1/masters/mxc_w1.c
-+++ b/drivers/w1/masters/mxc_w1.c
-@@ -138,7 +138,7 @@ static int __devinit mxc_w1_probe(struct platform_device *pdev)
- 		goto failed_ioremap;
- 	}
- 
--	clk_enable(mdev->clk);
-+	clk_prepare_enable(mdev->clk);
- 	__raw_writeb(mdev->clkdiv, mdev->regs + MXC_W1_TIME_DIVIDER);
- 
- 	mdev->bus_master.data = mdev;
-@@ -178,7 +178,7 @@ static int __devexit mxc_w1_remove(struct platform_device *pdev)
- 
- 	iounmap(mdev->regs);
- 	release_mem_region(res->start, resource_size(res));
--	clk_disable(mdev->clk);
-+	clk_disable_unprepare(mdev->clk);
- 	clk_put(mdev->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
+On Tue, Apr 10 2012, Sascha Hauer wrote:
+> On Sun, Apr 08, 2012 at 09:48:02PM -0400, Chris Ball wrote:
+>> >
+>> > [...]
+>> > +static int __init imx27_avic_add_irq_domain(struct device_node *np,
+>> > +				struct device_node *interrupt_parent)
+>> > +{
+>> > +	irq_domain_add_simple(np, 0);
+>> > +	return 0;
+>> > +}
+>> > +
+>> > +static int __init imx27_gpio_add_irq_domain(struct device_node *np,
+>> > +				struct device_node *interrupt_parent)
+>> > +{
+>> > +	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
+>> > +
+>> > +	irq_domain_add_simple(np, gpio_irq_base);
+>> > +
+>> > +	return 0;
+>> > +}
+>> 
+>> This patch was merged for 3.4-rc1, but it fails to compile because Grant
+>> removed irq_domain_add_simple() in 3.4-rc1.
+>
+> Thanks for noting. I assume that irq_domain_add_legacy is the right
+> approach here, just like the other i.MX boards do, right?
+
+Yeah, if you look at Grant's removal patch:
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=6b783f7c5dde2648fa0bbe7fc8ac80d78699e67f
+
+.. he converted all of the in-tree uses to irq_domain_add_legacy()
+at the time of removal, so that looks right.
+
+Thanks,
+
+- Chris.
 -- 
-1.7.9.5
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
