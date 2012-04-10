@@ -1,25 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 10 Apr 2012 14:22:34 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: DT: do not add a zero-sized memory property
-In-Reply-To: <1334080601-14339-2-git-send-email-marc.zyngier@arm.com>
-References: <1334080601-14339-1-git-send-email-marc.zyngier@arm.com>
- <1334080601-14339-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.LFD.2.02.1204101421510.16314@xanadu.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 10 Apr 2012 11:59:13 -0700
+Subject: [PATCH 25/40] ARM: imx: add common clock support for clk busy
+In-Reply-To: <1334065553-7565-26-git-send-email-s.hauer@pengutronix.de>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-26-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4F848301.4080607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Apr 2012, Marc Zyngier wrote:
+On 04/10/12 06:45, Sascha Hauer wrote:
+> +static int clk_busy_wait(void __iomem *reg, u8 shift)
+> +{
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(10);
+> +
+> +	while (readl_relaxed(reg) & (1 << shift))
+> +		if (time_after(jiffies, timeout))
+> +			return -ETIMEDOUT;
+> +
+> +	return 0;
+> +}
 
-> Some bootloaders are broken enough to expose an ATAG_MEM with
-> a null size. Converting such tag to a memory node leads to
-> an unbootable system.
-> 
-> Skip over zero sized ATAG_MEM to avoid this situation.
-> 
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+MSM also has a bit to poll to see if a clock is enabled or not, similar
+to this rate switch complete bit. Would it make sense to have another
+few clock ops like wait_for_enable(), wait_for_rate(),
+wait_for_disable()? Then you should be able to copy the basic divider
+ops and assign the wait ops and avoid the wrappers.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Also, why are these drivers in arch/arm? Shouldn't we be putting all
+clock drivers into drivers/clk/ now?
 
-
-Nicolas
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
