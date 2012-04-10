@@ -1,40 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 10 Apr 2012 08:36:56 -0500
-Subject: COMMON_CLK_DISABLE_UNUSED
-In-Reply-To: <CAJOA=zP8XFTN1mcAyUky3ovrx4Dg1zb9zaB5r8zUYE46Ec-tMQ@mail.gmail.com>
-References: <20120409222903.GA31622@lunn.ch>
- <CAJOA=zP8XFTN1mcAyUky3ovrx4Dg1zb9zaB5r8zUYE46Ec-tMQ@mail.gmail.com>
-Message-ID: <4F843778.8050506@gmail.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Tue, 10 Apr 2012 19:10:44 +0530
+Subject: [PATCH 0/2] OMAP2+: UART: Fix usage of default mux pads
+Message-ID: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2012 06:04 PM, Turquette, Mike wrote:
-> On Mon, Apr 9, 2012 at 3:29 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> I think it would be good to consider deleting this config option and
->> just have the code always enabled.
-> 
-> I agree.  We already support the CLK_IGNORE_UNUSED flag, so any
-> platforms that don't want this functionality wholesale can set that
-> bit for every clock.
-> 
-> I'll pull out that option.
-> 
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-CLK_IGNORE_UNUSED looks a bit broken to me. If you don't have the flag
-set on the whole chain of parents, then a parent could be turned off.
-This could happen at boot time or when another child get disabled and
-the common parent's ref count goes to 0 and gets disabled.
+We populating default uart mux pins if no mux data is provided
+by board files. But were not probing the availability of uart pins
+in tx/rx mode i.e. mux mode0. If particular pin is used for any other
+purpose then default pads were breaking those peripherals e.g. uart2
+pin was used as gpio nreset pin ehci on beagle board.
 
-I think a better solution would be a force enable or enable on boot flag
-that sets ref counts correctly. Otherwise, each platform has to call
-clk_prepare and clk_enable for all the clocks it wants to keep on.
+So remove the default adding procedure and probe the pins before
+using them as uart pins. Determine if uart pins are used in uart mux_mode0
+then configure rx pin for wakeup capability.
 
-Here's a simple case that needs work. You have a cpu clock controlled by
-cpufreq driver. If the cpufreq driver is not loaded, we want the cpu
-clock always enabled and don't want the clk infrastructure turning it
-off. If the cpufreq driver is loaded, then we potentially want it to be
-able to enable and disable the cpu clock if we switch parents. I guess
-the easiest solution is the cpufreq driver needs to assume the cpu clock
-is already enabled with a ref count of 1.
+Testing updates:
+Boot tested on 3430SDP
+Tested on beagle-xm with ehci module which needs uart pin muxed as gpio
+line for nreset sequence.
 
-Rob
+RX pad wakeup after enabling off mode in cpu_idle path and suspend path
+tested - 3430SDP & Beagle-XM
+
+Govindraj.R (2):
+  OMAP2+: UART: Fix incorrect population of default uart pads
+  OMAP2+: UART: Add mechanism to probe uart pins and configure rx
+    wakeup
+
+ arch/arm/mach-omap2/mux.c    |    3 +-
+ arch/arm/mach-omap2/mux.h    |   10 +++
+ arch/arm/mach-omap2/serial.c |  164 +++++++++++++-----------------------------
+ 3 files changed, 61 insertions(+), 116 deletions(-)
+
+-- 
+1.7.9
