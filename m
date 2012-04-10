@@ -1,125 +1,67 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 10 Apr 2012 16:26:33 +0530
-Subject: [PATCHv6 15/19] I2C: OMAP: make the read ready processing a separate
- function
+Date: Tue, 10 Apr 2012 16:26:30 +0530
+Subject: [PATCHv6 12/19] I2C: OMAP: Fix the crash in i2c remove
 In-Reply-To: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334055397-899-16-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334055397-899-13-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Makes the read ready processing a separate
-function. This is to avoid extremely long level of indentation.
+    In omap_i2c_remove we are accessing the I2C_CON register without
+    enabling the clocks. Fix the same by enabling the clocks and disabling
+    it.
+    This fixes the following crash.
+    [  154.723022] ------------[ cut here ]------------
+    [  154.725677] WARNING: at arch/arm/mach-omap2/omap_l3_noc.c:112 l3_interrupt_handler+0x1b4/0x1c4()
+    [  154.725677] L3 custom error: MASTER:MPU TARGET:L4 PER2
+    [  154.742614] Modules linked in: i2c_omap(-)
+    [  154.746948] Backtrace:
+    [  154.746948] [<c0013078>] (dump_backtrace+0x0/0x110) from [<c026c158>] (dump_stack+0x18/0x1c)
+    [  154.752716]  r6:00000070 r5:c002c43c r4:df9b9e98 r3:df9b8000
+    [  154.764465] [<c026c140>] (dump_stack+0x0/0x1c) from [<c0041a2c>] (warn_slowpath_common+0x5c/0x6c)
+    [  154.768341] [<c00419d0>] (warn_slowpath_common+0x0/0x6c) from [<c0041ae0>] (warn_slowpath_fmt+0x38/0x40)
+    [  154.776153]  r8:00000180 r7:c0361594 r6:c0379b48 r5:00080003 r4:e0838b00
+    [  154.790771] r3:00000009
+    [  154.791778] [<c0041aa8>] (warn_slowpath_fmt+0x0/0x40) from [<c002c43c>] (l3_interrupt_handler+0x1b4/0x1c4)
+    [  154.803710]  r3:c0361598 r2:c02ef74c
+    [  154.807403] [<c002c288>] (l3_interrupt_handler+0x0/0x1c4) from [<c0085f44>] (handle_irq_event_percpu+0x58/0
+    [  154.818237]  r8:0000002a r7:00000000 r6:00000000 r5:df808054 r4:df8893c0
+    [  154.825378] [<c0085eec>] (handle_irq_event_percpu+0x0/0x188) from [<c00860b8>] (handle_irq_event+0x44/0x64)
+    [  154.835662] [<c0086074>] (handle_irq_event+0x0/0x64) from [<c0088ec0>] (handle_fasteoi_irq+0xa4/0x10c)
+    [  154.845458]  r6:0000002a r5:df808054 r4:df808000 r3:c034a150
+    [  154.846466] [<c0088e1c>] (handle_fasteoi_irq+0x0/0x10c) from [<c0085ed0>] (generic_handle_irq+0x30/0x38)
+    [  154.854278]  r5:c034aa48 r4:0000002a
+    [  154.862091] [<c0085ea0>] (generic_handle_irq+0x0/0x38) from [<c000fd38>] (handle_IRQ+0x60/0xc0)
+    [  154.874450]  r4:c034ea70 r3:000001f8
+    [  154.878234] [<c000fcd8>] (handle_IRQ+0x0/0xc0) from [<c0008478>] (gic_handle_irq+0x20/0x5c)
+    [  154.887023]  r7:ffffff40 r6:df9b9fb0 r5:c034e2b4 r4:0000001a
+    [  154.887054] [<c0008458>] (gic_handle_irq+0x0/0x5c) from [<c000ea80>] (__irq_usr+0x40/0x60)
+    [  154.901153] Exception stack(0xdf9b9fb0 to 0xdf9b9ff8)
+    [  154.907104] 9fa0:                                     beaf1f04 4006be00 0000000f 0000000c
+    [  154.915710] 9fc0: 4006c000 00000000 00008034 ffffff40 00000007 00000000 00000000 0007b8d7
+    [  154.916778] 9fe0: 00000000 beaf1b68 0000d23c 4005baf0 80000010 ffffffff
+    [  154.931335]  r6:ffffffff r5:80000010 r4:4005baf0 r3:beaf1f04
+    [  154.937316] ---[ end trace 1b75b31a2719ed21 ]--
 
+Cc: <stable@vger.kernel.org>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   86 +++++++++++++++++++++-------------------
- 1 files changed, 45 insertions(+), 41 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index a5b1ec1..c113f41 100644
+index 86be475..8258597 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -784,6 +784,49 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+@@ -1134,7 +1134,9 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ 
+ 	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
++	pm_runtime_get_sync(&pdev->dev);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
++	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
  	return 0;
  }
- 
-+static int process_read_rdy(struct omap_i2c_dev *dev)
-+{
-+	u8 num_bytes = 1;
-+	u16 stat, w;
-+
-+	if (dev->errata & I2C_OMAP_ERRATA_I207)
-+		i2c_omap_errata_i207(dev, stat);
-+
-+	if (dev->fifo_size) {
-+		if (stat & OMAP_I2C_STAT_RRDY)
-+			num_bytes = dev->fifo_size;
-+		else    /* read RXSTAT on RDR interrupt */
-+			num_bytes = (omap_i2c_read_reg(dev,
-+					OMAP_I2C_BUFSTAT_REG) >> 8) & 0x3F;
-+	}
-+	while (num_bytes) {
-+		num_bytes--;
-+		w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
-+		if (dev->buf_len) {
-+			*dev->buf++ = w;
-+			dev->buf_len--;
-+			/*
-+			 * Data reg in 2430, omap3 and omap4 is 8 bit wide
-+			 */
-+			if (dev->flags & OMAP_I2C_FLAG_16BIT_DATA_REG) {
-+				if (dev->buf_len) {
-+					*dev->buf++ = w >> 8;
-+					dev->buf_len--;
-+				}
-+			}
-+		} else {
-+			if (stat & OMAP_I2C_STAT_RRDY)
-+				dev_err(dev->dev,
-+					"RRDY IRQ while no data requested\n");
-+			if (stat & OMAP_I2C_STAT_RDR)
-+				dev_err(dev->dev,
-+					"RDR IRQ while no data requested\n");
-+			return -EIO;
-+		}
-+	}
-+	return 0;
-+}
-+
- static irqreturn_t
- omap_i2c_isr(int this_irq, void *dev_id)
- {
-@@ -834,48 +877,9 @@ complete:
- 			return IRQ_HANDLED;
- 		}
- 		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
--			u8 num_bytes = 1;
--
--			if (dev->errata & I2C_OMAP_ERRATA_I207)
--				i2c_omap_errata_i207(dev, stat);
-+			if (process_read_rdy(dev) == -EIO)
-+				break;
- 
--			if (dev->fifo_size) {
--				if (stat & OMAP_I2C_STAT_RRDY)
--					num_bytes = dev->fifo_size;
--				else    /* read RXSTAT on RDR interrupt */
--					num_bytes = (omap_i2c_read_reg(dev,
--							OMAP_I2C_BUFSTAT_REG)
--							>> 8) & 0x3F;
--			}
--			while (num_bytes) {
--				num_bytes--;
--				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
--				if (dev->buf_len) {
--					*dev->buf++ = w;
--					dev->buf_len--;
--					/*
--					 * Data reg in 2430, omap3 and
--					 * omap4 is 8 bit wide
--					 */
--					if (dev->flags &
--						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
--						if (dev->buf_len) {
--							*dev->buf++ = w >> 8;
--							dev->buf_len--;
--						}
--					}
--				} else {
--					if (stat & OMAP_I2C_STAT_RRDY)
--						dev_err(dev->dev,
--							"RRDY IRQ while no data"
--								" requested\n");
--					if (stat & OMAP_I2C_STAT_RDR)
--						dev_err(dev->dev,
--							"RDR IRQ while no data"
--								" requested\n");
--					break;
--				}
--			}
- 			omap_i2c_ack_stat(dev,
- 				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
- 			continue;
 -- 
 1.7.4.1
