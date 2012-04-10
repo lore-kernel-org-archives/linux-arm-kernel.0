@@ -1,40 +1,94 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 10 Apr 2012 07:57:12 -0500
-Subject: [PATCH 3/4] clk: add DT clock binding support
-In-Reply-To: <CAOMZO5AKmnQRo4_3GVDSMUc0fMZ5orwvZSxjXfn6m-5Boew04A@mail.gmail.com>
-References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
- <1334003101-17274-4-git-send-email-robherring2@gmail.com>
- <CAOMZO5AKmnQRo4_3GVDSMUc0fMZ5orwvZSxjXfn6m-5Boew04A@mail.gmail.com>
-Message-ID: <4F842E28.8060609@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 10 Apr 2012 14:57:48 +0200
+Subject: [PATCHv8 10/10] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <201204101158.29590.arnd@arndb.de>
+References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
+ <1334055852-19500-11-git-send-email-m.szyprowski@samsung.com>
+ <201204101158.29590.arnd@arndb.de>
+Message-ID: <002d01cd1719$87ac7520$97055f60$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2012 11:27 PM, Fabio Estevam wrote:
-> On Mon, Apr 9, 2012 at 5:25 PM, Rob Herring <robherring2@gmail.com> wrote:
->> From: Grant Likely <grant.likely@secretlab.ca>
->>
->> Based on work 1st by Ben Herrenschmidt and Jeremy Kerr, then by Grant
->> Likely, this patch adds support to clk_get to allow drivers to retrieve
->> clock data from the device tree.
->>
->> Platforms scan for clocks in DT with of_clk_init and a match table, and
->> the register a provider through of_clk_add_provider. The provider's
->> clk_src_get function will be called when a device references the
->> provider's OF node for a clock reference.
->>
->> v5 (Rob Herring):
->>    - Move from drivers/of into common clock subsystem
->>    - Squashed "dt/clock: add a simple provider get function" and
->>      "dt/clock: add function to get parent clock name"
->>    - Rebase to 3.4-rc1
->>    - Drop CONFIG_OF_CLOCK and just use CONFIG_OF
->>    - Add missing EXPORT_SYMBOL to various functions
->>    - s/clock-output-name/clock-output-names/
->>    - Define that fixed-clock binding is a single output
+Hi Arnd,
+
+On Tuesday, April 10, 2012 1:58 PM Arnd Bergmann wrote:
+
+> On Tuesday 10 April 2012, Marek Szyprowski wrote:
+> > +/**
+> > + * arm_iommu_create_mapping
+> > + * @bus: pointer to the bus holding the client device (for IOMMU calls)
+> > + * @base: start address of the valid IO address space
+> > + * @size: size of the valid IO address space
+> > + * @order: accuracy of the IO addresses allocations
+> > + *
+> > + * Creates a mapping structure which holds information about used/unused
+> > + * IO address ranges, which is required to perform memory allocation and
+> > + * mapping with IOMMU aware functions.
+> > + *
+> > + * The client device need to be attached to the mapping with
+> > + * arm_iommu_attach_device function.
+> > + */
+> > +struct dma_iommu_mapping *
+> > +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+> > +                        int order)
+> > +{
+> > +       unsigned int count = size >> (PAGE_SHIFT + order);
+> > +       unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+> > +       struct dma_iommu_mapping *mapping;
+> > +       int err = -ENOMEM;
+> > +
+> > +       if (!count)
+> > +               return ERR_PTR(-EINVAL);
+> > +
+> > +       mapping = kzalloc(sizeof(struct dma_iommu_mapping), GFP_KERNEL);
+> > +       if (!mapping)
+> > +               goto err;
+> > +
+> > +       mapping->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+> > +       if (!mapping->bitmap)
+> > +               goto err2;
+> > +
+> > +       mapping->base = base;
+> > +       mapping->bits = BITS_PER_BYTE * bitmap_size;
+> > +       mapping->order = order;
+> > +       spin_lock_init(&mapping->lock);
+> > +
+> > +       mapping->domain = iommu_domain_alloc(bus);
+> > +       if (!mapping->domain)
+> > +               goto err3;
+> > +
+> > +       kref_init(&mapping->kref);
+> > +       return mapping;
+> > +err3:
+> > +       kfree(mapping->bitmap);
+> > +err2:
+> > +       kfree(mapping);
+> > +err:
+> > +       return ERR_PTR(err);
+> > +}
+> > +EXPORT_SYMBOL(arm_iommu_create_mapping);
 > 
-> The patch history should go below the --- line,
+> I don't understand this function, mostly I guess because you have not
+> provided any users. A few questions here:
+> 
+> * What is ARM specific about it that it is named arm_iommu_create_mapping?
+>   Isn't this completely generic, at least on the interface side?
+> 
+> * Why is this exported to modules? Which device drivers do you expect
+>   to call it?
+> 
+> * Why do you pass the bus_type in here? That seems like the completely
+>   wrong thing to do when all devices are on the same bus type (e.g.
+>   amba or platform) but are connected to different instances that each
+>   have their own iommu. I guess this is a question for J?rg, because the
+>   base iommu interface provides iommu_domain_alloc().
 
-No, depends who you ask, and Grant is very much in favor of retaining
-the history.
+I will soon post a patch which shows how my IOMMU aware dma-mapping 
+integrates with Samsung Exynos4 SYSMMU driver, so I will be able to answer
+all your questions by pointing to the respective lines in either IOMMU
+framework or my integration code.
 
-Rob
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
