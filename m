@@ -1,164 +1,154 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:26 +0200
-Subject: [PATCH v6 03/17] pwm: Add debugfs interface
+Date: Tue, 10 Apr 2012 17:06:32 +0200
+Subject: [PATCH v6 09/17] pwm: tegra: Add device tree support
 In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-4-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1334070400-25013-10-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a debugfs interface that can be used to list the
-current internal state of the PWM devices registered with the PWM
-framework.
+Add auxdata to instantiate the PWFM controller from a device tree,
+include the corresponding nodes in the dtsi files for Tegra 20 and
+Tegra 30 and add binding documentation.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Reviewed-by: Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
 Changes in v5:
-- new patch splitting off debugfs interface implementation
-- use seq_file's iterator interface for debugfs support
-- add missing forward declaration of struct seq_file
+- rename tegra-pwm.txt to nvidia,tegra20-pwm.txt
 
- drivers/pwm/core.c  |   90 +++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pwm.h |    6 ++++
- 2 files changed, 96 insertions(+)
+Changes in v4:
+- add DT binding documentation
+- allow nvidia,tegra20-pwm as fallback for nvidia,tegra30-pwm
+- export OF device table (for module auto-loading)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 8688754..7e13da1 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -27,6 +27,8 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- #include <linux/device.h>
-+#include <linux/debugfs.h>
-+#include <linux/seq_file.h>
+Changes in v3:
+- add missing include for mach/iomap.h
+
+ .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt |   18 ++++++++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    6 ++++++
+ arch/arm/boot/dts/tegra30.dtsi                     |    6 ++++++
+ arch/arm/mach-tegra/board-dt-tegra20.c             |    1 +
+ arch/arm/mach-tegra/board-dt-tegra30.c             |    3 +++
+ drivers/pwm/pwm-tegra.c                            |   11 +++++++++++
+ 6 files changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
+
+diff --git a/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt b/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
+new file mode 100644
+index 0000000..bbbeedb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
+@@ -0,0 +1,18 @@
++Tegra SoC PWFM controller
++
++Required properties:
++- compatible: should be one of:
++  - "nvidia,tegra20-pwm"
++  - "nvidia,tegra30-pwm"
++- reg: physical base address and length of the controller's registers
++- #pwm-cells: On Tegra the number of cells used to specify a PWM is 2. The
++  first cell specifies the per-chip index of the PWM to use and the second
++  cell is the duty cycle in nanoseconds.
++
++Example:
++
++	pwm: pwm at 7000a000 {
++		compatible = "nvidia,tegra20-pwm";
++		reg = <0x7000a000 0x100>;
++		#pwm-cells = <2>;
++	};
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 108e894..55b28fd 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -154,6 +154,12 @@
+ 		interrupts = < 0 91 0x04 >;
+ 	};
  
- #define MAX_PWMS 1024
++	pwm: pwm at 7000a000 {
++		compatible = "nvidia,tegra20-pwm";
++		reg = <0x7000a000 0x100>;
++		#pwm-cells = <2>;
++	};
++
+ 	emc at 7000f400 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 62a7b39..3fa5211 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -154,6 +154,12 @@
+ 		interrupts = < 0 91 0x04 >;
+ 	};
  
-@@ -334,3 +336,91 @@ void pwm_disable(struct pwm_device *pwm)
- 		pwm->chip->ops->disable(pwm->chip, pwm);
- }
- EXPORT_SYMBOL_GPL(pwm_disable);
++	pwm: pwm at 7000a000 {
++		compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
++		reg = <0x7000a000 0x100>;
++		#pwm-cells = <2>;
++	};
 +
-+#ifdef CONFIG_DEBUG_FS
-+static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < chip->npwm; i++) {
-+		struct pwm_device *pwm = &chip->pwms[i];
-+
-+		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
-+
-+		if (test_bit(PWMF_REQUESTED, &pwm->flags))
-+			seq_printf(s, " requested");
-+
-+		if (test_bit(PWMF_ENABLED, &pwm->flags))
-+			seq_printf(s, " enabled");
-+
-+		seq_printf(s, "\n");
-+	}
-+}
-+
-+static void *pwm_seq_start(struct seq_file *s, loff_t *pos)
-+{
-+	mutex_lock(&pwm_lock);
-+	s->private = "";
-+
-+	return seq_list_start(&pwm_chips, *pos);
-+}
-+
-+static void *pwm_seq_next(struct seq_file *s, void *v, loff_t *pos)
-+{
-+	s->private = "\n";
-+
-+	return seq_list_next(v, &pwm_chips, pos);
-+}
-+
-+static void pwm_seq_stop(struct seq_file *s, void *v)
-+{
-+	mutex_unlock(&pwm_lock);
-+}
-+
-+static int pwm_seq_show(struct seq_file *s, void *v)
-+{
-+	struct pwm_chip *chip = list_entry(v, struct pwm_chip, list);
-+
-+	seq_printf(s, "%s%s/%s, %d PWM device%s\n", (char *)s->private,
-+		   chip->dev->bus ? chip->dev->bus->name : "no-bus",
-+		   dev_name(chip->dev), chip->npwm,
-+		   (chip->npwm != 1) ? "s" : "");
-+
-+	if (chip->ops->dbg_show)
-+		chip->ops->dbg_show(chip, s);
-+	else
-+		pwm_dbg_show(chip, s);
-+
-+	return 0;
-+}
-+
-+static const struct seq_operations pwm_seq_ops = {
-+	.start = pwm_seq_start,
-+	.next = pwm_seq_next,
-+	.stop = pwm_seq_stop,
-+	.show = pwm_seq_show,
-+};
-+
-+static int pwm_seq_open(struct inode *inode, struct file *file)
-+{
-+	return seq_open(file, &pwm_seq_ops);
-+}
-+
-+static const struct file_operations pwm_debugfs_ops = {
-+	.owner = THIS_MODULE,
-+	.open = pwm_seq_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = seq_release,
-+};
-+
-+static int __init pwm_debugfs_init(void)
-+{
-+	debugfs_create_file("pwm", S_IFREG | S_IRUGO, NULL, NULL,
-+			    &pwm_debugfs_ops);
-+
-+	return 0;
-+}
-+
-+subsys_initcall(pwm_debugfs_init);
-+#endif /* CONFIG_DEBUG_FS */
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 5710391..047cd53 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -2,6 +2,7 @@
- #define __LINUX_PWM_H
- 
- struct pwm_device;
-+struct seq_file;
- 
- /*
-  * pwm_request - request a PWM device
-@@ -65,6 +66,7 @@ static inline unsigned int pwm_get_period(struct pwm_device *pwm)
-  * @config: configure duty cycles and period length for this PWM
-  * @enable: enable PWM output toggling
-  * @disable: disable PWM output toggling
-+ * @dbg_show: optional routine to show contents in debugfs
-  * @owner: helps prevent removal of modules exporting active PWMs
-  */
- struct pwm_ops {
-@@ -79,6 +81,10 @@ struct pwm_ops {
- 					  struct pwm_device *pwm);
- 	void			(*disable)(struct pwm_chip *chip,
- 					   struct pwm_device *pwm);
-+#ifdef CONFIG_DEBUG_FS
-+	void			(*dbg_show)(struct pwm_chip *chip,
-+					    struct seq_file *s);
-+#endif
- 	struct module		*owner;
+ 	sdhci at 78000000 {
+ 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+ 		reg = <0x78000000 0x200>;
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 0952494..87bdce5 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -73,6 +73,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 		       &tegra_ehci2_pdata),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB3_BASE, "tegra-ehci.2",
+ 		       &tegra_ehci3_pdata),
++	OF_DEV_AUXDATA("nvidia,tegra20-pwm", TEGRA_PWFM_BASE, "tegra-pwm", NULL),
+ 	{}
  };
  
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index 5f7c03e..5e1180f 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -33,6 +33,8 @@
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
+ 
++#include <mach/iomap.h>
++
+ #include "board.h"
+ #include "clock.h"
+ 
+@@ -51,6 +53,7 @@ struct of_dev_auxdata tegra30_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C500, "tegra-i2c.2", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C700, "tegra-i2c.3", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000D000, "tegra-i2c.4", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra30-pwm", TEGRA_PWFM_BASE, "tegra-pwm", NULL),
+ 	{}
+ };
+ 
+diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
+index 0950142..472b74e 100644
+--- a/drivers/pwm/pwm-tegra.c
++++ b/drivers/pwm/pwm-tegra.c
+@@ -239,9 +239,20 @@ static int __devexit tegra_pwm_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id tegra_pwm_of_match[] = {
++	{ .compatible = "nvidia,tegra20-pwm" },
++	{ .compatible = "nvidia,tegra30-pwm" },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(of, tegra_pwm_of_match);
++#endif
++
+ static struct platform_driver tegra_pwm_driver = {
+ 	.driver = {
+ 		.name = "tegra-pwm",
++		.of_match_table = of_match_ptr(tegra_pwm_of_match),
+ 	},
+ 	.probe = tegra_pwm_probe,
+ 	.remove = __devexit_p(tegra_pwm_remove),
 -- 
 1.7.9.6
