@@ -1,193 +1,165 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:37 +0200
-Subject: [PATCH 24/40] ARM: imx: add common clock support for pfd
+Date: Tue, 10 Apr 2012 15:45:39 +0200
+Subject: [PATCH 26/40] ARM i.MX3: Make ccm base address a variable
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-25-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-27-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+Instead of having a cpu_is_* in each ccm register access it
+is mor efficient to make it a variable.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/Makefile  |    3 +-
- arch/arm/mach-imx/clk-pfd.c |  138 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h     |    3 +
- 3 files changed, 143 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-pfd.c
+ arch/arm/mach-imx/crmregs-imx3.h |   79 +++++++++++++++++++-------------------
+ arch/arm/mach-imx/mm-imx3.c      |    6 +++
+ arch/arm/mach-imx/pm-imx3.c      |    4 +-
+ 3 files changed, 47 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 1b3f2ae..4d6be8d 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -11,7 +11,8 @@ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o pm-i
+diff --git a/arch/arm/mach-imx/crmregs-imx3.h b/arch/arm/mach-imx/crmregs-imx3.h
+index 5314127..a1dfde5 100644
+--- a/arch/arm/mach-imx/crmregs-imx3.h
++++ b/arch/arm/mach-imx/crmregs-imx3.h
+@@ -24,48 +24,47 @@
+ #define CKIH_CLK_FREQ_27MHZ     27000000
+ #define CKIL_CLK_FREQ           32768
  
- obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clock-mx51-mx53.o ehci-imx5.o pm-imx5.o cpu_op-mx51.o
+-#define MXC_CCM_BASE		(cpu_is_mx31() ? \
+-MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR) : MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR))
++extern void __iomem *mx3_ccm_base;
  
--obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o
-+obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
-+			    clk-pfd.o
+ /* Register addresses */
+-#define MXC_CCM_CCMR		(MXC_CCM_BASE + 0x00)
+-#define MXC_CCM_PDR0		(MXC_CCM_BASE + 0x04)
+-#define MXC_CCM_PDR1		(MXC_CCM_BASE + 0x08)
+-#define MX35_CCM_PDR2		(MXC_CCM_BASE + 0x0C)
+-#define MXC_CCM_RCSR		(MXC_CCM_BASE + 0x0C)
+-#define MX35_CCM_PDR3		(MXC_CCM_BASE + 0x10)
+-#define MXC_CCM_MPCTL		(MXC_CCM_BASE + 0x10)
+-#define MX35_CCM_PDR4		(MXC_CCM_BASE + 0x14)
+-#define MXC_CCM_UPCTL		(MXC_CCM_BASE + 0x14)
+-#define MX35_CCM_RCSR		(MXC_CCM_BASE + 0x18)
+-#define MXC_CCM_SRPCTL		(MXC_CCM_BASE + 0x18)
+-#define MX35_CCM_MPCTL		(MXC_CCM_BASE + 0x1C)
+-#define MXC_CCM_COSR		(MXC_CCM_BASE + 0x1C)
+-#define MX35_CCM_PPCTL		(MXC_CCM_BASE + 0x20)
+-#define MXC_CCM_CGR0		(MXC_CCM_BASE + 0x20)
+-#define MX35_CCM_ACMR		(MXC_CCM_BASE + 0x24)
+-#define MXC_CCM_CGR1		(MXC_CCM_BASE + 0x24)
+-#define MX35_CCM_COSR		(MXC_CCM_BASE + 0x28)
+-#define MXC_CCM_CGR2		(MXC_CCM_BASE + 0x28)
+-#define MX35_CCM_CGR0		(MXC_CCM_BASE + 0x2C)
+-#define MXC_CCM_WIMR		(MXC_CCM_BASE + 0x2C)
+-#define MX35_CCM_CGR1		(MXC_CCM_BASE + 0x30)
+-#define MXC_CCM_LDC		(MXC_CCM_BASE + 0x30)
+-#define MX35_CCM_CGR2		(MXC_CCM_BASE + 0x34)
+-#define MXC_CCM_DCVR0		(MXC_CCM_BASE + 0x34)
+-#define MX35_CCM_CGR3		(MXC_CCM_BASE + 0x38)
+-#define MXC_CCM_DCVR1		(MXC_CCM_BASE + 0x38)
+-#define MXC_CCM_DCVR2		(MXC_CCM_BASE + 0x3C)
+-#define MXC_CCM_DCVR3		(MXC_CCM_BASE + 0x40)
+-#define MXC_CCM_LTR0		(MXC_CCM_BASE + 0x44)
+-#define MXC_CCM_LTR1		(MXC_CCM_BASE + 0x48)
+-#define MXC_CCM_LTR2		(MXC_CCM_BASE + 0x4C)
+-#define MXC_CCM_LTR3		(MXC_CCM_BASE + 0x50)
+-#define MXC_CCM_LTBR0		(MXC_CCM_BASE + 0x54)
+-#define MXC_CCM_LTBR1		(MXC_CCM_BASE + 0x58)
+-#define MXC_CCM_PMCR0		(MXC_CCM_BASE + 0x5C)
+-#define MXC_CCM_PMCR1		(MXC_CCM_BASE + 0x60)
+-#define MXC_CCM_PDR2		(MXC_CCM_BASE + 0x64)
++#define MXC_CCM_CCMR		0x00
++#define MXC_CCM_PDR0		0x04
++#define MXC_CCM_PDR1		0x08
++#define MX35_CCM_PDR2		0x0C
++#define MXC_CCM_RCSR		0x0C
++#define MX35_CCM_PDR3		0x10
++#define MXC_CCM_MPCTL		0x10
++#define MX35_CCM_PDR4		0x14
++#define MXC_CCM_UPCTL		0x14
++#define MX35_CCM_RCSR		0x18
++#define MXC_CCM_SRPCTL		0x18
++#define MX35_CCM_MPCTL		0x1C
++#define MXC_CCM_COSR		0x1C
++#define MX35_CCM_PPCTL		0x20
++#define MXC_CCM_CGR0		0x20
++#define MX35_CCM_ACMR		0x24
++#define MXC_CCM_CGR1		0x24
++#define MX35_CCM_COSR		0x28
++#define MXC_CCM_CGR2		0x28
++#define MX35_CCM_CGR0		0x2C
++#define MXC_CCM_WIMR		0x2C
++#define MX35_CCM_CGR1		0x30
++#define MXC_CCM_LDC		0x30
++#define MX35_CCM_CGR2		0x34
++#define MXC_CCM_DCVR0		0x34
++#define MX35_CCM_CGR3		0x38
++#define MXC_CCM_DCVR1		0x38
++#define MXC_CCM_DCVR2		0x3C
++#define MXC_CCM_DCVR3		0x40
++#define MXC_CCM_LTR0		0x44
++#define MXC_CCM_LTR1		0x48
++#define MXC_CCM_LTR2		0x4C
++#define MXC_CCM_LTR3		0x50
++#define MXC_CCM_LTBR0		0x54
++#define MXC_CCM_LTBR1		0x58
++#define MXC_CCM_PMCR0		0x5C
++#define MXC_CCM_PMCR1		0x60
++#define MXC_CCM_PDR2		0x64
  
- # Support for CMOS sensor interface
- obj-$(CONFIG_MX1_VIDEO) += mx1-camera-fiq.o mx1-camera-fiq-ksym.o
-diff --git a/arch/arm/mach-imx/clk-pfd.c b/arch/arm/mach-imx/clk-pfd.c
-new file mode 100644
-index 0000000..3cd2a0c
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-pfd.c
-@@ -0,0 +1,138 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include "clk.h"
-+
-+/**
-+ * struct clk_pfd - IMX PFD clock
-+ * @clk_hw:	clock source
-+ * @reg:	PFD register address
-+ * @idx:	the index of PFD encoded in the register
-+ *
-+ * PFD clock found on i.MX6 series.  Each register for PFD has 4 clk_pfd
-+ * data encoded, and member idx is used to specify the one.  And each
-+ * register has SET, CLR and TOG registers at offset 0x4 0x8 and 0xc.
-+ */
-+struct clk_pfd {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	u8		idx;
-+};
-+
-+#define to_clk_pfd(_hw) container_of(_hw, struct clk_pfd, hw)
-+
-+#define SET	0x4
-+#define CLR	0x8
-+#define OTG	0xc
-+
-+static int clk_pfd_enable(struct clk_hw *hw)
-+{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
-+
-+	writel_relaxed(1 << ((pfd->idx + 1) * 8 - 1), pfd->reg + CLR);
-+
-+	return 0;
-+}
-+
-+static void clk_pfd_disable(struct clk_hw *hw)
-+{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
-+
-+	writel_relaxed(1 << ((pfd->idx + 1) * 8 - 1), pfd->reg + SET);
-+}
-+
-+static unsigned long clk_pfd_recalc_rate(struct clk_hw *hw,
-+					 unsigned long parent_rate)
-+{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
-+	u64 tmp = parent_rate;
-+	u8 frac = (readl_relaxed(pfd->reg) >> (pfd->idx * 8)) & 0x3f;
-+
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static long clk_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long *prate)
-+{
-+	unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
-+	u64 tmp = parent_rate;
-+	u8 frac;
-+
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
-+	tmp = parent_rate;
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static int clk_pfd_set_rate(struct clk_hw *hw, unsigned long rate)
-+{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
-+	unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
-+	u64 tmp = parent_rate;
-+	u8 frac;
-+
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
-+
-+	writel_relaxed(0x3f << (pfd->idx * 8), pfd->reg + CLR);
-+	writel_relaxed(frac << (pfd->idx * 8), pfd->reg + SET);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops clk_pfd_ops = {
-+	.enable		= clk_pfd_enable,
-+	.disable	= clk_pfd_disable,
-+	.recalc_rate	= clk_pfd_recalc_rate,
-+	.round_rate	= clk_pfd_round_rate,
-+	.set_rate	= clk_pfd_set_rate,
-+};
-+
-+struct clk *imx_clk_pfd(const char *name, char *parent_name,
-+			void __iomem *reg, u8 idx)
-+{
-+	struct clk_pfd *pfd;
-+	struct clk *clk;
-+
-+	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);
-+	if (!pfd)
-+		return NULL;
-+	pfd->reg = reg;
-+	pfd->idx = idx;
-+
-+	clk = clk_register(NULL, name, &clk_pfd_ops, &pfd->hw,
-+			   &parent_name, 1, 0);
-+	if (!clk)
-+		kfree(pfd);
-+
-+	return clk;
-+}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index fb44f03..50f5638 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -29,6 +29,9 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 		char *parent_name, void __iomem *base, u32 gate_mask,
- 		u32 div_mask);
+ /* Register bit definitions */
+ #define MXC_CCM_CCMR_WBEN                       (1 << 27)
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 7412738..57b39f8 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -31,6 +31,10 @@
+ #include <mach/iomux-v3.h>
+ #include <mach/irqs.h>
  
-+struct clk *imx_clk_pfd(const char *name, char *parent_name,
-+		void __iomem *reg, u8 idx);
++#include "crmregs-imx3.h"
 +
- static inline struct clk *imx_clk_fixed(const char *name, int rate)
++void __iomem *mx3_ccm_base;
++
+ static void imx3_idle(void)
  {
- 	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+ 	unsigned long reg = 0;
+@@ -137,6 +141,7 @@ void __init imx31_init_early(void)
+ 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
+ 	arch_ioremap_caller = imx3_ioremap_caller;
+ 	arm_pm_idle = imx3_idle;
++	mx3_ccm_base = MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR);
+ }
+ 
+ void __init mx31_init_irq(void)
+@@ -210,6 +215,7 @@ void __init imx35_init_early(void)
+ 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
+ 	arm_pm_idle = imx3_idle;
+ 	arch_ioremap_caller = imx3_ioremap_caller;
++	mx3_ccm_base = MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR);
+ }
+ 
+ void __init mx35_init_irq(void)
+diff --git a/arch/arm/mach-imx/pm-imx3.c b/arch/arm/mach-imx/pm-imx3.c
+index b375243..822103b 100644
+--- a/arch/arm/mach-imx/pm-imx3.c
++++ b/arch/arm/mach-imx/pm-imx3.c
+@@ -21,14 +21,14 @@
+  */
+ void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode)
+ {
+-	int reg = __raw_readl(MXC_CCM_CCMR);
++	int reg = __raw_readl(mx3_ccm_base + MXC_CCM_CCMR);
+ 	reg &= ~MXC_CCM_CCMR_LPM_MASK;
+ 
+ 	switch (mode) {
+ 	case MX3_WAIT:
+ 		if (cpu_is_mx35())
+ 			reg |= MXC_CCM_CCMR_LPM_WAIT_MX35;
+-		__raw_writel(reg, MXC_CCM_CCMR);
++		__raw_writel(reg, mx3_ccm_base + MXC_CCM_CCMR);
+ 		break;
+ 	default:
+ 		pr_err("Unknown cpu power mode: %d\n", mode);
 -- 
 1.7.9.5
