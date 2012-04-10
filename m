@@ -1,74 +1,116 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 10 Apr 2012 10:04:08 +0200
-Subject: [PATCH] pinctrl: implement pinctrl deferred probing
-Message-ID: <1334045048-15566-1-git-send-email-linus.walleij@stericsson.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Apr 2012 10:29:35 +0200
+Subject: [PATCH] Visstrim_M10: Add board version detection.
+In-Reply-To: <1333961523-16356-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1333961523-16356-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120410082935.GX3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Apr 09, 2012 at 10:52:03AM +0200, Javier Martin wrote:
+> Visstrim_M10 boards have 3 gpios to detect the
+> expansion board version attached and other 3 to
+> detect the motherboard revision.
+> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> ---
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   38 +++++++++++++++++++++++++++
+>  1 files changed, 38 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> index f9aa657..cdf277e 100644
+> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> @@ -38,6 +38,7 @@
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+> +#include <asm/system.h>
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx27.h>
+>  
+> @@ -48,6 +49,14 @@
+>  #define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
+>  #define SDHC1_IRQ IRQ_GPIOB(25)
+>  
+> +#define MOTHERBOARD_BIT2	(GPIO_PORTD + 31)
+> +#define MOTHERBOARD_BIT1	(GPIO_PORTD + 30)
+> +#define MOTHERBOARD_BIT0	(GPIO_PORTD + 29)
+> +
+> +#define EXPBOARD_BIT2		(GPIO_PORTD + 25)
+> +#define EXPBOARD_BIT1		(GPIO_PORTD + 27)
+> +#define EXPBOARD_BIT0		(GPIO_PORTD + 28)
+> +
+>  static const int visstrim_m10_pins[] __initconst = {
+>  	/* UART1 (console) */
+>  	PE12_PF_UART1_TXD,
+> @@ -119,6 +128,14 @@ static const int visstrim_m10_pins[] __initconst = {
+>  	PB19_PF_CSI_D7,
+>  	PB20_PF_CSI_VSYNC,
+>  	PB21_PF_CSI_HSYNC,
+> +	/* mother board version */
+> +	MOTHERBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+> +	MOTHERBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+> +	MOTHERBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+> +	/* expansion board version */
+> +	EXPBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+> +	EXPBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+> +	EXPBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+>  };
+>  
+>  /* Camera */
+> @@ -399,11 +416,32 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
+>  	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
+>  };
+>  
+> +static void __init visstrim_m10_revision(void)
+> +{
+> +	int exp_version = 0;
+> +	int mo_version = 0;
+> +
+> +	/* Get expansion board version (negative logic) */
+> +	exp_version |= ((!gpio_get_value(EXPBOARD_BIT2) << 2) & (1 << 2));
+> +	exp_version |= ((!gpio_get_value(EXPBOARD_BIT1) << 1) & (1 << 1));
+> +	exp_version |= ((!gpio_get_value(EXPBOARD_BIT0)) & 1);
 
-If drivers try to obtain pinctrl handles for a pin controller that
-has not yet registered to the subsystem, we need to be able to
-back out and retry with deferred probing. So let's return
--EPROBE_DEFER whenever this location fails.
+Why not:
 
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- Documentation/pinctrl.txt    |    5 +++++
- drivers/pinctrl/core.c       |    7 +++++--
- drivers/pinctrl/devicetree.c |    4 ++--
- 3 files changed, 12 insertions(+), 4 deletions(-)
+	exp_version |= !gpio_get_value(EXPBOARD_BIT2) << 2;
+	exp_version |= !gpio_get_value(EXPBOARD_BIT1) << 1;
+	exp_version |= !gpio_get_value(EXPBOARD_BIT0);
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index eb46b1c..4431c3e7 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -1043,6 +1043,11 @@ quickly poking some registers.
- The pins are allocated for your device when you issue the pinctrl_get() call,
- after this you should be able to see this in the debugfs listing of all pins.
- 
-+NOTE: the pinctrl system will return -EPROBE_DEFER if it cannot find the
-+requested pinctrl handles, for example if the pinctrl driver has not yet
-+registered. Thus make sure that the error path in your driver gracefully
-+cleans up and is ready to retry the probing later in the startup process.
-+
- 
- System pin control hogging
- ==========================
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 7ff8690..3ae00ab 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -521,8 +521,11 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
- 		dev_err(p->dev, "unknown pinctrl device %s in map entry",
- 			map->ctrl_dev_name);
- 		kfree(setting);
--		/* Eventually, this should trigger deferred probe */
--		return -ENODEV;
-+		/*
-+		 * OK let us guess that the driver is not there yet, and
-+		 * let's defer obtaining this pinctrl handle to later...
-+		 */
-+		return -EPROBE_DEFER;
- 	}
- 
- 	switch (map->type) {
-diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
-index 5ef2feb..8833538 100644
---- a/drivers/pinctrl/devicetree.c
-+++ b/drivers/pinctrl/devicetree.c
-@@ -124,8 +124,8 @@ static int dt_to_map_one_config(struct pinctrl *p, const char *statename,
- 			dev_err(p->dev, "could not find pctldev for node %s\n",
- 				np_config->full_name);
- 			of_node_put(np_pctldev);
--			/* FIXME: This should trigger deferrered probe */
--			return -ENODEV;
-+			/* OK let's just assume this will appear later then */
-+			return -EPROBE_DEFER;
- 		}
- 		pctldev = find_pinctrl_by_of_node(np_pctldev);
- 		if (pctldev)
+Also, you should request the gpios before using them
+(gpio_request_array)
+
+Sascha
+
+> +
+> +	/* Get mother board version (negative logic) */
+> +	mo_version |= ((!gpio_get_value(MOTHERBOARD_BIT2) << 2) & (1 << 2));
+> +	mo_version |= ((!gpio_get_value(MOTHERBOARD_BIT1) << 1) & (1 << 1));
+> +	mo_version |= ((!gpio_get_value(MOTHERBOARD_BIT0)) & 1);
+> +
+> +	system_rev = 0x27000;
+> +	system_rev |= (mo_version << 4);
+> +	system_rev |= exp_version;
+> +}
+> +
+>  static void __init visstrim_m10_board_init(void)
+>  {
+>  	int ret;
+>  
+>  	imx27_soc_init();
+> +	visstrim_m10_revision();
+>  
+>  	ret = mxc_gpio_setup_multiple_pins(visstrim_m10_pins,
+>  			ARRAY_SIZE(visstrim_m10_pins), "VISSTRIM_M10");
+> -- 
+> 1.7.0.4
+> 
+> 
+
 -- 
-1.7.9.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
