@@ -1,36 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Apr 2012 11:10:47 +0100
-Subject: [PATCH] Input: eeti_ts: Mark as CONFIG_BROKEN
-In-Reply-To: <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
-References: <1333777207-4151-1-git-send-email-olof@lixom.net>
- <20120407070206.GA17623@core.coreip.homeip.net>
- <4F8089A9.6080704@raumfeld.com>
- <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
-Message-ID: <20120410101047.GQ24211@n2100.arm.linux.org.uk>
+Date: Tue, 10 Apr 2012 11:12:44 +0100
+Subject: [PATCH/RESEND] ARM: Kconfig: Remove duplicate IRQ Kconfig entries
+In-Reply-To: <1333992911-26744-1-git-send-email-sboyd@codeaurora.org>
+References: <1333992911-26744-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20120410101244.GR24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 07, 2012 at 01:32:31PM -0700, Olof Johansson wrote:
-> Haojian, I think it was probably premature to do the multiplatform
-> change like that, since it means that a PXA-only kernel has no mapping
-> from irq_to_gpio to pxa_irq_to_gpio. Can you please address this as a
-> fix for 3.4?
+Who are you expecting to pick up on this patch?  You're sending it _to_
+the mailing list rather than to a person.  Are you expecting all
+subscribers to pick it up and apply it individually? ;)
 
-Please fix ezx-pcap instead - it's broken as it currently stands by using
-irq_to_gpio(), and it's one reason why my randconfig builds on OMAP fail.
-
-The big problem is - what does this do:
-
-        do {
-...
-        } while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
-
-if pcap->spi->irq has no GPIO associated with the interrupt?  irq_to_gpio()
-probably returns some random number which might be some other GPIO in the
-system, and gpio_get_value() could oops if irq_to_gpio returns a negative
-or large positive number.  To put it another way, according to the above
-code, irq_to_gpio() must always return a valid gpio for the IRQ even if
-the IRQ doesn't have a GPIO associated with it.
-
-This is a fine illustration of why irq_to_gpio() is just plain broken in
-its design.
+On Mon, Apr 09, 2012 at 10:35:11AM -0700, Stephen Boyd wrote:
+> These kconfig entries are already defined in kernel/irq/Kconfig
+> so select them instead of redefining them.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/Kconfig |   10 ++--------
+>  1 file changed, 2 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 7a08e37..a3ae6e9 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -30,6 +30,8 @@ config ARM
+>  	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
+>  	select HAVE_C_RECORDMCOUNT
+>  	select HAVE_GENERIC_HARDIRQS
+> +	select HARDIRQS_SW_RESEND
+> +	select GENERIC_IRQ_PROBE
+>  	select GENERIC_IRQ_SHOW
+>  	select CPU_PM if (SUSPEND || CPU_IDLE)
+>  	select GENERIC_PCI_IOMAP
+> @@ -125,14 +127,6 @@ config TRACE_IRQFLAGS_SUPPORT
+>  	bool
+>  	default y
+>  
+> -config HARDIRQS_SW_RESEND
+> -	bool
+> -	default y
+> -
+> -config GENERIC_IRQ_PROBE
+> -	bool
+> -	default y
+> -
+>  config GENERIC_LOCKBREAK
+>  	bool
+>  	default y
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
