@@ -1,20 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Apr 2012 09:35:36 +0100
-Subject: questions about drivers/dma/amba-pl08x.c
-In-Reply-To: <CACRpkdaC3=vSGF6XH=7Oiqsdg0RVDfbv-M5NZDY5psF96BssHQ@mail.gmail.com>
-References: <CAKwPUozgACvV-TZdn92f1O2shSEvFBfbN-hrS=FNQ5O+DEEY5g@mail.gmail.com>
- <CACRpkdaC3=vSGF6XH=7Oiqsdg0RVDfbv-M5NZDY5psF96BssHQ@mail.gmail.com>
-Message-ID: <20120410083536.GL24211@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Apr 2012 10:42:50 +0200
+Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
+In-Reply-To: <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
+References: <4F793C56.2030605@st.com>
+ <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
+Message-ID: <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 10:32:20AM +0200, Linus Walleij wrote:
-> Sorry, I'm not following, so slave is true and there is still no slave
-> channels defined? It looks like your platform data is wrong.
-> 
-> But better error checking is always needed so if you want to,
-> please send a patch to improve it...
+On Wed, Apr 4, 2012 at 4:59 PM, viresh kumar <viresh.linux@gmail.com> wrote:
+> On Apr 2, 2012 11:15 AM, "Viresh Kumar" <viresh.kumar@st.com> wrote:
+>>
+>> Hi Arnd/Olof,
+>>
+>> The following changes since commit
+>> dd775ae2549217d3ae09363e3edb305d0fa19928:
+>>
+>> ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+>>
+>> are available in the git repository at:
+>>
+>> ?git://git.stlinux.com/spear/linux-2.6.git spear-dt
+>>
+>> for you to fetch changes up to 8f21ec99c7b78c3f0baf6bbf2e438da68da3dc08:
+>>
+>> ?SPEAr: Update defconfigs (2012-04-02 09:03:59 +0530)
+>
+> Arnd,
+>
+> I don't exactly know how it works, but Linus
+> would require this pull before he applies pinctrl patches.
 
-Or we could just say that if people want to point the gun at their feet
-and pull the trigger, we shouldn't detect that and stop the bullet coming
-out the barrel.
+Will there be conflicts between this patch set and the stuff you're
+submitting for pinctrl? Or is it just runtime problems?
+
+The ARM SoC and pinctrl are not on top of each other or anything
+like that, they are merged in parallell.
+
+Yours,
+Linus Walleij
