@@ -1,27 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Apr 2012 09:54:20 +0200
-Subject: [PATCH] pinctrl: Add SPEAr pinctrl drivers
-In-Reply-To: <4F7B7D1B.7030507@wwwdotorg.org>
-References: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
- <201204031347.35256.arnd@arndb.de>
- <CACRpkdZYccTvHEMa=4=-uoLZYQxEPS+932UPA7MGc+-94eLc6w@mail.gmail.com>
- <4F7B7D1B.7030507@wwwdotorg.org>
-Message-ID: <CACRpkdZ5e-eqkPA8DP+L8_DnfQxQ-0+QRp8RcXSwOPU-ZNFSSA@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 10 Apr 2012 10:04:08 +0200
+Subject: [PATCH] pinctrl: implement pinctrl deferred probing
+Message-ID: <1334045048-15566-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2012 at 12:43 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/03/2012 03:24 PM, Linus Walleij wrote:
->> So basically the pinctrl subsystem needs to return -EPROBE_DEFER
->> to the driver in this case, so it can escalate that further.
->
-> Yes, I believe so.
->
-> There should be a couple of comments in pinctrl now (well, perhaps some
-> of them aren't there yet until my DT patches are applied!) that indicate
-> where -EPROBE_DEFER should be returned.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-OK I'll fix something...
+If drivers try to obtain pinctrl handles for a pin controller that
+has not yet registered to the subsystem, we need to be able to
+back out and retry with deferred probing. So let's return
+-EPROBE_DEFER whenever this location fails.
 
-Yours,
-Linus Walleij
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ Documentation/pinctrl.txt    |    5 +++++
+ drivers/pinctrl/core.c       |    7 +++++--
+ drivers/pinctrl/devicetree.c |    4 ++--
+ 3 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index eb46b1c..4431c3e7 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -1043,6 +1043,11 @@ quickly poking some registers.
+ The pins are allocated for your device when you issue the pinctrl_get() call,
+ after this you should be able to see this in the debugfs listing of all pins.
+ 
++NOTE: the pinctrl system will return -EPROBE_DEFER if it cannot find the
++requested pinctrl handles, for example if the pinctrl driver has not yet
++registered. Thus make sure that the error path in your driver gracefully
++cleans up and is ready to retry the probing later in the startup process.
++
+ 
+ System pin control hogging
+ ==========================
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 7ff8690..3ae00ab 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -521,8 +521,11 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
+ 		dev_err(p->dev, "unknown pinctrl device %s in map entry",
+ 			map->ctrl_dev_name);
+ 		kfree(setting);
+-		/* Eventually, this should trigger deferred probe */
+-		return -ENODEV;
++		/*
++		 * OK let us guess that the driver is not there yet, and
++		 * let's defer obtaining this pinctrl handle to later...
++		 */
++		return -EPROBE_DEFER;
+ 	}
+ 
+ 	switch (map->type) {
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index 5ef2feb..8833538 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -124,8 +124,8 @@ static int dt_to_map_one_config(struct pinctrl *p, const char *statename,
+ 			dev_err(p->dev, "could not find pctldev for node %s\n",
+ 				np_config->full_name);
+ 			of_node_put(np_pctldev);
+-			/* FIXME: This should trigger deferrered probe */
+-			return -ENODEV;
++			/* OK let's just assume this will appear later then */
++			return -EPROBE_DEFER;
+ 		}
+ 		pctldev = find_pinctrl_by_of_node(np_pctldev);
+ 		if (pctldev)
+-- 
+1.7.9.2
