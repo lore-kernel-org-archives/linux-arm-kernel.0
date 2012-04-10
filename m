@@ -1,26 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Apr 2012 10:01:16 -0700
-Subject: [PATCH/RESEND] ARM: Kconfig: Remove duplicate IRQ Kconfig entries
-In-Reply-To: <20120410101244.GR24211@n2100.arm.linux.org.uk>
-References: <1333992911-26744-1-git-send-email-sboyd@codeaurora.org>
- <20120410101244.GR24211@n2100.arm.linux.org.uk>
-Message-ID: <4F84675C.40900@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 10 Apr 2012 10:05:49 -0700
+Subject: [PATCH 0/4] ARM: Exynos4: NURI and UniversalC210 fixes for
+ v3.4-rc2
+In-Reply-To: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
+References: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F84686D.60606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/12 03:12, Russell King - ARM Linux wrote:
-> Who are you expecting to pick up on this patch?  You're sending it _to_
-> the mailing list rather than to a person.  Are you expecting all
-> subscribers to pick it up and apply it individually? ;)
+Marek Szyprowski wrote:
+> Hi Kukjin,
+> 
+Hi Marek,
 
-I was hoping Thomas would ack it and you would say "Please put it into
-the patch tracker". Step 1 can probably be skipped with a proper timeout
-applied.
+> I've just checked the support for Samsung NURI and UniversalC210 boards
+> in v3.4-rc1 and found some issues. The attached patches fixes the
+> leftovers from missing s3c-sdhci driver changes, fixes division by
+> zero caused by missing initial value for xusbxti clock and removes broken
+> optional configuration entries for touch screen driver. It would be great
+> if the attached patches will get merged to v3.4-rcX series.
+> 
+OK, looks good to me, applied.
 
-Usually I send a patch _to_ a mailing list and a maintainer says
-"Thanks, applied". For you, "Thanks, applied" is "Please put it into the
-patch tracker".
+Thanks.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Best regards,
+> Marek Szyprowski
+> 
+> 
+> Patch summary:
+> 
+> Marek Szyprowski (4):
+>    ARM: Exynos4: fix SDHCI support on NURI&  UniversalC210 boards
+>    ARM: Exynos4: fix regulator name for NURI board
+>    ARM: Exynos4: set fix xusbxti clock for NURI and Universal210 boards
+>    ARM: Exynos4: Remove broken config values for touchscren for NURI
+>      board
+> 
+>   arch/arm/mach-exynos/mach-nuri.c           |   51 +++-------------------------
+>   arch/arm/mach-exynos/mach-universal_c210.c |    5 ++-
+>   2 files changed, 9 insertions(+), 47 deletions(-)
+> 
