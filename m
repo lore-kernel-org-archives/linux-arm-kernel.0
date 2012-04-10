@@ -1,9 +1,9 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:51 +0200
-Subject: [PATCH 38/40] USB gadget i.MX: fix clock handling
+Date: Tue, 10 Apr 2012 15:45:52 +0200
+Subject: [PATCH 39/40] USB ehci i.MX: Fix clock handling
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-39-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-40-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,112 +22,97 @@ easier.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/usb/gadget/fsl_mxc_udc.c |   74 ++++++++++++--------------------------
- 1 file changed, 23 insertions(+), 51 deletions(-)
+ drivers/usb/host/ehci-mxc.c |   52 ++++++++++++++++++++++---------------------
+ 1 file changed, 27 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
-index dcbc0a2..cfaa40a 100644
---- a/drivers/usb/gadget/fsl_mxc_udc.c
-+++ b/drivers/usb/gadget/fsl_mxc_udc.c
-@@ -21,7 +21,8 @@
- #include <mach/hardware.h>
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index ae16c34..a2fb7c5 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -32,7 +32,10 @@
+ #define ULPI_VIEWPORT_OFFSET	0x170
  
- static struct clk *mxc_ahb_clk;
--static struct clk *mxc_usb_clk;
-+static struct clk *mxc_ipg_clk;
-+static struct clk *mxc_per_clk;
+ struct ehci_mxc_priv {
+-	struct clk *usbclk, *ahbclk, *phy1clk;
++	struct clk *clk_ipg;
++	struct clk *clk_ahb;
++	struct clk *clk_per;
++	struct clk *phy1clk;
+ 	struct usb_hcd *hcd;
+ };
  
- /* workaround ENGcm09152 for i.MX35 */
- #define USBPHYCTRL_OTGBASE_OFFSET	0x608
-@@ -35,55 +36,31 @@ int fsl_udc_clk_init(struct platform_device *pdev)
- 
- 	pdata = pdev->dev.platform_data;
- 
--	if (!cpu_is_mx35() && !cpu_is_mx25()) {
--		mxc_ahb_clk = clk_get(&pdev->dev, "usb_ahb");
--		if (IS_ERR(mxc_ahb_clk))
--			return PTR_ERR(mxc_ahb_clk);
-+	mxc_ahb_clk = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(mxc_ahb_clk))
-+		return PTR_ERR(mxc_ahb_clk);
- 
--		ret = clk_enable(mxc_ahb_clk);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "clk_enable(\"usb_ahb\") failed\n");
--			goto eenahb;
--		}
--	}
-+	mxc_per_clk = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(mxc_per_clk))
-+		return PTR_ERR(mxc_per_clk);
- 
--	/* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
--	mxc_usb_clk = clk_get(&pdev->dev, "usb");
--	if (IS_ERR(mxc_usb_clk)) {
--		dev_err(&pdev->dev, "clk_get(\"usb\") failed\n");
--		ret = PTR_ERR(mxc_usb_clk);
--		goto egusb;
--	}
-+	mxc_ipg_clk = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(mxc_ipg_clk))
-+		return PTR_ERR(mxc_ipg_clk);
- 
--	if (!cpu_is_mx51()) {
--		freq = clk_get_rate(mxc_usb_clk);
--		if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
--		    (freq < 59999000 || freq > 60001000)) {
--			dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
--			ret = -EINVAL;
--			goto eclkrate;
--		}
-+	/* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
-+	freq = clk_get_rate(mxc_usb_clk);
-+	if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
-+	    (freq < 59999000 || freq > 60001000)) {
-+		dev_err(&pdev->dev, "USB_CLK=%lu, should be 60MHz\n", freq);
-+		return -EINVAL;
+@@ -166,22 +169,28 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
  	}
  
--	ret = clk_enable(mxc_usb_clk);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "clk_enable(\"usb_clk\") failed\n");
--		goto eenusb;
--	}
-+	clk_prepare_enable(mxc_ahb_clk);
-+	clk_prepare_enable(mxc_per_clk);
-+	clk_prepare_enable(mxc_ipg_clk);
+ 	/* enable clocks */
+-	priv->usbclk = clk_get(dev, "usb");
+-	if (IS_ERR(priv->usbclk)) {
+-		ret = PTR_ERR(priv->usbclk);
++	priv->clk_ipg = devm_clk_get(dev, "ipg");
++	if (IS_ERR(priv->clk_ipg)) {
++		ret = PTR_ERR(priv->clk_ipg);
+ 		goto err_clk;
+ 	}
+-	clk_prepare_enable(priv->usbclk);
  
- 	return 0;
--
--eenusb:
--eclkrate:
--	clk_put(mxc_usb_clk);
--	mxc_usb_clk = NULL;
--egusb:
--	if (!cpu_is_mx35())
--		clk_disable(mxc_ahb_clk);
--eenahb:
--	if (!cpu_is_mx35())
--		clk_put(mxc_ahb_clk);
--	return ret;
- }
+-	if (!cpu_is_mx35() && !cpu_is_mx25()) {
+-		priv->ahbclk = clk_get(dev, "usb_ahb");
+-		if (IS_ERR(priv->ahbclk)) {
+-			ret = PTR_ERR(priv->ahbclk);
+-			goto err_clk_ahb;
+-		}
+-		clk_prepare_enable(priv->ahbclk);
++	priv->clk_ahb = devm_clk_get(dev, "ahb");
++	if (IS_ERR(priv->clk_ahb)) {
++		ret = PTR_ERR(priv->clk_ahb);
++		goto err_clk;
++	}
++
++	priv->clk_per = devm_clk_get(dev, "per");
++	if (IS_ERR(priv->clk_per)) {
++		ret = PTR_ERR(priv->clk_per);
++		goto err_clk;
+ 	}
  
- void fsl_udc_clk_finalize(struct platform_device *pdev)
-@@ -112,12 +89,7 @@ void fsl_udc_clk_finalize(struct platform_device *pdev)
++	clk_prepare_enable(priv->clk_per);
++	clk_prepare_enable(priv->clk_ahb);
++	clk_prepare_enable(priv->clk_ipg);
++
+ 	/* "dr" device has its own clock on i.MX51 */
+ 	if (cpu_is_mx51() && (pdev->id == 0)) {
+ 		priv->phy1clk = clk_get(dev, "usb_phy1");
+@@ -270,13 +279,9 @@ err_init:
+ 		clk_put(priv->phy1clk);
+ 	}
+ err_clk_phy:
+-	if (priv->ahbclk) {
+-		clk_disable_unprepare(priv->ahbclk);
+-		clk_put(priv->ahbclk);
+-	}
+-err_clk_ahb:
+-	clk_disable_unprepare(priv->usbclk);
+-	clk_put(priv->usbclk);
++	clk_disable_unprepare(priv->clk_ahb);
++	clk_disable_unprepare(priv->clk_ipg);
++	clk_disable_unprepare(priv->clk_per);
+ err_clk:
+ 	iounmap(hcd->regs);
+ err_ioremap:
+@@ -307,12 +312,9 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
+ 	usb_put_hcd(hcd);
+ 	platform_set_drvdata(pdev, NULL);
  
- void fsl_udc_clk_release(void)
- {
--	if (mxc_usb_clk) {
--		clk_disable(mxc_usb_clk);
--		clk_put(mxc_usb_clk);
+-	clk_disable_unprepare(priv->usbclk);
+-	clk_put(priv->usbclk);
+-	if (priv->ahbclk) {
+-		clk_disable_unprepare(priv->ahbclk);
+-		clk_put(priv->ahbclk);
 -	}
--	if (!cpu_is_mx35()) {
--		clk_disable(mxc_ahb_clk);
--		clk_put(mxc_ahb_clk);
--	}
-+	clk_disable_unprepare(mxc_ahb_clk);
-+	clk_disable_unprepare(mxc_ipg_clk);
-+	clk_disable_unprepare(mxc_per_clk);
- }
++	clk_disable_unprepare(priv->clk_ahb);
++	clk_disable_unprepare(priv->clk_ipg);
++	clk_disable_unprepare(priv->clk_per);
+ 	if (priv->phy1clk) {
+ 		clk_disable_unprepare(priv->phy1clk);
+ 		clk_put(priv->phy1clk);
 -- 
 1.7.9.5
