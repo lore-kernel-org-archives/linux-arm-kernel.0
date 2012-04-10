@@ -1,123 +1,85 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:31 +0200
-Subject: [PATCH 18/40] ARM i.MX: prepare for common clock framework
+Date: Tue, 10 Apr 2012 15:45:25 +0200
+Subject: [PATCH 12/40] USB ehci mxc: prepare/unprepare clock
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-19-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-13-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Add necessary #ifdefs for CONFIG_COMMON_CLOCK
-- Add a global spinlock to protect the CCM registers
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/clk.h                |   44 ++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/clock.c              |   11 ++++++++
- arch/arm/plat-mxc/include/mach/clock.h |    4 +++
- 3 files changed, 59 insertions(+)
- create mode 100644 arch/arm/mach-imx/clk.h
+ drivers/usb/host/ehci-mxc.c |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-new file mode 100644
-index 0000000..2f1a7b2
---- /dev/null
-+++ b/arch/arm/mach-imx/clk.h
-@@ -0,0 +1,44 @@
-+#ifndef __MACH_IMX_CLK_H
-+#define __MACH_IMX_CLK_H
-+
-+#include <linux/spinlock.h>
-+#include <linux/clk-provider.h>
-+#include <mach/clock.h>
-+
-+struct clk *imx_clk_pllv1(const char *name, char *parent,
-+		void __iomem *base);
-+
-+static inline struct clk *imx_clk_fixed(const char *name, int rate)
-+{
-+	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
-+}
-+
-+static inline struct clk *imx_clk_divider(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift, u8 width)
-+{
-+	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
-+			reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
-+static inline struct clk *imx_clk_gate(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift)
-+{
-+	return clk_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+			shift, 0, &imx_ccm_lock);
-+}
-+
-+static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
-+		u8 shift, u8 width, char **parents, int num_parents)
-+{
-+	return clk_register_mux(NULL, name, parents, num_parents, 0, reg, shift,
-+			width, 0, &imx_ccm_lock);
-+}
-+
-+static inline struct clk *imx_clk_fixed_factor(const char *name,
-+		const char *parent, unsigned int mult, unsigned int div)
-+{
-+	return clk_register_fixed_factor(NULL, name, parent,
-+			CLK_SET_RATE_PARENT, mult, div);
-+}
-+
-+#endif
-diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-index 2ed3ab1..5079787 100644
---- a/arch/arm/plat-mxc/clock.c
-+++ b/arch/arm/plat-mxc/clock.c
-@@ -41,6 +41,7 @@
- #include <mach/clock.h>
- #include <mach/hardware.h>
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index a797d51..ae16c34 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -171,7 +171,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(priv->usbclk);
+ 		goto err_clk;
+ 	}
+-	clk_enable(priv->usbclk);
++	clk_prepare_enable(priv->usbclk);
  
-+#ifndef CONFIG_COMMON_CLK
- static LIST_HEAD(clocks);
- static DEFINE_MUTEX(clocks_mutex);
+ 	if (!cpu_is_mx35() && !cpu_is_mx25()) {
+ 		priv->ahbclk = clk_get(dev, "usb_ahb");
+@@ -179,7 +179,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 			ret = PTR_ERR(priv->ahbclk);
+ 			goto err_clk_ahb;
+ 		}
+-		clk_enable(priv->ahbclk);
++		clk_prepare_enable(priv->ahbclk);
+ 	}
  
-@@ -200,6 +201,16 @@ struct clk *clk_get_parent(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_get_parent);
+ 	/* "dr" device has its own clock on i.MX51 */
+@@ -189,7 +189,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 			ret = PTR_ERR(priv->phy1clk);
+ 			goto err_clk_phy;
+ 		}
+-		clk_enable(priv->phy1clk);
++		clk_prepare_enable(priv->phy1clk);
+ 	}
  
-+#else
-+
-+/*
-+ * Lock to protect the clock module (ccm) registers. Used
-+ * on all i.MXs
-+ */
-+DEFINE_SPINLOCK(imx_ccm_lock);
-+
-+#endif /* CONFIG_COMMON_CLK */
-+
- /*
-  * Get the resulting clock rate from a PLL register value and the input
-  * frequency. PLLs with this register layout can at least be found on
-diff --git a/arch/arm/plat-mxc/include/mach/clock.h b/arch/arm/plat-mxc/include/mach/clock.h
-index 753a598..bd940c7 100644
---- a/arch/arm/plat-mxc/include/mach/clock.h
-+++ b/arch/arm/plat-mxc/include/mach/clock.h
-@@ -23,6 +23,7 @@
- #ifndef __ASSEMBLY__
- #include <linux/list.h>
  
-+#ifndef CONFIG_COMMON_CLK
- struct module;
+@@ -266,16 +266,16 @@ err_add:
+ 		pdata->exit(pdev);
+ err_init:
+ 	if (priv->phy1clk) {
+-		clk_disable(priv->phy1clk);
++		clk_disable_unprepare(priv->phy1clk);
+ 		clk_put(priv->phy1clk);
+ 	}
+ err_clk_phy:
+ 	if (priv->ahbclk) {
+-		clk_disable(priv->ahbclk);
++		clk_disable_unprepare(priv->ahbclk);
+ 		clk_put(priv->ahbclk);
+ 	}
+ err_clk_ahb:
+-	clk_disable(priv->usbclk);
++	clk_disable_unprepare(priv->usbclk);
+ 	clk_put(priv->usbclk);
+ err_clk:
+ 	iounmap(hcd->regs);
+@@ -307,14 +307,14 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
+ 	usb_put_hcd(hcd);
+ 	platform_set_drvdata(pdev, NULL);
  
- struct clk {
-@@ -59,6 +60,9 @@ struct clk {
- 
- int clk_register(struct clk *clk);
- void clk_unregister(struct clk *clk);
-+#endif /* CONFIG_COMMON_CLK */
-+
-+extern spinlock_t imx_ccm_lock;
- 
- unsigned long mxc_decode_pll(unsigned int pll, u32 f_ref);
+-	clk_disable(priv->usbclk);
++	clk_disable_unprepare(priv->usbclk);
+ 	clk_put(priv->usbclk);
+ 	if (priv->ahbclk) {
+-		clk_disable(priv->ahbclk);
++		clk_disable_unprepare(priv->ahbclk);
+ 		clk_put(priv->ahbclk);
+ 	}
+ 	if (priv->phy1clk) {
+-		clk_disable(priv->phy1clk);
++		clk_disable_unprepare(priv->phy1clk);
+ 		clk_put(priv->phy1clk);
+ 	}
  
 -- 
 1.7.9.5
