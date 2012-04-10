@@ -1,70 +1,27 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 10 Apr 2012 09:52:37 +0200
-Subject: [PATCH] pinctrl: fix build failure on PPC
-Message-ID: <1334044357-14486-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Apr 2012 09:54:20 +0200
+Subject: [PATCH] pinctrl: Add SPEAr pinctrl drivers
+In-Reply-To: <4F7B7D1B.7030507@wwwdotorg.org>
+References: <a1b7f612544a09989cec80a0318f35b6e48eb1d3.1333453148.git.viresh.kumar@st.com>
+ <201204031347.35256.arnd@arndb.de>
+ <CACRpkdZYccTvHEMa=4=-uoLZYQxEPS+932UPA7MGc+-94eLc6w@mail.gmail.com>
+ <4F7B7D1B.7030507@wwwdotorg.org>
+Message-ID: <CACRpkdZ5e-eqkPA8DP+L8_DnfQxQ-0+QRp8RcXSwOPU-ZNFSSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Wed, Apr 4, 2012 at 12:43 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/03/2012 03:24 PM, Linus Walleij wrote:
+>> So basically the pinctrl subsystem needs to return -EPROBE_DEFER
+>> to the driver in this case, so it can escalate that further.
+>
+> Yes, I believe so.
+>
+> There should be a couple of comments in pinctrl now (well, perhaps some
+> of them aren't there yet until my DT patches are applied!) that indicate
+> where -EPROBE_DEFER should be returned.
 
-commit 23289e6ecc6d ("pinctrl: core device tree mapping table
-parsing support") caused a build failure on PPC:
+OK I'll fix something...
 
-drivers/pinctrl/devicetree.c: In function 'dt_free_map':
-drivers/pinctrl/devicetree.c:44:42: error: dereferencing pointer to incomplete type
-drivers/pinctrl/devicetree.c:45:6: error: dereferencing pointer to incomplete type
-drivers/pinctrl/devicetree.c: In function 'dt_to_map_one_config':
-drivers/pinctrl/devicetree.c:140:21: error: dereferencing pointer to incomplete type
-drivers/pinctrl/devicetree.c:141:10: error: dereferencing pointer to incomplete type
-drivers/pinctrl/devicetree.c:146:11: error: dereferencing pointer to incomplete type
-
-This is probably because the Makefile for pinctrl contains this,
-that makes a small piece of the implementation build and link
-in isolation:
-
-obj-$(CONFIG_OF)                += devicetree.o
-
-So let's use some local Kconfig option that depends on both OF
-and PINCTRL so that this file is only compiled if you have
-both enabled.
-
-Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/Kconfig  |    5 +++++
- drivers/pinctrl/Makefile |    2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index abfb964..d68c878 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -17,6 +17,11 @@ config PINMUX
- config PINCONF
- 	bool "Support pin configuration controllers"
- 
-+config PINCTRL_OF
-+	bool
-+	depends on OF
-+	default y if OF
-+
- config GENERIC_PINCONF
- 	bool
- 	select PINCONF
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 049c9fb..5412f60 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -5,7 +5,7 @@ ccflags-$(CONFIG_DEBUG_PINCTRL)	+= -DDEBUG
- obj-$(CONFIG_PINCTRL)		+= core.o
- obj-$(CONFIG_PINMUX)		+= pinmux.o
- obj-$(CONFIG_PINCONF)		+= pinconf.o
--obj-$(CONFIG_OF)		+= devicetree.o
-+obj-$(CONFIG_PINCTRL_OF)	+= devicetree.o
- obj-$(CONFIG_GENERIC_PINCONF)	+= pinconf-generic.o
- obj-$(CONFIG_PINCTRL_PXA3xx)	+= pinctrl-pxa3xx.o
- obj-$(CONFIG_PINCTRL_MMP2)	+= pinctrl-mmp2.o
--- 
-1.7.9.2
+Yours,
+Linus Walleij
