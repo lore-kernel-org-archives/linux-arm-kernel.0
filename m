@@ -1,81 +1,40 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 10 Apr 2012 16:26:20 +0530
-Subject: [PATCHv6 02/19] I2C: OMAP: Remove reset at init
+Date: Tue, 10 Apr 2012 16:26:37 +0530
+Subject: [PATCHv6 19/19] ARM: OMAP4: hwmod data: I2C: add flag for context
+ restore
 In-Reply-To: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334055397-899-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334055397-899-20-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset in the driver at init is not needed anymore as the
-following patch has removed the HWMOD_INIT_NO_RESET flag.
-6d3c55f [OMAP: hwmod: fix the i2c-reset timeout during bootup]
+Restore of context is not done for OMAP4. This patch
+adds the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE in the OMAP4
+hwmod data which activates the restore for OMAP4.
+Currently the OMAP4 does not hit device off still the
+driver may have support for it.
 
-This patch does the following
--removes the reset from the probe and implements a omap_i2c_reset
- function to reset.
-- Reset is removed from omap_i2c_init, which was called
- not only during probe, but also after time out and error handling.
- omap_i2c_reset is added in those places to effect the reset.
-
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Wamsley <paul@pwsan.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   20 +++++++++++++-------
- 1 files changed, 13 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 4f4188d..e402ebb 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -269,15 +269,9 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
- }
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 08daa5e..cddce60 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2262,7 +2262,8 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
+ };
  
--static int omap_i2c_init(struct omap_i2c_dev *dev)
-+static int omap_i2c_reset(struct omap_i2c_dev *dev)
- {
--	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
--	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
--	unsigned long fclk_rate = 12000000;
- 	unsigned long timeout;
--	unsigned long internal_clk = 0;
--	struct clk *fclk;
--
- 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
- 		/* Disable I2C controller before soft reset */
- 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
-@@ -325,6 +319,16 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 							dev->westate);
- 		}
- 	}
-+}
-+
-+static int omap_i2c_init(struct omap_i2c_dev *dev)
-+{
-+	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
-+	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
-+	unsigned long fclk_rate = 12000000;
-+	unsigned long internal_clk = 0;
-+	struct clk *fclk;
-+
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+-	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
++	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE |
++			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
+ };
  
- 	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
-@@ -548,6 +552,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 		return r;
- 	if (r == 0) {
- 		dev_err(dev->dev, "controller timed out\n");
-+		omap_i2c_reset(dev);
- 		omap_i2c_init(dev);
- 		return -ETIMEDOUT;
- 	}
-@@ -558,6 +563,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	/* We have an error */
- 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
- 			    OMAP_I2C_STAT_XUDF)) {
-+		omap_i2c_reset(dev);
- 		omap_i2c_init(dev);
- 		return -EIO;
- 	}
+ /* i2c1 */
 -- 
 1.7.4.1
