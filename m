@@ -1,33 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 10 Apr 2012 01:27:28 -0300
-Subject: [PATCH 3/4] clk: add DT clock binding support
-In-Reply-To: <1334003101-17274-4-git-send-email-robherring2@gmail.com>
-References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
- <1334003101-17274-4-git-send-email-robherring2@gmail.com>
-Message-ID: <CAOMZO5AKmnQRo4_3GVDSMUc0fMZ5orwvZSxjXfn6m-5Boew04A@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 10 Apr 2012 12:41:34 +0800
+Subject: [PATCH v2 1/1] pinctrl: add some error checking for user interfaces
+Message-ID: <1334032894-6012-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 9, 2012 at 5:25 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Grant Likely <grant.likely@secretlab.ca>
->
-> Based on work 1st by Ben Herrenschmidt and Jeremy Kerr, then by Grant
-> Likely, this patch adds support to clk_get to allow drivers to retrieve
-> clock data from the device tree.
->
-> Platforms scan for clocks in DT with of_clk_init and a match table, and
-> the register a provider through of_clk_add_provider. The provider's
-> clk_src_get function will be called when a device references the
-> provider's OF node for a clock reference.
->
-> v5 (Rob Herring):
-> ? ?- Move from drivers/of into common clock subsystem
-> ? ?- Squashed "dt/clock: add a simple provider get function" and
-> ? ? ?"dt/clock: add function to get parent clock name"
-> ? ?- Rebase to 3.4-rc1
-> ? ?- Drop CONFIG_OF_CLOCK and just use CONFIG_OF
-> ? ?- Add missing EXPORT_SYMBOL to various functions
-> ? ?- s/clock-output-name/clock-output-names/
-> ? ?- Define that fixed-clock binding is a single output
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-The patch history should go below the --- line,
+This patch can avoid kernel oops in case the mux or config
+function is not supported by driver.
+
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+v1-> v2: typo fix
+---
+ drivers/pinctrl/pinconf.c |    4 ++++
+ drivers/pinctrl/pinmux.c  |   15 +++++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+index eb3a14f..384dcc1 100644
+--- a/drivers/pinctrl/pinconf.c
++++ b/drivers/pinctrl/pinconf.c
+@@ -448,8 +448,12 @@ static void pinconf_dump_pin(struct pinctrl_dev *pctldev,
+ static int pinconf_pins_show(struct seq_file *s, void *what)
+ {
+ 	struct pinctrl_dev *pctldev = s->private;
++	const struct pinconf_ops *ops = pctldev->desc->confops;
+ 	unsigned i, pin;
+ 
++	if (!ops || !ops->pin_config_get)
++		return 0;
++
+ 	seq_puts(s, "Pin config settings per pin\n");
+ 	seq_puts(s, "Format: pin (name): pinmux setting array\n");
+ 
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 8849830..c494c37 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -323,6 +323,11 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
+ 	const unsigned *pins;
+ 	unsigned num_pins;
+ 
++	if (!pmxops) {
++		dev_err(pctldev->dev, "does not support mux function\n");
++		return -EINVAL;
++	}
++
+ 	setting->data.mux.func =
+ 		pinmux_func_name_to_selector(pctldev, map->data.mux.function);
+ 	if (setting->data.mux.func < 0)
+@@ -481,11 +486,14 @@ static int pinmux_functions_show(struct seq_file *s, void *what)
+ {
+ 	struct pinctrl_dev *pctldev = s->private;
+ 	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
+-	unsigned nfuncs = pmxops->get_functions_count(pctldev);
++	unsigned nfuncs;
+ 	unsigned func_selector = 0;
+ 
+-	mutex_lock(&pinctrl_mutex);
++	if (!pmxops)
++		return 0;
+ 
++	mutex_lock(&pinctrl_mutex);
++	nfuncs = pmxops->get_functions_count(pctldev);
+ 	while (func_selector < nfuncs) {
+ 		const char *func = pmxops->get_function_name(pctldev,
+ 							  func_selector);
+@@ -520,6 +528,9 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
+ 	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
+ 	unsigned i, pin;
+ 
++	if (!pmxops)
++		return 0;
++
+ 	seq_puts(s, "Pinmux settings per pin\n");
+ 	seq_puts(s, "Format: pin (name): mux_owner gpio_owner hog?\n");
+ 
+-- 
+1.7.0.4
