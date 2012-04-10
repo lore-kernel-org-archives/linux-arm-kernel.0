@@ -1,56 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Apr 2012 07:42:47 +0800
-Subject: [PATCH 2/7] of: add clock providers
-In-Reply-To: <4F82F386.7080303@gmail.com>
-References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
- <1331680947-29861-3-git-send-email-robherring2@gmail.com>
- <20120409115549.GB18692@S2101-09.ap.freescale.net>
- <4F82E9A3.1030606@gmail.com>
- <20120409141347.GC18692@S2101-09.ap.freescale.net>
- <4F82F386.7080303@gmail.com>
-Message-ID: <20120409234241.GE18692@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Apr 2012 17:08:09 -0700
+Subject: [PATCH] arm: omap4: hsmmc: check for null pointer
+In-Reply-To: <1333460858-9324-1-git-send-email-balajitk@ti.com>
+References: <1333460858-9324-1-git-send-email-balajitk@ti.com>
+Message-ID: <20120410000808.GE6487@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2012 at 09:34:46AM -0500, Rob Herring wrote:
-> On 04/09/2012 09:13 AM, Shawn Guo wrote:
-...
-> >
-> > 	uart_serial_clk: uart-baud {
-> > 		compatible = "fsl,imx6q-clock";
-> > 		#clock-cells = <0>;
-> > 		/* clocks = <&ipg_per_clk>; */
-> > 		clocks = <???>;
+* Balaji T K <balajitk@ti.com> [120403 06:47]:
+> platform_device pdev can be NULL if CONFIG_MMC_OMAP_HS is not set.
+> Add check for NULL pointer
 > 
-> This is a provider node not a consumer, so you don't have a clocks
-> property.
-
-To me, any clock except root is not only a provider but also a consumer.
-If "clocks" property is required for a consumer ...
-
-> You could, but then you need the parent clock defined in the DT.
+> Fixes the following boot crash seen with omap4sdp and omap4panda
+> when MMC is disabled.
 > 
-..., then we need to define the entire clock tree in the DT.
-
-> The compatible property here looks too generic. In the CCM code, how do
-> you match it to the uart baud clock? You shouldn't be using the name.
+> Unable to handle kernel NULL pointer dereference at virtual address 0000008c
+> pgd = c0004000
+> [0000008c] *pgd=00000000
+> Internal error: Oops: 5 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0    Not tainted  (3.4.0-rc1-05971-ga4dfa82 #4)
+> PC is at omap_4430sdp_init+0x184/0x410
+> LR is at device_add+0x1a0/0x664
 > 
-The code was copied from my early implementation which gets the entire
-clock tree and every clock (reg, bits, shift) represented in DT, and I
-do not need to map it to CCM code at all.
+> Signed-off-by: Balaji T K <balajitk@ti.com>
+> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-4430sdp.c    |    6 +++++-
+>  arch/arm/mach-omap2/board-omap4panda.c |    6 +++++-
+>  2 files changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index a39fc4b..1ce771d 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -526,8 +526,12 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
+>  	struct omap2_hsmmc_info *c;
+>  
+>  	omap_hsmmc_init(controllers);
+> -	for (c = controllers; c->mmc; c++)
+> +	for (c = controllers; c->mmc; c++) {
+> +		/* pdev can be null if CONFIG_MMC_OMAP_HS is not set */
+> +		if (!c->pdev)
+> +			continue;
+>  		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
+> +	}
+>  
+>  	return 0;
+>  }
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index d8c0e89..104fd6d 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -278,8 +278,12 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
+>  	struct omap2_hsmmc_info *c;
+>  
+>  	omap_hsmmc_init(controllers);
+> -	for (c = controllers; c->mmc; c++)
+> +	for (c = controllers; c->mmc; c++) {
+> +		/* pdev can be null if CONFIG_MMC_OMAP_HS is not set */
+> +		if (!c->pdev)
+> +			continue;
+>  		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
+> +	}
+>  
+>  	return 0;
+>  }
 
-> You need to first decide if you are going to define each clock in the DT
+Uhh cut and paste duplicate code.. Let's get rid of that while at
+it. Can you please update this so we have only one copy of
+omap4_twl6030_hsmmc_init in some place, maybe in one of the
+arch/arm/mach-omap2/*twl*.c files?
 
-That was my preference, but it brings too many clock nodes into DT.
+Thanks,
 
-> or just the whole CCM as a node.
-> You can't really do something in the
-> middle or be evolving it over time. You could perhaps make the PLLs be
-> separate nodes and inputs to the CCM. As they really are separate h/w
-> blocks.
-
-I do not understand this part.
-
--- 
-Regards,
-Shawn
+Tony
