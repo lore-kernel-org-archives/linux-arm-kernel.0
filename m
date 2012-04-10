@@ -1,134 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 10 Apr 2012 09:11:37 -0700
-Subject: [PATCH 2/2] OMAP2+: UART: Add mechanism to probe uart pins and
- configure rx wakeup
-In-Reply-To: <1334065246-21294-3-git-send-email-govindraj.raja@ti.com>
-References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
- <1334065246-21294-3-git-send-email-govindraj.raja@ti.com>
-Message-ID: <20120410161136.GF6487@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Apr 2012 18:11:42 +0200
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <20120410143055.GT24211@n2100.arm.linux.org.uk>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
+ <20120410143055.GT24211@n2100.arm.linux.org.uk>
+Message-ID: <20120410161142.GG3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Govindraj.R <govindraj.raja@ti.com> [120410 06:44]:
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -120,11 +120,63 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
->  #endif /* CONFIG_PM */
->  
->  #ifdef CONFIG_OMAP_MUX
-> -static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
-> +
-> +#define OMAP_UART_DEFAULT_PAD_NAME_LEN	28
-> +static char rx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN],
-> +		tx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN] __initdata;
-> +static struct omap_device_pad default_omap_uart_pads[2] __initdata;
+On Tue, Apr 10, 2012 at 03:30:55PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 10, 2012 at 03:45:14PM +0200, Sascha Hauer wrote:
+> > With the generic clock framework we do not necessarily have
+> > a pointer to the struct clk we want to register a lookup
+> > for, so add a const char *clkname field to struct clk_lookup
+> > so that a lookup can be registered with a clock name.
+> 
+> All this silly names all over the place is getting to be utterly
+> rediculous. Why do we need to name clocks and look them up by name
+> when we have a perfectly good way (clkdev) to do this already?  Yes,
+> it takes a struct clk pointer but that's exactly because that's what
+> it has to return.
+> 
+> Why do we want to have another idiotic string to look up a clock which
+> is named using an idiotic scheme to find out its pointer to only then
+> register that with clkdev?
+> 
+> I think this clk stuff has gone totally insane wrt names recently.
 
-Won't the default_omap_uart_pads get overwritten for each port?
-We need that information in the driver too for each port? Why don't you
-just allocate bdata.pads in omap_serial_board_init as we now assume it's
-needed for each port?
+clk names and clk lookups are two different things. The former is a
+unique identifier for a clock whereas the latter associates a clock
+to a device. Multiple lookups can point to the same clock, so they can't
+be used to identify a particular clock. I know I'm not telling anything
+new to you here, so I think your question goes down to why we need a
+unique identifier string for clocks.
 
-> +static void  __init omap_serial_fill_default_pads(struct omap_board_data *bdata)
->  {
-> +	struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
-> +	struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
-> +
-> +	if (bdata->id != 2) {
-> +		snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
-> +			 "uart%d_rx.uart%d_rx", bdata->id + 1, bdata->id + 1);
-> +		snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
-> +			 "uart%d_tx.uart%d_tx", bdata->id + 1, bdata->id + 1);
-> +	} else {
-> +		snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
-> +			"uart%d_rx_irrx.uart%d_rx_irrx", bdata->id + 1,
-> +			bdata->id + 1);
-> +		snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
-> +			"uart%d_tx_irtx.uart%d_tx_irtx", bdata->id + 1,
-> +			bdata->id + 1);
-> +	}
+For me the big advantage for clocks having unique names is that I do not
+have to have a struct clk * to pass the (possible) parents of a clock to
+the clock framework during registration. Also it makes us independent of
+the registration order of the clock tree (no need to register the
+parents before the children). The debugfs representation of the clock
+tree also makes use of the names.
 
-This would be simpler with something like this (untested):
+Sascha
 
-	char *rx_fmt, *tx_fmt;
-	int uart_nr = bdata->id + 1;
-
-	if (bdata->id == 2) {
-		rx_fmt = "uart%d_rx.uart%d_rx";
-		tx_fmt = "uart%d_tx.uart%d_tx";
-        } else {
-		rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
-		tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
-        }
-
-	snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
-			uart_nr, uart_nr);
-	snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
-			uart_nr, uart_nr);
-
-> +	if (omap_mux_get_by_name(rx_pad_name, &rx_partition, &rx_mux) >= 0 &&
-> +			omap_mux_get_by_name
-> +				(tx_pad_name, &tx_partition, &tx_mux) >= 0) {
-> +		u16 tx_mode, rx_mode;
-> +
-> +		tx_mode = omap_mux_read(tx_partition, tx_mux->reg_offset);
-> +		rx_mode = omap_mux_read(rx_partition, rx_mux->reg_offset);
-> +
-> +		/*
-> +		 * Check if uart is used in default tx/rx mode i.e. in mux mode0
-> +		 * if yes then configure rx pin for wake up capability
-> +		 */
-> +		if (!(rx_mode & 0x07) && !(tx_mode & 0x07)) {
-> +			default_omap_uart_pads[0].name = rx_pad_name;
-> +			default_omap_uart_pads[0].flags  =
-> +				OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP;
-> +			default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
-> +								OMAP_MUX_MODE0;
-> +			default_omap_uart_pads[0].idle = OMAP_PIN_INPUT |
-> +								OMAP_MUX_MODE0;
-> +
-> +			default_omap_uart_pads[1].name = tx_pad_name;
-> +			default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
-> +								OMAP_MUX_MODE0;
-> +			bdata->pads = default_omap_uart_pads;
-> +			bdata->pads_cnt = ARRAY_SIZE(default_omap_uart_pads);
-> +		}
-> +	}
->  }
-
-Then looking at omap_serial_board_init, it still looks wrong:
-
-void __init omap_serial_board_init(struct omap_uart_port_info *info)
-{
-	struct omap_uart_state *uart;
-	struct omap_board_data bdata;
-
-	list_for_each_entry(uart, &uart_list, node) {
-		bdata.id = uart->num;
-		bdata.flags = 0;
-		bdata.pads = NULL;
-		bdata.pads_cnt = 0;
-
-		if (cpu_is_omap44xx() || cpu_is_omap34xx())
-			omap_serial_fill_default_pads(&bdata);
-
-Why don't you fill the pads for omap2? It has the same pads, although
-it does not have the serial wake-up events working.
-
-And why don't you exit if omap_serial_fill_default_pads fails for the
-no info case?
-
-Shouldn't it be something like:
-
-		if (!info) {
-			res = omap_serial_fill_default_pads(&bdata);
-			if (!res)
-				return;
-			port = NULL;
-		} else {
-			port = &info[uart->num];		
-		}
-		omap_serial_init_port(&bdata, port);
-
-Regards,
-
-Tony
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
