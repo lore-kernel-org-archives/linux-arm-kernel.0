@@ -1,47 +1,55 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:24 +0200
-Subject: [PATCH 11/40] mtd mxc_nand: prepare/unprepare clock
+Date: Tue, 10 Apr 2012 15:45:48 +0200
+Subject: [PATCH 35/40] ARM i.MX: remove now unused old clock support
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-12-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-36-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/clock-imx1.c      |  636 -----------
+ arch/arm/mach-imx/clock-imx21.c     | 1239 --------------------
+ arch/arm/mach-imx/clock-imx25.c     |  346 ------
+ arch/arm/mach-imx/clock-imx27.c     |  785 -------------
+ arch/arm/mach-imx/clock-imx31.c     |  630 -----------
+ arch/arm/mach-imx/clock-imx35.c     |  536 ---------
+ arch/arm/mach-imx/clock-imx6q.c     | 2111 -----------------------------------
+ arch/arm/mach-imx/clock-mx51-mx53.c | 1675 ---------------------------
+ 8 files changed, 7958 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/clock-imx1.c
+ delete mode 100644 arch/arm/mach-imx/clock-imx21.c
+ delete mode 100644 arch/arm/mach-imx/clock-imx25.c
+ delete mode 100644 arch/arm/mach-imx/clock-imx27.c
+ delete mode 100644 arch/arm/mach-imx/clock-imx31.c
+ delete mode 100644 arch/arm/mach-imx/clock-imx35.c
+ delete mode 100644 arch/arm/mach-imx/clock-imx6q.c
+ delete mode 100644 arch/arm/mach-imx/clock-mx51-mx53.c
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index cc0678a..9e374e9 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -690,7 +690,7 @@ static void mxc_nand_select_chip(struct mtd_info *mtd, int chip)
- 	if (chip == -1) {
- 		/* Disable the NFC clock */
- 		if (host->clk_act) {
--			clk_disable(host->clk);
-+			clk_disable_unprepare(host->clk);
- 			host->clk_act = 0;
- 		}
- 		return;
-@@ -698,7 +698,7 @@ static void mxc_nand_select_chip(struct mtd_info *mtd, int chip)
- 
- 	if (!host->clk_act) {
- 		/* Enable the NFC clock */
--		clk_enable(host->clk);
-+		clk_prepare_enable(host->clk);
- 		host->clk_act = 1;
- 	}
- 
-@@ -1078,7 +1078,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 		goto eclk;
- 	}
- 
--	clk_enable(host->clk);
-+	clk_prepare_enable(host->clk);
- 	host->clk_act = 1;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+diff --git a/arch/arm/mach-imx/clock-imx1.c b/arch/arm/mach-imx/clock-imx1.c
+deleted file mode 100644
+index 4aabeb2..0000000
+diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
+deleted file mode 100644
+index ee15d8c..0000000
+diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
+deleted file mode 100644
+index b0fec74c..0000000
+diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+deleted file mode 100644
+index 98e04f5..0000000
+diff --git a/arch/arm/mach-imx/clock-imx31.c b/arch/arm/mach-imx/clock-imx31.c
+deleted file mode 100644
+index 3a943cd..0000000
+diff --git a/arch/arm/mach-imx/clock-imx35.c b/arch/arm/mach-imx/clock-imx35.c
+deleted file mode 100644
+index e56c1a8..0000000
+diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+deleted file mode 100644
+index 111c328..0000000
+diff --git a/arch/arm/mach-imx/clock-mx51-mx53.c b/arch/arm/mach-imx/clock-mx51-mx53.c
+deleted file mode 100644
+index 0847050..0000000
 -- 
 1.7.9.5
