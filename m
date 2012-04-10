@@ -1,51 +1,70 @@
-From: kassey1216@gmail.com (Kassey Lee)
-Date: Tue, 10 Apr 2012 15:30:58 +0800
-Subject: questions about drivers/dma/amba-pl08x.c
-Message-ID: <CAKwPUozgACvV-TZdn92f1O2shSEvFBfbN-hrS=FNQ5O+DEEY5g@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 10 Apr 2012 09:52:37 +0200
+Subject: [PATCH] pinctrl: fix build failure on PPC
+Message-ID: <1334044357-14486-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Linus, Walleij:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-             I found the dma controller driver for amba-pl08x.
-             may i have two questions for you ? Thank you very much!
+commit 23289e6ecc6d ("pinctrl: core device tree mapping table
+parsing support") caused a build failure on PPC:
 
-             1) how to add the devices resource for this driver ? i
-did not find any info in the kernel but this driver.
-             2) in the below function, if the slave is set true,
-kernel will panic, because slave_channels is NULL, and nobody
-initialize this member, should this member be initialized by vendor ?
+drivers/pinctrl/devicetree.c: In function 'dt_free_map':
+drivers/pinctrl/devicetree.c:44:42: error: dereferencing pointer to incomplete type
+drivers/pinctrl/devicetree.c:45:6: error: dereferencing pointer to incomplete type
+drivers/pinctrl/devicetree.c: In function 'dt_to_map_one_config':
+drivers/pinctrl/devicetree.c:140:21: error: dereferencing pointer to incomplete type
+drivers/pinctrl/devicetree.c:141:10: error: dereferencing pointer to incomplete type
+drivers/pinctrl/devicetree.c:146:11: error: dereferencing pointer to incomplete type
 
+This is probably because the Makefile for pinctrl contains this,
+that makes a small piece of the implementation build and link
+in isolation:
 
-static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
-                struct dma_device *dmadev, unsigned int channels, bool slave)
-{
-        struct pl08x_dma_chan *chan;
-        int i;
+obj-$(CONFIG_OF)                += devicetree.o
 
-        INIT_LIST_HEAD(&dmadev->channels);
+So let's use some local Kconfig option that depends on both OF
+and PINCTRL so that this file is only compiled if you have
+both enabled.
 
-        /*
-         * Register as many many memcpy as we have physical channels,
-         * we won't always be able to use all but the code will have
-         * to cope with that situation.
-         */
-        for (i = 0; i < channels; i++) {
-                chan = kzalloc(sizeof(*chan), GFP_KERNEL);
-                if (!chan) {
-                        dev_err(&pl08x->adev->dev,
-                                "%s no memory for channel\n", __func__);
-                        return -ENOMEM;
-                }
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/Kconfig  |    5 +++++
+ drivers/pinctrl/Makefile |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-                chan->host = pl08x;
-                chan->state = PL08X_CHAN_IDLE;
-
-                if (slave) {
-                        chan->cd = &pl08x->pd->slave_channels[i];
-                        pl08x_dma_slave_init(chan);
-                } else {
-
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index abfb964..d68c878 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -17,6 +17,11 @@ config PINMUX
+ config PINCONF
+ 	bool "Support pin configuration controllers"
+ 
++config PINCTRL_OF
++	bool
++	depends on OF
++	default y if OF
++
+ config GENERIC_PINCONF
+ 	bool
+ 	select PINCONF
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 049c9fb..5412f60 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -5,7 +5,7 @@ ccflags-$(CONFIG_DEBUG_PINCTRL)	+= -DDEBUG
+ obj-$(CONFIG_PINCTRL)		+= core.o
+ obj-$(CONFIG_PINMUX)		+= pinmux.o
+ obj-$(CONFIG_PINCONF)		+= pinconf.o
+-obj-$(CONFIG_OF)		+= devicetree.o
++obj-$(CONFIG_PINCTRL_OF)	+= devicetree.o
+ obj-$(CONFIG_GENERIC_PINCONF)	+= pinconf-generic.o
+ obj-$(CONFIG_PINCTRL_PXA3xx)	+= pinctrl-pxa3xx.o
+ obj-$(CONFIG_PINCTRL_MMP2)	+= pinctrl-mmp2.o
 -- 
-Best regards
-Kassey
+1.7.9.2
