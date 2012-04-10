@@ -1,102 +1,22 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Tue, 10 Apr 2012 17:01:37 +0530
-Subject: [PATCH 00/19] I2C updates
-In-Reply-To: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
-References: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CANfBPZ92EEAqrFC2gnULAXwQKhWdAuNntHz0QVXuUR3Wr=nSGQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Apr 2012 11:31:56 +0000
+Subject: [PATCHv8 03/10] ARM: dma-mapping: introduce ARM_DMA_ERROR constant
+In-Reply-To: <1334055852-19500-4-git-send-email-m.szyprowski@samsung.com>
+References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
+ <1334055852-19500-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201204101131.56412.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 4:26 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> The patch series does the following
->
-> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
-> - I2C register restore only if context if the context is lost
-> - Bus busy recovery mechanism.
-> - the reset is not done in init.
->
-> v2 changes
-> -Adds a patch to use devm_* functions
-> -Also checks the return type of the get_sync and in case
-> ?of errors prevents register access.
-> - In case of i2c remove register access was done without any
-> ?get_sync fix the same.
-> - Adds a pdata function pointer to do context save restore
->
-> v3 changes
-> - Split the omap_i2c_isr to increase readability
-> - Adds the restore flag patch for OMAP4 to the series
-> - Make the i2c use SET_RUNTIME_PM_OPS
-> v4 changes
-> - Folds a patch from Tasslehoff to prevent any merge conflicts.
-> - Prevents the XDUF flag to be set if the underflow condition is not met.
->
-> v5 changes
-> - Add consistency in the subject naming.
->
-> v6 changes
-> - As per discussion in [1] .Adds a patch to rename the 1p153 errata and
-> ?use the unique id instead as the section number in the recent errata
-> ?docs has changed.
->
->
-> [1] http://www.spinics.net/lists/linux-i2c/msg07607.html
->
-> Tested on omap4sdp and omap3sdp.
->
->
-> The following changes since commit 258f742635360175564e9470eb060ff4d4b984e7:
->
-> ?modpost: Fix modpost license checking of vmlinux.o (2012-04-09 20:52:56 -0700)
->
-> are available in the git repository at:
-> ?git at gitorious.org:linus-tree/linus-tree.git i2c_omap-next
+On Tuesday 10 April 2012, Marek Szyprowski wrote:
+> Replace all uses of ~0 with ARM_DMA_ERROR, what should make the code
+> easier to read.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Minor nit:
-You might want to indicate a git:// link instead of an ssh URL ?
+I like the idea, but why not name this DMA_ERROR_CODE like the other
+architectures do? I think in the long run we should put the definition
+into a global header file.
 
->
->
-> Jon Hunter (1):
-> ?I2C: OMAP: Correct I2C revision for OMAP3
->
-> Shubhrajyoti D (16):
-> ?I2C: OMAP: make omap_i2c_unidle/idle functions depend on
-> ? ?CONFIG_PM_RUNTIME
-> ?I2C: OMAP: Remove reset at init
-> ?I2C: OMAP: I2C register restore only if context is lost
-> ?I2C: OMAP: Fix the interrupt clearing in OMAP4
-> ?I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
-> ?I2C: OMAP: Optimise the remove code
-> ?I2C: OMAP: Fix the error handling
-> ?I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
-> ? ?than zero
-> ?I2C: OMAP: use devm_* functions
-> ?I2C: OMAP: Fix the crash in i2c remove
-> ?I2C: OMAP: Handle error check for pm runtime
-> ?I2C: OMAP: Use SET_RUNTIME_PM_OPS
-> ?I2C: OMAP: make the read ready processing a separate function
-> ?I2C: OMAP: Do not set the XUDF if the underflow is not reached
-> ?I2C: OMAP: Rename the 1p153 to the erratum id i462
-> ?ARM: OMAP4: hwmod data: I2C: add flag for context restore
->
-> Tasslehoff Kjappfot (1):
-> ?I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
->
-> Vikram Pandita (1):
-> ?I2C: OMAP: Recover from Bus Busy condition
->
-> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? ?3 +-
-> ?arch/arm/plat-omap/i2c.c ? ? ? ? ? ? ? ? ? | ? ?3 +
-> ?drivers/i2c/busses/i2c-omap.c ? ? ? ? ? ? ?| ?342 +++++++++++++++-------------
-> ?include/linux/i2c-omap.h ? ? ? ? ? ? ? ? ? | ? ?1 +
-> ?4 files changed, 194 insertions(+), 155 deletions(-)
->
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Arnd
