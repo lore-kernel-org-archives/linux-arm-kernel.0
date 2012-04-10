@@ -1,25 +1,35 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 10 Apr 2012 14:52:59 +0530
-Subject: questions about drivers/dma/amba-pl08x.c
-In-Reply-To: <4F83F011.7070004@st.com>
-References: <CAKwPUozgACvV-TZdn92f1O2shSEvFBfbN-hrS=FNQ5O+DEEY5g@mail.gmail.com>
- <CACRpkdaC3=vSGF6XH=7Oiqsdg0RVDfbv-M5NZDY5psF96BssHQ@mail.gmail.com>
- <4F83F011.7070004@st.com>
-Message-ID: <4F83FBF3.7060308@st.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 10 Apr 2012 12:24:43 +0300
+Subject: [PATCH RESEND] Input: omap-keypad: dynamically handle register
+ offsets
+In-Reply-To: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
+References: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120410092441.GB20616@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/10/2012 2:02 PM, Viresh Kumar wrote:
-> On 4/10/2012 2:02 PM, Linus Walleij wrote:
->> Hm, Viresh have you posted your platform code for PL080 on
->> SPEAr?
-> 
-> Ya. it was present in my DT support of SPEAr3xx.
-> 
+On Tue, Apr 03, 2012 at 10:52:26AM +0530, Sourav Poddar wrote:
+> +static int kbd_write_irqstatus(struct omap4_keypad *keypad_data,
+> +						u32 offset, u32 value)
+> +{
+> +	return __raw_writel(value, keypad_data->base + offset);
+> +}
+> +
+> +static int kbd_write_irqenable(struct omap4_keypad *keypad_data,
+> +						u32 offset, u32 value)
+> +{
+> +	return __raw_writel(value, keypad_data->base + offset);
+> +}
 
-Must have given link too :(
-
-lists.infradead.org/pipermail/linux-arm-kernel/2012-March/091843.html
+if this only writes to irqenable, why do you pass offset as an argument?
+likewise for irqstatus.
 
 -- 
-viresh
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120410/8f295da2/attachment-0001.sig>
