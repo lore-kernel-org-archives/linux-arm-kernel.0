@@ -1,54 +1,30 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 10 Apr 2012 10:12:36 -0400
-Subject: [PATCH 1/3] ARM i.MX27: Add devicetree support
-In-Reply-To: <20120410091715.GA3852@pengutronix.de> (Sascha Hauer's message of
- "Tue, 10 Apr 2012 11:17:15 +0200")
-References: <1330503654-2197-1-git-send-email-s.hauer@pengutronix.de>
- <1330503654-2197-2-git-send-email-s.hauer@pengutronix.de>
- <87lim5zne5.fsf@laptop.org> <20120410091715.GA3852@pengutronix.de>
-Message-ID: <87iph7wu97.fsf@laptop.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 10 Apr 2012 16:02:31 +0200
+Subject: [PATCH 1/1] ARN: at91: fix rm9200ek flash size
+Message-ID: <1334066551-5554-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The flash size is 8MiB.
 
-On Tue, Apr 10 2012, Sascha Hauer wrote:
-> On Sun, Apr 08, 2012 at 09:48:02PM -0400, Chris Ball wrote:
->> >
->> > [...]
->> > +static int __init imx27_avic_add_irq_domain(struct device_node *np,
->> > +				struct device_node *interrupt_parent)
->> > +{
->> > +	irq_domain_add_simple(np, 0);
->> > +	return 0;
->> > +}
->> > +
->> > +static int __init imx27_gpio_add_irq_domain(struct device_node *np,
->> > +				struct device_node *interrupt_parent)
->> > +{
->> > +	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
->> > +
->> > +	irq_domain_add_simple(np, gpio_irq_base);
->> > +
->> > +	return 0;
->> > +}
->> 
->> This patch was merged for 3.4-rc1, but it fails to compile because Grant
->> removed irq_domain_add_simple() in 3.4-rc1.
->
-> Thanks for noting. I assume that irq_domain_add_legacy is the right
-> approach here, just like the other i.MX boards do, right?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/board-rm9200ek.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Yeah, if you look at Grant's removal patch:
-
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=6b783f7c5dde2648fa0bbe7fc8ac80d78699e67f
-
-.. he converted all of the in-tree uses to irq_domain_add_legacy()
-at the time of removal, so that looks right.
-
-Thanks,
-
-- Chris.
+diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
+index 78ffc83..2b15b8a 100644
+--- a/arch/arm/mach-at91/board-rm9200ek.c
++++ b/arch/arm/mach-at91/board-rm9200ek.c
+@@ -103,7 +103,7 @@ static struct i2c_board_info __initdata ek_i2c_devices[] = {
+ };
+ 
+ #define EK_FLASH_BASE	AT91_CHIPSELECT_0
+-#define EK_FLASH_SIZE	SZ_2M
++#define EK_FLASH_SIZE	SZ_8M
+ 
+ static struct physmap_flash_data ek_flash_data = {
+ 	.width		= 2,
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.9.1
