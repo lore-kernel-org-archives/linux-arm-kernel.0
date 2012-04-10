@@ -1,19 +1,28 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 10 Apr 2012 15:44:51 +0200
-Subject: [PATCH] ARM: mmci: add support for the Nomadik MMCI variant
-In-Reply-To: <1334005410-20539-1-git-send-email-linus.walleij@linaro.org>
-References: <1334005410-20539-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4F843953.6070503@stericsson.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Apr 2012 15:45:30 +0200
+Subject: [PATCH 17/40] ARM i.MX5: prepare gpc_dvfs_clk
+In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-18-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2012 11:03 PM, Linus Walleij wrote:
-> The Nomadik variant is somewhere inbetween the U300 and the Ux500
-> variant, its actually expose the same primecell ID as the U300
-> but had different characteristics so it needs a small revision
-> bump and hard-coding from the board/device tree. After this it
-> works just fine.
->
-> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/mm-imx5.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Looks good to me. Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index 05250ae..d9936ce 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -32,6 +32,7 @@ static void imx5_idle(void)
+ 		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+ 		if (IS_ERR(gpc_dvfs_clk))
+ 			return;
++		clk_prepare(gpc_dvfs_clk);
+ 	}
+ 	clk_enable(gpc_dvfs_clk);
+ 	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+-- 
+1.7.9.5
