@@ -1,82 +1,65 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 10 Apr 2012 12:41:34 +0800
-Subject: [PATCH v2 1/1] pinctrl: add some error checking for user interfaces
-Message-ID: <1334032894-6012-1-git-send-email-b29396@freescale.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 10 Apr 2012 05:30:58 +0000
+Subject: [PATCH v2] arm: da850: change ASYNC/PLL0_SYSCLK3 clock rate
+ with DVFS
+In-Reply-To: <4F833315.1050109@ti.com>
+References: <1333617232-27967-1-git-send-email-prakash.pm@ti.com>
+ <4F833315.1050109@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC317A594E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+Hi Sekhar,
 
-This patch can avoid kernel oops in case the mux or config
-function is not supported by driver.
+On Tue, Apr 10, 2012 at 00:35:57, Nori, Sekhar wrote:
+> Hi Prakash,
+> 
+> On 4/5/2012 2:43 PM, Manjunathappa, Prakash wrote:
+> > Clock for EMIF is derived from ASYNC clock domain(PLL0_SYSCLK3) and was
+> > configured with fixed divider as there was no significant performance
+> > degradation with existing NAND/NOR EMIF devices if it is not
+> > reconfigured accordingly at different OPPs.
+> 
+> This is not correct AFAICT. The divider is not fixed in current code.
+> There is an attempt to adjust the async1 (PLL0 SYSCLK3 rate) and keep it
+> constant at 100MHz by adjusting the divider at each OPP transition (see
+> the call to clock_set_rate() on async clock in cpufreq.c). This was
+> based on an earlier understanding that PLL0_SYSCLK3 can support 100MHz
+> at all OPPs and all AEMIF modes. Looking at the datasheet now, it is
+> clear that that assumption is not true.
+> 
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
-v1-> v2: typo fix
----
- drivers/pinctrl/pinconf.c |    4 ++++
- drivers/pinctrl/pinmux.c  |   15 +++++++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
+I will correct this.
+ 
+> > 
+> > On systems where devices other than NAND/NOR are interfaced through
+> > EMIF, such performance degradation may not be desirable. So change the
+> > PLL0_SYSCLK3 output frequency for different OPPs by re-configuring
+> > the divider value.
+> 
+> This again is not the point. The issue is that depending on what mode
+> you have AEMIF running in *and* depending on what OPP you are at, a
+> particular value of ASYNC1 clock is required to get maximum performance
+> out of AEMIF.
+> 
 
-diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-index eb3a14f..384dcc1 100644
---- a/drivers/pinctrl/pinconf.c
-+++ b/drivers/pinctrl/pinconf.c
-@@ -448,8 +448,12 @@ static void pinconf_dump_pin(struct pinctrl_dev *pctldev,
- static int pinconf_pins_show(struct seq_file *s, void *what)
- {
- 	struct pinctrl_dev *pctldev = s->private;
-+	const struct pinconf_ops *ops = pctldev->desc->confops;
- 	unsigned i, pin;
- 
-+	if (!ops || !ops->pin_config_get)
-+		return 0;
-+
- 	seq_puts(s, "Pin config settings per pin\n");
- 	seq_puts(s, "Format: pin (name): pinmux setting array\n");
- 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 8849830..c494c37 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -323,6 +323,11 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
- 	const unsigned *pins;
- 	unsigned num_pins;
- 
-+	if (!pmxops) {
-+		dev_err(pctldev->dev, "does not support mux function\n");
-+		return -EINVAL;
-+	}
-+
- 	setting->data.mux.func =
- 		pinmux_func_name_to_selector(pctldev, map->data.mux.function);
- 	if (setting->data.mux.func < 0)
-@@ -481,11 +486,14 @@ static int pinmux_functions_show(struct seq_file *s, void *what)
- {
- 	struct pinctrl_dev *pctldev = s->private;
- 	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
--	unsigned nfuncs = pmxops->get_functions_count(pctldev);
-+	unsigned nfuncs;
- 	unsigned func_selector = 0;
- 
--	mutex_lock(&pinctrl_mutex);
-+	if (!pmxops)
-+		return 0;
- 
-+	mutex_lock(&pinctrl_mutex);
-+	nfuncs = pmxops->get_functions_count(pctldev);
- 	while (func_selector < nfuncs) {
- 		const char *func = pmxops->get_function_name(pctldev,
- 							  func_selector);
-@@ -520,6 +528,9 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
- 	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
- 	unsigned i, pin;
- 
-+	if (!pmxops)
-+		return 0;
-+
- 	seq_puts(s, "Pinmux settings per pin\n");
- 	seq_puts(s, "Format: pin (name): mux_owner gpio_owner hog?\n");
- 
--- 
-1.7.0.4
+Correct, I will reword it to convey the same.
+
+> > 
+> > Also add Kconfig option to support platforms requiring fixed EMIF clock
+> > rate.
+> 
+> This breaks single image support for all DA850 boards. Kconfig in this
+> case is not an option.
+> 
+> Why not make the OPP table board specific while maintain a sane (and
+> safe) default in SoC file so there is something to fall back upon in
+> case a board does not need to define its own? This should also address
+> Christian's concern in the other e-mail thread about board specific OPP
+> values being hardcoded in SoC file with no way to override them.
+> 
+
+Ok, I will look at this option and try to implement. 
+
+Thanks,
+Prakash
