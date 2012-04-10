@@ -1,85 +1,95 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:25 +0200
-Subject: [PATCH 12/40] USB ehci mxc: prepare/unprepare clock
+Date: Tue, 10 Apr 2012 15:45:18 +0200
+Subject: [PATCH 05/40] spi i.MX: do not depend on grouped clocks
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-13-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+the current i.MX clock support groups together unrelated clocks
+to a single clock which is then used by the driver. This can't
+be accomplished with the generic clock framework so we instead
+request the individual clocks in the driver. For i.MX there are
+generally three different clocks:
+
+ipg: bus clock (needed to access registers)
+ahb: dma relevant clock, sometimes referred to as hclk in the datasheet
+per: bit clock, pixel clock
+
+This patch changes the driver to request the individual clocks.
+Currently all clk_get will get the same clock until the SoCs
+are converted to the generic clock framework
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/usb/host/ehci-mxc.c |   18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/spi/spi-imx.c |   30 +++++++++++++++++++-----------
+ 1 file changed, 19 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index a797d51..ae16c34 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -171,7 +171,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 		ret = PTR_ERR(priv->usbclk);
- 		goto err_clk;
- 	}
--	clk_enable(priv->usbclk);
-+	clk_prepare_enable(priv->usbclk);
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index 31054e3..b54bfe8 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -85,7 +85,8 @@ struct spi_imx_data {
+ 	struct completion xfer_done;
+ 	void *base;
+ 	int irq;
+-	struct clk *clk;
++	struct clk *clk_per;
++	struct clk *clk_ipg;
+ 	unsigned long spi_clk;
  
- 	if (!cpu_is_mx35() && !cpu_is_mx25()) {
- 		priv->ahbclk = clk_get(dev, "usb_ahb");
-@@ -179,7 +179,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 			ret = PTR_ERR(priv->ahbclk);
- 			goto err_clk_ahb;
- 		}
--		clk_enable(priv->ahbclk);
-+		clk_prepare_enable(priv->ahbclk);
+ 	unsigned int count;
+@@ -841,15 +842,22 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+ 		goto out_iounmap;
  	}
  
- 	/* "dr" device has its own clock on i.MX51 */
-@@ -189,7 +189,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 			ret = PTR_ERR(priv->phy1clk);
- 			goto err_clk_phy;
- 		}
--		clk_enable(priv->phy1clk);
-+		clk_prepare_enable(priv->phy1clk);
+-	spi_imx->clk = clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(spi_imx->clk)) {
+-		dev_err(&pdev->dev, "unable to get clock\n");
+-		ret = PTR_ERR(spi_imx->clk);
++	spi_imx->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
++	if (IS_ERR(spi_imx->clk_ipg)) {
++		ret = PTR_ERR(spi_imx->clk_ipg);
+ 		goto out_free_irq;
  	}
  
+-	clk_enable(spi_imx->clk);
+-	spi_imx->spi_clk = clk_get_rate(spi_imx->clk);
++	spi_imx->clk_per = devm_clk_get(&pdev->dev, "per");
++	if (IS_ERR(spi_imx->clk_per)) {
++		ret = PTR_ERR(spi_imx->clk_per);
++		goto out_free_irq;
++	}
++
++	clk_prepare_enable(spi_imx->clk_per);
++	clk_prepare_enable(spi_imx->clk_ipg);
++
++	spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
  
-@@ -266,16 +266,16 @@ err_add:
- 		pdata->exit(pdev);
- err_init:
- 	if (priv->phy1clk) {
--		clk_disable(priv->phy1clk);
-+		clk_disable_unprepare(priv->phy1clk);
- 		clk_put(priv->phy1clk);
- 	}
- err_clk_phy:
- 	if (priv->ahbclk) {
--		clk_disable(priv->ahbclk);
-+		clk_disable_unprepare(priv->ahbclk);
- 		clk_put(priv->ahbclk);
- 	}
- err_clk_ahb:
--	clk_disable(priv->usbclk);
-+	clk_disable_unprepare(priv->usbclk);
- 	clk_put(priv->usbclk);
- err_clk:
- 	iounmap(hcd->regs);
-@@ -307,14 +307,14 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
- 	usb_put_hcd(hcd);
- 	platform_set_drvdata(pdev, NULL);
+ 	spi_imx->devtype_data->reset(spi_imx);
  
--	clk_disable(priv->usbclk);
-+	clk_disable_unprepare(priv->usbclk);
- 	clk_put(priv->usbclk);
- 	if (priv->ahbclk) {
--		clk_disable(priv->ahbclk);
-+		clk_disable_unprepare(priv->ahbclk);
- 		clk_put(priv->ahbclk);
- 	}
- 	if (priv->phy1clk) {
--		clk_disable(priv->phy1clk);
-+		clk_disable_unprepare(priv->phy1clk);
- 		clk_put(priv->phy1clk);
- 	}
+@@ -867,8 +875,8 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+ 	return ret;
+ 
+ out_clk_put:
+-	clk_disable(spi_imx->clk);
+-	clk_put(spi_imx->clk);
++	clk_disable_unprepare(spi_imx->clk_per);
++	clk_disable_unprepare(spi_imx->clk_ipg);
+ out_free_irq:
+ 	free_irq(spi_imx->irq, spi_imx);
+ out_iounmap:
+@@ -896,8 +904,8 @@ static int __devexit spi_imx_remove(struct platform_device *pdev)
+ 	spi_bitbang_stop(&spi_imx->bitbang);
+ 
+ 	writel(0, spi_imx->base + MXC_CSPICTRL);
+-	clk_disable(spi_imx->clk);
+-	clk_put(spi_imx->clk);
++	clk_disable_unprepare(spi_imx->clk_per);
++	clk_disable_unprepare(spi_imx->clk_ipg);
+ 	free_irq(spi_imx->irq, spi_imx);
+ 	iounmap(spi_imx->base);
  
 -- 
 1.7.9.5
