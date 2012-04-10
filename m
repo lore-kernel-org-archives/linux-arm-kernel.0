@@ -1,117 +1,111 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:23 +0200
-Subject: [PATCH 10/40] serial i.MX: do not depend on grouped clocks
+Date: Tue, 10 Apr 2012 15:45:16 +0200
+Subject: [PATCH 03/40] clk: declare clk_ops of basic clks in clk-provider.h
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-11-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the current i.MX clock support groups together unrelated clocks
-to a single clock which is then used by the driver. This can't
-be accomplished with the generic clock framework so we instead
-request the individual clocks in the driver. For i.MX there are
-generally three different clocks:
+From: Shawn Guo <shawn.guo@linaro.org>
 
-ipg: bus clock (needed to access registers)
-ahb: dma relevant clock, sometimes referred to as hclk in the datasheet
-per: bit clock, pixel clock
+Besides the static initialization, the clk_ops of basic clks could
+also be used by particular clk type being subclass of the basic clks.
 
-This patch changes the driver to request the individual clocks.
-Currently all clk_get will get the same clock until the SoCs
-are converted to the generic clock framework
+For example, clk_busy_divider has the same clk_ops as clk_divider,
+except it has to wait for a busy bit before return success with
+.set_rate.  clk_busy_divider will somehow reuse clk_ops of clk_divider.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Since clk-provider.h is included by clk-private.h, it's safe to move
+those clk_ops declaration of basic clks form  clk-private.h into
+clk-provider.h, so that implementation of clks like clk_busy_divider
+above do not need to include clk-private.h to access those clk_ops.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/tty/serial/imx.c |   38 +++++++++++++++++++++++---------------
- 1 file changed, 23 insertions(+), 15 deletions(-)
+ include/linux/clk-private.h  |    8 --------
+ include/linux/clk-provider.h |    8 ++++++++
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index e7fecee..267ec6d 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -204,7 +204,8 @@ struct imx_port {
- 	unsigned int		irda_inv_rx:1;
- 	unsigned int		irda_inv_tx:1;
- 	unsigned short		trcv_delay; /* transceiver delay */
--	struct clk		*clk;
-+	struct clk		*clk_ipg;
-+	struct clk		*clk_per;
- 	struct imx_uart_data	*devdata;
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index 5e4312b..f19fee0 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -55,8 +55,6 @@ struct clk {
+  * alternative macro for static initialization
+  */
+ 
+-extern struct clk_ops clk_fixed_rate_ops;
+-
+ #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
+ 				_fixed_rate_flags)		\
+ 	static struct clk _name;				\
+@@ -78,8 +76,6 @@ extern struct clk_ops clk_fixed_rate_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern struct clk_ops clk_gate_ops;
+-
+ #define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr,	\
+ 				_flags, _reg, _bit_idx,		\
+ 				_gate_flags, _lock)		\
+@@ -110,8 +106,6 @@ extern struct clk_ops clk_gate_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern struct clk_ops clk_divider_ops;
+-
+ #define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr,	\
+ 				_flags, _reg, _shift, _width,	\
+ 				_divider_flags, _lock)		\
+@@ -143,8 +137,6 @@ extern struct clk_ops clk_divider_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern struct clk_ops clk_mux_ops;
+-
+ #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags,	\
+ 				_reg, _shift, _width,		\
+ 				_mux_flags, _lock)		\
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 21ca2f8..587f54b 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -149,6 +149,8 @@ struct clk_fixed_rate {
+ 	u8		flags;
  };
  
-@@ -672,7 +673,7 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
- 	 * RFDIV is set such way to satisfy requested uartclk value
- 	 */
- 	val = TXTL << 10 | RXTL;
--	ufcr_rfdiv = (clk_get_rate(sport->clk) + sport->port.uartclk / 2)
-+	ufcr_rfdiv = (clk_get_rate(sport->clk_per) + sport->port.uartclk / 2)
- 			/ sport->port.uartclk;
- 
- 	if(!ufcr_rfdiv)
-@@ -1285,7 +1286,7 @@ imx_console_get_options(struct imx_port *sport, int *baud,
- 		else
- 			ucfr_rfdiv = 6 - ucfr_rfdiv;
- 
--		uartclk = clk_get_rate(sport->clk);
-+		uartclk = clk_get_rate(sport->clk_per);
- 		uartclk /= ucfr_rfdiv;
- 
- 		{	/*
-@@ -1503,14 +1504,22 @@ static int serial_imx_probe(struct platform_device *pdev)
- 	sport->timer.function = imx_timeout;
- 	sport->timer.data     = (unsigned long)sport;
- 
--	sport->clk = clk_get(&pdev->dev, "uart");
--	if (IS_ERR(sport->clk)) {
--		ret = PTR_ERR(sport->clk);
-+	sport->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(sport->clk_ipg)) {
-+		ret = PTR_ERR(sport->clk_ipg);
- 		goto unmap;
- 	}
--	clk_prepare_enable(sport->clk);
- 
--	sport->port.uartclk = clk_get_rate(sport->clk);
-+	sport->clk_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(sport->clk_per)) {
-+		ret = PTR_ERR(sport->clk_per);
-+		goto unmap;
-+	}
++extern struct clk_ops clk_fixed_rate_ops;
 +
-+	clk_prepare_enable(sport->clk_per);
-+	clk_prepare_enable(sport->clk_ipg);
+ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		unsigned long fixed_rate);
+@@ -180,6 +182,8 @@ struct clk_gate {
+ 
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+ 
++extern struct clk_ops clk_gate_ops;
 +
-+	sport->port.uartclk = clk_get_rate(sport->clk_per);
+ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+@@ -218,6 +222,8 @@ struct clk_divider {
+ #define CLK_DIVIDER_ONE_BASED		BIT(0)
+ #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
  
- 	imx_ports[sport->port.line] = sport;
- 
-@@ -1531,8 +1540,8 @@ deinit:
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
- clkput:
--	clk_disable_unprepare(sport->clk);
--	clk_put(sport->clk);
-+	clk_disable_unprepare(sport->clk_per);
-+	clk_disable_unprepare(sport->clk_ipg);
- unmap:
- 	iounmap(sport->port.membase);
- free:
-@@ -1550,11 +1559,10 @@ static int serial_imx_remove(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, NULL);
- 
--	if (sport) {
--		uart_remove_one_port(&imx_reg, &sport->port);
--		clk_disable_unprepare(sport->clk);
--		clk_put(sport->clk);
--	}
-+	uart_remove_one_port(&imx_reg, &sport->port);
++extern struct clk_ops clk_divider_ops;
 +
-+	clk_disable_unprepare(sport->clk_per);
-+	clk_disable_unprepare(sport->clk_ipg);
+ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+@@ -252,6 +258,8 @@ struct clk_mux {
+ #define CLK_MUX_INDEX_ONE		BIT(0)
+ #define CLK_MUX_INDEX_BIT		BIT(1)
  
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
++extern struct clk_ops clk_mux_ops;
++
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
 -- 
 1.7.9.5
