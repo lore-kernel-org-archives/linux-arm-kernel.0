@@ -1,28 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Apr 2012 10:22:14 +0100
-Subject: Bug in v7_coherent_kern_range() ?
-In-Reply-To: <4F7E646D.6000302@freescale.com>
-References: <4F77C9A6.6080601@freescale.com>
- <20120402111240.GG19011@mudshark.cambridge.arm.com>
- <4F7E646D.6000302@freescale.com>
-Message-ID: <20120410092214.GA2620@mudshark.cambridge.arm.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 10 Apr 2012 14:52:59 +0530
+Subject: questions about drivers/dma/amba-pl08x.c
+In-Reply-To: <4F83F011.7070004@st.com>
+References: <CAKwPUozgACvV-TZdn92f1O2shSEvFBfbN-hrS=FNQ5O+DEEY5g@mail.gmail.com>
+ <CACRpkdaC3=vSGF6XH=7Oiqsdg0RVDfbv-M5NZDY5psF96BssHQ@mail.gmail.com>
+ <4F83F011.7070004@st.com>
+Message-ID: <4F83FBF3.7060308@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2012 at 04:35:09AM +0100, Huang Shijie wrote:
-> >
-> > http://lists.arm.linux.org.uk/lurker/message/20111107.173344.f738392e.en.html
-> I tested this patch.  It fixed this bug. This bug did not occur any more.
-> But my system still hung at futex. I think the futex issue is another 
-> bug.(will this patch affect the futex?)
+On 4/10/2012 2:02 PM, Viresh Kumar wrote:
+> On 4/10/2012 2:02 PM, Linus Walleij wrote:
+>> Hm, Viresh have you posted your platform code for PL080 on
+>> SPEAr?
+> 
+> Ya. it was present in my DT support of SPEAr3xx.
+> 
 
-If you're on an SMP system, can you check that you have df77abca ("ARM:
-7099/1: futex: preserve oldval in SMP __futex_atomic_op") applied?
+Must have given link too :(
 
-> So :
-> Tested-by: Huang Shijie <b32955@freescale.com>
+lists.infradead.org/pipermail/linux-arm-kernel/2012-March/091843.html
 
-Ok, thanks. It looks that has briefly revived the discussion over there at
-least.
-
-Will
+-- 
+viresh
