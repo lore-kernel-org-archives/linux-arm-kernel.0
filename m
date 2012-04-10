@@ -1,89 +1,81 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 10 Apr 2012 16:26:18 +0530
-Subject: [PATCH 00/19] I2C updates
-Message-ID: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
+Date: Tue, 10 Apr 2012 16:26:20 +0530
+Subject: [PATCHv6 02/19] I2C: OMAP: Remove reset at init
+In-Reply-To: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
+References: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334055397-899-3-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series does the following
+The reset in the driver at init is not needed anymore as the
+following patch has removed the HWMOD_INIT_NO_RESET flag.
+6d3c55f [OMAP: hwmod: fix the i2c-reset timeout during bootup]
 
-- Warn fixes if CONFIG_PM_RUNTIME is not selected.
-- I2C register restore only if context if the context is lost
-- Bus busy recovery mechanism.
-- the reset is not done in init.
+This patch does the following
+-removes the reset from the probe and implements a omap_i2c_reset
+ function to reset.
+- Reset is removed from omap_i2c_init, which was called
+ not only during probe, but also after time out and error handling.
+ omap_i2c_reset is added in those places to effect the reset.
 
-v2 changes
--Adds a patch to use devm_* functions
--Also checks the return type of the get_sync and in case
- of errors prevents register access.
-- In case of i2c remove register access was done without any
- get_sync fix the same.
-- Adds a pdata function pointer to do context save restore
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |   20 +++++++++++++-------
+ 1 files changed, 13 insertions(+), 7 deletions(-)
 
-v3 changes
-- Split the omap_i2c_isr to increase readability
-- Adds the restore flag patch for OMAP4 to the series
-- Make the i2c use SET_RUNTIME_PM_OPS
-v4 changes
-- Folds a patch from Tasslehoff to prevent any merge conflicts.
-- Prevents the XDUF flag to be set if the underflow condition is not met.
-
-v5 changes
-- Add consistency in the subject naming. 
-
-v6 changes
-- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
- use the unique id instead as the section number in the recent errata
- docs has changed.
-
-
-[1] http://www.spinics.net/lists/linux-i2c/msg07607.html 
-
-Tested on omap4sdp and omap3sdp.
-
-
-The following changes since commit 258f742635360175564e9470eb060ff4d4b984e7:
-
-  modpost: Fix modpost license checking of vmlinux.o (2012-04-09 20:52:56 -0700)
-
-are available in the git repository at:
-  git at gitorious.org:linus-tree/linus-tree.git i2c_omap-next
-
-
-Jon Hunter (1):
-  I2C: OMAP: Correct I2C revision for OMAP3
-
-Shubhrajyoti D (16):
-  I2C: OMAP: make omap_i2c_unidle/idle functions depend on
-    CONFIG_PM_RUNTIME
-  I2C: OMAP: Remove reset at init
-  I2C: OMAP: I2C register restore only if context is lost
-  I2C: OMAP: Fix the interrupt clearing in OMAP4
-  I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
-  I2C: OMAP: Optimise the remove code
-  I2C: OMAP: Fix the error handling
-  I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
-    than zero
-  I2C: OMAP: use devm_* functions
-  I2C: OMAP: Fix the crash in i2c remove
-  I2C: OMAP: Handle error check for pm runtime
-  I2C: OMAP: Use SET_RUNTIME_PM_OPS
-  I2C: OMAP: make the read ready processing a separate function
-  I2C: OMAP: Do not set the XUDF if the underflow is not reached
-  I2C: OMAP: Rename the 1p153 to the erratum id i462
-  ARM: OMAP4: hwmod data: I2C: add flag for context restore
-
-Tasslehoff Kjappfot (1):
-  I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
-
-Vikram Pandita (1):
-  I2C: OMAP: Recover from Bus Busy condition
-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +-
- arch/arm/plat-omap/i2c.c                   |    3 +
- drivers/i2c/busses/i2c-omap.c              |  342 +++++++++++++++-------------
- include/linux/i2c-omap.h                   |    1 +
- 4 files changed, 194 insertions(+), 155 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 4f4188d..e402ebb 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -269,15 +269,9 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+ 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
+ }
+ 
+-static int omap_i2c_init(struct omap_i2c_dev *dev)
++static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ {
+-	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
+-	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+-	unsigned long fclk_rate = 12000000;
+ 	unsigned long timeout;
+-	unsigned long internal_clk = 0;
+-	struct clk *fclk;
+-
+ 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
+ 		/* Disable I2C controller before soft reset */
+ 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
+@@ -325,6 +319,16 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 							dev->westate);
+ 		}
+ 	}
++}
++
++static int omap_i2c_init(struct omap_i2c_dev *dev)
++{
++	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
++	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
++	unsigned long fclk_rate = 12000000;
++	unsigned long internal_clk = 0;
++	struct clk *fclk;
++
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 
+ 	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+@@ -548,6 +552,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 		return r;
+ 	if (r == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
++		omap_i2c_reset(dev);
+ 		omap_i2c_init(dev);
+ 		return -ETIMEDOUT;
+ 	}
+@@ -558,6 +563,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	/* We have an error */
+ 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+ 			    OMAP_I2C_STAT_XUDF)) {
++		omap_i2c_reset(dev);
+ 		omap_i2c_init(dev);
+ 		return -EIO;
+ 	}
 -- 
 1.7.4.1
