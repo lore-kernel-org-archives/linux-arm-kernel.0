@@ -1,323 +1,298 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:37 +0200
-Subject: [PATCH v6 14/17] ARM vt8500: Move vt8500 pwm driver to pwm framework
+Date: Tue, 10 Apr 2012 17:06:38 +0200
+Subject: [PATCH v6 15/17] pwm: add pwm-mxs support
 In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-15-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1334070400-25013-16-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Move the driver to drivers/pwm/ and convert it to use the framework.
+Add generic PWM framework driver (DT only) for Freescale MXS.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Alexey Charkov <alchark@gmail.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
-Changes in v5:
-- adopt patch by Sascha Hauer to move vt8500 driver to PWM framework
+Changes in v6:
+- adopt patch by Shawn Guo
 
- arch/arm/mach-vt8500/Makefile                      |    2 -
- drivers/pwm/Kconfig                                |    9 ++
- drivers/pwm/Makefile                               |    1 +
- .../mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c  |  169 +++++++-------------
- 4 files changed, 66 insertions(+), 115 deletions(-)
- rename arch/arm/mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c (52%)
+ Documentation/devicetree/bindings/pwm/mxs-pwm.txt |   17 ++
+ drivers/pwm/Kconfig                               |    9 +
+ drivers/pwm/Makefile                              |    1 +
+ drivers/pwm/pwm-mxs.c                             |  207 +++++++++++++++++++++
+ 4 files changed, 234 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/mxs-pwm.txt
+ create mode 100644 drivers/pwm/pwm-mxs.c
 
-diff --git a/arch/arm/mach-vt8500/Makefile b/arch/arm/mach-vt8500/Makefile
-index 81aedb7..8df9e4a 100644
---- a/arch/arm/mach-vt8500/Makefile
-+++ b/arch/arm/mach-vt8500/Makefile
-@@ -5,5 +5,3 @@ obj-$(CONFIG_VTWM_VERSION_WM8505) += devices-wm8505.o
- 
- obj-$(CONFIG_MACH_BV07) += bv07.o
- obj-$(CONFIG_MACH_WM8505_7IN_NETBOOK) += wm8505_7in.o
--
--obj-$(CONFIG_HAVE_PWM) += pwm.o
+diff --git a/Documentation/devicetree/bindings/pwm/mxs-pwm.txt b/Documentation/devicetree/bindings/pwm/mxs-pwm.txt
+new file mode 100644
+index 0000000..48ead0d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/mxs-pwm.txt
+@@ -0,0 +1,17 @@
++Freescale MXS PWM controller
++
++Required properties:
++- compatible: should be "fsl,mxs-pwm"
++- reg: physical base address and length of the controller's registers
++- #pwm-cells: should be 2.  The first cell specifies the per-chip index
++  of the PWM to use and the second cell is the duty cycle in nanoseconds.
++- fsl,pwm-number: the number of PWM devices
++
++Example:
++
++pwm: pwm at 80064000 {
++	compatible = "fsl,imx28-pwm", "fsl,mxs-pwm";
++	reg = <0x80064000 2000>;
++	#pwm-cells = <2>;
++	fsl,pwm-number = <8>;
++};
 diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 0d9aa92..a93feff 100644
+index a93feff..39bdebc 100644
 --- a/drivers/pwm/Kconfig
 +++ b/drivers/pwm/Kconfig
-@@ -55,4 +55,13 @@ config PWM_TEGRA
+@@ -27,6 +27,15 @@ config PWM_IMX
  	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-tegra.
+ 	  will be called pwm-imx.
  
-+config PWM_VT8500
-+	tristate "vt8500 pwm support"
-+	depends on ARCH_VT8500
++config PWM_MXS
++	tristate "Freescale MXS PWM support"
++	depends on ARCH_MXS && OF
 +	help
-+	  Generic PWM framework driver for vt8500.
++	  Generic PWM framework driver for Freescale MXS.
 +
 +	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-vt8500.
++	  will be called pwm-mxs.
 +
- endif
+ config PWM_PXA
+ 	tristate "PXA PWM support"
+ 	depends on ARCH_PXA
 diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index a1d87b1..b7c0fcf 100644
+index b7c0fcf..cec2500 100644
 --- a/drivers/pwm/Makefile
 +++ b/drivers/pwm/Makefile
-@@ -4,3 +4,4 @@ obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
+@@ -1,6 +1,7 @@
+ obj-$(CONFIG_PWM)		+= core.o
+ obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
+ obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
++obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
  obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
  obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-+obj-$(CONFIG_PWM_VT8500)	+= pwm-vt8500.o
-diff --git a/arch/arm/mach-vt8500/pwm.c b/drivers/pwm/pwm-vt8500.c
-similarity index 52%
-rename from arch/arm/mach-vt8500/pwm.c
-rename to drivers/pwm/pwm-vt8500.c
-index 8ad825e..3db0746 100644
---- a/arch/arm/mach-vt8500/pwm.c
-+++ b/drivers/pwm/pwm-vt8500.c
-@@ -26,21 +26,13 @@
- 
- #define VT8500_NR_PWMS 4
- 
--static DEFINE_MUTEX(pwm_lock);
--static LIST_HEAD(pwm_list);
--
--struct pwm_device {
--	struct list_head	node;
--	struct platform_device	*pdev;
--
--	const char	*label;
--
--	void __iomem	*regbase;
--
--	unsigned int	use_count;
--	unsigned int	pwm_id;
-+struct vt8500_chip {
-+	struct pwm_chip chip;
-+	void __iomem *base;
- };
- 
-+#define to_vt8500_chip(chip)	container_of(chip, struct vt8500_chip, chip)
+diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
+new file mode 100644
+index 0000000..ebf91da
+--- /dev/null
++++ b/drivers/pwm/pwm-mxs.c
+@@ -0,0 +1,207 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
- #define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
- static inline void pwm_busy_wait(void __iomem *reg, u8 bitmask)
- {
-@@ -53,14 +45,13 @@ static inline void pwm_busy_wait(void __iomem *reg, u8 bitmask)
- 			   bitmask);
- }
- 
--int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-+static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+		int duty_ns, int period_ns)
- {
-+	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
- 	unsigned long long c;
- 	unsigned long period_cycles, prescale, pv, dc;
- 
--	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
--		return -EINVAL;
--
- 	c = 25000000/2; /* wild guess --- need to implement clocks */
- 	c = c * period_ns;
- 	do_div(c, 1000000000);
-@@ -80,104 +71,58 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	do_div(c, period_ns);
- 	dc = c;
- 
--	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 1));
--	writel(prescale, pwm->regbase + 0x4 + (pwm->pwm_id << 4));
-+	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 1));
-+	writel(prescale, vt8500->base + 0x4 + (pwm->hwpwm << 4));
- 
--	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 2));
--	writel(pv, pwm->regbase + 0x8 + (pwm->pwm_id << 4));
-+	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 2));
-+	writel(pv, vt8500->base + 0x8 + (pwm->hwpwm << 4));
- 
--	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 3));
--	writel(dc, pwm->regbase + 0xc + (pwm->pwm_id << 4));
-+	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 3));
-+	writel(dc, vt8500->base + 0xc + (pwm->hwpwm << 4));
- 
- 	return 0;
- }
--EXPORT_SYMBOL(pwm_config);
- 
--int pwm_enable(struct pwm_device *pwm)
-+static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
--	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 0));
--	writel(5, pwm->regbase + (pwm->pwm_id << 4));
--	return 0;
--}
--EXPORT_SYMBOL(pwm_enable);
--
--void pwm_disable(struct pwm_device *pwm)
--{
--	pwm_busy_wait(pwm->regbase + 0x40 + pwm->pwm_id, (1 << 0));
--	writel(0, pwm->regbase + (pwm->pwm_id << 4));
--}
--EXPORT_SYMBOL(pwm_disable);
--
--struct pwm_device *pwm_request(int pwm_id, const char *label)
--{
--	struct pwm_device *pwm;
--	int found = 0;
--
--	mutex_lock(&pwm_lock);
-+	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
- 
--	list_for_each_entry(pwm, &pwm_list, node) {
--		if (pwm->pwm_id == pwm_id) {
--			found = 1;
--			break;
--		}
--	}
--
--	if (found) {
--		if (pwm->use_count == 0) {
--			pwm->use_count++;
--			pwm->label = label;
--		} else {
--			pwm = ERR_PTR(-EBUSY);
--		}
--	} else {
--		pwm = ERR_PTR(-ENOENT);
--	}
--
--	mutex_unlock(&pwm_lock);
--	return pwm;
-+	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
-+	writel(5, vt8500->base + (pwm->hwpwm << 4));
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/slab.h>
++#include <mach/common.h>
++
++#define SET	0x4
++#define CLR	0x8
++#define TOG	0xc
++
++#define PWM_CTRL		0x0
++#define PWM_ACTIVE0		0x10
++#define PWM_PERIOD0		0x20
++#define  PERIOD_PERIOD(p)	((p) & 0xffff)
++#define  PERIOD_PERIOD_MAX	0x10000
++#define  PERIOD_ACTIVE_HIGH	(3 << 16)
++#define  PERIOD_INACTIVE_LOW	(2 << 18)
++#define  PERIOD_CDIV(div)	(((div) & 0x7) << 20)
++#define  PERIOD_CDIV_MAX	8
++
++struct mxs_pwm_chip {
++	struct pwm_chip chip;
++	struct device *dev;
++	struct clk *clk;
++	void __iomem *base;
++};
++
++#define to_mxs_pwm_chip(_chip) container_of(_chip, struct mxs_pwm_chip, chip)
++
++static int mxs_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++			  int duty_ns, int period_ns)
++{
++	struct mxs_pwm_chip *mxs = to_mxs_pwm_chip(chip);
++	int ret, div = 0;
++	unsigned int period_cycles, duty_cycles;
++	unsigned long rate;
++	unsigned long long c;
++
++	rate = clk_get_rate(mxs->clk);
++	while (1) {
++		c = rate / (1 << div);
++		c = c * period_ns;
++		do_div(c, 1000000000);
++		if (c < PERIOD_PERIOD_MAX)
++			break;
++		div++;
++		if (div > PERIOD_CDIV_MAX)
++			return -EINVAL;
++	}
++
++	period_cycles = c;
++	c *= duty_ns;
++	do_div(c, period_ns);
++	duty_cycles = c;
++
++	/*
++	 * If the PWM channel is disabled, make sure to turn on the clock
++	 * before writing the register. Otherwise, keep it enabled.
++	 */
++	if (!test_bit(PWMF_ENABLED, &pwm->flags)) {
++		ret = clk_prepare_enable(mxs->clk);
++		if (ret)
++			return ret;
++	}
++
++	writel(duty_cycles << 16,
++			mxs->base + PWM_ACTIVE0 + pwm->hwpwm * 0x20);
++	writel(PERIOD_PERIOD(period_cycles) | PERIOD_ACTIVE_HIGH |
++	       PERIOD_INACTIVE_LOW | PERIOD_CDIV(div),
++			mxs->base + PWM_PERIOD0 + pwm->hwpwm * 0x20);
++
++	/*
++	 * If the PWM is not enabled, turn the clock off again to save power.
++	 */
++	if (!test_bit(PWMF_ENABLED, &pwm->flags))
++		clk_disable_unprepare(mxs->clk);
++
 +	return 0;
- }
--EXPORT_SYMBOL(pwm_request);
- 
--void pwm_free(struct pwm_device *pwm)
-+static void vt8500_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
--	mutex_lock(&pwm_lock);
--
--	if (pwm->use_count) {
--		pwm->use_count--;
--		pwm->label = NULL;
--	} else {
--		pr_warning("PWM device already freed\n");
--	}
-+	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
- 
--	mutex_unlock(&pwm_lock);
-+	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
-+	writel(0, vt8500->base + (pwm->hwpwm << 4));
- }
--EXPORT_SYMBOL(pwm_free);
- 
--static inline void __add_pwm(struct pwm_device *pwm)
--{
--	mutex_lock(&pwm_lock);
--	list_add_tail(&pwm->node, &pwm_list);
--	mutex_unlock(&pwm_lock);
--}
-+static struct pwm_ops vt8500_pwm_ops = {
-+	.enable = vt8500_pwm_enable,
-+	.disable = vt8500_pwm_disable,
-+	.config = vt8500_pwm_config,
++}
++
++static int mxs_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct mxs_pwm_chip *mxs = to_mxs_pwm_chip(chip);
++	int ret;
++
++	ret = clk_prepare_enable(mxs->clk);
++	if (ret)
++		return ret;
++
++	writel(1 << pwm->hwpwm, mxs->base + PWM_CTRL + SET);
++
++	return 0;
++}
++
++static void mxs_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct mxs_pwm_chip *mxs = to_mxs_pwm_chip(chip);
++
++	writel(1 << pwm->hwpwm, mxs->base + PWM_CTRL + CLR);
++
++	clk_disable_unprepare(mxs->clk);
++}
++
++static const struct pwm_ops mxs_pwm_ops = {
++	.config = mxs_pwm_config,
++	.enable = mxs_pwm_enable,
++	.disable = mxs_pwm_disable,
 +	.owner = THIS_MODULE,
 +};
- 
- static int __devinit pwm_probe(struct platform_device *pdev)
- {
--	struct pwm_device *pwms;
-+	struct vt8500_chip *chip;
- 	struct resource *r;
--	int ret = 0;
--	int i;
++
++static int mxs_pwm_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct mxs_pwm_chip *mxs;
 +	int ret;
- 
--	pwms = kzalloc(sizeof(struct pwm_device) * VT8500_NR_PWMS, GFP_KERNEL);
--	if (pwms == NULL) {
-+	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
-+	if (chip == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
- 		return -ENOMEM;
- 	}
- 
--	for (i = 0; i < VT8500_NR_PWMS; i++) {
--		pwms[i].use_count = 0;
--		pwms[i].pwm_id = i;
--		pwms[i].pdev = pdev;
--	}
-+	chip->chip.dev = &pdev->dev;
-+	chip->chip.ops = &vt8500_pwm_ops;
-+	chip->chip.base = -1;
-+	chip->chip.npwm = VT8500_NR_PWMS;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
-@@ -193,51 +138,49 @@ static int __devinit pwm_probe(struct platform_device *pdev)
- 		goto err_free;
- 	}
- 
--	pwms[0].regbase = ioremap(r->start, resource_size(r));
--	if (pwms[0].regbase == NULL) {
-+	chip->base = ioremap(r->start, resource_size(r));
-+	if (chip->base == NULL) {
- 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
- 		ret = -ENODEV;
- 		goto err_free_mem;
- 	}
- 
--	for (i = 1; i < VT8500_NR_PWMS; i++)
--		pwms[i].regbase = pwms[0].regbase;
--
--	for (i = 0; i < VT8500_NR_PWMS; i++)
--		__add_pwm(&pwms[i]);
-+	ret = pwmchip_add(&chip->chip);
-+	if (ret < 0)
-+		goto err_unmap;
- 
--	platform_set_drvdata(pdev, pwms);
--	return 0;
-+	platform_set_drvdata(pdev, chip);
++
++	mxs = devm_kzalloc(&pdev->dev, sizeof(*mxs), GFP_KERNEL);
++	if (!mxs)
++		return -ENOMEM;
++
++	mxs->base = of_iomap(np, 0);
++	if (!mxs->base)
++		return -EADDRNOTAVAIL;
++
++	mxs->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(mxs->clk)) {
++		ret = PTR_ERR(mxs->clk);
++		goto iounmap;
++	}
++
++	mxs->chip.dev = &pdev->dev;
++	mxs->chip.ops = &mxs_pwm_ops;
++	mxs->chip.base = -1;
++	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
++		goto clk_put;
++	}
++
++	ret = pwmchip_add(&mxs->chip);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
++		goto clk_put;
++	}
++
++	mxs->dev = &pdev->dev;
++	platform_set_drvdata(pdev, mxs);
++
++	mxs_reset_block(mxs->base);
++
++	return 0;
++
++clk_put:
++	clk_put(mxs->clk);
++iounmap:
++	iounmap(mxs->base);
 +	return ret;
- 
-+err_unmap:
-+	iounmap(chip->base);
- err_free_mem:
- 	release_mem_region(r->start, resource_size(r));
- err_free:
--	kfree(pwms);
-+	kfree(chip);
- 	return ret;
- }
- 
- static int __devexit pwm_remove(struct platform_device *pdev)
- {
--	struct pwm_device *pwms;
-+	struct vt8500_chip *chip;
- 	struct resource *r;
--	int i;
-+	int err;
- 
--	pwms = platform_get_drvdata(pdev);
--	if (pwms == NULL)
-+	chip = platform_get_drvdata(pdev);
-+	if (chip == NULL)
- 		return -ENODEV;
- 
--	mutex_lock(&pwm_lock);
--
--	for (i = 0; i < VT8500_NR_PWMS; i++)
--		list_del(&pwms[i].node);
--	mutex_unlock(&pwm_lock);
-+	err = pwmchip_remove(&chip->chip);
-+	if (err < 0)
-+		return err;
- 
--	iounmap(pwms[0].regbase);
-+	iounmap(chip->base);
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(r->start, resource_size(r));
- 
--	kfree(pwms);
-+	kfree(chip);
- 	return 0;
- }
- 
++}
++
++static int __devexit mxs_pwm_remove(struct platform_device *pdev)
++{
++	struct mxs_pwm_chip *mxs = platform_get_drvdata(pdev);
++
++	pwmchip_remove(&mxs->chip);
++	clk_put(mxs->clk);
++	iounmap(mxs->base);
++
++	return 0;
++}
++
++static struct of_device_id mxs_pwm_dt_ids[] = {
++	{ .compatible = "fsl,mxs-pwm", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, mxs_pwm_of_match);
++
++static struct platform_driver mxs_pwm_driver = {
++	.driver = {
++		.name = "mxs-pwm",
++		.of_match_table = of_match_ptr(mxs_pwm_dt_ids),
++	},
++	.probe = mxs_pwm_probe,
++	.remove = __devexit_p(mxs_pwm_remove),
++};
++module_platform_driver(mxs_pwm_driver);
++
++MODULE_ALIAS("platform:mxs-pwm");
++MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
++MODULE_DESCRIPTION("Freescale MXS PWM Driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.9.6
