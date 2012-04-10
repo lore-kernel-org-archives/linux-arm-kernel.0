@@ -1,41 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Apr 2012 11:00:38 +0100
-Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
-In-Reply-To: <1333717838.12209.83.camel@dagon.hellion.org.uk>
-References: <1333715458-13834-1-git-send-email-ijc@hellion.org.uk>
- <4F7EE6AE.4020909@mvista.com>
- <1333717838.12209.83.camel@dagon.hellion.org.uk>
-Message-ID: <20120410100038.GP24211@n2100.arm.linux.org.uk>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Tue, 10 Apr 2012 15:36:49 +0530
+Subject: [GIT PULL]: omap-serial updates for 3.4-rc
+In-Reply-To: <1334052148-10385-1-git-send-email-govindraj.raja@ti.com>
+References: <1334052148-10385-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <CAMrsUdKDhuDLr2=0uiQtY=r4pvmJQo=pJgERRCXySLghO7yGXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2012 at 02:10:38PM +0100, Ian Campbell wrote:
-> On Fri, 2012-04-06 at 16:50 +0400, Sergei Shtylyov wrote:
-> > On 06.04.2012 16:30, Ian Campbell wrote:
-> > > Fixes build the following error when CONFIG_KEXEC is enabled:
-> > 
-> >     Maybe "the following build error" instead?
-> 
-> Done.
-> 
-> > >    CC      arch/arm/mach-kirkwood/board-dt.o
-> > > arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
-> > > arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
-> > > arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
-> > 
-> > > kexec.h also needs string.h.
-> > 
-> >     Why it doesn't include it?
-> 
-> Not sure, but actually I should be using linux/kexec.h not asm/kexec.h
-> anyway which solves the problem too:
+CC'ing Linux-ARM
 
-Because you should not be using asm/kexec.h directly but using linux/kexec.h
-instead, which will include it via this path:
 
-linux/kexec.h -> linux/compat.h -> linux/sem.h -> linux/rcupdate.h
- -> linux/cpumask.h -> linux/bitmap.h -> linux/string.h
-
-checkpatch has been nobbled not to complain by default about using asm/%.h
-includes when linux/%.h includes are also present, which is a backwards
-step imho.
+On Tue, Apr 10, 2012 at 3:32 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
+> Hi Tony,
+>
+> Please Pull the following omap uart changes.
+> Changes basically involves getting rid of cpu checks
+> for populating erratas and features and move the same
+> from serial.c to omap-serial.c, MVR reg is used to find
+> uart versions and errata flags are populated accordingly.
+>
+> --
+> Thanks,
+> Govindraj.R
+>
+> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+>
+> ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://gitorious.org/linux-3-x/omap-serial.git for_3.4/uart_fixes
+>
+> for you to fetch changes up to 6c34f211069409ea6d08b900eeaf86ef8efd0dca:
+>
+> ?OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx (2012-04-10 15:14:58 +0530)
+>
+> ----------------------------------------------------------------
+> Govindraj.R (3):
+> ? ? ?OMAP2+: UART: Remove cpu checks for populating errata flags
+> ? ? ?OMAP2+: UART: enable tx wakeup bit for wer reg
+> ? ? ?OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
+>
+> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 13 +---
+> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?9 +++-
+> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 83 ++++++++++++++++++++++++-
+> ?3 files changed, 91 insertions(+), 14 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
