@@ -1,141 +1,175 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Apr 2012 15:45:17 +0200
-Subject: [PATCH 04/40] dmaengine i.MX SDMA: do not depend on grouped clocks
+Date: Tue, 10 Apr 2012 15:45:53 +0200
+Subject: [PATCH 40/40] ARM i.MX: Remove now unused struct clk argument from
+ mxc_timer_init
 In-Reply-To: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334065553-7565-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334065553-7565-41-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the current i.MX clock support groups together unrelated clocks
-to a single clock which is then used by the driver. This can't
-be accomplished with the generic clock framework so we instead
-request the individual clocks in the driver. For i.MX there are
-generally three different clocks:
-
-ipg: bus clock (needed to access registers)
-ahb: dma relevant clock, sometimes referred to as hclk in the datasheet
-per: bit clock, pixel clock
-
-This patch changes the driver to request the individual clocks.
-Currently all clk_get will get the same clock until the SoCs
-are converted to the generic clock framework
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/dma/imx-sdma.c |   40 ++++++++++++++++++++++++++++------------
- 1 file changed, 28 insertions(+), 12 deletions(-)
+ arch/arm/mach-imx/clk-imx1.c            |    3 +--
+ arch/arm/mach-imx/clk-imx21.c           |    4 ++--
+ arch/arm/mach-imx/clk-imx25.c           |    2 +-
+ arch/arm/mach-imx/clk-imx27.c           |    3 +--
+ arch/arm/mach-imx/clk-imx31.c           |    3 +--
+ arch/arm/mach-imx/clk-imx35.c           |    3 +--
+ arch/arm/mach-imx/clk-imx51-imx53.c     |    6 ++----
+ arch/arm/mach-imx/clk-imx6q.c           |    2 +-
+ arch/arm/plat-mxc/include/mach/common.h |    2 +-
+ arch/arm/plat-mxc/time.c                |    4 ++--
+ 10 files changed, 13 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index d3e38e2..fddccae 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -322,7 +322,8 @@ struct sdma_engine {
- 	struct sdma_context_data	*context;
- 	dma_addr_t			context_phys;
- 	struct dma_device		dma_device;
--	struct clk			*clk;
-+	struct clk			*clk_ipg;
-+	struct clk			*clk_ahb;
- 	struct mutex			channel_0_lock;
- 	struct sdma_script_start_addrs	*script_addrs;
- };
-@@ -859,7 +860,8 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
- 	sdmac->peripheral_type = data->peripheral_type;
- 	sdmac->event_id0 = data->dma_request;
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 60f1801..9d58776 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -102,8 +102,7 @@ int __init mx1_clocks_init(unsigned long fref)
  
--	clk_enable(sdmac->sdma->clk);
-+	clk_enable(sdmac->sdma->clk_ipg);
-+	clk_enable(sdmac->sdma->clk_ahb);
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
  
- 	ret = sdma_request_channel(sdmac);
- 	if (ret)
-@@ -896,7 +898,8 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
- 
- 	dma_free_coherent(NULL, PAGE_SIZE, sdmac->bd, sdmac->bd_phys);
- 
--	clk_disable(sdma->clk);
-+	clk_disable(sdma->clk_ipg);
-+	clk_disable(sdma->clk_ahb);
- }
- 
- static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
-@@ -1169,12 +1172,14 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
- 	addr = (void *)header + header->script_addrs_start;
- 	ram_code = (void *)header + header->ram_code_start;
- 
--	clk_enable(sdma->clk);
-+	clk_enable(sdma->clk_ipg);
-+	clk_enable(sdma->clk_ahb);
- 	/* download the RAM image for SDMA */
- 	sdma_load_script(sdma, ram_code,
- 			header->ram_code_size,
- 			addr->ram_code_start_addr);
--	clk_disable(sdma->clk);
-+	clk_disable(sdma->clk_ipg);
-+	clk_disable(sdma->clk_ahb);
- 
- 	sdma_add_scripts(sdma, addr);
- 
-@@ -1216,7 +1221,8 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 		return -ENODEV;
- 	}
- 
--	clk_enable(sdma->clk);
-+	clk_enable(sdma->clk_ipg);
-+	clk_enable(sdma->clk_ahb);
- 
- 	/* Be sure SDMA has not started yet */
- 	writel_relaxed(0, sdma->regs + SDMA_H_C0PTR);
-@@ -1269,12 +1275,14 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 	/* Initializes channel's priorities */
- 	sdma_set_channel_priority(&sdma->channel[0], 7);
- 
--	clk_disable(sdma->clk);
-+	clk_disable(sdma->clk_ipg);
-+	clk_disable(sdma->clk_ahb);
+-	mxc_timer_init(NULL, MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR),
+-			MX1_TIM1_INT);
++	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
  
  	return 0;
- 
- err_dma_alloc:
--	clk_disable(sdma->clk);
-+	clk_disable(sdma->clk_ipg);
-+	clk_disable(sdma->clk_ahb);
- 	dev_err(sdma->dev, "initialisation failed with %d\n", ret);
- 	return ret;
  }
-@@ -1313,12 +1321,21 @@ static int __init sdma_probe(struct platform_device *pdev)
- 		goto err_request_region;
- 	}
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
+index c4779a0..e4a0ede 100644
+--- a/arch/arm/mach-imx/clk-imx21.c
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -167,7 +167,7 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
  
--	sdma->clk = clk_get(&pdev->dev, NULL);
--	if (IS_ERR(sdma->clk)) {
--		ret = PTR_ERR(sdma->clk);
-+	sdma->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(sdma->clk_ipg)) {
-+		ret = PTR_ERR(sdma->clk_ipg);
- 		goto err_clk;
- 	}
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
  
-+	sdma->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(sdma->clk_ahb)) {
-+		ret = PTR_ERR(sdma->clk_ahb);
-+		goto err_clk;
-+	}
+-	mxc_timer_init(NULL, MX21_IO_ADDRESS(MX21_GPT1_BASE_ADDR),
+-			MX21_INT_GPT1);
++	mxc_timer_init(MX21_IO_ADDRESS(MX21_GPT1_BASE_ADDR), MX21_INT_GPT1);
 +
-+	clk_prepare(sdma->clk_ipg);
-+	clk_prepare(sdma->clk_ahb);
-+
- 	sdma->regs = ioremap(iores->start, resource_size(iores));
- 	if (!sdma->regs) {
- 		ret = -ENOMEM;
-@@ -1426,7 +1443,6 @@ err_alloc:
- err_request_irq:
- 	iounmap(sdma->regs);
- err_ioremap:
--	clk_put(sdma->clk);
- err_clk:
- 	release_mem_region(iores->start, resource_size(iores));
- err_request_region:
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 717b8a0..9cde523 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -227,6 +227,6 @@ int __init mx25_clocks_init(void)
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+-	mxc_timer_init(NULL, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
++	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 3a1e965..d81c3c6 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -246,8 +246,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
+-	mxc_timer_init(NULL, MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR),
+-			MX27_INT_GPT1);
++	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
+ 
+ 	clk_prepare_enable(emi_ahb);
+ 
+diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
+index de3addb..b57a460 100644
+--- a/arch/arm/mach-imx/clk-imx31.c
++++ b/arch/arm/mach-imx/clk-imx31.c
+@@ -161,8 +161,7 @@ int __init mx31_clocks_init(unsigned long fref)
+ 	mx31_revision();
+ 	clk_disable_unprepare(iim);
+ 
+-	mxc_timer_init(NULL, MX31_IO_ADDRESS(MX31_GPT1_BASE_ADDR),
+-			MX31_INT_GPT);
++	mxc_timer_init(MX31_IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index 7d26ae8..a77502a 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -251,8 +251,7 @@ int __init mx35_clocks_init()
+ 	epit_timer_init(&epit1_clk,
+ 			MX35_IO_ADDRESS(MX35_EPIT1_BASE_ADDR), MX35_INT_EPIT1);
+ #else
+-	mxc_timer_init(NULL, MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR),
+-			MX35_INT_GPT);
++	mxc_timer_init(MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
+ #endif
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 5b5d7a0..4d8229e 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -309,8 +309,7 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_set_rate(esdhc_b_podf, 166250000);
+ 
+ 	/* System timer */
+-	mxc_timer_init(NULL, MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR),
+-		MX51_INT_GPT);
++	mxc_timer_init(MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR), MX51_INT_GPT);
+ 
+ 	clk_prepare_enable(iim);
+ 	imx_print_silicon_rev("i.MX51", mx51_revision());
+@@ -363,8 +362,7 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_set_rate(esdhc_b_podf, 200000000);
+ 
+ 	/* System timer */
+-	mxc_timer_init(NULL, MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR),
+-		MX53_INT_GPT);
++	mxc_timer_init(MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR), MX53_INT_GPT);
+ 
+ 	clk_prepare_enable(iim);
+ 	imx_print_silicon_rev("i.MX53", mx53_revision());
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index f379fa6..cd48fa5 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -401,7 +401,7 @@ int __init mx6q_clocks_init(void)
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
+ 	irq = irq_of_parse_and_map(np, 0);
+-	mxc_timer_init(NULL, base, irq);
++	mxc_timer_init(base, irq);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 0319c4a..5cae195 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -54,7 +54,7 @@ extern void imx50_soc_init(void);
+ extern void imx51_soc_init(void);
+ extern void imx53_soc_init(void);
+ extern void epit_timer_init(struct clk *timer_clk, void __iomem *base, int irq);
+-extern void mxc_timer_init(struct clk *timer_clk, void __iomem *, int);
++extern void mxc_timer_init(void __iomem *, int);
+ extern int mx1_clocks_init(unsigned long fref);
+ extern int mx21_clocks_init(unsigned long lref, unsigned long fref);
+ extern int mx25_clocks_init(void);
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index 99f958c..f32a249 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -280,10 +280,10 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
+ 	return 0;
+ }
+ 
+-void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
++void __init mxc_timer_init(void __iomem *base, int irq)
+ {
+ 	uint32_t tctl_val;
+-	struct clk *timer_ipg_clk;
++	struct clk *timer_ipg_clk, *timer_clk;
+ 
+ 	if (!timer_clk) {
+ 		timer_clk = clk_get_sys("imx-gpt.0", "per");
 -- 
 1.7.9.5
