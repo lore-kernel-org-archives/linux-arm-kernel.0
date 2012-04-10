@@ -1,46 +1,55 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:40 +0200
-Subject: [PATCH v6 17/17] pwm: Take over maintainership of the PWM subsystem
-In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-18-git-send-email-thierry.reding@avionic-design.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 10 Apr 2012 17:32:44 +0200
+Subject: [PATCH 1/1] ARM: at91: fix at91sam9261ek dm9000 irq
+Message-ID: <1334071964-18990-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm taking over the maintainership of the PWM subsystem. This commit
-also adds the URLs to the gitorious project and repository as well as
-any missing files related to the PWM subsystem.
+You need now to set the irq via gpio_to_irq.
+since d0fbda9add (ARM: at91/gpio: drop PIN_BASE)
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable at vger.kernel.org
 ---
-Note: I guess this patch in particular could use some Acked-by, maybe from
-Arnd and Sascha so that people will know this happens with their blessing.
+Hi Greg,
 
- MAINTAINERS |   10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+	this bug is present in 3.2 & 3.3
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 275db57..55a11ab 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5420,10 +5420,16 @@ S:	Maintained
- F:	Documentation/video4linux/README.pvrusb2
- F:	drivers/media/video/pvrusb2/
+Best Regards,
+J.
+ arch/arm/mach-at91/board-sam9261ek.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index 065b5ee..2736453 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -76,8 +76,6 @@ static struct resource dm9000_resource[] = {
+ 		.flags	= IORESOURCE_MEM
+ 	},
+ 	[2] = {
+-		.start	= AT91_PIN_PC11,
+-		.end	= AT91_PIN_PC11,
+ 		.flags	= IORESOURCE_IRQ
+ 			| IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_HIGHEDGE,
+ 	}
+@@ -121,6 +119,8 @@ static struct sam9_smc_config __initdata dm9000_smc_config = {
  
--PWM core
--M:	Sascha Hauer <s.hauer@pengutronix.de>
-+PWM SUBSYSTEM
-+M:	Thierry Reding <thierry.reding@avionic-design.de>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
-+W:	http://gitorious.org/linux-pwm
-+T:	git git://gitorious.org/linux-pwm/linux-pwm.git
-+F:	Documentation/pwm.txt
-+F:	Documentation/devicetree/bindings/pwm/
-+F:	include/linux/pwm.h
-+F:	include/linux/of_pwm.h
- F:	drivers/pwm/
+ static void __init ek_add_device_dm9000(void)
+ {
++	struct resource *r = &dm9000_resource[2];
++
+ 	/* Configure chip-select 2 (DM9000) */
+ 	sam9_smc_configure(0, 2, &dm9000_smc_config);
  
- PXA2xx/PXA3xx SUPPORT
+@@ -130,6 +130,7 @@ static void __init ek_add_device_dm9000(void)
+ 	/* Configure Interrupt pin as input, no pull-up */
+ 	at91_set_gpio_input(AT91_PIN_PC11, 0);
+ 
++	r->start = r->end = gpio_to_irq(AT91_PIN_PC11);
+ 	platform_device_register(&dm9000_device);
+ }
+ #else
 -- 
-1.7.9.6
+1.7.9.1
