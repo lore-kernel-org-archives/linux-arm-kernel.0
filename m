@@ -1,51 +1,130 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 10 Apr 2012 16:26:34 +0530
-Subject: [PATCHv6 16/19] I2C: OMAP: fix missing handling of errata
- I2C_OMAP3_1P153
+Date: Tue, 10 Apr 2012 16:26:19 +0530
+Subject: [PATCHv6 01/19] I2C: OMAP: make omap_i2c_unidle/idle functions depend
+ on CONFIG_PM_RUNTIME
 In-Reply-To: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334055397-899-17-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334055397-899-2-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tasslehoff Kjappfot <tasskjapp@gmail.com>
+The functions omap_i2c_unidle/idle are called from omap_i2c_runtime_resume
+and omap_i2c_runtime_suspend which is compiled for CONFIG_PM_RUNTIME.
+This patch removes the omap_i2c_unidle/idle functions and folds them
+into the runtime callbacks.
 
-i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
-Move the errata handling to i2c_probe.
+This fixes the below warn when CONFIG_PM_RUNTIME is not defined
 
-Signed-off-by: Tasslehoff Kjappfot <tasskjapp@gmail.com>
+ CC      arch/arm/mach-omap2/board-ti8168evm.o
+drivers/i2c/busses/i2c-omap.c:272: warning: 'omap_i2c_unidle' defined but not used
+drivers/i2c/busses/i2c-omap.c:293: warning: 'omap_i2c_idle' defined but not used
+  CC      net/ipv4/ip_forward.o
+
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   75 +++++++++++++++++-----------------------
+ 1 files changed, 32 insertions(+), 43 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index c113f41..51576d6 100644
+index 801df60..4f4188d 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -431,11 +431,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 	/* Take the I2C module out of reset: */
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+@@ -269,47 +269,6 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+ 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
+ }
  
--	dev->errata = 0;
+-static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+-{
+-	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+-		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+-		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
+-		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
+-		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
+-		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
+-		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, dev->syscstate);
+-		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+-		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+-	}
 -
--	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
--		dev->errata |= I2C_OMAP_ERRATA_I207;
+-	/*
+-	 * Don't write to this register if the IE state is 0 as it can
+-	 * cause deadlock.
+-	 */
+-	if (dev->iestate)
+-		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+-}
 -
- 	/* Enable interrupts */
- 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
- 			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
-@@ -1056,6 +1051,11 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
- 
-+	dev->errata = 0;
+-static void omap_i2c_idle(struct omap_i2c_dev *dev)
+-{
+-	u16 iv;
+-
+-	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+-	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
+-		omap_i2c_write_reg(dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
+-	else
+-		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
+-
+-	if (dev->rev < OMAP_I2C_OMAP1_REV_2) {
+-		iv = omap_i2c_read_reg(dev, OMAP_I2C_IV_REG); /* Read clears */
+-	} else {
+-		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, dev->iestate);
+-
+-		/* Flush posted write */
+-		omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+-	}
+-}
+-
+ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ {
+ 	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
+@@ -1163,8 +1122,22 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
++	u16 iv;
 +
-+	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
-+		dev->errata |= I2C_OMAP_ERRATA_I207;
++	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
++	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
++		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
++	else
++		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
 +
- 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
- 		dev->errata |= I2C_OMAP3_1P153;
++	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
++		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
++	} else {
++		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
  
+-	omap_i2c_idle(_dev);
++		/* Flush posted write */
++		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
++	}
+ 
+ 	return 0;
+ }
+@@ -1174,7 +1147,23 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+ 
+-	omap_i2c_unidle(_dev);
++	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
++		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
++		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
++		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
++		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
++		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
++		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
++		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
++		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
++	}
++
++	/*
++	 * Don't write to this register if the IE state is 0 as it can
++	 * cause deadlock.
++	 */
++	if (_dev->iestate)
++		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
+ 
+ 	return 0;
+ }
 -- 
 1.7.4.1
