@@ -1,27 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Apr 2012 15:30:55 +0100
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120410143055.GT24211@n2100.arm.linux.org.uk>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 10 Apr 2012 20:26:51 +0530
+Subject: [PATCH 00/19] I2C updates
+In-Reply-To: <20120410114153.GR20616@arwen.pp.htv.fi>
+References: <1334055397-899-1-git-send-email-shubhrajyoti@ti.com>
+ <CANfBPZ92EEAqrFC2gnULAXwQKhWdAuNntHz0QVXuUR3Wr=nSGQ@mail.gmail.com>
+ <20120410114153.GR20616@arwen.pp.htv.fi>
+Message-ID: <4F844A33.90609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 03:45:14PM +0200, Sascha Hauer wrote:
-> With the generic clock framework we do not necessarily have
-> a pointer to the struct clk we want to register a lookup
-> for, so add a const char *clkname field to struct clk_lookup
-> so that a lookup can be registered with a clock name.
+On Tuesday 10 April 2012 05:11 PM, Felipe Balbi wrote:
+> On Tue, Apr 10, 2012 at 05:01:37PM +0530, S, Venkatraman wrote:
+>> On Tue, Apr 10, 2012 at 4:26 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+[...]
+>>>  modpost: Fix modpost license checking of vmlinux.o (2012-04-09 20:52:56 -0700)
+>>>
+>>> are available in the git repository at:
+>>>  git at gitorious.org:linus-tree/linus-tree.git i2c_omap-next
+>> Minor nit:
+>> You might want to indicate a git:// link instead of an ssh URL ?
+> indeed, for those who haven't noticed git now has separate url and
+> pushurl for every remote. Meaning you can pull and push with different
+> urls. This solves this issue.
+Thanks,
+Venkat , Felipe
 
-All this silly names all over the place is getting to be utterly
-rediculous. Why do we need to name clocks and look them up by name
-when we have a perfectly good way (clkdev) to do this already?  Yes,
-it takes a struct clk pointer but that's exactly because that's what
-it has to return.
+Here is the corrected pull request
+The following changes since commit 258f742635360175564e9470eb060ff4d4b984e7:
 
-Why do we want to have another idiotic string to look up a clock which
-is named using an idiotic scheme to find out its pointer to only then
-register that with clkdev?
+  modpost: Fix modpost license checking of vmlinux.o (2012-04-09
+20:52:56 -0700)
 
-I think this clk stuff has gone totally insane wrt names recently.
+are available in the git repository at:
+  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-next
+
+Jon Hunter (1):
+      I2C: OMAP: Correct I2C revision for OMAP3
+
+Shubhrajyoti D (16):
+      I2C: OMAP: make omap_i2c_unidle/idle functions depend on
+CONFIG_PM_RUNTIME
+      I2C: OMAP: Remove reset at init
+      I2C: OMAP: I2C register restore only if context is lost
+      I2C: OMAP: Fix the interrupt clearing in OMAP4
+      I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
+      I2C: OMAP: Optimise the remove code
+      I2C: OMAP: Fix the error handling
+      I2C: OMAP: Don't check if wait_for_completion_timeout() returns
+less than zero
+      I2C: OMAP: use devm_* functions
+      I2C: OMAP: Fix the crash in i2c remove
+      I2C: OMAP: Handle error check for pm runtime
+      I2C: OMAP: Use SET_RUNTIME_PM_OPS
+      I2C: OMAP: make the read ready processing a separate function
+      I2C: OMAP: Do not set the XUDF if the underflow is not reached
+      I2C: OMAP: Rename the 1p153 to the erratum id i462
+      ARM: OMAP4: hwmod data: I2C: add flag for context restore
+
+Tasslehoff Kjappfot (1):
+      I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
+
+Vikram Pandita (1):
+      I2C: OMAP: Recover from Bus Busy condition
+
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +-
+ arch/arm/plat-omap/i2c.c                   |    3 +
+ drivers/i2c/busses/i2c-omap.c              |  342
++++++++++++++++-------------
+ include/linux/i2c-omap.h                   |    1 +
+ 4 files changed, 194 insertions(+), 155 deletions(-)
