@@ -1,38 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 10 Apr 2012 10:22:27 -0700
-Subject: [PATCH] gpio: samsung: refactor gpiolib init for exynos4/5
-In-Reply-To: <1333913007-16032-1-git-send-email-olof@lixom.net>
-References: <1333913007-16032-1-git-send-email-olof@lixom.net>
-Message-ID: <4F846C53.1070407@samsung.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue, 10 Apr 2012 20:28:53 +0300
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
+References: <4F683B36.8090101@metasoft.pl>
+ <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48E3E@AUSP01VMBX24.collaborationhost.net>
+ <20120323070446.GC5812@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20120410172853.GA25697@mwesterb-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> Only code move, no functional change.
->
-> Main reason to do this was to get rid of the warnings:
->
-> drivers/gpio/gpio-samsung.c: In function 'samsung_gpiolib_init':
-> drivers/gpio/gpio-samsung.c:2974:1: warning: label 'err_ioremap4' defined but not used [-Wunused-label]
-> drivers/gpio/gpio-samsung.c:2722:47: warning: unused variable 'gpio_base4' [-Wunused-variable]
->
-> without adding more ifdef mess.
->
-> I think this whole file would do well being coverted over to a platform
-> driver and moving most of the tables out to SoC code and/or device trees,
-> but since that changes init ordering it needs to be done with some care,
-> i.e. not at this time.
->
-> Signed-off-by: Olof Johansson<olof@lixom.net>
+On Fri, Mar 23, 2012 at 11:09:50AM -0500, H Hartley Sweeten wrote:
+> On Friday, March 23, 2012 12:05 AM, Mika Westerberg wrote:
+> > On Thu, Mar 22, 2012 at 09:19:10PM -0500, H Hartley Sweeten wrote:
+> >
+> >> Did you test this patch or just review it?
+> >
+> > I tested and reviewed it.
+> 
+> OK. What kernel? My tests so far have been with 3.3.
+> 
+> >> On my system it doesn't work. I think it has something to do with the
+> >> changes to m2m_hw_interrupt but I haven't tracked it down yet.
+> >> 
+> >> It looks like what's missing is a:
+> >> 
+> >> 	edmac->edma->hw_submit(edmac);
+> >> 
+> >> But, maybe that's not needed with double buffering?
+> >
+> > Did you try without your patch and adding my VIC hack? That's what I did when
+> > I first got this patch and I saw no problems. I tested with audio (M2P),
+> > mmc_spi (M2M) and dmatest (M2M).
+> 
+> No, I have not applied your VIC hack.
+> 
+> Until we get a working solution, without any hacks, I don't want this to go in.
 
-Looks ok to me :)
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Now that the spurious interrupts thing with VIC has been sorted out, should we
+revisit this patch? Hartley, do you have any objections merging this?
