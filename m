@@ -1,36 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Apr 2012 13:17:08 +0000
-Subject: [PATCHv8 07/10] ARM: dma-mapping: move all dma bounce code to
- separate dma ops structure
-In-Reply-To: <002801cd1718$b556a1e0$2003e5a0$%szyprowski@samsung.com>
-References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
- <201204101224.24959.arnd@arndb.de>
- <002801cd1718$b556a1e0$2003e5a0$%szyprowski@samsung.com>
-Message-ID: <201204101317.08765.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 10 Apr 2012 08:36:56 -0500
+Subject: COMMON_CLK_DISABLE_UNUSED
+In-Reply-To: <CAJOA=zP8XFTN1mcAyUky3ovrx4Dg1zb9zaB5r8zUYE46Ec-tMQ@mail.gmail.com>
+References: <20120409222903.GA31622@lunn.ch>
+ <CAJOA=zP8XFTN1mcAyUky3ovrx4Dg1zb9zaB5r8zUYE46Ec-tMQ@mail.gmail.com>
+Message-ID: <4F843778.8050506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 April 2012, Marek Szyprowski wrote:
-> Before patch no 6, there were custom methods for all scatter/gather
-> related operations. They iterated over the whole scatter list and called
-> cache related operations directly (which in turn checked if we use dma
-> bounce code or not and called respective version). Patch no 6 changed
-> them not to use such shortcut for direct calling cache related operations.
+On 04/09/2012 06:04 PM, Turquette, Mike wrote:
+> On Mon, Apr 9, 2012 at 3:29 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> I think it would be good to consider deleting this config option and
+>> just have the code always enabled.
 > 
-> Instead it provides similar loop over scatter list and calls methods
-> from the current device's dma_map_ops structure. This way, after patch no 
-> 7 these functions call simple dma_map_page() method for all standard 
-> devices and dma bounce aware version for devices registered for dma 
-> bouncing (with use different dma_map_ops).
+> I agree.  We already support the CLK_IGNORE_UNUSED flag, so any
+> platforms that don't want this functionality wholesale can set that
+> bit for every clock.
+> 
+> I'll pull out that option.
+> 
 
-Ok, thanks for the explanation.
+CLK_IGNORE_UNUSED looks a bit broken to me. If you don't have the flag
+set on the whole chain of parents, then a parent could be turned off.
+This could happen at boot time or when another child get disabled and
+the common parent's ref count goes to 0 and gets disabled.
 
-> I can provide a separate set of scatter/gather list related functions for
-> the linear dma mapping implementation and dma bouncing implementation 
-> if you think that the current approach is too complicated or 
-> over-engineered.
+I think a better solution would be a force enable or enable on boot flag
+that sets ref counts correctly. Otherwise, each platform has to call
+clk_prepare and clk_enable for all the clocks it wants to keep on.
 
-It's probably not needed, though I have not looked at the big picture
-with all the patches applied. which I should do at some point.
+Here's a simple case that needs work. You have a cpu clock controlled by
+cpufreq driver. If the cpufreq driver is not loaded, we want the cpu
+clock always enabled and don't want the clk infrastructure turning it
+off. If the cpufreq driver is loaded, then we potentially want it to be
+able to enable and disable the cpu clock if we switch parents. I guess
+the easiest solution is the cpufreq driver needs to assume the cpu clock
+is already enabled with a ref count of 1.
 
-	Arnd
+Rob
