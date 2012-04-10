@@ -1,55 +1,48 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 Apr 2012 17:32:44 +0200
-Subject: [PATCH 1/1] ARM: at91: fix at91sam9261ek dm9000 irq
-Message-ID: <1334071964-18990-1-git-send-email-plagnioj@jcrosoft.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 10 Apr 2012 09:01:05 -0700
+Subject: [PATCH] Input: eeti_ts: Mark as CONFIG_BROKEN
+In-Reply-To: <20120410101047.GQ24211@n2100.arm.linux.org.uk>
+References: <1333777207-4151-1-git-send-email-olof@lixom.net>
+ <20120407070206.GA17623@core.coreip.homeip.net>
+ <4F8089A9.6080704@raumfeld.com>
+ <CAOesGMiPZ0so-ZN0HCHHhw16oPWWgfVD5t--wKSvEUtzQx94CA@mail.gmail.com>
+ <20120410101047.GQ24211@n2100.arm.linux.org.uk>
+Message-ID: <20120410160105.GA19927@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You need now to set the irq via gpio_to_irq.
-since d0fbda9add (ARM: at91/gpio: drop PIN_BASE)
+On Tue, Apr 10, 2012 at 11:10:47AM +0100, Russell King - ARM Linux wrote:
+> On Sat, Apr 07, 2012 at 01:32:31PM -0700, Olof Johansson wrote:
+> > Haojian, I think it was probably premature to do the multiplatform
+> > change like that, since it means that a PXA-only kernel has no mapping
+> > from irq_to_gpio to pxa_irq_to_gpio. Can you please address this as a
+> > fix for 3.4?
+> 
+> Please fix ezx-pcap instead - it's broken as it currently stands by using
+> irq_to_gpio(), and it's one reason why my randconfig builds on OMAP fail.
+> 
+> The big problem is - what does this do:
+> 
+>         do {
+> ...
+>         } while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
+> 
+> if pcap->spi->irq has no GPIO associated with the interrupt?  irq_to_gpio()
+> probably returns some random number which might be some other GPIO in the
+> system, and gpio_get_value() could oops if irq_to_gpio returns a negative
+> or large positive number.  To put it another way, according to the above
+> code, irq_to_gpio() must always return a valid gpio for the IRQ even if
+> the IRQ doesn't have a GPIO associated with it.
+> 
+> This is a fine illustration of why irq_to_gpio() is just plain broken in
+> its design.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable at vger.kernel.org
----
-Hi Greg,
+OK, so we can fix eeti_ts and wacom_i2c; but what do we do with
+egalax_ts.c? It reconfigures gpio as output and sens a pulse to wake the
+controller from sleep. I guess we'll need platform data attached to
+it...
 
-	this bug is present in 3.2 & 3.3
+Thanks.
 
-Best Regards,
-J.
- arch/arm/mach-at91/board-sam9261ek.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index 065b5ee..2736453 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -76,8 +76,6 @@ static struct resource dm9000_resource[] = {
- 		.flags	= IORESOURCE_MEM
- 	},
- 	[2] = {
--		.start	= AT91_PIN_PC11,
--		.end	= AT91_PIN_PC11,
- 		.flags	= IORESOURCE_IRQ
- 			| IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_HIGHEDGE,
- 	}
-@@ -121,6 +119,8 @@ static struct sam9_smc_config __initdata dm9000_smc_config = {
- 
- static void __init ek_add_device_dm9000(void)
- {
-+	struct resource *r = &dm9000_resource[2];
-+
- 	/* Configure chip-select 2 (DM9000) */
- 	sam9_smc_configure(0, 2, &dm9000_smc_config);
- 
-@@ -130,6 +130,7 @@ static void __init ek_add_device_dm9000(void)
- 	/* Configure Interrupt pin as input, no pull-up */
- 	at91_set_gpio_input(AT91_PIN_PC11, 0);
- 
-+	r->start = r->end = gpio_to_irq(AT91_PIN_PC11);
- 	platform_device_register(&dm9000_device);
- }
- #else
 -- 
-1.7.9.1
+Dmitry
