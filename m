@@ -1,110 +1,38 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Tue, 10 Apr 2012 11:26:59 +0200
-Subject: [PATCH 1/2] Visstrim_M10: Add board version detection.
-Message-ID: <1334050019-21549-1-git-send-email-javier.martin@vista-silicon.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Apr 2012 10:29:04 +0100
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to
+ check presence of 32k timer
+In-Reply-To: <4F83F600.4000002@ti.com>
+References: <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+ <20120405095221.GC25053@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
+ <87hawxkgoi.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
+ <20120406180452.GB15734@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83184ABEF@DBDE01.ent.ti.com>
+ <4F83440E.70502@ti.com> <20120410084413.GD25053@n2100.arm.linux.org.uk>
+ <4F83F600.4000002@ti.com>
+Message-ID: <20120410092904.GE25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Visstrim_M10 boards have 3 gpios to detect the
-expansion board version attached and other 3 to
-detect the motherboard revision.
+On Tue, Apr 10, 2012 at 02:27:36PM +0530, Santosh Shilimkar wrote:
+> On Tuesday 10 April 2012 02:14 PM, Russell King - ARM Linux wrote:
+> > On Mon, Apr 09, 2012 at 03:18:22PM -0500, Jon Hunter wrote:
+> >> True, but we would always want to use the 32k timer if CONFIG_PM is  
+> >> specified. So what I am saying is that if a device has a 32ksync timer  
+> >> and CONFIG_PM is defined, we always want to use the 32ksync timer and a  
+> >> gptimer should never be used.
+> > 
+> > Why?  What if you want to have PM enabled, and you also want to use the
+> > kernels high resolution timers, or you want more accurate timing than
+> > the 30.5us tick interval of the 32k timer?
+> 
+> You might have missed the earlier comments on the thread. High
+> resolution GP timer(sysclk) will stop in deeper power states and
+> hence it can't be used with PM enabled usecases.
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   55 +++++++++++++++++++++++++++
- 1 files changed, 55 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index f9aa657..adbadf1 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -38,6 +38,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include <asm/system.h>
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
- 
-@@ -48,6 +49,14 @@
- #define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
- #define SDHC1_IRQ IRQ_GPIOB(25)
- 
-+#define MOTHERBOARD_BIT2	(GPIO_PORTD + 31)
-+#define MOTHERBOARD_BIT1	(GPIO_PORTD + 30)
-+#define MOTHERBOARD_BIT0	(GPIO_PORTD + 29)
-+
-+#define EXPBOARD_BIT2		(GPIO_PORTD + 25)
-+#define EXPBOARD_BIT1		(GPIO_PORTD + 27)
-+#define EXPBOARD_BIT0		(GPIO_PORTD + 28)
-+
- static const int visstrim_m10_pins[] __initconst = {
- 	/* UART1 (console) */
- 	PE12_PF_UART1_TXD,
-@@ -119,6 +128,23 @@ static const int visstrim_m10_pins[] __initconst = {
- 	PB19_PF_CSI_D7,
- 	PB20_PF_CSI_VSYNC,
- 	PB21_PF_CSI_HSYNC,
-+	/* mother board version */
-+	MOTHERBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-+	MOTHERBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-+	MOTHERBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-+	/* expansion board version */
-+	EXPBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-+	EXPBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-+	EXPBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-+};
-+
-+static struct gpio visstrim_m10_version_gpios[] = {
-+	{ EXPBOARD_BIT0, GPIOF_IN, "exp-version-0" },
-+	{ EXPBOARD_BIT1, GPIOF_IN, "exp-version-1" },
-+	{ EXPBOARD_BIT2, GPIOF_IN, "exp-version-2" },
-+	{ MOTHERBOARD_BIT0, GPIOF_IN, "mother-version-0" },
-+	{ MOTHERBOARD_BIT1, GPIOF_IN, "mother-version-1" },
-+	{ MOTHERBOARD_BIT2, GPIOF_IN, "mother-version-2" },
- };
- 
- /* Camera */
-@@ -399,11 +425,40 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
- 	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
- };
- 
-+static void __init visstrim_m10_revision(void)
-+{
-+	int exp_version = 0;
-+	int mo_version = 0;
-+	int ret;
-+
-+	ret = gpio_request_array(visstrim_m10_version_gpios,
-+				 ARRAY_SIZE(visstrim_m10_version_gpios));
-+	if (ret) {
-+		pr_err("Failed to request version gpios");
-+		return;
-+	}
-+
-+	/* Get expansion board version (negative logic) */
-+	exp_version |= !gpio_get_value(EXPBOARD_BIT2) << 2;
-+	exp_version |= !gpio_get_value(EXPBOARD_BIT1) << 1;
-+	exp_version |= !gpio_get_value(EXPBOARD_BIT0);
-+
-+	/* Get mother board version (negative logic) */
-+	mo_version |= !gpio_get_value(MOTHERBOARD_BIT2) << 2;
-+	mo_version |= !gpio_get_value(MOTHERBOARD_BIT1) << 1;
-+	mo_version |= !gpio_get_value(MOTHERBOARD_BIT0);
-+
-+	system_rev = 0x27000;
-+	system_rev |= (mo_version << 4);
-+	system_rev |= exp_version;
-+}
-+
- static void __init visstrim_m10_board_init(void)
- {
- 	int ret;
- 
- 	imx27_soc_init();
-+	visstrim_m10_revision();
- 
- 	ret = mxc_gpio_setup_multiple_pins(visstrim_m10_pins,
- 			ARRAY_SIZE(visstrim_m10_pins), "VISSTRIM_M10");
--- 
-1.7.0.4
+Which means folk should be given the choice at boot time between running
+with the deeper power states and having a higher resolution timing source,
+rather than denying them the higher resolution timing source when PM is
+enabled.
