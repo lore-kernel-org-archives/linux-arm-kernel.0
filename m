@@ -1,51 +1,44 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 10 Apr 2012 11:49:28 +0800
-Subject: [PATCH 1/1] pinctrl: add some error checking for user interfaces
-In-Reply-To: <4F82FA2A.3090604@wwwdotorg.org>
-References: <1333967409-8168-1-git-send-email-b29396@freescale.com>
- <4F82FA2A.3090604@wwwdotorg.org>
-Message-ID: <20120410034927.GA674@shlinux2.ap.freescale.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 10 Apr 2012 09:07:33 +0530
+Subject: [PATCH 1/2] dma/amba-pl08x: check for terminal count status only
+In-Reply-To: <1334004801-20185-1-git-send-email-linus.walleij@linaro.org>
+References: <1334004801-20185-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4F83AAFD.1030507@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2012 at 11:03:06PM +0800, Stephen Warren wrote:
-> On 04/09/2012 04:30 AM, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > This patch can avoid kernel oops in case the mux or config
-> > function is not supported by driver.
-> > 
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > ---
-> >  drivers/pinctrl/pinconf.c |    4 ++++
-> >  drivers/pinctrl/pinmux.c  |   15 +++++++++++++--
-> >  2 files changed, 17 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-> > index eb3a14f..384dcc1 100644
-> > --- a/drivers/pinctrl/pinconf.c
-> > +++ b/drivers/pinctrl/pinconf.c
-> > @@ -448,8 +448,12 @@ static void pinconf_dump_pin(struct pinctrl_dev *pctldev,
-> >  static int pinconf_pins_show(struct seq_file *s, void *what)
-> >  {
-> >  	struct pinctrl_dev *pctldev = s->private;
-> > +	const struct pinconf_ops *ops = pctldev->desc->confops;
-> >  	unsigned i, pin;
-> >  
-> > +	if (!ops || !ops->pin_config_get)
-> > +		return 0;
+On 4/10/2012 2:23 AM, Linus Walleij wrote:
+> For some reason I can't figure out we're reading the PL080_INT_STATUS
+> register instead of PL080_TC_STATUS when checking for the terminal
+> count. The PL080_INT_STATUS is a logical OR between the error and
+> terminal count status register and may not report what we want it
+> to, especially if there is an error and a terminal count at the same
+> time and the former is not lowered in time for the check in the TC
+> register. Make sure we read what we're actually interested in.
 > 
-> I don't think this is necessary; it looks like this function (and those
-> it calls) always checks ops where they're used.
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Alim Akhtar <alim.akhtar@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/dma/amba-pl08x.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-Yes, it's true.
-But it will still dump all pins configs although there's no config value
-which is almost the same as another debug entry 'pins'.
-It looks it does not make too much sense to dump this info if no config support.
-The existing pinconf_group_show did like this way(no output).
-So i changed pinconf_pins_show in the same behavior as pinconf_group_show.
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index c301a8e..08589c6 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -1615,7 +1615,7 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
+>  			__func__, err);
+>  		writel(err, pl08x->base + PL080_ERR_CLEAR);
+>  	}
+> -	tc = readl(pl08x->base + PL080_INT_STATUS);
+> +	tc = readl(pl08x->base + PL080_TC_STATUS);
+>  	if (tc)
+>  		writel(tc, pl08x->base + PL080_TC_CLEAR);
+>  
 
-Do you think it's reasonable?
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
 
-Regards
-Dong Aisheng
+-- 
+viresh
