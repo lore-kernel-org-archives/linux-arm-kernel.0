@@ -1,154 +1,334 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:32 +0200
-Subject: [PATCH v6 09/17] pwm: tegra: Add device tree support
+Date: Tue, 10 Apr 2012 17:06:34 +0200
+Subject: [PATCH v6 11/17] pwm: Move PXA PWM driver to PWM framework
 In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-10-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1334070400-25013-12-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add auxdata to instantiate the PWFM controller from a device tree,
-include the corresponding nodes in the dtsi files for Tegra 20 and
-Tegra 30 and add binding documentation.
+This commit moves the PXA PWM driver to the drivers/pwm subdirectory and
+converts it to use the new PWM framework.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
 Changes in v5:
-- rename tegra-pwm.txt to nvidia,tegra20-pwm.txt
-
-Changes in v4:
-- add DT binding documentation
-- allow nvidia,tegra20-pwm as fallback for nvidia,tegra30-pwm
-- export OF device table (for module auto-loading)
+- replace __raw_readl()/__raw_writel() by readl()/writel()
+- use clk_prepare_enable() and clk_disable_unprepare()
 
 Changes in v3:
-- add missing include for mach/iomap.h
+- update PWM ops for changes in patch 2
 
- .../devicetree/bindings/pwm/nvidia,tegra20-pwm.txt |   18 ++++++++++++++++++
- arch/arm/boot/dts/tegra20.dtsi                     |    6 ++++++
- arch/arm/boot/dts/tegra30.dtsi                     |    6 ++++++
- arch/arm/mach-tegra/board-dt-tegra20.c             |    1 +
- arch/arm/mach-tegra/board-dt-tegra30.c             |    3 +++
- drivers/pwm/pwm-tegra.c                            |   11 +++++++++++
- 6 files changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
+ arch/arm/plat-pxa/Makefile                       |    1 -
+ drivers/pwm/Kconfig                              |    9 ++
+ drivers/pwm/Makefile                             |    1 +
+ arch/arm/plat-pxa/pwm.c => drivers/pwm/pwm-pxa.c |  172 ++++++++--------------
+ 4 files changed, 68 insertions(+), 115 deletions(-)
+ rename arch/arm/plat-pxa/pwm.c => drivers/pwm/pwm-pxa.c (57%)
 
-diff --git a/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt b/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
-new file mode 100644
-index 0000000..bbbeedb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
-@@ -0,0 +1,18 @@
-+Tegra SoC PWFM controller
-+
-+Required properties:
-+- compatible: should be one of:
-+  - "nvidia,tegra20-pwm"
-+  - "nvidia,tegra30-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: On Tegra the number of cells used to specify a PWM is 2. The
-+  first cell specifies the per-chip index of the PWM to use and the second
-+  cell is the duty cycle in nanoseconds.
-+
-+Example:
-+
-+	pwm: pwm at 7000a000 {
-+		compatible = "nvidia,tegra20-pwm";
-+		reg = <0x7000a000 0x100>;
-+		#pwm-cells = <2>;
-+	};
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 108e894..55b28fd 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -154,6 +154,12 @@
- 		interrupts = < 0 91 0x04 >;
- 	};
+diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
+index f302d04..af8e484 100644
+--- a/arch/arm/plat-pxa/Makefile
++++ b/arch/arm/plat-pxa/Makefile
+@@ -8,5 +8,4 @@ obj-$(CONFIG_PXA3xx)		+= mfp.o
+ obj-$(CONFIG_PXA95x)		+= mfp.o
+ obj-$(CONFIG_ARCH_MMP)		+= mfp.o
  
-+	pwm: pwm at 7000a000 {
-+		compatible = "nvidia,tegra20-pwm";
-+		reg = <0x7000a000 0x100>;
-+		#pwm-cells = <2>;
-+	};
-+
- 	emc at 7000f400 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 62a7b39..3fa5211 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -154,6 +154,12 @@
- 		interrupts = < 0 91 0x04 >;
- 	};
+-obj-$(CONFIG_HAVE_PWM)		+= pwm.o
+ obj-$(CONFIG_PXA_SSP)		+= ssp.o
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index eb54042..0ef4f30 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -18,6 +18,15 @@ config PWM_BFIN
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called pwm-bfin.
  
-+	pwm: pwm at 7000a000 {
-+		compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
-+		reg = <0x7000a000 0x100>;
-+		#pwm-cells = <2>;
-+	};
++config PWM_PXA
++	tristate "PXA PWM support"
++	depends on ARCH_PXA
++	help
++	  Generic PWM framework driver for PXA.
 +
- 	sdhci at 78000000 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000000 0x200>;
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 0952494..87bdce5 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -73,6 +73,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
- 		       &tegra_ehci2_pdata),
- 	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB3_BASE, "tegra-ehci.2",
- 		       &tegra_ehci3_pdata),
-+	OF_DEV_AUXDATA("nvidia,tegra20-pwm", TEGRA_PWFM_BASE, "tegra-pwm", NULL),
- 	{}
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-pxa.
++
+ config PWM_TEGRA
+ 	tristate "NVIDIA Tegra PWM support"
+ 	depends on ARCH_TEGRA
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index 251b8d2..e859c51 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_PWM)		+= core.o
+ obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
++obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
+ obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+diff --git a/arch/arm/plat-pxa/pwm.c b/drivers/pwm/pwm-pxa.c
+similarity index 57%
+rename from arch/arm/plat-pxa/pwm.c
+rename to drivers/pwm/pwm-pxa.c
+index ef32686..d5c6ce5 100644
+--- a/arch/arm/plat-pxa/pwm.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -43,33 +43,39 @@ MODULE_DEVICE_TABLE(platform, pwm_id_table);
+ #define PWMCR_SD	(1 << 6)
+ #define PWMDCR_FD	(1 << 10)
+ 
+-struct pwm_device {
+-	struct list_head	node;
+-	struct pwm_device	*secondary;
+-	struct platform_device	*pdev;
++struct pxa_pwm_chip {
++	struct pwm_chip	chip;
++	struct device	*dev;
+ 
+-	const char	*label;
+ 	struct clk	*clk;
+ 	int		clk_enabled;
+ 	void __iomem	*mmio_base;
+-
+-	unsigned int	use_count;
+-	unsigned int	pwm_id;
  };
  
-diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
-index 5f7c03e..5e1180f 100644
---- a/arch/arm/mach-tegra/board-dt-tegra30.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra30.c
-@@ -33,6 +33,8 @@
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
- 
-+#include <mach/iomap.h>
++static inline struct pxa_pwm_chip *to_pxa_pwm_chip(struct pwm_chip *chip)
++{
++	return container_of(chip, struct pxa_pwm_chip, chip);
++}
 +
- #include "board.h"
- #include "clock.h"
+ /*
+  * period_ns = 10^9 * (PRESCALE + 1) * (PV + 1) / PWM_CLK_RATE
+  * duty_ns   = 10^9 * (PRESCALE + 1) * DC / PWM_CLK_RATE
+  */
+-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++			  int duty_ns, int period_ns)
+ {
++	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
+ 	unsigned long long c;
+ 	unsigned long period_cycles, prescale, pv, dc;
++	unsigned long offset;
++	int rc;
  
-@@ -51,6 +53,7 @@ struct of_dev_auxdata tegra30_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C500, "tegra-i2c.2", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000C700, "tegra-i2c.3", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", 0x7000D000, "tegra-i2c.4", NULL),
-+	OF_DEV_AUXDATA("nvidia,tegra30-pwm", TEGRA_PWFM_BASE, "tegra-pwm", NULL),
- 	{}
- };
+-	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
++	if (period_ns == 0 || duty_ns > period_ns)
+ 		return -EINVAL;
  
-diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
-index 0950142..472b74e 100644
---- a/drivers/pwm/pwm-tegra.c
-+++ b/drivers/pwm/pwm-tegra.c
-@@ -239,9 +239,20 @@ static int __devexit tegra_pwm_remove(struct platform_device *pdev)
+-	c = clk_get_rate(pwm->clk);
++	offset = pwm->hwpwm ? 0x10 : 0;
++
++	c = clk_get_rate(pc->clk);
+ 	c = c * period_ns;
+ 	do_div(c, 1000000000);
+ 	period_cycles = c;
+@@ -90,98 +96,56 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 	/* NOTE: the clock to PWM has to be enabled first
+ 	 * before writing to the registers
+ 	 */
+-	clk_enable(pwm->clk);
+-	__raw_writel(prescale, pwm->mmio_base + PWMCR);
+-	__raw_writel(dc, pwm->mmio_base + PWMDCR);
+-	__raw_writel(pv, pwm->mmio_base + PWMPCR);
+-	clk_disable(pwm->clk);
++	rc = clk_prepare_enable(pc->clk);
++	if (rc < 0)
++		return rc;
++
++	writel(prescale, pc->mmio_base + offset + PWMCR);
++	writel(dc, pc->mmio_base + offset + PWMDCR);
++	writel(pv, pc->mmio_base + offset + PWMPCR);
+ 
++	clk_disable_unprepare(pc->clk);
+ 	return 0;
+ }
+-EXPORT_SYMBOL(pwm_config);
+ 
+-int pwm_enable(struct pwm_device *pwm)
++static int pxa_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
++	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
+ 	int rc = 0;
+ 
+-	if (!pwm->clk_enabled) {
+-		rc = clk_enable(pwm->clk);
++	if (!pc->clk_enabled) {
++		rc = clk_prepare_enable(pc->clk);
+ 		if (!rc)
+-			pwm->clk_enabled = 1;
++			pc->clk_enabled++;
+ 	}
+ 	return rc;
+ }
+-EXPORT_SYMBOL(pwm_enable);
+ 
+-void pwm_disable(struct pwm_device *pwm)
++static void pxa_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+-	if (pwm->clk_enabled) {
+-		clk_disable(pwm->clk);
+-		pwm->clk_enabled = 0;
+-	}
+-}
+-EXPORT_SYMBOL(pwm_disable);
++	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
+ 
+-static DEFINE_MUTEX(pwm_lock);
+-static LIST_HEAD(pwm_list);
+-
+-struct pwm_device *pwm_request(int pwm_id, const char *label)
+-{
+-	struct pwm_device *pwm;
+-	int found = 0;
+-
+-	mutex_lock(&pwm_lock);
+-
+-	list_for_each_entry(pwm, &pwm_list, node) {
+-		if (pwm->pwm_id == pwm_id) {
+-			found = 1;
+-			break;
+-		}
++	if (pc->clk_enabled) {
++		clk_disable_unprepare(pc->clk);
++		pc->clk_enabled--;
+ 	}
+-
+-	if (found) {
+-		if (pwm->use_count == 0) {
+-			pwm->use_count++;
+-			pwm->label = label;
+-		} else
+-			pwm = ERR_PTR(-EBUSY);
+-	} else
+-		pwm = ERR_PTR(-ENOENT);
+-
+-	mutex_unlock(&pwm_lock);
+-	return pwm;
+ }
+-EXPORT_SYMBOL(pwm_request);
+-
+-void pwm_free(struct pwm_device *pwm)
+-{
+-	mutex_lock(&pwm_lock);
+ 
+-	if (pwm->use_count) {
+-		pwm->use_count--;
+-		pwm->label = NULL;
+-	} else
+-		pr_warning("PWM device already freed\n");
+-
+-	mutex_unlock(&pwm_lock);
+-}
+-EXPORT_SYMBOL(pwm_free);
+-
+-static inline void __add_pwm(struct pwm_device *pwm)
+-{
+-	mutex_lock(&pwm_lock);
+-	list_add_tail(&pwm->node, &pwm_list);
+-	mutex_unlock(&pwm_lock);
+-}
++static struct pwm_ops pxa_pwm_ops = {
++	.config = pxa_pwm_config,
++	.enable = pxa_pwm_enable,
++	.disable = pxa_pwm_disable,
++	.owner = THIS_MODULE,
++};
+ 
+ static int __devinit pwm_probe(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *id = platform_get_device_id(pdev);
+-	struct pwm_device *pwm, *secondary = NULL;
++	struct pxa_pwm_chip *pwm;
+ 	struct resource *r;
+ 	int ret = 0;
+ 
+-	pwm = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
++	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
+ 	if (pwm == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate memory\n");
+ 		return -ENOMEM;
+@@ -194,9 +158,10 @@ static int __devinit pwm_probe(struct platform_device *pdev)
+ 	}
+ 	pwm->clk_enabled = 0;
+ 
+-	pwm->use_count = 0;
+-	pwm->pwm_id = PWM_ID_BASE(id->driver_data) + pdev->id;
+-	pwm->pdev = pdev;
++	pwm->chip.dev = &pdev->dev;
++	pwm->chip.ops = &pxa_pwm_ops;
++	pwm->chip.base = -1;
++	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+@@ -219,25 +184,12 @@ static int __devinit pwm_probe(struct platform_device *pdev)
+ 		goto err_free_mem;
+ 	}
+ 
+-	if (id->driver_data & HAS_SECONDARY_PWM) {
+-		secondary = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
+-		if (secondary == NULL) {
+-			ret = -ENOMEM;
+-			goto err_free_mem;
+-		}
+-
+-		*secondary = *pwm;
+-		pwm->secondary = secondary;
+-
+-		/* registers for the second PWM has offset of 0x10 */
+-		secondary->mmio_base = pwm->mmio_base + 0x10;
+-		secondary->pwm_id = pdev->id + 2;
++	ret = pwmchip_add(&pwm->chip);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
++		return ret;
+ 	}
+ 
+-	__add_pwm(pwm);
+-	if (secondary)
+-		__add_pwm(secondary);
+-
+ 	platform_set_drvdata(pdev, pwm);
+ 	return 0;
+ 
+@@ -252,30 +204,22 @@ err_free:
+ 
+ static int __devexit pwm_remove(struct platform_device *pdev)
+ {
+-	struct pwm_device *pwm;
++	struct pxa_pwm_chip *chip;
+ 	struct resource *r;
+ 
+-	pwm = platform_get_drvdata(pdev);
+-	if (pwm == NULL)
++	chip = platform_get_drvdata(pdev);
++	if (chip == NULL)
+ 		return -ENODEV;
+ 
+-	mutex_lock(&pwm_lock);
+-
+-	if (pwm->secondary) {
+-		list_del(&pwm->secondary->node);
+-		kfree(pwm->secondary);
+-	}
++	pwmchip_remove(&chip->chip);
+ 
+-	list_del(&pwm->node);
+-	mutex_unlock(&pwm_lock);
+-
+-	iounmap(pwm->mmio_base);
++	iounmap(chip->mmio_base);
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(r->start, resource_size(r));
+ 
+-	clk_put(pwm->clk);
+-	kfree(pwm);
++	clk_put(chip->clk);
++	kfree(chip);
  	return 0;
  }
  
-+#ifdef CONFIG_OF
-+static struct of_device_id tegra_pwm_of_match[] = {
-+	{ .compatible = "nvidia,tegra20-pwm" },
-+	{ .compatible = "nvidia,tegra30-pwm" },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, tegra_pwm_of_match);
-+#endif
-+
- static struct platform_driver tegra_pwm_driver = {
- 	.driver = {
- 		.name = "tegra-pwm",
-+		.of_match_table = of_match_ptr(tegra_pwm_of_match),
- 	},
- 	.probe = tegra_pwm_probe,
- 	.remove = __devexit_p(tegra_pwm_remove),
 -- 
 1.7.9.6
