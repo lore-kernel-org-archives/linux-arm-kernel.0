@@ -1,340 +1,164 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:28 +0200
-Subject: [PATCH v6 05/17] pwm: Add device tree support
+Date: Tue, 10 Apr 2012 17:06:26 +0200
+Subject: [PATCH v6 03/17] pwm: Add debugfs interface
 In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-6-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1334070400-25013-4-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds helpers to support device tree bindings for the generic
-PWM API. Device tree binding documentation for PWM controllers is also
-provided.
+This commit adds a debugfs interface that can be used to list the
+current internal state of the PWM devices registered with the PWM
+framework.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Reviewed-by: Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 ---
-Changes in v6:
-- don't override error code in of_pwm_simple_xlate()
-- no longer export of_pwm_request(), only pwm_get() should be used
-- do a reverse lookup of the index into the "pwms" property by matching
-  the con_id parameter to the "pwm-names" property
-
 Changes in v5:
-- use IS_ENABLED(CONFIG_OF) along with the compiler's DCE instead of
-  empty implementations of of_pwmchip_add() and of_pwmchip_remove() in
-  the !OF case
-- remove OF_PWM Kconfig symbol and make OF support code conditional on
-  the OF symbol only
-- use "pwms" and "pwm-names" fixed property names
-- remove redundant check in of_pwm_simple_xlate()
-- use pwm_request_from_chip() instead of pwm_request_from_device()
-- integrate OF support with pwm_get() from new patch 4
+- new patch splitting off debugfs interface implementation
+- use seq_file's iterator interface for debugfs support
+- add missing forward declaration of struct seq_file
 
-Changes in v4:
-- add OF-specific code removed from patch 2
-- make of_node_to_pwmchip() and of_pwm_simple_xlate() static
-- rename of_get_named_pwm() to of_pwm_request(), return a struct
-  pwm_device, get rid of the now unused spec parameter and use the
-  device_node.name field as the PWM's name
-- return a requested struct pwm_device from pwm_chip.of_xlate and
-  drop the now unused spec parameter
-- move OF support code into drivers/pwm/core.c
-- used deferred probing if a PWM chip is not available yet
+ drivers/pwm/core.c  |   90 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pwm.h |    6 ++++
+ 2 files changed, 96 insertions(+)
 
-Changes in v2:
-- add device tree binding documentation
-- add of_xlate to parse controller-specific PWM-specifier
-
- Documentation/devicetree/bindings/pwm/pwm.txt |   57 ++++++++++
- drivers/pwm/core.c                            |  151 ++++++++++++++++++++++++-
- include/linux/pwm.h                           |    6 +
- 3 files changed, 212 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm.txt
-
-diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
-new file mode 100644
-index 0000000..73ec962
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm.txt
-@@ -0,0 +1,57 @@
-+Specifying PWM information for devices
-+======================================
-+
-+1) PWM user nodes
-+-----------------
-+
-+PWM users should specify a list of PWM devices that they want to use
-+with a property containing a 'pwm-list':
-+
-+	pwm-list ::= <single-pwm> [pwm-list]
-+	single-pwm ::= <pwm-phandle> <pwm-specifier>
-+	pwm-phandle : phandle to PWM controller node
-+	pwm-specifier : array of #pwm-cells specifying the given PWM
-+			(controller specific)
-+
-+PWM properties should be named "pwms". The exact meaning of each pwms
-+property must be documented in the device tree binding for each device.
-+An optional property "pwm-names" may contain a list of strings to label
-+each of the PWM devices listed in the "pwms" property. If no "pwm-names"
-+property is given, the name of the user node will be used as fallback.
-+
-+Drivers for devices that use more than a single PWM device can use the
-+"pwm-names" property to map the name of the PWM device requested by the
-+pwm_get() call to an index into the list given by the "pwms" property.
-+
-+The following example could be used to describe a PWM-based backlight
-+device:
-+
-+	pwm: pwm {
-+		#pwm-cells = <2>;
-+	};
-+
-+	[...]
-+
-+	bl: backlight {
-+		pwms = <&pwm 0 5000000>;
-+		pwm-names = "backlight";
-+	};
-+
-+pwm-specifier typically encodes the chip-relative PWM number and the PWM
-+period in nanoseconds. Note that in the example above, specifying the
-+"pwm-names" is redundant because the name "backlight" would be used as
-+fallback anyway.
-+
-+2) PWM controller nodes
-+-----------------------
-+
-+PWM controller nodes must specify the number of cells used for the
-+specifier using the '#pwm-cells' property.
-+
-+An example PWM controller might look like this:
-+
-+	pwm: pwm at 7000a000 {
-+		compatible = "nvidia,tegra20-pwm";
-+		reg = <0x7000a000 0x100>;
-+		#pwm-cells = <2>;
-+	};
 diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 402e466..e5ab7cd 100644
+index 8688754..7e13da1 100644
 --- a/drivers/pwm/core.c
 +++ b/drivers/pwm/core.c
-@@ -129,6 +129,45 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
- 	return 0;
- }
+@@ -27,6 +27,8 @@
+ #include <linux/err.h>
+ #include <linux/slab.h>
+ #include <linux/device.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
  
-+static struct pwm_device *of_pwm_simple_xlate(struct pwm_chip *pc,
-+					      const struct of_phandle_args *args)
-+{
-+	struct pwm_device *pwm;
-+
-+	if (pc->of_pwm_n_cells < 2)
-+		return ERR_PTR(-EINVAL);
-+
-+	if (args->args[0] >= pc->npwm)
-+		return ERR_PTR(-EINVAL);
-+
-+	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
-+	if (IS_ERR(pwm))
-+		return pwm;
-+
-+	pwm_set_period(pwm, args->args[1]);
-+
-+	return pwm;
-+}
-+
-+void of_pwmchip_add(struct pwm_chip *chip)
-+{
-+	if (!chip->dev || !chip->dev->of_node)
-+		return;
-+
-+	if (!chip->of_xlate) {
-+		chip->of_xlate = of_pwm_simple_xlate;
-+		chip->of_pwm_n_cells = 2;
-+	}
-+
-+	of_node_get(chip->dev->of_node);
-+}
-+
-+void of_pwmchip_remove(struct pwm_chip *chip)
-+{
-+	if (chip->dev && chip->dev->of_node)
-+		of_node_put(chip->dev->of_node);
-+}
-+
- /**
-  * pwm_set_chip_data() - set private chip data for a PWM
-  * @pwm: PWM device
-@@ -197,6 +236,9 @@ int pwmchip_add(struct pwm_chip *chip)
- 	INIT_LIST_HEAD(&chip->list);
- 	list_add(&chip->list, &pwm_chips);
+ #define MAX_PWMS 1024
  
-+	if (IS_ENABLED(CONFIG_OF))
-+		of_pwmchip_add(chip);
-+
- out:
- 	mutex_unlock(&pwm_lock);
- 	return ret;
-@@ -227,6 +269,10 @@ int pwmchip_remove(struct pwm_chip *chip)
- 	}
- 
- 	list_del_init(&chip->list);
-+
-+	if (IS_ENABLED(CONFIG_OF))
-+		of_pwmchip_remove(chip);
-+
- 	free_pwms(chip);
- 
- out:
-@@ -352,6 +398,102 @@ void pwm_disable(struct pwm_device *pwm)
+@@ -334,3 +336,91 @@ void pwm_disable(struct pwm_device *pwm)
+ 		pwm->chip->ops->disable(pwm->chip, pwm);
  }
  EXPORT_SYMBOL_GPL(pwm_disable);
- 
-+#ifdef CONFIG_OF
-+static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-+{
-+	struct pwm_chip *chip;
 +
++#ifdef CONFIG_DEBUG_FS
++static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
++{
++	unsigned int i;
++
++	for (i = 0; i < chip->npwm; i++) {
++		struct pwm_device *pwm = &chip->pwms[i];
++
++		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
++
++		if (test_bit(PWMF_REQUESTED, &pwm->flags))
++			seq_printf(s, " requested");
++
++		if (test_bit(PWMF_ENABLED, &pwm->flags))
++			seq_printf(s, " enabled");
++
++		seq_printf(s, "\n");
++	}
++}
++
++static void *pwm_seq_start(struct seq_file *s, loff_t *pos)
++{
 +	mutex_lock(&pwm_lock);
++	s->private = "";
 +
-+	list_for_each_entry(chip, &pwm_chips, list)
-+		if (chip->dev && chip->dev->of_node == np) {
-+			mutex_unlock(&pwm_lock);
-+			return chip;
-+		}
-+
-+	mutex_unlock(&pwm_lock);
-+
-+	return ERR_PTR(-EPROBE_DEFER);
++	return seq_list_start(&pwm_chips, *pos);
 +}
 +
-+/**
-+ * of_pwm_request() - request a PWM via the PWM framework
-+ * @np: device node to get the PWM from
-+ * @con_id: consumer name
-+ *
-+ * Returns the PWM device parsed from the phandle and index specified in the
-+ * "pwms" property of a device tree node or a negative error-code on failure.
-+ * Values parsed from the device tree are stored in the returned PWM device
-+ * object.
-+ *
-+ * If con_id is NULL, the first PWM device listed in the "pwms" property will
-+ * be requested. Otherwise the "pwm-names" property is used to do a reverse
-+ * lookup of the PWM index. This also means that the "pwm-names" property
-+ * becomes mandatory for devices that look up the PWM device via the con_id
-+ * parameter.
-+ */
-+static struct pwm_device *of_pwm_request(struct device_node *np,
-+					 const char *con_id)
++static void *pwm_seq_next(struct seq_file *s, void *v, loff_t *pos)
 +{
-+	struct pwm_device *pwm = NULL;
-+	struct of_phandle_args args;
-+	struct pwm_chip *pc;
-+	int index = 0;
-+	int err;
++	s->private = "\n";
 +
-+	if (con_id) {
-+		index = of_property_match_string(np, "pwm-names", con_id);
-+		if (index < 0)
-+			return ERR_PTR(index);
-+	}
-+
-+	err = of_parse_phandle_with_args(np, "pwms", "#pwm-cells", index,
-+					 &args);
-+	if (err) {
-+		pr_debug("%s(): can't parse \"pwms\" property\n", __func__);
-+		return ERR_PTR(err);
-+	}
-+
-+	pc = of_node_to_pwmchip(args.np);
-+	if (IS_ERR(pc)) {
-+		pr_debug("%s(): PWM chip not found\n", __func__);
-+		pwm = ERR_CAST(pc);
-+		goto put;
-+	}
-+
-+	if (args.args_count != pc->of_pwm_n_cells) {
-+		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
-+			 args.np->full_name);
-+		pwm = ERR_PTR(-EINVAL);
-+		goto put;
-+	}
-+
-+	pwm = pc->of_xlate(pc, &args);
-+	if (IS_ERR(pwm))
-+		goto put;
-+
-+	/*
-+	 * If a consumer name was not given, try to look it up from the
-+	 * "pwm-names" property if it exists. Otherwise use the name of
-+	 * the user device node.
-+	 */
-+	if (!con_id) {
-+		err = of_property_read_string_index(np, "pwm-names", index,
-+						    &con_id);
-+		if (err < 0)
-+			con_id = np->name;
-+	}
-+
-+	pwm->label = con_id;
-+
-+put:
-+	of_node_put(args.np);
-+
-+	return pwm;
++	return seq_list_next(v, &pwm_chips, pos);
 +}
-+EXPORT_SYMBOL(of_pwm_request);
-+#endif
 +
- /**
-  * pwm_add_table() - register PWM device consumers
-  * @table: array of consumers to register
-@@ -374,8 +516,9 @@ void __init pwm_add_table(struct pwm_lookup *table, size_t num)
-  * @dev: device for PWM consumer
-  * @con_id: consumer name
-  *
-- * Look up a PWM chip and a relative index via a table supplied by board setup
-- * code (see pwm_add_table()).
-+ * Lookup is first attempted using DT. If the device was not instantiated from
-+ * a device tree, a PWM chip and a relative index is looked up via a table
-+ * supplied by board setup code (see pwm_add_table()).
-  *
-  * Once a PWM chip has been found the specified PWM device will be requested
-  * and is ready to be used.
-@@ -390,6 +533,10 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 	unsigned int index;
- 	unsigned int match;
- 
-+	/* look up via DT first */
-+	if (dev && dev->of_node)
-+		return of_pwm_request(dev->of_node, con_id);
++static void pwm_seq_stop(struct seq_file *s, void *v)
++{
++	mutex_unlock(&pwm_lock);
++}
 +
- 	/*
- 	 * We look up the provider in the static table typically provided by
- 	 * board setup code. We first try to lookup the consumer device by
++static int pwm_seq_show(struct seq_file *s, void *v)
++{
++	struct pwm_chip *chip = list_entry(v, struct pwm_chip, list);
++
++	seq_printf(s, "%s%s/%s, %d PWM device%s\n", (char *)s->private,
++		   chip->dev->bus ? chip->dev->bus->name : "no-bus",
++		   dev_name(chip->dev), chip->npwm,
++		   (chip->npwm != 1) ? "s" : "");
++
++	if (chip->ops->dbg_show)
++		chip->ops->dbg_show(chip, s);
++	else
++		pwm_dbg_show(chip, s);
++
++	return 0;
++}
++
++static const struct seq_operations pwm_seq_ops = {
++	.start = pwm_seq_start,
++	.next = pwm_seq_next,
++	.stop = pwm_seq_stop,
++	.show = pwm_seq_show,
++};
++
++static int pwm_seq_open(struct inode *inode, struct file *file)
++{
++	return seq_open(file, &pwm_seq_ops);
++}
++
++static const struct file_operations pwm_debugfs_ops = {
++	.owner = THIS_MODULE,
++	.open = pwm_seq_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = seq_release,
++};
++
++static int __init pwm_debugfs_init(void)
++{
++	debugfs_create_file("pwm", S_IFREG | S_IRUGO, NULL, NULL,
++			    &pwm_debugfs_ops);
++
++	return 0;
++}
++
++subsys_initcall(pwm_debugfs_init);
++#endif /* CONFIG_DEBUG_FS */
 diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 2947a4f..21d076c 100644
+index 5710391..047cd53 100644
 --- a/include/linux/pwm.h
 +++ b/include/linux/pwm.h
-@@ -1,6 +1,8 @@
- #ifndef __LINUX_PWM_H
+@@ -2,6 +2,7 @@
  #define __LINUX_PWM_H
  
-+#include <linux/of.h>
-+
  struct pwm_device;
- struct seq_file;
++struct seq_file;
  
-@@ -105,6 +107,10 @@ struct pwm_chip {
- 	unsigned int		npwm;
- 
- 	struct pwm_device	*pwms;
-+
-+	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
-+					    const struct of_phandle_args *args);
-+	unsigned int		of_pwm_n_cells;
+ /*
+  * pwm_request - request a PWM device
+@@ -65,6 +66,7 @@ static inline unsigned int pwm_get_period(struct pwm_device *pwm)
+  * @config: configure duty cycles and period length for this PWM
+  * @enable: enable PWM output toggling
+  * @disable: disable PWM output toggling
++ * @dbg_show: optional routine to show contents in debugfs
+  * @owner: helps prevent removal of modules exporting active PWMs
+  */
+ struct pwm_ops {
+@@ -79,6 +81,10 @@ struct pwm_ops {
+ 					  struct pwm_device *pwm);
+ 	void			(*disable)(struct pwm_chip *chip,
+ 					   struct pwm_device *pwm);
++#ifdef CONFIG_DEBUG_FS
++	void			(*dbg_show)(struct pwm_chip *chip,
++					    struct seq_file *s);
++#endif
+ 	struct module		*owner;
  };
  
- int pwm_set_chip_data(struct pwm_device *pwm, void *data);
 -- 
 1.7.9.6
