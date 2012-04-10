@@ -1,32 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 Apr 2012 09:35:43 +0100
-Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
-In-Reply-To: <20120410083130.GK24211@n2100.arm.linux.org.uk>
-References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20120406074942.GO7264@S2101-09.ap.freescale.net>
- <20120410083130.GK24211@n2100.arm.linux.org.uk>
-Message-ID: <20120410083543.GC3149@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Apr 2012 09:35:36 +0100
+Subject: questions about drivers/dma/amba-pl08x.c
+In-Reply-To: <CACRpkdaC3=vSGF6XH=7Oiqsdg0RVDfbv-M5NZDY5psF96BssHQ@mail.gmail.com>
+References: <CAKwPUozgACvV-TZdn92f1O2shSEvFBfbN-hrS=FNQ5O+DEEY5g@mail.gmail.com>
+ <CACRpkdaC3=vSGF6XH=7Oiqsdg0RVDfbv-M5NZDY5psF96BssHQ@mail.gmail.com>
+Message-ID: <20120410083536.GL24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 09:31:30AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 06, 2012 at 03:49:45PM +0800, Shawn Guo wrote:
-> > I believe this patch fixes the amba probe failure that impacts any
-> > AMBA platform build with CONFIG_REGULATOR enabled.  Could you consider
-> > to send the fix for -rc soon?
+On Tue, Apr 10, 2012 at 10:32:20AM +0200, Linus Walleij wrote:
+> Sorry, I'm not following, so slave is true and there is still no slave
+> channels defined? It looks like your platform data is wrong.
+> 
+> But better error checking is always needed so if you want to,
+> please send a patch to improve it...
 
-> No idea.  I don't have Mark's patch in the patch system.
-
-It's there as far as I can tell - it's 7366/1, which is visible in the
-web interface at:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7366/1
-
-Is there something else I need to do?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120410/f8948335/attachment.sig>
+Or we could just say that if people want to point the gun at their feet
+and pull the trigger, we shouldn't detect that and stop the bullet coming
+out the barrel.
