@@ -1,34 +1,70 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Wed, 11 Apr 2012 06:08:28 +0900
-Subject: [PATCH 3/4] arm: davinci: use for_each_set_bit_from
-In-Reply-To: <4F8462DE.4030004@ti.com>
-References: <1333442836-9947-1-git-send-email-akinobu.mita@gmail.com>
- <1333442836-9947-3-git-send-email-akinobu.mita@gmail.com>
- <4F8462DE.4030004@ti.com>
-Message-ID: <CAC5umygW+i=8=a+x7BnDuN=GPBFSXA4TWgrvQQvtWv0jSreWXw@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 10 Apr 2012 17:37:41 -0400
+Subject: [PATCH v3 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <201203301136.05038.arnd@arndb.de> (Arnd Bergmann's message of
+ "Fri, 30 Mar 2012 11:36:04 +0000")
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <201203271619.13320.arnd@arndb.de> <4F7553D1.4030008@st.com>
+ <201203301136.05038.arnd@arndb.de>
+Message-ID: <87wr5ntgii.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/4/11 Sekhar Nori <nsekhar@ti.com>:
-> Hi Akinobu,
->
-> On 4/3/2012 2:17 PM, Akinobu Mita wrote:
->> Use for_each_set_bit_from to iterate over all the set bit in a memory
->> region.
->>
->> Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: linux-arm-kernel at lists.infradead.org
->
-> Looks good to me. If you are planning to send this upstream outside of
-> davinci tree, please add my:
->
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
->
-> Else, let me know and I will be happy to queue it.
+Hi Arnd,
 
-Christian found a bug in this patch. So  I'll resend it, then please queue it
-to your tree.
+(Diff truncated to show relevant hunks.)
+
+On Fri, Mar 30 2012, Arnd Bergmann wrote:
+> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> index dbd4368..90b86e5 100644
+> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> @@ -15,10 +15,10 @@ Optional properties:
+>  ti,dual-volt: boolean, supports dual voltage cards
+>  <supply-name>-supply: phandle to the regulator device tree node
+>  "supply-name" examples are "vmmc", "vmmc_aux" etc
+> -ti,bus-width: Number of data lines, default assumed is 1 if the property is missing.
+> +bus-width: Number of data lines, default assumed is 1 if the property is missing.
+>  cd-gpios: GPIOs for card detection
+>  wp-gpios: GPIOs for write protection
+> -ti,non-removable: non-removable slot (like eMMC)
+> +non-removable: non-removable slot (like eMMC)
+>  ti,needs-special-reset: Requires a special softreset sequence
+>  
+>  Example:
+> @@ -27,7 +27,7 @@ Example:
+>  		reg = <0x4809c000 0x400>;
+>  		ti,hwmods = "mmc1";
+>  		ti,dual-volt;
+> -		ti,bus-width = <4>;
+> +		bus-width = <4>;
+>  		vmmc-supply = <&vmmc>; /* phandle to regulator node */
+>  		ti,non-removable;
+>  	};
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 47adb16..ae48fc7 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1766,7 +1766,7 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
+>  		pdata->slots[0].nonremovable = true;
+>  		pdata->slots[0].no_regulator_off_init = true;
+>  	}
+> -	of_property_read_u32(np, "ti,bus-width", &bus_width);
+> +	of_property_read_u32(np, "bus-width", &bus_width);
+>  	if (bus_width == 4)
+>  		pdata->slots[0].caps |= MMC_CAP_4_BIT_DATA;
+>  	else if (bus_width == 8)
+
+Here you change "ti,non-removable" to "non-removable" in the properties
+section of ti-omap-hsmmc.txt without changing it in the example section
+of that document, or in the code or shipped .dts files.
+
+(Presumably you decided to preserve it for backwards compatibility, so
+the bindings documentation shouldn't be changed.)
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
