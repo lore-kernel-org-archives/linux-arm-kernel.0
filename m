@@ -1,342 +1,104 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 10 Apr 2012 17:06:31 +0200
-Subject: [PATCH v6 08/17] pwm: Add NVIDIA Tegra SoC support
+Date: Tue, 10 Apr 2012 17:06:29 +0200
+Subject: [PATCH v6 06/17] ARM: tegra: Fix PWM clock programming
 In-Reply-To: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1334070400-25013-9-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1334070400-25013-7-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a generic PWM framework driver for the PWFM controller
-found on NVIDIA Tegra SoCs. The driver is based on code from the
-Chromium kernel tree and was originally written by Gary King (NVIDIA)
-and later modified by Simon Que (Chromium).
+From: Simon Que <sque@chromium.org>
 
+PWM clock source registers in Tegra 2 have different clock source selection bit
+fields than other registers.  PWM clock source bits in CLK_SOURCE_PWM_0 register
+are located at bit field bit[30:28] while others are at bit field bit[31:30] in
+their respective clock source register.
+
+This patch updates the clock programming to correctly reflect that, by adding a
+flag to indicate the alternate bit field format and checking for it when
+selecting a clock source (parent clock).
+
+Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+Signed-off-by: Simon Que <sque@chromium.org>
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
-Changes in v6:
-- return EADDRNOTAVAIL if devm_request_and_ioremap() fails
-- make tegra_pwm_ops constant
-
-Changes in v5:
-- use devm_request_and_ioremap()
-- use clk_prepare_enable() and clk_disable_unprepare()
-- call pwmchip_remove() after disabling PWM devices
-- remove tegra_pwm_chip.enable[] field and use the PWM flags instead
-- use pwm_readl()/pwm_writel() for register accesses and split out clock
-  management to where it's needed
-- add MODULE_ALIAS to enable automatic module loading
-
 Changes in v4:
-- merge patch from ChromiumOS kernel to fix a rounding issue
-- move DT code to patch 7
+  - reuse PWM flag from Tegra 30 clock programming
+  - mask out bit 31 explicitly
 
-Changes in v3:
-- use pwm_device.hwpwm instead of recomputing it
-- update pwm_ops for changes in patch 2
+ arch/arm/mach-tegra/tegra2_clocks.c |   32 ++++++++++++++++++++++++++++----
+ 1 file changed, 28 insertions(+), 4 deletions(-)
 
-Changes in v2:
-- set pwm_chip.dev field
-- rename clk_enb to enable
-- introduce NUM_PWM macro instead of hard-coding the number of PWM
-  devices
-- update comment in tegra_pwm_config
-- fix coding-style for multi-line comments
-- use module_platform_driver
-- change license to GPL
-
- drivers/pwm/Kconfig     |   10 ++
- drivers/pwm/Makefile    |    1 +
- drivers/pwm/pwm-tegra.c |  254 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 265 insertions(+)
- create mode 100644 drivers/pwm/pwm-tegra.c
-
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 93c1052..bda6f23 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -9,4 +9,14 @@ menuconfig PWM
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 592a4ee..64735bd 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -69,6 +69,8 @@
  
- if PWM
+ #define PERIPH_CLK_SOURCE_MASK		(3<<30)
+ #define PERIPH_CLK_SOURCE_SHIFT		30
++#define PERIPH_CLK_SOURCE_PWM_MASK	(7<<28)
++#define PERIPH_CLK_SOURCE_PWM_SHIFT	28
+ #define PERIPH_CLK_SOURCE_ENABLE	(1<<28)
+ #define PERIPH_CLK_SOURCE_DIVU71_MASK	0xFF
+ #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
+@@ -908,9 +910,20 @@ static void tegra2_periph_clk_init(struct clk *c)
+ 	u32 val = clk_readl(c->reg);
+ 	const struct clk_mux_sel *mux = NULL;
+ 	const struct clk_mux_sel *sel;
++	u32 shift;
++	u32 mask;
++
++	if (c->flags & MUX_PWM) {
++		shift = PERIPH_CLK_SOURCE_PWM_SHIFT;
++		mask = PERIPH_CLK_SOURCE_PWM_MASK;
++	} else {
++		shift = PERIPH_CLK_SOURCE_SHIFT;
++		mask = PERIPH_CLK_SOURCE_MASK;
++	}
++
+ 	if (c->flags & MUX) {
+ 		for (sel = c->inputs; sel->input != NULL; sel++) {
+-			if (val >> PERIPH_CLK_SOURCE_SHIFT == sel->value)
++			if ((val & mask) >> shift == sel->value)
+ 				mux = sel;
+ 		}
+ 		BUG_ON(!mux);
+@@ -1023,12 +1036,23 @@ static int tegra2_periph_clk_set_parent(struct clk *c, struct clk *p)
+ {
+ 	u32 val;
+ 	const struct clk_mux_sel *sel;
++	u32 mask, shift;
++
+ 	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
++
++	if (c->flags & MUX_PWM) {
++		shift = PERIPH_CLK_SOURCE_PWM_SHIFT;
++		mask = PERIPH_CLK_SOURCE_PWM_MASK;
++	} else {
++		shift = PERIPH_CLK_SOURCE_SHIFT;
++		mask = PERIPH_CLK_SOURCE_MASK;
++	}
++
+ 	for (sel = c->inputs; sel->input != NULL; sel++) {
+ 		if (sel->input == p) {
+ 			val = clk_readl(c->reg);
+-			val &= ~PERIPH_CLK_SOURCE_MASK;
+-			val |= (sel->value) << PERIPH_CLK_SOURCE_SHIFT;
++			val &= ~mask;
++			val |= (sel->value) << shift;
  
-+config PWM_TEGRA
-+	tristate "NVIDIA Tegra PWM support"
-+	depends on ARCH_TEGRA
-+	help
-+	  Generic PWM framework driver for the PWFM controller found on NVIDIA
-+	  Tegra SoCs.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-tegra.
-+
- endif
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 3469c3d..12300f5 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_PWM)		+= core.o
-+obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
-new file mode 100644
-index 0000000..0950142
---- /dev/null
-+++ b/drivers/pwm/pwm-tegra.c
-@@ -0,0 +1,254 @@
-+/*
-+ * drivers/pwm/pwm-tegra.c
-+ *
-+ * Tegra pulse-width-modulation controller driver
-+ *
-+ * Copyright (c) 2010, NVIDIA Corporation.
-+ * Based on arch/arm/plat-mxc/pwm.c by Sascha Hauer <s.hauer@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pwm.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#define PWM_ENABLE	(1 << 31)
-+#define PWM_DUTY_WIDTH	8
-+#define PWM_DUTY_SHIFT	16
-+#define PWM_SCALE_WIDTH	13
-+#define PWM_SCALE_SHIFT	0
-+
-+#define NUM_PWM 4
-+
-+struct tegra_pwm_chip {
-+	struct pwm_chip		chip;
-+	struct device		*dev;
-+
-+	struct clk		*clk;
-+
-+	void __iomem		*mmio_base;
-+};
-+
-+static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct tegra_pwm_chip, chip);
-+}
-+
-+static inline u32 pwm_readl(struct tegra_pwm_chip *chip, unsigned int num)
-+{
-+	return readl(chip->mmio_base + (num << 4));
-+}
-+
-+static inline void pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
-+			     unsigned long val)
-+{
-+	writel(val, chip->mmio_base + (num << 4));
-+}
-+
-+static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			    int duty_ns, int period_ns)
-+{
-+	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-+	unsigned long long c;
-+	unsigned long rate, hz;
-+	u32 val = 0;
-+	int err;
-+
-+	/*
-+	 * Convert from duty_ns / period_ns to a fixed number of duty ticks
-+	 * per (1 << PWM_DUTY_WIDTH) cycles and make sure to round to the
-+	 * nearest integer during division.
-+	 */
-+	c = duty_ns * ((1 << PWM_DUTY_WIDTH) - 1) + period_ns / 2;
-+	do_div(c, period_ns);
-+
-+	val = (u32)c << PWM_DUTY_SHIFT;
-+
-+	/*
-+	 * Compute the prescaler value for which (1 << PWM_DUTY_WIDTH)
-+	 * cycles@the PWM clock rate will take period_ns nanoseconds.
-+	 */
-+	rate = clk_get_rate(pc->clk) >> PWM_DUTY_WIDTH;
-+	hz = 1000000000ul / period_ns;
-+
-+	rate = (rate + (hz / 2)) / hz;
-+
-+	/*
-+	 * Since the actual PWM divider is the register's frequency divider
-+	 * field minus 1, we need to decrement to get the correct value to
-+	 * write to the register.
-+	 */
-+	if (rate > 0)
-+		rate--;
-+
-+	/*
-+	 * Make sure that the rate will fit in the register's frequency
-+	 * divider field.
-+	 */
-+	if (rate >> PWM_SCALE_WIDTH)
-+		return -EINVAL;
-+
-+	val |= rate << PWM_SCALE_SHIFT;
-+
-+	/*
-+	 * If the PWM channel is disabled, make sure to turn on the clock
-+	 * before writing the register. Otherwise, keep it enabled.
-+	 */
-+	if (!test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		err = clk_prepare_enable(pc->clk);
-+		if (err < 0)
-+			return err;
-+	} else
-+		val |= PWM_ENABLE;
-+
-+	pwm_writel(pc, pwm->hwpwm, val);
-+
-+	/*
-+	 * If the PWM is not enabled, turn the clock off again to save power.
-+	 */
-+	if (!test_bit(PWMF_ENABLED, &pwm->flags))
-+		clk_disable_unprepare(pc->clk);
-+
-+	return 0;
-+}
-+
-+static int tegra_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-+	int rc = 0;
-+	u32 val;
-+
-+	rc = clk_prepare_enable(pc->clk);
-+	if (rc < 0)
-+		return rc;
-+
-+	val = pwm_readl(pc, pwm->hwpwm);
-+	val |= PWM_ENABLE;
-+	pwm_writel(pc, pwm->hwpwm, val);
-+
-+	return 0;
-+}
-+
-+static void tegra_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
-+	u32 val;
-+
-+	val = pwm_readl(pc, pwm->hwpwm);
-+	val &= ~PWM_ENABLE;
-+	pwm_writel(pc, pwm->hwpwm, val);
-+
-+	clk_disable_unprepare(pc->clk);
-+}
-+
-+static const struct pwm_ops tegra_pwm_ops = {
-+	.config = tegra_pwm_config,
-+	.enable = tegra_pwm_enable,
-+	.disable = tegra_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int tegra_pwm_probe(struct platform_device *pdev)
-+{
-+	struct tegra_pwm_chip *pwm;
-+	struct resource *r;
-+	int ret;
-+
-+	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-+	if (!pwm) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	pwm->dev = &pdev->dev;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!r) {
-+		dev_err(&pdev->dev, "no memory resources defined\n");
-+		return -ENODEV;
-+	}
-+
-+	pwm->mmio_base = devm_request_and_ioremap(&pdev->dev, r);
-+	if (!pwm->mmio_base) {
-+		dev_err(&pdev->dev, "failed to ioremap() region\n");
-+		return -EADDRNOTAVAIL;
-+	}
-+
-+	platform_set_drvdata(pdev, pwm);
-+
-+	pwm->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pwm->clk))
-+		return PTR_ERR(pwm->clk);
-+
-+	pwm->chip.dev = &pdev->dev;
-+	pwm->chip.ops = &tegra_pwm_ops;
-+	pwm->chip.base = -1;
-+	pwm->chip.npwm = NUM_PWM;
-+
-+	ret = pwmchip_add(&pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
-+		clk_put(pwm->clk);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __devexit tegra_pwm_remove(struct platform_device *pdev)
-+{
-+	struct tegra_pwm_chip *pc = platform_get_drvdata(pdev);
-+	int i;
-+
-+	if (WARN_ON(!pc))
-+		return -ENODEV;
-+
-+	for (i = 0; i < NUM_PWM; i++) {
-+		struct pwm_device *pwm = &pc->chip.pwms[i];
-+
-+		if (!test_bit(PWMF_ENABLED, &pwm->flags))
-+			if (clk_prepare_enable(pc->clk) < 0)
-+				continue;
-+
-+		pwm_writel(pc, i, 0);
-+
-+		clk_disable_unprepare(pc->clk);
-+	}
-+
-+	pwmchip_remove(&pc->chip);
-+	clk_put(pc->clk);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver tegra_pwm_driver = {
-+	.driver = {
-+		.name = "tegra-pwm",
-+	},
-+	.probe = tegra_pwm_probe,
-+	.remove = __devexit_p(tegra_pwm_remove),
-+};
-+
-+module_platform_driver(tegra_pwm_driver);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("NVIDIA Corporation");
-+MODULE_ALIAS("platform:tegra-pwm");
+ 			if (c->refcnt)
+ 				clk_enable(p);
+@@ -2146,7 +2170,7 @@ static struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("i2s2",	"tegra-i2s.1",		NULL,	18,	0x104,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("spdif_out",	"spdif_out",		NULL,	10,	0x108,	100000000, mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("spdif_in",	"spdif_in",		NULL,	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71),
+-	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71),
++	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71 | MUX_PWM),
+ 	PERIPH_CLK("spi",	"spi",			NULL,	43,	0x114,	40000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("xio",	"xio",			NULL,	45,	0x120,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("twc",	"twc",			NULL,	16,	0x12c,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 -- 
 1.7.9.6
