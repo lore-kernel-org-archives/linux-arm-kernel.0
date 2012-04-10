@@ -1,30 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 Apr 2012 16:02:31 +0200
-Subject: [PATCH 1/1] ARN: at91: fix rm9200ek flash size
-Message-ID: <1334066551-5554-1-git-send-email-plagnioj@jcrosoft.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Apr 2012 15:30:55 +0100
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120410143055.GT24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flash size is 8MiB.
+On Tue, Apr 10, 2012 at 03:45:14PM +0200, Sascha Hauer wrote:
+> With the generic clock framework we do not necessarily have
+> a pointer to the struct clk we want to register a lookup
+> for, so add a const char *clkname field to struct clk_lookup
+> so that a lookup can be registered with a clock name.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/board-rm9200ek.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+All this silly names all over the place is getting to be utterly
+rediculous. Why do we need to name clocks and look them up by name
+when we have a perfectly good way (clkdev) to do this already?  Yes,
+it takes a struct clk pointer but that's exactly because that's what
+it has to return.
 
-diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index 78ffc83..2b15b8a 100644
---- a/arch/arm/mach-at91/board-rm9200ek.c
-+++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -103,7 +103,7 @@ static struct i2c_board_info __initdata ek_i2c_devices[] = {
- };
- 
- #define EK_FLASH_BASE	AT91_CHIPSELECT_0
--#define EK_FLASH_SIZE	SZ_2M
-+#define EK_FLASH_SIZE	SZ_8M
- 
- static struct physmap_flash_data ek_flash_data = {
- 	.width		= 2,
--- 
-1.7.9.1
+Why do we want to have another idiotic string to look up a clock which
+is named using an idiotic scheme to find out its pointer to only then
+register that with clkdev?
+
+I think this clk stuff has gone totally insane wrt names recently.
