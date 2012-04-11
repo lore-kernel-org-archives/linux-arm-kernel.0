@@ -1,31 +1,28 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 11 Apr 2012 13:17:11 +0530
-Subject: [PATCH] clk: Don't set clk->new_rate twice
-Message-ID: <b1645e8d85b8857b4b153f1a3d7e9929f0ad4a74.1334130399.git.viresh.kumar@st.com>
+Date: Wed, 11 Apr 2012 13:29:56 +0530
+Subject: [PATCH 2/2] dma/amba-pl08x: add support for the Nomadik variant
+In-Reply-To: <CACRpkdaz9g7cRc1rAMHUzRbLcrYtB-kPCB6bFEMYZxxmWfLNSg@mail.gmail.com>
+References: <1334004816-20219-1-git-send-email-linus.walleij@linaro.org>
+ <4F83AC55.3070900@st.com>
+ <CACRpkdaz9g7cRc1rAMHUzRbLcrYtB-kPCB6bFEMYZxxmWfLNSg@mail.gmail.com>
+Message-ID: <4F8539FC.4030503@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if (!clk->ops->round_rate && (clk->flags & CLK_SET_RATE_PARENT)) is true, then
-we don't need to set clk->new_rate here, as we will call clk_calc_subtree()
-afterwards and it also sets clk->new_rate.
+On 4/11/2012 1:29 PM, Linus Walleij wrote:
+>>> >> +                             ch->locked = true;
+>>> >> +                     } else
+>>> >> +                             ch->locked = false;
+>>> >> +             }
+>>> >> +
+>> >
+>> > Memory for ch is allocated with kmalloc and so its default value is garbage.
+>> > So we must set locked to false in else part here.
+> Hm maybe better to kzalloc() the channel structs?
+> 
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/clk/clk.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Then, you can remove code which makes its field zero explicitly, as it is already
+zero.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 56e32a1..9d11c19 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -775,7 +775,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
- 
- 	if (!clk->ops->round_rate && (clk->flags & CLK_SET_RATE_PARENT)) {
- 		top = clk_calc_new_rates(clk->parent, rate);
--		new_rate = clk->new_rate = clk->parent->new_rate;
-+		new_rate = clk->parent->new_rate;
- 
- 		goto out;
- 	}
 -- 
-1.7.9
+viresh
