@@ -1,31 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Apr 2012 10:54:01 +0200
-Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
-In-Reply-To: <4F854504.2060101@st.com>
-References: <4F793C56.2030605@st.com>
- <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
- <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
- <4F83FAE2.8020107@st.com>
- <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
- <4F853FC0.4080802@st.com>
- <CACRpkdYgSFYgr-CVmG0JenMM+EOydjJxpR8zaFuGPiMKtKRM9Q@mail.gmail.com>
- <4F854504.2060101@st.com>
-Message-ID: <CACRpkdaU8yVAnsvL3JBh-XZv0pQ0jtdDOz97nF2v7LbQoYRz_g@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 11 Apr 2012 11:56:39 +0300
+Subject: [PATCH RESEND] Input: omap-keypad: dynamically handle register
+ offsets
+In-Reply-To: <CAKdam57PkBQXTHv3VZ79vQ_v4TZYLxKCP4FY01XFEQJ-PPLkuQ@mail.gmail.com>
+References: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
+ <20120410162353.GA6217@core.coreip.homeip.net>
+ <CAKdam57PkBQXTHv3VZ79vQ_v4TZYLxKCP4FY01XFEQJ-PPLkuQ@mail.gmail.com>
+Message-ID: <20120411085638.GC12064@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 10:47 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 4/11/2012 2:13 PM, Linus Walleij wrote:
->> Yeah you can send this pull request and then Arnd or Olof will put it
->> on some topic branch like "topic-spear" and then you base your
->> further work on top of that and then send a new pull request to be
->> merged into that same branch, with the pinctrl stuff. And include the
->> ACK:s directly in the patches (git rebase -i is your friend...)
->
-> git rebase -i is an old friend, but it seem i don't know him completely :(
-> How does it help in adding Acked-by automatically? Is there anything more
-> than marking all of them as "rework" and add these Acks manually?
+On Wed, Apr 11, 2012 at 02:19:48PM +0530, Poddar, Sourav wrote:
+> >> +static int kbd_readl(struct omap4_keypad *keypad_data, u32 offset)
+> >> +{
+> >> + ? ? if (keypad_data->revision == KBD_REVISION_OMAP4)
+> >> + ? ? ? ? ? ? return __raw_readl(keypad_data->base + offset);
+> >> + ? ? else if (keypad_data->revision == KBD_REVISION_OMAP5)
+> >> + ? ? ? ? ? ? return __raw_readl(keypad_data->base + offset + 0x10);
+> >> +
+> >> + ? ? return -ENODEV;
+> >
+> > Instead do:
+> >
+> > ? ? ? ?return __raw_readl(keypad_data->base + keypad_data->reg_offset +
+> > ? ? ? ? ? ? ? ? ? ? ? ? ? offset);
+> >> +}
+> I have a couple of doubts on this:
+> 1. Before using kbd_readl/kbd_write anywhere we
+> need to populate the "keypad_data->reg_offset"  with the register address
+> which we need to read or write.
 
-Not that I'm aware of ... That's how I do it atleast.
+no no... keypad_data->reg_offset would be 0 or 0x10 depending on the
+scheme you decode from revision.
 
-Linus Walleij
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120411/c9cb20d9/attachment.sig>
