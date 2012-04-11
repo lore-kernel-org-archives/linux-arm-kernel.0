@@ -1,35 +1,31 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 11 Apr 2012 13:54:44 +0200
-Subject: [PATCH 3/5] MAINTAINERS: add entry for Atmel DMA driver
+Date: Wed, 11 Apr 2012 13:54:46 +0200
+Subject: [PATCH 5/5] MAINTAINERS: remove non-responding web link for
+ atmel_usba driver
 In-Reply-To: <cover.1334137680.git.nicolas.ferre@atmel.com>
 References: <cover.1334137680.git.nicolas.ferre@atmel.com>
-Message-ID: <a322a49e3fe11155f8b0dc19bedaf21018b390fb.1334137680.git.nicolas.ferre@atmel.com>
+Message-ID: <05cc973152bedd39bf37fa1222960c2a2c438500.1334137680.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
+Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 ---
- MAINTAINERS |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ MAINTAINERS |    1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 0ac46d8..4fc6a6c 100644
+index be04d43..cde4008 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1331,6 +1331,14 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+@@ -1379,7 +1379,6 @@ F:	drivers/input/touchscreen/atmel_tsadcc.c
+ ATMEL USBA UDC DRIVER
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://avr32linux.org/twiki/bin/view/Main/AtmelUsbDeviceDriver
  S:	Supported
- F:	drivers/tty/serial/atmel_serial.c
+ F:	drivers/usb/gadget/atmel_usba_udc.*
  
-+ATMEL DMA DRIVER
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Supported
-+F:	drivers/dma/at_hdmac.c
-+F:	drivers/dma/at_hdmac_regs.h
-+F:	arch/arm/mach-at91/include/mach/at_hdmac.h
-+
- ATMEL ISI DRIVER
- M:	Josh Wu <josh.wu@atmel.com>
- L:	linux-media at vger.kernel.org
 -- 
 1.7.9.4
