@@ -1,33 +1,28 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Apr 2012 16:45:29 +0800
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120411082401.GA32187@sirena.org.uk>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
- <20120410143055.GT24211@n2100.arm.linux.org.uk>
- <20120410161142.GG3852@pengutronix.de>
- <20120411011149.GA20818@b20223-02.ap.freescale.net>
- <20120411082401.GA32187@sirena.org.uk>
-Message-ID: <20120411084528.GB20818@b20223-02.ap.freescale.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 11 Apr 2012 14:17:00 +0530
+Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
+In-Reply-To: <CACRpkdYgSFYgr-CVmG0JenMM+EOydjJxpR8zaFuGPiMKtKRM9Q@mail.gmail.com>
+References: <4F793C56.2030605@st.com>
+ <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
+ <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
+ <4F83FAE2.8020107@st.com>
+ <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
+ <4F853FC0.4080802@st.com>
+ <CACRpkdYgSFYgr-CVmG0JenMM+EOydjJxpR8zaFuGPiMKtKRM9Q@mail.gmail.com>
+Message-ID: <4F854504.2060101@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 09:24:02AM +0100, Mark Brown wrote:
-> On Wed, Apr 11, 2012 at 09:11:50AM +0800, Richard Zhao wrote:
-> 
-> > I don't like string loopup either. And after DT binding, we can use
-> > phandler to refer clk.
-> 
-> No, this is only useful on platforms that use DT.  This is a generic
-> Linux API so it needs to support architectures and platforms that don't
-> use DT as it's vanishingly unlikely that DT will ever be adopted by all
-> platforms.
-My point is using string lookup as less as possible. When one register
-a clk, one already got the struct clk* pointer and could use it in
-struct lookup.
+On 4/11/2012 2:13 PM, Linus Walleij wrote:
+> Yeah you can send this pull request and then Arnd or Olof will put it
+> on some topic branch like "topic-spear" and then you base your
+> further work on top of that and then send a new pull request to be
+> merged into that same branch, with the pinctrl stuff. And include the
+> ACK:s directly in the patches (git rebase -i is your friend...)
 
-I'm worried about the performance as I saw string lookup is used more
-and more often. In fast boot case, for example, even 5ms is important.
+git rebase -i is an old friend, but it seem i don't know him completely :(
+How does it help in adding Acked-by automatically? Is there anything more
+than marking all of them as "rework" and add these Acks manually?
 
-Thanks
-Richard
+-- 
+viresh
