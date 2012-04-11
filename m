@@ -1,36 +1,58 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 11 Apr 2012 16:03:42 +0530
-Subject: [PATCH] clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is set and
- clk is enabled
-Message-ID: <b9cb6ed1e4bf0f777873b142d88cedfc520023b2.1334140283.git.viresh.kumar@st.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Wed, 11 Apr 2012 16:22:21 +0530
+Subject: [PATCHv7 10/18] I2C: OMAP: Don't check if
+ wait_for_completion_timeout() returns less than zero
+In-Reply-To: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
+References: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334141549-8288-11-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is well documented but isn't implemented. clk_set_rate() must check if
-flags have CLK_SET_RATE_GATE bit set and is enabled too.
+By definition, wait_for_completion_timeout() returns an unsigned value and
+therefore, it is not necessary to check if the return value is less than zero
+as this is not possible.
 
-Untested patch.
+This is based on a patch from Jon Hunter <jon-hunter@ti.com>
+Changes from his patch
+- Declare a long as the wait_for_completion_timeout returns long.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Original patch is
+http://git.omapzoom.org/?p=kernel/omap.git;a=commitdiff;h=ea02cece7b0000bc736e60c4188a11aaa74bc6e6
+
+Cc : Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/clk/clk.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   10 ++++------
+ 1 files changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 9d11c19..65dc35d 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -905,6 +905,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 	if (rate == clk->rate)
- 		goto out;
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 959e97c..121c52e 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -502,7 +502,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 			     struct i2c_msg *msg, int stop)
+ {
+ 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+-	int r;
++	unsigned long timeout;
+ 	u16 w;
  
-+	if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
- 	/* calculate new rates and get the topmost changed clock */
- 	top = clk_calc_new_rates(clk, rate);
- 	if (!top) {
+ 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+@@ -570,12 +570,10 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	 * REVISIT: We should abort the transfer on signals, but the bus goes
+ 	 * into arbitration and we're currently unable to recover from it.
+ 	 */
+-	r = wait_for_completion_timeout(&dev->cmd_complete,
+-					OMAP_I2C_TIMEOUT);
++	timeout = wait_for_completion_timeout(&dev->cmd_complete,
++						OMAP_I2C_TIMEOUT);
+ 	dev->buf_len = 0;
+-	if (r < 0)
+-		return r;
+-	if (r == 0) {
++	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+ 		omap_i2c_reset(dev);
+ 		omap_i2c_init(dev);
 -- 
-1.7.9
+1.7.4.1
