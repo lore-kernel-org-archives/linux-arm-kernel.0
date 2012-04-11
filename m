@@ -1,38 +1,31 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 11 Apr 2012 14:32:54 +0300
-Subject: [PATCHv7 01/18] I2C: OMAP: make omap_i2c_unidle/idle functions
- depend on CONFIG_PM_RUNTIME
-In-Reply-To: <1334142776-10583-2-git-send-email-shubhrajyoti@ti.com>
-References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
- <1334142776-10583-2-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120411113254.GE12064@arwen.pp.htv.fi>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 11 Apr 2012 17:04:15 +0530
+Subject: [PATCH v2 02/15] ARM: mark const init data with __initconst
+ instead of __initdata
+In-Reply-To: <1333137905-13809-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20120330200358.GV15647@pengutronix.de>
+ <1333137905-13809-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <4F856C37.2040304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 04:42:39PM +0530, Shubhrajyoti D wrote:
-> The functions omap_i2c_unidle/idle are called from omap_i2c_runtime_resume
-> and omap_i2c_runtime_suspend which is compiled for CONFIG_PM_RUNTIME.
-> This patch removes the omap_i2c_unidle/idle functions and folds them
-> into the runtime callbacks.
-> 
-> This fixes the below warn when CONFIG_PM_RUNTIME is not defined
-> 
->  CC      arch/arm/mach-omap2/board-ti8168evm.o
-> drivers/i2c/busses/i2c-omap.c:272: warning: 'omap_i2c_unidle' defined but not used
-> drivers/i2c/busses/i2c-omap.c:293: warning: 'omap_i2c_idle' defined but not used
->   CC      net/ipv4/ip_forward.o
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Hi Uwe,
 
-how about just moving them into the #ifdef ? /me thinks it's easier to
-read with the function. Matter of taste though, it's not that much code.
+On 3/31/2012 1:34 AM, Uwe Kleine-K?nig wrote:
+> As long as there is no other non-const variable marked __initdata in the
+> same compilation unit it doesn't hurt. If there were one however
+> compilation would fail with
+> 
+> 	error: $variablename causes a section type conflict
+> 
+> because a section containing const variables is marked read only and so
+> cannot contain non-const variables.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120411/78ab606c/attachment.sig>
+For the DaVinci parts,
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
