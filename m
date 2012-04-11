@@ -1,44 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Apr 2012 10:44:03 +0200
-Subject: [GIT PULL] i.MX cleanup patches for next
-Message-ID: <20120411084403.GN3852@pengutronix.de>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 11 Apr 2012 16:45:29 +0800
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <20120411082401.GA32187@sirena.org.uk>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
+ <20120410143055.GT24211@n2100.arm.linux.org.uk>
+ <20120410161142.GG3852@pengutronix.de>
+ <20120411011149.GA20818@b20223-02.ap.freescale.net>
+ <20120411082401.GA32187@sirena.org.uk>
+Message-ID: <20120411084528.GB20818@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Wed, Apr 11, 2012 at 09:24:02AM +0100, Mark Brown wrote:
+> On Wed, Apr 11, 2012 at 09:11:50AM +0800, Richard Zhao wrote:
+> 
+> > I don't like string loopup either. And after DT binding, we can use
+> > phandler to refer clk.
+> 
+> No, this is only useful on platforms that use DT.  This is a generic
+> Linux API so it needs to support architectures and platforms that don't
+> use DT as it's vanishingly unlikely that DT will ever be adopted by all
+> platforms.
+My point is using string lookup as less as possible. When one register
+a clk, one already got the struct clk* pointer and could use it in
+struct lookup.
 
-Please pull the following i.MX cleanup patches for next.
+I'm worried about the performance as I saw string lookup is used more
+and more often. In fast boot case, for example, even 5ms is important.
 
-Sascha
-
-The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
-
-  Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-cleanup-20120411
-
-for you to fetch changes up to b0843e814737756a38003afe663a626653b66f58:
-
-  efikamx: match machine descriptions with legacy (2012-04-02 11:20:38 +0200)
-
-----------------------------------------------------------------
-i.MX misc cleanups
-
-----------------------------------------------------------------
-Hector Oron (1):
-      efikamx: match machine descriptions with legacy
-
-Uwe Kleine-K?nig (1):
-      ARM: imx/mx21ads: remove unneeded cast
-
- arch/arm/mach-imx/mach-mx21ads.c      |    3 +--
- arch/arm/mach-imx/mach-mx51_efikamx.c |    3 +--
- arch/arm/mach-imx/mach-mx51_efikasb.c |    2 +-
- 3 files changed, 3 insertions(+), 5 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Richard
