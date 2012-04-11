@@ -1,104 +1,90 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 10 Apr 2012 18:35:28 -0600
-Subject: [PATCH v4 03/12] ARM: OMAP1: OCPI: move to mach-omap1/
+Date: Tue, 10 Apr 2012 18:35:38 -0600
+Subject: [PATCH v4 04/12] ARM: OMAP1: OHCI: use platform_data fn ptr to enable
+ OCPI bus
 In-Reply-To: <20120411003454.27059.37500.stgit@dusk>
 References: <20120411003454.27059.37500.stgit@dusk>
-Message-ID: <20120411003525.27059.43118.stgit@dusk>
+Message-ID: <20120411003528.27059.8836.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the OMAP1 OCPI "bus" code to arch/arm/mach-omap1, since it is
-only used on OMAP1 devices.  In the long term, it probably makes sense
-to move the OCPI bus code to somewhere under drivers/.
+The OMAP1 OHCI driver needs to enable the OCPI IP block before it can
+work.  Previously, the driver was simply calling a symbol defined in
+the OMAP platform code, but this is incorrect: drivers should be fully
+decoupled from platform and architecture code.
+
+So instead, modify the driver to call through a platform_data function
+pointer instead.  We skip any DT aspect, since OMAP1 is not scheduled
+to be converted to DT in the near future.
+
+This resolves the following sparse warning:
+
+It also gets rid of a cpu_is_omap16xx() call in a driver.
+
+In the long term, it probably makes sense to move the OCPI bus code to
+somewhere under drivers/.  This should avoid the whole platform_data/DT
+issue with this function.
+
+Also interesting is that drivers/usb/host/ohci-nxp.c contains a stub
+for ocpi_enable() - perhaps the NXP chips use a similar OCPI IP block?
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: Roland Stigge <stigge@antcom.de>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Anand Gadiyar <gadiyar@ti.com>
 ---
- arch/arm/mach-omap1/Makefile |    3 +++
- arch/arm/mach-omap1/common.h |    2 ++
- arch/arm/mach-omap1/ocpi.c   |    7 +++++--
- arch/arm/plat-omap/Makefile  |    3 ---
- 4 files changed, 10 insertions(+), 5 deletions(-)
- rename arch/arm/{plat-omap/ocpi.c => mach-omap1/ocpi.c} (93%)
+ arch/arm/mach-omap1/usb.c               |    3 +++
+ arch/arm/plat-omap/include/plat/board.h |    2 ++
+ drivers/usb/host/ohci-omap.c            |    5 +++--
+ 3 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index 9923f92..20d65af 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -12,6 +12,9 @@ endif
- 
- obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
- 
-+# OCPI interconnect support for 1710, 1610 and 5912
-+obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
-+
- # Power Management
- obj-$(CONFIG_PM) += pm.o sleep.o
- 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index ef656ff..a90b9d7 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -63,4 +63,6 @@ extern bool omap_32k_timer_init(void);
- 
- extern u32 omap_irq_flags;
- 
-+extern int ocpi_enable(void);
-+
- #endif /* __ARCH_ARM_MACH_OMAP1_COMMON_H */
-diff --git a/arch/arm/plat-omap/ocpi.c b/arch/arm/mach-omap1/ocpi.c
-similarity index 93%
-rename from arch/arm/plat-omap/ocpi.c
-rename to arch/arm/mach-omap1/ocpi.c
-index ebe0c73..238170c 100644
---- a/arch/arm/plat-omap/ocpi.c
-+++ b/arch/arm/mach-omap1/ocpi.c
-@@ -4,6 +4,7 @@
-  * Minimal OCP bus support for omap16xx
-  *
-  * Copyright (C) 2003 - 2005 Nokia Corporation
-+ * Copyright (C) 2012 Texas Instruments, Inc.
-  * Written by Tony Lindgren <tony@atomide.com>
-  *
-  * Modified for clock framework by Paul Mundt <paul.mundt@nokia.com>.
-@@ -35,6 +36,8 @@
- 
- #include <mach/hardware.h>
+diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+index 19de03b..e61afd9 100644
+--- a/arch/arm/mach-omap1/usb.c
++++ b/arch/arm/mach-omap1/usb.c
+@@ -29,6 +29,8 @@
+ #include <plat/mux.h>
+ #include <plat/usb.h>
  
 +#include "common.h"
 +
- #define OCPI_BASE		0xfffec320
- #define OCPI_FAULT		(OCPI_BASE + 0x00)
- #define OCPI_CMD_FAULT		(OCPI_BASE + 0x04)
-@@ -64,7 +67,7 @@ int ocpi_enable(void)
- 	/* Enable access for OHCI in OCPI */
- 	val = omap_readl(OCPI_PROT);
- 	val &= ~0xff;
--	//val &= (1 << 0);	/* Allow access only to EMIFS */
-+	/* val &= (1 << 0);	 Allow access only to EMIFS */
- 	omap_writel(val, OCPI_PROT);
- 
- 	val = omap_readl(OCPI_SEC);
-@@ -86,7 +89,7 @@ static int __init omap_ocpi_init(void)
- 
- 	clk_enable(ocpi_ck);
- 	ocpi_enable();
--	printk("OMAP OCPI interconnect driver loaded\n");
-+	pr_info("OMAP OCPI interconnect driver loaded\n");
- 
- 	return 0;
+ /* These routines should handle the standard chip-specific modes
+  * for usb0/1/2 ports, covering basic mux and transceiver setup.
+  *
+@@ -138,6 +140,7 @@ static inline void ohci_device_init(struct omap_usb_config *pdata)
+ 	if (cpu_is_omap7xx())
+ 		ohci_resources[1].start = INT_7XX_USB_HHC_1;
+ 	pdata->ohci_device = &ohci_device;
++	pdata->ocpi_enable = &ocpi_enable;
  }
-diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-index c0fe275..ed8605f 100644
---- a/arch/arm/plat-omap/Makefile
-+++ b/arch/arm/plat-omap/Makefile
-@@ -9,9 +9,6 @@ obj-m :=
- obj-n :=
- obj-  :=
  
--# OCPI interconnect support for 1710, 1610 and 5912
--obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
--
- # omap_device support (OMAP2+ only@the moment)
- obj-$(CONFIG_ARCH_OMAP2) += omap_device.o
- obj-$(CONFIG_ARCH_OMAP3) += omap_device.o
+ #else
+diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
+index d5eb4c8..4814c5b 100644
+--- a/arch/arm/plat-omap/include/plat/board.h
++++ b/arch/arm/plat-omap/include/plat/board.h
+@@ -91,6 +91,8 @@ struct omap_usb_config {
+ 	u32 (*usb0_init)(unsigned nwires, unsigned is_device);
+ 	u32 (*usb1_init)(unsigned nwires);
+ 	u32 (*usb2_init)(unsigned nwires, unsigned alt_pingroup);
++
++	int (*ocpi_enable)(void);
+ };
+ 
+ struct omap_lcd_config {
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index 96451e4..71229cb 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -205,8 +205,9 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+ 	need_transceiver = need_transceiver
+ 			|| machine_is_omap_h2() || machine_is_omap_h3();
+ 
+-	if (cpu_is_omap16xx())
+-		ocpi_enable();
++	/* XXX OMAP16xx only */
++	if (config->ocpi_enable)
++		config->ocpi_enable();
+ 
+ #ifdef	CONFIG_USB_OTG
+ 	if (need_transceiver) {
