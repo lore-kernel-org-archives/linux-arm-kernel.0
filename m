@@ -1,35 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Apr 2012 10:47:04 +0100
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120411094231.GO3852@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
- <20120410143055.GT24211@n2100.arm.linux.org.uk>
- <20120410161142.GG3852@pengutronix.de>
- <20120411011149.GA20818@b20223-02.ap.freescale.net>
- <20120411082401.GA32187@sirena.org.uk>
- <20120411084528.GB20818@b20223-02.ap.freescale.net>
- <20120411092034.GV24211@n2100.arm.linux.org.uk>
- <20120411094231.GO3852@pengutronix.de>
-Message-ID: <20120411094704.GY24211@n2100.arm.linux.org.uk>
+From: will.newton@gmail.com (Will Newton)
+Date: Wed, 11 Apr 2012 11:11:57 +0100
+Subject: [PATCH] mmc: remove linux/blkdev.h include from host drivers
+In-Reply-To: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
+References: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <CAFbHwiQrq30HO2X4KG1u5J2+dT2dEcZAd0gXEXm7nc7jjm--wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 11:42:31AM +0200, Sascha Hauer wrote:
-> On Wed, Apr 11, 2012 at 10:20:34AM +0100, Russell King - ARM Linux wrote:
-> > Yes, and you're not the only one who has that concern.  What this patch
-> > does is turn a pair of string compares through a table into that plus
-> > another set of string compares across all struct clk, which will make
-> > the lookup yet more expensive.
-> > 
-> > I see no reason why you'd register the cl_lookup structures before you
-> > know about which clks actually exist - and if they already exist, then
-> > you can already find the struct clk pointer and use that to register
-> > the proper return value for clk_get() via the clkdev APIs.
-> 
-> Indeed I have struct clk pointers, so I can instead use a to-be-written
-> combination of clkdev_alloc/clkdev_add. Would that be ok?
+On Tue, Apr 10, 2012 at 8:06 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> None of mmc host drivers using linux/blkdev.h header
+> really need anything from it. The slight exception is
+> atmel-mci, which uses blkdev.h only because it indirectly
+> pulls asm/cacheflush.h
+>
+> So remove any inclusion of blkdev.h - it should also fix
+> build errors of dw_mmc and atmel-mci drivers when
+> CONFIG_BLOCK is disabled, like following:
+> ------------------------------------------------------
+> In file included from drivers/mmc/host/dw_mmc.c:14:0:
+> include/linux/blkdev.h:1408:42: warning: ?struct task_struct? declared inside parameter list [enabled by default]
+> include/linux/blkdev.h:1408:42: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+> include/linux/blkdev.h:1412:51: warning: ?struct task_struct? declared inside parameter list [enabled by default]
+> include/linux/blkdev.h:1417:1: error: unknown type name ?bool?
+> include/linux/blkdev.h:1417:48: warning: ?struct task_struct? declared inside parameter list [enabled by default]
+> include/linux/blkdev.h: In function ?blk_needs_flush_plug?:
+> include/linux/blkdev.h:1419:9: error: ?false? undeclared (first use in this function)
+> include/linux/blkdev.h:1419:9: note: each undeclared identifier is reported only once for each function it appears in
+> make[1]: *** [drivers/mmc/host/dw_mmc.o] Error 1
+> make: *** [drivers/mmc/host/dw_mmc.o] Error 2
+> ------------------------------------------------------
+>
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: Pavel Pisa <ppisa@pikron.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Will Newton <will.newton@imgtec.com>
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 
-As we already have clkdev_alloc and clkdev_add, then I don't see that as
-a problem - except we may have to change __clkdev_alloc() so that it can
-be used before kmalloc() is up and running.
+For the dw_mmc part:
+
+Acked-by: Will Newton <will.newton@imgtec.com>
