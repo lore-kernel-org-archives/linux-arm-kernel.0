@@ -1,26 +1,56 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Apr 2012 10:17:38 +0200
-Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
-In-Reply-To: <4F83FAE2.8020107@st.com>
-References: <4F793C56.2030605@st.com>
- <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
- <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
- <4F83FAE2.8020107@st.com>
-Message-ID: <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
+Date: Wed, 11 Apr 2012 10:19:56 +0200
+Subject: questions about drivers/dma/amba-pl08x.c
+In-Reply-To: <CAKwPUoy6ooNbKDb=gbS_jAZuaA7SteGP+RVEhoeCK-eLKoqamw@mail.gmail.com>
+References: <CAKwPUozgACvV-TZdn92f1O2shSEvFBfbN-hrS=FNQ5O+DEEY5g@mail.gmail.com>
+ <CACRpkdaC3=vSGF6XH=7Oiqsdg0RVDfbv-M5NZDY5psF96BssHQ@mail.gmail.com>
+ <CAKwPUoy6ooNbKDb=gbS_jAZuaA7SteGP+RVEhoeCK-eLKoqamw@mail.gmail.com>
+Message-ID: <CACRpkdZTeEsZ4+czpmchZJczuS5b3=H4wFPUPb+d7c0=+f4hdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 11:18 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 4/10/2012 2:12 PM, Linus Walleij wrote:
->> Will there be conflicts between this patch set and the stuff you're
->> submitting for pinctrl? Or is it just runtime problems?
+On Tue, Apr 10, 2012 at 12:42 PM, Kassey Lee <kassey1216@gmail.com> wrote:
+
+> hi, Linus, Walleij:
+> ? ? ? ?thanks for your answer! is this you meaning?
+
+Sort of...
+
+> Subject: [PATCH] dmaengine/amba-pl08x: check slave_channels to avoid kernel
+> ?panic
 >
-> Yes. There will be conflicts. I have touched dts files in pinctrl patches
-> that got added in this patchset.
+> slave_channels is platform dependent, it should
+> be initialized by board.c, and here we need to check it
+> to avoid a NULL panic.
+>
+> Signed-off-by: Kassey,Lee <kassey1216@gmail.com>
+> ---
+> ?drivers/dma/amba-pl08x.c | ? ?7 +++++++
+> ?1 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index c301a8e..b558ea6 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -1687,6 +1687,13 @@ static int
+> pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+> ? ? ? ? ? ? ? ?chan->state = PL08X_CHAN_IDLE;
+>
+> ? ? ? ? ? ? ? ?if (slave) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (!pl08x->pd->slave_channels) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(&pl08x->adev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%s slave_channels is
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?not initialized\n", __func__);
 
-Hm, then we should maybe consider mergeing all that pinctrl stuff
-through ARM SoC later as well. I can probably provide the
-necessary ACKs.
+Do not split messages for 80 col compliance. Ignore checkpatch warning in this
+case.
 
-Yours,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? kfree(chan);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EFAULT;
+
+Use -EINVAL;
+
+> + ? ? ? ? ? ? ? ? ? ? ? }
+
+Thanks,
 Linus Walleij
