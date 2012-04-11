@@ -1,277 +1,294 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 10 Apr 2012 18:35:59 -0600
-Subject: [PATCH v4 10/12] ARM: OMAP1: board files: deduplicate and clean some
- NAND-related code
-In-Reply-To: <20120411003454.27059.37500.stgit@dusk>
-References: <20120411003454.27059.37500.stgit@dusk>
-Message-ID: <20120411003555.27059.96204.stgit@dusk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 10 Apr 2012 20:43:24 -0400
+Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
+ DNS-325
+In-Reply-To: <alpine.DEB.2.00.1204091418400.23719@marmot.wormnet.eu>
+References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
+ <1332885255-8304-2-git-send-email-jm@lentin.co.uk>
+ <20120406234955.840F73E1323@localhost>
+ <alpine.DEB.2.00.1204091418400.23719@marmot.wormnet.eu>
+Message-ID: <20120411004324.GB14790@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H2, H3, Perseus2, and FSample board files all contain the same
-duplicated code to handle NAND commands.  That code is missing
-some casts around conversions from unsigned long to void __iomem *.
+On Mon, Apr 09, 2012 at 02:20:26PM +0100, Jamie Lentin wrote:
+> On Fri, 6 Apr 2012, Grant Likely wrote:
+> 
+> >On Tue, 27 Mar 2012 22:54:11 +0100, Jamie Lentin <jm@lentin.co.uk> wrote:
+> >>Add support for the DNS-320 and DNS-325. Describe as much as currently possible
+> >>in the devicetree files, create a board-dnskw.c for everything else.
+> >>
+> >>Use IEEE-compliant "okay", rather than "ok"
+> >>
+> >>Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >>Acked-by: Jason Cooper <jason@lakedaemon.net>
+> >>Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> >>---
+> >> arch/arm/boot/dts/kirkwood-dns320.dts |   29 +++
+> >> arch/arm/boot/dts/kirkwood-dns325.dts |   24 +++
+> >> arch/arm/mach-kirkwood/Kconfig        |   23 +++
+> >> arch/arm/mach-kirkwood/Makefile       |    1 +
+> >> arch/arm/mach-kirkwood/Makefile.boot  |    2 +
+> >> arch/arm/mach-kirkwood/board-dnskw.c  |  306 +++++++++++++++++++++++++++++++++
+> >> arch/arm/mach-kirkwood/board-dt.c     |    5 +
+> >> arch/arm/mach-kirkwood/common.h       |    6 +
+> >> 8 files changed, 396 insertions(+), 0 deletions(-)
+> >> create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
+> >> create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
+> >> create mode 100644 arch/arm/mach-kirkwood/board-dnskw.c
+> >>
+> >>diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
+> >>new file mode 100644
+> >>index 0000000..78c834f
+> >>--- /dev/null
+> >>+++ b/arch/arm/boot/dts/kirkwood-dns320.dts
+> >>@@ -0,0 +1,29 @@
+> >>+/dts-v1/;
+> >>+
+> >>+/include/ "kirkwood.dtsi"
+> >>+
+> >>+/ {
+> >>+	model = "D-Link DNS-320 NAS (Rev A1)";
+> >>+	compatible = "dlink,dns-320-a1", "dlink,dns-320", "dlink,dns-kirkwood", "mrvl,kirkwood-88f6281", "mrvl,kirkwood";
+> >>+
+> >>+	memory {
+> >>+		device_type = "memory";
+> >>+		reg = <0x00000000 0x8000000>;
+> >>+	};
+> >>+
+> >>+	chosen {
+> >>+		bootargs = "console=ttyS0,115200n8 earlyprintk";
+> >>+	};
+> >>+
+> >>+	ocp at f1000000 {
+> >>+		serial at 12000 {
+> >>+			clock-frequency = <166666667>;
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>+		serial at 12100 {
+> >>+			clock-frequency = <166666667>;
+> >>+			status = "okay";
+> >>+		};
+> >>+	};
+> >>+};
+> >>diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
+> >>new file mode 100644
+> >>index 0000000..23241ab
+> >>--- /dev/null
+> >>+++ b/arch/arm/boot/dts/kirkwood-dns325.dts
+> >>@@ -0,0 +1,24 @@
+> >>+/dts-v1/;
+> >>+
+> >>+/include/ "kirkwood.dtsi"
+> >>+
+> >>+/ {
+> >>+	model = "D-Link DNS-325 NAS (Rev A1)";
+> >>+	compatible = "dlink,dns-325-a1", "dlink,dns-325", "dlink,dns-kirkwood", "mrvl,kirkwood-88f6281", "mrvl,kirkwood";
+> >>+
+> >>+	memory {
+> >>+		device_type = "memory";
+> >>+		reg = <0x00000000 0x10000000>;
+> >>+	};
+> >>+
+> >>+	chosen {
+> >>+		bootargs = "console=ttyS0,115200n8 earlyprintk";
+> >>+	};
+> >>+
+> >>+	ocp at f1000000 {
+> >>+		serial at 12000 {
+> >>+			clock-frequency = <200000000>;
+> >>+			status = "okay";
+> >>+		};
+> >>+	};
+> >>+};
+> >>diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> >>index 90ceab7..d594b6e 100644
+> >>--- a/arch/arm/mach-kirkwood/Kconfig
+> >>+++ b/arch/arm/mach-kirkwood/Kconfig
+> >>@@ -58,6 +58,29 @@ config MACH_DREAMPLUG_DT
+> >> 	  Say 'Y' here if you want your kernel to support the
+> >> 	  Marvell DreamPlug (Flattened Device Tree).
+> >>
+> >>+config MACH_DNSKW_DT
+> >>+        bool
+> >>+
+> >>+config MACH_DNS320_DT
+> >>+	bool "D-Link DNS-320 (Flattened Device Tree)"
+> >>+	select ARCH_KIRKWOOD_DT
+> >>+	select MACH_DNSKW_DT
+> >>+	select CONFIG_MTD_OF_PARTS
+> >>+	select CONFIG_SERIAL_OF_PLATFORM
+> >
+> >These two lines are dangerous.  It is not safe to 'select' Kconfig
+> >symbols that have 'depends' constraints.  Otherwise, the symbol will
+> >get forced on without it's dependencies.
+> >
+> >Typically other code handles this by creating blank "HAVE_*" symbols
+> >that the needed symbol can do something like "default y if HAVE_*"
+> >
+> 
+> Okay I didn't realise this, thanks. The options in question aren't
+> hard dependencies per-se, but no serial or NAND support is probably a
+> mistake, so added them here to avoid a certain amount of shooting in foot.
+> 
+> What's the etiquette in this situation? Adding HAVE_* seems excessive,
+> would selecting them in kirkwood_defconfig make more sense? Or would it
+> simply be covered by having a reasonable config on my website or suchlike?
 
-Consolidate the duplicated code into a new file,
-arch/arm/mach-omap1/board-nand.c.  Resolve the sparse warnings by
-adding appropriate casts:
+The latter sounds good.  kirkwood_defconfig is in need of some love, and
+I haven't had time to get to it.
 
-arch/arm/mach-omap1/board-h2.c:193:9: warning: incorrect type in argument 1 (different base types)
-arch/arm/mach-omap1/board-h2.c:193:9:    expected void const volatile [noderef] <asn:2>*<noident>
-arch/arm/mach-omap1/board-h2.c:193:9:    got unsigned long
-arch/arm/mach-omap1/board-perseus2.c:157:9: warning: incorrect type in argument 1 (different base types)
-arch/arm/mach-omap1/board-perseus2.c:157:9:    expected void const volatile [noderef] <asn:2>*<noident>
-arch/arm/mach-omap1/board-perseus2.c:157:9:    got unsigned long
-arch/arm/mach-omap1/board-fsample.c:199:9: warning: incorrect type in argument 1 (different base types)
-arch/arm/mach-omap1/board-fsample.c:199:9:    expected void const volatile [noderef] <asn:2>*<noident>
-arch/arm/mach-omap1/board-fsample.c:199:9:    got unsigned long
-arch/arm/mach-omap1/board-h3.c:195:9: warning: incorrect type in argument 1 (different base types)
-arch/arm/mach-omap1/board-h3.c:195:9:    expected void const volatile [noderef] <asn:2>*<noident>
-arch/arm/mach-omap1/board-h3.c:195:9:    got unsigned long
+> Jason, given you've already applied this patch, would you rather me
+> submit something else to ditch these, or resumbit the entire series,
+> combining feedback?
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Brian Swetland <swetland@google.com>
-Cc: Imre Deak <imre.deak@nokia.com>
-Cc: Greg Lonnon <glonnon@ridgerun.com>
-Cc: Kevin Hilman <kjh@hilman.org>
-Cc: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap1/Makefile         |   10 +++++----
- arch/arm/mach-omap1/board-fsample.c  |   16 +-------------
- arch/arm/mach-omap1/board-h2.c       |   17 +--------------
- arch/arm/mach-omap1/board-h3.c       |   16 +-------------
- arch/arm/mach-omap1/board-nand.c     |   39 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap1/board-perseus2.c |   16 +-------------
- arch/arm/mach-omap1/common.h         |    4 +++
- 7 files changed, 53 insertions(+), 65 deletions(-)
- create mode 100644 arch/arm/mach-omap1/board-nand.c
+I only applied it locally, I was waiting for comments like this before
+doing a pull request.  Go ahead and redo the series based on the input
+and repost.  I'll replace what I have.
 
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index 20d65af..398e9e5 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -31,13 +31,15 @@ usb-fs-$(CONFIG_USB)			:= usb.o
- obj-y					+= $(usb-fs-m) $(usb-fs-y)
- 
- # Specific board support
--obj-$(CONFIG_MACH_OMAP_H2)		+= board-h2.o board-h2-mmc.o
-+obj-$(CONFIG_MACH_OMAP_H2)		+= board-h2.o board-h2-mmc.o \
-+					   board-nand.o
- obj-$(CONFIG_MACH_OMAP_INNOVATOR)	+= board-innovator.o
- obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o
--obj-$(CONFIG_MACH_OMAP_PERSEUS2)	+= board-perseus2.o
--obj-$(CONFIG_MACH_OMAP_FSAMPLE)		+= board-fsample.o
-+obj-$(CONFIG_MACH_OMAP_PERSEUS2)	+= board-perseus2.o board-nand.o
-+obj-$(CONFIG_MACH_OMAP_FSAMPLE)		+= board-fsample.o board-nand.o
- obj-$(CONFIG_MACH_OMAP_OSK)		+= board-osk.o
--obj-$(CONFIG_MACH_OMAP_H3)		+= board-h3.o board-h3-mmc.o
-+obj-$(CONFIG_MACH_OMAP_H3)		+= board-h3.o board-h3-mmc.o \
-+					   board-nand.o
- obj-$(CONFIG_MACH_VOICEBLUE)		+= board-voiceblue.o
- obj-$(CONFIG_MACH_OMAP_PALMTE)		+= board-palmte.o
- obj-$(CONFIG_MACH_OMAP_PALMZ71)		+= board-palmz71.o
-diff --git a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
-index 80bd43c..4a4afb3 100644
---- a/arch/arm/mach-omap1/board-fsample.c
-+++ b/arch/arm/mach-omap1/board-fsample.c
-@@ -185,20 +185,6 @@ static struct platform_device nor_device = {
- 	.resource	= &nor_resource,
- };
- 
--static void nand_cmd_ctl(struct mtd_info *mtd, int cmd,	unsigned int ctrl)
--{
--	struct nand_chip *this = mtd->priv;
--	unsigned long mask;
--
--	if (cmd == NAND_CMD_NONE)
--		return;
--
--	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
--	if (ctrl & NAND_ALE)
--		mask |= 0x04;
--	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
--}
--
- #define FSAMPLE_NAND_RB_GPIO_PIN	62
- 
- static int nand_dev_ready(struct mtd_info *mtd)
-@@ -216,7 +202,7 @@ static struct platform_nand_data nand_data = {
- 		.part_probe_types	= part_probes,
- 	},
- 	.ctrl	= {
--		.cmd_ctrl	= nand_cmd_ctl,
-+		.cmd_ctrl	= omap1_nand_cmd_ctl,
- 		.dev_ready	= nand_dev_ready,
- 	},
- };
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index 553a2e5..057ec13 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -179,20 +179,6 @@ static struct mtd_partition h2_nand_partitions[] = {
- 	},
- };
- 
--static void h2_nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
--{
--	struct nand_chip *this = mtd->priv;
--	unsigned long mask;
--
--	if (cmd == NAND_CMD_NONE)
--		return;
--
--	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
--	if (ctrl & NAND_ALE)
--		mask |= 0x04;
--	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
--}
--
- #define H2_NAND_RB_GPIO_PIN	62
- 
- static int h2_nand_dev_ready(struct mtd_info *mtd)
-@@ -212,9 +198,8 @@ static struct platform_nand_data h2_nand_platdata = {
- 		.part_probe_types	= h2_part_probes,
- 	},
- 	.ctrl	= {
--		.cmd_ctrl	= h2_nand_cmd_ctl,
-+		.cmd_ctrl	= omap1_nand_cmd_ctl,
- 		.dev_ready	= h2_nand_dev_ready,
--
- 	},
- };
- 
-diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
-index 4c19f4c..f6ddf87 100644
---- a/arch/arm/mach-omap1/board-h3.c
-+++ b/arch/arm/mach-omap1/board-h3.c
-@@ -181,20 +181,6 @@ static struct mtd_partition nand_partitions[] = {
- 	},
- };
- 
--static void nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
--{
--	struct nand_chip *this = mtd->priv;
--	unsigned long mask;
--
--	if (cmd == NAND_CMD_NONE)
--		return;
--
--	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
--	if (ctrl & NAND_ALE)
--		mask |= 0x04;
--	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
--}
--
- #define H3_NAND_RB_GPIO_PIN	10
- 
- static int nand_dev_ready(struct mtd_info *mtd)
-@@ -214,7 +200,7 @@ static struct platform_nand_data nand_platdata = {
- 		.part_probe_types	= part_probes,
- 	},
- 	.ctrl	= {
--		.cmd_ctrl	= nand_cmd_ctl,
-+		.cmd_ctrl	= omap1_nand_cmd_ctl,
- 		.dev_ready	= nand_dev_ready,
- 
- 	},
-diff --git a/arch/arm/mach-omap1/board-nand.c b/arch/arm/mach-omap1/board-nand.c
-new file mode 100644
-index 0000000..dfa8aab
---- /dev/null
-+++ b/arch/arm/mach-omap1/board-nand.c
-@@ -0,0 +1,39 @@
-+/*
-+ * linux/arch/arm/mach-omap1/board-nand.c
-+ *
-+ * Common OMAP1 board NAND code
-+ *
-+ * Copyright (C) 2004, 2012 Texas Instruments, Inc.
-+ * Copyright (C) 2002 MontaVista Software, Inc.
-+ * Copyright (C) 2001 RidgeRun, Inc.
-+ * Author: RidgeRun, Inc.
-+ *         Greg Lonnon (glonnon at ridgerun.com) or info at ridgerun.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/nand.h>
-+
-+#include "common.h"
-+
-+void omap1_nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
-+{
-+	struct nand_chip *this = mtd->priv;
-+	unsigned long mask;
-+
-+	if (cmd == NAND_CMD_NONE)
-+		return;
-+
-+	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
-+	if (ctrl & NAND_ALE)
-+		mask |= 0x04;
-+
-+	mask |= (unsigned long)this->IO_ADDR_W;
-+
-+	writeb(cmd, (void __iomem *)mask);
-+}
-+
-diff --git a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
-index 76d4ee0..a2c8889 100644
---- a/arch/arm/mach-omap1/board-perseus2.c
-+++ b/arch/arm/mach-omap1/board-perseus2.c
-@@ -143,20 +143,6 @@ static struct platform_device nor_device = {
- 	.resource	= &nor_resource,
- };
- 
--static void nand_cmd_ctl(struct mtd_info *mtd, int cmd,	unsigned int ctrl)
--{
--	struct nand_chip *this = mtd->priv;
--	unsigned long mask;
--
--	if (cmd == NAND_CMD_NONE)
--		return;
--
--	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
--	if (ctrl & NAND_ALE)
--		mask |= 0x04;
--	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
--}
--
- #define P2_NAND_RB_GPIO_PIN	62
- 
- static int nand_dev_ready(struct mtd_info *mtd)
-@@ -174,7 +160,7 @@ static struct platform_nand_data nand_data = {
- 		.part_probe_types	= part_probes,
- 	},
- 	.ctrl	= {
--		.cmd_ctrl	= nand_cmd_ctl,
-+		.cmd_ctrl	= omap1_nand_cmd_ctl,
- 		.dev_ready	= nand_dev_ready,
- 	},
- };
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index a90b9d7..8cc616e 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -27,6 +27,7 @@
- #define __ARCH_ARM_MACH_OMAP1_COMMON_H
- 
- #include <plat/common.h>
-+#include <linux/mtd/mtd.h>
- 
- #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
- void omap7xx_map_io(void);
-@@ -58,6 +59,9 @@ void omap1_restart(char, const char *);
- 
- extern void __init omap_check_revision(void);
- 
-+extern void omap1_nand_cmd_ctl(struct mtd_info *mtd, int cmd,
-+			       unsigned int ctrl);
-+
- extern struct sys_timer omap1_timer;
- extern bool omap_32k_timer_init(void);
- 
+> 
+> >>+	help
+> >>+	  Say 'Y' here if you want your kernel to support the
+> >>+	  D-Link DNS-320 NAS, using Flattened Device Tree.
+> >>+
+> >>+config MACH_DNS325_DT
+> >>+	bool "D-Link DNS-325 (Flattened Device Tree)"
+> >>+	select ARCH_KIRKWOOD_DT
+> >>+	select MACH_DNSKW_DT
+> >>+	select CONFIG_MTD_OF_PARTS
+> >>+	select CONFIG_SERIAL_OF_PLATFORM
+> >>+	help
+> >>+	  Say 'Y' here if you want your kernel to support the
+> >>+	  D-Link DNS-325 NAS, using Flattened Device Tree.
+> >>+
+> >
+> >The *only* difference between these two configs is the .dtb file that
+> >gets built.  Don't create a separate Kconfig entry for each dnskw
+> >board.  Just build all the dnskw dtb files when MACH_DNSKW_DT is
+> >selected.  Building .dtb files is cheap.
+> >
+> 
+> The rationale for this is the code in dnskw.c is (hopefully!) temporary,
+> and when it goes there isn't any need for MACH_DNSKW_DT either.
+> 
+> In a future land where everything has been converted to devicetree, what
+> would be best? An option to "Build all kirkwood-based .dtb's", an option
+> to build all D-link .dtb's, Q-QNAP .dtb's, etc. or an option for each
+> board? I've not got any strong opinion, so will reformat the above to
+> whatever is considered best.
+
+Based on Grant's comment, I'll probably be working towards a
+MACH_GLOBALSCALE_DT option to catch dreamplug,sheevaplug,guruplug, etc.
+Perhaps this should be MACH_BUFFALO_DT?
+
+> >> config MACH_TS219
+> >> 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
+> >> 	help
+> >>diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+> >>index e299a95..b092af5 100644
+> >>--- a/arch/arm/mach-kirkwood/Makefile
+> >>+++ b/arch/arm/mach-kirkwood/Makefile
+> >>@@ -22,3 +22,4 @@ obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
+> >> obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+> >> obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
+> >> obj-$(CONFIG_MACH_DREAMPLUG_DT)		+= board-dreamplug.o
+> >>+obj-$(CONFIG_MACH_DNSKW_DT)		+= board-dnskw.o
+> >>diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
+> >>index 16f9385..9c5e45f 100644
+> >>--- a/arch/arm/mach-kirkwood/Makefile.boot
+> >>+++ b/arch/arm/mach-kirkwood/Makefile.boot
+> >>@@ -3,3 +3,5 @@ params_phys-y	:= 0x00000100
+> >> initrd_phys-y	:= 0x00800000
+> >>
+> >> dtb-$(CONFIG_MACH_DREAMPLUG_DT) += kirkwood-dreamplug.dtb
+> >>+dtb-$(CONFIG_MACH_DNS320_DT) += kirkwood-dns320.dtb
+> >>+dtb-$(CONFIG_MACH_DNS325_DT) += kirkwood-dns325.dtb
+> >>diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+> >>new file mode 100644
+> >>index 0000000..7cb7f6a
+> >>--- /dev/null
+> >>+++ b/arch/arm/mach-kirkwood/board-dnskw.c
+> >>@@ -0,0 +1,306 @@
+> >>+/*
+> >>+ * Copyright 2012 (C), Jamie Lentin <jm@lentin.co.uk>
+> >>+ *
+> >>+ * arch/arm/mach-kirkwood/board-dnskw.c
+> >>+ *
+> >>+ * D-link DNS-320 & DNS-325 NAS Init for drivers not converted to
+> >>+ * flattened device tree yet.
+> >>+ *
+> >>+ * This file is licensed under the terms of the GNU General Public
+> >>+ * License version 2.  This program is licensed "as is" without any
+> >>+ * warranty of any kind, whether express or implied.
+> >>+ */
+> >>+
+> >>+#include <linux/kernel.h>
+> >>+#include <linux/init.h>
+> >>+#include <linux/platform_device.h>
+> >>+#include <linux/i2c.h>
+> >>+#include <linux/ata_platform.h>
+> >>+#include <linux/mv643xx_eth.h>
+> >>+#include <linux/of.h>
+> >>+#include <linux/gpio.h>
+> >>+#include <linux/input.h>
+> >>+#include <linux/gpio_keys.h>
+> >>+#include <linux/gpio-fan.h>
+> >>+#include <linux/leds.h>
+> >>+#include <linux/mtd/physmap.h>
+> >>+#include <asm/mach-types.h>
+> >>+#include <asm/mach/arch.h>
+> >>+#include <asm/mach/map.h>
+> >>+#include <mach/kirkwood.h>
+> >>+#include <mach/bridge-regs.h>
+> >>+#include "common.h"
+> >>+#include "mpp.h"
+> >>+
+> >>+static struct mtd_partition dnskw_nand_parts[] = {
+> >>+	{
+> >>+		.name		= "u-boot",
+> >>+		.offset		= 0,
+> >>+		.size		= SZ_1M,
+> >>+		.mask_flags	= MTD_WRITEABLE
+> >>+	}, {
+> >>+		.name		= "uImage",
+> >>+		.offset		= MTDPART_OFS_NXTBLK,
+> >>+		.size		= 5 * SZ_1M
+> >>+	}, {
+> >>+		.name		= "ramdisk",
+> >>+		.offset		= MTDPART_OFS_NXTBLK,
+> >>+		.size		= 5 * SZ_1M
+> >>+	}, {
+> >>+		.name		= "image",
+> >>+		.offset		= MTDPART_OFS_NXTBLK,
+> >>+		.size		= 102 * SZ_1M
+> >>+	}, {
+> >>+		.name		= "mini firmware",
+> >>+		.offset		= MTDPART_OFS_NXTBLK,
+> >>+		.size		= 10 * SZ_1M
+> >>+	}, {
+> >>+		.name		= "config",
+> >>+		.offset		= MTDPART_OFS_NXTBLK,
+> >>+		.size		= 5 * SZ_1M
+> >>+	},
+> >>+};
+> >
+> >This patch adds a static partition mapping, and then a later patch in
+> >this same series removes it again.  Please don't do that.  Just squash
+> >the patches together.  Or, if sqashing is not appropriate, then just
+> >omit the partitions.
+> >
+> >I also suggest omiting similar data when there are patches already in
+> >progess to do it properly.  It is okay for the inital support to go in
+> >to be incomplete when enhancements will be ready soon.
+> >
+> 
+> Noted. If the entire patchset needs resubmitting, I'll combine the patch
+> that moves this definition to the .dtb
+
+See my comment in my other reply, just don't add nand/partition support
+in the beginning.
+
+thx,
+
+Jason.
