@@ -1,37 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 11 Apr 2012 13:54:45 +0200
-Subject: [PATCH 4/5] MAINTAINERS: add entry for Atmel timer counter (TC)
-In-Reply-To: <cover.1334137680.git.nicolas.ferre@atmel.com>
-References: <cover.1334137680.git.nicolas.ferre@atmel.com>
-Message-ID: <d8f2e44af30ba7fc2c40e614ea17d40cc82c374c.1334137680.git.nicolas.ferre@atmel.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Wed, 11 Apr 2012 17:26:26 +0530
+Subject: [PATCHv7 11/18] I2C: OMAP: use devm_* functions
+In-Reply-To: <20120411113456.GF12064@arwen.pp.htv.fi>
+References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
+ <1334142776-10583-12-git-send-email-shubhrajyoti@ti.com>
+ <20120411113456.GF12064@arwen.pp.htv.fi>
+Message-ID: <4F85716A.4030308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry for the Timer Counter (TC) library and the clocksource
-driver that is using this library.
+On Wednesday 11 April 2012 05:04 PM, Felipe Balbi wrote:
+> On Wed, Apr 11, 2012 at 04:42:49PM +0530, Shubhrajyoti D wrote:
+>> The various devm_ functions allocate memory that is released when a driver
+>> detaches. This patch uses devm_kzalloc, devm_request_mem_region and
+>> devm_ioremap for data that is allocated in the probe function of a platform
+>> device and is only freed in the remove function.
+>>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>>  drivers/i2c/busses/i2c-omap.c |   29 +++++++++--------------------
+>>  1 files changed, 9 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> index 121c52e..86be475 100644
+>> --- a/drivers/i2c/busses/i2c-omap.c
+>> +++ b/drivers/i2c/busses/i2c-omap.c
+>> @@ -995,17 +995,17 @@ omap_i2c_probe(struct platform_device *pdev)
+>>  		return -ENODEV;
+>>  	}
+>>  
+>> -	ioarea = request_mem_region(mem->start, resource_size(mem),
+>> -			pdev->name);
+>> +	ioarea = devm_request_mem_region(&pdev->dev, mem->start,
+>> +			resource_size(mem), pdev->name);
+> you could use devm_request_and_ioremap()
+OK will do that.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- MAINTAINERS |    7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4fc6a6c..be04d43 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1363,6 +1363,13 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- S:	Supported
- F:	drivers/spi/spi-atmel.*
- 
-+ATMEL Timer Counter (TC) AND CLOCKSOURCE DRIVERS
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Supported
-+F:	drivers/misc/atmel_tclib.c
-+F:	drivers/clocksource/tcb_clksrc.c
-+
- ATMEL TSADCC DRIVER
- M:	Josh Wu <josh.wu@atmel.com>
- L:	linux-input at vger.kernel.org
--- 
-1.7.9.4
+thanks,
