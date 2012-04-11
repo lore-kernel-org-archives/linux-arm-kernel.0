@@ -1,261 +1,112 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 10 Apr 2012 20:35:34 -0400
-Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
- DNS-325
-In-Reply-To: <20120406234955.840F73E1323@localhost>
-References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
- <1332885255-8304-2-git-send-email-jm@lentin.co.uk>
- <20120406234955.840F73E1323@localhost>
-Message-ID: <20120411003534.GA14790@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 10 Apr 2012 18:35:16 -0600
+Subject: [PATCH v4 00/12] ARM: OMAP: resolve some warnings
+Message-ID: <20120411003454.27059.37500.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2012 at 04:49:55PM -0700, Grant Likely wrote:
-> On Tue, 27 Mar 2012 22:54:11 +0100, Jamie Lentin <jm@lentin.co.uk> wrote:
-> > Add support for the DNS-320 and DNS-325. Describe as much as currently possible
-> > in the devicetree files, create a board-dnskw.c for everything else.
-> > 
-> > Use IEEE-compliant "okay", rather than "ok"
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> > ---
-> >  arch/arm/boot/dts/kirkwood-dns320.dts |   29 +++
-> >  arch/arm/boot/dts/kirkwood-dns325.dts |   24 +++
-> >  arch/arm/mach-kirkwood/Kconfig        |   23 +++
-> >  arch/arm/mach-kirkwood/Makefile       |    1 +
-> >  arch/arm/mach-kirkwood/Makefile.boot  |    2 +
-> >  arch/arm/mach-kirkwood/board-dnskw.c  |  306 +++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-kirkwood/board-dt.c     |    5 +
-> >  arch/arm/mach-kirkwood/common.h       |    6 +
-> >  8 files changed, 396 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
-> >  create mode 100644 arch/arm/mach-kirkwood/board-dnskw.c
-> > 
-> > diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
-> > new file mode 100644
-> > index 0000000..78c834f
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-dns320.dts
-> > @@ -0,0 +1,29 @@
-> > +/dts-v1/;
-> > +
-> > +/include/ "kirkwood.dtsi"
-> > +
-> > +/ {
-> > +	model = "D-Link DNS-320 NAS (Rev A1)";
-> > +	compatible = "dlink,dns-320-a1", "dlink,dns-320", "dlink,dns-kirkwood", "mrvl,kirkwood-88f6281", "mrvl,kirkwood";
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x00000000 0x8000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> > +	};
-> > +
-> > +	ocp at f1000000 {
-> > +		serial at 12000 {
-> > +			clock-frequency = <166666667>;
-> > +			status = "okay";
-> > +		};
-> > +
-> > +		serial at 12100 {
-> > +			clock-frequency = <166666667>;
-> > +			status = "okay";
-> > +		};
-> > +	};
-> > +};
-> > diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
-> > new file mode 100644
-> > index 0000000..23241ab
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-dns325.dts
-> > @@ -0,0 +1,24 @@
-> > +/dts-v1/;
-> > +
-> > +/include/ "kirkwood.dtsi"
-> > +
-> > +/ {
-> > +	model = "D-Link DNS-325 NAS (Rev A1)";
-> > +	compatible = "dlink,dns-325-a1", "dlink,dns-325", "dlink,dns-kirkwood", "mrvl,kirkwood-88f6281", "mrvl,kirkwood";
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x00000000 0x10000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> > +	};
-> > +
-> > +	ocp at f1000000 {
-> > +		serial at 12000 {
-> > +			clock-frequency = <200000000>;
-> > +			status = "okay";
-> > +		};
-> > +	};
-> > +};
-> > diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-> > index 90ceab7..d594b6e 100644
-> > --- a/arch/arm/mach-kirkwood/Kconfig
-> > +++ b/arch/arm/mach-kirkwood/Kconfig
-> > @@ -58,6 +58,29 @@ config MACH_DREAMPLUG_DT
-> >  	  Say 'Y' here if you want your kernel to support the
-> >  	  Marvell DreamPlug (Flattened Device Tree).
-> >  
-> > +config MACH_DNSKW_DT
-> > +        bool
-> > +
-> > +config MACH_DNS320_DT
-> > +	bool "D-Link DNS-320 (Flattened Device Tree)"
-> > +	select ARCH_KIRKWOOD_DT
-> > +	select MACH_DNSKW_DT
-> > +	select CONFIG_MTD_OF_PARTS
-> > +	select CONFIG_SERIAL_OF_PLATFORM
-> 
-> These two lines are dangerous.  It is not safe to 'select' Kconfig
-> symbols that have 'depends' constraints.  Otherwise, the symbol will
-> get forced on without it's dependencies.
-> 
-> Typically other code handles this by creating blank "HAVE_*" symbols
-> that the needed symbol can do something like "default y if HAVE_*"
+This is the latest version of the OMAP warnings cleanup series.
+This version fixes most of the warnings with arch/arm/mach-omap1,
+arch/arm/mach-omap2, and arch/arm/plat-omap.  It also fixes some
+bugs discovered in the process.
 
-I'm in favor of just omitting these two lines.  I think it's a bad habit
-to presume what features a user may want.  This should be handled by
-*_defconfig, if anywhere.
+Boot-tested on 5912OSK, N800, 35xx BeagleBoard, 37xx EVM,
+and 4430 Pandaboard.  Build-tested on the configs listed below,
+which are available from git://git.pwsan.com/omap_kconfigs.
 
-> > +	help
-> > +	  Say 'Y' here if you want your kernel to support the
-> > +	  D-Link DNS-320 NAS, using Flattened Device Tree.
-> > +
-> > +config MACH_DNS325_DT
-> > +	bool "D-Link DNS-325 (Flattened Device Tree)"
-> > +	select ARCH_KIRKWOOD_DT
-> > +	select MACH_DNSKW_DT
-> > +	select CONFIG_MTD_OF_PARTS
-> > +	select CONFIG_SERIAL_OF_PLATFORM
-> > +	help
-> > +	  Say 'Y' here if you want your kernel to support the
-> > +	  D-Link DNS-325 NAS, using Flattened Device Tree.
-> > +
-> 
-> The *only* difference between these two configs is the .dtb file that
-> gets built.  Don't create a separate Kconfig entry for each dnskw
-> board.  Just build all the dnskw dtb files when MACH_DNSKW_DT is
-> selected.  Building .dtb files is cheap.
+This series is also available from git://git.pwsan.com/linux-2.6
+in the branch 'sparse_cppcheck_cleanup_3.5'.
 
-Ack.
+Felipe, one of the patches in this branch touches
+drivers/usb/host/ohci-omap.c - could you ack it for me if you are
+okay with the change?
 
-> >  config MACH_TS219
-> >  	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
-> >  	help
-> > diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-> > index e299a95..b092af5 100644
-> > --- a/arch/arm/mach-kirkwood/Makefile
-> > +++ b/arch/arm/mach-kirkwood/Makefile
-> > @@ -22,3 +22,4 @@ obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
-> >  obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
-> >  obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
-> >  obj-$(CONFIG_MACH_DREAMPLUG_DT)		+= board-dreamplug.o
-> > +obj-$(CONFIG_MACH_DNSKW_DT)		+= board-dnskw.o
-> > diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-> > index 16f9385..9c5e45f 100644
-> > --- a/arch/arm/mach-kirkwood/Makefile.boot
-> > +++ b/arch/arm/mach-kirkwood/Makefile.boot
-> > @@ -3,3 +3,5 @@ params_phys-y	:= 0x00000100
-> >  initrd_phys-y	:= 0x00800000
-> >  
-> >  dtb-$(CONFIG_MACH_DREAMPLUG_DT) += kirkwood-dreamplug.dtb
-> > +dtb-$(CONFIG_MACH_DNS320_DT) += kirkwood-dns320.dtb
-> > +dtb-$(CONFIG_MACH_DNS325_DT) += kirkwood-dns325.dtb
-> > diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-> > new file mode 100644
-> > index 0000000..7cb7f6a
-> > --- /dev/null
-> > +++ b/arch/arm/mach-kirkwood/board-dnskw.c
-> > @@ -0,0 +1,306 @@
-> > +/*
-> > + * Copyright 2012 (C), Jamie Lentin <jm@lentin.co.uk>
-> > + *
-> > + * arch/arm/mach-kirkwood/board-dnskw.c
-> > + *
-> > + * D-link DNS-320 & DNS-325 NAS Init for drivers not converted to
-> > + * flattened device tree yet.
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/init.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/i2c.h>
-> > +#include <linux/ata_platform.h>
-> > +#include <linux/mv643xx_eth.h>
-> > +#include <linux/of.h>
-> > +#include <linux/gpio.h>
-> > +#include <linux/input.h>
-> > +#include <linux/gpio_keys.h>
-> > +#include <linux/gpio-fan.h>
-> > +#include <linux/leds.h>
-> > +#include <linux/mtd/physmap.h>
-> > +#include <asm/mach-types.h>
-> > +#include <asm/mach/arch.h>
-> > +#include <asm/mach/map.h>
-> > +#include <mach/kirkwood.h>
-> > +#include <mach/bridge-regs.h>
-> > +#include "common.h"
-> > +#include "mpp.h"
-> > +
-> > +static struct mtd_partition dnskw_nand_parts[] = {
-> > +	{
-> > +		.name		= "u-boot",
-> > +		.offset		= 0,
-> > +		.size		= SZ_1M,
-> > +		.mask_flags	= MTD_WRITEABLE
-> > +	}, {
-> > +		.name		= "uImage",
-> > +		.offset		= MTDPART_OFS_NXTBLK,
-> > +		.size		= 5 * SZ_1M
-> > +	}, {
-> > +		.name		= "ramdisk",
-> > +		.offset		= MTDPART_OFS_NXTBLK,
-> > +		.size		= 5 * SZ_1M
-> > +	}, {
-> > +		.name		= "image",
-> > +		.offset		= MTDPART_OFS_NXTBLK,
-> > +		.size		= 102 * SZ_1M
-> > +	}, {
-> > +		.name		= "mini firmware",
-> > +		.offset		= MTDPART_OFS_NXTBLK,
-> > +		.size		= 10 * SZ_1M
-> > +	}, {
-> > +		.name		= "config",
-> > +		.offset		= MTDPART_OFS_NXTBLK,
-> > +		.size		= 5 * SZ_1M
-> > +	},
-> > +};
-> 
-> This patch adds a static partition mapping, and then a later patch in
-> this same series removes it again.  Please don't do that.  Just squash
-> the patches together.  Or, if sqashing is not appropriate, then just
-> omit the partitions.
-> 
-> I also suggest omiting similar data when there are patches already in
-> progess to do it properly.  It is okay for the inital support to go in
-> to be incomplete when enhancements will be ready soon.
 
-This is my doing.  He was basing this off of dreamplug, which has SPI
-NOR flash and partitions specified in the board file because the spi
-driver is waiting for kirkwood to be converted to common clock.  Jamie,
-go ahead and drop the above in the initial board-dnskw.c patch and just
-add support for nand/partitions in the last patch (fdt).
+- Paul
 
-thx,
+---
 
-Jason.
+object size (delta in bytes from v3.4-rc2):
+ text 	 data 	  bss 	total 	kernel
+  -84 	  +24 	    0 	  -60 	5912osk_testconfig/vmlinux
+ -100 	   -8 	    0 	 -108 	n800_multi_omap2xxx/vmlinux
+  -68 	   -8 	    0 	  -76 	n800_testconfig/vmlinux
+ -224 	  +56 	  -32 	 -200 	omap1_defconfig/vmlinux
+ -148 	  +32 	    0 	 -116 	omap2_4_testconfig/vmlinux
+ -212 	    0 	    0 	 -212 	omap2plus_defconfig/vmlinux
+ -148 	    0 	    0 	 -148 	omap2plus_no_pm/vmlinux
+ -152 	    0 	    0 	 -152 	omap3_4_testconfig/vmlinux
+ -100 	   -8 	    0 	 -108 	omap3_testconfig/vmlinux
+ -188 	  -24 	  -64 	 -276 	omap4_testconfig/vmlinux
+
+Paul Walmsley (12):
+      ARM: OMAP2+: declare file-local functions as static
+      ARM: OMAP: add includes for missing prototypes
+      ARM: OMAP1: OCPI: move to mach-omap1/
+      ARM: OMAP1: OHCI: use platform_data fn ptr to enable OCPI bus
+      ARM: OMAP2+: GPMC: resolve type-conversion warning from sparse
+      ARM: OMAP: fix 'using plain integer as NULL pointer' sparse warnings
+      ARM: OMAP: OCM RAM: use memset_io() when clearing SRAM
+      ARM: OMAP: DMA: use constant array maximum, drop some LCD DMA code
+      ARM: OMAP: USB: remove unnecessary sideways include
+      ARM: OMAP1: board files: deduplicate and clean some NAND-related code
+      ARM: OMAP1: DMTIMER: fix broken timer clock source selection
+      ARM: OMAP2+: clean up some cppcheck warnings
+
+
+ arch/arm/mach-omap1/Makefile                 |   13 ++++++---
+ arch/arm/mach-omap1/ams-delta-fiq.c          |    2 +
+ arch/arm/mach-omap1/board-fsample.c          |   16 +----------
+ arch/arm/mach-omap1/board-h2.c               |   17 +----------
+ arch/arm/mach-omap1/board-h3.c               |   16 +----------
+ arch/arm/mach-omap1/board-nand.c             |   39 ++++++++++++++++++++++++++
+ arch/arm/mach-omap1/board-palmz71.c          |    4 +--
+ arch/arm/mach-omap1/board-perseus2.c         |   16 +----------
+ arch/arm/mach-omap1/clock.c                  |    3 +-
+ arch/arm/mach-omap1/common.h                 |   11 +++++++
+ arch/arm/mach-omap1/fpga.c                   |    2 +
+ arch/arm/mach-omap1/id.c                     |    2 +
+ arch/arm/mach-omap1/io.c                     |    3 +-
+ arch/arm/mach-omap1/irq.c                    |    2 +
+ arch/arm/mach-omap1/lcd_dma.c                |    7 +----
+ arch/arm/mach-omap1/ocpi.c                   |    7 +++--
+ arch/arm/mach-omap1/pm.c                     |    9 +++---
+ arch/arm/mach-omap1/reset.c                  |    2 +
+ arch/arm/mach-omap1/timer.c                  |    7 ++---
+ arch/arm/mach-omap1/usb.c                    |    3 ++
+ arch/arm/mach-omap2/am35xx-emac.c            |   37 +++++++++++--------------
+ arch/arm/mach-omap2/board-omap3evm.c         |    8 +++--
+ arch/arm/mach-omap2/board-omap4panda.c       |    8 +++--
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    4 +--
+ arch/arm/mach-omap2/board-zoom-display.c     |    1 +
+ arch/arm/mach-omap2/common.h                 |    2 -
+ arch/arm/mach-omap2/devices.c                |    7 ++---
+ arch/arm/mach-omap2/gpio.c                   |    2 +
+ arch/arm/mach-omap2/gpmc-onenand.c           |    3 +-
+ arch/arm/mach-omap2/gpmc.c                   |    3 +-
+ arch/arm/mach-omap2/hwspinlock.c             |    2 +
+ arch/arm/mach-omap2/io.c                     |    1 +
+ arch/arm/mach-omap2/irq.c                    |    3 +-
+ arch/arm/mach-omap2/mux.c                    |    2 +
+ arch/arm/mach-omap2/omap-secure.c            |    1 +
+ arch/arm/mach-omap2/omap-wakeupgen.c         |    2 +
+ arch/arm/mach-omap2/pm24xx.c                 |    3 --
+ arch/arm/mach-omap2/pm34xx.c                 |   10 ++-----
+ arch/arm/mach-omap2/prm_common.c             |    4 ++-
+ arch/arm/mach-omap2/serial.c                 |    2 +
+ arch/arm/mach-omap2/usb-tusb6010.c           |    2 +
+ arch/arm/plat-omap/Makefile                  |    3 --
+ arch/arm/plat-omap/common.c                  |    1 +
+ arch/arm/plat-omap/dma.c                     |   13 +++++++--
+ arch/arm/plat-omap/dmtimer.c                 |    3 +-
+ arch/arm/plat-omap/include/plat/board.h      |    2 +
+ arch/arm/plat-omap/include/plat/common.h     |    2 +
+ arch/arm/plat-omap/include/plat/dma.h        |    1 +
+ arch/arm/plat-omap/include/plat/dmtimer.h    |    4 +--
+ arch/arm/plat-omap/omap_device.c             |    2 -
+ arch/arm/plat-omap/sram.c                    |    4 +--
+ arch/arm/plat-omap/usb.c                     |    4 ---
+ drivers/usb/host/ohci-omap.c                 |    5 ++-
+ 53 files changed, 165 insertions(+), 167 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/board-nand.c
+ rename arch/arm/{plat-omap/ocpi.c => mach-omap1/ocpi.c} (93%)
