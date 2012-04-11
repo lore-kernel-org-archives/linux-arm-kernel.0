@@ -1,97 +1,51 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:42:49 +0530
-Subject: [PATCHv7 11/18] I2C: OMAP: use devm_* functions
+Date: Wed, 11 Apr 2012 16:42:54 +0530
+Subject: [PATCHv7 16/18] I2C: OMAP: fix missing handling of errata
+ I2C_OMAP3_1P153
 In-Reply-To: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334142776-10583-12-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334142776-10583-17-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The various devm_ functions allocate memory that is released when a driver
-detaches. This patch uses devm_kzalloc, devm_request_mem_region and
-devm_ioremap for data that is allocated in the probe function of a platform
-device and is only freed in the remove function.
+From: Tasslehoff Kjappfot <tasskjapp@gmail.com>
 
+i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
+Move the errata handling to i2c_probe.
+
+Signed-off-by: Tasslehoff Kjappfot <tasskjapp@gmail.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   29 +++++++++--------------------
- 1 files changed, 9 insertions(+), 20 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 121c52e..86be475 100644
+index dd78ba1..f28bd5d 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -995,17 +995,17 @@ omap_i2c_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+@@ -431,11 +431,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 	/* Take the I2C module out of reset: */
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
  
--	ioarea = request_mem_region(mem->start, resource_size(mem),
--			pdev->name);
-+	ioarea = devm_request_mem_region(&pdev->dev, mem->start,
-+			resource_size(mem), pdev->name);
- 	if (!ioarea) {
- 		dev_err(&pdev->dev, "I2C region already claimed\n");
- 		return -EBUSY;
- 	}
+-	dev->errata = 0;
+-
+-	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+-		dev->errata |= I2C_OMAP_ERRATA_I207;
+-
+ 	/* Enable interrupts */
+ 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+ 			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
+@@ -1060,6 +1055,11 @@ omap_i2c_probe(struct platform_device *pdev)
  
--	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
-+	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
- 	if (!dev) {
--		r = -ENOMEM;
--		goto err_release_region;
-+		dev_err(&pdev->dev, "Menory allocation failed\n");
-+		return -ENOMEM;
- 	}
+ 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
  
- 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
-@@ -1029,11 +1029,10 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	dev->dev = &pdev->dev;
- 	dev->irq = irq->start;
--	dev->base = ioremap(mem->start, resource_size(mem));
--	if (!dev->base) {
--		r = -ENOMEM;
--		goto err_free_mem;
--	}
-+	dev->base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
-+	if (!dev->base)
-+		return -ENOMEM;
++	dev->errata = 0;
 +
- 
- 	platform_set_drvdata(pdev, dev);
- 
-@@ -1121,13 +1120,8 @@ err_free_irq:
- err_unuse_clocks:
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(dev->dev);
--	iounmap(dev->base);
- 	pm_runtime_disable(&pdev->dev);
--err_free_mem:
- 	platform_set_drvdata(pdev, NULL);
--	kfree(dev);
--err_release_region:
--	release_mem_region(mem->start, resource_size(mem));
- 
- 	return r;
- }
-@@ -1135,7 +1129,6 @@ err_release_region:
- static int __devexit omap_i2c_remove(struct platform_device *pdev)
- {
- 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
--	struct resource		*mem;
- 
- 	platform_set_drvdata(pdev, NULL);
- 
-@@ -1143,10 +1136,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
- 	i2c_del_adapter(&dev->adapter);
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_disable(&pdev->dev);
--	iounmap(dev->base);
--	kfree(dev);
--	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(mem->start, resource_size(mem));
- 	return 0;
- }
++	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
++		dev->errata |= I2C_OMAP_ERRATA_I207;
++
+ 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
+ 		dev->errata |= I2C_OMAP3_1P153;
  
 -- 
 1.7.4.1
