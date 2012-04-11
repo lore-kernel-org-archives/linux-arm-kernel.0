@@ -1,39 +1,42 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Wed, 11 Apr 2012 17:26:26 +0530
-Subject: [PATCHv7 11/18] I2C: OMAP: use devm_* functions
-In-Reply-To: <20120411113456.GF12064@arwen.pp.htv.fi>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Wed, 11 Apr 2012 17:29:07 +0530
+Subject: [PATCHv7 01/18] I2C: OMAP: make omap_i2c_unidle/idle functions
+ depend on CONFIG_PM_RUNTIME
+In-Reply-To: <20120411113254.GE12064@arwen.pp.htv.fi>
 References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
- <1334142776-10583-12-git-send-email-shubhrajyoti@ti.com>
- <20120411113456.GF12064@arwen.pp.htv.fi>
-Message-ID: <4F85716A.4030308@ti.com>
+ <1334142776-10583-2-git-send-email-shubhrajyoti@ti.com>
+ <20120411113254.GE12064@arwen.pp.htv.fi>
+Message-ID: <CAM=Q2csMkvbVwSav8d4KCXkcNS=oQGpPY2R-hiVzZvVPEngrog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 April 2012 05:04 PM, Felipe Balbi wrote:
-> On Wed, Apr 11, 2012 at 04:42:49PM +0530, Shubhrajyoti D wrote:
->> The various devm_ functions allocate memory that is released when a driver
->> detaches. This patch uses devm_kzalloc, devm_request_mem_region and
->> devm_ioremap for data that is allocated in the probe function of a platform
->> device and is only freed in the remove function.
+Hi Felipe,
+
+On Wed, Apr 11, 2012 at 5:02 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Wed, Apr 11, 2012 at 04:42:39PM +0530, Shubhrajyoti D wrote:
+>> The functions omap_i2c_unidle/idle are called from omap_i2c_runtime_resume
+>> and omap_i2c_runtime_suspend which is compiled for CONFIG_PM_RUNTIME.
+>> This patch removes the omap_i2c_unidle/idle functions and folds them
+>> into the runtime callbacks.
+>>
+>> This fixes the below warn when CONFIG_PM_RUNTIME is not defined
+>>
+>> ?CC ? ? ?arch/arm/mach-omap2/board-ti8168evm.o
+>> drivers/i2c/busses/i2c-omap.c:272: warning: 'omap_i2c_unidle' defined but not used
+>> drivers/i2c/busses/i2c-omap.c:293: warning: 'omap_i2c_idle' defined but not used
+>> ? CC ? ? ?net/ipv4/ip_forward.o
 >>
 >> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->> ---
->>  drivers/i2c/busses/i2c-omap.c |   29 +++++++++--------------------
->>  1 files changed, 9 insertions(+), 20 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->> index 121c52e..86be475 100644
->> --- a/drivers/i2c/busses/i2c-omap.c
->> +++ b/drivers/i2c/busses/i2c-omap.c
->> @@ -995,17 +995,17 @@ omap_i2c_probe(struct platform_device *pdev)
->>  		return -ENODEV;
->>  	}
->>  
->> -	ioarea = request_mem_region(mem->start, resource_size(mem),
->> -			pdev->name);
->> +	ioarea = devm_request_mem_region(&pdev->dev, mem->start,
->> +			resource_size(mem), pdev->name);
-> you could use devm_request_and_ioremap()
-OK will do that.
+>
+> how about just moving them into the #ifdef ? /me thinks it's easier to
+> read with the function. Matter of taste though, it's not that much code.
 
-thanks,
+Kevin preferred folding into the  runtime functions.
+
+http://www.spinics.net/lists/linux-omap/msg62764.html
+
+Don't feel strongly though.
+
+>
+> --
+> balbi
