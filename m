@@ -1,25 +1,37 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 11 Apr 2012 05:15:12 +0000
-Subject: [PATCH v3 4/9] ARM: OMAP2+: gpmc-nand: populate gpmc configs
-In-Reply-To: <4F84890A.30500@ti.com>
-References: <cover.1333640054.git.afzal@ti.com>
- <6c120ab77d0900a6f977246bc58fb37c62280371.1333640054.git.afzal@ti.com>
- <4F84890A.30500@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317C6F64@DBDE01.ent.ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 10 Apr 2012 23:28:19 -0600
+Subject: [PATCH V2 4/5] ARM: dt: tegra30.dtsi: Add audio-related nodes
+In-Reply-To: <CAOesGMhDDenRK_GeR=jWJbcoacRMUPnjFu5w4DCyUWC=CadnbA@mail.gmail.com>
+References: <1334099980-19527-1-git-send-email-swarren@wwwdotorg.org>
+ <1334099980-19527-4-git-send-email-swarren@wwwdotorg.org>
+ <CAOesGMhDDenRK_GeR=jWJbcoacRMUPnjFu5w4DCyUWC=CadnbA@mail.gmail.com>
+Message-ID: <4F851673.6030000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Wed, Apr 11, 2012 at 00:54:58, Hunter, Jon wrote:
-> > +#define	GPMC_NAND_CONFIG_NUM	4
+On 04/10/2012 10:27 PM, Olof Johansson wrote:
+...
+> On Tue, Apr 10, 2012 at 4:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Add nodes for the Tegra30 AHUB and I2S controllers.
+...
+>> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+...
+>> +       ahub at 70080000 {
 > 
-> Where does 4 come from?
+> No need for unit address here since there's only one node with this
+> name -- "ahub {"  is sufficient.
 
+Is there actually a benefit from leaving it out though?
 
-It depends on the use case, for NAND, with the way it was being
-configured (or number of times gpmc_cs_configure was being called)
-4 are needed.
+>> +               compatible = "nvidia,tegra30-ahub";
+>> +               reg = <0x70080000 0x200 0x70080200 0x100>;
+> 
+> Why not just use 0x70080000 0x300?
 
-Regards
-Afzal
+The register space is logically divided into two chunks; the first for
+the DMA FIFOs and the second for the AHUB routing registers. Future
+chips may change the relative positions and sizes of these two chunks,
+hence I figured it was best to model them independently even though
+they're contiguous in Tegra30.
