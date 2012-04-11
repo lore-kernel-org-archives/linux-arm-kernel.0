@@ -1,50 +1,42 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:22:25 +0530
-Subject: [PATCHv7 14/18] I2C: OMAP: Use SET_RUNTIME_PM_OPS
+Date: Wed, 11 Apr 2012 16:22:18 +0530
+Subject: [PATCHv7 07/18] I2C: OMAP: Optimise the remove code
 In-Reply-To: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334141549-8288-15-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334141549-8288-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use SET_RUNTIME_PM_OPS macro to set runtime functions.
+The omap_i2c_remove function may not be needed after
+device exit so the memory could be freed.
 
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   11 ++++-------
- 1 files changed, 4 insertions(+), 7 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index f371d4f..c396cb7 100644
+index 3670088..2096726 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1217,15 +1217,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
- 
- 	return 0;
+@@ -1134,8 +1134,7 @@ err_release_region:
+ 	return r;
  }
-+#endif
  
- static struct dev_pm_ops omap_i2c_pm_ops = {
--	.runtime_suspend = omap_i2c_runtime_suspend,
--	.runtime_resume = omap_i2c_runtime_resume,
-+	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
-+			   omap_i2c_runtime_resume, NULL)
- };
--#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
--#else
--#define OMAP_I2C_PM_OPS NULL
--#endif
+-static int
+-omap_i2c_remove(struct platform_device *pdev)
++static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	struct resource		*mem;
+@@ -1228,7 +1227,7 @@ static struct dev_pm_ops omap_i2c_pm_ops = {
  
  static struct platform_driver omap_i2c_driver = {
  	.probe		= omap_i2c_probe,
-@@ -1233,7 +1230,7 @@ static struct platform_driver omap_i2c_driver = {
+-	.remove		= omap_i2c_remove,
++	.remove		= __devexit_p(omap_i2c_remove),
  	.driver		= {
  		.name	= "omap_i2c",
  		.owner	= THIS_MODULE,
--		.pm	= OMAP_I2C_PM_OPS,
-+		.pm	= &omap_i2c_pm_ops,
- 		.of_match_table = of_match_ptr(omap_i2c_of_match),
- 	},
- };
 -- 
 1.7.4.1
