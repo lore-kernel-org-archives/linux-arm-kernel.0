@@ -1,66 +1,373 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Apr 2012 12:59:00 -0600 (MDT)
-Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait
- for reset status
-In-Reply-To: <4F8565C7.4080506@ti.com>
-References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
- <1331659524-7635-3-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
- <4F8565C7.4080506@ti.com>
-Message-ID: <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 11 Apr 2012 13:00:39 -0600
+Subject: [PATCH] pinctrl: tegra: refactor probe handling
+Message-ID: <1334170839-10396-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Wed, 11 Apr 2012, Rajendra Nayak wrote:
+Rather than having a single tegra-pinctrl driver that determines whether
+it's running on Tegra20 or Tegra30, instead have separate drivers for
+each that call into utility functions to implement the majority of the
+driver. This change is based on review feedback of the SPEAr pinctrl
+driver, which had originally copied to Tegra driver structure.
 
-> The changes were done to fix up random L3 interconnect errors that
-> Anand G was seeing(during i2c reset operation) on some customer platforms.
+This requires that the two drivers have unique names. Update a couple
+spots in arch/arm/mach-tegra for the name change.
 
-Okay.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Linus, It'll be easiest for me to merge this through the Tegra tree, since
+the arch/arm changes depend on the patches there that switch to using the
+pinctrl driver. If you could ack this, it'd be great. Thanks.
 
-> I seem to have completely overlooked the I2C_EN programming part done in 
-> omap_i2c_reset() function when I did the patch.
+ arch/arm/mach-tegra/board-pinmux.h |    2 +-
+ arch/arm/mach-tegra/devices.c      |    2 +-
+ drivers/pinctrl/pinctrl-tegra.c    |   80 +++++------------------------------
+ drivers/pinctrl/pinctrl-tegra.h    |   23 +---------
+ drivers/pinctrl/pinctrl-tegra20.c  |   40 ++++++++++++++++-
+ drivers/pinctrl/pinctrl-tegra30.c  |   40 ++++++++++++++++-
+ 6 files changed, 91 insertions(+), 96 deletions(-)
 
-No worries.
-
-> While the patch did fix the issue for Anand, I guess it
-> was because of the additional delay post reset, waiting on the
-> RESETDONE bit and timing out, before accessing the i2c_con register.
-> So looks like this patch should certainly be reverted but atleast some
-> platforms/modules (the issue was seen on OMAP4/i2c) will need some
-> delay between the omap_hwmod_softreset() call and any subsequent module
-> register accesses.
-> The patch from Fernando [1] can be quite useful if we can use the
-> 'srst_udelay' field to populate the appropriate delay needed which can
-> then be used up in omap_hwmod_softreset() function.
-> I am out sick today, but I can try some on these lines tomorrow once
-> I am in office, if the approach seems fine to you.
-
-Sorry to hear that - I hope you feel better soon.
-
-That approach sounds fine to me, but I don't think Fernando's patch will 
-help with I2C..  Since it uses a custom reset function omap_i2c_reset(), 
-the delay will actually need to go there.
-
-Another option though is that it might be possible to generalize the 
-_ocp_softreset() function to handle the I2C/HDQ cases, so they wouldn't 
-need custom reset functions.  I'd guess that's probably 3.5 material, 
-though.
-
-> Btw, is [1] queued already by you/Benoit to go upstream or are there
-> issues with it?
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086713.html
-
-Tony pulled it:
-
-http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commit;h=b8a633451951d149494076393698880453bf6bfe
-
-Not sure when he plans to send it upstream, but I now think it should go 
-up sooner as part of v3.4-rc fixes, to avoid any potential OCP bus errors.
-
-
-- Paul
+diff --git a/arch/arm/mach-tegra/board-pinmux.h b/arch/arm/mach-tegra/board-pinmux.h
+index 45b5ad8..c5f3f33 100644
+--- a/arch/arm/mach-tegra/board-pinmux.h
++++ b/arch/arm/mach-tegra/board-pinmux.h
+@@ -19,7 +19,7 @@
+ 
+ #include <mach/pinconf-tegra.h>
+ 
+-#define PINMUX_DEV "tegra-pinmux"
++#define PINMUX_DEV "tegra20-pinctrl"
+ 
+ #define TEGRA_MAP_MUX(_group_, _function_) \
+ 	PIN_MAP_MUX_GROUP_HOG_DEFAULT(PINMUX_DEV, _group_, _function_)
+diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+index 58e5803..2d8dfa2 100644
+--- a/arch/arm/mach-tegra/devices.c
++++ b/arch/arm/mach-tegra/devices.c
+@@ -110,7 +110,7 @@ static struct resource pinmux_resource[] = {
+ };
+ 
+ struct platform_device tegra_pinmux_device = {
+-	.name		= "tegra-pinmux",
++	.name		= "tegra20-pinctrl",
+ 	.id		= -1,
+ 	.resource	= pinmux_resource,
+ 	.num_resources	= ARRAY_SIZE(pinmux_resource),
+diff --git a/drivers/pinctrl/pinctrl-tegra.c b/drivers/pinctrl/pinctrl-tegra.c
+index f6eba9c..3ac8ad3 100644
+--- a/drivers/pinctrl/pinctrl-tegra.c
++++ b/drivers/pinctrl/pinctrl-tegra.c
+@@ -1,7 +1,7 @@
+ /*
+  * Driver for the NVIDIA Tegra pinmux
+  *
+- * Copyright (c) 2011, NVIDIA CORPORATION.  All rights reserved.
++ * Copyright (c) 2011-2012, NVIDIA CORPORATION.  All rights reserved.
+  *
+  * Derived from code:
+  * Copyright (C) 2010 Google, Inc.
+@@ -22,7 +22,8 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+-#include <linux/of_device.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinmux.h>
+@@ -31,10 +32,9 @@
+ 
+ #include <mach/pinconf-tegra.h>
+ 
++#include "core.h"
+ #include "pinctrl-tegra.h"
+ 
+-#define DRIVER_NAME "tegra-pinmux"
+-
+ struct tegra_pmx {
+ 	struct device *dev;
+ 	struct pinctrl_dev *pctl;
+@@ -87,7 +87,7 @@ static void tegra_pinctrl_pin_dbg_show(struct pinctrl_dev *pctldev,
+ 				       struct seq_file *s,
+ 				       unsigned offset)
+ {
+-	seq_printf(s, " " DRIVER_NAME);
++	seq_printf(s, " %s", dev_name(pctldev->dev));
+ }
+ 
+ static int reserve_map(struct pinctrl_map **map, unsigned *reserved_maps,
+@@ -589,60 +589,29 @@ static struct pinctrl_gpio_range tegra_pinctrl_gpio_range = {
+ };
+ 
+ static struct pinctrl_desc tegra_pinctrl_desc = {
+-	.name = DRIVER_NAME,
+ 	.pctlops = &tegra_pinctrl_ops,
+ 	.pmxops = &tegra_pinmux_ops,
+ 	.confops = &tegra_pinconf_ops,
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static struct of_device_id tegra_pinctrl_of_match[] __devinitdata = {
+-#ifdef CONFIG_PINCTRL_TEGRA20
+-	{
+-		.compatible = "nvidia,tegra20-pinmux",
+-		.data = tegra20_pinctrl_init,
+-	},
+-#endif
+-#ifdef CONFIG_PINCTRL_TEGRA30
+-	{
+-		.compatible = "nvidia,tegra30-pinmux",
+-		.data = tegra30_pinctrl_init,
+-	},
+-#endif
+-	{},
+-};
+-
+-static int __devinit tegra_pinctrl_probe(struct platform_device *pdev)
++int __devinit tegra_pinctrl_probe(struct platform_device *pdev,
++			const struct tegra_pinctrl_soc_data *soc_data)
+ {
+-	const struct of_device_id *match;
+-	tegra_pinctrl_soc_initf initf = NULL;
+ 	struct tegra_pmx *pmx;
+ 	struct resource *res;
+ 	int i;
+ 
+-	match = of_match_device(tegra_pinctrl_of_match, &pdev->dev);
+-	if (match)
+-		initf = (tegra_pinctrl_soc_initf)match->data;
+-#ifdef CONFIG_PINCTRL_TEGRA20
+-	if (!initf)
+-		initf = tegra20_pinctrl_init;
+-#endif
+-	if (!initf) {
+-		dev_err(&pdev->dev,
+-			"Could not determine SoC-specific init func\n");
+-		return -EINVAL;
+-	}
+-
+ 	pmx = devm_kzalloc(&pdev->dev, sizeof(*pmx), GFP_KERNEL);
+ 	if (!pmx) {
+ 		dev_err(&pdev->dev, "Can't alloc tegra_pmx\n");
+ 		return -ENOMEM;
+ 	}
+ 	pmx->dev = &pdev->dev;
+-
+-	(*initf)(&pmx->soc);
++	pmx->soc = soc_data;
+ 
+ 	tegra_pinctrl_gpio_range.npins = pmx->soc->ngpios;
++	tegra_pinctrl_desc.name = dev_name(&pdev->dev);
+ 	tegra_pinctrl_desc.pins = pmx->soc->pins;
+ 	tegra_pinctrl_desc.npins = pmx->soc->npins;
+ 
+@@ -697,8 +666,9 @@ static int __devinit tegra_pinctrl_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(tegra_pinctrl_probe);
+ 
+-static int __devexit tegra_pinctrl_remove(struct platform_device *pdev)
++int __devexit tegra_pinctrl_remove(struct platform_device *pdev)
+ {
+ 	struct tegra_pmx *pmx = platform_get_drvdata(pdev);
+ 
+@@ -707,30 +677,4 @@ static int __devexit tegra_pinctrl_remove(struct platform_device *pdev)
+ 
+ 	return 0;
+ }
+-
+-static struct platform_driver tegra_pinctrl_driver = {
+-	.driver = {
+-		.name = DRIVER_NAME,
+-		.owner = THIS_MODULE,
+-		.of_match_table = tegra_pinctrl_of_match,
+-	},
+-	.probe = tegra_pinctrl_probe,
+-	.remove = __devexit_p(tegra_pinctrl_remove),
+-};
+-
+-static int __init tegra_pinctrl_init(void)
+-{
+-	return platform_driver_register(&tegra_pinctrl_driver);
+-}
+-arch_initcall(tegra_pinctrl_init);
+-
+-static void __exit tegra_pinctrl_exit(void)
+-{
+-	platform_driver_unregister(&tegra_pinctrl_driver);
+-}
+-module_exit(tegra_pinctrl_exit);
+-
+-MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
+-MODULE_DESCRIPTION("NVIDIA Tegra pinctrl driver");
+-MODULE_LICENSE("GPL v2");
+-MODULE_DEVICE_TABLE(of, tegra_pinctrl_of_match);
++EXPORT_SYMBOL_GPL(tegra_pinctrl_remove);
+diff --git a/drivers/pinctrl/pinctrl-tegra.h b/drivers/pinctrl/pinctrl-tegra.h
+index 782c795..705c007 100644
+--- a/drivers/pinctrl/pinctrl-tegra.h
++++ b/drivers/pinctrl/pinctrl-tegra.h
+@@ -139,25 +139,8 @@ struct tegra_pinctrl_soc_data {
+ 	unsigned ngroups;
+ };
+ 
+-/**
+- * tegra_pinctrl_soc_initf() - Retrieve pin controller details for a SoC.
+- * @soc_data:	This pointer must be updated to point at a struct containing
+- *		details of the SoC.
+- */
+-typedef void (*tegra_pinctrl_soc_initf)(
+-			const struct tegra_pinctrl_soc_data **soc_data);
+-
+-/**
+- * tegra20_pinctrl_init() - Retrieve pin controller details for Tegra20
+- * @soc_data:	This pointer will be updated to point at a struct containing
+- *		details of Tegra20's pin controller.
+- */
+-void tegra20_pinctrl_init(const struct tegra_pinctrl_soc_data **soc_data);
+-/**
+- * tegra30_pinctrl_init() - Retrieve pin controller details for Tegra20
+- * @soc_data:	This pointer will be updated to point at a struct containing
+- *		details of Tegra30's pin controller.
+- */
+-void tegra30_pinctrl_init(const struct tegra_pinctrl_soc_data **soc_data);
++int tegra_pinctrl_probe(struct platform_device *pdev,
++			const struct tegra_pinctrl_soc_data *soc_data);
++int tegra_pinctrl_remove(struct platform_device *pdev);
+ 
+ #endif
+diff --git a/drivers/pinctrl/pinctrl-tegra20.c b/drivers/pinctrl/pinctrl-tegra20.c
+index f69ff96..a74f9a5 100644
+--- a/drivers/pinctrl/pinctrl-tegra20.c
++++ b/drivers/pinctrl/pinctrl-tegra20.c
+@@ -1,7 +1,7 @@
+ /*
+  * Pinctrl data for the NVIDIA Tegra20 pinmux
+  *
+- * Copyright (c) 2011, NVIDIA CORPORATION.  All rights reserved.
++ * Copyright (c) 2011-2012, NVIDIA CORPORATION.  All rights reserved.
+  *
+  * Derived from code:
+  * Copyright (C) 2010 Google, Inc.
+@@ -17,6 +17,8 @@
+  * more details.
+  */
+ 
++#include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinmux.h>
+@@ -2854,7 +2856,39 @@ static const struct tegra_pinctrl_soc_data tegra20_pinctrl = {
+ 	.ngroups = ARRAY_SIZE(tegra20_groups),
+ };
+ 
+-void __devinit tegra20_pinctrl_init(const struct tegra_pinctrl_soc_data **soc)
++static int __devinit tegra20_pinctrl_probe(struct platform_device *pdev)
+ {
+-	*soc = &tegra20_pinctrl;
++	return tegra_pinctrl_probe(pdev, &tegra20_pinctrl);
+ }
++
++static struct of_device_id tegra20_pinctrl_of_match[] __devinitdata = {
++	{ .compatible = "nvidia,tegra20-pinmux", },
++	{ },
++};
++
++static struct platform_driver tegra20_pinctrl_driver = {
++	.driver = {
++		.name = "tegra20-pinctrl",
++		.owner = THIS_MODULE,
++		.of_match_table = tegra20_pinctrl_of_match,
++	},
++	.probe = tegra20_pinctrl_probe,
++	.remove = __devexit_p(tegra_pinctrl_remove),
++};
++
++static int __init tegra20_pinctrl_init(void)
++{
++	return platform_driver_register(&tegra20_pinctrl_driver);
++}
++arch_initcall(tegra20_pinctrl_init);
++
++static void __exit tegra20_pinctrl_exit(void)
++{
++	platform_driver_unregister(&tegra20_pinctrl_driver);
++}
++module_exit(tegra20_pinctrl_exit);
++
++MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
++MODULE_DESCRIPTION("NVIDIA Tegra20 pinctrl driver");
++MODULE_LICENSE("GPL v2");
++MODULE_DEVICE_TABLE(of, tegra20_pinctrl_of_match);
+diff --git a/drivers/pinctrl/pinctrl-tegra30.c b/drivers/pinctrl/pinctrl-tegra30.c
+index 4d7571d..0386fdf 100644
+--- a/drivers/pinctrl/pinctrl-tegra30.c
++++ b/drivers/pinctrl/pinctrl-tegra30.c
+@@ -1,7 +1,7 @@
+ /*
+  * Pinctrl data for the NVIDIA Tegra30 pinmux
+  *
+- * Copyright (c) 2011, NVIDIA CORPORATION.  All rights reserved.
++ * Copyright (c) 2011-2012, NVIDIA CORPORATION.  All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms and conditions of the GNU General Public License,
+@@ -13,6 +13,8 @@
+  * more details.
+  */
+ 
++#include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinmux.h>
+@@ -3720,7 +3722,39 @@ static const struct tegra_pinctrl_soc_data tegra30_pinctrl = {
+ 	.ngroups = ARRAY_SIZE(tegra30_groups),
+ };
+ 
+-void __devinit tegra30_pinctrl_init(const struct tegra_pinctrl_soc_data **soc)
++static int __devinit tegra30_pinctrl_probe(struct platform_device *pdev)
+ {
+-	*soc = &tegra30_pinctrl;
++	return tegra_pinctrl_probe(pdev, &tegra30_pinctrl);
+ }
++
++static struct of_device_id tegra30_pinctrl_of_match[] __devinitdata = {
++	{ .compatible = "nvidia,tegra30-pinmux", },
++	{ },
++};
++
++static struct platform_driver tegra30_pinctrl_driver = {
++	.driver = {
++		.name = "tegra30-pinctrl",
++		.owner = THIS_MODULE,
++		.of_match_table = tegra30_pinctrl_of_match,
++	},
++	.probe = tegra30_pinctrl_probe,
++	.remove = __devexit_p(tegra_pinctrl_remove),
++};
++
++static int __init tegra30_pinctrl_init(void)
++{
++	return platform_driver_register(&tegra30_pinctrl_driver);
++}
++arch_initcall(tegra30_pinctrl_init);
++
++static void __exit tegra30_pinctrl_exit(void)
++{
++	platform_driver_unregister(&tegra30_pinctrl_driver);
++}
++module_exit(tegra30_pinctrl_exit);
++
++MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
++MODULE_DESCRIPTION("NVIDIA Tegra30 pinctrl driver");
++MODULE_LICENSE("GPL v2");
++MODULE_DEVICE_TABLE(of, tegra30_pinctrl_of_match);
+-- 
+1.7.0.4
