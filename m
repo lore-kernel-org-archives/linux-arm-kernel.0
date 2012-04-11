@@ -1,33 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Apr 2012 10:43:53 +0200
-Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
-In-Reply-To: <4F853FC0.4080802@st.com>
-References: <4F793C56.2030605@st.com>
- <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
- <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
- <4F83FAE2.8020107@st.com>
- <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
- <4F853FC0.4080802@st.com>
-Message-ID: <CACRpkdYgSFYgr-CVmG0JenMM+EOydjJxpR8zaFuGPiMKtKRM9Q@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Apr 2012 10:44:03 +0200
+Subject: [GIT PULL] i.MX cleanup patches for next
+Message-ID: <20120411084403.GN3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 10:24 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+Hi Arnd, Olof,
 
-> On 4/11/2012 1:47 PM, Linus Walleij wrote:
->> Hm, then we should maybe consider mergeing all that pinctrl stuff
->> through ARM SoC later as well. I can probably provide the
->> necessary ACKs.
->
-> That would be much better. Just to know who should update these Acks
-> in commits. If it isn't a pull request, Arnd will do it. But if it is,
-> then probably i am required to update this?
+Please pull the following i.MX cleanup patches for next.
 
-Yeah you can send this pull request and then Arnd or Olof will put it
-on some topic branch like "topic-spear" and then you base your
-further work on top of that and then send a new pull request to be
-merged into that same branch, with the pinctrl stuff. And include the
-ACK:s directly in the patches (git rebase -i is your friend...)
+Sascha
 
-Yours,
-Linus Walleij
+The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+
+  Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-cleanup-20120411
+
+for you to fetch changes up to b0843e814737756a38003afe663a626653b66f58:
+
+  efikamx: match machine descriptions with legacy (2012-04-02 11:20:38 +0200)
+
+----------------------------------------------------------------
+i.MX misc cleanups
+
+----------------------------------------------------------------
+Hector Oron (1):
+      efikamx: match machine descriptions with legacy
+
+Uwe Kleine-K?nig (1):
+      ARM: imx/mx21ads: remove unneeded cast
+
+ arch/arm/mach-imx/mach-mx21ads.c      |    3 +--
+ arch/arm/mach-imx/mach-mx51_efikamx.c |    3 +--
+ arch/arm/mach-imx/mach-mx51_efikasb.c |    2 +-
+ 3 files changed, 3 insertions(+), 5 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
