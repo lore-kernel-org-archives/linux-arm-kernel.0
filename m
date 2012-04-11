@@ -1,37 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Apr 2012 09:12:00 +0000
-Subject: [PATCH v4 10/12] ARM: OMAP1: board files: deduplicate and clean
- some NAND-related code
-In-Reply-To: <20120411003555.27059.96204.stgit@dusk>
-References: <20120411003454.27059.37500.stgit@dusk>
- <20120411003555.27059.96204.stgit@dusk>
-Message-ID: <201204110912.01216.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Apr 2012 10:13:28 +0100
+Subject: [PATCH] ARM:vexpress: Remove twice included header files
+In-Reply-To: <1334063461-11130-1-git-send-email-thomas@tomweber.eu>
+References: <1334063461-11130-1-git-send-email-thomas@tomweber.eu>
+Message-ID: <20120411091328.GU24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 April 2012, Paul Walmsley wrote:
-> +void omap1_nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
-> +{
-> +       struct nand_chip *this = mtd->priv;
-> +       unsigned long mask;
-> +
-> +       if (cmd == NAND_CMD_NONE)
-> +               return;
-> +
-> +       mask = (ctrl & NAND_CLE) ? 0x02 : 0;
-> +       if (ctrl & NAND_ALE)
-> +               mask |= 0x04;
-> +
-> +       mask |= (unsigned long)this->IO_ADDR_W;
-> +
-> +       writeb(cmd, (void __iomem *)mask);
-> +}
+On Tue, Apr 10, 2012 at 03:11:01PM +0200, Thomas Weber wrote:
+> Remove duplicates of
+>  - linux/device.h and
+>  - asm/hardware/gic.h
+> 
+> Signed-off-by: Thomas Weber <thomas@tomweber.eu>
 
-IO_ADDR_W is always a page aligned pointer AFAICT, so you can actually
-remove both casts and make it more readable at the same time by writing
-the last two lines as
+Please put this in the patch system, thanks.
 
-	writeb(cmd, this->IO_ADDR_W + mask);
-
-
-	Arnd
+> ---
+>  arch/arm/mach-vexpress/v2m.c |    2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index 47cdcca..e769ab6 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+> @@ -14,7 +14,6 @@
+>  #include <linux/ata_platform.h>
+>  #include <linux/smsc911x.h>
+>  #include <linux/spinlock.h>
+> -#include <linux/device.h>
+>  #include <linux/usb/isp1760.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/mtd/physmap.h>
+> @@ -29,7 +28,6 @@
+>  #include <asm/hardware/gic.h>
+>  #include <asm/hardware/timer-sp.h>
+>  #include <asm/hardware/sp810.h>
+> -#include <asm/hardware/gic.h>
+>  
+>  #include <mach/ct-ca9x4.h>
+>  #include <mach/motherboard.h>
+> -- 
+> 1.7.10
+> 
