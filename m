@@ -1,62 +1,128 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 11 Apr 2012 10:44:22 -0400 (EDT)
-Subject: [PATCH v2 3/4] ARM: mm: truncate memory banks to fit in 4GB space
- for classic MMU
-In-Reply-To: <1334154639-13869-4-git-send-email-will.deacon@arm.com>
-References: <1334154639-13869-1-git-send-email-will.deacon@arm.com>
- <1334154639-13869-4-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1204111038130.16314@xanadu.home>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 11 Apr 2012 10:47:10 -0500
+Subject: [PATCH v3 1/9] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A9317C6F4B@DBDE01.ent.ti.com>
+References: <cover.1333640054.git.afzal@ti.com>
+ <cefbe934da40f0a169b1e3a75c46451e5546a8bd.1333640054.git.afzal@ti.com>
+ <4F7DFED5.4030000@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317C5E58@DBDE01.ent.ti.com>
+ <4F833D8D.8000802@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317C693C@DBDE01.ent.ti.com>
+ <4F8488A2.7030602@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317C6F4B@DBDE01.ent.ti.com>
+Message-ID: <4F85A77E.30203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Apr 2012, Will Deacon wrote:
+Hi Afzal,
 
-> If a bank of memory spanning the 4GB boundary is added on a !CONFIG_LPAE
-> kernel then we will hang early during boot since the memory bank will
-> have wrapped around to zero.
+On 04/11/2012 12:11 AM, Mohammed, Afzal wrote:
+> Hi Jon,
 > 
-> This patch truncates memory banks for !LPAE configurations when the end
-> address is not representable in 32 bits.
+> On Wed, Apr 11, 2012 at 00:53:14, Hunter, Jon wrote:
+>> I agree with your argument but I was thinking today only OMAP uses the 
+>> GPMC so we could not worry about this. Ok, leave as-is, but can we 
+>> modify the code as follows as the "else if" is not really needed...
+>>
+>> if (gpmc->num_irq < GPMC_NR_IRQ) {
+>> 	dev_warn(gpmc->dev, "Insufficient interrupts for device\n");
+>> 	return -EINVAL;
+>> }
+>>
+>> gpmc->num_irq = GPMC_NR_IRQ;
 > 
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Yes, it is better
+> 
+>>
+>>>>
+>>>> Furthermore, GPMC_NR_IRQ is defined as 6 which is correct for OMAP2/3
+>>>> but not for OMAP4/5, it is 5. Therefore, we need to detect whether we
+>>>> are using an OMAP2/3 or OMAP4+ and set num_irqs based upon this. This
+>>>> could be done in the probe and we can avoid passing this.
+>>>
+>>> Is it dependent on OMAPX or GPMC IP version? if it is IP version, then driver
+>>> can be enhanced to handle it, if not, platform has to pass this information.
+>>
+>> Here are the GPMC IP revisions ...
+>>
+>> OMAP5430 = 0x00000060
+>> OMAP4430 = 0x00000060
+>> OMAP3630 = 0x00000050
+>> OMAP3430 = 0x00000050
+>>
+>> So this should work for OMAP. We should check OMAP2 as well. What about 
+>> the AMxxx devices?
+> 
+> 
+> I badly needed this information, thanks.
+> 
+> AM3359 = 0x00000060, it has only 2 waitpin interrupts
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Great so this is consistent!
 
-Now what if start = 1G and size = 5G? The size variable is an unsigned 
-long, meaning that right now the size might be truncated to 1G.
+>>>>>>> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>>>>>>> +	if (res == NULL)
+>>>>>>> +		dev_warn(gpmc->dev, "Failed to get resource: irq\n");
+>>>>>>> +	else
+>>>>>>> +		gpmc->master_irq = res->start;
+>>>>>>
+>>>>>> Why not return an error if the IRQ is not found? We don't know if anyone
+>>>>>> will be trying to use them.
+>>>>>
+>>>>> Why do you want to do that ?
+>>>>
+>>>> Because this indicates a BUG :-)
+>>>
+>>> I disagree, this need not be considered a bug always,
+>>> for eg. If gpmc irq is not connected to intc
+>>
+>> Ok, so for devices existing today this indicates a bug ;-)
+> 
+> I do not want to consider that case to be bug enough for probe
+> to fail, there are other drivers which does similar enhancing
+> its use cases,
+> 
+> eg. 1e351a9 mfd: Make TPS65910 usable without interrupts
 
-> ---
->  arch/arm/kernel/setup.c |   16 +++++++++++++++-
->  1 files changed, 15 insertions(+), 1 deletions(-)
+Ok, fine.
+
+>>
+>> At a minimum you need to improve the error handing here. If the 
+>> platform_get_resource fails you are still calling "gpmc_setup_irq()" 
+>> which appears to be pointless. It would be better if the gpmc irq chip 
+>> is not initialised in this case so that drivers attempting to request 
+>> these irqs failed.
 > 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index b914113..ebfac78 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -523,7 +523,21 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
->  	 */
->  	size -= start & ~PAGE_MASK;
->  	bank->start = PAGE_ALIGN(start);
-> -	bank->size  = size & PAGE_MASK;
-> +
-> +#ifndef CONFIG_LPAE
-> +	if (bank->start + size < bank->start) {
-> +		printk(KERN_CRIT "Truncating memory at 0x%08llx to fit in "
-> +			"32-bit physical address space\n", (long long)start);
-> +		/*
-> +		 * To ensure bank->start + bank->size is representable in
-> +		 * 32 bits, we use ULONG_MAX as the upper limit rather than 4GB.
-> +		 * This means we lose a page after masking.
-> +		 */
-> +		size = ULONG_MAX - bank->start;
-> +	}
-> +#endif
-> +
-> +	bank->size = size & PAGE_MASK;
->  
->  	/*
->  	 * Check whether this memory region has non-zero size or
-> -- 
-> 1.7.4.1
+> Please see gpmc_setup_irq, if irq is not present, it returns in the
+> beginning, and gpmc_irq_chip is not initialized in that case.
+
+Yes you are right.
+
+>>>>>>> +	for (gdq = gp->device_pdata, gd = gpmc->device; *gdq; gdq++, i++) {
+>>>>>>> +		ret = gpmc_setup_device(*gdq, gd, gpmc);
+>>>>>>> +		if (IS_ERR_VALUE(ret))
+>>>>>>> +			dev_err(gpmc->dev, "gpmc setup on %s failed\n",
+>>>>>>> +								(*gdq)->name);
+>>>>>>> +		else
+>>>>>>> +			gd++;
+>>>>>>> +	}
+>>>>>>
+>>>>>> Would a while loop be simpler?
+>>>>>
+>>>>> My preference is to go with "for"
+>>>>
+>>>> Ok, just wondering if this could be cleaned up a little.
+>>>
+>>> For travelling through array of pointers, for looks natural to me, if you
+>>> have a better way, please send it, it can be folded in next version.
+>>
+>> Could you have num_devices to indicate how many platform devices there 
+>> are and then a simple for-loop of 0 to num_devices?
 > 
+> This will cause coding to be done by platform to be less simple, and my
+> preference is not to use another variable
+
+Hehe, I wondered if that would make life a little more difficult. Ok
+lets leave it for now.
+
+Jon
