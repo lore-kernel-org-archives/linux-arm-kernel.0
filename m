@@ -1,41 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 11 Apr 2012 15:46:20 -0700
-Subject: [PATCH 05/12] arm: omap3: am35x: Add PWROFF feature
-In-Reply-To: <1334171147-7517-6-git-send-email-mgreer@animalcreek.com> (Mark
- A. Greer's message of "Wed, 11 Apr 2012 12:05:40 -0700")
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-6-git-send-email-mgreer@animalcreek.com>
-Message-ID: <87iph5q43n.fsf@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Apr 2012 00:47:20 +0200
+Subject: [PATCH 1/1] ARM: Rename CONFIG_ARM_AMBA to CONFIG_ARM_PRIMECELL
+In-Reply-To: <9c8b8d1212528994ea09c9cc57428ce3d1f45da9.1333663714.git.rubini@gnudd.com>
+References: <cover.1333663714.git.rubini@gnudd.com>
+ <9c8b8d1212528994ea09c9cc57428ce3d1f45da9.1333663714.git.rubini@gnudd.com>
+Message-ID: <CACRpkdbDZCwQLdrPtm-VD6-iCD0hgsNos=KB7P6PL6-p=upjZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, Apr 6, 2012 at 12:22 AM, Alessandro Rubini <rubini@gnudd.com> wrote:
 
-"Mark A. Greer" <mgreer@animalcreek.com> writes:
-
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> The AMBA bus (Advanced Microcontroller Bus Architecture) is just an
+> interconnection bus that needs no software support. ?Software support
+> offered in Linux is some sort of enumeration that only applies to
+> "PrimeCell" logic blocks (devices). ?This renames the config option
+> to match reality.
 >
-> Typical OMAP3 SoCs have four power domain states: ON,
-> INACTIVE, RETENTION, and OFF.  The am35x family of SoCs
-> has only two states: ON and INACTIVE.  To distinguish which
-> set of states the current device has, add the 'OMAP3_HAS_PWROFF'
-> feature.  When that feature/bit is set, the device supports the
-> RETENTION and OFF states; otherwise, it doesn't.
+> Change suggested by Russell King.
 >
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> Note: CONFIG_ARM_AMBA is retained and is enabled when
+> CONFIG_ARM_PRIMECELL is selected. ?So any #ifdef in out-of-tree
+> drivers will still work until the symbol will be removed in due time.
+>
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Paul has mentioned this already, but the same applies here: We shouldn't
-be using SoC-global feature flag for this.   We already have per-pwrdm
-flags that indicate what states a given powerdomain suports (see .pwrsts
-field.)
+Yeah this thing can be a bit confusing...
 
-Wherever we have blind writes to next powerstates that assume support
-for RET/OFF is present, those should probably use a helper function from
-the powerdomain code that checks if that state is even supported.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Jean's work on functional powerstates will probably help here if you
-really need to support INACTIVE.  However, Paul may be right in that you
-might just start with supporing ON only, and validate that module-level
-wakups acutally work.
-
-Kevin
+Thanks,
+Linus Walleij
