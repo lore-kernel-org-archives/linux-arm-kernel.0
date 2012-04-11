@@ -1,97 +1,125 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:22:22 +0530
-Subject: [PATCHv7 11/18] I2C: OMAP: use devm_* functions
+Date: Wed, 11 Apr 2012 16:22:26 +0530
+Subject: [PATCHv7 15/18] I2C: OMAP: make the read ready processing a separate
+ function
 In-Reply-To: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334141549-8288-12-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334141549-8288-16-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The various devm_ functions allocate memory that is released when a driver
-detaches. This patch uses devm_kzalloc, devm_request_mem_region and
-devm_ioremap for data that is allocated in the probe function of a platform
-device and is only freed in the remove function.
+No functional change. Makes the read ready processing a separate
+function. This is to avoid extremely long level of indentation.
 
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   29 +++++++++--------------------
- 1 files changed, 9 insertions(+), 20 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   86 +++++++++++++++++++++-------------------
+ 1 files changed, 45 insertions(+), 41 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 121c52e..86be475 100644
+index c396cb7..666a365 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -995,17 +995,17 @@ omap_i2c_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	ioarea = request_mem_region(mem->start, resource_size(mem),
--			pdev->name);
-+	ioarea = devm_request_mem_region(&pdev->dev, mem->start,
-+			resource_size(mem), pdev->name);
- 	if (!ioarea) {
- 		dev_err(&pdev->dev, "I2C region already claimed\n");
- 		return -EBUSY;
- 	}
- 
--	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
-+	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
- 	if (!dev) {
--		r = -ENOMEM;
--		goto err_release_region;
-+		dev_err(&pdev->dev, "Menory allocation failed\n");
-+		return -ENOMEM;
- 	}
- 
- 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
-@@ -1029,11 +1029,10 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	dev->dev = &pdev->dev;
- 	dev->irq = irq->start;
--	dev->base = ioremap(mem->start, resource_size(mem));
--	if (!dev->base) {
--		r = -ENOMEM;
--		goto err_free_mem;
--	}
-+	dev->base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
-+	if (!dev->base)
-+		return -ENOMEM;
-+
- 
- 	platform_set_drvdata(pdev, dev);
- 
-@@ -1121,13 +1120,8 @@ err_free_irq:
- err_unuse_clocks:
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(dev->dev);
--	iounmap(dev->base);
- 	pm_runtime_disable(&pdev->dev);
--err_free_mem:
- 	platform_set_drvdata(pdev, NULL);
--	kfree(dev);
--err_release_region:
--	release_mem_region(mem->start, resource_size(mem));
- 
- 	return r;
- }
-@@ -1135,7 +1129,6 @@ err_release_region:
- static int __devexit omap_i2c_remove(struct platform_device *pdev)
- {
- 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
--	struct resource		*mem;
- 
- 	platform_set_drvdata(pdev, NULL);
- 
-@@ -1143,10 +1136,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
- 	i2c_del_adapter(&dev->adapter);
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_disable(&pdev->dev);
--	iounmap(dev->base);
--	kfree(dev);
--	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(mem->start, resource_size(mem));
+@@ -786,6 +786,49 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
  	return 0;
  }
  
++static int process_read_rdy(struct omap_i2c_dev *dev)
++{
++	u8 num_bytes = 1;
++	u16 stat, w;
++
++	if (dev->errata & I2C_OMAP_ERRATA_I207)
++		i2c_omap_errata_i207(dev, stat);
++
++	if (dev->fifo_size) {
++		if (stat & OMAP_I2C_STAT_RRDY)
++			num_bytes = dev->fifo_size;
++		else    /* read RXSTAT on RDR interrupt */
++			num_bytes = (omap_i2c_read_reg(dev,
++					OMAP_I2C_BUFSTAT_REG) >> 8) & 0x3F;
++	}
++	while (num_bytes) {
++		num_bytes--;
++		w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
++		if (dev->buf_len) {
++			*dev->buf++ = w;
++			dev->buf_len--;
++			/*
++			 * Data reg in 2430, omap3 and omap4 is 8 bit wide
++			 */
++			if (dev->flags & OMAP_I2C_FLAG_16BIT_DATA_REG) {
++				if (dev->buf_len) {
++					*dev->buf++ = w >> 8;
++					dev->buf_len--;
++				}
++			}
++		} else {
++			if (stat & OMAP_I2C_STAT_RRDY)
++				dev_err(dev->dev,
++					"RRDY IRQ while no data requested\n");
++			if (stat & OMAP_I2C_STAT_RDR)
++				dev_err(dev->dev,
++					"RDR IRQ while no data requested\n");
++			return -EIO;
++		}
++	}
++	return 0;
++}
++
+ static irqreturn_t
+ omap_i2c_isr(int this_irq, void *dev_id)
+ {
+@@ -836,48 +879,9 @@ complete:
+ 			return IRQ_HANDLED;
+ 		}
+ 		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
+-			u8 num_bytes = 1;
+-
+-			if (dev->errata & I2C_OMAP_ERRATA_I207)
+-				i2c_omap_errata_i207(dev, stat);
++			if (process_read_rdy(dev) == -EIO)
++				break;
+ 
+-			if (dev->fifo_size) {
+-				if (stat & OMAP_I2C_STAT_RRDY)
+-					num_bytes = dev->fifo_size;
+-				else    /* read RXSTAT on RDR interrupt */
+-					num_bytes = (omap_i2c_read_reg(dev,
+-							OMAP_I2C_BUFSTAT_REG)
+-							>> 8) & 0x3F;
+-			}
+-			while (num_bytes) {
+-				num_bytes--;
+-				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
+-				if (dev->buf_len) {
+-					*dev->buf++ = w;
+-					dev->buf_len--;
+-					/*
+-					 * Data reg in 2430, omap3 and
+-					 * omap4 is 8 bit wide
+-					 */
+-					if (dev->flags &
+-						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
+-						if (dev->buf_len) {
+-							*dev->buf++ = w >> 8;
+-							dev->buf_len--;
+-						}
+-					}
+-				} else {
+-					if (stat & OMAP_I2C_STAT_RRDY)
+-						dev_err(dev->dev,
+-							"RRDY IRQ while no data"
+-								" requested\n");
+-					if (stat & OMAP_I2C_STAT_RDR)
+-						dev_err(dev->dev,
+-							"RDR IRQ while no data"
+-								" requested\n");
+-					break;
+-				}
+-			}
+ 			omap_i2c_ack_stat(dev,
+ 				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
+ 			continue;
 -- 
 1.7.4.1
