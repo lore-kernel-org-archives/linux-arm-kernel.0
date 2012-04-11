@@ -1,21 +1,19 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 11 Apr 2012 10:09:49 +0100
-Subject: [PATCH] ARM:vexpress: Remove twice included header files
-In-Reply-To: <1334063461-11130-1-git-send-email-thomas@tomweber.eu>
-References: <1334063461-11130-1-git-send-email-thomas@tomweber.eu>
-Message-ID: <1334135389.31683.5.camel@hornet>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Apr 2012 08:43:57 +0000
+Subject: [PATCH v4 01/12] ARM: OMAP2+: declare file-local functions as
+ static
+In-Reply-To: <20120411003516.27059.99477.stgit@dusk>
+References: <20120411003454.27059.37500.stgit@dusk>
+ <20120411003516.27059.99477.stgit@dusk>
+Message-ID: <201204110843.57548.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-04-10 at 15:11 +0200, Thomas Weber wrote:
-> Remove duplicates of
->  - linux/device.h and
->  - asm/hardware/gic.h
-> 
-> Signed-off-by: Thomas Weber <thomas@tomweber.eu>
+On Wednesday 11 April 2012, Paul Walmsley wrote:
+> Several function declarations used only in the files in which they're
+> declared should include the static keyboard, but don't:
+					^^^ ???
 
-Cool, thanks!
+The patch looks good otherwise,
 
-I'll make sure it gets queued for the next merge window.
-
-Pawe?
+Acked-by: Arnd Bergmann <arnd@arndb.de>
