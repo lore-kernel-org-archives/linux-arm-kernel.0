@@ -1,71 +1,41 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 11 Apr 2012 12:57:44 -0700
-Subject: [PATCH 2/2] clk: Move init fields from clk to clk_hw
-In-Reply-To: <CAJOA=zMEN_im3-T+_uXB_mTu842o_fRkr9-7h=X18fKBoH46aQ@mail.gmail.com>
-References: <CAJOA=zN2cSSpM92oRnW0RyU_ZzyoQ=jthc-fAkf-P3z37uWt7w@mail.gmail.com>
- <1332214706-675-1-git-send-email-skannan@codeaurora.org>
- <1332214706-675-2-git-send-email-skannan@codeaurora.org>
- <20120320072018.GC32469@S2101-09.ap.freescale.net>
- <cbd6490459b9fd68875fec4a7c7de073.squirrel@www.codeaurora.org>
- <20120320094031.GI3852@pengutronix.de>
- <20120320141811.GF32469@S2101-09.ap.freescale.net>
- <20120320181050.GN3852@pengutronix.de> <4F68E34A.70207@codeaurora.org>
- <20120320231242.GP3852@pengutronix.de>
- <CAJOA=zOGTW7OqACWgJQW6HSPLVev+apdNhv4vNXjHTcp=7N+uQ@mail.gmail.com>
- <4F694484.1030706@codeaurora.org> <4F714397.6080608@codeaurora.org>
- <CAJOA=zOq=kYfZUEnnQT_D4w=Kpp5n7R=k9oOCrxF59P5W-nw-w@mail.gmail.com>
- <4F7E4752.4020007@codeaurora.org>
- <CAJOA=zMEN_im3-T+_uXB_mTu842o_fRkr9-7h=X18fKBoH46aQ@mail.gmail.com>
-Message-ID: <4F85E238.9050102@codeaurora.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 11 Apr 2012 16:05:51 -0400
+Subject: [PATCH] mmc: remove imxmmc driver
+In-Reply-To: <1334174103-4724-1-git-send-email-s.hauer@pengutronix.de> (Sascha
+ Hauer's message of "Wed, 11 Apr 2012 21:55:03 +0200")
+References: <1334174103-4724-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <87hawqrq3k.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2012 10:59 AM, Turquette, Mike wrote:
-> On Thu, Apr 5, 2012 at 6:30 PM, Saravana Kannan<skannan@codeaurora.org>  wrote:
->> (*nudge*) (*nudge*) again :-)
->>
->> Sorry to keep nudging you on this often. The longer we wait for this, the
->> more churn it will cause later on. That's why I'm being persistent on this.
->> Also, once this goes in, I can start working on upstreaming MSM clock
->> support.
+Hi Sascha,
 
-<SNIP>
+On Wed, Apr 11 2012, Sascha Hauer wrote:
+> This driver is broken since 2.6.31 when the traditional i.MX1
+> support was removed.
+>
+> In theory the i.MX1 mmc controller can be supported by the mxcmmc
+> driver which basically is the same hardware. However, the i.MX1
+> controller has severe bugs which made several workarounds necessary which
+> resulted in a different driver structure. At that time it seemed easier
+> to write a second driver to support hardware without bugs.
+>
+> As noone cared for the i.MX1 driver for a long time and it does
+> not compile, remove it.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/mmc/host/Kconfig  |   10 -
+>  drivers/mmc/host/Makefile |    1 -
+>  drivers/mmc/host/imxmmc.c | 1169 ---------------------------------------------
+>  3 files changed, 1180 deletions(-)
+>  delete mode 100644 drivers/mmc/host/imxmmc.c
 
-> TL;DR: I think a combination of your change to expose the
-> not-so-private parts of struct clk into struct clk_hw are OK and have
-> real benefits for the clk-provider.h code.  However we need to
-> implement it such that all the statically initialized data can be
-> __initdata.
-
-Sounds like a reasonable compromise.
-
-> My only concern with this series is that platform clock code will
-> access struct clk_hw members without the appropriate lock held (namely
-> prepare_lock).  I'm a bit worried that there might be a case where
-> some clock code access clk_hw->name when clk_hw has somehow been
-> destroyed/altered (e.g. if clk_put every finally gets implemented...).
->   Besides clk_put are there any real instances where this might happen?
-
-This problem is true for any struct/field marked as __init_data. So, I 
-don't think this is a real problem. If someone is stupid enough to mark 
-their data as __init_data and access them later, then there is not much 
-we can do. Also, I believe the compiler throws out some warning when you 
-try to access __init_data from non-init code.
-
-> I'll be pushing my fixes branch out to the list soon.  Do you want to
-> rebase this change on top of it taking into account the __initdata
-> bits?
-
-I thought it might be easier for you to base your changes on top of my 
-patch. But I can try to rebase mine on top of your changes. Hopefully 
-your fixes aren't crazy big/complex.
-
-This is a busy week for me at work. I will try to send a patch in a day 
-or two.
+Looks good, but you missed drivers/mmc/host/imxmmc.h.
 
 Thanks,
-Saravana
 
+- Chris.
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
