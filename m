@@ -1,176 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 11 Apr 2012 16:47:19 -0600
-Subject: [PATCH] pinctrl: tegra: debugfs enhancements
-Message-ID: <1334184439-16428-1-git-send-email-swarren@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Apr 2012 16:47:31 -0600 (MDT)
+Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
+ wake-ups work
+In-Reply-To: <20120411222313.GC31197@animalcreek.com>
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+ <20120411222313.GC31197@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1204111637490.29473@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+cc Govindraj
 
-* Only provide debugfs-relates ops when CONFIG_DEBUG_FS is enabled.
-* Implement pin_config_group_dbg_show op.
-* Implement pin_config_config_dbg_show op.
+On Wed, 11 Apr 2012, Mark A. Greer wrote:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Linus, this too would be best to take through the Tegra tree. It depends
-on the other two patches I just posted, but to satisfy that, I'll just
-base my branch off of pinctrl once you've applied those branches and its
-stable.
+> On Wed, Apr 11, 2012 at 03:37:47PM -0600, Paul Walmsley wrote:
+>
+> > I don't quite understand this patch.  Are you saying that AM3517/3505 
+> > can't wake from WFI?  That would seem odd.
+> 
+> No, I'm saying that I/O doesn't seem to wake it up from the WFI.
+> I've learned to not trust the am35x TRM much so I'm pretty much
+> feeling my way along in the dark.
 
- drivers/pinctrl/pinctrl-tegra.c |   75 +++++++++++++++++++++++++++++++++++---
- 1 files changed, 69 insertions(+), 6 deletions(-)
+Hehe, no worries, just curious.
 
-diff --git a/drivers/pinctrl/pinctrl-tegra.c b/drivers/pinctrl/pinctrl-tegra.c
-index 3ac8ad3..df52d75 100644
---- a/drivers/pinctrl/pinctrl-tegra.c
-+++ b/drivers/pinctrl/pinctrl-tegra.c
-@@ -83,12 +83,14 @@ static int tegra_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_DEBUG_FS
- static void tegra_pinctrl_pin_dbg_show(struct pinctrl_dev *pctldev,
- 				       struct seq_file *s,
- 				       unsigned offset)
- {
- 	seq_printf(s, " %s", dev_name(pctldev->dev));
- }
-+#endif
- 
- static int reserve_map(struct pinctrl_map **map, unsigned *reserved_maps,
- 		       unsigned *num_maps, unsigned reserve)
-@@ -295,7 +297,9 @@ static struct pinctrl_ops tegra_pinctrl_ops = {
- 	.get_groups_count = tegra_pinctrl_get_groups_count,
- 	.get_group_name = tegra_pinctrl_get_group_name,
- 	.get_group_pins = tegra_pinctrl_get_group_pins,
-+#ifdef CONFIG_DEBUG_FS
- 	.pin_dbg_show = tegra_pinctrl_pin_dbg_show,
-+#endif
- 	.dt_node_to_map = tegra_pinctrl_dt_node_to_map,
- 	.dt_free_map = tegra_pinctrl_dt_free_map,
- };
-@@ -385,6 +389,7 @@ static struct pinmux_ops tegra_pinmux_ops = {
- static int tegra_pinconf_reg(struct tegra_pmx *pmx,
- 			     const struct tegra_pingroup *g,
- 			     enum tegra_pinconf_param param,
-+			     bool report_err,
- 			     s8 *bank, s16 *reg, s8 *bit, s8 *width)
- {
- 	switch (param) {
-@@ -472,9 +477,10 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
- 	}
- 
- 	if (*reg < 0) {
--		dev_err(pmx->dev,
--			"Config param %04x not supported on group %s\n",
--			param, g->name);
-+		if (report_err)
-+			dev_err(pmx->dev,
-+				"Config param %04x not supported on group %s\n",
-+				param, g->name);
- 		return -ENOTSUPP;
- 	}
- 
-@@ -507,7 +513,8 @@ static int tegra_pinconf_group_get(struct pinctrl_dev *pctldev,
- 
- 	g = &pmx->soc->groups[group];
- 
--	ret = tegra_pinconf_reg(pmx, g, param, &bank, &reg, &bit, &width);
-+	ret = tegra_pinconf_reg(pmx, g, param, true, &bank, &reg, &bit,
-+				&width);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -534,7 +541,8 @@ static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
- 
- 	g = &pmx->soc->groups[group];
- 
--	ret = tegra_pinconf_reg(pmx, g, param, &bank, &reg, &bit, &width);
-+	ret = tegra_pinconf_reg(pmx, g, param, true, &bank, &reg, &bit,
-+				&width);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -563,23 +571,78 @@ static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_DEBUG_FS
- static void tegra_pinconf_dbg_show(struct pinctrl_dev *pctldev,
- 				   struct seq_file *s, unsigned offset)
- {
- }
- 
-+static const char *strip_prefix(const char *s)
-+{
-+	const char *comma = strchr(s, ',');
-+	if (!comma)
-+		return s;
-+
-+	return comma + 1;
-+}
-+
- static void tegra_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
--					 struct seq_file *s, unsigned selector)
-+					 struct seq_file *s, unsigned group)
-+{
-+	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
-+	const struct tegra_pingroup *g;
-+	int i, ret;
-+	s8 bank, bit, width;
-+	s16 reg;
-+	u32 val;
-+
-+	g = &pmx->soc->groups[group];
-+
-+	for (i = 0; i < ARRAY_SIZE(cfg_params); i++) {
-+		ret = tegra_pinconf_reg(pmx, g, cfg_params[i].param, false,
-+					&bank, &reg, &bit, &width);
-+		if (ret < 0)
-+			continue;
-+
-+		val = pmx_readl(pmx, bank, reg);
-+		val >>= bit;
-+		val &= (1 << width) - 1;
-+
-+		seq_printf(s, "\n\t%s=%u",
-+			   strip_prefix(cfg_params[i].property), val);
-+	}
-+}
-+
-+static void tegra_pinconf_config_dbg_show(struct pinctrl_dev *pctldev,
-+					  struct seq_file *s,
-+					  unsigned long config)
- {
-+	enum tegra_pinconf_param param = TEGRA_PINCONF_UNPACK_PARAM(config);
-+	u16 arg = TEGRA_PINCONF_UNPACK_ARG(config);
-+	const char *pname = "unknown";
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(cfg_params); i++) {
-+		if (cfg_params[i].param == param) {
-+			pname = cfg_params[i].property;
-+			break;
-+		}
-+	}
-+
-+	seq_printf(s, "%s=%d", strip_prefix(pname), arg);
- }
-+#endif
- 
- struct pinconf_ops tegra_pinconf_ops = {
- 	.pin_config_get = tegra_pinconf_get,
- 	.pin_config_set = tegra_pinconf_set,
- 	.pin_config_group_get = tegra_pinconf_group_get,
- 	.pin_config_group_set = tegra_pinconf_group_set,
-+#ifdef CONFIG_DEBUG_FS
- 	.pin_config_dbg_show = tegra_pinconf_dbg_show,
- 	.pin_config_group_dbg_show = tegra_pinconf_group_dbg_show,
-+	.pin_config_config_dbg_show = tegra_pinconf_config_dbg_show,
-+#endif
- };
- 
- static struct pinctrl_gpio_range tegra_pinctrl_gpio_range = {
--- 
-1.7.0.4
+> I do know that without this patch, the system is extremely slow which I 
+> believe is from it only returning from the WFI because of a timer 
+> expiration or something like that.
+
+How are you trying to wake it up -- from an incoming character via 
+the UART?
+
+Does the system pause in the middle of UART transmits, or does it get the 
+transmit buffers out cleanly and just not respond promptly to incoming 
+characters?
+
+> > There are other sources of wakeup on the system other than I/O wakeup.  
+> > I/O wakeup only applies to wakeups from the I/O pads when the chip is in 
+> > RETENTION or OFF.  And as I understand it, neither of those apply to 
+> > AM3517/3505?
+> 
+> Hmm, its true that RETENTION and OFF aren't supported.  It does wake up
+> occasionally (as mentioned above) it just seems that I/O doesn't wake
+> it up.  I may be mistaken.  I'm only going from what I've seen since and
+> the TRM seems to have lots of errors so I'm not sure what to trust in it.
+
+OK no problem, just trying to understand what's going on.  Sounds like 
+you've gotten tossed into the deep end :-)
+
+> > Even if I/O wakeups aren't supported, many of the IP blocks on the system 
+> > should be able to cause the ARM to exit WFI by asserting their 
+> > SWAKEUP lines and raising their interrupt lines.
+> 
+> Okay, but that doesn't seem to be working.  I'll look some more to see
+> why they aren't working.
+
+There could be a hidden dependency on I/O wakeup being present in the UART 
+driver. We've been going through some UART driver angst recently...
+
+
+- Paul
