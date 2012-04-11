@@ -1,69 +1,82 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:42:56 +0530
-Subject: [PATCHv7 18/18] I2C: OMAP: Rename the 1p153 to the erratum id i462
-In-Reply-To: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
-References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334142776-10583-19-git-send-email-shubhrajyoti@ti.com>
+Date: Wed, 11 Apr 2012 16:42:38 +0530
+Subject: [PATCHv7 00/18] I2C updates
+Message-ID: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The section number in the recent errata document has changed.
-Rename the erratum 1p153 to the unique id i462 instead, so that
-it is easier to reference. Also change the function name and comments
-to reflect the same.
+The patch series does the following
 
-Cc: Jon Hunter <jon-hunter@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+- Warn fixes if CONFIG_PM_RUNTIME is not selected.
+- I2C register restore only if context if the context is lost
+- Bus busy recovery mechanism.
+- the reset is not done in init.
+- Adds a patch to use devm_* functions
+- Also checks the return type of the get_sync and in case
+ of errors prevents register access, also print the cause of
+ failure in case of errors.
+- In case of i2c remove register access was done without any
+ get_sync fix the same.
+- Adds a pdata function pointer to do context save restore
+- Split the omap_i2c_isr to increase readability
+- Make the i2c use SET_RUNTIME_PM_OPS
+- Folds a patch from Tasslehoff to prevent any merge conflicts.
+- Prevents the XDUF flag to be set if the underflow condition is not met.
+- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
+ use the unique id instead as the section number in the recent errata
+ docs has changed.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 2b7182b..705a0f7 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -170,7 +170,7 @@ enum {
- 
- /* Errata definitions */
- #define I2C_OMAP_ERRATA_I207		(1 << 0)
--#define I2C_OMAP3_1P153			(1 << 1)
-+#define I2C_OMAP_ERRATA_I462		(1 << 1)
- 
- struct omap_i2c_dev {
- 	struct device		*dev;
-@@ -753,11 +753,11 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
- #endif
- 
- /*
-- * OMAP3430 Errata 1.153: When an XRDY/XDR is hit, wait for XUDF before writing
-+ * OMAP3430 Errata i462: When an XRDY/XDR is hit, wait for XUDF before writing
-  * data to DATA_REG. Otherwise some data bytes can be lost while transferring
-  * them from the memory to the I2C interface.
-  */
--static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
-+static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
- {
- 	unsigned long timeout = 10000;
- 
-@@ -920,8 +920,8 @@ complete:
- 					break;
- 				}
- 
--				if ((dev->errata & I2C_OMAP3_1P153) &&
--				    errata_omap3_1p153(dev, &stat, &err))
-+				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
-+				    errata_omap3_i462(dev, &stat, &err))
- 					goto complete;
- 
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
-@@ -1061,7 +1061,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->errata |= I2C_OMAP_ERRATA_I207;
- 
- 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
--		dev->errata |= I2C_OMAP3_1P153;
-+		dev->errata |= I2C_OMAP_ERRATA_I462;
- 
- 	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
- 		u16 s;
+- As discussed in [2] Paul has queued the flag for context restore patch,
+ removing it from the series.
+
+
+[1] http://www.spinics.net/lists/linux-i2c/msg07607.html
+[2] http://www.spinics.net/lists/linux-i2c/msg07685.html
+
+Tested on omap4sdp and omap3sdp.
+
+
+The following changes since commit 258f742635360175564e9470eb060ff4d4b984e7:
+
+  modpost: Fix modpost license checking of vmlinux.o (2012-04-09 20:52:56 -0700)
+
+are available in the git repository at:
+  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-next
+
+
+
+Jon Hunter (1):
+  I2C: OMAP: Correct I2C revision for OMAP3
+
+Shubhrajyoti D (15):
+  I2C: OMAP: make omap_i2c_unidle/idle functions depend on
+    CONFIG_PM_RUNTIME
+  I2C: OMAP: Remove reset at init
+  I2C: OMAP: I2C register restore only if context is lost
+  I2C: OMAP: Fix the interrupt clearing in OMAP4
+  I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
+  I2C: OMAP: Optimise the remove code
+  I2C: OMAP: Fix the error handling
+  I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
+    than zero
+  I2C: OMAP: use devm_* functions
+  I2C: OMAP: Fix the crash in i2c remove
+  I2C: OMAP: Handle error check for pm runtime
+  I2C: OMAP: Use SET_RUNTIME_PM_OPS
+  I2C: OMAP: make the read ready processing a separate function
+  I2C: OMAP: Do not set the XUDF if the underflow is not reached
+  I2C: OMAP: Rename the 1p153 to the erratum id i462
+
+Tasslehoff Kjappfot (1):
+  I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
+
+Vikram Pandita (1):
+  I2C: OMAP: Recover from Bus Busy condition
+
+ arch/arm/plat-omap/i2c.c      |    3 +
+ drivers/i2c/busses/i2c-omap.c |  348 +++++++++++++++++++++++------------------
+ include/linux/i2c-omap.h      |    1 +
+ 3 files changed, 198 insertions(+), 154 deletions(-)
+
 -- 
 1.7.4.1
