@@ -1,34 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Apr 2012 15:30:36 +0100
-Subject: [PATCH v2 1/4] ARM: nommu: fix typo in mm/Kconfig
-In-Reply-To: <1334154639-13869-1-git-send-email-will.deacon@arm.com>
-References: <1334154639-13869-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1334154639-13869-2-git-send-email-will.deacon@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 11 Apr 2012 16:34:29 +0200
+Subject: [PATCH 0/2] Exynos: fix SYSMMU driver to work with power domains
+Message-ID: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The description for the CPU_HIGH_VECTOR Kconfig option for nommu builds
-doesn't make any sense.
+Hi!
 
-This patch fixes up the trivial grammatical error.
+These two patches fixes operation of the SYSMMU driver (v12 version [1])
+with the new power domain driver based on generic power domains and
+runtime pw, which has been merged to Linux kernel v3.4-rc1.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+[1] https://lkml.org/lkml/2012/3/15/51
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 7edef91..7c8a7d8 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -723,7 +723,7 @@ config CPU_HIGH_VECTOR
- 	bool "Select the High exception vector"
- 	help
- 	  Say Y here to select high exception vector(0xFFFF0000~).
--	  The exception vector can be vary depending on the platform
-+	  The exception vector can vary depending on the platform
- 	  design in nommu mode. If your platform needs to select
- 	  high exception vector, say Y.
- 	  Otherwise or if you are unsure, say N, and the low exception
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+Patch summary:
+
+Marek Szyprowski (2):
+  iommu/exynos: fix runtime pm support
+  ARM: Exynos4: update SYSMMU setup code for gen_pd power domain driver
+
+ arch/arm/mach-exynos/dev-sysmmu.c |    6 +++++-
+ arch/arm/mach-exynos/pm_domains.c |   13 +++++++++++++
+ drivers/iommu/exynos-iommu.c      |   20 ++++++++++++++++++--
+ 3 files changed, 36 insertions(+), 3 deletions(-)
+
 -- 
-1.7.4.1
+1.7.1.569.g6f426
