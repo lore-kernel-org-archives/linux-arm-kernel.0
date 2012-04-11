@@ -1,19 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 11 Apr 2012 16:11:39 +0100
-Subject: [PATCH v6 03/17] pwm: Add debugfs interface
-In-Reply-To: <20120411123352.GA2445@S2101-09.ap.freescale.net>
-References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
- <1334070400-25013-4-git-send-email-thierry.reding@avionic-design.de>
- <20120411123352.GA2445@S2101-09.ap.freescale.net>
-Message-ID: <20120411151138.GA29823@opensource.wolfsonmicro.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 11 Apr 2012 19:18:33 +0400
+Subject: [PATCH 1/2] iommu/exynos: fix runtime pm support
+In-Reply-To: <1334154871-4756-2-git-send-email-m.szyprowski@samsung.com>
+References: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
+ <1334154871-4756-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4F85A0C9.7050800@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 08:33:56PM +0800, Shawn Guo wrote:
-> On Tue, Apr 10, 2012 at 05:06:26PM +0200, Thierry Reding wrote:
+Hello.
 
-> > Reviewed-by: Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Marek Szyprowski wrote:
 
-> I have done review only once :)
+> Fix registration to runtime pw and add missing resume callback.
 
-But it was a really thorough and detailed review!
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/iommu/exynos-iommu.c |   20 ++++++++++++++++++--
+>  1 files changed, 18 insertions(+), 2 deletions(-)
+
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index b8daf7c..eef924d 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+[...]
+> @@ -674,11 +673,28 @@ err_alloc:
+>  	return ret;
+>  }
+>  
+> +static int exynos_pm_resume(struct device *dev)
+> +{
+> +	struct sysmmu_drvdata *data;
+> +
+> +	data = dev_get_drvdata(dev);
+
+    Why not do it right in the initializer?
+
+WBR, Sergei
