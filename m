@@ -1,40 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 11 Apr 2012 14:07:48 +0200
-Subject: [PATCHv8 05/10] ARM: dma-mapping: use
- asm-generic/dma-mapping-common.h
-In-Reply-To: <201204101147.20733.arnd@arndb.de>
-References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
- <1334055852-19500-6-git-send-email-m.szyprowski@samsung.com>
- <201204101147.20733.arnd@arndb.de>
-Message-ID: <012f01cd17db$b5f918d0$21eb4a70$%szyprowski@samsung.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 11 Apr 2012 12:09:22 +0000
+Subject: [PATCHv7 14/18] I2C: OMAP: Use SET_RUNTIME_PM_OPS
+In-Reply-To: <20120411113537.GG12064@arwen.pp.htv.fi>
+References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
+ <1334142776-10583-15-git-send-email-shubhrajyoti@ti.com>
+ <20120411113537.GG12064@arwen.pp.htv.fi>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C331829571@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Bablpi,
 
-On Tuesday, April 10, 2012 1:47 PM Arnd Bergmann wrote:
-
-> On Tuesday 10 April 2012, Marek Szyprowski wrote:
-> > This patch modifies dma-mapping implementation on ARM architecture to
-> > use common dma_map_ops structure and asm-generic/dma-mapping-common.h
-> > helpers.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Wed, Apr 11, 2012 at 17:05:38, Balbi, Felipe wrote:
+> On Wed, Apr 11, 2012 at 04:42:52PM +0530, Shubhrajyoti D wrote:
+> > Use SET_RUNTIME_PM_OPS macro to set runtime functions.
+> > 
+> > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 > > ---
-> >  arch/arm/Kconfig                   |    1 +
-> >  arch/arm/include/asm/device.h      |    1 +
-> >  arch/arm/include/asm/dma-mapping.h |  196 +++++-------------------------------
-> >  arch/arm/mm/dma-mapping.c          |  148 ++++++++++++++++-----------
-> >  4 files changed, 115 insertions(+), 231 deletions(-)
+> >  drivers/i2c/busses/i2c-omap.c |   11 ++++-------
+> >  1 files changed, 4 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> > index dd65416..28de1d2 100644
+> > --- a/drivers/i2c/busses/i2c-omap.c
+> > +++ b/drivers/i2c/busses/i2c-omap.c
+> > @@ -1217,15 +1217,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
+> >  
+> >  	return 0;
+> >  }
+> > +#endif
+> >  
+> >  static struct dev_pm_ops omap_i2c_pm_ops = {
+> > -	.runtime_suspend = omap_i2c_runtime_suspend,
+> > -	.runtime_resume = omap_i2c_runtime_resume,
+> > +	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+> > +			   omap_i2c_runtime_resume, NULL)
+> >  };
+> > -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+> > -#else
+> > -#define OMAP_I2C_PM_OPS NULL
+> > -#endif
 > 
-> Looks good in principle. One question: Now that many of the functions are only
-> used in the dma_map_ops, can you make them 'static' instead?
+> I think you should keep this define, otherwise the pm pointer will
+> always be valid.
 
-Some of these non static functions (mainly arm_dma_*_sg_* family) are also used by dma bounce
-code introduced in the next patch, that's why I left them without static attribute.
+No. using SET_RUNTIME_PM_OPS will make it NULL when !CONFIG_PM_RUNTIME
+Kindly correct me if I am wrong.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> 
+> -- 
+> balbi
+> 
+
+
+Regards, 
+Gururaja
