@@ -1,307 +1,193 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 11 Apr 2012 18:01:18 +0200
-Subject: [PATCH 8/9] ARM: at91: add at91sam9263 DT support
+Date: Wed, 11 Apr 2012 18:01:19 +0200
+Subject: [PATCH 9/9] ARM: at91: add at91sam9263ek DT support
 In-Reply-To: <20120411153515.GK16641@game.jcrosoft.org>
 References: <20120411153515.GK16641@game.jcrosoft.org>
-Message-ID: <1334160079-30831-8-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1334160079-30831-9-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/boot/dts/at91sam9263.dtsi       |  221 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/at91sam9263.c         |   10 ++
- arch/arm/mach-at91/at91sam9263_devices.c |   20 +++
- 3 files changed, 251 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9263.dtsi
+ arch/arm/boot/dts/at91sam9263ek.dts |  156 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/Makefile.boot    |    2 +
+ 2 files changed, 158 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9263ek.dts
 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
 new file mode 100644
-index 0000000..baecf52
+index 0000000..f86ac4b
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -0,0 +1,221 @@
++++ b/arch/arm/boot/dts/at91sam9263ek.dts
+@@ -0,0 +1,156 @@
 +/*
-+ * at91sam9263.dtsi - Device Tree Include file for AT91SAM9263 family SoC
++ * at91sam9263ek.dts - Device Tree file for Atmel at91sam9263 reference board
 + *
 + *  Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 + *
-+ * Licensed under GPLv2 only.
++ * Licensed under GPLv2 only
 + */
-+
-+/include/ "skeleton.dtsi"
++/dts-v1/;
++/include/ "at91sam9263.dtsi"
 +
 +/ {
-+	model = "Atmel AT91SAM9263 family SoC";
-+	compatible = "atmel,at91sam9263";
-+	interrupt-parent = <&aic>;
++	model = "Atmel at91sam9263ek";
++	compatible = "atmel,at91sam9263ek", "atmel,at91sam9263", "atmel,at91sam9";
 +
-+	aliases {
-+		serial0 = &dbgu;
-+		serial1 = &usart0;
-+		serial2 = &usart1;
-+		serial3 = &usart2;
-+		gpio0 = &pioA;
-+		gpio1 = &pioB;
-+		gpio2 = &pioC;
-+		gpio3 = &pioD;
-+		gpio4 = &pioE;
-+		tcb0 = &tcb0;
-+	};
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,arm926ejs";
-+		};
++	chosen {
++		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock5 rw rootfstype=ubifs";
 +	};
 +
 +	memory {
-+		reg = <0x20000000 0x08000000>;
++		reg = <0x20000000 0x4000000>;
 +	};
 +
-+	ahb {
-+		compatible = "simple-bus";
++	clocks {
 +		#address-cells = <1>;
 +		#size-cells = <1>;
 +		ranges;
 +
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <16367660>;
++		};
++	};
++
++	ahb {
 +		apb {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			aic: interrupt-controller at fffff000 {
-+				#interrupt-cells = <2>;
-+				compatible = "atmel,at91rm9200-aic";
-+				interrupt-controller;
-+				interrupt-parent;
-+				reg = <0xfffff000 0x200>;
-+			};
-+
-+			pmc: pmc at fffffc00 {
-+				compatible = "atmel,at91rm9200-pmc";
-+				reg = <0xfffffc00 0x100>;
-+			};
-+
-+			ramc: ramc at ffffe200 {
-+				compatible = "atmel,at91sam9260-sdramc";
-+				reg = <0xffffe200 0x200
-+				       0xffffe800 0x200>;
-+			};
-+
-+			pit: timer at fffffd30 {
-+				compatible = "atmel,at91sam9260-pit";
-+				reg = <0xfffffd30 0xf>;
-+				interrupts = <1 4>;
-+			};
-+
-+			tcb0: timer at fff7c000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfff7c000 0x100>;
-+				interrupts = <19 4>;
-+			};
-+
-+			rstc at fffffd00 {
-+				compatible = "atmel,at91sam9260-rstc";
-+				reg = <0xfffffd00 0x10>;
-+			};
-+
-+			shdwc at fffffd10 {
-+				compatible = "atmel,at91sam9260-shdwc";
-+				reg = <0xfffffd10 0x10>;
-+			};
-+
-+			pioA: gpio at fffff200 {
-+				compatible = "atmel,at91rm9200-gpio";
-+				reg = <0xfffff200 0x100>;
-+				interrupts = <2 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			pioB: gpio at fffff400 {
-+				compatible = "atmel,at91rm9200-gpio";
-+				reg = <0xfffff400 0x100>;
-+				interrupts = <3 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			pioC: gpio at fffff600 {
-+				compatible = "atmel,at91rm9200-gpio";
-+				reg = <0xfffff600 0x100>;
-+				interrupts = <4 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			pioD: gpio at fffff800 {
-+				compatible = "atmel,at91rm9200-gpio";
-+				reg = <0xfffff800 0x100>;
-+				interrupts = <4 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			pioE: gpio at fffffa00 {
-+				compatible = "atmel,at91rm9200-gpio";
-+				reg = <0xfffffa00 0x100>;
-+				interrupts = <4 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
 +			dbgu: serial at ffffee00 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xffffee00 0x200>;
-+				interrupts = <1 4>;
-+				status = "disabled";
++				status = "okay";
 +			};
 +
 +			usart0: serial at fff8c000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfff8c000 0x200>;
-+				interrupts = <7 4>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "disabled";
-+			};
-+
-+			usart1: serial at fff90000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfff90000 0x200>;
-+				interrupts = <8 4>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "disabled";
-+			};
-+
-+			usart2: serial at fff94000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfff94000 0x200>;
-+				interrupts = <9 4>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "disabled";
++				status = "okay";
 +			};
 +
 +			macb0: ethernet at fffbc000 {
-+				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-+				reg = <0xfffbc000 0x100>;
-+				interrupts = <21 4>;
-+				status = "disabled";
++				phy-mode = "rmii";
++				status = "okay";
 +			};
 +
 +			usb1: gadget at fff78000 {
-+				compatible = "atmel,at91rm9200-udc";
-+				reg = <0xfff78000 0x4000>;
-+				interrupts = <24 4>;
-+				status = "disabled";
++				atmel,vbus-gpio = <&pioA 25 0>;
++				status = "okay";
 +			};
 +		};
 +
 +		nand0: nand at 40000000 {
-+			compatible = "atmel,at91rm9200-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x40000000 0x10000000
-+			       0xffffe000 0x200
-+			      >;
-+			atmel,nand-addr-offset = <21>;
-+			atmel,nand-cmd-offset = <22>;
-+			gpios = <&pioA 22 0
-+				 &pioD 15 0
-+				 0
-+				>;
-+			status = "disabled";
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt = <1>;
++			status = "okay";
++
++			at91bootstrap at 0 {
++				label = "at91bootstrap";
++				reg = <0x0 0x20000>;
++			};
++
++			barebox at 20000 {
++				label = "barebox";
++				reg = <0x20000 0x40000>;
++			};
++
++			bareboxenv at 60000 {
++				label = "bareboxenv";
++				reg = <0x60000 0x20000>;
++			};
++
++			bareboxenv2 at 80000 {
++				label = "bareboxenv2";
++				reg = <0x80000 0x20000>;
++			};
++
++			oftree at 80000 {
++				label = "oftree";
++				reg = <0xa0000 0x20000>;
++			};
++
++			kernel at a0000 {
++				label = "kernel";
++				reg = <0xc0000 0x400000>;
++			};
++
++			rootfs at 4a0000 {
++				label = "rootfs";
++				reg = <0x4c0000 0x7800000>;
++			};
++
++			data at 7ca0000 {
++				label = "data";
++				reg = <0x7cc0000 0x8340000>;
++			};
 +		};
 +
 +		usb0: ohci at 00a00000 {
-+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
-+			reg = <0x00a00000 0x100000>;
-+			interrupts = <29 4>;
-+			status = "disabled";
++			num-ports = <2>;
++			status = "okay";
++			atmel,vbus-gpio = <&pioA 24 0
++					   &pioA 21 0
++					  >;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		d3 {
++			label = "d3";
++			gpios = <&pioB 7 0>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		d2 {
++			label = "d2";
++			gpios = <&pioC 29 1>;
++			linux,default-trigger = "nand-disk";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		left_click {
++			label = "left_click";
++			gpios = <&pioC 5 1>;
++			linux,code = <272>;
++			gpio-key,wakeup;
++		};
++
++		right_click {
++			label = "right_click";
++			gpios = <&pioC 4 1>;
++			linux,code = <273>;
++			gpio-key,wakeup;
 +		};
 +	};
 +
 +	i2c at 0 {
-+		compatible = "i2c-gpio";
-+		gpios = <&pioB 4 0 /* sda */
-+			 &pioB 5 0 /* scl */
-+			>;
-+		i2c-gpio,sda-open-drain;
-+		i2c-gpio,scl-open-drain;
-+		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
++		status = "okay";
++
++		24c512 at 50 {
++			compatible = "24c512";
++			reg = <0x50>;
++			pagesize = <128>;
++		};
 +	};
 +};
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 7fae365..ed91c7e 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -199,6 +199,16 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioC", &pioCDE_clk),
- 	CLKDEV_CON_ID("pioD", &pioCDE_clk),
- 	CLKDEV_CON_ID("pioE", &pioCDE_clk),
-+	/* more usart lookup table for DT entries */
-+	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
-+	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
-+	CLKDEV_CON_DEV_ID("usart", "fff90000.serial", &usart1_clk),
-+	CLKDEV_CON_DEV_ID("usart", "fff94000.serial", &usart2_clk),
-+	/* more tc lookup table for DT entries */
-+	CLKDEV_CON_DEV_ID("t0_clk", "fff7c000.timer", &tcb_clk),
-+	CLKDEV_CON_DEV_ID("hclk", "a00000.ohci", &ohci_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index dfe5bc0..175e000 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -953,8 +953,25 @@ static struct platform_device at91sam9263_tcb_device = {
- 	.num_resources	= ARRAY_SIZE(tcb_resources),
- };
- 
-+#if defined(CONFIG_OF)
-+static struct of_device_id tcb_ids[] = {
-+	{ .compatible = "atmel,at91rm9200-tcb" },
-+	{ /*sentinel*/ }
-+};
-+#endif
-+
- static void __init at91_add_device_tc(void)
- {
-+#if defined(CONFIG_OF)
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, tcb_ids);
-+	if (np) {
-+		of_node_put(np);
-+		return;
-+	}
-+#endif
-+
- 	platform_device_register(&at91sam9263_tcb_device);
- }
- #else
-@@ -1483,6 +1500,9 @@ void __init at91_add_device_serial(void) {}
-  */
- static int __init at91_add_standard_devices(void)
- {
-+	if (of_have_populated_dt())
-+		return 0;
-+
- 	at91_add_device_rtt();
- 	at91_add_device_watchdog();
- 	at91_add_device_tc();
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index b2ac536..0c6e0e9 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -17,6 +17,8 @@ endif
+ # sam9260
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9260.dtb
++# sam9263
++dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9263ek.dtb
+ # sam9g20
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g20ek.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g20ek_2mmc.dtb
 -- 
 1.7.9.1
