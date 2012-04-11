@@ -1,41 +1,32 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 11 Apr 2012 18:15:25 -0500
-Subject: [PATCH] Fix build breakage in ep93xx-core
-In-Reply-To: <4F860FBB.4050102@gmail.com>
-References: <4F860FBB.4050102@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F00206986C070F@AUSP01VMBX24.collaborationhost.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 11 Apr 2012 20:24:39 -0300
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Add support for
+ CONFIG_REGULATOR_FIXED_VOLTAGE
+Message-ID: <1334186679-22925-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 11, 2012 4:12 PM, Ryan Mallon wrote:
-> Commit ede55aaa8bb2dd37e302b2f94312306d216e5f97 "arm: ep93xx: use
-> DEFINE_RES_* macros" introduced a build breakage in ep93xx due to a
-> typo. Fix it.
->
-> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Add support for CONFIG_REGULATOR_FIXED_VOLTAGE.
 
-Doh! It's correct in my tree but somehow I fubared it when I created the
-patch.  Sorry for the trouble.
+Without this option the mx27_3ds cannot have the external Ethernet functional
+due to the need of smsc regulators.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-> ---
->
-> I should have caught this when I applied it to my tree, but its now
-> already got a patch sitting on top of it. I'll be doing test builds for
-> each applied patch in future :-).
->
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 8771076..66b1494 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -357,7 +357,7 @@ static struct ep93xx_eth_data ep93xx_eth_data;
->  
->  static struct resource ep93xx_eth_resource[] = {
->  	DEFINE_RES_MEM(EP93XX_ETHERNET_PHYS_BASE, 0x10000),
-> -	DEFINE_REQ_IRQ(IRQ_EP93XX_ETHERNET),
-> +	DEFINE_RES_IRQ(IRQ_EP93XX_ETHERNET),
->  };
->  
->  static u64 ep93xx_eth_dma_mask = DMA_BIT_MASK(32);
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index b5ac644..6b31cb6 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -112,6 +112,7 @@ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_MC13XXX=y
+ CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+ CONFIG_FB=y
+-- 
+1.7.1
