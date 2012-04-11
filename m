@@ -1,28 +1,29 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 11 Apr 2012 13:29:56 +0530
-Subject: [PATCH 2/2] dma/amba-pl08x: add support for the Nomadik variant
-In-Reply-To: <CACRpkdaz9g7cRc1rAMHUzRbLcrYtB-kPCB6bFEMYZxxmWfLNSg@mail.gmail.com>
-References: <1334004816-20219-1-git-send-email-linus.walleij@linaro.org>
- <4F83AC55.3070900@st.com>
- <CACRpkdaz9g7cRc1rAMHUzRbLcrYtB-kPCB6bFEMYZxxmWfLNSg@mail.gmail.com>
-Message-ID: <4F8539FC.4030503@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Apr 2012 10:16:42 +0200
+Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
+In-Reply-To: <4F793C56.2030605@st.com>
+References: <4F793C56.2030605@st.com>
+Message-ID: <CACRpkdbztwt_ztxy6__iuhH+5O+sy83xtpbROOr-0RZgkFwHPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2012 1:29 PM, Linus Walleij wrote:
->>> >> +                             ch->locked = true;
->>> >> +                     } else
->>> >> +                             ch->locked = false;
->>> >> +             }
->>> >> +
->> >
->> > Memory for ch is allocated with kmalloc and so its default value is garbage.
->> > So we must set locked to false in else part here.
-> Hm maybe better to kzalloc() the channel structs?
-> 
+On Mon, Apr 2, 2012 at 7:42 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-Then, you can remove code which makes its field zero explicitly, as it is already
-zero.
+> The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+>
+> ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.stlinux.com/spear/linux-2.6.git spear-dt
+>
+> for you to fetch changes up to 8f21ec99c7b78c3f0baf6bbf2e438da68da3dc08:
 
--- 
-viresh
+> Viresh Kumar (8):
+> ? ? ?SPI/Pl022: Include types.h to remove compilation warnings
+
+This patch should go through Grant's SPI tree I think? Especially
+since it is eligible for -rc:s...
+
+Yours,
+Linus Walleij
