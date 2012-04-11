@@ -1,50 +1,44 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 11 Apr 2012 12:05:37 -0700
-Subject: [PATCH 02/12] arm: omap3: Only sleep during cpu_idle if I/O wake-ups
- work
-In-Reply-To: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1334171147-7517-3-git-send-email-mgreer@animalcreek.com>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Wed, 11 Apr 2012 21:47:51 +0200
+Subject: [PATCH 5/5] MAINTAINERS: remove non-responding web link for
+ atmel_usba driver
+In-Reply-To: <05cc973152bedd39bf37fa1222960c2a2c438500.1334137680.git.nicolas.ferre@atmel.com>
+References: <cover.1334137680.git.nicolas.ferre@atmel.com>
+ <05cc973152bedd39bf37fa1222960c2a2c438500.1334137680.git.nicolas.ferre@atmel.com>
+Message-ID: <20120411194751.GA7055@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+Around Wed 11 Apr 2012 13:54:46 +0200 or thereabout, Nicolas Ferre wrote:
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
+> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+> ---
+>  MAINTAINERS |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index be04d43..cde4008 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1379,7 +1379,6 @@ F:	drivers/input/touchscreen/atmel_tsadcc.c
+>  ATMEL USBA UDC DRIVER
+>  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -W:	http://avr32linux.org/twiki/bin/view/Main/AtmelUsbDeviceDriver
+>  S:	Supported
+>  F:	drivers/usb/gadget/atmel_usba_udc.*
 
-Currently in the OMAP3 code, cpu_idle() calls pm_idle(),
-which is a function pointer set to omap3_pm_idle()).
-omap3_pm_idle() calls omap_sram_idle() which eventually
-causes a 'wfi' instruction to be executed effectively
-putting the system to sleep.  It is assumed that an
-I/O wake-up event will occur to wake the system up again.
-This doesn't work on systems that don't support I/O wake-ups
-(indicated by omap3_has_io_wakeup() returning false).
+FWIW, I'm mirroring the old contents of avr32linux.org, it will eventually
+reappear on mirror.egtvedt.no/avr32linux.org, for the URL above it'll be
+http://mirror.egtvedt.no/avr32linux.org/twiki/bin/view/Main/AtmelUsbDeviceDriver
 
-Leaving pm_idle() pointing to default_idle() won't work
-either because the cpu_<processor>_do_idle() routine which
-is eventually called may also execute a 'wfi' instruction
-(e.g., cpu_v7_do_idle()).
+I'll get graphics and attached files do download when I have completed the
+initial mirroring.
 
-To handle this, leave pm_idle() pointing to omap3_pm_idle()
-but add a check in omap3_pm_idle() so it avoids calling
-omap_sram_idle() when I/O wake-ups aren't supported.
+With regards to this specific driver, I am unsure how much information the
+wiki really gives, it is probably out of sync as well now...
 
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
----
- arch/arm/mach-omap2/pm34xx.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index ec92676..b7bbcee 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -397,7 +397,7 @@ static void omap3_pm_idle(void)
- {
- 	local_fiq_disable();
- 
--	if (omap_irq_pending())
-+	if (omap_irq_pending() || !omap3_has_io_wakeup())
- 		goto out;
- 
- 	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
 -- 
-1.7.9.4
+mvh
+Hans-Christian Egtvedt
