@@ -1,50 +1,58 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 11 Apr 2012 15:00:14 -0700
-Subject: [PATCH 12/12] arm: omap3: am35x: Register davinci_mdio before
- davinci_emac
-In-Reply-To: <alpine.DEB.2.00.1204111520260.29473@utopia.booyaka.com>
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-13-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1204111520260.29473@utopia.booyaka.com>
-Message-ID: <20120411220014.GB31197@animalcreek.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 12 Apr 2012 08:03:34 +1000
+Subject: [PATCH v2] arm: ep93xx: use gpio_led_register_device
+In-Reply-To: <201204111429.20038.hartleys@visionengravers.com>
+References: <201204111429.20038.hartleys@visionengravers.com>
+Message-ID: <4F85FFB6.8050406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 03:24:05PM -0600, Paul Walmsley wrote:
-> cc Ilya
-> 
-> On Wed, 11 Apr 2012, Mark A. Greer wrote:
-> 
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> > 
-> > Problem:
-> > --------
-> > When resuming from a Suspend-to-RAM event, the eth0 device
-> > (davinci emac/mdio) on am35xx boards wouldn't work and the
-> > following error message appeared on the console:
-> > 
-> > "net eth0: could not connect to phy davinci_mdio-0:00"
-> 
-> ...
-> 
-> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> > ---
-> >  arch/arm/mach-omap2/am35xx-emac.c |   11 ++++++-----
-> >  1 file changed, 6 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
-> > index 1f97e74..d23bd6c 100644
-> > --- a/arch/arm/mach-omap2/am35xx-emac.c
-> > +++ b/arch/arm/mach-omap2/am35xx-emac.c
-> 
-> This is a little off-topic from this patch, but we should get rid of this 
-> arch/arm/mach-omap2/am35xx-emac.c file.  These on-chip devices should be 
-> registered via the hwmod code.  Looking at 
-> arch/arm/mach-omap2/omap_hwmod_3xxx_data.c, I don't see any trace of the 
-> EMAC or MDIO in there.  That's where all of these IPSS IP blocks should be 
-> declared...
+On 12/04/12 07:29, H Hartley Sweeten wrote:
 
-Okay, I'll take a look and see what I can do.
+> Use gpio_led_register_device to register the two leds
+> connected to the ep93xx.
+> 
+> Since this is a common feature for all ep93xx based boards,
+> create a new Kconfig option, ARCH_EP93XX_TYPICAL, to select
+> the LEDS_GPIO_REGISTER feature.
+> 
+> The struct gpio_led and struct gpio_led_platform_data variables
+> have been changed to const struct because of:
+> 
+> commit 9517f925f2eb9ffca78b3f0f9389fc675bcb572c
+>     leds: make *struct gpio_led_platform_data.leds const
+> 
+> They have also been marked as __initconst because the helper
+> function gpio_led_register_device makes a deep copy of the
+> platform data to allow it to live in init memory:
+> 
+> commit 4440673a95e63ad888a41db596edaa0c55d3a332
+>     leds: provide helper to register "leds-gpio" devices
+> 
+> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> 
+> ---
+> 
+> diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+> index 97a2493..19d8148 100644
+> --- a/arch/arm/mach-ep93xx/Kconfig
+> +++ b/arch/arm/mach-ep93xx/Kconfig
+> @@ -2,6 +2,11 @@ if ARCH_EP93XX
+>  
+>  menu "Cirrus EP93xx Implementation Options"
+>  
+> +config ARCH_EP93XX_TYPICAL
 
-Mark
---
+
+One minor change. Please use a different name for this. Since all
+of the boards use this and it cannot be unselected, its a bit
+misleading to call it typical. EP93XX_SOC or EP93XX_COMMON would
+be a bit better.
+
+~Ryan
+
+> +	bool
+> +	default y
+> +	select LEDS_GPIO_REGISTER
+> +
