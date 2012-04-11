@@ -1,48 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Apr 2012 09:59:25 +0200
-Subject: [PATCH 2/2] dma/amba-pl08x: add support for the Nomadik variant
-In-Reply-To: <4F83AC55.3070900@st.com>
-References: <1334004816-20219-1-git-send-email-linus.walleij@linaro.org>
- <4F83AC55.3070900@st.com>
-Message-ID: <CACRpkdaz9g7cRc1rAMHUzRbLcrYtB-kPCB6bFEMYZxxmWfLNSg@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 11 Apr 2012 13:17:11 +0530
+Subject: [PATCH] clk: Don't set clk->new_rate twice
+Message-ID: <b1645e8d85b8857b4b153f1a3d7e9929f0ad4a74.1334130399.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 5:43 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 4/10/2012 2:23 AM, Linus Walleij wrote:
+if (!clk->ops->round_rate && (clk->flags & CLK_SET_RATE_PARENT)) is true, then
+we don't need to set clk->new_rate here, as we will call clk_calc_subtree()
+afterwards and it also sets clk->new_rate.
 
->> + ? ? ? ? ? ? ? ? ? ? val = readl(ch->base + PL080_CH_CONFIG);
->> + ? ? ? ? ? ? ? ? ? ? if (val & (PL080N_CONFIG_ITPROT | PL080N_CONFIG_SECPROT)) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_info(&adev->dev, "physical channel %d reserved "
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"for secure access only\n", i);
->
-> Better not to break the print string. Go beyond 80 columns.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/clk/clk.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-OK
-
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ch->locked = true;
->> + ? ? ? ? ? ? ? ? ? ? } else
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ch->locked = false;
->> + ? ? ? ? ? ? }
->> +
->
-> Memory for ch is allocated with kmalloc and so its default value is garbage.
-> So we must set locked to false in else part here.
-
-Hm maybe better to kzalloc() the channel structs?
-
->> @@ -2036,9 +2069,9 @@ static struct amba_id pl08x_ids[] = {
->> ? ? ? },
->> ? ? ? /* Nomadik 8815 PL080 variant */
->> ? ? ? {
->> - ? ? ? ? ? ? .id ? ? = 0x00280880,
->> + ? ? ? ? ? ? .id ? ? = 0x00280080,
->
-> Has this changed? How it worked earlier?
-
-Never worked until now. It was based on incorrect data sheets...
-
-I'll send a V2 ASAP.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 56e32a1..9d11c19 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -775,7 +775,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ 
+ 	if (!clk->ops->round_rate && (clk->flags & CLK_SET_RATE_PARENT)) {
+ 		top = clk_calc_new_rates(clk->parent, rate);
+-		new_rate = clk->new_rate = clk->parent->new_rate;
++		new_rate = clk->parent->new_rate;
+ 
+ 		goto out;
+ 	}
+-- 
+1.7.9
