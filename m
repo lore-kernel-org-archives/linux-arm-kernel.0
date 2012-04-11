@@ -1,50 +1,61 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 11 Apr 2012 09:11:50 +0800
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120410161142.GG3852@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
- <20120410143055.GT24211@n2100.arm.linux.org.uk>
- <20120410161142.GG3852@pengutronix.de>
-Message-ID: <20120411011149.GA20818@b20223-02.ap.freescale.net>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 11 Apr 2012 11:13:54 +1000
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
+In-Reply-To: <m2aa2n7mmw.fsf@igel.home>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+ <20120402215524.GM24211@n2100.arm.linux.org.uk>
+ <1333406005.30734.61.camel@pasglop>
+ <20120402225223.GN24211@n2100.arm.linux.org.uk>
+ <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
+ <1333755470.3040.38.camel@pasglop> <m2aa2n7mmw.fsf@igel.home>
+Message-ID: <1334106834.2984.17.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 06:11:42PM +0200, Sascha Hauer wrote:
-> On Tue, Apr 10, 2012 at 03:30:55PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Apr 10, 2012 at 03:45:14PM +0200, Sascha Hauer wrote:
-> > > With the generic clock framework we do not necessarily have
-> > > a pointer to the struct clk we want to register a lookup
-> > > for, so add a const char *clkname field to struct clk_lookup
-> > > so that a lookup can be registered with a clock name.
-> > 
-> > All this silly names all over the place is getting to be utterly
-> > rediculous. Why do we need to name clocks and look them up by name
-> > when we have a perfectly good way (clkdev) to do this already?  Yes,
-> > it takes a struct clk pointer but that's exactly because that's what
-> > it has to return.
-> > 
-> > Why do we want to have another idiotic string to look up a clock which
-> > is named using an idiotic scheme to find out its pointer to only then
-> > register that with clkdev?
-> > 
-> > I think this clk stuff has gone totally insane wrt names recently.
+On Sat, 2012-04-07 at 14:27 +0200, Andreas Schwab wrote:
+> Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
 > 
-> clk names and clk lookups are two different things. The former is a
-> unique identifier for a clock whereas the latter associates a clock
-> to a device. Multiple lookups can point to the same clock, so they can't
-> be used to identify a particular clock. I know I'm not telling anything
-> new to you here, so I think your question goes down to why we need a
-> unique identifier string for clocks.
+> > It's arguable that this irq_set_irq_type(,NONE) shouln't be there but
+> > still ... it's been around for ever and things worked :-) So something
+> > -else- is causing the problem and I'd like to understand what exactly.
 > 
-> For me the big advantage for clocks having unique names is that I do not
-> have to have a struct clk * to pass the (possible) parents of a clock to
-> the clock framework during registration. Also it makes us independent of
-> the registration order of the clock tree (no need to register the
-> parents before the children). The debugfs representation of the clock
-> tree also makes use of the names.
-I don't like string loopup either. And after DT binding, we can use
-phandler to refer clk.
+> AFAICS before a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5
+> irq_set_irq_type(,NONE) was actually a no-op.
 
-BRs
-Richard
+So I'm still a bit baffled... ie, I understand some of what's happening
+but not why it breaks things, I haven't yet managed to reproduce but I
+haven't tried too hard just yet (was away from the HW) :
+
+Basically, we end up setting the mpic to IRQ_TYPE_LEVEL_LOW as a result
+of a request to set it to IRQ_TYPE_NONE, ie, we apply a "default"
+setting instead of just setting it to "none" (in part because we don't
+have a way in HW to disable the trigger completely. We then write that
+into the irq_desc with irqd_set_trigger_type().
+
+Then we return IRQ_SET_MASK_OK_NOCOPY, which means that the generic
+__irq_set_trigger() code will read back what we've set in the desc and
+adjust things accordingly, rather than writing the original value in,
+ie, our descriptor ends up being effectively set to IRQ_TYPE_LEVEL_LOW
+rather than IRQ_TYPE_NONE.
+
+Later, when we actually try to set it to IRQ_TYPE_LEVEL_LOW as a result
+of parsing the device-tree, we then hit the code
+irq_create_of_mapping(), at the bottom, which will skip the call to
+irq_set_irq_type() if we are trying to set it to the same type that it's
+already set to....
+
+But I don't see why that breaks anything, ie we -have- set things to
+LEVEL_LOW as a result of IRQ_TYPE_NONE, which is the right setting, so
+things should work despite the fact that we skip the second call.
+
+Out of curiosity, can you try removing the check in irqdomain and always
+apply the setting regardless of the previous value (ie, remove the check
+of type against irqd_get_trigger at the end of irq_create_of_mapping),
+see if that makes a difference ?
+
+Cheers,
+Ben.
