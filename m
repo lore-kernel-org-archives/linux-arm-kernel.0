@@ -1,265 +1,109 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 11 Apr 2012 16:36:44 +0200
-Subject: [PATCH] ARM: Exynos4: integrate SYSMMU driver with DMA-mapping
- interface
-In-Reply-To: <1334155004-5700-1-git-send-email-m.szyprowski@samsung.com>
-References: <1334155004-5700-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1334155004-5700-2-git-send-email-m.szyprowski@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 11 Apr 2012 09:47:29 -0500
+Subject: [PULL] generic irq chip and pl061 irqdomain support
+In-Reply-To: <20120407041155.196043E25B3@localhost>
+References: <4F3ADFE7.4090409@gmail.com> <4F5437FE.2000306@gmail.com>
+ <4F5FD037.5000703@gmail.com> <20120313231834.8B6AE3E050F@localhost>
+ <4F79A3B3.9040209@gmail.com> <20120407041155.196043E25B3@localhost>
+Message-ID: <4F859981.1020502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides an provides setup code which assigns IOMMU controllers
-to FIMC and MFC devices and enables IOMMU aware DMA-mapping for them.
-It has been tested on Samsung Exynos4 platform, NURI board.
+On 04/06/2012 11:11 PM, Grant Likely wrote:
+> On Mon, 02 Apr 2012 08:03:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>> Grant,
+>>
+>> On 03/13/2012 06:18 PM, Grant Likely wrote:
+>>> On Tue, 13 Mar 2012 17:54:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>>>> On 03/04/2012 09:50 PM, Rob Herring wrote:
+>>>>> Grant,
+>>>>>
+>>>>> On 02/14/2012 04:27 PM, Rob Herring wrote:
+>>>>>> Grant,
+>>>>>>
+>>>>>> Please pull. This is based on your current branch which you have said
+>>>>>> you plan to rebase, so feel free to rebase these as you need to. This
+>>>>>> has been tested on highbank and i.MX5.
+>>>>>>
+>>>>>
+>>>>> Ping.
+>>>>>
+>>>>> I've rebased onto your current tree. Updated pull request:
+>>>>>
+>>>>> The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
+>>>>>
+>>>>>   mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
+>>>>>
+>>>>> Rob Herring (3):
+>>>>>       ARM: kconfig: always select IRQ_DOMAIN
+>>>>>       irq: add irq_domain support to generic-chip
+>>>>>       gpio: pl061: enable interrupts with DT style binding
+>>>>>
+>>>>>  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
+>>>>>  arch/arm/Kconfig                                   |    2 +-
+>>>>>  arch/arm/common/Kconfig                            |    2 -
+>>>>>  drivers/gpio/gpio-pl061.c                          |   48 ++++---
+>>>>>  include/linux/irq.h                                |   15 ++
+>>>>>  kernel/irq/generic-chip.c                          |  152
+>>>>> +++++++++++++++++---
+>>>>>  6 files changed, 186 insertions(+), 48 deletions(-)
+>>>>>
+>>>>
+>>>> Ping again...
+>>>
+>>> Okay, I've pulled this in.  I need to do some compile testing before I push
+>>> it out.
+>>
+>> What happened to this? It's not in rc1.
+> 
+> I kept looking at it and planning to send Linus a pull request, but I
+> just couldn't make myself comfortable with the state of the patch.  It
+> seems to me that there is too much bleeding of irq_domain state into
+> irq_generic_chip and it doesn't return any meaningful context to the
+> caller that can be used to tear it back down.
+> 
+> I think for the domain+generic_chip use case the API needs refining so
+> that it returns a container structure with both the irq_domain and the
+> array of generic chips.  Plus there needs to be a remove function
+> (there also needs to be an irq_domain remove function; I also realized
+> that was a missing piece when I looked at it).
+> 
+> I had really hoped to get fixup patches sorted out in time to still
+> get Linus to merge it even though it hadn't been through Linux next,
+> but given that I couldn't even find time to email you properly about
+> it, it seems I was doomed.  :-(  There weren't any other users of it
+> in linux-next though, so in the end I just didn't sent the pull req.
 
-Most of the work is done in the s5p_sysmmu_late_init() function, which
-first assigns SYSMMU controller to respective client device and then
-creates IO address space mapping structures. In this example 128 MiB of
-address space is created at 0x20000000 for most of the devices. IO address
-allocation precision is set to 2^4 pages, so all small allocations will be
-aligned to 64 pages. This reduces the size of the io address space bitmap
-to 4 KiB.
+There weren't any users in next because this was not in next for very
+long. iMX had support ready to go. This (or at least some parts) is
+needed to convert any existing users of generic_chip over to domains and
+DT whether we add domain support directly or not.
 
-To solve the clock dependency issues, parent clocks have been added to each
-SYSMMU controller bus clock. This models the true hardware behavior,
-because client's device bus clock also gates the respective sysmmu bus
-clock.
+> I've got a couple of fixup patches on top of your branch that I'll
+> send to you so you can see some of the stuff that I've done.  I'm also
+> not comfortable with adding flags, irq_clr & irq_set into
+> irq_generic_chip, but I can't quite put my finger on why.  :-/  Also,
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/Kconfig               |    1 +
- arch/arm/mach-exynos/clock-exynos4.c       |   64 +++++++++++++++-------------
- arch/arm/mach-exynos/dev-sysmmu.c          |   44 +++++++++++++++++++
- arch/arm/mach-exynos/include/mach/sysmmu.h |    3 +
- drivers/iommu/Kconfig                      |    1 +
- 5 files changed, 84 insertions(+), 29 deletions(-)
+I'm not adding those. The timing of the irq handler setup is different
+with a domain, so I have to store those for later. I think this also
+makes generic_chip incompatible with domains as it now exists.
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 801c738..25b9ba5 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -288,6 +288,7 @@ config MACH_NURI
- 	select S5P_DEV_USB_EHCI
- 	select S5P_SETUP_MIPIPHY
- 	select EXYNOS4_DEV_DMA
-+	select EXYNOS_DEV_SYSMMU
- 	select EXYNOS4_SETUP_FIMC
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index 29ae4df..fe459a3 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -497,29 +497,6 @@ static struct clk *exynos4_gate_clocks[] = {
- 
- static struct clk exynos4_init_clocks_off[] = {
- 	{
--		.name		= "timers",
--		.parent		= &exynos4_clk_aclk_100.clk,
--		.enable		= exynos4_clk_ip_peril_ctrl,
--		.ctrlbit	= (1<<24),
--	}, {
--		.name		= "csis",
--		.devname	= "s5p-mipi-csis.0",
--		.enable		= exynos4_clk_ip_cam_ctrl,
--		.ctrlbit	= (1 << 4),
--		.parent		= &exynos4_clk_gate_cam,
--	}, {
--		.name		= "csis",
--		.devname	= "s5p-mipi-csis.1",
--		.enable		= exynos4_clk_ip_cam_ctrl,
--		.ctrlbit	= (1 << 5),
--		.parent		= &exynos4_clk_gate_cam,
--	}, {
--		.name		= "jpeg",
--		.id		= 0,
--		.enable		= exynos4_clk_ip_cam_ctrl,
--		.ctrlbit	= (1 << 6),
--		.parent		= &exynos4_clk_gate_cam,
--	}, {
- 		.name		= "fimc",
- 		.devname	= "exynos4-fimc.0",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
-@@ -544,6 +521,35 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.ctrlbit	= (1 << 3),
- 		.parent		= &exynos4_clk_gate_cam,
- 	}, {
-+		.name		= "mfc",
-+		.devname	= "s5p-mfc",
-+		.enable		= exynos4_clk_ip_mfc_ctrl,
-+		.ctrlbit	= (1 << 0),
-+		.parent		= &exynos4_clk_gate_mfc,
-+	}, {
-+		.name		= "timers",
-+		.parent		= &exynos4_clk_aclk_100.clk,
-+		.enable		= exynos4_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1<<24),
-+	}, {
-+		.name		= "csis",
-+		.devname	= "s5p-mipi-csis.0",
-+		.enable		= exynos4_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 4),
-+		.parent		= &exynos4_clk_gate_cam,
-+	}, {
-+		.name		= "csis",
-+		.devname	= "s5p-mipi-csis.1",
-+		.enable		= exynos4_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 5),
-+		.parent		= &exynos4_clk_gate_cam,
-+	}, {
-+		.name		= "jpeg",
-+		.id		= 0,
-+		.enable		= exynos4_clk_ip_cam_ctrl,
-+		.ctrlbit	= (1 << 6),
-+		.parent		= &exynos4_clk_gate_cam,
-+	}, {
- 		.name		= "hsmmc",
- 		.devname	= "exynos4-sdhci.0",
- 		.parent		= &exynos4_clk_aclk_133.clk,
-@@ -674,12 +680,6 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.ctrlbit	= (1 << 0),
- 		.parent		= &exynos4_clk_gate_lcd0,
- 	}, {
--		.name		= "mfc",
--		.devname	= "s5p-mfc",
--		.enable		= exynos4_clk_ip_mfc_ctrl,
--		.ctrlbit	= (1 << 0),
--		.parent		= &exynos4_clk_gate_mfc,
--	}, {
- 		.name		= "i2c",
- 		.devname	= "s3c2440-i2c.0",
- 		.parent		= &exynos4_clk_aclk_100.clk,
-@@ -738,11 +738,13 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
- 		.enable		= exynos4_clk_ip_mfc_ctrl,
- 		.ctrlbit	= (1 << 1),
-+		.parent		= &exynos4_init_clocks_off[4],
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
- 		.enable		= exynos4_clk_ip_mfc_ctrl,
- 		.ctrlbit	= (1 << 2),
-+		.parent		= &exynos4_init_clocks_off[4],
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(tv, 2),
-@@ -763,21 +765,25 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.devname	= SYSMMU_CLOCK_DEVNAME(fimc0, 5),
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 7),
-+		.parent		= &exynos4_init_clocks_off[0],
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(fimc1, 6),
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 8),
-+		.parent		= &exynos4_init_clocks_off[1],
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(fimc2, 7),
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 9),
-+		.parent		= &exynos4_init_clocks_off[2],
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(fimc3, 8),
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 10),
-+		.parent		= &exynos4_init_clocks_off[3],
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(fimd0, 10),
-diff --git a/arch/arm/mach-exynos/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
-index 3544638..31f2d6ca 100644
---- a/arch/arm/mach-exynos/dev-sysmmu.c
-+++ b/arch/arm/mach-exynos/dev-sysmmu.c
-@@ -12,12 +12,15 @@
- 
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/slab.h>
- 
- #include <plat/cpu.h>
-+#include <plat/devs.h>
- 
- #include <mach/map.h>
- #include <mach/irqs.h>
- #include <mach/sysmmu.h>
-+#include <asm/dma-iommu.h>
- 
- static u64 exynos_sysmmu_dma_mask = DMA_BIT_MASK(32);
- 
-@@ -276,3 +279,44 @@ static int __init init_sysmmu_platform_device(void)
-  * see pm_domain.c, which use arch_initcall()
-  */
- core_initcall(init_sysmmu_platform_device);
-+#ifdef CONFIG_ARM_DMA_USE_IOMMU
-+int __init s5p_create_iommu_mapping(struct device *client, dma_addr_t base,
-+				    unsigned int size, int order)
-+{
-+	struct dma_iommu_mapping *mapping;
-+	if (!client)
-+		return 0;
-+	mapping = arm_iommu_create_mapping(&platform_bus_type, base, size, order);
-+	if (!mapping)
-+		return -ENOMEM;
-+	client->dma_parms = kzalloc(sizeof(*client->dma_parms), GFP_KERNEL);
-+	dma_set_max_seg_size(client, 0xffffffffu);
-+	arm_iommu_attach_device(client, mapping);
-+	return 0;
-+}
-+
-+/*
-+ * s5p_sysmmu_late_init
-+ * Create DMA-mapping IOMMU context for specified devices. This function must
-+ * be called later, once SYSMMU driver gets registered and probed.
-+ */
-+static int __init s5p_sysmmu_late_init(void)
-+{
-+	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc0).dev, &s5p_device_fimc0.dev);
-+	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc1).dev, &s5p_device_fimc1.dev);
-+	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc2).dev, &s5p_device_fimc2.dev);
-+	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc3).dev, &s5p_device_fimc3.dev);
-+	platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_l).dev, &s5p_device_mfc_l.dev);
-+	platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_r).dev, &s5p_device_mfc_r.dev);
-+
-+	s5p_create_iommu_mapping(&s5p_device_fimc0.dev, 0x20000000, SZ_128M, 4);
-+	s5p_create_iommu_mapping(&s5p_device_fimc1.dev, 0x20000000, SZ_128M, 4);
-+	s5p_create_iommu_mapping(&s5p_device_fimc2.dev, 0x20000000, SZ_128M, 4);
-+	s5p_create_iommu_mapping(&s5p_device_fimc3.dev, 0x20000000, SZ_128M, 4);
-+	s5p_create_iommu_mapping(&s5p_device_mfc_l.dev, 0x20000000, SZ_128M, 4);
-+	s5p_create_iommu_mapping(&s5p_device_mfc_r.dev, 0x40000000, SZ_128M, 4);
-+
-+	return 0;
-+}
-+device_initcall(s5p_sysmmu_late_init);
-+#endif
-diff --git a/arch/arm/mach-exynos/include/mach/sysmmu.h b/arch/arm/mach-exynos/include/mach/sysmmu.h
-index 998daf2..07cae3a 100644
---- a/arch/arm/mach-exynos/include/mach/sysmmu.h
-+++ b/arch/arm/mach-exynos/include/mach/sysmmu.h
-@@ -57,6 +57,9 @@ static inline void platform_set_sysmmu(
- }
- #endif
- 
-+int __init s5p_create_iommu_mapping(struct device *client, dma_addr_t base,
-+				    unsigned int size, int order);
-+
- #else /* !CONFIG_EXYNOS_DEV_SYSMMU */
- #define platform_set_sysmmu(dev, sysmmu) do { } while (0)
- #endif
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 3b745bb..223e31e 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -166,6 +166,7 @@ config EXYNOS_IOMMU
- 	bool "Exynos IOMMU Support"
- 	depends on EXYNOS_DEV_SYSMMU
- 	select IOMMU_API
-+	select ARM_DMA_USE_IOMMU
- 	help
- 	  Support for the IOMMU(System MMU) of Samsung Exynos application
- 	  processor family. This enables H/W multimedia accellerators to see
--- 
-1.7.1.569.g6f426
+> the api for irq_setup_generic_chip_domain() is enormous.  If a context
+> structure is used, then it would probably be better to populate it
+> with the configuration so that the API isn't nearly so large.
+
+This is largely an artifact of the existing generic_chip api which has
+a large number of parameters, but they are spread across 2 functions.
+
+There's a couple of simple things I could do:
+- drop name and use node->name instead. If node is null then the
+irq_chip will have no name, but this appears to be optional.
+- make the callback fill in irq_base, reg_base, flags, irq_clr, irq_set
+and private
+- make the common case an inline wrapper. All but 1 user sets num_ct to
+1 for example.
+
+Rob
