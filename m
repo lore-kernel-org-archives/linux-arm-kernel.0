@@ -1,65 +1,40 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 11 Apr 2012 10:39:56 +0200
-Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
- from dt
-In-Reply-To: <CAB-zwWjSSsR0XMrntkEmHDtgJ_zDxgJh6KX=TsSKggd9mCgsVQ@mail.gmail.com>
-References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
- <1323863746-18145-5-git-send-email-rnayak@ti.com>
- <CAB-zwWjSSsR0XMrntkEmHDtgJ_zDxgJh6KX=TsSKggd9mCgsVQ@mail.gmail.com>
-Message-ID: <4F85435C.1060305@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 11 Apr 2012 14:13:21 +0530
+Subject: [PATCH] ARM: OMAP2+: remove redundant sysconfig context restore
+In-Reply-To: <1334133256-20475-1-git-send-email-tarun.kanti@ti.com>
+References: <1334133256-20475-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <CAMQu2gw0feL22aVi-ZDffBzest0+sdMnL2Hwa6GwwVKiKF118Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+CC'ing LAKML
 
-On 4/11/2012 2:16 AM, Ramirez Luna, Omar wrote:
-> Hi,
+On Wed, Apr 11, 2012 at 2:04 PM, Tarun Kanti DebBarma
+<tarun.kanti@ti.com> wrote:
+> Since hwmod framework now manages sysconfig context save/restore
+> there is no more need to touch this register in driver. Hence,
+> remove restore of sysconfig register in omap_timer_restore_context.
+> This was causing incorrect context restore of sysconfig register.
 >
-> On Wed, Dec 14, 2011 at 5:55 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
->> Pass minimal data needed for console boot, from dt, for
->> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
->> static initialization from generic board file.
-> ...
->> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
->> index 63b5416..a508ed5 100644
->> --- a/arch/arm/mach-omap2/board-generic.c
->> +++ b/arch/arm/mach-omap2/board-generic.c
->> @@ -69,7 +69,6 @@ static void __init omap_generic_init(void)
->>         if (node)
->>                 irq_domain_add_simple(node, 0);
->>
->> -       omap_serial_init();
->>         omap_sdrc_init(NULL, NULL);
->>
->>         of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
->> --
->> 1.7.1
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> ---
+> ?arch/arm/plat-omap/dmtimer.c | ? ?2 --
+> ?1 files changed, 0 insertions(+), 2 deletions(-)
 >
-> I'm fairly new to DT and I'm trying to boot it with pandaboard and
-> k3.3, however above hunk deletes omap serial initialization, which
-> causes a panic on boot, because pdata is NULL:
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index 652139c..15e7882 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -82,8 +82,6 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
 >
-> static void serial_omap_start_tx(struct uart_port *port)
-> {
-> ...
->                  if (pdata->set_noidle)
+> ?static void omap_timer_restore_context(struct omap_dm_timer *timer)
+> ?{
+> - ? ? ? __raw_writel(timer->context.tiocp_cfg,
+> - ? ? ? ? ? ? ? ? ? ? ? timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
+> ? ? ? ?if (timer->revision == 1)
+> ? ? ? ? ? ? ? ?__raw_writel(timer->context.tistat, timer->sys_stat);
 >
-> Perhaps because this change skips the following path:
->
-> omap_serial_init->omap_serial_board_init->omap_serial_init_port
->
-> Where pdata is built in omap_device_build.
->
-> I'm just trying to confirm that I'm not alone or doing some silly
-> thing before getting in depth with the code.
 
-Yes, it is a known issue and the fix was unfortunately was not merged 
-during -rc phases but is fixed in 3.4 and should be fixed in 3.3 stable 
-branch as well. I received the notification from Greg KH 2 weeks ago 
-about the stable: Patch "tty: serial: OMAP: Fix oops due to NULL pdata 
-in DT boot" has been added to the 3.3-stable tree
+Looks good to me.
 
-You should just switch to 3.4-rc2 or get the patch if you are stuck to 3.3.
-
-Regards,
-Benoit
+Acked-by: Santosh Shilimkar <santosh.shilimka@ti.com>
