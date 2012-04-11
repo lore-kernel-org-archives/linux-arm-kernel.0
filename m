@@ -1,82 +1,38 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:42:38 +0530
-Subject: [PATCHv7 00/18] I2C updates
-Message-ID: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 11 Apr 2012 14:32:54 +0300
+Subject: [PATCHv7 01/18] I2C: OMAP: make omap_i2c_unidle/idle functions
+ depend on CONFIG_PM_RUNTIME
+In-Reply-To: <1334142776-10583-2-git-send-email-shubhrajyoti@ti.com>
+References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
+ <1334142776-10583-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120411113254.GE12064@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series does the following
+On Wed, Apr 11, 2012 at 04:42:39PM +0530, Shubhrajyoti D wrote:
+> The functions omap_i2c_unidle/idle are called from omap_i2c_runtime_resume
+> and omap_i2c_runtime_suspend which is compiled for CONFIG_PM_RUNTIME.
+> This patch removes the omap_i2c_unidle/idle functions and folds them
+> into the runtime callbacks.
+> 
+> This fixes the below warn when CONFIG_PM_RUNTIME is not defined
+> 
+>  CC      arch/arm/mach-omap2/board-ti8168evm.o
+> drivers/i2c/busses/i2c-omap.c:272: warning: 'omap_i2c_unidle' defined but not used
+> drivers/i2c/busses/i2c-omap.c:293: warning: 'omap_i2c_idle' defined but not used
+>   CC      net/ipv4/ip_forward.o
+> 
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-- Warn fixes if CONFIG_PM_RUNTIME is not selected.
-- I2C register restore only if context if the context is lost
-- Bus busy recovery mechanism.
-- the reset is not done in init.
-- Adds a patch to use devm_* functions
-- Also checks the return type of the get_sync and in case
- of errors prevents register access, also print the cause of
- failure in case of errors.
-- In case of i2c remove register access was done without any
- get_sync fix the same.
-- Adds a pdata function pointer to do context save restore
-- Split the omap_i2c_isr to increase readability
-- Make the i2c use SET_RUNTIME_PM_OPS
-- Folds a patch from Tasslehoff to prevent any merge conflicts.
-- Prevents the XDUF flag to be set if the underflow condition is not met.
-- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
- use the unique id instead as the section number in the recent errata
- docs has changed.
-
-- As discussed in [2] Paul has queued the flag for context restore patch,
- removing it from the series.
-
-
-[1] http://www.spinics.net/lists/linux-i2c/msg07607.html
-[2] http://www.spinics.net/lists/linux-i2c/msg07685.html
-
-Tested on omap4sdp and omap3sdp.
-
-
-The following changes since commit 258f742635360175564e9470eb060ff4d4b984e7:
-
-  modpost: Fix modpost license checking of vmlinux.o (2012-04-09 20:52:56 -0700)
-
-are available in the git repository at:
-  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-next
-
-
-
-Jon Hunter (1):
-  I2C: OMAP: Correct I2C revision for OMAP3
-
-Shubhrajyoti D (15):
-  I2C: OMAP: make omap_i2c_unidle/idle functions depend on
-    CONFIG_PM_RUNTIME
-  I2C: OMAP: Remove reset at init
-  I2C: OMAP: I2C register restore only if context is lost
-  I2C: OMAP: Fix the interrupt clearing in OMAP4
-  I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
-  I2C: OMAP: Optimise the remove code
-  I2C: OMAP: Fix the error handling
-  I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
-    than zero
-  I2C: OMAP: use devm_* functions
-  I2C: OMAP: Fix the crash in i2c remove
-  I2C: OMAP: Handle error check for pm runtime
-  I2C: OMAP: Use SET_RUNTIME_PM_OPS
-  I2C: OMAP: make the read ready processing a separate function
-  I2C: OMAP: Do not set the XUDF if the underflow is not reached
-  I2C: OMAP: Rename the 1p153 to the erratum id i462
-
-Tasslehoff Kjappfot (1):
-  I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
-
-Vikram Pandita (1):
-  I2C: OMAP: Recover from Bus Busy condition
-
- arch/arm/plat-omap/i2c.c      |    3 +
- drivers/i2c/busses/i2c-omap.c |  348 +++++++++++++++++++++++------------------
- include/linux/i2c-omap.h      |    1 +
- 3 files changed, 198 insertions(+), 154 deletions(-)
+how about just moving them into the #ifdef ? /me thinks it's easier to
+read with the function. Matter of taste though, it's not that much code.
 
 -- 
-1.7.4.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120411/78ab606c/attachment.sig>
