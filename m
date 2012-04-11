@@ -1,28 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Apr 2012 01:07:43 +0200
-Subject: [PATCH 1/3] integrator: fix the IRQ masks on the Integrator/CP
-In-Reply-To: <20120411225651.GD24211@n2100.arm.linux.org.uk>
-References: <1334184223-18864-1-git-send-email-linus.walleij@linaro.org>
- <20120411225651.GD24211@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZxXiaPSkP7eiamNaWLWNepFHfPNu=-uZbk8h4n7jwCKA@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 11 Apr 2012 18:07:41 -0500
+Subject: [PATCH v2] arm: ep93xx: use gpio_led_register_device
+In-Reply-To: <4F85FFB6.8050406@gmail.com>
+References: <201204111429.20038.hartleys@visionengravers.com>
+ <4F85FFB6.8050406@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F00206986C0701@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 12:56 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-
->> - ? ? pic_mask = ~((~0u) << (11 - IRQ_PIC_START));
->> - ? ? pic_mask |= (~((~0u) << (29 - 22))) << 22;
->> + ? ? pic_mask = ~((~0u) << (1 + IRQ_PIC_END - IRQ_PIC_START));
+On Wednesday, April 11, 2012 3:04 PM, Ryan Mallon wrote:
+> On 12/04/12 07:29, H Hartley Sweeten wrote:
+>>  menu "Cirrus EP93xx Implementation Options"
+>>  
+>> +config ARCH_EP93XX_TYPICAL
 >
-> Err no, the original is correct.
 >
-> Integrator/CP only has IRQs 29-22 and IRQs 11-0. ?IRQs 21-12 are
-> reserved. ?Integrator/AP on the other hand has IRQs 21-0.
+> One minor change. Please use a different name for this. Since all
+> of the boards use this and it cannot be unselected, its a bit
+> misleading to call it typical. EP93XX_SOC or EP93XX_COMMON would
+> be a bit better.
 
-Ahhh like that, now I finally see. Thanks! I'll fix.
-The "hole" in the mask creates some obstacles in the hwirq map too, will
-sort it out.
+Done.  Changed it to EP93XX_SOC_COMMON
 
-Yours,
-Linus Walleij
+>> +	bool
+>> +	default y
+
+I guess this could also be
+
+	def_bool y
+
+But, I don't know if it's necessary...
+
+>> +	select LEDS_GPIO_REGISTER
+>> +
+
+Hartley
