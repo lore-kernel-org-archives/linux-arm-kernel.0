@@ -1,29 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Apr 2012 10:16:42 +0200
+Date: Wed, 11 Apr 2012 10:17:38 +0200
 Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
-In-Reply-To: <4F793C56.2030605@st.com>
+In-Reply-To: <4F83FAE2.8020107@st.com>
 References: <4F793C56.2030605@st.com>
-Message-ID: <CACRpkdbztwt_ztxy6__iuhH+5O+sy83xtpbROOr-0RZgkFwHPQ@mail.gmail.com>
+ <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
+ <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
+ <4F83FAE2.8020107@st.com>
+Message-ID: <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 2, 2012 at 7:42 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On Tue, Apr 10, 2012 at 11:18 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> On 4/10/2012 2:12 PM, Linus Walleij wrote:
+>> Will there be conflicts between this patch set and the stuff you're
+>> submitting for pinctrl? Or is it just runtime problems?
+>
+> Yes. There will be conflicts. I have touched dts files in pinctrl patches
+> that got added in this patchset.
 
-> The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
->
-> ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
->
-> are available in the git repository at:
->
-> ?git://git.stlinux.com/spear/linux-2.6.git spear-dt
->
-> for you to fetch changes up to 8f21ec99c7b78c3f0baf6bbf2e438da68da3dc08:
-
-> Viresh Kumar (8):
-> ? ? ?SPI/Pl022: Include types.h to remove compilation warnings
-
-This patch should go through Grant's SPI tree I think? Especially
-since it is eligible for -rc:s...
+Hm, then we should maybe consider mergeing all that pinctrl stuff
+through ARM SoC later as well. I can probably provide the
+necessary ACKs.
 
 Yours,
 Linus Walleij
