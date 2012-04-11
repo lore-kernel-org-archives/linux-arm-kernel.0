@@ -1,79 +1,57 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 11 Apr 2012 12:05:40 -0700
-Subject: [PATCH 05/12] arm: omap3: am35x: Add PWROFF feature
+Date: Wed, 11 Apr 2012 12:05:36 -0700
+Subject: [PATCH 01/12] arm: omap3: Only access IVA if one exists
 In-Reply-To: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
 References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1334171147-7517-6-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1334171147-7517-2-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Typical OMAP3 SoCs have four power domain states: ON,
-INACTIVE, RETENTION, and OFF.  The am35x family of SoCs
-has only two states: ON and INACTIVE.  To distinguish which
-set of states the current device has, add the 'OMAP3_HAS_PWROFF'
-feature.  When that feature/bit is set, the device supports the
-RETENTION and OFF states; otherwise, it doesn't.
+prcm_setup_regs() blindly accesses IVA bits
+in the PRM and calls omap3_iva_idle() which
+does more IVA related register accesses.
+Only do this if the IVA hardware actually
+exists.
 
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- arch/arm/mach-omap2/id.c              |    7 +++++--
- arch/arm/plat-omap/include/plat/cpu.h |    8 +++++---
- 2 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c |   15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 9736049..b6508e5 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -245,7 +245,7 @@ void __init omap3xxx_check_features(void)
- 	    omap_rev() == OMAP3430_REV_ES3_1_2)
- 		omap_features |= OMAP3_HAS_IO_CHAIN_CTRL;
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 703bd10..ec92676 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -583,10 +583,13 @@ static void __init prcm_setup_regs(void)
+ 			  OMAP3430_PER_MOD, OMAP3430_PM_MPUGRPSEL);
  
--	omap_features |= OMAP3_HAS_SDRC;
-+	omap_features |= OMAP3_HAS_SDRC | OMAP3_HAS_PWROFF;
+ 	/* Don't attach IVA interrupts */
+-	omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
+-	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
+-	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
+-	omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD, OMAP3430_PM_IVAGRPSEL);
++	if (omap3_has_iva()) {
++		omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
++		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
++		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
++		omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD,
++					OMAP3430_PM_IVAGRPSEL);
++	}
  
- 	/*
- 	 * am35x fixups:
-@@ -254,9 +254,12 @@ void __init omap3xxx_check_features(void)
- 	 *   OMAP3_CHECK_FEATURE() will interpret some of those zeroes to
- 	 *   mean that a feature is present even though it isn't so clear
- 	 *   the incorrectly set feature bits.
-+	 * - Indicate that am35x SoCs don't support the PWRDM_POWER_RET
-+	 *   and PWRDM_POWER_OFF states by clearing OMAP3_HAS_PWROFF.
- 	 */
- 	if (cpu_is_omap3505() || cpu_is_omap3517())
--		omap_features &= ~(OMAP3_HAS_IVA | OMAP3_HAS_ISP);
-+		omap_features &= ~(OMAP3_HAS_IVA | OMAP3_HAS_ISP |
-+			OMAP3_HAS_PWROFF);
+ 	/* Clear any pending 'reset' flags */
+ 	omap2_prm_write_mod_reg(0xffffffff, MPU_MOD, OMAP2_RM_RSTST);
+@@ -600,7 +603,9 @@ static void __init prcm_setup_regs(void)
+ 	/* Clear any pending PRCM interrupts */
+ 	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
  
- 	/*
- 	 * TODO: Get additional info (where applicable)
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index dc6a86b..c3f1a42 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -477,9 +477,10 @@ extern u32 omap_features;
- #define OMAP3_HAS_IO_WAKEUP		BIT(6)
- #define OMAP3_HAS_SDRC			BIT(7)
- #define OMAP3_HAS_IO_CHAIN_CTRL		BIT(8)
--#define OMAP4_HAS_MPU_1GHZ		BIT(9)
--#define OMAP4_HAS_MPU_1_2GHZ		BIT(10)
--#define OMAP4_HAS_MPU_1_5GHZ		BIT(11)
-+#define OMAP3_HAS_PWROFF		BIT(9)
-+#define OMAP4_HAS_MPU_1GHZ		BIT(10)
-+#define OMAP4_HAS_MPU_1_2GHZ		BIT(11)
-+#define OMAP4_HAS_MPU_1_5GHZ		BIT(12)
+-	omap3_iva_idle();
++	if (omap3_has_iva())
++		omap3_iva_idle();
++
+ 	omap3_d2d_idle();
+ }
  
- 
- #define OMAP3_HAS_FEATURE(feat,flag)			\
-@@ -497,6 +498,7 @@ OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
- OMAP3_HAS_FEATURE(io_wakeup, IO_WAKEUP)
- OMAP3_HAS_FEATURE(sdrc, SDRC)
- OMAP3_HAS_FEATURE(io_chain_ctrl, IO_CHAIN_CTRL)
-+OMAP3_HAS_FEATURE(pwroff, PWROFF)
- 
- /*
-  * Runtime detection of OMAP4 features
 -- 
 1.7.9.4
