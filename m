@@ -1,70 +1,69 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:22:24 +0530
-Subject: [PATCHv7 13/18] I2C: OMAP: Handle error check for pm runtime
+Date: Wed, 11 Apr 2012 16:22:29 +0530
+Subject: [PATCHv7 18/18] I2C: OMAP: Rename the 1p153 to the erratum id i462
 In-Reply-To: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334141549-8288-14-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334141549-8288-19-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If PM runtime get_sync fails return with the error
-so that no further reads/writes goes through the interface.
-This will avoid possible abort. Add a error message in case
-of failure with the cause of the failure.
+The section number in the recent errata document has changed.
+Rename the erratum 1p153 to the unique id i462 instead, so that
+it is easier to reference. Also change the function name and comments
+to reflect the same.
 
+Cc: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   19 ++++++++++++++++---
- 1 files changed, 16 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 8258597..f371d4f 100644
+index 2bf8120..667d344 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -616,7 +616,11 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 	int i;
- 	int r;
+@@ -170,7 +170,7 @@ enum {
  
--	pm_runtime_get_sync(dev->dev);
-+	r = pm_runtime_get_sync(dev->dev);
-+	if (r < 0) {
-+		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", r);
-+		return r;
-+	}
+ /* Errata definitions */
+ #define I2C_OMAP_ERRATA_I207		(1 << 0)
+-#define I2C_OMAP3_1P153			(1 << 1)
++#define I2C_OMAP_ERRATA_I462		(1 << 1)
  
- 	r = omap_i2c_wait_for_bb(dev);
- 	if (r < 0)
-@@ -1044,7 +1048,11 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->regs = (u8 *)reg_map_ip_v1;
+ struct omap_i2c_dev {
+ 	struct device		*dev;
+@@ -753,11 +753,11 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
+ #endif
  
- 	pm_runtime_enable(dev->dev);
--	pm_runtime_get_sync(dev->dev);
-+	r = pm_runtime_get_sync(dev->dev);
-+	if (r < 0) {
-+		dev_err(dev->dev, "pm_runtime_get_sync failed:%d\n", r);
-+		return r;
-+	}
- 
- 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
- 
-@@ -1129,12 +1137,17 @@ err_unuse_clocks:
- static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ /*
+- * OMAP3430 Errata 1.153: When an XRDY/XDR is hit, wait for XUDF before writing
++ * OMAP3430 Errata i462: When an XRDY/XDR is hit, wait for XUDF before writing
+  * data to DATA_REG. Otherwise some data bytes can be lost while transferring
+  * them from the memory to the I2C interface.
+  */
+-static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
++static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
  {
- 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
-+	int ret;
+ 	unsigned long timeout = 10000;
  
- 	platform_set_drvdata(pdev, NULL);
+@@ -920,8 +920,8 @@ complete:
+ 					break;
+ 				}
  
- 	free_irq(dev->irq, dev);
- 	i2c_del_adapter(&dev->adapter);
--	pm_runtime_get_sync(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret < 0) {
-+		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", r);
-+		return ret;
-+	}
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
+-				if ((dev->errata & I2C_OMAP3_1P153) &&
+-				    errata_omap3_1p153(dev, &stat, &err))
++				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
++				    errata_omap3_i462(dev, &stat, &err))
+ 					goto complete;
+ 
+ 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
+@@ -1061,7 +1061,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->errata |= I2C_OMAP_ERRATA_I207;
+ 
+ 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
+-		dev->errata |= I2C_OMAP3_1P153;
++		dev->errata |= I2C_OMAP_ERRATA_I462;
+ 
+ 	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
+ 		u16 s;
 -- 
 1.7.4.1
