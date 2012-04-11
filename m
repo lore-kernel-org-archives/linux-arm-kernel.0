@@ -1,47 +1,171 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Apr 2012 12:09:14 +1000
-Subject: [PATCH] arm: ep93xx: Don't try to release not acquired GPIO lines
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F002069840A362@AUSP01VMBX24.collaborationhost.net>
-References: <4F7D8587.5020205@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F002069840A362@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4F84E7CA.8000508@gmail.com>
+Date: Wed, 11 Apr 2012 12:15:24 +1000
+Subject: [PATCH] arm: ep93xx: use gpio_led_register_device
+In-Reply-To: <201204041042.22674.hartleys@visionengravers.com>
+References: <201204041042.22674.hartleys@visionengravers.com>
+Message-ID: <4F84E93C.1070004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/12 02:39, H Hartley Sweeten wrote:
+On 05/04/12 03:42, H Hartley Sweeten wrote:
 
-> On Thursday, April 05, 2012 4:44 AM, Rafal Prylowski wrote:
->> Fail path of ep93xx_keypad_acquire_gpio() tries to release
->> GPIO lines not acquired successfully before. Fix this.
->>
->> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
->> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Cc: Ryan Mallon <rmallon@gmail.com>
->>
->> ---
->> Patch applies to v3.4rc1.
->>
->>  arch/arm/mach-ep93xx/core.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
->> ===================================================================
->> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
->> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
->> @@ -734,7 +734,7 @@ int ep93xx_keypad_acquire_gpio(struct pl
->>  fail_gpio_d:
->>  	gpio_free(EP93XX_GPIO_LINE_C(i));
->>  fail_gpio_c:
->> -	for ( ; i >= 0; --i) {
->> +	for (--i; i >= 0; --i) {
->>  		gpio_free(EP93XX_GPIO_LINE_C(i));
->>  		gpio_free(EP93XX_GPIO_LINE_D(i));
->>  	}
+> Use gpio_led_register_device to register the two leds connected to
+> the ep93xx.
 > 
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Add a SOC_EP93XX Kconfig option for common options needed by ep93xx
+> and use that option to select LEDS_GPIO_REGISTER.
+> 
+> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
 
+Hi Hartley,
 
-Applied to ep93xx-fixes on https://github.com/RyanMallon/linux-ep93xx
+Just a couple of comments below.
 
-Thanks,
 ~Ryan
+
+> ---
+> 
+>  arch/arm/mach-ep93xx/Kconfig |   12 ++++++++++++
+>  arch/arm/mach-ep93xx/core.c  |   16 ++++------------
+>  2 files changed, 16 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+> index 97a2493..b27a8ad 100644
+> --- a/arch/arm/mach-ep93xx/Kconfig
+> +++ b/arch/arm/mach-ep93xx/Kconfig
+> @@ -2,6 +2,10 @@ if ARCH_EP93XX
+>  
+>  menu "Cirrus EP93xx Implementation Options"
+>  
+> +config SOC_EP93XX
+> +	bool
+> +	select LEDS_GPIO_REGISTER
+> +
+
+
+So, this option is currently just used to indirectly select
+LEDS_GPIO_REGISTER. Do you have plans for it to select other things?
+Otherwise, its just a bunch of extra Kconfig lines for not much benefit.
+
+>  config CRUNCH
+>  	bool "Support for MaverickCrunch"
+>  	help
+> @@ -48,12 +52,14 @@ endchoice
+>  config MACH_ADSSPHERE
+>  	bool "Support ADS Sphere"
+>  	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+> +	select SOC_EP93XX
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the ADS
+>  	  Sphere board.
+>  
+>  config MACH_EDB93XX
+>  	bool
+> +	select SOC_EP93XX
+>  
+>  config MACH_EDB9301
+>  	bool "Support Cirrus Logic EDB9301"
+> @@ -122,12 +128,14 @@ config MACH_EDB9315A
+>  config MACH_GESBC9312
+>  	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+>  	bool "Support Glomation GESBC-9312-sx"
+> +	select SOC_EP93XX
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the Glomation
+>  	  GESBC-9312-sx board.
+>  
+>  config MACH_MICRO9
+>  	bool
+> +	select SOC_EP93XX
+>  
+>  config MACH_MICRO9H
+>  	bool "Support Contec Micro9-High"
+> @@ -164,6 +172,7 @@ config MACH_MICRO9S
+>  config MACH_SIM_ONE
+>          bool "Support Simplemachines Sim.One board"
+>          depends on EP93XX_SDCE0_PHYS_OFFSET
+> +	select SOC_EP93XX
+
+
+The existing whitespace here is using spaces instead of tabs. If the
+result looks terrible (not aligned) then we should maybe do a separate
+patch to clean up the crappy whitespace.
+
+>          help
+>            Say 'Y' here if you want your kernel to support the
+>            Simplemachines Sim.One board.
+> @@ -171,6 +180,7 @@ config MACH_SIM_ONE
+>  config MACH_SNAPPER_CL15
+>  	bool "Support Bluewater Systems Snapper CL15 Module"
+>  	depends on EP93XX_SDCE0_PHYS_OFFSET
+> +	select SOC_EP93XX
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the Bluewater
+>  	  Systems Snapper CL15 Module.
+> @@ -178,6 +188,7 @@ config MACH_SNAPPER_CL15
+>  config MACH_TS72XX
+>  	bool "Support Technologic Systems TS-72xx SBC"
+>  	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+> +	select SOC_EP93XX
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Technologic Systems TS-72xx board.
+> @@ -185,6 +196,7 @@ config MACH_TS72XX
+>  config MACH_VISION_EP9307
+>  	bool "Support Vision Engraving Systems EP9307 SoM"
+>  	depends on EP93XX_SDCE0_PHYS_OFFSET
+> +	select SOC_EP93XX
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Vision Engraving Systems EP9307 SoM.
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 8d25895..257a124 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -513,7 +513,7 @@ void __init ep93xx_register_spi(struct ep93xx_spi_info *info,
+>  /*************************************************************************
+>   * EP93xx LEDs
+>   *************************************************************************/
+> -static struct gpio_led ep93xx_led_pins[] = {
+> +static const struct gpio_led ep93xx_led_pins[] __initconst = {
+
+
+This fix, and related changes are not mentioned in the changelog.
+
+>  	{
+>  		.name	= "platform:grled",
+>  		.gpio	= EP93XX_GPIO_LINE_GRLED,
+> @@ -523,20 +523,11 @@ static struct gpio_led ep93xx_led_pins[] = {
+>  	},
+>  };
+>  
+> -static struct gpio_led_platform_data ep93xx_led_data = {
+> +static const struct gpio_led_platform_data ep93xx_led_data __initconst = {
+>  	.num_leds	= ARRAY_SIZE(ep93xx_led_pins),
+>  	.leds		= ep93xx_led_pins,
+>  };
+>  
+> -static struct platform_device ep93xx_leds = {
+> -	.name		= "leds-gpio",
+> -	.id		= -1,
+> -	.dev		= {
+> -		.platform_data	= &ep93xx_led_data,
+> -	},
+> -};
+> -
+> -
+>  /*************************************************************************
+>   * EP93xx pwm peripheral handling
+>   *************************************************************************/
+> @@ -889,8 +880,9 @@ void __init ep93xx_init_devices(void)
+>  
+>  	platform_device_register(&ep93xx_rtc_device);
+>  	platform_device_register(&ep93xx_ohci_device);
+> -	platform_device_register(&ep93xx_leds);
+>  	platform_device_register(&ep93xx_wdt_device);
+> +
+> +	gpio_led_register_device(-1, &ep93xx_led_data);
+>  }
+>  
+>  void ep93xx_restart(char mode, const char *cmd)
