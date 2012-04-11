@@ -1,28 +1,30 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Apr 2012 16:07:35 -0300
-Subject: [PATCH 1/2] ARM: imx6q-arm2: Remove hardcoded mac address
-Message-ID: <1334171256-18761-1-git-send-email-festevam@gmail.com>
+Date: Wed, 11 Apr 2012 16:07:36 -0300
+Subject: [PATCH 2/2] ARM: imx6q-arm2:: Pass GPIO for FEC PHY reset
+In-Reply-To: <1334171256-18761-1-git-send-email-festevam@gmail.com>
+References: <1334171256-18761-1-git-send-email-festevam@gmail.com>
+Message-ID: <1334171256-18761-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not hardcode the local mac address.
+GPIO4_15 is used for FEC PHY reset.
 
-Let bootloader retrieve it.
+Pass it to the FEC driver.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6q-arm2.dts |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/imx6q-arm2.dts |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-index ce1c823..04501d1 100644
+index 04501d1..aa230d2 100644
 --- a/arch/arm/boot/dts/imx6q-arm2.dts
 +++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -29,7 +29,6 @@
+@@ -29,6 +29,7 @@
  		aips-bus at 02100000 { /* AIPS2 */
  			enet at 02188000 {
  				phy-mode = "rgmii";
--				local-mac-address = [00 04 9F 01 1B 61];
++				phy-reset-gpios = <&gpio4 15 0>;
  				status = "okay";
  			};
  
