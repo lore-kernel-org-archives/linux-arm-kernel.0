@@ -1,71 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Apr 2012 08:43:59 +0200
-Subject: [PATCH] clk: clk_calc_new_rates() required for parent only if
- CLK_SET_RATE_PARENT is set
-In-Reply-To: <0b5e799807b09e47db1bf2805359aae36d947f60.1334124495.git.viresh.kumar@st.com>
-References: <0b5e799807b09e47db1bf2805359aae36d947f60.1334124495.git.viresh.kumar@st.com>
-Message-ID: <20120411064359.GD20478@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 11 Apr 2012 08:48:24 +0200
+Subject: [PATCHv24 00/16] Contiguous Memory Allocator
+In-Reply-To: <CA+K6fF5TbhYX_XYXL33h5s8cnSogSna4Cq2-vM4MfX4igSyozg@mail.gmail.com>
+References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
+ <alpine.DEB.2.00.1204101528390.9354@kernel.research.nokia.com>
+ <CA+K6fF5TbhYX_XYXL33h5s8cnSogSna4Cq2-vM4MfX4igSyozg@mail.gmail.com>
+Message-ID: <00c201cd17af$17a3aa50$46eafef0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 11:38:53AM +0530, Viresh Kumar wrote:
-> We need to call clk_calc_new_rates() for parent clock only when we have
-> CLK_SET_RATE_PARENT flag set for clock.
-> 
-> This patch fixes it.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Hi,
 
-I see no functional change in this patch. With or without this patch we
-only call clk_calc_new_rates() when the parent rate actually changed.
-The code is easier to read with this patch and may be slightly more
-efficient, so:
+On Tuesday, April 10, 2012 7:20 PM Sandeep Patil wrote:
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >> This is (yet another) update of CMA patches.
+> >
+> >
+> > How well CMA is supposed to work if you have mlocked processes? I've
+> > been testing these patches, and noticed that by creating a small mlocked
+> > process you start to get plenty of test_pages_isolated() failure warnings,
+> > and bigger allocations will always fail.
+> 
+> CMIIW, I think mlocked pages are never migrated. The reason is because
+> __isolate_lru_pages() does not isolate Unevictable pages right now.
+> 
+> Minchan added support to allow this but the patch was dropped.
+> 
+> See the discussion at : https://lkml.org/lkml/2011/8/29/295
 
-> ---
->  drivers/clk/clk.c |   15 +++++++--------
->  1 files changed, 7 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 2f58455..56e32a1 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -780,15 +780,14 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
->  		goto out;
->  	}
->  
-> -	if (clk->flags & CLK_SET_RATE_PARENT)
-> -		new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
-> -	else
-> -		new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
-> -
-> -	if (best_parent_rate != clk->parent->rate) {
-> -		top = clk_calc_new_rates(clk->parent, best_parent_rate);
-> +	if (clk->flags & CLK_SET_RATE_PARENT) {
-> +		new_rate = clk->ops->round_rate(clk->hw, rate,
-> +				&best_parent_rate);
->  
-> -		goto out;
-> +		if (best_parent_rate != clk->parent->rate)
-> +			top = clk_calc_new_rates(clk->parent, best_parent_rate);
-> +	} else {
-> +		new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
->  	}
->  
->  out:
-> -- 
-> 1.7.9
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Right, we are aware of this limitation. We are working on solving it but we didn't 
+consider it a blocker for the core CMA patches. Such issues can be easily fixed with 
+the incremental patches.
 
+Best regards
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Marek Szyprowski
+Samsung Poland R&D Center
