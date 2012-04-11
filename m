@@ -1,126 +1,140 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Apr 2012 10:22:58 +0200
-Subject: [PATCH 1/2] Visstrim_M10: Add board version detection.
-In-Reply-To: <1334050019-21549-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1334050019-21549-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120411082258.GL3852@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 11 Apr 2012 10:23:31 +0200
+Subject: [alexandre.belloni@piout.net: AT91SAM9261-EK still broken ?]
+In-Reply-To: <20120410163211.GJ16641@game.jcrosoft.org>
+References: <20120409192055.GA7092@piout.net>
+ <20120409205653.GA10737@piout.net> <20120410163211.GJ16641@game.jcrosoft.org>
+Message-ID: <4F853F83.6010707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 11:26:59AM +0200, Javier Martin wrote:
-> Visstrim_M10 boards have 3 gpios to detect the
-> expansion board version attached and other 3 to
-> detect the motherboard revision.
+On 04/10/2012 06:32 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> HI,
 > 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> 	bug found and fixed
 
-Applied, thanks
+Yes, it is fixed in the patch posted a few minutes before by
+Jean-Christophe:
+[PATCH 1/1] ARM: at91: fix at91sam9261ek dm9000 irq
 
-Sascha
+We have included it in our AT91 "fixes" branch and will submit it soon
+for inclusion in arm-soc.
+https://github.com/at91linux/linux-at91/commits/at91-fixes
 
-> ---
->  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   55 +++++++++++++++++++++++++++
->  1 files changed, 55 insertions(+), 0 deletions(-)
+
+Thanks to Alexandre for having reported this and to Jean-Christophe for
+having corrected it so quickly.
+
+Best regards,
+
+> On 22:56 Mon 09 Apr     , Alexandre Belloni wrote:
+>> Hi again,
+>>
+>> More info, I get almost the same behavior while booting from nand.
+>> ts_calibrate and ubiattach seem to trigger the issue.
+>>
+>> ifconfig eth0 192.168.1.222
+>> dm9000 dm9000.0: eth0: link down
+>> # dm9000 dm9000.0: eth0: link up, 100Mbps, full-duplex, lpa 0x45E1
+>> ping 192.168.1.1
+>> PING 192.168.1.1 (192.168.1.1): 56 data bytes
+>> 64 bytes from 192.168.1.1: seq=0 ttl=64 time=12.184 ms
+>> [...]
+>> --- 192.168.1.1 ping statistics ---
+>> 28 packets transmitted, 28 packets received, 0% packet loss
+>> round-trip min/avg/max = 0.471/5.027/14.160 ms
+>> # ts_calibrate 
+>> xres = 240, yres = 320
+>> signal 2 caught
+>> # ping 192.168.1.1
+>> PING 192.168.1.1 (192.168.1.1): 56 data bytes
+>> ------------[ cut here ]------------
+>> WARNING: at net/sched/sch_generic.c:256 dev_watchdog+0x258/0x278()
+>> NETDEV WATCHDOG: eth0 (dm9000): transmit queue 0 timed out
+>> Modules linked in:
+>> [<c0012614>] (unwind_backtrace+0x0/0xf0) from [<c0019f98>] (warn_slowpath_common+0x4c/0x64)
+>> [<c0019f98>] (warn_slowpath_common+0x4c/0x64) from [<c001a044>] (warn_slowpath_fmt+0x30/0x40)
+>> [<c001a044>] (warn_slowpath_fmt+0x30/0x40) from [<c0250010>] (dev_watchdog+0x258/0x278)
+>> [<c0250010>] (dev_watchdog+0x258/0x278) from [<c002370c>] (run_timer_softirq+0xf8/0x230)
+>> [<c002370c>] (run_timer_softirq+0xf8/0x230) from [<c001f140>] (__do_softirq+0x90/0x120)
+>> [<c001f140>] (__do_softirq+0x90/0x120) from [<c001f534>] (irq_exit+0x48/0x50)
+>> [<c001f534>] (irq_exit+0x48/0x50) from [<c000e980>] (handle_IRQ+0x44/0x98)
+>> [<c000e980>] (handle_IRQ+0x44/0x98) from [<c000dd78>] (__irq_svc+0x38/0x60)
+>> [<c000dd78>] (__irq_svc+0x38/0x60) from [<c000eacc>] (default_idle+0x24/0x40)
+>> [<c000eacc>] (default_idle+0x24/0x40) from [<c000ec90>] (cpu_idle+0x84/0xbc)
+>> [<c000ec90>] (cpu_idle+0x84/0xbc) from [<c03f76e0>] (start_kernel+0x24c/0x290)
+>> ---[ end trace 93ffb7dfd2d10fb0 ]---
+>> --- 192.168.1.1 ping statistics ---
+>> 9 packets transmitted, 0 packets received, 100% packet loss
+>>
+>>
+>> On Mon, Apr 09, 2012 at 09:20:55PM +0200, Alexandre Belloni wrote :
+>>> Hum, I got the wrong list...
+>>>
+>>> ----- Forwarded message from Alexandre Belloni <alexandre.belloni@piout.net> -----
+>>>
+>>> Date: Mon, 9 Apr 2012 21:10:25 +0200
+>>> From: Alexandre Belloni <alexandre.belloni@piout.net>
+>>> To: linux-arm-kernel at lists.arm.linux.org.uk
+>>> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Subject: AT91SAM9261-EK still broken ?
+>>> User-Agent: Mutt/1.5.21 (2010-09-15)
+>>>
+>>> Hi Jean-Christophe,
+>>>
+>>> I'm using linux 3.4-rc2 and it seems I'm running in the same issue that
+>>> was described there: https://lkml.org/lkml/2011/8/8/355
+>>>
+>>> I didn't have a deep look into it but when I try to use ts_calibrate or
+>>> ts_test, the network interface is freezing. As I'm using nfs to boot, I
+>>> can't do anything anymore...
+>>>
+>>> Kernel message:
+>>>
+>>> # ts_calibrate 
+>>> ------------[ cut here ]------------
+>>> WARNING: at net/sched/sch_generic.c:256 dev_watchdog+0x258/0x278()
+>>> NETDEV WATCHDOG: eth0 (dm9000): transmit queue 0 timed out
+>>> Modules linked in:
+>>> [<c0012614>] (unwind_backtrace+0x0/0xf0) from [<c0019f98>] (warn_slowpath_common+0x4c/0x64)
+>>> [<c0019f98>] (warn_slowpath_common+0x4c/0x64) from [<c001a044>] (warn_slowpath_fmt+0x30/0x40)
+>>> [<c001a044>] (warn_slowpath_fmt+0x30/0x40) from [<c023fb70>] (dev_watchdog+0x258/0x278)
+>>> [<c023fb70>] (dev_watchdog+0x258/0x278) from [<c002370c>] (run_timer_softirq+0xf8/0x230)
+>>> [<c002370c>] (run_timer_softirq+0xf8/0x230) from [<c001f140>] (__do_softirq+0x90/0x120)
+>>> [<c001f140>] (__do_softirq+0x90/0x120) from [<c001f534>] (irq_exit+0x48/0x50)
+>>> [<c001f534>] (irq_exit+0x48/0x50) from [<c000e980>] (handle_IRQ+0x44/0x98)
+>>> [<c000e980>] (handle_IRQ+0x44/0x98) from [<c000dd78>] (__irq_svc+0x38/0x60)
+>>> [<c000dd78>] (__irq_svc+0x38/0x60) from [<c000eacc>] (default_idle+0x24/0x40)
+>>> [<c000eacc>] (default_idle+0x24/0x40) from [<c000ec90>] (cpu_idle+0x84/0xbc)
+>>> [<c000ec90>] (cpu_idle+0x84/0xbc) from [<c03e16e0>] (start_kernel+0x24c/0x290)
+>>> ---[ end trace e6a4b7e1afc454c3 ]---
+>>> nfs: server 192.168.1.1 not responding, still trying
+>>>
+>>> Regards,
+>>>
+>>> -- 
+>>> Alexandre Belloni
+>>>
+>>> ----- End forwarded message -----
+>>>
+>>> -- 
+>>> Alexandre Belloni
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>> -- 
+>> Alexandre Belloni
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> index f9aa657..adbadf1 100644
-> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> @@ -38,6 +38,7 @@
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/time.h>
-> +#include <asm/system.h>
->  #include <mach/common.h>
->  #include <mach/iomux-mx27.h>
->  
-> @@ -48,6 +49,14 @@
->  #define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
->  #define SDHC1_IRQ IRQ_GPIOB(25)
->  
-> +#define MOTHERBOARD_BIT2	(GPIO_PORTD + 31)
-> +#define MOTHERBOARD_BIT1	(GPIO_PORTD + 30)
-> +#define MOTHERBOARD_BIT0	(GPIO_PORTD + 29)
-> +
-> +#define EXPBOARD_BIT2		(GPIO_PORTD + 25)
-> +#define EXPBOARD_BIT1		(GPIO_PORTD + 27)
-> +#define EXPBOARD_BIT0		(GPIO_PORTD + 28)
-> +
->  static const int visstrim_m10_pins[] __initconst = {
->  	/* UART1 (console) */
->  	PE12_PF_UART1_TXD,
-> @@ -119,6 +128,23 @@ static const int visstrim_m10_pins[] __initconst = {
->  	PB19_PF_CSI_D7,
->  	PB20_PF_CSI_VSYNC,
->  	PB21_PF_CSI_HSYNC,
-> +	/* mother board version */
-> +	MOTHERBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-> +	MOTHERBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-> +	MOTHERBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-> +	/* expansion board version */
-> +	EXPBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-> +	EXPBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-> +	EXPBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
-> +};
-> +
-> +static struct gpio visstrim_m10_version_gpios[] = {
-> +	{ EXPBOARD_BIT0, GPIOF_IN, "exp-version-0" },
-> +	{ EXPBOARD_BIT1, GPIOF_IN, "exp-version-1" },
-> +	{ EXPBOARD_BIT2, GPIOF_IN, "exp-version-2" },
-> +	{ MOTHERBOARD_BIT0, GPIOF_IN, "mother-version-0" },
-> +	{ MOTHERBOARD_BIT1, GPIOF_IN, "mother-version-1" },
-> +	{ MOTHERBOARD_BIT2, GPIOF_IN, "mother-version-2" },
->  };
->  
->  /* Camera */
-> @@ -399,11 +425,40 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
->  	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
->  };
->  
-> +static void __init visstrim_m10_revision(void)
-> +{
-> +	int exp_version = 0;
-> +	int mo_version = 0;
-> +	int ret;
-> +
-> +	ret = gpio_request_array(visstrim_m10_version_gpios,
-> +				 ARRAY_SIZE(visstrim_m10_version_gpios));
-> +	if (ret) {
-> +		pr_err("Failed to request version gpios");
-> +		return;
-> +	}
-> +
-> +	/* Get expansion board version (negative logic) */
-> +	exp_version |= !gpio_get_value(EXPBOARD_BIT2) << 2;
-> +	exp_version |= !gpio_get_value(EXPBOARD_BIT1) << 1;
-> +	exp_version |= !gpio_get_value(EXPBOARD_BIT0);
-> +
-> +	/* Get mother board version (negative logic) */
-> +	mo_version |= !gpio_get_value(MOTHERBOARD_BIT2) << 2;
-> +	mo_version |= !gpio_get_value(MOTHERBOARD_BIT1) << 1;
-> +	mo_version |= !gpio_get_value(MOTHERBOARD_BIT0);
-> +
-> +	system_rev = 0x27000;
-> +	system_rev |= (mo_version << 4);
-> +	system_rev |= exp_version;
-> +}
-> +
->  static void __init visstrim_m10_board_init(void)
->  {
->  	int ret;
->  
->  	imx27_soc_init();
-> +	visstrim_m10_revision();
->  
->  	ret = mxc_gpio_setup_multiple_pins(visstrim_m10_pins,
->  			ARRAY_SIZE(visstrim_m10_pins), "VISSTRIM_M10");
-> -- 
-> 1.7.0.4
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> 
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
