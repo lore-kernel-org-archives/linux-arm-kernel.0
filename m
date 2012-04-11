@@ -1,217 +1,31 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Wed, 11 Apr 2012 14:19:48 +0530
-Subject: [PATCH RESEND] Input: omap-keypad: dynamically handle register
- offsets
-In-Reply-To: <20120410162353.GA6217@core.coreip.homeip.net>
-References: <1333430546-23454-1-git-send-email-sourav.poddar@ti.com>
- <20120410162353.GA6217@core.coreip.homeip.net>
-Message-ID: <CAKdam57PkBQXTHv3VZ79vQ_v4TZYLxKCP4FY01XFEQJ-PPLkuQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Apr 2012 10:54:01 +0200
+Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
+In-Reply-To: <4F854504.2060101@st.com>
+References: <4F793C56.2030605@st.com>
+ <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
+ <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
+ <4F83FAE2.8020107@st.com>
+ <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
+ <4F853FC0.4080802@st.com>
+ <CACRpkdYgSFYgr-CVmG0JenMM+EOydjJxpR8zaFuGPiMKtKRM9Q@mail.gmail.com>
+ <4F854504.2060101@st.com>
+Message-ID: <CACRpkdaU8yVAnsvL3JBh-XZv0pQ0jtdDOz97nF2v7LbQoYRz_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On Wed, Apr 11, 2012 at 10:47 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> On 4/11/2012 2:13 PM, Linus Walleij wrote:
+>> Yeah you can send this pull request and then Arnd or Olof will put it
+>> on some topic branch like "topic-spear" and then you base your
+>> further work on top of that and then send a new pull request to be
+>> merged into that same branch, with the pinctrl stuff. And include the
+>> ACK:s directly in the patches (git rebase -i is your friend...)
+>
+> git rebase -i is an old friend, but it seem i don't know him completely :(
+> How does it help in adding Acked-by automatically? Is there anything more
+> than marking all of them as "rework" and add these Acks manually?
 
-On Tue, Apr 10, 2012 at 9:53 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> Hi Sourav,
->
-> On Tue, Apr 03, 2012 at 10:52:26AM +0530, Sourav Poddar wrote:
->> From: G, Manjunath Kondaiah <manjugk@ti.com>
->>
->> Keypad controller register offsets are different for omap4
->> and omap5. Handle these offsets through static mapping and
->> assign these mappings during run time.
->>
->
-> In addition to Felipe's comments.
->
->> @@ -76,11 +81,66 @@ struct omap4_keypad {
->>
->> ? ? ? unsigned int rows;
->> ? ? ? unsigned int cols;
->> + ? ? unsigned int revision;
->> + ? ? u32 irqstatus;
->> + ? ? u32 irqenable;
->
-> ? ? ? ?u32 reg_offset;
->
-> and you probably won't need revision field.
->
->> ? ? ? unsigned int row_shift;
->> ? ? ? unsigned char key_state[8];
->> ? ? ? unsigned short keymap[];
->> ?};
->>
->> +static int kbd_readl(struct omap4_keypad *keypad_data, u32 offset)
->> +{
->> + ? ? if (keypad_data->revision == KBD_REVISION_OMAP4)
->> + ? ? ? ? ? ? return __raw_readl(keypad_data->base + offset);
->> + ? ? else if (keypad_data->revision == KBD_REVISION_OMAP5)
->> + ? ? ? ? ? ? return __raw_readl(keypad_data->base + offset + 0x10);
->> +
->> + ? ? return -ENODEV;
->
-> Instead do:
->
-> ? ? ? ?return __raw_readl(keypad_data->base + keypad_data->reg_offset +
-> ? ? ? ? ? ? ? ? ? ? ? ? ? offset);
->> +}
-I have a couple of doubts on this:
-1. Before using kbd_readl/kbd_write anywhere we
-need to populate the "keypad_data->reg_offset"  with the register address
-which we need to read or write.
->> +
->> +static void kbd_writel(struct omap4_keypad *keypad_data, u32 offset, u32
->> value)
->> +{
->> + ? ? if (keypad_data->revision == KBD_REVISION_OMAP4)
->> + ? ? ? ? ? ? __raw_writel(value, keypad_data->base + offset);
->> + ? ? else if (keypad_data->revision == KBD_REVISION_OMAP5)
->> + ? ? ? ? ? ? __raw_writel(value, keypad_data->base + offset + 0x10);
->
-> ? ? ? ?__raw_writel(value,
-> ? ? ? ? ? ? ? ? ? ? keypad_data->base + keypad_data->reg_offset + offset);
->
->> +}
->> +
->> +static int kbd_read_revision(struct omap4_keypad *keypad_data, u32
->> offset)
->> +{
->> + ? ? int reg;
->> + ? ? reg = __raw_readl(keypad_data->base + offset);
->> + ? ? reg &= 0x03 << 30;
->> + ? ? reg >>= 30;
->> +
->> + ? ? switch (reg) {
->> + ? ? case 1:
->> + ? ? ? ? ? ? return KBD_REVISION_OMAP5;
->> + ? ? case 0:
->> + ? ? ? ? ? ? return KBD_REVISION_OMAP4;
->> + ? ? default:
->> + ? ? ? ? ? ? return -ENODEV;
->
-> -EINVAL? -EIO?
-Hmm, -EINVAL looks more apt here.Will change.
->
->> + ? ? }
->> +}
->> +
->> ?/* Interrupt handler */
->> ?static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
->> ?{
->> @@ -91,12 +151,11 @@ static irqreturn_t omap4_keypad_interrupt(int irq,
->> void *dev_id)
->> ? ? ? u32 *new_state = (u32 *) key_state;
->>
->> ? ? ? /* Disable interrupts */
->> - ? ? __raw_writel(OMAP4_VAL_IRQDISABLE,
->> - ? ? ? ? ? ? ? ? ?keypad_data->base + OMAP4_KBD_IRQENABLE);
->> + ? ? kbd_write_irqenable(keypad_data, keypad_data->irqenable,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_VAL_IRQDISABLE);
->>
->> - ? ? *new_state = __raw_readl(keypad_data->base +
->> OMAP4_KBD_FULLCODE31_0);
->> - ? ? *(new_state + 1) = __raw_readl(keypad_data->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP4_KBD_FULLCODE63_32);
->> + ? ? *new_state = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE31_0);
->> + ? ? *(new_state + 1) = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE63_32);
->>
->> ? ? ? for (row = 0; row < keypad_data->rows; row++) {
->> ? ? ? ? ? ? ? changed = key_state[row] ^ keypad_data->key_state[row];
->> @@ -121,12 +180,13 @@ static irqreturn_t omap4_keypad_interrupt(int irq,
->> void *dev_id)
->> ? ? ? ? ? ? ? sizeof(keypad_data->key_state));
->>
->> ? ? ? /* clear pending interrupts */
->> - ? ? __raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQSTATUS);
->> + ? ? kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
->> + ? ? ? ? ? ? kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
->>
->> ? ? ? /* enable interrupts */
->> - ? ? __raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN |
->> OMAP4_DEF_IRQENABLE_LONGKEY,
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQENABLE);
->> + ? ? kbd_write_irqenable(keypad_data, keypad_data->irqenable,
->> + ? ? ? ? ? ? OMAP4_DEF_IRQENABLE_EVENTEN |
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_DEF_IRQENABLE_LONGKEY);
->>
->> ? ? ? return IRQ_HANDLED;
->> ?}
->> @@ -139,16 +199,30 @@ static int omap4_keypad_open(struct input_dev
->> *input)
->>
->> ? ? ? disable_irq(keypad_data->irq);
->>
->> - ? ? __raw_writel(OMAP4_VAL_FUNCTIONALCFG,
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_CTRL);
->> - ? ? __raw_writel(OMAP4_VAL_DEBOUNCINGTIME,
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_DEBOUNCINGTIME);
->> - ? ? __raw_writel(OMAP4_VAL_IRQDISABLE,
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQSTATUS);
->> - ? ? __raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN |
->> OMAP4_DEF_IRQENABLE_LONGKEY,
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQENABLE);
->> - ? ? __raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
->> + ? ? keypad_data->revision = kbd_read_revision(keypad_data,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_KBD_REVISION);
->
-> ? ? ? ?switch()
-Ok. Will covert that to switch statement.
->> + ? ? if (keypad_data->revision == KBD_REVISION_OMAP4) {
->> + ? ? ? ? ? ? keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS;
->> + ? ? ? ? ? ? keypad_data->irqenable = OMAP4_KBD_IRQENABLE;
->> + ? ? } else if (keypad_data->revision == KBD_REVISION_OMAP5) {
->> + ? ? ? ? ? ? keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS + 0x0c;
->> + ? ? ? ? ? ? keypad_data->irqenable = OMAP4_KBD_IRQENABLE + 0x0c;
->> + ? ? } else {
->> + ? ? ? ? ? ? pr_err("Omap keypad not found\n");
->> + ? ? ? ? ? ? return -ENODEV;
->
-> Hmm, this is in open() but should probably be in probe().
-This requires reading of KBD_REVISION register, which can
-be done once the clocks are enabled. As the current implementation
-goes, clocks get enabled only when some input device is opened.
->
+Not that I'm aware of ... That's how I do it atleast.
 
->> + ? ? }
->> +
->> + ? ? kbd_writel(keypad_data, OMAP4_KBD_CTRL,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_VAL_FUNCTIONALCFG);
->> + ? ? kbd_writel(keypad_data, OMAP4_KBD_DEBOUNCINGTIME,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_VAL_DEBOUNCINGTIME);
->> + ? ? kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_VAL_IRQDISABLE);
->> + ? ? kbd_write_irqenable(keypad_data, keypad_data->irqenable,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_DEF_IRQENABLE_EVENTEN |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_DEF_IRQENABLE_LONGKEY);
->> + ? ? kbd_writel(keypad_data, OMAP4_KBD_WAKEUPENABLE,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_DEF_WUP_EVENT_ENA |
->> OMAP4_DEF_WUP_LONG_KEY_ENA);
->>
->> ? ? ? enable_irq(keypad_data->irq);
->>
->> @@ -162,12 +236,12 @@ static void omap4_keypad_close(struct input_dev
->> *input)
->> ? ? ? disable_irq(keypad_data->irq);
->>
->> ? ? ? /* Disable interrupts */
->> - ? ? __raw_writel(OMAP4_VAL_IRQDISABLE,
->> - ? ? ? ? ? ? ? ? ?keypad_data->base + OMAP4_KBD_IRQENABLE);
->> + ? ? kbd_write_irqenable(keypad_data, keypad_data->irqenable,
->> + ? ? ? ? ? ? ? ? ? ? OMAP4_VAL_IRQDISABLE);
->>
->> ? ? ? /* clear pending interrupts */
->> - ? ? __raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
->> - ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQSTATUS);
->> + ? ? kbd_write_irqstatus(keypad_data, keypad_data->irqstatus,
->> + ? ? ? ? ? ? kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
->>
->> ? ? ? enable_irq(keypad_data->irq);
->>
->
-> Thanks.
->
-> --
-> Dmitry
+Linus Walleij
