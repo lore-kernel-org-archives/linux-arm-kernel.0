@@ -1,26 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Apr 2012 13:01:49 -0600 (MDT)
-Subject: [PATCH v4 04/12] ARM: OMAP1: OHCI: use platform_data fn ptr to
- enable OCPI bus
-In-Reply-To: <20120411182634.GA9396@arwen.pp.htv.fi>
-References: <20120411003454.27059.37500.stgit@dusk>
- <20120411003528.27059.8836.stgit@dusk>
- <20120411182634.GA9396@arwen.pp.htv.fi>
-Message-ID: <alpine.DEB.2.00.1204111301230.29473@utopia.booyaka.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 11 Apr 2012 16:07:35 -0300
+Subject: [PATCH 1/2] ARM: imx6q-arm2: Remove hardcoded mac address
+Message-ID: <1334171256-18761-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Do not hardcode the local mac address.
 
-On Wed, 11 Apr 2012, Felipe Balbi wrote:
+Let bootloader retrieve it.
 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-arm2.dts |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Thanks, ack added.
-
-> ideally ocpi.c would be a platform_driver
-
-Agreed.
-
-
-- Paul
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index ce1c823..04501d1 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -29,7 +29,6 @@
+ 		aips-bus at 02100000 { /* AIPS2 */
+ 			enet at 02188000 {
+ 				phy-mode = "rgmii";
+-				local-mac-address = [00 04 9F 01 1B 61];
+ 				status = "okay";
+ 			};
+ 
+-- 
+1.7.1
