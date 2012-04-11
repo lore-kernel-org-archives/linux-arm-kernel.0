@@ -1,205 +1,47 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Apr 2012 12:06:58 +1000
-Subject: [PATCH] arm: ep93xx: use DEFINE_RES_* macros
-In-Reply-To: <201203211135.49295.hartleys@visionengravers.com>
-References: <201203211135.49295.hartleys@visionengravers.com>
-Message-ID: <4F84E742.6030507@gmail.com>
+Date: Wed, 11 Apr 2012 12:09:14 +1000
+Subject: [PATCH] arm: ep93xx: Don't try to release not acquired GPIO lines
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F002069840A362@AUSP01VMBX24.collaborationhost.net>
+References: <4F7D8587.5020205@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F002069840A362@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F84E7CA.8000508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/03/12 05:35, H Hartley Sweeten wrote:
+On 06/04/12 02:39, H Hartley Sweeten wrote:
 
-> Use the DEFINE_RES_* macros to reduce some of the boilerplate code.
+> On Thursday, April 05, 2012 4:44 AM, Rafal Prylowski wrote:
+>> Fail path of ep93xx_keypad_acquire_gpio() tries to release
+>> GPIO lines not acquired successfully before. Fix this.
+>>
+>> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+>> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Ryan Mallon <rmallon@gmail.com>
+>>
+>> ---
+>> Patch applies to v3.4rc1.
+>>
+>>  arch/arm/mach-ep93xx/core.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
+>> ===================================================================
+>> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
+>> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
+>> @@ -734,7 +734,7 @@ int ep93xx_keypad_acquire_gpio(struct pl
+>>  fail_gpio_d:
+>>  	gpio_free(EP93XX_GPIO_LINE_C(i));
+>>  fail_gpio_c:
+>> -	for ( ; i >= 0; --i) {
+>> +	for (--i; i >= 0; --i) {
+>>  		gpio_free(EP93XX_GPIO_LINE_C(i));
+>>  		gpio_free(EP93XX_GPIO_LINE_D(i));
+>>  	}
 > 
-> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
 
-Applied (with Mika's ack) to ep93xx-cleanup branch on
-https://github.com/RyanMallon/linux-ep93xx.
-
-I won't do an official announcement of the repo yet, but hopefully that
-branch will remain stable :-).
+Applied to ep93xx-fixes on https://github.com/RyanMallon/linux-ep93xx
 
 Thanks,
 ~Ryan
-
-> 
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 8d25895..a2cb176 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -241,11 +241,7 @@ unsigned int ep93xx_chip_revision(void)
->   * EP93xx GPIO
->   *************************************************************************/
->  static struct resource ep93xx_gpio_resource[] = {
-> -	{
-> -		.start		= EP93XX_GPIO_PHYS_BASE,
-> -		.end		= EP93XX_GPIO_PHYS_BASE + 0xcc - 1,
-> -		.flags		= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_GPIO_PHYS_BASE, 0xcc),
->  };
->  
->  static struct platform_device ep93xx_gpio_device = {
-> @@ -288,11 +284,7 @@ static AMBA_APB_DEVICE(uart3, "apb:uart3", 0x00041010, EP93XX_UART3_PHYS_BASE,
->  	{ IRQ_EP93XX_UART3 }, &ep93xx_uart_data);
->  
->  static struct resource ep93xx_rtc_resource[] = {
-> -	{
-> -		.start		= EP93XX_RTC_PHYS_BASE,
-> -		.end		= EP93XX_RTC_PHYS_BASE + 0x10c - 1,
-> -		.flags		= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_RTC_PHYS_BASE, 0x10c),
->  };
->  
->  static struct platform_device ep93xx_rtc_device = {
-> @@ -304,16 +296,8 @@ static struct platform_device ep93xx_rtc_device = {
->  
->  
->  static struct resource ep93xx_ohci_resources[] = {
-> -	[0] = {
-> -		.start	= EP93XX_USB_PHYS_BASE,
-> -		.end	= EP93XX_USB_PHYS_BASE + 0x0fff,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start	= IRQ_EP93XX_USB,
-> -		.end	= IRQ_EP93XX_USB,
-> -		.flags	= IORESOURCE_IRQ,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_USB_PHYS_BASE, 0x1000),
-> +	DEFINE_RES_IRQ(IRQ_EP93XX_USB),
->  };
->  
->  
-> @@ -372,15 +356,8 @@ void __init ep93xx_register_flash(unsigned int width,
->  static struct ep93xx_eth_data ep93xx_eth_data;
->  
->  static struct resource ep93xx_eth_resource[] = {
-> -	{
-> -		.start	= EP93XX_ETHERNET_PHYS_BASE,
-> -		.end	= EP93XX_ETHERNET_PHYS_BASE + 0xffff,
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.start	= IRQ_EP93XX_ETHERNET,
-> -		.end	= IRQ_EP93XX_ETHERNET,
-> -		.flags	= IORESOURCE_IRQ,
-> -	}
-> +	DEFINE_RES_MEM(EP93XX_ETHERNET_PHYS_BASE, 0x10000),
-> +	DEFINE_REQ_IRQ(IRQ_EP93XX_ETHERNET),
->  };
->  
->  static u64 ep93xx_eth_dma_mask = DMA_BIT_MASK(32);
-> @@ -461,16 +438,8 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
->  static struct ep93xx_spi_info ep93xx_spi_master_data;
->  
->  static struct resource ep93xx_spi_resources[] = {
-> -	{
-> -		.start	= EP93XX_SPI_PHYS_BASE,
-> -		.end	= EP93XX_SPI_PHYS_BASE + 0x18 - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> -	{
-> -		.start	= IRQ_EP93XX_SSP,
-> -		.end	= IRQ_EP93XX_SSP,
-> -		.flags	= IORESOURCE_IRQ,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_SPI_PHYS_BASE, 0x18),
-> +	DEFINE_RES_IRQ(IRQ_EP93XX_SSP),
->  };
->  
->  static u64 ep93xx_spi_dma_mask = DMA_BIT_MASK(32);
-> @@ -541,11 +510,7 @@ static struct platform_device ep93xx_leds = {
->   * EP93xx pwm peripheral handling
->   *************************************************************************/
->  static struct resource ep93xx_pwm0_resource[] = {
-> -	{
-> -		.start	= EP93XX_PWM_PHYS_BASE,
-> -		.end	= EP93XX_PWM_PHYS_BASE + 0x10 - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE, 0x10),
->  };
->  
->  static struct platform_device ep93xx_pwm0_device = {
-> @@ -556,11 +521,7 @@ static struct platform_device ep93xx_pwm0_device = {
->  };
->  
->  static struct resource ep93xx_pwm1_resource[] = {
-> -	{
-> -		.start	= EP93XX_PWM_PHYS_BASE + 0x20,
-> -		.end	= EP93XX_PWM_PHYS_BASE + 0x30 - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE + 0x20, 0x10),
->  };
->  
->  static struct platform_device ep93xx_pwm1_device = {
-> @@ -628,11 +589,7 @@ EXPORT_SYMBOL(ep93xx_pwm_release_gpio);
->  static struct ep93xxfb_mach_info ep93xxfb_data;
->  
->  static struct resource ep93xx_fb_resource[] = {
-> -	{
-> -		.start		= EP93XX_RASTER_PHYS_BASE,
-> -		.end		= EP93XX_RASTER_PHYS_BASE + 0x800 - 1,
-> -		.flags		= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_RASTER_PHYS_BASE, 0x800),
->  };
->  
->  static struct platform_device ep93xx_fb_device = {
-> @@ -680,15 +637,8 @@ void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
->  static struct ep93xx_keypad_platform_data ep93xx_keypad_data;
->  
->  static struct resource ep93xx_keypad_resource[] = {
-> -	{
-> -		.start	= EP93XX_KEY_MATRIX_PHYS_BASE,
-> -		.end	= EP93XX_KEY_MATRIX_PHYS_BASE + 0x0c - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	}, {
-> -		.start	= IRQ_EP93XX_KEY,
-> -		.end	= IRQ_EP93XX_KEY,
-> -		.flags	= IORESOURCE_IRQ,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_KEY_MATRIX_PHYS_BASE, 0x0c),
-> +	DEFINE_RES_IRQ(IRQ_EP93XX_KEY),
->  };
->  
->  static struct platform_device ep93xx_keypad_device = {
-> @@ -761,11 +711,7 @@ EXPORT_SYMBOL(ep93xx_keypad_release_gpio);
->   * EP93xx I2S audio peripheral handling
->   *************************************************************************/
->  static struct resource ep93xx_i2s_resource[] = {
-> -	{
-> -		.start	= EP93XX_I2S_PHYS_BASE,
-> -		.end	= EP93XX_I2S_PHYS_BASE + 0x100 - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_I2S_PHYS_BASE, 0x100),
->  };
->  
->  static struct platform_device ep93xx_i2s_device = {
-> @@ -824,16 +770,8 @@ EXPORT_SYMBOL(ep93xx_i2s_release);
->   * EP93xx AC97 audio peripheral handling
->   *************************************************************************/
->  static struct resource ep93xx_ac97_resources[] = {
-> -	{
-> -		.start	= EP93XX_AAC_PHYS_BASE,
-> -		.end	= EP93XX_AAC_PHYS_BASE + 0xac - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> -	{
-> -		.start	= IRQ_EP93XX_AACINTR,
-> -		.end	= IRQ_EP93XX_AACINTR,
-> -		.flags	= IORESOURCE_IRQ,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_AAC_PHYS_BASE, 0xac),
-> +	DEFINE_RES_IRQ(IRQ_EP93XX_AACINTR),
->  };
->  
->  static struct platform_device ep93xx_ac97_device = {
