@@ -1,38 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Apr 2012 16:07:37 +0100
-Subject: [PATCH v2 3/4] ARM: mm: truncate memory banks to fit in 4GB
- space for classic MMU
-In-Reply-To: <alpine.LFD.2.02.1204111038130.16314@xanadu.home>
-References: <1334154639-13869-1-git-send-email-will.deacon@arm.com>
- <1334154639-13869-4-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1204111038130.16314@xanadu.home>
-Message-ID: <20120411150737.GH16643@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Apr 2012 15:08:45 +0000
+Subject: [PATCH V3 1/5] ARM: kirkwood: Basic support for DNS-320 and
+ DNS-325
+In-Reply-To: <20120411141118.GG14790@titan.lakedaemon.net>
+References: <1332885255-8304-1-git-send-email-jm@lentin.co.uk>
+ <op.wclrwkqi4cuzmg@gonzo.lentin.co.uk>
+ <20120411141118.GG14790@titan.lakedaemon.net>
+Message-ID: <201204111508.46143.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 03:44:22PM +0100, Nicolas Pitre wrote:
-> On Wed, 11 Apr 2012, Will Deacon wrote:
+On Wednesday 11 April 2012, Jason Cooper wrote:
+> > Thinking about it, MACH_DNSKW_DT would probably be best. Anything
+> > more general, e.g. MACH_DLINK_DNS_DT, would also cover the
+> > orion-based DNS-313/323/343. Presumably there will always be
+> > differences between kirkwood and orion5x?
 > 
-> > If a bank of memory spanning the 4GB boundary is added on a !CONFIG_LPAE
-> > kernel then we will hang early during boot since the memory bank will
-> > have wrapped around to zero.
-> > 
-> > This patch truncates memory banks for !LPAE configurations when the end
-> > address is not representable in 32 bits.
-> > 
-> > Cc: Nicolas Pitre <nico@fluxnic.net>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Hmm, Well, I think I would prefer MACH_DLINK_KIRKWOOD_DT,
+> MACH_DLINK_ORION5X_DT.  This way, all the dtb's for a given manf/SoC are
+> built in one go, and the correct board-dt file is built as well.
 > 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+> So, in my case, I would do MACH_GLOBALSCALE_KIRKWOOD_DT, and
+> MACH_GLOBALSCALE_ARMADA_DT.
+> 
+> Grant, Arnd, sound sensible?
 
-Thanks Nicolas.
+I think it's fine, I just don't spend too much time on the naming
+when the goal is to eventually just have one config option for
+all manufacturers.
 
-> Now what if start = 1G and size = 5G? The size variable is an unsigned 
-> long, meaning that right now the size might be truncated to 1G.
-
-membank->size is also an unsigned long, so I guess we'd have to create two
-adjacent banks for this scenario. This is easy for ATAGs, because the
-tag_mem32 structure has a u32 for size but obviously a DT blob could pass
-something larger.
-
-Will
+	Arnd
