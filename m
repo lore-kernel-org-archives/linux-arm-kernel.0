@@ -1,86 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 10 Apr 2012 20:54:37 -0400
-Subject: [PULL] generic irq chip and pl061 irqdomain support
-In-Reply-To: <20120407041155.196043E25B3@localhost>
-References: <4F3ADFE7.4090409@gmail.com> <4F5437FE.2000306@gmail.com>
- <4F5FD037.5000703@gmail.com> <20120313231834.8B6AE3E050F@localhost>
- <4F79A3B3.9040209@gmail.com> <20120407041155.196043E25B3@localhost>
-Message-ID: <20120411005436.GC14790@titan.lakedaemon.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 11 Apr 2012 09:00:35 +0800
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <CAMQu2gwSAPtXOYWP1VmVCuxru_CrbLC-gLaaD7n4+utu3rOwxQ@mail.gmail.com>
+References: <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
+ <20120405095221.GC25053@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
+ <87hawxkgoi.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
+ <20120406180452.GB15734@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83184ABEF@DBDE01.ent.ti.com>
+ <4F83440E.70502@ti.com>
+ <20120410084413.GD25053@n2100.arm.linux.org.uk>
+ <4F83F600.4000002@ti.com>
+ <20120410092904.GE25053@n2100.arm.linux.org.uk>
+ <CAMQu2gwSAPtXOYWP1VmVCuxru_CrbLC-gLaaD7n4+utu3rOwxQ@mail.gmail.com>
+Message-ID: <CACVXFVMtPEo1h6auh8gc=ZAxb0+w_-Jy7ARixS30k=9-TeKrkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2012 at 09:11:55PM -0700, Grant Likely wrote:
-> On Mon, 02 Apr 2012 08:03:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> > Grant,
-> > 
-> > On 03/13/2012 06:18 PM, Grant Likely wrote:
-> > > On Tue, 13 Mar 2012 17:54:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> > >> On 03/04/2012 09:50 PM, Rob Herring wrote:
-> > >>> Grant,
-> > >>>
-> > >>> On 02/14/2012 04:27 PM, Rob Herring wrote:
-> > >>>> Grant,
-> > >>>>
-> > >>>> Please pull. This is based on your current branch which you have said
-> > >>>> you plan to rebase, so feel free to rebase these as you need to. This
-> > >>>> has been tested on highbank and i.MX5.
-> > >>>>
-> > >>>
-> > >>> Ping.
-> > >>>
-> > >>> I've rebased onto your current tree. Updated pull request:
-> > >>>
-> > >>> The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
-> > >>>
-> > >>>   mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
-> > >>>
-> > >>> are available in the git repository at:
-> > >>>   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
-> > >>>
-> > >>> Rob Herring (3):
-> > >>>       ARM: kconfig: always select IRQ_DOMAIN
-> > >>>       irq: add irq_domain support to generic-chip
-> > >>>       gpio: pl061: enable interrupts with DT style binding
-> > >>>
-> > >>>  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
-> > >>>  arch/arm/Kconfig                                   |    2 +-
-> > >>>  arch/arm/common/Kconfig                            |    2 -
-> > >>>  drivers/gpio/gpio-pl061.c                          |   48 ++++---
-> > >>>  include/linux/irq.h                                |   15 ++
-> > >>>  kernel/irq/generic-chip.c                          |  152
-> > >>> +++++++++++++++++---
-> > >>>  6 files changed, 186 insertions(+), 48 deletions(-)
-> > >>>
-> > >>
-> > >> Ping again...
-> > > 
-> > > Okay, I've pulled this in.  I need to do some compile testing before I push
-> > > it out.
-> > 
-> > What happened to this? It's not in rc1.
-> 
-> I kept looking at it and planning to send Linus a pull request, but I
-> just couldn't make myself comfortable with the state of the patch.  It
-> seems to me that there is too much bleeding of irq_domain state into
-> irq_generic_chip and it doesn't return any meaningful context to the
-> caller that can be used to tear it back down.
-> 
-> I think for the domain+generic_chip use case the API needs refining so
-> that it returns a container structure with both the irq_domain and the
-> array of generic chips.  Plus there needs to be a remove function
-> (there also needs to be an irq_domain remove function; I also realized
-> that was a missing piece when I looked at it).
-> 
-> I had really hoped to get fixup patches sorted out in time to still
-> get Linus to merge it even though it hadn't been through Linux next,
-> but given that I couldn't even find time to email you properly about
-> it, it seems I was doomed.  :-(  There weren't any other users of it
-> in linux-next though, so in the end I just didn't sent the pull req.
+On Tue, Apr 10, 2012 at 5:51 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> On Tue, Apr 10, 2012 at 2:59 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Apr 10, 2012 at 02:27:36PM +0530, Santosh Shilimkar wrote:
+>>> On Tuesday 10 April 2012 02:14 PM, Russell King - ARM Linux wrote:
+>>> > On Mon, Apr 09, 2012 at 03:18:22PM -0500, Jon Hunter wrote:
+>>> >> True, but we would always want to use the 32k timer if CONFIG_PM is
+>>> >> specified. So what I am saying is that if a device has a 32ksync timer
+>>> >> and CONFIG_PM is defined, we always want to use the 32ksync timer and a
+>>> >> gptimer should never be used.
+>>> >
+>>> > Why? ?What if you want to have PM enabled, and you also want to use the
+>>> > kernels high resolution timers, or you want more accurate timing than
+>>> > the 30.5us tick interval of the 32k timer?
+>>>
+>>> You might have missed the earlier comments on the thread. High
+>>> resolution GP timer(sysclk) will stop in deeper power states and
+>>> hence it can't be used with PM enabled usecases.
+>>
+>> Which means folk should be given the choice at boot time between running
+>> with the deeper power states and having a higher resolution timing source,
+>> rather than denying them the higher resolution timing source when PM is
+>> enabled.
+>
+> Good point. My point is such facilities is already part of the kernel and
+> there is no need to add a new one. The last proposal was allowing user to
+> choose gptimer as a clocksource and then you already have facility to
+> disable C-state now so, all should work in general
 
-I have several patches for kirkwood/orion which depend on this.  I'd be
-lying if I said they were ready for submission, but getting this merged
-would sure help move things along.  ;-)
+'nohlt' in boot cmd should work to prevent CPU from entering deep C-state,
+which looks enough to make gptimer working well if system suspend isn't
+considered.
 
-thx,
-
-Jason.
+Thanks,
+-- 
+Ming Lei
