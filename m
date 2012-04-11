@@ -1,58 +1,33 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 12 Apr 2012 08:03:34 +1000
-Subject: [PATCH v2] arm: ep93xx: use gpio_led_register_device
-In-Reply-To: <201204111429.20038.hartleys@visionengravers.com>
-References: <201204111429.20038.hartleys@visionengravers.com>
-Message-ID: <4F85FFB6.8050406@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Apr 2012 16:04:44 -0600 (MDT)
+Subject: [PATCH 08/12] arm: omap3: am35x: Fix clockdomain dependencies
+In-Reply-To: <20120411215513.GA31197@animalcreek.com>
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-9-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111540060.29473@utopia.booyaka.com>
+ <20120411215513.GA31197@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1204111555360.29473@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/12 07:29, H Hartley Sweeten wrote:
+On Wed, 11 Apr 2012, Mark A. Greer wrote:
 
-> Use gpio_led_register_device to register the two leds
-> connected to the ep93xx.
+> On Wed, Apr 11, 2012 at 03:44:38PM -0600, Paul Walmsley wrote:
 > 
-> Since this is a common feature for all ep93xx based boards,
-> create a new Kconfig option, ARCH_EP93XX_TYPICAL, to select
-> the LEDS_GPIO_REGISTER feature.
+> > Looks like there are an extra set of commas here, maybe just use:
+> > 
+> > static struct clkdm_dep gfx_sgx_am35x_wkdeps[] = {
+> > 	{ .clkdm_name = "mpu_clkdm" },
+> > 	{ .clkdm_name = "wkup_clkdm" },
+> > 	{ NULL },
 > 
-> The struct gpio_led and struct gpio_led_platform_data variables
-> have been changed to const struct because of:
-> 
-> commit 9517f925f2eb9ffca78b3f0f9389fc675bcb572c
->     leds: make *struct gpio_led_platform_data.leds const
-> 
-> They have also been marked as __initconst because the helper
-> function gpio_led_register_device makes a deep copy of the
-> platform data to allow it to live in init memory:
-> 
-> commit 4440673a95e63ad888a41db596edaa0c55d3a332
->     leds: provide helper to register "leds-gpio" devices
-> 
-> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> 
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
-> index 97a2493..19d8148 100644
-> --- a/arch/arm/mach-ep93xx/Kconfig
-> +++ b/arch/arm/mach-ep93xx/Kconfig
-> @@ -2,6 +2,11 @@ if ARCH_EP93XX
->  
->  menu "Cirrus EP93xx Implementation Options"
->  
-> +config ARCH_EP93XX_TYPICAL
+> Yes, there are extra commas but they come from the code I'm copying
+> and removing iva2_clkdm from.  I was keeping things consistent so I
+> kept the commas.  Given that, do you still want them removed?
+> (I'm indifferent.)
+
+Yes please.  I realize it's a minor issue, but I'd like to keep the format 
+of these files internally consistent.
 
 
-One minor change. Please use a different name for this. Since all
-of the boards use this and it cannot be unselected, its a bit
-misleading to call it typical. EP93XX_SOC or EP93XX_COMMON would
-be a bit better.
-
-~Ryan
-
-> +	bool
-> +	default y
-> +	select LEDS_GPIO_REGISTER
-> +
+- Paul
