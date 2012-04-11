@@ -1,50 +1,97 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:42:52 +0530
-Subject: [PATCHv7 14/18] I2C: OMAP: Use SET_RUNTIME_PM_OPS
+Date: Wed, 11 Apr 2012 16:42:49 +0530
+Subject: [PATCHv7 11/18] I2C: OMAP: use devm_* functions
 In-Reply-To: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334142776-10583-15-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334142776-10583-12-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use SET_RUNTIME_PM_OPS macro to set runtime functions.
+The various devm_ functions allocate memory that is released when a driver
+detaches. This patch uses devm_kzalloc, devm_request_mem_region and
+devm_ioremap for data that is allocated in the probe function of a platform
+device and is only freed in the remove function.
 
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   11 ++++-------
- 1 files changed, 4 insertions(+), 7 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   29 +++++++++--------------------
+ 1 files changed, 9 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index dd65416..28de1d2 100644
+index 121c52e..86be475 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1217,15 +1217,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
+@@ -995,17 +995,17 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
+-	ioarea = request_mem_region(mem->start, resource_size(mem),
+-			pdev->name);
++	ioarea = devm_request_mem_region(&pdev->dev, mem->start,
++			resource_size(mem), pdev->name);
+ 	if (!ioarea) {
+ 		dev_err(&pdev->dev, "I2C region already claimed\n");
+ 		return -EBUSY;
+ 	}
+ 
+-	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
++	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+-		r = -ENOMEM;
+-		goto err_release_region;
++		dev_err(&pdev->dev, "Menory allocation failed\n");
++		return -ENOMEM;
+ 	}
+ 
+ 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
+@@ -1029,11 +1029,10 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	dev->dev = &pdev->dev;
+ 	dev->irq = irq->start;
+-	dev->base = ioremap(mem->start, resource_size(mem));
+-	if (!dev->base) {
+-		r = -ENOMEM;
+-		goto err_free_mem;
+-	}
++	dev->base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
++	if (!dev->base)
++		return -ENOMEM;
++
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 
+@@ -1121,13 +1120,8 @@ err_free_irq:
+ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(dev->dev);
+-	iounmap(dev->base);
+ 	pm_runtime_disable(&pdev->dev);
+-err_free_mem:
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(dev);
+-err_release_region:
+-	release_mem_region(mem->start, resource_size(mem));
+ 
+ 	return r;
+ }
+@@ -1135,7 +1129,6 @@ err_release_region:
+ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+-	struct resource		*mem;
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
+@@ -1143,10 +1136,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ 	i2c_del_adapter(&dev->adapter);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_disable(&pdev->dev);
+-	iounmap(dev->base);
+-	kfree(dev);
+-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mem->start, resource_size(mem));
  	return 0;
  }
-+#endif
  
- static struct dev_pm_ops omap_i2c_pm_ops = {
--	.runtime_suspend = omap_i2c_runtime_suspend,
--	.runtime_resume = omap_i2c_runtime_resume,
-+	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
-+			   omap_i2c_runtime_resume, NULL)
- };
--#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
--#else
--#define OMAP_I2C_PM_OPS NULL
--#endif
- 
- static struct platform_driver omap_i2c_driver = {
- 	.probe		= omap_i2c_probe,
-@@ -1233,7 +1230,7 @@ static struct platform_driver omap_i2c_driver = {
- 	.driver		= {
- 		.name	= "omap_i2c",
- 		.owner	= THIS_MODULE,
--		.pm	= OMAP_I2C_PM_OPS,
-+		.pm	= &omap_i2c_pm_ops,
- 		.of_match_table = of_match_ptr(omap_i2c_of_match),
- 	},
- };
 -- 
 1.7.4.1
