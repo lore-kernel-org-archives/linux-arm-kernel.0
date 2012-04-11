@@ -1,109 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Apr 2012 09:47:29 -0500
-Subject: [PULL] generic irq chip and pl061 irqdomain support
-In-Reply-To: <20120407041155.196043E25B3@localhost>
-References: <4F3ADFE7.4090409@gmail.com> <4F5437FE.2000306@gmail.com>
- <4F5FD037.5000703@gmail.com> <20120313231834.8B6AE3E050F@localhost>
- <4F79A3B3.9040209@gmail.com> <20120407041155.196043E25B3@localhost>
-Message-ID: <4F859981.1020502@gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 11 Apr 2012 17:05:48 +0200
+Subject: [PATCH] mmc: remove linux/blkdev.h include from host drivers
+In-Reply-To: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
+References: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <4F859DCC.6040307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2012 11:11 PM, Grant Likely wrote:
-> On Mon, 02 Apr 2012 08:03:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
->> Grant,
->>
->> On 03/13/2012 06:18 PM, Grant Likely wrote:
->>> On Tue, 13 Mar 2012 17:54:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
->>>> On 03/04/2012 09:50 PM, Rob Herring wrote:
->>>>> Grant,
->>>>>
->>>>> On 02/14/2012 04:27 PM, Rob Herring wrote:
->>>>>> Grant,
->>>>>>
->>>>>> Please pull. This is based on your current branch which you have said
->>>>>> you plan to rebase, so feel free to rebase these as you need to. This
->>>>>> has been tested on highbank and i.MX5.
->>>>>>
->>>>>
->>>>> Ping.
->>>>>
->>>>> I've rebased onto your current tree. Updated pull request:
->>>>>
->>>>> The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
->>>>>
->>>>>   mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
->>>>>
->>>>> are available in the git repository at:
->>>>>   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
->>>>>
->>>>> Rob Herring (3):
->>>>>       ARM: kconfig: always select IRQ_DOMAIN
->>>>>       irq: add irq_domain support to generic-chip
->>>>>       gpio: pl061: enable interrupts with DT style binding
->>>>>
->>>>>  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
->>>>>  arch/arm/Kconfig                                   |    2 +-
->>>>>  arch/arm/common/Kconfig                            |    2 -
->>>>>  drivers/gpio/gpio-pl061.c                          |   48 ++++---
->>>>>  include/linux/irq.h                                |   15 ++
->>>>>  kernel/irq/generic-chip.c                          |  152
->>>>> +++++++++++++++++---
->>>>>  6 files changed, 186 insertions(+), 48 deletions(-)
->>>>>
->>>>
->>>> Ping again...
->>>
->>> Okay, I've pulled this in.  I need to do some compile testing before I push
->>> it out.
->>
->> What happened to this? It's not in rc1.
-> 
-> I kept looking at it and planning to send Linus a pull request, but I
-> just couldn't make myself comfortable with the state of the patch.  It
-> seems to me that there is too much bleeding of irq_domain state into
-> irq_generic_chip and it doesn't return any meaningful context to the
-> caller that can be used to tear it back down.
-> 
-> I think for the domain+generic_chip use case the API needs refining so
-> that it returns a container structure with both the irq_domain and the
-> array of generic chips.  Plus there needs to be a remove function
-> (there also needs to be an irq_domain remove function; I also realized
-> that was a missing piece when I looked at it).
-> 
-> I had really hoped to get fixup patches sorted out in time to still
-> get Linus to merge it even though it hadn't been through Linux next,
-> but given that I couldn't even find time to email you properly about
-> it, it seems I was doomed.  :-(  There weren't any other users of it
-> in linux-next though, so in the end I just didn't sent the pull req.
+Hi Dmitry,
 
-There weren't any users in next because this was not in next for very
-long. iMX had support ready to go. This (or at least some parts) is
-needed to convert any existing users of generic_chip over to domains and
-DT whether we add domain support directly or not.
+Le 04/10/2012 09:06 PM, Dmitry Artamonow a ?crit :
+> None of mmc host drivers using linux/blkdev.h header
+> really need anything from it. The slight exception is
+> atmel-mci, which uses blkdev.h only because it indirectly
+> pulls asm/cacheflush.h
+>
+> So remove any inclusion of blkdev.h - it should also fix
+> build errors of dw_mmc and atmel-mci drivers when
+> CONFIG_BLOCK is disabled, like following:
+> ------------------------------------------------------
+> In file included from drivers/mmc/host/dw_mmc.c:14:0:
+> include/linux/blkdev.h:1408:42: warning: ?struct task_struct? declared inside parameter list [enabled by default]
+> include/linux/blkdev.h:1408:42: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+> include/linux/blkdev.h:1412:51: warning: ?struct task_struct? declared inside parameter list [enabled by default]
+> include/linux/blkdev.h:1417:1: error: unknown type name ?bool?
+> include/linux/blkdev.h:1417:48: warning: ?struct task_struct? declared inside parameter list [enabled by default]
+> include/linux/blkdev.h: In function ?blk_needs_flush_plug?:
+> include/linux/blkdev.h:1419:9: error: ?false? undeclared (first use in this function)
+> include/linux/blkdev.h:1419:9: note: each undeclared identifier is reported only once for each function it appears in
+> make[1]: *** [drivers/mmc/host/dw_mmc.o] Error 1
+> make: *** [drivers/mmc/host/dw_mmc.o] Error 2
+> ------------------------------------------------------
+>
+> Cc: Ludovic Desroches<ludovic.desroches@atmel.com>
+> Cc: Pavel Pisa<ppisa@pikron.com>
+> Cc: Sascha Hauer<s.hauer@pengutronix.de>
+> Cc: Will Newton<will.newton@imgtec.com>
+> Signed-off-by: Dmitry Artamonow<mad_soft@inbox.ru>
+> ---
+>
+>   drivers/mmc/host/at91_mci.c  |    1 -
+>   drivers/mmc/host/atmel-mci.c |    2 +-
 
-> I've got a couple of fixup patches on top of your branch that I'll
-> send to you so you can see some of the stuff that I've done.  I'm also
-> not comfortable with adding flags, irq_clr & irq_set into
-> irq_generic_chip, but I can't quite put my finger on why.  :-/  Also,
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-I'm not adding those. The timing of the irq handler setup is different
-with a domain, so I have to store those for later. I think this also
-makes generic_chip incompatible with domains as it now exists.
+Thanks for your patch.
 
-> the api for irq_setup_generic_chip_domain() is enormous.  If a context
-> structure is used, then it would probably be better to populate it
-> with the configuration so that the API isn't nearly so large.
+Regards
 
-This is largely an artifact of the existing generic_chip api which has
-a large number of parameters, but they are spread across 2 functions.
-
-There's a couple of simple things I could do:
-- drop name and use node->name instead. If node is null then the
-irq_chip will have no name, but this appears to be optional.
-- make the callback fill in irq_base, reg_base, flags, irq_clr, irq_set
-and private
-- make the common case an inline wrapper. All but 1 user sets num_ct to
-1 for example.
-
-Rob
+Ludovic
