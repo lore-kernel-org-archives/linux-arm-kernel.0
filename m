@@ -1,69 +1,58 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 11 Apr 2012 16:34:31 +0200
-Subject: [PATCH 2/2] ARM: Exynos4: update SYSMMU setup code for gen_pd power
- domain driver
-In-Reply-To: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
-References: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1334154871-4756-3-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 11 Apr 2012 16:36:43 +0200
+Subject: [PATCH/RFC] ARM: Exynos4: Integrate IOMMU aware DMA-mapping
+Message-ID: <1334155004-5700-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SYSMMU platform devices must be registered before setting up power
-domains to let power domain driver to correctly register also SYSMMU
-controller devices. This patch also registers SYSMMU controller devices
-to respective power domains.
+Hi!
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/dev-sysmmu.c |    6 +++++-
- arch/arm/mach-exynos/pm_domains.c |   13 +++++++++++++
- 2 files changed, 18 insertions(+), 1 deletions(-)
+This is an example of the IOMMU aware DMA-mapping implementation usage
+on a Samsung Exynos4 based NURI board. The ARM DMA-mapping IOMMU aware
+implementation is available in the [1] thread: 
 
-diff --git a/arch/arm/mach-exynos/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
-index c5b1ea3..3544638 100644
---- a/arch/arm/mach-exynos/dev-sysmmu.c
-+++ b/arch/arm/mach-exynos/dev-sysmmu.c
-@@ -271,4 +271,8 @@ static int __init init_sysmmu_platform_device(void)
- 
- 	return 0;
- }
--arch_initcall(init_sysmmu_platform_device);
-+/*
-+ * SYSMMU platform devices must be registered before power domains
-+ * see pm_domain.c, which use arch_initcall()
-+ */
-+core_initcall(init_sysmmu_platform_device);
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 13b3068..51a028d 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -21,6 +21,7 @@
- #include <linux/of_address.h>
- 
- #include <mach/regs-pmu.h>
-+#include <mach/sysmmu.h>
- #include <plat/devs.h>
- 
- /*
-@@ -155,6 +156,18 @@ static __init int exynos4_pm_init_power_domain(void)
- 		pm_genpd_init(&exynos4_pm_domains[idx]->pd, NULL,
- 				exynos4_pm_domains[idx]->is_off);
- 
-+#ifdef CONFIG_EXYNOS_DEV_SYSMMU
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(fimc0), &exynos4_pd_cam);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(fimc1), &exynos4_pd_cam);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(fimc2), &exynos4_pd_cam);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(fimc3), &exynos4_pd_cam);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(jpeg), &exynos4_pd_cam);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(mfc_l), &exynos4_pd_mfc);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(mfc_r), &exynos4_pd_mfc);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(fimd0), &exynos4_pd_lcd0);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(rot), &exynos4_pd_lcd0);
-+	exynos_pm_add_dev_to_genpd(&SYSMMU_PLATDEV(tv), &exynos4_pd_tv);
-+#endif
- #ifdef CONFIG_S5P_DEV_FIMD0
- 	exynos_pm_add_dev_to_genpd(&s5p_device_fimd0, &exynos4_pd_lcd0);
- #endif
+This patch essentially registers DMA-mmaping/IOMMU support for FIMC and
+MFC devices and performs some tweaks in clocks hierarchy to get SYSMMU
+driver working correctly.
+
+The drivers have been tested with mainline V4L2 drivers for FIMC and MFC
+hardware.
+
+For easier testing I've created a separate kernel branch with all
+required prerequisite patches. It is based on lastest kgene/for-next
+branch and is available on my git repository:
+
+git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc2-arm-dma-v8-samsung
+
+This patch requires the following items:
+1. ARM DMA-mapping patches [1]
+2. Exynos SYSMMU driver v12 [2]
+3. Exynos SYSMMU driver runtime pm fixes
+4. Exynos4 gen_pd power domain driver fixes
+
+Runtime pm and power domain patches are required on Samsung Nuri board,
+but might be optional on boards where bootloader doesn't disable all
+devices on boot.
+
+[1] http://www.spinics.net/lists/linux-arch/msg17331.html
+[2] https://lkml.org/lkml/2012/3/15/51
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+Patch summary:
+
+Marek Szyprowski (1):
+  ARM: Exynos4: integrate SYSMMU driver with DMA-mapping interface
+
+ arch/arm/mach-exynos/Kconfig               |    1 +
+ arch/arm/mach-exynos/clock-exynos4.c       |   64 +++++++++++++++-------------
+ arch/arm/mach-exynos/dev-sysmmu.c          |   44 +++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/sysmmu.h |    3 +
+ drivers/iommu/Kconfig                      |    1 +
+ 5 files changed, 84 insertions(+), 29 deletions(-)
+
 -- 
 1.7.1.569.g6f426
