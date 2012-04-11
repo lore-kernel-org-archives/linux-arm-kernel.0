@@ -1,43 +1,41 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Wed, 11 Apr 2012 20:36:53 +0900
-Subject: [PATCH v2] arm: davinci: use for_each_set_bit_from
-Message-ID: <1334144213-25870-1-git-send-email-akinobu.mita@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 11 Apr 2012 13:37:50 +0200
+Subject: [PATCH RFC] ARM: at91: remove at91_register_uart_fns and headers
+In-Reply-To: <CAFumwP38ghv91gwZ55pQeDDD67_t+61pLqBkvX8wzZk5R-3z5w@mail.gmail.com>
+References: <1333728149-32711-1-git-send-email-joachim.eastwood@jotron.com>
+ <20120408180906.GA13348@samfundet.no>
+ <CAF8ieYVvWJDEkVheGrCuQ+4Ucx_WV-M3qXia1-Y97vqCmeeETQ@mail.gmail.com>
+ <CAFumwP38ghv91gwZ55pQeDDD67_t+61pLqBkvX8wzZk5R-3z5w@mail.gmail.com>
+Message-ID: <4F856D0E.5040802@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use for_each_set_bit_from to iterate over all the set bit in a memory
-region.
+On 04/08/2012 11:55 PM, Andrew Victor :
+> hi,
+> 
+>> Yeah, as far as I know, nobody ever used this functionality on AVR32.
+>> In fact, I can't even think of a reason to use it.
+>>
+>> But I seem to recall submitting a patch to remove this functionality a
+>> long time ago, and it was struck down. I don't remember the reason,
+>> but there's a chance it might still be valid.
+> 
+> Some of the SAN People / Multenet AT91RM9200 boards needed it....
+> We needed to use GPIO pins for some of the modem-control signals -
+> couldn't use the standard pins since the alternate pin function was
+> being used.
+> 
+> Regards,
+>  Andrew Victor
 
-Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Christian Riesch <christian.riesch@omicron.at>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
-v2: remove uncorrect semicolon at the end of the line found by Christian Riesch
+Hi Andrew,
 
- arch/arm/mach-davinci/dma.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+Well if it is of some interest on your side, I am in favor of keeping
+this feature. It is not a so big amount of code and seems quite easy to
+maintain...
 
-diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-index fd33919..95ce019 100644
---- a/arch/arm/mach-davinci/dma.c
-+++ b/arch/arm/mach-davinci/dma.c
-@@ -557,9 +557,9 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
- 	if (i == edma_cc[ctlr]->num_slots)
- 		stop_slot = i;
- 
--	for (j = start_slot; j < stop_slot; j++)
--		if (test_bit(j, tmp_inuse))
--			clear_bit(j, edma_cc[ctlr]->edma_inuse);
-+	j = start_slot;
-+	for_each_set_bit_from(j, tmp_inuse, stop_slot)
-+		clear_bit(j, edma_cc[ctlr]->edma_inuse);
- 
- 	if (count)
- 		return -EBUSY;
+Thanks a lot to all for your feedback anyway.
+
+Cheers,
 -- 
-1.7.4.4
+Nicolas Ferre
