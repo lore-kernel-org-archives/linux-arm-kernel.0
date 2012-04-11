@@ -1,231 +1,77 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 11 Apr 2012 22:56:01 +0200
-Subject: [PATCH 06/12] arm: omap3: am35x: Add full PWRDM_POWER_INACTIVE
- support
-In-Reply-To: <1334171147-7517-7-git-send-email-mgreer@animalcreek.com>
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-7-git-send-email-mgreer@animalcreek.com>
-Message-ID: <CAORVsuW2Nax4h+SxEJ6dLM1AopAFPQjvK0FHa9N5mEEVCStpQw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 11 Apr 2012 14:57:07 -0600
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map;
+ use irq_alloc_desc() instead
+In-Reply-To: <1334122182.2984.33.camel@pasglop>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+ <20120402215524.GM24211@n2100.arm.linux.org.uk>
+ <1333406005.30734.61.camel@pasglop>
+ <20120402225223.GN24211@n2100.arm.linux.org.uk>
+ <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
+ <1333755470.3040.38.camel@pasglop> <m2aa2n7mmw.fsf@igel.home>
+ <1334106834.2984.17.camel@pasglop> <1334107996.2984.20.camel@pasglop>
+ <1334122182.2984.33.camel@pasglop>
+Message-ID: <20120411205707.68AC13E08B6@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, 11 Apr 2012 15:29:42 +1000, Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
+> On Wed, 2012-04-11 at 11:33 +1000, Benjamin Herrenschmidt wrote:
+> > On Wed, 2012-04-11 at 11:13 +1000, Benjamin Herrenschmidt wrote:
+> > > On Sat, 2012-04-07 at 14:27 +0200, Andreas Schwab wrote:
+> > > > Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
+> > > > 
+> > > > > It's arguable that this irq_set_irq_type(,NONE) shouln't be there but
+> > > > > still ... it's been around for ever and things worked :-) So something
+> > > > > -else- is causing the problem and I'd like to understand what exactly.
+> > > > 
+> > > > AFAICS before a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5
+> > > > irq_set_irq_type(,NONE) was actually a no-op.
+> > > 
+> > > So I'm still a bit baffled... ie, I understand some of what's happening
+> > > but not why it breaks things, I haven't yet managed to reproduce but I
+> > > haven't tried too hard just yet (was away from the HW) :
+> > 
+> > Allright, I have a repro-case, I'll dig.
+> 
+> Ok, so it's Grant's fault :-)
 
-On Wed, Apr 11, 2012 at 9:05 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
->
-> The am35x family of SoCs only support PWRDM_POWER_ON
-> and PWRDM_POWER_INACTIVE power states. This causes
-> an issue in some areas of the OMAP3 power-related
-> code because of assumptions that PWRDM_POWER_RET
-> and/or PWRDM_POWER_OFF are always valid states.
->
-> To get am35x SoCs to work properly, add missing support
-> for PWRDM_POWER_INACTIVE and remove assumptions that
-> PWRDM_POWER_RET and PWRDM_POWER_OFF are always valid states.
->
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+I pretty much expected it would be.  :-p
 
-I just posted a patch set '[RFC/PATCH v2 0/6] ARM: OMAP2+: PM:
-introduce the power domains functional states' [1] which I think
-should be used to base your patches on. This patch set introduces
-functional states for the power domains power ans logic states, and
-the conversion functions between the internal power and logic states
-and the functional states.
+> So basically, it's quite subtle and I'm only 99% sure of the details but
+> I believe what happens is:
+> 
+>  - The audio interrupts get virq 64 and 65 (so above NR_IRQS)
+> 
+>  - The reverse map isn't pre-filled at map time (we should probably do
+> it nowadays), we do it lazily so ...
 
-I would be glad to help on the AM35x support for the functional states.
+Hmmm... I though I had merged a patch that does that.
 
-What do you think?
+/me goes to look again...
 
-[1] http://marc.info/?l=linux-omap&m=133417729712693&w=2
+Okay, I did write that patch, but I never merged it because it didn't
+get much review and I was already nervous about the other irq_domain
+changes.  I'll post it again and ask for feedback.
 
-Regards,
-Jean
+>  - The whole business with irq_virq_count needs fixing. Basically the
+> default value shouldn't be NR_IRQ. I suggest making it 0 and have all
+> the use sites do something like:
+> 
+> 	max = irq_virq_count ? irq_virq_count : nr_irqs;
+> 
+> (Grant, can you take care of that ?)
 
-> ---
-> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 29 +++++++++++++++++++++++--
-> ?arch/arm/mach-omap2/pm-debug.c ? ?| ? ?8 +++++--
-> ?arch/arm/mach-omap2/pm34xx.c ? ? ?| ? 43 +++++++++++++++++++++++--------------
-> ?3 files changed, 60 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 12cf81d..187872a 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -175,12 +175,23 @@ static int next_valid_state(struct cpuidle_device *dev,
-> ? ? ? ?struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
-> ? ? ? ?struct cpuidle_state *curr = &drv->states[index];
-> ? ? ? ?struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
-> - ? ? ? u32 mpu_deepest_state = PWRDM_POWER_RET;
-> - ? ? ? u32 core_deepest_state = PWRDM_POWER_RET;
-> + ? ? ? u32 mpu_deepest_state;
-> + ? ? ? u32 core_deepest_state;
-> ? ? ? ?int next_index = -1;
->
-> + ? ? ? if (omap3_has_pwroff()) {
-> + ? ? ? ? ? ? ? mpu_deepest_state = PWRDM_POWER_RET;
-> + ? ? ? ? ? ? ? core_deepest_state = PWRDM_POWER_RET;
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? mpu_deepest_state = PWRDM_POWER_INACTIVE;
-> + ? ? ? ? ? ? ? core_deepest_state = PWRDM_POWER_INACTIVE;
-> + ? ? ? }
-> +
-> ? ? ? ?if (enable_off_mode) {
-> + ? ? ? ? ? ? ? WARN_ON(!omap3_has_pwroff());
-> +
-> ? ? ? ? ? ? ? ?mpu_deepest_state = PWRDM_POWER_OFF;
-> +
-> ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? * Erratum i583: valable for ES rev < Es1.2 on 3630.
-> ? ? ? ? ? ? ? ? * CORE OFF mode is not supported in a stable form, restrict
-> @@ -311,6 +322,9 @@ void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params)
-> ? ? ? ? ? ? ? ? ? ? ? ?cpuidle_board_params[i].exit_latency;
-> ? ? ? ? ? ? ? ?cpuidle_params_table[i].target_residency =
-> ? ? ? ? ? ? ? ? ? ? ? ?cpuidle_board_params[i].target_residency;
-> +
-> + ? ? ? ? ? ? ? WARN_ON(!omap3_has_pwroff() && (i >= 2) &&
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cpuidle_params_table[i].valid);
-> ? ? ? ?}
-> ? ? ? ?return;
-> ?}
-> @@ -349,6 +363,16 @@ static inline struct omap3_idle_statedata *_fill_cstate_usage(
-> ? ? ? ?return cx;
-> ?}
->
-> +/* Only C1 & C2 C states valid when RET & OFF states aren't supported */
-> +static void omap3_cstate_valid_fixup(void)
-> +{
-> + ? ? ? int idx;
-> +
-> + ? ? ? if (!omap3_has_pwroff())
-> + ? ? ? ? ? ? ? for (idx = 2; idx < OMAP3_NUM_STATES; idx++)
-> + ? ? ? ? ? ? ? ? ? ? ? cpuidle_params_table[idx].valid = 0;
-> +}
-> +
-> ?/**
-> ?* omap3_idle_init - Init routine for OMAP3 idle
-> ?*
-> @@ -366,6 +390,7 @@ int __init omap3_idle_init(void)
-> ? ? ? ?per_pd = pwrdm_lookup("per_pwrdm");
-> ? ? ? ?cam_pd = pwrdm_lookup("cam_pwrdm");
->
-> + ? ? ? omap3_cstate_valid_fixup();
->
-> ? ? ? ?drv->safe_state_index = -1;
-> ? ? ? ?dev = &per_cpu(omap3_idle_dev, smp_processor_id());
-> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-> index 814bcd9..339ed42 100644
-> --- a/arch/arm/mach-omap2/pm-debug.c
-> +++ b/arch/arm/mach-omap2/pm-debug.c
-> @@ -239,19 +239,23 @@ static int option_get(void *data, u64 *val)
-> ?static int option_set(void *data, u64 val)
-> ?{
-> ? ? ? ?u32 *option = data;
-> + ? ? ? int ret = -EINVAL;
->
-> ? ? ? ?*option = val;
->
-> - ? ? ? if (option == &enable_off_mode) {
-> + ? ? ? if (omap3_has_pwroff() && (option == &enable_off_mode)) {
-> ? ? ? ? ? ? ? ?if (val)
-> ? ? ? ? ? ? ? ? ? ? ? ?omap_pm_enable_off_mode();
-> ? ? ? ? ? ? ? ?else
-> ? ? ? ? ? ? ? ? ? ? ? ?omap_pm_disable_off_mode();
-> +
-> ? ? ? ? ? ? ? ?if (cpu_is_omap34xx())
-> ? ? ? ? ? ? ? ? ? ? ? ?omap3_pm_off_mode_enable(val);
-> +
-> + ? ? ? ? ? ? ? ret = 0;
-> ? ? ? ?}
->
-> - ? ? ? return 0;
-> + ? ? ? return ret;
-> ?}
->
-> ?DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index b7bbcee..00c4abe 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -279,6 +279,7 @@ void omap_sram_idle(void)
-> ? ? ? ?mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
-> ? ? ? ?switch (mpu_next_state) {
-> ? ? ? ?case PWRDM_POWER_ON:
-> + ? ? ? case PWRDM_POWER_INACTIVE:
-> ? ? ? ?case PWRDM_POWER_RET:
-> ? ? ? ? ? ? ? ?/* No need to save context */
-> ? ? ? ? ? ? ? ?save_state = 0;
-> @@ -614,6 +615,8 @@ void omap3_pm_off_mode_enable(int enable)
-> ? ? ? ?struct power_state *pwrst;
-> ? ? ? ?u32 state;
->
-> + ? ? ? WARN_ON(!omap3_has_pwroff());
-> +
-> ? ? ? ?if (enable)
-> ? ? ? ? ? ? ? ?state = PWRDM_POWER_OFF;
-> ? ? ? ?else
-> @@ -668,7 +671,12 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
-> ? ? ? ?if (!pwrst)
-> ? ? ? ? ? ? ? ?return -ENOMEM;
-> ? ? ? ?pwrst->pwrdm = pwrdm;
-> - ? ? ? pwrst->next_state = PWRDM_POWER_RET;
-> +
-> + ? ? ? if (omap3_has_pwroff())
-> + ? ? ? ? ? ? ? pwrst->next_state = PWRDM_POWER_RET;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? pwrst->next_state = PWRDM_POWER_INACTIVE;
-> +
-> ? ? ? ?list_add(&pwrst->node, &pwrst_list);
->
-> ? ? ? ?if (pwrdm_has_hdwr_sar(pwrdm))
-> @@ -781,25 +789,28 @@ static int __init omap3_pm_init(void)
-> ? ? ? ? ? ? ? ?omap3630_ctrl_disable_rta();
->
-> ? ? ? ?clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
-> - ? ? ? if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
-> - ? ? ? ? ? ? ? omap3_secure_ram_storage =
-> - ? ? ? ? ? ? ? ? ? ? ? kmalloc(0x803F, GFP_KERNEL);
-> - ? ? ? ? ? ? ? if (!omap3_secure_ram_storage)
-> - ? ? ? ? ? ? ? ? ? ? ? pr_err("Memory allocation failed when "
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"allocating for secure sram context\n");
->
-> - ? ? ? ? ? ? ? local_irq_disable();
-> - ? ? ? ? ? ? ? local_fiq_disable();
-> + ? ? ? if (omap3_has_pwroff()) {
-> + ? ? ? ? ? ? ? if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
-> + ? ? ? ? ? ? ? ? ? ? ? omap3_secure_ram_storage =
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? kmalloc(0x803F, GFP_KERNEL);
-> + ? ? ? ? ? ? ? ? ? ? ? if (!omap3_secure_ram_storage)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_err("Memory allocation failed when "
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"allocating for secure sram context\n");
->
-> - ? ? ? ? ? ? ? omap_dma_global_context_save();
-> - ? ? ? ? ? ? ? omap3_save_secure_ram_context();
-> - ? ? ? ? ? ? ? omap_dma_global_context_restore();
-> + ? ? ? ? ? ? ? ? ? ? ? local_irq_disable();
-> + ? ? ? ? ? ? ? ? ? ? ? local_fiq_disable();
->
-> - ? ? ? ? ? ? ? local_irq_enable();
-> - ? ? ? ? ? ? ? local_fiq_enable();
-> - ? ? ? }
-> + ? ? ? ? ? ? ? ? ? ? ? omap_dma_global_context_save();
-> + ? ? ? ? ? ? ? ? ? ? ? omap3_save_secure_ram_context();
-> + ? ? ? ? ? ? ? ? ? ? ? omap_dma_global_context_restore();
-> +
-> + ? ? ? ? ? ? ? ? ? ? ? local_irq_enable();
-> + ? ? ? ? ? ? ? ? ? ? ? local_fiq_enable();
->
-> - ? ? ? omap3_save_scratchpad_contents();
-> + ? ? ? ? ? ? ? ? ? ? ? omap3_save_scratchpad_contents();
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> ? ? ? ?return ret;
->
-> ?err3:
-> --
-> 1.7.9.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+Yeah, I've got a different way to fix it though.  There is exactly one
+user of irq_virq_count in-tree right now: PS3.  Also, irq_virq_count
+is only useful for the NOMAP mapping.  So, instead of having a single
+global irq_virq_count values, I've dropped it entirely and added a
+max_irq argument to irq_domain_add_nomap().  That makes it a property
+of an individual nomap irq domain instead of a global system settting.
+
+Hopefully I'll have a draft patch ready today.
+
+g.
