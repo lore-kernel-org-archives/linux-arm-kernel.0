@@ -1,7 +1,7 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Apr 2012 10:41:36 +0100
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Apr 2012 11:42:31 +0200
 Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120411093253.GF3163@opensource.wolfsonmicro.com>
+In-Reply-To: <20120411092034.GV24211@n2100.arm.linux.org.uk>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
  <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
  <20120410143055.GT24211@n2100.arm.linux.org.uk>
@@ -9,32 +9,48 @@ References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
  <20120411011149.GA20818@b20223-02.ap.freescale.net>
  <20120411082401.GA32187@sirena.org.uk>
  <20120411084528.GB20818@b20223-02.ap.freescale.net>
- <20120411091548.GD3163@opensource.wolfsonmicro.com>
- <20120411092147.GW24211@n2100.arm.linux.org.uk>
- <20120411093253.GF3163@opensource.wolfsonmicro.com>
-Message-ID: <20120411094136.GX24211@n2100.arm.linux.org.uk>
+ <20120411092034.GV24211@n2100.arm.linux.org.uk>
+Message-ID: <20120411094231.GO3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 10:32:54AM +0100, Mark Brown wrote:
-> On Wed, Apr 11, 2012 at 10:21:47AM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Apr 11, 2012 at 10:15:49AM +0100, Mark Brown wrote:
-> > > On Wed, Apr 11, 2012 at 04:45:29PM +0800, Richard Zhao wrote:
-> > > > a clk, one already got the struct clk* pointer and could use it in
-> > > > struct lookup.
+On Wed, Apr 11, 2012 at 10:20:34AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 11, 2012 at 04:45:29PM +0800, Richard Zhao wrote:
+> > On Wed, Apr 11, 2012 at 09:24:02AM +0100, Mark Brown wrote:
+> > > On Wed, Apr 11, 2012 at 09:11:50AM +0800, Richard Zhao wrote:
+> > > 
+> > > > I don't like string loopup either. And after DT binding, we can use
+> > > > phandler to refer clk.
+> > > 
+> > > No, this is only useful on platforms that use DT.  This is a generic
+> > > Linux API so it needs to support architectures and platforms that don't
+> > > use DT as it's vanishingly unlikely that DT will ever be adopted by all
+> > > platforms.
+> > My point is using string lookup as less as possible. When one register
+> > a clk, one already got the struct clk* pointer and could use it in
+> > struct lookup.
+> > 
+> > I'm worried about the performance as I saw string lookup is used more
+> > and more often. In fast boot case, for example, even 5ms is important.
 > 
-> > > How will you handle cases where one clock supplies another?
+> Yes, and you're not the only one who has that concern.  What this patch
+> does is turn a pair of string compares through a table into that plus
+> another set of string compares across all struct clk, which will make
+> the lookup yet more expensive.
 > 
-> > What has that got to do with clkdev (which is the topic in this thread)?
-> 
-> I'm expecting (well, hoping) that at some point we'll want to connect
-> clock trees between devices and it seems likely that clkdev will be
-> pressed into service for that since it's how we're binding clocks at the
-> minute.  It may be that we come up with some other scheme for making
-> those connections but as we appear to be defining a new scheme for
-> binding clocks together anyway it seems sensible that we should at least
-> be considering that case.
+> I see no reason why you'd register the cl_lookup structures before you
+> know about which clks actually exist - and if they already exist, then
+> you can already find the struct clk pointer and use that to register
+> the proper return value for clk_get() via the clkdev APIs.
 
-clkdev is just a mechanism to obtain a struct clk for a particular input
-on a particular device.  Nothing more, nothing less.  So how does this
-detail about how the struct clk ultimate gets used concern clkdev?
+Indeed I have struct clk pointers, so I can instead use a to-be-written
+combination of clkdev_alloc/clkdev_add. Would that be ok?
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
