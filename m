@@ -1,28 +1,27 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Wed, 11 Apr 2012 11:09:44 -0700
-Subject: [PATCH] ARM: msm: remove unused MSM boards
-In-Reply-To: <20120411180408.GA12930@codeaurora.org>
-References: <1334165870-12487-1-git-send-email-davidb@codeaurora.org>
- <20120411175550.GB8114@fifo99.com>
- <20120411180408.GA12930@codeaurora.org>
-Message-ID: <20120411180944.GE8114@fifo99.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Apr 2012 12:16:11 -0600 (MDT)
+Subject: [PATCH v4 01/12] ARM: OMAP2+: declare file-local functions as
+ static
+In-Reply-To: <201204110843.57548.arnd@arndb.de>
+References: <20120411003454.27059.37500.stgit@dusk>
+ <20120411003516.27059.99477.stgit@dusk> <201204110843.57548.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.00.1204111215480.29473@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 11:04:09AM -0700, David Brown wrote:
-> On Wed, Apr 11, 2012 at 10:55:50AM -0700, Daniel Walker wrote:
-> > On Wed, Apr 11, 2012 at 10:37:50AM -0700, David Brown wrote:
-> > > The "mahimahi" and "sapphire" were never finished, and have never been
-> > > built.
-> > > 
-> > > The "halibut" target was a dev board that hasn't ever been widely
-> > > available (MSM7201 "SURF").
-> > 
-> > I don't mind if you remove halibut, but the others are just incomplete
-> > phone support which someone may want to add to.. I'd prefer to fix those
-> > two..
-> 
-> Why, though?  It's obvious that nobody is using them, since they've
-> never worked.
+On Wed, 11 Apr 2012, Arnd Bergmann wrote:
 
-https://lkml.org/lkml/2011/1/20/367
+> On Wednesday 11 April 2012, Paul Walmsley wrote:
+> > Several function declarations used only in the files in which they're
+> > declared should include the static keyboard, but don't:
+> 					^^^ ???
+
+Heh, should have read "keyword".
+
+> The patch looks good otherwise,
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Thanks for the comment, ack added.
+
+- Paul
