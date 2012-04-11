@@ -1,40 +1,33 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 11 Apr 2012 14:13:21 +0530
-Subject: [PATCH] ARM: OMAP2+: remove redundant sysconfig context restore
-In-Reply-To: <1334133256-20475-1-git-send-email-tarun.kanti@ti.com>
-References: <1334133256-20475-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <CAMQu2gw0feL22aVi-ZDffBzest0+sdMnL2Hwa6GwwVKiKF118Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Apr 2012 10:43:53 +0200
+Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
+In-Reply-To: <4F853FC0.4080802@st.com>
+References: <4F793C56.2030605@st.com>
+ <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
+ <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
+ <4F83FAE2.8020107@st.com>
+ <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
+ <4F853FC0.4080802@st.com>
+Message-ID: <CACRpkdYgSFYgr-CVmG0JenMM+EOydjJxpR8zaFuGPiMKtKRM9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC'ing LAKML
+On Wed, Apr 11, 2012 at 10:24 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-On Wed, Apr 11, 2012 at 2:04 PM, Tarun Kanti DebBarma
-<tarun.kanti@ti.com> wrote:
-> Since hwmod framework now manages sysconfig context save/restore
-> there is no more need to touch this register in driver. Hence,
-> remove restore of sysconfig register in omap_timer_restore_context.
-> This was causing incorrect context restore of sysconfig register.
+> On 4/11/2012 1:47 PM, Linus Walleij wrote:
+>> Hm, then we should maybe consider mergeing all that pinctrl stuff
+>> through ARM SoC later as well. I can probably provide the
+>> necessary ACKs.
 >
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> ---
-> ?arch/arm/plat-omap/dmtimer.c | ? ?2 --
-> ?1 files changed, 0 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index 652139c..15e7882 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
-> @@ -82,8 +82,6 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
->
-> ?static void omap_timer_restore_context(struct omap_dm_timer *timer)
-> ?{
-> - ? ? ? __raw_writel(timer->context.tiocp_cfg,
-> - ? ? ? ? ? ? ? ? ? ? ? timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
-> ? ? ? ?if (timer->revision == 1)
-> ? ? ? ? ? ? ? ?__raw_writel(timer->context.tistat, timer->sys_stat);
->
+> That would be much better. Just to know who should update these Acks
+> in commits. If it isn't a pull request, Arnd will do it. But if it is,
+> then probably i am required to update this?
 
-Looks good to me.
+Yeah you can send this pull request and then Arnd or Olof will put it
+on some topic branch like "topic-spear" and then you base your
+further work on top of that and then send a new pull request to be
+merged into that same branch, with the pinctrl stuff. And include the
+ACK:s directly in the patches (git rebase -i is your friend...)
 
-Acked-by: Santosh Shilimkar <santosh.shilimka@ti.com>
+Yours,
+Linus Walleij
