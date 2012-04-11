@@ -1,20 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 11 Apr 2012 09:43:31 -0600
-Subject: [PATCH v2] pinctrl: implement pinctrl deferred probing
-In-Reply-To: <1334133248-1452-1-git-send-email-linus.walleij@stericsson.com>
-References: <1334133248-1452-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4F85A6A3.8050009@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 11 Apr 2012 10:44:22 -0400 (EDT)
+Subject: [PATCH v2 3/4] ARM: mm: truncate memory banks to fit in 4GB space
+ for classic MMU
+In-Reply-To: <1334154639-13869-4-git-send-email-will.deacon@arm.com>
+References: <1334154639-13869-1-git-send-email-will.deacon@arm.com>
+ <1334154639-13869-4-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1204111038130.16314@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2012 02:34 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> If drivers try to obtain pinctrl handles for a pin controller that
-> has not yet registered to the subsystem, we need to be able to
-> back out and retry with deferred probing. So let's return
-> -EPROBE_DEFER whenever this location fails. Also downgrade the
-> errors to info, maybe we will even set them to debug once the
-> deferred probing is commonplace.
+On Wed, 11 Apr 2012, Will Deacon wrote:
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> If a bank of memory spanning the 4GB boundary is added on a !CONFIG_LPAE
+> kernel then we will hang early during boot since the memory bank will
+> have wrapped around to zero.
+> 
+> This patch truncates memory banks for !LPAE configurations when the end
+> address is not representable in 32 bits.
+> 
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+Now what if start = 1G and size = 5G? The size variable is an unsigned 
+long, meaning that right now the size might be truncated to 1G.
+
+> ---
+>  arch/arm/kernel/setup.c |   16 +++++++++++++++-
+>  1 files changed, 15 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index b914113..ebfac78 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -523,7 +523,21 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
+>  	 */
+>  	size -= start & ~PAGE_MASK;
+>  	bank->start = PAGE_ALIGN(start);
+> -	bank->size  = size & PAGE_MASK;
+> +
+> +#ifndef CONFIG_LPAE
+> +	if (bank->start + size < bank->start) {
+> +		printk(KERN_CRIT "Truncating memory at 0x%08llx to fit in "
+> +			"32-bit physical address space\n", (long long)start);
+> +		/*
+> +		 * To ensure bank->start + bank->size is representable in
+> +		 * 32 bits, we use ULONG_MAX as the upper limit rather than 4GB.
+> +		 * This means we lose a page after masking.
+> +		 */
+> +		size = ULONG_MAX - bank->start;
+> +	}
+> +#endif
+> +
+> +	bank->size = size & PAGE_MASK;
+>  
+>  	/*
+>  	 * Check whether this memory region has non-zero size or
+> -- 
+> 1.7.4.1
+> 
