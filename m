@@ -1,67 +1,116 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:22:23 +0530
-Subject: [PATCHv7 12/18] I2C: OMAP: Fix the crash in i2c remove
+Date: Wed, 11 Apr 2012 16:22:14 +0530
+Subject: [PATCHv7 03/18] I2C: OMAP: Recover from Bus Busy condition
 In-Reply-To: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334141549-8288-13-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334141549-8288-4-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    In omap_i2c_remove we are accessing the I2C_CON register without
-    enabling the clocks. Fix the same by enabling the clocks and disabling
-    it.
-    This fixes the following crash.
-    [  154.723022] ------------[ cut here ]------------
-    [  154.725677] WARNING: at arch/arm/mach-omap2/omap_l3_noc.c:112 l3_interrupt_handler+0x1b4/0x1c4()
-    [  154.725677] L3 custom error: MASTER:MPU TARGET:L4 PER2
-    [  154.742614] Modules linked in: i2c_omap(-)
-    [  154.746948] Backtrace:
-    [  154.746948] [<c0013078>] (dump_backtrace+0x0/0x110) from [<c026c158>] (dump_stack+0x18/0x1c)
-    [  154.752716]  r6:00000070 r5:c002c43c r4:df9b9e98 r3:df9b8000
-    [  154.764465] [<c026c140>] (dump_stack+0x0/0x1c) from [<c0041a2c>] (warn_slowpath_common+0x5c/0x6c)
-    [  154.768341] [<c00419d0>] (warn_slowpath_common+0x0/0x6c) from [<c0041ae0>] (warn_slowpath_fmt+0x38/0x40)
-    [  154.776153]  r8:00000180 r7:c0361594 r6:c0379b48 r5:00080003 r4:e0838b00
-    [  154.790771] r3:00000009
-    [  154.791778] [<c0041aa8>] (warn_slowpath_fmt+0x0/0x40) from [<c002c43c>] (l3_interrupt_handler+0x1b4/0x1c4)
-    [  154.803710]  r3:c0361598 r2:c02ef74c
-    [  154.807403] [<c002c288>] (l3_interrupt_handler+0x0/0x1c4) from [<c0085f44>] (handle_irq_event_percpu+0x58/0
-    [  154.818237]  r8:0000002a r7:00000000 r6:00000000 r5:df808054 r4:df8893c0
-    [  154.825378] [<c0085eec>] (handle_irq_event_percpu+0x0/0x188) from [<c00860b8>] (handle_irq_event+0x44/0x64)
-    [  154.835662] [<c0086074>] (handle_irq_event+0x0/0x64) from [<c0088ec0>] (handle_fasteoi_irq+0xa4/0x10c)
-    [  154.845458]  r6:0000002a r5:df808054 r4:df808000 r3:c034a150
-    [  154.846466] [<c0088e1c>] (handle_fasteoi_irq+0x0/0x10c) from [<c0085ed0>] (generic_handle_irq+0x30/0x38)
-    [  154.854278]  r5:c034aa48 r4:0000002a
-    [  154.862091] [<c0085ea0>] (generic_handle_irq+0x0/0x38) from [<c000fd38>] (handle_IRQ+0x60/0xc0)
-    [  154.874450]  r4:c034ea70 r3:000001f8
-    [  154.878234] [<c000fcd8>] (handle_IRQ+0x0/0xc0) from [<c0008478>] (gic_handle_irq+0x20/0x5c)
-    [  154.887023]  r7:ffffff40 r6:df9b9fb0 r5:c034e2b4 r4:0000001a
-    [  154.887054] [<c0008458>] (gic_handle_irq+0x0/0x5c) from [<c000ea80>] (__irq_usr+0x40/0x60)
-    [  154.901153] Exception stack(0xdf9b9fb0 to 0xdf9b9ff8)
-    [  154.907104] 9fa0:                                     beaf1f04 4006be00 0000000f 0000000c
-    [  154.915710] 9fc0: 4006c000 00000000 00008034 ffffff40 00000007 00000000 00000000 0007b8d7
-    [  154.916778] 9fe0: 00000000 beaf1b68 0000d23c 4005baf0 80000010 ffffffff
-    [  154.931335]  r6:ffffffff r5:80000010 r4:4005baf0 r3:beaf1f04
-    [  154.937316] ---[ end trace 1b75b31a2719ed21 ]--
+From: Vikram Pandita <vikram.pandita@ti.com>
 
-Cc: <stable@vger.kernel.org>
+In case a peripheral is driving SDA bus low (ie. a start condition), provide
+a constant clock output using the test mode of the OMAP I2C controller to
+try and clear the bus. Soft reset I2C controller after attempting the bus clear
+to ensure that controller is in a good state.
+
+Based upon Vikram Pandita's patch from TI Android 3.0.
+I acknowledge the contributions and suggestions of Jon and Hemant.
+
+A couple differences from the original patch ...
+1. Add a new function for bus clear
+2. Ensure that the CON.I2C_EN bit is set when using the SYSTEST feature to
+   output a permanent clock. This bit needs to be set and typically it would
+   be set by the unidle function but this is not the case for all OMAP
+   generations.
+3. Program the SYSTEST setting only the bits we care about. However, restore
+   SYSTEST registers to there original state as some OMAP generations do not
+   implement perform a soft-reset.
+4. Clear the CON register after performing the bus clear, so when we call the
+   init function the controller is disabled and the init function will
+   re-enable later.
+
+Original patch can be found here:
+http://git.omapzoom.org/?p=kernel/omap.git;a=commit;h=a2ab04192ba25e60f95ba1ff3af5601a2d7b5bd1
+
+Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   33 ++++++++++++++++++++++++++++++---
+ 1 files changed, 30 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 86be475..8258597 100644
+index e402ebb..a882558 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1134,7 +1134,9 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+@@ -147,16 +147,15 @@ enum {
+ #define OMAP_I2C_SCLH_HSSCLH	8
  
- 	free_irq(dev->irq, dev);
- 	i2c_del_adapter(&dev->adapter);
-+	pm_runtime_get_sync(&pdev->dev);
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	return 0;
+ /* I2C System Test Register (OMAP_I2C_SYSTEST): */
+-#ifdef DEBUG
+ #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
+ #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
+ #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
+-#define OMAP_I2C_SYSTEST_TMODE_SHIFT	(12)		/* Test mode select */
++#define OMAP_I2C_SYSTEST_TMODE_TEST	(2 << 12)	/* Test mode select */
++#define OMAP_I2C_SYSTEST_TMODE_LOOP	(3 << 12)	/* Test mode select */
+ #define OMAP_I2C_SYSTEST_SCL_I		(1 << 3)	/* SCL line sense in */
+ #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
+ #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
+ #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
+-#endif
+ 
+ /* OCP_SYSSTATUS bit definitions */
+ #define SYSS_RESETDONE_MASK		(1 << 0)
+@@ -319,6 +318,7 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ 							dev->westate);
+ 		}
+ 	}
++	return 0;
  }
+ 
+ static int omap_i2c_init(struct omap_i2c_dev *dev)
+@@ -471,6 +471,31 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
+ }
+ 
+ /*
++ * Bus Clear
++ */
++static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
++{
++	u16 w;
++
++	/*
++	 * Per the I2C specification, if we are stuck in a bus busy state
++	 * we can attempt a bus clear to try and recover the bus by sending
++	 * at least 9 clock pulses on SCL. Put the I2C in a test mode so it
++	 * will output a continuous clock on SCL.
++	 */
++	w = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
++	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, (OMAP_I2C_SYSTEST_ST_EN
++			   | OMAP_I2C_SYSTEST_TMODE_TEST));
++	msleep(1);
++	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, w);
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
++	omap_i2c_reset(dev);
++	omap_i2c_init(dev);
++	return omap_i2c_wait_for_bb(dev);
++}
++
++/*
+  * Low level master read/write transaction.
+  */
+ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+@@ -597,6 +622,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ 	r = omap_i2c_wait_for_bb(dev);
+ 	if (r < 0)
++		r = omap_i2c_bus_clear(dev);
++	if (r < 0)
+ 		goto out;
+ 
+ 	if (dev->set_mpu_wkup_lat != NULL)
 -- 
 1.7.4.1
