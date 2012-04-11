@@ -1,54 +1,52 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 11 Apr 2012 15:05:58 +0200
-Subject: [PATCHv8 04/10] ARM: dma-mapping: remove offset parameter to
- prepare for generic dma_ops
-In-Reply-To: <201204111218.39800.arnd@arndb.de>
-References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
- <201204101143.27915.arnd@arndb.de>
- <012e01cd17db$5f165c30$1d431490$%szyprowski@samsung.com>
- <201204111218.39800.arnd@arndb.de>
-Message-ID: <014901cd17e3$d67d18b0$83774a10$%szyprowski@samsung.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Wed, 11 Apr 2012 18:40:45 +0530
+Subject: [PATCHv7 14/18] I2C: OMAP: Use SET_RUNTIME_PM_OPS
+In-Reply-To: <20120411113537.GG12064@arwen.pp.htv.fi>
+References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
+ <1334142776-10583-15-git-send-email-shubhrajyoti@ti.com>
+ <20120411113537.GG12064@arwen.pp.htv.fi>
+Message-ID: <CAM=Q2ct=_VEGkv9Rfu5_YNn250qcS=gMoQNCEC1nnsNbnPdc2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Felipe,
 
-On Wednesday, April 11, 2012 2:19 PM Arnd Bergmann wrote:
+On Wed, Apr 11, 2012 at 5:05 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Wed, Apr 11, 2012 at 04:42:52PM +0530, Shubhrajyoti D wrote:
+>> Use SET_RUNTIME_PM_OPS macro to set runtime functions.
+>>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>> ?drivers/i2c/busses/i2c-omap.c | ? 11 ++++-------
+>> ?1 files changed, 4 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> index dd65416..28de1d2 100644
+>> --- a/drivers/i2c/busses/i2c-omap.c
+>> +++ b/drivers/i2c/busses/i2c-omap.c
+>> @@ -1217,15 +1217,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
+>>
+>> ? ? ? return 0;
+>> ?}
+>> +#endif
+>>
+>> ?static struct dev_pm_ops omap_i2c_pm_ops = {
+>> - ? ? .runtime_suspend = omap_i2c_runtime_suspend,
+>> - ? ? .runtime_resume = omap_i2c_runtime_resume,
+>> + ? ? SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+>> + ? ? ? ? ? ? ? ? ? ? ? ?omap_i2c_runtime_resume, NULL)
+>> ?};
+>> -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+>> -#else
+>> -#define OMAP_I2C_PM_OPS NULL
+>> -#endif
+>
+> I think you should keep this define, otherwise the pm pointer will
+> always be valid.
 
-> On Wednesday 11 April 2012, Marek Szyprowski wrote:
-> > Well, range sync functions are available from the early days of the dma
-> > mapping api (at least that's what I've found reading the change log and
-> > old patches). They are the correct way of doing a partial syncs on the
-> > buffer (usually used by the network device drivers). This patch changes
-> > only the internal implementation of the dma bounce functions to let
-> > them tunnel through dma_map_ops structure. The driver api stays
-> > unchanged, so driver are obliged to call dma_*_range_* functions to
-> > keep code clean and easy to understand.
-> >
-> > The only drawback I can see from this patch is reduced detection of
-> > the dma api abuse. Let us consider the following code:
-> >
-> > dma_addr = dma_map_single(dev, ptr, 64, DMA_TO_DEVICE);
-> > dma_sync_single_range_for_cpu(dev, dma_addr+16, 0, 32, DMA_TO_DEVICE);
-> >
-> > Without the patch such code fails, because dma bounce code is unable
-> > to find the bounce buffer for the given dma_address. After the patch
-> > the sync call will be equivalent to:
-> >
-> >         dma_sync_single_range_for_cpu(dev, dma_addr, 16, 32, DMA_TO_DEVICE);
-> >
-> > which succeeds.
-> >
-> > I don't consider this as a real problem. DMA API abuse should be caught
-> > by debug_dma_* function family, so we can simplify the internal low-level
-> > implementation without losing anything.
-> >
-> 
-> Ok, fair enough. Can you put the above text into the changelog?
+Will correct it .
+Thanks,
 
-Yes, I will update it in the next release.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+>
+> --
+> balbi
