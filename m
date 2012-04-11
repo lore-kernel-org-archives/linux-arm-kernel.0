@@ -1,38 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Apr 2012 18:52:23 +0200
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 11 Apr 2012 12:58:58 -0400
 Subject: [PATCH] mmc: remove linux/blkdev.h include from host drivers
-In-Reply-To: <87ty0qs2fz.fsf@laptop.org>
+In-Reply-To: <20120411165223.GP3852@pengutronix.de> (Sascha Hauer's message of
+ "Wed, 11 Apr 2012 18:52:23 +0200")
 References: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
- <87ty0qs2fz.fsf@laptop.org>
-Message-ID: <20120411165223.GP3852@pengutronix.de>
+ <87ty0qs2fz.fsf@laptop.org> <20120411165223.GP3852@pengutronix.de>
+Message-ID: <87pqberyr1.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 11:39:12AM -0400, Chris Ball wrote:
-> Hi Sascha, Wolfram,
-> 
-> On Tue, Apr 10 2012, Dmitry Artamonow wrote:
-> > I've compile tested everything with and without CONFIG_BLOCK enabled,
-> > except for imxmmc.c - this driver seems to be long time broken
-> > (at least since the removal of mach-imx in 2.6.31 - see commit
-> > 1341d34ffc296f98dc84876f35f3151525dc02a2 ) 
-> 
-> I can confirm that it no longer builds:
-> 
-> /home/cjb/git/mmc/drivers/mmc/host/imxmmc.c:32:26: fatal error: mach/imx-dma.h: No such file or directory
-> 
-> Should imxmmc simply be removed from drivers/mmc/host?  Do any of the
-> more current i.MX MMC drivers support the same hardware?
+Hi,
 
-It has long been on my todo list to remove this driver. The more recent
-i.MX use the mxcmmc driver which is basically the same hardware but
-without a bunch of bugs which made the older imxmmc driver unusable on
-newer hardware. I can send a patch if you like.
+On Wed, Apr 11 2012, Sascha Hauer wrote:
+>> Should imxmmc simply be removed from drivers/mmc/host?  Do any of the
+>> more current i.MX MMC drivers support the same hardware?
+>
+> It has long been on my todo list to remove this driver. The more recent
+> i.MX use the mxcmmc driver which is basically the same hardware but
+> without a bunch of bugs which made the older imxmmc driver unusable on
+> newer hardware. I can send a patch if you like.
 
-Sascha
+Thanks, let's do it.
 
+It would be nice to have a story for how MX1 users can use their
+hardware with modern kernels, even if it's just "It should be possible
+to modify the mxcmmc driver to support this older hardware, and the sort
+of changes that need to be made are <..>".
+
+(Dmitry, your patch is fine -- I can remove the imxmmc hunk from it when
+applying.)
+
+- Chris.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
