@@ -1,28 +1,167 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Wed, 11 Apr 2012 10:57:18 -0500
-Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
- from dt
-In-Reply-To: <4F85435C.1060305@ti.com>
-References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
- <1323863746-18145-5-git-send-email-rnayak@ti.com>
- <CAB-zwWjSSsR0XMrntkEmHDtgJ_zDxgJh6KX=TsSKggd9mCgsVQ@mail.gmail.com>
- <4F85435C.1060305@ti.com>
-Message-ID: <CAB-zwWhFTysfm4-7rY+g8rCOdRK6CAQA0c=+QaOyTxQOvVdLiw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 11 Apr 2012 18:01:12 +0200
+Subject: [PATCH 2/9] arm: at91: add Calao TNY-A9260 and TNY-A9G20 board support
+In-Reply-To: <20120411153515.GK16641@game.jcrosoft.org>
+References: <20120411153515.GK16641@game.jcrosoft.org>
+Message-ID: <1334160079-30831-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 3:39 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> Yes, it is a known issue and the fix was unfortunately was not merged during
-> -rc phases but is fixed in 3.4 and should be fixed in 3.3 stable branch as
-> well. I received the notification from Greg KH 2 weeks ago about the stable:
-> Patch "tty: serial: OMAP: Fix oops due to NULL pdata in DT boot" has been
-> added to the 3.3-stable tree
->
-> You should just switch to 3.4-rc2 or get the patch if you are stuck to 3.3.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/boot/dts/tny_a9260.dts         |   15 ++++++
+ arch/arm/boot/dts/tny_a9260_common.dtsi |   83 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tny_a9g20.dts         |   15 ++++++
+ arch/arm/mach-at91/Makefile.boot        |    2 +
+ 4 files changed, 115 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tny_a9260.dts
+ create mode 100644 arch/arm/boot/dts/tny_a9260_common.dtsi
+ create mode 100644 arch/arm/boot/dts/tny_a9g20.dts
 
-Thanks, switching to 3.4-rc kernels fixed the problem (for cramfs),
-and right now this works for me.
-
-Regards,
-
-Omar
+diff --git a/arch/arm/boot/dts/tny_a9260.dts b/arch/arm/boot/dts/tny_a9260.dts
+new file mode 100644
+index 0000000..367a16d
+--- /dev/null
++++ b/arch/arm/boot/dts/tny_a9260.dts
+@@ -0,0 +1,15 @@
++/*
++ * tny_a9260.dts - Device Tree file for Caloa TNY A9260 board
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++/dts-v1/;
++/include/ "at91sam9260.dtsi"
++/include/ "tny_a9260_common.dtsi"
++
++/ {
++	model = "Calao TNY A9260";
++	compatible = "calao,tny-a9260", "atmel,at91sam9260", "atmel,at91sam9";
++};
+diff --git a/arch/arm/boot/dts/tny_a9260_common.dtsi b/arch/arm/boot/dts/tny_a9260_common.dtsi
+new file mode 100644
+index 0000000..0e6d3de
+--- /dev/null
++++ b/arch/arm/boot/dts/tny_a9260_common.dtsi
+@@ -0,0 +1,83 @@
++/*
++ * tny_a9260_common.dtsi - Device Tree file for Caloa TNY A926x board
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++
++/ {
++	chosen {
++		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock6 rw rootfstype=ubifs";
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++	};
++
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++
++			at91bootstrap at 0 {
++				label = "at91bootstrap";
++				reg = <0x0 0x20000>;
++			};
++
++			barebox at 20000 {
++				label = "barebox";
++				reg = <0x20000 0x40000>;
++			};
++
++			bareboxenv at 60000 {
++				label = "bareboxenv";
++				reg = <0x60000 0x20000>;
++			};
++
++			bareboxenv2 at 80000 {
++				label = "bareboxenv2";
++				reg = <0x80000 0x20000>;
++			};
++
++			oftree at 80000 {
++				label = "oftree";
++				reg = <0xa0000 0x20000>;
++			};
++
++			kernel at a0000 {
++				label = "kernel";
++				reg = <0xc0000 0x400000>;
++			};
++
++			rootfs at 4a0000 {
++				label = "rootfs";
++				reg = <0x4c0000 0x7800000>;
++			};
++
++			data at 7ca0000 {
++				label = "data";
++				reg = <0x7cc0000 0x8340000>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/tny_a9g20.dts b/arch/arm/boot/dts/tny_a9g20.dts
+new file mode 100644
+index 0000000..e1ab64c
+--- /dev/null
++++ b/arch/arm/boot/dts/tny_a9g20.dts
+@@ -0,0 +1,15 @@
++/*
++ * tny_a9g20.dts - Device Tree file for Caloa TNY A9G20 board
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++/dts-v1/;
++/include/ "at91sam9g20.dtsi"
++/include/ "tny_a9260_common.dtsi"
++
++/ {
++	model = "Calao TNY A9G20";
++	compatible = "calao,tny-a9g20", "atmel,at91sam9g20", "atmel,at91sam9";
++};
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index 0c2336c..bdf9841 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -15,7 +15,9 @@ endif
+ 
+ # Keep dtb files sorted alphabetically for each SoC
+ # sam9260
++dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
+ # sam9g20
++dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9g20.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9g20.dtb
+ # sam9g45
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9m10g45ek.dtb
+-- 
+1.7.9.1
