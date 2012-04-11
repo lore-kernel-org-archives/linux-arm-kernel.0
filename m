@@ -1,128 +1,79 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 11 Apr 2012 10:47:10 -0500
-Subject: [PATCH v3 1/9] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A9317C6F4B@DBDE01.ent.ti.com>
-References: <cover.1333640054.git.afzal@ti.com>
- <cefbe934da40f0a169b1e3a75c46451e5546a8bd.1333640054.git.afzal@ti.com>
- <4F7DFED5.4030000@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317C5E58@DBDE01.ent.ti.com>
- <4F833D8D.8000802@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317C693C@DBDE01.ent.ti.com>
- <4F8488A2.7030602@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317C6F4B@DBDE01.ent.ti.com>
-Message-ID: <4F85A77E.30203@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 11 Apr 2012 17:35:15 +0200
+Subject: [PATCH 0/9] AT91: more DT soc and boards support
+Message-ID: <20120411153515.GK16641@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+HI,
 
-On 04/11/2012 12:11 AM, Mohammed, Afzal wrote:
-> Hi Jon,
-> 
-> On Wed, Apr 11, 2012 at 00:53:14, Hunter, Jon wrote:
->> I agree with your argument but I was thinking today only OMAP uses the 
->> GPMC so we could not worry about this. Ok, leave as-is, but can we 
->> modify the code as follows as the "else if" is not really needed...
->>
->> if (gpmc->num_irq < GPMC_NR_IRQ) {
->> 	dev_warn(gpmc->dev, "Insufficient interrupts for device\n");
->> 	return -EINVAL;
->> }
->>
->> gpmc->num_irq = GPMC_NR_IRQ;
-> 
-> Yes, it is better
-> 
->>
->>>>
->>>> Furthermore, GPMC_NR_IRQ is defined as 6 which is correct for OMAP2/3
->>>> but not for OMAP4/5, it is 5. Therefore, we need to detect whether we
->>>> are using an OMAP2/3 or OMAP4+ and set num_irqs based upon this. This
->>>> could be done in the probe and we can avoid passing this.
->>>
->>> Is it dependent on OMAPX or GPMC IP version? if it is IP version, then driver
->>> can be enhanced to handle it, if not, platform has to pass this information.
->>
->> Here are the GPMC IP revisions ...
->>
->> OMAP5430 = 0x00000060
->> OMAP4430 = 0x00000060
->> OMAP3630 = 0x00000050
->> OMAP3430 = 0x00000050
->>
->> So this should work for OMAP. We should check OMAP2 as well. What about 
->> the AMxxx devices?
-> 
-> 
-> I badly needed this information, thanks.
-> 
-> AM3359 = 0x00000060, it has only 2 waitpin interrupts
+	In this patch series you will found the support for
 
-Great so this is consistent!
+	 - at91sam9260 (nearly the same as 9g20)
+	 - at91sam9263
 
->>>>>>> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->>>>>>> +	if (res == NULL)
->>>>>>> +		dev_warn(gpmc->dev, "Failed to get resource: irq\n");
->>>>>>> +	else
->>>>>>> +		gpmc->master_irq = res->start;
->>>>>>
->>>>>> Why not return an error if the IRQ is not found? We don't know if anyone
->>>>>> will be trying to use them.
->>>>>
->>>>> Why do you want to do that ?
->>>>
->>>> Because this indicates a BUG :-)
->>>
->>> I disagree, this need not be considered a bug always,
->>> for eg. If gpmc irq is not connected to intc
->>
->> Ok, so for devices existing today this indicates a bug ;-)
-> 
-> I do not want to consider that case to be bug enough for probe
-> to fail, there are other drivers which does similar enhancing
-> its use cases,
-> 
-> eg. 1e351a9 mfd: Make TPS65910 usable without interrupts
+	and boards
+	 - at91sam9g20ek (1 mmc and 2mmc version)
+	 - at91sam9263ek
+	 - Calao USB A9260
+	 - Calao TNY A9260 & A9G20
 
-Ok, fine.
+The following changes since commit 0b51efa18140c8a134e64a987417ff02d30f7363:
 
->>
->> At a minimum you need to improve the error handing here. If the 
->> platform_get_resource fails you are still calling "gpmc_setup_irq()" 
->> which appears to be pointless. It would be better if the gpmc irq chip 
->> is not initialised in this case so that drivers attempting to request 
->> these irqs failed.
-> 
-> Please see gpmc_setup_irq, if irq is not present, it returns in the
-> beginning, and gpmc_irq_chip is not initialized in that case.
+  gpio: drop CONFIG_OF_GPIO in the definition of the struct gpio_chip (2012-04-10 21:37:22 +0800)
 
-Yes you are right.
+are available in the git repository at:
 
->>>>>>> +	for (gdq = gp->device_pdata, gd = gpmc->device; *gdq; gdq++, i++) {
->>>>>>> +		ret = gpmc_setup_device(*gdq, gd, gpmc);
->>>>>>> +		if (IS_ERR_VALUE(ret))
->>>>>>> +			dev_err(gpmc->dev, "gpmc setup on %s failed\n",
->>>>>>> +								(*gdq)->name);
->>>>>>> +		else
->>>>>>> +			gd++;
->>>>>>> +	}
->>>>>>
->>>>>> Would a while loop be simpler?
->>>>>
->>>>> My preference is to go with "for"
->>>>
->>>> Ok, just wondering if this could be cleaned up a little.
->>>
->>> For travelling through array of pointers, for looks natural to me, if you
->>> have a better way, please send it, it can be folded in next version.
->>
->> Could you have num_devices to indicate how many platform devices there 
->> are and then a simple for-loop of 0 to num_devices?
-> 
-> This will cause coding to be done by platform to be less simple, and my
-> preference is not to use another variable
+  git at github.com:at91linux/linux-at91.git j/for-3.5
 
-Hehe, I wondered if that would make life a little more difficult. Ok
-lets leave it for now.
+for you to fetch changes up to c8a6a45dd44db2526caeda45606e6c47621878d2:
 
-Jon
+  ARM: at91: add at91sam9263ek DT support (2012-04-11 23:43:06 +0800)
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (9):
+      ARM: at91: add at91sam9260 DT support
+      arm: at91: add Calao TNY-A9260 and TNY-A9G20 board support
+      ARM: at91: add at91sam9g20ek boards dt support
+      ARM: at91: USB A926x update nand partition
+      ARM: at91: Calao USB A926x factorize common binding in usb_a9260_common
+      ARM: at91: DT: add Calao USB A9260 DT support
+      ARM: at91: standard device init only if DT is not populated.
+      ARM: at91: add at91sam9263 DT support
+      ARM: at91: add at91sam9263ek DT support
+
+ arch/arm/boot/dts/at91sam9260.dtsi          |  239 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi          |  221 +++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263ek.dts         |  156 +++++++++++++++++
+ arch/arm/boot/dts/at91sam9g20.dtsi        
+  |  227 +-------------------------
+ arch/arm/boot/dts/at91sam9g20ek.dts         |   29 ++++
+ arch/arm/boot/dts/at91sam9g20ek_2mmc.dts    |   29 ++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  142 ++++++++++++++++
+ arch/arm/boot/dts/tny_a9260.dts             |   15 ++
+ arch/arm/boot/dts/tny_a9260_common.dtsi     |   83 +++++++++
+ arch/arm/boot/dts/tny_a9g20.dts             |   15 ++
+ arch/arm/boot/dts/usb_a9260.dts             |   23 +++
+ arch/arm/boot/dts/usb_a9260_common.dtsi     |  117 +++++++++++++
+ arch/arm/boot/dts/usb_a9g20.dts             |  102 +-----------
+ arch/arm/mach-at91/Makefile.boot            |    8 +
+ arch/arm/mach-at91/at91sam9260_devices.c    |   20 +--
+ arch/arm/mach-at91/at91sam9263.c            |   10 +
+ arch/arm/mach-at91/at91sam9263_devices.c    |   20 +++
+ arch/arm/mach-at91/at91sam9g45_devices.c    |   30 +---
+ arch/arm/mach-at91/board-usb-a926x.c        |    4 +
+ 19 files changed, 1122 insertions(+), 368 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9260.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9263.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9263ek.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9g20ek.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+ create mode 100644 arch/arm/boot/dts/tny_a9260.dts
+ create mode 100644 arch/arm/boot/dts/tny_a9260_common.dtsi
+ create mode 100644 arch/arm/boot/dts/tny_a9g20.dts
+ create mode 100644 arch/arm/boot/dts/usb_a9260.dts
+ create mode 100644 arch/arm/boot/dts/usb_a9260_common.dtsi
+
+Best Regards,
+J.
