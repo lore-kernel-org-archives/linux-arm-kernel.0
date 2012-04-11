@@ -1,32 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Apr 2012 08:02:27 -0300
-Subject: Bug in v7_coherent_kern_range() ?
-In-Reply-To: <20120411102437.GE16643@mudshark.cambridge.arm.com>
-References: <4F77C9A6.6080601@freescale.com>
- <20120402111240.GG19011@mudshark.cambridge.arm.com>
- <4F7E646D.6000302@freescale.com>
- <20120410092214.GA2620@mudshark.cambridge.arm.com>
- <4F840BDC.5060307@freescale.com> <4F854992.9080601@freescale.com>
- <20120411102437.GE16643@mudshark.cambridge.arm.com>
-Message-ID: <CAOMZO5A1hO8O1Zr5R2929bA2LYrcKM0RySM4aSu0PkLU-Cmr_w@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 11 Apr 2012 16:36:47 +0530
+Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait
+ for reset status
+In-Reply-To: <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
+References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
+ <1331659524-7635-3-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
+Message-ID: <4F8565C7.4080506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 7:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+Hi Paul,
 
->> I wish i could find a more common test case to reproduce this bug. But, i can't.
->> The only test case now is to run the gplay on our IMX6Q platform.
+On Wednesday 11 April 2012 05:41 AM, Paul Walmsley wrote:
+> Just noticed that this change results in I2C softreset failed messages on
+> OMAP2/3/4 on v3.4-rc2.  For example, on 2420:
 >
-> Ok, that makes it tricky since I don't have gplay or an IMX6Q platform.
+> [    0.200378] omap_hwmod: i2c1: softreset failed (waited 10000 usec)
+> [    0.222076] omap_hwmod: i2c2: softreset failed (waited 10000 usec)
+>
+> Looking more closely at the code, I think the intention of the original
+> code was basically correct.  HDQ and I2C both need to execute some custom
+> reset code after the SOFTRESET bit is set, but before the RESETDONE bit is
+> tested.  After this patch, the internal hwmod code tries to wait for
+> RESETDONE to change, before the custom code runs -- and that is going to
+> fail.
+>
+> Just out of curiosity, was the change in this patch prompted by some code
+> that needed the change?  Or was this a theoretical problem, driven by a
+> code review?
 
-gplay is a C application that does the same thing as launching a
-simple Gstreamer pipeline like:
+The changes were done to fix up random L3 interconnect errors that
+Anand G was seeing(during i2c reset operation) on some customer 
+platforms. I seem to have completely overlooked the I2C_EN programming 
+part done in omap_i2c_reset() function when I did the patch.
 
-gst-launch playbin2 uri=file:///home/file.mp4
+While the patch did fix the issue for Anand, I guess it
+was because of the additional delay post reset, waiting on the
+RESETDONE bit and timing out, before accessing the i2c_con register.
+So looks like this patch should certainly be reverted but atleast some
+platforms/modules (the issue was seen on OMAP4/i2c) will need some
+delay between the omap_hwmod_softreset() call and any subsequent module
+register accesses.
+The patch from Fernando [1] can be quite useful if we can use the
+'srst_udelay' field to populate the appropriate delay needed which can
+then be used up in omap_hwmod_softreset() function.
+I am out sick today, but I can try some on these lines tomorrow once
+I am in office, if the approach seems fine to you.
+Btw, is [1] queued already by you/Benoit to go upstream or are there
+issues with it?
 
-Huang,
+regards,
+Rajendra
 
-Does the problem also occur if you don?t use the VPU driver? I mean,
-does it also happen if you decode the file using software codecs. I
-would like to know if the issue you see is related to the VPU driver
-or not.
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086713.html
