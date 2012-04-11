@@ -1,38 +1,31 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 11 Apr 2012 08:48:24 +0200
-Subject: [PATCHv24 00/16] Contiguous Memory Allocator
-In-Reply-To: <CA+K6fF5TbhYX_XYXL33h5s8cnSogSna4Cq2-vM4MfX4igSyozg@mail.gmail.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
- <alpine.DEB.2.00.1204101528390.9354@kernel.research.nokia.com>
- <CA+K6fF5TbhYX_XYXL33h5s8cnSogSna4Cq2-vM4MfX4igSyozg@mail.gmail.com>
-Message-ID: <00c201cd17af$17a3aa50$46eafef0$%szyprowski@samsung.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 11 Apr 2012 12:17:47 +0530
+Subject: [PATCH] clk: clk_calc_new_rates() required for parent only if
+ CLK_SET_RATE_PARENT is set
+In-Reply-To: <20120411064359.GD20478@pengutronix.de>
+References: <0b5e799807b09e47db1bf2805359aae36d947f60.1334124495.git.viresh.kumar@st.com>
+ <20120411064359.GD20478@pengutronix.de>
+Message-ID: <4F852913.20708@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tuesday, April 10, 2012 7:20 PM Sandeep Patil wrote:
-
-> >> This is (yet another) update of CMA patches.
-> >
-> >
-> > How well CMA is supposed to work if you have mlocked processes? I've
-> > been testing these patches, and noticed that by creating a small mlocked
-> > process you start to get plenty of test_pages_isolated() failure warnings,
-> > and bigger allocations will always fail.
+On 4/11/2012 12:13 PM, Sascha Hauer wrote:
+> I see no functional change in this patch. With or without this patch we
+> only call clk_calc_new_rates() when the parent rate actually changed.
+> The code is easier to read with this patch and may be slightly more
+> efficient, so:
 > 
-> CMIIW, I think mlocked pages are never migrated. The reason is because
-> __isolate_lru_pages() does not isolate Unevictable pages right now.
-> 
-> Minchan added support to allow this but the patch was dropped.
-> 
-> See the discussion at : https://lkml.org/lkml/2011/8/29/295
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Right, we are aware of this limitation. We are working on solving it but we didn't 
-consider it a blocker for the core CMA patches. Such issues can be easily fixed with 
-the incremental patches.
+Thanks Sascha. :)
+Actually i am doing SPEAr clock stuff and i have to look at already
+implemented clock source files. when i feel something can be rearranged
+in a better way (atleast according to me :) ), i patch it.
 
-Best regards
+They wouldn't be tested as i don't have SPEAr stuff ready. Will mention this
+untested thing in patch next time.
+
+You may see some more of these in coming time.
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+viresh
