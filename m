@@ -1,66 +1,44 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 11 Apr 2012 12:13:00 +0000
-Subject: [PATCHv7 14/18] I2C: OMAP: Use SET_RUNTIME_PM_OPS
-In-Reply-To: <20120411121056.GJ12064@arwen.pp.htv.fi>
-References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
- <1334142776-10583-15-git-send-email-shubhrajyoti@ti.com>
- <20120411113537.GG12064@arwen.pp.htv.fi>
- <1BAFE6F6C881BF42822005164F1491C331829571@DBDE01.ent.ti.com>
- <20120411121056.GJ12064@arwen.pp.htv.fi>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C3318295AE@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Apr 2012 12:18:39 +0000
+Subject: [PATCHv8 04/10] ARM: dma-mapping: remove offset parameter to
+ prepare for generic dma_ops
+In-Reply-To: <012e01cd17db$5f165c30$1d431490$%szyprowski@samsung.com>
+References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
+ <201204101143.27915.arnd@arndb.de>
+ <012e01cd17db$5f165c30$1d431490$%szyprowski@samsung.com>
+Message-ID: <201204111218.39800.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 17:40:58, Balbi, Felipe wrote:
-> On Wed, Apr 11, 2012 at 12:09:22PM +0000, Hebbar, Gururaja wrote:
-> > Bablpi,
-> > 
-> > On Wed, Apr 11, 2012 at 17:05:38, Balbi, Felipe wrote:
-> > > On Wed, Apr 11, 2012 at 04:42:52PM +0530, Shubhrajyoti D wrote:
-> > > > Use SET_RUNTIME_PM_OPS macro to set runtime functions.
-> > > > 
-> > > > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > > > ---
-> > > >  drivers/i2c/busses/i2c-omap.c |   11 ++++-------
-> > > >  1 files changed, 4 insertions(+), 7 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> > > > index dd65416..28de1d2 100644
-> > > > --- a/drivers/i2c/busses/i2c-omap.c
-> > > > +++ b/drivers/i2c/busses/i2c-omap.c
-> > > > @@ -1217,15 +1217,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
-> > > >  
-> > > >  	return 0;
-> > > >  }
-> > > > +#endif
-> > > >  
-> > > >  static struct dev_pm_ops omap_i2c_pm_ops = {
-> > > > -	.runtime_suspend = omap_i2c_runtime_suspend,
-> > > > -	.runtime_resume = omap_i2c_runtime_resume,
-> > > > +	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
-> > > > +			   omap_i2c_runtime_resume, NULL)
-> > > >  };
-> > > > -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
-> > > > -#else
-> > > > -#define OMAP_I2C_PM_OPS NULL
-> > > > -#endif
-> > > 
-> > > I think you should keep this define, otherwise the pm pointer will
-> > > always be valid.
-> > 
-> > No. using SET_RUNTIME_PM_OPS will make it NULL when !CONFIG_PM_RUNTIME
-> > Kindly correct me if I am wrong.
+On Wednesday 11 April 2012, Marek Szyprowski wrote:
+> Well, range sync functions are available from the early days of the dma 
+> mapping api (at least that's what I've found reading the change log and
+> old patches). They are the correct way of doing a partial syncs on the 
+> buffer (usually used by the network device drivers). This patch changes
+> only the internal implementation of the dma bounce functions to let 
+> them tunnel through dma_map_ops structure. The driver api stays
+> unchanged, so driver are obliged to call dma_*_range_* functions to
+> keep code clean and easy to understand. 
 > 
-> you will have a defined structure with NULL members, but the structure
-> itself is still valid.
-
-Oops. You are correct. I stand corrected.
-
+> The only drawback I can see from this patch is reduced detection of
+> the dma api abuse. Let us consider the following code:
 > 
-> -- 
-> balbi
+> dma_addr = dma_map_single(dev, ptr, 64, DMA_TO_DEVICE);
+> dma_sync_single_range_for_cpu(dev, dma_addr+16, 0, 32, DMA_TO_DEVICE);
+> 
+> Without the patch such code fails, because dma bounce code is unable
+> to find the bounce buffer for the given dma_address. After the patch
+> the sync call will be equivalent to: 
+> 
+>         dma_sync_single_range_for_cpu(dev, dma_addr, 16, 32, DMA_TO_DEVICE);
+> 
+> which succeeds.
+> 
+> I don't consider this as a real problem. DMA API abuse should be caught
+> by debug_dma_* function family, so we can simplify the internal low-level
+> implementation without losing anything.
 > 
 
+Ok, fair enough. Can you put the above text into the changelog?
 
-Regards, 
-Gururaja
+	Arnd
