@@ -1,81 +1,42 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:42:40 +0530
-Subject: [PATCHv7 02/18] I2C: OMAP: Remove reset at init
+Date: Wed, 11 Apr 2012 16:42:45 +0530
+Subject: [PATCHv7 07/18] I2C: OMAP: Optimise the remove code
 In-Reply-To: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334142776-10583-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334142776-10583-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset in the driver at init is not needed anymore as the
-following patch has removed the HWMOD_INIT_NO_RESET flag.
-6d3c55f [OMAP: hwmod: fix the i2c-reset timeout during bootup]
-
-This patch does the following
--removes the reset from the probe and implements a omap_i2c_reset
- function to reset.
-- Reset is removed from omap_i2c_init, which was called
- not only during probe, but also after time out and error handling.
- omap_i2c_reset is added in those places to effect the reset.
+The omap_i2c_remove function may not be needed after
+device exit so the memory could be freed.
 
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   20 +++++++++++++-------
- 1 files changed, 13 insertions(+), 7 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 4f4188d..e402ebb 100644
+index 3670088..2096726 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -269,15 +269,9 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
+@@ -1134,8 +1134,7 @@ err_release_region:
+ 	return r;
  }
  
--static int omap_i2c_init(struct omap_i2c_dev *dev)
-+static int omap_i2c_reset(struct omap_i2c_dev *dev)
+-static int
+-omap_i2c_remove(struct platform_device *pdev)
++static int __devexit omap_i2c_remove(struct platform_device *pdev)
  {
--	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
--	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
--	unsigned long fclk_rate = 12000000;
- 	unsigned long timeout;
--	unsigned long internal_clk = 0;
--	struct clk *fclk;
--
- 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
- 		/* Disable I2C controller before soft reset */
- 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
-@@ -325,6 +319,16 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 							dev->westate);
- 		}
- 	}
-+}
-+
-+static int omap_i2c_init(struct omap_i2c_dev *dev)
-+{
-+	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
-+	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
-+	unsigned long fclk_rate = 12000000;
-+	unsigned long internal_clk = 0;
-+	struct clk *fclk;
-+
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	struct resource		*mem;
+@@ -1228,7 +1227,7 @@ static struct dev_pm_ops omap_i2c_pm_ops = {
  
- 	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
-@@ -548,6 +552,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 		return r;
- 	if (r == 0) {
- 		dev_err(dev->dev, "controller timed out\n");
-+		omap_i2c_reset(dev);
- 		omap_i2c_init(dev);
- 		return -ETIMEDOUT;
- 	}
-@@ -558,6 +563,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	/* We have an error */
- 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
- 			    OMAP_I2C_STAT_XUDF)) {
-+		omap_i2c_reset(dev);
- 		omap_i2c_init(dev);
- 		return -EIO;
- 	}
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
+-	.remove		= omap_i2c_remove,
++	.remove		= __devexit_p(omap_i2c_remove),
+ 	.driver		= {
+ 		.name	= "omap_i2c",
+ 		.owner	= THIS_MODULE,
 -- 
 1.7.4.1
