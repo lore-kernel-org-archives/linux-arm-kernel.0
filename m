@@ -1,24 +1,29 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 11 Apr 2012 13:54:32 +0530
-Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
-In-Reply-To: <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
-References: <4F793C56.2030605@st.com>
- <CAOh2x=n8GO-vzFgDEdeyUVdGiOE_-BxgpC5+LbKRMtvgnoSxHQ@mail.gmail.com>
- <CACRpkdZgfY340a5=Mgs0WwTO1e4AiKxv3-xm4pbpEg2jOmiNgg@mail.gmail.com>
- <4F83FAE2.8020107@st.com>
- <CACRpkdbaG0uKeCrAsc8Q4sfY0yY=h48esY=z=Wb8HWHBLK6aVA@mail.gmail.com>
-Message-ID: <4F853FC0.4080802@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Apr 2012 10:26:30 +0200
+Subject: [PATCH] pinctrl: fix build failure on PPC
+In-Reply-To: <4F844E52.3080902@wwwdotorg.org>
+References: <1334044357-14486-1-git-send-email-linus.walleij@stericsson.com>
+ <4F844E52.3080902@wwwdotorg.org>
+Message-ID: <CACRpkdYPD4iA2vdy-VOP2E+FfESJmbuMtLDVi0rGBn6FCCzuyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2012 1:47 PM, Linus Walleij wrote:
-> Hm, then we should maybe consider mergeing all that pinctrl stuff
-> through ARM SoC later as well. I can probably provide the
-> necessary ACKs.
+On Tue, Apr 10, 2012 at 5:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/10/2012 01:52 AM, Linus Walleij wrote:
 
-That would be much better. Just to know who should update these Acks
-in commits. If it isn't a pull request, Arnd will do it. But if it is,
-then probably i am required to update this?
+>> So let's use some local Kconfig option that depends on both OF
+>> and PINCTRL so that this file is only compiled if you have
+>> both enabled.
+>
+> It seems simpler to just fix the Makefile to only compile the file when
+> its needed directly, without introducing a new Kconfig option. See
+> https://lkml.org/lkml/2012/4/3/445.
 
--- 
-viresh
+But I think it is basically a config problem, not a compilation problem,
+that is why I did it this way.
+
+But I won't be stubborn about it ... I'll see if I can just switch that one
+patch out then.
+
+Yours,
+Linus Walleij
