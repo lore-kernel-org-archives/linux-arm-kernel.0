@@ -1,41 +1,42 @@
-From: will.newton@gmail.com (Will Newton)
-Date: Wed, 11 Apr 2012 11:11:57 +0100
-Subject: [PATCH] mmc: remove linux/blkdev.h include from host drivers
-In-Reply-To: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
-References: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <CAFbHwiQrq30HO2X4KG1u5J2+dT2dEcZAd0gXEXm7nc7jjm--wg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Apr 2012 11:24:37 +0100
+Subject: Bug in v7_coherent_kern_range() ?
+In-Reply-To: <4F854992.9080601@freescale.com>
+References: <4F77C9A6.6080601@freescale.com>
+ <20120402111240.GG19011@mudshark.cambridge.arm.com>
+ <4F7E646D.6000302@freescale.com>
+ <20120410092214.GA2620@mudshark.cambridge.arm.com>
+ <4F840BDC.5060307@freescale.com> <4F854992.9080601@freescale.com>
+Message-ID: <20120411102437.GE16643@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 8:06 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> None of mmc host drivers using linux/blkdev.h header
-> really need anything from it. The slight exception is
-> atmel-mci, which uses blkdev.h only because it indirectly
-> pulls asm/cacheflush.h
->
-> So remove any inclusion of blkdev.h - it should also fix
-> build errors of dw_mmc and atmel-mci drivers when
-> CONFIG_BLOCK is disabled, like following:
-> ------------------------------------------------------
-> In file included from drivers/mmc/host/dw_mmc.c:14:0:
-> include/linux/blkdev.h:1408:42: warning: ?struct task_struct? declared inside parameter list [enabled by default]
-> include/linux/blkdev.h:1408:42: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-> include/linux/blkdev.h:1412:51: warning: ?struct task_struct? declared inside parameter list [enabled by default]
-> include/linux/blkdev.h:1417:1: error: unknown type name ?bool?
-> include/linux/blkdev.h:1417:48: warning: ?struct task_struct? declared inside parameter list [enabled by default]
-> include/linux/blkdev.h: In function ?blk_needs_flush_plug?:
-> include/linux/blkdev.h:1419:9: error: ?false? undeclared (first use in this function)
-> include/linux/blkdev.h:1419:9: note: each undeclared identifier is reported only once for each function it appears in
-> make[1]: *** [drivers/mmc/host/dw_mmc.o] Error 1
-> make: *** [drivers/mmc/host/dw_mmc.o] Error 2
-> ------------------------------------------------------
->
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: Pavel Pisa <ppisa@pikron.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Will Newton <will.newton@imgtec.com>
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+On Wed, Apr 11, 2012 at 10:06:26AM +0100, Huang Shijie wrote:
+> Ok. Can you please:
+> 
+> (a) Make your test case available somewhere?
+> 
+> 
+> I wish i could find a more common test case to reproduce this bug. But, i can't.
+> The only test case now is to run the gplay on our IMX6Q platform.
 
-For the dw_mmc part:
+Ok, that makes it tricky since I don't have gplay or an IMX6Q platform.
 
-Acked-by: Will Newton <will.newton@imgtec.com>
+> (b) Try a more recent mainline kernel (3.3)?
+> 
+> 
+> yes, I will try to test the linaro kernel.
+
+Can you not try vanilla mainline instead? Either way, let me know how you
+get on.
+
+> The info of the libc:
+>      GNU libc version: 2.13
+>      GNU libc release: stable
+
+That looks new enough for swp not to be an issue.
+
+If you still have this problem with a newer kernel, we can try using the
+fallback SMP futex implementation and see if that works.
+
+Will
