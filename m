@@ -1,236 +1,204 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 11 Apr 2012 12:05:45 -0700
-Subject: [PATCH 10/12] arm: omap3: am35x: Add minimal EMIF4 support
+Date: Wed, 11 Apr 2012 12:05:41 -0700
+Subject: [PATCH 06/12] arm: omap3: am35x: Add full PWRDM_POWER_INACTIVE support
 In-Reply-To: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
 References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1334171147-7517-11-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1334171147-7517-7-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-The typical SDRAM Controller Subsystem module (SDRC)
-on TI OMAP3 devices has two submodules: the SDRAM Memory
-Scheduler (SMS) submodule, and the SDRC submodule--the
-'SDRC' acronym/term is overloaded.  The am35x family of
-devices is different in that it has an EMIF4 submodule
-instead of an SDRC submodule.  The SMS submodules are
-similar, though.
+The am35x family of SoCs only support PWRDM_POWER_ON
+and PWRDM_POWER_INACTIVE power states. This causes
+an issue in some areas of the OMAP3 power-related
+code because of assumptions that PWRDM_POWER_RET
+and/or PWRDM_POWER_OFF are always valid states.
 
-Currently, the code assumes that if its an OMAP3 device,
-then it has an SDRC module and if it has an SDRC module,
-it has an SDRC submodule.  Since the SDRC module can now
-have an EMIF4 submodule, the code needs to be reworked.
-
-This rework can be minimal since there is an EMIF driver being
-developed which should take care of most of the EMIF4 details.
-In the meantime:
-- enable smart-idle and VTP power save mode in the EMIF4
-- have omap3_core_dpll_m2_set_rate() return an error when
-  there's an EMIF4 module because it assumes there's an
-  SDRC submodule
-- don't bother pushing map3_sram_configure_core_dpll()
-  to sram since its not used when there's an EMIF4
-  submodule.
-
-NOTE: There is still a bit of ugliness in that the SDRC
-submodule's mapping (in omap34xx_io_desc[]) is used.
-That works okay since the address and size of the EMIF4
-submodule is the same as the SDRC submodule's.  To fix that,
-a special "early_cpu_is_xxx()" or "early_omap3_has_sdrc_emif4()"
-routine needs to be created because its too early to use the
-regular cpu_is_xxx() or omap3_has_sdrc_emif4() calls.
+To get am35x SoCs to work properly, add missing support
+for PWRDM_POWER_INACTIVE and remove assumptions that
+PWRDM_POWER_RET and PWRDM_POWER_OFF are always valid states.
 
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- arch/arm/mach-omap2/clkt34xx_dpll3m2.c |    6 +++-
- arch/arm/mach-omap2/io.c               |    9 ++++++
- arch/arm/mach-omap2/sdrc.c             |   52 ++++++++++++++++++++++----------
- arch/arm/mach-omap2/sdrc.h             |   13 ++++++++
- arch/arm/plat-omap/sram.c              |    8 +++--
- 5 files changed, 68 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |   29 +++++++++++++++++++++++--
+ arch/arm/mach-omap2/pm-debug.c    |    8 +++++--
+ arch/arm/mach-omap2/pm34xx.c      |   43 +++++++++++++++++++++++--------------
+ 3 files changed, 60 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
-index d6e34dd..3864528 100644
---- a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
-+++ b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
-@@ -21,6 +21,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index 12cf81d..187872a 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -175,12 +175,23 @@ static int next_valid_state(struct cpuidle_device *dev,
+ 	struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
+ 	struct cpuidle_state *curr = &drv->states[index];
+ 	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
+-	u32 mpu_deepest_state = PWRDM_POWER_RET;
+-	u32 core_deepest_state = PWRDM_POWER_RET;
++	u32 mpu_deepest_state;
++	u32 core_deepest_state;
+ 	int next_index = -1;
  
-+#include <plat/cpu.h>
- #include <plat/clock.h>
- #include <plat/sram.h>
- #include <plat/sdrc.h>
-@@ -45,7 +46,7 @@
-  * @rate: rounded target rate
-  *
-  * Program the DPLL M2 divider with the rounded target rate.  Returns
-- * -EINVAL upon error, or 0 upon success.
-+ * -EINVAL upon error or if there's an EMIF4 submodule, or 0 upon success.
-  */
- int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
- {
-@@ -60,6 +61,9 @@ int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
- 	if (!clk || !rate)
- 		return -EINVAL;
- 
-+	if (omap3_has_sdrc_emif4())
-+		return -EINVAL;
-+
- 	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
- 	if (validrate != rate)
- 		return -EINVAL;
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 065bd76..1accc90 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -450,6 +450,15 @@ void __init omap3630_init_early(void)
- 
- void __init am35xx_init_early(void)
- {
-+	/*
-+	 * The am35x has an EMIF4 submodule in the SDRC module instead
-+	 * of an SDRC submodule like other OMAP3 SoCs.  Fortunately,
-+	 * the EMIF4 and SDRC submodules are at the same physical address
-+	 * so we can use the SDRC mapping to access the EMIF4 submodule.
-+	 * The reason for not making a separate mapping for the EMIF4 is
-+	 * to avoid creating an early_cpu_is_xxx()-like call because its
-+	 * too early to use cpu_is_3505/3517() or omap3_has_sdrc_emif4().
-+	 */
- 	omap3_init_early();
- }
- 
-diff --git a/arch/arm/mach-omap2/sdrc.c b/arch/arm/mach-omap2/sdrc.c
-index e3d345f..d804065 100644
---- a/arch/arm/mach-omap2/sdrc.c
-+++ b/arch/arm/mach-omap2/sdrc.c
-@@ -24,11 +24,13 @@
- #include <linux/io.h>
- 
- #include "common.h"
-+#include "control.h"
- #include <plat/clock.h>
- #include <plat/sram.h>
- 
- #include <plat/sdrc.h>
- #include "sdrc.h"
-+#include "emif4.h"
- 
- static struct omap_sdrc_params *sdrc_init_params_cs0, *sdrc_init_params_cs1;
- 
-@@ -136,28 +138,46 @@ void __init omap2_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
- 			    struct omap_sdrc_params *sdrc_cs1)
- {
- 	u32 l;
-+	void __iomem *ctrl_base;
- 
- 	l = sms_read_reg(SMS_SYSCONFIG);
- 	l &= ~(0x3 << 3);
- 	l |= (0x2 << 3);
- 	sms_write_reg(l, SMS_SYSCONFIG);
- 
--	l = sdrc_read_reg(SDRC_SYSCONFIG);
--	l &= ~(0x3 << 3);
--	l |= (0x2 << 3);
--	sdrc_write_reg(l, SDRC_SYSCONFIG);
--
--	sdrc_init_params_cs0 = sdrc_cs0;
--	sdrc_init_params_cs1 = sdrc_cs1;
--
--	/* XXX Enable SRFRONIDLEREQ here also? */
--	/*
--	 * PWDENA should not be set due to 34xx erratum 1.150 - PWDENA
--	 * can cause random memory corruption
--	 */
--	l = (1 << SDRC_POWER_EXTCLKDIS_SHIFT) |
--		(1 << SDRC_POWER_PAGEPOLICY_SHIFT);
--	sdrc_write_reg(l, SDRC_POWER);
-+	if (omap3_has_sdrc_emif4()) {
-+		l = emif4_read_reg(EMIF4_PWR_MGMT_CTRL);
-+		l &= ~(0x3 << 30);
-+		l |= (0x2 << 30);
-+		emif4_write_reg(l, EMIF4_PWR_MGMT_CTRL);
-+
-+		/* Enable VTP Power Save Mode */
-+		ctrl_base = omap_ctrl_base_get();
-+		if (ctrl_base) {
-+			l = __raw_readl(ctrl_base + AM35XX_CONTROL_DEVCONF3);
-+			l &= ~(0x3 << 13);
-+			l |= (0x1 << 13);
-+			__raw_writel(l, ctrl_base + AM35XX_CONTROL_DEVCONF3);
-+		}
++	if (omap3_has_pwroff()) {
++		mpu_deepest_state = PWRDM_POWER_RET;
++		core_deepest_state = PWRDM_POWER_RET;
 +	} else {
-+		l = sdrc_read_reg(SDRC_SYSCONFIG);
-+		l &= ~(0x3 << 3);
-+		l |= (0x2 << 3);
-+		sdrc_write_reg(l, SDRC_SYSCONFIG);
-+
-+		sdrc_init_params_cs0 = sdrc_cs0;
-+		sdrc_init_params_cs1 = sdrc_cs1;
-+
-+		/* XXX Enable SRFRONIDLEREQ here also? */
-+		/*
-+		 * PWDENA should not be set due to 34xx erratum 1.150 - PWDENA
-+		 * can cause random memory corruption
-+		 */
-+		l = (1 << SDRC_POWER_EXTCLKDIS_SHIFT) |
-+			(1 << SDRC_POWER_PAGEPOLICY_SHIFT);
-+		sdrc_write_reg(l, SDRC_POWER);
++		mpu_deepest_state = PWRDM_POWER_INACTIVE;
++		core_deepest_state = PWRDM_POWER_INACTIVE;
 +	}
 +
- 	omap2_sms_save_context();
+ 	if (enable_off_mode) {
++		WARN_ON(!omap3_has_pwroff());
++
+ 		mpu_deepest_state = PWRDM_POWER_OFF;
++
+ 		/*
+ 		 * Erratum i583: valable for ES rev < Es1.2 on 3630.
+ 		 * CORE OFF mode is not supported in a stable form, restrict
+@@ -311,6 +322,9 @@ void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params)
+ 			cpuidle_board_params[i].exit_latency;
+ 		cpuidle_params_table[i].target_residency =
+ 			cpuidle_board_params[i].target_residency;
++
++		WARN_ON(!omap3_has_pwroff() && (i >= 2) &&
++				cpuidle_params_table[i].valid);
+ 	}
+ 	return;
+ }
+@@ -349,6 +363,16 @@ static inline struct omap3_idle_statedata *_fill_cstate_usage(
+ 	return cx;
  }
  
-diff --git a/arch/arm/mach-omap2/sdrc.h b/arch/arm/mach-omap2/sdrc.h
-index b3f8379..5fb6490 100644
---- a/arch/arm/mach-omap2/sdrc.h
-+++ b/arch/arm/mach-omap2/sdrc.h
-@@ -25,6 +25,7 @@ extern void __iomem *omap2_sdrc_base;
- extern void __iomem *omap2_sms_base;
- 
- #define OMAP_SDRC_REGADDR(reg)			(omap2_sdrc_base + (reg))
-+#define OMAP_EMIF4_REGADDR(reg)			(omap2_sdrc_base + (reg))
- #define OMAP_SMS_REGADDR(reg)			(omap2_sms_base + (reg))
- 
- /* SDRC global register get/set */
-@@ -39,6 +40,18 @@ static inline u32 sdrc_read_reg(u16 reg)
- 	return __raw_readl(OMAP_SDRC_REGADDR(reg));
- }
- 
-+/* EMIF4 global register get/set */
-+
-+static inline void emif4_write_reg(u32 val, u16 reg)
++/* Only C1 & C2 C states valid when RET & OFF states aren't supported */
++static void omap3_cstate_valid_fixup(void)
 +{
-+	__raw_writel(val, OMAP_EMIF4_REGADDR(reg));
++	int idx;
++
++	if (!omap3_has_pwroff())
++		for (idx = 2; idx < OMAP3_NUM_STATES; idx++)
++			cpuidle_params_table[idx].valid = 0;
 +}
 +
-+static inline u32 emif4_read_reg(u16 reg)
-+{
-+	return __raw_readl(OMAP_EMIF4_REGADDR(reg));
-+}
-+
- /* SMS global register get/set */
+ /**
+  * omap3_idle_init - Init routine for OMAP3 idle
+  *
+@@ -366,6 +390,7 @@ int __init omap3_idle_init(void)
+ 	per_pd = pwrdm_lookup("per_pwrdm");
+ 	cam_pd = pwrdm_lookup("cam_pwrdm");
  
- static inline void sms_write_reg(u32 val, u16 reg)
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index eec98af..42ccfcb 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -353,9 +353,11 @@ void omap3_sram_restore_context(void)
++	omap3_cstate_valid_fixup();
+ 
+ 	drv->safe_state_index = -1;
+ 	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 814bcd9..339ed42 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -239,19 +239,23 @@ static int option_get(void *data, u64 *val)
+ static int option_set(void *data, u64 val)
  {
- 	omap_sram_ceil = omap_sram_base + omap_sram_size;
+ 	u32 *option = data;
++	int ret = -EINVAL;
  
--	_omap3_sram_configure_core_dpll =
--		omap_sram_push(omap3_sram_configure_core_dpll,
--			       omap3_sram_configure_core_dpll_sz);
-+	if (!omap3_has_sdrc_emif4())
-+		_omap3_sram_configure_core_dpll =
-+			omap_sram_push(omap3_sram_configure_core_dpll,
-+				       omap3_sram_configure_core_dpll_sz);
+ 	*option = val;
+ 
+-	if (option == &enable_off_mode) {
++	if (omap3_has_pwroff() && (option == &enable_off_mode)) {
+ 		if (val)
+ 			omap_pm_enable_off_mode();
+ 		else
+ 			omap_pm_disable_off_mode();
 +
- 	omap_push_sram_idle();
+ 		if (cpu_is_omap34xx())
+ 			omap3_pm_off_mode_enable(val);
++
++		ret = 0;
+ 	}
+ 
+-	return 0;
++	return ret;
  }
- #endif /* CONFIG_PM */
+ 
+ DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index b7bbcee..00c4abe 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -279,6 +279,7 @@ void omap_sram_idle(void)
+ 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+ 	switch (mpu_next_state) {
+ 	case PWRDM_POWER_ON:
++	case PWRDM_POWER_INACTIVE:
+ 	case PWRDM_POWER_RET:
+ 		/* No need to save context */
+ 		save_state = 0;
+@@ -614,6 +615,8 @@ void omap3_pm_off_mode_enable(int enable)
+ 	struct power_state *pwrst;
+ 	u32 state;
+ 
++	WARN_ON(!omap3_has_pwroff());
++
+ 	if (enable)
+ 		state = PWRDM_POWER_OFF;
+ 	else
+@@ -668,7 +671,12 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+ 	if (!pwrst)
+ 		return -ENOMEM;
+ 	pwrst->pwrdm = pwrdm;
+-	pwrst->next_state = PWRDM_POWER_RET;
++
++	if (omap3_has_pwroff())
++		pwrst->next_state = PWRDM_POWER_RET;
++	else
++		pwrst->next_state = PWRDM_POWER_INACTIVE;
++
+ 	list_add(&pwrst->node, &pwrst_list);
+ 
+ 	if (pwrdm_has_hdwr_sar(pwrdm))
+@@ -781,25 +789,28 @@ static int __init omap3_pm_init(void)
+ 		omap3630_ctrl_disable_rta();
+ 
+ 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
+-	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+-		omap3_secure_ram_storage =
+-			kmalloc(0x803F, GFP_KERNEL);
+-		if (!omap3_secure_ram_storage)
+-			pr_err("Memory allocation failed when "
+-			       "allocating for secure sram context\n");
+ 
+-		local_irq_disable();
+-		local_fiq_disable();
++	if (omap3_has_pwroff()) {
++		if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
++			omap3_secure_ram_storage =
++				kmalloc(0x803F, GFP_KERNEL);
++			if (!omap3_secure_ram_storage)
++				pr_err("Memory allocation failed when "
++				       "allocating for secure sram context\n");
+ 
+-		omap_dma_global_context_save();
+-		omap3_save_secure_ram_context();
+-		omap_dma_global_context_restore();
++			local_irq_disable();
++			local_fiq_disable();
+ 
+-		local_irq_enable();
+-		local_fiq_enable();
+-	}
++			omap_dma_global_context_save();
++			omap3_save_secure_ram_context();
++			omap_dma_global_context_restore();
++
++			local_irq_enable();
++			local_fiq_enable();
+ 
+-	omap3_save_scratchpad_contents();
++			omap3_save_scratchpad_contents();
++		}
++	}
+ 	return ret;
+ 
+ err3:
 -- 
 1.7.9.4
