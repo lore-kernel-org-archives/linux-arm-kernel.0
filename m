@@ -1,61 +1,82 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 11 Apr 2012 11:13:54 +1000
-Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
- irq_alloc_desc() instead
-In-Reply-To: <m2aa2n7mmw.fsf@igel.home>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
- <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
- <20120402202848.1EB833E02A7@localhost>
- <20120402215524.GM24211@n2100.arm.linux.org.uk>
- <1333406005.30734.61.camel@pasglop>
- <20120402225223.GN24211@n2100.arm.linux.org.uk>
- <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
- <1333755470.3040.38.camel@pasglop> <m2aa2n7mmw.fsf@igel.home>
-Message-ID: <1334106834.2984.17.camel@pasglop>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 10 Apr 2012 21:21:33 -0400
+Subject: [PATCH] ARM: orion5x: Fix GPIO enable bits for MPP9
+In-Reply-To: <1333771725.7150.32.camel@deadeye>
+References: <1333771725.7150.32.camel@deadeye>
+Message-ID: <20120411012133.GD14790@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-04-07 at 14:27 +0200, Andreas Schwab wrote:
-> Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
+On Sat, Apr 07, 2012 at 05:08:45AM +0100, Ben Hutchings wrote:
+> Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 seems to have
+> accidentally inverted the GPIO valid bits for MPP9 (only).  For the
+> mv2120 platform which uses MPP9 as a GPIO LED device, this results in
+> the error:
 > 
-> > It's arguable that this irq_set_irq_type(,NONE) shouln't be there but
-> > still ... it's been around for ever and things worked :-) So something
-> > -else- is causing the problem and I'd like to understand what exactly.
+> [   12.711476] leds-gpio: probe of leds-gpio failed with error -22
 > 
-> AFAICS before a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5
-> irq_set_irq_type(,NONE) was actually a no-op.
+> Reported-by: Henry von Tresckow <hvontres@gmail.com>
+> References: http://bugs.debian.org/667446
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> Cc: stable at vger.kernel.org [v3.0+]
+> ---
+> I know nothing about this platform, and this is totally untested.  But
+> it does look quite straightforward...
 
-So I'm still a bit baffled... ie, I understand some of what's happening
-but not why it breaks things, I haven't yet managed to reproduce but I
-haven't tried too hard just yet (was away from the HW) :
+Can we confirm that it doesn't break functionality on the following:
 
-Basically, we end up setting the mpic to IRQ_TYPE_LEVEL_LOW as a result
-of a request to set it to IRQ_TYPE_NONE, ie, we apply a "default"
-setting instead of just setting it to "none" (in part because we don't
-have a way in HW to disable the trigger completely. We then write that
-into the irq_desc with irqd_set_trigger_type().
+* d2net            (MPP9_GPIO, /* Rear power switch (auto|off) */)
+* db88f5281        (MPP9_GPIO, /* JP3, CON11.3 */)
+* dns-323          (MPP9_GPIO, /* power button switch */)
+* dns-323b         (MPP9_GPIO, /* power button switch */)
+* dns-323c         (MPP9_GPIO, /* i/o left amber LED */)
+* ls-chl           (MPP9_GPIO, /* USB POWER */)
+* ls_hgl           (MPP9_GPIO, /* USB_PWR */)
+* lsmini           (MPP9_GPIO, /* LED_FUNC */)
+* mv2120           (MPP9_GPIO, /* SATA 1 fail LED */)
+* net2big          (MPP9_GPIO, /* Rear power switch (auto|off) */)
+* rd88f5181l-fxo   (MPP9_GPIO, /* GE_RXERR */)
+* rd88f5181l-ge    (MPP9_GPIO, /* GE_RXERR */)
+* terastation_pro2 (MPP9_GPIO, /* RTC int */)
+* wnr854t          (MPP9_GIGE, /* GE_RXERR */)
+* wrt350n-v2       (MPP9_GIGE, /* GE_RXERR */)
 
-Then we return IRQ_SET_MASK_OK_NOCOPY, which means that the generic
-__irq_set_trigger() code will read back what we've set in the desc and
-adjust things accordingly, rather than writing the original value in,
-ie, our descriptor ends up being effectively set to IRQ_TYPE_LEVEL_LOW
-rather than IRQ_TYPE_NONE.
+Also, while I'm looking at it, Is it correct that four boards
+(rd88f5181l-*, wnr854t, wrt350n-v2) use the same pin for the same
+purpose, two declare it as GPIO, and two as GIGE... :-/  Perhaps part of
+the same problem?
 
-Later, when we actually try to set it to IRQ_TYPE_LEVEL_LOW as a result
-of parsing the device-tree, we then hit the code
-irq_create_of_mapping(), at the bottom, which will skip the call to
-irq_set_irq_type() if we are trying to set it to the same type that it's
-already set to....
+thx,
 
-But I don't see why that breaks anything, ie we -have- set things to
-LEVEL_LOW as a result of IRQ_TYPE_NONE, which is the right setting, so
-things should work despite the fact that we skip the second call.
+Jason.
 
-Out of curiosity, can you try removing the check in irqdomain and always
-apply the setting regardless of the previous value (ie, remove the check
-of type against irqd_get_trigger at the end of irq_create_of_mapping),
-see if that makes a difference ?
-
-Cheers,
-Ben.
+> 
+> Ben.
+> 
+>  arch/arm/mach-orion5x/mpp.h |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
+> index eac6897..db70e79 100644
+> --- a/arch/arm/mach-orion5x/mpp.h
+> +++ b/arch/arm/mach-orion5x/mpp.h
+> @@ -65,8 +65,8 @@
+>  #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
+>  
+>  #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
+> -#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
+> -#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
+> +#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
+> +#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
+>  
+>  #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
+>  #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
