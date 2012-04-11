@@ -1,103 +1,48 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 11 Apr 2012 15:58:46 +0800
-Subject: [PATCH] dma: mxs-dma: enable channel in device_issue_pending call
-In-Reply-To: <1334122334-27930-1-git-send-email-shawn.guo@linaro.org>
-References: <1334122334-27930-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F8539B6.6020109@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Apr 2012 09:59:25 +0200
+Subject: [PATCH 2/2] dma/amba-pl08x: add support for the Nomadik variant
+In-Reply-To: <4F83AC55.3070900@st.com>
+References: <1334004816-20219-1-git-send-email-linus.walleij@linaro.org>
+ <4F83AC55.3070900@st.com>
+Message-ID: <CACRpkdaz9g7cRc1rAMHUzRbLcrYtB-kPCB6bFEMYZxxmWfLNSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?04?11? 13:32, Shawn Guo ??:
-> Enable channel in device_issue_pending call, so that the order between
-> cookie assignment and channel enabling can be ensured naturally.
+On Tue, Apr 10, 2012 at 5:43 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> On 4/10/2012 2:23 AM, Linus Walleij wrote:
+
+>> + ? ? ? ? ? ? ? ? ? ? val = readl(ch->base + PL080_CH_CONFIG);
+>> + ? ? ? ? ? ? ? ? ? ? if (val & (PL080N_CONFIG_ITPROT | PL080N_CONFIG_SECPROT)) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_info(&adev->dev, "physical channel %d reserved "
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"for secure access only\n", i);
 >
-> It fixes the mxs gpmi-nand breakage which is caused by the incorrect
-> order of cookie assigning and channel enabling.
+> Better not to break the print string. Go beyond 80 columns.
+
+OK
+
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ch->locked = true;
+>> + ? ? ? ? ? ? ? ? ? ? } else
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ch->locked = false;
+>> + ? ? ? ? ? ? }
+>> +
 >
-> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> [resend to cc LAKML, sorry]
+> Memory for ch is allocated with kmalloc and so its default value is garbage.
+> So we must set locked to false in else part here.
+
+Hm maybe better to kzalloc() the channel structs?
+
+>> @@ -2036,9 +2069,9 @@ static struct amba_id pl08x_ids[] = {
+>> ? ? ? },
+>> ? ? ? /* Nomadik 8815 PL080 variant */
+>> ? ? ? {
+>> - ? ? ? ? ? ? .id ? ? = 0x00280880,
+>> + ? ? ? ? ? ? .id ? ? = 0x00280080,
 >
-> Shijie,
->
-> I tested the patch with mmc and sound driver.  Can you give it a test
-> with gpmi-nand to see if it fixes the problem for you?
->
-> Thanks,
-> Shawn
->
->  drivers/dma/mxs-dma.c                  |   10 +++-------
->  drivers/mmc/host/mxs-mmc.c             |    3 +++
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    1 +
->  3 files changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index c81ef7e..655d4ce 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -201,10 +201,6 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
->  
->  static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
->  {
-> -	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
-> -
-> -	mxs_dma_enable_chan(mxs_chan);
-> -
->  	return dma_cookie_assign(tx);
->  }
->  
-> @@ -558,9 +554,9 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
->  
->  static void mxs_dma_issue_pending(struct dma_chan *chan)
->  {
-> -	/*
-> -	 * Nothing to do. We only have a single descriptor.
-> -	 */
-> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-> +
-> +	mxs_dma_enable_chan(mxs_chan);
->  }
->  
->  static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index b0f2ef9..e3f5af9 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -363,6 +363,7 @@ static void mxs_mmc_bc(struct mxs_mmc_host *host)
->  		goto out;
->  
->  	dmaengine_submit(desc);
-> +	dma_async_issue_pending(host->dmach);
->  	return;
->  
->  out:
-> @@ -403,6 +404,7 @@ static void mxs_mmc_ac(struct mxs_mmc_host *host)
->  		goto out;
->  
->  	dmaengine_submit(desc);
-> +	dma_async_issue_pending(host->dmach);
->  	return;
->  
->  out:
-> @@ -531,6 +533,7 @@ static void mxs_mmc_adtc(struct mxs_mmc_host *host)
->  		goto out;
->  
->  	dmaengine_submit(desc);
-> +	dma_async_issue_pending(host->dmach);
->  	return;
->  out:
->  	dev_warn(mmc_dev(host->mmc),
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index 75b1dde..9ec51ce 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -266,6 +266,7 @@ int start_dma_without_bch_irq(struct gpmi_nand_data *this,
->  	desc->callback		= dma_irq_callback;
->  	desc->callback_param	= this;
->  	dmaengine_submit(desc);
-> +	dma_async_issue_pending(get_dma_chan(this));
->  
->  	/* Wait for the interrupt from the DMA block. */
->  	err = wait_for_completion_timeout(dma_c, msecs_to_jiffies(1000));
-Tested-by: Huang Shijie <b32955@freescale.com>
+> Has this changed? How it worked earlier?
+
+Never worked until now. It was based on incorrect data sheets...
+
+I'll send a V2 ASAP.
+
+Yours,
+Linus Walleij
