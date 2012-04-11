@@ -1,31 +1,20 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 11 Apr 2012 11:39:12 -0400
-Subject: [PATCH] mmc: remove linux/blkdev.h include from host drivers
-In-Reply-To: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru> (Dmitry
- Artamonow's message of "Tue, 10 Apr 2012 23:06:23 +0400")
-References: <1334084783-3572-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <87ty0qs2fz.fsf@laptop.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 11 Apr 2012 09:43:31 -0600
+Subject: [PATCH v2] pinctrl: implement pinctrl deferred probing
+In-Reply-To: <1334133248-1452-1-git-send-email-linus.walleij@stericsson.com>
+References: <1334133248-1452-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4F85A6A3.8050009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha, Wolfram,
+On 04/11/2012 02:34 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> If drivers try to obtain pinctrl handles for a pin controller that
+> has not yet registered to the subsystem, we need to be able to
+> back out and retry with deferred probing. So let's return
+> -EPROBE_DEFER whenever this location fails. Also downgrade the
+> errors to info, maybe we will even set them to debug once the
+> deferred probing is commonplace.
 
-On Tue, Apr 10 2012, Dmitry Artamonow wrote:
-> I've compile tested everything with and without CONFIG_BLOCK enabled,
-> except for imxmmc.c - this driver seems to be long time broken
-> (at least since the removal of mach-imx in 2.6.31 - see commit
-> 1341d34ffc296f98dc84876f35f3151525dc02a2 ) 
-
-I can confirm that it no longer builds:
-
-/home/cjb/git/mmc/drivers/mmc/host/imxmmc.c:32:26: fatal error: mach/imx-dma.h: No such file or directory
-
-Should imxmmc simply be removed from drivers/mmc/host?  Do any of the
-more current i.MX MMC drivers support the same hardware?
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
