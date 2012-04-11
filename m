@@ -1,58 +1,50 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Wed, 11 Apr 2012 09:00:35 +0800
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <CAMQu2gwSAPtXOYWP1VmVCuxru_CrbLC-gLaaD7n4+utu3rOwxQ@mail.gmail.com>
-References: <79CD15C6BA57404B839C016229A409A83184846A@DBDE01.ent.ti.com>
- <20120405095221.GC25053@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A831848621@DBDE01.ent.ti.com>
- <87hawxkgoi.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A831849432@DBDE01.ent.ti.com>
- <20120406180452.GB15734@atomide.com>
- <79CD15C6BA57404B839C016229A409A83184ABEF@DBDE01.ent.ti.com>
- <4F83440E.70502@ti.com>
- <20120410084413.GD25053@n2100.arm.linux.org.uk>
- <4F83F600.4000002@ti.com>
- <20120410092904.GE25053@n2100.arm.linux.org.uk>
- <CAMQu2gwSAPtXOYWP1VmVCuxru_CrbLC-gLaaD7n4+utu3rOwxQ@mail.gmail.com>
-Message-ID: <CACVXFVMtPEo1h6auh8gc=ZAxb0+w_-Jy7ARixS30k=9-TeKrkw@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 11 Apr 2012 09:11:50 +0800
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <20120410161142.GG3852@pengutronix.de>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
+ <20120410143055.GT24211@n2100.arm.linux.org.uk>
+ <20120410161142.GG3852@pengutronix.de>
+Message-ID: <20120411011149.GA20818@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 5:51 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> On Tue, Apr 10, 2012 at 2:59 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Apr 10, 2012 at 02:27:36PM +0530, Santosh Shilimkar wrote:
->>> On Tuesday 10 April 2012 02:14 PM, Russell King - ARM Linux wrote:
->>> > On Mon, Apr 09, 2012 at 03:18:22PM -0500, Jon Hunter wrote:
->>> >> True, but we would always want to use the 32k timer if CONFIG_PM is
->>> >> specified. So what I am saying is that if a device has a 32ksync timer
->>> >> and CONFIG_PM is defined, we always want to use the 32ksync timer and a
->>> >> gptimer should never be used.
->>> >
->>> > Why? ?What if you want to have PM enabled, and you also want to use the
->>> > kernels high resolution timers, or you want more accurate timing than
->>> > the 30.5us tick interval of the 32k timer?
->>>
->>> You might have missed the earlier comments on the thread. High
->>> resolution GP timer(sysclk) will stop in deeper power states and
->>> hence it can't be used with PM enabled usecases.
->>
->> Which means folk should be given the choice at boot time between running
->> with the deeper power states and having a higher resolution timing source,
->> rather than denying them the higher resolution timing source when PM is
->> enabled.
->
-> Good point. My point is such facilities is already part of the kernel and
-> there is no need to add a new one. The last proposal was allowing user to
-> choose gptimer as a clocksource and then you already have facility to
-> disable C-state now so, all should work in general
+On Tue, Apr 10, 2012 at 06:11:42PM +0200, Sascha Hauer wrote:
+> On Tue, Apr 10, 2012 at 03:30:55PM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Apr 10, 2012 at 03:45:14PM +0200, Sascha Hauer wrote:
+> > > With the generic clock framework we do not necessarily have
+> > > a pointer to the struct clk we want to register a lookup
+> > > for, so add a const char *clkname field to struct clk_lookup
+> > > so that a lookup can be registered with a clock name.
+> > 
+> > All this silly names all over the place is getting to be utterly
+> > rediculous. Why do we need to name clocks and look them up by name
+> > when we have a perfectly good way (clkdev) to do this already?  Yes,
+> > it takes a struct clk pointer but that's exactly because that's what
+> > it has to return.
+> > 
+> > Why do we want to have another idiotic string to look up a clock which
+> > is named using an idiotic scheme to find out its pointer to only then
+> > register that with clkdev?
+> > 
+> > I think this clk stuff has gone totally insane wrt names recently.
+> 
+> clk names and clk lookups are two different things. The former is a
+> unique identifier for a clock whereas the latter associates a clock
+> to a device. Multiple lookups can point to the same clock, so they can't
+> be used to identify a particular clock. I know I'm not telling anything
+> new to you here, so I think your question goes down to why we need a
+> unique identifier string for clocks.
+> 
+> For me the big advantage for clocks having unique names is that I do not
+> have to have a struct clk * to pass the (possible) parents of a clock to
+> the clock framework during registration. Also it makes us independent of
+> the registration order of the clock tree (no need to register the
+> parents before the children). The debugfs representation of the clock
+> tree also makes use of the names.
+I don't like string loopup either. And after DT binding, we can use
+phandler to refer clk.
 
-'nohlt' in boot cmd should work to prevent CPU from entering deep C-state,
-which looks enough to make gptimer working well if system suspend isn't
-considered.
-
-Thanks,
--- 
-Ming Lei
+BRs
+Richard
