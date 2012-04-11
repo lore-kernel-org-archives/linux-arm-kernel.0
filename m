@@ -1,89 +1,116 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 10 Apr 2012 21:27:08 -0700
-Subject: [PATCH V2 4/5] ARM: dt: tegra30.dtsi: Add audio-related nodes
-In-Reply-To: <1334099980-19527-4-git-send-email-swarren@wwwdotorg.org>
-References: <1334099980-19527-1-git-send-email-swarren@wwwdotorg.org>
- <1334099980-19527-4-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAOesGMhDDenRK_GeR=jWJbcoacRMUPnjFu5w4DCyUWC=CadnbA@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 11 Apr 2012 05:11:56 +0000
+Subject: [PATCH v3 1/9] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <4F8488A2.7030602@ti.com>
+References: <cover.1333640054.git.afzal@ti.com>
+ <cefbe934da40f0a169b1e3a75c46451e5546a8bd.1333640054.git.afzal@ti.com>
+ <4F7DFED5.4030000@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317C5E58@DBDE01.ent.ti.com>
+ <4F833D8D.8000802@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A9317C693C@DBDE01.ent.ti.com>
+ <4F8488A2.7030602@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317C6F4B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jon,
 
-Nits/questions below.
+On Wed, Apr 11, 2012 at 00:53:14, Hunter, Jon wrote:
+> I agree with your argument but I was thinking today only OMAP uses the 
+> GPMC so we could not worry about this. Ok, leave as-is, but can we 
+> modify the code as follows as the "else if" is not really needed...
+> 
+> if (gpmc->num_irq < GPMC_NR_IRQ) {
+> 	dev_warn(gpmc->dev, "Insufficient interrupts for device\n");
+> 	return -EINVAL;
+> }
+> 
+> gpmc->num_irq = GPMC_NR_IRQ;
 
-On Tue, Apr 10, 2012 at 4:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Add nodes for the Tegra30 AHUB and I2S controllers.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> v2:
-> * Move I2S nodes inside AHUB node, since it's the bus that contains them.
-> * Correct APBIF reg size
-> * Add nvidia,ahub-cif-ids to I2S nodes
-> ---
-> ?arch/arm/boot/dts/tegra30.dtsi | ? 41 ++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 41 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> index 62a7b39..98c29d1 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -183,4 +183,45 @@
-> ? ? ? ? ? ? ? ?reg = < 0x70000868 0xd0 ? ? /* Pad control registers */
-> ? ? ? ? ? ? ? ? ? ? ? ?0x70003000 0x3e0 >; /* Mux registers */
-> ? ? ? ?};
-> +
-> + ? ? ? ahub at 70080000 {
+Yes, it is better
 
-No need for unit address here since there's only one node with this
-name -- "ahub {"  is sufficient.
+> 
+> >>
+> >> Furthermore, GPMC_NR_IRQ is defined as 6 which is correct for OMAP2/3
+> >> but not for OMAP4/5, it is 5. Therefore, we need to detect whether we
+> >> are using an OMAP2/3 or OMAP4+ and set num_irqs based upon this. This
+> >> could be done in the probe and we can avoid passing this.
+> >
+> > Is it dependent on OMAPX or GPMC IP version? if it is IP version, then driver
+> > can be enhanced to handle it, if not, platform has to pass this information.
+> 
+> Here are the GPMC IP revisions ...
+> 
+> OMAP5430 = 0x00000060
+> OMAP4430 = 0x00000060
+> OMAP3630 = 0x00000050
+> OMAP3430 = 0x00000050
+> 
+> So this should work for OMAP. We should check OMAP2 as well. What about 
+> the AMxxx devices?
 
-> + ? ? ? ? ? ? ? compatible = "nvidia,tegra30-ahub";
-> + ? ? ? ? ? ? ? reg = <0x70080000 0x200 0x70080200 0x100>;
 
-Why not just use 0x70080000 0x300?
+I badly needed this information, thanks.
 
-> + ? ? ? ? ? ? ? interrupts = < 0 103 0x04 >;
-> + ? ? ? ? ? ? ? nvidia,dma-request-selector = <&apbdma 1>;
-> +
-> + ? ? ? ? ? ? ? ranges;
-> + ? ? ? ? ? ? ? #address-cells = <1>;
-> + ? ? ? ? ? ? ? #size-cells = <1>;
-> +
-> + ? ? ? ? ? ? ? tegra_i2s0: i2s at 70080300 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "nvidia,tegra30-i2s";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x70080300 0x100>;
-> + ? ? ? ? ? ? ? ? ? ? ? nvidia,ahub-cif-ids = <4 4>;
-> + ? ? ? ? ? ? ? };
-> +
-> + ? ? ? ? ? ? ? tegra_i2s1: i2s at 70080400 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "nvidia,tegra30-i2s";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x70080400 0x100>;
-> + ? ? ? ? ? ? ? ? ? ? ? nvidia,ahub-cif-ids = <5 5>;
-> + ? ? ? ? ? ? ? };
-> +
-> + ? ? ? ? ? ? ? tegra_i2s2: i2s at 70080500 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "nvidia,tegra30-i2s";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x70080500 0x100>;
-> + ? ? ? ? ? ? ? ? ? ? ? nvidia,ahub-cif-ids = <6 6>;
-> + ? ? ? ? ? ? ? };
-> +
-> + ? ? ? ? ? ? ? tegra_i2s3: i2s at 70080600 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "nvidia,tegra30-i2s";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x70080600 0x100>;
-> + ? ? ? ? ? ? ? ? ? ? ? nvidia,ahub-cif-ids = <7 7>;
-> + ? ? ? ? ? ? ? };
-> +
-> + ? ? ? ? ? ? ? tegra_i2s4: i2s at 70080700 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "nvidia,tegra30-i2s";
-> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x70080700 0x100>;
-> + ? ? ? ? ? ? ? ? ? ? ? nvidia,ahub-cif-ids = <8 8>;
-> + ? ? ? ? ? ? ? };
-> + ? ? ? };
-> ?};
-> --
-> 1.7.0.4
->
+AM3359 = 0x00000060, it has only 2 waitpin interrupts
+
+> >>>>> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> >>>>> +	if (res == NULL)
+> >>>>> +		dev_warn(gpmc->dev, "Failed to get resource: irq\n");
+> >>>>> +	else
+> >>>>> +		gpmc->master_irq = res->start;
+> >>>>
+> >>>> Why not return an error if the IRQ is not found? We don't know if anyone
+> >>>> will be trying to use them.
+> >>>
+> >>> Why do you want to do that ?
+> >>
+> >> Because this indicates a BUG :-)
+> >
+> > I disagree, this need not be considered a bug always,
+> > for eg. If gpmc irq is not connected to intc
+> 
+> Ok, so for devices existing today this indicates a bug ;-)
+
+I do not want to consider that case to be bug enough for probe
+to fail, there are other drivers which does similar enhancing
+its use cases,
+
+eg. 1e351a9 mfd: Make TPS65910 usable without interrupts
+
+> 
+> At a minimum you need to improve the error handing here. If the 
+> platform_get_resource fails you are still calling "gpmc_setup_irq()" 
+> which appears to be pointless. It would be better if the gpmc irq chip 
+> is not initialised in this case so that drivers attempting to request 
+> these irqs failed.
+
+Please see gpmc_setup_irq, if irq is not present, it returns in the
+beginning, and gpmc_irq_chip is not initialized in that case.
+
+> >>>>> +	for (gdq = gp->device_pdata, gd = gpmc->device; *gdq; gdq++, i++) {
+> >>>>> +		ret = gpmc_setup_device(*gdq, gd, gpmc);
+> >>>>> +		if (IS_ERR_VALUE(ret))
+> >>>>> +			dev_err(gpmc->dev, "gpmc setup on %s failed\n",
+> >>>>> +								(*gdq)->name);
+> >>>>> +		else
+> >>>>> +			gd++;
+> >>>>> +	}
+> >>>>
+> >>>> Would a while loop be simpler?
+> >>>
+> >>> My preference is to go with "for"
+> >>
+> >> Ok, just wondering if this could be cleaned up a little.
+> >
+> > For travelling through array of pointers, for looks natural to me, if you
+> > have a better way, please send it, it can be folded in next version.
+> 
+> Could you have num_devices to indicate how many platform devices there 
+> are and then a simple for-loop of 0 to num_devices?
+
+This will cause coding to be done by platform to be less simple, and my
+preference is not to use another variable
+
+Regards
+Afzal
