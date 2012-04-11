@@ -1,37 +1,33 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 11 Apr 2012 18:07:41 -0500
-Subject: [PATCH v2] arm: ep93xx: use gpio_led_register_device
-In-Reply-To: <4F85FFB6.8050406@gmail.com>
-References: <201204111429.20038.hartleys@visionengravers.com>
- <4F85FFB6.8050406@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F00206986C0701@AUSP01VMBX24.collaborationhost.net>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 12 Apr 2012 09:11:55 +1000
+Subject: [PATCH] Fix build breakage in ep93xx-core
+Message-ID: <4F860FBB.4050102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 11, 2012 3:04 PM, Ryan Mallon wrote:
-> On 12/04/12 07:29, H Hartley Sweeten wrote:
->>  menu "Cirrus EP93xx Implementation Options"
->>  
->> +config ARCH_EP93XX_TYPICAL
->
->
-> One minor change. Please use a different name for this. Since all
-> of the boards use this and it cannot be unselected, its a bit
-> misleading to call it typical. EP93XX_SOC or EP93XX_COMMON would
-> be a bit better.
+Commit ede55aaa8bb2dd37e302b2f94312306d216e5f97 "arm: ep93xx: use
+DEFINE_RES_* macros" introduced a build breakage in ep93xx due to a
+typo. Fix it.
 
-Done.  Changed it to EP93XX_SOC_COMMON
+Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 
->> +	bool
->> +	default y
+---
 
-I guess this could also be
+I should have caught this when I applied it to my tree, but its now
+already got a patch sitting on top of it. I'll be doing test builds for
+each applied patch in future :-).
 
-	def_bool y
-
-But, I don't know if it's necessary...
-
->> +	select LEDS_GPIO_REGISTER
->> +
-
-Hartley
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 8771076..66b1494 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -357,7 +357,7 @@ static struct ep93xx_eth_data ep93xx_eth_data;
+ 
+ static struct resource ep93xx_eth_resource[] = {
+ 	DEFINE_RES_MEM(EP93XX_ETHERNET_PHYS_BASE, 0x10000),
+-	DEFINE_REQ_IRQ(IRQ_EP93XX_ETHERNET),
++	DEFINE_RES_IRQ(IRQ_EP93XX_ETHERNET),
+ };
+ 
+ static u64 ep93xx_eth_dma_mask = DMA_BIT_MASK(32);
