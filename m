@@ -1,944 +1,1974 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Apr 2012 17:33:48 +0200
-Subject: [PATCH 7/7] DRM: add PXA kms simple driver
+Date: Wed, 11 Apr 2012 17:33:44 +0200
+Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system support
 In-Reply-To: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
 References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1334158428-23735-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+This patch adds support for creating simple drm devices. The
+basic idea of this patch is that drm drivers using the sdrm layer
+no longer have to implement a full drm device but instead only
+register crtcs, encoders and connectors with the sdrm layer. The
+sdrm layer then registers a drm device with the drm core and
+takes care of the drm device.
 
-This adds a sdrm driver for the PXA LCDC controller.
-Currently only the base framebuffer is supported, no overlay.
-There is no support for smart panels and so far only RGB565
-pixel format is supported.
-Tested on PHYTEC PCM-990 development board.
+Adding this layer has advantages especially for embedded devices.
+On these type of devices there is no single device (pci card on
+PCs) with which the drm core can be initialized, instead there
+are multiple devices. The crtc usually is on the SoC, but
+encoders and connectors are usually board specific, they can be
+on the SoC, but can also be externally connected via i2c or can
+be completely transparent to software. Also the components used
+to compose a drm device vary from board to board.
 
-Also adds EOFINT and SOFINT bit definitions for the LDCMD registers.
+While the components of a drm device are highly board specific
+with embedded systems the the general interfacing with the drm
+layer tends to be identical across most SoCs which involves a lot
+of code duplication. By making the crtc/encoder/connector helpers
+mandatory much of this duplication can be avoided.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+This patch is based on the exynos drm driver with the exynos_
+prefix replaced with a sdrm_ prefix.
+
+The 's' in sdrm has no special meaning, depending on what you
+think about it it can stand for 'Simple', 'Stupid', or 'Saschas'
+drm.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-pxa/include/mach/regs-lcd.h |    2 +
- drivers/gpu/drm/Kconfig                   |    2 +
- drivers/gpu/drm/Makefile                  |    1 +
- drivers/gpu/drm/pxa/Kconfig               |   12 +
- drivers/gpu/drm/pxa/Makefile              |    1 +
- drivers/gpu/drm/pxa/pxa-lcdc-crtc.c       |  845 +++++++++++++++++++++++++++++
- 6 files changed, 863 insertions(+)
- create mode 100644 drivers/gpu/drm/pxa/Kconfig
- create mode 100644 drivers/gpu/drm/pxa/Makefile
- create mode 100644 drivers/gpu/drm/pxa/pxa-lcdc-crtc.c
+ drivers/gpu/drm/Kconfig           |    2 +
+ drivers/gpu/drm/Makefile          |    1 +
+ drivers/gpu/drm/sdrm/Kconfig      |    8 +
+ drivers/gpu/drm/sdrm/Makefile     |    2 +
+ drivers/gpu/drm/sdrm/sdrm.c       |  904 +++++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/sdrm/sdrm.h       |   57 +++
+ drivers/gpu/drm/sdrm/sdrm_fb.c    |  191 ++++++++
+ drivers/gpu/drm/sdrm/sdrm_fbdev.c |  238 ++++++++++
+ drivers/gpu/drm/sdrm/sdrm_gem.c   |  342 ++++++++++++++
+ include/drm/sdrm.h                |  102 +++++
+ 10 files changed, 1847 insertions(+)
+ create mode 100644 drivers/gpu/drm/sdrm/Kconfig
+ create mode 100644 drivers/gpu/drm/sdrm/Makefile
+ create mode 100644 drivers/gpu/drm/sdrm/sdrm.c
+ create mode 100644 drivers/gpu/drm/sdrm/sdrm.h
+ create mode 100644 drivers/gpu/drm/sdrm/sdrm_fb.c
+ create mode 100644 drivers/gpu/drm/sdrm/sdrm_fbdev.c
+ create mode 100644 drivers/gpu/drm/sdrm/sdrm_gem.c
+ create mode 100644 include/drm/sdrm.h
 
-diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h b/arch/arm/mach-pxa/include/mach/regs-lcd.h
-index f82dcea..69699ce 100644
---- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
-+++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
-@@ -158,6 +158,8 @@
- #define LCSR1_EOF(x)	(1 << ((x) + 7))  /* End of Frame Status */
- #define LCSR1_SOF(x)	(1 << ((x) - 1))  /* Start of Frame Status */
- 
-+#define LDCMD_EOFINT	(1 << 21)	/* instructs DMA to set the EOF status bit */
-+#define LCDMD_SOFINT	(1 << 22)	/* instructs DMA to set the SOF status bit */
- #define LDCMD_PAL	(1 << 26)	/* instructs DMA to load palette buffer */
- 
- /* overlay control registers */
 diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
-index 4650d65..6a68e33 100644
+index e354bc0..93d9f79 100644
 --- a/drivers/gpu/drm/Kconfig
 +++ b/drivers/gpu/drm/Kconfig
-@@ -190,3 +190,5 @@ source "drivers/gpu/drm/udl/Kconfig"
- source "drivers/gpu/drm/sdrm/Kconfig"
+@@ -186,3 +186,5 @@ source "drivers/gpu/drm/vmwgfx/Kconfig"
+ source "drivers/gpu/drm/gma500/Kconfig"
  
- source "drivers/gpu/drm/imx/Kconfig"
+ source "drivers/gpu/drm/udl/Kconfig"
 +
-+source "drivers/gpu/drm/pxa/Kconfig"
++source "drivers/gpu/drm/sdrm/Kconfig"
 diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
-index b0c283e..0f16044 100644
+index c20da5b..44c5949 100644
 --- a/drivers/gpu/drm/Makefile
 +++ b/drivers/gpu/drm/Makefile
-@@ -44,4 +44,5 @@ obj-$(CONFIG_DRM_GMA500) += gma500/
+@@ -42,4 +42,5 @@ obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
+ obj-$(CONFIG_DRM_EXYNOS) +=exynos/
+ obj-$(CONFIG_DRM_GMA500) += gma500/
  obj-$(CONFIG_DRM_UDL) += udl/
- obj-$(CONFIG_DRM_SDRM) += sdrm/
- obj-$(CONFIG_DRM_IMX) +=imx/
-+obj-$(CONFIG_DRM_PXA) +=pxa/
++obj-$(CONFIG_DRM_SDRM) += sdrm/
  obj-y			+= i2c/
-diff --git a/drivers/gpu/drm/pxa/Kconfig b/drivers/gpu/drm/pxa/Kconfig
+diff --git a/drivers/gpu/drm/sdrm/Kconfig b/drivers/gpu/drm/sdrm/Kconfig
 new file mode 100644
-index 0000000..bb2e7e0
+index 0000000..2424b2c
 --- /dev/null
-+++ b/drivers/gpu/drm/pxa/Kconfig
-@@ -0,0 +1,12 @@
-+config DRM_PXA
-+	tristate "DRM Support for Marvell PXA"
-+	depends on DRM && ARCH_PXA
++++ b/drivers/gpu/drm/sdrm/Kconfig
+@@ -0,0 +1,8 @@
++config DRM_SDRM
++	tristate
++	depends on DRM
++	select DRM_KMS_HELPER
++	select FB_CFB_FILLRECT
++	select FB_CFB_COPYAREA
++	select FB_CFB_IMAGEBLIT
 +
-+config DRM_PXA_LCDC
-+	tristate "DRM Support for PXA2xx and PXA3xx"
-+	depends on DRM && DRM_PXA
-+	select DRM_SDRM
-+	select DRM_SDRM_ENCON
-+	help
-+	  Choose this if you have a PXA2xx or PXA3xx processor
-+	  with a display connected to the internal LCD controller.
-diff --git a/drivers/gpu/drm/pxa/Makefile b/drivers/gpu/drm/pxa/Makefile
+diff --git a/drivers/gpu/drm/sdrm/Makefile b/drivers/gpu/drm/sdrm/Makefile
 new file mode 100644
-index 0000000..bb5cf1f
+index 0000000..c603f1b
 --- /dev/null
-+++ b/drivers/gpu/drm/pxa/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_DRM_PXA_LCDC) += pxa-lcdc-crtc.o
-diff --git a/drivers/gpu/drm/pxa/pxa-lcdc-crtc.c b/drivers/gpu/drm/pxa/pxa-lcdc-crtc.c
++++ b/drivers/gpu/drm/sdrm/Makefile
+@@ -0,0 +1,2 @@
++drm-sdrm-objs := sdrm.o sdrm_gem.o sdrm_fbdev.o sdrm_fb.o
++obj-$(CONFIG_DRM_SDRM) += drm-sdrm.o
+diff --git a/drivers/gpu/drm/sdrm/sdrm.c b/drivers/gpu/drm/sdrm/sdrm.c
 new file mode 100644
-index 0000000..3d0e6e9
+index 0000000..2077419
 --- /dev/null
-+++ b/drivers/gpu/drm/pxa/pxa-lcdc-crtc.c
-@@ -0,0 +1,845 @@
-+#include <linux/clk.h>
++++ b/drivers/gpu/drm/sdrm/sdrm.c
+@@ -0,0 +1,904 @@
++/*
++ * simple drm driver
++ *
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
 +#include <linux/device.h>
-+#include <linux/module.h>
 +#include <linux/platform_device.h>
-+
 +#include <drm/drmP.h>
 +#include <drm/drm_fb_helper.h>
 +#include <drm/drm_crtc_helper.h>
++#include <linux/fb.h>
++#include <asm/fb.h>
++#include <linux/module.h>
 +#include <drm/sdrm.h>
-+#include <drm/sdrm_encon.h>
++#include "sdrm.h"
 +
-+#include <mach/hardware.h>
-+#include <mach/pxafb.h>
++#define DRIVER_NAME		"drm-generic"
++#define DRIVER_DESC		"drm generic graphics"
++#define DRIVER_DATE		"20110604"
++#define DRIVER_MAJOR		1
++#define DRIVER_MINOR		0
++#define DRIVER_PATCHLEVEL	0
 +
-+/* PXA LCD DMA descriptor */
-+struct pxafb_dma_descriptor {
-+	unsigned int fdadr;
-+	unsigned int fsadr;
-+	unsigned int fidr;
-+	unsigned int ldcmd;
++struct sdrm_device {
++	struct drm_device		*drm;
++	struct platform_device		*pdev;
++	struct drm_fb_helper		*fb_helper;
++	struct list_head		crtc_list;
++	struct list_head		encoder_list;
++	struct list_head		connector_list;
++	struct list_head		list;
++	const char			*name;
++	int				registered;
++	struct mutex			mutex;
++	struct drm_driver		driver;
 +};
 +
-+enum {
-+	PAL_NONE	= -1,
-+	PAL_BASE	= 0,
-+	PAL_OV1		= 1,
-+	PAL_OV2		= 2,
-+	PAL_MAX,
++struct sdrm_crtc {
++	struct drm_crtc			*crtc;
++	struct list_head		list;
++	struct sdrm_device		*sdrm;
++	int				registered;
++	int				pipe;
++	struct drm_crtc_helper_funcs	crtc_helper_funcs;
++	struct drm_crtc_funcs		crtc_funcs;
++	struct sdrm_crtc_helper_funcs	sdrm_helper_funcs;
 +};
 +
-+enum {
-+	DMA_BASE	= 0,
-+	DMA_UPPER	= 0,
-+	DMA_LOWER	= 1,
-+	DMA_OV1		= 1,
-+	DMA_OV2_Y	= 2,
-+	DMA_OV2_Cb	= 3,
-+	DMA_OV2_Cr	= 4,
-+	DMA_CURSOR	= 5,
-+	DMA_CMD		= 6,
-+	DMA_MAX,
++struct sdrm_encoder {
++	struct drm_encoder		*encoder;
++	struct list_head		list;
++	struct sdrm_device		*sdrm;
++	int				registered;
++	struct module			*owner;
 +};
 +
-+/* maximum palette size - 256 entries, each 4 bytes long */
-+#define PALETTE_SIZE	(256 * 4)
-+#define CMD_BUFF_SIZE	(1024 * 50)
-+
-+/* NOTE: the palette and frame dma descriptors are doubled to allow
-+ * the 2nd set for branch settings (FBRx)
-+ */
-+struct pxafb_dma_buff {
-+	unsigned char palette[PAL_MAX * PALETTE_SIZE];
-+	uint16_t cmd_buff[CMD_BUFF_SIZE];
-+	struct pxafb_dma_descriptor pal_desc[PAL_MAX * 2];
-+	struct pxafb_dma_descriptor dma_desc[DMA_MAX * 2];
++struct sdrm_connector {
++	struct drm_connector		*connector;
++	struct list_head		list;
++	struct sdrm_device		*sdrm;
++	int				registered;
++	struct module			*owner;
 +};
 +
-+struct pxa_crtc {
-+	struct drm_crtc		base;
-+	struct sdrm_crtc	*sdrm_crtc;
-+	int			di_no;
-+	int			enabled;
-+
-+	void __iomem		*mmio_base;
-+
-+	struct pxafb_dma_buff	*dma_buff;
-+	size_t			dma_buff_size;
-+	dma_addr_t		dma_buff_phys;
-+	dma_addr_t		fdadr[DMA_MAX * 2];
-+
-+	unsigned long		video_mem_phys;	/* physical address of frame buffer */
-+
-+	u32			lccr0;
-+	u32			lccr3;
-+	u32			lccr4;
-+	u32			cmap_inverse:1,
-+				cmap_static:1,
-+				unused:30;
-+
-+	u32			reg_lccr0;
-+	u32			reg_lccr1;
-+	u32			reg_lccr2;
-+	u32			reg_lccr3;
-+	u32			reg_lccr4;
-+
-+	struct completion	disable_done;
-+
-+	struct clk		*clk;
-+	struct device		*dev;
-+	int			vblank_enable;
-+
-+	struct drm_pending_vblank_event *page_flip_event;
-+	struct drm_framebuffer	*newfb;
-+
-+	void (*lcd_power)(int, struct fb_var_screeninfo *);
-+};
-+
-+#define to_pxa_crtc(x) container_of(x, struct pxa_crtc, base)
-+
-+static inline unsigned long
-+lcd_readl(struct pxa_crtc *pxa_crtc, unsigned int off)
++static int sdrm_driver_open(struct drm_device *drm, struct drm_file *file)
 +{
-+	return __raw_readl(pxa_crtc->mmio_base + off);
-+}
++	struct sdrm_device *sdrm = drm->dev_private;
 +
-+static inline void
-+lcd_writel(struct pxa_crtc *pxa_crtc, unsigned int off, unsigned long val)
-+{
-+	__raw_writel(val, pxa_crtc->mmio_base + off);
-+}
-+
-+static void pxa_crtc_load_lut(struct drm_crtc *crtc)
-+{
-+}
-+
-+const char *fourcc_to_str(u32 fourcc)
-+{
-+	static char buf[5];
-+
-+	*(u32 *)buf = fourcc;
-+	buf[4] = 0;
-+
-+	return buf;
-+}
-+
-+static inline void __pxa_crtc_lcd_power(struct pxa_crtc *pxa_crtc, int on)
-+{
-+	dev_dbg(pxa_crtc->dev, "LCD power o%s\n", on ? "n" : "ff");
-+
-+	if (pxa_crtc->lcd_power)
-+		pxa_crtc->lcd_power(on, NULL); /* there is no fb_info */
-+}
-+
-+static void pxa_crtc_enable_controller(struct pxa_crtc *pxa_crtc)
-+{
-+	dev_dbg(pxa_crtc->dev, "Enabling LCD controller\n");
-+
-+	/* enable LCD controller clock */
-+	clk_prepare_enable(pxa_crtc->clk);
-+
-+	if (pxa_crtc->lccr0 & LCCR0_LCDT)
-+		return;
-+
-+	/* Sequence from 11.7.10 */
-+	lcd_writel(pxa_crtc, LCCR4, pxa_crtc->reg_lccr4);
-+	lcd_writel(pxa_crtc, LCCR3, pxa_crtc->reg_lccr3);
-+	lcd_writel(pxa_crtc, LCCR2, pxa_crtc->reg_lccr2);
-+	lcd_writel(pxa_crtc, LCCR1, pxa_crtc->reg_lccr1);
-+	lcd_writel(pxa_crtc, LCCR0, pxa_crtc->reg_lccr0 & ~LCCR0_ENB);
-+
-+	lcd_writel(pxa_crtc, FDADR0, pxa_crtc->fdadr[0]);
-+	if (pxa_crtc->lccr0 & LCCR0_SDS)
-+		lcd_writel(pxa_crtc, FDADR1, pxa_crtc->fdadr[1]);
-+
-+	lcd_writel(pxa_crtc, LCCR0, pxa_crtc->reg_lccr0 | LCCR0_ENB);
-+}
-+
-+static void pxa_crtc_disable_controller(struct pxa_crtc *pxa_crtc)
-+{
-+	uint32_t lccr0;
-+
-+	dev_dbg(pxa_crtc->dev, "Disabling LCD controller\n");
-+
-+	/* Clear LCD Status Register */
-+	lcd_writel(pxa_crtc, LCSR, 0xffffffff);
-+
-+	lccr0 = lcd_readl(pxa_crtc, LCCR0) & ~LCCR0_LDM;
-+	lcd_writel(pxa_crtc, LCCR0, lccr0);
-+	lcd_writel(pxa_crtc, LCCR0, lccr0 | LCCR0_DIS);
-+
-+	wait_for_completion_timeout(&pxa_crtc->disable_done, 200 * HZ / 1000);
-+
-+	/* disable LCD controller clock */
-+	clk_disable_unprepare(pxa_crtc->clk);
-+}
-+
-+static void pxa_crtc_decode_mach_info(struct pxa_crtc *pxa_crtc,
-+				      struct pxafb_mach_info *inf)
-+{
-+	unsigned int lcd_conn = inf->lcd_conn;
-+
-+	pxa_crtc->cmap_inverse = inf->cmap_inverse;
-+	pxa_crtc->cmap_static = inf->cmap_static;
-+	pxa_crtc->lccr4 = inf->lccr4;
-+
-+	switch (lcd_conn & LCD_TYPE_MASK) {
-+	case LCD_TYPE_MONO_STN:
-+		pxa_crtc->lccr0 = LCCR0_CMS;
-+		break;
-+	case LCD_TYPE_MONO_DSTN:
-+		pxa_crtc->lccr0 = LCCR0_CMS | LCCR0_SDS;
-+		break;
-+	case LCD_TYPE_COLOR_STN:
-+		pxa_crtc->lccr0 = 0;
-+		break;
-+	case LCD_TYPE_COLOR_DSTN:
-+		pxa_crtc->lccr0 = LCCR0_SDS;
-+		break;
-+	case LCD_TYPE_COLOR_TFT:
-+		pxa_crtc->lccr0 = LCCR0_PAS;
-+		break;
-+	case LCD_TYPE_SMART_PANEL:
-+		pxa_crtc->lccr0 = LCCR0_LCDT | LCCR0_PAS;
-+		break;
-+	default:
-+		/* fall back to backward compatibility way */
-+		pxa_crtc->lccr0 = inf->lccr0;
-+		pxa_crtc->lccr3 = inf->lccr3;
-+		return;
-+	}
-+
-+	if (lcd_conn == LCD_MONO_STN_8BPP)
-+		pxa_crtc->lccr0 |= LCCR0_DPD;
-+
-+	pxa_crtc->lccr0 |= (lcd_conn & LCD_ALTERNATE_MAPPING) ? LCCR0_LDDALT : 0;
-+
-+	pxa_crtc->lccr3 = LCCR3_Acb((inf->lcd_conn >> 10) & 0xff);
-+	pxa_crtc->lccr3 |= (lcd_conn & LCD_BIAS_ACTIVE_LOW) ? LCCR3_OEP : 0;
-+	pxa_crtc->lccr3 |= (lcd_conn & LCD_PCLK_EDGE_FALL)  ? LCCR3_PCP : 0;
-+}
-+
-+/*
-+ * Calculate the PCD value from the clock rate (in picoseconds).
-+ * We take account of the PPCR clock setting.
-+ * From PXA Developer's Manual:
-+ *
-+ *   PixelClock =      LCLK
-+ *                -------------
-+ *                2 ( PCD + 1 )
-+ *
-+ *   PCD =      LCLK
-+ *         ------------- - 1
-+ *         2(PixelClock)
-+ *
-+ * Where:
-+ *   LCLK = LCD/Memory Clock
-+ *   PCD = LCCR3[7:0]
-+ *
-+ * PixelClock here is in Hz while the pixclock argument given is the
-+ * period in picoseconds. Hence PixelClock = 1 / ( pixclock * 10^-12 )
-+ *
-+ * The function get_lclk_frequency_10khz returns LCLK in units of
-+ * 10khz. Calling the result of this function lclk gives us the
-+ * following
-+ *
-+ *    PCD = (lclk * 10^4 ) * ( pixclock * 10^-12 )
-+ *          -------------------------------------- - 1
-+ *                          2
-+ *
-+ * Factoring the 10^4 and 10^-12 out gives 10^-8 == 1 / 100000000 as used below.
-+ */
-+static inline unsigned int get_pcd(struct pxa_crtc *pxa_crtc,
-+				   unsigned int pixclock)
-+{
-+	unsigned long long pcd;
-+
-+	/* FIXME: Need to take into account Double Pixel Clock mode
-+	 * (DPC) bit? or perhaps set it based on the various clock
-+	 * speeds */
-+	pcd = (unsigned long long)(clk_get_rate(pxa_crtc->clk) / 10000);
-+	pcd *= pixclock;
-+	do_div(pcd, 100000000 * 2);
-+	/* no need for this, since we should subtract 1 anyway. they cancel */
-+	/* pcd += 1; */ /* make up for integer math truncations */
-+	return (unsigned int)pcd;
-+}
-+
-+static int setup_frame_dma(struct pxa_crtc *pxa_crtc, int dma, int pal,
-+			   unsigned long start, size_t size)
-+{
-+	struct pxafb_dma_descriptor *dma_desc;
-+	unsigned int dma_desc_off;
-+
-+	if (dma < 0 || dma >= DMA_MAX * 2)
-+		return -EINVAL;
-+
-+	dma_desc = &pxa_crtc->dma_buff->dma_desc[dma];
-+	dma_desc_off = offsetof(struct pxafb_dma_buff, dma_desc[dma]);
-+
-+	dma_desc->fsadr = start;
-+	dma_desc->fidr  = 0;
-+	/* enable EOFINT unconditionally, but mask interrupt with LCCR0_EFM */
-+	dma_desc->ldcmd = size | LDCMD_EOFINT;
-+
-+	if (pal < 0 || pal >= PAL_MAX * 2) {
-+		dma_desc->fdadr = pxa_crtc->dma_buff_phys + dma_desc_off;
-+		pxa_crtc->fdadr[dma] = pxa_crtc->dma_buff_phys + dma_desc_off;
-+	} else {
-+		return -EINVAL;
++	if (!try_module_get(sdrm->pdev->dev.driver->owner)) {
++		dev_err(drm->dev, "could not get module %s\n",
++				module_name(sdrm->pdev->dev.driver->owner));
++		return -ENODEV;
 +	}
 +
 +	return 0;
 +}
 +
-+static void setup_base_frame(struct pxa_crtc *pxa_crtc, int branch)
++static void sdrm_driver_lastclose(struct drm_device *drm)
 +{
-+	struct drm_framebuffer *fb = pxa_crtc->base.fb;
-+	struct drm_display_mode *mode = &pxa_crtc->base.mode;
-+	int nbytes, dma, pal, bpp = fb->bits_per_pixel;
-+	unsigned long offset;
++	struct sdrm_device *sdrm = drm->dev_private;
 +
-+	dma = DMA_BASE + (branch ? DMA_MAX : 0);
-+	pal = (bpp >= 16) ? PAL_NONE : PAL_BASE + (branch ? PAL_MAX : 0);
-+
-+	nbytes = mode->crtc_hdisplay * mode->crtc_vdisplay * bpp / 8;
-+	offset = pxa_crtc->video_mem_phys; /* no yoffset support yet */
-+
-+	if (pxa_crtc->lccr0 & LCCR0_SDS) {
-+		nbytes = nbytes / 2;
-+		setup_frame_dma(pxa_crtc, dma + 1, PAL_NONE,
-+				offset + nbytes, nbytes);
-+	}
-+
-+	setup_frame_dma(pxa_crtc, dma, pal, offset, nbytes);
-+}
-+
-+static void setup_parallel_timing(struct pxa_crtc *pxa_crtc,
-+				  struct drm_display_mode *mode)
-+{
-+	unsigned int lines_per_panel, pcd = get_pcd(pxa_crtc, mode->clock);
-+	int hsync_len = mode->hsync_end - mode->hsync_start;
-+	int right_margin = mode->hsync_start - mode->hdisplay;
-+	int left_margin = mode->htotal - mode->hsync_end;
-+	int vsync_len = mode->vsync_end - mode->vsync_start;
-+	int upper_margin = mode->vtotal - mode->vsync_end;
-+	int lower_margin = mode->vsync_start - mode->vdisplay;
-+
-+	pxa_crtc->reg_lccr1 =
-+		LCCR1_DisWdth(mode->hdisplay) +
-+		LCCR1_HorSnchWdth(hsync_len) +
-+		LCCR1_BegLnDel(left_margin) +
-+		LCCR1_EndLnDel(right_margin);
++	module_put(sdrm->pdev->dev.driver->owner);
 +
 +	/*
-+	 * If we have a dual scan LCD, we need to halve
-+	 * the YRES parameter.
++	 * This shouldn't be here. If multiple drm applications (i.e. two
++	 * xservers) are running and the active one crashes then we will
++	 * only restore fbdev mode when the other one exits aswell. Anyway,
++	 * this is what all other drivers so for now we do it aswell.
 +	 */
-+	lines_per_panel = mode->vdisplay;
-+	if ((pxa_crtc->lccr0 & LCCR0_SDS) == LCCR0_Dual)
-+		lines_per_panel /= 2;
-+
-+	pxa_crtc->reg_lccr2 =
-+		LCCR2_DisHght(lines_per_panel) +
-+		LCCR2_VrtSnchWdth(vsync_len) +
-+		LCCR2_BegFrmDel(upper_margin) +
-+		LCCR2_EndFrmDel(lower_margin);
-+
-+	pxa_crtc->reg_lccr3 = pxa_crtc->lccr3 |
-+		(mode->flags & DRM_MODE_FLAG_PHSYNC ?
-+		 LCCR3_HorSnchH : LCCR3_HorSnchL) |
-+		(mode->flags & DRM_MODE_FLAG_PVSYNC ?
-+		 LCCR3_VrtSnchH : LCCR3_VrtSnchL);
-+
-+	if (pcd)
-+		pxa_crtc->reg_lccr3 |= LCCR3_PixClkDiv(pcd);
++	drm_fb_helper_restore_fbdev_mode(sdrm->fb_helper);
 +}
 +
-+/* calculate 4-bit BPP value for LCCR3 and OVLxC1 */
-+static int pixel_format_to_bpp(struct drm_framebuffer *fb)
++static int sdrm_driver_unload(struct drm_device *drm)
 +{
-+	int bpp = -EINVAL;
++	struct sdrm_device *sdrm = drm->dev_private;
 +
-+	switch (fb->pixel_format) {
-+	case DRM_FORMAT_C8:
-+		bpp = 3;
-+		break;
-+	case DRM_FORMAT_XRGB1555:
-+	case DRM_FORMAT_ARGB1555:
-+	case DRM_FORMAT_RGB565:
-+		bpp = 4;
-+		break;
-+	case DRM_FORMAT_RGB888:
-+		bpp = 9;
-+		break;
-+	}
-+	return bpp;
++	sdrm_fbdev_fini(sdrm->fb_helper);
++	sdrm->fb_helper = NULL;
++
++	drm_mode_config_cleanup(sdrm->drm);
++	drm_kms_helper_poll_fini(sdrm->drm);
++
++	return 0;
++}
++
++static int sdrm_suspend(struct drm_device *drm, pm_message_t state)
++{
++	/* TODO */
++
++	return 0;
++}
++
++static int sdrm_resume(struct drm_device *drm)
++{
++	/* TODO */
++
++	return 0;
 +}
 +
 +/*
-+ *  pxa_crtc_fb_to_lccr3():
-+ *    Convert a bits per pixel value to the correct bit pattern for LCCR3
-+ *
-+ *  NOTE: for PXA27x with overlays support, the LCCR3_PDFOR_x bits have an
-+ *  implication of the acutal use of transparency bit,  which we handle it
-+ *  here separatedly. See PXA27x Developer's Manual, Section <<7.4.6 Pixel
-+ *  Formats>> for the valid combination of PDFOR, PAL_FOR for various BPP.
-+ *
-+ *  Transparency for palette pixel formats is not supported at the moment.
++ * We don't care at all for crtc numbers, but the core expects the
++ * crtcs to be numbered
 + */
-+static uint32_t pxa_crtc_fb_to_lccr3(struct drm_framebuffer *fb)
++static struct sdrm_crtc *sdrm_crtc_by_num(struct sdrm_device *sdrm, int num)
 +{
-+	int bpp = pixel_format_to_bpp(fb);
-+	uint32_t lccr3;
-+	int transparency;
++	struct sdrm_crtc *sdrm_crtc;
 +
-+	if (bpp < 0)
-+		return 0;
-+
-+	lccr3 = LCCR3_BPP(bpp);
-+
-+	switch (fb->pixel_format) {
-+	case DRM_FORMAT_ARGB1555:
-+	case DRM_FORMAT_XRGB1555:
-+		lccr3 |= LCCR3_PDFOR_3;
-+		break;
-+	case DRM_FORMAT_RGB565:
-+		break;
-+	case DRM_FORMAT_ARGB8888;
-+	case DRM_FORMAT_XRGB8888;
-+		lccr3 |= LCCR3_PDFOR_0;
-+		break;
-+	case DRM_FORMAT_RGB888;
-+		lccr3 |= LCCR3_PDFOR_3;
-+		break;
-+	}
-+	return lccr3;
++	list_for_each_entry(sdrm_crtc, &sdrm->crtc_list, list)
++		if (sdrm_crtc->pipe == num)
++			return sdrm_crtc;
++	return NULL;
 +}
 +
-+static int pxa_drm_crtc_set(struct drm_crtc *crtc,
-+		struct drm_display_mode *mode)
++int sdrm_crtc_vblank_get(struct sdrm_crtc *sdrm_crtc)
 +{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+	struct drm_framebuffer *fb = crtc->fb;
-+	unsigned long flags;
++	return drm_vblank_get(sdrm_crtc->sdrm->drm, sdrm_crtc->pipe);
++}
++EXPORT_SYMBOL_GPL(sdrm_crtc_vblank_get);
 +
++void sdrm_crtc_vblank_put(struct sdrm_crtc *sdrm_crtc)
++{
++	drm_vblank_put(sdrm_crtc->sdrm->drm, sdrm_crtc->pipe);
++}
++EXPORT_SYMBOL_GPL(sdrm_crtc_vblank_put);
 +
-+	/* Pixel clock */
++void sdrm_handle_vblank(struct sdrm_crtc *sdrm_crtc)
++{
++	struct sdrm_device *sdrm = sdrm_crtc->sdrm;
 +
-+	/* Pixel format */
-+	switch (fb->pixel_format) {
-+	case DRM_FORMAT_RGB565:
-+		pr_info("depth: %d, bpp: %d\n", fb->depth, fb->bits_per_pixel);
-+		break;
-+	default:
-+		dev_err(pxa_crtc->dev, "unsupported pixel format %s\n",
-+				fourcc_to_str(fb->pixel_format));
++	if (sdrm->registered)
++		drm_handle_vblank(sdrm_crtc->sdrm->drm, sdrm_crtc->pipe);
++}
++EXPORT_SYMBOL_GPL(sdrm_handle_vblank);
++
++static int sdrm_enable_vblank(struct drm_device *drm, int crtc)
++{
++	struct sdrm_device *sdrm = drm->dev_private;
++	struct sdrm_crtc *sdrm_crtc;
++	int ret;
++
++	sdrm_crtc = sdrm_crtc_by_num(sdrm, crtc);
++	if (!sdrm_crtc)
 +		return -EINVAL;
-+	}
 +
-+	/* Update shadow copy atomically */
-+	local_irq_save(flags);
++	if (!sdrm_crtc->sdrm_helper_funcs.enable_vblank)
++		return -ENOSYS;
 +
-+	setup_parallel_timing(pxa_crtc, mode);
-+
-+	setup_base_frame(pxa_crtc, 0);
-+
-+	pxa_crtc->reg_lccr0 = pxa_crtc->lccr0 |
-+		(LCCR0_LDM | LCCR0_SFM | LCCR0_IUM | LCCR0_EFM |
-+		 LCCR0_QDM | LCCR0_BM  | LCCR0_OUM);
-+
-+	pxa_crtc->reg_lccr3 |= pxa_crtc_fb_to_lccr3(fb);
-+
-+	pxa_crtc->reg_lccr4 = lcd_readl(pxa_crtc, LCCR4) & ~LCCR4_PAL_FOR_MASK;
-+	pxa_crtc->reg_lccr4 |= (pxa_crtc->lccr4 & LCCR4_PAL_FOR_MASK);
-+	local_irq_restore(flags);
-+
-+	/*
-+	 * Only update the registers if the controller is enabled
-+	 * and something has changed.
-+	 */
-+	if ((lcd_readl(pxa_crtc, LCCR0) != pxa_crtc->reg_lccr0) ||
-+	    (lcd_readl(pxa_crtc, LCCR1) != pxa_crtc->reg_lccr1) ||
-+	    (lcd_readl(pxa_crtc, LCCR2) != pxa_crtc->reg_lccr2) ||
-+	    (lcd_readl(pxa_crtc, LCCR3) != pxa_crtc->reg_lccr3) ||
-+	    (lcd_readl(pxa_crtc, LCCR4) != pxa_crtc->reg_lccr4) ||
-+	    (lcd_readl(pxa_crtc, FDADR0) != pxa_crtc->fdadr[0]) ||
-+	    ((pxa_crtc->lccr0 & LCCR0_SDS) &&
-+	    (lcd_readl(pxa_crtc, FDADR1) != pxa_crtc->fdadr[1]))) {
-+		if (pxa_crtc->enabled) {
-+			pxa_crtc_disable_controller(pxa_crtc);
-+			pxa_crtc_enable_controller(pxa_crtc);
-+		}
-+	}
-+
-+	return 0;
++	ret = sdrm_crtc->sdrm_helper_funcs.enable_vblank(sdrm_crtc->crtc);
++	return ret;
 +}
 +
-+static int pxa_drm_set_base(struct drm_crtc *crtc, int x, int y)
++static void sdrm_disable_vblank(struct drm_device *drm, int crtc)
 +{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+	struct sdrm_buf_entry *entry;
-+	struct drm_framebuffer *fb = crtc->fb;
-+	unsigned long phys;
-+	int dma = DMA_MAX + DMA_BASE;
++	struct sdrm_device *sdrm = drm->dev_private;
++	struct sdrm_crtc *sdrm_crtc;
 +
-+	entry = sdrm_fb_get_buf(fb);
-+	if (!entry)
-+		return -EFAULT;
-+
-+	phys = entry->paddr;
-+	phys += x * (fb->bits_per_pixel >> 3);
-+	phys += y * fb->pitches[0];
-+
-+	dev_dbg(pxa_crtc->dev, "%s: phys: 0x%lx\n", __func__, phys);
-+	dev_dbg(pxa_crtc->dev, "%s: xy: %dx%d\n", __func__, x, y);
-+
-+	pxa_crtc->video_mem_phys = entry->paddr;
-+
-+	setup_base_frame(pxa_crtc, 1);
-+
-+	if (pxa_crtc->lccr0 & LCCR0_SDS)
-+		lcd_writel(pxa_crtc, FBR1, pxa_crtc->fdadr[dma + 1] | 0x1);
-+
-+	lcd_writel(pxa_crtc, FBR0, pxa_crtc->fdadr[dma] | 0x1);
-+
-+	return 0;
-+}
-+
-+static int pxa_crtc_mode_set(struct drm_crtc *crtc,
-+			       struct drm_display_mode *mode,
-+			       struct drm_display_mode *adjusted_mode,
-+			       int x, int y,
-+			       struct drm_framebuffer *old_fb)
-+{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+
-+	pxa_drm_set_base(crtc, x, y);
-+
-+	return pxa_drm_crtc_set(crtc, mode);
-+}
-+
-+static void pxa_crtc_enable(struct pxa_crtc *pxa_crtc)
-+{
-+	if (!pxa_crtc->enabled) {
-+		__pxa_crtc_lcd_power(pxa_crtc, 1);
-+		pxa_crtc_enable_controller(pxa_crtc);
-+	}
-+	pxa_crtc->enabled = 1;
-+}
-+
-+static void pxa_crtc_disable(struct pxa_crtc *pxa_crtc)
-+{
-+	if (pxa_crtc->enabled) {
-+		pxa_crtc_disable_controller(pxa_crtc);
-+		__pxa_crtc_lcd_power(pxa_crtc, 0);
-+	}
-+	pxa_crtc->enabled = 0;
-+}
-+
-+static void pxa_crtc_dpms(struct drm_crtc *crtc, int mode)
-+{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+
-+	dev_dbg(pxa_crtc->dev, "%s mode: %d\n", __func__, mode);
-+
-+	switch (mode) {
-+	case DRM_MODE_DPMS_ON:
-+		pxa_crtc_enable(pxa_crtc);
-+		break;
-+	default:
-+		pxa_crtc_disable(pxa_crtc);
-+		break;
-+	}
-+}
-+
-+static bool pxa_crtc_mode_fixup(struct drm_crtc *crtc,
-+				  struct drm_display_mode *mode,
-+				  struct drm_display_mode *adjusted_mode)
-+{
-+	return true;
-+}
-+
-+static void pxa_crtc_prepare(struct drm_crtc *crtc)
-+{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+
-+	pxa_crtc_disable(pxa_crtc);
-+}
-+
-+static void pxa_crtc_commit(struct drm_crtc *crtc)
-+{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+
-+	pxa_crtc_enable(pxa_crtc);
-+}
-+
-+static struct drm_crtc_helper_funcs pxa_helper_funcs = {
-+	.dpms = pxa_crtc_dpms,
-+	.prepare = pxa_crtc_prepare,
-+	.commit = pxa_crtc_commit,
-+	.mode_fixup = pxa_crtc_mode_fixup,
-+	.mode_set = pxa_crtc_mode_set,
-+	.load_lut = pxa_crtc_load_lut,
-+};
-+
-+static void sdrm_handle_pageflip(struct pxa_crtc *pxa_crtc)
-+{
-+	struct drm_pending_vblank_event *e;
-+	struct timeval now;
-+	unsigned long flags;
-+	struct drm_device *drm = pxa_crtc->base.dev;
-+
-+	spin_lock_irqsave(&drm->event_lock, flags);
-+
-+	e = pxa_crtc->page_flip_event;
-+
-+	if (!e) {
-+		spin_unlock_irqrestore(&drm->event_lock, flags);
++	sdrm_crtc = sdrm_crtc_by_num(sdrm, crtc);
++	if (!sdrm_crtc)
 +		return;
++
++	if (!sdrm_crtc->sdrm_helper_funcs.disable_vblank)
++		return;
++
++	sdrm_crtc->sdrm_helper_funcs.disable_vblank(sdrm_crtc->crtc);
++}
++
++static struct vm_operations_struct sdrm_gem_vm_ops = {
++	.fault = sdrm_gem_fault,
++	.open = drm_gem_vm_open,
++	.close = drm_gem_vm_close,
++};
++
++static struct drm_ioctl_desc sdrm_ioctls[] = {
++	/* none so far */
++};
++
++static const struct file_operations sdrm_driver_fops = {
++	 .owner = THIS_MODULE,
++	 .open = drm_open,
++	 .release = drm_release,
++	 .unlocked_ioctl = drm_ioctl,
++	 .mmap = sdrm_gem_mmap,
++	 .poll = drm_poll,
++	 .fasync = drm_fasync,
++	 .read = drm_read,
++	 .llseek = noop_llseek,
++};
++
++static int sdrm_get_irq(struct drm_device *dev)
++{
++	/*
++	 * Return an arbitrary number to make the core happy.
++	 * We can't return anything meaningful here since drm
++	 * devices in general have multiple irqs
++	 */
++	return 1234;
++}
++
++static struct drm_bus drm_platform_bus = {
++	.bus_type = DRIVER_BUS_PLATFORM,
++	.get_irq = sdrm_get_irq,
++};
++
++static struct drm_driver sdrm_driver_template = {
++	.driver_features	= DRIVER_MODESET | DRIVER_GEM,
++	.unload			= sdrm_driver_unload,
++	.open			= sdrm_driver_open,
++	.lastclose		= sdrm_driver_lastclose,
++	.gem_free_object	= sdrm_gem_free_object,
++	.gem_vm_ops		= &sdrm_gem_vm_ops,
++	.dumb_create		= sdrm_gem_dumb_create,
++	.dumb_map_offset	= sdrm_gem_dumb_map_offset,
++	.dumb_destroy		= sdrm_gem_dumb_destroy,
++
++	.suspend		= sdrm_suspend,
++	.resume			= sdrm_resume,
++
++	.get_vblank_counter	= drm_vblank_count,
++	.enable_vblank		= sdrm_enable_vblank,
++	.disable_vblank		= sdrm_disable_vblank,
++	.reclaim_buffers	= drm_core_reclaim_buffers,
++	.ioctls			= sdrm_ioctls,
++	.num_ioctls		= ARRAY_SIZE(sdrm_ioctls),
++	.bus			= &drm_platform_bus,
++	.fops			= &sdrm_driver_fops,
++	.name			= DRIVER_NAME,
++	.desc			= DRIVER_DESC,
++	.date			= DRIVER_DATE,
++	.major			= DRIVER_MAJOR,
++	.minor			= DRIVER_MINOR,
++	.patchlevel		= DRIVER_PATCHLEVEL,
++};
++
++static LIST_HEAD(sdrm_device_list);
++static DEFINE_MUTEX(sdrm_list_mutex);
++
++/*
++ * sdrm_device_get - find or allocate sdrm device with unique name
++ *
++ * This function returns the sdrm device with the unique name 'name'
++ * If this already exists, return it, otherwise allocate a new
++ * object.
++ */
++static struct sdrm_device *sdrm_device_get(const char *name)
++{
++	struct sdrm_device *sdrm;
++
++	mutex_lock(&sdrm_list_mutex);
++
++	list_for_each_entry(sdrm, &sdrm_device_list, list)
++		if (!strcmp(sdrm->name, name))
++			goto out;
++
++	mutex_unlock(&sdrm_list_mutex);
++
++	sdrm = kzalloc(sizeof(*sdrm), GFP_KERNEL);
++	if (!sdrm)
++		goto out;
++
++	mutex_init(&sdrm->mutex);
++	INIT_LIST_HEAD(&sdrm->crtc_list);
++	INIT_LIST_HEAD(&sdrm->connector_list);
++	INIT_LIST_HEAD(&sdrm->encoder_list);
++
++	sdrm->name = kstrdup(name, GFP_KERNEL);
++	if (!sdrm->name) {
++		kfree(sdrm);
++		goto out;
 +	}
 +
-+	do_gettimeofday(&now);
-+	e->event.sequence = 0;
-+	e->event.tv_sec = now.tv_sec;
-+	e->event.tv_usec = now.tv_usec;
-+	pxa_crtc->page_flip_event = NULL;
++	mutex_lock(&sdrm_list_mutex);
 +
-+	list_add_tail(&e->base.link, &e->base.file_priv->event_list);
++	list_add_tail(&sdrm->list, &sdrm_device_list);
++out:
++	mutex_unlock(&sdrm_list_mutex);
 +
-+	wake_up_interruptible(&e->base.file_priv->event_wait);
-+
-+	spin_unlock_irqrestore(&drm->event_lock, flags);
-+}
-+
-+static int pxa_crtc_enable_vblank(struct drm_crtc *crtc)
-+{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+	uint32_t lccr0;
-+
-+	pxa_crtc->reg_lccr0 &= ~LCCR0_EFM;
-+
-+	lccr0 = lcd_readl(pxa_crtc, LCCR0);
-+	lccr0 &= ~LCCR0_EFM;
-+	lcd_writel(pxa_crtc, LCCR0, lccr0);
-+
-+	return 0;
-+}
-+
-+static void pxa_crtc_disable_vblank(struct drm_crtc *crtc)
-+{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
-+	uint32_t lccr0;
-+
-+	pxa_crtc->reg_lccr0 &= ~LCCR0_EFM;
-+
-+	lccr0 = lcd_readl(pxa_crtc, LCCR0);
-+	lccr0 |= LCCR0_EFM;
-+	lcd_writel(pxa_crtc, LCCR0, lccr0);
++	return sdrm;
 +}
 +
 +/*
-+ * Handle LCDC interrupts.
++ * sdrm_device_maybe_release - free sdrm device if noone is using it
++ *
++ * If we have no crtcs, connectors and encoders registered for this
++ * device we can free it. Caller must hold sdrm->mutex.
 + */
-+static irqreturn_t pxa_irq_handler(int irq, void *dev_id)
++static void sdrm_device_maybe_release(struct sdrm_device *sdrm)
 +{
-+	struct pxa_crtc *pxa_crtc = dev_id;
-+	struct drm_device *drm = pxa_crtc->base.dev;
-+	unsigned int lccr0, lcsr;
++	if (!list_empty(&sdrm->crtc_list))
++		return;
++	if (!list_empty(&sdrm->connector_list))
++		return;
++	if (!list_empty(&sdrm->encoder_list))
++		return;
 +
-+	lcsr = lcd_readl(pxa_crtc, LCSR);
-+	if (lcsr & LCSR_LDD) {
-+		lccr0 = lcd_readl(pxa_crtc, LCCR0);
-+		lcd_writel(pxa_crtc, LCCR0, lccr0 | LCCR0_LDM);
-+		complete(&pxa_crtc->disable_done);
-+	}
++	mutex_lock(&sdrm_list_mutex);
++	list_del(&sdrm->list);
++	mutex_unlock(&sdrm_list_mutex);
 +
-+	if (lcsr & LCSR_BER)
-+		dev_err(pxa_crtc->dev, "bus error caused by dma channel %d\n",
-+			(lcsr >> 28) & 0x7);
-+
-+	if (lcsr & LCSR_EOF)
-+		sdrm_handle_pageflip(pxa_crtc);
-+
-+	/* Acknowledge interrupt */
-+	lcd_writel(pxa_crtc, LCSR, lcsr);
-+
-+	drm_handle_vblank(drm, 0);
-+
-+	if (pxa_crtc->newfb) {
-+		pxa_crtc->base.fb = pxa_crtc->newfb;
-+		pxa_crtc->newfb = NULL;
-+		pxa_drm_set_base(&pxa_crtc->base, 0, 0);
-+		sdrm_handle_pageflip(pxa_crtc);
-+		sdrm_crtc_vblank_put(pxa_crtc->sdrm_crtc);
-+	}
-+
-+	return IRQ_HANDLED;
++	kfree(sdrm->name);
++	kfree(sdrm);
 +}
 +
-+static int pxa_page_flip(struct drm_crtc *crtc,
-+			 struct drm_framebuffer *fb,
-+			 struct drm_pending_vblank_event *event)
++/*
++ * I think this legacy modegroup handling should be removed and we
++ * have a patch for this which also defines HAVE_MODEGROUP_REMOVED
++ * For now ifdef this here to make this work with and without this
++ * patch.
++ */
++#ifndef HAVE_MODEGROUP_REMOVED
++static int drm_mode_group_reinit(struct drm_device *dev)
 +{
-+	struct pxa_crtc *pxa_crtc = to_pxa_crtc(crtc);
++	struct drm_mode_group *group = &dev->primary->mode_group;
++	uint32_t *id_list = group->id_list;
++	int ret;
 +
-+	if (pxa_crtc->newfb)
-+		return -EBUSY;
++	ret = drm_mode_group_init_legacy_group(dev, group);
++	if (ret < 0)
++		return ret;
 +
-+	pxa_crtc->newfb = fb;
-+	pxa_crtc->page_flip_event = event;
-+	sdrm_crtc_vblank_get(pxa_crtc->sdrm_crtc);
-+
++	kfree(id_list);
 +	return 0;
 +}
-+
-+static const struct drm_crtc_funcs pxa_crtc_funcs = {
-+	.page_flip = pxa_page_flip,
-+};
-+
-+static const struct sdrm_crtc_helper_funcs pxa_sdrm_helper = {
-+	.enable_vblank = pxa_crtc_enable_vblank,
-+	.disable_vblank = pxa_crtc_disable_vblank,
-+};
-+
-+#define DRIVER_NAME "pxa-lcdc-crtc"
-+
-+static int __devinit pxa_crtc_probe(struct platform_device *pdev)
++#else
++static int drm_mode_group_reinit(struct drm_device *dev)
 +{
-+	struct pxa_crtc *pxa_crtc;
-+	struct resource *res;
-+	int ret, irq;
-+	struct pxafb_mach_info *pdata = pdev->dev.platform_data;
++	return 0;
++}
++#endif
 +
-+	dev_dbg(&pdev->dev, "pxa_crtc_probe\n");
++/*
++ * register an encoder to the drm core
++ */
++static int sdrm_encoder_register(struct sdrm_encoder *sdrm_encoder)
++{
++	struct sdrm_device *sdrm = sdrm_encoder->sdrm;
 +
-+	if (!pdata)
-+		return -EINVAL;
-+
-+	dev_info(&pdev->dev, "got a %dx%dx%d LCD\n",
-+			pdata->modes->xres,
-+			pdata->modes->yres,
-+			pdata->modes->bpp);
-+	if (pdata->modes->xres == 0 ||
-+	    pdata->modes->yres == 0 ||
-+	    pdata->modes->bpp == 0) {
-+		dev_err(&pdev->dev, "Invalid resolution or bit depth\n");
-+		return -EINVAL;
-+	}
-+
-+	pxa_crtc = devm_kzalloc(&pdev->dev, sizeof(*pxa_crtc), GFP_KERNEL);
-+	if (!pxa_crtc) {
-+		dev_dbg(&pdev->dev, "failed to allocate crtc\n");
-+		return -ENOMEM;
-+	}
-+
-+	pxa_crtc->dev = &pdev->dev;
-+
-+	init_completion(&pxa_crtc->disable_done);
-+
-+	pxa_crtc_decode_mach_info(pxa_crtc, pdata);
-+
-+	pxa_crtc->lcd_power = pdata->pxafb_lcd_power;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
++	if (!try_module_get(sdrm_encoder->owner))
 +		return -ENODEV;
 +
-+	res = devm_request_mem_region(&pdev->dev, res->start,
-+			resource_size(res), DRIVER_NAME);
-+	if (!res)
-+		return -EBUSY;
++	drm_encoder_init(sdrm->drm, sdrm_encoder->encoder,
++			sdrm_encoder->encoder->funcs,
++			DRM_MODE_ENCODER_TMDS);
 +
-+	pxa_crtc->mmio_base = devm_ioremap(&pdev->dev, res->start,
-+				resource_size(res));
-+	if (!pxa_crtc->mmio_base) {
-+		dev_err(&pdev->dev, "Cannot map frame buffer registers\n");
-+		return -EBUSY;
-+	}
++	drm_mode_group_reinit(sdrm->drm);
 +
-+	irq = platform_get_irq(pdev, 0);
-+	ret = devm_request_irq(&pdev->dev, irq, pxa_irq_handler, 0, "pxa_drm",
-+			pxa_crtc);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "irq request failed with %d.\n", ret);
-+		return ret;
-+	}
-+
-+	pxa_crtc->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pxa_crtc->clk)) {
-+		ret = PTR_ERR(pxa_crtc->clk);
-+		dev_err(&pdev->dev, "unable to get clock: %d\n", ret);
-+		return ret;
-+	}
-+
-+	pxa_crtc->sdrm_crtc = sdrm_add_crtc(dev_name(&pdev->dev),
-+			&pxa_crtc->base, &pxa_crtc_funcs, &pxa_helper_funcs,
-+			&pxa_sdrm_helper);
-+	if (!pxa_crtc->sdrm_crtc) {
-+		dev_err(&pdev->dev, "failed to add crtc\n");
-+		ret = -EINVAL;
-+		goto err_clk;
-+	}
-+
-+	platform_set_drvdata(pdev, pxa_crtc);
-+
-+	/* there are no devm helpers for dma_alloc_coherent */
-+	pxa_crtc->dma_buff_size = PAGE_ALIGN(sizeof(struct pxafb_dma_buff));
-+	pxa_crtc->dma_buff = dma_alloc_coherent(pxa_crtc->dev,
-+				pxa_crtc->dma_buff_size,
-+				&pxa_crtc->dma_buff_phys, GFP_KERNEL);
-+	if (pxa_crtc->dma_buff == NULL) {
-+		dev_err(&pdev->dev, "Failed to allocate memory for DMA\n");
-+		ret = -ENOMEM;
-+		goto err_crtc;
-+	}
-+
-+	ret = sdrm_init_drm(dev_name(&pdev->dev), pdev, 16);
-+	if (ret) {
-+		dev_err(&pdev->dev, "init drm failed with %d\n", ret);
-+		goto err_free_dma;
-+	}
++	sdrm_encoder->registered = 1;
 +
 +	return 0;
++}
 +
-+err_free_dma:
-+	dma_free_coherent(&pdev->dev, pxa_crtc->dma_buff_size,
-+			pxa_crtc->dma_buff, pxa_crtc->dma_buff_phys);
-+err_crtc:
-+	sdrm_remove_crtc(pxa_crtc->sdrm_crtc);
-+err_clk:
-+	clk_put(pxa_crtc->clk);
++/*
++ * unregister an encoder from the drm core
++ */
++static void sdrm_encoder_unregister(struct sdrm_encoder *sdrm_encoder)
++{
++	struct sdrm_device *sdrm = sdrm_encoder->sdrm;
++
++	if (!sdrm_encoder->registered)
++		return;
++
++	if (sdrm->registered)
++		drm_encoder_cleanup(sdrm_encoder->encoder);
++
++	drm_mode_group_reinit(sdrm->drm);
++
++	sdrm_encoder->registered = 0;
++
++	module_put(sdrm_encoder->owner);
++}
++
++/*
++ * register a connector to the drm core
++ */
++static int sdrm_connector_register(struct sdrm_connector *sdrm_connector)
++{
++	struct sdrm_device *sdrm = sdrm_connector->sdrm;
++	int ret;
++
++	if (!try_module_get(sdrm_connector->owner))
++		return -ENODEV;
++
++	drm_connector_init(sdrm->drm, sdrm_connector->connector,
++			sdrm_connector->connector->funcs,
++			DRM_MODE_CONNECTOR_VGA);
++	drm_mode_group_reinit(sdrm->drm);
++	ret = drm_sysfs_connector_add(sdrm_connector->connector);
++	if (ret)
++		goto err;
++
++	sdrm_connector->registered = 1;
++
++	return 0;
++err:
++	module_put(sdrm_connector->owner);
 +
 +	return ret;
 +}
 +
-+static int __devexit pxa_crtc_remove(struct platform_device *pdev)
++/*
++ * unregister a connector from the drm core
++ */
++static void sdrm_connector_unregister(struct sdrm_connector *sdrm_connector)
 +{
-+	struct pxa_crtc *pxa_crtc = platform_get_drvdata(pdev);
++	struct sdrm_device *sdrm = sdrm_connector->sdrm;
 +
-+	sdrm_exit_drm(dev_name(&pdev->dev));
++	if (!sdrm_connector->registered)
++		return;
 +
-+	clk_disable_unprepare(pxa_crtc->clk);
-+	clk_put(pxa_crtc->clk);
++	if (sdrm->registered) {
++		drm_sysfs_connector_remove(sdrm_connector->connector);
++		drm_connector_cleanup(sdrm_connector->connector);
++	}
 +
-+	sdrm_remove_crtc(pxa_crtc->sdrm_crtc);
++	drm_mode_group_reinit(sdrm->drm);
 +
-+	platform_set_drvdata(pdev, NULL);
++	sdrm_connector->registered = 0;
++
++	module_put(sdrm_connector->owner);
++}
++
++/*
++ * register a crtc to the drm core
++ */
++static int sdrm_crtc_register(struct sdrm_crtc *sdrm_crtc)
++{
++	struct sdrm_device *sdrm = sdrm_crtc->sdrm;
++	int ret;
++
++	drm_crtc_init(sdrm->drm, sdrm_crtc->crtc, &sdrm_crtc->crtc_funcs);
++	ret = drm_mode_crtc_set_gamma_size(sdrm_crtc->crtc, 256);
++	if (ret)
++		return ret;
++
++	drm_crtc_helper_add(sdrm_crtc->crtc, &sdrm_crtc->crtc_helper_funcs);
++
++	sdrm_crtc->registered = 1;
 +
 +	return 0;
 +}
 +
-+static struct platform_driver pxa_crtc_driver = {
-+	.remove		= __devexit_p(pxa_crtc_remove),
-+	.probe		= pxa_crtc_probe,
-+	.driver		= {
-+		.name	= DRIVER_NAME,
-+		.owner	= THIS_MODULE,
-+	},
++static void sdrm_crtc_unregister(struct sdrm_crtc *sdrm_crtc)
++{
++	/*
++	 * The hard work has already been done in driver unload
++	 */
++	sdrm_crtc->registered = 0;
++}
++
++/*
++ * sdrm_uninit - unitialize all crtcs, encoders, connectors
++ *
++ * This is called in case initialization fails or as a cleanup
++ * after unitializing a drm device. Caller must hold sdrm->mutex
++ */
++static void sdrm_uninit(struct sdrm_device *sdrm)
++{
++	struct sdrm_crtc *sdrm_crtc;
++	struct sdrm_encoder *sdrm_encoder;
++	struct sdrm_connector *sdrm_connector;
++
++	list_for_each_entry(sdrm_crtc, &sdrm->crtc_list, list)
++		sdrm_crtc_unregister(sdrm_crtc);
++
++	list_for_each_entry(sdrm_connector, &sdrm->connector_list, list)
++		sdrm_connector_unregister(sdrm_connector);
++
++	list_for_each_entry(sdrm_encoder, &sdrm->encoder_list, list)
++		sdrm_encoder_unregister(sdrm_encoder);
++
++	sdrm->registered = 0;
++}
++
++/*
++ * Called by the CRTC driver when all CRTCs are registered. This
++ * puts all the pieces together and initializes the driver.
++ * Once this is called no more CRTCs can be registered since
++ * the drm core has hardcoded the number of crtcs in several
++ * places.
++ */
++int sdrm_init_drm(const char *name, struct platform_device *pdev,
++		int preferred_bpp)
++{
++	struct sdrm_device *sdrm;
++	struct drm_device *drm;
++	struct sdrm_crtc *sdrm_crtc;
++	struct sdrm_encoder *sdrm_encoder;
++	struct sdrm_connector *sdrm_connector;
++	int ret;
++	int num_crtcs = 0;
++
++	sdrm = sdrm_device_get(name);
++	if (!sdrm)
++		return -ENOMEM;
++
++	drm = kzalloc(sizeof(struct drm_device), GFP_KERNEL);
++	if (!drm)
++		return -ENOMEM;
++
++	sdrm->drm = drm;
++
++	memcpy(&sdrm->driver, &sdrm_driver_template,
++			sizeof(sdrm_driver_template));
++
++	drm->dev_private = sdrm;
++
++	ret = drm_fill_in_dev(drm, NULL, &sdrm->driver);
++	if (ret) {
++		printk(KERN_ERR "DRM: Fill_in_dev failed.\n");
++		goto err_fill_in;
++	}
++
++	/*
++	 * enable drm irq mode.
++	 * - with irq_enabled = 1, we can use the vblank feature.
++	 *
++	 * P.S. note that we wouldn't use drm irq handler but
++	 *      just spsdrmific driver own one instead bsdrmause
++	 *      drm framework supports only one irq handler and
++	 *      drivers can well take care of their interrupts
++	 */
++	drm->irq_enabled = 1;
++
++	mutex_lock(&drm_global_mutex);
++
++	ret = drm_get_minor(drm, &drm->control, DRM_MINOR_CONTROL);
++	if (ret)
++		goto err_get_minor1;
++
++	ret = drm_get_minor(drm, &drm->primary, DRM_MINOR_LEGACY);
++	if (ret)
++		goto err_get_minor2;
++
++	mutex_unlock(&drm_global_mutex);
++
++	drm_mode_config_init(drm);
++	sdrm_mode_config_init(drm);
++
++	mutex_lock(&sdrm->mutex);
++
++	/* we need at least one crtc */
++	if (list_empty(&sdrm->crtc_list)) {
++		ret = -EINVAL;
++		goto err_init;
++	}
++
++	/* Register the subdevices we have so far */
++
++	list_for_each_entry(sdrm_encoder, &sdrm->encoder_list, list) {
++		ret = sdrm_encoder_register(sdrm_encoder);
++		if (ret)
++			goto err_init;
++	}
++
++	list_for_each_entry(sdrm_connector, &sdrm->connector_list, list) {
++		ret = sdrm_connector_register(sdrm_connector);
++		if (ret)
++			goto err_init;
++	}
++
++	list_for_each_entry(sdrm_crtc, &sdrm->crtc_list, list) {
++		sdrm_crtc->pipe = num_crtcs;
++		num_crtcs++;
++		ret = sdrm_crtc_register(sdrm_crtc);
++		if (ret)
++			goto err_init;
++	}
++
++	sdrm->pdev = pdev;
++	sdrm->drm->platformdev = pdev;
++	sdrm->drm->dev = &pdev->dev;
++
++	sdrm->fb_helper = sdrm_fbdev_init(sdrm->drm, preferred_bpp);
++	if (!sdrm->fb_helper) {
++		printk("sdrm_fbdev_init failed\n");
++		ret = -ENOMEM;
++		goto err_init;
++	}
++
++	drm_kms_helper_poll_init(sdrm->drm);
++
++#ifndef HAVE_MODEGROUP_REMOVED
++	mutex_lock(&drm_global_mutex);
++
++	/* setup the grouping for the legacy output */
++	ret = drm_mode_group_init_legacy_group(sdrm->drm,
++			&sdrm->drm->primary->mode_group);
++	mutex_unlock(&drm_global_mutex);
++
++	if (ret)
++		return ret;
++#endif
++	ret = drm_vblank_init(sdrm->drm, num_crtcs);
++	if (ret)
++		goto err_init;
++
++	/*
++	 * with vblank_disable_allowed = 1, vblank interrupt will be disabled
++	 * by drm timer once a current process gives up ownership of
++	 * vblank event.(after drm_vblank_put function is called)
++	 */
++	sdrm->drm->vblank_disable_allowed = 1;
++
++	sdrm->registered = 1;
++
++	mutex_unlock(&sdrm->mutex);
++
++	return 0;
++
++err_init:
++	sdrm_uninit(sdrm);
++	mutex_unlock(&sdrm->mutex);
++err_get_minor2:
++	drm_put_minor(&drm->control);
++err_get_minor1:
++err_fill_in:
++	mutex_unlock(&drm_global_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(sdrm_init_drm);
++
++/*
++ * Called by the CRTC driver to uninitialize the driver.
++ */
++int sdrm_exit_drm(const char *name)
++{
++	struct sdrm_device *sdrm;
++
++	sdrm = sdrm_device_get(name);
++	if (!sdrm)
++		return -ENODEV;
++
++	sdrm_uninit(sdrm);
++	/*
++	 * The drm core never does anything with this list, yet it removes
++	 * this entry, so initialize it
++	 */
++	INIT_LIST_HEAD(&sdrm->drm->driver_item);
++	drm_put_dev(sdrm->drm);
++
++	sdrm->drm = NULL;
++	sdrm->registered = 0;
++	sdrm->pdev = NULL;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(sdrm_exit_drm);
++
++/*
++ * sdrm_add_crtc - add a new crtc
++ *
++ * The return value if !NULL is a cookie for the caller to pass to
++ * sdrm_remove_crtc later.
++ */
++struct sdrm_crtc *sdrm_add_crtc(const char *name, struct drm_crtc *crtc,
++		const struct drm_crtc_funcs *crtc_funcs,
++		const struct drm_crtc_helper_funcs *crtc_helper_funcs,
++		const struct sdrm_crtc_helper_funcs *sdrm_helper_funcs)
++{
++	struct sdrm_device *sdrm;
++	struct sdrm_crtc *sdrm_crtc;
++
++	sdrm = sdrm_device_get(name);
++	if (!sdrm)
++		return NULL; /* -ENOMEM */
++
++	if (sdrm->registered)
++		return NULL; /* -EBUSY */
++
++	sdrm_crtc = kzalloc(sizeof(*sdrm_crtc), GFP_KERNEL);
++	if (!sdrm_crtc)
++		return NULL; /* -ENOMEM */
++
++	sdrm_crtc->crtc_funcs = *crtc_funcs;
++	sdrm_crtc->crtc_helper_funcs = *crtc_helper_funcs;
++	sdrm_crtc->sdrm_helper_funcs = *sdrm_helper_funcs;
++
++	WARN_ON(crtc_funcs->set_config);
++	WARN_ON(crtc_funcs->destroy);
++
++	sdrm_crtc->crtc_funcs.set_config = drm_crtc_helper_set_config;
++	sdrm_crtc->crtc_funcs.destroy = drm_crtc_cleanup;
++
++	sdrm_crtc->crtc = crtc;
++	sdrm_crtc->sdrm = sdrm;
++
++	mutex_lock(&sdrm->mutex);
++
++	list_add_tail(&sdrm_crtc->list, &sdrm->crtc_list);
++
++	mutex_unlock(&sdrm->mutex);
++
++	return sdrm_crtc;
++}
++EXPORT_SYMBOL_GPL(sdrm_add_crtc);
++
++/*
++ * sdrm_remove_crtc - remove a crtc
++ *
++ * Can only be called on inactive drm devices since the drm
++ * core can't handle dynamic crtcs
++ */
++int sdrm_remove_crtc(struct sdrm_crtc *sdrm_crtc)
++{
++	struct sdrm_device *sdrm = sdrm_crtc->sdrm;
++
++	if (sdrm->registered)
++		return -EBUSY;
++
++	mutex_lock(&sdrm->mutex);
++
++	sdrm_crtc_unregister(sdrm_crtc);
++
++	list_del(&sdrm_crtc->list);
++
++	kfree(sdrm_crtc);
++
++	sdrm_device_maybe_release(sdrm);
++
++	mutex_unlock(&sdrm->mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(sdrm_remove_crtc);
++
++/*
++ * sdrm_add_encoder - add a new encoder
++ *
++ * The return value if !NULL is a cookie for the caller to pass to
++ * sdrm_remove_crtc later.
++ *
++ * Can be called on both active and inactive devices.
++ */
++struct sdrm_encoder *sdrm_add_encoder(const char *name,
++		struct drm_encoder *encoder, struct module *owner)
++{
++	struct sdrm_device *sdrm;
++	struct sdrm_encoder *sdrm_encoder;
++	int ret;
++
++	sdrm = sdrm_device_get(name);
++	if (!sdrm)
++		return NULL;
++
++	sdrm_encoder = kzalloc(sizeof(struct sdrm_encoder), GFP_KERNEL);
++	if (!sdrm_encoder)
++		return NULL;
++	sdrm_encoder->encoder = encoder;
++	sdrm_encoder->sdrm = sdrm;
++	sdrm_encoder->owner = owner;
++
++	mutex_lock(&sdrm->mutex);
++
++	if (sdrm->registered) {
++		/*
++		 * If the drm device is up register the encoder,
++		 * otherwise it will be done in sdrm_init_drm()
++		 */
++		ret = sdrm_encoder_register(sdrm_encoder);
++		if (ret) {
++			kfree(sdrm_encoder);
++			goto err;
++		}
++	}
++
++	list_add_tail(&sdrm_encoder->list, &sdrm->encoder_list);
++err:
++	mutex_unlock(&sdrm->mutex);
++
++	return sdrm_encoder;
++}
++EXPORT_SYMBOL_GPL(sdrm_add_encoder);
++
++/*
++ * sdrm_remove_encoder - remove an encoder
++ *
++ * Can be called on both active and inactive devices.
++ */
++int sdrm_remove_encoder(struct sdrm_encoder *sdrm_encoder)
++{
++	struct sdrm_device *sdrm = sdrm_encoder->sdrm;
++
++	mutex_lock(&sdrm->mutex);
++
++	sdrm_encoder_unregister(sdrm_encoder);
++
++	list_del(&sdrm_encoder->list);
++
++	kfree(sdrm_encoder);
++
++	sdrm_device_maybe_release(sdrm);
++
++	mutex_unlock(&sdrm->mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(sdrm_remove_encoder);
++
++/*
++ * sdrm_add_connector - add a connector
++ *
++ * Can be called on both active and inactive devices.
++ */
++struct sdrm_connector *sdrm_add_connector(const char *name,
++		struct drm_connector *connector, struct module *owner)
++{
++	struct sdrm_device *sdrm;
++	struct sdrm_connector *sdrm_connector;
++	int ret;
++
++	sdrm = sdrm_device_get(name);
++	if (!sdrm)
++		return NULL;
++
++	sdrm_connector = kzalloc(sizeof(struct sdrm_connector), GFP_KERNEL);
++	if (!sdrm_connector)
++		return NULL;
++
++	sdrm_connector->connector = connector;
++	sdrm_connector->sdrm = sdrm;
++	sdrm_connector->owner = owner;
++
++	mutex_lock(&sdrm->mutex);
++
++	if (sdrm->registered) {
++		/*
++		 * If the drm device is up register the connector,
++		 * otherwise it will be done in sdrm_init_drm()
++		 */
++		ret = sdrm_connector_register(sdrm_connector);
++		if (ret) {
++			kfree(sdrm_connector);
++			sdrm_connector = NULL;
++			goto err;
++		}
++	}
++
++	list_add_tail(&sdrm_connector->list, &sdrm->connector_list);
++err:
++	mutex_unlock(&sdrm->mutex);
++
++	return sdrm_connector;
++}
++EXPORT_SYMBOL_GPL(sdrm_add_connector);
++
++/*
++ * sdrm_remove_connector - remove a connector
++ *
++ * Can be called on both active and inactive devices.
++ */
++int sdrm_remove_connector(struct sdrm_connector *sdrm_connector)
++{
++	struct sdrm_device *sdrm = sdrm_connector->sdrm;
++
++	mutex_lock(&sdrm->mutex);
++
++	sdrm_connector_unregister(sdrm_connector);
++
++	list_del(&sdrm_connector->list);
++
++	kfree(sdrm_connector);
++
++	sdrm_device_maybe_release(sdrm);
++
++	mutex_unlock(&sdrm->mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(sdrm_remove_connector);
++
++MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
++MODULE_DESCRIPTION(DRIVER_DESC);
++MODULE_LICENSE("GPL");
+diff --git a/drivers/gpu/drm/sdrm/sdrm.h b/drivers/gpu/drm/sdrm/sdrm.h
+new file mode 100644
+index 0000000..e5d3a63
+--- /dev/null
++++ b/drivers/gpu/drm/sdrm/sdrm.h
+@@ -0,0 +1,57 @@
++#ifndef _SDRM_H_
++#define _SDRM_H_
++
++void sdrm_mode_config_init(struct drm_device *drm);
++
++struct drm_fb_helper *sdrm_fbdev_init(struct drm_device *drm,
++		int preferred_bpp);
++void sdrm_fbdev_fini(struct drm_fb_helper *);
++
++#define to_sdrm_gem_obj(x)	container_of(x,\
++			struct sdrm_gem_obj, base)
++
++struct sdrm_gem_obj {
++	struct drm_gem_object base;
++	struct sdrm_buf_entry *entry;
 +};
 +
-+module_platform_driver(pxa_crtc_driver);
++/* unmap a buffer from user space. */
++int sdrm_gem_munmap_ioctl(struct drm_device *drm, void *data,
++		struct drm_file *file_priv);
 +
-+MODULE_DESCRIPTION("PXA LCDC framebuffer driver");
-+MODULE_AUTHOR("Philipp Zabel, Pengutronix");
-+MODULE_LICENSE("GPL");
++/* initialize gem object. */
++int sdrm_gem_init_object(struct drm_gem_object *obj);
++
++/* free gem object. */
++void sdrm_gem_free_object(struct drm_gem_object *gem_obj);
++
++/* create memory region for drm framebuffer. */
++int sdrm_gem_dumb_create(struct drm_file *file_priv,
++		struct drm_device *drm, struct drm_mode_create_dumb *args);
++
++/* map memory region for drm framebuffer to user space. */
++int sdrm_gem_dumb_map_offset(struct drm_file *file_priv,
++		struct drm_device *drm, uint32_t handle, uint64_t *offset);
++
++/* page fault handler and mmap fault address(virtual) to physical memory. */
++int sdrm_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
++
++/* set vm_flags and we can change the vm attribute to other one at here. */
++int sdrm_gem_mmap(struct file *filp, struct vm_area_struct *vma);
++
++/*
++ * destroy memory region allocated.
++ *	- a gem handle and physical memory region pointed by a gem object
++ *	would be released by drm_gem_handle_delete().
++ */
++int sdrm_gem_dumb_destroy(struct drm_file *file_priv,
++		struct drm_device *drm, unsigned int handle);
++
++/* allocate physical memory. */
++struct sdrm_buf_entry *sdrm_buf_create(struct drm_device *drm,
++		unsigned int size);
++
++/* remove allocated physical memory. */
++void sdrm_buf_destroy(struct drm_device *drm, struct sdrm_buf_entry *entry);
++
++#endif /* _SDRM_H_ */
+diff --git a/drivers/gpu/drm/sdrm/sdrm_fb.c b/drivers/gpu/drm/sdrm/sdrm_fb.c
+new file mode 100644
+index 0000000..7f9c69d
+--- /dev/null
++++ b/drivers/gpu/drm/sdrm/sdrm_fb.c
+@@ -0,0 +1,191 @@
++/*
++ * simple drm driver
++ *
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix
++ *
++ * Based on Samsung Exynos code
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/module.h>
++#include <drm/drmP.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/sdrm.h>
++
++#include "sdrm.h"
++
++#define to_sdrm_fb(x)	container_of(x, struct sdrm_fb, fb)
++
++/*
++ * sdrm specific framebuffer structure.
++ *
++ * @fb: drm framebuffer obejct.
++ * @sdrm_gem_obj: drm ec specific gem object containing a gem object.
++ * @entry: pointer to ec drm buffer entry object.
++ *	- containing only the information to physically continuous memory
++ *	region allocated at default framebuffer creation.
++ */
++struct sdrm_fb {
++	struct drm_framebuffer		fb;
++	struct sdrm_gem_obj	*sdrm_gem_obj;
++	struct sdrm_buf_entry	*entry;
++};
++
++static void sdrm_fb_destroy(struct drm_framebuffer *fb)
++{
++	struct sdrm_fb *sdrm_fb = to_sdrm_fb(fb);
++
++	drm_framebuffer_cleanup(fb);
++
++	/*
++	 * default framebuffer has no gem object so
++	 * a buffer of the default framebuffer should be released at here.
++	 */
++	if (!sdrm_fb->sdrm_gem_obj && sdrm_fb->entry)
++		sdrm_buf_destroy(fb->dev, sdrm_fb->entry);
++
++	kfree(sdrm_fb);
++}
++
++static int sdrm_fb_create_handle(struct drm_framebuffer *fb,
++		struct drm_file *file_priv, unsigned int *handle)
++{
++	struct sdrm_fb *sdrm_fb = to_sdrm_fb(fb);
++
++	return drm_gem_handle_create(file_priv,
++			&sdrm_fb->sdrm_gem_obj->base, handle);
++}
++
++static int sdrm_fb_dirty(struct drm_framebuffer *fb,
++		struct drm_file *file_priv, unsigned flags,
++		unsigned color, struct drm_clip_rect *clips,
++		unsigned num_clips)
++{
++	/* TODO */
++
++	return 0;
++}
++
++static struct drm_framebuffer_funcs sdrm_fb_funcs = {
++	.destroy	= sdrm_fb_destroy,
++	.create_handle	= sdrm_fb_create_handle,
++	.dirty		= sdrm_fb_dirty,
++};
++
++static struct drm_framebuffer *sdrm_fb_create(struct drm_device *dev,
++		struct drm_file *file_priv, struct drm_mode_fb_cmd2 *mode_cmd)
++{
++	struct sdrm_fb *sdrm_fb;
++	struct drm_framebuffer *fb;
++	struct drm_gem_object *obj;
++	unsigned int size;
++	int ret;
++	u32 bpp, depth;
++
++	drm_fb_get_bpp_depth(mode_cmd->pixel_format, &depth, &bpp);
++
++	mode_cmd->pitches[0] = max(mode_cmd->pitches[0],
++			mode_cmd->width * (bpp >> 3));
++
++	dev_dbg(dev->dev, "drm fb create(%dx%d)\n",
++			mode_cmd->width, mode_cmd->height);
++
++	sdrm_fb = kzalloc(sizeof(*sdrm_fb), GFP_KERNEL);
++	if (!sdrm_fb) {
++		dev_err(dev->dev, "failed to allocate drm framebuffer.\n");
++		return ERR_PTR(-ENOMEM);
++	}
++
++	fb = &sdrm_fb->fb;
++	ret = drm_framebuffer_init(dev, fb, &sdrm_fb_funcs);
++	if (ret) {
++		dev_err(dev->dev, "failed to initialize framebuffer.\n");
++		goto err_init;
++	}
++
++	dev_dbg(dev->dev, "create: fb id: %d\n", fb->base.id);
++
++	size = mode_cmd->pitches[0] * mode_cmd->height;
++
++	/*
++	 * without file_priv we are called from sdrm_fbdev_create in which
++	 * case we only create a framebuffer without a handle.
++	 */
++	if (!file_priv) {
++		struct sdrm_buf_entry *entry;
++
++		entry = sdrm_buf_create(dev, size);
++		if (IS_ERR(entry)) {
++			ret = PTR_ERR(entry);
++			goto err_buffer;
++		}
++
++		sdrm_fb->entry = entry;
++	} else {
++		obj = drm_gem_object_lookup(dev, file_priv, mode_cmd->handles[0]);
++		if (!obj) {
++			ret = -EINVAL;
++			goto err_buffer;
++		}
++
++		sdrm_fb->sdrm_gem_obj = to_sdrm_gem_obj(obj);
++
++		drm_gem_object_unreference_unlocked(obj);
++
++		sdrm_fb->entry = sdrm_fb->sdrm_gem_obj->entry;
++	}
++
++	drm_helper_mode_fill_fb_struct(fb, mode_cmd);
++
++	return fb;
++
++err_buffer:
++	drm_framebuffer_cleanup(fb);
++
++err_init:
++	kfree(sdrm_fb);
++
++	return ERR_PTR(ret);
++}
++
++struct sdrm_buf_entry *sdrm_fb_get_buf(struct drm_framebuffer *fb)
++{
++	struct sdrm_fb *sdrm_fb = to_sdrm_fb(fb);
++	struct sdrm_buf_entry *entry;
++
++	entry = sdrm_fb->entry;
++
++	return entry;
++}
++EXPORT_SYMBOL_GPL(sdrm_fb_get_buf);
++
++static struct drm_mode_config_funcs sdrm_mode_config_funcs = {
++	.fb_create = sdrm_fb_create,
++};
++
++void sdrm_mode_config_init(struct drm_device *dev)
++{
++	dev->mode_config.min_width = 0;
++	dev->mode_config.min_height = 0;
++
++	/*
++	 * set max width and height as default value(4096x4096).
++	 * this value would be used to check framebuffer size limitation
++	 * at drm_mode_addfb().
++	 */
++	dev->mode_config.max_width = 4096;
++	dev->mode_config.max_height = 4096;
++
++	dev->mode_config.funcs = &sdrm_mode_config_funcs;
++}
+diff --git a/drivers/gpu/drm/sdrm/sdrm_fbdev.c b/drivers/gpu/drm/sdrm/sdrm_fbdev.c
+new file mode 100644
+index 0000000..8f3e3e0
+--- /dev/null
++++ b/drivers/gpu/drm/sdrm/sdrm_fbdev.c
+@@ -0,0 +1,238 @@
++/*
++ * simple drm driver
++ *
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix
++ *
++ * Based on Samsung Exynos code
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/module.h>
++#include <drm/drmP.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_fb_helper.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/sdrm.h>
++
++#include "sdrm.h"
++
++#define MAX_CONNECTOR		4
++#define PREFERRED_BPP		16
++
++static struct fb_ops sdrm_fb_ops = {
++	.owner		= THIS_MODULE,
++	.fb_fillrect	= cfb_fillrect,
++	.fb_copyarea	= cfb_copyarea,
++	.fb_imageblit	= cfb_imageblit,
++	.fb_check_var	= drm_fb_helper_check_var,
++	.fb_set_par	= drm_fb_helper_set_par,
++	.fb_blank	= drm_fb_helper_blank,
++	.fb_pan_display	= drm_fb_helper_pan_display,
++	.fb_setcmap	= drm_fb_helper_setcmap,
++};
++
++static int sdrm_fbdev_update(struct drm_fb_helper *helper,
++				     struct drm_framebuffer *fb,
++				     unsigned int fb_width,
++				     unsigned int fb_height)
++{
++	struct fb_info *fbi = helper->fbdev;
++	struct drm_device *drm = helper->dev;
++	struct sdrm_buf_entry *entry;
++	unsigned int size = fb_width * fb_height * (fb->bits_per_pixel >> 3);
++	unsigned long offset;
++
++	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->depth);
++	drm_fb_helper_fill_var(fbi, helper, fb_width, fb_height);
++
++	entry = sdrm_fb_get_buf(fb);
++	if (!entry) {
++		dev_dbg(drm->dev, "entry is null.\n");
++		return -EFAULT;
++	}
++
++	offset = fbi->var.xoffset * (fb->bits_per_pixel >> 3);
++	offset += fbi->var.yoffset * fb->pitches[0];
++
++	drm->mode_config.fb_base = entry->paddr;
++	fbi->screen_base = entry->vaddr + offset;
++	fbi->fix.smem_start = entry->paddr + offset;
++	fbi->screen_size = size;
++	fbi->fix.smem_len = size;
++	fbi->flags |= FBINFO_CAN_FORCE_OUTPUT;
++
++	return 0;
++}
++
++static int sdrm_fbdev_create(struct drm_fb_helper *helper,
++				    struct drm_fb_helper_surface_size *sizes)
++{
++	struct drm_device *drm = helper->dev;
++	struct fb_info *fbi;
++	struct drm_framebuffer *fb;
++	struct drm_mode_fb_cmd2 mode_cmd = { 0 };
++	struct platform_device *pdev = drm->platformdev;
++	int ret;
++
++	dev_dbg(drm->dev, "surface width(%d), height(%d) and bpp(%d\n",
++			sizes->surface_width, sizes->surface_height,
++			sizes->surface_bpp);
++
++	mode_cmd.width = sizes->surface_width;
++	mode_cmd.height = sizes->surface_height;
++	mode_cmd.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
++			sizes->surface_depth);
++
++	mutex_lock(&drm->struct_mutex);
++
++	fbi = framebuffer_alloc(0, &pdev->dev);
++	if (!fbi) {
++		ret = -ENOMEM;
++		goto err_fb_alloc;
++	}
++
++	fb = drm->mode_config.funcs->fb_create(drm, NULL, &mode_cmd);
++	if (IS_ERR(fb)) {
++		dev_err(drm->dev, "failed to create drm framebuffer.\n");
++		ret = PTR_ERR(fb);
++		goto err_fb_create;
++	}
++
++	helper->fb = fb;
++	helper->fbdev = fbi;
++
++	fbi->par = helper;
++	fbi->flags = FBINFO_FLAG_DEFAULT;
++	fbi->fbops = &sdrm_fb_ops;
++
++	ret = fb_alloc_cmap(&fbi->cmap, 256, 0);
++	if (ret)
++		goto err_alloc_cmap;
++
++	ret = sdrm_fbdev_update(helper, helper->fb, sizes->fb_width,
++			sizes->fb_height);
++	if (ret)
++		goto err_fbdev_update;
++
++	mutex_unlock(&drm->struct_mutex);
++
++	return 0;
++
++err_fbdev_update:
++	fb_dealloc_cmap(&fbi->cmap);
++
++err_alloc_cmap:
++	fb->funcs->destroy(fb);
++
++err_fb_create:
++	framebuffer_release(fbi);
++
++err_fb_alloc:
++	mutex_unlock(&drm->struct_mutex);
++
++	return ret;
++}
++
++static int sdrm_fbdev_probe(struct drm_fb_helper *helper,
++				   struct drm_fb_helper_surface_size *sizes)
++{
++	int ret;
++
++	BUG_ON(helper->fb);
++
++	ret = sdrm_fbdev_create(helper, sizes);
++	if (ret) {
++		dev_err(helper->dev->dev, "creating fbdev failed with %d\n", ret);
++		return ret;
++	}
++
++	/*
++	 * fb_helper expects a value more than 1 if succeed
++	 * because register_framebuffer() should be called.
++	 */
++	return 1;
++}
++
++static struct drm_fb_helper_funcs sdrm_fb_helper_funcs = {
++	.fb_probe = sdrm_fbdev_probe,
++};
++
++struct drm_fb_helper *sdrm_fbdev_init(struct drm_device *drm, int preferred_bpp)
++{
++	struct drm_fb_helper *helper;
++	unsigned int num_crtc;
++	int ret;
++
++	helper = kzalloc(sizeof(*helper), GFP_KERNEL);
++	if (!helper)
++		return NULL;
++
++	helper->funcs = &sdrm_fb_helper_funcs;
++
++	num_crtc = drm->mode_config.num_crtc;
++
++	ret = drm_fb_helper_init(drm, helper, num_crtc, MAX_CONNECTOR);
++	if (ret) {
++		dev_err(drm->dev, "initializing drm fb helper failed with %d\n",
++				ret);
++		goto err_init;
++	}
++
++	ret = drm_fb_helper_single_add_all_connectors(helper);
++	if (ret) {
++		dev_err(drm->dev, "registering drm_fb_helper_connector failed with %d\n",
++				ret);
++		goto err_setup;
++
++	}
++
++	ret = drm_fb_helper_initial_config(helper, preferred_bpp);
++	if (ret) {
++		dev_err(drm->dev, "initial config failed with %d\n", ret);
++		goto err_setup;
++	}
++
++	return helper;
++
++err_setup:
++	drm_fb_helper_fini(helper);
++
++err_init:
++	kfree(helper);
++
++	return NULL;
++}
++
++void sdrm_fbdev_fini(struct drm_fb_helper *helper)
++{
++	/* release linux framebuffer */
++	if (helper->fbdev) {
++		struct fb_info *info;
++		int ret;
++
++		info = helper->fbdev;
++		ret = unregister_framebuffer(info);
++		if (ret)
++			dev_err(helper->dev->dev, "unregister_framebuffer failed with %d\n",
++					ret);
++
++		if (info->cmap.len)
++			fb_dealloc_cmap(&info->cmap);
++
++		framebuffer_release(info);
++	}
++
++	drm_fb_helper_fini(helper);
++
++	kfree(helper);
++}
+diff --git a/drivers/gpu/drm/sdrm/sdrm_gem.c b/drivers/gpu/drm/sdrm/sdrm_gem.c
+new file mode 100644
+index 0000000..4f98627
+--- /dev/null
++++ b/drivers/gpu/drm/sdrm/sdrm_gem.c
+@@ -0,0 +1,342 @@
++/*
++ * simple drm driver
++ *
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix
++ *
++ * Based on Samsung Exynos code
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <drm/drmP.h>
++#include <drm/drm.h>
++#include <drm/sdrm.h>
++
++#include "sdrm.h"
++
++static int lowlevel_buffer_allocate(struct drm_device *drm,
++		struct sdrm_buf_entry *entry)
++{
++	entry->vaddr = dma_alloc_writecombine(drm->dev, entry->size,
++			(dma_addr_t *)&entry->paddr, GFP_KERNEL);
++	if (!entry->vaddr) {
++		dev_err(drm->dev, "failed to allocate buffer.\n");
++		return -ENOMEM;
++	}
++
++	dev_dbg(drm->dev, "allocated : vaddr(0x%x), paddr(0x%x), size(0x%x)\n",
++			(unsigned int)entry->vaddr, entry->paddr, entry->size);
++
++	return 0;
++}
++
++static void lowlevel_buffer_free(struct drm_device *drm,
++		struct sdrm_buf_entry *entry)
++{
++	dma_free_writecombine(drm->dev, entry->size, entry->vaddr,
++			entry->paddr);
++}
++
++struct sdrm_buf_entry *sdrm_buf_create(struct drm_device *drm,
++		unsigned int size)
++{
++	struct sdrm_buf_entry *entry;
++
++	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
++	if (!entry)
++		return ERR_PTR(-ENOMEM);
++
++	entry->size = size;
++
++	/*
++	 * allocate memory region with size and set the memory information
++	 * to vaddr and paddr of a entry object.
++	 */
++	if (lowlevel_buffer_allocate(drm, entry) < 0) {
++		kfree(entry);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	return entry;
++}
++
++void sdrm_buf_destroy(struct drm_device *drm,
++		struct sdrm_buf_entry *entry)
++{
++	lowlevel_buffer_free(drm, entry);
++
++	kfree(entry);
++	entry = NULL;
++}
++
++static unsigned int convert_to_vm_err_msg(int msg)
++{
++	unsigned int out_msg;
++
++	switch (msg) {
++	case 0:
++	case -ERESTARTSYS:
++	case -EINTR:
++		out_msg = VM_FAULT_NOPAGE;
++		break;
++
++	case -ENOMEM:
++		out_msg = VM_FAULT_OOM;
++		break;
++
++	default:
++		out_msg = VM_FAULT_SIGBUS;
++		break;
++	}
++
++	return out_msg;
++}
++
++static unsigned int get_gem_mmap_offset(struct drm_gem_object *obj)
++{
++	return (unsigned int)obj->map_list.hash.key << PAGE_SHIFT;
++}
++
++static struct sdrm_gem_obj *sdrm_gem_create(struct drm_device *drm,
++		unsigned int size)
++{
++	struct sdrm_gem_obj *sdrm_gem_obj;
++	struct sdrm_buf_entry *entry;
++	struct drm_gem_object *obj;
++	int ret;
++
++	size = roundup(size, PAGE_SIZE);
++
++	sdrm_gem_obj = kzalloc(sizeof(*sdrm_gem_obj), GFP_KERNEL);
++	if (!sdrm_gem_obj)
++		return ERR_PTR(-ENOMEM);
++
++	/* allocate the new buffer object and memory region. */
++	entry = sdrm_buf_create(drm, size);
++	if (!entry) {
++		ret = -ENOMEM;
++		goto err_alloc;
++	}
++
++	sdrm_gem_obj->entry = entry;
++
++	obj = &sdrm_gem_obj->base;
++
++	ret = drm_gem_object_init(drm, obj, size);
++	if (ret) {
++		dev_err(drm->dev, "initializing GEM object failed with %d\n", ret);
++		goto err_obj_init;
++	}
++
++	ret = drm_gem_create_mmap_offset(obj);
++	if (ret) {
++		dev_err(drm->dev, "creating mmap offset failed with %d\n", ret);
++		goto err_create_mmap_offset;
++	}
++
++	return sdrm_gem_obj;
++
++err_create_mmap_offset:
++	drm_gem_object_release(obj);
++
++err_obj_init:
++	sdrm_buf_destroy(drm, sdrm_gem_obj->entry);
++
++err_alloc:
++	kfree(sdrm_gem_obj);
++
++	return ERR_PTR(ret);
++}
++
++static struct sdrm_gem_obj *sdrm_gem_create_with_handle(struct drm_file *file_priv,
++		struct drm_device *drm, unsigned int size,
++		unsigned int *handle)
++{
++	struct sdrm_gem_obj *sdrm_gem_obj;
++	struct drm_gem_object *obj;
++	int ret;
++
++	sdrm_gem_obj = sdrm_gem_create(drm, size);
++	if (IS_ERR(sdrm_gem_obj))
++		return sdrm_gem_obj;
++
++	obj = &sdrm_gem_obj->base;
++
++	/*
++	 * allocate a id of idr table where the obj is registered
++	 * and handle has the id what user can see.
++	 */
++	ret = drm_gem_handle_create(file_priv, obj, handle);
++	if (ret)
++		goto err_handle_create;
++
++	/* drop reference from allocate - handle holds it now. */
++	drm_gem_object_unreference_unlocked(obj);
++
++	return sdrm_gem_obj;
++
++err_handle_create:
++	sdrm_gem_free_object(obj);
++
++	return ERR_PTR(ret);
++}
++
++static int sdrm_gem_mmap_buffer(struct file *filp,
++		struct vm_area_struct *vma)
++{
++	struct drm_gem_object *obj = filp->private_data;
++	struct sdrm_gem_obj *sdrm_gem_obj = to_sdrm_gem_obj(obj);
++	struct sdrm_buf_entry *entry;
++	unsigned long pfn, vm_size;
++
++	vma->vm_flags |= VM_IO | VM_RESERVED;
++
++	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
++	vma->vm_file = filp;
++
++	vm_size = vma->vm_end - vma->vm_start;
++	/*
++	 * an entry contains information to physically continuous memory
++	 * allocated by user request or at framebuffer creation.
++	 */
++	entry = sdrm_gem_obj->entry;
++
++	/* check if user-requested size is valid. */
++	if (vm_size > entry->size)
++		return -EINVAL;
++
++	/*
++	 * get page frame number to physical memory to be mapped
++	 * to user space.
++	 */
++	pfn = sdrm_gem_obj->entry->paddr >> PAGE_SHIFT;
++
++	if (remap_pfn_range(vma, vma->vm_start, pfn, vm_size,
++				vma->vm_page_prot)) {
++		dev_err(obj->dev->dev, "failed to remap pfn range.\n");
++		return -EAGAIN;
++	}
++
++	return 0;
++}
++
++static const struct file_operations sdrm_gem_fops = {
++	.mmap = sdrm_gem_mmap_buffer,
++};
++
++int sdrm_gem_init_object(struct drm_gem_object *obj)
++{
++	return 0;
++}
++
++void sdrm_gem_free_object(struct drm_gem_object *gem_obj)
++{
++	struct sdrm_gem_obj *sdrm_gem_obj;
++
++	if (gem_obj->map_list.map)
++		drm_gem_free_mmap_offset(gem_obj);
++
++	drm_gem_object_release(gem_obj);
++
++	sdrm_gem_obj = to_sdrm_gem_obj(gem_obj);
++
++	sdrm_buf_destroy(gem_obj->dev, sdrm_gem_obj->entry);
++
++	kfree(sdrm_gem_obj);
++}
++
++int sdrm_gem_dumb_create(struct drm_file *file_priv,
++		struct drm_device *dev, struct drm_mode_create_dumb *args)
++{
++	struct sdrm_gem_obj *sdrm_gem_obj;
++
++	/* FIXME: This should be configured by the crtc driver */
++	args->pitch = args->width * args->bpp >> 3;
++	args->size = args->pitch * args->height;
++
++	sdrm_gem_obj = sdrm_gem_create_with_handle(file_priv, dev, args->size,
++			&args->handle);
++	if (IS_ERR(sdrm_gem_obj))
++		return PTR_ERR(sdrm_gem_obj);
++
++	return 0;
++}
++
++int sdrm_gem_dumb_map_offset(struct drm_file *file_priv,
++		struct drm_device *drm, uint32_t handle, uint64_t *offset)
++{
++	struct sdrm_gem_obj *sdrm_gem_obj;
++	struct drm_gem_object *obj;
++
++	mutex_lock(&drm->struct_mutex);
++
++	obj = drm_gem_object_lookup(drm, file_priv, handle);
++	if (!obj) {
++		dev_err(drm->dev, "failed to lookup gem object\n");
++		mutex_unlock(&drm->struct_mutex);
++		return -EINVAL;
++	}
++
++	sdrm_gem_obj = to_sdrm_gem_obj(obj);
++
++	*offset = get_gem_mmap_offset(&sdrm_gem_obj->base);
++
++	drm_gem_object_unreference(obj);
++
++	mutex_unlock(&drm->struct_mutex);
++
++	return 0;
++}
++
++int sdrm_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
++{
++	struct drm_gem_object *obj = vma->vm_private_data;
++	struct sdrm_gem_obj *sdrm_gem_obj = to_sdrm_gem_obj(obj);
++	struct drm_device *dev = obj->dev;
++	unsigned long pfn;
++	pgoff_t page_offset;
++	int ret;
++
++	page_offset = ((unsigned long)vmf->virtual_address -
++			vma->vm_start) >> PAGE_SHIFT;
++
++	mutex_lock(&dev->struct_mutex);
++
++	pfn = (sdrm_gem_obj->entry->paddr >> PAGE_SHIFT) + page_offset;
++
++	ret = vm_insert_mixed(vma, (unsigned long)vmf->virtual_address, pfn);
++
++	mutex_unlock(&dev->struct_mutex);
++
++	return convert_to_vm_err_msg(ret);
++}
++
++int sdrm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
++{
++	int ret;
++
++	ret = drm_gem_mmap(filp, vma);
++	if (ret)
++		return ret;
++
++	vma->vm_flags &= ~VM_PFNMAP;
++	vma->vm_flags |= VM_MIXEDMAP;
++
++	return ret;
++}
++
++
++int sdrm_gem_dumb_destroy(struct drm_file *file_priv,
++		struct drm_device *dev, unsigned int handle)
++{
++	return drm_gem_handle_delete(file_priv, handle);
++}
+diff --git a/include/drm/sdrm.h b/include/drm/sdrm.h
+new file mode 100644
+index 0000000..ad4f5f6
+--- /dev/null
++++ b/include/drm/sdrm.h
+@@ -0,0 +1,102 @@
++#ifndef __DRM_SDRM_H
++#define __DRM_SDRM_H
++
++#include <drm/drmP.h>
++#include <drm/drm_crtc_helper.h>
++
++/**
++ * User-desired buffer creation information structure.
++ *
++ * @size: requested size for the object.
++ *	- this size value would be page-aligned internally.
++ * @flags: user request for setting memory type or cache attributes.
++ * @handle: returned handle for the object.
++ */
++struct sdrm_gem_create {
++	unsigned int size;
++	unsigned int flags;
++	unsigned int handle;
++};
++
++/**
++ * A structure for getting buffer offset.
++ *
++ * @handle: a pointer to gem object created.
++ * @pad: just padding to be 64-bit aligned.
++ * @offset: relatived offset value of the memory region allocated.
++ *	- this value should be set by user.
++ */
++struct sdrm_gem_map_off {
++	unsigned int handle;
++	unsigned int pad;
++	uint64_t offset;
++};
++
++/**
++ * A structure for mapping buffer.
++ *
++ * @handle: a handle to gem object created.
++ * @size: memory size to be mapped.
++ * @mapped: having user virtual address mmaped.
++ *	- this variable would be filled by exynos gem module
++ *	of kernel side with user virtual address which is allocated
++ *	by do_mmap().
++ */
++struct sdrm_gem_mmap {
++	unsigned int handle;
++	unsigned int size;
++	uint64_t mapped;
++};
++
++struct sdrm_device;
++struct sdrm_crtc;
++
++struct sdrm_crtc_helper_funcs {
++	int (*enable_vblank)(struct drm_crtc *crtc);
++	void (*disable_vblank)(struct drm_crtc *crtc);
++};
++
++struct sdrm_crtc *sdrm_add_crtc(const char *name, struct drm_crtc *crtc,
++		const struct drm_crtc_funcs *crtc_funcs,
++		const struct drm_crtc_helper_funcs *crtc_helper_funcs,
++		const struct sdrm_crtc_helper_funcs *ec_helper_funcs);
++int sdrm_remove_crtc(struct sdrm_crtc *);
++int sdrm_init_drm(const char *name, struct platform_device *pdev,
++		int preferred_bpp);
++int sdrm_exit_drm(const char *name);
++
++int sdrm_crtc_vblank_get(struct sdrm_crtc *sdrm_crtc);
++void sdrm_crtc_vblank_put(struct sdrm_crtc *sdrm_crtc);
++void sdrm_handle_vblank(struct sdrm_crtc *sdrm_crtc);
++
++/*
++ * sdrm drm buffer entry structure.
++ *
++ * @paddr: physical address of allocated memory.
++ * @vaddr: kernel virtual address of allocated memory.
++ * @size: size of allocated memory.
++ */
++struct sdrm_buf_entry {
++	dma_addr_t paddr;
++	void __iomem *vaddr;
++	unsigned int size;
++
++	dma_addr_t r_paddr;
++	void __iomem *r_vaddr;
++	unsigned int r_size;
++};
++
++/* get physical memory information of a drm framebuffer. */
++struct sdrm_buf_entry *sdrm_fb_get_buf(struct drm_framebuffer *fb);
++
++struct sdrm_encoder;
++struct sdrm_encoder *sdrm_add_encoder(const char *drmname,
++		struct drm_encoder *encoder, struct module *owner);
++int sdrm_remove_encoder(struct sdrm_encoder *);
++
++struct sdrm_connector;
++struct sdrm_connector *sdrm_add_connector(const char *drmname,
++		struct drm_connector *connector, struct module *owner);
++int sdrm_remove_connector(struct sdrm_connector *);
++
++#endif /* __DRM_SDRM_H */
 -- 
 1.7.9.5
