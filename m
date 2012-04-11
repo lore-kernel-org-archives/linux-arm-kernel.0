@@ -1,25 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Apr 2012 10:35:34 +0200
-Subject: [PATCH] pinctrl: implement pinctrl deferred probing
-In-Reply-To: <4F84537A.2020300@wwwdotorg.org>
-References: <1334045048-15566-1-git-send-email-linus.walleij@stericsson.com>
- <4F84537A.2020300@wwwdotorg.org>
-Message-ID: <CACRpkdYc3fbwX6oPKm8JAZLG-51vDXhihGqk=HAoS9Xz+BnF=A@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 11 Apr 2012 10:39:56 +0200
+Subject: [PATCH v3 4/4] ARM: omap: pass minimal SoC/board data for UART
+ from dt
+In-Reply-To: <CAB-zwWjSSsR0XMrntkEmHDtgJ_zDxgJh6KX=TsSKggd9mCgsVQ@mail.gmail.com>
+References: <1323863746-18145-1-git-send-email-rnayak@ti.com>
+ <1323863746-18145-5-git-send-email-rnayak@ti.com>
+ <CAB-zwWjSSsR0XMrntkEmHDtgJ_zDxgJh6KX=TsSKggd9mCgsVQ@mail.gmail.com>
+Message-ID: <4F85435C.1060305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 5:36 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+Hi Omar,
 
->> @@ -521,8 +521,11 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
->> ? ? ? ? ? ? ? dev_err(p->dev, "unknown pinctrl device %s in map entry",
->> ? ? ? ? ? ? ? ? ? ? ? map->ctrl_dev_name);
+On 4/11/2012 2:16 AM, Ramirez Luna, Omar wrote:
+> Hi,
 >
-> Perhaps this dev_err (and the one in the other hunk) should be
-> downgraded to warn/info/debug?
+> On Wed, Dec 14, 2011 at 5:55 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
+>> Pass minimal data needed for console boot, from dt, for
+>> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
+>> static initialization from generic board file.
+> ...
+>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>> index 63b5416..a508ed5 100644
+>> --- a/arch/arm/mach-omap2/board-generic.c
+>> +++ b/arch/arm/mach-omap2/board-generic.c
+>> @@ -69,7 +69,6 @@ static void __init omap_generic_init(void)
+>>         if (node)
+>>                 irq_domain_add_simple(node, 0);
+>>
+>> -       omap_serial_init();
+>>         omap_sdrc_init(NULL, NULL);
+>>
+>>         of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+>> --
+>> 1.7.1
+>
+> I'm fairly new to DT and I'm trying to boot it with pandaboard and
+> k3.3, however above hunk deletes omap serial initialization, which
+> causes a panic on boot, because pdata is NULL:
+>
+> static void serial_omap_start_tx(struct uart_port *port)
+> {
+> ...
+>                  if (pdata->set_noidle)
+>
+> Perhaps because this change skips the following path:
+>
+> omap_serial_init->omap_serial_board_init->omap_serial_init_port
+>
+> Where pdata is built in omap_device_build.
+>
+> I'm just trying to confirm that I'm not alone or doing some silly
+> thing before getting in depth with the code.
 
-I've downgraded to dev_info() for now (see v2), I suspect people may have some
-problems with deferred probing ATM so better log something for them. Later we
-may set it to dev_dbg() if it looks too noisy...
+Yes, it is a known issue and the fix was unfortunately was not merged 
+during -rc phases but is fixed in 3.4 and should be fixed in 3.3 stable 
+branch as well. I received the notification from Greg KH 2 weeks ago 
+about the stable: Patch "tty: serial: OMAP: Fix oops due to NULL pdata 
+in DT boot" has been added to the 3.3-stable tree
 
-Thanks,
-Linus Walleij
+You should just switch to 3.4-rc2 or get the patch if you are stuck to 3.3.
+
+Regards,
+Benoit
