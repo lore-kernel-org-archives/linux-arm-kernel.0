@@ -1,51 +1,70 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:42:54 +0530
-Subject: [PATCHv7 16/18] I2C: OMAP: fix missing handling of errata
- I2C_OMAP3_1P153
+Date: Wed, 11 Apr 2012 16:42:51 +0530
+Subject: [PATCHv7 13/18] I2C: OMAP: Handle error check for pm runtime
 In-Reply-To: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334142776-10583-17-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334142776-10583-14-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tasslehoff Kjappfot <tasskjapp@gmail.com>
+If PM runtime get_sync fails return with the error
+so that no further reads/writes goes through the interface.
+This will avoid possible abort. Add a error message in case
+of failure with the cause of the failure.
 
-i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
-Move the errata handling to i2c_probe.
-
-Signed-off-by: Tasslehoff Kjappfot <tasskjapp@gmail.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   19 ++++++++++++++++---
+ 1 files changed, 16 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index dd78ba1..f28bd5d 100644
+index 8258597..dd65416 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -431,11 +431,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 	/* Take the I2C module out of reset: */
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+@@ -616,7 +616,11 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 	int i;
+ 	int r;
  
--	dev->errata = 0;
--
--	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
--		dev->errata |= I2C_OMAP_ERRATA_I207;
--
- 	/* Enable interrupts */
- 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
- 			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
-@@ -1060,6 +1055,11 @@ omap_i2c_probe(struct platform_device *pdev)
+-	pm_runtime_get_sync(dev->dev);
++	r = pm_runtime_get_sync(dev->dev);
++	if (r < 0) {
++		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", r);
++		return r;
++	}
+ 
+ 	r = omap_i2c_wait_for_bb(dev);
+ 	if (r < 0)
+@@ -1044,7 +1048,11 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
+-	pm_runtime_get_sync(dev->dev);
++	r = pm_runtime_get_sync(dev->dev);
++	if (r < 0) {
++		dev_err(dev->dev, "pm_runtime_get_sync failed:%d\n", r);
++		return r;
++	}
  
  	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
  
-+	dev->errata = 0;
-+
-+	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
-+		dev->errata |= I2C_OMAP_ERRATA_I207;
-+
- 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
- 		dev->errata |= I2C_OMAP3_1P153;
+@@ -1129,12 +1137,17 @@ err_unuse_clocks:
+ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
++	int ret;
  
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
+-	pm_runtime_get_sync(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", ret);
++		return ret;
++	}
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
 -- 
 1.7.4.1
