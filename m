@@ -1,116 +1,101 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 11 Apr 2012 05:11:56 +0000
-Subject: [PATCH v3 1/9] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <4F8488A2.7030602@ti.com>
-References: <cover.1333640054.git.afzal@ti.com>
- <cefbe934da40f0a169b1e3a75c46451e5546a8bd.1333640054.git.afzal@ti.com>
- <4F7DFED5.4030000@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317C5E58@DBDE01.ent.ti.com>
- <4F833D8D.8000802@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317C693C@DBDE01.ent.ti.com>
- <4F8488A2.7030602@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A9317C6F4B@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Apr 2012 13:32:14 +0800
+Subject: [PATCH] dma: mxs-dma: enable channel in device_issue_pending call
+Message-ID: <1334122334-27930-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Enable channel in device_issue_pending call, so that the order between
+cookie assignment and channel enabling can be ensured naturally.
 
-On Wed, Apr 11, 2012 at 00:53:14, Hunter, Jon wrote:
-> I agree with your argument but I was thinking today only OMAP uses the 
-> GPMC so we could not worry about this. Ok, leave as-is, but can we 
-> modify the code as follows as the "else if" is not really needed...
-> 
-> if (gpmc->num_irq < GPMC_NR_IRQ) {
-> 	dev_warn(gpmc->dev, "Insufficient interrupts for device\n");
-> 	return -EINVAL;
-> }
-> 
-> gpmc->num_irq = GPMC_NR_IRQ;
+It fixes the mxs gpmi-nand breakage which is caused by the incorrect
+order of cookie assigning and channel enabling.
 
-Yes, it is better
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+[resend to cc LAKML, sorry]
 
-> 
-> >>
-> >> Furthermore, GPMC_NR_IRQ is defined as 6 which is correct for OMAP2/3
-> >> but not for OMAP4/5, it is 5. Therefore, we need to detect whether we
-> >> are using an OMAP2/3 or OMAP4+ and set num_irqs based upon this. This
-> >> could be done in the probe and we can avoid passing this.
-> >
-> > Is it dependent on OMAPX or GPMC IP version? if it is IP version, then driver
-> > can be enhanced to handle it, if not, platform has to pass this information.
-> 
-> Here are the GPMC IP revisions ...
-> 
-> OMAP5430 = 0x00000060
-> OMAP4430 = 0x00000060
-> OMAP3630 = 0x00000050
-> OMAP3430 = 0x00000050
-> 
-> So this should work for OMAP. We should check OMAP2 as well. What about 
-> the AMxxx devices?
+Shijie,
 
+I tested the patch with mmc and sound driver.  Can you give it a test
+with gpmi-nand to see if it fixes the problem for you?
 
-I badly needed this information, thanks.
+Thanks,
+Shawn
 
-AM3359 = 0x00000060, it has only 2 waitpin interrupts
+ drivers/dma/mxs-dma.c                  |   10 +++-------
+ drivers/mmc/host/mxs-mmc.c             |    3 +++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    1 +
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-> >>>>> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> >>>>> +	if (res == NULL)
-> >>>>> +		dev_warn(gpmc->dev, "Failed to get resource: irq\n");
-> >>>>> +	else
-> >>>>> +		gpmc->master_irq = res->start;
-> >>>>
-> >>>> Why not return an error if the IRQ is not found? We don't know if anyone
-> >>>> will be trying to use them.
-> >>>
-> >>> Why do you want to do that ?
-> >>
-> >> Because this indicates a BUG :-)
-> >
-> > I disagree, this need not be considered a bug always,
-> > for eg. If gpmc irq is not connected to intc
-> 
-> Ok, so for devices existing today this indicates a bug ;-)
-
-I do not want to consider that case to be bug enough for probe
-to fail, there are other drivers which does similar enhancing
-its use cases,
-
-eg. 1e351a9 mfd: Make TPS65910 usable without interrupts
-
-> 
-> At a minimum you need to improve the error handing here. If the 
-> platform_get_resource fails you are still calling "gpmc_setup_irq()" 
-> which appears to be pointless. It would be better if the gpmc irq chip 
-> is not initialised in this case so that drivers attempting to request 
-> these irqs failed.
-
-Please see gpmc_setup_irq, if irq is not present, it returns in the
-beginning, and gpmc_irq_chip is not initialized in that case.
-
-> >>>>> +	for (gdq = gp->device_pdata, gd = gpmc->device; *gdq; gdq++, i++) {
-> >>>>> +		ret = gpmc_setup_device(*gdq, gd, gpmc);
-> >>>>> +		if (IS_ERR_VALUE(ret))
-> >>>>> +			dev_err(gpmc->dev, "gpmc setup on %s failed\n",
-> >>>>> +								(*gdq)->name);
-> >>>>> +		else
-> >>>>> +			gd++;
-> >>>>> +	}
-> >>>>
-> >>>> Would a while loop be simpler?
-> >>>
-> >>> My preference is to go with "for"
-> >>
-> >> Ok, just wondering if this could be cleaned up a little.
-> >
-> > For travelling through array of pointers, for looks natural to me, if you
-> > have a better way, please send it, it can be folded in next version.
-> 
-> Could you have num_devices to indicate how many platform devices there 
-> are and then a simple for-loop of 0 to num_devices?
-
-This will cause coding to be done by platform to be less simple, and my
-preference is not to use another variable
-
-Regards
-Afzal
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index c81ef7e..655d4ce 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -201,10 +201,6 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+ 
+ static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+ {
+-	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
+-
+-	mxs_dma_enable_chan(mxs_chan);
+-
+ 	return dma_cookie_assign(tx);
+ }
+ 
+@@ -558,9 +554,9 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
+ 
+ static void mxs_dma_issue_pending(struct dma_chan *chan)
+ {
+-	/*
+-	 * Nothing to do. We only have a single descriptor.
+-	 */
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
++
++	mxs_dma_enable_chan(mxs_chan);
+ }
+ 
+ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index b0f2ef9..e3f5af9 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -363,6 +363,7 @@ static void mxs_mmc_bc(struct mxs_mmc_host *host)
+ 		goto out;
+ 
+ 	dmaengine_submit(desc);
++	dma_async_issue_pending(host->dmach);
+ 	return;
+ 
+ out:
+@@ -403,6 +404,7 @@ static void mxs_mmc_ac(struct mxs_mmc_host *host)
+ 		goto out;
+ 
+ 	dmaengine_submit(desc);
++	dma_async_issue_pending(host->dmach);
+ 	return;
+ 
+ out:
+@@ -531,6 +533,7 @@ static void mxs_mmc_adtc(struct mxs_mmc_host *host)
+ 		goto out;
+ 
+ 	dmaengine_submit(desc);
++	dma_async_issue_pending(host->dmach);
+ 	return;
+ out:
+ 	dev_warn(mmc_dev(host->mmc),
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 75b1dde..9ec51ce 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -266,6 +266,7 @@ int start_dma_without_bch_irq(struct gpmi_nand_data *this,
+ 	desc->callback		= dma_irq_callback;
+ 	desc->callback_param	= this;
+ 	dmaengine_submit(desc);
++	dma_async_issue_pending(get_dma_chan(this));
+ 
+ 	/* Wait for the interrupt from the DMA block. */
+ 	err = wait_for_completion_timeout(dma_c, msecs_to_jiffies(1000));
+-- 
+1.7.4.1
