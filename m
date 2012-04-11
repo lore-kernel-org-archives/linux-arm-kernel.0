@@ -1,167 +1,142 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 11 Apr 2012 13:14:36 -0700
-Subject: [PATCH 1/2] OMAP2+: UART: Fix incorrect population of default
- uart pads
-In-Reply-To: <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
-References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
- <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
-Message-ID: <CA+Bv8XbtC4O4zjA=Ct0EwsNvLc6MyO3-NfSs+EcwvvBrf=YP=w@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 11 Apr 2012 14:15:43 -0600 (MDT)
+Subject: [PATCH v2 5/8] ARM: OMAP2+: hwmod: ensure that SYSCONFIG bits
+ are reprogrammed after a reset
+In-Reply-To: <CAB-zwWh3tcz5xUkzthH_AAsmeXfMieUW-SCQnAaXyfSg8khqvg@mail.gmail.com>
+References: <20120228053524.16278.59430.stgit@dusk>
+ <20120228053657.16278.76132.stgit@dusk>
+ <CAB-zwWhAa3PprwDLzWLkBFUHPeJO3HN3M9mAZF=ohGTvP43jYA@mail.gmail.com>
+ <alpine.DEB.2.00.1203150024260.7269@utopia.booyaka.com>
+ <CAB-zwWh3tcz5xUkzthH_AAsmeXfMieUW-SCQnAaXyfSg8khqvg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1204111401480.29473@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 6:40 AM, Govindraj.R <govindraj.raja@ti.com> wrote:
-> From: "Govindraj.R" <govindraj.raja@ti.com>
->
-> The following commit:
-> (7496ba3 ?ARM: OMAP2+: UART: Add default mux for all uarts)
-> added default pads for all uarts. But not all boards tend to
-> use all uarts and most of unused uart pins are muxed for
-> other purpose. This commit breaks the modules which where trying
-> to use unused uart pins on their boards.
->
-> So remove the default pads adding.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Russ Dill <russ.dill@gmail.com>
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+On Thu, 15 Mar 2012, Ramirez Luna, Omar wrote:
 
-Signed-off-by: Russ.Dill at ti.com
+> On Thu, Mar 15, 2012 at 1:25 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Wed, 14 Mar 2012, Ramirez Luna, Omar wrote:
+> >
+> >> If we reached here the reset lines will be asserted, and then the code
+> >> below touches sysc registers on a module under reset.
+> >
+> > Do you know of any case where this would be a problem? ?Seems like it
+> > would only affect IP blocks that have both hard reset lines and SYSCONFIG
+> > registers, and as far as I know, we don't have any of those defined?
+> 
+> MMU (not yet mainlined) has both, a reset line and a sysconfig.
 
-> ---
-> ?arch/arm/mach-omap2/serial.c | ?116 ------------------------------------------
-> ?1 files changed, 0 insertions(+), 116 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index c9503a7..1554233 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -120,124 +120,8 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
-> ?#endif /* CONFIG_PM */
->
-> ?#ifdef CONFIG_OMAP_MUX
-> -static struct omap_device_pad default_uart1_pads[] __initdata = {
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart1_cts.uart1_cts",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart1_rts.uart1_rts",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart1_tx.uart1_tx",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart1_rx.uart1_rx",
-> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> - ? ? ? },
-> -};
-> -
-> -static struct omap_device_pad default_uart2_pads[] __initdata = {
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart2_cts.uart2_cts",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart2_rts.uart2_rts",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart2_tx.uart2_tx",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart2_rx.uart2_rx",
-> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> - ? ? ? },
-> -};
-> -
-> -static struct omap_device_pad default_uart3_pads[] __initdata = {
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart3_cts_rctx.uart3_cts_rctx",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart3_rts_sd.uart3_rts_sd",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart3_tx_irtx.uart3_tx_irtx",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart3_rx_irrx.uart3_rx_irrx",
-> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> -};
-> -
-> -static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "gpmc_wait2.uart4_tx",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "gpmc_wait3.uart4_rx",
-> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE2,
-> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE2,
-> - ? ? ? },
-> -};
-> -
-> -static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart4_tx.uart4_tx",
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .name ? = "uart4_rx.uart4_rx",
-> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> - ? ? ? },
-> -};
-> -
-> ?static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
-> ?{
-> - ? ? ? switch (bdata->id) {
-> - ? ? ? case 0:
-> - ? ? ? ? ? ? ? bdata->pads = default_uart1_pads;
-> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
-> - ? ? ? ? ? ? ? break;
-> - ? ? ? case 1:
-> - ? ? ? ? ? ? ? bdata->pads = default_uart2_pads;
-> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
-> - ? ? ? ? ? ? ? break;
-> - ? ? ? case 2:
-> - ? ? ? ? ? ? ? bdata->pads = default_uart3_pads;
-> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
-> - ? ? ? ? ? ? ? break;
-> - ? ? ? case 3:
-> - ? ? ? ? ? ? ? if (cpu_is_omap44xx()) {
-> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap4_uart4_pads;
-> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt =
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(default_omap4_uart4_pads);
-> - ? ? ? ? ? ? ? } else if (cpu_is_omap3630()) {
-> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap36xx_uart4_pads;
-> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt =
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(default_omap36xx_uart4_pads);
-> - ? ? ? ? ? ? ? }
-> - ? ? ? ? ? ? ? break;
-> - ? ? ? default:
-> - ? ? ? ? ? ? ? break;
-> - ? ? ? }
-> ?}
-> ?#else
-> ?static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
-> --
-> 1.7.9
->
+Thanks, I've updated this patch with this fix, included below; rebased 
+the series on v3.4-rc2 (the branch is now "hwmod_code_cleanup_3.5"); and 
+will ask Tony to re-pull it.
+
+> I have been holding the hwmod for some time, but now that
+> rpmsg/remoteproc is going to mainline it could make use of it along
+> with omap3isp, however now I need to define functions to handle the
+> reset lines (although I was fine with hwmod handling it).
+
+OK.
+
+> AFAIKnew, hwmod handling the reset line was fine (IMHO), the only 2 things were:
+> - For the drivers to somehow make use of shutdown/enable if they
+> needed they hwmod under reset and out.
+> - The annoying: hwmod XX failed to hardreset because of the wrong
+> reset sequence but causing no functional issues.
+
+Thanks for the feedback.  Apparently the OMAP4 DSP/ISS people had some 
+issues with the old sequence, although I haven't heard anything from them 
+directly, so it's unclear what exactly is going on with their code.
+ 
+Anyway, please don't hesitate to let us know if you find any other issues 
+with the updated behavior.
+
+
+- Paul
+
+From: Paul Walmsley <paul@pwsan.com>
+Date: Mon, 27 Feb 2012 15:23:56 -0700
+Subject: [PATCH] ARM: OMAP2+: hwmod: update OCP_SYSCONFIG registers after a
+ custom reset
+
+Since OCP_SYSCONFIG bits are cleared during reset, they should be
+reprogrammed unless the IP block is being left in reset.  (The only IP
+blocks that are left in reset are IP blocks with hardreset lines and
+no custom reset function.)  If the IP block is left in reset, then it
+is inaccessible to the MPU, and an access to the OCP_SYSCONFIG
+register will cause an abort.
+
+This version incorporates comments from Omar Ramirez Luna
+<omar.ramirez@ti.com> to skip the OCP_SYSCONFIG access after asserting
+hardreset lines.  This allows the MMU (IOMMU) IP block, which has
+both hardreset lines and an OCP_SYSCONFIG register.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   39 ++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index fed805c..451e865 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1480,10 +1480,10 @@ dis_opt_clks:
+  * IVA) have idiosyncratic reset sequences.  So for these relatively
+  * rare cases, custom reset code can be supplied in the struct
+  * omap_hwmod_class .reset function pointer.  Passes along the return
+- * value from either _reset() or the custom reset function - these
+- * must return -EINVAL if the hwmod cannot be reset this way or if the
+- * hwmod is in the wrong state, -ETIMEDOUT if the module did not reset
+- * in time, or 0 upon success.
++ * value from either _ocp_softreset() or the custom reset function -
++ * these must return -EINVAL if the hwmod cannot be reset this way or
++ * if the hwmod is in the wrong state, -ETIMEDOUT if the module did
++ * not reset in time, or 0 upon success.
+  */
+ static int _reset(struct omap_hwmod *oh)
+ {
+@@ -1491,22 +1491,29 @@ static int _reset(struct omap_hwmod *oh)
+ 
+ 	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
+ 
+-	if (oh->class->reset)
+-		return oh->class->reset(oh);
+-
+-	if (!oh->rst_lines_cnt) {
+-		r = _ocp_softreset(oh);
+-		if (oh->class->sysc) {
+-			_update_sysc_cache(oh);
+-			_enable_sysc(oh);
++	if (oh->class->reset) {
++		r = oh->class->reset(oh);
++	} else {
++		if (oh->rst_lines_cnt > 0) {
++			for (i = 0; i < oh->rst_lines_cnt; i++)
++				_assert_hardreset(oh, oh->rst_lines[i].name);
++			return 0;
++		} else {
++			r = _ocp_softreset(oh);
+ 		}
+-		return r;
+ 	}
+ 
+-	for (i = 0; i < oh->rst_lines_cnt; i++)
+-		_assert_hardreset(oh, oh->rst_lines[i].name);
++	/*
++	 * OCP_SYSCONFIG bits need to be reprogrammed after a
++	 * softreset.  The _enable() function should be split to avoid
++	 * the rewrite of the OCP_SYSCONFIG register.
++	 */
++	if (oh->class->sysc) {
++		_update_sysc_cache(oh);
++		_enable_sysc(oh);
++	}
+ 
+-	return 0;
++	return r;
+ }
+ 
+ /**
+-- 
+1.7.9.5
