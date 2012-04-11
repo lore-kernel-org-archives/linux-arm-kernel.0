@@ -1,57 +1,52 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 11 Apr 2012 12:05:36 -0700
-Subject: [PATCH 01/12] arm: omap3: Only access IVA if one exists
+Date: Wed, 11 Apr 2012 12:05:39 -0700
+Subject: [PATCH 04/12] arm: omap3: am35x: Don't mark missing features as
+ present
 In-Reply-To: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
 References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1334171147-7517-2-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1334171147-7517-5-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-prcm_setup_regs() blindly accesses IVA bits
-in the PRM and calls omap3_iva_idle() which
-does more IVA related register accesses.
-Only do this if the IVA hardware actually
-exists.
+The Chip Identification register on the am35x family of SoCs
+has bits 12, 7:5, and 3:2 marked as reserved and are read as
+zeroes.  Unfortunately, on other omap SoCs, a 0 bit means a
+feature is "Full Use" so the OMAP3_CHECK_FEATURE() macro
+called by omap3_check_features() will incorrectly interpret
+those zeroes to mean that a feature is present even though it
+isn't.  To fix that, the feature bits that are incorrectly
+set (namely, OMAP3_HAS_IVA and OMAP3_HAS_ISP) need to be
+cleared after all of the calls to OMAP3_CHECK_FEATURE() in
+omap3_check_features() are made.
 
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- arch/arm/mach-omap2/pm34xx.c |   15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/id.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 703bd10..ec92676 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -583,10 +583,13 @@ static void __init prcm_setup_regs(void)
- 			  OMAP3430_PER_MOD, OMAP3430_PM_MPUGRPSEL);
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 0e79b7b..9736049 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -248,6 +248,17 @@ void __init omap3xxx_check_features(void)
+ 	omap_features |= OMAP3_HAS_SDRC;
  
- 	/* Don't attach IVA interrupts */
--	omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
--	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
--	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
--	omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD, OMAP3430_PM_IVAGRPSEL);
-+	if (omap3_has_iva()) {
-+		omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
-+		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
-+		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
-+		omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD,
-+					OMAP3430_PM_IVAGRPSEL);
-+	}
- 
- 	/* Clear any pending 'reset' flags */
- 	omap2_prm_write_mod_reg(0xffffffff, MPU_MOD, OMAP2_RM_RSTST);
-@@ -600,7 +603,9 @@ static void __init prcm_setup_regs(void)
- 	/* Clear any pending PRCM interrupts */
- 	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
- 
--	omap3_iva_idle();
-+	if (omap3_has_iva())
-+		omap3_iva_idle();
+ 	/*
++	 * am35x fixups:
++	 * - The am35x Chip ID register has bits 12, 7:5, and 3:2 marked as
++	 *   reserved and therefore return 0 when read.  Unfortunately,
++	 *   OMAP3_CHECK_FEATURE() will interpret some of those zeroes to
++	 *   mean that a feature is present even though it isn't so clear
++	 *   the incorrectly set feature bits.
++	 */
++	if (cpu_is_omap3505() || cpu_is_omap3517())
++		omap_features &= ~(OMAP3_HAS_IVA | OMAP3_HAS_ISP);
 +
- 	omap3_d2d_idle();
- }
- 
++	/*
+ 	 * TODO: Get additional info (where applicable)
+ 	 *       e.g. Size of L2 cache.
+ 	 */
 -- 
 1.7.9.4
