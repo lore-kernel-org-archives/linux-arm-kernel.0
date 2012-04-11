@@ -1,49 +1,39 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 11 Apr 2012 16:11:39 -0700
-Subject: [PATCH 05/12] arm: omap3: am35x: Add PWROFF feature
-In-Reply-To: <87iph5q43n.fsf@ti.com>
+Date: Wed, 11 Apr 2012 16:22:20 -0700
+Subject: [PATCH 10/12] arm: omap3: am35x: Add minimal EMIF4 support
+In-Reply-To: <alpine.DEB.2.00.1204111529120.29473@utopia.booyaka.com>
 References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-6-git-send-email-mgreer@animalcreek.com>
- <87iph5q43n.fsf@ti.com>
-Message-ID: <20120411231139.GH31197@animalcreek.com>
+ <1334171147-7517-11-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111529120.29473@utopia.booyaka.com>
+Message-ID: <20120411232220.GI31197@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 03:46:20PM -0700, Kevin Hilman wrote:
-> Hi Mark,
+On Wed, Apr 11, 2012 at 03:31:25PM -0600, Paul Walmsley wrote:
+> cc Aneesh
 > 
-> "Mark A. Greer" <mgreer@animalcreek.com> writes:
+> On Wed, 11 Apr 2012, Mark A. Greer wrote:
 > 
 > > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> >
-> > Typical OMAP3 SoCs have four power domain states: ON,
-> > INACTIVE, RETENTION, and OFF.  The am35x family of SoCs
-> > has only two states: ON and INACTIVE.  To distinguish which
-> > set of states the current device has, add the 'OMAP3_HAS_PWROFF'
-> > feature.  When that feature/bit is set, the device supports the
-> > RETENTION and OFF states; otherwise, it doesn't.
-> >
-> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> > 
+> > The typical SDRAM Controller Subsystem module (SDRC)
+> > on TI OMAP3 devices has two submodules: the SDRAM Memory
+> > Scheduler (SMS) submodule, and the SDRC submodule--the
+> > 'SDRC' acronym/term is overloaded.  The am35x family of
+> > devices is different in that it has an EMIF4 submodule
+> > instead of an SDRC submodule.  The SMS submodules are
+> > similar, though.
 > 
-> Paul has mentioned this already, but the same applies here: We shouldn't
-> be using SoC-global feature flag for this.   We already have per-pwrdm
-> flags that indicate what states a given powerdomain suports (see .pwrsts
-> field.)
+> The best thing to do is to add an EMIF driver stub that is initialized 
+> based on hwmod data, rather than hacking this into the existing SDRC.
 > 
-> Wherever we have blind writes to next powerstates that assume support
-> for RET/OFF is present, those should probably use a helper function from
-> the powerdomain code that checks if that state is even supported.
+> I don't know what the current state of the EMIF driver is.  Aneesh, 
+> do you know what the current status is?
+> 
+> If it's not going upstream for some reason, then I'd suggest adding 
+> arch/arm/mach-omap2/emif.c for now.
 
-Okay, thanks Kevin.
-
-> Jean's work on functional powerstates will probably help here if you
-> really need to support INACTIVE.  However, Paul may be right in that you
-> might just start with supporing ON only, and validate that module-level
-> wakups acutally work.
-
-Yeah, I'm going to do that as soon as I catch up the emails.  I thinking
-more & more that Paul is right and that we should just scrap the INACTIVE
-state and leave everything ON.
+Okay, thanks Paul.
 
 Mark
 --
