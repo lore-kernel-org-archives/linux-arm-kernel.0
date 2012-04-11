@@ -1,61 +1,94 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Apr 2012 00:44:09 +0200
-Subject: [PATCH 3/3] plat-versatile: internalize FPGA IRQ data
-Message-ID: <1334184249-18932-1-git-send-email-linus.walleij@linaro.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 11 Apr 2012 15:44:42 -0700
+Subject: [PATCH v3] arm: ep93xx: use gpio_led_register_device
+Message-ID: <201204111544.43177.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the FPGA IRQ data container into the implementation
-and out of the public interface, it is only used internally now.
+Use gpio_led_register_device to register the two leds
+connected to the ep93xx.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Since this is a common feature for all ep93xx based boards,
+create a new Kconfig option, EP93XX_SOC_COMMON, to select
+the LEDS_GPIO_REGISTER feature.
+
+The struct gpio_led and struct gpio_led_platform_data variables
+have been changed to const struct because of:
+
+commit 9517f925f2eb9ffca78b3f0f9389fc675bcb572c
+? ? leds: make *struct gpio_led_platform_data.leds const
+
+They have also been marked as __initconst because the helper
+function gpio_led_register_device makes a deep copy of the
+platform data to allow it to live in init memory:
+
+commit 4440673a95e63ad888a41db596edaa0c55d3a332
+? ? leds: provide helper to register "leds-gpio" devices
+
+Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+
 ---
- arch/arm/plat-versatile/fpga-irq.c              |   14 ++++++++++++++
- arch/arm/plat-versatile/include/plat/fpga-irq.h |    7 -------
- 2 files changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/plat-versatile/fpga-irq.c b/arch/arm/plat-versatile/fpga-irq.c
-index b7e06ea..dc57dcd 100644
---- a/arch/arm/plat-versatile/fpga-irq.c
-+++ b/arch/arm/plat-versatile/fpga-irq.c
-@@ -15,6 +15,20 @@
- #define IRQ_ENABLE_SET		0x08
- #define IRQ_ENABLE_CLEAR	0x0c
+diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+index 97a2493..fe3c1fa 100644
+--- a/arch/arm/mach-ep93xx/Kconfig
++++ b/arch/arm/mach-ep93xx/Kconfig
+@@ -2,6 +2,11 @@ if ARCH_EP93XX
  
-+/**
-+ * struct fpga_irq_data - irq data container for the FPGA IRQ controller
-+ * @base: memory offset in virtual memory
-+ * @irq_start: first IRQ number handled by this instance
-+ * @chip: chip container for this instance
-+ * @domain: domain for this instance
-+ */
-+struct fpga_irq_data {
-+	void __iomem *base;
-+	unsigned int irq_start;
-+	struct irq_chip chip;
-+	struct irq_domain *domain;
-+};
+ menu "Cirrus EP93xx Implementation Options"
+ 
++config EP93XX_SOC_COMMON
++	bool
++	default y
++	select LEDS_GPIO_REGISTER
 +
- /* we cannot allocate memory when VICs are initially registered */
- static struct fpga_irq_data fpga_irq_devices[CONFIG_PLAT_VERSATILE_FPGA_IRQ_NR];
- static int fpga_irq_id;
-diff --git a/arch/arm/plat-versatile/include/plat/fpga-irq.h b/arch/arm/plat-versatile/include/plat/fpga-irq.h
-index 7f8009a..91bcfb6 100644
---- a/arch/arm/plat-versatile/include/plat/fpga-irq.h
-+++ b/arch/arm/plat-versatile/include/plat/fpga-irq.h
-@@ -1,13 +1,6 @@
- #ifndef PLAT_FPGA_IRQ_H
- #define PLAT_FPGA_IRQ_H
+ config CRUNCH
+ 	bool "Support for MaverickCrunch"
+ 	help
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 8d25895..257a124 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -513,7 +513,7 @@ void __init ep93xx_register_spi(struct ep93xx_spi_info *info,
+ /*************************************************************************
+  * EP93xx LEDs
+  *************************************************************************/
+-static struct gpio_led ep93xx_led_pins[] = {
++static const struct gpio_led ep93xx_led_pins[] __initconst = {
+ 	{
+ 		.name	= "platform:grled",
+ 		.gpio	= EP93XX_GPIO_LINE_GRLED,
+@@ -523,20 +523,11 @@ static struct gpio_led ep93xx_led_pins[] = {
+ 	},
+ };
  
--struct fpga_irq_data {
--	void __iomem *base;
--	unsigned int irq_start;
--	struct irq_chip chip;
--	struct irq_domain *domain;
+-static struct gpio_led_platform_data ep93xx_led_data = {
++static const struct gpio_led_platform_data ep93xx_led_data __initconst = {
+ 	.num_leds	= ARRAY_SIZE(ep93xx_led_pins),
+ 	.leds		= ep93xx_led_pins,
+ };
+ 
+-static struct platform_device ep93xx_leds = {
+-	.name		= "leds-gpio",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &ep93xx_led_data,
+-	},
 -};
 -
- struct device_node;
- struct pt_regs;
+-
+ /*************************************************************************
+  * EP93xx pwm peripheral handling
+  *************************************************************************/
+@@ -889,8 +880,9 @@ void __init ep93xx_init_devices(void)
  
--- 
-1.7.7.6
+ 	platform_device_register(&ep93xx_rtc_device);
+ 	platform_device_register(&ep93xx_ohci_device);
+-	platform_device_register(&ep93xx_leds);
+ 	platform_device_register(&ep93xx_wdt_device);
++
++	gpio_led_register_device(-1, &ep93xx_led_data);
+ }
+ 
+ void ep93xx_restart(char mode, const char *cmd)
