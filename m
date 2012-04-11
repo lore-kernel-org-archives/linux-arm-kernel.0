@@ -1,19 +1,18 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Apr 2012 15:08:54 -0600 (MDT)
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Wed, 11 Apr 2012 14:12:53 -0700
 Subject: [PATCH 06/12] arm: omap3: am35x: Add full PWRDM_POWER_INACTIVE
  support
 In-Reply-To: <CAORVsuW2Nax4h+SxEJ6dLM1AopAFPQjvK0FHa9N5mEEVCStpQw@mail.gmail.com>
 References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
  <1334171147-7517-7-git-send-email-mgreer@animalcreek.com>
  <CAORVsuW2Nax4h+SxEJ6dLM1AopAFPQjvK0FHa9N5mEEVCStpQw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1204111506240.29473@utopia.booyaka.com>
+Message-ID: <20120411211253.GA7979@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wed, 11 Apr 2012, Jean Pihet wrote:
-
+On Wed, Apr 11, 2012 at 10:56:01PM +0200, Jean Pihet wrote:
+> Hi Mark,
+> 
 > On Wed, Apr 11, 2012 at 9:05 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
 > > From: "Mark A. Greer" <mgreer@animalcreek.com>
 > >
@@ -37,10 +36,15 @@ On Wed, 11 Apr 2012, Jean Pihet wrote:
 > and the functional states.
 > 
 > I would be glad to help on the AM35x support for the functional states.
+> 
+> What do you think?
 
-Since it might take a while for the functional powerstate code to go 
-upstream, if Mark wants to do this, I'd suggest that he split the
-powerdomain-specific patches off from the rest of his series.  This should 
-avoid blocking the rest of his patches on the infrastructure changes.
+Sure.  Sounds like the right thing to do.
 
-- Paul
+> [1] http://marc.info/?l=linux-omap&m=133417729712693&w=2
+
+Thanks for the pointer.  I'll do a little research and contact you
+out-of-band.
+
+Mark
+--
