@@ -1,62 +1,51 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:22:19 +0530
-Subject: [PATCHv7 08/18] I2C: OMAP: Fix the error handling
+Date: Wed, 11 Apr 2012 16:22:27 +0530
+Subject: [PATCHv7 16/18] I2C: OMAP: fix missing handling of errata
+ I2C_OMAP3_1P153
 In-Reply-To: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334141549-8288-9-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334141549-8288-17-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in probe
-      pm_runtime_put(dev->dev);
+From: Tasslehoff Kjappfot <tasskjapp@gmail.com>
 
-...
-        /* i2c device drivers may be active on return from add_adapter() */
-        adap->nr = pdev->id;
-        r = i2c_add_numbered_adapter(adap);
-        if (r) {
-                dev_err(dev->dev, "failure adding adapter\n");
-                goto err_free_irq;
-        }
-...
+i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
+Move the errata handling to i2c_probe.
 
-        return 0;
-
-err_free_irq:
-        free_irq(dev->irq, dev);
-err_unuse_clocks:
-        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-        pm_runtime_put(dev->dev);
-
-This may access the i2c registers without the clocks.
-Attempting to fix the same by moving the pm_rintime_put after the error check.
-
+Signed-off-by: Tasslehoff Kjappfot <tasskjapp@gmail.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 2096726..a461097 100644
+index 666a365..7489eb6 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1095,8 +1095,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
- 		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+@@ -431,11 +431,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 	/* Take the I2C module out of reset: */
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
  
--	pm_runtime_put(dev->dev);
+-	dev->errata = 0;
 -
- 	adap = &dev->adapter;
- 	i2c_set_adapdata(adap, dev);
- 	adap->owner = THIS_MODULE;
-@@ -1116,6 +1114,8 @@ omap_i2c_probe(struct platform_device *pdev)
+-	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+-		dev->errata |= I2C_OMAP_ERRATA_I207;
+-
+ 	/* Enable interrupts */
+ 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+ 			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
+@@ -1060,6 +1055,11 @@ omap_i2c_probe(struct platform_device *pdev)
  
- 	of_i2c_register_devices(adap);
+ 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
  
-+	pm_runtime_put(dev->dev);
++	dev->errata = 0;
 +
- 	return 0;
++	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
++		dev->errata |= I2C_OMAP_ERRATA_I207;
++
+ 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
+ 		dev->errata |= I2C_OMAP3_1P153;
  
- err_free_irq:
 -- 
 1.7.4.1
