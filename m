@@ -1,67 +1,321 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Apr 2012 12:43:11 +0100
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120411103107.GG3163@opensource.wolfsonmicro.com>
-References: <20120410143055.GT24211@n2100.arm.linux.org.uk>
- <20120410161142.GG3852@pengutronix.de>
- <20120411011149.GA20818@b20223-02.ap.freescale.net>
- <20120411082401.GA32187@sirena.org.uk>
- <20120411084528.GB20818@b20223-02.ap.freescale.net>
- <20120411091548.GD3163@opensource.wolfsonmicro.com>
- <20120411092147.GW24211@n2100.arm.linux.org.uk>
- <20120411093253.GF3163@opensource.wolfsonmicro.com>
- <20120411094136.GX24211@n2100.arm.linux.org.uk>
- <20120411103107.GG3163@opensource.wolfsonmicro.com>
-Message-ID: <20120411114311.GZ24211@n2100.arm.linux.org.uk>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Wed, 11 Apr 2012 17:20:11 +0530
+Subject: [PATCH 2/2] OMAP2+: UART: Add mechanism to probe uart pins and
+ configure rx wakeup
+In-Reply-To: <20120410161136.GF6487@atomide.com>
+References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
+ <1334065246-21294-3-git-send-email-govindraj.raja@ti.com>
+ <20120410161136.GF6487@atomide.com>
+Message-ID: <CAMrsUdK2ZqCGWtL104tBC_h-XHD0UMMFagch_eSER+92zC1FiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 11:31:07AM +0100, Mark Brown wrote:
-> On Wed, Apr 11, 2012 at 10:41:36AM +0100, Russell King - ARM Linux wrote:
-> > clkdev is just a mechanism to obtain a struct clk for a particular input
-> > on a particular device.  Nothing more, nothing less.  So how does this
-> > detail about how the struct clk ultimate gets used concern clkdev?
-> 
-> It shouldn't.  
-> 
-> The main point I'm trying to make is that if we're adding an alternative
-> mechanism to the direct pointers for specifying the bindings to clkdev
-> (which is broadly the point of the original patch, AFAICT based on a
-> desire to split the mapping out from the definitions) then having it rely
-> on device tree in the first instance means we'll just need to solve the
-> same problem again for non-DT systems.  Richard was saying that the
-> problem Sascha was trying to solve is irrelevant because we can rely on
-> device tree but device tree is not widely available enough for that.
+On Tue, Apr 10, 2012 at 9:41 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Govindraj.R <govindraj.raja@ti.com> [120410 06:44]:
+>> --- a/arch/arm/mach-omap2/serial.c
+>> +++ b/arch/arm/mach-omap2/serial.c
+>> @@ -120,11 +120,63 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
+>> ?#endif /* CONFIG_PM */
+>>
+>> ?#ifdef CONFIG_OMAP_MUX
+>> -static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+>> +
+>> +#define OMAP_UART_DEFAULT_PAD_NAME_LEN ? ? ? 28
+>> +static char rx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN],
+>> + ? ? ? ? ? ? tx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN] __initdata;
+>> +static struct omap_device_pad default_omap_uart_pads[2] __initdata;
+>
+> Won't the default_omap_uart_pads get overwritten for each port?
+> We need that information in the driver too for each port? Why don't you
+> just allocate bdata.pads in omap_serial_board_init as we now assume it's
+> needed for each port?
+>
 
-Err what?  Look, it's very very simple.
+Yes can be part of omap_uart_state structure.
 
-clkdev is all about translating a device + connection ID to a struct clk
-pointer.  That's all, nothing more, nothing less.
+>> +static void ?__init omap_serial_fill_default_pads(struct omap_board_data *bdata)
+>> ?{
+>> + ? ? struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
+>> + ? ? struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
+>> +
+>> + ? ? if (bdata->id != 2) {
+>> + ? ? ? ? ? ? snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
+>> + ? ? ? ? ? ? ? ? ? ? ?"uart%d_rx.uart%d_rx", bdata->id + 1, bdata->id + 1);
+>> + ? ? ? ? ? ? snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
+>> + ? ? ? ? ? ? ? ? ? ? ?"uart%d_tx.uart%d_tx", bdata->id + 1, bdata->id + 1);
+>> + ? ? } else {
+>> + ? ? ? ? ? ? snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
+>> + ? ? ? ? ? ? ? ? ? ? "uart%d_rx_irrx.uart%d_rx_irrx", bdata->id + 1,
+>> + ? ? ? ? ? ? ? ? ? ? bdata->id + 1);
+>> + ? ? ? ? ? ? snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN,
+>> + ? ? ? ? ? ? ? ? ? ? "uart%d_tx_irtx.uart%d_tx_irtx", bdata->id + 1,
+>> + ? ? ? ? ? ? ? ? ? ? bdata->id + 1);
+>> + ? ? }
+>
+> This would be simpler with something like this (untested):
+>
+> ? ? ? ?char *rx_fmt, *tx_fmt;
+> ? ? ? ?int uart_nr = bdata->id + 1;
+>
+> ? ? ? ?if (bdata->id == 2) {
+> ? ? ? ? ? ? ? ?rx_fmt = "uart%d_rx.uart%d_rx";
+> ? ? ? ? ? ? ? ?tx_fmt = "uart%d_tx.uart%d_tx";
+> ? ? ? ?} else {
+> ? ? ? ? ? ? ? ?rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
+> ? ? ? ? ? ? ? ?tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
+> ? ? ? ?}
+>
+> ? ? ? ?snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
+> ? ? ? ? ? ? ? ? ? ? ? ?uart_nr, uart_nr);
+> ? ? ? ?snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
+> ? ? ? ? ? ? ? ? ? ? ? ?uart_nr, uart_nr);
+>
 
-What I see going on is that people want to translate a device + connection
-ID to some other name, and use this other name to look up a struct clk.
-Utterly idiotic and pointless.  Whether it be OF or not OF.
+okay fine.
 
-It's a crazy absurd idea.  At some point, you have to do some kind of
-lookup and return a struct clk.  Why the hell have this insane double
-mapping?
+>> + ? ? if (omap_mux_get_by_name(rx_pad_name, &rx_partition, &rx_mux) >= 0 &&
+>> + ? ? ? ? ? ? ? ? ? ? omap_mux_get_by_name
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (tx_pad_name, &tx_partition, &tx_mux) >= 0) {
+>> + ? ? ? ? ? ? u16 tx_mode, rx_mode;
+>> +
+>> + ? ? ? ? ? ? tx_mode = omap_mux_read(tx_partition, tx_mux->reg_offset);
+>> + ? ? ? ? ? ? rx_mode = omap_mux_read(rx_partition, rx_mux->reg_offset);
+>> +
+>> + ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ?* Check if uart is used in default tx/rx mode i.e. in mux mode0
+>> + ? ? ? ? ? ? ?* if yes then configure rx pin for wake up capability
+>> + ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? if (!(rx_mode & 0x07) && !(tx_mode & 0x07)) {
+>> + ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].name = rx_pad_name;
+>> + ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].flags ?=
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP;
+>> + ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
+>> + ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[0].idle = OMAP_PIN_INPUT |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[1].name = tx_pad_name;
+>> + ? ? ? ? ? ? ? ? ? ? default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MUX_MODE0;
+>> + ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap_uart_pads;
+>> + ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_omap_uart_pads);
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> ?}
+>
+> Then looking at omap_serial_board_init, it still looks wrong:
+>
+> void __init omap_serial_board_init(struct omap_uart_port_info *info)
+> {
+> ? ? ? ?struct omap_uart_state *uart;
+> ? ? ? ?struct omap_board_data bdata;
+>
+> ? ? ? ?list_for_each_entry(uart, &uart_list, node) {
+> ? ? ? ? ? ? ? ?bdata.id = uart->num;
+> ? ? ? ? ? ? ? ?bdata.flags = 0;
+> ? ? ? ? ? ? ? ?bdata.pads = NULL;
+> ? ? ? ? ? ? ? ?bdata.pads_cnt = 0;
+>
+> ? ? ? ? ? ? ? ?if (cpu_is_omap44xx() || cpu_is_omap34xx())
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_serial_fill_default_pads(&bdata);
+>
+> Why don't you fill the pads for omap2? It has the same pads, although
+> it does not have the serial wake-up events working.
+>
+> And why don't you exit if omap_serial_fill_default_pads fails for the
+> no info case?
+>
+> Shouldn't it be something like:
+>
+> ? ? ? ? ? ? ? ?if (!info) {
+> ? ? ? ? ? ? ? ? ? ? ? ?res = omap_serial_fill_default_pads(&bdata);
+> ? ? ? ? ? ? ? ? ? ? ? ?if (!res)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?return;
+> ? ? ? ? ? ? ? ? ? ? ? ?port = NULL;
+> ? ? ? ? ? ? ? ?} else {
+> ? ? ? ? ? ? ? ? ? ? ? ?port = &info[uart->num];
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?omap_serial_init_port(&bdata, port);
+>
 
-Look, solving the DT problem with clkdev is really simple.  You have the
-DT node for the struct device, so you can look up DT properties associated
-with that device.  Properties have a name, and you can use the connection
-ID to translate into a DT property name to be looked up - eg, clk_%s.
-This can return a phandle or whatever else which could then be translated
-into a struct clk if you're representing each clk as a node in DT.
+Yes if filling of default pads fails we can avoid registering that port
+however I think that should not depend on availability of port info.
 
-Nice and simple, no need for any additional crappy translation what so
-ever - and, oh my god, it reduces the amount of list based searching
-required to do the translation.
+Here [1] is the updated patch.
 
-And it also allows non-DT to work just fine provided you register your
-clk lookups _after_ you know the struct clk pointers which is exactly what
-happens today.
+--
+Thanks,
+Govindraj.R
 
-Now, if getting the struct clk pointers is insanely difficult because of
-the design of the common clk stuff, then that's where the problem lies,
-and that problem needs to be fixed, and clkdev does not need to be bodged
-around to fix a problem which is not relevant to it.
+
+[1]:
+
+
+>From ea06c7d5014b68f622b3e2ca226e5a5194d48e9a Mon Sep 17 00:00:00 2001
+From: "Govindraj.R" <govindraj.raja@ti.com>
+Date: Tue, 10 Apr 2012 18:21:52 +0530
+Subject: [PATCH 2/2] OMAP2+: UART: Add mechanism to probe uart pins and
+ configure rx wakeup
+
+Default pad populating procedure should first probe whether the uart
+pins are available as uart tx/rx pins if yes then we can configure them
+and use rx pin for wakeup capability.
+
+Utilise the mux api available to probe the availability of mux pins
+in uart mode.
+
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Russ Dill <russ.dill@gmail.com>
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/mux.c    |    3 +-
+ arch/arm/mach-omap2/mux.h    |   10 ++++++
+ arch/arm/mach-omap2/serial.c |   73 +++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 80 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 65c3391..d937ddd 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -217,8 +217,7 @@ static int __init _omap_mux_get_by_name(struct
+omap_mux_partition *partition,
+ 	return -ENODEV;
+ }
+
+-static int __init
+-omap_mux_get_by_name(const char *muxname,
++int __init omap_mux_get_by_name(const char *muxname,
+ 			struct omap_mux_partition **found_partition,
+ 			struct omap_mux **found_mux)
+ {
+diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+index 69fe060..68927f1 100644
+--- a/arch/arm/mach-omap2/mux.h
++++ b/arch/arm/mach-omap2/mux.h
+@@ -225,8 +225,18 @@ omap_hwmod_mux_init(struct omap_device_pad
+*bpads, int nr_pads);
+  */
+ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
+
++int omap_mux_get_by_name(const char *muxname,
++		struct omap_mux_partition **found_partition,
++		struct omap_mux **found_mux);
+ #else
+
++static inline int omap_mux_get_by_name(const char *muxname,
++		struct omap_mux_partition **found_partition,
++		struct omap_mux **found_mux)
++{
++	return 0;
++}
++
+ static inline int omap_mux_init_gpio(int gpio, int val)
+ {
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 2e351f5..9d62cae 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -57,6 +57,7 @@ struct omap_uart_state {
+
+ 	struct list_head node;
+ 	struct omap_hwmod *oh;
++	struct omap_device_pad default_omap_uart_pads[2];
+ };
+
+ static LIST_HEAD(uart_list);
+@@ -120,11 +121,75 @@ static void omap_uart_set_smartidle(struct
+platform_device *pdev) {}
+ #endif /* CONFIG_PM */
+
+ #ifdef CONFIG_OMAP_MUX
+-static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
++
++#define OMAP_UART_DEFAULT_PAD_NAME_LEN	28
++static char rx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN],
++		tx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN] __initdata;
++
++static void  __init
++omap_serial_fill_uart_tx_rx_pads(struct omap_board_data *bdata,
++				struct omap_uart_state *uart)
+ {
++	uart->default_omap_uart_pads[0].name = rx_pad_name;
++	uart->default_omap_uart_pads[0].flags = OMAP_DEVICE_PAD_REMUX |
++							OMAP_DEVICE_PAD_WAKEUP;
++	uart->default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
++							OMAP_MUX_MODE0;
++	uart->default_omap_uart_pads[0].idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0;
++	uart->default_omap_uart_pads[1].name = tx_pad_name;
++	uart->default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
++							OMAP_MUX_MODE0;
++	bdata->pads = uart->default_omap_uart_pads;
++	bdata->pads_cnt = ARRAY_SIZE(uart->default_omap_uart_pads);
++}
++
++static int  __init omap_serial_fill_default_pads(struct omap_board_data *bdata,
++						struct omap_uart_state *uart)
++{
++	struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
++	struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
++	char *rx_fmt, *tx_fmt;
++	int uart_nr = bdata->id + 1;
++
++	if (bdata->id != 2) {
++		rx_fmt = "uart%d_rx.uart%d_rx";
++		tx_fmt = "uart%d_tx.uart%d_tx";
++	} else {
++		rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
++		tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
++	}
++
++	snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
++			uart_nr, uart_nr);
++	snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
++			uart_nr, uart_nr);
++
++	if (omap_mux_get_by_name(rx_pad_name, &rx_partition, &rx_mux) >= 0 &&
++			omap_mux_get_by_name
++				(tx_pad_name, &tx_partition, &tx_mux) >= 0) {
++		u16 tx_mode, rx_mode;
++
++		tx_mode = omap_mux_read(tx_partition, tx_mux->reg_offset);
++		rx_mode = omap_mux_read(rx_partition, rx_mux->reg_offset);
++
++		/*
++		 * Check if uart is used in default tx/rx mode i.e. in mux mode0
++		 * if yes then configure rx pin for wake up capability
++		 */
++		if (!(rx_mode & 0x07) && !(tx_mode & 0x07)) {
++			omap_serial_fill_uart_tx_rx_pads(bdata, uart);
++			return 0;
++		}
++	}
++
++	return -ENODEV;
+ }
+ #else
+-static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
++static int __init omap_serial_fill_default_pads(struct omap_board_data *bdata
++					struct omap_uart_state *uart)
++{
++	return 0;
++}
+ #endif
+
+ char *cmdline_find_option(char *str)
+@@ -289,8 +354,8 @@ void __init omap_serial_board_init(struct
+omap_uart_port_info *info)
+ 		bdata.pads = NULL;
+ 		bdata.pads_cnt = 0;
+
+-		if (cpu_is_omap44xx() || cpu_is_omap34xx())
+-			omap_serial_fill_default_pads(&bdata);
++		if (omap_serial_fill_default_pads(&bdata, uart))
++			continue;
+
+ 		if (!info)
+ 			omap_serial_init_port(&bdata, NULL);
+-- 
+1.7.9
