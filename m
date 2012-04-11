@@ -1,27 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Apr 2012 12:19:54 -0600 (MDT)
-Subject: [PATCH v4 04/12] ARM: OMAP1: OHCI: use platform_data fn ptr to
- enable OCPI bus
-In-Reply-To: <4F853788.2030007@antcom.de>
-References: <20120411003454.27059.37500.stgit@dusk>
- <20120411003528.27059.8836.stgit@dusk> <4F853788.2030007@antcom.de>
-Message-ID: <alpine.DEB.2.00.1204111219240.29473@utopia.booyaka.com>
+From: dsaxena@plexity.net (Deepak Saxena)
+Date: Wed, 11 Apr 2012 11:21:59 -0700
+Subject: [GIT PULL] ixp2xxx platform removal for 3.5
+In-Reply-To: <4F7F2BC8.9040101@gmail.com>
+References: <4F7F2BC8.9040101@gmail.com>
+Message-ID: <20120411182159.GA12519@plexity.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Apr 2012, Roland Stigge wrote:
-
-> On 04/11/2012 02:35 AM, Paul Walmsley wrote:
-> > Also interesting is that drivers/usb/host/ohci-nxp.c contains a stub
-> > for ocpi_enable() - perhaps the NXP chips use a similar OCPI IP block?
+pr 06 2012, at 12:45, Rob Herring was caught saying:
+> Arnd, Olof,
 > 
-> I'd rather suspect a copy-paste error here since ocpi_enable() is unused
-> in ohci-nxp.c and the extern declaration looks like an incomplete but
-> intended removal.
+> Please pull the ixp23xx and ixp2000 platform removal for 3.5. I've only
+> included the arch/arm/* portion here. David Miller already picked up the
+> net driver for net-next, and I'm assuming other subsystem maintainers
+> will pick up i2c, mtd and watchdog patches. In any case, there aren't
+> any ordering dependencies with the other patches.
 > 
-> Will probably just remove this reference in my DT patchset.
+> Rob
+> 
+> The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+> 
+>   Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+> 
+> are available in the git repository at:
+>   git://sources.calxeda.com/kernel/linux.git ixp2xxx-removal
+> 
+> Rob Herring (1):
+>       ARM: remove ixp23xx and ixp2000 platforms
 
-Thanks, will drop the comment from the patch description.
+As the person who originally wrote much of this code (and is both
+happy and sad to see it go):
 
-
-- Paul
+Acked-by: Deepak Saxena <dsaxena@plexity.net>
