@@ -1,69 +1,97 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 11 Apr 2012 16:22:29 +0530
-Subject: [PATCHv7 18/18] I2C: OMAP: Rename the 1p153 to the erratum id i462
+Date: Wed, 11 Apr 2012 16:22:22 +0530
+Subject: [PATCHv7 11/18] I2C: OMAP: use devm_* functions
 In-Reply-To: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334141549-8288-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334141549-8288-19-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334141549-8288-12-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The section number in the recent errata document has changed.
-Rename the erratum 1p153 to the unique id i462 instead, so that
-it is easier to reference. Also change the function name and comments
-to reflect the same.
+The various devm_ functions allocate memory that is released when a driver
+detaches. This patch uses devm_kzalloc, devm_request_mem_region and
+devm_ioremap for data that is allocated in the probe function of a platform
+device and is only freed in the remove function.
 
-Cc: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   29 +++++++++--------------------
+ 1 files changed, 9 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 2bf8120..667d344 100644
+index 121c52e..86be475 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -170,7 +170,7 @@ enum {
+@@ -995,17 +995,17 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
- /* Errata definitions */
- #define I2C_OMAP_ERRATA_I207		(1 << 0)
--#define I2C_OMAP3_1P153			(1 << 1)
-+#define I2C_OMAP_ERRATA_I462		(1 << 1)
+-	ioarea = request_mem_region(mem->start, resource_size(mem),
+-			pdev->name);
++	ioarea = devm_request_mem_region(&pdev->dev, mem->start,
++			resource_size(mem), pdev->name);
+ 	if (!ioarea) {
+ 		dev_err(&pdev->dev, "I2C region already claimed\n");
+ 		return -EBUSY;
+ 	}
  
- struct omap_i2c_dev {
- 	struct device		*dev;
-@@ -753,11 +753,11 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
- #endif
+-	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
++	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+-		r = -ENOMEM;
+-		goto err_release_region;
++		dev_err(&pdev->dev, "Menory allocation failed\n");
++		return -ENOMEM;
+ 	}
  
- /*
-- * OMAP3430 Errata 1.153: When an XRDY/XDR is hit, wait for XUDF before writing
-+ * OMAP3430 Errata i462: When an XRDY/XDR is hit, wait for XUDF before writing
-  * data to DATA_REG. Otherwise some data bytes can be lost while transferring
-  * them from the memory to the I2C interface.
-  */
--static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
-+static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
+ 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
+@@ -1029,11 +1029,10 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	dev->dev = &pdev->dev;
+ 	dev->irq = irq->start;
+-	dev->base = ioremap(mem->start, resource_size(mem));
+-	if (!dev->base) {
+-		r = -ENOMEM;
+-		goto err_free_mem;
+-	}
++	dev->base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
++	if (!dev->base)
++		return -ENOMEM;
++
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 
+@@ -1121,13 +1120,8 @@ err_free_irq:
+ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(dev->dev);
+-	iounmap(dev->base);
+ 	pm_runtime_disable(&pdev->dev);
+-err_free_mem:
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(dev);
+-err_release_region:
+-	release_mem_region(mem->start, resource_size(mem));
+ 
+ 	return r;
+ }
+@@ -1135,7 +1129,6 @@ err_release_region:
+ static int __devexit omap_i2c_remove(struct platform_device *pdev)
  {
- 	unsigned long timeout = 10000;
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+-	struct resource		*mem;
  
-@@ -920,8 +920,8 @@ complete:
- 					break;
- 				}
+ 	platform_set_drvdata(pdev, NULL);
  
--				if ((dev->errata & I2C_OMAP3_1P153) &&
--				    errata_omap3_1p153(dev, &stat, &err))
-+				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
-+				    errata_omap3_i462(dev, &stat, &err))
- 					goto complete;
+@@ -1143,10 +1136,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ 	i2c_del_adapter(&dev->adapter);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_disable(&pdev->dev);
+-	iounmap(dev->base);
+-	kfree(dev);
+-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mem->start, resource_size(mem));
+ 	return 0;
+ }
  
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
-@@ -1061,7 +1061,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->errata |= I2C_OMAP_ERRATA_I207;
- 
- 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
--		dev->errata |= I2C_OMAP3_1P153;
-+		dev->errata |= I2C_OMAP_ERRATA_I462;
- 
- 	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
- 		u16 s;
 -- 
 1.7.4.1
