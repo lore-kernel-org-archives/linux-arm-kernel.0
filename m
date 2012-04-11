@@ -1,61 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 10 Apr 2012 21:29:56 -0400
-Subject: [PATCHv2] ARM: orion5x: Fix GPIO enable bits for MPP9
-In-Reply-To: <1333858733.7150.115.camel@deadeye>
-References: <1333858733.7150.115.camel@deadeye>
-Message-ID: <20120411012956.GE14790@titan.lakedaemon.net>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 11 Apr 2012 11:33:16 +1000
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
+In-Reply-To: <1334106834.2984.17.camel@pasglop>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+ <20120402215524.GM24211@n2100.arm.linux.org.uk>
+ <1333406005.30734.61.camel@pasglop>
+ <20120402225223.GN24211@n2100.arm.linux.org.uk>
+ <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
+ <1333755470.3040.38.camel@pasglop> <m2aa2n7mmw.fsf@igel.home>
+ <1334106834.2984.17.camel@pasglop>
+Message-ID: <1334107996.2984.20.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 08, 2012 at 05:18:53AM +0100, Ben Hutchings wrote:
-> Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 ('ARM: orion5x: Refactor
-> mpp code to use common orion platform mpp.') seems to have accidentally
-> inverted the GPIO valid bits for MPP9 (only).  For the mv2120 platform
-> which uses MPP9 as a GPIO LED device, this results in the error:
+On Wed, 2012-04-11 at 11:13 +1000, Benjamin Herrenschmidt wrote:
+> On Sat, 2012-04-07 at 14:27 +0200, Andreas Schwab wrote:
+> > Benjamin Herrenschmidt <benh@kernel.crashing.org> writes:
+> > 
+> > > It's arguable that this irq_set_irq_type(,NONE) shouln't be there but
+> > > still ... it's been around for ever and things worked :-) So something
+> > > -else- is causing the problem and I'd like to understand what exactly.
+> > 
+> > AFAICS before a09b659cd68c10ec6a30cb91ebd2c327fcd5bfe5
+> > irq_set_irq_type(,NONE) was actually a no-op.
 > 
-> [   12.711476] leds-gpio: probe of leds-gpio failed with error -22
-> 
-> Reported-by: Henry von Tresckow <hvontres@gmail.com>
-> References: http://bugs.debian.org/667446
-> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> Cc: stable at vger.kernel.org [v3.0+]
-> ---
-> v2: Add subject of the earlier commit
+> So I'm still a bit baffled... ie, I understand some of what's happening
+> but not why it breaks things, I haven't yet managed to reproduce but I
+> haven't tried too hard just yet (was away from the HW) :
 
-oops, replied to the earlier one before seeing this one.  Playing
-catchup after the holidays.
+Allright, I have a repro-case, I'll dig.
 
-Please see my earlier post regarding possible breakage on other boards.
-
-thx,
-
-Jason.
-
->  arch/arm/mach-orion5x/mpp.h |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
-> index eac6897..db70e79 100644
-> --- a/arch/arm/mach-orion5x/mpp.h
-> +++ b/arch/arm/mach-orion5x/mpp.h
-> @@ -65,8 +65,8 @@
->  #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
->  
->  #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
-> -#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
-> -#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
-> +#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
-> +#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
->  
->  #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
->  #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cheers,
+Ben.
