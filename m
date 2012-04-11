@@ -1,75 +1,49 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Apr 2012 15:37:47 -0600 (MDT)
-Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
- wake-ups work
-In-Reply-To: <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
-Message-ID: <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 12 Apr 2012 07:37:28 +1000
+Subject: [PATCH v5 06/27] irq_domain/powerpc: eliminate irq_map; use
+ irq_alloc_desc() instead
+In-Reply-To: <20120411205707.68AC13E08B6@localhost>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-7-git-send-email-grant.likely@secretlab.ca>
+ <m2iphj3zxr.fsf@igel.home> <m2hax2qeqs.fsf@igel.home>
+ <20120402202848.1EB833E02A7@localhost>
+ <20120402215524.GM24211@n2100.arm.linux.org.uk>
+ <1333406005.30734.61.camel@pasglop>
+ <20120402225223.GN24211@n2100.arm.linux.org.uk>
+ <1333409927.30734.62.camel@pasglop> <m24nsx9iz1.fsf@igel.home>
+ <1333755470.3040.38.camel@pasglop> <m2aa2n7mmw.fsf@igel.home>
+ <1334106834.2984.17.camel@pasglop> <1334107996.2984.20.camel@pasglop>
+ <1334122182.2984.33.camel@pasglop> <20120411205707.68AC13E08B6@localhost>
+Message-ID: <1334180248.2984.39.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wed, 11 Apr 2012, Mark A. Greer wrote:
-
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Wed, 2012-04-11 at 14:57 -0600, Grant Likely wrote:
 > 
-> Currently, the OMAP3 cpuidle driver calls omap3_enter_idle()
-> which calls omap_sram_idle().  omap_sram_idle() eventually
-> causes a 'wfi' instruction to be executed effectively putting
-> the system to sleep.  It is assumed that an I/O wake-up event
-> will occur to wake the system up again.  This doesn't work on
-> systems that don't support I/O wake-ups (indicated by
-> omap3_has_io_wakeup() returning false).
+> Yeah, I've got a different way to fix it though.  There is exactly one
+> user of irq_virq_count in-tree right now: PS3.  Also, irq_virq_count
+> is only useful for the NOMAP mapping.  So, instead of having a single
+> global irq_virq_count values, I've dropped it entirely and added a
+> max_irq argument to irq_domain_add_nomap().  That makes it a property
+> of an individual nomap irq domain instead of a global system settting.
 > 
-> To handle this, follow the same path in omap3_enter_idle()
-> that would be followed if an interrupt were pending.
+> Hopefully I'll have a draft patch ready today. 
 
-I don't quite understand this patch.  Are you saying that AM3517/3505 
-can't wake from WFI?  That would seem odd.
+That works for me. I'll send patches for cleanup MPIC as well.
 
-There are other sources of wakeup on the system other than I/O wakeup.  
-I/O wakeup only applies to wakeups from the I/O pads when the chip is in 
-RETENTION or OFF.  And as I understand it, neither of those apply to 
-AM3517/3505?
+One thing tho (Thomas, Russell) is that I like using set_irq_trigger to
+establish the "defaults" in mpic, ie, it does the descriptor locking
+etc... for me, I'd rather avoid open coding all of that. What I need is
+a "variant" that doesn't actually change the trigger but instead
+initializes the irq_desc with whatever settings the HW currently has
+(ie, I need to make sure things are properly in sync) though other
+implementations may want to use that for defaults.
 
-Even if I/O wakeups aren't supported, many of the IP blocks on the system 
-should be able to cause the ARM to exit WFI by asserting their 
-SWAKEUP lines and raising their interrupt lines.
+Any objection to defining something like IRQ_TYPE_DEFAULT ?
 
-So this change doesn't seem quite right to me...
+I was thinking about making it equal to IRQ_TYPE_SENSE_MASK since that
+can obviously not be a valid trigger value and is distinct from
+IRQ_TYPE_NONE.
 
-More broadly, if AM3517/3505 only supports powerdomains ON, then you 
-should probably use your own CPUIdle driver that doesn't touch the 
-powerdomain states at all.
-
-
-- Paul
-
-
-> 
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 5358664..12cf81d 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -100,7 +100,7 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
->  	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
->  	pwrdm_set_next_pwrst(core_pd, core_state);
->  
-> -	if (omap_irq_pending() || need_resched())
-> +	if (omap_irq_pending() || need_resched() || !omap3_has_io_wakeup())
->  		goto return_sleep_time;
->  
->  	/* Deny idle for C1 */
-> -- 
-> 1.7.9.4
-> 
-
-
-- Paul
+Cheers,
+Ben.
