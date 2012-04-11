@@ -1,21 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Apr 2012 00:05:58 +0100
-Subject: [PATCH 2/2 v2] dma/amba-pl08x: add support for the Nomadik variant
-In-Reply-To: <1334185214-27250-1-git-send-email-linus.walleij@linaro.org>
-References: <1334185214-27250-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20120411230558.GF24211@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Apr 2012 01:07:43 +0200
+Subject: [PATCH 1/3] integrator: fix the IRQ masks on the Integrator/CP
+In-Reply-To: <20120411225651.GD24211@n2100.arm.linux.org.uk>
+References: <1334184223-18864-1-git-send-email-linus.walleij@linaro.org>
+ <20120411225651.GD24211@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZxXiaPSkP7eiamNaWLWNepFHfPNu=-uZbk8h4n7jwCKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 01:00:14AM +0200, Linus Walleij wrote:
-> The Nomadik PL080 variant has some extra protection bits that
-> may be set, so we need to check these bits to see if the
-> channels are actually available for the DMAengine to use.
+On Thu, Apr 12, 2012 at 12:56 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Actually, there is another issue to be considered with PL080.  For memcpy
-transfers, a restricted set of channels should be used, because the PL080
-only guarantees certain channels won't consume all bus bandwidth, locking
-out (eg) the CPU from doing other stuff while the memcpy DMA is running.
+>> - ? ? pic_mask = ~((~0u) << (11 - IRQ_PIC_START));
+>> - ? ? pic_mask |= (~((~0u) << (29 - 22))) << 22;
+>> + ? ? pic_mask = ~((~0u) << (1 + IRQ_PIC_END - IRQ_PIC_START));
+>
+> Err no, the original is correct.
+>
+> Integrator/CP only has IRQs 29-22 and IRQs 11-0. ?IRQs 21-12 are
+> reserved. ?Integrator/AP on the other hand has IRQs 21-0.
 
-So really the way physical channels are selected needs to become more
-inteligent overall.
+Ahhh like that, now I finally see. Thanks! I'll fix.
+The "hole" in the mask creates some obstacles in the hwirq map too, will
+sort it out.
+
+Yours,
+Linus Walleij
