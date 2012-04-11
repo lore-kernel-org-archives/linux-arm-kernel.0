@@ -1,41 +1,167 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 11 Apr 2012 16:05:51 -0400
-Subject: [PATCH] mmc: remove imxmmc driver
-In-Reply-To: <1334174103-4724-1-git-send-email-s.hauer@pengutronix.de> (Sascha
- Hauer's message of "Wed, 11 Apr 2012 21:55:03 +0200")
-References: <1334174103-4724-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <87hawqrq3k.fsf@laptop.org>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Wed, 11 Apr 2012 13:14:36 -0700
+Subject: [PATCH 1/2] OMAP2+: UART: Fix incorrect population of default
+ uart pads
+In-Reply-To: <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
+References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
+ <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <CA+Bv8XbtC4O4zjA=Ct0EwsNvLc6MyO3-NfSs+EcwvvBrf=YP=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Apr 10, 2012 at 6:40 AM, Govindraj.R <govindraj.raja@ti.com> wrote:
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+>
+> The following commit:
+> (7496ba3 ?ARM: OMAP2+: UART: Add default mux for all uarts)
+> added default pads for all uarts. But not all boards tend to
+> use all uarts and most of unused uart pins are muxed for
+> other purpose. This commit breaks the modules which where trying
+> to use unused uart pins on their boards.
+>
+> So remove the default pads adding.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Russ Dill <russ.dill@gmail.com>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 
-On Wed, Apr 11 2012, Sascha Hauer wrote:
-> This driver is broken since 2.6.31 when the traditional i.MX1
-> support was removed.
->
-> In theory the i.MX1 mmc controller can be supported by the mxcmmc
-> driver which basically is the same hardware. However, the i.MX1
-> controller has severe bugs which made several workarounds necessary which
-> resulted in a different driver structure. At that time it seemed easier
-> to write a second driver to support hardware without bugs.
->
-> As noone cared for the i.MX1 driver for a long time and it does
-> not compile, remove it.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Russ.Dill at ti.com
+
 > ---
->  drivers/mmc/host/Kconfig  |   10 -
->  drivers/mmc/host/Makefile |    1 -
->  drivers/mmc/host/imxmmc.c | 1169 ---------------------------------------------
->  3 files changed, 1180 deletions(-)
->  delete mode 100644 drivers/mmc/host/imxmmc.c
-
-Looks good, but you missed drivers/mmc/host/imxmmc.h.
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> ?arch/arm/mach-omap2/serial.c | ?116 ------------------------------------------
+> ?1 files changed, 0 insertions(+), 116 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index c9503a7..1554233 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -120,124 +120,8 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
+> ?#endif /* CONFIG_PM */
+>
+> ?#ifdef CONFIG_OMAP_MUX
+> -static struct omap_device_pad default_uart1_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_cts.uart1_cts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_rts.uart1_rts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_tx.uart1_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_rx.uart1_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_uart2_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_cts.uart2_cts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_rts.uart2_rts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_tx.uart2_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_rx.uart2_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_uart3_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_cts_rctx.uart3_cts_rctx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_rts_sd.uart3_rts_sd",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_tx_irtx.uart3_tx_irtx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_rx_irrx.uart3_rx_irrx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "gpmc_wait2.uart4_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "gpmc_wait3.uart4_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart4_tx.uart4_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart4_rx.uart4_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> ?static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+> ?{
+> - ? ? ? switch (bdata->id) {
+> - ? ? ? case 0:
+> - ? ? ? ? ? ? ? bdata->pads = default_uart1_pads;
+> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? case 1:
+> - ? ? ? ? ? ? ? bdata->pads = default_uart2_pads;
+> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? case 2:
+> - ? ? ? ? ? ? ? bdata->pads = default_uart3_pads;
+> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? case 3:
+> - ? ? ? ? ? ? ? if (cpu_is_omap44xx()) {
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap4_uart4_pads;
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt =
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(default_omap4_uart4_pads);
+> - ? ? ? ? ? ? ? } else if (cpu_is_omap3630()) {
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap36xx_uart4_pads;
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt =
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(default_omap36xx_uart4_pads);
+> - ? ? ? ? ? ? ? }
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? default:
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? }
+> ?}
+> ?#else
+> ?static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
+> --
+> 1.7.9
+>
