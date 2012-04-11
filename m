@@ -1,29 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Apr 2012 10:26:30 +0200
-Subject: [PATCH] pinctrl: fix build failure on PPC
-In-Reply-To: <4F844E52.3080902@wwwdotorg.org>
-References: <1334044357-14486-1-git-send-email-linus.walleij@stericsson.com>
- <4F844E52.3080902@wwwdotorg.org>
-Message-ID: <CACRpkdYPD4iA2vdy-VOP2E+FfESJmbuMtLDVi0rGBn6FCCzuyA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Apr 2012 10:33:42 +0200
+Subject: [GIT PULL] i.MX board feature patches
+Message-ID: <20120411083342.GM3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 5:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/10/2012 01:52 AM, Linus Walleij wrote:
+Hi Arnd, Olof,
 
->> So let's use some local Kconfig option that depends on both OF
->> and PINCTRL so that this file is only compiled if you have
->> both enabled.
->
-> It seems simpler to just fix the Makefile to only compile the file when
-> its needed directly, without introducing a new Kconfig option. See
-> https://lkml.org/lkml/2012/4/3/445.
+Please pull the following board feature patches for i.MX
 
-But I think it is basically a config problem, not a compilation problem,
-that is why I did it this way.
+Thanks
+ Sascha
 
-But I won't be stubborn about it ... I'll see if I can just switch that one
-patch out then.
+The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
 
-Yours,
-Linus Walleij
+  Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-features-board-20120411
+
+for you to fetch changes up to e7259f7ca3a0c7a269fecb61156224ddd3edb92c:
+
+  Visstrim_M10: Add board version detection. (2012-04-11 10:16:03 +0200)
+
+----------------------------------------------------------------
+misc i.MX board specific features
+
+----------------------------------------------------------------
+Alex Gershgorin (1):
+      ARM: regulator: i.MX35-PDK Add regulator support
+
+Javier Martin (1):
+      Visstrim_M10: Add board version detection.
+
+Uwe Kleine-K?nig (1):
+      ARM: imx_v4_v5_defconfig: enable adc and touch driver of mc13783
+
+ arch/arm/configs/imx_v4_v5_defconfig        |    4 +-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   55 ++++++++
+ arch/arm/mach-imx/mach-mx35_3ds.c           |  193 +++++++++++++++++++++++++++
+ 3 files changed, 251 insertions(+), 1 deletion(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
