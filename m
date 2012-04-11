@@ -1,113 +1,96 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Apr 2012 17:19:40 -0600
-Subject: [PATCH V2 5/5] ARM: dt: tegra cardhu: basic audio support
-In-Reply-To: <1334099980-19527-1-git-send-email-swarren@wwwdotorg.org>
-References: <1334099980-19527-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1334099980-19527-5-git-send-email-swarren@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 10 Apr 2012 18:11:36 -0600 (MDT)
+Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait
+ for reset status
+In-Reply-To: <1331659524-7635-3-git-send-email-rnayak@ti.com>
+References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
+ <1331659524-7635-3-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi Rajendra,
 
-Add WM8903 codec nodes, and top-level sound complex node for basic
-analog audio over headset jack and internal speakers.
+On Tue, 13 Mar 2012, Rajendra Nayak wrote:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2:
-* Adjust sound node compatible value; s/tegra30/tegra/. The requirement
-  to specifically version this is removed due to the Tegra ASoC utilities
-  code internally determining the chip version.
-* Move I2S nodes inside AHUB node, since it's the bus that contains them.
----
- arch/arm/boot/dts/tegra-cardhu.dts |   63 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 63 insertions(+), 0 deletions(-)
+> omap_hwmod_softreset() does not seem to wait for reset status
+> after doing a softreset. Make it use _ocp_softreset() instead
+> which does this correctly.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Anand Gadiyar <gadiyar@ti.com>
+> Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
-index 0a9f34a..ab8d901 100644
---- a/arch/arm/boot/dts/tegra-cardhu.dts
-+++ b/arch/arm/boot/dts/tegra-cardhu.dts
-@@ -51,6 +51,15 @@
- 				nvidia,pull = <2>;
- 				nvidia,tristate = <0>;
- 			};
-+			dap2_fs_pa2 {
-+				nvidia,pins =	"dap2_fs_pa2",
-+						"dap2_sclk_pa3",
-+						"dap2_din_pa4",
-+						"dap2_dout_pa5";
-+				nvidia,function = "i2s1";
-+				nvidia,pull = <0>;
-+				nvidia,tristate = <0>;
-+			};
- 		};
- 	};
- 
-@@ -92,6 +101,20 @@
- 
- 	i2c at 7000d000 {
- 		clock-frequency = <100000>;
-+
-+		wm8903: wm8903 at 1a {
-+			compatible = "wlf,wm8903";
-+			reg = <0x1a>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <179 0x04>; /* gpio PW3 */
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+			micdet-cfg = <0>;
-+			micdet-delay = <100>;
-+			gpio-cfg = <0xffffffff 0xffffffff 0 0xffffffff 0xffffffff>;
-+		};
- 	};
- 
- 	sdhci at 78000000 {
-@@ -111,4 +134,44 @@
- 	sdhci at 78000400 {
- 		support-8bit;
- 	};
-+
-+	ahub at 70080000 {
-+		i2s at 70080300 {
-+			status = "disable";
-+		};
-+
-+		i2s at 70080500 {
-+			status = "disable";
-+		};
-+
-+		i2s at 70080600 {
-+			status = "disable";
-+		};
-+
-+		i2s at 70080700 {
-+			status = "disable";
-+		};
-+	};
-+
-+	sound {
-+		compatible = "nvidia,tegra-audio-wm8903-cardhu",
-+			     "nvidia,tegra-audio-wm8903";
-+		nvidia,model = "NVIDIA Tegra Cardhu";
-+
-+		nvidia,audio-routing =
-+			"Headphone Jack", "HPOUTR",
-+			"Headphone Jack", "HPOUTL",
-+			"Int Spk", "ROP",
-+			"Int Spk", "RON",
-+			"Int Spk", "LOP",
-+			"Int Spk", "LON",
-+			"Mic Jack", "MICBIAS",
-+			"IN1L", "Mic Jack";
-+
-+		nvidia,i2s-controller = <&tegra_i2s1>;
-+		nvidia,audio-codec = <&wm8903>;
-+
-+		nvidia,spkr-en-gpios = <&wm8903 2 0>;
-+		nvidia,hp-det-gpios = <&gpio 178 0>; /* gpio PW2 */
-+	};
- };
--- 
-1.7.0.4
+Just noticed that this change results in I2C softreset failed messages on 
+OMAP2/3/4 on v3.4-rc2.  For example, on 2420:
+
+[    0.200378] omap_hwmod: i2c1: softreset failed (waited 10000 usec)
+[    0.222076] omap_hwmod: i2c2: softreset failed (waited 10000 usec)
+
+Looking more closely at the code, I think the intention of the original 
+code was basically correct.  HDQ and I2C both need to execute some custom 
+reset code after the SOFTRESET bit is set, but before the RESETDONE bit is 
+tested.  After this patch, the internal hwmod code tries to wait for 
+RESETDONE to change, before the custom code runs -- and that is going to 
+fail.
+
+Just out of curiosity, was the change in this patch prompted by some code 
+that needed the change?  Or was this a theoretical problem, driven by a 
+code review?  If the latter, we should probably revert this patch, and 
+maybe improve the documentation and omap_hwmod_softreset() function name 
+to clarify what it actually does.  But if it's the former, it looks like 
+we'll need a way to support both the full, standard SOFTRESET sequence 
+(perhaps via omap_hwmod_reset() ?) while also supporting the HDQ/I2C 
+custom reset code.
+
+
+regards,
+
+
+- Paul
+
+
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c |   14 ++------------
+>  1 files changed, 2 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 6c0e7eb..0c64853 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2423,20 +2423,10 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs)
+>   */
+>  int omap_hwmod_softreset(struct omap_hwmod *oh)
+>  {
+> -	u32 v;
+> -	int ret;
+> -
+> -	if (!oh || !(oh->_sysc_cache))
+> +	if (!oh)
+>  		return -EINVAL;
+>  
+> -	v = oh->_sysc_cache;
+> -	ret = _set_softreset(oh, &v);
+> -	if (ret)
+> -		goto error;
+> -	_write_sysconfig(v, oh);
+> -
+> -error:
+> -	return ret;
+> +	return _ocp_softreset(oh);
+>  }
+>  
+>  /**
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+- Paul
