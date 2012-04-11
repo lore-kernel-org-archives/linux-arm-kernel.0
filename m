@@ -1,51 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 11 Apr 2012 14:35:38 +0300
-Subject: [PATCHv7 14/18] I2C: OMAP: Use SET_RUNTIME_PM_OPS
-In-Reply-To: <1334142776-10583-15-git-send-email-shubhrajyoti@ti.com>
-References: <1334142776-10583-1-git-send-email-shubhrajyoti@ti.com>
- <1334142776-10583-15-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120411113537.GG12064@arwen.pp.htv.fi>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Wed, 11 Apr 2012 20:36:53 +0900
+Subject: [PATCH v2] arm: davinci: use for_each_set_bit_from
+Message-ID: <1334144213-25870-1-git-send-email-akinobu.mita@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 04:42:52PM +0530, Shubhrajyoti D wrote:
-> Use SET_RUNTIME_PM_OPS macro to set runtime functions.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   11 ++++-------
->  1 files changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index dd65416..28de1d2 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1217,15 +1217,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
->  
->  	return 0;
->  }
-> +#endif
->  
->  static struct dev_pm_ops omap_i2c_pm_ops = {
-> -	.runtime_suspend = omap_i2c_runtime_suspend,
-> -	.runtime_resume = omap_i2c_runtime_resume,
-> +	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
-> +			   omap_i2c_runtime_resume, NULL)
->  };
-> -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
-> -#else
-> -#define OMAP_I2C_PM_OPS NULL
-> -#endif
+Use for_each_set_bit_from to iterate over all the set bit in a memory
+region.
 
-I think you should keep this define, otherwise the pm pointer will
-always be valid.
+Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Christian Riesch <christian.riesch@omicron.at>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+v2: remove uncorrect semicolon at the end of the line found by Christian Riesch
 
+ arch/arm/mach-davinci/dma.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+index fd33919..95ce019 100644
+--- a/arch/arm/mach-davinci/dma.c
++++ b/arch/arm/mach-davinci/dma.c
+@@ -557,9 +557,9 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+ 	if (i == edma_cc[ctlr]->num_slots)
+ 		stop_slot = i;
+ 
+-	for (j = start_slot; j < stop_slot; j++)
+-		if (test_bit(j, tmp_inuse))
+-			clear_bit(j, edma_cc[ctlr]->edma_inuse);
++	j = start_slot;
++	for_each_set_bit_from(j, tmp_inuse, stop_slot)
++		clear_bit(j, edma_cc[ctlr]->edma_inuse);
+ 
+ 	if (count)
+ 		return -EBUSY;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120411/c44025e5/attachment.sig>
+1.7.4.4
