@@ -1,43 +1,66 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 11 Apr 2012 15:21:29 -0700
-Subject: [PATCH 25/40] ARM: imx: add common clock support for clk busy
-In-Reply-To: <20120411065305.GH3852@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-26-git-send-email-s.hauer@pengutronix.de>
- <4F848301.4080607@codeaurora.org> <20120411065305.GH3852@pengutronix.de>
-Message-ID: <4F8603E9.1080607@codeaurora.org>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Wed, 11 Apr 2012 15:23:13 -0700
+Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
+ wake-ups work
+In-Reply-To: <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+Message-ID: <20120411222313.GC31197@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/12 23:53, Sascha Hauer wrote:
-> On Tue, Apr 10, 2012 at 11:59:13AM -0700, Stephen Boyd wrote:
->> On 04/10/12 06:45, Sascha Hauer wrote:
->>> +static int clk_busy_wait(void __iomem *reg, u8 shift)
->>> +{
->>> +	unsigned long timeout = jiffies + msecs_to_jiffies(10);
->>> +
->>> +	while (readl_relaxed(reg) & (1 << shift))
->>> +		if (time_after(jiffies, timeout))
->>> +			return -ETIMEDOUT;
->>> +
->>> +	return 0;
->>> +}
->> MSM also has a bit to poll to see if a clock is enabled or not, similar
->> to this rate switch complete bit. Would it make sense to have another
->> few clock ops like wait_for_enable(), wait_for_rate(),
->> wait_for_disable()? Then you should be able to copy the basic divider
->> ops and assign the wait ops and avoid the wrappers.
-> I think this won't work. What arguments would your wait_for_* functions
-> take?
+On Wed, Apr 11, 2012 at 03:37:47PM -0600, Paul Walmsley wrote:
+> 
+> On Wed, 11 Apr 2012, Mark A. Greer wrote:
+> 
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> > 
+> > Currently, the OMAP3 cpuidle driver calls omap3_enter_idle()
+> > which calls omap_sram_idle().  omap_sram_idle() eventually
+> > causes a 'wfi' instruction to be executed effectively putting
+> > the system to sleep.  It is assumed that an I/O wake-up event
+> > will occur to wake the system up again.  This doesn't work on
+> > systems that don't support I/O wake-ups (indicated by
+> > omap3_has_io_wakeup() returning false).
+> > 
+> > To handle this, follow the same path in omap3_enter_idle()
+> > that would be followed if an interrupt were pending.
+> 
+> I don't quite understand this patch.  Are you saying that AM3517/3505 
+> can't wake from WFI?  That would seem odd.
 
-I assume the same as what all the other ops take.
+No, I'm saying that I/O doesn't seem to wake it up from the WFI.
+I've learned to not trust the am35x TRM much so I'm pretty much
+feeling my way along in the dark.  I do know that without this
+patch, the system is extremely slow which I believe is from it
+only returning from the WFI because of a timer expiration or
+something like that.
 
-wait_for_disable(struct clk_hw *hw)
-wait_for_enable(struct clk_hw *hw)
-wait_for_rate(struct clk_hw *hw)
+> There are other sources of wakeup on the system other than I/O wakeup.  
+> I/O wakeup only applies to wakeups from the I/O pads when the chip is in 
+> RETENTION or OFF.  And as I understand it, neither of those apply to 
+> AM3517/3505?
 
-Do you see the need for anything else?
+Hmm, its true that RETENTION and OFF aren't supported.  It does wake up
+occasionally (as mentioned above) it just seems that I/O doesn't wake
+it up.  I may be mistaken.  I'm only going from what I've seen since and
+the TRM seems to have lots of errors so I'm not sure what to trust in it.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Even if I/O wakeups aren't supported, many of the IP blocks on the system 
+> should be able to cause the ARM to exit WFI by asserting their 
+> SWAKEUP lines and raising their interrupt lines.
+
+Okay, but that doesn't seem to be working.  I'll look some more to see
+why they aren't working.
+
+> So this change doesn't seem quite right to me...
+> 
+> More broadly, if AM3517/3505 only supports powerdomains ON, then you 
+> should probably use your own CPUIdle driver that doesn't touch the 
+> powerdomain states at all.
+
+Okay, I can do that.
+
+Mark
+--
