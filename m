@@ -1,48 +1,84 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Apr 2012 10:33:42 +0200
-Subject: [GIT PULL] i.MX board feature patches
-Message-ID: <20120411083342.GM3852@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 11 Apr 2012 10:34:08 +0200
+Subject: [PATCH v2] pinctrl: implement pinctrl deferred probing
+Message-ID: <1334133248-1452-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Please pull the following board feature patches for i.MX
+If drivers try to obtain pinctrl handles for a pin controller that
+has not yet registered to the subsystem, we need to be able to
+back out and retry with deferred probing. So let's return
+-EPROBE_DEFER whenever this location fails. Also downgrade the
+errors to info, maybe we will even set them to debug once the
+deferred probing is commonplace.
 
-Thanks
- Sascha
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ Documentation/pinctrl.txt    |    5 +++++
+ drivers/pinctrl/core.c       |    9 ++++++---
+ drivers/pinctrl/devicetree.c |    6 +++---
+ 3 files changed, 14 insertions(+), 6 deletions(-)
 
-The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
-
-  Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-features-board-20120411
-
-for you to fetch changes up to e7259f7ca3a0c7a269fecb61156224ddd3edb92c:
-
-  Visstrim_M10: Add board version detection. (2012-04-11 10:16:03 +0200)
-
-----------------------------------------------------------------
-misc i.MX board specific features
-
-----------------------------------------------------------------
-Alex Gershgorin (1):
-      ARM: regulator: i.MX35-PDK Add regulator support
-
-Javier Martin (1):
-      Visstrim_M10: Add board version detection.
-
-Uwe Kleine-K?nig (1):
-      ARM: imx_v4_v5_defconfig: enable adc and touch driver of mc13783
-
- arch/arm/configs/imx_v4_v5_defconfig        |    4 +-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   55 ++++++++
- arch/arm/mach-imx/mach-mx35_3ds.c           |  193 +++++++++++++++++++++++++++
- 3 files changed, 251 insertions(+), 1 deletion(-)
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index eb46b1c..4431c3e7 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -1043,6 +1043,11 @@ quickly poking some registers.
+ The pins are allocated for your device when you issue the pinctrl_get() call,
+ after this you should be able to see this in the debugfs listing of all pins.
+ 
++NOTE: the pinctrl system will return -EPROBE_DEFER if it cannot find the
++requested pinctrl handles, for example if the pinctrl driver has not yet
++registered. Thus make sure that the error path in your driver gracefully
++cleans up and is ready to retry the probing later in the startup process.
++
+ 
+ System pin control hogging
+ ==========================
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 7ff8690..59027ab 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -518,11 +518,14 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
+ 
+ 	setting->pctldev = get_pinctrl_dev_from_devname(map->ctrl_dev_name);
+ 	if (setting->pctldev == NULL) {
+-		dev_err(p->dev, "unknown pinctrl device %s in map entry",
++		dev_info(p->dev, "unknown pinctrl device %s in map entry, deferring probe",
+ 			map->ctrl_dev_name);
+ 		kfree(setting);
+-		/* Eventually, this should trigger deferred probe */
+-		return -ENODEV;
++		/*
++		 * OK let us guess that the driver is not there yet, and
++		 * let's defer obtaining this pinctrl handle to later...
++		 */
++		return -EPROBE_DEFER;
+ 	}
+ 
+ 	switch (map->type) {
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index 5ef2feb..fcb1de4 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -121,11 +121,11 @@ static int dt_to_map_one_config(struct pinctrl *p, const char *statename,
+ 	for (;;) {
+ 		np_pctldev = of_get_next_parent(np_pctldev);
+ 		if (!np_pctldev || of_node_is_root(np_pctldev)) {
+-			dev_err(p->dev, "could not find pctldev for node %s\n",
++			dev_info(p->dev, "could not find pctldev for node %s, deferring probe\n",
+ 				np_config->full_name);
+ 			of_node_put(np_pctldev);
+-			/* FIXME: This should trigger deferrered probe */
+-			return -ENODEV;
++			/* OK let's just assume this will appear later then */
++			return -EPROBE_DEFER;
+ 		}
+ 		pctldev = find_pinctrl_by_of_node(np_pctldev);
+ 		if (pctldev)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.2
