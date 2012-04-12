@@ -1,18 +1,16 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 11 Apr 2012 18:02:41 -0700
-Subject: [PATCH 03/13] clk: core: clk_calc_new_rates handles NULL parents
+Date: Wed, 11 Apr 2012 18:02:39 -0700
+Subject: [PATCH 01/13] clk: core: correct clk_set_rate kerneldoc
 In-Reply-To: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
 References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1334192572-12499-4-git-send-email-mturquette@linaro.org>
+Message-ID: <1334192572-12499-2-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible to call clk_set_rate on a clock with a NULL parent.  One
-such example is an adjustable-rate root clock.  Ensure that
-clk_calc_new_rates does not dereference parent without checking first
-and also handle the corner cases gracefully.
+Remove old and misleading documentation from the previous clk_set_rate
+implementaion.
 
-Reported-by: Rajendra Nayak <rnayak@ti.com>
+Reported-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 Cc: Arnd Bergman <arnd.bergmann@linaro.org>
 Cc: Olof Johansson <olof@lixom.net>
@@ -23,61 +21,65 @@ Cc: Richard Zhao <richard.zhao@linaro.org>
 Cc: Saravana Kannan <skannan@codeaurora.org>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/clk.c |   29 +++++++++++++++++++++--------
- 1 files changed, 21 insertions(+), 8 deletions(-)
+ drivers/clk/clk.c |   41 +++++++++++------------------------------
+ 1 files changed, 11 insertions(+), 30 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 4daacf5..d83a9e0 100644
+index 9cf6f59..3ed36d3 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -763,25 +763,38 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
- static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
- {
- 	struct clk *top = clk;
--	unsigned long best_parent_rate = clk->parent->rate;
-+	unsigned long best_parent_rate;
- 	unsigned long new_rate;
- 
--	if (!clk->ops->round_rate && !(clk->flags & CLK_SET_RATE_PARENT)) {
--		clk->new_rate = clk->rate;
-+	/* sanity */
-+	if (IS_ERR_OR_NULL(clk))
-+		return NULL;
-+
-+	/* never propagate up to the parent */
-+	if (!(clk->flags & CLK_SET_RATE_PARENT)) {
-+		if (!clk->ops->round_rate) {
-+			clk->new_rate = clk->rate;
-+			return NULL;
-+		} else {
-+			new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
-+			goto out;
-+		}
-+	}
-+
-+	/* need clk->parent from here on out */
-+	if (!clk->parent) {
-+		pr_debug("%s: %s has NULL parent\n", __func__, clk->name);
- 		return NULL;
- 	}
- 
--	if (!clk->ops->round_rate && (clk->flags & CLK_SET_RATE_PARENT)) {
-+	if (!clk->ops->round_rate) {
- 		top = clk_calc_new_rates(clk->parent, rate);
- 		new_rate = clk->new_rate = clk->parent->new_rate;
- 
- 		goto out;
- 	}
- 
--	if (clk->flags & CLK_SET_RATE_PARENT)
--		new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
--	else
--		new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
-+	new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
- 
- 	if (best_parent_rate != clk->parent->rate) {
- 		top = clk_calc_new_rates(clk->parent, best_parent_rate);
+@@ -859,38 +859,19 @@ static void clk_change_rate(struct clk *clk)
+  * @clk: the clk whose rate is being changed
+  * @rate: the new rate for clk
+  *
+- * In the simplest case clk_set_rate will only change the rate of clk.
++ * In the simplest case clk_set_rate will only adjust the rate of clk.
+  *
+- * If clk has the CLK_SET_RATE_GATE flag set and it is enabled this call
+- * will fail; only when the clk is disabled will it be able to change
+- * its rate.
++ * Setting the CLK_SET_RATE_PARENT flag allows the rate change operation to
++ * propagate up to clk's parent; whether or not this happens depends on the
++ * outcome of clk's .round_rate implementation.  If *parent_rate is unchanged
++ * after calling .round_rate then upstream parent propagation is ignored.  If
++ * *parent_rate comes back with a new rate for clk's parent then we propagate
++ * up to clk's parent and set it's rate.  Upward propagation will continue
++ * until either a clk does not support the CLK_SET_RATE_PARENT flag or
++ * .round_rate stops requesting changes to clk's parent_rate.
+  *
+- * Setting the CLK_SET_RATE_PARENT flag allows clk_set_rate to
+- * recursively propagate up to clk's parent; whether or not this happens
+- * depends on the outcome of clk's .round_rate implementation.  If
+- * *parent_rate is 0 after calling .round_rate then upstream parent
+- * propagation is ignored.  If *parent_rate comes back with a new rate
+- * for clk's parent then we propagate up to clk's parent and set it's
+- * rate.  Upward propagation will continue until either a clk does not
+- * support the CLK_SET_RATE_PARENT flag or .round_rate stops requesting
+- * changes to clk's parent_rate.  If there is a failure during upstream
+- * propagation then clk_set_rate will unwind and restore each clk's rate
+- * that had been successfully changed.  Afterwards a rate change abort
+- * notification will be propagated downstream, starting from the clk
+- * that failed.
+- *
+- * At the end of all of the rate setting, clk_set_rate internally calls
+- * __clk_recalc_rates and propagates the rate changes downstream,
+- * starting from the highest clk whose rate was changed.  This has the
+- * added benefit of propagating post-rate change notifiers.
+- *
+- * Note that while post-rate change and rate change abort notifications
+- * are guaranteed to be sent to a clk only once per call to
+- * clk_set_rate, pre-change notifications will be sent for every clk
+- * whose rate is changed.  Stacking pre-change notifications is noisy
+- * for the drivers subscribed to them, but this allows drivers to react
+- * to intermediate clk rate changes up until the point where the final
+- * rate is achieved at the end of upstream propagation.
++ * Rate changes are accomplished via tree traversal that also recalculates the
++ * rates for the clocks and fires off POST_RATE_CHANGE notifiers.
+  *
+  * Returns 0 on success, -EERROR otherwise.
+  */
 -- 
 1.7.5.4
