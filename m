@@ -1,19 +1,150 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 12 Apr 2012 06:10:45 -0700
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <4F867A95.9030104@ti.com>
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
- <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
- <20120412030044.GA26236@kroah.com> <4F867A95.9030104@ti.com>
-Message-ID: <20120412131045.GB31384@kroah.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 12 Apr 2012 14:08:30 +0100
+Subject: [RFC PATCH 2/3] ARM: mm: v7 cache level operations
+In-Reply-To: <1334236111-28144-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1334236111-28144-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1334236111-28144-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 12:17:49PM +0530, Santosh Shilimkar wrote:
-> I was hoping that we will have some thing like drivers/memory/*
-> but since it doesn't exist, we used drivers/misc.
+ARM v7 architecture introduces the concept of cache levels and registers
+to probe and manage cache levels accordingly.
 
-Why not create it?  I have no objection to that, it makes it more
-obvious as to what this really is.
+This patch adds v7 support for dcache level operations and defines a
+preferred cache level hook that by default is set to Level of
+Unification Inner Shareable (LoUIS).
 
-greg k-h
+Allowed cache levels are:
+	-1: 	flush the entire cache system
+	 0:	no-op
+	 [1-7]  flush the corresponding data cache level
+
+[LoUIS] has been chosen as preferred level since it represents the cache
+levels which are not shared by CPUs in most of the current systems (i.e.
+cache levels that are per-CPU as e.g. an integrated L1).
+
+Power-down operations like hotplug and CPU idle require to clean/invalidate
+only cache levels that are within the CPU power domain, and LoUIS reflects
+this requirement properly in most of the systems.
+
+To improve configurability and possibly optimize cache operations a DT binding
+is in the making to allow platforms to define the preferred cache level in a
+more flexible way.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Vincent Guittot <vincent.guittot@linaro.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Colin Cross <ccross@android.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Amit Kachhap <amit.kachhap@linaro.org>
+---
+ arch/arm/include/asm/cacheflush.h |   16 ++++++++++++++
+ arch/arm/mm/cache-v7.S            |   43 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 58 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 741ae25..0c9e4fa 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -204,7 +204,23 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+ #define __flush_icache_preferred	__flush_icache_all_generic
+ #endif
+ 
++#if __LINUX_ARM_ARCH__ >= 7
++/*
++ * Hotplug and CPU idle code requires to flush only cache levels
++ * impacted by power down operations. In v7 the upper level is
++ * retrieved by reading LoUIS field of CLIDR, since inner shareability
++ * represents the cache boundaries affected by per-CPU shutdown
++ * operations in the most common platforms.
++ */
++#define __cache_level_v7_uis ({ \
++	u32 val; \
++	asm volatile("mrc p15, 1, %0, c0, c0, 1" : "=r"(val)); \
++	((val & 0xe00000) >> 21); })
++
++#define flush_cache_level_preferred()		__cache_level_v7_uis
++#else
+ #define flush_cache_level_preferred()		(-1)
++#endif
+ 
+ static inline int flush_cache_level_cpu(void)
+ {
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 07c4bc8..c79f152 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -33,6 +33,23 @@ ENTRY(v7_flush_icache_all)
+ ENDPROC(v7_flush_icache_all)
+ 
+ /*
++ *	v7_flush_dcache_level(level)
++ *
++ *	Flush the D-cache up to the level passed as first input parameter.
++ *
++ * 	r0 - cache level
++ *
++ *	Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
++ */
++
++ENTRY(v7_flush_dcache_level)
++	dmb
++	mov	r3, r0, lsl #1			@ level * 2
++	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
++	b	__flush_level
++ENDPROC(v7_flush_dcache_level)
++
++/*
+  *	v7_flush_dcache_all()
+  *
+  *	Flush the whole D-cache.
+@@ -47,6 +64,7 @@ ENTRY(v7_flush_dcache_all)
+ 	ands	r3, r0, #0x7000000		@ extract loc from clidr
+ 	mov	r3, r3, lsr #23			@ left align loc bit field
+ 	beq	finished			@ if loc is 0, then no need to clean
++__flush_level:
+ 	mov	r10, #0				@ start clean at cache level 0
+ loop1:
+ 	add	r2, r10, r10, lsr #1		@ work out 3x current cache level
+@@ -114,6 +132,29 @@ ENTRY(v7_flush_kern_cache_all)
+ ENDPROC(v7_flush_kern_cache_all)
+ 
+ /*
++ *	v7_flush_kern_dcache_level(int level)
++ *      level - upper level that should be cleaned/invalidated
++ *		[valid values (-1,7)]
++ *              level == -1 forces a flush_kern_cache_all
++ *              level == 0 is a nop
++ *              1 < level <=7 flush dcache up to level
++ *	Flush the data cache up to a level passed as a platform
++ *	specific parameter
++ */
++ENTRY(v7_flush_kern_dcache_level)
++	cmp	r0, #-1				@ -1 defaults to flush all
++	beq	v7_flush_kern_cache_all
++ ARM(	stmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
++ THUMB(	stmfd	sp!, {r4-r7, r9-r11, lr}	)
++	sub	r2, r0, #1
++	cmp	r2, #6
++	blls	v7_flush_dcache_level		@ jump if 0 < level <=7
++ ARM(	ldmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
++ THUMB(	ldmfd	sp!, {r4-r7, r9-r11, lr}	)
++	mov	pc, lr
++ENDPROC(v7_flush_kern_dcache_level)
++
++/*
+  *	v7_flush_cache_all()
+  *
+  *	Flush all TLB entries in a particular address space
+@@ -346,4 +387,4 @@ ENDPROC(v7_dma_unmap_area)
+ 	__INITDATA
+ 
+ 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
+-	define_cache_functions v7
++	define_cache_functions v7, cachelevel=1
+-- 
+1.7.9.5
