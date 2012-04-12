@@ -1,85 +1,51 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 12 Apr 2012 18:36:17 +0530
-Subject: [PATCHv8 00/18] I2C Updates
-Message-ID: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
+Date: Thu, 12 Apr 2012 18:36:31 +0530
+Subject: [PATCHv8 14/18] I2C: OMAP: Use SET_RUNTIME_PM_OPS
+In-Reply-To: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
+References: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334235995-6727-15-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series does the following
+Use SET_RUNTIME_PM_OPS macro to set runtime functions.
 
-- Warn fixes if CONFIG_PM_RUNTIME is not selected.
-- I2C register restore only if context if the context is lost
-- Bus busy recovery mechanism.
-- the reset is not done in init.
-- Adds a patch to use devm_* functions
-- Also checks the return type of the get_sync and in case
- of errors prevents register access, also print the cause of
- failure in case of errors.
-- In case of i2c remove register access was done without any
- get_sync fix the same.
-- Adds a pdata function pointer to do context save restore
-- Split the omap_i2c_isr to increase readability
-- Make the i2c use SET_RUNTIME_PM_OPS
-- Folds a patch from Tasslehoff to prevent any merge conflicts.
-- Prevents the XDUF flag to be set if the underflow condition is not met.
-- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
- use the unique id instead as the section number in the recent errata
- docs has changed.
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-- As discussed in [2], Paul has queued the flag for context restore patch,
- removing it from the series.
-
-v8 
-Fix Felipe's comments  and use devm_request_and_ioremap.
-
-
-[1] http://www.spinics.net/lists/linux-i2c/msg07607.html
-[2] http://www.spinics.net/lists/linux-i2c/msg07685.html
-
-Tested on omap4sdp and omap3sdp.
-
-
-The following changes since commit 258f742635360175564e9470eb060ff4d4b984e7:
-
-  modpost: Fix modpost license checking of vmlinux.o (2012-04-09 20:52:56 -0700)
-
-are available in the git repository at:
-  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-next
-
-
-
-Jon Hunter (1):
-  I2C: OMAP: Correct I2C revision for OMAP3
-
-Shubhrajyoti D (15):
-  I2C: OMAP: make omap_i2c_unidle/idle functions depend on
-    CONFIG_PM_RUNTIME
-  I2C: OMAP: Remove reset at init
-  I2C: OMAP: I2C register restore only if context is lost
-  I2C: OMAP: Fix the interrupt clearing in OMAP4
-  I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
-  I2C: OMAP: Optimise the remove code
-  I2C: OMAP: Fix the error handling
-  I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
-    than zero
-  I2C: OMAP: use devm_* functions
-  I2C: OMAP: Fix the crash in i2c remove
-  I2C: OMAP: Handle error check for pm runtime
-  I2C: OMAP: Use SET_RUNTIME_PM_OPS
-  I2C: OMAP: make the read ready processing a separate function
-  I2C: OMAP: Do not set the XUDF if the underflow is not reached
-  I2C: OMAP: Rename the 1p153 to the erratum id i462
-
-Tasslehoff Kjappfot (1):
-  I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
-
-Vikram Pandita (1):
-  I2C: OMAP: Recover from Bus Busy condition
-
- arch/arm/plat-omap/i2c.c      |    3 +
- drivers/i2c/busses/i2c-omap.c |  350 +++++++++++++++++++++++------------------
- include/linux/i2c-omap.h      |    1 +
- 3 files changed, 199 insertions(+), 155 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 95fb9f9..4815528 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1149,6 +1149,7 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
+ #ifdef CONFIG_PM_RUNTIME
+ static void omap_i2c_restore(struct omap_i2c_dev *dev)
+ {
+@@ -1212,15 +1213,16 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 
+ 	return 0;
+ }
++#endif /* CONFIG_PM_RUNTIME */
+ 
+ static struct dev_pm_ops omap_i2c_pm_ops = {
+-	.runtime_suspend = omap_i2c_runtime_suspend,
+-	.runtime_resume = omap_i2c_runtime_resume,
++	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
++			   omap_i2c_runtime_resume, NULL)
+ };
+ #define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+ #else
+ #define OMAP_I2C_PM_OPS NULL
+-#endif
++#endif /* CONFIG_PM */
+ 
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
 -- 
 1.7.4.1
