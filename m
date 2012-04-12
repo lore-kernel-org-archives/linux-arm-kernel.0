@@ -1,73 +1,41 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 12 Apr 2012 11:51:13 +0530
-Subject: [PATCH 09/13] clk: Make clk_get_rate() return 0 on error
-In-Reply-To: <1334192572-12499-10-git-send-email-mturquette@linaro.org>
-References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334192572-12499-10-git-send-email-mturquette@linaro.org>
-Message-ID: <4F867459.20806@st.com>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Thu, 12 Apr 2012 14:26:32 +0800
+Subject: [PATCH 0/4] Add support for Atmel's AT91SAM9N12-EK (With DT)
+Message-ID: <1334211996-31572-1-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/12/2012 6:32 AM, Mike Turquette wrote:
-> From: Rajendra Nayak <rnayak@ti.com>
-> 
-> Most users of clk_get_rate() actually assume a non zero
-> return value as a valid rate returned. Returing -EINVAL
-> might confuse such users, so make it instead return zero
-> on error.
-> 
-> Besides the return value of clk_get_rate seems to be
-> 'unsigned long'.
-> 
-> Signed-off-by: Rajendra nayak <rnayak@ti.com>
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Richard Zhao <richard.zhao@linaro.org>
-> Cc: Saravana Kannan <skannan@codeaurora.org>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/clk/clk.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 9924aec..a24b121 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -285,7 +285,7 @@ unsigned long __clk_get_rate(struct clk *clk)
->  	unsigned long ret;
->  
->  	if (!clk) {
-> -		ret = -EINVAL;
-> +		ret = 0;
->  		goto out;
->  	}
->  
-> @@ -295,7 +295,7 @@ unsigned long __clk_get_rate(struct clk *clk)
->  		goto out;
->  
->  	if (!clk->parent)
-> -		ret = -ENODEV;
-> +		ret = 0;
->  
->  out:
->  	return ret;
-> @@ -560,7 +560,7 @@ EXPORT_SYMBOL_GPL(clk_enable);
->   * @clk: the clk whose rate is being returned
->   *
->   * Simply returns the cached rate of the clk.  Does not query the hardware.  If
-> - * clk is NULL then returns -EINVAL.
-> + * clk is NULL then returns 0.
->   */
->  unsigned long clk_get_rate(struct clk *clk)
->  {
+This series adds support for Atmel's AT91SAM9N12-EK.
 
-Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
+Patches are on top of v3.4-rc2 and target for v3.5
+
+Hong Xu (4):
+  AT91: Add DT description files for AT91SAM9N12-EK
+  AT91: Add machine header file for AT91SAM9N12 SoC
+  AT91: Add machine files for AT91SAM9N12 SoC
+  Add default kernel configuration file for AT91SAM9N12-EK
+
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |  223 +++
+ arch/arm/boot/dts/at91sam9n12ek.dts                |  111 ++
+ arch/arm/configs/at91sam9n12ek_defconfig           | 1862 ++++++++++++++++++++
+ arch/arm/mach-at91/Kconfig                         |    9 +
+ arch/arm/mach-at91/Makefile                        |    1 +
+ arch/arm/mach-at91/at91sam9n12.c                   |  275 +++
+ arch/arm/mach-at91/board-dt.c                      |    1 +
+ arch/arm/mach-at91/clock.c                         |   15 +-
+ arch/arm/mach-at91/include/mach/at91sam9n12.h      |   68 +
+ .../mach-at91/include/mach/at91sam9n12_matrix.h    |   53 +
+ arch/arm/mach-at91/include/mach/cpu.h              |   10 +
+ arch/arm/mach-at91/include/mach/hardware.h         |    2 +
+ arch/arm/mach-at91/setup.c                         |    6 +
+ arch/arm/mach-at91/soc.h                           |    5 +
+ 14 files changed, 2636 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9n12.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9n12ek.dts
+ create mode 100644 arch/arm/configs/at91sam9n12ek_defconfig
+ create mode 100644 arch/arm/mach-at91/at91sam9n12.c
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
 
 -- 
-viresh
+1.7.3.3
