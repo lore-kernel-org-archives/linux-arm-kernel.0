@@ -1,30 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Apr 2012 21:13:24 -0300
-Subject: [PATCH 1/3] ARM i.MX27: Add devicetree support
-In-Reply-To: <87iph7wu97.fsf@laptop.org>
-References: <1330503654-2197-1-git-send-email-s.hauer@pengutronix.de>
- <1330503654-2197-2-git-send-email-s.hauer@pengutronix.de>
- <87lim5zne5.fsf@laptop.org> <20120410091715.GA3852@pengutronix.de>
- <87iph7wu97.fsf@laptop.org>
-Message-ID: <CAOMZO5ChBtMnR-MHMGyqn6xnXHAXzzBq0AA0-x7q_uk7zYC5vA@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 11 Apr 2012 19:24:29 -0500
+Subject: [PATCH 07/12] arm: omap3: am35x: Set proper powerdomain states
+In-Reply-To: <20120411224031.GD31197@animalcreek.com>
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-8-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111546110.29473@utopia.booyaka.com>
+ <20120411224031.GD31197@animalcreek.com>
+Message-ID: <4F8620BD.5000800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
 
-On Tue, Apr 10, 2012 at 11:12 AM, Chris Ball <cjb@laptop.org> wrote:
+On 04/11/2012 05:40 PM, Mark A. Greer wrote:
+> On Wed, Apr 11, 2012 at 03:53:30PM -0600, Paul Walmsley wrote:
+>> Hi
+>>
+>> On Wed, 11 Apr 2012, Mark A. Greer wrote:
+>>
+>>> From: "Mark A. Greer" <mgreer@animalcreek.com>
+>>>
+>>> The am35x family of SoCs only support PWRSTS_ON
+>>> and PWRSTS_INACTIVE states so create a new set
+>>> of powerdomain structures that ensure that only
+>>> the ON and INACTIVE states are entered.
+>>
+>> I'm still unsure what we should do about this INACTIVE state.  As far as I 
+>> can tell, it does not actually represent a distinct powerdomain state on 
+>> OMAP3.  We can't write it to the PM_PWSTCTRL_*.POWERSTATE bits, since that 
+>> value is marked as "reserved".  And SPRUGR0B, the AM3517/3505 TRM, 
+>> explicitly states "This register should not be programmed with reserved 
+>> values of bit fields for proper functioning of power state control."
+>> Of course SPRUGR0B also claims that AM3517/3505 supports RETENTION, so 
+>> that is relatively confusing.
+> 
+> Yep.  You read one section which tells you the device doesn't support
+> such-and-such then it goes on for pages describing how it works.  I play
+> with the hardware and the registers are there so it seems like it should
+> work.  Its been an "adventure". :)
+> 
+>> OMAP4 PRCM actually does seem to support powerdomain INACTIVE state, 
+>> although it does not actually seem to represent a separate state.  As I 
+>> understand it, it simply allows the clockdomains in the powerdomain to 
+>> transitioning from the ACTIVE state into the INACTIVE state.  In other 
+>> words, it doesn't affect the powerdomain power state at all.  And on OMAP4 
+>> it's referred to as the ON-INACTIVE state, to clarify that it is simply a 
+>> variant of the ON state.  I wish they had just added a separate bit for 
+>> this; it would have avoided some frustration...
+>>
+>> Anyway, my question is this: is there any point at all to defining the 
+>> INACTIVE state for 3517/3505, given that it apparently cannot be read 
+>> from, nor written to the PRCM hardware?
+> 
+> Great question and I really don't know the answer--its too hard to know
+> what's for real and what isn't in the TRM.  Maybe it is best to get rid
+> of INACTIVE and just leave everything ON.
 
->> Thanks for noting. I assume that irq_domain_add_legacy is the right
->> approach here, just like the other i.MX boards do, right?
->
-> Yeah, if you look at Grant's removal patch:
->
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=6b783f7c5dde2648fa0bbe7fc8ac80d78699e67f
->
-> .. he converted all of the in-tree uses to irq_domain_add_legacy()
-> at the time of removal, so that looks right.
+FWIW, for omap3 class device inactive is defined as ...
 
-I managed to get mx27pdk booting from dt (thanks Shawn for the tips!)
-and I fixed this problem.
+"Inactive: The same as power on but all clocks are cut. Logic is not
+working, because no clock is running."
 
-Will send the fix soon.
+There is nothing explicit to program as far as the power domain goes.
+For OMAP4 you can program the power domain to enter inactive and when
+all power domains in a voltage domain are inactive the voltage domain
+can enter the sleep state.
+
+Cheers
+Jon
