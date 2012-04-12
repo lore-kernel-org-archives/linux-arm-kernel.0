@@ -1,22 +1,21 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 11 Apr 2012 18:02:42 -0700
-Subject: [PATCH 04/13] clk: core: enforce clk_ops consistency
+Date: Wed, 11 Apr 2012 18:02:40 -0700
+Subject: [PATCH 02/13] clk: core: remove dead code paths
 In-Reply-To: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
 References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1334192572-12499-5-git-send-email-mturquette@linaro.org>
+Message-ID: <1334192572-12499-3-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation/clk.txt has some handsome ASCII art outlining which
-clk_ops are mandatory for a given clock, given the capability of the
-hardware.  Enforce those mandates with sanity checks in __clk_init.
+Some static inline dummy functions were left over from before the clock
+core was consolidated from several C files down to one.  Remove them.
 
+Reported-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 Cc: Arnd Bergman <arnd.bergmann@linaro.org>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
 Cc: Richard Zhao <richard.zhao@linaro.org>
 Cc: Saravana Kannan <skannan@codeaurora.org>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
@@ -24,33 +23,32 @@ Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/clk.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+ drivers/clk/clk.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index d83a9e0..9924aec 100644
+index 3ed36d3..4daacf5 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -1202,6 +1202,20 @@ void __clk_init(struct device *dev, struct clk *clk)
- 	if (__clk_lookup(clk->name))
- 		goto out;
+@@ -194,7 +194,7 @@ static int __init clk_debug_init(void)
+ late_initcall(clk_debug_init);
+ #else
+ static inline int clk_debug_register(struct clk *clk) { return 0; }
+-#endif /* CONFIG_COMMON_CLK_DEBUG */
++#endif
  
-+	/* check that clk_ops are sane.  See Documentation/clk.txt */
-+	if (clk->ops->set_rate &&
-+			!(clk->ops->round_rate && clk->ops->recalc_rate)) {
-+		pr_warning("%s: %s must implement .round_rate & .recalc_rate\n",
-+				__func__, clk->name);
-+		goto out;
-+	}
-+
-+	if (clk->ops->set_parent && !clk->ops->get_parent) {
-+		pr_warning("%s: %s must implement .get_parent & .set_parent\n",
-+				__func__, clk->name);
-+		goto out;
-+	}
-+
- 	/* throw a WARN if any entries in parent_names are NULL */
- 	for (i = 0; i < clk->num_parents; i++)
- 		WARN(!clk->parent_names[i],
+ #ifdef CONFIG_COMMON_CLK_DISABLE_UNUSED
+ /* caller must hold prepare_lock */
+@@ -246,9 +246,7 @@ static int clk_disable_unused(void)
+ 	return 0;
+ }
+ late_initcall(clk_disable_unused);
+-#else
+-static inline int clk_disable_unused(struct clk *clk) { return 0; }
+-#endif /* CONFIG_COMMON_CLK_DISABLE_UNUSED */
++#endif
+ 
+ /***    helper functions   ***/
+ 
 -- 
 1.7.5.4
