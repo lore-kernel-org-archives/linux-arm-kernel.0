@@ -1,125 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 12 Apr 2012 16:59:46 +0530
-Subject: [PATCH 1/2] ARM: mm: Add v7_flush_dcache_by_level() API.
-In-Reply-To: <1334230187-21553-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1334230187-21553-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1334230187-21553-2-git-send-email-santosh.shilimkar@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Apr 2012 11:34:24 +0000
+Subject: [PATCH v6 17/17] pwm: Take over maintainership of the PWM
+ subsystem
+In-Reply-To: <20120412072206.GB18252@avionic-0098.mockup.avionic-design.de>
+References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
+ <201204101951.44198.arnd@arndb.de>
+ <20120412072206.GB18252@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201204121134.24892.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R Sricharan <r.sricharan@ti.com>
+On Thursday 12 April 2012, Thierry Reding wrote:
+>   * Arnd Bergmann wrote:
+> > On Tuesday 10 April 2012, Thierry Reding wrote:
+> > > I'm taking over the maintainership of the PWM subsystem. This commit
+> > > also adds the URLs to the gitorious project and repository as well as
+> > > any missing files related to the PWM subsystem.
+> > > 
+> > > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > > ---
+> > > Note: I guess this patch in particular could use some Acked-by, maybe from
+> > > Arnd and Sascha so that people will know this happens with their blessing.
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> As far as I can tell the series is in pretty good shape. I've integrated
+> Shawn's latest comments and I think we could get this into 3.5. Does it make
+> sense to take the PWM tree through Linux next before having it pulled into
+> mainline during the next merge window?
 
-On ARMv7 based SOC with an integrated L2 cache, there is a need
-to have a flush API to operate on each cache level. In few low
-power modes, L2 cache is retained where as L1 is lost. The current
-v7_flush_dcache_all(), flushes all the levels and it would be quite
-expensive.
+Yes, that's the way to go. Just ask Stephen Rothwell to include it right
+away if you are sufficiently happy with the contents and believe that they
+don't break stuff.
 
-So introduce v7_flush_dcache_by_level() API which takes a
-parameter (cache level), and flush only on that level.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-v7.S |   56 ++++++++++++++++++++++++++++++++++++++---------
- 1 files changed, 45 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index a655d3d..cbeff42 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -43,12 +43,32 @@ ENDPROC(v7_flush_icache_all)
-  */
- ENTRY(v7_flush_dcache_all)
- 	dmb					@ ensure ordering with previous memory accesses
-+	mov	r8, lr				@ store lr
- 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
- 	ands	r3, r0, #0x7000000		@ extract loc from clidr
- 	mov	r3, r3, lsr #23			@ left align loc bit field
- 	beq	finished			@ if loc is 0, then no need to clean
- 	mov	r10, #0				@ start clean at cache level 0
- loop1:
-+	bl	v7_flush_dcache_current_level
-+skip:
-+	add	r10, r10, #2			@ increment cache number
-+	cmp	r3, r10						@
-+	bgt	loop1
-+finished:
-+	mov	r10, #0				@ swith back to cache level 0
-+	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
-+	dsb
-+	isb
-+	mov	pc, r8				@ restore lr
-+ENDPROC(v7_flush_dcache_all)
-+/*
-+ *	v7_flush_dcache_current_level()
-+ *
-+ *	Flush the D-cache by specifed level like l1, l2 etc.
-+ *	Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
-+ */
-+ENTRY(v7_flush_dcache_current_level)
- 	add	r2, r10, r10, lsr #1		@ work out 3x current cache level
- 	mov	r1, r0, lsr r2			@ extract cache type bits from clidr
- 	and	r1, r1, #7			@ mask of the bits for current cache only
-@@ -84,17 +104,31 @@ loop3:
- 	bge	loop3
- 	subs	r7, r7, #1			@ decrement the index
- 	bge	loop2
--skip:
--	add	r10, r10, #2			@ increment cache number
--	cmp	r3, r10
--	bgt	loop1
--finished:
-+	mov	pc, lr
-+ENDPROC(v7_flush_dcache_current_level)
-+
-+/*
-+ *	v7_flush_dcache_by_level()
-+ *	r0	- cache level to be flushed
-+ *
-+ *	Flush the D-cache by specifed level like l1, l2 etc.
-+ *	Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
-+ */
-+ENTRY(v7_flush_dcache_by_level)
-+	dmb					@ ensure ordering with previous memory accesses
-+	mov	r8, lr				@ store the lr
-+	mov	r10, r0				@ temp storage
-+	sub	r10, r10, #1
-+	mov	r10, r10, lsl #1
-+	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
-+	bl	v7_flush_dcache_current_level
-+finished1:
- 	mov	r10, #0				@ swith back to cache level 0
- 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
- 	dsb
- 	isb
--	mov	pc, lr
--ENDPROC(v7_flush_dcache_all)
-+	mov	pc, r8				@ restore lr
-+ENDPROC(v7_flush_dcache_by_level)
- 
- /*
-  *	v7_flush_cache_all()
-@@ -108,14 +142,14 @@ ENDPROC(v7_flush_dcache_all)
-  *
-  */
- ENTRY(v7_flush_kern_cache_all)
-- ARM(	stmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
-- THUMB(	stmfd	sp!, {r4-r7, r9-r11, lr}	)
-+ ARM(	stmfd	sp!, {r4-r5, r7-r11, lr}	)
-+ THUMB(	stmfd	sp!, {r4-r11, lr}	)
- 	bl	v7_flush_dcache_all
- 	mov	r0, #0
- 	ALT_SMP(mcr	p15, 0, r0, c7, c1, 0)	@ invalidate I-cache inner shareable
- 	ALT_UP(mcr	p15, 0, r0, c7, c5, 0)	@ I+BTB cache invalidate
-- ARM(	ldmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
-- THUMB(	ldmfd	sp!, {r4-r7, r9-r11, lr}	)
-+ ARM(	ldmfd	sp!, {r4-r5, r7-r11, lr}	)
-+ THUMB(	ldmfd	sp!, {r4-r11, lr}	)
- 	mov	pc, lr
- ENDPROC(v7_flush_kern_cache_all)
- 
--- 
-1.7.5.4
+	Arnd
