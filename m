@@ -1,19 +1,18 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 11 Apr 2012 18:02:49 -0700
-Subject: [PATCH 11/13] clk: Constify parent name arrays
+Date: Wed, 11 Apr 2012 18:02:41 -0700
+Subject: [PATCH 03/13] clk: core: clk_calc_new_rates handles NULL parents
 In-Reply-To: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
 References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1334192572-12499-12-git-send-email-mturquette@linaro.org>
+Message-ID: <1334192572-12499-4-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@opensource.wolfsonmicro.com>
+It is possible to call clk_set_rate on a clock with a NULL parent.  One
+such example is an adjustable-rate root clock.  Ensure that
+clk_calc_new_rates does not dereference parent without checking first
+and also handle the corner cases gracefully.
 
-Drivers should be able to declare their arrays of parent names as const
-so the APIs need to accept const arguments.
-
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-[mturquette at linaro.org: constified gate]
+Reported-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 Cc: Arnd Bergman <arnd.bergmann@linaro.org>
 Cc: Olof Johansson <olof@lixom.net>
@@ -22,94 +21,63 @@ Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@freescale.com>
 Cc: Richard Zhao <richard.zhao@linaro.org>
 Cc: Saravana Kannan <skannan@codeaurora.org>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/clk-mux.c        |    2 +-
- drivers/clk/clk.c            |    2 +-
- include/linux/clk-private.h  |    2 +-
- include/linux/clk-provider.h |    8 ++++----
- 4 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/clk/clk.c |   29 +++++++++++++++++++++--------
+ 1 files changed, 21 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 5424488..bd5e598 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -89,7 +89,7 @@ const struct clk_ops clk_mux_ops = {
- EXPORT_SYMBOL_GPL(clk_mux_ops);
- 
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		char **parent_names, u8 num_parents, unsigned long flags,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock)
- {
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index a24b121..ddade87 100644
+index 4daacf5..d83a9e0 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -1328,7 +1328,7 @@ out:
-  */
- struct clk *clk_register(struct device *dev, const char *name,
- 		const struct clk_ops *ops, struct clk_hw *hw,
--		char **parent_names, u8 num_parents, unsigned long flags)
-+		const char **parent_names, u8 num_parents, unsigned long flags)
+@@ -763,25 +763,38 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
+ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
  {
- 	struct clk *clk;
+ 	struct clk *top = clk;
+-	unsigned long best_parent_rate = clk->parent->rate;
++	unsigned long best_parent_rate;
+ 	unsigned long new_rate;
  
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index f19fee0..e9c8b98 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -30,7 +30,7 @@ struct clk {
- 	const struct clk_ops	*ops;
- 	struct clk_hw		*hw;
- 	struct clk		*parent;
--	char			**parent_names;
-+	const char		**parent_names;
- 	struct clk		**parents;
- 	u8			num_parents;
- 	unsigned long		rate;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 6eb8e5d..8981435 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -176,7 +176,7 @@ struct clk_gate {
- 	u8		bit_idx;
- 	u8		flags;
- 	spinlock_t	*lock;
--	char		*parent[1];
-+	const char	*parent[1];
- };
+-	if (!clk->ops->round_rate && !(clk->flags & CLK_SET_RATE_PARENT)) {
+-		clk->new_rate = clk->rate;
++	/* sanity */
++	if (IS_ERR_OR_NULL(clk))
++		return NULL;
++
++	/* never propagate up to the parent */
++	if (!(clk->flags & CLK_SET_RATE_PARENT)) {
++		if (!clk->ops->round_rate) {
++			clk->new_rate = clk->rate;
++			return NULL;
++		} else {
++			new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
++			goto out;
++		}
++	}
++
++	/* need clk->parent from here on out */
++	if (!clk->parent) {
++		pr_debug("%s: %s has NULL parent\n", __func__, clk->name);
+ 		return NULL;
+ 	}
  
- #define CLK_GATE_SET_TO_DISABLE		BIT(0)
-@@ -214,7 +214,7 @@ struct clk_divider {
- 	u8		width;
- 	u8		flags;
- 	spinlock_t	*lock;
--	char		*parent[1];
-+	const char	*parent[1];
- };
+-	if (!clk->ops->round_rate && (clk->flags & CLK_SET_RATE_PARENT)) {
++	if (!clk->ops->round_rate) {
+ 		top = clk_calc_new_rates(clk->parent, rate);
+ 		new_rate = clk->new_rate = clk->parent->new_rate;
  
- #define CLK_DIVIDER_ONE_BASED		BIT(0)
-@@ -257,7 +257,7 @@ struct clk_mux {
+ 		goto out;
+ 	}
  
- extern const struct clk_ops clk_mux_ops;
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		char **parent_names, u8 num_parents, unsigned long flags,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock);
+-	if (clk->flags & CLK_SET_RATE_PARENT)
+-		new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
+-	else
+-		new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
++	new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
  
-@@ -278,7 +278,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-  */
- struct clk *clk_register(struct device *dev, const char *name,
- 		const struct clk_ops *ops, struct clk_hw *hw,
--		char **parent_names, u8 num_parents, unsigned long flags);
-+		const char **parent_names, u8 num_parents, unsigned long flags);
- 
- /* helper functions */
- const char *__clk_get_name(struct clk *clk);
+ 	if (best_parent_rate != clk->parent->rate) {
+ 		top = clk_calc_new_rates(clk->parent, best_parent_rate);
 -- 
 1.7.5.4
