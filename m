@@ -1,32 +1,79 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 12 Apr 2012 14:11:54 +0200
-Subject: [PATCH][RESEND] ARM: SAMSUNG: make SAMSUNG_PM_DEBUG select
- DEBUG_LL
-In-Reply-To: <4F6B398A.8040703@samsung.com>
-References: <201203202120.45806.heiko@sntech.de> <4F6B398A.8040703@samsung.com>
-Message-ID: <201204121411.55054.heiko@sntech.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 12 Apr 2012 14:13:37 +0200
+Subject: [PATCH] ARM: Exynos4: integrate SYSMMU driver with DMA-mapping
+ interface
+In-Reply-To: <201204121109.28753.arnd@arndb.de>
+References: <1334155004-5700-1-git-send-email-m.szyprowski@samsung.com>
+ <4F869AF4.3080402@gmail.com>
+ <026301cd188d$32613860$9723a920$%szyprowski@samsung.com>
+ <201204121109.28753.arnd@arndb.de>
+Message-ID: <028f01cd18a5$b0721770$11564650$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 22. M?rz 2012, 15:39:06 schrieb Kukjin Kim:
-> On 03/20/12 13:20, Heiko St?bner wrote:
-> > From: Maurus Cuelenaere<mcuelenaere@gmail.com>
-> > 
-> > When selecting SAMSUNG_PM_DEBUG, it complains about a missing
-> > printascii() function if you do not select DEBUG_LL, so make the former
-> > select the latter.
-> > 
-> > Signed-off-by: Maurus Cuelenaere<mcuelenaere@gmail.com>
-> > Acked-by: Heiko Stuebner<heiko@sntech.de>
-> > ---
-> > This was originally sent in september 2010, but seems to have been
-> > forgotten. As this problem has bitten me today, here it is again.
+
+
+
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, April 12, 2012 1:09 PM
+> To: Marek Szyprowski
+> Cc: 'Subash Patel'; linux-arm-kernel at lists.infradead.org; linaro-mm-sig at lists.linaro.org;
+> linux-mm at kvack.org; linux-arch at vger.kernel.org; iommu at lists.linux-foundation.org; 'Kyungmin
+> Park'; 'Joerg Roedel'; 'Russell King - ARM Linux'; 'Chunsang Jeong'; 'Krishna Reddy'; 'KyongHo
+> Cho'; Andrzej Pietrasiewicz; 'Benjamin Herrenschmidt'; 'Konrad Rzeszutek Wilk'; 'Hiroshi Doyu'
+> Subject: Re: [PATCH] ARM: Exynos4: integrate SYSMMU driver with DMA-mapping interface
 > 
-> Yeah, missed. Looks good to me and will apply.
+> On Thursday 12 April 2012, Marek Szyprowski wrote:
+> > +
+> > > > +/*
+> > > > + * s5p_sysmmu_late_init
+> > > > + * Create DMA-mapping IOMMU context for specified devices. This function must
+> > > > + * be called later, once SYSMMU driver gets registered and probed.
+> > > > + */
+> > > > +static int __init s5p_sysmmu_late_init(void)
+> > > > +{
+> > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc0).dev,&s5p_device_fimc0.dev);
+> > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc1).dev,&s5p_device_fimc1.dev);
+> > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc2).dev,&s5p_device_fimc2.dev);
+> > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc3).dev,&s5p_device_fimc3.dev);
+> > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_l).dev,&s5p_device_mfc_l.dev);
+> > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_r).dev,&s5p_device_mfc_r.dev);
+> > > > +
+> > > > +   s5p_create_iommu_mapping(&s5p_device_fimc0.dev, 0x20000000, SZ_128M, 4);
+> > > > +   s5p_create_iommu_mapping(&s5p_device_fimc1.dev, 0x20000000, SZ_128M, 4);
+> > > > +   s5p_create_iommu_mapping(&s5p_device_fimc2.dev, 0x20000000, SZ_128M, 4);
+> > > > +   s5p_create_iommu_mapping(&s5p_device_fimc3.dev, 0x20000000, SZ_128M, 4);
+> > > > +   s5p_create_iommu_mapping(&s5p_device_mfc_l.dev, 0x20000000, SZ_128M, 4);
+> > > > +   s5p_create_iommu_mapping(&s5p_device_mfc_r.dev, 0x40000000, SZ_128M, 4);
+> > > > +
+> > > > +   return 0;
+> > > > +}
+> > > > +device_initcall(s5p_sysmmu_late_init);
+> > >
+> > > Shouldn't these things be specific to a SoC? With this RFC, it happens
+> > > that you will predefine the IOMMU attachment and mapping information for
+> > > devices in common location (dev-sysmmu.c)? This may lead to problems
+> > > because there are some IP's with SYSMMU support in exynos5, but not
+> > > available in exynos4 (eg: GSC, FIMC-LITE, FIMC-ISP) Previously we used
+> > > to do above declaration in individual machine file, which I think was
+> > > more meaningful.
+> >
+> > Right, I simplified the code too much. Keeping these definitions inside machine
+> > files was a better idea. I completely forgot that Exynos sub-platform now covers
+> > both Exynos4 and Exynos5 SoC families.
+> 
+> Ideally the information about iommu attachment should come from the
+> device tree. We have the "dma-ranges" properties that define how a dma
+> address space is mapped. I am not entirely sure how that works when you
+> have multiple IOMMUs and if that requires defining addititional properties,
+> but I think we should make it so that we don't have to hardcode specific
+> devices in the source.
 
-thanks, but it seems I can't find it in the linux-samsung git currently.
+Right, until that time machine/board files are imho ok.
 
-Any news on this?
-
-Thanks
-Heiko
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
