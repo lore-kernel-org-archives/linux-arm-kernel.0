@@ -1,92 +1,181 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 12 Apr 2012 10:17:28 -0500
-Subject: [PATCH] ARM: dts: remove blank interrupt-parent properties
-Message-ID: <1334243848-29522-1-git-send-email-robherring2@gmail.com>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Thu, 12 Apr 2012 23:39:41 +0800
+Subject: [PATCH 1/2] mfd: da9052: add device-tree support for i2c driver
+Message-ID: <1334245182-31725-1-git-send-email-paul.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 
-These were incorrectly introduced and can cause problems for of_irq_init.
+This patch adds device-tree support for dialog MFD and the binding
+documentations.
 
-The correct way to define a root controller is no interrupt-parent set at
-all or the interrupt-parent is set to the root controller itself when
-inherited from a parent node.
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Ashish Jangam <ashish.jangam@kpitcummins.com>
 ---
-Arnd, Olof,
+ .../devicetree/bindings/mfd/da9052-i2c.txt         |   58 ++++++++++++++++++++
+ drivers/mfd/da9052-i2c.c                           |   54 +++++++++++++++---
+ 2 files changed, 104 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/da9052-i2c.txt
 
-Please apply for 3.4.
-
-Rob
-
- arch/arm/boot/dts/at91sam9g20.dtsi |    1 -
- arch/arm/boot/dts/at91sam9g45.dtsi |    1 -
- arch/arm/boot/dts/at91sam9x5.dtsi  |    1 -
- arch/arm/boot/dts/db8500.dtsi      |    1 -
- arch/arm/boot/dts/highbank.dts     |    1 -
- 5 files changed, 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index 92f3662..6c33256 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -55,7 +55,6 @@
- 				#interrupt-cells = <2>;
- 				compatible = "atmel,at91rm9200-aic";
- 				interrupt-controller;
--				interrupt-parent;
- 				reg = <0xfffff000 0x200>;
- 			};
+diff --git a/Documentation/devicetree/bindings/mfd/da9052-i2c.txt b/Documentation/devicetree/bindings/mfd/da9052-i2c.txt
+new file mode 100644
+index 0000000..042d042
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/da9052-i2c.txt
+@@ -0,0 +1,58 @@
++* Dialog DA9052/53 Power Management Integrated Circuit (PMIC)
++
++Required properties:
++- compatible : Should be "dialog,da9052", "dialog,da9053-aa",
++			 "dialog,da9053-ab", or "dialog,da9053-bb"
++
++Sub-nodes:
++- regulators : Contain the regulator nodes.  The DA9052 regulators are
++  sorted as following:
++
++    buck_core : regulator BUCK_CORE (id: 0 )
++    buck_pro  : regulator BUCK_PRO  (id: 1 )
++    buck_mem  : regulator BUCK_MEM  (id: 2 )
++    buck_peri : regulator BUCK_PERI (id: 3 )
++    ldo1      : regulator LDO1	    (id: 4 )
++    ldo2      : regulator LDO2	    (id: 5 )
++    ldo3      : regulator LDO3	    (id: 6 )
++    ldo4      : regulator LDO4	    (id: 7 )
++    ldo5      : regulator LDO5	    (id: 8 )
++    ldo6      : regulator LDO6	    (id: 9 )
++    ldo7      : regulator LDO7	    (id: 10)
++    ldo8      : regulator LDO8	    (id: 11)
++    ldo9      : regulator LDO9	    (id: 12)
++    ldo10     : regulator LDO10     (id: 13)
++
++  The bindings details of individual regulator device can be found in:
++  Documentation/devicetree/bindings/regulator/regulator.txt
++
++Examples:
++
++i2c at 63fc8000 { /* I2C1 */
++	status = "okay";
++
++	pmic: dialog at 48 {
++		compatible = "dialog,da9053-aa";
++		reg = <0x48>;
++
++		regulators {
++			regulator-buck0 {
++				regulator-name = "DA9052_BUCK_CORE";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <2075000>;
++			};
++
++			regulator-buck1 {
++				regulator-name = "DA9052_BUCK_PRO";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <2075000>;
++			};
++
++			regulator-buck2 {
++				regulator-name = "DA9052_BUCK_MEM";
++				regulator-min-microvolt = <925000>;
++				regulator-max-microvolt = <2500000>;
++			};
++		};
++	};
++};
+diff --git a/drivers/mfd/da9052-i2c.c b/drivers/mfd/da9052-i2c.c
+index 36b88e3..e07bcfa 100644
+--- a/drivers/mfd/da9052-i2c.c
++++ b/drivers/mfd/da9052-i2c.c
+@@ -22,6 +22,11 @@
+ #include <linux/mfd/da9052/da9052.h>
+ #include <linux/mfd/da9052/reg.h>
  
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 3d0c32f..2815be1 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -56,7 +56,6 @@
- 				#interrupt-cells = <2>;
- 				compatible = "atmel,at91rm9200-aic";
- 				interrupt-controller;
--				interrupt-parent;
- 				reg = <0xfffff000 0x200>;
- 			};
++#ifdef CONFIG_OF
++#include <linux/of.h>
++#include <linux/of_device.h>
++#endif
++
+ static int da9052_i2c_enable_multiwrite(struct da9052 *da9052)
+ {
+ 	int reg_val, ret;
+@@ -41,6 +46,24 @@ static int da9052_i2c_enable_multiwrite(struct da9052 *da9052)
+ 	return 0;
+ }
  
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index c111001..1995c44 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -54,7 +54,6 @@
- 				#interrupt-cells = <2>;
- 				compatible = "atmel,at91rm9200-aic";
- 				interrupt-controller;
--				interrupt-parent;
- 				reg = <0xfffff000 0x200>;
- 			};
++static struct i2c_device_id da9052_i2c_id[] = {
++	{"da9052", DA9052},
++	{"da9053-aa", DA9053_AA},
++	{"da9053-ba", DA9053_BA},
++	{"da9053-bb", DA9053_BB},
++	{}
++};
++
++#ifdef CONFIG_OF
++static const struct of_device_id dialog_dt_ids[] = {
++	{ .compatible = "dialog,da9052" },
++	{ .compatible = "dialog,da9053-aa" },
++	{ .compatible = "dialog,da9053-ab" },
++	{ .compatible = "dialog,da9053-bb" },
++	{ /* sentinel */ }
++};
++#endif
++
+ static int __devinit da9052_i2c_probe(struct i2c_client *client,
+ 				       const struct i2c_device_id *id)
+ {
+@@ -76,6 +99,26 @@ static int __devinit da9052_i2c_probe(struct i2c_client *client,
+ 	if (ret < 0)
+ 		goto err_regmap;
  
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index d73dce6..14bc307 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -24,7 +24,6 @@
- 			#interrupt-cells = <3>;
- 			#address-cells = <1>;
- 			interrupt-controller;
--			interrupt-parent;
- 			reg = <0xa0411000 0x1000>,
- 			      <0xa0410100 0x100>;
- 		};
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 357e780..4121b06 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -100,7 +100,6 @@
- 			#size-cells = <0>;
- 			#address-cells = <1>;
- 			interrupt-controller;
--			interrupt-parent;
- 			reg = <0xfff11000 0x1000>,
- 			      <0xfff10100 0x100>;
- 		};
++#ifdef CONFIG_OF
++	if (!id) {
++		int i;
++		struct device_node *np = client->dev.of_node;
++
++		for (i = 0;
++		     i < sizeof(dialog_dt_ids)/sizeof(dialog_dt_ids[0]);
++		     i++)
++			if (of_device_is_compatible(np,
++						dialog_dt_ids[i].compatible))
++				id = &da9052_i2c_id[i];
++	}
++#endif
++
++	if (!id) {
++		ret = -ENODEV;
++		dev_err(&client->dev, "id is null.\n");
++		goto err_regmap;
++	}
++
+ 	ret = da9052_device_init(da9052, id->driver_data);
+ 	if (ret != 0)
+ 		goto err_regmap;
+@@ -100,14 +143,6 @@ static int __devexit da9052_i2c_remove(struct i2c_client *client)
+ 	return 0;
+ }
+ 
+-static struct i2c_device_id da9052_i2c_id[] = {
+-	{"da9052", DA9052},
+-	{"da9053-aa", DA9053_AA},
+-	{"da9053-ba", DA9053_BA},
+-	{"da9053-bb", DA9053_BB},
+-	{}
+-};
+-
+ static struct i2c_driver da9052_i2c_driver = {
+ 	.probe = da9052_i2c_probe,
+ 	.remove = __devexit_p(da9052_i2c_remove),
+@@ -115,6 +150,9 @@ static struct i2c_driver da9052_i2c_driver = {
+ 	.driver = {
+ 		.name = "da9052",
+ 		.owner = THIS_MODULE,
++#ifdef CONFIG_OF
++		.of_match_table = dialog_dt_ids,
++#endif
+ 	},
+ };
+ 
 -- 
 1.7.9.5
