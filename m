@@ -1,44 +1,50 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 12 Apr 2012 21:24:29 +0200
+From: aneesh@ti.com (V, Aneesh)
+Date: Thu, 12 Apr 2012 12:58:55 -0700
 Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <alpine.DEB.2.00.1204121304050.29473@utopia.booyaka.com>
+In-Reply-To: <20120412030044.GA26236@kroah.com>
 References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
  <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
- <20120412030044.GA26236@kroah.com> <4F867A95.9030104@ti.com>
- <20120412131045.GB31384@kroah.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E95947E@DQHE04.ent.ti.com>
- <alpine.DEB.2.00.1204121053570.29473@utopia.booyaka.com>
- <4F87240F.6060902@ti.com>
- <alpine.DEB.2.00.1204121304050.29473@utopia.booyaka.com>
-Message-ID: <4F872BED.7000703@ti.com>
+ <20120412030044.GA26236@kroah.com>
+Message-ID: <CAM=4YEQ6_+7xPwi2jucks1P9p8tO3cSG7S0s=VVJVrueb4fB=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/12/2012 9:15 PM, Paul Walmsley wrote:
-> Hi Beno?t,
->
-> On Thu, 12 Apr 2012, Cousson, Benoit wrote:
->
->> The LPDDR2 spec does consider as well NVM (Non Volatile Memory), so I think we
->> should stick to driver/memory for EMIF.
->
-> Hmm good point!
->
->>> So perhaps something like drivers/memory/dram/ for the SDRAM controllers,
->>> and maybe drivers/memory/ for the GPMC?
->>
->> In fact Felipe was considering something else for that kind of general purpose
->> bus driver like GMPC, C2C and LLI...
->>
->> ... But I do not remember the name :-)
->
-> It would be nice if we could separate IP blocks that can drive an Ethernet
-> controller or modem chip from the DRAM controllers; they are quite
-> different beasts from a common API standpoint.
+Hi Greg,
 
-Yep, fully agree. In fact Felipe's suggestion was something like 
-drivers/ocd for off-chip devices, but maybe something like drivers/gpbus 
-will highlight a little bit more the bus controller aspect of such driver.
+On Wed, Apr 11, 2012 at 8:00 PM, Greg KH <greg@kroah.com> wrote:
+> On Wed, Apr 11, 2012 at 08:44:39PM -0600, Paul Walmsley wrote:
+>> Cc Mark Greer, Mark Salter
+>>
+>> Hi Greg, Aneesh,
+>>
+>> On Sat, 17 Mar 2012, Aneesh V wrote:
+>>
+>> > Add a driver for the EMIF SDRAM controller used in TI SoCs
+>> >
+>> > EMIF is an SDRAM controller that supports, based on its revision,
+>> > one or more of LPDDR2/DDR2/DDR3 protocols.This driver adds support
+>> > for LPDDR2.
+>>
+>> Just checking to see what the current state of this series is. ?Greg, are
+>> you considering this for merging, or are there remaining issues? ?Aneesh,
+>> do you have any remaining issues to resolve with this set?
+>
+> What about the review comment about devfreq?
 
-Regards,
-Benoit
+I see that Santosh has already commented on this.
+My views are similar, that frequency update is only one of the
+many functions of the driver.
+
+>
+>> This is useful not only for OMAP4 and AM3517/3505, but also will probably
+>> be useful for the C6x chips that Mark Salter is working on.
+>
+> It's still in my "to-review" queue, that I'm slowly making my way
+> through. ?So it's not lost, but I would like to get the devfreq
+> interface question cleared up first.
+
+Thanks. I will wait for your review then. Once I have your comments
+I will re-work and submit in the new directory structure proposed.
+
+thanks,
+Aneesh
