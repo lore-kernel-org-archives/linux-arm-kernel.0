@@ -1,61 +1,77 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 12 Apr 2012 07:21:18 -0700
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E95947E@DQHE04.ent.ti.com>
- (Afzal Mohammed's message of "Thu, 12 Apr 2012 13:34:15 +0000")
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
- <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
- <20120412030044.GA26236@kroah.com> <4F867A95.9030104@ti.com>
- <20120412131045.GB31384@kroah.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E95947E@DQHE04.ent.ti.com>
-Message-ID: <871untjajl.fsf@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 12 Apr 2012 20:00:26 +0530
+Subject: [PATCH 2/2] ARM: mm: Flush only CPU local cache instead of all
+ cache levels.
+In-Reply-To: <20120412132729.GA27744@e102568-lin.cambridge.arm.com>
+References: <1334230187-21553-1-git-send-email-santosh.shilimkar@ti.com>
+ <1334230187-21553-3-git-send-email-santosh.shilimkar@ti.com>
+ <20120412132729.GA27744@e102568-lin.cambridge.arm.com>
+Message-ID: <CAMQu2gzdaGOq-dyJ8dZmyL3e+jg0QJj2BfQBsxh=EYkXrQVTsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Mohammed, Afzal" <afzal@ti.com> writes:
+On Thu, Apr 12, 2012 at 6:57 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Hi Santosh,
+>
+> just posted a series whose aim is the same, please have a look and
+> let's try to merge the two approaches.
+>
+Sure ...
 
-> Hi Greg,
+> On Thu, Apr 12, 2012 at 12:29:47PM +0100, Santosh Shilimkar wrote:
+>> The ARMv7 processor setup functions clean and invalidates the
+>> cpu cache before enabling MMU. The intention here is to start
+>> with clean CPU local cache.
+>>
+>> But on architectures like Cortex-[A15/A8], this code will end
+>> up flushing the L2 cache as well which undesirable and incorrect.
 >
-> On Thu, Apr 12, 2012 at 18:40:45, Greg KH wrote:
->> On Thu, Apr 12, 2012 at 12:17:49PM +0530, Santosh Shilimkar wrote:
->> > I was hoping that we will have some thing like drivers/memory/*
->> > but since it doesn't exist, we used drivers/misc.
->> 
->> Why not create it?  I have no objection to that, it makes it more
->> obvious as to what this really is.
+> Undesirable agreed, can you define incorrect please ?
 >
-> There is another memory controller used in a few TI SoCs,
-> namely GPMC [1], do you prefer having it too there.
->
-> As of now it is not a driver, platform code handles GPMC, a patch
-> series for converting it into a driver (but still residing in
-> platform folder) was sent a few days back [2,3].
+I was mainly visualizing mainly the hotplug scenario where one CPU
+is middle of accessing shared data and other CPU in it's way up path
+flush L1 + L2. After thinking bit more, looks like it might work without
+issues so incorrect may not be write word.
 
-IMO, wherever EMIF ends up, GPMC should as well.
+>> The setup functions are used in CPU hotplug scenario's too and
+>> hence flushing all cache levels should be avoided.
+>>
+>
+> Agreed, but this is also true for __cpu_disable() if we consider hotplug into
+> the picture. The difference is that __cpu_disable is not v7 specific
+> that's what I tried to address with my series, a more generic (and of course
+> arguable) approach.
+>
+>> Fix this code by restricting the cache flush to local cpu
+>> cache or L1.
+>>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+>> ---
+>> ?arch/arm/mm/proc-v7.S | ? ?3 ++-
+>> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+>> index f1c8486..96cfc31 100644
+>> --- a/arch/arm/mm/proc-v7.S
+>> +++ b/arch/arm/mm/proc-v7.S
+>> @@ -172,7 +172,8 @@ __v7_ca15mp_setup:
+>> ?__v7_setup:
+>> ? ? ? adr ? ? r12, __v7_setup_stack ? ? ? ? ? @ the local stack
+>> ? ? ? stmia ? r12, {r0-r5, r7, r9, r11, lr}
+>> - ? ? bl ? ? ?v7_flush_dcache_all
+>> + ? ? mov ? ? r0, #0x1
+>> + ? ? bl ? ? ?v7_flush_dcache_by_level
+>
+> I did not post my patch here that is similar but basically the idea here is
+> to clean/invalidate up to Level of Unification Inner Shareable.
+>
+ok.
 
-Kevin
-
-
-> [1]
-> GPMC (General Purpose Memory Controller) in brief:
-> GPMC is an unified memory controller dedicated to interfacing external
-> memory devices like
->  Asynchronous SRAM like memories and application specific integrated circuit devices.
->  Asynchronous, synchronous, and page mode burst NOR flash devices NAND flash
->  Pseudo-SRAM devices
+> That hardcoded 0x1 must be explained, it might work for most of the v7 systems
+> but I think it should be generalized.
 >
-> GPMC has to be configured as required by timings of the connected
-> peripheral. It needs to be configured only initially. Once it is
-> configured it can be used to handle different protocols like NAND,
-> NOR. Various kinds of devices like ethernet, uart, usb, fpga etc
-> can work using GPMC interface. GPMC has a seperate additional
-> functionality of NAND handling
->
-> [2] https://lkml.org/lkml/2012/4/5/210
-> [3] https://lkml.org/lkml/2012/4/5/212
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Agree. I just looked at current V7 processors and thought that #1 should be
+fine.
