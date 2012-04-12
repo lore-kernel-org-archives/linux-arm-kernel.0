@@ -1,16 +1,20 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 12 Apr 2012 09:50:39 +0530
-Subject: Booting DT support without U-Boot supporting it
-Message-ID: <4F865817.3000802@st.com>
+Date: Thu, 12 Apr 2012 09:58:10 +0530
+Subject: [PATCH 01/13] clk: core: correct clk_set_rate kerneldoc
+In-Reply-To: <1334192572-12499-2-git-send-email-mturquette@linaro.org>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334192572-12499-2-git-send-email-mturquette@linaro.org>
+Message-ID: <4F8659DA.4030305@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 4/12/2012 6:32 AM, Mike Turquette wrote:
+> - * If clk has the CLK_SET_RATE_GATE flag set and it is enabled this call
+> - * will fail; only when the clk is disabled will it be able to change
+> - * its rate.
 
-My U-boot is on an older version and that doesn't have DT support for ARM.
-Now, is there any way of booting Linux with DT, without U-Boot supporting DT?
-
-Like, if we can compile dtb somehow with Linux or something else?
+Why is CLK_SET_RATE_GATE removed? I already sent a patch to fix clk_set_rate()
+for this. And i think it should be required.
 
 -- 
 viresh
