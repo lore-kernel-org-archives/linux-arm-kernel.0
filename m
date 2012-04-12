@@ -1,59 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 12 Apr 2012 17:33:19 +0100
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120411114311.GZ24211@n2100.arm.linux.org.uk>
-References: <20120410161142.GG3852@pengutronix.de>
- <20120411011149.GA20818@b20223-02.ap.freescale.net>
- <20120411082401.GA32187@sirena.org.uk>
- <20120411084528.GB20818@b20223-02.ap.freescale.net>
- <20120411091548.GD3163@opensource.wolfsonmicro.com>
- <20120411092147.GW24211@n2100.arm.linux.org.uk>
- <20120411093253.GF3163@opensource.wolfsonmicro.com>
- <20120411094136.GX24211@n2100.arm.linux.org.uk>
- <20120411103107.GG3163@opensource.wolfsonmicro.com>
- <20120411114311.GZ24211@n2100.arm.linux.org.uk>
-Message-ID: <20120412163319.GE3195@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 12 Apr 2012 11:00:12 -0600 (MDT)
+Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E95947E@DQHE04.ent.ti.com>
+References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
+ <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
+ <20120412030044.GA26236@kroah.com> <4F867A95.9030104@ti.com>
+ <20120412131045.GB31384@kroah.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E95947E@DQHE04.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1204121053570.29473@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 12:43:11PM +0100, Russell King - ARM Linux wrote:
+Hi
 
-> What I see going on is that people want to translate a device + connection
-> ID to some other name, and use this other name to look up a struct clk.
-> Utterly idiotic and pointless.  Whether it be OF or not OF.
+On Thu, 12 Apr 2012, Mohammed, Afzal wrote:
 
-> It's a crazy absurd idea.  At some point, you have to do some kind of
-> lookup and return a struct clk.  Why the hell have this insane double
-> mapping?
+> On Thu, Apr 12, 2012 at 18:40:45, Greg KH wrote:
+> > On Thu, Apr 12, 2012 at 12:17:49PM +0530, Santosh Shilimkar wrote:
+> > > I was hoping that we will have some thing like drivers/memory/*
+> > > but since it doesn't exist, we used drivers/misc.
+> > 
+> > Why not create it?  I have no objection to that, it makes it more
+> > obvious as to what this really is.
+> 
+> There is another memory controller used in a few TI SoCs,
+> namely GPMC [1], do you prefer having it too there.
+> 
+> As of now it is not a driver, platform code handles GPMC, a patch
+> series for converting it into a driver (but still residing in
+> platform folder) was sent a few days back [2,3].
 
-I agree, that is silly.  I had understood from Sascha's comments that
-the use case was building up the SoC clock tree with some indirect
-references.  I can understand someone wanting to do that for a use case
-like grafting chunks of tree built up of static data together, it might
-be a bit more nicely data driven.
+Probably the GPMC driver should go into a slightly different place than 
+SDRC/EMIF.  
 
-> Look, solving the DT problem with clkdev is really simple.  You have the
-> DT node for the struct device, so you can look up DT properties associated
+GPMC is actually a general-purpose parallel bus driver.  It's used to 
+interface Ethernet controllers, UARTs, FPGAs, NAND/NOR flash, SRAM, etc.  
+It cannot be used to control DRAM, at least not without a separate DRAM 
+controller chip.
 
-Yes, DT is completely straightforward here.
+SDRC/EMIF are both DRAM controllers.  That's all they do.  They can't be 
+used to control anything else.  They implement DRAM refresh, etc.
 
-> And it also allows non-DT to work just fine provided you register your
-> clk lookups _after_ you know the struct clk pointers which is exactly what
-> happens today.
+So perhaps something like drivers/memory/dram/ for the SDRAM controllers, 
+and maybe drivers/memory/ for the GPMC?
 
-> Now, if getting the struct clk pointers is insanely difficult because of
-> the design of the common clk stuff, then that's where the problem lies,
-> and that problem needs to be fixed, and clkdev does not need to be bodged
-> around to fix a problem which is not relevant to it.
 
-I don't think it's anything particularly to do with the common clk stuff
-really (at least I share your opinion that it shouldn't be) but it does
-seem like it might be a real pain once we start deploying clock trees
-that go off SoC.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120412/6f2bafb0/attachment.sig>
+- Paul
