@@ -1,62 +1,62 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 12 Apr 2012 12:17:49 +0530
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <20120412030044.GA26236@kroah.com>
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
- <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
- <20120412030044.GA26236@kroah.com>
-Message-ID: <4F867A95.9030104@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 12 Apr 2012 14:49:23 +0800
+Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
+In-Reply-To: <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+Message-ID: <20120412064920.GH2445@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 April 2012 08:30 AM, Greg KH wrote:
-> On Wed, Apr 11, 2012 at 08:44:39PM -0600, Paul Walmsley wrote:
->> Cc Mark Greer, Mark Salter
->>
->> Hi Greg, Aneesh,
->>
->> On Sat, 17 Mar 2012, Aneesh V wrote:
->>
->>> Add a driver for the EMIF SDRAM controller used in TI SoCs
->>>
->>> EMIF is an SDRAM controller that supports, based on its revision,
->>> one or more of LPDDR2/DDR2/DDR3 protocols.This driver adds support
->>> for LPDDR2.
->>
->> Just checking to see what the current state of this series is.  Greg, are 
->> you considering this for merging, or are there remaining issues?  Aneesh, 
->> do you have any remaining issues to resolve with this set?
-> 
-> What about the review comment about devfreq?
->
-Devfreq is not suitable for this driver. I already replied on this
-thread [1]
+On Wed, Apr 11, 2012 at 06:02:51PM -0700, Mike Turquette wrote:
+...
+> @@ -175,23 +188,32 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+>  	div->flags = clk_divider_flags;
+>  	div->lock = lock;
+>  
+> +	/* allocate the temporary parent_names */
+>  	if (parent_name) {
+> -		div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+> -		if (!div->parent[0])
+> -			goto out;
+> +		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
+> +		if (!parent_names[0]) {
+> +			pr_err("%s: could not allocate parent_names\n",
+> +					__func__);
+> +			goto fail_parent_names;
+> +		}
+>  	}
 
-Acting on frequency change is just one function of the controller
-driver and that too need not bed to attached with devfreq. The driver
-has features like temperature handling as per JDEC specs, active power
-managements modes, system wide suspend power management like self
-refresh and also configuration which can help memory hotplug for
-power savings and initialising the DDR timings to avoid boot-loader
-defaults.The controller IP works in conjunction with PRCM (OMAP Power
-IP) block to achieve some of this functionality.
+Why do we need to copy the parent_names here at all?  clk_register()
+has done that for each basic clk.
 
-I was hoping that we will have some thing like drivers/memory/*
-but since it doesn't exist, we used drivers/misc.
+Regards,
+Shawn
 
-Regards
-Santosh
-[1] https://lkml.org/lkml/2012/3/19/178
-
->> This is useful not only for OMAP4 and AM3517/3505, but also will probably 
->> be useful for the C6x chips that Mark Salter is working on.
-> 
-> It's still in my "to-review" queue, that I'm slowly making my way
-> through.  So it's not lost, but I would like to get the devfreq
-> interface question cleared up first.
-> 
-Let us know if you need more clarification on devfreq part.
-Thanks for looking into it.
-
-Regards
-Santosh
+>  
+> +	/* register the clock */
+>  	clk = clk_register(dev, name,
+>  			&clk_divider_ops, &div->hw,
+> -			div->parent,
+> +			(parent_name ? parent_names: NULL),
+>  			(parent_name ? 1 : 0),
+>  			flags);
+> -	if (clk)
+> -		return clk;
+>  
+> -out:
+> -	kfree(div->parent[0]);
+> -	kfree(div);
+> +	/* free the temporary parent_names */
+> +	if (parent_name)
+> +		kfree(parent_names[0]);
+> +
+> +	if (!IS_ERR(clk))
+> +		goto out;
+>  
+> -	return NULL;
+> +fail_parent_names:
+> +	kfree(div);
+> +out:
+> +	return clk;
+>  }
