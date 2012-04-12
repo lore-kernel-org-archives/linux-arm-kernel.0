@@ -1,32 +1,31 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 12 Apr 2012 19:51:44 +0200
-Subject: [PATCH] pinctrl: mark non-EXPERIMENTAL
-Message-ID: <1334253104-30527-1-git-send-email-linus.walleij@stericsson.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 12 Apr 2012 10:56:39 -0700
+Subject: [PATCH] dma-mapping.c: local variables should not be exposed globaly
+Message-ID: <201204121056.41398.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+The variable 'consistent_base' is only referenced in this file and
+should be marked static to prevent it from being exposed globably.
 
-With the finalization of the external driver API and the device
-tree support, this subsystem is now mature and can be promoted to
-non-experimental status.
+This quiets the sparse warning:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+warning: symbol 'consistent_base' was not declared. Should it be static?
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
 ---
- drivers/pinctrl/Kconfig |    1 -
- 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index abfb964..f73a5ea 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -4,7 +4,6 @@
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index db23ae4..3d368d3 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -130,7 +130,7 @@ static pte_t **consistent_pte;
  
- config PINCTRL
- 	bool
--	depends on EXPERIMENTAL
+ #define DEFAULT_CONSISTENT_DMA_SIZE SZ_2M
  
- if PINCTRL
+-unsigned long consistent_base = CONSISTENT_END - DEFAULT_CONSISTENT_DMA_SIZE;
++static unsigned long consistent_base = CONSISTENT_END - DEFAULT_CONSISTENT_DMA_SIZE;
  
--- 
-1.7.9.2
+ void __init init_consistent_dma_size(unsigned long size)
+ {
