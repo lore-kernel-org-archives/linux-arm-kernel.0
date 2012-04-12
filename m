@@ -1,44 +1,36 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 12 Apr 2012 10:22:22 +0530
-Subject: [PATCH] ARM: OMAP2+: remove redundant sysconfig context restore
-In-Reply-To: <87zkahlrdc.fsf@ti.com>
-References: <1334133256-20475-1-git-send-email-tarun.kanti@ti.com>
- <87zkahlrdc.fsf@ti.com>
-Message-ID: <CAC83ZvKyh38=BdWg9ExTM20Sq_c3e-fo2JrH5Cmv80hY8TxLLA@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 12 Apr 2012 00:54:34 -0400
+Subject: linux-next: manual merge of the arm-soc tree with the mmc tree
+In-Reply-To: <20120412140206.704731281bf2ee7d93d582bf@canb.auug.org.au>
+ (Stephen Rothwell's message of "Thu, 12 Apr 2012 14:02:06 +1000")
+References: <20120412140206.704731281bf2ee7d93d582bf@canb.auug.org.au>
+Message-ID: <87pqbdr1md.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 6:04 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Hi,
+
+On Thu, Apr 12 2012, Stephen Rothwell wrote:
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> drivers/mmc/host/Kconfig between commit a334b9550294 ("mmc: remove imxmmc
+> driver") from the mmc tree and commits a21a92c0c787 ("mmc: Kconfig: remove
+> choice between at91_mci and atmel-mci") and 62080f06de6b ("mmc:
+> atmel-mci: remove the need for CONFIG_MMC_ATMELMCI_DMA") from the arm-soc
+> tree.
 >
->> Since hwmod framework now manages sysconfig context save/restore
->> there is no more need to touch this register in driver. Hence,
->> remove restore of sysconfig register in omap_timer_restore_context.
->> This was causing incorrect context restore of sysconfig register.
->>
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->
-> While cleaning this up, you can remove it from 'struct timer_regs' ?in
-> <plat/dmtimer.h> as well, since the code you remove is the only user.
-Oh yes I missed that. Thanks.
---
-Tarun
->
-> Kevin
->
->> ---
->> ?arch/arm/plat-omap/dmtimer.c | ? ?2 --
->> ?1 files changed, 0 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
->> index 652139c..15e7882 100644
->> --- a/arch/arm/plat-omap/dmtimer.c
->> +++ b/arch/arm/plat-omap/dmtimer.c
->> @@ -82,8 +82,6 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
->>
->> ?static void omap_timer_restore_context(struct omap_dm_timer *timer)
->> ?{
->> - ? ? __raw_writel(timer->context.tiocp_cfg,
->> - ? ? ? ? ? ? ? ? ? ? timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
->> ? ? ? if (timer->revision == 1)
->> ? ? ? ? ? ? ? __raw_writel(timer->context.tistat, timer->sys_stat);
+> I fixed it up (see below) and can carry the fix as necessary.
+
+Thanks, Stephen.
+
+Nicolas and Arnd, these MMC Kconfig patches weren't sent to me or
+linux-mmc@ for review, so I haven't seen them before.  They look
+fine, but I'd like to be in the loop directly to avoid surprises.
+
+Do these MMC patches have any dependency on other work?  It doesn't
+look like it.  If that's so, I'd rather carry them in the MMC tree
+to save Stephen and Linus from dealing with the merge conflict.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
