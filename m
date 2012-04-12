@@ -1,30 +1,88 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Apr 2012 15:12:23 +0100
-Subject: [PATCH 0/3] ARM errata fixes for multiple-platform kernels
-Message-ID: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 12 Apr 2012 15:12:24 +0100
+Subject: [PATCH 1/3] ARM: errata: only handle ARM erratum #326103 on affected
+ cores
+In-Reply-To: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
+References: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1334239946-15934-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Erratum #326103 ("FSR write bit incorrect on a SWP to read-only memory")
+only affects the ARM 1136 core prior to r1p0. The workaround
+disassembles the faulting instruction to determine whether it was a read
+or write access on all v6 cores.
 
-This series fixes three errata workarounds so that they are only applied
-on platforms known to be affected at runtime, since applying them on
-other platforms can cause nasty side effects (lockups).
+An issue has been reported on the ARM 11MPCore whereby loading the
+faulting instruction may happen in parallel with that page being
+unmapped, resulting in a deadlock due to the lack of TLB broadcasting
+in hardware:
 
-Comments and any tested-bys are more than welcome,
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/091561.html
 
-Will
+This patch limits the workaround so that it is only used on affected
+cores, which are known to be UP only. Other v6 cores can rely on the
+FSR to indicate the access type correctly.
 
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig        |    9 +++++++++
+ arch/arm/mm/abort-ev6.S |   17 +++++++++++------
+ 2 files changed, 20 insertions(+), 6 deletions(-)
 
-Will Deacon (3):
-  ARM: errata: only handle ARM erratum #326103 on affected cores
-  ARM: l2x0: only apply workaround for erratum #753970 on PL310
-  ARM: l2x0: only write to debug registers on PL310
-
- arch/arm/Kconfig         |    9 +++++++++
- arch/arm/mm/abort-ev6.S  |   17 +++++++++++------
- arch/arm/mm/cache-l2x0.c |   25 ++++++++++++++-----------
- 3 files changed, 34 insertions(+), 17 deletions(-)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index cf006d4..36586dba 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1186,6 +1186,15 @@ if !MMU
+ source "arch/arm/Kconfig-nommu"
+ endif
+ 
++config ARM_ERRATA_326103
++	bool "ARM errata: FSR write bit incorrect on a SWP to read-only memory"
++	depends on CPU_V6
++	help
++	  Executing a SWP instruction to read-only memory does not set bit 11
++	  of the FSR on the ARM 1136 prior to r1p0. This causes the kernel to
++	  treat the access as a read, preventing a COW from occurring and
++	  causing the faulting task to livelock.
++
+ config ARM_ERRATA_411920
+ 	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
+ 	depends on CPU_V6 || CPU_V6K
+diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
+index ff1f7cc..8074199 100644
+--- a/arch/arm/mm/abort-ev6.S
++++ b/arch/arm/mm/abort-ev6.S
+@@ -26,18 +26,23 @@ ENTRY(v6_early_abort)
+ 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
+ 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
+ /*
+- * Faulty SWP instruction on 1136 doesn't set bit 11 in DFSR (erratum 326103).
+- * The test below covers all the write situations, including Java bytecodes
++ * Faulty SWP instruction on 1136 doesn't set bit 11 in DFSR.
+  */
+-	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
++#ifdef CONFIG_ARM_ERRATA_326103
++	ldr	ip, =0x4107b36
++	mrc	p15, 0, r3, c0, c0, 0		@ get processor id
++	teq	ip, r3, lsr #4			@ r0 ARM1136?
++	bne	do_DataAbort
+ 	tst	r5, #PSR_J_BIT			@ Java?
++	tsteq	r5, #PSR_T_BIT			@ Thumb?
+ 	bne	do_DataAbort
+-	do_thumb_abort fsr=r1, pc=r4, psr=r5, tmp=r3
+-	ldreq	r3, [r4]			@ read aborted ARM instruction
++	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
++	ldr	r3, [r4]			@ read aborted ARM instruction
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+-	reveq	r3, r3
++	rev	r3, r3
+ #endif
+ 	do_ldrd_abort tmp=ip, insn=r3
+ 	tst	r3, #1 << 20			@ L = 0 -> write
+ 	orreq	r1, r1, #1 << 11		@ yes.
++#endif
+ 	b	do_DataAbort
 -- 
 1.7.4.1
