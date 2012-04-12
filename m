@@ -1,96 +1,60 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Thu, 12 Apr 2012 23:39:42 +0800
-Subject: [PATCH 2/2] regulator: da9052: add device tree support
-In-Reply-To: <1334245182-31725-1-git-send-email-paul.liu@linaro.org>
-References: <1334245182-31725-1-git-send-email-paul.liu@linaro.org>
-Message-ID: <1334245182-31725-2-git-send-email-paul.liu@linaro.org>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Thu, 12 Apr 2012 08:45:37 -0700
+Subject: [PATCH] arm: msm: trout: fix compile failure
+Message-ID: <1334245537-13395-1-git-send-email-dwalker@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+Fixes the following warnings,
 
-This patch adds device tree support for dialog regulators
+arch/arm/mach-msm/board-trout.c: In function 'trout_init':
+arch/arm/mach-msm/board-trout.c:71: error: 'system_rev' undeclared (first use in this function)
+arch/arm/mach-msm/board-trout.c:71: error: (Each undeclared identifier is reported only once
+arch/arm/mach-msm/board-trout.c:71: error: for each function it appears in.)
 
-Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Ashish Jangam <ashish.jangam@kpitcummins.com>
+and
+
+arch/arm/mach-msm/board-trout-panel.c: In function 'trout_init_panel':
+arch/arm/mach-msm/board-trout-panel.c:267: error: 'system_rev' undeclared (first use in this function)
+arch/arm/mach-msm/board-trout-panel.c:267: error: (Each undeclared identifier is reported only once
+arch/arm/mach-msm/board-trout-panel.c:267: error: for each function it appears in.)
+
+This came in with the following commit 9f97da78bf018206fb623cd351d454af2f105fe0
+which removes asm/system.h
+
+Signed-off-by: Daniel Walker <dwalker@fifo99.com>
+cc: David Howells <dhowells@redhat.com>
+cc: Bryan Huntsman <bryanh@codeaurora.org>
+cc: linux-arm-msm at vger.kernel.org
+cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/regulator/da9052-regulator.c |   44 +++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ arch/arm/mach-msm/board-trout-panel.c |    1 +
+ arch/arm/mach-msm/board-trout.c       |    1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/regulator/da9052-regulator.c b/drivers/regulator/da9052-regulator.c
-index 09915e8..892700c 100644
---- a/drivers/regulator/da9052-regulator.c
-+++ b/drivers/regulator/da9052-regulator.c
-@@ -19,6 +19,9 @@
+diff --git a/arch/arm/mach-msm/board-trout-panel.c b/arch/arm/mach-msm/board-trout-panel.c
+index 25105c1..89bf6b4 100644
+--- a/arch/arm/mach-msm/board-trout-panel.c
++++ b/arch/arm/mach-msm/board-trout-panel.c
+@@ -12,6 +12,7 @@
+ 
+ #include <asm/io.h>
+ #include <asm/mach-types.h>
++#include <asm/system_info.h>
+ 
+ #include <mach/msm_fb.h>
+ #include <mach/vreg.h>
+diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+index 5414f76..d4060a3 100644
+--- a/arch/arm/mach-msm/board-trout.c
++++ b/arch/arm/mach-msm/board-trout.c
+@@ -19,6 +19,7 @@
  #include <linux/platform_device.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
-+#ifdef CONFIG_OF
-+#include <linux/regulator/of_regulator.h>
-+#endif
+ #include <linux/clkdev.h>
  
- #include <linux/mfd/da9052/da9052.h>
- #include <linux/mfd/da9052/reg.h>
-@@ -536,6 +539,7 @@ static int __devinit da9052_regulator_probe(struct platform_device *pdev)
- 	struct da9052_regulator *regulator;
- 	struct da9052 *da9052;
- 	struct da9052_pdata *pdata;
-+	struct regulator_init_data *initdata = NULL;
- 	int ret;
- 
- 	regulator = devm_kzalloc(&pdev->dev, sizeof(struct da9052_regulator),
-@@ -554,9 +558,47 @@ static int __devinit da9052_regulator_probe(struct platform_device *pdev)
- 		ret = -EINVAL;
- 		goto err;
- 	}
-+	if (pdata && pdata->regulators) {
-+		initdata = pdata->regulators[pdev->id];
-+	} else {
-+#ifdef CONFIG_OF
-+		struct device_node *nproot = da9052->dev->of_node;
-+		struct device_node *np;
-+		int c;
-+
-+		if (!nproot) {
-+			ret = -ENODEV;
-+			goto err;
-+		}
-+
-+		nproot = of_find_node_by_name(nproot, "regulators");
-+		if (!nproot) {
-+			ret = -ENODEV;
-+			goto err;
-+		}
-+
-+		c = 0;
-+		for (np = of_get_next_child(nproot, NULL);
-+		     np != NULL;
-+		     np = of_get_next_child(nproot, np)) {
-+			if (c == pdev->id) {
-+				initdata = of_get_regulator_init_data(
-+					&pdev->dev, np);
-+				break;
-+			}
-+			c++;
-+		}
-+#endif
-+	}
-+
-+	if (!initdata) {
-+		dev_err(&pdev->dev, "no initdata\n");
-+		ret = -ENODEV;
-+		goto err;
-+	}
- 	regulator->rdev = regulator_register(&regulator->info->reg_desc,
- 					     &pdev->dev,
--					     pdata->regulators[pdev->id],
-+					     initdata,
- 					     regulator, NULL);
- 	if (IS_ERR(regulator->rdev)) {
- 		dev_err(&pdev->dev, "failed to register regulator %s\n",
++#include <asm/system_info.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
 -- 
-1.7.9.5
+1.7.10.130.g36e6c
