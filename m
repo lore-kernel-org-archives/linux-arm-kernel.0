@@ -1,77 +1,92 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 12 Apr 2012 20:00:26 +0530
-Subject: [PATCH 2/2] ARM: mm: Flush only CPU local cache instead of all
- cache levels.
-In-Reply-To: <20120412132729.GA27744@e102568-lin.cambridge.arm.com>
-References: <1334230187-21553-1-git-send-email-santosh.shilimkar@ti.com>
- <1334230187-21553-3-git-send-email-santosh.shilimkar@ti.com>
- <20120412132729.GA27744@e102568-lin.cambridge.arm.com>
-Message-ID: <CAMQu2gzdaGOq-dyJ8dZmyL3e+jg0QJj2BfQBsxh=EYkXrQVTsw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 12 Apr 2012 10:17:28 -0500
+Subject: [PATCH] ARM: dts: remove blank interrupt-parent properties
+Message-ID: <1334243848-29522-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 6:57 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Hi Santosh,
->
-> just posted a series whose aim is the same, please have a look and
-> let's try to merge the two approaches.
->
-Sure ...
+From: Rob Herring <rob.herring@calxeda.com>
 
-> On Thu, Apr 12, 2012 at 12:29:47PM +0100, Santosh Shilimkar wrote:
->> The ARMv7 processor setup functions clean and invalidates the
->> cpu cache before enabling MMU. The intention here is to start
->> with clean CPU local cache.
->>
->> But on architectures like Cortex-[A15/A8], this code will end
->> up flushing the L2 cache as well which undesirable and incorrect.
->
-> Undesirable agreed, can you define incorrect please ?
->
-I was mainly visualizing mainly the hotplug scenario where one CPU
-is middle of accessing shared data and other CPU in it's way up path
-flush L1 + L2. After thinking bit more, looks like it might work without
-issues so incorrect may not be write word.
+These were incorrectly introduced and can cause problems for of_irq_init.
 
->> The setup functions are used in CPU hotplug scenario's too and
->> hence flushing all cache levels should be avoided.
->>
->
-> Agreed, but this is also true for __cpu_disable() if we consider hotplug into
-> the picture. The difference is that __cpu_disable is not v7 specific
-> that's what I tried to address with my series, a more generic (and of course
-> arguable) approach.
->
->> Fix this code by restricting the cache flush to local cpu
->> cache or L1.
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
->> ---
->> ?arch/arm/mm/proc-v7.S | ? ?3 ++-
->> ?1 files changed, 2 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->> index f1c8486..96cfc31 100644
->> --- a/arch/arm/mm/proc-v7.S
->> +++ b/arch/arm/mm/proc-v7.S
->> @@ -172,7 +172,8 @@ __v7_ca15mp_setup:
->> ?__v7_setup:
->> ? ? ? adr ? ? r12, __v7_setup_stack ? ? ? ? ? @ the local stack
->> ? ? ? stmia ? r12, {r0-r5, r7, r9, r11, lr}
->> - ? ? bl ? ? ?v7_flush_dcache_all
->> + ? ? mov ? ? r0, #0x1
->> + ? ? bl ? ? ?v7_flush_dcache_by_level
->
-> I did not post my patch here that is similar but basically the idea here is
-> to clean/invalidate up to Level of Unification Inner Shareable.
->
-ok.
+The correct way to define a root controller is no interrupt-parent set at
+all or the interrupt-parent is set to the root controller itself when
+inherited from a parent node.
 
-> That hardcoded 0x1 must be explained, it might work for most of the v7 systems
-> but I think it should be generalized.
->
-Agree. I just looked at current V7 processors and thought that #1 should be
-fine.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+Arnd, Olof,
+
+Please apply for 3.4.
+
+Rob
+
+ arch/arm/boot/dts/at91sam9g20.dtsi |    1 -
+ arch/arm/boot/dts/at91sam9g45.dtsi |    1 -
+ arch/arm/boot/dts/at91sam9x5.dtsi  |    1 -
+ arch/arm/boot/dts/db8500.dtsi      |    1 -
+ arch/arm/boot/dts/highbank.dts     |    1 -
+ 5 files changed, 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 92f3662..6c33256 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -55,7 +55,6 @@
+ 				#interrupt-cells = <2>;
+ 				compatible = "atmel,at91rm9200-aic";
+ 				interrupt-controller;
+-				interrupt-parent;
+ 				reg = <0xfffff000 0x200>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 3d0c32f..2815be1 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -56,7 +56,6 @@
+ 				#interrupt-cells = <2>;
+ 				compatible = "atmel,at91rm9200-aic";
+ 				interrupt-controller;
+-				interrupt-parent;
+ 				reg = <0xfffff000 0x200>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index c111001..1995c44 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -54,7 +54,6 @@
+ 				#interrupt-cells = <2>;
+ 				compatible = "atmel,at91rm9200-aic";
+ 				interrupt-controller;
+-				interrupt-parent;
+ 				reg = <0xfffff000 0x200>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index d73dce6..14bc307 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -24,7 +24,6 @@
+ 			#interrupt-cells = <3>;
+ 			#address-cells = <1>;
+ 			interrupt-controller;
+-			interrupt-parent;
+ 			reg = <0xa0411000 0x1000>,
+ 			      <0xa0410100 0x100>;
+ 		};
+diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+index 357e780..4121b06 100644
+--- a/arch/arm/boot/dts/highbank.dts
++++ b/arch/arm/boot/dts/highbank.dts
+@@ -100,7 +100,6 @@
+ 			#size-cells = <0>;
+ 			#address-cells = <1>;
+ 			interrupt-controller;
+-			interrupt-parent;
+ 			reg = <0xfff11000 0x1000>,
+ 			      <0xfff10100 0x100>;
+ 		};
+-- 
+1.7.9.5
