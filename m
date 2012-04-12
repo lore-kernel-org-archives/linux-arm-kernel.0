@@ -1,34 +1,49 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 12 Apr 2012 14:47:36 +0200
-Subject: [PATCH 3/9] ARM: at91: add at91sam9g20ek boards dt support
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A9317C7D68@DBDE01.ent.ti.com>
-References: <20120411153515.GK16641@game.jcrosoft.org>
- <1334160079-30831-3-git-send-email-plagnioj@jcrosoft.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317C7B88@DBDE01.ent.ti.com>
- <20120412114559.GM16641@game.jcrosoft.org>
- <C8443D0743D26F4388EA172BF4E2A7A9317C7D68@DBDE01.ent.ti.com>
-Message-ID: <20120412124736.GN16641@game.jcrosoft.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 12 Apr 2012 18:35:08 +0530
+Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait
+ for reset status
+In-Reply-To: <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
+References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
+ <1331659524-7635-3-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
+ <4F8565C7.4080506@ti.com>
+ <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
+Message-ID: <4F86D304.1020902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:14 Thu 12 Apr     , Mohammed, Afzal wrote:
-> Hi Jean,
-> 
-> On Thu, Apr 12, 2012 at 17:15:59, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > If ATMEL is also going driver way, then probably our voice together may be
-> > > heard and hopefully it will expedite the matter.
-> > I'm going to add it too  my idea was to create something similiar as the
-> > pintrl
-> > you register the ddifferent bank supported buy the SoC and then the driver
-> > request the bank for the dev_name
-> > 
-> > at soc level you will set the default timings and then the drvier may
-> > manipulate them
-> > 
-> > I already update the API of sam9_smc to abstract the access to the register.
-> 
-> Is SMC code being converted to driver ?
-no I'm busy on pinctrl I just cereate an abstracted API
+Hi Paul,
 
-Best Regards,
-J.
+On Thursday 12 April 2012 12:29 AM, Paul Walmsley wrote:
+> That approach sounds fine to me, but I don't think Fernando's patch will
+> help with I2C..  Since it uses a custom reset function omap_i2c_reset(),
+> the delay will actually need to go there.
+
+While working on fixing this I stumbled upon a couple of other
+things which don't seem right.
+
+The i2c custom reset funtion (omap_i2c_reset) uses a hwmod exposed
+api to set the SOFTRESET bit, however it then accesses the hwmod
+internal structure to poll on RESETDONE status bit. Should there be
+another function exposed to poll on RESETDONE too?
+
+_reset() function documents its return value to be -ETIMEDOUT, if the
+module fails to reset in time, and hence expects the custom reset
+function to return the same in such cases. The omap_i2c_reset() function
+seems to return 0 even in cases of timeout. However looking more closely
+the return value from _reset() does not seem to be used in the framework
+today.
+
+The comment in _ocp_softreset() suggests the intent was to add a new
+state to the hwmod state machine.
+
+         /*
+          * XXX add _HWMOD_STATE_WEDGED for modules that don't come back 
+from
+          * _wait_target_ready() or _reset()
+          */
+
+is it still the case, or should _reset() just return a void?
+
+regards,
+Rajendra
