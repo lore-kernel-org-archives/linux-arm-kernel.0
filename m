@@ -1,62 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 12 Apr 2012 14:49:23 +0800
-Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
-In-Reply-To: <1334192572-12499-14-git-send-email-mturquette@linaro.org>
-References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334192572-12499-14-git-send-email-mturquette@linaro.org>
-Message-ID: <20120412064920.GH2445@S2101-09.ap.freescale.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 12 Apr 2012 12:19:35 +0530
+Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
+In-Reply-To: <201204111730.12267.arnd@arndb.de>
+References: <4F793C56.2030605@st.com> <201204111730.12267.arnd@arndb.de>
+Message-ID: <4F867AFF.80206@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 06:02:51PM -0700, Mike Turquette wrote:
-...
-> @@ -175,23 +188,32 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
->  	div->flags = clk_divider_flags;
->  	div->lock = lock;
->  
-> +	/* allocate the temporary parent_names */
->  	if (parent_name) {
-> -		div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
-> -		if (!div->parent[0])
-> -			goto out;
-> +		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
-> +		if (!parent_names[0]) {
-> +			pr_err("%s: could not allocate parent_names\n",
-> +					__func__);
-> +			goto fail_parent_names;
-> +		}
->  	}
+On 4/11/2012 11:00 PM, Arnd Bergmann wrote:
+> Hi Viresh,
+> 
+> I've played around with spear myself, based on your patches. Please
+> consider adding this patch, or a variation of it.
+> 
+> 8<---
+> ARM: spear: remove most mach/*.h header contents
+> 
+> The register and irq definitions in mach/*.h for spear3xx and
+> spear6xx are now mostly obsolete, after the platforms have been
+> converted to device tree based probing and the data is now
+> part of the device tree files.
+> 
+> The misc_regs.h contents are moved into clock.c because that is
+> the only user, aside from the DMA_CHN_CFG that should eventually
+> get handled differently. Some of the contents of mach/spear.h
+> still remain, because they are used to set up the static map table,
+> timer, uart and auxdata tables, but almost everything got removed.
+> We might remove everything but the map table as the DT conversion
+> completes, but that is not a priority. I've also made sure to
+> make both copies of spear.h more or less identical so we can
+> eventually combine them.
+> 
+> The spear3?0.h files were only used by the spear3?0.c files, so I
+> merged the contents in there and removed the bits that were unused.
+> This is something that should still be looked at.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Why do we need to copy the parent_names here at all?  clk_register()
-has done that for each basic clk.
+Thanks Arnd for this.
 
-Regards,
-Shawn
+I have applied it in my local branch with minor fixes. I will add this
+to my pull branch: spear-dt, once i get Acks by linus for pinctrl stuff.
 
->  
-> +	/* register the clock */
->  	clk = clk_register(dev, name,
->  			&clk_divider_ops, &div->hw,
-> -			div->parent,
-> +			(parent_name ? parent_names: NULL),
->  			(parent_name ? 1 : 0),
->  			flags);
-> -	if (clk)
-> -		return clk;
->  
-> -out:
-> -	kfree(div->parent[0]);
-> -	kfree(div);
-> +	/* free the temporary parent_names */
-> +	if (parent_name)
-> +		kfree(parent_names[0]);
-> +
-> +	if (!IS_ERR(clk))
-> +		goto out;
->  
-> -	return NULL;
-> +fail_parent_names:
-> +	kfree(div);
-> +out:
-> +	return clk;
->  }
+This branch will contain following:
+- SPEAr3xx DT patches
+- SPEAr Pinctrl Patches (with Acks from Linus)
+- Your rework patch.
+
+Will send you pull request again, as soon i as get feedback on pinctrl stuff.
+
+-- 
+viresh
