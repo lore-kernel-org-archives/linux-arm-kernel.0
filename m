@@ -1,79 +1,106 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 12 Apr 2012 15:43:28 +0300
-Subject: [PATCH 1/2] ARM: PXA2xx: MFP: fix bug with MFP_LPM_KEEP_OUTPUT
-Message-ID: <1334234609-780-1-git-send-email-grinberg@compulab.co.il>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 12 Apr 2012 20:50:17 +0800
+Subject: [PATCH 1/3] clk: always pass parent_rate into .round_rate
+In-Reply-To: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1334235019-15553-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pins that have MFP_LPM_KEEP_OUTPUT set and are configured for output
-must retain the output state in low power mode.
-Currently, the pin direction configuration is overrided with values
-in gpdr_lpm[] array and do not obey the MFP_LPM_KEEP_OUTPUT setting.
+The parent_rate will likely be used by most .round_rate implementation
+no matter whether flag CLK_SET_RATE_PARENT is set or not, so let's
+always pass parent_rate into .round_rate.
 
-Fix the above bug and add some documentation to clarify the
-MFP_LPM_KEEP_OUTPUT setting purpose.
-
-Reported-by: Paul Parsons <lost.distance@yahoo.com>
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Tested-by: Paul Parsons <lost.distance@yahoo.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h |    7 +++++++
- arch/arm/mach-pxa/mfp-pxa2xx.c              |   12 ++++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
+ drivers/clk/clk-divider.c |   12 +++---------
+ drivers/clk/clk.c         |   16 +++++++---------
+ 2 files changed, 10 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h b/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h
-index c54cef2..cbf51ae 100644
---- a/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h
-+++ b/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h
-@@ -17,6 +17,7 @@
-  *
-  * bit     23 - Input/Output (PXA2xx specific)
-  * bit     24 - Wakeup Enable(PXA2xx specific)
-+ * bit     25 - Keep Output  (PXA2xx specific)
-  */
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index add784b..04439f1 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -67,8 +67,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 	if (divider->flags & CLK_DIVIDER_ONE_BASED)
+ 		maxdiv--;
  
- #define MFP_DIR_IN		(0x0 << 23)
-@@ -25,6 +26,12 @@
- #define MFP_DIR(x)		(((x) >> 23) & 0x1)
+-	if (!best_parent_rate) {
+-		parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
++	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
++		parent_rate = *best_parent_rate;
+ 		bestdiv = DIV_ROUND_UP(parent_rate, rate);
+ 		bestdiv = bestdiv == 0 ? 1 : bestdiv;
+ 		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
+@@ -108,13 +108,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	int div;
+ 	div = clk_divider_bestdiv(hw, rate, prate);
  
- #define MFP_LPM_CAN_WAKEUP	(0x1 << 24)
-+
-+/*
-+ * MFP_LPM_KEEP_OUTPUT must be specified for pins that need to
-+ * retain their last output level (low or high).
-+ * Note: MFP_LPM_KEEP_OUTPUT has no effect on pins configured for input.
-+ */
- #define MFP_LPM_KEEP_OUTPUT	(0x1 << 25)
- 
- #define WAKEUP_ON_EDGE_RISE	(MFP_LPM_CAN_WAKEUP | MFP_LPM_EDGE_RISE)
-diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
-index b0a8428..d2373d7 100644
---- a/arch/arm/mach-pxa/mfp-pxa2xx.c
-+++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
-@@ -366,14 +366,22 @@ static int pxa2xx_mfp_suspend(void)
- 	}
- 
- 	for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++) {
--
- 		saved_gafr[0][i] = GAFR_L(i);
- 		saved_gafr[1][i] = GAFR_U(i);
- 		saved_gpdr[i] = GPDR(i * 32);
- 		saved_pgsr[i] = PGSR(i);
-+	}
- 
--		GPDR(i * 32) = gpdr_lpm[i];
-+	/* set GPDR bits taking into account MFP_LPM_KEEP_OUTPUT */
-+	for (i = 0; i < pxa_last_gpio; i++) {
-+		if ((gpdr_lpm[gpio_to_bank(i)] & GPIO_bit(i)) ||
-+		    ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
-+		     (saved_gpdr[gpio_to_bank(i)] & GPIO_bit(i))))
-+			GPDR(i) |= GPIO_bit(i);
-+		else
-+			GPDR(i) &= ~GPIO_bit(i);
- 	}
-+
- 	return 0;
+-	if (prate)
+-		return *prate / div;
+-	else {
+-		unsigned long r;
+-		r = __clk_get_rate(__clk_get_parent(hw->clk));
+-		return r / div;
+-	}
++	return *prate / div;
  }
  
+ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index af2bf12..19caa0a 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -582,7 +582,7 @@ EXPORT_SYMBOL_GPL(clk_get_rate);
+  */
+ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+ {
+-	unsigned long unused;
++	unsigned long parent_rate = 0;
+ 
+ 	if (!clk)
+ 		return -EINVAL;
+@@ -590,10 +590,10 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+ 	if (!clk->ops->round_rate)
+ 		return clk->rate;
+ 
+-	if (clk->flags & CLK_SET_RATE_PARENT)
+-		return clk->ops->round_rate(clk->hw, rate, &unused);
+-	else
+-		return clk->ops->round_rate(clk->hw, rate, NULL);
++	if (clk->parent)
++		parent_rate = clk->parent->rate;
++
++	return clk->ops->round_rate(clk->hw, rate, &parent_rate);
+ }
+ 
+ /**
+@@ -763,7 +763,7 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
+ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ {
+ 	struct clk *top = clk;
+-	unsigned long best_parent_rate;
++	unsigned long best_parent_rate = 0;
+ 	unsigned long new_rate;
+ 
+ 	/* sanity */
+@@ -775,9 +775,6 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ 		if (!clk->ops->round_rate) {
+ 			clk->new_rate = clk->rate;
+ 			return NULL;
+-		} else {
+-			new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
+-			goto out;
+ 		}
+ 	}
+ 
+@@ -794,6 +791,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ 		goto out;
+ 	}
+ 
++	best_parent_rate = clk->parent->rate;
+ 	new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
+ 
+ 	if (best_parent_rate != clk->parent->rate) {
 -- 
-1.7.3.4
+1.7.5.4
