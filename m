@@ -1,68 +1,118 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 11 Apr 2012 18:02:47 -0700
-Subject: [PATCH 09/13] clk: Make clk_get_rate() return 0 on error
+Date: Wed, 11 Apr 2012 18:02:46 -0700
+Subject: [PATCH 08/13] clk: declare clk_ops of basic clks in clk-provider.h
 In-Reply-To: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
 References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1334192572-12499-10-git-send-email-mturquette@linaro.org>
+Message-ID: <1334192572-12499-9-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Most users of clk_get_rate() actually assume a non zero
-return value as a valid rate returned. Returing -EINVAL
-might confuse such users, so make it instead return zero
-on error.
+Besides the static initialization, the clk_ops of basic clks could
+also be used by particular clk type being subclass of the basic clks.
 
-Besides the return value of clk_get_rate seems to be
-'unsigned long'.
+For example, clk_busy_divider has the same clk_ops as clk_divider,
+except it has to wait for a busy bit before return success with
+.set_rate.  clk_busy_divider will somehow reuse clk_ops of clk_divider.
 
-Signed-off-by: Rajendra nayak <rnayak@ti.com>
+Since clk-provider.h is included by clk-private.h, it's safe to move
+those clk_ops declaration of basic clks form  clk-private.h into
+clk-provider.h, so that implementation of clks like clk_busy_divider
+above do not need to include clk-private.h to access those clk_ops.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 Cc: Arnd Bergman <arnd.bergmann@linaro.org>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
 Cc: Richard Zhao <richard.zhao@linaro.org>
 Cc: Saravana Kannan <skannan@codeaurora.org>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/clk.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ include/linux/clk-private.h  |    8 --------
+ include/linux/clk-provider.h |    4 ++++
+ 2 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 9924aec..a24b121 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -285,7 +285,7 @@ unsigned long __clk_get_rate(struct clk *clk)
- 	unsigned long ret;
- 
- 	if (!clk) {
--		ret = -EINVAL;
-+		ret = 0;
- 		goto out;
- 	}
- 
-@@ -295,7 +295,7 @@ unsigned long __clk_get_rate(struct clk *clk)
- 		goto out;
- 
- 	if (!clk->parent)
--		ret = -ENODEV;
-+		ret = 0;
- 
- out:
- 	return ret;
-@@ -560,7 +560,7 @@ EXPORT_SYMBOL_GPL(clk_enable);
-  * @clk: the clk whose rate is being returned
-  *
-  * Simply returns the cached rate of the clk.  Does not query the hardware.  If
-- * clk is NULL then returns -EINVAL.
-+ * clk is NULL then returns 0.
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index 5f4ccd7..f19fee0 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -55,8 +55,6 @@ struct clk {
+  * alternative macro for static initialization
   */
- unsigned long clk_get_rate(struct clk *clk)
- {
+ 
+-extern const struct clk_ops clk_fixed_rate_ops;
+-
+ #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
+ 				_fixed_rate_flags)		\
+ 	static struct clk _name;				\
+@@ -78,8 +76,6 @@ extern const struct clk_ops clk_fixed_rate_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern const struct clk_ops clk_gate_ops;
+-
+ #define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr,	\
+ 				_flags, _reg, _bit_idx,		\
+ 				_gate_flags, _lock)		\
+@@ -110,8 +106,6 @@ extern const struct clk_ops clk_gate_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern const struct clk_ops clk_divider_ops;
+-
+ #define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr,	\
+ 				_flags, _reg, _shift, _width,	\
+ 				_divider_flags, _lock)		\
+@@ -143,8 +137,6 @@ extern const struct clk_ops clk_divider_ops;
+ 		.flags = _flags,				\
+ 	};
+ 
+-extern const struct clk_ops clk_mux_ops;
+-
+ #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags,	\
+ 				_reg, _shift, _width,		\
+ 				_mux_flags, _lock)		\
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5508897..6eb8e5d 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -149,6 +149,7 @@ struct clk_fixed_rate {
+ 	u8		flags;
+ };
+ 
++extern const struct clk_ops clk_fixed_rate_ops;
+ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		unsigned long fixed_rate);
+@@ -180,6 +181,7 @@ struct clk_gate {
+ 
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+ 
++extern const struct clk_ops clk_gate_ops;
+ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+@@ -218,6 +220,7 @@ struct clk_divider {
+ #define CLK_DIVIDER_ONE_BASED		BIT(0)
+ #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
+ 
++extern const struct clk_ops clk_divider_ops;
+ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+@@ -252,6 +255,7 @@ struct clk_mux {
+ #define CLK_MUX_INDEX_ONE		BIT(0)
+ #define CLK_MUX_INDEX_BIT		BIT(1)
+ 
++extern const struct clk_ops clk_mux_ops;
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
 -- 
 1.7.5.4
