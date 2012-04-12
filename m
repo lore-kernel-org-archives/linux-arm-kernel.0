@@ -1,54 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Apr 2012 17:49:26 -0600 (MDT)
-Subject: [PATCH 08/12] arm: omap3: am35x: Fix clockdomain dependencies
-In-Reply-To: <20120411224911.GE31197@animalcreek.com>
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-9-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1204111540060.29473@utopia.booyaka.com>
- <20120411215513.GA31197@animalcreek.com>
- <alpine.DEB.2.00.1204111555360.29473@utopia.booyaka.com>
- <20120411224911.GE31197@animalcreek.com>
-Message-ID: <alpine.DEB.2.00.1204111748540.29473@utopia.booyaka.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 11 Apr 2012 21:13:24 -0300
+Subject: [PATCH 1/3] ARM i.MX27: Add devicetree support
+In-Reply-To: <87iph7wu97.fsf@laptop.org>
+References: <1330503654-2197-1-git-send-email-s.hauer@pengutronix.de>
+ <1330503654-2197-2-git-send-email-s.hauer@pengutronix.de>
+ <87lim5zne5.fsf@laptop.org> <20120410091715.GA3852@pengutronix.de>
+ <87iph7wu97.fsf@laptop.org>
+Message-ID: <CAOMZO5ChBtMnR-MHMGyqn6xnXHAXzzBq0AA0-x7q_uk7zYC5vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Apr 2012, Mark A. Greer wrote:
+Sascha,
 
-> On Wed, Apr 11, 2012 at 04:04:44PM -0600, Paul Walmsley wrote:
-> > On Wed, 11 Apr 2012, Mark A. Greer wrote:
-> > 
-> > > On Wed, Apr 11, 2012 at 03:44:38PM -0600, Paul Walmsley wrote:
-> > > 
-> > > > Looks like there are an extra set of commas here, maybe just use:
-> > > > 
-> > > > static struct clkdm_dep gfx_sgx_am35x_wkdeps[] = {
-> > > > 	{ .clkdm_name = "mpu_clkdm" },
-> > > > 	{ .clkdm_name = "wkup_clkdm" },
-> > > > 	{ NULL },
-> > > 
-> > > Yes, there are extra commas but they come from the code I'm copying
-> > > and removing iva2_clkdm from.  I was keeping things consistent so I
-> > > kept the commas.  Given that, do you still want them removed?
-> > > (I'm indifferent.)
-> > 
-> > Yes please.  I realize it's a minor issue, but I'd like to keep the format 
-> > of these files internally consistent.
-> 
-> Hrm, did you meant "No thanks"?  As in, leave the commas there since
-> that's what the code that is already there is like?
+On Tue, Apr 10, 2012 at 11:12 AM, Chris Ball <cjb@laptop.org> wrote:
 
-The current data is in this format:
+>> Thanks for noting. I assume that irq_domain_add_legacy is the right
+>> approach here, just like the other i.MX boards do, right?
+>
+> Yeah, if you look at Grant's removal patch:
+>
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=6b783f7c5dde2648fa0bbe7fc8ac80d78699e67f
+>
+> .. he converted all of the in-tree uses to irq_domain_add_legacy()
+> at the time of removal, so that looks right.
 
-/* 3430 PM_WKDEP_CAM: IVA2, MPU, WKUP */
-static struct clkdm_dep cam_wkdeps[] = {
-	{ .clkdm_name = "iva2_clkdm" },
-	{ .clkdm_name = "mpu_clkdm" },
-	{ .clkdm_name = "wkup_clkdm" },
-	{ NULL },
-};
+I managed to get mx27pdk booting from dt (thanks Shawn for the tips!)
+and I fixed this problem.
 
-So if you can match that, it would be ideal.
-
-
-
-- Paul
+Will send the fix soon.
