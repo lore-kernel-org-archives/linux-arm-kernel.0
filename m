@@ -1,30 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Apr 2012 20:44:39 -0600 (MDT)
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <1331934707-29487-1-git-send-email-aneesh@ti.com>
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
-Message-ID: <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 12 Apr 2012 10:44:18 +0800
+Subject: [PATCH 25/40] ARM: imx: add common clock support for clk busy
+In-Reply-To: <20120412015013.GA27730@b20223-02.ap.freescale.net>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-26-git-send-email-s.hauer@pengutronix.de>
+ <20120412015013.GA27730@b20223-02.ap.freescale.net>
+Message-ID: <20120412024415.GE2445@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc Mark Greer, Mark Salter
+On Thu, Apr 12, 2012 at 09:50:14AM +0800, Richard Zhao wrote:
+...
+> > +struct clk_busy_divider {
+> > +	struct clk_hw hw;
+> > +	void __iomem *reg;
+> > +	u8 shift;
+> > +	struct clk_divider div;
+> > +	const struct clk_ops *div_ops;
+> > +};
+> It's not like a good way to inherit from struct clk_divider.
 
-Hi Greg, Aneesh,
+Any good way to suggest?
 
-On Sat, 17 Mar 2012, Aneesh V wrote:
+> Since we
+> already have struct clk_hw in struct clk_divider, why do you still 
+> duplicate hw here?
+>  
+I can use the clk_hw in clk_divider, but it will make the translation
+from clk_hw to clk_busy_divider a bit more complicated.  And in any
+case, clk_busy_divider is a particular type of clk, so it should not
+be surprising to have a its own clk_hw like any other clks.
 
-> Add a driver for the EMIF SDRAM controller used in TI SoCs
-> 
-> EMIF is an SDRAM controller that supports, based on its revision,
-> one or more of LPDDR2/DDR2/DDR3 protocols.This driver adds support
-> for LPDDR2.
-
-Just checking to see what the current state of this series is.  Greg, are 
-you considering this for merging, or are there remaining issues?  Aneesh, 
-do you have any remaining issues to resolve with this set?
-
-This is useful not only for OMAP4 and AM3517/3505, but also will probably 
-be useful for the C6x chips that Mark Salter is working on.
-
-
-- Paul
+-- 
+Regards,
+Shawn
