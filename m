@@ -1,260 +1,49 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 12 Apr 2012 11:18:17 +0200
-Subject: [PATCH] ARM: Exynos4: integrate SYSMMU driver with DMA-mapping
- interface
-In-Reply-To: <4F869AF4.3080402@gmail.com>
-References: <1334155004-5700-1-git-send-email-m.szyprowski@samsung.com>
- <1334155004-5700-2-git-send-email-m.szyprowski@samsung.com>
- <4F869AF4.3080402@gmail.com>
-Message-ID: <026301cd188d$32613860$9723a920$%szyprowski@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Apr 2012 10:19:57 +0100
+Subject: [RESEND PATCH] ARM: tls: remove covert channel via TPIDRURW
+Message-ID: <1334222397-16265-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Subash,
+TPIDRURW is a user read/write register forming part of the group of
+thread registers in more recent versions of the ARM architecture (~v6+).
 
-On Thursday, April 12, 2012 11:06 AM Subash Patel wrote:
+Currently, the kernel does not touch this register, which allows tasks
+to communicate covertly by reading and writing to the register without
+context-switching affecting its contents.
 
-> On 04/11/2012 08:06 PM, Marek Szyprowski wrote:
-> > This patch provides an provides setup code which assigns IOMMU controllers
-> > to FIMC and MFC devices and enables IOMMU aware DMA-mapping for them.
-> > It has been tested on Samsung Exynos4 platform, NURI board.
-> >
-> > Most of the work is done in the s5p_sysmmu_late_init() function, which
-> > first assigns SYSMMU controller to respective client device and then
-> > creates IO address space mapping structures. In this example 128 MiB of
-> > address space is created at 0x20000000 for most of the devices. IO address
-> > allocation precision is set to 2^4 pages, so all small allocations will be
-> > aligned to 64 pages. This reduces the size of the io address space bitmap
-> > to 4 KiB.
-> >
-> > To solve the clock dependency issues, parent clocks have been added to each
-> > SYSMMU controller bus clock. This models the true hardware behavior,
-> > because client's device bus clock also gates the respective sysmmu bus
-> > clock.
-> >
-> > Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
-> > Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
-> > ---
-> >   arch/arm/mach-exynos/Kconfig               |    1 +
-> >   arch/arm/mach-exynos/clock-exynos4.c       |   64 +++++++++++++++-------------
-> >   arch/arm/mach-exynos/dev-sysmmu.c          |   44 +++++++++++++++++++
-> >   arch/arm/mach-exynos/include/mach/sysmmu.h |    3 +
-> >   drivers/iommu/Kconfig                      |    1 +
-> >   5 files changed, 84 insertions(+), 29 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> > index 801c738..25b9ba5 100644
-> > --- a/arch/arm/mach-exynos/Kconfig
-> > +++ b/arch/arm/mach-exynos/Kconfig
-> > @@ -288,6 +288,7 @@ config MACH_NURI
-> >   	select S5P_DEV_USB_EHCI
-> >   	select S5P_SETUP_MIPIPHY
-> >   	select EXYNOS4_DEV_DMA
-> > +	select EXYNOS_DEV_SYSMMU
-> >   	select EXYNOS4_SETUP_FIMC
-> >   	select EXYNOS4_SETUP_FIMD0
-> >   	select EXYNOS4_SETUP_I2C1
-> > diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-> > index 29ae4df..fe459a3 100644
-> > --- a/arch/arm/mach-exynos/clock-exynos4.c
-> > +++ b/arch/arm/mach-exynos/clock-exynos4.c
-> > @@ -497,29 +497,6 @@ static struct clk *exynos4_gate_clocks[] = {
-> >
-> >   static struct clk exynos4_init_clocks_off[] = {
-> >   	{
-> > -		.name		= "timers",
-> > -		.parent		=&exynos4_clk_aclk_100.clk,
-> > -		.enable		= exynos4_clk_ip_peril_ctrl,
-> > -		.ctrlbit	= (1<<24),
-> > -	}, {
-> > -		.name		= "csis",
-> > -		.devname	= "s5p-mipi-csis.0",
-> > -		.enable		= exynos4_clk_ip_cam_ctrl,
-> > -		.ctrlbit	= (1<<  4),
-> > -		.parent		=&exynos4_clk_gate_cam,
-> > -	}, {
-> > -		.name		= "csis",
-> > -		.devname	= "s5p-mipi-csis.1",
-> > -		.enable		= exynos4_clk_ip_cam_ctrl,
-> > -		.ctrlbit	= (1<<  5),
-> > -		.parent		=&exynos4_clk_gate_cam,
-> > -	}, {
-> > -		.name		= "jpeg",
-> > -		.id		= 0,
-> > -		.enable		= exynos4_clk_ip_cam_ctrl,
-> > -		.ctrlbit	= (1<<  6),
-> > -		.parent		=&exynos4_clk_gate_cam,
-> > -	}, {
-> >   		.name		= "fimc",
-> >   		.devname	= "exynos4-fimc.0",
-> >   		.enable		= exynos4_clk_ip_cam_ctrl,
-> > @@ -544,6 +521,35 @@ static struct clk exynos4_init_clocks_off[] = {
-> >   		.ctrlbit	= (1<<  3),
-> >   		.parent		=&exynos4_clk_gate_cam,
-> >   	}, {
-> > +		.name		= "mfc",
-> > +		.devname	= "s5p-mfc",
-> > +		.enable		= exynos4_clk_ip_mfc_ctrl,
-> > +		.ctrlbit	= (1<<  0),
-> > +		.parent		=&exynos4_clk_gate_mfc,
-> > +	}, {
-> > +		.name		= "timers",
-> > +		.parent		=&exynos4_clk_aclk_100.clk,
-> > +		.enable		= exynos4_clk_ip_peril_ctrl,
-> > +		.ctrlbit	= (1<<24),
-> > +	}, {
-> > +		.name		= "csis",
-> > +		.devname	= "s5p-mipi-csis.0",
-> > +		.enable		= exynos4_clk_ip_cam_ctrl,
-> > +		.ctrlbit	= (1<<  4),
-> > +		.parent		=&exynos4_clk_gate_cam,
-> > +	}, {
-> > +		.name		= "csis",
-> > +		.devname	= "s5p-mipi-csis.1",
-> > +		.enable		= exynos4_clk_ip_cam_ctrl,
-> > +		.ctrlbit	= (1<<  5),
-> > +		.parent		=&exynos4_clk_gate_cam,
-> > +	}, {
-> > +		.name		= "jpeg",
-> > +		.id		= 0,
-> > +		.enable		= exynos4_clk_ip_cam_ctrl,
-> > +		.ctrlbit	= (1<<  6),
-> > +		.parent		=&exynos4_clk_gate_cam,
-> > +	}, {
-> >   		.name		= "hsmmc",
-> >   		.devname	= "exynos4-sdhci.0",
-> >   		.parent		=&exynos4_clk_aclk_133.clk,
-> > @@ -674,12 +680,6 @@ static struct clk exynos4_init_clocks_off[] = {
-> >   		.ctrlbit	= (1<<  0),
-> >   		.parent		=&exynos4_clk_gate_lcd0,
-> >   	}, {
-> > -		.name		= "mfc",
-> > -		.devname	= "s5p-mfc",
-> > -		.enable		= exynos4_clk_ip_mfc_ctrl,
-> > -		.ctrlbit	= (1<<  0),
-> > -		.parent		=&exynos4_clk_gate_mfc,
-> > -	}, {
-> >   		.name		= "i2c",
-> >   		.devname	= "s3c2440-i2c.0",
-> >   		.parent		=&exynos4_clk_aclk_100.clk,
-> > @@ -738,11 +738,13 @@ static struct clk exynos4_init_clocks_off[] = {
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
-> >   		.enable		= exynos4_clk_ip_mfc_ctrl,
-> >   		.ctrlbit	= (1<<  1),
-> > +		.parent		=&exynos4_init_clocks_off[4],
-> >   	}, {
-> >   		.name		= SYSMMU_CLOCK_NAME,
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
-> >   		.enable		= exynos4_clk_ip_mfc_ctrl,
-> >   		.ctrlbit	= (1<<  2),
-> > +		.parent		=&exynos4_init_clocks_off[4],
-> >   	}, {
-> >   		.name		= SYSMMU_CLOCK_NAME,
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(tv, 2),
-> > @@ -763,21 +765,25 @@ static struct clk exynos4_init_clocks_off[] = {
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(fimc0, 5),
-> >   		.enable		= exynos4_clk_ip_cam_ctrl,
-> >   		.ctrlbit	= (1<<  7),
-> > +		.parent		=&exynos4_init_clocks_off[0],
-> >   	}, {
-> >   		.name		= SYSMMU_CLOCK_NAME,
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(fimc1, 6),
-> >   		.enable		= exynos4_clk_ip_cam_ctrl,
-> >   		.ctrlbit	= (1<<  8),
-> > +		.parent		=&exynos4_init_clocks_off[1],
-> >   	}, {
-> >   		.name		= SYSMMU_CLOCK_NAME,
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(fimc2, 7),
-> >   		.enable		= exynos4_clk_ip_cam_ctrl,
-> >   		.ctrlbit	= (1<<  9),
-> > +		.parent		=&exynos4_init_clocks_off[2],
-> >   	}, {
-> >   		.name		= SYSMMU_CLOCK_NAME,
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(fimc3, 8),
-> >   		.enable		= exynos4_clk_ip_cam_ctrl,
-> >   		.ctrlbit	= (1<<  10),
-> > +		.parent		=&exynos4_init_clocks_off[3],
-> >   	}, {
-> >   		.name		= SYSMMU_CLOCK_NAME,
-> >   		.devname	= SYSMMU_CLOCK_DEVNAME(fimd0, 10),
-> > diff --git a/arch/arm/mach-exynos/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
-> > index 3544638..31f2d6ca 100644
-> > --- a/arch/arm/mach-exynos/dev-sysmmu.c
-> > +++ b/arch/arm/mach-exynos/dev-sysmmu.c
-> > @@ -12,12 +12,15 @@
-> >
-> >   #include<linux/platform_device.h>
-> >   #include<linux/dma-mapping.h>
-> > +#include<linux/slab.h>
-> >
-> >   #include<plat/cpu.h>
-> > +#include<plat/devs.h>
-> >
-> >   #include<mach/map.h>
-> >   #include<mach/irqs.h>
-> >   #include<mach/sysmmu.h>
-> > +#include<asm/dma-iommu.h>
-> >
-> >   static u64 exynos_sysmmu_dma_mask = DMA_BIT_MASK(32);
-> >
-> > @@ -276,3 +279,44 @@ static int __init init_sysmmu_platform_device(void)
-> >    * see pm_domain.c, which use arch_initcall()
-> >    */
-> >   core_initcall(init_sysmmu_platform_device);
-> > +#ifdef CONFIG_ARM_DMA_USE_IOMMU
-> > +int __init s5p_create_iommu_mapping(struct device *client, dma_addr_t base,
-> > +				    unsigned int size, int order)
-> > +{
-> > +	struct dma_iommu_mapping *mapping;
-> > +	if (!client)
-> > +		return 0;
-> > +	mapping = arm_iommu_create_mapping(&platform_bus_type, base, size, order);
-> > +	if (!mapping)
-> > +		return -ENOMEM;
-> > +	client->dma_parms = kzalloc(sizeof(*client->dma_parms), GFP_KERNEL);
-> > +	dma_set_max_seg_size(client, 0xffffffffu);
-> > +	arm_iommu_attach_device(client, mapping);
-> > +	return 0;
-> > +}
-> > +
-> > +/*
-> > + * s5p_sysmmu_late_init
-> > + * Create DMA-mapping IOMMU context for specified devices. This function must
-> > + * be called later, once SYSMMU driver gets registered and probed.
-> > + */
-> > +static int __init s5p_sysmmu_late_init(void)
-> > +{
-> > +	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc0).dev,&s5p_device_fimc0.dev);
-> > +	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc1).dev,&s5p_device_fimc1.dev);
-> > +	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc2).dev,&s5p_device_fimc2.dev);
-> > +	platform_set_sysmmu(&SYSMMU_PLATDEV(fimc3).dev,&s5p_device_fimc3.dev);
-> > +	platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_l).dev,&s5p_device_mfc_l.dev);
-> > +	platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_r).dev,&s5p_device_mfc_r.dev);
-> > +
-> > +	s5p_create_iommu_mapping(&s5p_device_fimc0.dev, 0x20000000, SZ_128M, 4);
-> > +	s5p_create_iommu_mapping(&s5p_device_fimc1.dev, 0x20000000, SZ_128M, 4);
-> > +	s5p_create_iommu_mapping(&s5p_device_fimc2.dev, 0x20000000, SZ_128M, 4);
-> > +	s5p_create_iommu_mapping(&s5p_device_fimc3.dev, 0x20000000, SZ_128M, 4);
-> > +	s5p_create_iommu_mapping(&s5p_device_mfc_l.dev, 0x20000000, SZ_128M, 4);
-> > +	s5p_create_iommu_mapping(&s5p_device_mfc_r.dev, 0x40000000, SZ_128M, 4);
-> > +
-> > +	return 0;
-> > +}
-> > +device_initcall(s5p_sysmmu_late_init);
-> 
-> Shouldn't these things be specific to a SoC? With this RFC, it happens
-> that you will predefine the IOMMU attachment and mapping information for
-> devices in common location (dev-sysmmu.c)? This may lead to problems
-> because there are some IP's with SYSMMU support in exynos5, but not
-> available in exynos4 (eg: GSC, FIMC-LITE, FIMC-ISP) Previously we used
-> to do above declaration in individual machine file, which I think was
-> more meaningful.
+This patch clears TPIDRURW when TPIDRURO is updated via the set_tls
+macro, which is called directly from __switch_to. Since the current
+behaviour makes the register useless to userspace as far as thread
+pointers are concerned, simply clearing the register (rather than saving
+and restoring it) will not cause any problems to userspace.
 
-Right, I simplified the code too much. Keeping these definitions inside machine 
-files was a better idea. I completely forgot that Exynos sub-platform now covers
-both Exynos4 and Exynos5 SoC families.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/tls.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Best regards
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 60843eb..73409e6 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -7,6 +7,8 @@
+ 
+ 	.macro set_tls_v6k, tp, tmp1, tmp2
+ 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
++	mov	\tmp1, #0
++	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+ 	.endm
+ 
+ 	.macro set_tls_v6, tp, tmp1, tmp2
+@@ -15,6 +17,8 @@
+ 	mov	\tmp2, #0xffff0fff
+ 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+ 	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
++	movne	\tmp1, #0
++	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+ 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.4.1
