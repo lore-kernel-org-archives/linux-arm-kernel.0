@@ -1,84 +1,65 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 12 Apr 2012 13:45:59 +0200
-Subject: [PATCH 3/9] ARM: at91: add at91sam9g20ek boards dt support
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A9317C7B88@DBDE01.ent.ti.com>
-References: <20120411153515.GK16641@game.jcrosoft.org>
- <1334160079-30831-3-git-send-email-plagnioj@jcrosoft.com>
- <C8443D0743D26F4388EA172BF4E2A7A9317C7B88@DBDE01.ent.ti.com>
-Message-ID: <20120412114559.GM16641@game.jcrosoft.org>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Thu, 12 Apr 2012 14:10:36 +0200
+Subject: [PATCH v3 0/3] Add PATA host controller support for Cirrus Logic
+ EP93xx CPU
+Message-ID: <4F86C63C.6030908@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07:06 Thu 12 Apr     , Mohammed, Afzal wrote:
-> + omap ml
-> 
-> Hi Jean, Andrew, Nicolas,
-> 
-> On Wed, Apr 11, 2012 at 21:31:13, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > +	ahb {
-> > +		apb {
-> > +			dbgu: serial at fffff200 {
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			usart0: serial at fffb0000 {
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			usart1: serial at fffb4000 {
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			macb0: ethernet at fffc4000 {
-> > +				phy-mode = "rmii";
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			usb1: gadget at fffa4000 {
-> > +				atmel,vbus-gpio = <&pioC 5 0>;
-> > +				status = "okay";
-> > +			};
-> > +		};
-> > +
-> > +		nand0: nand at 40000000 {
-> > +			nand-bus-width = <8>;
-> > +			nand-ecc-mode = "soft";
-> > +			nand-on-flash-bbt;
-> > +			status = "okay";
-> 
-> I have a few queries about handling static memory controller (SMC) of ATMEL
-> 
-> 1. How is SMC configured when DT is used ?
-> 2. With "d6a0166 atmel/nand: add DT support", ek_add_device_nand() is no more
-> present (which was earlier configuring SMC), so is SMC configuration handled
-> by Kernel on DT boot or is it done by bootloader when DT ?
-> 3. How ek_add_device_dm9000() is going to be achieved with DT ?
-> 4. Is there any plan to create a driver out of SMC code & use DT with it ?
-> 
-> Reason for bringing these queries is that TI OMAP chips have GPMC [1], SMC in ATMEL
-> seems somewhat similar and currently GPMC is configured in platform code, &
-> we are creating a driver out of that code [2]. There are different views on where
-> GPMC driver should go, mfd, misc folders etc, but could not yet get concrete
-> suggestions even with a loud cry.
-put me in ccc I'll take a look
-> 
-> If ATMEL is also going driver way, then probably our voice together may be
-> heard and hopefully it will expedite the matter.
-I'm going to add it too  my idea was to create something similiar as the
-pintrl
-you register the ddifferent bank supported buy the SoC and then the driver
-request the bank for the dev_name
+Hi,
 
-at soc level you will set the default timings and then the drvier may
-manipulate them
+this is a third version of EP93xx PATA driver (PATCH v3 1/3),
+IDE platform code for ep93xx (PATCH v3 2/3) and IDE support
+for EDB93xx boards (PATCH v3 3/3).
+Patches apply to current mainline (v3.4rc2).
 
-I already update the API of sam9_smc to abstract the access to the register.
+v2:
+- don't BUG() in ep93xx_pata_dma_start(), ep93xx_pata_dma_setup(),
+- don't use ata_ioports structure for EP93xx IDECTRL register values,
+- IORDY timeout handling using jiffies (ep93xx_pata_wait_for_iordy),
+- IDE/GPIO pin muxing solved by adding ep93xx_ide_acquire/release_gpio,
+- register the driver also for EDB9312 and EDB9315 boards,
+- corrected many coding style issues,
+- dma initialization changed: request and configure channels in
+  ep93xx_pata_dma_init (was: request in ep93xx_pata_dma_init,
+  configuration in ep93xx_pata_dma_setup - channels were needlessly
+  configured to the same values before each transfer).
 
-I expect the code for the request to be generic but handling of the timing IP
-specific
+v3:
+- use custom delay loop (ep93xx_pata_delay()) instead of ndelay(),
+- use ata_timing_compute() and ata_timing_merge() to properly calculate
+  timings for the delay loop,
+- use single ata_timing struct in ep93xx_pata_data for both IDE register
+  and PIO data transfers,
+- IORDY timeout handling using custom delay loop,
+- move common parts of code from ep93xx_pata_{read/write}() to
+  ep93xx_pata_rw_begin(), ep93xx_pata_rw_end(),
+- introduce ep93xx_pata_{read/write}_{reg/data}() - wrappers which call
+  ep93xx_pata_{read/write}() with proper timings selected,
+- corrected delays in ep93xx_pata_{read/write}: time waited for IORDY
+  is added to t2; wait (t0 - t2) or t2i (whichever is greater) after
+  deassertion of DIOW-/DIOR-,
+- removed DPRINTK, VPRINTK.
 
-Evenif the GPMC is smiliar as the SMC I do not expect a generic API to manage
-it easly (for the timings).
+The reason for using custom delay loop is that currently ndelay() has
+only 1us resolution on ep93xx. Using ndelay() gives us about 6 - 7us
+total execution time for each IDE register/PIO data transfer. This
+results in ~250kB/s transfers, no matter what PIO mode is selected.
+Using custom delay loop, this driver transfers data at ~2,1MB/s (PIO4).
+Is using such delay loop in the driver acceptable?
 
-Best Regrds,
-J
+Thanks,
+RP
+
+[PATCH v3 1/3] PATA host controller driver for ep93xx
+[PATCH v3 2/3] ep93xx: IDE driver platform support code
+[PATCH v3 3/3] ep93xx: Add IDE support to edb93xx boards
+
+ arch/arm/mach-ep93xx/core.c                  |   96 +
+ arch/arm/mach-ep93xx/edb93xx.c               |   24
+ arch/arm/mach-ep93xx/include/mach/platform.h |    3
+ arch/arm/mach-ep93xx/soc.h                   |    1
+ drivers/ata/Kconfig                          |    9
+ drivers/ata/Makefile                         |    1
+ drivers/ata/pata_ep93xx.c                    | 1044 +++++++++++++++++
+ 7 files changed, 1178 insertions(+)
