@@ -1,63 +1,174 @@
-From: prylowski@metasoft.pl (Rafal Prylowski)
-Date: Thu, 12 Apr 2012 14:15:15 +0200
-Subject: [PATCH v3 3/3] ep93xx: Add IDE support to edb93xx boards
-In-Reply-To: <4F86C63C.6030908@metasoft.pl>
-References: <4F86C63C.6030908@metasoft.pl>
-Message-ID: <4F86C753.3020200@metasoft.pl>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 12 Apr 2012 14:38:40 +0200
+Subject: [PATCH] ARM: Exynos4: integrate SYSMMU driver with DMA-mapping
+ interface
+In-Reply-To: <028f01cd18a5$b0721770$11564650$%szyprowski@samsung.com>
+References: <026301cd188d$32613860$9723a920$%szyprowski@samsung.com><201204121109.28753.arnd@arndb.de><028f01cd18a5$b0721770$11564650$%szyprowski@samsung.com>
+Message-ID: <20120412.153840.505876550992316983.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Marek Szyprowski <m.szyprowski@samsung.com>
+Subject: RE: [PATCH] ARM: Exynos4: integrate SYSMMU driver with DMA-mapping interface
+Date: Thu, 12 Apr 2012 14:13:37 +0200
+Message-ID: <028f01cd18a5$b0721770$11564650$%szyprowski@samsung.com>
 
-Add IDE support to edb93xx boards.
+>
+>
+>
+>
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Thursday, April 12, 2012 1:09 PM
+> > To: Marek Szyprowski
+> > Cc: 'Subash Patel'; linux-arm-kernel at lists.infradead.org; linaro-mm-sig at lists.linaro.org;
+> > linux-mm at kvack.org; linux-arch at vger.kernel.org; iommu at lists.linux-foundation.org; 'Kyungmin
+> > Park'; 'Joerg Roedel'; 'Russell King - ARM Linux'; 'Chunsang Jeong'; 'Krishna Reddy'; 'KyongHo
+> > Cho'; Andrzej Pietrasiewicz; 'Benjamin Herrenschmidt'; 'Konrad Rzeszutek Wilk'; 'Hiroshi Doyu'
+> > Subject: Re: [PATCH] ARM: Exynos4: integrate SYSMMU driver with DMA-mapping interface
+> >
+> > On Thursday 12 April 2012, Marek Szyprowski wrote:
+> > > +
+> > > > > +/*
+> > > > > + * s5p_sysmmu_late_init
+> > > > > + * Create DMA-mapping IOMMU context for specified devices. This function must
+> > > > > + * be called later, once SYSMMU driver gets registered and probed.
+> > > > > + */
+> > > > > +static int __init s5p_sysmmu_late_init(void)
+> > > > > +{
+> > > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc0).dev,&s5p_device_fimc0.dev);
+> > > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc1).dev,&s5p_device_fimc1.dev);
+> > > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc2).dev,&s5p_device_fimc2.dev);
+> > > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(fimc3).dev,&s5p_device_fimc3.dev);
+> > > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_l).dev,&s5p_device_mfc_l.dev);
+> > > > > +   platform_set_sysmmu(&SYSMMU_PLATDEV(mfc_r).dev,&s5p_device_mfc_r.dev);
+> > > > > +
+> > > > > +   s5p_create_iommu_mapping(&s5p_device_fimc0.dev, 0x20000000, SZ_128M, 4);
+> > > > > +   s5p_create_iommu_mapping(&s5p_device_fimc1.dev, 0x20000000, SZ_128M, 4);
+> > > > > +   s5p_create_iommu_mapping(&s5p_device_fimc2.dev, 0x20000000, SZ_128M, 4);
+> > > > > +   s5p_create_iommu_mapping(&s5p_device_fimc3.dev, 0x20000000, SZ_128M, 4);
+> > > > > +   s5p_create_iommu_mapping(&s5p_device_mfc_l.dev, 0x20000000, SZ_128M, 4);
+> > > > > +   s5p_create_iommu_mapping(&s5p_device_mfc_r.dev, 0x40000000, SZ_128M, 4);
+> > > > > +
+> > > > > +   return 0;
+> > > > > +}
+> > > > > +device_initcall(s5p_sysmmu_late_init);
+> > > >
+> > > > Shouldn't these things be specific to a SoC? With this RFC, it happens
+> > > > that you will predefine the IOMMU attachment and mapping information for
+> > > > devices in common location (dev-sysmmu.c)? This may lead to problems
+> > > > because there are some IP's with SYSMMU support in exynos5, but not
+> > > > available in exynos4 (eg: GSC, FIMC-LITE, FIMC-ISP) Previously we used
+> > > > to do above declaration in individual machine file, which I think was
+> > > > more meaningful.
+> > >
+> > > Right, I simplified the code too much. Keeping these definitions inside machine
+> > > files was a better idea. I completely forgot that Exynos sub-platform now covers
+> > > both Exynos4 and Exynos5 SoC families.
+> >
+> > Ideally the information about iommu attachment should come from the
+> > device tree. We have the "dma-ranges" properties that define how a dma
+> > address space is mapped. I am not entirely sure how that works when you
+> > have multiple IOMMUs and if that requires defining addititional properties,
+> > but I think we should make it so that we don't have to hardcode specific
+> > devices in the source.
+>
+> Right, until that time machine/board files are imho ok.
 
-Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
+In Tegra30, there are quite many IOMMU attachable (platform)devices,
+and it's quite nice for us to configure them (un)attached with address
+range and IOMMU device ID(ASID) in DT in advance rather than inserting
+the code to attach those devices here and there.
 
+Experimentally I added some hook in platform_device_add() as below,
+but apparently this won't be accepted.
+
+>From cb34373ebbf025e42ec6d8fea2e19e74ba41231e Mon Sep 17 00:00:00 2001
+From: Hiroshi DOYU <hdoyu@nvidia.com>
+Date: Thu, 22 Mar 2012 16:06:27 +0200
+Subject: [PATCH 1/1] ARM: dma-mapping: All platform_device DMA API'able
+
+Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
 ---
- arch/arm/mach-ep93xx/edb93xx.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/mach-tegra/board-cardhu.c |    7 ++++++-
+ arch/arm/mm/dma-mapping.c          |    5 ++++-
+ drivers/base/platform.c            |   11 +++++++++--
+ include/linux/device.h             |    2 ++
+ 4 files changed, 21 insertions(+), 4 deletions(-)
 
-Index: linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-===================================================================
---- linux-2.6.orig/arch/arm/mach-ep93xx/edb93xx.c
-+++ linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-@@ -233,6 +233,29 @@ static void __init edb93xx_register_fb(v
- }
- 
- 
-+/*************************************************************************
-+ * EDB93xx IDE
-+ *************************************************************************/
-+static int __init edb93xx_has_ide(void)
-+{
-+	/*
-+	 * Although EDB9312 and EDB9315 do have IDE capability, they have
-+	 * INTRQ line wired as pull-up, which makes using IDE interface
-+	 * problematic.
-+	 */
-+	return machine_is_edb9312() || machine_is_edb9315 ||
-+	       machine_is_edb9315a();
-+}
+diff --git a/arch/arm/mach-tegra/board-cardhu.c b/arch/arm/mach-tegra/board-cardhu.c
+index 339011e..38f5292 100644
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index ca5544e..5e6dbe0 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -758,6 +758,9 @@ size_t arm_iommu_iova_avail(struct device *dev)
+ 	size_t size = 0;
+ 	unsigned long start = 0;
+
++	BUG_ON(!dev);
++	BUG_ON(!mapping);
 +
-+static void __init edb93xx_register_ide(void)
-+{
-+	if (!edb93xx_has_ide())
-+		return;
+ 	spin_lock_irqsave(&mapping->lock, flags);
+ 	while (1) {
+ 		unsigned long end;
+@@ -1513,7 +1516,7 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+ 	mapping->domain = iommu_domain_alloc(bus);
+ 	if (!mapping->domain)
+ 		goto err3;
+-
++	bus->map = mapping;
+ 	kref_init(&mapping->kref);
+ 	return mapping;
+ err3:
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 99a5272..4af431c 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -21,6 +21,8 @@
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
+
++#include <asm/dma-iommu.h>
 +
-+	ep93xx_register_ide();
-+}
+ #include "base.h"
+
+ #define to_platform_driver(drv)	(container_of((drv), struct platform_driver, \
+@@ -305,8 +307,13 @@ int platform_device_add(struct platform_device *pdev)
+ 		 dev_name(&pdev->dev), dev_name(pdev->dev.parent));
+
+ 	ret = device_add(&pdev->dev);
+-	if (ret == 0)
+-		return ret;
++	if (ret)
++		goto failed;
 +
++	if (platform_bus_type.map)
++		arm_iommu_attach_device(&pdev->dev, platform_bus_type.map);
 +
- static void __init edb93xx_init_machine(void)
- {
- 	ep93xx_init_devices();
-@@ -243,6 +266,7 @@ static void __init edb93xx_init_machine(
- 	edb93xx_register_i2s();
- 	edb93xx_register_pwm();
- 	edb93xx_register_fb();
-+	edb93xx_register_ide();
- }
- 
- 
++	return 0;
+
+  failed:
+ 	while (--i >= 0) {
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 28c35f8..732611f 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -34,6 +34,7 @@ struct subsys_private;
+ struct bus_type;
+ struct device_node;
+ struct iommu_ops;
++struct dma_iommu_mapping;
+
+ struct bus_attribute {
+ 	struct attribute	attr;
+@@ -101,6 +102,7 @@ struct bus_type {
+ 	const struct dev_pm_ops *pm;
+
+ 	struct iommu_ops *iommu_ops;
++	struct dma_iommu_mapping *map;
+
+ 	struct subsys_private *p;
+ };
+--
+1.7.5.4
