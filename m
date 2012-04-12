@@ -1,49 +1,62 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 12 Apr 2012 18:35:08 +0530
-Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait
- for reset status
-In-Reply-To: <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
-References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
- <1331659524-7635-3-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
- <4F8565C7.4080506@ti.com>
- <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
-Message-ID: <4F86D304.1020902@ti.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 12 Apr 2012 18:36:25 +0530
+Subject: [PATCHv8 08/18] I2C: OMAP: Fix the error handling
+In-Reply-To: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
+References: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334235995-6727-9-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Currently in probe
+      pm_runtime_put(dev->dev);
 
-On Thursday 12 April 2012 12:29 AM, Paul Walmsley wrote:
-> That approach sounds fine to me, but I don't think Fernando's patch will
-> help with I2C..  Since it uses a custom reset function omap_i2c_reset(),
-> the delay will actually need to go there.
+...
+        /* i2c device drivers may be active on return from add_adapter() */
+        adap->nr = pdev->id;
+        r = i2c_add_numbered_adapter(adap);
+        if (r) {
+                dev_err(dev->dev, "failure adding adapter\n");
+                goto err_free_irq;
+        }
+...
 
-While working on fixing this I stumbled upon a couple of other
-things which don't seem right.
+        return 0;
 
-The i2c custom reset funtion (omap_i2c_reset) uses a hwmod exposed
-api to set the SOFTRESET bit, however it then accesses the hwmod
-internal structure to poll on RESETDONE status bit. Should there be
-another function exposed to poll on RESETDONE too?
+err_free_irq:
+        free_irq(dev->irq, dev);
+err_unuse_clocks:
+        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+        pm_runtime_put(dev->dev);
 
-_reset() function documents its return value to be -ETIMEDOUT, if the
-module fails to reset in time, and hence expects the custom reset
-function to return the same in such cases. The omap_i2c_reset() function
-seems to return 0 even in cases of timeout. However looking more closely
-the return value from _reset() does not seem to be used in the framework
-today.
+This may access the i2c registers without the clocks.
+Attempting to fix the same by moving the pm_rintime_put after the error check.
 
-The comment in _ocp_softreset() suggests the intent was to add a new
-state to the hwmod state machine.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-         /*
-          * XXX add _HWMOD_STATE_WEDGED for modules that don't come back 
-from
-          * _wait_target_ready() or _reset()
-          */
-
-is it still the case, or should _reset() just return a void?
-
-regards,
-Rajendra
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 2096726..a461097 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1095,8 +1095,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
+ 		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+ 
+-	pm_runtime_put(dev->dev);
+-
+ 	adap = &dev->adapter;
+ 	i2c_set_adapdata(adap, dev);
+ 	adap->owner = THIS_MODULE;
+@@ -1116,6 +1114,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
++	pm_runtime_put(dev->dev);
++
+ 	return 0;
+ 
+ err_free_irq:
+-- 
+1.7.4.1
