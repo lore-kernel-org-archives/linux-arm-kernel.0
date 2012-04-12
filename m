@@ -1,62 +1,105 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 12 Apr 2012 18:36:25 +0530
-Subject: [PATCHv8 08/18] I2C: OMAP: Fix the error handling
+Date: Thu, 12 Apr 2012 18:36:28 +0530
+Subject: [PATCHv8 11/18] I2C: OMAP: use devm_* functions
 In-Reply-To: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334235995-6727-9-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334235995-6727-12-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in probe
-      pm_runtime_put(dev->dev);
-
-...
-        /* i2c device drivers may be active on return from add_adapter() */
-        adap->nr = pdev->id;
-        r = i2c_add_numbered_adapter(adap);
-        if (r) {
-                dev_err(dev->dev, "failure adding adapter\n");
-                goto err_free_irq;
-        }
-...
-
-        return 0;
-
-err_free_irq:
-        free_irq(dev->irq, dev);
-err_unuse_clocks:
-        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-        pm_runtime_put(dev->dev);
-
-This may access the i2c registers without the clocks.
-Attempting to fix the same by moving the pm_rintime_put after the error check.
+The various devm_ functions allocate memory that is released when a driver
+detaches. This patch uses devm_kzalloc, devm_request_mem_region and
+devm_ioremap for data that is allocated in the probe function of a platform
+device and is only freed in the remove function.
 
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   34 +++++++++-------------------------
+ 1 files changed, 9 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 2096726..a461097 100644
+index 121c52e..76b7b62 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1095,8 +1095,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
- 		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+@@ -976,7 +976,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev;
+ 	struct i2c_adapter	*adap;
+-	struct resource		*mem, *irq, *ioarea;
++	struct resource		*mem, *irq;
+ 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+ 	struct device_node	*node = pdev->dev.of_node;
+ 	const struct of_device_id *match;
+@@ -995,17 +995,16 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
--	pm_runtime_put(dev->dev);
--
- 	adap = &dev->adapter;
- 	i2c_set_adapdata(adap, dev);
- 	adap->owner = THIS_MODULE;
-@@ -1116,6 +1114,8 @@ omap_i2c_probe(struct platform_device *pdev)
+-	ioarea = request_mem_region(mem->start, resource_size(mem),
+-			pdev->name);
+-	if (!ioarea) {
+-		dev_err(&pdev->dev, "I2C region already claimed\n");
+-		return -EBUSY;
++	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
++	if (!dev) {
++		dev_err(&pdev->dev, "Menory allocation failed\n");
++		return -ENOMEM;
+ 	}
  
- 	of_i2c_register_devices(adap);
+-	dev = kzalloc(sizeof(struct omap_i2c_dev), GFP_KERNEL);
+-	if (!dev) {
+-		r = -ENOMEM;
+-		goto err_release_region;
++	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
++	if (!dev->base) {
++		dev_err(&pdev->dev, "I2C region already claimed\n");
++		return -ENOMEM;
+ 	}
  
-+	pm_runtime_put(dev->dev);
-+
+ 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
+@@ -1029,11 +1028,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	dev->dev = &pdev->dev;
+ 	dev->irq = irq->start;
+-	dev->base = ioremap(mem->start, resource_size(mem));
+-	if (!dev->base) {
+-		r = -ENOMEM;
+-		goto err_free_mem;
+-	}
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 
+@@ -1121,13 +1115,8 @@ err_free_irq:
+ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(dev->dev);
+-	iounmap(dev->base);
+ 	pm_runtime_disable(&pdev->dev);
+-err_free_mem:
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(dev);
+-err_release_region:
+-	release_mem_region(mem->start, resource_size(mem));
+ 
+ 	return r;
+ }
+@@ -1135,7 +1124,6 @@ err_release_region:
+ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+-	struct resource		*mem;
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
+@@ -1143,10 +1131,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ 	i2c_del_adapter(&dev->adapter);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_disable(&pdev->dev);
+-	iounmap(dev->base);
+-	kfree(dev);
+-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mem->start, resource_size(mem));
  	return 0;
+ }
  
- err_free_irq:
 -- 
 1.7.4.1
