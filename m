@@ -1,23 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 12 Apr 2012 13:19:49 +0800
-Subject: Booting DT support without U-Boot supporting it
-In-Reply-To: <4F865817.3000802@st.com>
-References: <4F865817.3000802@st.com>
-Message-ID: <20120412051947.GG2445@S2101-09.ap.freescale.net>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 12 Apr 2012 07:25:20 +0200
+Subject: [PATCH 1/2] ARM: ixp4xx: fix compilation, add gpiolib support
+In-Reply-To: <1328729069-21308-2-git-send-email-mkl@blackshift.org>
+References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+ <1328729069-21308-2-git-send-email-mkl@blackshift.org>
+Message-ID: <20120412052518.GA3260@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 09:50:39AM +0530, Viresh Kumar wrote:
-> Hi,
+On Wed, Feb 08, 2012 at 08:24:28PM +0100, Marc Kleine-Budde wrote:
+> From: Imre Kaloz <kaloz@openwrt.org>
 > 
-> My U-boot is on an older version and that doesn't have DT support for ARM.
-> Now, is there any way of booting Linux with DT, without U-Boot supporting DT?
+> The problem was introduced with commit:
+> "eb9ae7f gpio: fix build error in include/asm-generic/gpio.h"
 > 
-This is how I responded to Fabio on the same query a few hours ago :)
+> This patch adds gpiolib support for the IXP4xx platform, which fixes the
+> compilation of several ixp4xx platforms, e.g.:
 
-- Turn on CONFIG_ARM_APPENDED_DTB and CONFIG_ARM_ATAG_DTB_COMPAT
-- cat zImage mx27pdk.dtb > zImage_dtb
-- Boot zImage_dtb as you do with zImage
+Sorry to nag, but is someone going to take this patch?
 
-Regards,
-Shawn
+Thanks,
+Richard
