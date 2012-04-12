@@ -1,19 +1,21 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 11 Apr 2012 18:02:50 -0700
-Subject: [PATCH 12/13] clk: core: copy parent_names & return error codes
+Date: Wed, 11 Apr 2012 18:02:51 -0700
+Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
 In-Reply-To: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
 References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1334192572-12499-13-git-send-email-mturquette@linaro.org>
+Message-ID: <1334192572-12499-14-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up clk_register and solves a few bugs by teaching
-clk_register and __clk_init to return error codes (instead of just NULL)
-to better align with the existing clk.h api.
+This patch is the basic clk version of 'clk: core: copy parent_names &
+return error codes'.
 
-Along with that change this patch also introduces a new behavior whereby
-clk_register copies the parent_names array, thus allowing platforms to
-declare their parent_names arrays as __initdata.
+The registration functions are changed to allow the core code to copy
+the array of strings and allow platforms to declare those arrays as
+__initdata.
+
+This patch also converts all of the basic clk registration functions to
+return error codes which better aligns them with the existing clk.h api.
 
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 Cc: Arnd Bergman <arnd.bergmann@linaro.org>
@@ -28,166 +30,301 @@ Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/clk.c            |   61 +++++++++++++++++++++++++++++++++--------
- include/linux/clk-private.h  |    4 ++-
- include/linux/clk-provider.h |    3 +-
- 3 files changed, 54 insertions(+), 14 deletions(-)
+ drivers/clk/clk-divider.c    |   46 ++++++++++++++++++++++++++---------
+ drivers/clk/clk-fixed-rate.c |   54 ++++++++++++++++++++++++++---------------
+ drivers/clk/clk-gate.c       |   48 +++++++++++++++++++++++++++----------
+ drivers/clk/clk-mux.c        |    8 +++++-
+ include/linux/clk-provider.h |    2 -
+ 5 files changed, 110 insertions(+), 48 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index ddade87..af2bf12 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1185,34 +1185,41 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
-  * very large numbers of clocks that need to be statically initialized.  It is
-  * a layering violation to include clk-private.h from any code which implements
-  * a clock's .ops; as such any statically initialized clock data MUST be in a
-- * separate C file from the logic that implements it's operations.
-+ * separate C file from the logic that implements it's operations.  Returns 0
-+ * on success, otherwise an error code.
-  */
--void __clk_init(struct device *dev, struct clk *clk)
-+int __clk_init(struct device *dev, struct clk *clk)
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index b1c4b02..add784b 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -153,16 +153,29 @@ const struct clk_ops clk_divider_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_divider_ops);
+ 
++/**
++ * clk_register_divider - register a divider clock with the clock framework
++ * @dev: device registering this clock
++ * @name: name of this clock
++ * @parent_name: name of clock's parent
++ * @flags: framework-specific flags
++ * @reg: register address to adjust divider
++ * @shift: number of bits to shift the bitfield
++ * @width: width of the bitfield
++ * @clk_divider_flags: divider-specific flags for this clock
++ * @lock: shared register lock for this clock
++ */
+ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+ 		u8 clk_divider_flags, spinlock_t *lock)
  {
--	int i;
-+	int i, ret = 0;
- 	struct clk *orphan;
- 	struct hlist_node *tmp, *tmp2;
+ 	struct clk_divider *div;
+-	struct clk *clk;
++	struct clk *clk = ERR_PTR(-ENOMEM);
++	const char *parent_names[1];
  
- 	if (!clk)
--		return;
-+		return -EINVAL;
++	/* allocate the divider */
+ 	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
+-
+ 	if (!div) {
+ 		pr_err("%s: could not allocate divider clk\n", __func__);
+ 		return NULL;
+@@ -175,23 +188,32 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 	div->flags = clk_divider_flags;
+ 	div->lock = lock;
  
- 	mutex_lock(&prepare_lock);
- 
- 	/* check to see if a clock with this name is already registered */
--	if (__clk_lookup(clk->name))
-+	if (__clk_lookup(clk->name)) {
-+		pr_debug("%s: clk %s already initialized\n",
-+				__func__, clk->name);
-+		ret = -EEXIST;
- 		goto out;
-+	}
- 
- 	/* check that clk_ops are sane.  See Documentation/clk.txt */
- 	if (clk->ops->set_rate &&
- 			!(clk->ops->round_rate && clk->ops->recalc_rate)) {
- 		pr_warning("%s: %s must implement .round_rate & .recalc_rate\n",
- 				__func__, clk->name);
-+		ret = -EINVAL;
- 		goto out;
- 	}
- 
- 	if (clk->ops->set_parent && !clk->ops->get_parent) {
- 		pr_warning("%s: %s must implement .get_parent & .set_parent\n",
- 				__func__, clk->name);
-+		ret = -EINVAL;
- 		goto out;
- 	}
- 
-@@ -1308,7 +1315,7 @@ void __clk_init(struct device *dev, struct clk *clk)
- out:
- 	mutex_unlock(&prepare_lock);
- 
--	return;
-+	return ret;
- }
- 
- /**
-@@ -1324,29 +1331,59 @@ out:
-  * clk_register is the primary interface for populating the clock tree with new
-  * clock nodes.  It returns a pointer to the newly allocated struct clk which
-  * cannot be dereferenced by driver code but may be used in conjuction with the
-- * rest of the clock API.
-+ * rest of the clock API.  In the event of an error clk_register will return an
-+ * error code; drivers must test for an error code after calling clk_register.
-  */
- struct clk *clk_register(struct device *dev, const char *name,
- 		const struct clk_ops *ops, struct clk_hw *hw,
- 		const char **parent_names, u8 num_parents, unsigned long flags)
- {
-+	int i, ret = -ENOMEM;
- 	struct clk *clk;
- 
- 	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
--	if (!clk)
--		return NULL;
-+	if (!clk) {
-+		pr_err("%s: could not allocate clk\n", __func__);
-+		goto fail_out;
-+	}
- 
- 	clk->name = name;
- 	clk->ops = ops;
- 	clk->hw = hw;
- 	clk->flags = flags;
--	clk->parent_names = parent_names;
- 	clk->num_parents = num_parents;
- 	hw->clk = clk;
- 
--	__clk_init(dev, clk);
-+	/* allocate local copy in case parent_names is __initdata */
-+	clk->parent_names = kzalloc((sizeof(char*) * num_parents),
-+			GFP_KERNEL);
-+
-+	if (!clk->parent_names) {
-+		pr_err("%s: could not allocate clk->parent_names\n", __func__);
-+		goto fail_parent_names;
-+	}
-+
-+	/* copy each string name in case parent_names is __initdata */
-+	for (i = 0; i < num_parents; i++) {
-+		clk->parent_names[i] = kstrdup(parent_names[i], GFP_KERNEL);
-+		if (!clk->parent_names[i]) {
-+			pr_err("%s: could not copy parent_names\n", __func__);
-+			goto fail_parent_names_copy;
++	/* allocate the temporary parent_names */
+ 	if (parent_name) {
+-		div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+-		if (!div->parent[0])
+-			goto out;
++		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
++		if (!parent_names[0]) {
++			pr_err("%s: could not allocate parent_names\n",
++					__func__);
++			goto fail_parent_names;
 +		}
-+	}
+ 	}
+ 
++	/* register the clock */
+ 	clk = clk_register(dev, name,
+ 			&clk_divider_ops, &div->hw,
+-			div->parent,
++			(parent_name ? parent_names: NULL),
+ 			(parent_name ? 1 : 0),
+ 			flags);
+-	if (clk)
+-		return clk;
+ 
+-out:
+-	kfree(div->parent[0]);
+-	kfree(div);
++	/* free the temporary parent_names */
++	if (parent_name)
++		kfree(parent_names[0]);
 +
-+	ret = __clk_init(dev, clk);
-+	if (!ret)
-+		return clk;
++	if (!IS_ERR(clk))
++		goto out;
  
--	return clk;
-+fail_parent_names_copy:
-+	while (--i >= 0)
-+		kfree(clk->parent_names[i]);
-+	kfree(clk->parent_names);
+-	return NULL;
 +fail_parent_names:
-+	kfree(clk);
-+fail_out:
-+	return ERR_PTR(ret);
++	kfree(div);
++out:
++	return clk;
  }
- EXPORT_SYMBOL_GPL(clk_register);
+diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+index 027e477..ecd20ae 100644
+--- a/drivers/clk/clk-fixed-rate.c
++++ b/drivers/clk/clk-fixed-rate.c
+@@ -38,44 +38,58 @@ const struct clk_ops clk_fixed_rate_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
  
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index e9c8b98..e7032fd 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -181,8 +181,10 @@ struct clk {
-  *
-  * It is not necessary to call clk_register if __clk_init is used directly with
-  * statically initialized clock data.
-+ *
-+ * Returns 0 on success, otherwise an error code.
-  */
--void __clk_init(struct device *dev, struct clk *clk);
-+int __clk_init(struct device *dev, struct clk *clk);
++/**
++ * clk_register_fixed_rate - register fixed-rate clock with the clock framework
++ * @dev: device that is registering this clock
++ * @name: name of this clock
++ * @parent_name: name of clock's parent
++ * @flags: framework-specific flags
++ * @fixed_rate: non-adjustable clock rate
++ */
+ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		unsigned long fixed_rate)
+ {
+ 	struct clk_fixed_rate *fixed;
+-	char **parent_names = NULL;
+-	u8 len;
++	struct clk *clk = ERR_PTR(-ENOMEM);
++	const char *parent_names[1];
  
- #endif /* CONFIG_COMMON_CLK */
- #endif /* CLK_PRIVATE_H */
++	/* allocate fixed-rate clock */
+ 	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
+-
+ 	if (!fixed) {
+ 		pr_err("%s: could not allocate fixed clk\n", __func__);
+-		return ERR_PTR(-ENOMEM);
++		goto out;
+ 	}
+ 
+ 	/* struct clk_fixed_rate assignments */
+ 	fixed->fixed_rate = fixed_rate;
+ 
++	/* allocate the temporary parent_names */
+ 	if (parent_name) {
+-		parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
+-
+-		if (! parent_names)
+-			goto out;
+-
+-		len = sizeof(char) * strlen(parent_name);
+-
+-		parent_names[0] = kmalloc(len, GFP_KERNEL);
+-
+-		if (!parent_names[0])
+-			goto out;
+-
+-		strncpy(parent_names[0], parent_name, len);
++		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
++		if (!parent_names[0]) {
++			pr_err("%s: could not allocate parent_names\n",
++					__func__);
++			goto fail_parent_names;
++		}
+ 	}
+ 
+-out:
+-	return clk_register(dev, name,
++	/* register the clock */
++	clk = clk_register(dev, name,
+ 			&clk_fixed_rate_ops, &fixed->hw,
+-			parent_names,
++			(parent_name ? parent_names : NULL),
+ 			(parent_name ? 1 : 0),
+ 			flags);
++
++	/* free the temporary parent_names */
++	if (parent_name)
++		kfree(parent_names[0]);
++
++	if (!IS_ERR(clk))
++		goto out;
++
++fail_parent_names:
++	kfree(fixed);
++out:
++	return clk;
+ }
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index fe2ff9e..288fb5e 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -105,19 +105,31 @@ const struct clk_ops clk_gate_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_gate_ops);
+ 
++/**
++ * clk_register_gate - register a gate clock with the clock framework
++ * @dev: device that is registering this clock
++ * @name: name of this clock
++ * @parent_name: name of this clock's parent
++ * @flags: framework-specific flags for this clock
++ * @reg: register address to control gating of this clock
++ * @bit_idx: which bit in the register controls gating of this clock
++ * @clk_gate_flags: gate-specific flags for this clock
++ * @lock: shared register lock for this clock
++ */
+ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate_flags, spinlock_t *lock)
+ {
+ 	struct clk_gate *gate;
+-	struct clk *clk;
++	struct clk *clk = ERR_PTR(-ENOMEM);
++	const char *parent_names[1];
+ 
++	/* allocate the gate */
+ 	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
+-
+ 	if (!gate) {
+ 		pr_err("%s: could not allocate gated clk\n", __func__);
+-		return NULL;
++		goto out;
+ 	}
+ 
+ 	/* struct clk_gate assignments */
+@@ -126,22 +138,32 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 	gate->flags = clk_gate_flags;
+ 	gate->lock = lock;
+ 
++	/* allocate the temporary parent_names */
+ 	if (parent_name) {
+-		gate->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+-		if (!gate->parent[0])
+-			goto out;
++		parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
++		if (!parent_names[0]) {
++			pr_err("%s: could not allocate parent_names\n",
++					__func__);
++			goto fail_parent_names;
++		}
+ 	}
+ 
++	/* register the clock */
+ 	clk = clk_register(dev, name,
+ 			&clk_gate_ops, &gate->hw,
+-			gate->parent,
++			(parent_name ? parent_names : NULL),
+ 			(parent_name ? 1 : 0),
+ 			flags);
+-	if (clk)
+-		return clk;
+-out:
+-	kfree(gate->parent[0]);
+-	kfree(gate);
+ 
+-	return NULL;
++	/* free the temporary parent_names */
++	if (parent_name)
++		kfree(parent_names[0]);
++
++	if (!IS_ERR(clk))
++		goto out;
++
++fail_parent_names:
++	kfree(gate);
++out:
++	return clk;
+ }
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index bd5e598..5b237b6 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -94,6 +94,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		u8 clk_mux_flags, spinlock_t *lock)
+ {
+ 	struct clk_mux *mux;
++	struct clk *clk;
+ 
+ 	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
+ 
+@@ -109,6 +110,11 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 	mux->flags = clk_mux_flags;
+ 	mux->lock = lock;
+ 
+-	return clk_register(dev, name, &clk_mux_ops, &mux->hw,
++	clk = clk_register(dev, name, &clk_mux_ops, &mux->hw,
+ 			parent_names, num_parents, flags);
++
++	if (IS_ERR(clk))
++		kfree(mux);
++
++	return clk;
+ }
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 8981435..97f9fab 100644
+index 97f9fab..3323d24 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -274,7 +274,8 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-  * clk_register is the primary interface for populating the clock tree with new
-  * clock nodes.  It returns a pointer to the newly allocated struct clk which
-  * cannot be dereferenced by driver code but may be used in conjuction with the
-- * rest of the clock API.
-+ * rest of the clock API.  In the event of an error clk_register will return an
-+ * error code; drivers must test for an error code after calling clk_register.
-  */
- struct clk *clk_register(struct device *dev, const char *name,
- 		const struct clk_ops *ops, struct clk_hw *hw,
+@@ -176,7 +176,6 @@ struct clk_gate {
+ 	u8		bit_idx;
+ 	u8		flags;
+ 	spinlock_t	*lock;
+-	const char	*parent[1];
+ };
+ 
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+@@ -214,7 +213,6 @@ struct clk_divider {
+ 	u8		width;
+ 	u8		flags;
+ 	spinlock_t	*lock;
+-	const char	*parent[1];
+ };
+ 
+ #define CLK_DIVIDER_ONE_BASED		BIT(0)
 -- 
 1.7.5.4
