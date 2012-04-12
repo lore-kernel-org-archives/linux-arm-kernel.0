@@ -1,23 +1,45 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 12 Apr 2012 16:59:45 +0530
-Subject: [PATCH 0/2] ARM: mm: Add v7_flush_dcache_by_level() API
-Message-ID: <1334230187-21553-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Thu, 12 Apr 2012 16:59:47 +0530
+Subject: [PATCH 2/2] ARM: mm: Flush only CPU local cache instead of all cache
+ levels.
+In-Reply-To: <1334230187-21553-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1334230187-21553-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1334230187-21553-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Couple of patches on the ARMv7 cache code. First patch adds
-v7_flush_dcache_by_level() API and second patch updates the setup
-function to use the same.
+The ARMv7 processor setup functions clean and invalidates the
+cpu cache before enabling MMU. The intention here is to start
+with clean CPU local cache.
 
-R Sricharan (1):
-  ARM: mm: Add v7_flush_dcache_by_level() API.
+But on architectures like Cortex-[A15/A8], this code will end
+up flushing the L2 cache as well which undesirable and incorrect.
+The setup functions are used in CPU hotplug scenario's too and
+hence flushing all cache levels should be avoided.
 
-Santosh Shilimkar (1):
-  ARM: mm: Flush only CPU local cache instead of all cache levels.
+Fix this code by restricting the cache flush to local cpu
+cache or L1.
 
- arch/arm/mm/cache-v7.S |   56 ++++++++++++++++++++++++++++++++++++++---------
- arch/arm/mm/proc-v7.S  |    3 +-
- 2 files changed, 47 insertions(+), 12 deletions(-)
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/proc-v7.S |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index f1c8486..96cfc31 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -172,7 +172,8 @@ __v7_ca15mp_setup:
+ __v7_setup:
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+-	bl	v7_flush_dcache_all
++	mov	r0, #0x1
++	bl	v7_flush_dcache_by_level
+ 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
+ 
+ 	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
 -- 
 1.7.5.4
