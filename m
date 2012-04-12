@@ -1,53 +1,22 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 12 Apr 2012 12:19:35 +0530
-Subject: [GIT PULL] ARM: spear-soc DT support for 3.5
-In-Reply-To: <201204111730.12267.arnd@arndb.de>
-References: <4F793C56.2030605@st.com> <201204111730.12267.arnd@arndb.de>
-Message-ID: <4F867AFF.80206@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Apr 2012 08:56:13 +0200
+Subject: [PATCH 2/2 v2] dma/amba-pl08x: add support for the Nomadik variant
+In-Reply-To: <4F864F1E.8030708@st.com>
+References: <1334185214-27250-1-git-send-email-linus.walleij@linaro.org>
+ <4F864F1E.8030708@st.com>
+Message-ID: <CACRpkdYVGTYVzZKjmK13w-oW0S=McTB2Ux7DmZCC_DRRGsogpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2012 11:00 PM, Arnd Bergmann wrote:
-> Hi Viresh,
-> 
-> I've played around with spear myself, based on your patches. Please
-> consider adding this patch, or a variation of it.
-> 
-> 8<---
-> ARM: spear: remove most mach/*.h header contents
-> 
-> The register and irq definitions in mach/*.h for spear3xx and
-> spear6xx are now mostly obsolete, after the platforms have been
-> converted to device tree based probing and the data is now
-> part of the device tree files.
-> 
-> The misc_regs.h contents are moved into clock.c because that is
-> the only user, aside from the DMA_CHN_CFG that should eventually
-> get handled differently. Some of the contents of mach/spear.h
-> still remain, because they are used to set up the static map table,
-> timer, uart and auxdata tables, but almost everything got removed.
-> We might remove everything but the map table as the DT conversion
-> completes, but that is not a priority. I've also made sure to
-> make both copies of spear.h more or less identical so we can
-> eventually combine them.
-> 
-> The spear3?0.h files were only used by the spear3?0.c files, so I
-> merged the contents in there and removed the bits that were unused.
-> This is something that should still be looked at.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Thu, Apr 12, 2012 at 5:42 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-Thanks Arnd for this.
+>> ? ? ? ? ? ? ? ch->serving = NULL;
+>
+> I meant removing this one too. :)
 
-I have applied it in my local branch with minor fixes. I will add this
-to my pull branch: spear-dt, once i get Acks by linus for pinctrl stuff.
+Argh! I'll spin a V3 with that removed and your review tag.
 
-This branch will contain following:
-- SPEAr3xx DT patches
-- SPEAr Pinctrl Patches (with Acks from Linus)
-- Your rework patch.
+> Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
 
-Will send you pull request again, as soon i as get feedback on pinctrl stuff.
-
--- 
-viresh
+Thanks!
+Linus Walleij
