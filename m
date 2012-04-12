@@ -1,35 +1,38 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 12 Apr 2012 14:08:30 +0100
-Subject: [RFC PATCH 2/3] ARM: mm: v7 cache level operations
+Date: Thu, 12 Apr 2012 14:08:31 +0100
+Subject: [RFC PATCH 3/3] ARM: kernel: update cpu_suspend code to use dcache
+ level operations
 In-Reply-To: <1334236111-28144-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1334236111-28144-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1334236111-28144-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1334236111-28144-4-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM v7 architecture introduces the concept of cache levels and registers
-to probe and manage cache levels accordingly.
+In processors like A15/A7 L2 cache is unified and integrated within the
+processor cache hierarchy, so that it is not considered an outer cache
+anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
+all cache levels up to Level of Coherency (LoC) that includes the L2
+unified cache.
 
-This patch adds v7 support for dcache level operations and defines a
-preferred cache level hook that by default is set to Level of
-Unification Inner Shareable (LoUIS).
+When a single CPU is suspended (CPU idle) a complete L2 clean is not
+required, so generic cpu_suspend code must clean the data cache using the
+newly introduced dcache level function. The HW cache level is retrieved
+through the hook
 
-Allowed cache levels are:
-	-1: 	flush the entire cache system
-	 0:	no-op
-	 [1-7]  flush the corresponding data cache level
+flush_cache_level_cpu(void)
 
-[LoUIS] has been chosen as preferred level since it represents the cache
-levels which are not shared by CPUs in most of the current systems (i.e.
-cache levels that are per-CPU as e.g. an integrated L1).
+that returns the preferred data cache level to be flushed for the respective
+architecture/platform.
 
-Power-down operations like hotplug and CPU idle require to clean/invalidate
-only cache levels that are within the CPU power domain, and LoUIS reflects
-this requirement properly in most of the systems.
+The context and stack pointer (context pointer) are cleaned to main memory
+using cache area functions that operate on MVA and guarantee that the data
+is written back to main memory (perform cache cleaning up to the Point of
+Coherency - PoC) so that the processor can fetch the context when the MMU
+is off in the cpu_resume code path.
 
-To improve configurability and possibly optimize cache operations a DT binding
-is in the making to allow platforms to define the preferred cache level in a
-more flexible way.
+outer_cache management remains unchanged.
+
+Tested on an A15 dual-core cluster through CPU soft-reset.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -42,109 +45,32 @@ Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Amit Kachhap <amit.kachhap@linaro.org>
 ---
- arch/arm/include/asm/cacheflush.h |   16 ++++++++++++++
- arch/arm/mm/cache-v7.S            |   43 ++++++++++++++++++++++++++++++++++++-
- 2 files changed, 58 insertions(+), 1 deletion(-)
+ arch/arm/kernel/suspend.c |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 741ae25..0c9e4fa 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -204,7 +204,23 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
- #define __flush_icache_preferred	__flush_icache_all_generic
- #endif
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index 1794cc3..2909bc8 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -26,7 +26,18 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
  
-+#if __LINUX_ARM_ARCH__ >= 7
-+/*
-+ * Hotplug and CPU idle code requires to flush only cache levels
-+ * impacted by power down operations. In v7 the upper level is
-+ * retrieved by reading LoUIS field of CLIDR, since inner shareability
-+ * represents the cache boundaries affected by per-CPU shutdown
-+ * operations in the most common platforms.
-+ */
-+#define __cache_level_v7_uis ({ \
-+	u32 val; \
-+	asm volatile("mrc p15, 1, %0, c0, c0, 1" : "=r"(val)); \
-+	((val & 0xe00000) >> 21); })
-+
-+#define flush_cache_level_preferred()		__cache_level_v7_uis
-+#else
- #define flush_cache_level_preferred()		(-1)
-+#endif
+ 	cpu_do_suspend(ptr);
  
- static inline int flush_cache_level_cpu(void)
- {
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 07c4bc8..c79f152 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -33,6 +33,23 @@ ENTRY(v7_flush_icache_all)
- ENDPROC(v7_flush_icache_all)
- 
- /*
-+ *	v7_flush_dcache_level(level)
-+ *
-+ *	Flush the D-cache up to the level passed as first input parameter.
-+ *
-+ * 	r0 - cache level
-+ *
-+ *	Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
-+ */
-+
-+ENTRY(v7_flush_dcache_level)
-+	dmb
-+	mov	r3, r0, lsl #1			@ level * 2
-+	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
-+	b	__flush_level
-+ENDPROC(v7_flush_dcache_level)
-+
-+/*
-  *	v7_flush_dcache_all()
-  *
-  *	Flush the whole D-cache.
-@@ -47,6 +64,7 @@ ENTRY(v7_flush_dcache_all)
- 	ands	r3, r0, #0x7000000		@ extract loc from clidr
- 	mov	r3, r3, lsr #23			@ left align loc bit field
- 	beq	finished			@ if loc is 0, then no need to clean
-+__flush_level:
- 	mov	r10, #0				@ start clean at cache level 0
- loop1:
- 	add	r2, r10, r10, lsr #1		@ work out 3x current cache level
-@@ -114,6 +132,29 @@ ENTRY(v7_flush_kern_cache_all)
- ENDPROC(v7_flush_kern_cache_all)
- 
- /*
-+ *	v7_flush_kern_dcache_level(int level)
-+ *      level - upper level that should be cleaned/invalidated
-+ *		[valid values (-1,7)]
-+ *              level == -1 forces a flush_kern_cache_all
-+ *              level == 0 is a nop
-+ *              1 < level <=7 flush dcache up to level
-+ *	Flush the data cache up to a level passed as a platform
-+ *	specific parameter
-+ */
-+ENTRY(v7_flush_kern_dcache_level)
-+	cmp	r0, #-1				@ -1 defaults to flush all
-+	beq	v7_flush_kern_cache_all
-+ ARM(	stmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
-+ THUMB(	stmfd	sp!, {r4-r7, r9-r11, lr}	)
-+	sub	r2, r0, #1
-+	cmp	r2, #6
-+	blls	v7_flush_dcache_level		@ jump if 0 < level <=7
-+ ARM(	ldmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
-+ THUMB(	ldmfd	sp!, {r4-r7, r9-r11, lr}	)
-+	mov	pc, lr
-+ENDPROC(v7_flush_kern_dcache_level)
-+
-+/*
-  *	v7_flush_cache_all()
-  *
-  *	Flush all TLB entries in a particular address space
-@@ -346,4 +387,4 @@ ENDPROC(v7_dma_unmap_area)
- 	__INITDATA
- 
- 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
--	define_cache_functions v7
-+	define_cache_functions v7, cachelevel=1
+-	flush_cache_all();
++	flush_dcache_level(flush_cache_level_cpu());
++	/*
++	 * flush_dcache_level does not guarantee that
++	 * save_ptr and ptr are cleaned to main memory,
++	 * just up to the required cache level.
++	 * Since the context pointer and context itself
++	 * are to be retrieved with the MMU off that
++	 * data must be cleaned from all cache levels
++	 * to main memory using "area" cache primitives.
++	 */
++	__cpuc_flush_dcache_area(ptr, ptrsz);
++	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
+ 	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
+ 	outer_clean_range(virt_to_phys(save_ptr),
+ 			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
 -- 
 1.7.9.5
