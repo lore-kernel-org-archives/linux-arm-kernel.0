@@ -1,39 +1,60 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 12 Apr 2012 07:10:50 -0700
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E95947E@DQHE04.ent.ti.com>
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
- <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
- <20120412030044.GA26236@kroah.com> <4F867A95.9030104@ti.com>
- <20120412131045.GB31384@kroah.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E95947E@DQHE04.ent.ti.com>
-Message-ID: <20120412141050.GA31968@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Apr 2012 15:12:25 +0100
+Subject: [PATCH 2/3] ARM: l2x0: only apply workaround for erratum #753970 on
+ PL310
+In-Reply-To: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
+References: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1334239946-15934-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 01:34:15PM +0000, Mohammed, Afzal wrote:
-> Hi Greg,
-> 
-> On Thu, Apr 12, 2012 at 18:40:45, Greg KH wrote:
-> > On Thu, Apr 12, 2012 at 12:17:49PM +0530, Santosh Shilimkar wrote:
-> > > I was hoping that we will have some thing like drivers/memory/*
-> > > but since it doesn't exist, we used drivers/misc.
-> > 
-> > Why not create it?  I have no objection to that, it makes it more
-> > obvious as to what this really is.
-> 
-> There is another memory controller used in a few TI SoCs,
-> namely GPMC [1], do you prefer having it too there.
+The workaround for PL310 erratum #753970 can lead to deadlock on systems
+with an L220 cache controller.
 
-Sure, why not?
+This patch makes the workaround effective only when the cache controller
+is identified as a PL310 at probe time.
 
-> As of now it is not a driver, platform code handles GPMC, a patch
-> series for converting it into a driver (but still residing in
-> platform folder) was sent a few days back [2,3].
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/cache-l2x0.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-People are moving things out of the platform folder, so drivers/memory
-makes sense.
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index a53fd2a..a8d02c0 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -32,6 +32,7 @@ static void __iomem *l2x0_base;
+ static DEFINE_RAW_SPINLOCK(l2x0_lock);
+ static u32 l2x0_way_mask;	/* Bitmask of active ways */
+ static u32 l2x0_size;
++static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
+ 
+ struct l2x0_regs l2x0_saved_regs;
+ 
+@@ -61,12 +62,7 @@ static inline void cache_sync(void)
+ {
+ 	void __iomem *base = l2x0_base;
+ 
+-#ifdef CONFIG_PL310_ERRATA_753970
+-	/* write to an unmmapped register */
+-	writel_relaxed(0, base + L2X0_DUMMY_REG);
+-#else
+-	writel_relaxed(0, base + L2X0_CACHE_SYNC);
+-#endif
++	writel_relaxed(0, base + sync_reg_offset);
+ 	cache_wait(base + L2X0_CACHE_SYNC, 1);
+ }
+ 
+@@ -331,6 +327,10 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		else
+ 			ways = 8;
+ 		type = "L310";
++#ifdef CONFIG_PL310_ERRATA_753970
++		/* Unmapped register. */
++		sync_reg_offset = L2X0_DUMMY_REG;
++#endif
+ 		break;
+ 	case L2X0_CACHE_ID_PART_L210:
+ 		ways = (aux >> 13) & 0xf;
+-- 
+1.7.4.1
