@@ -1,69 +1,32 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 12 Apr 2012 12:37:14 -0500
-Subject: Question about return_address()
-Message-ID: <ADE657CA350FB648AAC2C43247A983F00206986C0886@AUSP01VMBX24.collaborationhost.net>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 12 Apr 2012 19:51:44 +0200
+Subject: [PATCH] pinctrl: mark non-EXPERIMENTAL
+Message-ID: <1334253104-30527-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I have a question about the return_address() function.
+With the finalization of the external driver API and the device
+tree support, this subsystem is now mature and can be promoted to
+non-experimental status.
 
-In arch/arm/include/asm/ftrace.h we have this (comment removed):
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-
-#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
-
-void *return_address(unsigned int);
-
-#else
-
-extern inline void *return_address(unsigned int level)
-{
-	return NULL;
-}
-
-#endif
-
-
-And in arch/arm/kernel/return_address.c we have this (only relevant
-parts):
-
-
-#include <linux/ftrace.h>
-
-#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
-
-void *return_address(unsigned int level)
-{
-	...
-}
-
-#else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
-
-#if defined(CONFIG_ARM_UNWIND)
-#warning "TODO: return_address should use unwind tables"
-#endif
-
-void *return_address(unsigned int level)
-{
-	return NULL;
-}
-
-#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
-
-EXPORT_SYMBOL_GPL(return_address);
-
-
-It appears that when CONFIG_FRAME_POINTER is set and CONFIG_ARM_UNWIND
-is not the function is declared twice, once as an inline in the header and again as an
-exported function in the source.
-
-Is this a problem which should be fixed?
-
-Right now it's producing a sparse warning:
-
-	warning: symbol 'return_address' was not declared. Should it be static?
-
-Regards,
-Hartley
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index abfb964..f73a5ea 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -4,7 +4,6 @@
+ 
+ config PINCTRL
+ 	bool
+-	depends on EXPERIMENTAL
+ 
+ if PINCTRL
+ 
+-- 
+1.7.9.2
