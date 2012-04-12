@@ -1,51 +1,18 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 12 Apr 2012 11:06:55 -0600 (MDT)
-Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
- both clk and hwmod
-In-Reply-To: <1334238098-29859-1-git-send-email-rnayak@ti.com>
-References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 12 Apr 2012 12:09:02 -0500
+Subject: [PATCH v3 2/3] ep93xx: IDE driver platform support code
+In-Reply-To: <4F86C714.4090605@metasoft.pl>
+References: <4F86C63C.6030908@metasoft.pl> <4F86C714.4090605@metasoft.pl>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F00206986C0863@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Thursday, April 12, 2012 5:14 AM, Rafal Prylowski wrote:
+>
+> Add IDE driver platform support code for ep93xx.
+>
+> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
 
-On Thu, 12 Apr 2012, Rajendra Nayak wrote:
-
-> On OMAP4+, the clkdm association is moved to hwmod while on older OMAPs'
-> its associated with a clk.
-
-Sounds like this should be conditional based on the platform, then, 
-rather than weakening the warning for all platforms ?
-
-> Hence look for a clkdm in both clk and hwmod and warn only when
-> its missing in both. Also fix the pr_warning() to print the correct
-> hwmod name.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 2c27fdb..83d56df 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -566,9 +566,9 @@ static int _init_main_clk(struct omap_hwmod *oh)
->  		return -EINVAL;
->  	}
->  
-> -	if (!oh->_clk->clkdm)
-> +	if (!oh->_clk->clkdm && !oh->clkdm_name)
->  		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
-> -			   oh->main_clk, oh->_clk->name);
-> +			   oh->name, oh->_clk->name);
->  
->  	return ret;
->  }
-> -- 
-> 1.7.1
-> 
-
-
-- Paul
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
