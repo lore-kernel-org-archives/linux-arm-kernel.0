@@ -1,176 +1,74 @@
-From: cary.zou1988@gmail.com (cary.zou)
-Date: Thu, 12 Apr 2012 20:39:39 +0800
-Subject: [PATCHv24 00/16] Contiguous Memory Allocator
-In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4F86CD0B.6090605@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 12 Apr 2012 15:43:29 +0300
+Subject: [PATCH 2/2] ARM: PXA2xx: MFP: fix potential direction bug
+In-Reply-To: <1334234609-780-1-git-send-email-grinberg@compulab.co.il>
+References: <1334234609-780-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1334234609-780-2-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
-I'm using CMA to malloc contiguous memory, and I have following failure:
+Pins configured as input and have MFP_LPM_DRIVE_* flag set, can have a
+wrong output value for some period of time (spike) during the suspend
+sequence.
+This can happen because the direction of the pins (GPDR) is set by
+software and the output level is set by hardware (PGSR) at a later
+stage.
 
-__alloc_contig_migrate_range: test_pages_isolated(3bc00, 3c000) failed
+Fix the above potential bug by setting the output levels first.
+Also save the actual levels of the pins before the suspend and restore
+them after the resume, but before the direction settings take place, so
+the same bug as described above will not happen in the resume sequence.
 
-I try to dump_page, it shows:
+Reported-by: Paul Parsons <lost.distance@yahoo.com>
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Tested-by: Paul Parsons <lost.distance@yahoo.com>
+---
+No regression has been seen after this patch.
 
-page:81778620 count:1 mapcount:0 mapping: (null) index:0x88b
-page flags: 0x40000000()
+ arch/arm/mach-pxa/mfp-pxa2xx.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-since I am not familiar with mm, can someone give me some hint on this
-failure?
-
-
-
-
-? 2012?04?03? 22:10, Marek Szyprowski ??:
-> Hi,
->
-> This is (yet another) update of CMA patches. I've rebased them onto
-> recent v3.4-rc1 kernel tree and integrated some minor bugfixes. The
-> first issue has been pointed by Sandeep Patil - alloc_contig_range
-> reclaimed two times too many pages, second issue (possible mismatch
-> between pageblock size and MAX_ORDER pages) has been recently spotted
-> by Michal Nazarewicz.
->
-> These patches are also available on my git repository:
-> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc1-cma-v24
->
-> Best regards
-> Marek Szyprowski
-> Samsung Poland R&D Center
->
-> Links to previous versions of the patchset:
-> v23: <http://www.spinics.net/lists/linux-media/msg44547.html>
-> v22: <http://www.spinics.net/lists/linux-media/msg44370.html>
-> v21: <http://www.spinics.net/lists/linux-media/msg44155.html>
-> v20: <http://www.spinics.net/lists/linux-mm/msg29145.html>
-> v19: <http://www.spinics.net/lists/linux-mm/msg29145.html>
-> v18: <http://www.spinics.net/lists/linux-mm/msg28125.html>
-> v17: <http://www.spinics.net/lists/arm-kernel/msg148499.html>
-> v16: <http://www.spinics.net/lists/linux-mm/msg25066.html>
-> v15: <http://www.spinics.net/lists/linux-mm/msg23365.html>
-> v14: <http://www.spinics.net/lists/linux-media/msg36536.html>
-> v13: (internal, intentionally not released)
-> v12: <http://www.spinics.net/lists/linux-media/msg35674.html>
-> v11: <http://www.spinics.net/lists/linux-mm/msg21868.html>
-> v10: <http://www.spinics.net/lists/linux-mm/msg20761.html>
->  v9: <http://article.gmane.org/gmane.linux.kernel.mm/60787>
->  v8: <http://article.gmane.org/gmane.linux.kernel.mm/56855>
->  v7: <http://article.gmane.org/gmane.linux.kernel.mm/55626>
->  v6: <http://article.gmane.org/gmane.linux.kernel.mm/55626>
->  v5: (intentionally left out as CMA v5 was identical to CMA v4)
->  v4: <http://article.gmane.org/gmane.linux.kernel.mm/52010>
->  v3: <http://article.gmane.org/gmane.linux.kernel.mm/51573>
->  v2: <http://article.gmane.org/gmane.linux.kernel.mm/50986>
->  v1: <http://article.gmane.org/gmane.linux.kernel.mm/50669>
->
->
-> Changelog:
->
-> v24:
->     1. fixed handling of diffrent sizes of pageblock and MAX_ORDER size
->        pages
->
->     2. fixed number of the reclaimed pages before performing the allocation
->        (thanks to Sandeep Patil for pointing this issue)
->
->     3. rebased onto Linux v3.4-rc1
->
-> v23:
->     1. fixed bug spotted by Aaro Koskinen (incorrect check inside VM_BUG_ON)
->
->     2. rebased onto next-20120222 tree from
->        git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git 
->
-> v22:
->     1. Fixed compilation break caused by missing fixup patch in v21
->
->     2. Fixed typos in the comments
->
->     3. Removed superfluous #include entries
->
-> v21:
->     1. Fixed incorrect check which broke memory compaction code
->
->     2. Fixed hacky and racy min_free_kbytes handling
->
->     3. Added serialization patch to watermark calculation
->
->     4. Fixed typos here and there in the comments
->
-> v20 and earlier - see previous patchsets.
->
->
-> Patches in this patchset:
->
-> Marek Szyprowski (6):
->   mm: extract reclaim code from __alloc_pages_direct_reclaim()
->   mm: trigger page reclaim in alloc_contig_range() to stabilise
->     watermarks
->   drivers: add Contiguous Memory Allocator
->   X86: integrate CMA with DMA-mapping subsystem
->   ARM: integrate CMA with DMA-mapping subsystem
->   ARM: Samsung: use CMA for 2 memory banks for s5p-mfc device
->
-> Mel Gorman (1):
->   mm: Serialize access to min_free_kbytes
->
-> Michal Nazarewicz (9):
->   mm: page_alloc: remove trailing whitespace
->   mm: compaction: introduce isolate_migratepages_range()
->   mm: compaction: introduce map_pages()
->   mm: compaction: introduce isolate_freepages_range()
->   mm: compaction: export some of the functions
->   mm: page_alloc: introduce alloc_contig_range()
->   mm: page_alloc: change fallbacks array handling
->   mm: mmzone: MIGRATE_CMA migration type added
->   mm: page_isolation: MIGRATE_CMA isolation functions added
->
->  Documentation/kernel-parameters.txt   |    9 +
->  arch/Kconfig                          |    3 +
->  arch/arm/Kconfig                      |    2 +
->  arch/arm/include/asm/dma-contiguous.h |   15 ++
->  arch/arm/include/asm/mach/map.h       |    1 +
->  arch/arm/kernel/setup.c               |    9 +-
->  arch/arm/mm/dma-mapping.c             |  370 ++++++++++++++++++++++++------
->  arch/arm/mm/init.c                    |   23 ++-
->  arch/arm/mm/mm.h                      |    3 +
->  arch/arm/mm/mmu.c                     |   31 ++-
->  arch/arm/plat-s5p/dev-mfc.c           |   51 +----
->  arch/x86/Kconfig                      |    1 +
->  arch/x86/include/asm/dma-contiguous.h |   13 +
->  arch/x86/include/asm/dma-mapping.h    |    4 +
->  arch/x86/kernel/pci-dma.c             |   18 ++-
->  arch/x86/kernel/pci-nommu.c           |    8 +-
->  arch/x86/kernel/setup.c               |    2 +
->  drivers/base/Kconfig                  |   89 +++++++
->  drivers/base/Makefile                 |    1 +
->  drivers/base/dma-contiguous.c         |  401 +++++++++++++++++++++++++++++++
->  include/asm-generic/dma-contiguous.h  |   28 +++
->  include/linux/device.h                |    4 +
->  include/linux/dma-contiguous.h        |  110 +++++++++
->  include/linux/gfp.h                   |   12 +
->  include/linux/mmzone.h                |   47 +++-
->  include/linux/page-isolation.h        |   18 +-
->  mm/Kconfig                            |    2 +-
->  mm/Makefile                           |    3 +-
->  mm/compaction.c                       |  418 +++++++++++++++++++++------------
->  mm/internal.h                         |   33 +++
->  mm/memory-failure.c                   |    2 +-
->  mm/memory_hotplug.c                   |    6 +-
->  mm/page_alloc.c                       |  409 ++++++++++++++++++++++++++++----
->  mm/page_isolation.c                   |   15 +-
->  mm/vmstat.c                           |    3 +
->  35 files changed, 1791 insertions(+), 373 deletions(-)
->  create mode 100644 arch/arm/include/asm/dma-contiguous.h
->  create mode 100644 arch/x86/include/asm/dma-contiguous.h
->  create mode 100644 drivers/base/dma-contiguous.c
->  create mode 100644 include/asm-generic/dma-contiguous.h
->  create mode 100644 include/linux/dma-contiguous.h
->
-
-
+diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
+index d2373d7..ef0426a 100644
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+@@ -33,6 +33,8 @@
+ #define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+ #define GPLR(x)		__REG2(0x40E00000, BANK_OFF((x) >> 5))
+ #define GPDR(x)		__REG2(0x40E00000, BANK_OFF((x) >> 5) + 0x0c)
++#define GPSR(x)		__REG2(0x40E00000, BANK_OFF((x) >> 5) + 0x18)
++#define GPCR(x)		__REG2(0x40E00000, BANK_OFF((x) >> 5) + 0x24)
+ 
+ #define PWER_WE35	(1 << 24)
+ 
+@@ -348,6 +350,7 @@ static inline void pxa27x_mfp_init(void) {}
+ #ifdef CONFIG_PM
+ static unsigned long saved_gafr[2][4];
+ static unsigned long saved_gpdr[4];
++static unsigned long saved_gplr[4];
+ static unsigned long saved_pgsr[4];
+ 
+ static int pxa2xx_mfp_suspend(void)
+@@ -369,7 +372,11 @@ static int pxa2xx_mfp_suspend(void)
+ 		saved_gafr[0][i] = GAFR_L(i);
+ 		saved_gafr[1][i] = GAFR_U(i);
+ 		saved_gpdr[i] = GPDR(i * 32);
++		saved_gplr[i] = GPLR(i * 32);
+ 		saved_pgsr[i] = PGSR(i);
++
++		GPSR(i * 32) = PGSR(i);
++		GPCR(i * 32) = ~PGSR(i);
+ 	}
+ 
+ 	/* set GPDR bits taking into account MFP_LPM_KEEP_OUTPUT */
+@@ -392,6 +399,8 @@ static void pxa2xx_mfp_resume(void)
+ 	for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++) {
+ 		GAFR_L(i) = saved_gafr[0][i];
+ 		GAFR_U(i) = saved_gafr[1][i];
++		GPSR(i * 32) = saved_gplr[i];
++		GPCR(i * 32) = ~saved_gplr[i];
+ 		GPDR(i * 32) = saved_gpdr[i];
+ 		PGSR(i) = saved_pgsr[i];
+ 	}
 -- 
-B.R
-Cary Zou
+1.7.3.4
