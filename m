@@ -1,27 +1,40 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Thu, 12 Apr 2012 17:19:05 +0900
-Subject: [PATCH 0/2] Exynos: fix SYSMMU driver to work with power domains
-In-Reply-To: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
-References: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAHQjnOOGWVcc95F==1__SCH0S-mX8bvRwOr7MhB3Arw=83jZMw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 12 Apr 2012 02:26:06 -0600 (MDT)
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 11:34 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hi!
->
-> These two patches fixes operation of the SYSMMU driver (v12 version [1])
-> with the new power domain driver based on generic power domains and
-> runtime pw, which has been merged to Linux kernel v3.4-rc1.
->
-Thanks, Marek.
+Hello Vaibhav,
 
-Your way of power gating is right
-and I will look into the changed runtime PM scheme in Exynos tree.
+On Fri, 30 Mar 2012, Vaibhav Hiremath wrote:
 
-> [1] https://lkml.org/lkml/2012/3/15/51
+> After some healthy discussion, now we have come to the conclusion and
+> decided to handle AM33XX PRM/CM part separately; as AM33XX-PRCM module is
+> different than OMAP3 and OMAP4 architecture.
 
-Regards,
+Have been reviewing these patch sets here.  Are these associated with any 
+board file?  I had to hand-apply several patch sets due to some 
+differences in mach-omap2/io.c.  Upon looking more closely, and looking at 
+your GitHub branch:
 
-KyongHo
+https://github.com/hvaibhav/am335x-linux/tree/am335x-prm-cm
+
+it seems that internally you've been modifying the AM3517 EVM board file 
+to test the BeagleBone?  But due to the init_early changes, this is 
+presumably not going to work if we want to keep the AM3517EVM working -- 
+is this your understanding as well?
+
+I'm kind of wondering how we're to test these...
+
+...
+
+BTW, the branch that I'm experimenting with is at 
+git://git.pwsan.com/linux-2.6 -- branch name 'am33xx_support_3.5' -- I am 
+still reviewing the patches there.
+
+
+- Paul
