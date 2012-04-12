@@ -1,67 +1,30 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Apr 2012 15:12:26 +0100
-Subject: [PATCH 3/3] ARM: l2x0: only write to debug registers on PL310
-In-Reply-To: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
-References: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1334239946-15934-4-git-send-email-will.deacon@arm.com>
+Date: Thu, 12 Apr 2012 15:12:23 +0100
+Subject: [PATCH 0/3] ARM errata fixes for multiple-platform kernels
+Message-ID: <1334239946-15934-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PL310 errata #588369 and #727915 require writes to the debug registers
-of the cache controller to work around known problems. Writing these
-registers on L220 may cause deadlock, so ensure that we only perform
-this operation when we identify a PL310 at probe time.
+Hello,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/cache-l2x0.c |   13 ++++++++-----
- 1 files changed, 8 insertions(+), 5 deletions(-)
+This series fixes three errata workarounds so that they are only applied
+on platforms known to be affected at runtime, since applying them on
+other platforms can cause nasty side effects (lockups).
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a8d02c0..2a8e380 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -81,10 +81,13 @@ static inline void l2x0_inv_line(unsigned long addr)
- }
- 
- #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
-+static inline void debug_writel(unsigned long val)
-+{
-+	if (outer_cache.set_debug)
-+		outer_cache.set_debug(val);
-+}
- 
--#define debug_writel(val)	outer_cache.set_debug(val)
--
--static void l2x0_set_debug(unsigned long val)
-+static void pl310_set_debug(unsigned long val)
- {
- 	writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
- }
-@@ -94,7 +97,7 @@ static inline void debug_writel(unsigned long val)
- {
- }
- 
--#define l2x0_set_debug	NULL
-+#define pl310_set_debug	NULL
- #endif
- 
- #ifdef CONFIG_PL310_ERRATA_588369
-@@ -331,6 +334,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 		/* Unmapped register. */
- 		sync_reg_offset = L2X0_DUMMY_REG;
- #endif
-+		outer_cache.set_debug = pl310_set_debug;
- 		break;
- 	case L2X0_CACHE_ID_PART_L210:
- 		ways = (aux >> 13) & 0xf;
-@@ -379,7 +383,6 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 	outer_cache.flush_all = l2x0_flush_all;
- 	outer_cache.inv_all = l2x0_inv_all;
- 	outer_cache.disable = l2x0_disable;
--	outer_cache.set_debug = l2x0_set_debug;
- 
- 	printk(KERN_INFO "%s cache controller enabled\n", type);
- 	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
+Comments and any tested-bys are more than welcome,
+
+Will
+
+
+Will Deacon (3):
+  ARM: errata: only handle ARM erratum #326103 on affected cores
+  ARM: l2x0: only apply workaround for erratum #753970 on PL310
+  ARM: l2x0: only write to debug registers on PL310
+
+ arch/arm/Kconfig         |    9 +++++++++
+ arch/arm/mm/abort-ev6.S  |   17 +++++++++++------
+ arch/arm/mm/cache-l2x0.c |   25 ++++++++++++++-----------
+ 3 files changed, 34 insertions(+), 17 deletions(-)
+
 -- 
 1.7.4.1
