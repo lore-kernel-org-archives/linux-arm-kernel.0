@@ -1,36 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Apr 2012 10:36:06 +0100
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <4F87F188.60603@st.com>
-References: <20120411094704.GY24211@n2100.arm.linux.org.uk>
- <4F879E9D.2090502@st.com>
- <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
- <4F87B443.6090405@st.com>
- <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
- <20120413085901.GG3168@opensource.wolfsonmicro.com> <4F87ED74.8020308@st.com>
- <20120413091712.GE27730@b20223-02.ap.freescale.net>
- <20120413092615.GH24211@n2100.arm.linux.org.uk> <4F87F188.60603@st.com>
-Message-ID: <20120413093606.GI24211@n2100.arm.linux.org.uk>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 13 Apr 2012 15:09:04 +0530
+Subject: [PATCH-V3 0/3] ARM: OMAP: Make OMAP clocksource source selection
+ runtime
+Message-ID: <1334309947-25214-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 02:57:36PM +0530, Viresh Kumar wrote:
-> On 4/13/2012 2:56 PM, Russell King - ARM Linux wrote:
-> > What's wrong with the struct clk returned from clk_register() - why
-> > not do this as a two-step process?
-> 
-> Code duplication on all platforms for creating these lookups.
-> 
-> > Especially as you may want to
-> > associate a single clock with more than one clk_lookup.
-> 
-> Can still be done, as we are still getting clk pointer back.
+Current OMAP code supports couple of clocksource options based
+on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
 
-You're not convincing me that you're approach here is correct, and
-I really doubt that this will have any effect at saving lines of code -
-your argument list is soo long that you'll have to wrap it onto several
-lines.
+This patch series cleans up the existing 32k-sync timer implementation
+without any major code changes, uses kernel parameter to override
+the default clocksource of "counter_32k", also in order to support
+some OMAP based derivative SoCs like AM33XX which doesn't have
+32K sync-timer hardware IP, adds hwmod lookup for omap2+
+devices, and if lookup fails then fall back to gp-timer.
 
-So I don't buy the 'code duplication' argument here - I think that's a
-red herring, and I think you're better off making interfaces which are
-simpler to use.
+if(use_gptimer_clksrc == true)
+	gptimer clocksource init;
+else if (counter_32 init == false)
+	/* Fallback to gptimer */
+	gptimer clocksource init(;
+
+
+With this, we should be able to support multi-omap boot
+including devices with/without 32k-sync timer.
+
+This patch-series has been boot tested on AM37xEVM platform, it
+would be helpful if somebody help me to validate it on OMAP1/2
+platforms.
+
+History:
+========
+Changes from V2:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/092037.html
+        - Added early_param support to read clocksource selection
+	  from user through kernel parameter ("clocksource=")
+	- Converted to ocp_if changes from Paul
+
+Changes from V1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/081037.html
+        - Based on Tony's comment, added pbase & size argument to
+	  omap_init_clocksource_32k(), to avoid cpu_is_xxx() check.
+	- Added commit description based on discussion on list
+          (Thanks to Santosh here)
+	- Reorder patch sequence
+
+
+Vaibhav Hiremath (3):
+  ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to prcm-common
+    header
+  ARM: OMAP2/3: hwmod data: Add 32k-sync timer data to hwmod database
+  ARM: OMAP: Make OMAP clocksource source selection using kernel param
+
+ arch/arm/mach-omap1/timer32k.c                     |    6 +-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   19 ++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   19 ++++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   19 ++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   54 +++++++++++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |    1 +
+ arch/arm/mach-omap2/prcm-common.h                  |    4 +
+ arch/arm/mach-omap2/timer.c                        |  100 +++++++++++++++-----
+ arch/arm/plat-omap/counter_32k.c                   |   85 +++++++----------
+ arch/arm/plat-omap/include/plat/common.h           |    2 +-
+ 10 files changed, 236 insertions(+), 73 deletions(-)
