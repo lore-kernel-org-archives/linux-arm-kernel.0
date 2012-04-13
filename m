@@ -1,51 +1,18 @@
-From: a0393947@ti.com (Archit Taneja)
-Date: Fri, 13 Apr 2012 14:21:48 +0530
-Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all
- DSS L3 slave interfaces
-In-Reply-To: <4F87E72A.2050104@ti.com>
-References: <1334304116-18872-1-git-send-email-archit@ti.com>
- <1334304116-18872-3-git-send-email-archit@ti.com> <4F87E72A.2050104@ti.com>
-Message-ID: <4F87E924.5040601@ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 13 Apr 2012 16:56:28 +0800
+Subject: [PATCH] clk: Allocate and add clock lookups from clk_register()
+In-Reply-To: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
+References: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
+Message-ID: <20120413085627.GD27730@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 April 2012 02:13 PM, Cousson, Benoit wrote:
-> On 4/13/2012 10:01 AM, Archit Taneja wrote:
->> The clock for all DSS L3 slave interfaces had been recently changed to
->> "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS
->> clock domain
->> which can't autoidle when enabled.
->>
->> Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS
->> hwmods so
->> that clock is explicitly enabled and disabled by software. Without this,
->> "dss_fck" would be left as enabled and the OMAP4 device won't idle
->> even when
->> DSS is not in use.
->
-> Yeah, that was done on purpose with Tomi knowning well that limitation.
->
-> The issue was mainly due to the lack of proper parent / child
-> relationship between the DSS (the whole subsystem) and the DSS children
-> at that time.
->
-> I think that Tomi posted a series to fix that for 3.4. So if we ensure
-> that every DSS IPs are children of the DSS, then pm_runtime will always
-> ensure that the DSS will be enabled each time a submodule is used.
->
-> So the right fix is to put back the proper iclk (l3_div) to the DSS
-> instead of the dss_fck.
+>  struct clk *clk_register(struct device *dev, const char *name,
+>  		const struct clk_ops *ops, struct clk_hw *hw,
+> -		const char **parent_names, u8 num_parents, unsigned long flags)
+> +		const char **parent_names, u8 num_parents, unsigned long flags,
+> +		struct clk_lookup **cl, const char *dev_id, const char *con_id)
+10 arguments. It worths to use a struct ? 
 
-Ok, I get it now. Tomi's patch series ensured the parent-child 
-dependency, but they didn't switch the iclks back to l3_div, I guess 
-that should be a part of the series too.
-
-Thanks,
-Archit
-
->
-> The current OMAP4 DSS clock setup is clearly a hack that should be fixed.
->
-> Regards,
-> Benoit
->
+Thanks
+Richard
