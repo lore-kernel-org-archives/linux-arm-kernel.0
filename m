@@ -1,29 +1,31 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 13 Apr 2012 15:23:16 -0700
-Subject: [PATCH 01/13] clk: core: correct clk_set_rate kerneldoc
-In-Reply-To: <4F8659DA.4030305@st.com>
+Date: Fri, 13 Apr 2012 15:27:32 -0700
+Subject: [PATCH 02/13] clk: core: remove dead code paths
+In-Reply-To: <4F8672CC.2040500@st.com>
 References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334192572-12499-2-git-send-email-mturquette@linaro.org>
- <4F8659DA.4030305@st.com>
-Message-ID: <CAJOA=zMHGO6N2q=StogU3envVBt23o-2Od70gtdRkQG_Ku7=CA@mail.gmail.com>
+ <1334192572-12499-3-git-send-email-mturquette@linaro.org>
+ <4F8672CC.2040500@st.com>
+Message-ID: <CAJOA=zPfYTj=o1HKiBaL5J+aa4BsTFPFDYZ5FcBkNzRd7jTZXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 9:28 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On Wed, Apr 11, 2012 at 11:14 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
 > On 4/12/2012 6:32 AM, Mike Turquette wrote:
->> - * If clk has the CLK_SET_RATE_GATE flag set and it is enabled this call
->> - * will fail; only when the clk is disabled will it be able to change
->> - * its rate.
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 3ed36d3..4daacf5 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -194,7 +194,7 @@ static int __init clk_debug_init(void)
+>> ?late_initcall(clk_debug_init);
+>> ?#else
+>> ?static inline int clk_debug_register(struct clk *clk) { return 0; }
+>> -#endif /* CONFIG_COMMON_CLK_DEBUG */
+>> +#endif
 >
-> Why is CLK_SET_RATE_GATE removed? I already sent a patch to fix clk_set_rate()
-> for this. And i think it should be required.
+> Why is this updated? Isn't this considered good practice anymore?
 
-I removed it from the documentation since it was not present in the
-code.  I was originally targeting this for an -rc and I was trying to
-limit the changes purely to fixes and cleanups, not new features.
-
-I haven't finished digging through all of the responses yet, so my
-goal for where these patches are headed might change.
+See comments in this thread:
+http://article.gmane.org/gmane.linux.kernel/1276102
 
 Regards,
 Mike
