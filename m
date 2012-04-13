@@ -1,61 +1,36 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 13 Apr 2012 09:00:45 +0100
-Subject: [PATCH 1/5] ARM: AT91: Add platform data for the AT91 ADCs
-In-Reply-To: <1333641684-20325-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1333641684-20325-1-git-send-email-maxime.ripard@free-electrons.com>
- <1333641684-20325-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4F87DD2D.70109@kernel.org>
+From: archit@ti.com (Archit Taneja)
+Date: Fri, 13 Apr 2012 13:31:54 +0530
+Subject: [PATCH 0/2] ARM: OMAP2PLUS: DSS hwmod fixes
+Message-ID: <1334304116-18872-1-git-send-email-archit@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/5/2012 5:01 PM, Maxime Ripard wrote:
-> The AT91 SoCs often embeds an ADC. This patch adds the needed
-> platform data to specify the informations required by the driver
-> to work properly.
->
-> For now, we only need the reference voltage and which channels
-> are available on the board.
-Trivial, though I'm in a fussy mood so see below.
->
-> Signed-off-by: Maxime Ripard<maxime.ripard@free-electrons.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
->
-> Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
-> Cc: Patrice Vilchez<patrice.vilchez@atmel.com>
-> Cc: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
-> ---
->   include/linux/platform_data/at91_adc.h |   23 +++++++++++++++++++++++
->   1 files changed, 23 insertions(+), 0 deletions(-)
->   create mode 100644 include/linux/platform_data/at91_adc.h
->
-> diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
-> new file mode 100644
-> index 0000000..1f71510
-> --- /dev/null
-> +++ b/include/linux/platform_data/at91_adc.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright (C) 2011 Free Electrons
-> + *
-> + * Licensed under the GPLv2 or later.
-If we are really being nitpicky, no point in the next blank line!
-> + *
-> + */
-> +
-> +#ifndef _AT91_ADC_H_
-> +#define _AT91_ADC_H_
-> +
-> +/**
-> + * struct at91_adc_data - platform data for ADC driver
-> + * @channels_used:	channels in use on the board as a bitmask
-> + * @vref:		Reference voltage for the ADC in millivolts
-> + */
-> +struct at91_adc_data {
-> +	unsigned long	channels_used;
-> +	u16		vref;
-> +};
-> +
-> +extern void __init at91_add_device_adc(struct at91_adc_data *data);
-> +
-> +#endif
+This set makes changes related to the OCPIF_SWSUP_IDLE flag for DSS slave
+interfaces. This is required since the clocks of these interfaces were changed
+recently with the patches below for OMAP2, OMAP3 and OMAP4 respectively:
+
+b8ac10d8b75843c9ddd6aadf70a0cdf8aa783659
+ARM: OMAP2xxx: HWMOD: fix DSS clock data
+
+6c3d7e34d68ffae888d33bf364f447e0b415591f
+ARM: OMAP3: HWMOD: fix DSS clock data
+
+da7cdfac1b0c58d6863532dd3b432c3fbc034978
+OMAP4: hwmod data: Change DSS main_clk scheme
+
+Tested on beagle and OMAP4 SDP over 3.4-rc2 kernel.
+
+Archit Taneja (2):
+  ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE flag from VENC
+    slave interface
+  ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all DSS L3 slave
+    interfaces
+
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    1 -
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 -
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    1 -
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    7 +++++++
+ 4 files changed, 7 insertions(+), 3 deletions(-)
+
+-- 
+1.7.5.4
