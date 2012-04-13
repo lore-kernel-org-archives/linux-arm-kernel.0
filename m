@@ -1,30 +1,42 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 13 Apr 2012 17:17:13 +0800
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <4F87ED74.8020308@st.com>
-References: <20120411084528.GB20818@b20223-02.ap.freescale.net>
- <20120411092034.GV24211@n2100.arm.linux.org.uk>
- <20120411094231.GO3852@pengutronix.de>
- <20120411094704.GY24211@n2100.arm.linux.org.uk>
- <4F879E9D.2090502@st.com>
- <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
- <4F87B443.6090405@st.com>
- <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
- <20120413085901.GG3168@opensource.wolfsonmicro.com>
- <4F87ED74.8020308@st.com>
-Message-ID: <20120413091712.GE27730@b20223-02.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 13 Apr 2012 10:18:29 +0100
+Subject: [PATCH/RFC v2] ARM: amba: Remove AMBA level regulator support
+In-Reply-To: <4F87EBFC.90000@stericsson.com>
+References: <1333306720-28344-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <4F87EBFC.90000@stericsson.com>
+Message-ID: <20120413091828.GJ3168@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 02:40:12PM +0530, Viresh Kumar wrote:
-> On 4/13/2012 2:29 PM, Mark Brown wrote:
-> > Or we need to dump the arguments into a struct.
-> 
-> Then we would end up creating too many structures in our mach/clock.c
-> files. That will look bad. May perform better. :)
-or pass struct clk_lookup* ? For non-leaf clks, it's NULL.
+On Fri, Apr 13, 2012 at 11:03:56AM +0200, Ulf Hansson wrote:
 
-> 
-> -- 
-> viresh
-> 
+> But, how should those amba drivers that implements runtime PM
+> support be able to switch of the vcore regulator during normal
+> suspend? In normal suspend case we can not use
+
+A generic AMBA driver should have no idea about the implementation of
+the particular SoC that it's integrated on to.  This applies even more
+to system suspend (where drivers can generally just assume that they
+will loose all power normally) than it does to runtime suspend.
+
+> pm_runtime_put/pm_runtime_put_sync to trigger the power domain
+> runtime functions to switch of vcore. This is kind of more generic
+> problem when dealing with power domains, but as said this patch will
+> have consequences.
+
+The power domain gets callbacks on the system suspend path too and can
+do whatever is sensible there.
+
+> As far as I can see, the power domain must then implement a
+> suspend_noirq function to make sure same things is done as for the
+> runtime_suspend function. Do you agree with this as well or is there
+> another option?
+
+Yes, the power domain should just be handling this transparently.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120413/f7c57571/attachment.sig>
