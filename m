@@ -1,31 +1,68 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 13 Apr 2012 15:27:32 -0700
-Subject: [PATCH 02/13] clk: core: remove dead code paths
-In-Reply-To: <4F8672CC.2040500@st.com>
-References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334192572-12499-3-git-send-email-mturquette@linaro.org>
- <4F8672CC.2040500@st.com>
-Message-ID: <CAJOA=zPfYTj=o1HKiBaL5J+aa4BsTFPFDYZ5FcBkNzRd7jTZXA@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 14 Apr 2012 00:36:35 +0200
+Subject: [PATCH RESEND v3 4/8] wdt: Device tree support for pnx4008-wdt
+In-Reply-To: <1334356600-20950-1-git-send-email-stigge@antcom.de>
+References: <1334356600-20950-1-git-send-email-stigge@antcom.de>
+Message-ID: <1334356600-20950-4-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 11:14 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 4/12/2012 6:32 AM, Mike Turquette wrote:
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 3ed36d3..4daacf5 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -194,7 +194,7 @@ static int __init clk_debug_init(void)
->> ?late_initcall(clk_debug_init);
->> ?#else
->> ?static inline int clk_debug_register(struct clk *clk) { return 0; }
->> -#endif /* CONFIG_COMMON_CLK_DEBUG */
->> +#endif
->
-> Why is this updated? Isn't this considered good practice anymore?
+This patch adds watchdog support to pnx4008-wdt.c
 
-See comments in this thread:
-http://article.gmane.org/gmane.linux.kernel/1276102
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-Regards,
-Mike
+---
+
+ Applies to v3.4-rc2
+
+ Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt |   13 +++++++++++++
+ drivers/watchdog/pnx4008_wdt.c                             |   10 ++++++++++
+ 2 files changed, 23 insertions(+)
+
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
+@@ -0,0 +1,13 @@
++* NXP PNX watchdog timer
++
++Required properties:
++- compatible: must be "nxp,pnx4008-wdt"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++Example:
++
++	watchdog at 4003C000 {
++		compatible = "nxp,pnx4008-wdt";
++		reg = <0x4003C000 0x1000>;
++	};
+--- linux-2.6.orig/drivers/watchdog/pnx4008_wdt.c
++++ linux-2.6/drivers/watchdog/pnx4008_wdt.c
+@@ -32,6 +32,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
++#include <linux/of.h>
+ #include <mach/hardware.h>
+ 
+ /* WatchDog Timer - Chapter 23 Page 207 */
+@@ -201,10 +202,19 @@ static int __devexit pnx4008_wdt_remove(
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id pnx4008_wdt_match[] = {
++	{ .compatible = "nxp,pnx4008-wdt" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, pnx4008_wdt_match);
++#endif
++
+ static struct platform_driver platform_wdt_driver = {
+ 	.driver = {
+ 		.name = "pnx4008-watchdog",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(pnx4008_wdt_match),
+ 	},
+ 	.probe = pnx4008_wdt_probe,
+ 	.remove = __devexit_p(pnx4008_wdt_remove),
