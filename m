@@ -1,69 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 13 Apr 2012 13:39:41 +0300
-Subject: [PATCH v9 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <CAFfN3gWCu5RnKb6dK4YMCAhpkfLncYdk1Cwqxb3wxMVznSiSFQ@mail.gmail.com>
-References: <cover.1322479017a.git.n.voss@weinmann.de>
- <201203191534.q2JFYl1b012744@gatekeeper.vosshq.de>
- <CAFfN3gWCu5RnKb6dK4YMCAhpkfLncYdk1Cwqxb3wxMVznSiSFQ@mail.gmail.com>
-Message-ID: <20120413103937.GH7154@arwen.pp.htv.fi>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 13 Apr 2012 04:43:07 -0600 (MDT)
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1204130440390.25832@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vaibhav,
 
-On Fri, Apr 13, 2012 at 12:17:59PM +0200, Hubert Feurstein wrote:
-> Hi Niko,
-> 
-> I'm using this driver since a while a now in my system
-> (soc:at91sam9m10; kernel:v3.2.14) and it works quite well. But
-> occasionally it happens that wrong data is read from my devices. I've
-> traced down the issue to the way how you do the interrupt handling. In
-> your code you do not consider that both status-flags (TXCOMP and
-> RXRDY) may be pending at the same time. So you handle the TXCOMP but
-> NOT the RXRDY which will cause a data-loss on the current transfer. As
-> a consequence also the next transfer will be corrupt, because you
-> start with old data in RHR. So I would suggest the following changes:
-> 
-> static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
-> {
-> 	struct at91_twi_dev *dev = dev_id;
-> 	const unsigned status = at91_twi_read(dev, AT91_TWI_SR);
-> 	unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
-> 
-> 	if (irqstatus & AT91_TWI_RXRDY) {
-> 		at91_twi_read_next_byte(dev);
-> 		irqstatus &= ~AT91_TWI_RXRDY;
-> 	}
-> 
-> 	if (irqstatus & AT91_TWI_TXRDY) {
-> 		at91_twi_write_next_byte(dev);
-> 		irqstatus &= ~AT91_TWI_TXRDY;
-> 	}
-> 
-> 	if (irqstatus & AT91_TWI_TXCOMP) {
-> 		at91_disable_twi_interrupts(dev);
-> 		dev->transfer_status = status;
-> 		complete(&dev->cmd_complete);
-> 		irqstatus &= ~AT91_TWI_TXCOMP;
-> 	}
-> 	
-> 	if (irqstatus) {
-> 		/* There should be no pending interrupt anymore. *)
-> 		return IRQ_NONE;
-> 	}
+On Fri, 13 Apr 2012, Hiremath, Vaibhav wrote:
 
-Dude, I remember asking the exact same thing when he first posted this
-driver. That whole if...else if... else if ... else didn't look right.
+> Yes, we are using am3517evm file for AM33XX MACHINE_INIT definition here.
+> These patches have been reviewed and accepted in the list, only thing is
+> they couldn't make it to upstream during v3.4 merge window.
+> 
+> I believe Tony is going to push them for v3.5 now.
 
-Can you send this in patch format Hubert ? Take a look at
-Documentation/SumittingPatches if you have never done it before.
+Hmm, but if you modify the AM3517EVM board file to call 
+am33xx_init_early(), won't that break the AM3517EVM board?
+Wouldn't a separate board file be needed for the AM33xx?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120413/dabfb87a/attachment-0001.sig>
+
+- Paul
