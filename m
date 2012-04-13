@@ -1,53 +1,69 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 12 Apr 2012 17:13:03 -0700
-Subject: [PATCH 02/12] arm: omap3: Only sleep during cpu_idle if I/O
- wake-ups work
-In-Reply-To: <4F8616F4.4010109@ti.com>
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-3-git-send-email-mgreer@animalcreek.com>
- <4F8616F4.4010109@ti.com>
-Message-ID: <20120413001303.GQ31197@animalcreek.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 12 Apr 2012 21:22:31 -0400
+Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
+Message-ID: <20120413012230.GA30438@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 06:42:44PM -0500, Jon Hunter wrote:
-> Hi Mark,
-> 
-> On 04/11/2012 02:05 PM, Mark A. Greer wrote:
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> > 
-> > Currently in the OMAP3 code, cpu_idle() calls pm_idle(),
-> > which is a function pointer set to omap3_pm_idle()).
-> > omap3_pm_idle() calls omap_sram_idle() which eventually
-> > causes a 'wfi' instruction to be executed effectively
-> > putting the system to sleep.  It is assumed that an
-> > I/O wake-up event will occur to wake the system up again.
-> > This doesn't work on systems that don't support I/O wake-ups
-> > (indicated by omap3_has_io_wakeup() returning false).
-> > 
-> > Leaving pm_idle() pointing to default_idle() won't work
-> > either because the cpu_<processor>_do_idle() routine which
-> > is eventually called may also execute a 'wfi' instruction
-> > (e.g., cpu_v7_do_idle()).
-> 
-> So with this change you will never execute wfi?
+Hi Mark,
 
-Correct.
+The commit in linux-next:
 
-> I would have thought a timer or peripheral interrupt would be able to
-> bring you out of wfi.
+-----------------
+commit b2bc9e0ee349db84035d8141e85babc7986594d7
+Author: Mark Brown <broonie@sirena.org.uk>
+Date:   Mon Apr 2 12:30:35 2012 +0100
 
-It occasionally wakes up so I'm guessing its a timer interrupt.
-It seems that peripheral interrupts aren't waking it up.
-Perhaps something isn't configured correctly but everything I've
-looked at looks okay (AFAICT).
+    ARM: 7366/1: amba: Remove AMBA level regulator support
+-----------------
 
-> IO wake-ups would only be needed for very low
-> power states. At least that is how it is on OMAP devices. I am not sure
-> how the AMxxx devices differ.
+is pointed at by git bisect for the u8500_defconfig build failure:
 
-The am35x isn't supposed to have them so there's no real info on it
-but I'm sure its the same as regular OMAP devices.
+drivers/dma/ste_dma40.c:2708:3: error: implicit declaration of function
+'regulator_disable' [-Werror=implicit-function-declaration]
+drivers/dma/ste_dma40.c:2747:3: error: implicit declaration of function
+'regulator_enable' [-Werror=implicit-function-declaration]
+drivers/dma/ste_dma40.c:3260:3: error: implicit declaration of function
+'regulator_get' [-Werror=implicit-function-declaration]
+drivers/dma/ste_dma40.c:3271:4: error: implicit declaration of function
+'regulator_put' [-Werror=implicit-function-declaration]
 
-Mark
+http://kisskb.ellerman.id.au/kisskb/buildresult/6095691/
+
+If, like my earlier mail this week, this is something you've already
+fixed, then please provide me a link, and I'll gladly include that in
+the triage report, so you don't get needless extra mails about it.
+
+Thanks,
+Paul.
 --
+
+git bisect start
+# good: [0034102808e0dbbf3a2394b82b1bb40b5778de9e] Linux 3.4-rc2
+git bisect good 0034102808e0dbbf3a2394b82b1bb40b5778de9e
+# bad: [87487c4514a94892ce478dc012da6d12a98ae360] Add linux-next specific files for 20120412
+git bisect bad 87487c4514a94892ce478dc012da6d12a98ae360
+# bad: [45701d47f211d6ce72ee2c1725904d2e173eb29f] Merge remote-tracking branch 'sound/for-next'
+git bisect bad 45701d47f211d6ce72ee2c1725904d2e173eb29f
+# good: [5d2acf8cc7515129a5d3aed7b0e0be18dbcf524f] Merge branch 'topic/misc' into for-next
+git bisect good 5d2acf8cc7515129a5d3aed7b0e0be18dbcf524f
+# bad: [846c4b315b6faae8f5ede661d80c222d669adbda] Merge remote-tracking branch 'target-merge/for-next-merge'
+git bisect bad 846c4b315b6faae8f5ede661d80c222d669adbda
+# bad: [9235a323f99492120565935040b6be61e687d0c6] Merge remote-tracking branch 'gfs2/master'
+git bisect bad 9235a323f99492120565935040b6be61e687d0c6
+# bad: [6c944bb0c84fa1a03af503e926d7bd3a4a7e7376] Merge remote-tracking branch 'usb.current/usb-linus'
+git bisect bad 6c944bb0c84fa1a03af503e926d7bd3a4a7e7376
+# bad: [ef75674b6700ad96cac1e1c377cf9809cea6a369] Merge remote-tracking branch 'net/master'
+git bisect bad ef75674b6700ad96cac1e1c377cf9809cea6a369
+# good: [39f86a608a3e0f0164bd1540acf87696cfdfb5bb] Merge branch 'v4l_for_linus' of git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-media
+git bisect good 39f86a608a3e0f0164bd1540acf87696cfdfb5bb
+# good: [a1ada086062101533eb0f841d3884137688091ec] Merge tag 'sound-3.4' of git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound
+git bisect good a1ada086062101533eb0f841d3884137688091ec
+# good: [87151b8689d890dfb495081f7be9b9e257f7a2df] net: allow pskb_expand_head() to get maximum tailroom
+git bisect good 87151b8689d890dfb495081f7be9b9e257f7a2df
+# good: [f549e088b806f44b6ab6eeef0cb71ced1d2488dd] Merge tag 'rdma-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/roland/infiniband
+git bisect good f549e088b806f44b6ab6eeef0cb71ced1d2488dd
+# bad: [b2bc9e0ee349db84035d8141e85babc7986594d7] ARM: 7366/1: amba: Remove AMBA level regulator support
+git bisect bad b2bc9e0ee349db84035d8141e85babc7986594d7
+# good: [34af657916332e89564566bc8d35e3e06cc0c236] ARM: 7377/1: vic: re-read status register before dispatching each IRQ handler
+git bisect good 34af657916332e89564566bc8d35e3e06cc0c236
