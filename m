@@ -1,30 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 Apr 2012 14:26:04 +0200
+Date: Fri, 13 Apr 2012 14:30:57 +0200
 Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
-In-Reply-To: <20120413012230.GA30438@windriver.com>
+In-Reply-To: <20120413103207.GL24211@n2100.arm.linux.org.uk>
 References: <20120413012230.GA30438@windriver.com>
-Message-ID: <CACRpkdYkTHcppMtEy94cRiaHApeeohiiaCaA0SuyG52n1s+Yag@mail.gmail.com>
+ <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
+ <20120413103207.GL24211@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdYfRVkUqhuNw3iwHNFZJwG=2MAqtzZyK6qytFOzqUrosQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 3:22 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-
-> is pointed at by git bisect for the u8500_defconfig build failure:
+On Fri, Apr 13, 2012 at 12:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Apr 13, 2012 at 10:01:52AM +0800, Shawn Guo wrote:
+>> That's because Mark's patch removes "#include
+>> <linux/regulator/consumer.h>" included indirectly by
+>> drivers/dma/ste_dma40.c from linux/amba/bus.h. ?The ste_dma40.c should
+>> really directly includes consumer.h.
 >
-> drivers/dma/ste_dma40.c:2708:3: error: implicit declaration of function
-> 'regulator_disable' [-Werror=implicit-function-declaration]
-> drivers/dma/ste_dma40.c:2747:3: error: implicit declaration of function
-> 'regulator_enable' [-Werror=implicit-function-declaration]
-> drivers/dma/ste_dma40.c:3260:3: error: implicit declaration of function
-> 'regulator_get' [-Werror=implicit-function-declaration]
-> drivers/dma/ste_dma40.c:3271:4: error: implicit declaration of function
-> 'regulator_put' [-Werror=implicit-function-declaration]
+> Okay, I'll drop this patch because it's causing regressions, so it can't
+> be pushed as a 'fix' during -rc.
 
-I've already sent a patch to the DMA maintainer to fix this.
-It was a bug in the DMA driver actually - it did not include the proper
-headers - so it just got triggered by this patch.
-http://marc.info/?l=linux-kernel&m=133424730706377&w=2
+Actually *not* having Marks patch also causes a regression on Ux500,
+albeit not at compile time, but at runtime.
+
+So for me as ux500 maintainer it's perfectly OK to have compilation
+broken until that DMA patch arrives (should just be an issue of the
+DMA maintainer picking it up), but if others feel differently
+by all means hold it off until the other one arrives.
 
 Yours,
 Linus Walleij
