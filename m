@@ -1,7 +1,7 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Apr 2012 12:17:16 +0800
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 13 Apr 2012 10:36:11 +0530
 Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <4F879E9D.2090502@st.com>
+In-Reply-To: <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
 References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
  <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
  <20120410143055.GT24211@n2100.arm.linux.org.uk>
@@ -11,29 +11,29 @@ References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
  <20120411084528.GB20818@b20223-02.ap.freescale.net>
  <20120411092034.GV24211@n2100.arm.linux.org.uk>
  <20120411094231.GO3852@pengutronix.de>
- <20120411094704.GY24211@n2100.arm.linux.org.uk>
- <4F879E9D.2090502@st.com>
-Message-ID: <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
+ <20120411094704.GY24211@n2100.arm.linux.org.uk>	<4F879E9D.2090502@st.com>
+ <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
+Message-ID: <4F87B443.6090405@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2012 11:33, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 4/11/2012 3:17 PM, Russell King - ARM Linux wrote:
->>> > Indeed I have struct clk pointers, so I can instead use a to-be-written
->>> > combination of clkdev_alloc/clkdev_add. Would that be ok?
->> As we already have clkdev_alloc and clkdev_add, then I don't see that as
->> a problem - except we may have to change __clkdev_alloc() so that it can
->> be used before kmalloc() is up and running.
->
-> Instead of platforms calling these routines, can we have these calls from
-> clk_register_*() routines directly? So, for every clock registered with
-> common clk framework this gets done automatically. We just need to pass
-> dev & con id strings to these routines.
->
-No.
+On 4/13/2012 9:47 AM, Shawn Guo wrote:
+>> >
+>> > Instead of platforms calling these routines, can we have these calls from
+>> > clk_register_*() routines directly? So, for every clock registered with
+>> > common clk framework this gets done automatically. We just need to pass
+>> > dev & con id strings to these routines.
+>> >
+> No.
+> 
+> Only small portion of the entire clock tree need to be in the lookup,
+> usually the leaf clocks that device drivers need to access/manage.
 
-Only small portion of the entire clock tree need to be in the lookup,
-usually the leaf clocks that device drivers need to access/manage.
+I am not asking to enforce this for all clocks and create too many clk lookups.
+But do it for all clk_register() calls, that have valid dev_id or con_id.
 
-Regards,
-Shawn
+Apart from device clocks, there are other clocks, parent selection, etc
+that need it, so that we can do clk_get_sys().
+
+-- 
+viresh
