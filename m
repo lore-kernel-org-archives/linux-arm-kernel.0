@@ -1,38 +1,167 @@
-From: jgutierrez@ti.com (Gutierrez, Juan)
-Date: Fri, 13 Apr 2012 18:06:22 -0500
-Subject: [PATCH 0/3] Fixes in preparation for enabling Dsp in omap4
-In-Reply-To: <87fwc744nc.fsf@ti.com>
-References: <1334352255-48584-1-git-send-email-jgutierrez@ti.com>
- <CADVn9RG_WFh3d8P=cfC_O_5vbvE0YELDwbJL66uqO2My8D4bzQ@mail.gmail.com>
- <87fwc744nc.fsf@ti.com>
-Message-ID: <CADVn9RGXyL1dBEJHPduSuA7Zx8-4kMMm9UGCtRF=Sd-myufh1A@mail.gmail.com>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Fri, 13 Apr 2012 16:14:21 -0700
+Subject: [PATCH 1/2] OMAP2+: UART: Fix incorrect population of default
+ uart pads
+In-Reply-To: <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
+References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
+ <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <CA+Bv8XZ9D35RGX7Nub8YH5fk9j4mWUnVFAz036DJfNkq2Hwx6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin
-
-Yes, I ran the checkpatch, but I indeed had some problems sending the
-patches to the list :(
-so I edited the patch directly in the mailer. I will try one more time
-with git send-email
-
-On Fri, Apr 13, 2012 at 6:02 PM, Kevin Hilman <khilman@ti.com> wrote:
-> "Gutierrez, Juan" <jgutierrez@ti.com> writes:
+On Tue, Apr 10, 2012 at 6:40 AM, Govindraj.R <govindraj.raja@ti.com> wrote:
+> From: "Govindraj.R" <govindraj.raja@ti.com>
 >
->> This set of patches provides the foundation for enabling
->> OMAP4 Dsp (Tesla) as remote processor.
+> The following commit:
+> (7496ba3 ?ARM: OMAP2+: UART: Add default mux for all uarts)
+> added default pads for all uarts. But not all boards tend to
+> use all uarts and most of unused uart pins are muxed for
+> other purpose. This commit breaks the modules which where trying
+> to use unused uart pins on their boards.
 >
-> Looks like this series suffers from space/tab and various whitespace
-> problems.
+> So remove the default pads adding.
 >
-> Please run them through scripts/checkpatch.pl, or possibly your mailer
-> is mangling them.
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Russ Dill <russ.dill@gmail.com>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+
+Acked-by: Russ Dill <russ.dill@ti.com>
+
+> ---
+> ?arch/arm/mach-omap2/serial.c | ?116 ------------------------------------------
+> ?1 files changed, 0 insertions(+), 116 deletions(-)
 >
-> Kevin
-
-
-
--- 
-Thanks
-
-juan gutierrez
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index c9503a7..1554233 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -120,124 +120,8 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
+> ?#endif /* CONFIG_PM */
+>
+> ?#ifdef CONFIG_OMAP_MUX
+> -static struct omap_device_pad default_uart1_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_cts.uart1_cts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_rts.uart1_rts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_tx.uart1_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart1_rx.uart1_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_uart2_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_cts.uart2_cts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_rts.uart2_rts",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_tx.uart2_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart2_rx.uart2_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_uart3_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_cts_rctx.uart3_cts_rctx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_rts_sd.uart3_rts_sd",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_tx_irtx.uart3_tx_irtx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart3_rx_irrx.uart3_rx_irrx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "gpmc_wait2.uart4_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "gpmc_wait3.uart4_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+> - ? ? ? },
+> -};
+> -
+> -static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart4_tx.uart4_tx",
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .name ? = "uart4_rx.uart4_rx",
+> - ? ? ? ? ? ? ? .flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+> - ? ? ? ? ? ? ? .enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? ? ? ? ? .idle ? = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+> - ? ? ? },
+> -};
+> -
+> ?static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+> ?{
+> - ? ? ? switch (bdata->id) {
+> - ? ? ? case 0:
+> - ? ? ? ? ? ? ? bdata->pads = default_uart1_pads;
+> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? case 1:
+> - ? ? ? ? ? ? ? bdata->pads = default_uart2_pads;
+> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? case 2:
+> - ? ? ? ? ? ? ? bdata->pads = default_uart3_pads;
+> - ? ? ? ? ? ? ? bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? case 3:
+> - ? ? ? ? ? ? ? if (cpu_is_omap44xx()) {
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap4_uart4_pads;
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt =
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(default_omap4_uart4_pads);
+> - ? ? ? ? ? ? ? } else if (cpu_is_omap3630()) {
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads = default_omap36xx_uart4_pads;
+> - ? ? ? ? ? ? ? ? ? ? ? bdata->pads_cnt =
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(default_omap36xx_uart4_pads);
+> - ? ? ? ? ? ? ? }
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? default:
+> - ? ? ? ? ? ? ? break;
+> - ? ? ? }
+> ?}
+> ?#else
+> ?static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
+> --
+> 1.7.9
+>
