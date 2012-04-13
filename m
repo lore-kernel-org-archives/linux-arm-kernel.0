@@ -1,358 +1,105 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Fri, 13 Apr 2012 19:26:17 +0800
-Subject: [PATCH 18/18] ARM: use new LEDS CPU trigger stub to replace old one
-In-Reply-To: <1334316377-23915-1-git-send-email-bryan.wu@canonical.com>
-References: <1334316377-23915-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1334316377-23915-19-git-send-email-bryan.wu@canonical.com>
+From: a0393947@ti.com (Archit Taneja)
+Date: Fri, 13 Apr 2012 17:07:00 +0530
+Subject: [PATCH 1/2] ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE
+ flag from VENC slave interface
+In-Reply-To: <alpine.DEB.2.00.1204130523170.25832@utopia.booyaka.com>
+References: <1334304116-18872-1-git-send-email-archit@ti.com>
+ <1334304116-18872-2-git-send-email-archit@ti.com>
+ <alpine.DEB.2.00.1204130520170.25832@utopia.booyaka.com>
+ <alpine.DEB.2.00.1204130523170.25832@utopia.booyaka.com>
+Message-ID: <4F880FDC.9080908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc:  Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- arch/arm/Kconfig            |   53 -------------------
- arch/arm/include/asm/leds.h |   50 ------------------
- arch/arm/kernel/Makefile    |    1 -
- arch/arm/kernel/leds.c      |  121 -------------------------------------------
- arch/arm/kernel/process.c   |    6 +--
- arch/arm/kernel/time.c      |   17 ------
- 6 files changed, 3 insertions(+), 245 deletions(-)
- delete mode 100644 arch/arm/include/asm/leds.h
- delete mode 100644 arch/arm/kernel/leds.c
+Hi,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a5dd93e..dcd625c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1761,59 +1761,6 @@ config FORCE_MAX_ZONEORDER
- 	  This config option is actually maximum order plus one. For example,
- 	  a value of 11 means that the largest free memory block is 2^10 pages.
- 
--config LEDS
--	bool "Timer and CPU usage LEDs"
--	depends on ARCH_CDB89712 || ARCH_EBSA110 || \
--		   ARCH_EBSA285 || ARCH_INTEGRATOR || \
--		   ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_NETWINDER || \
--		   ARCH_OMAP || ARCH_P720T || ARCH_PXA_IDP || \
--		   ARCH_SA1100 || ARCH_SHARK || ARCH_VERSATILE || \
--		   ARCH_AT91 || ARCH_DAVINCI || \
--		   ARCH_KS8695 || MACH_RD88F5182 || ARCH_REALVIEW
--	help
--	  If you say Y here, the LEDs on your machine will be used
--	  to provide useful information about your current system status.
--
--	  If you are compiling a kernel for a NetWinder or EBSA-285, you will
--	  be able to select which LEDs are active using the options below. If
--	  you are compiling a kernel for the EBSA-110 or the LART however, the
--	  red LED will simply flash regularly to indicate that the system is
--	  still functional. It is safe to say Y here if you have a CATS
--	  system, but the driver will do nothing.
--
--config LEDS_TIMER
--	bool "Timer LED" if (!ARCH_CDB89712 && !ARCH_OMAP) || \
--			    OMAP_OSK_MISTRAL || MACH_OMAP_H2 \
--			    || MACH_OMAP_PERSEUS2
--	depends on LEDS
--	depends on !GENERIC_CLOCKEVENTS
--	default y if ARCH_EBSA110
--	help
--	  If you say Y here, one of the system LEDs (the green one on the
--	  NetWinder, the amber one on the EBSA285, or the red one on the LART)
--	  will flash regularly to indicate that the system is still
--	  operational. This is mainly useful to kernel hackers who are
--	  debugging unstable kernels.
--
--	  The LART uses the same LED for both Timer LED and CPU usage LED
--	  functions. You may choose to use both, but the Timer LED function
--	  will overrule the CPU usage LED.
--
--config LEDS_CPU
--	bool "CPU usage LED" if (!ARCH_CDB89712 && !ARCH_EBSA110 && \
--			!ARCH_OMAP) \
--			|| OMAP_OSK_MISTRAL || MACH_OMAP_H2 \
--			|| MACH_OMAP_PERSEUS2
--	depends on LEDS
--	help
--	  If you say Y here, the red LED will be used to give a good real
--	  time indication of CPU usage, by lighting whenever the idle task
--	  is not currently executing.
--
--	  The LART uses the same LED for both Timer LED and CPU usage LED
--	  functions. You may choose to use both, but the Timer LED function
--	  will overrule the CPU usage LED.
--
- config ALIGNMENT_TRAP
- 	bool
- 	depends on CPU_CP15_MMU
-diff --git a/arch/arm/include/asm/leds.h b/arch/arm/include/asm/leds.h
-deleted file mode 100644
-index c545739..0000000
---- a/arch/arm/include/asm/leds.h
-+++ /dev/null
-@@ -1,50 +0,0 @@
--/*
-- *  arch/arm/include/asm/leds.h
-- *
-- *  Copyright (C) 1998 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- *  Event-driven interface for LEDs on machines
-- *  Added led_start and led_stop- Alex Holden, 28th Dec 1998.
-- */
--#ifndef ASM_ARM_LEDS_H
--#define ASM_ARM_LEDS_H
--
--
--typedef enum {
--	led_idle_start,
--	led_idle_end,
--	led_timer,
--	led_start,
--	led_stop,
--	led_claim,		/* override idle & timer leds */
--	led_release,		/* restore idle & timer leds */
--	led_start_timer_mode,
--	led_stop_timer_mode,
--	led_green_on,
--	led_green_off,
--	led_amber_on,
--	led_amber_off,
--	led_red_on,
--	led_red_off,
--	led_blue_on,
--	led_blue_off,
--	/*
--	 * I want this between led_timer and led_start, but
--	 * someone has decided to export this to user space
--	 */
--	led_halted
--} led_event_t;
--
--/* Use this routine to handle LEDs */
--
--#ifdef CONFIG_LEDS
--extern void (*leds_event)(led_event_t);
--#else
--#define leds_event(e)
--#endif
--
--#endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 7b787d6..fec979c 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -21,7 +21,6 @@ obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
- 
- obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += compat.o
- 
--obj-$(CONFIG_LEDS)		+= leds.o
- obj-$(CONFIG_OC_ETM)		+= etm.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ISA_DMA_API)	+= dma.o
-diff --git a/arch/arm/kernel/leds.c b/arch/arm/kernel/leds.c
-deleted file mode 100644
-index 1911dae..0000000
---- a/arch/arm/kernel/leds.c
-+++ /dev/null
-@@ -1,121 +0,0 @@
--/*
-- * LED support code, ripped out of arch/arm/kernel/time.c
-- *
-- *  Copyright (C) 1994-2001 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/export.h>
--#include <linux/init.h>
--#include <linux/device.h>
--#include <linux/syscore_ops.h>
--#include <linux/string.h>
--
--#include <asm/leds.h>
--
--static void dummy_leds_event(led_event_t evt)
--{
--}
--
--void (*leds_event)(led_event_t) = dummy_leds_event;
--
--struct leds_evt_name {
--	const char	name[8];
--	int		on;
--	int		off;
--};
--
--static const struct leds_evt_name evt_names[] = {
--	{ "amber", led_amber_on, led_amber_off },
--	{ "blue",  led_blue_on,  led_blue_off  },
--	{ "green", led_green_on, led_green_off },
--	{ "red",   led_red_on,   led_red_off   },
--};
--
--static ssize_t leds_store(struct device *dev,
--			struct device_attribute *attr,
--			const char *buf, size_t size)
--{
--	int ret = -EINVAL, len = strcspn(buf, " ");
--
--	if (len > 0 && buf[len] == '\0')
--		len--;
--
--	if (strncmp(buf, "claim", len) == 0) {
--		leds_event(led_claim);
--		ret = size;
--	} else if (strncmp(buf, "release", len) == 0) {
--		leds_event(led_release);
--		ret = size;
--	} else {
--		int i;
--
--		for (i = 0; i < ARRAY_SIZE(evt_names); i++) {
--			if (strlen(evt_names[i].name) != len ||
--			    strncmp(buf, evt_names[i].name, len) != 0)
--				continue;
--			if (strncmp(buf+len, " on", 3) == 0) {
--				leds_event(evt_names[i].on);
--				ret = size;
--			} else if (strncmp(buf+len, " off", 4) == 0) {
--				leds_event(evt_names[i].off);
--				ret = size;
--			}
--			break;
--		}
--	}
--	return ret;
--}
--
--static DEVICE_ATTR(event, 0200, NULL, leds_store);
--
--static struct bus_type leds_subsys = {
--	.name		= "leds",
--	.dev_name	= "leds",
--};
--
--static struct device leds_device = {
--	.id		= 0,
--	.bus		= &leds_subsys,
--};
--
--static int leds_suspend(void)
--{
--	leds_event(led_stop);
--	return 0;
--}
--
--static void leds_resume(void)
--{
--	leds_event(led_start);
--}
--
--static void leds_shutdown(void)
--{
--	leds_event(led_halted);
--}
--
--static struct syscore_ops leds_syscore_ops = {
--	.shutdown	= leds_shutdown,
--	.suspend	= leds_suspend,
--	.resume		= leds_resume,
--};
--
--static int __init leds_init(void)
--{
--	int ret;
--	ret = subsys_system_register(&leds_subsys, NULL);
--	if (ret == 0)
--		ret = device_register(&leds_device);
--	if (ret == 0)
--		ret = device_create_file(&leds_device, &dev_attr_event);
--	if (ret == 0)
--		register_syscore_ops(&leds_syscore_ops);
--	return ret;
--}
--
--device_initcall(leds_init);
--
--EXPORT_SYMBOL(leds_event);
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 2b7b017..89546da 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -31,9 +31,9 @@
- #include <linux/random.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/cpuidle.h>
-+#include <linux/leds.h>
- 
- #include <asm/cacheflush.h>
--#include <asm/leds.h>
- #include <asm/processor.h>
- #include <asm/thread_notify.h>
- #include <asm/stacktrace.h>
-@@ -209,7 +209,7 @@ void cpu_idle(void)
- 	while (1) {
- 		tick_nohz_idle_enter();
- 		rcu_idle_enter();
--		leds_event(led_idle_start);
-+		ledtrig_cpu(CPU_LED_IDLE_START);
- 		while (!need_resched()) {
- #ifdef CONFIG_HOTPLUG_CPU
- 			if (cpu_is_offline(smp_processor_id()))
-@@ -240,7 +240,7 @@ void cpu_idle(void)
- 			} else
- 				local_irq_enable();
- 		}
--		leds_event(led_idle_end);
-+		ledtrig_cpu(CPU_LED_IDLE_END);
- 		rcu_idle_exit();
- 		tick_nohz_idle_exit();
- 		schedule_preempt_disabled();
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index fe31b22..9f92eba 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -25,7 +25,6 @@
- #include <linux/timer.h>
- #include <linux/irq.h>
- 
--#include <asm/leds.h>
- #include <asm/thread_info.h>
- #include <asm/sched_clock.h>
- #include <asm/stacktrace.h>
-@@ -80,21 +79,6 @@ u32 arch_gettimeoffset(void)
- }
- #endif /* CONFIG_ARCH_USES_GETTIMEOFFSET */
- 
--#ifdef CONFIG_LEDS_TIMER
--static inline void do_leds(void)
--{
--	static unsigned int count = HZ/2;
--
--	if (--count == 0) {
--		count = HZ/2;
--		leds_event(led_timer);
--	}
--}
--#else
--#define	do_leds()
--#endif
--
--
- #ifndef CONFIG_GENERIC_CLOCKEVENTS
- /*
-  * Kernel system timer support.
-@@ -102,7 +86,6 @@ static inline void do_leds(void)
- void timer_tick(void)
- {
- 	profile_tick(CPU_PROFILING);
--	do_leds();
- 	xtime_update(1);
- #ifndef CONFIG_SMP
- 	update_process_times(user_mode(get_irq_regs()));
--- 
-1.7.9.5
+On Friday 13 April 2012 04:54 PM, Paul Walmsley wrote:
+> On Fri, 13 Apr 2012, Paul Walmsley wrote:
+>
+>> On Fri, 13 Apr 2012, Archit Taneja wrote:
+>>
+>>> The clocks for all DSS slave interfaces were recently changed to "dss_ick" on
+>>> OMAP2 and OMAP3, this clock can be autoidled by PRCM. The VENC interface
+>>> previously had "dss_54m_fck" as it's clock which couldn't be autoidled, and
+>>> hence the OCPIF_SWSUP_IDLE flag was needed.
+>>>
+>>> Remove the OCPIF_SWSUP_IDLE flag from VENC interfaces as it's clock is now
+>>> "dss_ick".
+>>>
+>>> Signed-off-by: Archit Taneja<archit@ti.com>
+>>
+>> Thanks, queued for 3.4-rc.
+>
+> By the way, I added another sentence to the commit log to describe what is
+> being fixed.  Please let me know if you have any comments.
+
+Thanks for improving the commit. It looks good to me.
+
+Archit
+
+
+>
+>
+> - Paul
+>
+> From: Archit Taneja<archit@ti.com>
+> Date: Fri, 13 Apr 2012 13:31:55 +0530
+> Subject: [PATCH 3/3] ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE flag
+>   from VENC slave interface
+>
+> The clocks for all DSS slave interfaces were recently changed to "dss_ick" on
+> OMAP2 and OMAP3, this clock can be autoidled by PRCM. The VENC interface
+> previously had "dss_54m_fck" as it's clock which couldn't be autoidled, and
+> hence the OCPIF_SWSUP_IDLE flag was needed.
+>
+> Remove the OCPIF_SWSUP_IDLE flag from VENC interfaces as it's clock is
+> now "dss_ick".  This allows the PRCM hardware to autoidle the VENC
+> interface clocks when they are not active, rather than relying on the
+> software to do it, which can keep the interface clocks active
+> unnecessarily.
+>
+> Signed-off-by: Archit Taneja<archit@ti.com>
+> [paul at pwsan.com: add a short description of the fix to the commit log]
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_2420_data.c |    1 -
+>   arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 -
+>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    1 -
+>   3 files changed, 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> index a5409ce..a6bde34 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> @@ -1000,7 +1000,6 @@ static struct omap_hwmod_ocp_if omap2420_l4_core__dss_venc = {
+>   			.flags	= OMAP_FIREWALL_L4,
+>   		}
+>   	},
+> -	.flags		= OCPIF_SWSUP_IDLE,
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> index c4f56cb..04a3885 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> @@ -1049,7 +1049,6 @@ static struct omap_hwmod_ocp_if omap2430_l4_core__dss_venc = {
+>   	.slave		=&omap2430_dss_venc_hwmod,
+>   	.clk		= "dss_ick",
+>   	.addr		= omap2_dss_venc_addrs,
+> -	.flags		= OCPIF_SWSUP_IDLE,
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index 34b9766d..db86ce9 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -1676,7 +1676,6 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__dss_venc = {
+>   			.flags	= OMAP_FIREWALL_L4,
+>   		}
+>   	},
+> -	.flags		= OCPIF_SWSUP_IDLE,
+>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>   };
+>
