@@ -1,48 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 13 Apr 2012 12:01:33 +0200
-Subject: [PATCH] clk: Allocate and add clock lookups from clk_register()
-In-Reply-To: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
-References: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
-Message-ID: <20120413100133.GI3852@pengutronix.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 13 Apr 2012 15:32:43 +0530
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <20120413093606.GI24211@n2100.arm.linux.org.uk>
+References: <20120411094704.GY24211@n2100.arm.linux.org.uk>
+ <4F879E9D.2090502@st.com>
+ <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
+ <4F87B443.6090405@st.com>
+ <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
+ <20120413085901.GG3168@opensource.wolfsonmicro.com> <4F87ED74.8020308@st.com>
+ <20120413091712.GE27730@b20223-02.ap.freescale.net>
+ <20120413092615.GH24211@n2100.arm.linux.org.uk> <4F87F188.60603@st.com>
+ <20120413093606.GI24211@n2100.arm.linux.org.uk>
+Message-ID: <4F87F9C3.2010802@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 12:04:57PM +0530, Viresh Kumar wrote:
-> clock lookups are required for few clocks for which we do clk_get() or
-> clk_get_sys(). Adding clock lookups for them with new clock framework, would
-> mean a lot of code for each platform. Simplify this by doing this allocation and
-> addition to global list in clk_register() only.
-> 
-> This is done on request by the caller, i.e. only if user passes valid pointers
-> in "dev_id" OR "con_id" fields.
-> 
-> A lot of changes at other places/files/comments are also required, that i would
-> do separately. This is the initial version to get initial feedback.
-> 
-> Pointer to original discussion:
-> http://www.spinics.net/lists/arm-kernel/msg169133.html
+On 4/13/2012 3:06 PM, Russell King - ARM Linux wrote:
+> You're not convincing me that you're approach here is correct, and
 
-For reasons mentioned in this thread (long argument list, line wraps in
-clk_register calls, only leaf nodes need lookups) I don't think this is
-a good idea.
+:(
 
->   */
->  struct clk *clk_register(struct device *dev, const char *name,
->  		const struct clk_ops *ops, struct clk_hw *hw,
-> -		const char **parent_names, u8 num_parents, unsigned long flags)
-> +		const char **parent_names, u8 num_parents, unsigned long flags,
-> +		struct clk_lookup **cl, const char *dev_id, const char *con_id)
->  {
+> I really doubt that this will have any effect at saving lines of code -
+> your argument list is soo long that you'll have to wrap it onto several
+> lines.
 
-Also this doesn't handle the case when multiple lookups are associated
-with a single clock (which is quite a common case on some SoCs). Yes,
-we could still use the returned clk to register the additional lookups,
-but that would make the advantage of this patch even smaller.
+There are two ways here:
+1. Leave clk_register() untouched and create lookups in machine code.
+2. change clk_register():
+	A. pass all arguments as i mentioned in my patch
+	B. pass structure instead of all so many args.
 
-Sascha
+Option 2 will have much lesser code than option 1, with both option A & B.
+In option 2.A.: we can create separate registration routines to save extra
+arguments passed, like:
+
+ struct clk *clk_register_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx,
+		u8 clk_gate_flags, spinlock_t *lock, struct clk_lookup **cl,
+		const char *dev_id, const char *con_id);
+
+static inline struct clk *clk_register_gate_nolookup(struct device *dev,
+		const char *name, const char *parent_name, unsigned long flags,
+		void __iomem *reg, u8 bit_idx, u8 clk_gate_flags,
+		spinlock_t *lock);
+
+Nodes, that don't need lookup stuff, can go ahead as earlier, just need
+to add _nolookup in existing routine name.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+viresh
