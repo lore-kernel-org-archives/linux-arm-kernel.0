@@ -1,34 +1,40 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 13 Apr 2012 16:27:10 +0100
-Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
- variants
-In-Reply-To: <4F88434C.9010709@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <1334328122.27644.15.camel@hornet> <201204131451.10638.arnd@arndb.de>
- <4F883E40.6000905@linaro.org> <1334329500.27644.18.camel@hornet>
- <4F88434C.9010709@linaro.org>
-Message-ID: <1334330830.27644.19.camel@hornet>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 13 Apr 2012 10:01:07 -0600
+Subject: [PATCH] pinctrl: tegra: debugfs enhancements
+In-Reply-To: <CACRpkdYiWTNQ7hVM4NczyemxOcHWNcK639-yoh2iWc-5_WQB2Q@mail.gmail.com>
+References: <1334184439-16428-1-git-send-email-swarren@wwwdotorg.org>
+ <CACRpkdYiWTNQ7hVM4NczyemxOcHWNcK639-yoh2iWc-5_WQB2Q@mail.gmail.com>
+Message-ID: <4F884DC3.70800@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-04-13 at 16:16 +0100, Lee Jones wrote:
-> Because in it's current state, gpio-nomadik doesn't know how to decode 
-> any provided flags and phandles don't work yet, hence the IRQ request 
-> really is just a number in this case. In a latter patch-set I provide 
-> the GPIO driver with said bindings and swap the simple integer format 
-> for one which is more in keeping with the DT format e.g. <32> becomes 
-> <&gpio1 1 0x4> for instance.
+On 04/13/2012 06:46 AM, Linus Walleij wrote:
+> On Thu, Apr 12, 2012 at 12:47 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > 
-> This patch does function perfectly well the way it is and provides no 
-> breakage. I'm aiming for both patch-sets to be sucked into the v3.5 
-> merge window in any case, so all functionality will be provided at -rc1. 
-> Only the bleeding edge, hardcore, kernel developers who use the 
-> gpio-nomadik driver (so, just me and Linus Walleij then :D ) will ever 
-> use this code as-is.
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> * Only provide debugfs-relates ops when CONFIG_DEBUG_FS is enabled.
+>> * Implement pin_config_group_dbg_show op.
+>> * Implement pin_config_config_dbg_show op.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> Linus, this too would be best to take through the Tegra tree. It depends
+>> on the other two patches I just posted, but to satisfy that, I'll just
+>> base my branch off of pinctrl once you've applied those branches and its
+>> stable.
+> 
+> OK that means you need that other patch adding the debug callback to
+> be in some stable branch so you can pull it into the Tegra
+> tree I guess?
+> 
+> Can we conclude base stabilization from this and say that the series
+> of patches upto debugfs enhancements v2 (with the kerneldoc fix)
+> is the stable merge base, and I'll push some tag for that.
 
-I see, fine by me.
+Sounds good to me.
 
-Cheers!
+> And once that settles:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Pawe?
+Thanks.
