@@ -1,46 +1,61 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 13 Apr 2012 11:08:40 -0700
-Subject: [GIT PULL] msm fixes for 3.4rc
-Message-ID: <20120413180840.GA17558@codeaurora.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sat, 14 Apr 2012 02:17:13 +0800
+Subject: [PATCH 1/3] pinctrl: pinctrl-imx: add imx pinctrl core driver
+In-Reply-To: <1334333915-1174-1-git-send-email-b29396@freescale.com>
+References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
+Message-ID: <CAA+hA=QaD=wzJoeNUxDqwAJ1grBiPxSKY+_cwYgNMBuaF4OJ6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd/Olof.  Here are some fixes for msm that fix problems caused by
-the latest ARM code.  The ones from Daniel remove unneeded fixups that
-now cause compilation failures.  Mine fix section mismatches, that
-were incompletely fixed earlier.
+On Sat, Apr 14, 2012 at 12:18 AM, Dong Aisheng <b29396@freescale.com> wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+>
+> The driver has mux and config support while the gpio is still
+> not supported.
+> For select input setting, the driver will handle it internally
+> and do not need user to take care of it.
+>
+> The pinctrl-imx core driver will parse the dts file and dynamically
+> create the pinmux functions and groups.
+>
+> Each IMX SoC pinctrl driver should register pins with a pin register map
+> including mux register and config register and select input map to core
+> for proper operations.
+>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+> ?.../bindings/pinctrl/fsl,imx6q-pinctrl.txt ? ? ? ? | ?201 ++++++
+> ?drivers/pinctrl/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?4 +
+> ?drivers/pinctrl/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?drivers/pinctrl/pinctrl-imx.c ? ? ? ? ? ? ? ? ? ? ?| ?716 ++++++++++++++++++++
+> ?drivers/pinctrl/pinctrl-imx.h ? ? ? ? ? ? ? ? ? ? ?| ?117 ++++
+> ?5 files changed, 1039 insertions(+), 0 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+> ?create mode 100644 drivers/pinctrl/pinctrl-imx.c
+> ?create mode 100644 drivers/pinctrl/pinctrl-imx.h
+>
+.........
+> +static int __devinit imx_pmx_parse_functions(struct device_node *np,
+> + ? ? ? ? ? ? ? ? ? ? ? struct imx_pinctrl_info *info, u32 index)
+> +{
+> + ? ? ? struct device_node *child;
+> + ? ? ? struct imx_pmx_func *func;
+> + ? ? ? struct imx_pin_group *grp;
+> + ? ? ? int ret;
+> + ? ? ? static u32 grp_index;
+> + ? ? ? u32 i = 0;
+> +
+> + ? ? ? dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
+> +
+> + ? ? ? func = &info->functions[index];
+> +
+> + ? ? ? /* Initialise function */
+> + ? ? ? func->name = np->name;
+> + ? ? ? func->num_groups = of_get_child_count(np);
+The driver depends on another dt patch which seems missed the 3.4 kernel.
+[PATCH V3 1/1] dt: add of_get_child_count helper function
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/084327.html
+I just sent out the mail to check with Rob.
 
-Thanks,
-David
-
-The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
-
-  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git msm-fix
-
-for you to fetch changes up to af33eadc73e4a5d35a966c1c7ffe28a8424c9d96:
-
-  ARM: msm: Fix section mismatches in proc_comm.c (2012-04-13 10:23:17 -0700)
-
-----------------------------------------------------------------
-Daniel Walker (2):
-      arm: msm: halibut: remove unneeded fixup
-      arm: msm: trout: fix compile failure
-
-David Brown (2):
-      video: msm: Fix section mismatches in mddi.c
-      ARM: msm: Fix section mismatches in proc_comm.c
-
- arch/arm/mach-msm/board-halibut.c     |    3 ---
- arch/arm/mach-msm/board-trout-panel.c |    1 +
- arch/arm/mach-msm/board-trout.c       |    1 +
- arch/arm/mach-msm/proc_comm.c         |    2 +-
- drivers/video/msm/mddi.c              |    8 ++++----
- 5 files changed, 7 insertions(+), 8 deletions(-)
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards
+Dong Aisheng
