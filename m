@@ -1,18 +1,31 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 13 Apr 2012 16:56:28 +0800
-Subject: [PATCH] clk: Allocate and add clock lookups from clk_register()
-In-Reply-To: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
-References: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
-Message-ID: <20120413085627.GD27730@b20223-02.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 13 Apr 2012 09:59:01 +0100
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
+References: <20120411011149.GA20818@b20223-02.ap.freescale.net>
+ <20120411082401.GA32187@sirena.org.uk>
+ <20120411084528.GB20818@b20223-02.ap.freescale.net>
+ <20120411092034.GV24211@n2100.arm.linux.org.uk>
+ <20120411094231.GO3852@pengutronix.de>
+ <20120411094704.GY24211@n2100.arm.linux.org.uk>
+ <4F879E9D.2090502@st.com>
+ <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
+ <4F87B443.6090405@st.com>
+ <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
+Message-ID: <20120413085901.GG3168@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  struct clk *clk_register(struct device *dev, const char *name,
->  		const struct clk_ops *ops, struct clk_hw *hw,
-> -		const char **parent_names, u8 num_parents, unsigned long flags)
-> +		const char **parent_names, u8 num_parents, unsigned long flags,
-> +		struct clk_lookup **cl, const char *dev_id, const char *con_id)
-10 arguments. It worths to use a struct ? 
+On Fri, Apr 13, 2012 at 01:22:24PM +0800, Shawn Guo wrote:
 
-Thanks
-Richard
+> It makes sense then.  Only concern I have is the long argument list of
+> clk_register() becomes even longer.
+
+Or we need to dump the arguments into a struct.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120413/f83715ee/attachment.sig>
