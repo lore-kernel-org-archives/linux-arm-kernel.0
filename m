@@ -1,44 +1,28 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 13 Apr 2012 14:56:31 +0530
-Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait
- for reset status
-In-Reply-To: <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
-References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
- <1331659524-7635-3-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
- <4F8565C7.4080506@ti.com>
- <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
-Message-ID: <4F87F147.3040002@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Apr 2012 10:26:15 +0100
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <20120413091712.GE27730@b20223-02.ap.freescale.net>
+References: <20120411092034.GV24211@n2100.arm.linux.org.uk>
+ <20120411094231.GO3852@pengutronix.de>
+ <20120411094704.GY24211@n2100.arm.linux.org.uk> <4F879E9D.2090502@st.com>
+ <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
+ <4F87B443.6090405@st.com>
+ <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
+ <20120413085901.GG3168@opensource.wolfsonmicro.com> <4F87ED74.8020308@st.com>
+ <20120413091712.GE27730@b20223-02.ap.freescale.net>
+Message-ID: <20120413092615.GH24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Fri, Apr 13, 2012 at 05:17:13PM +0800, Richard Zhao wrote:
+> On Fri, Apr 13, 2012 at 02:40:12PM +0530, Viresh Kumar wrote:
+> > On 4/13/2012 2:29 PM, Mark Brown wrote:
+> > > Or we need to dump the arguments into a struct.
+> > 
+> > Then we would end up creating too many structures in our mach/clock.c
+> > files. That will look bad. May perform better. :)
+> or pass struct clk_lookup* ? For non-leaf clks, it's NULL.
 
->> >  While the patch did fix the issue for Anand, I guess it
->> >  was because of the additional delay post reset, waiting on the
->> >  RESETDONE bit and timing out, before accessing the i2c_con register.
-
-I thought some more on this and the logic of the delay between the
-SOFTRESET bit being set and an immediate register access did not make
-much sense, because even polling on RESETDONE bit involves an immediate
-i2c register access, albeit a different one.
-
-I had a chat again with Anand this morning and realized the patch that
-fixed the problems he saw on some customer hardware had changes from
-both patch 1/2 and patch 2/2 from this series clubbed into one patch.
-I seem to have split them into 2 patches later while posting it out
-on the list.
-
-So in all likelihood its the changes in patch 1/2 which made a
-difference and the patch 2/2 was a result of my (wrong) analysis based
-on code review.
-
-The problems seen were extremely rare and not having access to those
-few failing boards is making it difficult to re-validate with these
-changes removed. However based on my analysis (hopefully right this time 
-:)) it seems safe to revert this patch in mainline.
-
-Should I go ahead and send a revert for the -rc?
-
-regards,
-Rajendra
+What's wrong with the struct clk returned from clk_register() - why
+not do this as a two-step process?  Especially as you may want to
+associate a single clock with more than one clk_lookup.
