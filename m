@@ -1,39 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Apr 2012 11:49:00 +0100
-Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
-In-Reply-To: <20120413104452.GR3168@opensource.wolfsonmicro.com>
-References: <20120413012230.GA30438@windriver.com>
- <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
- <20120413103207.GL24211@n2100.arm.linux.org.uk>
- <20120413104452.GR3168@opensource.wolfsonmicro.com>
-Message-ID: <20120413104900.GM24211@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 13 Apr 2012 12:11:51 +0100
+Subject: [PATCH] ARM: dts: remove blank interrupt-parent properties
+In-Reply-To: <1334243848-29522-1-git-send-email-robherring2@gmail.com>
+References: <1334243848-29522-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4F8809F7.703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 11:44:52AM +0100, Mark Brown wrote:
-> On Fri, Apr 13, 2012 at 11:32:07AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Apr 13, 2012 at 10:01:52AM +0800, Shawn Guo wrote:
-> 
-> > > That's because Mark's patch removes "#include
-> > > <linux/regulator/consumer.h>" included indirectly by
-> > > drivers/dma/ste_dma40.c from linux/amba/bus.h.  The ste_dma40.c should
-> > > really directly includes consumer.h.
-> 
-> > Okay, I'll drop this patch because it's causing regressions, so it can't
-> > be pushed as a 'fix' during -rc.
-> 
-> I did say we should've been pushing Shawn's patch in as a minimal fix
-> for 3.4...
+On 12/04/12 16:17, Rob Herring wrote:
+> From: Rob Herring<rob.herring@calxeda.com>
+>
+> These were incorrectly introduced and can cause problems for of_irq_init.
+>
+> The correct way to define a root controller is no interrupt-parent set at
+> all or the interrupt-parent is set to the root controller itself when
+> inherited from a parent node.
+>
+> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
 
-What patch?
+Tested-by: Lee Jones <lee.jones@linaro.org>
 
-> Alternatively if you're happy with the code just keeping the
-> header in place should avoid any issues, the one regression was just an
-> implicit header dependency.
-> 
-> Regardless of what happens for 3.4 we should keep the removal for -next,
-> it's clear that we don't want the bus doing this and it's causing
-> breakage for the non-ST platforms.  Do I need to resend the patch to the
-> patch system or will the existing copy be OK?
+Works for me. Now I can use my GPIO chained IRQs correctly.
 
-What I want is something that doesn't cause a regression for 3.4.
+> ---
+> Arnd, Olof,
+>
+> Please apply for 3.4.
+>
+> Rob
+>
+>   arch/arm/boot/dts/at91sam9g20.dtsi |    1 -
+>   arch/arm/boot/dts/at91sam9g45.dtsi |    1 -
+>   arch/arm/boot/dts/at91sam9x5.dtsi  |    1 -
+>   arch/arm/boot/dts/db8500.dtsi      |    1 -
+>   arch/arm/boot/dts/highbank.dts     |    1 -
+>   5 files changed, 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+> index 92f3662..6c33256 100644
+> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+> @@ -55,7 +55,6 @@
+>   				#interrupt-cells =<2>;
+>   				compatible = "atmel,at91rm9200-aic";
+>   				interrupt-controller;
+> -				interrupt-parent;
+>   				reg =<0xfffff000 0x200>;
+>   			};
+>
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 3d0c32f..2815be1 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -56,7 +56,6 @@
+>   				#interrupt-cells =<2>;
+>   				compatible = "atmel,at91rm9200-aic";
+>   				interrupt-controller;
+> -				interrupt-parent;
+>   				reg =<0xfffff000 0x200>;
+>   			};
+>
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index c111001..1995c44 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -54,7 +54,6 @@
+>   				#interrupt-cells =<2>;
+>   				compatible = "atmel,at91rm9200-aic";
+>   				interrupt-controller;
+> -				interrupt-parent;
+>   				reg =<0xfffff000 0x200>;
+>   			};
+>
+> diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+> index d73dce6..14bc307 100644
+> --- a/arch/arm/boot/dts/db8500.dtsi
+> +++ b/arch/arm/boot/dts/db8500.dtsi
+> @@ -24,7 +24,6 @@
+>   			#interrupt-cells =<3>;
+>   			#address-cells =<1>;
+>   			interrupt-controller;
+> -			interrupt-parent;
+>   			reg =<0xa0411000 0x1000>,
+>   			<0xa0410100 0x100>;
+>   		};
+> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+> index 357e780..4121b06 100644
+> --- a/arch/arm/boot/dts/highbank.dts
+> +++ b/arch/arm/boot/dts/highbank.dts
+> @@ -100,7 +100,6 @@
+>   			#size-cells =<0>;
+>   			#address-cells =<1>;
+>   			interrupt-controller;
+> -			interrupt-parent;
+>   			reg =<0xfff11000 0x1000>,
+>   			<0xfff10100 0x100>;
+>   		};
+
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
