@@ -1,30 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 13 Apr 2012 04:45:46 -0600 (MDT)
-Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait
- for reset status
-In-Reply-To: <4F87F147.3040002@ti.com>
-References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
- <1331659524-7635-3-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204101803020.20894@utopia.booyaka.com>
- <4F8565C7.4080506@ti.com>
- <alpine.DEB.2.00.1204111251100.29473@utopia.booyaka.com>
- <4F87F147.3040002@ti.com>
-Message-ID: <alpine.DEB.2.00.1204130443530.25832@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Apr 2012 11:49:00 +0100
+Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
+In-Reply-To: <20120413104452.GR3168@opensource.wolfsonmicro.com>
+References: <20120413012230.GA30438@windriver.com>
+ <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
+ <20120413103207.GL24211@n2100.arm.linux.org.uk>
+ <20120413104452.GR3168@opensource.wolfsonmicro.com>
+Message-ID: <20120413104900.GM24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+On Fri, Apr 13, 2012 at 11:44:52AM +0100, Mark Brown wrote:
+> On Fri, Apr 13, 2012 at 11:32:07AM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Apr 13, 2012 at 10:01:52AM +0800, Shawn Guo wrote:
+> 
+> > > That's because Mark's patch removes "#include
+> > > <linux/regulator/consumer.h>" included indirectly by
+> > > drivers/dma/ste_dma40.c from linux/amba/bus.h.  The ste_dma40.c should
+> > > really directly includes consumer.h.
+> 
+> > Okay, I'll drop this patch because it's causing regressions, so it can't
+> > be pushed as a 'fix' during -rc.
+> 
+> I did say we should've been pushing Shawn's patch in as a minimal fix
+> for 3.4...
 
-thanks for the summary,
+What patch?
 
-On Fri, 13 Apr 2012, Rajendra Nayak wrote:
+> Alternatively if you're happy with the code just keeping the
+> header in place should avoid any issues, the one regression was just an
+> implicit header dependency.
+> 
+> Regardless of what happens for 3.4 we should keep the removal for -next,
+> it's clear that we don't want the bus doing this and it's causing
+> breakage for the non-ST platforms.  Do I need to resend the patch to the
+> patch system or will the existing copy be OK?
 
-> Should I go ahead and send a revert for the -rc?
-
-Thanks for the offer, I don't think it's needed -- I'll just build the 
-revert changelog here with your comments from your E-mail.
-
-regards
-
-
-- Paul
+What I want is something that doesn't cause a regression for 3.4.
