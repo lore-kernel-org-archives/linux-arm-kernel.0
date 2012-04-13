@@ -1,23 +1,25 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 13 Apr 2012 10:15:30 -0400
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
- <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
-Message-ID: <1334326531.4033.12.camel@deneb.redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Apr 2012 14:21:02 +0000
+Subject: [PATCH 0/7 v2] Next round of DT enablement for ux500/Snowball
+In-Reply-To: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201204131421.02875.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-04-11 at 20:44 -0600, Paul Walmsley wrote:
-> This is useful not only for OMAP4 and AM3517/3505, but also will probably 
-> be useful for the C6x chips that Mark Salter is working on.
+On Friday 13 April 2012, Lee Jones wrote:
+> 
+> In this patch-set we change a couple of DT compatible entries
+> to something less cumbersome. Then we have a second stab at 
+> enabling DT for mmci. Only this time keeping it simple and 
+> continuing to use current DMA initialisation code. We'll 
+> change that once the generic bindings for DMA have been 
+> mainlined. Finally we enable Snowball's GPIO controller.
 
-I have been keeping an occasional eye on these patches but I don't see
-any usefulness for the currently supported C6X chips. The current set
-of supported chips use a completely different DDR controller. There is
-an EMIF controller on some which provides a parallel bus for connecting
-to external devices (NOR flash, etc) but it looks completely different
-from the OMAP EMIF. I think the TI DaVinci chips have EMIF (and other IO
-blocks) similar to C6X which could use common drivers.
+Looks good.
 
---Mark
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+for the entire series.
+
+	Arnd
