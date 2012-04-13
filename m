@@ -1,81 +1,49 @@
-From: h.feurstein@gmail.com (Hubert Feurstein)
-Date: Fri, 13 Apr 2012 12:17:59 +0200
-Subject: [PATCH v9 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <201203191534.q2JFYl1b012744@gatekeeper.vosshq.de>
-References: <cover.1322479017a.git.n.voss@weinmann.de>
- <201203191534.q2JFYl1b012744@gatekeeper.vosshq.de>
-Message-ID: <CAFfN3gWCu5RnKb6dK4YMCAhpkfLncYdk1Cwqxb3wxMVznSiSFQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Apr 2012 11:20:36 +0100
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <4F87F9C3.2010802@st.com>
+References: <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
+ <4F87B443.6090405@st.com>
+ <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
+ <20120413085901.GG3168@opensource.wolfsonmicro.com> <4F87ED74.8020308@st.com>
+ <20120413091712.GE27730@b20223-02.ap.freescale.net>
+ <20120413092615.GH24211@n2100.arm.linux.org.uk> <4F87F188.60603@st.com>
+ <20120413093606.GI24211@n2100.arm.linux.org.uk> <4F87F9C3.2010802@st.com>
+Message-ID: <20120413102036.GJ24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niko,
+On Fri, Apr 13, 2012 at 03:32:43PM +0530, Viresh Kumar wrote:
+> On 4/13/2012 3:06 PM, Russell King - ARM Linux wrote:
+> > You're not convincing me that you're approach here is correct, and
+> 
+> :(
+> 
+> > I really doubt that this will have any effect at saving lines of code -
+> > your argument list is soo long that you'll have to wrap it onto several
+> > lines.
+> 
+> There are two ways here:
+> 1. Leave clk_register() untouched and create lookups in machine code.
+> 2. change clk_register():
+> 	A. pass all arguments as i mentioned in my patch
+> 	B. pass structure instead of all so many args.
+> 
+> Option 2 will have much lesser code than option 1, with both option A & B.
+> In option 2.A.: we can create separate registration routines to save extra
+> arguments passed, like:
+> 
+>  struct clk *clk_register_gate(struct device *dev, const char *name,
+>  		const char *parent_name, unsigned long flags,
+>  		void __iomem *reg, u8 bit_idx,
+> 		u8 clk_gate_flags, spinlock_t *lock, struct clk_lookup **cl,
+> 		const char *dev_id, const char *con_id);
 
-I'm using this driver since a while a now in my system
-(soc:at91sam9m10; kernel:v3.2.14) and it works quite well. But
-occasionally it happens that wrong data is read from my devices. I've
-traced down the issue to the way how you do the interrupt handling. In
-your code you do not consider that both status-flags (TXCOMP and
-RXRDY) may be pending at the same time. So you handle the TXCOMP but
-NOT the RXRDY which will cause a data-loss on the current transfer. As
-a consequence also the next transfer will be corrupt, because you
-start with old data in RHR. So I would suggest the following changes:
+So you're going to have something around 4-5 lines of arguments per
+function call to use this function.  That's not elegant, that's not
+easy to use, that's not nice.  And I doubt that it really solves any
+code space concern because the compiler will have to store pointers
+and values somewhere, and shuffle those into registers and onto the
+stack for every function call using additional code to do that.
 
-static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
-{
-	struct at91_twi_dev *dev = dev_id;
-	const unsigned status = at91_twi_read(dev, AT91_TWI_SR);
-	unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
-
-	if (irqstatus & AT91_TWI_RXRDY) {
-		at91_twi_read_next_byte(dev);
-		irqstatus &= ~AT91_TWI_RXRDY;
-	}
-
-	if (irqstatus & AT91_TWI_TXRDY) {
-		at91_twi_write_next_byte(dev);
-		irqstatus &= ~AT91_TWI_TXRDY;
-	}
-
-	if (irqstatus & AT91_TWI_TXCOMP) {
-		at91_disable_twi_interrupts(dev);
-		dev->transfer_status = status;
-		complete(&dev->cmd_complete);
-		irqstatus &= ~AT91_TWI_TXCOMP;
-	}
-	
-	if (irqstatus) {
-		/* There should be no pending interrupt anymore. *)
-		return IRQ_NONE;
-	}
-
-	return IRQ_HANDLED;
-}
-
-To make sure that we do not start with old data in any case, I would
-suggest to read SR and RHR before initiating a new transfer.
-
-static int at91_do_twi_transfer(struct at91_twi_dev *dev)
-{
-	int ret;
-
-	dev_dbg(dev->dev, "transfer: %s %d bytes.\n",
-		(dev->msg->flags & I2C_M_RD) ? "read" : "write", dev->buf_len);
-
-	INIT_COMPLETION(dev->cmd_complete);
-	if (dev->msg->flags & I2C_M_RD) {
-		unsigned start_flags = AT91_TWI_START;
-
-		/* clear any pending data */
-		(void)at91_twi_read(dev, AT91_TWI_SR);
-		(void)at91_twi_read(dev, AT91_TWI_RHR);
-		
-		/* if only one byte is to be read, immediately stop transfer */
-		if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
-			start_flags |= AT91_TWI_STOP;
-		at91_twi_write(dev, AT91_TWI_CR, start_flags);
-
-		[snip]
-}
-
-
-Hubert
+I really don't get why you think this is an improvement.
