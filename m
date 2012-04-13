@@ -1,119 +1,100 @@
-From: jgutierrez@ti.com (Gutierrez, Juan)
-Date: Fri, 13 Apr 2012 16:53:30 -0500
-Subject: [PATCH 3/3] omap: remoteproc: add support for a boot register
-In-Reply-To: <1334352255-48584-4-git-send-email-jgutierrez@ti.com>
-References: <1334352255-48584-1-git-send-email-jgutierrez@ti.com>
- <1334352255-48584-4-git-send-email-jgutierrez@ti.com>
-Message-ID: <CADVn9RH8ZYvM79ghWGe4UP6CA20WcX46S43Bgn_mOSeyqyVkPg@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Sat, 14 Apr 2012 08:06:13 +1000
+Subject: [PATCH] i2c-at91: fix data-loss issue
+In-Reply-To: <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
+References: <20120413103937.GH7154@arwen.pp.htv.fi>
+ <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
+Message-ID: <4F88A355.2060303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some remote processors (like Omap4's DSP) need to explicitly
-configure a boot address in a special register or memory
-location, and this is the address from which they start
-executing code when taken out of reset.
+On 13/04/12 21:44, Hubert Feurstein wrote:
 
-Support for this infrastructure has been added to remoteproc
-code. The memory or register address where the boot address
-is to be stored is supplied through the boot_reg field of the
-platform data in the remoteproc. The omap_rproc_start function
-will fetch the boot address from the image, and write this
-address into the boot register, if provided, before taking the
-processor out of reset.
+> In the interrupt handler both status-flags (TXCOMP and RXRDY) might be
+> pending at the same time. In this case TXCOMP is handled but NOT RXRDY
+> which causes a data-loss on the current transfer. As a consequence also the
+> next transfer will be corrupt, because old data is pending in RHR.
+> 
+> To make sure that we do not start with old data in any case, SR and RHR is
+> read empty before initiating a new transfer.
+> 
+> Signed-off-by: Hubert Feurstein <h.feurstein@gmail.com>
 
-Signed-off-by: Juan Gutierrez <jgutierrez@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-?arch/arm/plat-omap/include/plat/remoteproc.h | ? ?2 ++
-?drivers/remoteproc/omap_remoteproc.c ? ? ? ? | ? 19 +++++++++++++++++++
-?2 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/remoteproc.h
-b/arch/arm/plat-omap/include/plat/remoteproc.h
-index b10eac8..2066a14 100644
---- a/arch/arm/plat-omap/include/plat/remoteproc.h
-+++ b/arch/arm/plat-omap/include/plat/remoteproc.h
-@@ -30,6 +30,7 @@ struct platform_device;
-?* @ops: start/stop rproc handlers
-?* @device_enable: omap-specific handler for enabling a device
-?* @device_shutdown: omap-specific handler for shutting down a device
-+ * @boot_reg: physical address of the control register for storing boot address
-?*/
-?struct omap_rproc_pdata {
-? ? ? ?const char *name;
-@@ -40,6 +41,7 @@ struct omap_rproc_pdata {
-? ? ? ?const struct rproc_ops *ops;
-? ? ? ?int (*device_enable) (struct platform_device *pdev);
-? ? ? ?int (*device_shutdown) (struct platform_device *pdev);
-+ ? ? ? u32 boot_reg;
-?};
+Couple of very minor comments below.
 
-?#if defined(CONFIG_OMAP_REMOTEPROC) || defined(CONFIG_OMAP_REMOTEPROC_MODULE)
-diff --git a/drivers/remoteproc/omap_remoteproc.c
-b/drivers/remoteproc/omap_remoteproc.c
-index 69425c4..e9b2f85 100644
---- a/drivers/remoteproc/omap_remoteproc.c
-+++ b/drivers/remoteproc/omap_remoteproc.c
-@@ -39,11 +39,13 @@
-?* @mbox: omap mailbox handle
-?* @nb: notifier block that will be invoked on inbound mailbox messages
-?* @rproc: rproc handle
-+ * @boot_reg: virtual address of the register where the bootaddr is stored
-?*/
-?struct omap_rproc {
-? ? ? ?struct omap_mbox *mbox;
-? ? ? ?struct notifier_block nb;
-? ? ? ?struct rproc *rproc;
-+ ? ? ? void __iomem *boot_reg;
-?};
+~Ryan
 
-?/**
-@@ -114,6 +116,10 @@ static int omap_rproc_start(struct rproc *rproc)
-? ? ? ?struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
-? ? ? ?int ret;
+> ---
+>  This patch applies on top of [PATCH v9 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+> 
+>  drivers/i2c/busses/i2c-at91.c |   23 ++++++++++++++++-------
+>  1 files changed, 16 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index 40c39a2..295835f 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -161,18 +161,22 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
+>  {
+>  	struct at91_twi_dev *dev = dev_id;
+>  	const unsigned status = at91_twi_read(dev, AT91_TWI_SR);
+> -	const unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
+> +	unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
+> +
+> +	irqstatus &= (AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_TXCOMP);
 
-+ ? ? ? /* load remote processor boot address if needed. */
-+ ? ? ? if (oproc->boot_reg)
-+ ? ? ? ? ? ? ? writel(rproc->bootaddr, oproc->boot_reg);
-+
-? ? ? ?oproc->nb.notifier_call = omap_rproc_mbox_callback;
+> +	if (!irqstatus)
+> +		return IRQ_NONE;
+> +
+> +	if (irqstatus & AT91_TWI_RXRDY)
+> +		at91_twi_read_next_byte(dev);
+> +
+> +	if (irqstatus & AT91_TWI_TXRDY)
+> +		at91_twi_write_next_byte(dev);
+>  
+>  	if (irqstatus & AT91_TWI_TXCOMP) {
+>  		at91_disable_twi_interrupts(dev);
+>  		dev->transfer_status = status;
+>  		complete(&dev->cmd_complete);
+> -	} else if (irqstatus & AT91_TWI_RXRDY) {
+> -		at91_twi_read_next_byte(dev);
+> -	} else if (irqstatus & AT91_TWI_TXRDY) {
+> -		at91_twi_write_next_byte(dev);
+> -	} else {
+> -		return IRQ_NONE;
+>  	}
+>  
+>  	return IRQ_HANDLED;
+> @@ -189,6 +193,10 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+>  	if (dev->msg->flags & I2C_M_RD) {
+>  		unsigned start_flags = AT91_TWI_START;
+>  
+> +		/* clear any pending data */
+> +		(void)at91_twi_read(dev, AT91_TWI_SR);
+> +		(void)at91_twi_read(dev, AT91_TWI_RHR);
 
-? ? ? ?/* every omap rproc is assigned a mailbox instance for messaging */
-@@ -194,6 +200,12 @@ static int __devinit omap_rproc_probe(struct
-platform_device *pdev)
-? ? ? ?oproc = rproc->priv;
-? ? ? ?oproc->rproc = rproc;
 
-+ ? ? ? if (pdata->boot_reg) {
-+ ? ? ? ? ? ? ? oproc->boot_reg = ioremap(pdata->boot_reg, sizeof(u32));
-+ ? ? ? ? ? ? ? if (!oproc->boot_reg)
-+ ? ? ? ? ? ? ? ? ? ? ? goto err_ioremap;
-+ ? ? ? }
-+
-? ? ? ?platform_set_drvdata(pdev, rproc);
+Drop the void cast.
 
-? ? ? ?ret = rproc_register(rproc);
-@@ -203,6 +215,9 @@ static int __devinit omap_rproc_probe(struct
-platform_device *pdev)
-? ? ? ?return 0;
+> +
+>  		/* if only one byte is to be read, immediately stop transfer */
+>  		if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
+>  			start_flags |= AT91_TWI_STOP;
+> @@ -259,6 +267,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+>  			internal_address |= addr << (8 * i);
+>  			int_addr_flag += AT91_TWI_IADRSZ_1;
+>  		}
+> +
 
-?free_rproc:
-+ ? ? ? if (oproc->boot_reg)
-+ ? ? ? ? ? ? ? iounmap(oproc->boot_reg);
-+err_ioremap:
-? ? ? ?rproc_free(rproc);
-? ? ? ?return ret;
-?}
-@@ -210,6 +225,10 @@ free_rproc:
-?static int __devexit omap_rproc_remove(struct platform_device *pdev)
-?{
-? ? ? ?struct rproc *rproc = platform_get_drvdata(pdev);
-+ ? ? ? struct omap_rproc *oproc = rproc->priv;
-+
-+ ? ? ? if (oproc->boot_reg)
-+ ? ? ? ? ? ? ? iounmap(oproc->boot_reg);
 
-? ? ? ?return rproc_unregister(rproc);
-?}
---
-1.7.5.4
+Please don't make unrelated whitespace changes.
+
+>  		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
+>  	}
+>  
+
+
+With those fixed, please add:
+
+Reviewed-by: Ryan Mallon <rmallon@gmail.com>
