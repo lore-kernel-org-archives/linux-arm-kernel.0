@@ -1,40 +1,81 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 13 Apr 2012 15:40:44 +0530
-Subject: [PATCH] clk: Allocate and add clock lookups from clk_register()
-In-Reply-To: <20120413100133.GI3852@pengutronix.de>
-References: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
- <20120413100133.GI3852@pengutronix.de>
-Message-ID: <4F87FBA4.7000700@st.com>
+From: h.feurstein@gmail.com (Hubert Feurstein)
+Date: Fri, 13 Apr 2012 12:17:59 +0200
+Subject: [PATCH v9 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <201203191534.q2JFYl1b012744@gatekeeper.vosshq.de>
+References: <cover.1322479017a.git.n.voss@weinmann.de>
+ <201203191534.q2JFYl1b012744@gatekeeper.vosshq.de>
+Message-ID: <CAFfN3gWCu5RnKb6dK4YMCAhpkfLncYdk1Cwqxb3wxMVznSiSFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2012 3:31 PM, Sascha Hauer wrote:
->> > Pointer to original discussion:
->> > http://www.spinics.net/lists/arm-kernel/msg169133.html
-> For reasons mentioned in this thread (long argument list, line wraps in
-> clk_register calls, only leaf nodes need lookups) I don't think this is
-> a good idea.
+Hi Niko,
 
-For that we can pass struct as argument.
+I'm using this driver since a while a now in my system
+(soc:at91sam9m10; kernel:v3.2.14) and it works quite well. But
+occasionally it happens that wrong data is read from my devices. I've
+traced down the issue to the way how you do the interrupt handling. In
+your code you do not consider that both status-flags (TXCOMP and
+RXRDY) may be pending at the same time. So you handle the TXCOMP but
+NOT the RXRDY which will cause a data-loss on the current transfer. As
+a consequence also the next transfer will be corrupt, because you
+start with old data in RHR. So I would suggest the following changes:
 
->> >   */
->> >  struct clk *clk_register(struct device *dev, const char *name,
->> >  		const struct clk_ops *ops, struct clk_hw *hw,
->> > -		const char **parent_names, u8 num_parents, unsigned long flags)
->> > +		const char **parent_names, u8 num_parents, unsigned long flags,
->> > +		struct clk_lookup **cl, const char *dev_id, const char *con_id)
->> >  {
-> Also this doesn't handle the case when multiple lookups are associated
-> with a single clock (which is quite a common case on some SoCs). Yes,
-> we could still use the returned clk to register the additional lookups,
-> but that would make the advantage of this patch even smaller.
+static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
+{
+	struct at91_twi_dev *dev = dev_id;
+	const unsigned status = at91_twi_read(dev, AT91_TWI_SR);
+	unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
 
-If there is a better way of managing this within the clock framework,
-without platforms having to do clkdev management, we can choose that.
-My main idea was to make platform code lighter.
+	if (irqstatus & AT91_TWI_RXRDY) {
+		at91_twi_read_next_byte(dev);
+		irqstatus &= ~AT91_TWI_RXRDY;
+	}
 
-We can do one more thing here to support multiple lookups for same clocks:
-We can pass array of struct having these three args as its fields.
+	if (irqstatus & AT91_TWI_TXRDY) {
+		at91_twi_write_next_byte(dev);
+		irqstatus &= ~AT91_TWI_TXRDY;
+	}
 
--- 
-viresh
+	if (irqstatus & AT91_TWI_TXCOMP) {
+		at91_disable_twi_interrupts(dev);
+		dev->transfer_status = status;
+		complete(&dev->cmd_complete);
+		irqstatus &= ~AT91_TWI_TXCOMP;
+	}
+	
+	if (irqstatus) {
+		/* There should be no pending interrupt anymore. *)
+		return IRQ_NONE;
+	}
+
+	return IRQ_HANDLED;
+}
+
+To make sure that we do not start with old data in any case, I would
+suggest to read SR and RHR before initiating a new transfer.
+
+static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+{
+	int ret;
+
+	dev_dbg(dev->dev, "transfer: %s %d bytes.\n",
+		(dev->msg->flags & I2C_M_RD) ? "read" : "write", dev->buf_len);
+
+	INIT_COMPLETION(dev->cmd_complete);
+	if (dev->msg->flags & I2C_M_RD) {
+		unsigned start_flags = AT91_TWI_START;
+
+		/* clear any pending data */
+		(void)at91_twi_read(dev, AT91_TWI_SR);
+		(void)at91_twi_read(dev, AT91_TWI_RHR);
+		
+		/* if only one byte is to be read, immediately stop transfer */
+		if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
+			start_flags |= AT91_TWI_STOP;
+		at91_twi_write(dev, AT91_TWI_CR, start_flags);
+
+		[snip]
+}
+
+
+Hubert
