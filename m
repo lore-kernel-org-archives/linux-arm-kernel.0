@@ -1,49 +1,63 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 13 Apr 2012 13:59:29 -0700
-Subject: [PATCH V2 4/5] ARM: dt: tegra30.dtsi: Add audio-related nodes
-In-Reply-To: <4F851673.6030000@wwwdotorg.org>
-References: <1334099980-19527-1-git-send-email-swarren@wwwdotorg.org>
- <1334099980-19527-4-git-send-email-swarren@wwwdotorg.org>
- <CAOesGMhDDenRK_GeR=jWJbcoacRMUPnjFu5w4DCyUWC=CadnbA@mail.gmail.com>
- <4F851673.6030000@wwwdotorg.org>
-Message-ID: <CAOesGMiVPLRMo6OnLpr0wk4VPPVcgjqbsi3T=D5zHGb1EYrmYw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 13 Apr 2012 14:31:05 -0700
+Subject: [PATCH] cpufreq: OMAP: fix build errors: depends on ARCH_OMAP2PLUS
+In-Reply-To: <20120413185322.GG25053@n2100.arm.linux.org.uk> (Russell King's
+ message of "Fri, 13 Apr 2012 19:53:22 +0100")
+References: <1332807568-638-1-git-send-email-khilman@ti.com>
+ <4F7CC926.5050300@ti.com>
+ <20120413185322.GG25053@n2100.arm.linux.org.uk>
+Message-ID: <87pqbb5nfq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 10:28 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/10/2012 10:27 PM, Olof Johansson wrote:
-> ...
->> On Tue, Apr 10, 2012 at 4:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> From: Stephen Warren <swarren@nvidia.com>
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+
+> On Wed, Apr 04, 2012 at 03:20:22PM -0700, Kevin Hilman wrote:
+>> Hi Dave,
+>>
+>> On 03/26/2012 05:19 PM, Kevin Hilman wrote:
+>>> The OMAP driver needs a 'depends on ARCH_OMAP2PLUS' since it only
+>>> builds for OMAP2+ platforms.
 >>>
->>> Add nodes for the Tegra30 AHUB and I2S controllers.
-> ...
->>> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> ...
->>> + ? ? ? ahub at 70080000 {
+>>> This 'depends on' was in the original patch from Russell King, but was
+>>> erroneously removed by me when making this option user-selectable in
+>>> commit b09db45c (cpufreq: OMAP driver depends CPUfreq tables.)  This
+>>> patch remedies that.
+>>>
+>>> Apologies to Russell King for breaking his originally working patch.
+>>>
+>>> Also, thanks to Grazvydas Ignotas for reporting the same problem.
+>>>
+>>> Cc: Russell King<rmk+kernel@arm.linux.org.uk>
+>>> Cc: Grazvydas Ignotas<notasas@gmail.com>
+>>> Signed-off-by: Kevin Hilman<khilman@ti.com>
+>>> ---
+>>> Dave, this applies on top of your current fixes branch, and fixes a
+>>> problem introduced there by me.  Please merge for v3.4-rc.  Thanks.
 >>
->> No need for unit address here since there's only one node with this
->> name -- "ahub {" ?is sufficient.
+>> Can you pick this up for v3.4-rc?
 >
-> Is there actually a benefit from leaving it out though?
-
-Just like there's no benefit from including it. :)
-
-So, either way is OK but I think we're a little too eager to always
-include them on ARM compared to what powerpc does. No big deal though.
+> Right, I'm fed up with chasing over this trivial patch.  It's been almost
+> a full month since the problem was first reported and it _still_ remains
+> unfixed in mainline, despite me chasing over it.  So, sorry, you lose.
 >
->>> + ? ? ? ? ? ? ? compatible = "nvidia,tegra30-ahub";
->>> + ? ? ? ? ? ? ? reg = <0x70080000 0x200 0x70080200 0x100>;
->>
->> Why not just use 0x70080000 0x300?
+> I'm merging my fix (attached) which I've been running against the nightly
+> builds into my fixes branch and will ask Linus to pull it this weekend.
+> If you want something else, then please send a patch on top of my fix to
+> do what you want.
 >
-> The register space is logically divided into two chunks; the first for
-> the DMA FIFOs and the second for the AHUB routing registers. Future
-> chips may change the relative positions and sizes of these two chunks,
-> hence I figured it was best to model them independently even though
-> they're contiguous in Tegra30.
+> Alternatively, send a replacement fix to Linus _before_ Sunday evening
+> copying me with it and I'll drop this from my tree.  But I want to see
+> an alternative going to Linus for that to happen.
 
-Makes perfect sense, thanks for the motivation.
+I've (re)sent the patches now.
 
+I just resent the CPUfreq driver Kconfig fix, this time directly to Linus.
 
--Olof
+I also just resent the arch/arm/mach-omap2 one to Tony/Paul with a
+slightly updated changelog making it clear that removing that dead code
+also fixes build errors so it can be queued ASAP for v3.4-rc.
+
+Combined, those fix the problems your patch addresses.
+
+Kevin
