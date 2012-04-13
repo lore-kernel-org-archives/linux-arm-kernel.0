@@ -1,25 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Apr 2012 14:21:02 +0000
-Subject: [PATCH 0/7 v2] Next round of DT enablement for ux500/Snowball
-In-Reply-To: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <201204131421.02875.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 13 Apr 2012 15:32:43 +0100
+Subject: [PATCH v2 1/2] mfd: da9052: add device-tree support for i2c driver
+In-Reply-To: <1334324261-5476-1-git-send-email-paul.liu@linaro.org>
+References: <1334324261-5476-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120413143243.GW3168@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 April 2012, Lee Jones wrote:
-> 
-> In this patch-set we change a couple of DT compatible entries
-> to something less cumbersome. Then we have a second stab at 
-> enabling DT for mmci. Only this time keeping it simple and 
-> continuing to use current DMA initialisation code. We'll 
-> change that once the generic bindings for DMA have been 
-> mainlined. Finally we enable Snowball's GPIO controller.
+On Fri, Apr 13, 2012 at 09:37:40PM +0800, Ying-Chun Liu (PaulLiu) wrote:
 
-Looks good.
+> +		regulators {
+> +			buck0 {
+> +				regulator-name = "DA9052_BUCK_CORE";
+> +				regulator-min-microvolt = <500000>;
+> +				regulator-max-microvolt = <2075000>;
+> +			};
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-for the entire series.
-
-	Arnd
+This is more of a nit but these names look like they aren't terribly
+idiomatic and could just be omitted - normally the name is used to tie
+the name to the supply on the schematic so the above might be "VCORE" or
+something.  If no name is provided then whatever the driver provides
+will be used.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120413/a4f67742/attachment.sig>
