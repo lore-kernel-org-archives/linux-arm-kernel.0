@@ -1,97 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Apr 2012 11:30:15 +0100
-Subject: [PATCH] clk: Allocate and add clock lookups from clk_register()
-In-Reply-To: <4F87FBA4.7000700@st.com>
-References: <9fa570d09d94cdc4892b4e413ef3a0edc6f9dcef.1334298848.git.viresh.kumar@st.com>
- <20120413100133.GI3852@pengutronix.de> <4F87FBA4.7000700@st.com>
-Message-ID: <20120413103015.GK24211@n2100.arm.linux.org.uk>
+Date: Fri, 13 Apr 2012 11:32:07 +0100
+Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
+In-Reply-To: <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
+References: <20120413012230.GA30438@windriver.com>
+ <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
+Message-ID: <20120413103207.GL24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 03:40:44PM +0530, Viresh Kumar wrote:
-> On 4/13/2012 3:31 PM, Sascha Hauer wrote:
-> >> > Pointer to original discussion:
-> >> > http://www.spinics.net/lists/arm-kernel/msg169133.html
-> > For reasons mentioned in this thread (long argument list, line wraps in
-> > clk_register calls, only leaf nodes need lookups) I don't think this is
-> > a good idea.
-> 
-> For that we can pass struct as argument.
-> 
-> >> >   */
-> >> >  struct clk *clk_register(struct device *dev, const char *name,
-> >> >  		const struct clk_ops *ops, struct clk_hw *hw,
-> >> > -		const char **parent_names, u8 num_parents, unsigned long flags)
-> >> > +		const char **parent_names, u8 num_parents, unsigned long flags,
-> >> > +		struct clk_lookup **cl, const char *dev_id, const char *con_id)
-> >> >  {
-> > Also this doesn't handle the case when multiple lookups are associated
-> > with a single clock (which is quite a common case on some SoCs). Yes,
-> > we could still use the returned clk to register the additional lookups,
-> > but that would make the advantage of this patch even smaller.
-> 
-> If there is a better way of managing this within the clock framework,
-> without platforms having to do clkdev management, we can choose that.
-> My main idea was to make platform code lighter.
-> 
-> We can do one more thing here to support multiple lookups for same clocks:
-> We can pass array of struct having these three args as its fields.
+On Fri, Apr 13, 2012 at 10:01:52AM +0800, Shawn Guo wrote:
+> On 13 April 2012 09:22, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> > Hi Mark,
+> >
+> > The commit in linux-next:
+> >
+> > -----------------
+> > commit b2bc9e0ee349db84035d8141e85babc7986594d7
+> > Author: Mark Brown <broonie@sirena.org.uk>
+> > Date: ? Mon Apr 2 12:30:35 2012 +0100
+> >
+> > ? ?ARM: 7366/1: amba: Remove AMBA level regulator support
+> > -----------------
+> >
+> > is pointed at by git bisect for the u8500_defconfig build failure:
+> >
+> > drivers/dma/ste_dma40.c:2708:3: error: implicit declaration of function
+> > 'regulator_disable' [-Werror=implicit-function-declaration]
+> > drivers/dma/ste_dma40.c:2747:3: error: implicit declaration of function
+> > 'regulator_enable' [-Werror=implicit-function-declaration]
+> > drivers/dma/ste_dma40.c:3260:3: error: implicit declaration of function
+> > 'regulator_get' [-Werror=implicit-function-declaration]
+> > drivers/dma/ste_dma40.c:3271:4: error: implicit declaration of function
+> > 'regulator_put' [-Werror=implicit-function-declaration]
+> >
+> That's because Mark's patch removes "#include
+> <linux/regulator/consumer.h>" included indirectly by
+> drivers/dma/ste_dma40.c from linux/amba/bus.h.  The ste_dma40.c should
+> really directly includes consumer.h.
 
-You can do something else too:
-
-int clk_register_clkdev(struct clk *clk, struct clk_lookup *cl, size_t num)
-{
-	unsigned i;
-
-	if (!clk)
-		return -ENOMEM;
-
-	for (i = 0; i < num; i++, cl++) {
-		cl->clk = clk;
-		clkdev_add(cl);
-	}
-	return 0;
-}
-
-and:
-
-int clk_register_single_clkdev(struct clk *clk, const char *devname, const char *conname)
-{
-	struct clk_lookup *cl;
-
-	if (!clk)
-		return -ENOMEM;
-
-	cl = clkdev_alloc(clk, conname, "%s", devname);
-	if (!cl)
-		return -ENOMEM;
-	clkdev_add(cl);
-	return 0;
-}
-
-and do:
-
-static struct clk_lookup clk_foo_lookups[] = {
-	{
-		.dev_name = foo,
-		.con_name = bar,
-	}, {
-		...
-	},
-};
-
-	clk = clk_register(dev, NULL, &ops, &hw, NULL, 0, 0);
-	ret = clk_register_clkdev(clk, clk_foo_lookups, ARRAY_SIZE(clk_foo_lookups));
-	if (ret)
-		...
-
-and:
-
-	clk = clk_register(dev, NULL, &ops, &hw, NULL, 0, 0);
-	ret = clk_register_simple_clkdev(clk, "devname", "conname");
-	if (ret)
-		...
-
-which are both much easier to use than a function taking some 11
-arguments, and doesn't require each and every clk_register*() function
-to be modified to take the clkdev stuff.
+Okay, I'll drop this patch because it's causing regressions, so it can't
+be pushed as a 'fix' during -rc.
