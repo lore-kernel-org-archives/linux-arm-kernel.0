@@ -1,42 +1,46 @@
-From: thomas@tomweber.eu (Thomas Weber)
-Date: Fri, 13 Apr 2012 19:33:04 +0200
-Subject: [PATCH] ARM: MSM: Remove twice included header files
-Message-ID: <1334338384-10728-1-git-send-email-thomas@tomweber.eu>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 13 Apr 2012 23:25:04 +0530
+Subject: [PATCH] ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+Message-ID: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove twice included gpio.h in board-msm7x30
-and board-qsd8x50.
+The current serial UART code, while fidling with ocp idlemode bits,
+forget about the smart idle wakeup bit even if it is supported by
+UART IP block. This will lead to missing the module wakeup on OMAP's
+where the smart idle wakeup is supported.
 
-Signed-off-by: Thomas Weber <thomas@tomweber.eu>
+This was the root cause of the console sluggishness issue, I have been
+observing on OMAP4 devices and also can be potential reason for some
+other UART wakeup issues.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Govindraj.R <govindraj.raja@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-msm/board-msm7x30.c |    1 -
- arch/arm/mach-msm/board-qsd8x50.c |    1 -
- 2 files changed, 2 deletions(-)
+ arch/arm/mach-omap2/serial.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index db81ed5..75b3cfc 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -17,7 +17,6 @@
- #include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/irq.h>
--#include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index 7e8909c..fbaa4ed 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -17,7 +17,6 @@
- #include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/irq.h>
--#include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/usb/msm_hsusb.h>
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index c9503a7..b28aae1 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -108,8 +108,14 @@ static void omap_uart_set_noidle(struct platform_device *pdev)
+ static void omap_uart_set_smartidle(struct platform_device *pdev)
+ {
+ 	struct omap_device *od = to_omap_device(pdev);
++	u8 idlemode;
+ 
+-	omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_SMART);
++	if (od->hwmods[0]->class->sysc->idlemodes & SIDLE_SMART_WKUP)
++		idlemode = HWMOD_IDLEMODE_SMART_WKUP;
++	else
++		idlemode = HWMOD_IDLEMODE_SMART;
++
++	omap_hwmod_set_slave_idlemode(od->hwmods[0], idlemode);
+ }
+ 
+ #else
 -- 
-1.7.10
+1.7.5.4
