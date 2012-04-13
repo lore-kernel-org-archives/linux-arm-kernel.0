@@ -1,74 +1,48 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 14 Apr 2012 00:36:33 +0200
-Subject: [PATCH RESEND v3 2/8] rtc: Add device tree support for LPC32xx
-In-Reply-To: <1334356600-20950-1-git-send-email-stigge@antcom.de>
-References: <1334356600-20950-1-git-send-email-stigge@antcom.de>
-Message-ID: <1334356600-20950-2-git-send-email-stigge@antcom.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 13 Apr 2012 16:38:59 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP: clock: cleanup CPUfreq leftovers, fix build
+ errors
+In-Reply-To: <1334350335-1250-1-git-send-email-khilman@ti.com>
+References: <1334350335-1250-1-git-send-email-khilman@ti.com>
+Message-ID: <alpine.DEB.2.00.1204131638320.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support for rtc-lpc32xx.c
+On Fri, 13 Apr 2012, Kevin Hilman wrote:
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> Now that we have OPP layer, and OMAP CPUfreq driver is using it, we no
+> longer need/use the clock framework code for filling up CPUfreq
+> tables.  Remove it.
+> 
+> Removing this code also eliminates build errors when CPU_FREQ_TABLE
+> support is not enabled.
+> 
+> Thanks to Russell King for pointing out the parts I missed under
+> plat-omap in the original version and also pointing out the build
+> errors when CPUFREQ_TABLE support was not enabled.
+> 
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Tony/Paul, can you queue this up ASAP for v3.4-rc?  This was a cleanup
+> that was targetted to go in to v3.4, but missed the merge window.  The
+> cleanup is still needed, but now it's also a fix since this dead code
+> also causes build errors when CPU_FREQ_TABLE support is not enabled.
+> 
+> Also, if we don't merge this patch, we'll have to rework it because
+> Russell has queued an alternate fix to this which changes some of this
+> code that should be removed instead:
+> http://marc.info/?l=linux-arm-kernel&m=133434335009356&w=2
+> However, if we get this fix in soon, Russell is willing to drop his 
+> version.   
+> 
+>  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   80 --------------------------
+>  arch/arm/mach-omap2/clock.c                  |    5 --
+>  arch/arm/mach-omap2/clock.h                  |    8 ---
+>  arch/arm/plat-omap/clock.c                   |   26 ---------
+>  arch/arm/plat-omap/include/plat/clock.h      |   10 ----
 
----
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
- Applies to v3.4-rc2
 
- Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt |   15 +++++++++++++++
- drivers/rtc/rtc-lpc32xx.c                             |   12 +++++++++++-
- 2 files changed, 26 insertions(+), 1 deletion(-)
-
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt
-@@ -0,0 +1,15 @@
-+* NXP LPC32xx SoC Real Time Clock controller
-+
-+Required properties:
-+- compatible: must be "nxp,lpc32xx-rtc"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: The RTC interrupt
-+
-+Example:
-+
-+	rtc at 40024000 {
-+		compatible = "nxp,lpc32xx-rtc";
-+		reg = <0x40024000 0x1000>;
-+		interrupts = <52 0>;
-+	};
---- linux-2.6.orig/drivers/rtc/rtc-lpc32xx.c
-+++ linux-2.6/drivers/rtc/rtc-lpc32xx.c
-@@ -19,6 +19,7 @@
- #include <linux/rtc.h>
- #include <linux/slab.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- 
- /*
-  * Clock and Power control register offsets
-@@ -386,13 +387,22 @@ static const struct dev_pm_ops lpc32xx_r
- #define LPC32XX_RTC_PM_OPS NULL
- #endif
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id lpc32xx_rtc_match[] = {
-+	{ .compatible = "nxp,lpc32xx-rtc" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, lpc32xx_rtc_match);
-+#endif
-+
- static struct platform_driver lpc32xx_rtc_driver = {
- 	.probe		= lpc32xx_rtc_probe,
- 	.remove		= __devexit_p(lpc32xx_rtc_remove),
- 	.driver = {
- 		.name	= RTC_NAME,
- 		.owner	= THIS_MODULE,
--		.pm	= LPC32XX_RTC_PM_OPS
-+		.pm	= LPC32XX_RTC_PM_OPS,
-+		.of_match_table = of_match_ptr(lpc32xx_rtc_match),
- 	},
- };
- 
+- Paul
