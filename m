@@ -1,63 +1,74 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 13 Apr 2012 16:19:18 -0700
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120413102036.GJ24211@n2100.arm.linux.org.uk>
-References: <CAAQ0ZWQ-ERDtCgEL9hJysX+-pW-K1O315t9PWoc1RMidLPpppg@mail.gmail.com>
- <4F87B443.6090405@st.com>
- <CAAQ0ZWR3-TvFjV3CX5oW+bUN6aW7ip5NphuKycq3twks2RrpMg@mail.gmail.com>
- <20120413085901.GG3168@opensource.wolfsonmicro.com> <4F87ED74.8020308@st.com>
- <20120413091712.GE27730@b20223-02.ap.freescale.net>
- <20120413092615.GH24211@n2100.arm.linux.org.uk>
- <4F87F188.60603@st.com> <20120413093606.GI24211@n2100.arm.linux.org.uk>
- <4F87F9C3.2010802@st.com> <20120413102036.GJ24211@n2100.arm.linux.org.uk>
-Message-ID: <CAJOA=zOaZ7gsM=uJ2ik3x6cathsizfRiGUmQbsruyqzXeDqQLg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 14 Apr 2012 01:21:32 +0200
+Subject: [PATCH 2/3] plat-versatile: modernize FPGA IRQ controller
+In-Reply-To: <20120411230319.GE24211@n2100.arm.linux.org.uk>
+References: <1334184240-18898-1-git-send-email-linus.walleij@linaro.org>
+ <20120411230319.GE24211@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZkNHodkpGZ9q+yNDqphgx7Bfa5veaCP9kub=FMqqmKOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 3:20 AM, Russell King - ARM Linux
+On Thu, Apr 12, 2012 at 1:03 AM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 13, 2012 at 03:32:43PM +0530, Viresh Kumar wrote:
->> On 4/13/2012 3:06 PM, Russell King - ARM Linux wrote:
->> > You're not convincing me that you're approach here is correct, and
+> On Thu, Apr 12, 2012 at 12:44:00AM +0200, Linus Walleij wrote:
+>> @@ -12,10 +15,14 @@
+>> ?#define IRQ_ENABLE_SET ? ? ? ? ? ? ? 0x08
+>> ?#define IRQ_ENABLE_CLEAR ? ? 0x0c
 >>
->> :(
->>
->> > I really doubt that this will have any effect at saving lines of code -
->> > your argument list is soo long that you'll have to wrap it onto several
->> > lines.
->>
->> There are two ways here:
->> 1. Leave clk_register() untouched and create lookups in machine code.
->> 2. change clk_register():
->> ? ? ? A. pass all arguments as i mentioned in my patch
->> ? ? ? B. pass structure instead of all so many args.
->>
->> Option 2 will have much lesser code than option 1, with both option A & B.
->> In option 2.A.: we can create separate registration routines to save extra
->> arguments passed, like:
->>
->> ?struct clk *clk_register_gate(struct device *dev, const char *name,
->> ? ? ? ? ? ? ? const char *parent_name, unsigned long flags,
->> ? ? ? ? ? ? ? void __iomem *reg, u8 bit_idx,
->> ? ? ? ? ? ? ? u8 clk_gate_flags, spinlock_t *lock, struct clk_lookup **cl,
->> ? ? ? ? ? ? ? const char *dev_id, const char *con_id);
+>> +/* we cannot allocate memory when VICs are initially registered */
 >
-> So you're going to have something around 4-5 lines of arguments per
-> function call to use this function. ?That's not elegant, that's not
-> easy to use, that's not nice. ?And I doubt that it really solves any
-> code space concern because the compiler will have to store pointers
-> and values somewhere, and shuffle those into registers and onto the
-> stack for every function call using additional code to do that.
+> They aren't VICs. ?A VIC is a totally different interrupt controller.
+
+OK copy/paste error...
+
+>> + ? ? u32 mask = (1 << d->hwirq);
 >
-> I really don't get why you think this is an improvement.
+> 1 << d->hwirq will do, no need for excessive parens here.
 
-My hope is that forthcoming struct clk_hw/static initializer patch
-will reduce the number of arguments to clk_register considerably.
-These interfaces are not frozen and everyone concerned with using the
-common framework is still figuring out exactly how this stuff should
-look.
+OK
 
-http://article.gmane.org/gmane.linux.ports.arm.msm/2587
+>> +static int handle_one_fpga(struct fpga_irq_data *f, struct pt_regs *regs)
+>> ?{
+>> + ? ? int handled = 0;
+>> + ? ? int irq;
+>> + ? ? u32 status = readl(f->base + IRQ_STATUS);
+>> +
+>> + ? ? while (status) {
+>> + ? ? ? ? ? ? irq = ffs(status) - 1;
+>> + ? ? ? ? ? ? handle_IRQ(irq_find_mapping(f->domain, irq), regs);
+>> + ? ? ? ? ? ? status &= ~(1 << irq);
+>> + ? ? ? ? ? ? handled = 1;
+>> + ? ? }
+>> +
+>> + ? ? return handled;
+>
+> Buggy. ?See what happens when you cache the status register, and
+> handle_IRQ enables interrupts after processing the first IRQ to do
+> soft IRQ processing.
 
-Regards,
-Mike
+Hm the code is exactly the same as in arch/arm/common/vic.c
+I guess once we figure this loop out we may need to go back and
+fix that driver also so good that we bring it up.
+
+Anyway, IIRC the VIC was written that way since it will traverse
+all IRQs once, if there are remaining IRQs after that these are
+treated from this outer loop in the per-instance handler:
+
+asmlinkage void __exception_irq_entry fpga_handle_irq(struct pt_regs *regs)
+{
+	int i, handled;
+
+	do {
+		for (i = 0, handled = 0; i < fpga_irq_id; ++i)
+			handled |= handle_one_fpga(&fpga_irq_devices[i], regs);
+	} while (handled);
+}
+
+This will traverse all flags on all controllers until all flags are low so all
+handlers get chance to run. (i.e. IRQ0 on controller 0 cannot lock others
+out.)
+
+It always looked sane to me, but what am I not getting here...
+
+Thanks,
+Linus Walleij
