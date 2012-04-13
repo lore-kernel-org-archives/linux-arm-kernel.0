@@ -1,47 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 13 Apr 2012 22:18:43 +0200
-Subject: [PATCH] rtc: add support for Freescale SNVS RTC
-In-Reply-To: <4F88515A.2020805@linaro.org>
-References: <1332162269-16789-1-git-send-email-paul.liu@linaro.org>
- <20120322151156.GF2213@S2101-09.ap.freescale.net>
- <4F88515A.2020805@linaro.org>
-Message-ID: <20120413201843.GF20478@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 13 Apr 2012 13:32:30 -0700
+Subject: [PATCH] cpufreq: OMAP: fix build errors: depends on ARCH_OMAP2PLUS
+Message-ID: <1334349150-917-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 14, 2012 at 12:16:26AM +0800, Ying-Chun Liu (PaulLiu) wrote:
-> > 
-> > I haven't completely understood this, and will need more study.
-> > 
-> 
-> Hi Shawn,
-> 
-> About the above ioctl() related blocks. I think it is used by some user
-> space libs that requires accurate time (47BIT TIME). And it have to be
-> sure that the time continuously flowing so the apps wants to be notified
-> that the rtc is changed dramatically by the set command.
-> 
-> I'm guessing that it might be related to the Multimedia binary libs. A/V
-> sync or something like that. But I don't have those source code. Please
-> make sure those libs are not using it.
-> 
-> I also see other Freescale RTC driver implement the same function. For
-> example:
-> http://tinyurl.com/cnp93jv
-> So I guess it might be a common ioctl that Freescale uses somewhere.
-> 
-> So my plan is to split the IOR to a header file. And keep the rest as is.
+The OMAP driver needs a 'depends on ARCH_OMAP2PLUS' since it only
+builds for OMAP2+ platforms.
 
-'think', 'might' and 'something like that' are the wrong words to
-convince anybody that these ioctls are needed. So unless you find real
-usecases and also can convince us that it's not possible to reach your
-goal using either the existing ioctls or an additional common (non fsl
-specific) ioctl please just drop them.
+This 'depends on' was in the original patch from Russell King, but was
+erroneously removed by me when making this option user-selectable in
+commit b09db45c (cpufreq: OMAP driver depends CPUfreq tables.)  This
+patch remedies that.
 
-Sascha
+Apologies to Russell King for breaking his originally working patch.
 
+Also, thanks to Grazvydas Ignotas for reporting the same problem.
+
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Grazvydas Ignotas <notasas@gmail.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Linus, can you apply this for v3.4-rc?  I haven't got a response from
+the CPUfreq maintainers after several weeks and a couple tries, so
+hopefully you can take this simple fix.   Thanks.
+
+ drivers/cpufreq/Kconfig.arm |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 82f1aa9..555a57b 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -4,6 +4,7 @@
+ 
+ config ARM_OMAP2PLUS_CPUFREQ
+ 	bool "TI OMAP2+"
++	depends on ARCH_OMAP2PLUS
+ 	default ARCH_OMAP2PLUS
+ 	select CPU_FREQ_TABLE
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.2
