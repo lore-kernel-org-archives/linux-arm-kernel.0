@@ -1,36 +1,42 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 13 Apr 2012 10:22:01 -0700
-Subject: [PATCH] arm: msm: trout: fix compile failure
-In-Reply-To: <20120413171619.GA16731@fifo99.com>
-References: <1334245537-13395-1-git-send-email-dwalker@fifo99.com>
- <20120413171619.GA16731@fifo99.com>
-Message-ID: <20120413172201.GA16754@codeaurora.org>
+From: thomas@tomweber.eu (Thomas Weber)
+Date: Fri, 13 Apr 2012 19:33:04 +0200
+Subject: [PATCH] ARM: MSM: Remove twice included header files
+Message-ID: <1334338384-10728-1-git-send-email-thomas@tomweber.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 10:16:19AM -0700, Daniel Walker wrote:
-> On Thu, Apr 12, 2012 at 08:45:37AM -0700, Daniel Walker wrote:
-> > Fixes the following warnings,
-> > 
-> > arch/arm/mach-msm/board-trout.c: In function 'trout_init':
-> > arch/arm/mach-msm/board-trout.c:71: error: 'system_rev' undeclared (first use in this function)
-> > arch/arm/mach-msm/board-trout.c:71: error: (Each undeclared identifier is reported only once
-> > arch/arm/mach-msm/board-trout.c:71: error: for each function it appears in.)
-> > 
-> > and
-> > 
-> > arch/arm/mach-msm/board-trout-panel.c: In function 'trout_init_panel':
-> > arch/arm/mach-msm/board-trout-panel.c:267: error: 'system_rev' undeclared (first use in this function)
-> > arch/arm/mach-msm/board-trout-panel.c:267: error: (Each undeclared identifier is reported only once
-> > arch/arm/mach-msm/board-trout-panel.c:267: error: for each function it appears in.)
-> > 
-> 
-> This needs to go upstream ASAP ..
+Remove twice included gpio.h in board-msm7x30
+and board-qsd8x50.
 
-I was going to send out a pull request today.
+Signed-off-by: Thomas Weber <thomas@tomweber.eu>
+---
+ arch/arm/mach-msm/board-msm7x30.c |    1 -
+ arch/arm/mach-msm/board-qsd8x50.c |    1 -
+ 2 files changed, 2 deletions(-)
 
-David
-
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index db81ed5..75b3cfc 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -17,7 +17,6 @@
+ #include <linux/gpio.h>
+ #include <linux/kernel.h>
+ #include <linux/irq.h>
+-#include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index 7e8909c..fbaa4ed 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -17,7 +17,6 @@
+ #include <linux/gpio.h>
+ #include <linux/kernel.h>
+ #include <linux/irq.h>
+-#include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/usb/msm_hsusb.h>
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.10
