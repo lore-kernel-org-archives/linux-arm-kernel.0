@@ -1,65 +1,23 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 14 Apr 2012 00:49:57 +0200
-Subject: [PATCH RESEND v3 0/8] arm: lpc32xx: Device tree support
-Message-ID: <1334357397-21296-1-git-send-email-stigge@antcom.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 13 Apr 2012 16:02:15 -0700
+Subject: [PATCH 0/3] Fixes in preparation for enabling Dsp in omap4
+In-Reply-To: <CADVn9RG_WFh3d8P=cfC_O_5vbvE0YELDwbJL66uqO2My8D4bzQ@mail.gmail.com>
+ (Juan Gutierrez's message of "Fri, 13 Apr 2012 16:53:07 -0500")
+References: <1334352255-48584-1-git-send-email-jgutierrez@ti.com>
+ <CADVn9RG_WFh3d8P=cfC_O_5vbvE0YELDwbJL66uqO2My8D4bzQ@mail.gmail.com>
+Message-ID: <87fwc744nc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the first series of patches to introduce device tree support for the
-LPC32xx SoC. This series includes patches for the various subsystems to support
-device tree to be used later by the machine's initialization.
+"Gutierrez, Juan" <jgutierrez@ti.com> writes:
 
-The patches apply to various subsystems:
+> This set of patches provides the foundation for enabling
+> OMAP4 Dsp (Tesla) as remote processor.
 
- * staging/iio/adc (1)
- * rtc (1)
- * net (1) - to be merged via arm-soc, acked by davem
- * wdt (1)
- * i2c (4)
- * arm-soc (i2c related in the former, to be merged via i2c, as suggested by
-	    Arnd Bergmann)
+Looks like this series suffers from space/tab and various whitespace
+problems.  
 
-Applies to v3.4-rc2
+Please run them through scripts/checkpatch.pl, or possibly your mailer
+is mangling them.
 
-You can also pull from
-
-  git://git.antcom.de/linux-2.6 lpc32xx/dt
-
-I'm CC'ing the various subsystem maintainers and lists who can each see what's
-going on and please pick their respective subsystem's changes. - Thanks!
-
-Changes since patch v2:
- * net: Use of_property_read_bool()
- * net: Fixed breakage with non-DT board (iram and mii options)
-
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
---
-
-Roland Stigge (8):
- iio: Add device tree support to LPC32xx ADC
- rtc: Add device tree support for LPC32xx
- net: Add device tree support to LPC32xx
- wdt: Device tree support for pnx4008-wdt
- i2c-pnx.c: Fix suspend
- i2c-pnx.c: Use resources in platforms
- i2c-pnx.c: Remove duplicated i2c.h
- i2c: Add device tree support to i2c-pnx.c
-
- Documentation/devicetree/bindings/i2c/pnx.txt                     |   40 ++
- Documentation/devicetree/bindings/net/lpc-eth.txt                 |   24 +
- Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt             |   15 
- Documentation/devicetree/bindings/staging/iio/adc/lpc32xx-adc.txt |   16 
- Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt        |   13 
- arch/arm/mach-lpc32xx/common.c                                    |   75 ++--
- arch/arm/mach-lpc32xx/include/mach/i2c.h                          |   63 ---
- arch/arm/mach-pnx4008/i2c.c                                       |   64 ++-
- arch/arm/mach-pnx4008/include/mach/i2c.h                          |   64 ---
- drivers/i2c/busses/i2c-pnx.c                                      |  164 +++++++---
- drivers/net/ethernet/nxp/lpc_eth.c                                |   73 ++--
- drivers/rtc/rtc-lpc32xx.c                                         |   12 
- drivers/staging/iio/adc/lpc32xx_adc.c                             |   10 
- drivers/watchdog/pnx4008_wdt.c                                    |   10 
- include/linux/i2c-pnx.h                                           |   10 
- 15 files changed, 512 insertions(+), 268 deletions(-)
+Kevin
