@@ -1,63 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 13 Apr 2012 15:59:20 +0100
-Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation
- for Device Tree bindings
-In-Reply-To: <1334325909-5779-5-git-send-email-lee.jones@linaro.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 13 Apr 2012 16:05:00 +0100
+Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
+ variants
+In-Reply-To: <4F883E40.6000905@linaro.org>
 References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <4F883F48.3080807@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <1334328122.27644.15.camel@hornet> <201204131451.10638.arnd@arndb.de>
+ <4F883E40.6000905@linaro.org>
+Message-ID: <1334329500.27644.18.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant's comments also taken heed of here:
+On Fri, 2012-04-13 at 15:54 +0100, Lee Jones wrote:
+> On 13/04/12 15:51, Arnd Bergmann wrote:
+> > On Friday 13 April 2012, Pawel Moll wrote:
+> >> On Fri, 2012-04-13 at 15:05 +0100, Lee Jones wrote:
+> >>> +     of_property_read_u32(np, "wp-gpios",&pdata->gpio_wp);
+> >>> +     if (!pdata->gpio_wp)
+> >>> +             pdata->gpio_wp = -1;
+> >>> +
+> >>> +     of_property_read_u32(np, "cd-gpios",&pdata->gpio_cd);
+> >>> +     if (!pdata->gpio_cd)
+> >>> +             pdata->gpio_cd = -1;
+> >>
+> >> I think you should use of_gpio_named_count(np, "XX-gpios") here rather
+> >> then of_property_read() - there's more to GPIOs than just a number...
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Wed, 4 Apr 2012 17:06:41 +0100
-Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation for
- Device Tree bindings
+Of course I meant of_get_named_gpio(np, "XX-gpios", 0) not
+_named_count ;-)
 
-Add required documentation for specific gpio-nomadik DT bindings.
+> > Hmm, that part was done right in the git tree, I guess something
+> > went wrong when sending out the series.
+> 
+> Different patch series.
+> 
+> The GPIO bindings aren't in yet. Once this one is accepted, I'll fire 
+> off the second patch-set.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/gpio/gpio-nmk.txt          |   29 ++++++++++++++++++++
- 1 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+Em, I'm not sure I'm following... Why not use the proper API
+immediately?
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-new file mode 100644
-index 0000000..3856789
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-@@ -0,0 +1,29 @@
-+Nomadik GPIO controller
-+
-+Required properties:
-+- compatible            : Should be "st,nomadik-gpio".
-+- reg                   : Physical base address and length of the controller's registers.
-+- interrupts            : The interrupt outputs from the controller.
-+- #gpio-cells           : Should be two:
-+                            The first cell is the pin number.
-+                            The second cell is used to specify optional parameters:
-+                              - bits[3:0] trigger type and level flags:
-+                                  1 = low-to-high edge triggered.
-+                                  2 = high-to-low edge triggered.
-+                                  4 = active high level-sensitive.
-+                                  8 = active low level-sensitive.
-+- gpio-controller       : Marks the device node as a GPIO controller.
-+- gpio-bank             : Specifies which bank a controller owns.
-+- st,supports-sleepmode : Specifies whether controller can sleep or not
-+
-+Example:
-+
-+                gpio1: gpio at 8012e080 {
-+                        compatible = "st,nomadik-gpio";
-+                        reg =  <0x8012e080 0x80>;
-+                        interrupts = <0 120 0x4>;
-+                        #gpio-cells = <2>;
-+                        gpio-controller;
-+                        supports-sleepmode;
-+                        gpio-bank = <1>;
-+                };
--- 
-1.7.9.1
+Generally, except for that, looks good to me.
+
+Pawe?
