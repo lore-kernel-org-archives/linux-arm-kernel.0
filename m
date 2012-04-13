@@ -1,32 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 Apr 2012 14:30:57 +0200
-Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
-In-Reply-To: <20120413103207.GL24211@n2100.arm.linux.org.uk>
-References: <20120413012230.GA30438@windriver.com>
- <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
- <20120413103207.GL24211@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYfRVkUqhuNw3iwHNFZJwG=2MAqtzZyK6qytFOzqUrosQ@mail.gmail.com>
+Date: Fri, 13 Apr 2012 14:41:16 +0200
+Subject: [PATCH] pinctrl: tegra: refactor probe handling
+In-Reply-To: <1334170839-10396-1-git-send-email-swarren@wwwdotorg.org>
+References: <1334170839-10396-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CACRpkdZQneBCOGp8oL2O4+J0OnOeW7NUHt2Eo7sKqQ_4jSGKLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 12:32 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 13, 2012 at 10:01:52AM +0800, Shawn Guo wrote:
->> That's because Mark's patch removes "#include
->> <linux/regulator/consumer.h>" included indirectly by
->> drivers/dma/ste_dma40.c from linux/amba/bus.h. ?The ste_dma40.c should
->> really directly includes consumer.h.
+On Wed, Apr 11, 2012 at 9:00 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+
+> From: Stephen Warren <swarren@nvidia.com>
 >
-> Okay, I'll drop this patch because it's causing regressions, so it can't
-> be pushed as a 'fix' during -rc.
+> Rather than having a single tegra-pinctrl driver that determines whether
+> it's running on Tegra20 or Tegra30, instead have separate drivers for
+> each that call into utility functions to implement the majority of the
+> driver. This change is based on review feedback of the SPEAr pinctrl
+> driver, which had originally copied to Tegra driver structure.
+>
+> This requires that the two drivers have unique names. Update a couple
+> spots in arch/arm/mach-tegra for the name change.
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Linus, It'll be easiest for me to merge this through the Tegra tree, since
+> the arch/arm changes depend on the patches there that switch to using the
+> pinctrl driver. If you could ack this, it'd be great. Thanks.
 
-Actually *not* having Marks patch also causes a regression on Ux500,
-albeit not at compile time, but at runtime.
-
-So for me as ux500 maintainer it's perfectly OK to have compilation
-broken until that DMA patch arrives (should just be an issue of the
-DMA maintainer picking it up), but if others feel differently
-by all means hold it off until the other one arrives.
+Sure,
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
