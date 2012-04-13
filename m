@@ -1,91 +1,46 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sat, 14 Apr 2012 02:07:59 +0800
-Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
-In-Reply-To: <4F381F6C.1030908@gmail.com>
-References: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
- <4F381F6C.1030908@gmail.com>
-Message-ID: <CAA+hA=RpfLfUyupVqBpMHsRN1h5KG5eLD86DkDygZRk5nCUtqA@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 13 Apr 2012 11:08:40 -0700
+Subject: [GIT PULL] msm fixes for 3.4rc
+Message-ID: <20120413180840.GA17558@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Arnd/Olof.  Here are some fixes for msm that fix problems caused by
+the latest ARM code.  The ones from Daniel remove unneeded fixups that
+now cause compilation failures.  Mine fix section mismatches, that
+were incompletely fixed earlier.
 
-On Mon, Feb 13, 2012 at 4:22 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 02/11/2012 11:22 AM, Dong Aisheng wrote:
->> Currently most code to get child count in kernel are almost same,
->> add a helper to implement this function for dt to use.
->>
->> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->>
->> ---
->> Hi Rob,
->>
->> Since my imx pinctrl driver series still depends on the pinctrl core dt
->> binding patch which is still not in mainline, i'd like this pure dt patch
->> go separately first in case others want to use.
->>
->
-> Applied for 3.4.
->
-I did not see this in 3.4 kernel.
-Anything i missed?
-My pinctrl-imx driver i just sent is using this.
+Thanks,
+David
 
-Regards
-Dong Aisheng
+The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
 
-> Rob
->
->> changes v2->v3:
->> ?Addressed some people's comments:
->> ?* do not use assignment as expression
->> ?* return 0 for non-dt case
->>
->> Changes v1->v2:
->> ?* change the name from of_get_child_number to of_get_child_count
->> ---
->> ?include/linux/of.h | ? 16 ++++++++++++++++
->> ?1 files changed, 16 insertions(+), 0 deletions(-)
->>
->> diff --git a/include/linux/of.h b/include/linux/of.h
->> index a75a831..ae242ef 100644
->> --- a/include/linux/of.h
->> +++ b/include/linux/of.h
->> @@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
->> ? ? ? for (child = of_get_next_child(parent, NULL); child != NULL; \
->> ? ? ? ? ? ?child = of_get_next_child(parent, child))
->>
->> +static inline int of_get_child_count(const struct device_node *np)
->> +{
->> + ? ? struct device_node *child = NULL;
->> + ? ? int num = 0;
->> +
->> + ? ? while ((child = of_get_next_child(np, child)) != NULL)
->> + ? ? ? ? ? ? num++;
->> +
->> + ? ? return num;
->> +}
->> +
->> ?extern struct device_node *of_find_node_with_property(
->> ? ? ? struct device_node *from, const char *prop_name);
->> ?#define for_each_node_with_property(dn, prop_name) \
->> @@ -268,6 +279,11 @@ static inline bool of_have_populated_dt(void)
->> ?#define for_each_child_of_node(parent, child) \
->> ? ? ? while (0)
->>
->> +static inline int of_get_child_count(const struct device_node *np)
->> +{
->> + ? ? return 0;
->> +}
->> +
->> ?static inline int of_device_is_compatible(const struct device_node *device,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const char *name)
->> ?{
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git msm-fix
+
+for you to fetch changes up to af33eadc73e4a5d35a966c1c7ffe28a8424c9d96:
+
+  ARM: msm: Fix section mismatches in proc_comm.c (2012-04-13 10:23:17 -0700)
+
+----------------------------------------------------------------
+Daniel Walker (2):
+      arm: msm: halibut: remove unneeded fixup
+      arm: msm: trout: fix compile failure
+
+David Brown (2):
+      video: msm: Fix section mismatches in mddi.c
+      ARM: msm: Fix section mismatches in proc_comm.c
+
+ arch/arm/mach-msm/board-halibut.c     |    3 ---
+ arch/arm/mach-msm/board-trout-panel.c |    1 +
+ arch/arm/mach-msm/board-trout.c       |    1 +
+ arch/arm/mach-msm/proc_comm.c         |    2 +-
+ drivers/video/msm/mddi.c              |    8 ++++----
+ 5 files changed, 7 insertions(+), 8 deletions(-)
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
