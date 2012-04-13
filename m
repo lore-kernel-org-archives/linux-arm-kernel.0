@@ -1,86 +1,68 @@
-From: archit@ti.com (Archit Taneja)
-Date: Fri, 13 Apr 2012 13:31:56 +0530
-Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all DSS
- L3 slave interfaces
-In-Reply-To: <1334304116-18872-1-git-send-email-archit@ti.com>
-References: <1334304116-18872-1-git-send-email-archit@ti.com>
-Message-ID: <1334304116-18872-3-git-send-email-archit@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 13 Apr 2012 10:21:50 +0200
+Subject: [PATCH] ARM: ux500: update defconfig
+Message-ID: <1334305310-19863-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock for all DSS L3 slave interfaces had been recently changed to
-"dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS clock domain
-which can't autoidle when enabled.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS hwmods so
-that clock is explicitly enabled and disabled by software. Without this,
-"dss_fck" would be left as enabled and the OMAP4 device won't idle even when
-DSS is not in use.
+Some new drivers and changed Kconfig dependencies for the v3.4
+kernel affecting the U8500 defconfig:
 
-Signed-off-by: Archit Taneja <archit@ti.com>
+- The SOC config options are now brought in by default
+- No need to explicitly select misc devices anymore
+- I2C is selected by default
+- We now have support for charging from the AB8500 so compile
+  in this
+- The regulator framework needs to be explictly selected
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/configs/u8500_defconfig |    9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index cc9bd10..f928347 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1216,6 +1216,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss = {
- 	.slave		= &omap44xx_dss_hwmod,
- 	.clk		= "dss_fck",
- 	.addr		= omap44xx_dss_dma_addrs,
-+	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_SDMA,
- };
- 
-@@ -1319,6 +1320,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dispc = {
- 	.slave		= &omap44xx_dss_dispc_hwmod,
- 	.clk		= "dss_fck",
- 	.addr		= omap44xx_dss_dispc_dma_addrs,
-+	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_SDMA,
- };
- 
-@@ -1417,6 +1419,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dsi1 = {
- 	.slave		= &omap44xx_dss_dsi1_hwmod,
- 	.clk		= "dss_fck",
- 	.addr		= omap44xx_dss_dsi1_dma_addrs,
-+	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_SDMA,
- };
- 
-@@ -1494,6 +1497,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dsi2 = {
- 	.slave		= &omap44xx_dss_dsi2_hwmod,
- 	.clk		= "dss_fck",
- 	.addr		= omap44xx_dss_dsi2_dma_addrs,
-+	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_SDMA,
- };
- 
-@@ -1591,6 +1595,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_hdmi = {
- 	.slave		= &omap44xx_dss_hdmi_hwmod,
- 	.clk		= "dss_fck",
- 	.addr		= omap44xx_dss_hdmi_dma_addrs,
-+	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_SDMA,
- };
- 
-@@ -1683,6 +1688,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_rfbi = {
- 	.slave		= &omap44xx_dss_rfbi_hwmod,
- 	.clk		= "dss_fck",
- 	.addr		= omap44xx_dss_rfbi_dma_addrs,
-+	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_SDMA,
- };
- 
-@@ -1758,6 +1764,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_venc = {
- 	.slave		= &omap44xx_dss_venc_hwmod,
- 	.clk		= "dss_fck",
- 	.addr		= omap44xx_dss_venc_dma_addrs,
-+	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_SDMA,
- };
- 
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index 889d73a..7e84f45 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -8,8 +8,6 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_LBDAF is not set
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_U8500=y
+-CONFIG_UX500_SOC_DB5500=y
+-CONFIG_UX500_SOC_DB8500=y
+ CONFIG_MACH_HREFV60=y
+ CONFIG_MACH_SNOWBALL=y
+ CONFIG_MACH_U5500=y
+@@ -39,7 +37,6 @@ CONFIG_CAIF=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=65536
+-CONFIG_MISC_DEVICES=y
+ CONFIG_AB8500_PWM=y
+ CONFIG_SENSORS_BH1780=y
+ CONFIG_NETDEVICES=y
+@@ -65,16 +62,18 @@ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_HW_RANDOM=y
+ CONFIG_HW_RANDOM_NOMADIK=y
+-CONFIG_I2C=y
+-CONFIG_I2C_NOMADIK=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_GPIO_STMPE=y
+ CONFIG_GPIO_TC3589X=y
++CONFIG_POWER_SUPPLY=y
++CONFIG_AB8500_BM=y
++CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL=y
+ CONFIG_MFD_STMPE=y
+ CONFIG_MFD_TC3589X=y
+ CONFIG_AB5500_CORE=y
+ CONFIG_AB8500_CORE=y
++CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_AB8500=y
+ # CONFIG_HID_SUPPORT is not set
+ CONFIG_USB_GADGET=y
 -- 
-1.7.5.4
+1.7.9.2
