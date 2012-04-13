@@ -1,42 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Apr 2012 11:32:07 +0100
-Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
-In-Reply-To: <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
-References: <20120413012230.GA30438@windriver.com>
- <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
-Message-ID: <20120413103207.GL24211@n2100.arm.linux.org.uk>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 13 Apr 2012 10:36:06 +0000
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 10:01:52AM +0800, Shawn Guo wrote:
-> On 13 April 2012 09:22, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> > Hi Mark,
-> >
-> > The commit in linux-next:
-> >
-> > -----------------
-> > commit b2bc9e0ee349db84035d8141e85babc7986594d7
-> > Author: Mark Brown <broonie@sirena.org.uk>
-> > Date: ? Mon Apr 2 12:30:35 2012 +0100
-> >
-> > ? ?ARM: 7366/1: amba: Remove AMBA level regulator support
-> > -----------------
-> >
-> > is pointed at by git bisect for the u8500_defconfig build failure:
-> >
-> > drivers/dma/ste_dma40.c:2708:3: error: implicit declaration of function
-> > 'regulator_disable' [-Werror=implicit-function-declaration]
-> > drivers/dma/ste_dma40.c:2747:3: error: implicit declaration of function
-> > 'regulator_enable' [-Werror=implicit-function-declaration]
-> > drivers/dma/ste_dma40.c:3260:3: error: implicit declaration of function
-> > 'regulator_get' [-Werror=implicit-function-declaration]
-> > drivers/dma/ste_dma40.c:3271:4: error: implicit declaration of function
-> > 'regulator_put' [-Werror=implicit-function-declaration]
-> >
-> That's because Mark's patch removes "#include
-> <linux/regulator/consumer.h>" included indirectly by
-> drivers/dma/ste_dma40.c from linux/amba/bus.h.  The ste_dma40.c should
-> really directly includes consumer.h.
+On Thu, Apr 12, 2012 at 13:56:06, Paul Walmsley wrote:
+> Hello Vaibhav,
+> 
+> On Fri, 30 Mar 2012, Vaibhav Hiremath wrote:
+> 
+> > After some healthy discussion, now we have come to the conclusion and
+> > decided to handle AM33XX PRM/CM part separately; as AM33XX-PRCM module is
+> > different than OMAP3 and OMAP4 architecture.
+> 
+> Have been reviewing these patch sets here.  Are these associated with any 
+> board file?  I had to hand-apply several patch sets due to some 
+> differences in mach-omap2/io.c.  Upon looking more closely, and looking at 
+> your GitHub branch:
+> 
+> https://github.com/hvaibhav/am335x-linux/tree/am335x-prm-cm
+> 
+> it seems that internally you've been modifying the AM3517 EVM board file 
+> to test the BeagleBone?  But due to the init_early changes, this is 
+> presumably not going to work if we want to keep the AM3517EVM working -- 
+> is this your understanding as well?
+> 
 
-Okay, I'll drop this patch because it's causing regressions, so it can't
-be pushed as a 'fix' during -rc.
+Yes, we are using am3517evm file for AM33XX MACHINE_INIT definition here.
+These patches have been reviewed and accepted in the list, only thing is
+they couldn't make it to upstream during v3.4 merge window.
+
+I believe Tony is going to push them for v3.5 now.
+
+> I'm kind of wondering how we're to test these...
+>
+
+I maintain multiple branches along with one superset branch in
+my gitorious tree, for example, currently I have,
+
+Individual features branches:
+----------------------------
+32ksync-timer-cleanup : 32k timer cleanup
+am335x-baseport-for-tony : baseport patches (reviewed & accepted)
+am335x-prm-cm-hwmod : prm/cm/hwmod patches
+
+superset branch:
+---------------
+am335x-upstream-staging: 
+
+I merge all feature branches into this superset branch and one additional
+Patch, required to get beaglebone to boot.
+
+> ...
+> 
+> BTW, the branch that I'm experimenting with is at 
+> git://git.pwsan.com/linux-2.6 -- branch name 'am33xx_support_3.5' -- I am 
+> still reviewing the patches there.
+> 
+
+Thanks Paul, really appreciate your help here. I will take a look at this 
+and let you know. Also, please let me know if you have any comments in the 
+patch.
+
+I really want to target for v3.5 merge window, and atleast get all basic 
+prm/cm/clock/hwmod things upstream.
+
+
+Thanks,
+Vaibhav
+
+> 
+> - Paul
+> 
