@@ -1,38 +1,51 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 13 Apr 2012 10:43:22 +0200
+From: a0393947@ti.com (Archit Taneja)
+Date: Fri, 13 Apr 2012 14:21:48 +0530
 Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all
  DSS L3 slave interfaces
-In-Reply-To: <1334304116-18872-3-git-send-email-archit@ti.com>
+In-Reply-To: <4F87E72A.2050104@ti.com>
 References: <1334304116-18872-1-git-send-email-archit@ti.com>
- <1334304116-18872-3-git-send-email-archit@ti.com>
-Message-ID: <4F87E72A.2050104@ti.com>
+ <1334304116-18872-3-git-send-email-archit@ti.com> <4F87E72A.2050104@ti.com>
+Message-ID: <4F87E924.5040601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2012 10:01 AM, Archit Taneja wrote:
-> The clock for all DSS L3 slave interfaces had been recently changed to
-> "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS clock domain
-> which can't autoidle when enabled.
+On Friday 13 April 2012 02:13 PM, Cousson, Benoit wrote:
+> On 4/13/2012 10:01 AM, Archit Taneja wrote:
+>> The clock for all DSS L3 slave interfaces had been recently changed to
+>> "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS
+>> clock domain
+>> which can't autoidle when enabled.
+>>
+>> Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS
+>> hwmods so
+>> that clock is explicitly enabled and disabled by software. Without this,
+>> "dss_fck" would be left as enabled and the OMAP4 device won't idle
+>> even when
+>> DSS is not in use.
 >
-> Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS hwmods so
-> that clock is explicitly enabled and disabled by software. Without this,
-> "dss_fck" would be left as enabled and the OMAP4 device won't idle even when
-> DSS is not in use.
+> Yeah, that was done on purpose with Tomi knowning well that limitation.
+>
+> The issue was mainly due to the lack of proper parent / child
+> relationship between the DSS (the whole subsystem) and the DSS children
+> at that time.
+>
+> I think that Tomi posted a series to fix that for 3.4. So if we ensure
+> that every DSS IPs are children of the DSS, then pm_runtime will always
+> ensure that the DSS will be enabled each time a submodule is used.
+>
+> So the right fix is to put back the proper iclk (l3_div) to the DSS
+> instead of the dss_fck.
 
-Yeah, that was done on purpose with Tomi knowning well that limitation.
+Ok, I get it now. Tomi's patch series ensured the parent-child 
+dependency, but they didn't switch the iclks back to l3_div, I guess 
+that should be a part of the series too.
 
-The issue was mainly due to the lack of proper parent / child 
-relationship between the DSS (the whole subsystem) and the DSS children 
-at that time.
+Thanks,
+Archit
 
-I think that Tomi posted a series to fix that for 3.4. So if we ensure 
-that every DSS IPs are children of the DSS, then pm_runtime will always 
-ensure that the DSS will be enabled each time a submodule is used.
-
-So the right fix is to put back the proper iclk (l3_div) to the DSS 
-instead of the dss_fck.
-
-The current OMAP4 DSS clock setup is clearly a hack that should be fixed.
-
-Regards,
-Benoit
+>
+> The current OMAP4 DSS clock setup is clearly a hack that should be fixed.
+>
+> Regards,
+> Benoit
+>
