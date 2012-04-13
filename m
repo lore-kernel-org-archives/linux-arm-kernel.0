@@ -1,97 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 13 Apr 2012 05:24:35 -0600 (MDT)
-Subject: [PATCH 1/2] ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE
- flag from VENC slave interface
-In-Reply-To: <alpine.DEB.2.00.1204130520170.25832@utopia.booyaka.com>
-References: <1334304116-18872-1-git-send-email-archit@ti.com>
- <1334304116-18872-2-git-send-email-archit@ti.com>
- <alpine.DEB.2.00.1204130520170.25832@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1204130523170.25832@utopia.booyaka.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 13 Apr 2012 12:25:42 +0100
+Subject: linux-next: "amba: Remove AMBA level regulator support" commit.
+In-Reply-To: <20120413104900.GM24211@n2100.arm.linux.org.uk>
+References: <20120413012230.GA30438@windriver.com>
+ <CAAQ0ZWReL=+bm9UOnt2=Dfy0zeWbJe3=y3pPzUKRzm2y277kFQ@mail.gmail.com>
+ <20120413103207.GL24211@n2100.arm.linux.org.uk>
+ <20120413104452.GR3168@opensource.wolfsonmicro.com>
+ <20120413104900.GM24211@n2100.arm.linux.org.uk>
+Message-ID: <20120413112539.GS3168@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Apr 2012, Paul Walmsley wrote:
+On Fri, Apr 13, 2012 at 11:49:00AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 13, 2012 at 11:44:52AM +0100, Mark Brown wrote:
 
-> On Fri, 13 Apr 2012, Archit Taneja wrote:
-> 
-> > The clocks for all DSS slave interfaces were recently changed to "dss_ick" on
-> > OMAP2 and OMAP3, this clock can be autoidled by PRCM. The VENC interface
-> > previously had "dss_54m_fck" as it's clock which couldn't be autoidled, and
-> > hence the OCPIF_SWSUP_IDLE flag was needed.
-> > 
-> > Remove the OCPIF_SWSUP_IDLE flag from VENC interfaces as it's clock is now
-> > "dss_ick".
-> > 
-> > Signed-off-by: Archit Taneja <archit@ti.com>
-> 
-> Thanks, queued for 3.4-rc.
+> > I did say we should've been pushing Shawn's patch in as a minimal fix
+> > for 3.4...
 
-By the way, I added another sentence to the commit log to describe what is 
-being fixed.  Please let me know if you have any comments.
+> What patch?
 
+The original one which just changed the return code that's checked for.
 
-- Paul
+> > Regardless of what happens for 3.4 we should keep the removal for -next,
+> > it's clear that we don't want the bus doing this and it's causing
+> > breakage for the non-ST platforms.  Do I need to resend the patch to the
+> > patch system or will the existing copy be OK?
 
-From: Archit Taneja <archit@ti.com>
-Date: Fri, 13 Apr 2012 13:31:55 +0530
-Subject: [PATCH 3/3] ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE flag
- from VENC slave interface
+> What I want is something that doesn't cause a regression for 3.4.
 
-The clocks for all DSS slave interfaces were recently changed to "dss_ick" on
-OMAP2 and OMAP3, this clock can be autoidled by PRCM. The VENC interface
-previously had "dss_54m_fck" as it's clock which couldn't be autoidled, and
-hence the OCPIF_SWSUP_IDLE flag was needed.
-
-Remove the OCPIF_SWSUP_IDLE flag from VENC interfaces as it's clock is
-now "dss_ick".  This allows the PRCM hardware to autoidle the VENC
-interface clocks when they are not active, rather than relying on the
-software to do it, which can keep the interface clocks active
-unnecessarily.
-
-Signed-off-by: Archit Taneja <archit@ti.com>
-[paul at pwsan.com: add a short description of the fix to the commit log]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    1 -
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 -
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    1 -
- 3 files changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index a5409ce..a6bde34 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -1000,7 +1000,6 @@ static struct omap_hwmod_ocp_if omap2420_l4_core__dss_venc = {
- 			.flags	= OMAP_FIREWALL_L4,
- 		}
- 	},
--	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index c4f56cb..04a3885 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -1049,7 +1049,6 @@ static struct omap_hwmod_ocp_if omap2430_l4_core__dss_venc = {
- 	.slave		= &omap2430_dss_venc_hwmod,
- 	.clk		= "dss_ick",
- 	.addr		= omap2_dss_venc_addrs,
--	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 34b9766d..db86ce9 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1676,7 +1676,6 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__dss_venc = {
- 			.flags	= OMAP_FIREWALL_L4,
- 		}
- 	},
--	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--- 
-1.7.10
+Well, if the overall result is something other than removing the code in
+3.5 then we'll just get further regressions down the line.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120413/f4fac225/attachment.sig>
