@@ -1,105 +1,79 @@
-From: a0393947@ti.com (Archit Taneja)
-Date: Fri, 13 Apr 2012 17:07:00 +0530
-Subject: [PATCH 1/2] ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE
- flag from VENC slave interface
-In-Reply-To: <alpine.DEB.2.00.1204130523170.25832@utopia.booyaka.com>
-References: <1334304116-18872-1-git-send-email-archit@ti.com>
- <1334304116-18872-2-git-send-email-archit@ti.com>
- <alpine.DEB.2.00.1204130520170.25832@utopia.booyaka.com>
- <alpine.DEB.2.00.1204130523170.25832@utopia.booyaka.com>
-Message-ID: <4F880FDC.9080908@ti.com>
+From: h.feurstein@gmail.com (Hubert Feurstein)
+Date: Fri, 13 Apr 2012 13:44:36 +0200
+Subject: [PATCH] i2c-at91: fix data-loss issue
+In-Reply-To: <20120413103937.GH7154@arwen.pp.htv.fi>
+References: <20120413103937.GH7154@arwen.pp.htv.fi>
+Message-ID: <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In the interrupt handler both status-flags (TXCOMP and RXRDY) might be
+pending at the same time. In this case TXCOMP is handled but NOT RXRDY
+which causes a data-loss on the current transfer. As a consequence also the
+next transfer will be corrupt, because old data is pending in RHR.
 
-On Friday 13 April 2012 04:54 PM, Paul Walmsley wrote:
-> On Fri, 13 Apr 2012, Paul Walmsley wrote:
->
->> On Fri, 13 Apr 2012, Archit Taneja wrote:
->>
->>> The clocks for all DSS slave interfaces were recently changed to "dss_ick" on
->>> OMAP2 and OMAP3, this clock can be autoidled by PRCM. The VENC interface
->>> previously had "dss_54m_fck" as it's clock which couldn't be autoidled, and
->>> hence the OCPIF_SWSUP_IDLE flag was needed.
->>>
->>> Remove the OCPIF_SWSUP_IDLE flag from VENC interfaces as it's clock is now
->>> "dss_ick".
->>>
->>> Signed-off-by: Archit Taneja<archit@ti.com>
->>
->> Thanks, queued for 3.4-rc.
->
-> By the way, I added another sentence to the commit log to describe what is
-> being fixed.  Please let me know if you have any comments.
+To make sure that we do not start with old data in any case, SR and RHR is
+read empty before initiating a new transfer.
 
-Thanks for improving the commit. It looks good to me.
+Signed-off-by: Hubert Feurstein <h.feurstein@gmail.com>
+---
+ This patch applies on top of [PATCH v9 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
 
-Archit
+ drivers/i2c/busses/i2c-at91.c |   23 ++++++++++++++++-------
+ 1 files changed, 16 insertions(+), 7 deletions(-)
 
-
->
->
-> - Paul
->
-> From: Archit Taneja<archit@ti.com>
-> Date: Fri, 13 Apr 2012 13:31:55 +0530
-> Subject: [PATCH 3/3] ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE flag
->   from VENC slave interface
->
-> The clocks for all DSS slave interfaces were recently changed to "dss_ick" on
-> OMAP2 and OMAP3, this clock can be autoidled by PRCM. The VENC interface
-> previously had "dss_54m_fck" as it's clock which couldn't be autoidled, and
-> hence the OCPIF_SWSUP_IDLE flag was needed.
->
-> Remove the OCPIF_SWSUP_IDLE flag from VENC interfaces as it's clock is
-> now "dss_ick".  This allows the PRCM hardware to autoidle the VENC
-> interface clocks when they are not active, rather than relying on the
-> software to do it, which can keep the interface clocks active
-> unnecessarily.
->
-> Signed-off-by: Archit Taneja<archit@ti.com>
-> [paul at pwsan.com: add a short description of the fix to the commit log]
-> Signed-off-by: Paul Walmsley<paul@pwsan.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod_2420_data.c |    1 -
->   arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 -
->   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    1 -
->   3 files changed, 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> index a5409ce..a6bde34 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> @@ -1000,7 +1000,6 @@ static struct omap_hwmod_ocp_if omap2420_l4_core__dss_venc = {
->   			.flags	= OMAP_FIREWALL_L4,
->   		}
->   	},
-> -	.flags		= OCPIF_SWSUP_IDLE,
->   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->   };
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-> index c4f56cb..04a3885 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-> @@ -1049,7 +1049,6 @@ static struct omap_hwmod_ocp_if omap2430_l4_core__dss_venc = {
->   	.slave		=&omap2430_dss_venc_hwmod,
->   	.clk		= "dss_ick",
->   	.addr		= omap2_dss_venc_addrs,
-> -	.flags		= OCPIF_SWSUP_IDLE,
->   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->   };
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> index 34b9766d..db86ce9 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> @@ -1676,7 +1676,6 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__dss_venc = {
->   			.flags	= OMAP_FIREWALL_L4,
->   		}
->   	},
-> -	.flags		= OCPIF_SWSUP_IDLE,
->   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->   };
->
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 40c39a2..295835f 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -161,18 +161,22 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
+ {
+ 	struct at91_twi_dev *dev = dev_id;
+ 	const unsigned status = at91_twi_read(dev, AT91_TWI_SR);
+-	const unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
++	unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
++
++	irqstatus &= (AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_TXCOMP);
++	if (!irqstatus)
++		return IRQ_NONE;
++
++	if (irqstatus & AT91_TWI_RXRDY)
++		at91_twi_read_next_byte(dev);
++
++	if (irqstatus & AT91_TWI_TXRDY)
++		at91_twi_write_next_byte(dev);
+ 
+ 	if (irqstatus & AT91_TWI_TXCOMP) {
+ 		at91_disable_twi_interrupts(dev);
+ 		dev->transfer_status = status;
+ 		complete(&dev->cmd_complete);
+-	} else if (irqstatus & AT91_TWI_RXRDY) {
+-		at91_twi_read_next_byte(dev);
+-	} else if (irqstatus & AT91_TWI_TXRDY) {
+-		at91_twi_write_next_byte(dev);
+-	} else {
+-		return IRQ_NONE;
+ 	}
+ 
+ 	return IRQ_HANDLED;
+@@ -189,6 +193,10 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+ 	if (dev->msg->flags & I2C_M_RD) {
+ 		unsigned start_flags = AT91_TWI_START;
+ 
++		/* clear any pending data */
++		(void)at91_twi_read(dev, AT91_TWI_SR);
++		(void)at91_twi_read(dev, AT91_TWI_RHR);
++
+ 		/* if only one byte is to be read, immediately stop transfer */
+ 		if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
+ 			start_flags |= AT91_TWI_STOP;
+@@ -259,6 +267,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+ 			internal_address |= addr << (8 * i);
+ 			int_addr_flag += AT91_TWI_IADRSZ_1;
+ 		}
++
+ 		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
+ 	}
+ 
+-- 
+1.7.8.3
