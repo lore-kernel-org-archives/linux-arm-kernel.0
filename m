@@ -1,41 +1,84 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 14 Apr 2012 09:57:09 +0100
-Subject: [PATCH] Fix asic3 build error
-Message-ID: <20120414085709.GQ24211@n2100.arm.linux.org.uk>
+Date: Sat, 14 Apr 2012 11:13:58 +0100
+Subject: Missing initialization of pages removed with memblock_remove
+In-Reply-To: <4F7CF0EF.2090302@codeaurora.org>
+References: <4F7CF0EF.2090302@codeaurora.org>
+Message-ID: <20120414101358.GR24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP randconfig builds occasionally fail with:
+On Wed, Apr 04, 2012 at 06:10:07PM -0700, Laura Abbott wrote:
+> We seem to have hit an odd edge case related to the use of  
+> memblock_remove. We carve out memory for certain use cases using  
+> memblock_remove, which gives a layout such as:
+>
+> <4>[    0.000000] Zone PFN ranges:
+> <4>[    0.000000]   Normal   0x00080200 -> 0x000a1200
+> <4>[    0.000000]   HighMem  0x000a1200 -> 0x000c0000
+> <4>[    0.000000] Movable zone start PFN for each node
+> <4>[    0.000000] early_node_map[3] active PFN ranges
+> <4>[    0.000000]     0: 0x00080200 -> 0x00088f00
+> <4>[    0.000000]     0: 0x00090000 -> 0x000ac680
+> <4>[    0.000000]     0: 0x000b7a02 -> 0x000c0000
+>
+> Since pfn_valid uses memblock_is_memory, pfn_valid will return false on  
+> all memory removed with memblock_remove.
 
-drivers/mfd/asic3.c: In function 'asic3_gpio_to_irq':
-drivers/mfd/asic3.c:530: error: 'IRQ_BOARD_START' undeclared (first use in this function)
-drivers/mfd/asic3.c:530: error: (Each undeclared identifier is reported only once
-drivers/mfd/asic3.c:530: error: for each function it appears in.)
+Correct.  memblock_remove() removes the range from the 'memory' array.
+memblock_is_memory() searches the 'memory' array to discover whether
+the address is within a region described by that array.  So, having called
+memblock_remove() on a region, memblock_is_memory() will then return false
+for that region.
 
-Fix it by using asic->irq_base rather than assuming this value is
-IRQ_BOARD_START.
+This provably works, because all those platforms using arm_memblock_steal()
+and then subsequently using ioremap() on the same physical address range
+relies upon this behaviour - and this is the desired behaviour.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-I don't have the ability to do anything but compile test this.  Please
-check that it's correct.  Also, I believe that the check for ASIC3_NUM_GPIOS
-is unnecessary - gpiolib won't call your driver if you don't own the GPIO.
+> As a result, none of the page structures for the memblock_remove regions
+> will have been initialized since memmap_init_zone calls pfn_valid before
+> trying to initialize the memmap. Normally this isn't an issue but a recent
+> test case ends up hitting a BUG_ON in move_freepages_block identical to
+> the case in  
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/059934.html
+> (BUG_ON(page_zone(start_page) != page_zone(end_page)))
 
- drivers/mfd/asic3.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+Yes, welcome to the sad fact that sparsemem can't handle... sparse memory.
+sparsemem apparantly was designed to handle fully populated memory sections,
+but we've had some forward progress to get it sorted.  So if your memory
+size is a multiple of 1MB, and you have memory in the upper half of the 4GB
+space, you'll need an insane number of sections to cover this if you follow
+this - you will need 4GB / 1MB = 4096 sections.
 
-diff --git a/drivers/mfd/asic3.c b/drivers/mfd/asic3.c
-index 1895cf9..1582c3d 100644
---- a/drivers/mfd/asic3.c
-+++ b/drivers/mfd/asic3.c
-@@ -527,7 +527,9 @@ static void asic3_gpio_set(struct gpio_chip *chip,
- 
- static int asic3_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- {
--	return (offset < ASIC3_NUM_GPIOS) ? IRQ_BOARD_START + offset : -ENXIO;
-+	struct asic3 *asic = container_of(chip, struct asic3, gpio);
-+
-+	return (offset < ASIC3_NUM_GPIOS) ? asic->irq_base + offset : -ENXIO;
- }
- 
- static __init int asic3_gpio_probe(struct platform_device *pdev,
+> What's happening is the calculation of start_page in  
+> move_freepages_block returns a page within a range removed by  
+> memblock_remove which means the page structure is uninitialized. (e.g.  
+> 0xb7a02 -> 0xb7800)
+>
+> I've read through that thread and several others which have discouraged  
+> use of CONFIG_HOLES_IN_ZONE due to the runtime overhead. The best  
+> alternative solution I've come up with is to align the memory removed  
+> via memblock_remove to MAX_ORDER_NR_PAGES but this will have a very high  
+> memory overhead for certain use cases.
+>
+> A more fundamental question I have is should the page structures be  
+> initialized for the regions removed with memblock_remove? Internally,  
+> we've been divided on this issue and reading the source code hasn't  
+> given any indication of if this is expected behavior or not.
+
+One of the problems with that is you may have a GB or so between memblock
+memory regions, and you certainly do not want to try and populate all
+those page structs.
+
+> Any suggestions on what's the cleanest solution?
+
+I think CONFIG_HOLES_IN_ZONE=y is the best solution short of writing a
+memory support subsystem which _can_ cope with all the various broken
+ideas of system memory layout on ARM.
+
+This would be a lot less of a problem had ARM Ltd mandated as part of
+the architecture that memory was to be contiguous (and preferably
+starting at physical address zero in normal system operation) but alas
+every silicon vendor is free to create whatever abortion they like
+here - we've even had cases where people want the order of physical
+memory reversed because the first populated memory region is at a
+higher address, which we've had to say a definite no to.
