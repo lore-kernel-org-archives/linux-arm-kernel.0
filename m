@@ -1,230 +1,213 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 14 Apr 2012 12:53:07 +0200
-Subject: [PATCH 1/4] ohci-nxp: Device tree support
-In-Reply-To: <1334400790-10892-1-git-send-email-stigge@antcom.de>
-References: <1334400790-10892-1-git-send-email-stigge@antcom.de>
-Message-ID: <1334400790-10892-2-git-send-email-stigge@antcom.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 14 Apr 2012 14:35:59 +0200
+Subject: [PATCH v2] rtc: add support for Freescale SNVS RTC
+In-Reply-To: <1334387237-23519-1-git-send-email-paul.liu@linaro.org>
+References: <1334387237-23519-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120414123559.GU3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support to ohci-nxp.c
+On Sat, Apr 14, 2012 at 03:07:17PM +0800, Ying-Chun Liu (PaulLiu) wrote:
+> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+> 
+> This adds an RTC driver for the Low Power (LP) section of SNVS.
+> It hooks into the /dev/rtc interface and supports ioctl to complete RTC
+> features. This driver supports device tree bindings.
+> It only uses the RTC hw in non-secure mode.
+> 
+> Signed-off-by: Anish Trivedi <anish@freescale.com>
+> Signed-off-by: Eric Miao <eric.miao@linaro.org>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/rtc/snvs-rtc.txt |   18 +
+>  drivers/rtc/Kconfig                                |   10 +
+>  drivers/rtc/Makefile                               |    1 +
+>  drivers/rtc/rtc-snvs.c                             |  644 ++++++++++++++++++++
+>  4 files changed, 673 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+>  create mode 100644 drivers/rtc/rtc-snvs.c
+> 
+> +#define CNTR_TO_SECS_SH 15	/* Converts 47-bit counter to 32-bit seconds */
+> +
+> +struct rtc_drv_data {
+> +	struct rtc_device *rtc;
+> +	void __iomem *ioaddr;
+> +	int irq;
+> +	bool irq_enable;
+> +};
+> +
+> +static DEFINE_SPINLOCK(rtc_lock);
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Put this three lines above.
 
----
+> +	writel(time >> (32 - CNTR_TO_SECS_SH), ioaddr + SNVS_LPSRTCMR);
+> +
+> +	/* Enable RTC again */
+> +	writel(lp_cr | SNVS_LPCR_SRTC_ENV, ioaddr + SNVS_LPCR);
+> +	timeout = jiffies + msecs_to_jiffies(3000);
+> +	while (!(readl(ioaddr + SNVS_LPCR) & SNVS_LPCR_SRTC_ENV)) {
+> +		if (time_after(jiffies, timeout)) {
+> +			dev_err(dev, "timeout on enabling RTC back\n");
+> +			return -EBUSY;
+> +		}
+> +	}
+> +
+> +	rtc_write_sync_lp(ioaddr);
+> +
+> +	new_time_47bit = (((u64) (readl(ioaddr + SNVS_LPSRTCMR) &
+> +		((0x1 << CNTR_TO_SECS_SH) - 1)) << 32) |
+> +		((u64) readl(ioaddr + SNVS_LPSRTCLR)));
+> +
+> +	time_diff = new_time_47bit - old_time_47bit;
 
-Applies to v3.4-rc2
+time_diff, old_time_47bit and new_time_47bit are set and never read.
+Remove.
 
- Documentation/devicetree/bindings/usb/ohci-nxp.txt |   16 ++++
- drivers/usb/host/ohci-nxp.c                        |   68 ++++++++++++++-------
- 2 files changed, 64 insertions(+), 20 deletions(-)
+> +
+> +	return 0;
+> +}
+> +
+> +static int snvs_rtc_proc(struct device *dev, struct seq_file *seq)
+> +{
+> +	struct rtc_drv_data *pdata = dev_get_drvdata(dev);
+> +	void __iomem *ioaddr = pdata->ioaddr;
+> +
+> +	seq_printf(seq, "alarm_IRQ\t: %s\n",
+> +		   (((readl(ioaddr + SNVS_LPCR)) & SNVS_LPCR_LPTA_EN) !=
+> +		    0) ? "yes" : "no");
+> +
+> +	return 0;
+> +}
+> +
+> +static int snvs_rtc_alarm_irq_enable(struct device *dev, unsigned int enable)
+> +{
+> +	struct rtc_drv_data *pdata = dev_get_drvdata(dev);
+> +	void __iomem *ioaddr = pdata->ioaddr;
+> +	u32 lp_cr;
+> +	unsigned long lock_flags = 0;
+> +
+> +	spin_lock_irqsave(&rtc_lock, lock_flags);
+> +
+> +	if (enable) {
+> +		if (!pdata->irq_enable) {
+> +			enable_irq(pdata->irq);
+> +			pdata->irq_enable = true;
+> +		}
 
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/usb/ohci-nxp.txt
-@@ -0,0 +1,16 @@
-+* OHCI controller, NXP ohci-nxp variant
-+
-+Required properties:
-+- compatible: must be "nxp,ohci-nxp"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: The OHCI interrupt
-+
-+Example (LPC32xx):
-+
-+	ohci at 31020000 {
-+		compatible = "nxp,ohci-nxp";
-+		reg = <0x31020000 0x300>;
-+		interrupt-parent = <&mic>;
-+		interrupts = <0x3b 0>;
-+	};
---- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
-+++ linux-2.6/drivers/usb/host/ohci-nxp.c
-@@ -22,6 +22,7 @@
- #include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
-+#include <linux/of.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -29,7 +30,6 @@
- 
- #include <mach/platform.h>
- #include <mach/irqs.h>
--#include <asm/gpio.h>
- 
- #define USB_CONFIG_BASE		0x31020000
- #define PWRMAN_BASE		0x40004000
-@@ -38,6 +38,7 @@
- 
- /* USB_CTRL bit defines */
- #define USB_SLAVE_HCLK_EN	(1 << 24)
-+#define USB_DEV_NEED_CLK_EN	(1 << 22)
- #define USB_HOST_NEED_CLK_EN	(1 << 21)
- 
- #define USB_OTG_CLK_CTRL	IO_ADDRESS(USB_CONFIG_BASE + 0xFF4)
-@@ -117,7 +118,6 @@ static struct i2c_driver isp1301_driver;
- static struct i2c_client *isp1301_i2c_client;
- 
- extern int usb_disabled(void);
--extern int ocpi_enable(void);
- 
- static struct clk *usb_clk;
- 
-@@ -220,7 +220,7 @@ static void isp1301_configure_lpc32xx(vo
- 		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR, ~0);
- 
- 	/* Enable usb_need_clk clock after transceiver is initialized */
--	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
-+	__raw_writel((__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN), USB_CTRL);
- 
- 	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n",
- 	      i2c_smbus_read_word_data(isp1301_i2c_client, 0x00));
-@@ -266,7 +266,7 @@ static void nxp_stop_hc(void)
- 	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
- }
- 
--static int __devinit ohci_nxp_start(struct usb_hcd *hcd)
-+static int ohci_nxp_start(struct usb_hcd *hcd)
- {
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 	int ret;
-@@ -367,16 +367,20 @@ static void nxp_unset_usb_bits(void)
- 	}
- }
- 
--static int __devinit usb_hcd_nxp_probe(struct platform_device *pdev)
-+static int usb_hcd_nxp_probe(struct platform_device *pdev)
- {
- 	struct usb_hcd *hcd = 0;
- 	struct ohci_hcd *ohci;
- 	const struct hc_driver *driver = &ohci_nxp_hc_driver;
- 	struct i2c_adapter *i2c_adap;
- 	struct i2c_board_info i2c_info;
-+	struct resource *res;
- 
- 	int ret = 0, irq;
- 
-+	pdev->dev.coherent_dma_mask = 0xFFFFFFFF;
-+	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-+
- 	dev_dbg(&pdev->dev, "%s: " DRIVER_DESC " (nxp)\n", hcd_name);
- 	if (usb_disabled()) {
- 		err("USB is disabled");
-@@ -384,16 +388,10 @@ static int __devinit usb_hcd_nxp_probe(s
- 		goto out;
- 	}
- 
--	if (pdev->num_resources != 2
--	    || pdev->resource[0].flags != IORESOURCE_MEM
--	    || pdev->resource[1].flags != IORESOURCE_IRQ) {
--		err("Invalid resource configuration");
--		ret = -ENODEV;
--		goto out;
--	}
--
- 	/* Enable AHB slave USB clock, needed for further USB clock control */
--	__raw_writel(USB_SLAVE_HCLK_EN | (1 << 19), USB_CTRL);
-+	__raw_writel(__raw_readl(USB_CTRL) | USB_SLAVE_HCLK_EN, USB_CTRL);
-+	__raw_writel(__raw_readl(USB_CTRL) & ~(1 << 20), USB_CTRL);
-+	__raw_writel(__raw_readl(USB_CTRL) | (1 << 19), USB_CTRL);
- 
- 	ret = i2c_add_driver(&isp1301_driver);
- 	if (ret < 0) {
-@@ -401,6 +399,11 @@ static int __devinit usb_hcd_nxp_probe(s
- 		goto out;
- 	}
- 	i2c_adap = i2c_get_adapter(2);
-+	if (!i2c_adap) {
-+		err("failed on i2c_get_adapter");
-+		goto out_i2c_driver;
-+	}
-+
- 	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
- 	strlcpy(i2c_info.type, "isp1301_nxp", I2C_NAME_SIZE);
- 	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
-@@ -435,6 +438,7 @@ static int __devinit usb_hcd_nxp_probe(s
- 	}
- 
- 	__raw_writel(__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN, USB_CTRL);
-+	__raw_writel(__raw_readl(USB_CTRL) & ~USB_DEV_NEED_CLK_EN, USB_CTRL);
- 
- 	/* Set to enable all needed USB clocks */
- 	__raw_writel(USB_CLOCK_MASK, USB_OTG_CLK_CTRL);
-@@ -442,7 +446,7 @@ static int __devinit usb_hcd_nxp_probe(s
- 	while ((__raw_readl(USB_OTG_CLK_STAT) & USB_CLOCK_MASK) !=
- 	       USB_CLOCK_MASK) ;
- 
--	hcd = usb_create_hcd (driver, &pdev->dev, dev_name(&pdev->dev));
-+	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
- 	if (!hcd) {
- 		err("Failed to allocate HC buffer");
- 		ret = -ENOMEM;
-@@ -452,19 +456,30 @@ static int __devinit usb_hcd_nxp_probe(s
- 	/* Set all USB bits in the Start Enable register */
- 	nxp_set_usb_bits();
- 
--	hcd->rsrc_start = pdev->resource[0].start;
--	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get MEM resource");
-+		ret =  -ENOMEM;
-+		goto out4;
-+	}
-+	hcd->rsrc_start = IO_ADDRESS(res->start);
-+	hcd->rsrc_len = resource_size(res);
- 	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
--		dev_dbg(&pdev->dev, "request_mem_region failed\n");
-+		dev_err(&pdev->dev, "request_mem_region failed\n");
- 		ret =  -ENOMEM;
- 		goto out4;
- 	}
--	hcd->regs = (void __iomem *)pdev->resource[0].start;
-+	hcd->regs = ioremap(res->start, hcd->rsrc_len);
-+	if (!hcd->regs) {
-+		err("Failed to ioremap");
-+		ret =  -ENOMEM;
-+		goto out5;
-+	}
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		ret = -ENXIO;
--		goto out4;
-+		goto out6;
- 	}
- 
- 	nxp_start_hc();
-@@ -478,6 +493,10 @@ static int __devinit usb_hcd_nxp_probe(s
- 		return ret;
- 
- 	nxp_stop_hc();
-+out6:
-+	iounmap(hcd->regs);
-+out5:
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
- out4:
- 	nxp_unset_usb_bits();
- 	usb_put_hcd(hcd);
-@@ -517,10 +536,19 @@ static int usb_hcd_nxp_remove(struct pla
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:usb-ohci");
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id usb_hcd_nxp_match[] = {
-+	{ .compatible = "nxp,ohci-nxp" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, usb_hcd_nxp_match);
-+#endif
-+
- static struct platform_driver usb_hcd_nxp_driver = {
- 	.driver = {
- 		.name = "usb-ohci",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(usb_hcd_nxp_match),
- 	},
- 	.probe = usb_hcd_nxp_probe,
- 	.remove = usb_hcd_nxp_remove,
+Why this enable_irq/disable_irq everywhere? You seem to have irq enable
+bits in your registers which should be enough.
+
+> +/* SNVS RTC Power management control */
+> +static int __devinit snvs_rtc_probe(struct platform_device *pdev)
+> +{
+> +	struct timespec tv;
+> +	struct rtc_device *rtc;
+> +	struct rtc_drv_data *pdata = NULL;
+
+No need to initialize this. I think you should use another name for this
+variable. People usually expect pdata for platform_data. Driver data is
+usually called priv, or snvs_rtc in this case.
+
+
+> +	void __iomem *ioaddr;
+> +	u32 lp_cr;
+> +	int ret = 0;
+
+No need to initialize this.
+
+> +
+> +	ioaddr = of_iomap(pdev->dev.of_node, 0);
+> +	if (!ioaddr)
+> +		return -EADDRNOTAVAIL;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return -ENOMEM;
+> +
+> +	pdata->ioaddr = ioaddr;
+> +
+> +	/* Configure and enable the RTC */
+> +	pdata->irq = platform_get_irq(pdev, 0);
+> +	if (pdata->irq >= 0) {
+
+Is there any hardware without an interrupt? If no, just bail out here
+and get rid of the additional complexity.
+
+> +		if (request_irq(pdata->irq, snvs_rtc_interrupt, IRQF_SHARED,
+> +				pdev->name, pdev) < 0) {
+> +			dev_warn(&pdev->dev, "interrupt not available.\n");
+> +			pdata->irq = -1;
+> +		} else {
+> +			disable_irq(pdata->irq);
+> +			pdata->irq_enable = false;
+> +		}
+> +	}
+> +
+> +	/* initialize glitch detect */
+> +	writel(SNVS_LPPGDR_INIT, ioaddr + SNVS_LPPGDR);
+> +	udelay(100);
+> +
+> +	/* clear lp interrupt status */
+> +	writel(0xFFFFFFFF, ioaddr + SNVS_LPSR);
+> +
+> +	/* Enable RTC */
+> +	lp_cr = readl(ioaddr + SNVS_LPCR);
+> +	if ((lp_cr & SNVS_LPCR_SRTC_ENV) == 0)
+> +		writel(lp_cr | SNVS_LPCR_SRTC_ENV, ioaddr + SNVS_LPCR);
+> +	udelay(100);
+> +
+> +	writel(0xFFFFFFFF, ioaddr + SNVS_LPSR);
+> +	udelay(100);
+> +
+> +	platform_set_drvdata(pdev, pdata);
+> +
+> +	rtc = rtc_device_register(pdev->name, &pdev->dev,
+> +				  &snvs_rtc_ops, THIS_MODULE);
+> +	if (IS_ERR(rtc)) {
+> +		ret = PTR_ERR(rtc);
+> +		goto err_out;
+> +	}
+> +
+> +	pdata->rtc = rtc;
+> +
+> +	tv.tv_nsec = 0;
+> +	tv.tv_sec = rtc_read_lp_counter(ioaddr);
+> +
+> +	/* By default, devices should wakeup if they can */
+> +	/* So snvs is set as "should wakeup" as it can */
+> +	device_init_wakeup(&pdev->dev, 1);
+> +
+> +	return ret;
+
+return 0 here instead to make it clear that this is the success path.
+
+> +
+> +err_out:
+> +	iounmap(ioaddr);
+> +	if (pdata->irq >= 0)
+> +		free_irq(pdata->irq, pdev);
+> +
+> +	return ret;
+> +}
+> +
+> +static int __devexit snvs_rtc_remove(struct platform_device *pdev)
+> +{
+> +	struct rtc_drv_data *pdata = platform_get_drvdata(pdev);
+> +	rtc_device_unregister(pdata->rtc);
+> +	if (pdata->irq >= 0)
+> +		free_irq(pdata->irq, pdev);
+> +	iounmap(pdata->ioaddr);
+> +
+> +	return 0;
+> +}
+> +
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
