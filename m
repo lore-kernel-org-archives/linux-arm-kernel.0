@@ -1,84 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 14 Apr 2012 11:13:58 +0100
-Subject: Missing initialization of pages removed with memblock_remove
-In-Reply-To: <4F7CF0EF.2090302@codeaurora.org>
-References: <4F7CF0EF.2090302@codeaurora.org>
-Message-ID: <20120414101358.GR24211@n2100.arm.linux.org.uk>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 14 Apr 2012 12:53:09 +0200
+Subject: [PATCH 3/4] iio: lpc32xx-adc: Remove driver conflict due to device
+ tree
+In-Reply-To: <1334400790-10892-1-git-send-email-stigge@antcom.de>
+References: <1334400790-10892-1-git-send-email-stigge@antcom.de>
+Message-ID: <1334400790-10892-4-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 06:10:07PM -0700, Laura Abbott wrote:
-> We seem to have hit an odd edge case related to the use of  
-> memblock_remove. We carve out memory for certain use cases using  
-> memblock_remove, which gives a layout such as:
->
-> <4>[    0.000000] Zone PFN ranges:
-> <4>[    0.000000]   Normal   0x00080200 -> 0x000a1200
-> <4>[    0.000000]   HighMem  0x000a1200 -> 0x000c0000
-> <4>[    0.000000] Movable zone start PFN for each node
-> <4>[    0.000000] early_node_map[3] active PFN ranges
-> <4>[    0.000000]     0: 0x00080200 -> 0x00088f00
-> <4>[    0.000000]     0: 0x00090000 -> 0x000ac680
-> <4>[    0.000000]     0: 0x000b7a02 -> 0x000c0000
->
-> Since pfn_valid uses memblock_is_memory, pfn_valid will return false on  
-> all memory removed with memblock_remove.
+Previously, the touchscreen and ADC drivers of the LPC32xx SoC had a Kconfig
+conflict declared because they use the same hardware. Upon the introduction of
+device tree support in both drivers, the conflict must be removed to enable
+the same kernel to support different hardware (configured via the device tree).
 
-Correct.  memblock_remove() removes the range from the 'memory' array.
-memblock_is_memory() searches the 'memory' array to discover whether
-the address is within a region described by that array.  So, having called
-memblock_remove() on a region, memblock_is_memory() will then return false
-for that region.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-This provably works, because all those platforms using arm_memblock_steal()
-and then subsequently using ioremap() on the same physical address range
-relies upon this behaviour - and this is the desired behaviour.
+---
 
-> As a result, none of the page structures for the memblock_remove regions
-> will have been initialized since memmap_init_zone calls pfn_valid before
-> trying to initialize the memmap. Normally this isn't an issue but a recent
-> test case ends up hitting a BUG_ON in move_freepages_block identical to
-> the case in  
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/059934.html
-> (BUG_ON(page_zone(start_page) != page_zone(end_page)))
+ Applies to v3.4-rc2
 
-Yes, welcome to the sad fact that sparsemem can't handle... sparse memory.
-sparsemem apparantly was designed to handle fully populated memory sections,
-but we've had some forward progress to get it sorted.  So if your memory
-size is a multiple of 1MB, and you have memory in the upper half of the 4GB
-space, you'll need an insane number of sections to cover this if you follow
-this - you will need 4GB / 1MB = 4096 sections.
+ drivers/staging/iio/adc/Kconfig |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-> What's happening is the calculation of start_page in  
-> move_freepages_block returns a page within a range removed by  
-> memblock_remove which means the page structure is uninitialized. (e.g.  
-> 0xb7a02 -> 0xb7800)
->
-> I've read through that thread and several others which have discouraged  
-> use of CONFIG_HOLES_IN_ZONE due to the runtime overhead. The best  
-> alternative solution I've come up with is to align the memory removed  
-> via memblock_remove to MAX_ORDER_NR_PAGES but this will have a very high  
-> memory overhead for certain use cases.
->
-> A more fundamental question I have is should the page structures be  
-> initialized for the regions removed with memblock_remove? Internally,  
-> we've been divided on this issue and reading the source code hasn't  
-> given any indication of if this is expected behavior or not.
-
-One of the problems with that is you may have a GB or so between memblock
-memory regions, and you certainly do not want to try and populate all
-those page structs.
-
-> Any suggestions on what's the cleanest solution?
-
-I think CONFIG_HOLES_IN_ZONE=y is the best solution short of writing a
-memory support subsystem which _can_ cope with all the various broken
-ideas of system memory layout on ARM.
-
-This would be a lot less of a problem had ARM Ltd mandated as part of
-the architecture that memory was to be contiguous (and preferably
-starting at physical address zero in normal system operation) but alas
-every silicon vendor is free to create whatever abortion they like
-here - we've even had cases where people want the order of physical
-memory reversed because the first populated memory region is at a
-higher address, which we've had to say a definite no to.
+--- linux-2.6.orig/drivers/staging/iio/adc/Kconfig
++++ linux-2.6/drivers/staging/iio/adc/Kconfig
+@@ -195,11 +195,13 @@ config MAX1363_RING_BUFFER
+ 
+ config LPC32XX_ADC
+ 	tristate "NXP LPC32XX ADC"
+-	depends on ARCH_LPC32XX && !TOUCHSCREEN_LPC32XX
++	depends on ARCH_LPC32XX
+ 	help
+ 	  Say yes here to build support for the integrated ADC inside the
+ 	  LPC32XX SoC. Note that this feature uses the same hardware as the
+-	  touchscreen driver, so you can only select one of the two drivers
+-	  (lpc32xx_adc or lpc32xx_ts). Provides direct access via sysfs.
++	  touchscreen driver, so you should either select only one of the two
++	  drivers (lpc32xx_adc or lpc32xx_ts) or, in the OpenFirmware case,
++	  activate only one via device tree selection.  Provides direct access
++	  via sysfs.
+ 
+ endmenu
