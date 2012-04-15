@@ -1,41 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 15 Apr 2012 08:53:57 +0800
-Subject: [PATCH 2/2] ARM: imx6q-arm2:: Pass GPIO for FEC PHY reset
-In-Reply-To: <1334171256-18761-2-git-send-email-festevam@gmail.com>
-References: <1334171256-18761-1-git-send-email-festevam@gmail.com>
- <1334171256-18761-2-git-send-email-festevam@gmail.com>
-Message-ID: <20120415005355.GC24997@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 14 Apr 2012 18:04:47 -0700
+Subject: [GIT PULL] Samsung fixes-2 for v3.4
+In-Reply-To: <4F89A0A5.5030806@samsung.com>
+References: <4F89A0A5.5030806@samsung.com>
+Message-ID: <CAOesGMhp48Kh+tJ1534G=ze0CEcVBpaPQxVKs8A31difVw9h9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 04:07:36PM -0300, Fabio Estevam wrote:
-> GPIO4_15 is used for FEC PHY reset.
-> 
-Is this the info you got from schematics?  The schematics on my hand
-tells something different.
+Hi,
 
-Regards,
-Shawn
+On Sat, Apr 14, 2012 at 9:07 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof,
+>
+> Please pull samsung fixes-2 for v3.4 from following:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.4-samsung-fixes-2
 
-> Pass it to the FEC driver.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q-arm2.dts |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-> index 04501d1..aa230d2 100644
-> --- a/arch/arm/boot/dts/imx6q-arm2.dts
-> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
-> @@ -29,6 +29,7 @@
->  		aips-bus at 02100000 { /* AIPS2 */
->  			enet at 02188000 {
->  				phy-mode = "rgmii";
-> +				phy-reset-gpios = <&gpio4 15 0>;
->  				status = "okay";
->  			};
->  
-> -- 
-> 1.7.1
-> 
+Pulled, thanks.
+
+> Most are for fix of build failure :( and warnings.
+> If any problems, please let me know.
+>
+> Note that according to changing the device name for sdhci controllers and
+> removing clk_type from sdhci platform_data after v3.4-rc1, need to update
+> regarding stuff in samsung arch part so I'm preparing its fix in
+> samsung-fixes-3. I will send it next turn.
+
+Looking at your current fixes-3 branch, it's unclear at a quick glance
+why the clk_type patch is a bugfix, and especially why it is a
+regression fix -- it looks like a cleanup. We're very close to 3.4-rc3
+now, so we should only be merging fixes (and ideally only regressions
+since 3.3).
+
+So, if you do need it to go into 3.4 please motivate it when you send
+the pull request.
+
+
+Thanks,
+
+-Olof
