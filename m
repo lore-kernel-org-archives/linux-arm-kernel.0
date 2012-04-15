@@ -1,41 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Apr 2012 18:04:47 -0700
-Subject: [GIT PULL] Samsung fixes-2 for v3.4
-In-Reply-To: <4F89A0A5.5030806@samsung.com>
-References: <4F89A0A5.5030806@samsung.com>
-Message-ID: <CAOesGMhp48Kh+tJ1534G=ze0CEcVBpaPQxVKs8A31difVw9h9Q@mail.gmail.com>
+Date: Sat, 14 Apr 2012 18:19:09 -0700
+Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi,
+ regulator and mmc DTS updates
+In-Reply-To: <CAOesGMg+xLrVNxF0XwO8poAtuduwEcxrXLN9pXa+T+y7kKMy7Q@mail.gmail.com>
+References: <4F612C29.40608@ti.com> <20120315004638.GW12083@atomide.com>
+ <201203150801.13183.arnd@arndb.de> <4F746CC0.9050507@ti.com>
+ <CAOesGMg+xLrVNxF0XwO8poAtuduwEcxrXLN9pXa+T+y7kKMy7Q@mail.gmail.com>
+Message-ID: <CAOesGMjJMgQF9jUUUMbm22oaEzan6eLW+-kWN9iB85buJxp4Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Benoit, Tony,
 
-On Sat, Apr 14, 2012 at 9:07 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd, Olof,
+On Thu, Mar 29, 2012 at 11:31 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Mar 29, 2012 at 7:08 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>> FYI, MMC DT adaptation just got merged, I2C, GPIO, SPI, regulator DT
+>> adaptation were already merged before, so it means that this branch can be
+>> merged to take advantage of all the DT adapted drivers.
 >
-> Please pull samsung fixes-2 for v3.4 from following:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.4-samsung-fixes-2
+> I've pulled this in as late/omap-dt, included in next/dt3 and
+> for-next. I'll let it sit in linux-next for at least one day before
+> it's sent in. Since it's just device tree additions, risk for
+> regressions should be low.
 
-Pulled, thanks.
+As you've noticed, this didn't make it into 3.4 due to the window
+closing early. :(
 
-> Most are for fix of build failure :( and warnings.
-> If any problems, please let me know.
->
-> Note that according to changing the device name for sdhci controllers and
-> removing clk_type from sdhci platform_data after v3.4-rc1, need to update
-> regarding stuff in samsung arch part so I'm preparing its fix in
-> samsung-fixes-3. I will send it next turn.
+I've renamed the branch in arm-soc to omap/dt-missed-3.4 and merged it
+into next/dt for the 3.5 merge window.
 
-Looking at your current fixes-3 branch, it's unclear at a quick glance
-why the clk_type patch is a bugfix, and especially why it is a
-regression fix -- it looks like a cleanup. We're very close to 3.4-rc3
-now, so we should only be merging fixes (and ideally only regressions
-since 3.3).
-
-So, if you do need it to go into 3.4 please motivate it when you send
-the pull request.
-
-
-Thanks,
 
 -Olof
