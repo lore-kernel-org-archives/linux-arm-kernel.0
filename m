@@ -1,40 +1,21 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 15 Apr 2012 08:49:11 +0800
-Subject: [PATCH 1/2] ARM: imx6q-arm2: Remove hardcoded mac address
-In-Reply-To: <1334171256-18761-1-git-send-email-festevam@gmail.com>
-References: <1334171256-18761-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120415004908.GB24997@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 14 Apr 2012 17:50:18 -0700
+Subject: [PATCH] ARM: OMAP: clock: cleanup CPUfreq leftovers,
+ fix build errors
+In-Reply-To: <20120413224807.GH6487@atomide.com>
+References: <1334350335-1250-1-git-send-email-khilman@ti.com>
+ <20120413224807.GH6487@atomide.com>
+Message-ID: <CAOesGMhgf0MigmeFaQditLF32L1tbmNHUJ1-ZcubVPe76zVsgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 04:07:35PM -0300, Fabio Estevam wrote:
-> Do not hardcode the local mac address.
-> 
-> Let bootloader retrieve it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Apr 13, 2012 at 3:48 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Yes let's drop the unnecessary code instead as Kevin is suggesting.
+> Please queue this directly with Olof as discussed on #armlinux:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Applied, thanks.
+Applied to fixes. Thanks!
 
-Regards,
-Shawn
 
-> ---
->  arch/arm/boot/dts/imx6q-arm2.dts |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-> index ce1c823..04501d1 100644
-> --- a/arch/arm/boot/dts/imx6q-arm2.dts
-> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
-> @@ -29,7 +29,6 @@
->  		aips-bus at 02100000 { /* AIPS2 */
->  			enet at 02188000 {
->  				phy-mode = "rgmii";
-> -				local-mac-address = [00 04 9F 01 1B 61];
->  				status = "okay";
->  			};
->  
-> -- 
-> 1.7.1
-> 
+-Olof
