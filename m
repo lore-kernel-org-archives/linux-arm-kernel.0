@@ -1,32 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 15 Apr 2012 11:29:54 -0700
-Subject: [GIT PULL] mxs: device tree support for v3.5
-In-Reply-To: <20120405013556.GI7264@S2101-09.ap.freescale.net>
-References: <20120405013556.GI7264@S2101-09.ap.freescale.net>
-Message-ID: <CAOesGMjrJe++s-tmgzs2oY1T9GVntngV71-2iqZhfWx2EiZL_g@mail.gmail.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sun, 15 Apr 2012 14:38:57 -0400
+Subject: Problem with of_irq_to_resource() and IRQ flags
+Message-ID: <CAKON4OwjBEsDb4=TvS_WkK-9dabHgLm0+Vgkprse9tSs6+bo8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2012 at 6:36 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Hi Arnd, Olof,
->
-> Please pull the mxs basic device tree support for -next, so that people
-> can start playing and contributing mxs device tree conversion. ?Thanks.
->
-> Regards,
-> Shawn
->
-> ---
-> The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
->
-> ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
->
-> are available in the git repository at:
-> ?git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/dt
+I'm trying to enable the dm9000 driver for DT support.  I've run into
+a problem with the interrupt flags. The dm9000 driver is expecting to
+get them passed in on the resource flags:
 
-Thanks, pulled.
+unsigned long irqflags = db->irq_res->flags & IRQF_TRIGGER_MASK;
 
-Sorry for the delay, we've been late at starting up the branches for 3.5.
+But of_irq_to_resource() is not adding them:
 
+		r->flags = IORESOURCE_IRQ;
 
--Olof
+Now if I trace into of_irq_to_resource() it calls
+irq_of_parse_and_map() which calls irq_create_of_mapping() which then
+calls  domain->ops->dt_translate() to get the flags.  So we have the
+flags down the callstack but passing them back means adding a
+parameter to a public API.
+
+I can't see any API to ask an irq for its current flags. That would be
+another way to get them and add them to the resource.
+
+Any other options?
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
