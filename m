@@ -1,21 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 15 Apr 2012 11:19:06 -0700
-Subject: [GIT PULL] i.MX board feature patches
-In-Reply-To: <20120411083342.GM3852@pengutronix.de>
-References: <20120411083342.GM3852@pengutronix.de>
-Message-ID: <CAOesGMhakTpuXWnHUnJqiEbzPBeXE1digiyJ+LeoPbjhyFAoLA@mail.gmail.com>
+Date: Sun, 15 Apr 2012 11:23:02 -0700
+Subject: [GIT PULL] i.MX cleanup patches for next
+In-Reply-To: <20120411084403.GN3852@pengutronix.de>
+References: <20120411084403.GN3852@pengutronix.de>
+Message-ID: <CAOesGMhk9tGokNwy1kdFDB+G08OYEEq9Uf1Qu=K=T8ufick2ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Apr 11, 2012 at 1:33 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+
+On Wed, Apr 11, 2012 at 1:44 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > Hi Arnd, Olof,
 >
-> Please pull the following board feature patches for i.MX
+> Please pull the following i.MX cleanup patches for next.
 >
-> Thanks
-> ?Sascha
+> Sascha
 >
 > The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
 >
@@ -23,31 +23,30 @@ On Wed, Apr 11, 2012 at 1:33 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 >
 > are available in the git repository at:
 >
-> ?git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-features-board-20120411
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-cleanup-20120411
 >
-> for you to fetch changes up to e7259f7ca3a0c7a269fecb61156224ddd3edb92c:
+> for you to fetch changes up to b0843e814737756a38003afe663a626653b66f58:
 >
-> ?Visstrim_M10: Add board version detection. (2012-04-11 10:16:03 +0200)
->
-> ----------------------------------------------------------------
-> misc i.MX board specific features
+> ?efikamx: match machine descriptions with legacy (2012-04-02 11:20:38 +0200)
 >
 > ----------------------------------------------------------------
-> Alex Gershgorin (1):
-> ? ? ?ARM: regulator: i.MX35-PDK Add regulator support
+> i.MX misc cleanups
 >
-> Javier Martin (1):
-> ? ? ?Visstrim_M10: Add board version detection.
+> ----------------------------------------------------------------
+> Hector Oron (1):
+> ? ? ?efikamx: match machine descriptions with legacy
+>
+> Uwe Kleine-K?nig (1):
+> ? ? ?ARM: imx/mx21ads: remove unneeded cast
 
+Same comment as on the other pull request regarding prefix on the efikamx patch.
 
-Just because I've already have given you the "please keep this in mind
-in the future" comments before, I'm going to ask you to respin this
-branch and fix the patch subjects on the two above patches. The first
-should probably be "ARM: imx: Add regulator support for i.MX35-PDK" or
-so, and the second one needs "ARM: imx:" prefix.
+Also, no need to date the tags -- the tag itself contains the date
+(Linus has been complaining to people who add redundant data to the
+tag contents when they send tags to him).
 
-Branch otherwise looks reasonable, so respin with that fixed and we'll
-pull it in.
+Branch contents otherwise looks OK, so respin and send a fresh pull
+request and we'll merge it in.
 
 
 -Olof
