@@ -1,57 +1,109 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 15 Apr 2012 19:29:58 +0200
-Subject: [PATCH 1/3] pinctrl: pinctrl-imx: add imx pinctrl core driver
-In-Reply-To: <20120415141736.GG24997@S2101-09.ap.freescale.net>
-References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
- <20120414134814.GA3852@pengutronix.de>
- <CAA+hA=T0FAfuGKcW0vAKO+OWyFdM-6vQqVo53xKf8y28m7gPOQ@mail.gmail.com>
- <20120415141736.GG24997@S2101-09.ap.freescale.net>
-Message-ID: <20120415172958.GG20478@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 15 Apr 2012 10:56:40 -0700
+Subject: [GIT PULL] ARM: fixes for 3.4-rc
+Message-ID: <CAOesGMgk1vAByHXSZ+S7Ucnxo5-CK_Hibg5XUUN6zwrRHJkMpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 15, 2012 at 10:17:43PM +0800, Shawn Guo wrote:
-> On Sun, Apr 15, 2012 at 11:49:04AM +0800, Dong Aisheng wrote:
-> ...
-> I'm thinking about documenting the definition we used to have in
-> iomux-mx*.h in the binding document and assign id to each of them
-> in order.
-> 
-> pinmux						id
-> ------						--
-> MX6Q_PAD_SD2_DAT1__USDHC2_DAT1			0
-> MX6Q_PAD_SD2_DAT1__ECSPI5_SS0			1
-> MX6Q_PAD_SD2_DAT1__WEIM_WEIM_CS_2		2
-> ...
-> 
-> The ordering between the list and imx6q_pin_regs[] array need to match.
-> 
-> By looking at the binding document, we can just put pinmux-id into
-> property "fsl,pins" (maybe rename it to "fsl,pinmux-ids") to get the
-> desired pinmux settings.  With doing so, we can gain the following.
-> 
-> 1) The pinmux-id can be used as index to locate the entry in array
->    imx6q_pin_regs[], so that the slow string lookup can be avoid.
-> 
-> 2) Property "fsl,mux" can be dropped, as it's been encoded in
->    imx6q_pin_regs[] entry.
-> 
-> 3) Converting the existing board files to device tree will be much
->    easier.  We only need to find the pinmux-id of those existing
->    definitions and put them in "fsl, pinmux-ids".
-> 
-> 4) When DTC support macro, we can simply move the pinmux-id list from
->    binding document into dts file.  No driver change is needed at all.
+Hi Linus,
 
-How far are we away from getting macro support? Do we already agree that we
-want to have such a feature? I remember I saw someone mentioning it,
-maybe even by piping the devicetree though CPP, but I didn't follow the
-further discussion.
 
-Sascha
+The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/fixes-for-linus
+
+for you to fetch changes up to 961a238c38a2716511dbd8e0f34d49dd46160007:
+
+  Merge branch 'v3.4-samsung-fixes-2' of
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into
+fixes (2012-04-14 17:50:45 -0700)
+
+----------------------------------------------------------------
+
+ARM: a few more SoC fixes for 3.4-rc
+
+* A handful of warning and build fixes for Qualcomm MSM
+* Build/warning and bug fixes for Samsung Exynos
+* A fix from Rob Herring that removes misplaced interrupt-parent
+  properties from a few device trees
+* A fix to OMAP dealing with cpufreq build errors, removing some of the
+  offending code since it was redundant anyway
+
+----------------------------------------------------------------
+Daniel Walker (2):
+      arm: msm: halibut: remove unneeded fixup
+      arm: msm: trout: fix compile failure
+
+David Brown (2):
+      video: msm: Fix section mismatches in mddi.c
+      ARM: msm: Fix section mismatches in proc_comm.c
+
+Jonghwan Choi (1):
+      ARM: EXYNOS: Fix compile error in exynos5250-cpufreq.c
+
+Kevin Hilman (1):
+      ARM: OMAP: clock: cleanup CPUfreq leftovers, fix build errors
+
+Kukjin Kim (1):
+      ARM: S5PV210: fix unused LDO supply field from wm8994_pdata
+
+Marek Szyprowski (3):
+      ARM: EXYNOS: fix regulator name for NURI board
+      ARM: EXYNOS: set fix xusbxti clock for NURI and Universal210 boards
+      ARM: EXYNOS: Remove broken config values for touchscren for NURI board
+
+Maurus Cuelenaere (1):
+      ARM: SAMSUNG: make SAMSUNG_PM_DEBUG select DEBUG_LL
+
+Olof Johansson (2):
+      Merge branch 'msm-fix' of
+git://git.kernel.org/.../davidb/linux-msm into fixes
+      Merge branch 'v3.4-samsung-fixes-2' of
+git://git.kernel.org/.../kgene/linux-samsung into fixes
+
+Rob Herring (1):
+      ARM: dts: remove blank interrupt-parent properties
+
+Sachin Kamat (2):
+      ARM: S5PV210: Fix compiler warning in dma.c file
+      ARM: EXYNOS: Fix Kconfig dependencies for device tree enabled
+machine files
+
+Thomas Abraham (1):
+      ARM: EXYNOS: Add PDMA and MDMA physical base address defines
+
+Tushar Behera (1):
+      ARM: EXYNOS: Add missing definition for IRQ_I2S0
+
+ arch/arm/boot/dts/at91sam9g20.dtsi             |    1 -
+ arch/arm/boot/dts/at91sam9g45.dtsi             |    1 -
+ arch/arm/boot/dts/at91sam9x5.dtsi              |    1 -
+ arch/arm/boot/dts/db8500.dtsi                  |    1 -
+ arch/arm/boot/dts/highbank.dts                 |    1 -
+ arch/arm/mach-exynos/Kconfig                   |    2 +
+ arch/arm/mach-exynos/include/mach/irqs.h       |    2 +
+ arch/arm/mach-exynos/include/mach/map.h        |    4 ++
+ arch/arm/mach-exynos/include/mach/regs-clock.h |    6 ++
+ arch/arm/mach-exynos/mach-exynos5-dt.c         |    2 +-
+ arch/arm/mach-exynos/mach-nuri.c               |   46 +-------------
+ arch/arm/mach-exynos/mach-universal_c210.c     |    2 +
+ arch/arm/mach-msm/board-halibut.c              |    3 -
+ arch/arm/mach-msm/board-trout-panel.c          |    1 +
+ arch/arm/mach-msm/board-trout.c                |    1 +
+ arch/arm/mach-msm/proc_comm.c                  |    2 +-
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c   |   80 ------------------------
+ arch/arm/mach-omap2/clock.c                    |    5 --
+ arch/arm/mach-omap2/clock.h                    |    8 ---
+ arch/arm/mach-s5pv210/dma.c                    |    2 -
+ arch/arm/mach-s5pv210/mach-aquila.c            |    4 +-
+ arch/arm/mach-s5pv210/mach-goni.c              |    4 +-
+ arch/arm/plat-omap/clock.c                     |   26 --------
+ arch/arm/plat-omap/include/plat/clock.h        |   10 ---
+ arch/arm/plat-samsung/Kconfig                  |    1 +
+ drivers/video/msm/mddi.c                       |    8 +--
+ 26 files changed, 31 insertions(+), 193 deletions(-)
