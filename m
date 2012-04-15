@@ -1,30 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Apr 2012 17:45:58 -0700
-Subject: [GIT PULL] msm fixes for 3.4rc
-In-Reply-To: <20120413180840.GA17558@codeaurora.org>
-References: <20120413180840.GA17558@codeaurora.org>
-Message-ID: <CAOesGMh_bkgpe0atL2TEirpkZXXiTL+auqzg-r+=uWndKUr8og@mail.gmail.com>
+Date: Sat, 14 Apr 2012 17:47:50 -0700
+Subject: [PATCH] ARM: dts: remove blank interrupt-parent properties
+In-Reply-To: <1334243848-29522-1-git-send-email-robherring2@gmail.com>
+References: <1334243848-29522-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAOesGMhxxAN+Uo-o3hV81Z+e7YHwvQ9cnDYE+7n+3qj3RVsFDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 11:08 AM, David Brown <davidb@codeaurora.org> wrote:
-> Arnd/Olof. ?Here are some fixes for msm that fix problems caused by
-> the latest ARM code. ?The ones from Daniel remove unneeded fixups that
-> now cause compilation failures. ?Mine fix section mismatches, that
-> were incompletely fixed earlier.
+On Thu, Apr 12, 2012 at 8:17 AM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> Thanks,
-> David
+> These were incorrectly introduced and can cause problems for of_irq_init.
 >
-> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+> The correct way to define a root controller is no interrupt-parent set at
+> all or the interrupt-parent is set to the root controller itself when
+> inherited from a parent node.
 >
-> ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> Arnd, Olof,
 >
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git msm-fix
+> Please apply for 3.4.
 
-Thanks, pulled.
+Thanks, applied.
 
 
 -Olof
