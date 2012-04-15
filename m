@@ -1,70 +1,99 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 14 Apr 2012 22:04:26 -0500
-Subject: [PATCH 4/7] dt/clock: Add handling for fixed clocks and a clock
- node setup iterator
-In-Reply-To: <20120409232723.GD18692@S2101-09.ap.freescale.net>
-References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
- <1331680947-29861-5-git-send-email-robherring2@gmail.com>
- <20120314075930.GF21337@S2101-09.ap.freescale.net>
- <4F81A53B.7020804@gmail.com>
- <20120409084930.GA18692@S2101-09.ap.freescale.net> <4F82EFB3.80402@gmail.com>
- <20120409232723.GD18692@S2101-09.ap.freescale.net>
-Message-ID: <4F8A3ABA.2080201@gmail.com>
+Date: Sat, 14 Apr 2012 22:15:40 -0500
+Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
+In-Reply-To: <CAA+hA=RpfLfUyupVqBpMHsRN1h5KG5eLD86DkDygZRk5nCUtqA@mail.gmail.com>
+References: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
+ <4F381F6C.1030908@gmail.com>
+ <CAA+hA=RpfLfUyupVqBpMHsRN1h5KG5eLD86DkDygZRk5nCUtqA@mail.gmail.com>
+Message-ID: <4F8A3D5C.8030001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2012 06:27 PM, Shawn Guo wrote:
-> On Mon, Apr 09, 2012 at 09:18:27AM -0500, Rob Herring wrote:
-> ...
->> You still haven't given any benefits of supporting multiple clocks. It's
->> slightly fewer dts lines, but not really anything else.
->>
-> What's more important than fewer dts lines is fewer nodes.  Isn't it
-> the whole point of #clock-cells?  In the real imx example I gave, with
-> #clock-cells support, I can have only one node to represent 3 fixed
-> clocks.
-
-So you want to have generic bindings for every clock which implies a
-bunch of nodes if not a node per clock anyway, but then object to 3
-nodes for fixed clocks.
-
-I don't think I've ever seen a chip with more than 3 clock inputs
-anyway. There are cases with additional clocks like a CMOS sensor or
-audio chip which provides a fixed input clock, but those clocks should
-reside with the nodes that generate them.
-
-> ...
->> I don't think people are going to define clocks generically in DT at the
->> mux, clk gate and divider level anyway. If you only have a few clocks
->> then you may, and 1 clock output per node is probably okay. If you have
->> hundreds of clocks then you probably won't, and will have a SOC specific
->> binding anyway.
->>
-> Why?
+On 04/13/2012 01:07 PM, Dong Aisheng wrote:
+> Hi Rob,
 > 
-> Take a look at clk-imx6q.c[1], you will find except pll and pfd, all
-> the imx6q clocks are represented as gate, divider and mux, and we
-> should not need a SoC specific binding for them.
-> 
+> On Mon, Feb 13, 2012 at 4:22 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 02/11/2012 11:22 AM, Dong Aisheng wrote:
+>>> Currently most code to get child count in kernel are almost same,
+>>> add a helper to implement this function for dt to use.
+>>>
+>>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> ---
+>>> Hi Rob,
+>>>
+>>> Since my imx pinctrl driver series still depends on the pinctrl core dt
+>>> binding patch which is still not in mainline, i'd like this pure dt patch
+>>> go separately first in case others want to use.
+>>>
+>>
+>> Applied for 3.4.
+>>
+> I did not see this in 3.4 kernel.
+> Anything i missed?
+> My pinctrl-imx driver i just sent is using this.
 
-I'm talking about the bindings and you are pointing me to an
-implementation with no bindings. It's 2 different things. The
-implementation can fully be the generic clk implementations, but the
-clock bindings can still be either a node per clock or a monolithic
-clock module node. There is no fixed rule here and there should not be.
-We can each chose what works best for us.
-
-I see a couple of examples that your clocks are still SoC specific
-despite your claims.
-
-Your clock gates may reuse clk_gate struct, but they still have custom
-ops to handle the 2-bit field. Obviously, you decided not to merge 2-bit
-field support into the existing clk gate code (the correct decision
-IMHO). I made a similar decision.
-
-For practically every clock, you need to set the spinlock to
-imx_ccm_lock. How are you going to know which clocks to set this lock
-for with a "generic" binding? You have to distinguish those from IPU
-clocks for example.
+Sorry, I did not get this sent to Grant in time. Go ahead and merge it
+with your pinctrl driver.
 
 Rob
+
+> 
+> Regards
+> Dong Aisheng
+> 
+>> Rob
+>>
+>>> changes v2->v3:
+>>>  Addressed some people's comments:
+>>>  * do not use assignment as expression
+>>>  * return 0 for non-dt case
+>>>
+>>> Changes v1->v2:
+>>>  * change the name from of_get_child_number to of_get_child_count
+>>> ---
+>>>  include/linux/of.h |   16 ++++++++++++++++
+>>>  1 files changed, 16 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/include/linux/of.h b/include/linux/of.h
+>>> index a75a831..ae242ef 100644
+>>> --- a/include/linux/of.h
+>>> +++ b/include/linux/of.h
+>>> @@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
+>>>       for (child = of_get_next_child(parent, NULL); child != NULL; \
+>>>            child = of_get_next_child(parent, child))
+>>>
+>>> +static inline int of_get_child_count(const struct device_node *np)
+>>> +{
+>>> +     struct device_node *child = NULL;
+>>> +     int num = 0;
+>>> +
+>>> +     while ((child = of_get_next_child(np, child)) != NULL)
+>>> +             num++;
+>>> +
+>>> +     return num;
+>>> +}
+>>> +
+>>>  extern struct device_node *of_find_node_with_property(
+>>>       struct device_node *from, const char *prop_name);
+>>>  #define for_each_node_with_property(dn, prop_name) \
+>>> @@ -268,6 +279,11 @@ static inline bool of_have_populated_dt(void)
+>>>  #define for_each_child_of_node(parent, child) \
+>>>       while (0)
+>>>
+>>> +static inline int of_get_child_count(const struct device_node *np)
+>>> +{
+>>> +     return 0;
+>>> +}
+>>> +
+>>>  static inline int of_device_is_compatible(const struct device_node *device,
+>>>                                         const char *name)
+>>>  {
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
