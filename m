@@ -1,31 +1,45 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sun, 15 Apr 2012 14:38:57 -0400
-Subject: Problem with of_irq_to_resource() and IRQ flags
-Message-ID: <CAKON4OwjBEsDb4=TvS_WkK-9dabHgLm0+Vgkprse9tSs6+bo8g@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 15 Apr 2012 23:20:55 +0200
+Subject: [git pull] Renesas DT changes for v3.5
+Message-ID: <201204152320.56147.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm trying to enable the dm9000 driver for DT support.  I've run into
-a problem with the interrupt flags. The dm9000 driver is expecting to
-get them passed in on the resource flags:
+Hi,
 
-unsigned long irqflags = db->irq_res->flags & IRQF_TRIGGER_MASK;
+Please pull changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
 
-But of_irq_to_resource() is not adding them:
+    Linux 3.4-rc2
 
-		r->flags = IORESOURCE_IRQ;
+with top-most commit 3b7b70552afe351a8bd8fff1eb2d60aab2206576:
 
-Now if I trace into of_irq_to_resource() it calls
-irq_of_parse_and_map() which calls irq_create_of_mapping() which then
-calls  domain->ops->dt_translate() to get the flags.  So we have the
-flags down the callstack but passing them back means adding a
-parameter to a public API.
+    ARM: mach-shmobile: sh7372 generic board support via DT V2
 
-I can't see any API to ask an irq for its current flags. That would be
-another way to get them and add them to the resource.
+from the git repository at:
 
-Any other options?
+  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git dt
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+to receive material requisite for preliminary support of device trees on
+Renesas platforms.
+
+Thanks!
+
+
+ arch/arm/boot/dts/sh7372.dtsi                |   21 +++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |    2 +
+ arch/arm/mach-shmobile/include/mach/intc.h   |   44 +++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/irqs.h   |    2 +-
+ arch/arm/mach-shmobile/intc-sh7372.c         |   34 ++++++++++++------
+ arch/arm/mach-shmobile/setup-sh7372.c        |   48 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/timer.c               |   17 +++++++++
+ 7 files changed, 155 insertions(+), 13 deletions(-)
+
+---------------
+
+Magnus Damm (6):
+      ARM: mach-shmobile: Introduce shmobile_setup_delay()
+      ARM: mach-shmobile: Introduce INTC_IRQ_PINS_16H
+      ARM: mach-shmobile: Use 0x3400 as INTCS vector offset
+      ARM: mach-shmobile: Use INTC_IRQ_PINS_16H on sh7372
+      ARM: mach-shmobile: Rework sh7372 INTCS demuxer V2
+      ARM: mach-shmobile: sh7372 generic board support via DT V2
