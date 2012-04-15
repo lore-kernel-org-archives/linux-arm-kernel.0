@@ -1,123 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 15 Apr 2012 08:11:26 +0800
-Subject: [PATCH] ARM: dts: Add basic support for imx6q-sabresd
-In-Reply-To: <1334238933-32281-1-git-send-email-fabio.estevam@freescale.com>
-References: <1334238933-32281-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120415001122.GA24997@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 14 Apr 2012 17:33:03 -0700
+Subject: [PATCH 1/5] ARM: tegra: Add pllc clock init table
+In-Reply-To: <1334356926-4275-1-git-send-email-swarren@wwwdotorg.org>
+References: <1334356926-4275-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120415003303.GA10967@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 10:55:33AM -0300, Fabio Estevam wrote:
-> Add basic support for imx6q-sabresd board.
+On Fri, Apr 13, 2012 at 04:42:02PM -0600, Stephen Warren wrote:
+> From: Allen Martin <amartin@nvidia.com>
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> (cherry picked from commit 54f28b336f2ba3da93a459d22e32944823960d08
+> in the chromeos-2.6.38 kernel)
+> 
+> swarren adds:
+
+The above 4 lines make no sense for upstream, so you can just say "from the
+Chrome OS 2.6.38 tree" or similar.
+
+> pll_c will be used as a clock source. Fill in tegra_pll_c_freq_table[]
+> so that it's possible to explicitly initialize the PLL.
+> 
+> NVIDIA's downstream nv-3.1 kernel and the ChromeOS kernel have different
+> pll_c tables. nv-3.1 contains entries for 522MHz and 598MHz output,
+> whereas the ChromeOS kernel contains entries for 600MHz output. I chose
+> to upstream the ChromeOS values for now, since the 600MHz rate appears
+> to match the default rate of this PLL when the HW boots.
+> 
+> Signed-off-by: Allen Martin <amartin@nvidia.com>
+> Signed-off-by: Olof Johansson <olofj@chromium.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  arch/arm/boot/dts/imx6q-sabresd.dts |   61 +++++++++++++++++++++++++++++++++++
->  1 files changed, 61 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6q-sabresd.dts
-
-Add imx6q-sabresd.dtb into target dtb-$(CONFIG_SOC_IMX6Q) in
-arch/arm/mach-imx/Makefile.boot.
-
+>  arch/arm/mach-tegra/tegra2_clocks.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-> new file mode 100644
-> index 0000000..77a6f92
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-> @@ -0,0 +1,61 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx6q.dtsi"
-> +
-> +/ {
-> +	model = "Freescale i.MX6Q SabreSD Board";
-
-I would expect "SabreSD" be "SABRE Smart Device".
-
-> +	compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
-
-The compatible needs to be documented in
-Documentation/devicetree/bindings/arm/fsl.txt.
-
-> +
-> +	memory {
-> +		reg = <0x10000000 0x80000000>;
-> +	};
-> +
-> +	soc {
-> +
-> +		aips-bus at 02000000 { /* AIPS1 */
-> +			spba-bus at 02000000 {
-> +				uart1: uart at 02020000 {
-> +				status = "okay";
-> +				};
-> +			};
-> +		};
-> +
-> +		aips-bus at 02100000 { /* AIPS2 */
-> +			enet at 02188000 {
-> +				phy-mode = "rgmii";
-> +				phy-reset-gpios = <&gpio1 25 0>;
-
-Have you tested fec driver with this setting?  I see the following.
-
-PHY: 2188000.enet-1:01 - Link is Up - 100/Full
-ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
-Sending DHCP requests ...
-eth0: no IPv6 routers present
-... timed out!
-IP-Config: Reopening network devices...
-eth0: Freescale FEC PHY driver [Generic PHY] (mii_bus:phy_addr=2188000.enet-1:01, irq=-1)
-Sending DHCP requests .
-PHY: 2188000.enet-1:01 - Link is Up - 100/Full
-..
-eth0: no IPv6 routers present
-.
-
-But fec seems working fine with above line removed.
-
-> +				status = "okay";
-> +			};
-> +
-> +			usdhc at 02198000 { /* uSDHC3 */
-> +				cd-gpios = <&gpio2 0 0>;
-> +				wp-gpios = <&gpio2 1 0>;
-> +				vmmc-supply = <&reg_3p3v>;
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +
-> +		reg_3p3v: 3p3v {
-> +			compatible = "regulator-fixed";
-
-Are you sure the regulator supplying SD is fixed-voltage?  I'm seeing
-it comes from a PMIC.
-
-Regards,
-Shawn
-
-> +			regulator-name = "3P3V";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-> +	};
-> +};
+> diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+> index cf4999b..0bf0f2d 100644
+> --- a/arch/arm/mach-tegra/tegra2_clocks.c
+> +++ b/arch/arm/mach-tegra/tegra2_clocks.c
+> @@ -1486,6 +1486,10 @@ static struct clk tegra_clk_m = {
+>  };
+>  
+>  static struct clk_pll_freq_table tegra_pll_c_freq_table[] = {
+> +	{ 12000000, 600000000, 600, 12, 1, 8 },
+> +	{ 13000000, 600000000, 600, 13, 1, 8 },
+> +	{ 19200000, 600000000, 500, 16, 1, 6 },
+> +	{ 26000000, 600000000, 600, 26, 1, 8 },
+>  	{ 0, 0, 0, 0, 0, 0 },
+>  };
+>  
 > -- 
-> 1.7.1
+> 1.7.0.4
+> 
