@@ -1,34 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Apr 2012 10:54:19 -0600
-Subject: [PATCH] ARM: tegra: update defconfig
-Message-ID: <1334595259-12305-1-git-send-email-swarren@wwwdotorg.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 16 Apr 2012 11:06:24 -0600
+Subject: [PATCH V4 1/5] of: Implement managed of_iomap()
+In-Reply-To: <CAOh2x=mptNGkRB-+930Uim=Op9erOxreeTL=3+qfoFeVpWNEYQ@mail.gmail.com>
+References: <cover.1334548272.git.viresh.kumar@st.com>
+ <6a0872f9d8959bc9d66d179e4911d6f09a219b42.1334548272.git.viresh.kumar@st.com>
+ <201204161442.38725.arnd@arndb.de>
+ <CACxGe6tec7y-9VNb9vNiPZhN6bt5MuMV0J18P_7Gk_pDwk-V=Q@mail.gmail.com>
+ <CAOh2x=n0NfovyfCpcdoMo2a7yLtb=imm1U+R-1L-2ihZ52FUhw@mail.gmail.com>
+ <CACxGe6tZhdvoJ60N8g5-P4UHWxB=699_bA2omEQa77u1hEEPrg@mail.gmail.com>
+ <CAOh2x=mptNGkRB-+930Uim=Op9erOxreeTL=3+qfoFeVpWNEYQ@mail.gmail.com>
+Message-ID: <CACxGe6t9+M5jQKkRduup7_wk4SKYu1SuTz7wzf0MEvo0poojRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Mon, Apr 16, 2012 at 10:21 AM, viresh kumar <viresh.linux@gmail.com> wrote:
+> On 4/16/12, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> It isn't recommended anymore. Use the bus_type specific helpers instead.
+>
+> Ok. So here is fixup for 3/5 of this patchset.
+>
+> @Linus: I will merge this with PACH 3/5 and send pull request to Arnd.
+>
+> fixup! pinctrl: Add SPEAr pinctrl drivers
 
-New options enabled:
-* RUNTIME_PM
+Cool, thanks.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Note: I intend to squash all defconfig changes into a single patch when
-applying. This is the only change I currently have though.
+Now what you *could* do is something like devm_platform_ioremap() that
+gets the resource, does request_region() and ioremap().  That would
+cut a lot of boilerplate out of drivers.  :-)
 
- arch/arm/configs/tegra_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 351d670..66c2dce 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -45,6 +45,7 @@ CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--- 
-1.7.0.4
+g.
