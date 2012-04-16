@@ -1,40 +1,46 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 16 Apr 2012 22:07:24 +0800
-Subject: [PATCH 2/3] pinctrl: a minor fix of pin config debug information
-In-Reply-To: <1334585244-10249-1-git-send-email-b29396@freescale.com>
-References: <1334585244-10249-1-git-send-email-b29396@freescale.com>
-Message-ID: <1334585244-10249-2-git-send-email-b29396@freescale.com>
+From: t.stanislaws@samsung.com (Tomasz Stanislawski)
+Date: Mon, 16 Apr 2012 15:58:55 +0200
+Subject: [PATCHv2 8/8] media/video/s5p-tv: mark const init data with
+ __initconst instead of __initdata
+In-Reply-To: <1334584735-12439-1-git-send-email-t.stanislaws@samsung.com>
+References: <1334584735-12439-1-git-send-email-t.stanislaws@samsung.com>
+Message-ID: <1334584735-12439-9-git-send-email-t.stanislaws@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+As long as there is no other non-const variable marked __initdata in the
+same compilation unit it doesn't hurt. If there were one however
+compilation would fail with
+
+	error: $variablename causes a section type conflict
+
+because a section containing const variables is marked read only and so
+cannot contain non-const variables.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Tomasz Stanislawski <t.stanislaws@samsung.com>
+Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-media at vger.kernel.org
 ---
- drivers/pinctrl/pinconf.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/media/video/s5p-tv/mixer_drv.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-index 384dcc1..5d231b3 100644
---- a/drivers/pinctrl/pinconf.c
-+++ b/drivers/pinctrl/pinconf.c
-@@ -455,7 +455,7 @@ static int pinconf_pins_show(struct seq_file *s, void *what)
- 		return 0;
- 
- 	seq_puts(s, "Pin config settings per pin\n");
--	seq_puts(s, "Format: pin (name): pinmux setting array\n");
-+	seq_puts(s, "Format: pin (name): configs\n");
- 
- 	mutex_lock(&pinctrl_mutex);
- 
-@@ -506,7 +506,7 @@ static int pinconf_groups_show(struct seq_file *s, void *what)
- 		return 0;
- 
- 	seq_puts(s, "Pin config settings per pin group\n");
--	seq_puts(s, "Format: group (name): pinmux setting array\n");
-+	seq_puts(s, "Format: group (name): configs\n");
- 
- 	mutex_lock(&pinctrl_mutex);
- 
+diff --git a/drivers/media/video/s5p-tv/mixer_drv.c b/drivers/media/video/s5p-tv/mixer_drv.c
+index a2c0c25..edca065 100644
+--- a/drivers/media/video/s5p-tv/mixer_drv.c
++++ b/drivers/media/video/s5p-tv/mixer_drv.c
+@@ -461,7 +461,7 @@ static struct platform_driver mxr_driver __refdata = {
+ static int __init mxr_init(void)
+ {
+ 	int i, ret;
+-	static const char banner[] __initdata = KERN_INFO
++	static const char banner[] __initconst = KERN_INFO
+ 		"Samsung TV Mixer driver, "
+ 		"(c) 2010-2011 Samsung Electronics Co., Ltd.\n";
+ 	printk(banner);
 -- 
-1.7.0.4
+1.7.5.4
