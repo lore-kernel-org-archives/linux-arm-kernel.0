@@ -1,56 +1,51 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Mon, 16 Apr 2012 15:35:38 +0530
-Subject: [PATCH] ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
-In-Reply-To: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAMrsUdLMugSaq74ke+1pdu9sUbAd7av61sB+hywTiZiOoxy-zQ@mail.gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Mon, 16 Apr 2012 19:09:53 +0900
+Subject: [PATCH 2/2] ARM: Exynos4: update SYSMMU setup code for gen_pd
+ power domain driver
+In-Reply-To: <1334154871-4756-3-git-send-email-m.szyprowski@samsung.com>
+References: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
+ <1334154871-4756-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAHQjnOMnxFvPGYxpvXTxKRU7aSOEKfcpOaBUnYikNwk=WRevbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 11:25 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> The current serial UART code, while fidling with ocp idlemode bits,
-> forget about the smart idle wakeup bit even if it is supported by
-> UART IP block. This will lead to missing the module wakeup on OMAP's
-> where the smart idle wakeup is supported.
+On Wed, Apr 11, 2012 at 11:34 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> SYSMMU platform devices must be registered before setting up power
+> domains to let power domain driver to correctly register also SYSMMU
+> controller devices. This patch also registers SYSMMU controller devices
+> to respective power domains.
 >
-> This was the root cause of the console sluggishness issue, I have been
-> observing on OMAP4 devices and also can be potential reason for some
-> other UART wakeup issues.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Govindraj.R <govindraj.raja@ti.com>
-
-Acked-by: Govindraj.R <govindraj.raja@ti.com>
-
-Adding to git://gitorious.org/linux-3-x/omap-serial.git  for_3.4/uart_fixes
-
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> ?arch/arm/mach-omap2/serial.c | ? ?8 +++++++-
-> ?1 files changed, 7 insertions(+), 1 deletions(-)
+> ?arch/arm/mach-exynos/dev-sysmmu.c | ? ?6 +++++-
+> ?arch/arm/mach-exynos/pm_domains.c | ? 13 +++++++++++++
+> ?2 files changed, 18 insertions(+), 1 deletions(-)
 >
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index c9503a7..b28aae1 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -108,8 +108,14 @@ static void omap_uart_set_noidle(struct platform_device *pdev)
-> ?static void omap_uart_set_smartidle(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct omap_device *od = to_omap_device(pdev);
-> + ? ? ? u8 idlemode;
+> diff --git a/arch/arm/mach-exynos/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
+> index c5b1ea3..3544638 100644
+> --- a/arch/arm/mach-exynos/dev-sysmmu.c
+> +++ b/arch/arm/mach-exynos/dev-sysmmu.c
+> @@ -271,4 +271,8 @@ static int __init init_sysmmu_platform_device(void)
 >
-> - ? ? ? omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_SMART);
-> + ? ? ? if (od->hwmods[0]->class->sysc->idlemodes & SIDLE_SMART_WKUP)
-> + ? ? ? ? ? ? ? idlemode = HWMOD_IDLEMODE_SMART_WKUP;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? idlemode = HWMOD_IDLEMODE_SMART;
-> +
-> + ? ? ? omap_hwmod_set_slave_idlemode(od->hwmods[0], idlemode);
+> ? ? ? ?return 0;
 > ?}
->
-> ?#else
-> --
-> 1.7.5.4
->
+> -arch_initcall(init_sysmmu_platform_device);
+> +/*
+> + * SYSMMU platform devices must be registered before power domains
+> + * see pm_domain.c, which use arch_initcall()
+> + */
+> +core_initcall(init_sysmmu_platform_device);
+I don't understand why init_sysmmu_platform_device() must be called before
+exynos4_pm_init_power_domain()?
+
+Other devices also added by an arch_initcall() function which calls
+mdesc->init_machine().
+I also was unable to find any reason to add devices before registering
+the devices
+to pm domain.
+
+Regards,
+
+KyongHo.
