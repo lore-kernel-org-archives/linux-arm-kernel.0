@@ -1,362 +1,414 @@
 From: hong.xu@atmel.com (Hong Xu)
-Date: Mon, 16 Apr 2012 17:39:25 +0800
-Subject: [PATCH v2 1/3] AT91: Add DT description files for AT91SAM9N12-EK
+Date: Mon, 16 Apr 2012 17:39:27 +0800
+Subject: [PATCH v2 3/3] AT91: Add machine files for AT91SAM9N12 SoC
 In-Reply-To: <1334569167-7064-1-git-send-email-hong.xu@atmel.com>
 References: <1334569167-7064-1-git-send-email-hong.xu@atmel.com>
-Message-ID: <1334569167-7064-2-git-send-email-hong.xu@atmel.com>
+Message-ID: <1334569167-7064-4-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Added AT91SAM9N12 SoC DT file, as well as the board definition file
-for AT91SAM9N12-EK.
 
 Signed-off-by: Hong Xu <hong.xu@atmel.com>
 ---
 Changes since v1,
-* Removed offset for memory node according to Ludovic's comment
-* Changed compatibility string for various peripherals
-* Removed <okay> status for tcb0/1 because they're enabled by default
-* Removed PMECC related bindings
+* Added DT entry in Makefile.boot
+* Removed board compatibility string (AT91 will use a generic name)
 
- arch/arm/boot/dts/at91sam9n12.dtsi  |  223 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts |   99 ++++++++++++++++
- 2 files changed, 322 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91sam9n12.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9n12ek.dts
+ arch/arm/mach-at91/Kconfig       |    9 ++
+ arch/arm/mach-at91/Makefile      |    1 +
+ arch/arm/mach-at91/Makefile.boot |    2 +
+ arch/arm/mach-at91/at91sam9n12.c |  275 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/clock.c       |   15 ++-
+ arch/arm/mach-at91/setup.c       |    6 +
+ 6 files changed, 303 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-at91/at91sam9n12.c
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 45db05d..8fc8fb4 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -105,6 +105,15 @@ config ARCH_AT91SAM9X5
+ 	select HAVE_NET_MACB
+ 	select HAVE_AT91_DBGU0
+ 
++config ARCH_AT91SAM9N12
++	bool "AT91SAM9N12 SoC"
++	select CPU_ARM926T
++	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
++	select HAVE_AT91_DBGU0
++	help
++	  Select this if you are using Atmel's AT91SAM9N12 SoC.
++
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+ 	select ARCH_USES_GETTIMEOFFSET
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 8512e53..7ab5f5f 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -21,6 +21,7 @@ obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devi
+ obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9X5)	+= at91sam9x5.o at91sam926x_time.o sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9N12)	+= at91sam9n12.o at91sam926x_time.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
+ 
+ # AT91RM9200 board-specific support
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index 0da66ca..29b6cfe 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -20,3 +20,5 @@ dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9g20.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9m10g45ek.dtb
+ # sam9x5
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g25ek.dtb
++# sam9n12
++dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9n12ek.dtb
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
 new file mode 100644
-index 0000000..2013c0a
+index 0000000..5187b95
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -0,0 +1,223 @@
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -0,0 +1,275 @@
 +/*
-+ * at91sam9n12.dtsi - Device Tree include file for AT91SAM9N12 SoC
++ * SoC specific setup code for the AT91SAM9N12
 + *
-+ *  Copyright (C) 2012 Atmel,
-+ *                2012 Hong Xu <hong.xu@atmel.com>
++ * Copyright (C) 2012 Atmel Corporation.
 + *
 + * Licensed under GPLv2 or later.
 + */
 +
-+/include/ "skeleton.dtsi"
++#include <linux/module.h>
++#include <linux/dma-mapping.h>
 +
-+/ {
-+	model = "Atmel AT91SAM9N12 SoC";
-+	compatible = "atmel,at91sam9n12";
-+	interrupt-parent = <&aic>;
++#include <asm/irq.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <mach/at91sam9n12.h>
++#include <mach/at91_pmc.h>
++#include <mach/cpu.h>
++#include <mach/board.h>
 +
-+	aliases {
-+		serial0 = &dbgu;
-+		serial1 = &usart0;
-+		serial2 = &usart1;
-+		serial3 = &usart2;
-+		serial4 = &usart3;
-+		gpio0 = &pioA;
-+		gpio1 = &pioB;
-+		gpio2 = &pioC;
-+		gpio3 = &pioD;
-+		tcb0 = &tcb0;
-+		tcb1 = &tcb1;
-+	};
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,arm926ejs";
-+		};
-+	};
++#include "soc.h"
++#include "generic.h"
++#include "clock.h"
++#include "sam9_smc.h"
 +
-+	memory {
-+		reg = <0x20000000 0x10000000>;
-+	};
++/* --------------------------------------------------------------------
++ *  Clocks
++ * -------------------------------------------------------------------- */
 +
-+	ahb {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		apb {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			aic: interrupt-controller at fffff000 {
-+				#interrupt-cells = <2>;
-+				compatible = "atmel,at91rm9200-aic";
-+				interrupt-controller;
-+				interrupt-parent;
-+				reg = <0xfffff000 0x200>;
-+			};
-+
-+			ramc0: ramc at ffffe800 {
-+				compatible = "atmel,at91sam9g45-ddramc";
-+				reg = <0xffffe800 0x200>;
-+			};
-+
-+			pmc: pmc at fffffc00 {
-+				compatible = "atmel,at91rm9200-pmc";
-+				reg = <0xfffffc00 0x100>;
-+			};
-+
-+			rstc at fffffe00 {
-+				compatible = "atmel,at91sam9g45-rstc";
-+				reg = <0xfffffe00 0x10>;
-+			};
-+
-+			pit: timer at fffffe30 {
-+				compatible = "atmel,at91sam9260-pit";
-+				reg = <0xfffffe30 0xf>;
-+				interrupts = <1 4>;
-+			};
-+
-+
-+			shdwc at fffffe10 {
-+				compatible = "atmel,at91sam9x5-shdwc";
-+				reg = <0xfffffe10 0x10>;
-+			};
-+
-+			tcb0: timer at f8008000 {
-+				compatible = "atmel,at91sam9x5-tcb";
-+				reg = <0xf8008000 0x100>;
-+				interrupts = <17 4>;
-+			};
-+
-+			tcb1: timer at f800c000 {
-+				compatible = "atmel,at91sam9x5-tcb";
-+				reg = <0xf800c000 0x100>;
-+				interrupts = <17 4>;
-+			};
-+
-+			dma: dma-controller at ffffec00 {
-+				compatible = "atmel,at91sam9g45-dma";
-+				reg = <0xffffec00 0x200>;
-+				interrupts = <20 4>;
-+			};
-+
-+			pioA: gpio at fffff400 {
-+				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+				reg = <0xfffff400 0x100>;
-+				interrupts = <2 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			pioB: gpio at fffff600 {
-+				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+				reg = <0xfffff600 0x100>;
-+				interrupts = <2 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			pioC: gpio at fffff800 {
-+				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+				reg = <0xfffff800 0x100>;
-+				interrupts = <3 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			pioD: gpio at fffffa00 {
-+				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+				reg = <0xfffffa00 0x100>;
-+				interrupts = <3 4>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffff200 0x200>;
-+				interrupts = <1 4>;
-+				status = "disabled";
-+			};
-+
-+			usart0: serial at f801c000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf801c000 0x4000>;
-+				interrupts = <5 4>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "disabled";
-+			};
-+
-+			usart1: serial at f8020000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf8020000 0x4000>;
-+				interrupts = <6 4>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "disabled";
-+			};
-+
-+			usart2: serial at f8024000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf8024000 0x4000>;
-+				interrupts = <7 4>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "disabled";
-+			};
-+
-+			usart3: serial at f8028000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf8028000 0x4000>;
-+				interrupts = <8 4>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "disabled";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			compatible = "atmel,at91rm9200-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = < 0x40000000 0x10000000
-+				0xffffe000 0x00000600
-+				0xffffe600 0x00000200
-+				0x00100000 0x00100000
-+			       >;
-+			atmel,nand-addr-offset = <21>;
-+			atmel,nand-cmd-offset = <22>;
-+			gpios = <&pioD 5 0
-+				 &pioD 4 0
-+				 0
-+				>;
-+			status = "disabled";
-+		};
-+
-+		usb0: ohci at 00500000 {
-+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
-+			reg = <0x00500000 0x00100000>;
-+			interrupts = <22 4>;
-+			status = "disabled";
-+		};
-+	};
-+
-+	i2c at 0 {
-+		compatible = "i2c-gpio";
-+		gpios = <&pioA 30 0 /* sda */
-+			 &pioA 31 0 /* scl */
-+			>;
-+		i2c-gpio,sda-open-drain;
-+		i2c-gpio,scl-open-drain;
-+		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-new file mode 100644
-index 0000000..62dc605
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -0,0 +1,99 @@
 +/*
-+ * at91sam9n12ek.dts - Device Tree file for AT91SAM9N12-EK board
-+ *
-+ *  Copyright (C) 2012 Atmel,
-+ *                2012 Hong Xu <hong.xu@atmel.com>
-+ *
-+ * Licensed under GPLv2 or later.
++ * The peripheral clocks.
 + */
-+/dts-v1/;
-+/include/ "at91sam9n12.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9N12-EK";
-+	compatible = "atmel,at91sam9n12ek", "atmel,at91sam9n12", "atmel,at91sam9";
-+
-+	chosen {
-+		bootargs = "mem=128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=jffs2";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x10000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <16000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt;
-+			status = "okay";
-+
-+			boot at 0 {
-+				label = "bootstrap/uboot/kernel";
-+				reg = <0x0 0x400000>;
-+			};
-+
-+			rootfs at 400000 {
-+				label = "rootfs";
-+				reg = <0x400000 0x3C00000>;
-+			};
-+
-+			data at 4000000 {
-+				label = "data";
-+				reg = <0x4000000 0xC000000>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		d8 {
-+			label = "d8";
-+			gpios = <&pioB 4 1>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		d9 {
-+			label = "d6";
-+			gpios = <&pioB 5 1>;
-+			linux,default-trigger = "nand-disk";
-+		};
-+
-+		d10 {
-+			label = "d7";
-+			gpios = <&pioB 6 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		enter {
-+			label = "Enter";
-+			gpios = <&pioB 4 1>;
-+			linux,code = <28>;
-+			gpio-key,wakeup;
-+		};
-+	};
++static struct clk pioAB_clk = {
++	.name		= "pioAB_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_PIOAB,
++	.type		= CLK_TYPE_PERIPHERAL,
 +};
++static struct clk pioCD_clk = {
++	.name		= "pioCD_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_PIOCD,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk usart0_clk = {
++	.name		= "usart0_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_USART0,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk usart1_clk = {
++	.name		= "usart1_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_USART1,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk usart2_clk = {
++	.name		= "usart2_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_USART2,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk usart3_clk = {
++	.name		= "usart3_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_USART3,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk twi0_clk = {
++	.name		= "twi0_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_TWI0,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk twi1_clk = {
++	.name		= "twi1_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_TWI1,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk mmc_clk = {
++	.name		= "mci_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_MCI,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk spi0_clk = {
++	.name		= "spi0_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_SPI0,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk spi1_clk = {
++	.name		= "spi1_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_SPI1,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk uart0_clk = {
++	.name		= "uart0_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_UART0,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk uart1_clk = {
++	.name		= "uart1_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_UART1,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk tcb_clk = {
++	.name		= "tcb_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_TCB,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk pwm_clk = {
++	.name		= "pwm_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_PWM,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk adc_clk = {
++	.name		= "adc_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_ADC,
++	.type	= CLK_TYPE_PERIPHERAL,
++};
++static struct clk dma_clk = {
++	.name		= "dma_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_DMA,
++	.type	= CLK_TYPE_PERIPHERAL,
++};
++static struct clk uhp_clk = {
++	.name		= "uhp",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_UHP,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk udp_clk = {
++	.name		= "udp_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_UDP,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk lcdc_clk = {
++	.name		= "lcdc_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_LCDC,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++static struct clk ssc_clk = {
++	.name		= "ssc_clk",
++	.pmc_mask	= 1 << AT91SAM9N12_ID_SSC,
++	.type		= CLK_TYPE_PERIPHERAL,
++};
++
++static struct clk *periph_clocks[] __initdata = {
++	&pioAB_clk,
++	&pioCD_clk,
++	&usart0_clk,
++	&usart1_clk,
++	&usart2_clk,
++	&usart3_clk,
++	&twi0_clk,
++	&twi1_clk,
++	&mmc_clk,
++	&spi0_clk,
++	&spi1_clk,
++	&lcdc_clk,
++	&uart0_clk,
++	&uart1_clk,
++	&tcb_clk,
++	&pwm_clk,
++	&adc_clk,
++	&dma_clk,
++	&uhp_clk,
++	&udp_clk,
++	&ssc_clk,
++};
++
++static struct clk_lookup periph_clocks_lookups[] = {
++	/* lookup table for DT entries */
++	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
++	CLKDEV_CON_DEV_ID("usart", "f801c000.serial", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "f8020000.serial", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "f8024000.serial", &usart2_clk),
++	CLKDEV_CON_DEV_ID("usart", "f8028000.serial", &usart3_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
++	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
++	CLKDEV_CON_ID("pioA", &pioAB_clk),
++	CLKDEV_CON_ID("pioB", &pioAB_clk),
++	CLKDEV_CON_ID("pioC", &pioCD_clk),
++	CLKDEV_CON_ID("pioD", &pioCD_clk),
++	/* additional fake clock for macb_hclk */
++	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &uhp_clk),
++	CLKDEV_CON_DEV_ID("ohci_clk", "500000.ohci", &uhp_clk),
++};
++
++/*
++ * The two programmable clocks.
++ * You must configure pin multiplexing to bring these signals out.
++ */
++static struct clk pck0 = {
++	.name		= "pck0",
++	.pmc_mask	= AT91_PMC_PCK0,
++	.type		= CLK_TYPE_PROGRAMMABLE,
++	.id		= 0,
++};
++static struct clk pck1 = {
++	.name		= "pck1",
++	.pmc_mask	= AT91_PMC_PCK1,
++	.type		= CLK_TYPE_PROGRAMMABLE,
++	.id		= 1,
++};
++
++static void __init at91sam9n12_register_clocks(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
++		clk_register(periph_clocks[i]);
++	clk_register(&pck0);
++	clk_register(&pck1);
++
++	clkdev_add_table(periph_clocks_lookups,
++			 ARRAY_SIZE(periph_clocks_lookups));
++
++}
++
++/* --------------------------------------------------------------------
++ *  AT91SAM9N12 processor initialization
++ * -------------------------------------------------------------------- */
++
++static void __init at91sam9n12_map_io(void)
++{
++	at91_init_sram(0, AT91SAM9N12_SRAM_BASE, AT91SAM9N12_SRAM_SIZE);
++}
++
++void __init at91sam9n12_initialize(void)
++{
++	at91_extern_irq = (1 << AT91SAM9N12_ID_IRQ0);
++
++	/* Register GPIO subsystem (using DT) */
++	at91_gpio_init(NULL, 0);
++}
++
++/* --------------------------------------------------------------------
++ *  Interrupt initialization
++ * -------------------------------------------------------------------- */
++/*
++ * The default interrupt priority levels (0 = lowest, 7 = highest).
++ */
++static unsigned int at91sam9n12_default_irq_priority[NR_AIC_IRQS] __initdata = {
++	7,	/* 00: Advanced Interrupt Controller (FIQ) */
++	7,	/* 01: System Peripherals */
++	1,	/* 02: Parallel IO Controller A and B */
++	1,	/* 03: Parallel IO Controller C and D */
++	4,	/* 04: FUSE Controller */
++	5,	/* 05: USART 0 */
++	5,	/* 06: USART 1 */
++	5,	/* 07: USART 2 */
++	5,	/* 08: USART 3 */
++	6,	/* 09: Two-Wire Interface 0 */
++	6,	/* 10: Two-Wire Interface 1 */
++	0,	/* 11: Reserved */
++	0,	/* 12: Multimedia Card Interface */
++	5,	/* 13: Serial Peripheral Interface 0 */
++	5,	/* 14: Serial Peripheral Interface 1 */
++	5,	/* 15: UART 0 */
++	5,	/* 16: UART 1 */
++	0,	/* 17: Timer Counter 0, 1, 2, 3, 4 and 5 */
++	0,	/* 18: Pulse Width Modulation Controller */
++	0,	/* 19: ADC Controller */
++	0,	/* 20: DMA Controller */
++	0,	/* 21: Reserved */
++	2,	/* 22: USB Host High Speed port */
++	2,	/* 23: USB Device High speed port */
++	3,	/* 24: Reserved */
++	3,	/* 25: LDC Controller or Image Sensor Interface */
++	0,	/* 26: Reserved */
++	3,	/* 27: Reserved */
++	4,	/* 28: Synchronous Serial Controller */
++	4,	/* 29: Reserved */
++	4,	/* 30: TRNG */
++	0,	/* 31: Advanced Interrupt Controller (IRQ0) */
++};
++
++struct at91_init_soc __initdata at91sam9n12_soc = {
++	.map_io = at91sam9n12_map_io,
++	.default_irq_priority = at91sam9n12_default_irq_priority,
++	.register_clocks = at91sam9n12_register_clocks,
++	.init = at91sam9n12_initialize,
++};
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index a0f4d74..46130da 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -57,13 +57,15 @@ void __iomem *at91_pmc_base;
+ 
+ #define cpu_has_800M_plla()	(  cpu_is_at91sam9g20() \
+ 				|| cpu_is_at91sam9g45() \
+-				|| cpu_is_at91sam9x5())
++				|| cpu_is_at91sam9x5() \
++				|| cpu_is_at91sam9n12())
+ 
+ #define cpu_has_300M_plla()	(cpu_is_at91sam9g10())
+ 
+ #define cpu_has_pllb()		(!(cpu_is_at91sam9rl() \
+ 				|| cpu_is_at91sam9g45() \
+-				|| cpu_is_at91sam9x5()))
++				|| cpu_is_at91sam9x5() \
++				|| cpu_is_at91sam9n12()))
+ 
+ #define cpu_has_upll()		(cpu_is_at91sam9g45() \
+ 				|| cpu_is_at91sam9x5())
+@@ -77,12 +79,15 @@ void __iomem *at91_pmc_base;
+ 				|| cpu_is_at91sam9x5()))
+ 
+ #define cpu_has_plladiv2()	(cpu_is_at91sam9g45() \
+-				|| cpu_is_at91sam9x5())
++				|| cpu_is_at91sam9x5() \
++				|| cpu_is_at91sam9n12())
+ 
+ #define cpu_has_mdiv3()		(cpu_is_at91sam9g45() \
+-				|| cpu_is_at91sam9x5())
++				|| cpu_is_at91sam9x5() \
++				|| cpu_is_at91sam9n12())
+ 
+-#define cpu_has_alt_prescaler()	(cpu_is_at91sam9x5())
++#define cpu_has_alt_prescaler()	(cpu_is_at91sam9x5() \
++				|| cpu_is_at91sam9n12())
+ 
+ static LIST_HEAD(clocks);
+ static DEFINE_SPINLOCK(clk_lock);
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 97cc04d..34c9c27 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -142,6 +142,11 @@ static void __init soc_detect(u32 dbgu_base)
+ 		at91_soc_initdata.type = AT91_SOC_SAM9X5;
+ 		at91_boot_soc = at91sam9x5_soc;
+ 		break;
++
++	case ARCH_ID_AT91SAM9N12:
++		at91_soc_initdata.type = AT91_SOC_SAM9N12;
++		at91_boot_soc = at91sam9n12_soc;
++		break;
+ 	}
+ 
+ 	/* at91sam9g10 */
+@@ -209,6 +214,7 @@ static const char *soc_name[] = {
+ 	[AT91_SOC_SAM9G45]	= "at91sam9g45",
+ 	[AT91_SOC_SAM9RL]	= "at91sam9rl",
+ 	[AT91_SOC_SAM9X5]	= "at91sam9x5",
++	[AT91_SOC_SAM9N12]	= "at91sam9n12",
+ 	[AT91_SOC_NONE]		= "Unknown"
+ };
+ 
 -- 
 1.7.10
