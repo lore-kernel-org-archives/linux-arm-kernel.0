@@ -1,23 +1,23 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 16 Apr 2012 18:34:56 +0300
-Subject: [RFC PATCH] cpuidle: allow per cpu latencies
-In-Reply-To: <20120410102857.GA22721@tbergstrom-lnx.Nvidia.com>
-References: <1333619620-21201-1-git-send-email-pdeschrijver@nvidia.com>
- <4F7DA009.4010802@linux.intel.com>
- <CAMQu2gzwe0F3qcaTqASEPUASdG1SjpUxrBrSp-RrYLgy3W24OQ@mail.gmail.com>
- <4F7F0D52.8080305@linaro.org>
- <20120410102857.GA22721@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20120416153456.GB514@tbergstrom-lnx.Nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Apr 2012 15:40:08 +0000
+Subject: [PATCH 00/12] at91: 3.4-rc3 fixes
+In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
+References: <cover.1334567594.git.nicolas.ferre@atmel.com>
+Message-ID: <201204161540.08389.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> Maybe we also want to make the 'disabled' flag per CPU then or provide some
-> other way the number of C states can be different per CPU?
+On Monday 16 April 2012, Nicolas Ferre wrote:
+> Here is another fixes series for AT91 that will go on top of 3.4-rc3.
+> We experienced some issues while compiling some drivers as modules: Joachim has
+> corrected several of them. We may reduce this number of exported values by
+> reworking some drivers, in the future.
+> Some drivers are also modified here, I would like to keep them in the series
+> as the modifications are really related with our recent move to irqdomains or
+> simply related with compiler annotations.
 
-What do you think about this? Do we also want to make the disabled flag per
-CPU? Or how should we deal with a different number of C states per CPU?
+I looked at all the patches, they look good to me, but patch 9 does not
+seem to be an actual bug-fix rather than a cleanup, so you might want
+to put that into a different series.
 
-Thanks,
-
-Peter.
+	Arnd
