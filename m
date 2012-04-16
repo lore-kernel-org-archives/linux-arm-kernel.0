@@ -1,33 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 16 Apr 2012 10:45:00 -0700
-Subject: [PATCH v3 2/6] ARM: local timers: Add A15 architected timer
- support
-In-Reply-To: <1334592810-4382-3-git-send-email-marc.zyngier@arm.com>
-References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
- <1334592810-4382-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4F8C5A9C.9000506@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Apr 2012 10:58:49 -0700
+Subject: [PATCH] OMAP: fix DMA vs memory ordering
+In-Reply-To: <20120414132435.GS24211@n2100.arm.linux.org.uk>
+References: <20120414132435.GS24211@n2100.arm.linux.org.uk>
+Message-ID: <20120416175849.GI6487@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/12 09:13, Marc Zyngier wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index cf006d4..68c382d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1543,6 +1543,13 @@ config HAVE_ARM_SCU
->  	help
->  	  This option enables support for the ARM system coherency unit
->  
-> +config ARM_ARCH_TIMER
-> +	bool "Architected timer support"
-> +	depends on CPU_V7
-> +	select TICK_ONESHOT
+Hi,
 
-I believe TICK_ONESHOT is a "hidden" option that should not be selected
-outside the generic clockevents layer. It seems Russell and Thomas have
-talked about this too, see 3872c48 (tick: Document TICK_ONESHOT config
-option, 2012-03-31).
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120414 06:27]:
+> Using coherent DMA memory with the OMAP DMA engine results in
+> unpredictable behaviour due to memory ordering issues; as things stand,
+> there is no guarantee that data written to coherent DMA memory will be
+> visible to the DMA hardware.
+> 
+> This is because the OMAP dma_write() accessor contains no barriers,
+> necessary on ARMv6 and above.  The effect of this can be seen in comments
+> in the OMAP serial driver, which incorrectly talks about cache flushing
+> for the coherent DMA stuff.
+> 
+> Rather than adding barriers to the accessors, add it in the DMA support
+> code just before we enable DMA, and just after we disable DMA.  This
+> avoids having barriers for every DMA register access.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Good catch.
+
+I guess what you're saying is we don't want to do mb() for each completed
+transfer that calls the driver specific callback function?
+
+Other than that:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
