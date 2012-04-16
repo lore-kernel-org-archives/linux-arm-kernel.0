@@ -1,52 +1,30 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Tue, 17 Apr 2012 09:21:41 +1000
-Subject: mc13xxx: add I2C support, V5
-In-Reply-To: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-References: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <201204170921.42027.marc@cpdesign.com.au>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Mon, 16 Apr 2012 18:37:48 -0500
+Subject: [PATCH] ARM: imx: Fix imx5 idle logic bug
+Message-ID: <1334619468-25680-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+The imx5_idle() check of the tzic_eanble_wake() return value uses
+incorrect (inverted) logic causing all attempt to idle to fail.
 
+Signed-off-by: Robert Lee <rob.lee@linaro.org>
+---
+ arch/arm/mach-imx/mm-imx5.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Sunday, April 01, 2012 04:41:35 PM Marc Reilly wrote:
-> This series (against mfd-2.6/for-next) changes the mc13xxx driver to use
-> regmap and adds I2C support.
-> It has a compile dependency on regmap/for-next, as the spi driver uses the
-> recently added pad_bits config field.
-
-(bump).
-
-Are these changes OK to go in?
-
-Cheers,
-Marc
-
-
-
-> 
-> Patch 2/4 has:
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Patch 4/4 has:
-> Signed-off-by: Oskar Schirmer <oskar@scara.com>
-> 
-> Changes since:
-> V4:
-> - Fix compile error when CONFIG_OF enabled
-> - Select REGMAP_I2C and REGMAP_SPI for appropriate drivers.
-> 
-> V3:
-> - spi driver uses padded register format (reads should actually work now!)
-> - mc13873 removed from I2C driver
-> - fix memory leak on probe error
-> 
-> Cheers,
-> Marc
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index 05250ae..e10f391 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -35,7 +35,7 @@ static void imx5_idle(void)
+ 	}
+ 	clk_enable(gpc_dvfs_clk);
+ 	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+-	if (tzic_enable_wake() != 0)
++	if (!tzic_enable_wake())
+ 		cpu_do_idle();
+ 	clk_disable(gpc_dvfs_clk);
+ }
+-- 
+1.7.10
