@@ -1,58 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 16 Apr 2012 08:39:56 +0200
-Subject: [PATCH 0/4] ARM: Exynos4: NURI and UniversalC210 fixes for
- v3.4-rc2
-In-Reply-To: <4F899CAF.6080906@samsung.com>
-References: <1333698206-12348-1-git-send-email-m.szyprowski@samsung.com>
- <4F84686D.60606@samsung.com>
- <00c101cd17ae$4582f0d0$d088d270$%szyprowski@samsung.com>
- <4F899CAF.6080906@samsung.com>
-Message-ID: <003401cd1b9b$bd602cd0$38208670$%szyprowski@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 16 Apr 2012 07:18:11 +0000
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <alpine.DEB.2.00.1204130440390.25832@utopia.booyaka.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204130440390.25832@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9EDCA9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-On Saturday, April 14, 2012 5:50 PM Kukjin Kim wrote:
-
-> >>> I've just checked the support for Samsung NURI and UniversalC210 boards
-> >>> in v3.4-rc1 and found some issues. The attached patches fixes the
-> >>> leftovers from missing s3c-sdhci driver changes, fixes division by
-> >>> zero caused by missing initial value for xusbxti clock and removes broken
-> >>> optional configuration entries for touch screen driver. It would be great
-> >>> if the attached patches will get merged to v3.4-rcX series.
-> >>>
-> >> OK, looks good to me, applied.
-> >
-> > Huh, it doesn't look that easy...
-> >
-> > I've just noticed that v3.4-rc2 comes with missing s3c-sdhci driver patches
-> > (see commit 1ddca05743525), so you need a bit more work on your fixes branch
-> > to get sdhci working again. Please restore patches 'ARM: EXYNOS: use
-> > 'exynos4-sdhci' as device name for sdhci controllers' and 'ARM: SAMSUNG:
-> > remove all uses of clk_type member in sdhci platform data' as well as the
-> > other patches which fixes issues after changing the name of sdhci platform
-> > devices from s3c-sdhci to exynos4-sdhci. My patch 'ARM: EXYNOS: fix SDHCI
-> > support on NURI and UniversalC210 boards' should be dropped then.
-> >
-> > If you have any problems, let me know, I have them already collected and
-> > rebased onto v3.4-rc2, so I can resend an updated version.
+On Fri, Apr 13, 2012 at 16:13:07, Paul Walmsley wrote:
+> Hi Vaibhav,
 > 
-> Thanks for your reminder. I re-worked Thomas' patches you said for it
-> and you can check it in my -next and -fixes-3 and I'm looking at that.
+> On Fri, 13 Apr 2012, Hiremath, Vaibhav wrote:
+> 
+> > Yes, we are using am3517evm file for AM33XX MACHINE_INIT definition here.
+> > These patches have been reviewed and accepted in the list, only thing is
+> > they couldn't make it to upstream during v3.4 merge window.
+> > 
+> > I believe Tony is going to push them for v3.5 now.
+> 
+> Hmm, but if you modify the AM3517EVM board file to call 
+> am33xx_init_early(), won't that break the AM3517EVM board?
+> Wouldn't a separate board file be needed for the AM33xx?
+> 
+Paul,
+It has been taken care of in Makefile,
 
-Thanks, now it is much better. 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 49f92bc..f51ce0b 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -236,6 +236,7 @@ obj-$(CONFIG_MACH_CRANEBOARD)               += board-am3517crane.o
+ obj-$(CONFIG_MACH_SBC3530)             += board-omap3stalker.o
+ obj-$(CONFIG_MACH_TI8168EVM)           += board-ti8168evm.o
+ obj-$(CONFIG_MACH_TI8148EVM)           += board-ti8168evm.o
++obj-$(CONFIG_MACH_AM335XEVM)           += board-am3517evm.o
 
-The only missing thing are host_caps2 entry updates, which I've posted a few 
-minutes ago in '[PATCH for v3.4-rc3] ARM: Samsung: add missing 
-MMC_CAP2_BROKEN_VOLTAGE capability' mail.
 
-I would also like to remind that UniversalC210 board requires 'ARM: Exynos4:
-use s5p-timer for UniversalC210 board' bugfix/workaround to work with recent 
-kernels. Any chance to get this patch merged? It has been (re)posted many 
-times since v3.2-rc1 if I remember correctly...
+Thanks,
+Vaibhav
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> 
+> - Paul
+> 
