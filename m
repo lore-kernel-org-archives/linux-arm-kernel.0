@@ -1,54 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Apr 2012 11:38:22 +0100
-Subject: [PATCH] CLKDEV: Add helper routines to allocate and add
- clkdevs for given struct clk *
-In-Reply-To: <4F8BF4DD.2080501@st.com>
-References: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
- <20120416102503.GA32687@glitch> <4F8BF4DD.2080501@st.com>
-Message-ID: <20120416103822.GU24211@n2100.arm.linux.org.uk>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Mon, 16 Apr 2012 16:10:29 +0530
+Subject: [GIT PULL]: omap-serial updates for 3.4-rc
+In-Reply-To: <CAMrsUdJ7wzX+Hnx_wBWNnCQz__0sMw8ruFGVWH+x3NGWG0NVQw@mail.gmail.com>
+References: <1334052148-10385-1-git-send-email-govindraj.raja@ti.com>
+ <CAMrsUdKDhuDLr2=0uiQtY=r4pvmJQo=pJgERRCXySLghO7yGXA@mail.gmail.com>
+ <CAMrsUdJ7wzX+Hnx_wBWNnCQz__0sMw8ruFGVWH+x3NGWG0NVQw@mail.gmail.com>
+Message-ID: <CAMrsUdJ9ehjC4-hChddQRnH0BtpFG3bVBTnm6zFZpU6F0za_bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 04:00:53PM +0530, Viresh Kumar wrote:
-> On 4/16/2012 3:55 PM, Domenico Andreoli wrote:
-> > On Mon, Apr 16, 2012 at 10:49:37AM +0530, Viresh Kumar wrote:
-> >> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> >> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> >> +int clk_register_single_clkdev(struct clk *clk, const char *dev_id,
-> >> +		const char *con_id)
-> >> +{
-> >> +	struct clk_lookup *cl;
-> >> +
-> >> +	if (!clk || (!dev_id && !con_id))
-> >> +		return -ENOMEM;
-> > 
-> > I would return -EINVAL here.
-> 
-> Will fix it.
+On Mon, Apr 16, 2012 at 12:52 PM, Raja, Govindraj <govindraj.raja@ti.com> wrote:
+> Hi Tony,
+>
+> On Tue, Apr 10, 2012 at 3:36 PM, Raja, Govindraj <govindraj.raja@ti.com> wrote:
+>> CC'ing Linux-ARM
+>>
+>>
+>> On Tue, Apr 10, 2012 at 3:32 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
+>>> Hi Tony,
+>>>
+>>> Please Pull the following omap uart changes.
+>>> Changes basically involves getting rid of cpu checks
+>>> for populating erratas and features and move the same
+>>> from serial.c to omap-serial.c, MVR reg is used to find
+>>> uart versions and errata flags are populated accordingly.
+>
+> here [1] is the updated pull request I have incorporated even the
+> serial mux fixes done along with previous changes.
+>
 
-Do we actually need this kind of check?
+Updated request [1]
 
-> >> +int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
-> >> +{
-> >> +	unsigned i;
-> >> +
-> >> +	if (!clk || !cl || !num)
-> >> +		return -ENOMEM;
-> > 
-> > I would return -EINVAL here as well.
-> 
-> Will fix this too.
+After adding Santosh's serial fix to use smartidle wakeup if available from
+hwmod.
 
-Ditto.
+--
+Thanks,
+Govindraj.R
 
-I don't think these checks actually help anyone, especially if the user
-forgets to check the return value (which makes them silent errors.)
+[1]:
 
-If you're going to abuse the interface by passing a NULL clk_lookup or
-num=0 then you deserve to get a big fat oops to tell you that you messed
-up.  Same for NULL dev_id and con_id above.
+The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
 
-Checking for NULL clk (or IS_ERR(clk)) and returning -ENOMEM does make
-sense as I mentioned in my original proposal (it allows you to pass the
-returned value from clk_register() directly to this function without
-further checking, and you get the right error code.
+  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+
+are available in the git repository at:
+
+  git://gitorious.org/linux-3-x/omap-serial.git for_3.4/uart_fixes
+
+for you to fetch changes up to 381772fefe13e73fc3d01c462d401785767c3775:
+
+  ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+(2012-04-16 15:46:26 +0530)
+
+----------------------------------------------------------------
+Govindraj.R (5):
+      OMAP2+: UART: Remove cpu checks for populating errata flags
+      OMAP2+: UART: enable tx wakeup bit for wer reg
+      OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
+      OMAP2+: UART: Fix incorrect population of default uart pads
+      OMAP2+: UART: Add mechanism to probe uart pins and configure rx wakeup
+
+Santosh Shilimkar (1):
+      ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+
+ arch/arm/mach-omap2/mux.c                     |    3 +-
+ arch/arm/mach-omap2/mux.h                     |   10 ++
+ arch/arm/mach-omap2/serial.c                  |  198 +++++++++----------------
+ arch/arm/plat-omap/include/plat/omap-serial.h |    9 +-
+ drivers/tty/serial/omap-serial.c              |   83 ++++++++++-
+ 5 files changed, 172 insertions(+), 131 deletions(-)
