@@ -1,64 +1,46 @@
-From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
-Date: Mon, 16 Apr 2012 22:51:33 +0200
-Subject: [PATCH] CLKDEV: Add helper routines to allocate and add clkdevs
- for given struct clk *
-In-Reply-To: <20120416204609.GA8548@glitch>
-References: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
- <20120416102503.GA32687@glitch> <4F8BF4DD.2080501@st.com>
- <20120416103822.GU24211@n2100.arm.linux.org.uk>
- <CAOh2x=kXeDOeZbAACOjKiwfdEniXkvAuFbrJ+rmgw=rq_gHQAg@mail.gmail.com>
- <20120416204609.GA8548@glitch>
-Message-ID: <20120416205133.GW3852@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 16 Apr 2012 22:52:59 +0200
+Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
+In-Reply-To: <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+Message-ID: <20120416205259.GI20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 10:46:09PM +0200, Domenico Andreoli wrote:
-> On Mon, Apr 16, 2012 at 07:09:32PM +0530, viresh kumar wrote:
-> > V2:
-> > 
-> > From: Russell King <rmk+kernel@arm.linux.org.uk>
-> > CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
-> > 
-> > With common clock framework, clks are allocated at runtime. Some of them require
-> > clkdevs to be allocated and added in global clkdev list.
-> > 
-> > This patch introduces helper routines to:
-> > 
-> >  - allocate and add single clkdev for a single clk structure.
-> >  - add multiple clkdevs for a single clk structure.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> > ---
-> > +struct clk_lookup * __init_refok
-> > +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
-> > +{
-> > +	struct clk_lookup * cl;
-> > +	va_list ap = NULL;
+On Wed, Apr 11, 2012 at 06:02:51PM -0700, Mike Turquette wrote:
+> This patch is the basic clk version of 'clk: core: copy parent_names &
+> return error codes'.
 > 
-> gcc complains because of this initialization:
+> The registration functions are changed to allow the core code to copy
+> the array of strings and allow platforms to declare those arrays as
+> __initdata.
 > 
-> drivers/clk/clkdev.c: In function 'clkdev_alloc':
-> drivers/clk/clkdev.c:149:2: error: invalid initializer
-> drivers/clk/clkdev.c: In function 'clk_register_single_clkdev':
-> drivers/clk/clkdev.c:197:2: error: invalid initializer
-> make[2]: *** [drivers/clk/clkdev.o] Error 1
-> make[1]: *** [drivers/clk] Error 2
+> This patch also converts all of the basic clk registration functions to
+> return error codes which better aligns them with the existing clk.h api.
 > 
 > 
-> so I finally tested it with this modification:
-> 
-> 	if (dev_fmt) {
-> 		va_start(ap, dev_fmt);
-> 		cl = clkdev_alloc_valist(clk, con_id, dev_fmt, ap);
-> 		va_end(ap);
-> 	} else
-> 		cl = clkdev_alloc(clk, con_id, NULL);
+> + */
+>  struct clk *clk_register_divider(struct device *dev, const char *name,
+>  		const char *parent_name, unsigned long flags,
+>  		void __iomem *reg, u8 shift, u8 width,
+>  		u8 clk_divider_flags, spinlock_t *lock)
+>  {
+>  	struct clk_divider *div;
+> -	struct clk *clk;
+> +	struct clk *clk = ERR_PTR(-ENOMEM);
+> +	const char *parent_names[1];
+>  
+> +	/* allocate the divider */
+>  	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
+> -
+>  	if (!div) {
+>  		pr_err("%s: could not allocate divider clk\n", __func__);
+>  		return NULL;
 
-Same here. The correct fix is simply not to initialize ap.
+You missed a conversion to ERR_PTR here.
 
 Sascha
-
 
 -- 
 Pengutronix e.K.                           |                             |
