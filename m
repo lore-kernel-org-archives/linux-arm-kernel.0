@@ -1,37 +1,33 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 16 Apr 2012 21:33:31 +0400
-Subject: [PATCH V4 1/5] of: Implement managed of_iomap()
-In-Reply-To: <CACxGe6t9+M5jQKkRduup7_wk4SKYu1SuTz7wzf0MEvo0poojRw@mail.gmail.com>
-References: <cover.1334548272.git.viresh.kumar@st.com>
- <6a0872f9d8959bc9d66d179e4911d6f09a219b42.1334548272.git.viresh.kumar@st.com>
- <201204161442.38725.arnd@arndb.de>
- <CACxGe6tec7y-9VNb9vNiPZhN6bt5MuMV0J18P_7Gk_pDwk-V=Q@mail.gmail.com>
- <CAOh2x=n0NfovyfCpcdoMo2a7yLtb=imm1U+R-1L-2ihZ52FUhw@mail.gmail.com>
- <CACxGe6tZhdvoJ60N8g5-P4UHWxB=699_bA2omEQa77u1hEEPrg@mail.gmail.com>
- <CAOh2x=mptNGkRB-+930Uim=Op9erOxreeTL=3+qfoFeVpWNEYQ@mail.gmail.com>
- <CACxGe6t9+M5jQKkRduup7_wk4SKYu1SuTz7wzf0MEvo0poojRw@mail.gmail.com>
-Message-ID: <4F8C57EB.4050907@mvista.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 16 Apr 2012 10:45:00 -0700
+Subject: [PATCH v3 2/6] ARM: local timers: Add A15 architected timer
+ support
+In-Reply-To: <1334592810-4382-3-git-send-email-marc.zyngier@arm.com>
+References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
+ <1334592810-4382-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4F8C5A9C.9000506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 04/16/12 09:13, Marc Zyngier wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index cf006d4..68c382d 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1543,6 +1543,13 @@ config HAVE_ARM_SCU
+>  	help
+>  	  This option enables support for the ARM system coherency unit
+>  
+> +config ARM_ARCH_TIMER
+> +	bool "Architected timer support"
+> +	depends on CPU_V7
+> +	select TICK_ONESHOT
 
-On 04/16/2012 09:06 PM, Grant Likely wrote:
+I believe TICK_ONESHOT is a "hidden" option that should not be selected
+outside the generic clockevents layer. It seems Russell and Thomas have
+talked about this too, see 3872c48 (tick: Document TICK_ONESHOT config
+option, 2012-03-31).
 
->>> It isn't recommended anymore. Use the bus_type specific helpers instead.
-
->> Ok. So here is fixup for 3/5 of this patchset.
-
->> @Linus: I will merge this with PACH 3/5 and send pull request to Arnd.
-
->> fixup! pinctrl: Add SPEAr pinctrl drivers
-
-> Cool, thanks.
-
-> Now what you *could* do is something like devm_platform_ioremap() that
-> gets the resource, does request_region() and ioremap().  That would
-> cut a lot of boilerplate out of drivers.  :-)
-
-    That is already done, called devm_request_and_ioremap().
-
-WRB, Sergei
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
