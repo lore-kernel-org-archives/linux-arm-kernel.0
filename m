@@ -1,51 +1,80 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Apr 2012 11:20:44 +0200
-Subject: [PATCH 00/12] at91: 3.4-rc3 fixes
-Message-ID: <cover.1334567594.git.nicolas.ferre@atmel.com>
+Date: Mon, 16 Apr 2012 11:20:55 +0200
+Subject: [PATCH 11/12] USB: ohci-at91: change annotations for probe/remove
+ functions
+In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
+References: <cover.1334567594.git.nicolas.ferre@atmel.com>
+Message-ID: <79e2edff922c337d1f0e8407f18e506b32df488e.1334567594.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add __devinit and __devexit on *_probe() and *_remove() functions
+with proper modification of struct platform_driver.
 
-Here is another fixes series for AT91 that will go on top of 3.4-rc3.
-We experienced some issues while compiling some drivers as modules: Joachim has
-corrected several of them. We may reduce this number of exported values by
-reworking some drivers, in the future.
-Some drivers are also modified here, I would like to keep them in the series
-as the modifications are really related with our recent move to irqdomains or
-simply related with compiler annotations.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: linux-usb at vger.kernel.org
+---
+ drivers/usb/host/ohci-at91.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Jean-Christophe PLAGNIOL-VILLARD (2):
-  ARM: at91: fix rm9200ek flash size
-  ARM: at91: fix at91sam9261ek Ethernet dm9000 irq
-
-Joachim Eastwood (5):
-  ARM: at91: Export at91_st_base
-  ARM: at91: Export at91_ramc_base
-  ARM: at91: Export at91_pmc_base
-  ARM: at91: Export at91_matrix_base
-  ARM: at91: remove empty at91_init_serial function
-
-Nicolas Ferre (5):
-  ARM: at91: fix typo in at91_pmc_base assembly declaration
-  ARM: at91/atmel-mci: remove unused setup_dma_addr() macro
-  leds-atmel-pwm.c: Make pwmled_probe() __devinit
-  USB: ohci-at91: change annotations for probe/remove functions
-  USB: gadget/at91_udc: add gpio_to_irq() function to vbus interrupt
-
- arch/arm/mach-at91/at91rm9200_devices.c     |    1 -
- arch/arm/mach-at91/at91rm9200_time.c        |    2 ++
- arch/arm/mach-at91/board-rm9200ek.c         |    2 +-
- arch/arm/mach-at91/board-sam9261ek.c        |    5 +++--
- arch/arm/mach-at91/clock.c                  |    1 +
- arch/arm/mach-at91/include/mach/at91_pmc.h  |    2 +-
- arch/arm/mach-at91/include/mach/atmel-mci.h |    7 -------
- arch/arm/mach-at91/setup.c                  |    2 ++
- drivers/leds/leds-atmel-pwm.c               |    2 +-
- drivers/usb/gadget/at91_udc.c               |    8 ++++----
- drivers/usb/host/ohci-at91.c                |   12 ++++++------
- 11 files changed, 21 insertions(+), 23 deletions(-)
-
-Thanks, best regards,
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 09f597a..13ebeca 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -94,7 +94,7 @@ static void at91_stop_hc(struct platform_device *pdev)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
++static void __devexit usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
+ 
+ /* configure so an HC device and id are always provided */
+ /* always called with process context; sleeping is OK */
+@@ -108,7 +108,7 @@ static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
+  * then invokes the start() method for the HCD associated with it
+  * through the hotplug entry's driver_data.
+  */
+-static int usb_hcd_at91_probe(const struct hc_driver *driver,
++static int __devinit usb_hcd_at91_probe(const struct hc_driver *driver,
+ 			struct platform_device *pdev)
+ {
+ 	int retval;
+@@ -203,7 +203,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+  * context, "rmmod" or something similar.
+  *
+  */
+-static void usb_hcd_at91_remove(struct usb_hcd *hcd,
++static void __devexit usb_hcd_at91_remove(struct usb_hcd *hcd,
+ 				struct platform_device *pdev)
+ {
+ 	usb_remove_hcd(hcd);
+@@ -545,7 +545,7 @@ static int __devinit ohci_at91_of_init(struct platform_device *pdev)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
++static int __devinit ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ {
+ 	struct at91_usbh_data	*pdata;
+ 	int			i;
+@@ -620,7 +620,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
+ }
+ 
+-static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
++static int __devexit ohci_hcd_at91_drv_remove(struct platform_device *pdev)
+ {
+ 	struct at91_usbh_data	*pdata = pdev->dev.platform_data;
+ 	int			i;
+@@ -696,7 +696,7 @@ MODULE_ALIAS("platform:at91_ohci");
+ 
+ static struct platform_driver ohci_hcd_at91_driver = {
+ 	.probe		= ohci_hcd_at91_drv_probe,
+-	.remove		= ohci_hcd_at91_drv_remove,
++	.remove		= __devexit_p(ohci_hcd_at91_drv_remove),
+ 	.shutdown	= usb_hcd_platform_shutdown,
+ 	.suspend	= ohci_hcd_at91_drv_suspend,
+ 	.resume		= ohci_hcd_at91_drv_resume,
 -- 
 1.7.10
