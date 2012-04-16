@@ -1,35 +1,46 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 16 Apr 2012 20:37:00 +0530
-Subject: [PATCH 6/7] UART: OMAP: Remove the hardcode serial_omap_console_ports
- array.
+Date: Mon, 16 Apr 2012 20:36:56 +0530
+Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
 In-Reply-To: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334588821-5224-7-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the array serial_omap_console_ports is hard coded to 4.
-Make it depend on the maximum uart count.
-Also fixes OMAP5 which has 6 instances of uart.
+In the error cases the clock cut is missed. This patch intends to fix the
+same.
 
+Cc: stable at vger.kernel.org
 Cc: Govindraj.R <govindraj.raja@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/tty/serial/omap-serial.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/tty/serial/omap-serial.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 1593986..cbc9d64 100644
+index fe099bb..10e80bb 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -1040,7 +1040,7 @@ static int serial_omap_poll_get_char(struct uart_port *port)
+@@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
  
- #ifdef CONFIG_SERIAL_OMAP_CONSOLE
+ 		if (ret < 0) {
+ 			serial_omap_enable_ier_thri(up);
++			pm_runtime_mark_last_busy(&up->pdev->dev);
++			pm_runtime_put_autosuspend(&up->pdev->dev);
+ 			return;
+ 		}
+ 	}
+@@ -1029,8 +1031,10 @@ static int serial_omap_poll_get_char(struct uart_port *port)
  
--static struct uart_omap_port *serial_omap_console_ports[4];
-+static struct uart_omap_port *serial_omap_console_ports[OMAP_MAX_HSUART_PORTS];
+ 	pm_runtime_get_sync(&up->pdev->dev);
+ 	status = serial_in(up, UART_LSR);
+-	if (!(status & UART_LSR_DR))
++	if (!(status & UART_LSR_DR)) {
++		pm_runtime_put(&up->pdev->dev);
+ 		return NO_POLL_CHAR;
++	}
  
- static struct uart_driver serial_omap_reg;
- 
+ 	status = serial_in(up, UART_RX);
+ 	pm_runtime_put(&up->pdev->dev);
 -- 
 1.7.4.1
