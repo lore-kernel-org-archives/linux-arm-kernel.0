@@ -1,83 +1,64 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Mon, 16 Apr 2012 12:25:03 +0200
-Subject: [PATCH] CLKDEV: Add helper routines to allocate and add clkdevs
- for given struct clk *
-In-Reply-To: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
-References: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
-Message-ID: <20120416102503.GA32687@glitch>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 16 Apr 2012 12:28:15 +0200
+Subject: [PATCH 2/2] ARM: Exynos4: update SYSMMU setup code for gen_pd
+ power domain driver
+In-Reply-To: <CAHQjnOMnxFvPGYxpvXTxKRU7aSOEKfcpOaBUnYikNwk=WRevbg@mail.gmail.com>
+References: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
+ <1334154871-4756-3-git-send-email-m.szyprowski@samsung.com>
+ <CAHQjnOMnxFvPGYxpvXTxKRU7aSOEKfcpOaBUnYikNwk=WRevbg@mail.gmail.com>
+Message-ID: <009a01cd1bbb$a22c50e0$e684f2a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 10:49:37AM +0530, Viresh Kumar wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi,
+
+On Monday, April 16, 2012 12:10 PM KyongHo Cho wrote:
+
+> On Wed, Apr 11, 2012 at 11:34 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > SYSMMU platform devices must be registered before setting up power
+> > domains to let power domain driver to correctly register also SYSMMU
+> > controller devices. This patch also registers SYSMMU controller devices
+> > to respective power domains.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > ?arch/arm/mach-exynos/dev-sysmmu.c | ? ?6 +++++-
+> > ?arch/arm/mach-exynos/pm_domains.c | ? 13 +++++++++++++
+> > ?2 files changed, 18 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
+> > index c5b1ea3..3544638 100644
+> > --- a/arch/arm/mach-exynos/dev-sysmmu.c
+> > +++ b/arch/arm/mach-exynos/dev-sysmmu.c
+> > @@ -271,4 +271,8 @@ static int __init init_sysmmu_platform_device(void)
+> >
+> > ? ? ? ?return 0;
+> > ?}
+> > -arch_initcall(init_sysmmu_platform_device);
+> > +/*
+> > + * SYSMMU platform devices must be registered before power domains
+> > + * see pm_domain.c, which use arch_initcall()
+> > + */
+> > +core_initcall(init_sysmmu_platform_device);
+> I don't understand why init_sysmmu_platform_device() must be called before
+> exynos4_pm_init_power_domain()?
 > 
-> With common clock framework, clks are allocated at runtime. Some of them require
-> clkdevs to be allocated and added in global clkdev list.
-> 
-> This patch introduces helper routines to:
-> 
->  - allocate and add single clkdev for a single clk structure.
->  - add multiple clkdevs for a single clk structure.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/clk/clkdev.c   |   33 +++++++++++++++++++++++++++++++++
->  include/linux/clkdev.h |    3 +++
->  2 files changed, 36 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 6db161f..6a98177 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -173,3 +173,36 @@ void clkdev_drop(struct clk_lookup *cl)
->  	kfree(cl);
->  }
->  EXPORT_SYMBOL(clkdev_drop);
-> +
-> +int clk_register_single_clkdev(struct clk *clk, const char *dev_id,
-> +		const char *con_id)
-> +{
-> +	struct clk_lookup *cl;
-> +
-> +	if (!clk || (!dev_id && !con_id))
-> +		return -ENOMEM;
+> Other devices also added by an arch_initcall() function which calls
+> mdesc->init_machine().
+> I also was unable to find any reason to add devices before registering
+> the devices to pm domain.
 
-I would return -EINVAL here.
+mdesc->init_machine is called before exynos4_pm_init_power_domain() from 
+arch/arm/mach-exynos/pm_domain.c, although both are started from arch_initcall.
+In this case the order of linking defines the order of calls.
 
-> +
-> +	cl = clkdev_alloc(clk, con_id, "%s", dev_id);
+exynos4_pm_init_power_domain() calls exynos_pm_add_dev_to_genpd() which in turn
+checks for pdev->dev.bus. All devices which have not been registered yet on the
+bus are simply skipped.
 
-clkdev_alloc() allows you to specify dev_fmt and possibly other arguments
-to build the dev_id on the fly, could clk_register_single_clkdev()
-preserve this ability?
-
-> +	if (!cl)
-> +		return -ENOMEM;
-> +
-> +	clkdev_add(cl);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(clk_register_single_clkdev);
-> +
-> +int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
-> +{
-> +	unsigned i;
-> +
-> +	if (!clk || !cl || !num)
-> +		return -ENOMEM;
-
-I would return -EINVAL here as well.
-
-> +
-> +	for (i = 0; i < num; i++, cl++) {
-> +		cl->clk = clk;
-> +		clkdev_add(cl);
-> +	}
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(clk_register_clkdevs);
-
-cheers,
-Domenico
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
