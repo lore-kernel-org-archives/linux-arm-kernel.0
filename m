@@ -1,33 +1,87 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Mon, 16 Apr 2012 18:10:51 +0530
-Subject: [PATCH 0/2] ARM: omap_hwmod: add api to enable/disable module level
- wakeup
-Message-ID: <1334580053-17242-1-git-send-email-govindraj.raja@ti.com>
+Date: Mon, 16 Apr 2012 18:10:53 +0530
+Subject: [PATCH 2/2] ARM: OMAP2+: omap_hwmod: Add api to enable/disable module
+ level wakeup events
+In-Reply-To: <1334580053-17242-1-git-send-email-govindraj.raja@ti.com>
+References: <1334580053-17242-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1334580053-17242-3-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Govindraj.R" <govindraj.raja@ti.com>
 
-On omap2/3 module level wakeup is handled using PM_WKEN registers.
-Expand the hwmod framework to handle the module level wakeup enable 
-registers.
+On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
+PM_WKEN1_CORE/PM_WKEN_PER regs.
 
-Tested on Beagle-xm by enabling and disabling uart wakeups from sysfs
-Series depends on following patch for testing.
-http://marc.info/?l=linux-omap&m=133457952909998&w=2
+Add api to control the module level wakeup mechanism from info provided from
+hwmod data. If module level wakeups are available from hwmod data then they
+have to be enabled/disabled as per driver request.
 
-Govindraj.R (2):
-  ARM: OMAP2+: omap_hwmod: Add interface to incorporate module level
-    wakeup
-  ARM: OMAP2+: omap_hwmod: Add api to enable/disable module level
-    wakeup events
+omap_hwmod_enable/disable_wakeup is used from serial.c which should
+act on those registers to enable or disable the module level wakeup
 
- arch/arm/mach-omap2/omap_hwmod.c             |   31 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    6 +++++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    6 +++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    8 ++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +++
- 5 files changed, 55 insertions(+), 0 deletions(-)
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   31 +++++++++++++++++++++++++++++++
+ 1 files changed, 31 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 2c27fdb..05576ae 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -382,6 +382,35 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
+ }
+ 
+ /**
++ * _enable_module_level_wakeup - enable/disable module level wakeup on hwmod.
++ * @oh: struct omap_hwmod *
++ * @set_wake: bool value indicating to set (true) or clear (false) module level
++ *		wakeup enable
++ *
++ * Set or clear the  module level wakeup capability the
++ * hwmod @oh. This function configures th PM_WKEN reg bits if they
++ * are available from hwmod. No return value
++ */
++static void _enable_module_level_wakeup(struct omap_hwmod *oh, bool set_wake)
++{
++	u32 v;
++
++	if (oh->prcm.omap2.module_wakeup_offs &&
++			oh->prcm.omap2.module_wakeup_bit) {
++		v = omap2_prm_read_mod_reg(oh->prcm.omap2.module_offs,
++				oh->prcm.omap2.module_wakeup_offs);
++
++		if (set_wake)
++			v |= oh->prcm.omap2.module_wakeup_bit;
++		else
++			v &= ~oh->prcm.omap2.module_wakeup_bit;
++
++		omap2_prm_write_mod_reg(v, oh->prcm.omap2.module_offs,
++				oh->prcm.omap2.module_wakeup_offs);
++	}
++}
++
++/**
+  * _set_idle_ioring_wakeup - enable/disable IO pad wakeup on hwmod idle for mux
+  * @oh: struct omap_hwmod *
+  * @set_wake: bool value indicating to set (true) or clear (false) wakeup enable
+@@ -2471,6 +2500,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ 		_write_sysconfig(v, oh);
+ 	}
+ 
++	_enable_module_level_wakeup(oh, true);
+ 	_set_idle_ioring_wakeup(oh, true);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+@@ -2504,6 +2534,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ 		_write_sysconfig(v, oh);
+ 	}
+ 
++	_enable_module_level_wakeup(oh, false);
+ 	_set_idle_ioring_wakeup(oh, false);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
 -- 
 1.7.9
