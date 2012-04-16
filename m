@@ -1,85 +1,47 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 16 Apr 2012 08:16:45 +0200
-Subject: [PATCH 2/4] input: Device tree support for LPC32xx touchscreen
-In-Reply-To: <1334400790-10892-3-git-send-email-stigge@antcom.de>
+Date: Mon, 16 Apr 2012 08:24:48 +0200
+Subject: [PATCH 4/4] ARM: LPC32xx: Device tree support
+In-Reply-To: <1334400790-10892-5-git-send-email-stigge@antcom.de>
 References: <1334400790-10892-1-git-send-email-stigge@antcom.de>
- <1334400790-10892-3-git-send-email-stigge@antcom.de>
-Message-ID: <20120416061645.GC3037@avionic-0098.adnet.avionic-design.de>
+ <1334400790-10892-5-git-send-email-stigge@antcom.de>
+Message-ID: <20120416062444.GD3037@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Roland Stigge wrote:
-> This patch adds device tree support for the LPC32xx SoC's touchscreen
-> controller.
+> This patch adds device tree support for the LPC32xx SoC
+> 
+> arch/arm/boot/dts/lpc32xx.dtsi: Include for devices based on LPC32xx
+> arch/arm/boot/dts/phy3250.dts: Board support for PHYTEC phyCORE-LPC3250
+> arch/arm/boot/mach-lpc32xx/irq.c: irq domain conversion
 > 
 > Signed-off-by: Roland Stigge <stigge@antcom.de>
 > 
 > ---
 > 
->  Applies to v3.4-rc2
+> Applies to v3.4-rc2 and requires the previously posted lpc32xx driver dt
+> patches (Set 1: 1..8 + GPIO patch)
 > 
->  Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt |   16 ++++++++++
->  drivers/input/touchscreen/lpc32xx_ts.c                              |   10 ++++++
->  2 files changed, 26 insertions(+)
-> 
-> --- /dev/null
-> +++ linux-2.6/Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt
-> @@ -0,0 +1,16 @@
-> +* NXP LPC32xx SoC Touchscreen Controller (TSC)
-> +
-> +Required properties:
-> +- compatible: must be "nxp,lpc32xx-tsc"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: The TSC/ADC interrupt
-> +
-> +Example:
-> +
-> +	tsc at 40048000 {
-> +		compatible = "nxp,lpc32xx-tsc";
-> +		reg = <0x40048000 0x1000>;
-> +		interrupt-parent = <&mic>;
-> +		interrupts = <39 0>;
-> +	};
-> --- linux-2.6.orig/drivers/input/touchscreen/lpc32xx_ts.c
-> +++ linux-2.6/drivers/input/touchscreen/lpc32xx_ts.c
-> @@ -22,6 +22,7 @@
->  #include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
->  
->  /*
->   * Touchscreen controller register offsets
-> @@ -383,6 +384,14 @@ static const struct dev_pm_ops lpc32xx_t
->  #define LPC32XX_TS_PM_OPS NULL
->  #endif
->  
-> +#ifdef CONFIG_OF
-> +static struct of_device_id lpc32xx_tsc_of_match[] = {
-> +	{ .compatible = "nxp,lpc32xx-tsc", },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, lpc32xx_tsc_of_match);
-> +#endif
-> +
->  static struct platform_driver lpc32xx_ts_driver = {
->  	.probe		= lpc32xx_ts_probe,
->  	.remove		= __devexit_p(lpc32xx_ts_remove),
-> @@ -390,6 +399,7 @@ static struct platform_driver lpc32xx_ts
->  		.name	= MOD_NAME,
->  		.owner	= THIS_MODULE,
->  		.pm	= LPC32XX_TS_PM_OPS,
-> +		.of_match_table = of_match_ptr(lpc32xx_tsc_of_match),
->  	},
->  };
->  module_platform_driver(lpc32xx_ts_driver);
+>  Documentation/devicetree/bindings/arm/lpc32xx-mic.txt |   38 ++
+>  Documentation/devicetree/bindings/arm/lpc32xx.txt     |    8 
+>  arch/arm/Kconfig                                      |    1 
+>  arch/arm/boot/dts/lpc32xx.dtsi                        |  303 ++++++++++++++++++
+>  arch/arm/boot/dts/phy3250.dts                         |  108 ++++++
+>  arch/arm/mach-lpc32xx/Kconfig                         |   26 -
+>  arch/arm/mach-lpc32xx/clock.c                         |   77 ++--
+>  arch/arm/mach-lpc32xx/common.c                        |  192 -----------
+>  arch/arm/mach-lpc32xx/common.h                        |   14 
+>  arch/arm/mach-lpc32xx/irq.c                           |   78 +++-
+>  arch/arm/mach-lpc32xx/phy3250.c                       |  146 +++-----
+>  11 files changed, 613 insertions(+), 378 deletions(-)
 
-Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
+This looks like too many unrelated changes for one patch.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120416/eed66b80/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120416/82e7d078/attachment.sig>
