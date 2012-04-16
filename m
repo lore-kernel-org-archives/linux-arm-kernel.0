@@ -1,32 +1,163 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Mon, 16 Apr 2012 18:50:11 -0500
-Subject: [PATCH 0/3] Add imx cpuidle
-Message-ID: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
+Date: Mon, 16 Apr 2012 18:50:12 -0500
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
+References: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add common imx cpuidle initialization functionality and add a i.MX5 and i.MX6
-platform cpuidle implementation.
+Add common cpuidle init functionality that can be used by various
+imx platforms.
 
-Robert Lee (3):
-  ARM: imx: Add common imx cpuidle init functionality.
-  ARM: imx: Add imx5 cpuidle driver
-  ARM: imx: Add imx6q cpuidle driver
-
- arch/arm/mach-imx/Makefile               |    4 +-
- arch/arm/mach-imx/cpuidle-imx5.c         |   55 ++++++++++++++++++
- arch/arm/mach-imx/cpuidle-imx6q.c        |   33 +++++++++++
- arch/arm/mach-imx/mach-imx6q.c           |    2 +
- arch/arm/mach-imx/mm-imx5.c              |   16 ++++--
+Signed-off-by: Robert Lee <rob.lee@linaro.org>
+---
  arch/arm/plat-mxc/Makefile               |    2 +
  arch/arm/plat-mxc/cpuidle.c              |   89 ++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/common.h  |    1 +
  arch/arm/plat-mxc/include/mach/cpuidle.h |   26 +++++++++
- 9 files changed, 222 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
- create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
+ 3 files changed, 117 insertions(+)
  create mode 100644 arch/arm/plat-mxc/cpuidle.c
  create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
 
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index e81290c..7c9e05f 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -16,6 +16,8 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
++obj-$(CONFIG_CPU_IDLE)    += cpuidle.o
++
+ ifdef CONFIG_SND_IMX_SOC
+ obj-y += ssi-fiq.o
+ obj-y += ssi-fiq-ksym.o
+diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
+new file mode 100644
+index 0000000..d1c9301
+--- /dev/null
++++ b/arch/arm/plat-mxc/cpuidle.c
+@@ -0,0 +1,89 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/cpuidle.h>
++#include <linux/hrtimer.h>
++#include <linux/err.h>
++#include <linux/slab.h>
++
++static struct cpuidle_device __percpu * imx_cpuidle_devices;
++static struct cpuidle_driver *drv;
++
++void __init imx_cpuidle_set_driver(struct cpuidle_driver *p)
++{
++	drv = p;
++}
++
++void imx_cpuidle_devices_uninit(void)
++{
++	int cpu_id;
++	struct cpuidle_device *dev;
++
++	for_each_possible_cpu(cpu_id) {
++		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
++		cpuidle_unregister_device(dev);
++	}
++
++	free_percpu(imx_cpuidle_devices);
++}
++
++static int __init imx_cpuidle_init(void)
++{
++	struct cpuidle_device *dev;
++	int cpu_id, ret;
++
++	if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
++		pr_err("%s: Invalid Input\n", __func__);
++		return -EINVAL;
++	}
++
++	ret = cpuidle_register_driver(drv);
++
++	if (ret) {
++		pr_err("%s: Failed to register cpuidle driver\n", __func__);
++		return ret;
++	}
++
++	imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
++
++	if (imx_cpuidle_devices == NULL) {
++		ret = -ENOMEM;
++		goto unregister_drv;
++	}
++
++	/* initialize state data for each cpuidle_device */
++	for_each_possible_cpu(cpu_id) {
++		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
++		dev->cpu = cpu_id;
++		dev->state_count = drv->state_count;
++
++		ret = cpuidle_register_device(dev);
++		if (ret) {
++			pr_err("%s: Failed to register cpu %u\n",
++				__func__, cpu_id);
++			goto uninit;
++		}
++	}
++
++	return 0;
++
++uninit:
++	imx_cpuidle_devices_uninit();
++
++unregister_drv:
++	cpuidle_unregister_driver(drv);
++
++	return ret;
++}
++late_initcall(imx_cpuidle_init);
+diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
+new file mode 100644
+index 0000000..6509f19
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/cpuidle.h>
++
++extern int imx5_cpuidle_init(void);
++extern int imx6q_cpuidle_init(void);
++
++#ifdef CONFIG_CPU_IDLE
++extern void imx_cpuidle_devices_uninit(void);
++extern void imx_cpuidle_set_driver(struct cpuidle_driver *p);
++extern int imx5_cpuidle_init(void);
++extern int imx6q_cpuidle_init(void);
++#else
++static inline void imx_cpuidle_devices_uninit(void) {}
++static inline void imx_cpuidle_set_driver(struct cpuidle_driver *p) {}
++#endif
 -- 
 1.7.10
