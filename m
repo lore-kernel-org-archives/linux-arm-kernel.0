@@ -1,36 +1,35 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Apr 2012 11:20:50 +0200
-Subject: [PATCH 06/12] ARM: at91: remove empty at91_init_serial function
+Date: Mon, 16 Apr 2012 11:20:48 +0200
+Subject: [PATCH 04/12] ARM: at91: Export at91_matrix_base
 In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
 References: <cover.1334567594.git.nicolas.ferre@atmel.com>
-Message-ID: <926de6d8b90feee26717c01543243b8e07681303.1334567594.git.nicolas.ferre@atmel.com>
+Message-ID: <ac8c411c8360c281d1fb5e03a975e9088d069ded.1334567594.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Joachim Eastwood <manabian@gmail.com>
 
-The real function is long gone and the empty one will generate warnings
-when configured without Atmel serial:
-  arch/arm/mach-at91/at91rm9200_devices.c:1176: warning: 'struct at91_uart_config' declared inside parameter list
-  arch/arm/mach-at91/at91rm9200_devices.c:1176: warning: its scope is only this definition or declaration, which is probably not what you want
+at91_matrix_* macro's are used by at91_udc usb gadget driver,
+which can be built as module, therefore we need to export the
+variable containing matrix base address.
 
 Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/at91rm9200_devices.c |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-at91/setup.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 99ce5c9..05774e5 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -1173,7 +1173,6 @@ void __init at91_add_device_serial(void)
- 		printk(KERN_INFO "AT91: No default serial console defined.\n");
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 0607847..f44a2e7 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -293,6 +293,7 @@ void __init at91_ioremap_rstc(u32 base_addr)
  }
- #else
--void __init __deprecated at91_init_serial(struct at91_uart_config *config) {}
- void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
- void __init at91_set_serial_console(unsigned portnr) {}
- void __init at91_add_device_serial(void) {}
+ 
+ void __iomem *at91_matrix_base;
++EXPORT_SYMBOL_GPL(at91_matrix_base);
+ 
+ void __init at91_ioremap_matrix(u32 base_addr)
+ {
 -- 
 1.7.10
