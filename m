@@ -1,30 +1,32 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Mon, 16 Apr 2012 18:37:48 -0500
-Subject: [PATCH] ARM: imx: Fix imx5 idle logic bug
-Message-ID: <1334619468-25680-1-git-send-email-rob.lee@linaro.org>
+Date: Mon, 16 Apr 2012 18:50:11 -0500
+Subject: [PATCH 0/3] Add imx cpuidle
+Message-ID: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx5_idle() check of the tzic_eanble_wake() return value uses
-incorrect (inverted) logic causing all attempt to idle to fail.
+Add common imx cpuidle initialization functionality and add a i.MX5 and i.MX6
+platform cpuidle implementation.
 
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
----
- arch/arm/mach-imx/mm-imx5.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Robert Lee (3):
+  ARM: imx: Add common imx cpuidle init functionality.
+  ARM: imx: Add imx5 cpuidle driver
+  ARM: imx: Add imx6q cpuidle driver
 
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index 05250ae..e10f391 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -35,7 +35,7 @@ static void imx5_idle(void)
- 	}
- 	clk_enable(gpc_dvfs_clk);
- 	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
--	if (tzic_enable_wake() != 0)
-+	if (!tzic_enable_wake())
- 		cpu_do_idle();
- 	clk_disable(gpc_dvfs_clk);
- }
+ arch/arm/mach-imx/Makefile               |    4 +-
+ arch/arm/mach-imx/cpuidle-imx5.c         |   55 ++++++++++++++++++
+ arch/arm/mach-imx/cpuidle-imx6q.c        |   33 +++++++++++
+ arch/arm/mach-imx/mach-imx6q.c           |    2 +
+ arch/arm/mach-imx/mm-imx5.c              |   16 ++++--
+ arch/arm/plat-mxc/Makefile               |    2 +
+ arch/arm/plat-mxc/cpuidle.c              |   89 ++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h  |    1 +
+ arch/arm/plat-mxc/include/mach/cpuidle.h |   26 +++++++++
+ 9 files changed, 222 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
+ create mode 100644 arch/arm/plat-mxc/cpuidle.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+
 -- 
 1.7.10
