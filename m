@@ -1,25 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Apr 2012 15:02:32 +0000
-Subject: [PATCH v6 17/17] pwm: Take over maintainership of the PWM
- subsystem
-In-Reply-To: <20120416055012.GA3037@avionic-0098.adnet.avionic-design.de>
-References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
- <20120412122740.GB5353@avionic-0098.adnet.avionic-design.de>
- <20120416055012.GA3037@avionic-0098.adnet.avionic-design.de>
-Message-ID: <201204161502.32620.arnd@arndb.de>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Mon, 16 Apr 2012 20:36:59 +0530
+Subject: [PATCH 5/7] UART: OMAP: Prevent cutting of clocks if put_sync
+ immediately follows
+In-Reply-To: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334588821-5224-6-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 April 2012, Thierry Reding wrote:
-> Seems like this issue is resolved, but something else came up. In the !OF
-> builds, of_pwm_request() no longer builds because of_property_match_string()
-> and of_parse_phandle_with_args() have no dummies for !OF. I've posted patches
-> for these on Friday and they need to go in before the PWM subsystem. I could
-> also revert the IS_ENABLED() parts and go back to a #ifdef CONFIG_OF but I'd
-> rather not.
-> 
+In serial_omap_stop_tx in the dma case. We do a autosuspend and
+immediately a put_sync. Prevent the call of auto suspend. The else
+case is left as is.
 
-Agreed, using IS_ENABLED from C code is much nicer than #ifdef because
-we can be sure that all code actually builds.
+Cc: Govindraj.R <govindraj.raja@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-	Arnd
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 7c69b21..1593986 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -149,11 +149,10 @@ static void serial_omap_stop_tx(struct uart_port *port)
+ 		omap_stop_dma(up->uart_dma.tx_dma_channel);
+ 		omap_free_dma(up->uart_dma.tx_dma_channel);
+ 		up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;
+-		pm_runtime_mark_last_busy(&up->pdev->dev);
+-		pm_runtime_put_autosuspend(&up->pdev->dev);
++	} else {
++		pm_runtime_get_sync(&up->pdev->dev);
+ 	}
+ 
+-	pm_runtime_get_sync(&up->pdev->dev);
+ 	if (up->ier & UART_IER_THRI) {
+ 		up->ier &= ~UART_IER_THRI;
+ 		serial_out(up, UART_IER, up->ier);
+-- 
+1.7.4.1
