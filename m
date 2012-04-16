@@ -1,1953 +1,627 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 16 Apr 2012 09:43:58 +0530
-Subject: [PATCH V4 2/5] SPEAr: Remove existing padmux support for SPEAr
+Date: Mon, 16 Apr 2012 09:43:59 +0530
+Subject: [PATCH V4 3/5] pinctrl: Add SPEAr pinctrl drivers
 In-Reply-To: <cover.1334548272.git.viresh.kumar@st.com>
 References: <cover.1334548272.git.viresh.kumar@st.com>
-Message-ID: <133aedcc5b3ee239cc481a193ee92a72e36b3198.1334548272.git.viresh.kumar@st.com>
+Message-ID: <f9cc539f87a9c73546fe6671d55d86838886adce.1334548272.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must use pinctrl framework instead of defining per SoC pinmux drivers. This
-patch removes existing padmux support present for SPEAr platform.
+This adds pinctrl driver for SPEAr platform. It also updates MAINTAINERS file
+for SPEAr pinctrl drivers.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |  128 --------
- arch/arm/mach-spear3xx/spear300.c             |  389 +----------------------
- arch/arm/mach-spear3xx/spear310.c             |  161 +----------
- arch/arm/mach-spear3xx/spear320.c             |  403 +-----------------------
- arch/arm/mach-spear3xx/spear3xx.c             |  425 -------------------------
- arch/arm/plat-spear/Makefile                  |    2 +-
- arch/arm/plat-spear/include/plat/padmux.h     |   92 ------
- arch/arm/plat-spear/padmux.c                  |  164 ----------
- 8 files changed, 4 insertions(+), 1760 deletions(-)
- delete mode 100644 arch/arm/plat-spear/include/plat/padmux.h
- delete mode 100644 arch/arm/plat-spear/padmux.c
+ MAINTAINERS                           |   23 +--
+ drivers/pinctrl/Kconfig               |    2 +
+ drivers/pinctrl/Makefile              |    2 +
+ drivers/pinctrl/spear/Kconfig         |   14 ++
+ drivers/pinctrl/spear/Makefile        |    3 +
+ drivers/pinctrl/spear/pinctrl-spear.c |  349 +++++++++++++++++++++++++++++++++
+ drivers/pinctrl/spear/pinctrl-spear.h |  142 +++++++++++++
+ 7 files changed, 520 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/pinctrl/spear/Kconfig
+ create mode 100644 drivers/pinctrl/spear/Makefile
+ create mode 100644 drivers/pinctrl/spear/pinctrl-spear.c
+ create mode 100644 drivers/pinctrl/spear/pinctrl-spear.h
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index a756958..9603bf4 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -20,7 +20,6 @@
- #include <linux/amba/bus.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <plat/padmux.h>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7e7ec09..1f2bc24 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5233,6 +5233,14 @@ M:	Linus Walleij <linus.walleij@linaro.org>
+ S:	Maintained
+ F:	drivers/pinctrl/
  
- /* spear3xx declarations */
- /*
-@@ -43,147 +42,20 @@ void __init spear3xx_dt_init_irq(void);
++PIN CONTROLLER - ST SPEAR
++M:	Viresh Kumar <viresh.kumar@st.com>
++L:	spear-devel at list.st.com
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++W:	http://www.st.com/spear
++S:	Maintained
++F:	driver/pinctrl/spear/
++
+ PKTCDVD DRIVER
+ M:	Peter Osterlund <petero2@telia.com>
+ S:	Maintained
+@@ -6329,21 +6337,6 @@ F:	arch/arm/mach-spear*/clock.c
+ F:	arch/arm/plat-spear/clock.c
+ F:	arch/arm/plat-spear/include/plat/clock.h
  
- void spear_restart(char, const char *);
+-SPEAR PAD MULTIPLEXING SUPPORT
+-M:	Viresh Kumar <viresh.kumar@st.com>
+-L:	spear-devel at list.st.com
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-W:	http://www.st.com/spear
+-S:	Maintained
+-F:	arch/arm/plat-spear/include/plat/padmux.h
+-F:	arch/arm/plat-spear/padmux.c
+-F:	arch/arm/mach-spear*/spear*xx.c
+-F:	arch/arm/mach-spear*/include/mach/generic.h
+-F:	arch/arm/mach-spear3xx/spear3*0.c
+-F:	arch/arm/mach-spear3xx/spear3*0_evb.c
+-F:	arch/arm/mach-spear6xx/spear600.c
+-F:	arch/arm/mach-spear6xx/spear600_evb.c
+-
+ SPI SUBSYSTEM
+ M:	Grant Likely <grant.likely@secretlab.ca>
+ L:	spi-devel-general at lists.sourceforge.net
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index d68c878..9908bba 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -89,6 +89,8 @@ config PINCTRL_COH901
+ 	  COH 901 335 and COH 901 571/3. They contain 3, 5 or 7
+ 	  ports of 8 GPIO pins each.
  
--/* pad mux declarations */
--#define PMX_FIRDA_MASK		(1 << 14)
--#define PMX_I2C_MASK		(1 << 13)
--#define PMX_SSP_CS_MASK		(1 << 12)
--#define PMX_SSP_MASK		(1 << 11)
--#define PMX_MII_MASK		(1 << 10)
--#define PMX_GPIO_PIN0_MASK	(1 << 9)
--#define PMX_GPIO_PIN1_MASK	(1 << 8)
--#define PMX_GPIO_PIN2_MASK	(1 << 7)
--#define PMX_GPIO_PIN3_MASK	(1 << 6)
--#define PMX_GPIO_PIN4_MASK	(1 << 5)
--#define PMX_GPIO_PIN5_MASK	(1 << 4)
--#define PMX_UART0_MODEM_MASK	(1 << 3)
--#define PMX_UART0_MASK		(1 << 2)
--#define PMX_TIMER_3_4_MASK	(1 << 1)
--#define PMX_TIMER_1_2_MASK	(1 << 0)
--
--/* pad mux devices */
--extern struct pmx_dev spear3xx_pmx_firda;
--extern struct pmx_dev spear3xx_pmx_i2c;
--extern struct pmx_dev spear3xx_pmx_ssp_cs;
--extern struct pmx_dev spear3xx_pmx_ssp;
--extern struct pmx_dev spear3xx_pmx_mii;
--extern struct pmx_dev spear3xx_pmx_gpio_pin0;
--extern struct pmx_dev spear3xx_pmx_gpio_pin1;
--extern struct pmx_dev spear3xx_pmx_gpio_pin2;
--extern struct pmx_dev spear3xx_pmx_gpio_pin3;
--extern struct pmx_dev spear3xx_pmx_gpio_pin4;
--extern struct pmx_dev spear3xx_pmx_gpio_pin5;
--extern struct pmx_dev spear3xx_pmx_uart0_modem;
--extern struct pmx_dev spear3xx_pmx_uart0;
--extern struct pmx_dev spear3xx_pmx_timer_3_4;
--extern struct pmx_dev spear3xx_pmx_timer_1_2;
--
--#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--/* padmux plgpio devices */
--extern struct pmx_dev spear3xx_pmx_plgpio_0_1;
--extern struct pmx_dev spear3xx_pmx_plgpio_2_3;
--extern struct pmx_dev spear3xx_pmx_plgpio_4_5;
--extern struct pmx_dev spear3xx_pmx_plgpio_6_9;
--extern struct pmx_dev spear3xx_pmx_plgpio_10_27;
--extern struct pmx_dev spear3xx_pmx_plgpio_28;
--extern struct pmx_dev spear3xx_pmx_plgpio_29;
--extern struct pmx_dev spear3xx_pmx_plgpio_30;
--extern struct pmx_dev spear3xx_pmx_plgpio_31;
--extern struct pmx_dev spear3xx_pmx_plgpio_32;
--extern struct pmx_dev spear3xx_pmx_plgpio_33;
--extern struct pmx_dev spear3xx_pmx_plgpio_34_36;
--extern struct pmx_dev spear3xx_pmx_plgpio_37_42;
--extern struct pmx_dev spear3xx_pmx_plgpio_43_44_47_48;
--extern struct pmx_dev spear3xx_pmx_plgpio_45_46_49_50;
--#endif
--
- /* spear300 declarations */
- #ifdef CONFIG_MACH_SPEAR300
--/* pad mux modes */
--extern struct pmx_mode spear300_nand_mode;
--extern struct pmx_mode spear300_nor_mode;
--extern struct pmx_mode spear300_photo_frame_mode;
--extern struct pmx_mode spear300_lend_ip_phone_mode;
--extern struct pmx_mode spear300_hend_ip_phone_mode;
--extern struct pmx_mode spear300_lend_wifi_phone_mode;
--extern struct pmx_mode spear300_hend_wifi_phone_mode;
--extern struct pmx_mode spear300_ata_pabx_wi2s_mode;
--extern struct pmx_mode spear300_ata_pabx_i2s_mode;
--extern struct pmx_mode spear300_caml_lcdw_mode;
--extern struct pmx_mode spear300_camu_lcd_mode;
--extern struct pmx_mode spear300_camu_wlcd_mode;
--extern struct pmx_mode spear300_caml_lcd_mode;
--
--/* pad mux devices */
--extern struct pmx_dev spear300_pmx_fsmc_2_chips;
--extern struct pmx_dev spear300_pmx_fsmc_4_chips;
--extern struct pmx_dev spear300_pmx_keyboard;
--extern struct pmx_dev spear300_pmx_clcd;
--extern struct pmx_dev spear300_pmx_telecom_gpio;
--extern struct pmx_dev spear300_pmx_telecom_tdm;
--extern struct pmx_dev spear300_pmx_telecom_spi_cs_i2c_clk;
--extern struct pmx_dev spear300_pmx_telecom_camera;
--extern struct pmx_dev spear300_pmx_telecom_dac;
--extern struct pmx_dev spear300_pmx_telecom_i2s;
--extern struct pmx_dev spear300_pmx_telecom_boot_pins;
--extern struct pmx_dev spear300_pmx_telecom_sdhci_4bit;
--extern struct pmx_dev spear300_pmx_telecom_sdhci_8bit;
--extern struct pmx_dev spear300_pmx_gpio1;
--
--/* Add spear300 machine declarations here */
- void __init spear300_clk_init(void);
++source "drivers/pinctrl/spear/Kconfig"
++
+ endmenu
  
- #endif /* CONFIG_MACH_SPEAR300 */
- 
- /* spear310 declarations */
- #ifdef CONFIG_MACH_SPEAR310
--/* pad mux devices */
--extern struct pmx_dev spear310_pmx_emi_cs_0_1_4_5;
--extern struct pmx_dev spear310_pmx_emi_cs_2_3;
--extern struct pmx_dev spear310_pmx_uart1;
--extern struct pmx_dev spear310_pmx_uart2;
--extern struct pmx_dev spear310_pmx_uart3_4_5;
--extern struct pmx_dev spear310_pmx_fsmc;
--extern struct pmx_dev spear310_pmx_rs485_0_1;
--extern struct pmx_dev spear310_pmx_tdm0;
--
--/* Add spear310 machine declarations here */
- void __init spear310_clk_init(void);
- 
- #endif /* CONFIG_MACH_SPEAR310 */
- 
- /* spear320 declarations */
- #ifdef CONFIG_MACH_SPEAR320
--/* pad mux modes */
--extern struct pmx_mode spear320_auto_net_smii_mode;
--extern struct pmx_mode spear320_auto_net_mii_mode;
--extern struct pmx_mode spear320_auto_exp_mode;
--extern struct pmx_mode spear320_small_printers_mode;
--
--/* pad mux devices */
--extern struct pmx_dev spear320_pmx_clcd;
--extern struct pmx_dev spear320_pmx_emi;
--extern struct pmx_dev spear320_pmx_fsmc;
--extern struct pmx_dev spear320_pmx_spp;
--extern struct pmx_dev spear320_pmx_sdhci;
--extern struct pmx_dev spear320_pmx_i2s;
--extern struct pmx_dev spear320_pmx_uart1;
--extern struct pmx_dev spear320_pmx_uart1_modem;
--extern struct pmx_dev spear320_pmx_uart2;
--extern struct pmx_dev spear320_pmx_touchscreen;
--extern struct pmx_dev spear320_pmx_can;
--extern struct pmx_dev spear320_pmx_sdhci_led;
--extern struct pmx_dev spear320_pmx_pwm0;
--extern struct pmx_dev spear320_pmx_pwm1;
--extern struct pmx_dev spear320_pmx_pwm2;
--extern struct pmx_dev spear320_pmx_pwm3;
--extern struct pmx_dev spear320_pmx_ssp1;
--extern struct pmx_dev spear320_pmx_ssp2;
--extern struct pmx_dev spear320_pmx_mii1;
--extern struct pmx_dev spear320_pmx_smii0;
--extern struct pmx_dev spear320_pmx_smii1;
--extern struct pmx_dev spear320_pmx_i2c1;
--
--/* Add spear320 machine declarations here */
- void __init spear320_clk_init(void);
- 
- #endif /* CONFIG_MACH_SPEAR320 */
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index f46fc26..2db0bd1 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -21,357 +21,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* muxing registers */
--#define PAD_MUX_CONFIG_REG	0x00
--#define MODE_CONFIG_REG		0x04
--
--/* modes */
--#define NAND_MODE			(1 << 0)
--#define NOR_MODE			(1 << 1)
--#define PHOTO_FRAME_MODE		(1 << 2)
--#define LEND_IP_PHONE_MODE		(1 << 3)
--#define HEND_IP_PHONE_MODE		(1 << 4)
--#define LEND_WIFI_PHONE_MODE		(1 << 5)
--#define HEND_WIFI_PHONE_MODE		(1 << 6)
--#define ATA_PABX_WI2S_MODE		(1 << 7)
--#define ATA_PABX_I2S_MODE		(1 << 8)
--#define CAML_LCDW_MODE			(1 << 9)
--#define CAMU_LCD_MODE			(1 << 10)
--#define CAMU_WLCD_MODE			(1 << 11)
--#define CAML_LCD_MODE			(1 << 12)
--#define ALL_MODES			0x1FFF
--
--struct pmx_mode spear300_nand_mode = {
--	.id = NAND_MODE,
--	.name = "nand mode",
--	.mask = 0x00,
--};
--
--struct pmx_mode spear300_nor_mode = {
--	.id = NOR_MODE,
--	.name = "nor mode",
--	.mask = 0x01,
--};
--
--struct pmx_mode spear300_photo_frame_mode = {
--	.id = PHOTO_FRAME_MODE,
--	.name = "photo frame mode",
--	.mask = 0x02,
--};
--
--struct pmx_mode spear300_lend_ip_phone_mode = {
--	.id = LEND_IP_PHONE_MODE,
--	.name = "lend ip phone mode",
--	.mask = 0x03,
--};
--
--struct pmx_mode spear300_hend_ip_phone_mode = {
--	.id = HEND_IP_PHONE_MODE,
--	.name = "hend ip phone mode",
--	.mask = 0x04,
--};
--
--struct pmx_mode spear300_lend_wifi_phone_mode = {
--	.id = LEND_WIFI_PHONE_MODE,
--	.name = "lend wifi phone mode",
--	.mask = 0x05,
--};
--
--struct pmx_mode spear300_hend_wifi_phone_mode = {
--	.id = HEND_WIFI_PHONE_MODE,
--	.name = "hend wifi phone mode",
--	.mask = 0x06,
--};
--
--struct pmx_mode spear300_ata_pabx_wi2s_mode = {
--	.id = ATA_PABX_WI2S_MODE,
--	.name = "ata pabx wi2s mode",
--	.mask = 0x07,
--};
--
--struct pmx_mode spear300_ata_pabx_i2s_mode = {
--	.id = ATA_PABX_I2S_MODE,
--	.name = "ata pabx i2s mode",
--	.mask = 0x08,
--};
--
--struct pmx_mode spear300_caml_lcdw_mode = {
--	.id = CAML_LCDW_MODE,
--	.name = "caml lcdw mode",
--	.mask = 0x0C,
--};
--
--struct pmx_mode spear300_camu_lcd_mode = {
--	.id = CAMU_LCD_MODE,
--	.name = "camu lcd mode",
--	.mask = 0x0D,
--};
--
--struct pmx_mode spear300_camu_wlcd_mode = {
--	.id = CAMU_WLCD_MODE,
--	.name = "camu wlcd mode",
--	.mask = 0x0E,
--};
--
--struct pmx_mode spear300_caml_lcd_mode = {
--	.id = CAML_LCD_MODE,
--	.name = "caml lcd mode",
--	.mask = 0x0F,
--};
--
--/* devices */
--static struct pmx_dev_mode pmx_fsmc_2_chips_modes[] = {
--	{
--		.ids = NAND_MODE | NOR_MODE | PHOTO_FRAME_MODE |
--			ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_fsmc_2_chips = {
--	.name = "fsmc_2_chips",
--	.modes = pmx_fsmc_2_chips_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_2_chips_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_fsmc_4_chips_modes[] = {
--	{
--		.ids = NAND_MODE | NOR_MODE | PHOTO_FRAME_MODE |
--			ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE,
--		.mask = PMX_FIRDA_MASK | PMX_UART0_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_fsmc_4_chips = {
--	.name = "fsmc_4_chips",
--	.modes = pmx_fsmc_4_chips_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_4_chips_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_keyboard_modes[] = {
--	{
--		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE |
--			LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE |
--			CAML_LCDW_MODE | CAMU_LCD_MODE | CAMU_WLCD_MODE |
--			CAML_LCD_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear300_pmx_keyboard = {
--	.name = "keyboard",
--	.modes = pmx_keyboard_modes,
--	.mode_count = ARRAY_SIZE(pmx_keyboard_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_clcd_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK ,
--	}, {
--		.ids = HEND_IP_PHONE_MODE | HEND_WIFI_PHONE_MODE |
--			CAMU_LCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_clcd = {
--	.name = "clcd",
--	.modes = pmx_clcd_modes,
--	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_gpio_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | CAMU_LCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_MII_MASK,
--	}, {
--		.ids = LEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	}, {
--		.ids = ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_WLCD_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_3_4_MASK,
--	}, {
--		.ids = HEND_IP_PHONE_MODE | HEND_WIFI_PHONE_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK,
--	}, {
--		.ids = ATA_PABX_WI2S_MODE,
--		.mask = PMX_MII_MASK | PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK
--			| PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_gpio = {
--	.name = "telecom_gpio",
--	.modes = pmx_telecom_gpio_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_gpio_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_tdm_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
--			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE
--			| HEND_WIFI_PHONE_MODE | ATA_PABX_WI2S_MODE
--			| ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
--			| CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_UART0_MODEM_MASK | PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_tdm = {
--	.name = "telecom_tdm",
--	.modes = pmx_telecom_tdm_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_tdm_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_spi_cs_i2c_clk_modes[] = {
--	{
--		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE |
--			LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE
--			| ATA_PABX_WI2S_MODE | ATA_PABX_I2S_MODE |
--			CAML_LCDW_MODE | CAML_LCD_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_spi_cs_i2c_clk = {
--	.name = "telecom_spi_cs_i2c_clk",
--	.modes = pmx_telecom_spi_cs_i2c_clk_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_spi_cs_i2c_clk_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_camera_modes[] = {
--	{
--		.ids = CAML_LCDW_MODE | CAML_LCD_MODE,
--		.mask = PMX_MII_MASK,
--	}, {
--		.ids = CAMU_LCD_MODE | CAMU_WLCD_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK | PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_camera = {
--	.name = "telecom_camera",
--	.modes = pmx_telecom_camera_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_camera_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_dac_modes[] = {
--	{
--		.ids = ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
--			| CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_dac = {
--	.name = "telecom_dac",
--	.modes = pmx_telecom_dac_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_dac_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_i2s_modes[] = {
--	{
--		.ids = LEND_IP_PHONE_MODE | HEND_IP_PHONE_MODE
--			| LEND_WIFI_PHONE_MODE | HEND_WIFI_PHONE_MODE |
--			ATA_PABX_I2S_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE
--			| CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_i2s = {
--	.name = "telecom_i2s",
--	.modes = pmx_telecom_i2s_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_i2s_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_boot_pins_modes[] = {
--	{
--		.ids = NAND_MODE | NOR_MODE,
--		.mask = PMX_UART0_MODEM_MASK | PMX_TIMER_1_2_MASK |
--			PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_boot_pins = {
--	.name = "telecom_boot_pins",
--	.modes = pmx_telecom_boot_pins_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_boot_pins_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_sdhci_4bit_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
--			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
--			HEND_WIFI_PHONE_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE |
--			CAMU_WLCD_MODE | CAML_LCD_MODE | ATA_PABX_WI2S_MODE |
--			ATA_PABX_I2S_MODE,
--		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK |
--			PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
--			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_sdhci_4bit = {
--	.name = "telecom_sdhci_4bit",
--	.modes = pmx_telecom_sdhci_4bit_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_4bit_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_telecom_sdhci_8bit_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
--			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
--			HEND_WIFI_PHONE_MODE | CAML_LCDW_MODE | CAMU_LCD_MODE |
--			CAMU_WLCD_MODE | CAML_LCD_MODE,
--		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK |
--			PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
--			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK | PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_telecom_sdhci_8bit = {
--	.name = "telecom_sdhci_8bit",
--	.modes = pmx_telecom_sdhci_8bit_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_8bit_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_gpio1_modes[] = {
--	{
--		.ids = PHOTO_FRAME_MODE,
--		.mask = PMX_UART0_MODEM_MASK | PMX_TIMER_1_2_MASK |
--			PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear300_pmx_gpio1 = {
--	.name = "arm gpio1",
--	.modes = pmx_gpio1_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio1_modes),
--	.enb_on_reset = 1,
--};
--
--/* pmx driver structure */
--static struct pmx_driver pmx_driver = {
--	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x0000000f},
--	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
--};
--
- /* spear3xx shared irq */
- static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -425,22 +74,6 @@ static struct spear_shirq shirq_ras1 = {
- 	},
- };
- 
--/* padmux devices to enable */
--static struct pmx_dev *spear300_evb_pmx_devs[] = {
--	/* spear3xx specific devices */
--	&spear3xx_pmx_i2c,
--	&spear3xx_pmx_ssp_cs,
--	&spear3xx_pmx_ssp,
--	&spear3xx_pmx_mii,
--	&spear3xx_pmx_uart0,
--
--	/* spear300 specific devices */
--	&spear300_pmx_fsmc_2_chips,
--	&spear300_pmx_clcd,
--	&spear300_pmx_telecom_sdhci_4bit,
--	&spear300_pmx_gpio1,
--};
--
- /* DMAC platform data's slave info */
- struct pl08x_channel_data spear300_dma_info[] = {
- 	{
-@@ -639,7 +272,7 @@ static struct of_dev_auxdata spear300_auxdata_lookup[] __initdata = {
- 
- static void __init spear300_dt_init(void)
- {
--	int ret = -EINVAL;
-+	int ret;
- 
- 	pl080_plat_data.slave_channels = spear300_dma_info;
- 	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear300_dma_info);
-@@ -654,26 +287,6 @@ static void __init spear300_dt_init(void)
- 		if (ret)
- 			pr_err("Error registering Shared IRQ\n");
- 	}
--
--	if (of_machine_is_compatible("st,spear300-evb")) {
--		/* pmx initialization */
--		pmx_driver.mode = &spear300_photo_frame_mode;
--		pmx_driver.devs = spear300_evb_pmx_devs;
--		pmx_driver.devs_count = ARRAY_SIZE(spear300_evb_pmx_devs);
--
--		pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE, SZ_4K);
--		if (pmx_driver.base) {
--			ret = pmx_register(&pmx_driver);
--			if (ret)
--				pr_err("padmux: registration failed. err no: %d\n",
--						ret);
--			/* Free Mapping, device selection already done */
--			iounmap(pmx_driver.base);
--		}
--
--		if (ret)
--			pr_err("Initialization Failed");
--	}
- }
- 
- static const char * const spear300_dt_board_compat[] = {
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 063e7da..aec07c9 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -22,128 +22,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* muxing registers */
--#define PAD_MUX_CONFIG_REG	0x08
--
--/* devices */
--static struct pmx_dev_mode pmx_emi_cs_0_1_4_5_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_emi_cs_0_1_4_5 = {
--	.name = "emi_cs_0_1_4_5",
--	.modes = pmx_emi_cs_0_1_4_5_modes,
--	.mode_count = ARRAY_SIZE(pmx_emi_cs_0_1_4_5_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_emi_cs_2_3_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_emi_cs_2_3 = {
--	.name = "emi_cs_2_3",
--	.modes = pmx_emi_cs_2_3_modes,
--	.mode_count = ARRAY_SIZE(pmx_emi_cs_2_3_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart1_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_uart1 = {
--	.name = "uart1",
--	.modes = pmx_uart1_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart2_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_uart2 = {
--	.name = "uart2",
--	.modes = pmx_uart2_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart3_4_5_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_uart3_4_5 = {
--	.name = "uart3_4_5",
--	.modes = pmx_uart3_4_5_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart3_4_5_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_fsmc_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_fsmc = {
--	.name = "fsmc",
--	.modes = pmx_fsmc_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_rs485_0_1_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_rs485_0_1 = {
--	.name = "rs485_0_1",
--	.modes = pmx_rs485_0_1_modes,
--	.mode_count = ARRAY_SIZE(pmx_rs485_0_1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_tdm0_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear310_pmx_tdm0 = {
--	.name = "tdm0",
--	.modes = pmx_tdm0_modes,
--	.mode_count = ARRAY_SIZE(pmx_tdm0_modes),
--	.enb_on_reset = 1,
--};
--
--/* pmx driver structure */
--static struct pmx_driver pmx_driver = {
--	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
--};
--
- /* spear3xx shared irq */
- static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -260,30 +138,6 @@ static struct spear_shirq shirq_intrcomm_ras = {
- 	},
- };
- 
--/* padmux devices to enable */
--static struct pmx_dev *spear310_evb_pmx_devs[] = {
--	/* spear3xx specific devices */
--	&spear3xx_pmx_i2c,
--	&spear3xx_pmx_ssp,
--	&spear3xx_pmx_gpio_pin0,
--	&spear3xx_pmx_gpio_pin1,
--	&spear3xx_pmx_gpio_pin2,
--	&spear3xx_pmx_gpio_pin3,
--	&spear3xx_pmx_gpio_pin4,
--	&spear3xx_pmx_gpio_pin5,
--	&spear3xx_pmx_uart0,
--
--	/* spear310 specific devices */
--	&spear310_pmx_emi_cs_0_1_4_5,
--	&spear310_pmx_emi_cs_2_3,
--	&spear310_pmx_uart1,
--	&spear310_pmx_uart2,
--	&spear310_pmx_uart3_4_5,
--	&spear310_pmx_fsmc,
--	&spear310_pmx_rs485_0_1,
--	&spear310_pmx_tdm0,
--};
--
- /* DMAC platform data's slave info */
- struct pl08x_channel_data spear310_dma_info[] = {
- 	{
-@@ -518,7 +372,7 @@ static struct of_dev_auxdata spear310_auxdata_lookup[] __initdata = {
- static void __init spear310_dt_init(void)
- {
- 	void __iomem *base;
--	int ret = 0;
-+	int ret;
- 
- 	pl080_plat_data.slave_channels = spear310_dma_info;
- 	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear310_dma_info);
-@@ -553,19 +407,6 @@ static void __init spear310_dt_init(void)
- 		if (ret)
- 			pr_err("Error registering Shared IRQ 4\n");
- 	}
--
--	if (of_machine_is_compatible("st,spear310-evb")) {
--		/* pmx initialization */
--		pmx_driver.base = base;
--		pmx_driver.mode = NULL;
--		pmx_driver.devs = spear310_evb_pmx_devs;
--		pmx_driver.devs_count = ARRAY_SIZE(spear310_evb_pmx_devs);
--
--		ret = pmx_register(&pmx_driver);
--		if (ret)
--			pr_err("padmux: registration failed. err no: %d\n",
--					ret);
--	}
- }
- 
- static const char * const spear310_dt_board_compat[] = {
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 1e74031..4812c69 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -23,373 +23,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* muxing registers */
--#define PAD_MUX_CONFIG_REG	0x0C
--#define MODE_CONFIG_REG		0x10
--
--/* modes */
--#define AUTO_NET_SMII_MODE	(1 << 0)
--#define AUTO_NET_MII_MODE	(1 << 1)
--#define AUTO_EXP_MODE		(1 << 2)
--#define SMALL_PRINTERS_MODE	(1 << 3)
--#define ALL_MODES		0xF
--
--struct pmx_mode spear320_auto_net_smii_mode = {
--	.id = AUTO_NET_SMII_MODE,
--	.name = "Automation Networking SMII Mode",
--	.mask = 0x00,
--};
--
--struct pmx_mode spear320_auto_net_mii_mode = {
--	.id = AUTO_NET_MII_MODE,
--	.name = "Automation Networking MII Mode",
--	.mask = 0x01,
--};
--
--struct pmx_mode spear320_auto_exp_mode = {
--	.id = AUTO_EXP_MODE,
--	.name = "Automation Expanded Mode",
--	.mask = 0x02,
--};
--
--struct pmx_mode spear320_small_printers_mode = {
--	.id = SMALL_PRINTERS_MODE,
--	.name = "Small Printers Mode",
--	.mask = 0x03,
--};
--
--/* devices */
--static struct pmx_dev_mode pmx_clcd_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_clcd = {
--	.name = "clcd",
--	.modes = pmx_clcd_modes,
--	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_emi_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_emi = {
--	.name = "emi",
--	.modes = pmx_emi_modes,
--	.mode_count = ARRAY_SIZE(pmx_emi_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_fsmc_modes[] = {
--	{
--		.ids = ALL_MODES,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_fsmc = {
--	.name = "fsmc",
--	.modes = pmx_fsmc_modes,
--	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_spp_modes[] = {
--	{
--		.ids = SMALL_PRINTERS_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_spp = {
--	.name = "spp",
--	.modes = pmx_spp_modes,
--	.mode_count = ARRAY_SIZE(pmx_spp_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_sdhci_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE |
--			SMALL_PRINTERS_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_sdhci = {
--	.name = "sdhci",
--	.modes = pmx_sdhci_modes,
--	.mode_count = ARRAY_SIZE(pmx_sdhci_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_i2s_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_i2s = {
--	.name = "i2s",
--	.modes = pmx_i2s_modes,
--	.mode_count = ARRAY_SIZE(pmx_i2s_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart1_modes[] = {
--	{
--		.ids = ALL_MODES,
--		.mask = PMX_GPIO_PIN0_MASK | PMX_GPIO_PIN1_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_uart1 = {
--	.name = "uart1",
--	.modes = pmx_uart1_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart1_modem_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE,
--		.mask = PMX_TIMER_1_2_MASK | PMX_TIMER_3_4_MASK |
--			PMX_SSP_CS_MASK,
--	}, {
--		.ids = SMALL_PRINTERS_MODE,
--		.mask = PMX_GPIO_PIN3_MASK | PMX_GPIO_PIN4_MASK |
--			PMX_GPIO_PIN5_MASK | PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_uart1_modem = {
--	.name = "uart1_modem",
--	.modes = pmx_uart1_modem_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart1_modem_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_uart2_modes[] = {
--	{
--		.ids = ALL_MODES,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_uart2 = {
--	.name = "uart2",
--	.modes = pmx_uart2_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_touchscreen_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_touchscreen = {
--	.name = "touchscreen",
--	.modes = pmx_touchscreen_modes,
--	.mode_count = ARRAY_SIZE(pmx_touchscreen_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_can_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE | AUTO_EXP_MODE,
--		.mask = PMX_GPIO_PIN2_MASK | PMX_GPIO_PIN3_MASK |
--			PMX_GPIO_PIN4_MASK | PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_can = {
--	.name = "can",
--	.modes = pmx_can_modes,
--	.mode_count = ARRAY_SIZE(pmx_can_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_sdhci_led_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_sdhci_led = {
--	.name = "sdhci_led",
--	.modes = pmx_sdhci_led_modes,
--	.mode_count = ARRAY_SIZE(pmx_sdhci_led_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm0_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	}, {
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm0 = {
--	.name = "pwm0",
--	.modes = pmx_pwm0_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm0_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm1_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_UART0_MODEM_MASK,
--	}, {
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm1 = {
--	.name = "pwm1",
--	.modes = pmx_pwm1_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm2_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
--		.mask = PMX_SSP_CS_MASK,
--	}, {
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm2 = {
--	.name = "pwm2",
--	.modes = pmx_pwm2_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_pwm3_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE | SMALL_PRINTERS_MODE | AUTO_NET_SMII_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_pwm3 = {
--	.name = "pwm3",
--	.modes = pmx_pwm3_modes,
--	.mode_count = ARRAY_SIZE(pmx_pwm3_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_ssp1_modes[] = {
--	{
--		.ids = SMALL_PRINTERS_MODE | AUTO_NET_SMII_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_ssp1 = {
--	.name = "ssp1",
--	.modes = pmx_ssp1_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_ssp2_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_ssp2 = {
--	.name = "ssp2",
--	.modes = pmx_ssp2_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp2_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_mii1_modes[] = {
--	{
--		.ids = AUTO_NET_MII_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_mii1 = {
--	.name = "mii1",
--	.modes = pmx_mii1_modes,
--	.mode_count = ARRAY_SIZE(pmx_mii1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_smii0_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | AUTO_EXP_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_smii0 = {
--	.name = "smii0",
--	.modes = pmx_smii0_modes,
--	.mode_count = ARRAY_SIZE(pmx_smii0_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_smii1_modes[] = {
--	{
--		.ids = AUTO_NET_SMII_MODE | SMALL_PRINTERS_MODE,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear320_pmx_smii1 = {
--	.name = "smii1",
--	.modes = pmx_smii1_modes,
--	.mode_count = ARRAY_SIZE(pmx_smii1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_i2c1_modes[] = {
--	{
--		.ids = AUTO_EXP_MODE,
--		.mask = 0x0,
--	},
--};
--
--struct pmx_dev spear320_pmx_i2c1 = {
--	.name = "i2c1",
--	.modes = pmx_i2c1_modes,
--	.mode_count = ARRAY_SIZE(pmx_i2c1_modes),
--	.enb_on_reset = 1,
--};
--
--/* pmx driver structure */
--static struct pmx_driver pmx_driver = {
--	.mode_reg = {.offset = MODE_CONFIG_REG, .mask = 0x00000007},
--	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
--};
--
- /* spear3xx shared irq */
- static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -514,27 +147,6 @@ static struct spear_shirq shirq_intrcomm_ras = {
- 	},
- };
- 
--/* padmux devices to enable */
--static struct pmx_dev *spear320_evb_pmx_devs[] = {
--	/* spear3xx specific devices */
--	&spear3xx_pmx_i2c,
--	&spear3xx_pmx_ssp,
--	&spear3xx_pmx_mii,
--	&spear3xx_pmx_uart0,
--
--	/* spear320 specific devices */
--	&spear320_pmx_fsmc,
--	&spear320_pmx_sdhci,
--	&spear320_pmx_i2s,
--	&spear320_pmx_uart1,
--	&spear320_pmx_uart2,
--	&spear320_pmx_can,
--	&spear320_pmx_pwm0,
--	&spear320_pmx_pwm1,
--	&spear320_pmx_pwm2,
--	&spear320_pmx_mii1,
--};
--
- /* DMAC platform data's slave info */
- struct pl08x_channel_data spear320_dma_info[] = {
- 	{
-@@ -772,7 +384,7 @@ static struct of_dev_auxdata spear320_auxdata_lookup[] __initdata = {
- static void __init spear320_dt_init(void)
- {
- 	void __iomem *base;
--	int ret = 0;
-+	int ret;
- 
- 	pl080_plat_data.slave_channels = spear320_dma_info;
- 	pl080_plat_data.num_slave_channels = ARRAY_SIZE(spear320_dma_info);
-@@ -801,19 +413,6 @@ static void __init spear320_dt_init(void)
- 		if (ret)
- 			pr_err("Error registering Shared IRQ 4\n");
- 	}
--
--	if (of_machine_is_compatible("st,spear320-evb")) {
--		/* pmx initialization */
--		pmx_driver.base = base;
--		pmx_driver.mode = &spear320_auto_net_mii_mode;
--		pmx_driver.devs = spear320_evb_pmx_devs;
--		pmx_driver.devs_count = ARRAY_SIZE(spear320_evb_pmx_devs);
--
--		ret = pmx_register(&pmx_driver);
--		if (ret)
--			pr_err("padmux: registration failed. err no: %d\n",
--					ret);
--	}
- }
- 
- static const char * const spear320_dt_board_compat[] = {
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 17d4ac9..12bf879 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -23,431 +23,6 @@
- #include <mach/generic.h>
- #include <mach/hardware.h>
- 
--/* pad multiplexing support */
--/* devices */
--static struct pmx_dev_mode pmx_firda_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_firda = {
--	.name = "firda",
--	.modes = pmx_firda_modes,
--	.mode_count = ARRAY_SIZE(pmx_firda_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_i2c_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_I2C_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_i2c = {
--	.name = "i2c",
--	.modes = pmx_i2c_modes,
--	.mode_count = ARRAY_SIZE(pmx_i2c_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_ssp_cs_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_ssp_cs = {
--	.name = "ssp_chip_selects",
--	.modes = pmx_ssp_cs_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp_cs_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_ssp_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_SSP_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_ssp = {
--	.name = "ssp",
--	.modes = pmx_ssp_modes,
--	.mode_count = ARRAY_SIZE(pmx_ssp_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_mii_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_mii = {
--	.name = "mii",
--	.modes = pmx_mii_modes,
--	.mode_count = ARRAY_SIZE(pmx_mii_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin0_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin0 = {
--	.name = "gpio_pin0",
--	.modes = pmx_gpio_pin0_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin0_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin1_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN1_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin1 = {
--	.name = "gpio_pin1",
--	.modes = pmx_gpio_pin1_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin1_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin2_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin2 = {
--	.name = "gpio_pin2",
--	.modes = pmx_gpio_pin2_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin2_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin3_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN3_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin3 = {
--	.name = "gpio_pin3",
--	.modes = pmx_gpio_pin3_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin3_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin4_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin4 = {
--	.name = "gpio_pin4",
--	.modes = pmx_gpio_pin4_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin4_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_gpio_pin5_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_gpio_pin5 = {
--	.name = "gpio_pin5",
--	.modes = pmx_gpio_pin5_modes,
--	.mode_count = ARRAY_SIZE(pmx_gpio_pin5_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_uart0_modem_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_uart0_modem = {
--	.name = "uart0_modem",
--	.modes = pmx_uart0_modem_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart0_modem_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_uart0_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_UART0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_uart0 = {
--	.name = "uart0",
--	.modes = pmx_uart0_modes,
--	.mode_count = ARRAY_SIZE(pmx_uart0_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_timer_3_4_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_timer_3_4 = {
--	.name = "timer_3_4",
--	.modes = pmx_timer_3_4_modes,
--	.mode_count = ARRAY_SIZE(pmx_timer_3_4_modes),
--	.enb_on_reset = 0,
--};
--
--static struct pmx_dev_mode pmx_timer_1_2_modes[] = {
--	{
--		.ids = 0xffffffff,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_timer_1_2 = {
--	.name = "timer_1_2",
--	.modes = pmx_timer_1_2_modes,
--	.mode_count = ARRAY_SIZE(pmx_timer_1_2_modes),
--	.enb_on_reset = 0,
--};
--
--#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--/* plgpios devices */
--static struct pmx_dev_mode pmx_plgpio_0_1_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_FIRDA_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_0_1 = {
--	.name = "plgpio 0 and 1",
--	.modes = pmx_plgpio_0_1_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_0_1_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_2_3_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_UART0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_2_3 = {
--	.name = "plgpio 2 and 3",
--	.modes = pmx_plgpio_2_3_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_2_3_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_4_5_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_I2C_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_4_5 = {
--	.name = "plgpio 4 and 5",
--	.modes = pmx_plgpio_4_5_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_4_5_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_6_9_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_SSP_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_6_9 = {
--	.name = "plgpio 6 to 9",
--	.modes = pmx_plgpio_6_9_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_6_9_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_10_27_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_MII_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_10_27 = {
--	.name = "plgpio 10 to 27",
--	.modes = pmx_plgpio_10_27_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_10_27_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_28_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN0_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_28 = {
--	.name = "plgpio 28",
--	.modes = pmx_plgpio_28_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_28_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_29_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN1_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_29 = {
--	.name = "plgpio 29",
--	.modes = pmx_plgpio_29_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_29_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_30_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_30 = {
--	.name = "plgpio 30",
--	.modes = pmx_plgpio_30_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_30_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_31_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN3_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_31 = {
--	.name = "plgpio 31",
--	.modes = pmx_plgpio_31_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_31_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_32_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_32 = {
--	.name = "plgpio 32",
--	.modes = pmx_plgpio_32_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_32_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_33_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_GPIO_PIN5_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_33 = {
--	.name = "plgpio 33",
--	.modes = pmx_plgpio_33_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_33_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_34_36_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_SSP_CS_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_34_36 = {
--	.name = "plgpio 34 to 36",
--	.modes = pmx_plgpio_34_36_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_34_36_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_37_42_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_UART0_MODEM_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_37_42 = {
--	.name = "plgpio 37 to 42",
--	.modes = pmx_plgpio_37_42_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_37_42_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_43_44_47_48_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_1_2_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_43_44_47_48 = {
--	.name = "plgpio 43, 44, 47 and 48",
--	.modes = pmx_plgpio_43_44_47_48_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_43_44_47_48_modes),
--	.enb_on_reset = 1,
--};
--
--static struct pmx_dev_mode pmx_plgpio_45_46_49_50_modes[] = {
--	{
--		.ids = 0x00,
--		.mask = PMX_TIMER_3_4_MASK,
--	},
--};
--
--struct pmx_dev spear3xx_pmx_plgpio_45_46_49_50 = {
--	.name = "plgpio 45, 46, 49 and 50",
--	.modes = pmx_plgpio_45_46_49_50_modes,
--	.mode_count = ARRAY_SIZE(pmx_plgpio_45_46_49_50_modes),
--	.enb_on_reset = 1,
--};
--#endif /* CONFIG_MACH_SPEAR310 || CONFIG_MACH_SPEAR320 */
--
- /* ssp device registration */
- struct pl022_ssp_controller pl022_plat_data = {
- 	.bus_id = 0,
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 4af6258..7744802 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -5,4 +5,4 @@
- # Common support
- obj-y	:= clock.o restart.o time.o pl080.o
- 
--obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
-+obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o
-diff --git a/arch/arm/plat-spear/include/plat/padmux.h b/arch/arm/plat-spear/include/plat/padmux.h
-deleted file mode 100644
-index 877f3ad..0000000
---- a/arch/arm/plat-spear/include/plat/padmux.h
-+++ /dev/null
-@@ -1,92 +0,0 @@
--/*
-- * arch/arm/plat-spear/include/plat/padmux.h
-- *
-- * SPEAr platform specific gpio pads muxing file
-- *
-- * Copyright (C) 2009 ST Microelectronics
-- * Viresh Kumar<viresh.kumar@st.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#ifndef __PLAT_PADMUX_H
--#define __PLAT_PADMUX_H
--
--#include <linux/types.h>
--
--/*
-- * struct pmx_reg: configuration structure for mode reg and mux reg
-- *
-- * offset: offset of mode reg
-- * mask: mask of mode reg
-- */
--struct pmx_reg {
--	u32 offset;
--	u32 mask;
--};
--
--/*
-- * struct pmx_dev_mode: configuration structure every group of modes of a device
-- *
-- * ids: all modes for this configuration
-- * mask: mask for supported mode
-- */
--struct pmx_dev_mode {
--	u32 ids;
--	u32 mask;
--};
--
--/*
-- * struct pmx_mode: mode definition structure
-- *
-- * name: mode name
-- * mask: mode mask
-- */
--struct pmx_mode {
--	char *name;
--	u32 id;
--	u32 mask;
--};
--
--/*
-- * struct pmx_dev: device definition structure
-- *
-- * name: device name
-- * modes: device configuration array for different modes supported
-- * mode_count: size of modes array
-- * is_active: is peripheral active/enabled
-- * enb_on_reset: if 1, mask bits to be cleared in reg otherwise to be set in reg
-- */
--struct pmx_dev {
--	char *name;
--	struct pmx_dev_mode *modes;
--	u8 mode_count;
--	bool is_active;
--	bool enb_on_reset;
--};
--
--/*
-- * struct pmx_driver: driver definition structure
-- *
-- * mode: mode to be set
-- * devs: array of pointer to pmx devices
-- * devs_count: ARRAY_SIZE of devs
-- * base: base address of soc config registers
-- * mode_reg: structure of mode config register
-- * mux_reg: structure of device mux config register
-- */
--struct pmx_driver {
--	struct pmx_mode *mode;
--	struct pmx_dev **devs;
--	u8 devs_count;
--	u32 *base;
--	struct pmx_reg mode_reg;
--	struct pmx_reg mux_reg;
--};
--
--/* pmx functions */
--int pmx_register(struct pmx_driver *driver);
--
--#endif /* __PLAT_PADMUX_H */
-diff --git a/arch/arm/plat-spear/padmux.c b/arch/arm/plat-spear/padmux.c
-deleted file mode 100644
-index 555eec6..0000000
---- a/arch/arm/plat-spear/padmux.c
-+++ /dev/null
-@@ -1,164 +0,0 @@
--/*
-- * arch/arm/plat-spear/include/plat/padmux.c
-- *
-- * SPEAr platform specific gpio pads muxing source file
-- *
-- * Copyright (C) 2009 ST Microelectronics
-- * Viresh Kumar<viresh.kumar@st.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/err.h>
--#include <linux/io.h>
--#include <linux/slab.h>
--#include <plat/padmux.h>
--
--/*
-- * struct pmx: pmx definition structure
-- *
-- * base: base address of configuration registers
-- * mode_reg: mode configurations
-- * mux_reg: muxing configurations
-- * active_mode: pointer to current active mode
-- */
--struct pmx {
--	u32 base;
--	struct pmx_reg mode_reg;
--	struct pmx_reg mux_reg;
--	struct pmx_mode *active_mode;
--};
--
--static struct pmx *pmx;
--
--/**
-- * pmx_mode_set - Enables an multiplexing mode
-- * @mode - pointer to pmx mode
-- *
-- * It will set mode of operation in hardware.
-- * Returns -ve on Err otherwise 0
-- */
--static int pmx_mode_set(struct pmx_mode *mode)
--{
--	u32 val;
--
--	if (!mode->name)
--		return -EFAULT;
--
--	pmx->active_mode = mode;
--
--	val = readl(pmx->base + pmx->mode_reg.offset);
--	val &= ~pmx->mode_reg.mask;
--	val |= mode->mask & pmx->mode_reg.mask;
--	writel(val, pmx->base + pmx->mode_reg.offset);
--
--	return 0;
--}
--
--/**
-- * pmx_devs_enable - Enables list of devices
-- * @devs - pointer to pmx device array
-- * @count - number of devices to enable
-- *
-- * It will enable pads for all required peripherals once and only once.
-- * If peripheral is not supported by current mode then request is rejected.
-- * Conflicts between peripherals are not handled and peripherals will be
-- * enabled in the order they are present in pmx_dev array.
-- * In case of conflicts last peripheral enabled will be present.
-- * Returns -ve on Err otherwise 0
-- */
--static int pmx_devs_enable(struct pmx_dev **devs, u8 count)
--{
--	u32 val, i, mask;
--
--	if (!count)
--		return -EINVAL;
--
--	val = readl(pmx->base + pmx->mux_reg.offset);
--	for (i = 0; i < count; i++) {
--		u8 j = 0;
--
--		if (!devs[i]->name || !devs[i]->modes) {
--			printk(KERN_ERR "padmux: dev name or modes is null\n");
--			continue;
--		}
--		/* check if peripheral exists in active mode */
--		if (pmx->active_mode) {
--			bool found = false;
--			for (j = 0; j < devs[i]->mode_count; j++) {
--				if (devs[i]->modes[j].ids &
--						pmx->active_mode->id) {
--					found = true;
--					break;
--				}
--			}
--			if (found == false) {
--				printk(KERN_ERR "%s device not available in %s"\
--						"mode\n", devs[i]->name,
--						pmx->active_mode->name);
--				continue;
--			}
--		}
--
--		/* enable peripheral */
--		mask = devs[i]->modes[j].mask & pmx->mux_reg.mask;
--		if (devs[i]->enb_on_reset)
--			val &= ~mask;
--		else
--			val |= mask;
--
--		devs[i]->is_active = true;
--	}
--	writel(val, pmx->base + pmx->mux_reg.offset);
--	kfree(pmx);
--
--	/* this will ensure that multiplexing can't be changed now */
--	pmx = (struct pmx *)-1;
--
--	return 0;
--}
--
--/**
-- * pmx_register - registers a platform requesting pad mux feature
-- * @driver - pointer to driver structure containing driver specific parameters
-- *
-- * Also this must be called only once. This will allocate memory for pmx
-- * structure, will call pmx_mode_set, will call pmx_devs_enable.
-- * Returns -ve on Err otherwise 0
-- */
--int pmx_register(struct pmx_driver *driver)
--{
--	int ret = 0;
--
--	if (pmx)
--		return -EPERM;
--	if (!driver->base || !driver->devs)
--		return -EFAULT;
--
--	pmx = kzalloc(sizeof(*pmx), GFP_KERNEL);
--	if (!pmx)
--		return -ENOMEM;
--
--	pmx->base = (u32)driver->base;
--	pmx->mode_reg.offset = driver->mode_reg.offset;
--	pmx->mode_reg.mask = driver->mode_reg.mask;
--	pmx->mux_reg.offset = driver->mux_reg.offset;
--	pmx->mux_reg.mask = driver->mux_reg.mask;
--
--	/* choose mode to enable */
--	if (driver->mode) {
--		ret = pmx_mode_set(driver->mode);
--		if (ret)
--			goto pmx_fail;
--	}
--	ret = pmx_devs_enable(driver->devs, driver->devs_count);
--	if (ret)
--		goto pmx_fail;
--
--	return 0;
--
--pmx_fail:
--	return ret;
--}
+ endif
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 5412f60..878a2dc 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -17,3 +17,5 @@ obj-$(CONFIG_PINCTRL_TEGRA20)	+= pinctrl-tegra20.o
+ obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
+ obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
+ obj-$(CONFIG_PINCTRL_COH901)	+= pinctrl-coh901.o
++
++obj-$(CONFIG_PLAT_SPEAR)	+= spear/
+diff --git a/drivers/pinctrl/spear/Kconfig b/drivers/pinctrl/spear/Kconfig
+new file mode 100644
+index 0000000..47a0e295
+--- /dev/null
++++ b/drivers/pinctrl/spear/Kconfig
+@@ -0,0 +1,14 @@
++#
++# ST Microelectronics SPEAr PINCTRL drivers
++#
++
++if PLAT_SPEAR
++
++config PINCTRL_SPEAR
++	bool
++	depends on OF
++	select PINMUX
++	help
++	  This enables pin control drivers for SPEAr Platform
++
++endif
+diff --git a/drivers/pinctrl/spear/Makefile b/drivers/pinctrl/spear/Makefile
+new file mode 100644
+index 0000000..69c1a51
+--- /dev/null
++++ b/drivers/pinctrl/spear/Makefile
+@@ -0,0 +1,3 @@
++# SPEAr pinmux support
++
++obj-$(CONFIG_PINCTRL_SPEAR)	+= pinctrl-spear.o
+diff --git a/drivers/pinctrl/spear/pinctrl-spear.c b/drivers/pinctrl/spear/pinctrl-spear.c
+new file mode 100644
+index 0000000..ad70be7
+--- /dev/null
++++ b/drivers/pinctrl/spear/pinctrl-spear.c
+@@ -0,0 +1,349 @@
++/*
++ * Driver for the ST Microelectronics SPEAr pinmux
++ *
++ * Copyright (C) 2012 ST Microelectronics
++ * Viresh Kumar <viresh.kumar@st.com>
++ *
++ * Inspired from:
++ * - U300 Pinctl drivers
++ * - Tegra Pinctl drivers
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/pinctrl/machine.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#include "pinctrl-spear.h"
++
++#define DRIVER_NAME "spear-pinmux"
++
++static inline u32 pmx_readl(struct spear_pmx *pmx, u32 reg)
++{
++	return readl_relaxed(pmx->vbase + reg);
++}
++
++static inline void pmx_writel(struct spear_pmx *pmx, u32 val, u32 reg)
++{
++	writel_relaxed(val, pmx->vbase + reg);
++}
++
++static int set_mode(struct spear_pmx *pmx, int mode)
++{
++	struct spear_pmx_mode *pmx_mode = NULL;
++	int i;
++	u32 val;
++
++	if (!pmx->machdata->pmx_modes || !pmx->machdata->npmx_modes)
++		return -EINVAL;
++
++	for (i = 0; i < pmx->machdata->npmx_modes; i++) {
++		if (pmx->machdata->pmx_modes[i]->mode == (1 << mode)) {
++			pmx_mode = pmx->machdata->pmx_modes[i];
++			break;
++		}
++	}
++
++	if (!pmx_mode)
++		return -EINVAL;
++
++	val = pmx_readl(pmx, pmx_mode->reg);
++	val &= ~pmx_mode->mask;
++	val |= pmx_mode->val;
++	pmx_writel(pmx, val, pmx_mode->reg);
++
++	pmx->machdata->mode = pmx_mode->mode;
++	dev_info(pmx->dev, "Configured Mode: %s with id: %x\n\n",
++			pmx_mode->name ? pmx_mode->name : "no_name",
++			pmx_mode->reg);
++
++	return 0;
++}
++
++void __devinit pmx_init_addr(struct spear_pinctrl_machdata *machdata, u16 reg)
++{
++	struct spear_pingroup *pgroup;
++	struct spear_modemux *modemux;
++	int i, j, group;
++
++	for (group = 0; group < machdata->ngroups; group++) {
++		pgroup = machdata->groups[group];
++
++		for (i = 0; i < pgroup->nmodemuxs; i++) {
++			modemux = &pgroup->modemuxs[i];
++
++			for (j = 0; j < modemux->nmuxregs; j++)
++				if (modemux->muxregs[j].reg == 0xFFFF)
++					modemux->muxregs[j].reg = reg;
++		}
++	}
++}
++
++static int spear_pinctrl_get_groups_cnt(struct pinctrl_dev *pctldev)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++
++	return pmx->machdata->ngroups;
++}
++
++static const char *spear_pinctrl_get_group_name(struct pinctrl_dev *pctldev,
++		unsigned group)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++
++	return pmx->machdata->groups[group]->name;
++}
++
++static int spear_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
++		unsigned group, const unsigned **pins, unsigned *num_pins)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++
++	*pins = pmx->machdata->groups[group]->pins;
++	*num_pins = pmx->machdata->groups[group]->npins;
++
++	return 0;
++}
++
++static void spear_pinctrl_pin_dbg_show(struct pinctrl_dev *pctldev,
++		struct seq_file *s, unsigned offset)
++{
++	seq_printf(s, " " DRIVER_NAME);
++}
++
++int spear_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
++				 struct device_node *np_config,
++				 struct pinctrl_map **map, unsigned *num_maps)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++	struct device_node *np;
++	struct property *prop;
++	const char *function, *group;
++	int ret, index = 0, count = 0;
++
++	/* calculate number of maps required */
++	for_each_child_of_node(np_config, np) {
++		ret = of_property_read_string(np, "st,function", &function);
++		if (ret < 0)
++			return ret;
++
++		ret = of_property_count_strings(np, "st,pins");
++		if (ret < 0)
++			return ret;
++
++		count += ret;
++	}
++
++	if (!count) {
++		dev_err(pmx->dev, "No child nodes passed via DT\n");
++		return -ENODEV;
++	}
++
++	*map = kzalloc(sizeof(*map) * count, GFP_KERNEL);
++	if (!*map)
++		return -ENOMEM;
++
++	for_each_child_of_node(np_config, np) {
++		of_property_read_string(np, "st,function", &function);
++		of_property_for_each_string(np, "st,pins", prop, group) {
++			(*map)[index].type = PIN_MAP_TYPE_MUX_GROUP;
++			(*map)[index].data.mux.group = group;
++			(*map)[index].data.mux.function = function;
++			index++;
++		}
++	}
++
++	*num_maps = count;
++
++	return 0;
++}
++
++void spear_pinctrl_dt_free_map(struct pinctrl_dev *pctldev,
++		struct pinctrl_map *map, unsigned num_maps)
++{
++	kfree(map);
++}
++
++static struct pinctrl_ops spear_pinctrl_ops = {
++	.get_groups_count = spear_pinctrl_get_groups_cnt,
++	.get_group_name = spear_pinctrl_get_group_name,
++	.get_group_pins = spear_pinctrl_get_group_pins,
++	.pin_dbg_show = spear_pinctrl_pin_dbg_show,
++	.dt_node_to_map = spear_pinctrl_dt_node_to_map,
++	.dt_free_map = spear_pinctrl_dt_free_map,
++};
++
++static int spear_pinctrl_get_funcs_count(struct pinctrl_dev *pctldev)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++
++	return pmx->machdata->nfunctions;
++}
++
++static const char *spear_pinctrl_get_func_name(struct pinctrl_dev *pctldev,
++		unsigned function)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++
++	return pmx->machdata->functions[function]->name;
++}
++
++static int spear_pinctrl_get_func_groups(struct pinctrl_dev *pctldev,
++		unsigned function, const char *const **groups,
++		unsigned * const ngroups)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++
++	*groups = pmx->machdata->functions[function]->groups;
++	*ngroups = pmx->machdata->functions[function]->ngroups;
++
++	return 0;
++}
++
++static int spear_pinctrl_endisable(struct pinctrl_dev *pctldev,
++		unsigned function, unsigned group, bool enable)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++	const struct spear_pingroup *pgroup;
++	const struct spear_modemux *modemux;
++	struct spear_muxreg *muxreg;
++	u32 val, temp;
++	int i, j;
++	bool found = false;
++
++	pgroup = pmx->machdata->groups[group];
++
++	for (i = 0; i < pgroup->nmodemuxs; i++) {
++		modemux = &pgroup->modemuxs[i];
++
++		/* SoC have any modes */
++		if (pmx->machdata->modes_supported) {
++			if (!(pmx->machdata->mode & modemux->modes))
++				continue;
++		}
++
++		found = true;
++		for (j = 0; j < modemux->nmuxregs; j++) {
++			muxreg = &modemux->muxregs[j];
++
++			val = pmx_readl(pmx, muxreg->reg);
++			val &= ~muxreg->mask;
++
++			if (enable)
++				temp = muxreg->val;
++			else
++				temp = ~muxreg->val;
++
++			val |= temp;
++			pmx_writel(pmx, val, muxreg->reg);
++		}
++	}
++
++	if (!found) {
++		dev_err(pmx->dev, "pinmux group: %s not supported\n",
++				pgroup->name);
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++static int spear_pinctrl_enable(struct pinctrl_dev *pctldev, unsigned function,
++		unsigned group)
++{
++	return spear_pinctrl_endisable(pctldev, function, group, true);
++}
++
++static void spear_pinctrl_disable(struct pinctrl_dev *pctldev,
++		unsigned function, unsigned group)
++{
++	spear_pinctrl_endisable(pctldev, function, group, false);
++}
++
++static struct pinmux_ops spear_pinmux_ops = {
++	.get_functions_count = spear_pinctrl_get_funcs_count,
++	.get_function_name = spear_pinctrl_get_func_name,
++	.get_function_groups = spear_pinctrl_get_func_groups,
++	.enable = spear_pinctrl_enable,
++	.disable = spear_pinctrl_disable,
++};
++
++static struct pinctrl_desc spear_pinctrl_desc = {
++	.name = DRIVER_NAME,
++	.pctlops = &spear_pinctrl_ops,
++	.pmxops = &spear_pinmux_ops,
++	.owner = THIS_MODULE,
++};
++
++int __devinit spear_pinctrl_probe(struct platform_device *pdev,
++		struct spear_pinctrl_machdata *machdata)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct spear_pmx *pmx;
++
++	if (!machdata)
++		return -ENODEV;
++
++	pmx = devm_kzalloc(&pdev->dev, sizeof(*pmx), GFP_KERNEL);
++	if (!pmx) {
++		dev_err(&pdev->dev, "Can't alloc spear_pmx\n");
++		return -ENOMEM;
++	}
++
++	pmx->vbase = devm_of_iomap(&pdev->dev, 0);
++	if (!pmx->vbase) {
++		dev_err(&pdev->dev, "Couldn't ioremap at index 0\n");
++		return -ENODEV;
++	}
++
++	pmx->dev = &pdev->dev;
++	pmx->machdata = machdata;
++
++	/* configure mode, if supported by SoC */
++	if (machdata->modes_supported) {
++		int mode = 0;
++
++		if (of_property_read_u32(np, "st,pinmux-mode", &mode)) {
++			dev_err(&pdev->dev, "OF: pinmux mode not passed\n");
++			return -EINVAL;
++		}
++
++		if (set_mode(pmx, mode)) {
++			dev_err(&pdev->dev, "OF: Couldn't configure mode: %x\n",
++					mode);
++			return -EINVAL;
++		}
++	}
++
++	platform_set_drvdata(pdev, pmx);
++
++	spear_pinctrl_desc.pins = machdata->pins;
++	spear_pinctrl_desc.npins = machdata->npins;
++
++	pmx->pctl = pinctrl_register(&spear_pinctrl_desc, &pdev->dev, pmx);
++	if (IS_ERR(pmx->pctl)) {
++		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
++		return PTR_ERR(pmx->pctl);
++	}
++
++	return 0;
++}
++
++int __devexit spear_pinctrl_remove(struct platform_device *pdev)
++{
++	struct spear_pmx *pmx = platform_get_drvdata(pdev);
++
++	pinctrl_unregister(pmx->pctl);
++
++	return 0;
++}
+diff --git a/drivers/pinctrl/spear/pinctrl-spear.h b/drivers/pinctrl/spear/pinctrl-spear.h
+new file mode 100644
+index 0000000..47a6b5b
+--- /dev/null
++++ b/drivers/pinctrl/spear/pinctrl-spear.h
+@@ -0,0 +1,142 @@
++/*
++ * Driver header file for the ST Microelectronics SPEAr pinmux
++ *
++ * Copyright (C) 2012 ST Microelectronics
++ * Viresh Kumar <viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __PINMUX_SPEAR_H__
++#define __PINMUX_SPEAR_H__
++
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/types.h>
++
++struct platform_device;
++struct device;
++
++/**
++ * struct spear_pmx_mode - SPEAr pmx mode
++ * @name: name of pmx mode
++ * @mode: mode id
++ * @reg: register for configuring this mode
++ * @mask: mask of this mode in reg
++ * @val: val to be configured at reg after doing (val & mask)
++ */
++struct spear_pmx_mode {
++	const char *const name;
++	u16 mode;
++	u16 reg;
++	u16 mask;
++	u32 val;
++};
++
++/**
++ * struct spear_muxreg - SPEAr mux reg configuration
++ * @reg: register offset
++ * @mask: mask bits
++ * @val: val to be written on mask bits
++ */
++struct spear_muxreg {
++	u16 reg;
++	u32 mask;
++	u32 val;
++};
++
++/**
++ * struct spear_modemux - SPEAr mode mux configuration
++ * @modes: mode ids supported by this group of muxregs
++ * @nmuxregs: number of muxreg configurations to be done for modes
++ * @muxregs: array of muxreg configurations to be done for modes
++ */
++struct spear_modemux {
++	u16 modes;
++	u8 nmuxregs;
++	struct spear_muxreg *muxregs;
++};
++
++/**
++ * struct spear_pingroup - SPEAr pin group configurations
++ * @name: name of pin group
++ * @pins: array containing pin numbers
++ * @npins: size of pins array
++ * @modemuxs: array of modemux configurations for this pin group
++ * @nmodemuxs: size of array modemuxs
++ *
++ * A representation of a group of pins in the SPEAr pin controller. Each group
++ * allows some parameter or parameters to be configured.
++ */
++struct spear_pingroup {
++	const char *name;
++	const unsigned *pins;
++	unsigned npins;
++	struct spear_modemux *modemuxs;
++	unsigned nmodemuxs;
++};
++
++/**
++ * struct spear_function - SPEAr pinctrl mux function
++ * @name: The name of the function, exported to pinctrl core.
++ * @groups: An array of pin groups that may select this function.
++ * @ngroups: The number of entries in @groups.
++ */
++struct spear_function {
++	const char *name;
++	const char *const *groups;
++	unsigned ngroups;
++};
++
++/**
++ * struct spear_pinctrl_machdata - SPEAr pin controller machine driver
++ *	configuration
++ * @pins: An array describing all pins the pin controller affects.
++ *	All pins which are also GPIOs must be listed first within the *array,
++ *	and be numbered identically to the GPIO controller's *numbering.
++ * @npins: The numbmer of entries in @pins.
++ * @functions: An array describing all mux functions the SoC supports.
++ * @nfunctions: The numbmer of entries in @functions.
++ * @groups: An array describing all pin groups the pin SoC supports.
++ * @ngroups: The numbmer of entries in @groups.
++ *
++ * @modes_supported: Does SoC support modes
++ * @mode: mode configured from probe
++ * @pmx_modes: array of modes supported by SoC
++ * @npmx_modes: number of entries in pmx_modes.
++ */
++struct spear_pinctrl_machdata {
++	const struct pinctrl_pin_desc *pins;
++	unsigned npins;
++	struct spear_function **functions;
++	unsigned nfunctions;
++	struct spear_pingroup **groups;
++	unsigned ngroups;
++
++	bool modes_supported;
++	u16 mode;
++	struct spear_pmx_mode **pmx_modes;
++	unsigned npmx_modes;
++};
++
++/**
++ * struct spear_pmx - SPEAr pinctrl mux
++ * @dev: pointer to struct dev of platform_device registered
++ * @pctl: pointer to struct pinctrl_dev
++ * @machdata: pointer to SoC or machine specific structure
++ * @vbase: virtual base address of pinmux controller
++ */
++struct spear_pmx {
++	struct device *dev;
++	struct pinctrl_dev *pctl;
++	struct spear_pinctrl_machdata *machdata;
++	void __iomem *vbase;
++};
++
++/* exported routines */
++void __devinit pmx_init_addr(struct spear_pinctrl_machdata *machdata, u16 reg);
++int __devinit spear_pinctrl_probe(struct platform_device *pdev,
++		struct spear_pinctrl_machdata *machdata);
++int __devexit spear_pinctrl_remove(struct platform_device *pdev);
++#endif /* __PINMUX_SPEAR_H__ */
 -- 
 1.7.9
