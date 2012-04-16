@@ -1,38 +1,92 @@
-From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Mon, 16 Apr 2012 09:40:11 +0200
-Subject: [PATCH] i2c-dev: Add support for I2C_M_RECV_LEN
-In-Reply-To: <4F7F2220.50003@interlog.com>
-References: <20120315180835.2e669111@endymion.delvare>
- <20120331081927.2438ea9e@endymion.delvare> <4F7CD11C.2090801@interlog.com>
- <20120405092422.453edecf@endymion.delvare> <4F7E3267.9040306@interlog.com>
- <20120406083751.46fd23c5@endymion.delvare> <4F7F16D3.6080307@interlog.com>
- <20120406182534.68d7f53d@endymion.delvare> <4F7F2220.50003@interlog.com>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D0905D5A1D2@wm021.weinmann.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 16 Apr 2012 09:53:24 +0200
+Subject: [GIT PULL] i.MX board feature patches
+In-Reply-To: <CAOesGMhakTpuXWnHUnJqiEbzPBeXE1digiyJ+LeoPbjhyFAoLA@mail.gmail.com>
+References: <20120411083342.GM3852@pengutronix.de>
+ <CAOesGMhakTpuXWnHUnJqiEbzPBeXE1digiyJ+LeoPbjhyFAoLA@mail.gmail.com>
+Message-ID: <20120416075324.GP3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Douglas Gilbert wrote on 2012-04-06:
-> On 12-04-06 12:25 PM, Jean Delvare wrote:
->> On Fri, 06 Apr 2012 12:16:19 -0400, Douglas Gilbert wrote:
->>> However I see that Nikolaus Voss has submitted a replacement driver
->>> for the i2c-at91 that works for the G45 which has two TWI units.
->>> Is that driver going into the mainline? Surely it is much better
->>> than the broken i2c-at91 driver that has been sitting broken for
->>> way too long. Atmel are bringing out new MCUs in that family which
->>> have 3 TWI units (e.g. AT91SAM9G25). Apart from the limitations
->>> about repeated starts surely Atmel have fixed the problems referred
->>> to in existing mainline i2c-at91.c driver from circa 2006.
->>> 
->>> My vote would be to add Nikolaus Voss's driver ASAP.
->> 
->> I'm not into embedded devices, so this isn't my call.
+On Sun, Apr 15, 2012 at 11:19:06AM -0700, Olof Johansson wrote:
+> Hi,
 > 
-> A pity. I checked lk 3.4-rc1 and the bad old driver is still there.
+> On Wed, Apr 11, 2012 at 1:33 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Hi Arnd, Olof,
+> >
+> > Please pull the following board feature patches for i.MX
+> >
+> > Thanks
+> > ?Sascha
+> >
+> > The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+> >
+> > ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+> >
+> > are available in the git repository at:
+> >
+> > ?git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-features-board-20120411
+> >
+> > for you to fetch changes up to e7259f7ca3a0c7a269fecb61156224ddd3edb92c:
+> >
+> > ?Visstrim_M10: Add board version detection. (2012-04-11 10:16:03 +0200)
+> >
+> > ----------------------------------------------------------------
+> > misc i.MX board specific features
+> >
+> > ----------------------------------------------------------------
+> > Alex Gershgorin (1):
+> > ? ? ?ARM: regulator: i.MX35-PDK Add regulator support
+> >
+> > Javier Martin (1):
+> > ? ? ?Visstrim_M10: Add board version detection.
+> 
+> 
+> Just because I've already have given you the "please keep this in mind
+> in the future" comments before, I'm going to ask you to respin this
+> branch and fix the patch subjects on the two above patches. The first
+> should probably be "ARM: imx: Add regulator support for i.MX35-PDK" or
+> so, and the second one needs "ARM: imx:" prefix.
+> 
+> Branch otherwise looks reasonable, so respin with that fixed and we'll
+> pull it in.
 
-as I see it, my driver has only been tested with the G45. If you
-can confirm it works with other devices, too, maybe this would help
-to get it into next.
+Here we go. Hopefully I am aware of this in the future :-/
 
-Niko
+Sascha
+
+The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+
+  Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-features-board-20120411-2
+
+for you to fetch changes up to 435ca24116bc5365a10fa0be1bf1c1e4c5680157:
+
+  ARM i.MX: Visstrim_M10: Add board version detection. (2012-04-16 09:49:31 +0200)
+
+----------------------------------------------------------------
+imx-features-board-20120411
+
+----------------------------------------------------------------
+Alex Gershgorin (1):
+      ARM: i.MX: i.MX35-PDK: Add regulator support
+
+Javier Martin (1):
+      ARM i.MX: Visstrim_M10: Add board version detection.
+
+Uwe Kleine-K?nig (1):
+      ARM: imx_v4_v5_defconfig: enable adc and touch driver of mc13783
+
+ arch/arm/configs/imx_v4_v5_defconfig        |    4 +-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   55 ++++++++
+ arch/arm/mach-imx/mach-mx35_3ds.c           |  193 +++++++++++++++++++++++++++
+ 3 files changed, 251 insertions(+), 1 deletion(-)
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
