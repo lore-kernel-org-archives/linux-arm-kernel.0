@@ -1,23 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Apr 2012 10:34:12 +0200
-Subject: [PATCH 1/7] ARM: ux500: Rename the DT compatible entry for i2c
- devices on Snowball
-In-Reply-To: <1334325909-5779-2-git-send-email-lee.jones@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkda4F0kWG67Vw7MJajghn5TGs-dzY90JAgf_=LU++TMx9A@mail.gmail.com>
+From: dhowells@redhat.com (David Howells)
+Date: Mon, 16 Apr 2012 09:35:28 +0100
+Subject: [PATCH] arm: msm: trout: fix compile failure
+In-Reply-To: <1334245537-13395-1-git-send-email-dwalker@fifo99.com>
+References: <1334245537-13395-1-git-send-email-dwalker@fifo99.com>
+Message-ID: <8793.1334565328@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 4:05 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Daniel Walker <dwalker@fifo99.com> wrote:
 
-> It is believed that the i2c compatible match entry is too long
-> and cumbersome in its current form. This patch takes steps to
-> decrease its length by using ST-Mircroelectrics' abbreviation ST.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Fixes the following warnings,
+> 
+> arch/arm/mach-msm/board-trout.c: In function 'trout_init':
+> arch/arm/mach-msm/board-trout.c:71: error: 'system_rev' undeclared (first use in this function)
+> arch/arm/mach-msm/board-trout.c:71: error: (Each undeclared identifier is reported only once
+> arch/arm/mach-msm/board-trout.c:71: error: for each function it appears in.)
+> 
+> and
+> 
+> arch/arm/mach-msm/board-trout-panel.c: In function 'trout_init_panel':
+> arch/arm/mach-msm/board-trout-panel.c:267: error: 'system_rev' undeclared (first use in this function)
+> arch/arm/mach-msm/board-trout-panel.c:267: error: (Each undeclared identifier is reported only once
+> arch/arm/mach-msm/board-trout-panel.c:267: error: for each function it appears in.)
+> 
+> This came in with the following commit 9f97da78bf018206fb623cd351d454af2f105fe0
+> which removes asm/system.h
+> 
+> Signed-off-by: Daniel Walker <dwalker@fifo99.com>
+> cc: David Howells <dhowells@redhat.com>
+> cc: Bryan Huntsman <bryanh@codeaurora.org>
+> cc: linux-arm-msm at vger.kernel.org
+> cc: linux-arm-kernel at lists.infradead.org
 
-Applied to ux500-core with speling cortecctions and Arnd's ACK.
-
-Thanks,
-Linus Walleij
+Acked-by: David Howells <dhowells@redhat.com>
