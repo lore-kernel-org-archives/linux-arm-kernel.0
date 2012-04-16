@@ -1,38 +1,42 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 Apr 2012 09:57:44 +0530
-Subject: [PATCH] OMAP: fix DMA vs memory ordering
-In-Reply-To: <20120414132435.GS24211@n2100.arm.linux.org.uk>
-References: <20120414132435.GS24211@n2100.arm.linux.org.uk>
-Message-ID: <4F8B9FC0.6090406@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 15 Apr 2012 22:24:25 -0700
+Subject: [PATCH] ARM: bcmring: fix build error due to bad AMBA_APB_DEVICE init
+Message-ID: <1334553865-10874-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 April 2012 06:54 PM, Russell King - ARM Linux wrote:
-> Using coherent DMA memory with the OMAP DMA engine results in
-> unpredictable behaviour due to memory ordering issues; as things stand,
-> there is no guarantee that data written to coherent DMA memory will be
-> visible to the DMA hardware.
-> 
-> This is because the OMAP dma_write() accessor contains no barriers,
-> necessary on ARMv6 and above.  The effect of this can be seen in comments
-> in the OMAP serial driver, which incorrectly talks about cache flushing
-> for the coherent DMA stuff.
-> 
-> Rather than adding barriers to the accessors, add it in the DMA support
-> code just before we enable DMA, and just after we disable DMA.  This
-> avoids having barriers for every DMA register access.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-I don't why the synchronisation in dma_[start/stop] was
-missing. The patch indeed make complete sense.
+Seems to have been introduced by:
+8ede1ae65 ARM: amba: bcmring: use common amba device initializers
 
+'id' is the missing parameter, and with the old initializer the value
+used was 0. Use the same here.
 
+arch/arm/mach-bcmring/core.c:55:77: error: macro "AMBA_APB_DEVICE" requires 6 arguments, but only 5 given
+arch/arm/mach-bcmring/core.c:55:8: warning: type defaults to 'int' in declaration of 'AMBA_APB_DEVICE' [-Wimplicit-int]
+arch/arm/mach-bcmring/core.c:56:77: error: macro "AMBA_APB_DEVICE" requires 6 arguments, but only 5 given
+arch/arm/mach-bcmring/core.c:56:8: warning: type defaults to 'int' in declaration of 'AMBA_APB_DEVICE' [-Wimplicit-int]
 
-> Is this why no one uses DMA with the serial driver?
->
-Will check if this patch helps in some of the DMA issues
-seen in serial driver.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jiandong Zheng <jdzheng@broadcom.com>
+---
+ arch/arm/mach-bcmring/core.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Regards
-Santosh
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index 22e4e0a..56d8b0f 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -52,8 +52,8 @@
+ #include <mach/csp/chipcHw_inline.h>
+ #include <mach/csp/tmrHw_reg.h>
+ 
+-static AMBA_APB_DEVICE(uartA, "uarta", MM_ADDR_IO_UARTA, { IRQ_UARTA }, NULL);
+-static AMBA_APB_DEVICE(uartB, "uartb", MM_ADDR_IO_UARTB, { IRQ_UARTB }, NULL);
++static AMBA_APB_DEVICE(uartA, "uarta", 0, MM_ADDR_IO_UARTA, { IRQ_UARTA }, NULL);
++static AMBA_APB_DEVICE(uartB, "uartb", 0, MM_ADDR_IO_UARTB, { IRQ_UARTB }, NULL);
+ 
+ static struct clk pll1_clk = {
+ 	.name = "PLL1",
+-- 
+1.7.9.2.359.gebfc2
