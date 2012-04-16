@@ -1,48 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Apr 2012 21:31:38 +0200
-Subject: [PATCH v2] plat-versatile: modernize FPGA IRQ controller
-In-Reply-To: <4F89EE5B.5080709@gmail.com>
-References: <1334422936-28856-1-git-send-email-linus.walleij@linaro.org>
- <4F89EE5B.5080709@gmail.com>
-Message-ID: <CACRpkdZTacwxc=sn8qiKMjrCRZyymwet3cZb=OE87JkuVSj-MA@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 16 Apr 2012 15:38:28 -0400
+Subject: [PATCH] ARM: fix mach-bcmring UART declarations
+Message-ID: <1334605108-28616-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 14, 2012 at 11:38 PM, Rob Herring <robherring2@gmail.com> wrote:
+This error appeared in the bcmring_defconfig build:
 
->> + ? ? fpga_irq_init(VA_SIC_BASE, "SIC", IRQ_SIC_START,
->> + ? ? ? ? ? ? IRQ_VICSOURCE31, ~PIC_MASK, np);
->
-> This needs some work...
->
-> For DT, you want to be calling of_irq_init and have a fpga_irq_dt_init
-> function which gets all this info from the dts. That's fine to do as a
-> follow on patch.
+  CC      arch/arm/mach-bcmring/core.o
+arch/arm/mach-bcmring/core.c:55: error: macro "AMBA_APB_DEVICE" requires 6 arguments, but only 5 given
+arch/arm/mach-bcmring/core.c:55: warning: type defaults to 'int' in declaration of 'AMBA_APB_DEVICE'
+arch/arm/mach-bcmring/core.c:56: error: macro "AMBA_APB_DEVICE" requires 6 arguments, but only 5 given
+arch/arm/mach-bcmring/core.c:56: warning: type defaults to 'int' in declaration of 'AMBA_APB_DEVICE'
+arch/arm/mach-bcmring/core.c:134: error: 'uartA_device' undeclared here (not in a function)
+arch/arm/mach-bcmring/core.c:135: error: 'uartB_device' undeclared here (not in a function)
+make[2]: *** [arch/arm/mach-bcmring/core.o] Error 1
 
-Yeah I need to do this stepwise or I'll end up tearing my hair.
+It appeared as of commit 8ede1ae65e61282cddba39bde4142be3885a6f5a
 
->> ? ? ? for (i = 0; i < 32; i++) {
->
-> This loop should be replaced by the domain .map function. For a legacy
-> domain, .map will be called by irq_domain_add_legacy 32 times.
+    "ARM: amba: bcmring: use common amba device initializers"
 
-OK ... of course it works like a charm. Will post v3 soon-ish.
+Note that in include/linux/amba/bus.h we have:
+   #define AMBA_APB_DEVICE(name, busid, id, base, irqs, data) ...
 
-On small obstacle: the .map function does not pass the
-void *host_data, so I worked around this by using a static
-file-local but this is a bit ugly...
+There is an a --> A case error in the busid and a missing zero
+placeholder for the id field.
 
-> If you have a valid mask, then I think you should be able to skip the holes.
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-Sure can. Works fine.
-
->> + ? ? f->domain = irq_domain_add_legacy(node, 32, f->irq_start, 0,
->
-> I think the fact that you always pass in 32 is your problem. You should
-> use "fls(valid) - 1" here.
-
-Since the function takes an absolute number of IRQs I guess
-it's just fls(valid)? It worked for me anyway...
-
-Thanks a lot Rob!
-Linus Walleij
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index 22e4e0a..adbfb19 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -52,8 +52,8 @@
+ #include <mach/csp/chipcHw_inline.h>
+ #include <mach/csp/tmrHw_reg.h>
+ 
+-static AMBA_APB_DEVICE(uartA, "uarta", MM_ADDR_IO_UARTA, { IRQ_UARTA }, NULL);
+-static AMBA_APB_DEVICE(uartB, "uartb", MM_ADDR_IO_UARTB, { IRQ_UARTB }, NULL);
++static AMBA_APB_DEVICE(uartA, "uartA", 0, MM_ADDR_IO_UARTA, {IRQ_UARTA}, NULL);
++static AMBA_APB_DEVICE(uartB, "uartB", 0, MM_ADDR_IO_UARTB, {IRQ_UARTB}, NULL);
+ 
+ static struct clk pll1_clk = {
+ 	.name = "PLL1",
+-- 
+1.7.9.1
