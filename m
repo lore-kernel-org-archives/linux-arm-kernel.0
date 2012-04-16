@@ -1,46 +1,47 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 16 Apr 2012 20:36:56 +0530
-Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
+Date: Mon, 16 Apr 2012 20:36:58 +0530
+Subject: [PATCH 4/7] UART: OMAP: Remove the default setting of special
+ character
 In-Reply-To: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334588821-5224-5-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the error cases the clock cut is missed. This patch intends to fix the
-same.
+Special character detect enable if enabled by default.Received data
+comparison with XOFF2 data happens by default.
 
-Cc: stable at vger.kernel.org
+tty provides only XOFF1 no X0FF2 is provided so no need
+to enable check for XOFF2.
+
+Keeping this enabled might give some slow transfers due to dummy xoff2
+comparison with xoff2 reset value.
+
+Since not all want the XOFF2 support lets not enable it by
+default.
+
 Cc: Govindraj.R <govindraj.raja@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/tty/serial/omap-serial.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ drivers/tty/serial/omap-serial.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index fe099bb..10e80bb 100644
+index 887d578..7c69b21 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
+@@ -682,11 +682,7 @@ serial_omap_configure_xonxoff
+ 	serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+ 	serial_out(up, UART_TI752_TCR, OMAP_UART_TCR_TRIG);
+-	/* Enable special char function UARTi.EFR_REG[5] and
+-	 * load the new software flow control mode IXON or IXOFF
+-	 * and restore the UARTi.EFR_REG[4] ENHANCED_EN value.
+-	 */
+-	serial_out(up, UART_EFR, up->efr | UART_EFR_SCD);
++
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
  
- 		if (ret < 0) {
- 			serial_omap_enable_ier_thri(up);
-+			pm_runtime_mark_last_busy(&up->pdev->dev);
-+			pm_runtime_put_autosuspend(&up->pdev->dev);
- 			return;
- 		}
- 	}
-@@ -1029,8 +1031,10 @@ static int serial_omap_poll_get_char(struct uart_port *port)
- 
- 	pm_runtime_get_sync(&up->pdev->dev);
- 	status = serial_in(up, UART_LSR);
--	if (!(status & UART_LSR_DR))
-+	if (!(status & UART_LSR_DR)) {
-+		pm_runtime_put(&up->pdev->dev);
- 		return NO_POLL_CHAR;
-+	}
- 
- 	status = serial_in(up, UART_RX);
- 	pm_runtime_put(&up->pdev->dev);
+ 	serial_out(up, UART_MCR, up->mcr & ~UART_MCR_TCRTLR);
 -- 
 1.7.4.1
