@@ -1,73 +1,62 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 16 Apr 2012 20:36:57 +0530
-Subject: [PATCH 3/7] UART: OMAP: fix software flow control
+Date: Mon, 16 Apr 2012 20:36:55 +0530
+Subject: [PATCH 1/7] ARM: OMAP: UART: Make context_loss_cnt signed
 In-Reply-To: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334588821-5224-4-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334588821-5224-2-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikram Pandita <vikram.pandita@ti.com>
+get_context_loss_count returns an int however it is stored in
+unsigned integer context_loss_cnt . This patch tries to make
+context_loss_cnt int. So that in case of errors(which may be negative)
+the value is not interpreted wrongly.
 
-Software flow control register bits were not defined correctly.
+In serial_omap_runtime_resume in case of errors returned by
+get_context_loss_count print a warning and do a restore.
 
-Also clarify the IXON and IXOFF logic to reflect what userspace wants.
-
-Cc: stable at vger.kernel.org
 Cc: Govindraj.R <govindraj.raja@ti.com>
-Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- arch/arm/plat-omap/include/plat/omap-serial.h |    4 ++--
- drivers/tty/serial/omap-serial.c              |   12 ++++++------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/plat-omap/include/plat/omap-serial.h |    2 +-
+ drivers/tty/serial/omap-serial.c              |   10 ++++++++--
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index b7fb6dc..6edc30a 100644
+index 9ff4444..b7fb6dc 100644
 --- a/arch/arm/plat-omap/include/plat/omap-serial.h
 +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -42,10 +42,10 @@
- #define OMAP_UART_WER_MOD_WKUP	0X7F
+@@ -128,7 +128,7 @@ struct uart_omap_port {
+ 	unsigned char		msr_saved_flags;
+ 	char			name[20];
+ 	unsigned long		port_activity;
+-	u32			context_loss_cnt;
++	int			context_loss_cnt;
+ 	u32			errata;
+ 	u8			wakeups_enabled;
  
- /* Enable XON/XOFF flow control on output */
--#define OMAP_UART_SW_TX		0x04
-+#define OMAP_UART_SW_TX		0x8
- 
- /* Enable XON/XOFF flow control on input */
--#define OMAP_UART_SW_RX		0x04
-+#define OMAP_UART_SW_RX		0x2
- 
- #define OMAP_UART_SYSC_RESET	0X07
- #define OMAP_UART_TCR_TRIG	0X0F
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 10e80bb..887d578 100644
+index d00b38e..fe099bb 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -651,19 +651,19 @@ serial_omap_configure_xonxoff
+@@ -1612,10 +1612,16 @@ static int serial_omap_runtime_resume(struct device *dev)
  
- 	/*
- 	 * IXON Flag:
--	 * Enable XON/XOFF flow control on output.
--	 * Transmit XON1, XOFF1
-+	 * Flow control for OMAP.TX
-+	 * OMAP.RX should listen for XON/XOFF
- 	 */
- 	if (termios->c_iflag & IXON)
--		up->efr |= OMAP_UART_SW_TX;
-+		up->efr |= OMAP_UART_SW_RX;
+ 	if (up && pdata) {
+ 		if (pdata->get_context_loss_count) {
+-			u32 loss_cnt = pdata->get_context_loss_count(dev);
++			int loss_cnt = pdata->get_context_loss_count(dev);
  
- 	/*
- 	 * IXOFF Flag:
--	 * Enable XON/XOFF flow control on input.
--	 * Receiver compares XON1, XOFF1.
-+	 * Flow control for OMAP.RX
-+	 * OMAP.TX should send XON/XOFF
- 	 */
- 	if (termios->c_iflag & IXOFF)
--		up->efr |= OMAP_UART_SW_RX;
-+		up->efr |= OMAP_UART_SW_TX;
+-			if (up->context_loss_cnt != loss_cnt)
++			if (loss_cnt < 0) {
++				dev_err(dev,
++					"get_context_loss_count failed : %d\n",
++					loss_cnt);
+ 				serial_omap_restore_context(up);
++			} else if (up->context_loss_cnt != loss_cnt) {
++				serial_omap_restore_context(up);
++			}
+ 		}
  
- 	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
+ 		/* Errata i291 */
 -- 
 1.7.4.1
