@@ -1,30 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Apr 2012 10:43:04 +0200
-Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation for
- Device Tree bindings
-In-Reply-To: <4F883F48.3080807@linaro.org>
+Date: Mon, 16 Apr 2012 10:48:47 +0200
+Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
+ variants
+In-Reply-To: <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
 References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-5-git-send-email-lee.jones@linaro.org>
- <4F883F48.3080807@linaro.org>
-Message-ID: <CACRpkdaJmS_koZ5QXY3UO+a1nLe6DgauvWnzVrruBzncX0B+jw@mail.gmail.com>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 4:59 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Fri, Apr 13, 2012 at 4:05 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Grant's comments also taken heed of here:
->
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Wed, 4 Apr 2012 17:06:41 +0100
-> Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation for
-> ?Device Tree bindings
->
-> Add required documentation for specific gpio-nomadik DT bindings.
+> Provide a means to collect attributes specific to ST-Ericsson's
+> ux500 variant series. This patch registers itself as the AMBA
+> driver to be called during the probe process. Once all
+> attributes and ux500 specifics are are collected the normal
+> mmci core probe is called.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> ?arch/arm/boot/dts/snowball.dts ? ? ? ? | ? 21 ++++++++++--
+> ?arch/arm/mach-ux500/board-mop500-sdi.c | ? ?4 +-
+> ?arch/arm/mach-ux500/board-mop500.c ? ? | ? ?3 +-
+> ?arch/arm/mach-ux500/board-mop500.h ? ? | ? ?4 ++
+> ?drivers/mmc/host/mmci.c ? ? ? ? ? ? ? ?| ? 58 +++++++++++++++++++++++++++++--
+> ?5 files changed, 80 insertions(+), 10 deletions(-)
 
-OK applied this version to the ux500 tree targeting ARM SoC.
-As with the other patch, let's keep it out of the GPIO tree.
+Can you split this in a clean patch to mmci.c and another patch for all
+the ux500 stuff? You can add my Acked-by for both.
+
+Obviously I cannot apply the mmci.c patch without Russell's ACK,
+(or you have to take it through his patch tracker). Russell has
+positively affirmed that he's looking after the MMCI driver.
+
+If you get Russell's ACK I'll behappy to merge it through ux500
+and ARM SoC.
 
 Yours,
 Linus Walleij
