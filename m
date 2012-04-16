@@ -1,67 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 Apr 2012 14:10:03 +0530
-Subject: [PATCH-V3 0/3] ARM: OMAP: Make OMAP clocksource source selection
- runtime
-In-Reply-To: <1334309947-25214-1-git-send-email-hvaibhav@ti.com>
-References: <1334309947-25214-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <4F8BDAE3.60708@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Apr 2012 10:40:50 +0200
+Subject: [PATCH 3/7] drivers/gpio: gpio-nomadik: Apply Device Tree bindings
+In-Reply-To: <1334325909-5779-4-git-send-email-lee.jones@linaro.org>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbypo3fbUnfzLPR5Hk3_SqWsRKgfX02dDefADY8PnXx5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav,
+On Fri, Apr 13, 2012 at 4:05 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Friday 13 April 2012 03:09 PM, Vaibhav Hiremath wrote:
-> Current OMAP code supports couple of clocksource options based
-> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
-> 
-> This patch series cleans up the existing 32k-sync timer implementation
-> without any major code changes, uses kernel parameter to override
-> the default clocksource of "counter_32k", also in order to support
-> some OMAP based derivative SoCs like AM33XX which doesn't have
-> 32K sync-timer hardware IP, adds hwmod lookup for omap2+
-> devices, and if lookup fails then fall back to gp-timer.
-> 
-> if(use_gptimer_clksrc == true)
-> 	gptimer clocksource init;
-> else if (counter_32 init == false)
-> 	/* Fallback to gptimer */
-> 	gptimer clocksource init(;
-> 
-> 
-> With this, we should be able to support multi-omap boot
-> including devices with/without 32k-sync timer.
-> 
-> This patch-series has been boot tested on AM37xEVM platform, it
-> would be helpful if somebody help me to validate it on OMAP1/2
-> platforms.
-> 
-> History:
-> ========
-> Changes from V2:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/092037.html
->         - Added early_param support to read clocksource selection
-> 	  from user through kernel parameter ("clocksource=")
-> 	- Converted to ocp_if changes from Paul
-> 
-> Changes from V1:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/081037.html
->         - Based on Tony's comment, added pbase & size argument to
-> 	  omap_init_clocksource_32k(), to avoid cpu_is_xxx() check.
-> 	- Added commit description based on discussion on list
->           (Thanks to Santosh here)
-> 	- Reorder patch sequence
-> 
-> 
-> Vaibhav Hiremath (3):
->   ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to prcm-common
->     header
->   ARM: OMAP2/3: hwmod data: Add 32k-sync timer data to hwmod database
->   ARM: OMAP: Make OMAP clocksource source selection using kernel param
-> 
-This versions of series seems to fine with me.
-Feel free to add,
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> ?arch/arm/boot/dts/db8500.dtsi ? ? ?| ? 18 +++++++++++++++
+> ?arch/arm/boot/dts/snowball.dts ? ? | ? 10 ++++----
+> ?arch/arm/mach-ux500/board-mop500.c | ? 12 ++++++++++
+> ?drivers/gpio/gpio-nomadik.c ? ? ? ?| ? 41 +++++++++++++++++++++++++++++++++--
+> ?4 files changed, 73 insertions(+), 8 deletions(-)
 
-Regards
-Santosh
+Thanks, I added a commit blurb and applied this to ux500-core.
+(So let's keep this out of the GPIO tree.)
+
+I am planning to do some pinctrl changes for ux500 this development
+cycle as well, let us take all of this through the ux500 tree up through
+ARM SoC to avoid conflicts and confusion.
+
+Yours,
+Linus Walleij
