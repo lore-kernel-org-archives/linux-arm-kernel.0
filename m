@@ -1,61 +1,69 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Mon, 16 Apr 2012 12:52:51 +0530
-Subject: [GIT PULL]: omap-serial updates for 3.4-rc
-In-Reply-To: <CAMrsUdKDhuDLr2=0uiQtY=r4pvmJQo=pJgERRCXySLghO7yGXA@mail.gmail.com>
-References: <1334052148-10385-1-git-send-email-govindraj.raja@ti.com>
- <CAMrsUdKDhuDLr2=0uiQtY=r4pvmJQo=pJgERRCXySLghO7yGXA@mail.gmail.com>
-Message-ID: <CAMrsUdJ7wzX+Hnx_wBWNnCQz__0sMw8ruFGVWH+x3NGWG0NVQw@mail.gmail.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Mon, 16 Apr 2012 09:30:02 +0200
+Subject: [PATCH] i2c-at91: fix data-loss issue
+In-Reply-To: <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
+References: <20120413103937.GH7154@arwen.pp.htv.fi>
+ <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D0905D5A1AA@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hubert Feurstein wrote on 2012-04-13:
+> In the interrupt handler both status-flags (TXCOMP and RXRDY) might be
+> pending at the same time. In this case TXCOMP is handled but NOT RXRDY
+> which causes a data-loss on the current transfer
 
-On Tue, Apr 10, 2012 at 3:36 PM, Raja, Govindraj <govindraj.raja@ti.com> wrote:
-> CC'ing Linux-ARM
->
->
-> On Tue, Apr 10, 2012 at 3:32 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
->> Hi Tony,
->>
->> Please Pull the following omap uart changes.
->> Changes basically involves getting rid of cpu checks
->> for populating erratas and features and move the same
->> from serial.c to omap-serial.c, MVR reg is used to find
->> uart versions and errata flags are populated accordingly.
+Right, this is definitely a bug and must be corrected. Part of my
+motivation for exclusively or-ing the irq bits was not reading/
+writing beyond the buffer because of (still) pending bits despite
+of an already finished transfer, so I gave TXCOMP the highest prio.
 
-here [1] is the updated pull request I have incorporated even the
-serial mux fixes done along with previous changes.
+Because of other reasons, write_next_byte() already checks this and
+does nothing if all data already has been written. My suggestion is
+to have read_next_byte() do this check too, as I don't trust the
+hardware to reset RXRDY _immediately_ after reading.
 
---
-Thanks,
-Govindraj.R
+> @@ -161,18 +161,22 @@ static irqreturn_t atmel_twi_interrupt(int irq, void
+> *dev_id)
+>  {
+>  	struct at91_twi_dev *dev = dev_id;
+>  	const unsigned status = at91_twi_read(dev, AT91_TWI_SR);
+> -	const unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
+> +	unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
+> +
+> +	irqstatus &= (AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_TXCOMP);
 
-[1]:
+The above line should be unnecessary as no more than those interrupts
+are enabled anyway. Any special reason for this?
+ 
+> +	if (!irqstatus)
+> +		return IRQ_NONE;
+> +
+> +	if (irqstatus & AT91_TWI_RXRDY)
+> +		at91_twi_read_next_byte(dev);
+> +
+> +	if (irqstatus & AT91_TWI_TXRDY)
+> +		at91_twi_write_next_byte(dev);
 
-The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+I would like to exclusively or TXRDY and RXRDY as those really should
+not be active at the same time. Keeps the decision tree lean ;-).
 
-  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+> @@ -189,6 +193,10 @@ static int
+>  at91_do_twi_transfer(struct at91_twi_dev *dev) 	if (dev->msg->flags &
+>  I2C_M_RD) { 		unsigned start_flags = AT91_TWI_START;
+> +		/* clear any pending data */
+> +		(void)at91_twi_read(dev, AT91_TWI_SR);
+> +		(void)at91_twi_read(dev, AT91_TWI_RHR);
 
-are available in the git repository at:
+I would like to modify this, as this is a partial fix for the above bug
+which should already be fully fixed by the modified isr.
+I fear subtle data-loss if we make (partial) tabula rasa before each
+transfer. I'd rather add an assertion to check if the corresponding
+irqs are active as an indication for a driver/hw-bug.
 
-  git://gitorious.org/linux-3-x/omap-serial.git for_3.4/uart_fixes
+I'll repost the driver with your fix on positive feedback from you.
+Thanks for tracking this down.
 
-for you to fetch changes up to 32b41c3c98aa652470ca42d1f0be4b558602babb:
+Ben, is there any chance to get this driver into next?
 
-  OMAP2+: UART: Add mechanism to probe uart pins and configure rx
-wakeup (2012-04-16 12:25:14 +0530)
-
-----------------------------------------------------------------
-Govindraj.R (5):
-      OMAP2+: UART: Remove cpu checks for populating errata flags
-      OMAP2+: UART: enable tx wakeup bit for wer reg
-      OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
-      OMAP2+: UART: Fix incorrect population of default uart pads
-      OMAP2+: UART: Add mechanism to probe uart pins and configure rx wakeup
-
- arch/arm/mach-omap2/mux.c                     |    3 +-
- arch/arm/mach-omap2/mux.h                     |   10 ++
- arch/arm/mach-omap2/serial.c                  |  190 +++++++++----------------
- arch/arm/plat-omap/include/plat/omap-serial.h |    9 +-
- drivers/tty/serial/omap-serial.c              |   83 +++++++++++-
- 5 files changed, 165 insertions(+), 130 deletions(-)
+Niko
