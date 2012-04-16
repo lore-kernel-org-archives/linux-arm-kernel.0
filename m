@@ -1,56 +1,56 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Mon, 16 Apr 2012 19:01:32 +0900
-Subject: [PATCH 0/2] Exynos: fix SYSMMU driver to work with power domains
-In-Reply-To: <CAHQjnOOws9imNo-S4prfHdqXjghotFaw_tqi81jNzHVPn8dXLg@mail.gmail.com>
-References: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
- <CAHQjnOOGWVcc95F==1__SCH0S-mX8bvRwOr7MhB3Arw=83jZMw@mail.gmail.com>
- <4F899D18.6000700@samsung.com>
- <CAHQjnOOws9imNo-S4prfHdqXjghotFaw_tqi81jNzHVPn8dXLg@mail.gmail.com>
-Message-ID: <CAH9JG2VuBTp30KQGeKUsdQZKuPeAMj8XvGHdH-8r=XA5F2a5qg@mail.gmail.com>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Mon, 16 Apr 2012 15:35:38 +0530
+Subject: [PATCH] ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+In-Reply-To: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAMrsUdLMugSaq74ke+1pdu9sUbAd7av61sB+hywTiZiOoxy-zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/16/12, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> On Sun, Apr 15, 2012 at 12:51 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> On 04/12/12 01:19, KyongHo Cho wrote:
->>>
->>> On Wed, Apr 11, 2012 at 11:34 PM, Marek Szyprowski
->>> <m.szyprowski@samsung.com>  wrote:
->>>>
->>>> Hi!
->>>>
->>>> These two patches fixes operation of the SYSMMU driver (v12 version [1])
->>>> with the new power domain driver based on generic power domains and
->>>> runtime pw, which has been merged to Linux kernel v3.4-rc1.
->>>>
->>> Thanks, Marek.
->>>
->>> Your way of power gating is right
->>> and I will look into the changed runtime PM scheme in Exynos tree.
->>>
->> KyongHo,
->>
->> Do you want to upstream this series with your previous sysmmu (cleanup and
->> moving) patches?
->>
+On Fri, Apr 13, 2012 at 11:25 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> The current serial UART code, while fidling with ocp idlemode bits,
+> forget about the smart idle wakeup bit even if it is supported by
+> UART IP block. This will lead to missing the module wakeup on OMAP's
+> where the smart idle wakeup is supported.
 >
-> Yes I hope so.
-> Marek's patch corrects run-time power management in Exynos4 with System MMU.
-
-Hi,
-
-Next time, if you give Acked-By or Reviewed_by, then it's more helpful
-to determine to merge or not.
-
-Thank you,
-Kyungmin Park
+> This was the root cause of the console sluggishness issue, I have been
+> observing on OMAP4 devices and also can be potential reason for some
+> other UART wakeup issues.
 >
-> Thank you.
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Govindraj.R <govindraj.raja@ti.com>
+
+Acked-by: Govindraj.R <govindraj.raja@ti.com>
+
+Adding to git://gitorious.org/linux-3-x/omap-serial.git  for_3.4/uart_fixes
+
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> ---
+> ?arch/arm/mach-omap2/serial.c | ? ?8 +++++++-
+> ?1 files changed, 7 insertions(+), 1 deletions(-)
 >
-> KyongHo
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index c9503a7..b28aae1 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -108,8 +108,14 @@ static void omap_uart_set_noidle(struct platform_device *pdev)
+> ?static void omap_uart_set_smartidle(struct platform_device *pdev)
+> ?{
+> ? ? ? ?struct omap_device *od = to_omap_device(pdev);
+> + ? ? ? u8 idlemode;
+>
+> - ? ? ? omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_SMART);
+> + ? ? ? if (od->hwmods[0]->class->sysc->idlemodes & SIDLE_SMART_WKUP)
+> + ? ? ? ? ? ? ? idlemode = HWMOD_IDLEMODE_SMART_WKUP;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? idlemode = HWMOD_IDLEMODE_SMART;
+> +
+> + ? ? ? omap_hwmod_set_slave_idlemode(od->hwmods[0], idlemode);
+> ?}
+>
+> ?#else
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.7.5.4
 >
