@@ -1,45 +1,49 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 15 Apr 2012 23:20:55 +0200
-Subject: [git pull] Renesas DT changes for v3.5
-Message-ID: <201204152320.56147.rjw@sisk.pl>
+From: minchan@kernel.org (Minchan Kim)
+Date: Mon, 16 Apr 2012 10:32:41 +0900
+Subject: [PATCH 4/4] ARM: remove consistent dma region and use common
+ vmalloc range for dma allocations
+In-Reply-To: <20120413183813.GO24211@n2100.arm.linux.org.uk>
+References: <1334325950-7881-1-git-send-email-m.szyprowski@samsung.com>
+ <1334325950-7881-5-git-send-email-m.szyprowski@samsung.com>
+ <20120413183813.GO24211@n2100.arm.linux.org.uk>
+Message-ID: <4F8B76B9.1060505@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/14/2012 03:38 AM, Russell King - ARM Linux wrote:
+> On Fri, Apr 13, 2012 at 04:05:50PM +0200, Marek Szyprowski wrote:
+>> This patch changes dma-mapping subsystem to use generic vmalloc areas
+>> for all consistent dma allocations. This increases the total size limit
+>> of the consistent allocations and removes platform hacks and a lot of
+>> duplicated code.
+>
+> NAK.  I don't think you appreciate the contexts from which the dma coherent
+> code can be called from, and the reason why we pre-allocate the page
+> tables (so that IRQ-based allocations work.)
+>
+> The vmalloc region doesn't allow that because page tables are allocated
+> using GFP_KERNEL not GFP_ATOMIC.
+>
+> Sorry.
+>
 
-Please pull changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+Off-topic.
 
-    Linux 3.4-rc2
-
-with top-most commit 3b7b70552afe351a8bd8fff1eb2d60aab2206576:
-
-    ARM: mach-shmobile: sh7372 generic board support via DT V2
-
-from the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git dt
-
-to receive material requisite for preliminary support of device trees on
-Renesas platforms.
-
-Thanks!
+I don't know why vmalloc functions have gfp_t argument.
+As Russel pointed out, we allocates page tables with GFP_KERNEL 
+regardless of gfp_t passed.
+It means gfp_t passed is useless.
+I see there are many cases calling __vmalloc with GFP_NOFS, even 
+GFP_ATOMIC. Then, it could end up deadlocking in reclaim context or 
+schedule bug.
+I'm not sure why we can't see such bugs until now.
+If I didn't miss something, Shouldn't we fix it?
 
 
- arch/arm/boot/dts/sh7372.dtsi                |   21 +++++++++++
- arch/arm/mach-shmobile/include/mach/common.h |    2 +
- arch/arm/mach-shmobile/include/mach/intc.h   |   44 +++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/irqs.h   |    2 +-
- arch/arm/mach-shmobile/intc-sh7372.c         |   34 ++++++++++++------
- arch/arm/mach-shmobile/setup-sh7372.c        |   48 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/timer.c               |   17 +++++++++
- 7 files changed, 155 insertions(+), 13 deletions(-)
-
----------------
-
-Magnus Damm (6):
-      ARM: mach-shmobile: Introduce shmobile_setup_delay()
-      ARM: mach-shmobile: Introduce INTC_IRQ_PINS_16H
-      ARM: mach-shmobile: Use 0x3400 as INTCS vector offset
-      ARM: mach-shmobile: Use INTC_IRQ_PINS_16H on sh7372
-      ARM: mach-shmobile: Rework sh7372 INTCS demuxer V2
-      ARM: mach-shmobile: sh7372 generic board support via DT V2
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Fight unfair telecom internet charges in Canada: sign http://stopthemeter.ca/
+> Don't email:<a href=mailto:"dont@kvack.org">  email at kvack.org</a>
+>
