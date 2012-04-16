@@ -1,62 +1,51 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 16 Apr 2012 20:36:55 +0530
-Subject: [PATCH 1/7] ARM: OMAP: UART: Make context_loss_cnt signed
+Date: Mon, 16 Apr 2012 20:37:01 +0530
+Subject: [PATCH 7/7] UART: OMAP: Trivial optimisation of the probe and remove
 In-Reply-To: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334588821-5224-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334588821-5224-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_context_loss_count returns an int however it is stored in
-unsigned integer context_loss_cnt . This patch tries to make
-context_loss_cnt int. So that in case of errors(which may be negative)
-the value is not interpreted wrongly.
-
-In serial_omap_runtime_resume in case of errors returned by
-get_context_loss_count print a warning and do a restore.
+The probe and remove may not be needed after initialisation and
+remove the code could be be put in the devint and devexit section.
 
 Cc: Govindraj.R <govindraj.raja@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- arch/arm/plat-omap/include/plat/omap-serial.h |    2 +-
- drivers/tty/serial/omap-serial.c              |   10 ++++++++--
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ drivers/tty/serial/omap-serial.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index 9ff4444..b7fb6dc 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -128,7 +128,7 @@ struct uart_omap_port {
- 	unsigned char		msr_saved_flags;
- 	char			name[20];
- 	unsigned long		port_activity;
--	u32			context_loss_cnt;
-+	int			context_loss_cnt;
- 	u32			errata;
- 	u8			wakeups_enabled;
- 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index d00b38e..fe099bb 100644
+index cbc9d64..42ad500 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -1612,10 +1612,16 @@ static int serial_omap_runtime_resume(struct device *dev)
+@@ -1358,7 +1358,7 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
+ 	return omap_up_info;
+ }
  
- 	if (up && pdata) {
- 		if (pdata->get_context_loss_count) {
--			u32 loss_cnt = pdata->get_context_loss_count(dev);
-+			int loss_cnt = pdata->get_context_loss_count(dev);
+-static int serial_omap_probe(struct platform_device *pdev)
++static int __devinit serial_omap_probe(struct platform_device *pdev)
+ {
+ 	struct uart_omap_port	*up;
+ 	struct resource		*mem, *irq, *dma_tx, *dma_rx;
+@@ -1489,7 +1489,7 @@ err_port_line:
+ 	return ret;
+ }
  
--			if (up->context_loss_cnt != loss_cnt)
-+			if (loss_cnt < 0) {
-+				dev_err(dev,
-+					"get_context_loss_count failed : %d\n",
-+					loss_cnt);
- 				serial_omap_restore_context(up);
-+			} else if (up->context_loss_cnt != loss_cnt) {
-+				serial_omap_restore_context(up);
-+			}
- 		}
+-static int serial_omap_remove(struct platform_device *dev)
++static int __devexit serial_omap_remove(struct platform_device *dev)
+ {
+ 	struct uart_omap_port *up = platform_get_drvdata(dev);
  
- 		/* Errata i291 */
+@@ -1654,7 +1654,7 @@ MODULE_DEVICE_TABLE(of, omap_serial_of_match);
+ 
+ static struct platform_driver serial_omap_driver = {
+ 	.probe          = serial_omap_probe,
+-	.remove         = serial_omap_remove,
++	.remove         = __devexit_p(serial_omap_remove),
+ 	.driver		= {
+ 		.name	= DRIVER_NAME,
+ 		.pm	= &serial_omap_dev_pm_ops,
 -- 
 1.7.4.1
