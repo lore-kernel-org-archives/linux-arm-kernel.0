@@ -1,92 +1,33 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Mon, 16 Apr 2012 18:00:07 +0530
-Subject: [PATCH] tty: omap-serial: Keep the wakeup mechanism enabled by default
-Message-ID: <1334579407-16970-1-git-send-email-govindraj.raja@ti.com>
+Date: Mon, 16 Apr 2012 18:10:51 +0530
+Subject: [PATCH 0/2] ARM: omap_hwmod: add api to enable/disable module level
+ wakeup
+Message-ID: <1334580053-17242-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Govindraj.R" <govindraj.raja@ti.com>
 
-The wakeups can be left enabled by default and should be disabled
-only when disabled from sysfs and while entering suspend.
+On omap2/3 module level wakeup is handled using PM_WKEN registers.
+Expand the hwmod framework to handle the module level wakeup enable 
+registers.
 
-Thanks to Kevin Hilman <khilman@ti.com> for suggesting this.
-Discussion References:
-http://www.spinics.net/lists/linux-omap/msg67764.html
-http://www.spinics.net/lists/linux-omap/msg67838.html
+Tested on Beagle-xm by enabling and disabling uart wakeups from sysfs
+Series depends on following patch for testing.
+http://marc.info/?l=linux-omap&m=133457952909998&w=2
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- drivers/tty/serial/omap-serial.c |   30 +++++++++++-------------------
- 1 files changed, 11 insertions(+), 19 deletions(-)
+Govindraj.R (2):
+  ARM: OMAP2+: omap_hwmod: Add interface to incorporate module level
+    wakeup
+  ARM: OMAP2+: omap_hwmod: Add api to enable/disable module level
+    wakeup events
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index d00b38e..4a92447 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -930,13 +930,6 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
- 	serial_out(up, UART_EFR, efr);
- 	serial_out(up, UART_LCR, 0);
- 
--	if (!device_may_wakeup(&up->pdev->dev)) {
--		if (!state)
--			pm_runtime_forbid(&up->pdev->dev);
--		else
--			pm_runtime_allow(&up->pdev->dev);
--	}
--
- 	pm_runtime_put(&up->pdev->dev);
- }
- 
-@@ -1184,10 +1177,16 @@ static struct uart_driver serial_omap_reg = {
- static int serial_omap_suspend(struct device *dev)
- {
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
-+	struct omap_uart_port_info *pdata = dev->platform_data;
- 
- 	if (up) {
- 		uart_suspend_port(&serial_omap_reg, &up->port);
- 		flush_work_sync(&up->qos_work);
-+
-+		if (!device_may_wakeup(dev)) {
-+			pdata->enable_wakeup(up->pdev, false);
-+			up->wakeups_enabled = false;
-+		}
- 	}
- 
- 	return 0;
-@@ -1582,18 +1581,6 @@ static int serial_omap_runtime_suspend(struct device *dev)
- 	if (pdata->get_context_loss_count)
- 		up->context_loss_cnt = pdata->get_context_loss_count(dev);
- 
--	if (device_may_wakeup(dev)) {
--		if (!up->wakeups_enabled) {
--			pdata->enable_wakeup(up->pdev, true);
--			up->wakeups_enabled = true;
--		}
--	} else {
--		if (up->wakeups_enabled) {
--			pdata->enable_wakeup(up->pdev, false);
--			up->wakeups_enabled = false;
--		}
--	}
--
- 	/* Errata i291 */
- 	if (up->use_dma && pdata->set_forceidle &&
- 			(up->errata & UART_ERRATA_i291_DMA_FORCEIDLE))
-@@ -1618,6 +1605,11 @@ static int serial_omap_runtime_resume(struct device *dev)
- 				serial_omap_restore_context(up);
- 		}
- 
-+		if (!up->wakeups_enabled) {
-+			pdata->enable_wakeup(up->pdev, true);
-+			up->wakeups_enabled = true;
-+		}
-+
- 		/* Errata i291 */
- 		if (up->use_dma && pdata->set_noidle &&
- 				(up->errata & UART_ERRATA_i291_DMA_FORCEIDLE))
+ arch/arm/mach-omap2/omap_hwmod.c             |   31 ++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    6 +++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    6 +++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    8 ++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +++
+ 5 files changed, 55 insertions(+), 0 deletions(-)
+
 -- 
 1.7.9
