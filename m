@@ -1,33 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Apr 2012 09:51:27 -0600
-Subject: [PATCH 1/5] ARM: tegra: Add pllc clock init table
-In-Reply-To: <20120415003303.GA10967@quad.lixom.net>
-References: <1334356926-4275-1-git-send-email-swarren@wwwdotorg.org>
- <20120415003303.GA10967@quad.lixom.net>
-Message-ID: <4F8C3FFF.1050104@wwwdotorg.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 16 Apr 2012 17:52:08 +0200
+Subject: [PATCH v2 1/3] USB: Add driver for NXP ISP1301 USB transceiver
+In-Reply-To: <Pine.LNX.4.44L0.1204161106410.1408-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1204161106410.1408-100000@iolanthe.rowland.org>
+Message-ID: <4F8C4028.5090602@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2012 06:33 PM, Olof Johansson wrote:
-> On Fri, Apr 13, 2012 at 04:42:02PM -0600, Stephen Warren wrote:
->> From: Allen Martin <amartin@nvidia.com>
->>
->> (cherry picked from commit 54f28b336f2ba3da93a459d22e32944823960d08
->> in the chromeos-2.6.38 kernel)
->>
->> swarren adds:
+On 04/16/2012 05:09 PM, Alan Stern wrote:
+>>  drivers/usb/Makefile        |    5 ++
+>>  drivers/usb/misc/Kconfig    |   12 ++++++
+>>  drivers/usb/misc/Makefile   |    1 
+>>  drivers/usb/misc/isp1301.c  |   64 ++++++++++++++++++++++++++++++++++
+>>  include/linux/usb/isp1301.h |   82 ++++++++++++++++++++++++++++++++++++++++++++
 > 
-> The above 4 lines make no sense for upstream, so you can just say "from the
-> Chrome OS 2.6.38 tree" or similar.
+> You know, drivers/usb/misc is meant for miscellaneous USB device 
+> drivers.  Not for host or transceiver drivers.
+> 
+> You should put the new file somewhere else.  Maybe in the otg 
+> directory, although that may not be completely appropriate either.  
+> Maybe something under the host directory.
 
-I tend to disagree; I'd love to see some tie between downstream and
-upstream repositories so that people working on both downstream and
-upstream kernels can tie the two together much more easily. And, the
-chromeos tree is well known amongst those working on Tegra, and publicly
-accessible.
+The driver is used by drivers in the following directories:
 
-Still, I guess we haven't followed this practice on commits before, so
-it would be inconsistent to include this, unless we resolved to be
-diligent about this going forward.
+drivers/usb/host/    (ohci-nxp.c)
+drivers/usb/otg/     (isp1301_omap.c)
+drivers/usb/gadget/  (lpc32xx_udc.c)
 
-So, I'll remove it.
+So host/ and otg/ don't look much better.
+
+Maybe one of (new):
+
+    drivers/usb/transceiver/
+    drivers/usb/phy/
+    drivers/usb/lowlevel/
+
+?
+
+Otherwise, I will put it in drivers/usb/otg/ even of it doesn't look
+better to me but the chip is advertised as "OTG transceiver". ;-)
+
+Thanks in advance,
+
+Roland
