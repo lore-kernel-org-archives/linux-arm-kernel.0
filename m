@@ -1,93 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Apr 2012 17:13:27 +0100
-Subject: [PATCH v3 3/6] ARM: architected timers: Add A15 specific sched_clock
- implementation
-In-Reply-To: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
-References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1334592810-4382-4-git-send-email-marc.zyngier@arm.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Mon, 16 Apr 2012 21:51:58 +0530
+Subject: [PATCH V4 1/5] of: Implement managed of_iomap()
+In-Reply-To: <CACxGe6tZhdvoJ60N8g5-P4UHWxB=699_bA2omEQa77u1hEEPrg@mail.gmail.com>
+References: <cover.1334548272.git.viresh.kumar@st.com>
+ <6a0872f9d8959bc9d66d179e4911d6f09a219b42.1334548272.git.viresh.kumar@st.com>
+ <201204161442.38725.arnd@arndb.de>
+ <CACxGe6tec7y-9VNb9vNiPZhN6bt5MuMV0J18P_7Gk_pDwk-V=Q@mail.gmail.com>
+ <CAOh2x=n0NfovyfCpcdoMo2a7yLtb=imm1U+R-1L-2ihZ52FUhw@mail.gmail.com>
+ <CACxGe6tZhdvoJ60N8g5-P4UHWxB=699_bA2omEQa77u1hEEPrg@mail.gmail.com>
+Message-ID: <CAOh2x=mptNGkRB-+930Uim=Op9erOxreeTL=3+qfoFeVpWNEYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide an A15 sched_clock implementation using the virtual counter,
-which is thought to be more useful than the physical one in a
-virtualised environment, as it can offset the time spent in another
-VM or the hypervisor.
+On 4/16/12, Grant Likely <grant.likely@secretlab.ca> wrote:
+> It isn't recommended anymore. Use the bus_type specific helpers instead.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Ok. So here is fixup for 3/5 of this patchset.
+
+@Linus: I will merge this with PACH 3/5 and send pull request to Arnd.
+
+fixup! pinctrl: Add SPEAr pinctrl drivers
+
 ---
- arch/arm/include/asm/arch_timer.h |    6 ++++++
- arch/arm/kernel/arch_timer.c      |   25 +++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 0 deletions(-)
+ drivers/pinctrl/spear/pinctrl-spear.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 827305d..dc008c6 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -9,11 +9,17 @@ struct arch_timer {
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
- int arch_timer_register(struct arch_timer *);
-+int arch_timer_sched_clock_init(void);
- #else
- static inline int arch_timer_register(struct arch_timer *at)
+diff --git a/drivers/pinctrl/spear/pinctrl-spear.c
+b/drivers/pinctrl/spear/pinctrl-spear.c
+index ad70be7..3ec53df 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear.c
++++ b/drivers/pinctrl/spear/pinctrl-spear.c
+@@ -289,18 +289,23 @@ int __devinit spear_pinctrl_probe(struct
+platform_device *pdev,
+ 		struct spear_pinctrl_machdata *machdata)
  {
- 	return -ENXIO;
- }
+ 	struct device_node *np = pdev->dev.of_node;
++	struct resource *res;
+ 	struct spear_pmx *pmx;
+
+ 	if (!machdata)
+ 		return -ENODEV;
+
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -EINVAL;
 +
-+static inline int arch_timer_sched_clock_init(void)
-+{
-+	return -ENXIO;
-+}
- #endif
- 
- #endif
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index ce8c7ed..611859a 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -22,6 +22,7 @@
- #include <asm/cputype.h>
- #include <asm/localtimer.h>
- #include <asm/arch_timer.h>
-+#include <asm/sched_clock.h>
- 
- static unsigned long arch_timer_rate;
- static int arch_timer_ppi;
-@@ -203,6 +204,18 @@ static inline cycle_t arch_counter_get_cntvct(void)
- 	return ((cycle_t) cvalh << 32) | cvall;
- }
- 
-+static u32 notrace arch_counter_get_cntvct32(void)
-+{
-+	cycle_t cntvct = arch_counter_get_cntvct();
-+
-+	/*
-+	 * The sched_clock infrastructure only knows about counters
-+	 * with@most 32bits. Forget about the upper 24 bits for the
-+	 * time being...
-+	 */
-+	return (u32)(cntvct & (u32)~0);
-+}
-+
- static cycle_t arch_counter_read(struct clocksource *cs)
- {
- 	return arch_counter_get_cntpct();
-@@ -285,3 +298,15 @@ out_free:
- 
- 	return err;
- }
-+
-+int __init arch_timer_sched_clock_init(void)
-+{
-+	int err;
-+
-+	err = arch_timer_available();
-+	if (err)
-+		return err;
-+
-+	setup_sched_clock(arch_counter_get_cntvct32, 32, arch_timer_rate);
-+	return 0;
-+}
--- 
-1.7.7.1
+ 	pmx = devm_kzalloc(&pdev->dev, sizeof(*pmx), GFP_KERNEL);
+ 	if (!pmx) {
+ 		dev_err(&pdev->dev, "Can't alloc spear_pmx\n");
+ 		return -ENOMEM;
+ 	}
+
+-	pmx->vbase = devm_of_iomap(&pdev->dev, 0);
++	pmx->vbase = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+ 	if (!pmx->vbase) {
+ 		dev_err(&pdev->dev, "Couldn't ioremap at index 0\n");
+ 		return -ENODEV;
