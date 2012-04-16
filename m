@@ -1,51 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Apr 2012 17:13:29 +0100
-Subject: [PATCH v3 5/6] ARM: architected timers: add support for UP timer
+Date: Mon, 16 Apr 2012 17:13:25 +0100
+Subject: [PATCH v3 1/6] ARM: local timers: reserve local_timer_register() to
+ SMP
 In-Reply-To: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
 References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1334592810-4382-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1334592810-4382-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_LOCAL_TIMERS is not defined, let the architected timer
-driver register a single clock_event_device that is used as a
-global timer.
+When running an SMP_ON_UP enabled kernel on UP, or with nosmp
+passed to the kernel, we want to be able to detect that a local
+timer is not going to be used (local timers are only used on
+SMP platforms), so we could register it as a global timer instead.
+
+Return -ENXIO when the above case is detected.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/arch_timer.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/kernel/smp.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index e2c1f86..8062805 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -245,6 +245,8 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
- 	.stop	= arch_timer_stop,
- };
- 
-+static struct clock_event_device arch_timer_global_evt;
-+
- static int __init arch_timer_common_register(void)
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index addbbe8..11c4148 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -454,6 +454,9 @@ static struct local_timer_ops *lt_ops;
+ #ifdef CONFIG_LOCAL_TIMERS
+ int local_timer_register(struct local_timer_ops *ops)
  {
- 	int err;
-@@ -279,6 +281,17 @@ static int __init arch_timer_common_register(void)
- 	}
- 
- 	err = local_timer_register(&arch_timer_ops);
-+	if (err) {
-+		/*
-+		 * We couldn't register as a local timer (could be
-+		 * because we're on a UP platform, or because some
-+		 * other local timer is already present...). Try as a
-+		 * global timer instead.
-+		 */
-+		arch_timer_global_evt.cpumask = cpumask_of(0);
-+		err = arch_timer_setup(&arch_timer_global_evt);
-+	}
++	if (!is_smp() || !setup_max_cpus)
++		return -ENXIO;
 +
- 	if (err)
- 		goto out_free_irq;
+ 	if (lt_ops)
+ 		return -EBUSY;
  
 -- 
 1.7.7.1
