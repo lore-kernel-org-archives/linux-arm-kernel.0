@@ -1,43 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Apr 2012 12:46:30 +0200
-Subject: [PATCH 13/13] dmaengine: Kconfig: fix Atmel at_hdmac entry
-In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
-References: <cover.1334567594.git.nicolas.ferre@atmel.com>
-Message-ID: <1334573190-14931-1-git-send-email-nicolas.ferre@atmel.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Mon, 16 Apr 2012 12:56:48 +0200
+Subject: [PATCH] CLKDEV: Add helper routines to allocate and add clkdevs
+ for given struct clk *
+In-Reply-To: <20120416103822.GU24211@n2100.arm.linux.org.uk>
+References: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
+ <20120416102503.GA32687@glitch> <4F8BF4DD.2080501@st.com>
+ <20120416103822.GU24211@n2100.arm.linux.org.uk>
+Message-ID: <20120416105648.GA414@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove SoC dependency and make it generic for every Atmel ARM AT91. That will
-allow to select this driver for newer chips. Keep dependency on AT91 because of
-the use of an header file located in include/mach directory.
-Modify the comment to reflect this.
+On Mon, Apr 16, 2012 at 11:38:22AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Apr 16, 2012 at 04:00:53PM +0530, Viresh Kumar wrote:
+> > On 4/16/2012 3:55 PM, Domenico Andreoli wrote:
+> > > On Mon, Apr 16, 2012 at 10:49:37AM +0530, Viresh Kumar wrote:
+> > >> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> > >> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> > >> +int clk_register_single_clkdev(struct clk *clk, const char *dev_id,
+> > >> +		const char *con_id)
+> > >> +{
+> > >> +	struct clk_lookup *cl;
+> > >> +
+> > >> +	if (!clk || (!dev_id && !con_id))
+> > >> +		return -ENOMEM;
+> > > 
+> > > I would return -EINVAL here.
+> > 
+> > Will fix it.
+> 
+> Do we actually need this kind of check?
+> 
+> > >> +int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
+> > >> +{
+> > >> +	unsigned i;
+> > >> +
+> > >> +	if (!clk || !cl || !num)
+> > >> +		return -ENOMEM;
+> > > 
+> > > I would return -EINVAL here as well.
+> > 
+> > Will fix this too.
+> 
+> Ditto.
+> 
+> I don't think these checks actually help anyone, especially if the user
+> forgets to check the return value (which makes them silent errors.)
+> 
+> If you're going to abuse the interface by passing a NULL clk_lookup or
+> num=0 then you deserve to get a big fat oops to tell you that you messed
+> up.  Same for NULL dev_id and con_id above.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
----
-I keep this Kconfig modification in this "fixes" series. The DMA
-driver will not be available for 9x5 SoC family otherwise.
+I hope for a BUG_ON then.
 
- drivers/dma/Kconfig |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index cf9da36..ef378b5 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -91,11 +91,10 @@ config DW_DMAC
- 
- config AT_HDMAC
- 	tristate "Atmel AHB DMA support"
--	depends on ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-+	depends on ARCH_AT91
- 	select DMA_ENGINE
- 	help
--	  Support the Atmel AHB DMA controller.  This can be integrated in
--	  chips such as the Atmel AT91SAM9RL.
-+	  Support the Atmel AHB DMA controller.
- 
- config FSL_DMA
- 	tristate "Freescale Elo and Elo Plus DMA support"
--- 
-1.7.10
+cheers,
+Domenico
