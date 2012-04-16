@@ -1,44 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Apr 2012 17:13:24 +0100
-Subject: [PATCH v3 0/6] A7/A15 architected timer support
-Message-ID: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 16 Apr 2012 17:13:30 +0100
+Subject: [PATCH v3 6/6] ARM: vexpress: plug local timers into the DT code
+In-Reply-To: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
+References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1334592810-4382-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for the architected timers found in
-Cortex-A7 and Cortex-A15. It adds local timer support, sched_clock,
-global timer and DT support.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-vexpress/v2m.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-Tested on Cortex A15, based on v3.4-rc3. Branch also available at:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git timers-v3.4-rc3
-
-* From v2:
-- Allow the generic code to report that local timers cannot be used.
-- Plug local timers into the VExpress DT code.
-
-* From the initial revision:
-- Fixed global timer registration when an SMP kernel is running on UP
-  with LOCAL_TIMERS enabled.
-
-Marc Zyngier (6):
-  ARM: local timers: reserve local_timer_register() to SMP
-  ARM: local timers: Add A15 architected timer support
-  ARM: architected timers: Add A15 specific sched_clock implementation
-  ARM: architected timers: add DT support
-  ARM: architected timers: add support for UP timer
-  ARM: vexpress: plug local timers into the DT code
-
- .../devicetree/bindings/arm/arch_timer.txt         |   27 ++
- arch/arm/Kconfig                                   |    7 +
- arch/arm/include/asm/arch_timer.h                  |   31 ++
- arch/arm/kernel/Makefile                           |    1 +
- arch/arm/kernel/arch_timer.c                       |  364 ++++++++++++++++++++
- arch/arm/kernel/smp.c                              |    3 +
- arch/arm/mach-vexpress/v2m.c                       |    8 +-
- 7 files changed, 440 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
- create mode 100644 arch/arm/include/asm/arch_timer.h
- create mode 100644 arch/arm/kernel/arch_timer.c
-
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 47cdcca..fd62bfe 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -19,8 +19,10 @@
+ #include <linux/clkdev.h>
+ #include <linux/mtd/physmap.h>
+ 
++#include <asm/arch_timer.h>
+ #include <asm/mach-types.h>
+ #include <asm/sizes.h>
++#include <asm/smp_twd.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+@@ -616,7 +618,6 @@ void __init v2m_dt_init_early(void)
+ 	}
+ 
+ 	clkdev_add_table(v2m_dt_lookups, ARRAY_SIZE(v2m_dt_lookups));
+-	versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
+ }
+ 
+ static  struct of_device_id vexpress_irq_match[] __initdata = {
+@@ -643,6 +644,11 @@ static void __init v2m_dt_timer_init(void)
+ 		return;
+ 	node = of_find_node_by_path(path);
+ 	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
++	if (arch_timer_of_register())
++		twd_local_timer_of_register();
++
++	if (arch_timer_sched_clock_init())
++		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
+ }
+ 
+ static struct sys_timer v2m_dt_timer = {
 -- 
 1.7.7.1
