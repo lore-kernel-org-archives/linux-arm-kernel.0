@@ -1,80 +1,43 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Apr 2012 11:20:55 +0200
-Subject: [PATCH 11/12] USB: ohci-at91: change annotations for probe/remove
- functions
+Date: Mon, 16 Apr 2012 11:20:53 +0200
+Subject: [PATCH 09/12] ARM: at91/atmel-mci: remove unused setup_dma_addr()
+ macro
 In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
 References: <cover.1334567594.git.nicolas.ferre@atmel.com>
-Message-ID: <79e2edff922c337d1f0e8407f18e506b32df488e.1334567594.git.nicolas.ferre@atmel.com>
+Message-ID: <93a2e5f55b3064422a7fab75d5d9035c58152989.1334567594.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add __devinit and __devexit on *_probe() and *_remove() functions
-with proper modification of struct platform_driver.
+This macro is not used anymove in atmel-mci driver. It has been removed
+by a patch that was dealing with dw_dmac.c e2b35f3:
+(dmaengine/dw_dmac: Fix dw_dmac user drivers to adapt to slave_config changes)
+
+We are now using the dmaengine API to specify the slave DMA parameters:
+dmaengine_slave_config().
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: linux-usb at vger.kernel.org
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: <linux-mmc@vger.kernel.org>
 ---
- drivers/usb/host/ohci-at91.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-at91/include/mach/atmel-mci.h |    7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 09f597a..13ebeca 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -94,7 +94,7 @@ static void at91_stop_hc(struct platform_device *pdev)
+diff --git a/arch/arm/mach-at91/include/mach/atmel-mci.h b/arch/arm/mach-at91/include/mach/atmel-mci.h
+index 998cb0c..5d84fe3 100644
+--- a/arch/arm/mach-at91/include/mach/atmel-mci.h
++++ b/arch/arm/mach-at91/include/mach/atmel-mci.h
+@@ -14,11 +14,4 @@ struct mci_dma_data {
+ #define	slave_data_ptr(s)	(&(s)->sdata)
+ #define find_slave_dev(s)	((s)->sdata.dma_dev)
  
- /*-------------------------------------------------------------------------*/
- 
--static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
-+static void __devexit usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
- 
- /* configure so an HC device and id are always provided */
- /* always called with process context; sleeping is OK */
-@@ -108,7 +108,7 @@ static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
-  * then invokes the start() method for the HCD associated with it
-  * through the hotplug entry's driver_data.
-  */
--static int usb_hcd_at91_probe(const struct hc_driver *driver,
-+static int __devinit usb_hcd_at91_probe(const struct hc_driver *driver,
- 			struct platform_device *pdev)
- {
- 	int retval;
-@@ -203,7 +203,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
-  * context, "rmmod" or something similar.
-  *
-  */
--static void usb_hcd_at91_remove(struct usb_hcd *hcd,
-+static void __devexit usb_hcd_at91_remove(struct usb_hcd *hcd,
- 				struct platform_device *pdev)
- {
- 	usb_remove_hcd(hcd);
-@@ -545,7 +545,7 @@ static int __devinit ohci_at91_of_init(struct platform_device *pdev)
- 
- /*-------------------------------------------------------------------------*/
- 
--static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
-+static int __devinit ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- {
- 	struct at91_usbh_data	*pdata;
- 	int			i;
-@@ -620,7 +620,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- 	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
- }
- 
--static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
-+static int __devexit ohci_hcd_at91_drv_remove(struct platform_device *pdev)
- {
- 	struct at91_usbh_data	*pdata = pdev->dev.platform_data;
- 	int			i;
-@@ -696,7 +696,7 @@ MODULE_ALIAS("platform:at91_ohci");
- 
- static struct platform_driver ohci_hcd_at91_driver = {
- 	.probe		= ohci_hcd_at91_drv_probe,
--	.remove		= ohci_hcd_at91_drv_remove,
-+	.remove		= __devexit_p(ohci_hcd_at91_drv_remove),
- 	.shutdown	= usb_hcd_platform_shutdown,
- 	.suspend	= ohci_hcd_at91_drv_suspend,
- 	.resume		= ohci_hcd_at91_drv_resume,
+-#define	setup_dma_addr(s, t, r)	do {		\
+-	if (s) {				\
+-		(s)->sdata.tx_reg = (t);	\
+-		(s)->sdata.rx_reg = (r);	\
+-	}					\
+-} while (0)
+-
+ #endif /* __MACH_ATMEL_MCI_H */
 -- 
 1.7.10
