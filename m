@@ -1,52 +1,262 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 16 Apr 2012 07:50:12 +0200
-Subject: [PATCH v6 17/17] pwm: Take over maintainership of the PWM
- subsystem
-In-Reply-To: <20120412122740.GB5353@avionic-0098.adnet.avionic-design.de>
-References: <1334070400-25013-1-git-send-email-thierry.reding@avionic-design.de>
- <201204101951.44198.arnd@arndb.de>
- <20120412072206.GB18252@avionic-0098.mockup.avionic-design.de>
- <201204121134.24892.arnd@arndb.de>
- <20120412122740.GB5353@avionic-0098.adnet.avionic-design.de>
-Message-ID: <20120416055012.GA3037@avionic-0098.adnet.avionic-design.de>
+Date: Mon, 16 Apr 2012 08:15:31 +0200
+Subject: [PATCH 1/4] ohci-nxp: Device tree support
+In-Reply-To: <1334400790-10892-2-git-send-email-stigge@antcom.de>
+References: <1334400790-10892-1-git-send-email-stigge@antcom.de>
+ <1334400790-10892-2-git-send-email-stigge@antcom.de>
+Message-ID: <20120416061531.GB3037@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thierry Reding wrote:
-> * Arnd Bergmann wrote:
-> > On Thursday 12 April 2012, Thierry Reding wrote:
-> > >   * Arnd Bergmann wrote:
-> > > > On Tuesday 10 April 2012, Thierry Reding wrote:
-> > > > > I'm taking over the maintainership of the PWM subsystem. This commit
-> > > > > also adds the URLs to the gitorious project and repository as well as
-> > > > > any missing files related to the PWM subsystem.
-> > > > > 
-> > > > > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > > > > ---
-> > > > > Note: I guess this patch in particular could use some Acked-by, maybe from
-> > > > > Arnd and Sascha so that people will know this happens with their blessing.
-> > > > 
-> > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > 
-> > > As far as I can tell the series is in pretty good shape. I've integrated
-> > > Shawn's latest comments and I think we could get this into 3.5. Does it make
-> > > sense to take the PWM tree through Linux next before having it pulled into
-> > > mainline during the next merge window?
-> > 
-> > Yes, that's the way to go. Just ask Stephen Rothwell to include it right
-> > away if you are sufficiently happy with the contents and believe that they
-> > don't break stuff.
+* Roland Stigge wrote:
+> This patch adds device tree support to ohci-nxp.c
 > 
-> I just saw that there's been some discussion to remove IS_ENABLED() and
-> replace it by something else. So maybe I should wait another day or two
-> until those changes settle in next.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> ---
+> 
+> Applies to v3.4-rc2
+> 
+>  Documentation/devicetree/bindings/usb/ohci-nxp.txt |   16 ++++
+>  drivers/usb/host/ohci-nxp.c                        |   68 ++++++++++++++-------
+>  2 files changed, 64 insertions(+), 20 deletions(-)
+> 
+> --- /dev/null
+> +++ linux-2.6/Documentation/devicetree/bindings/usb/ohci-nxp.txt
+> @@ -0,0 +1,16 @@
+> +* OHCI controller, NXP ohci-nxp variant
+> +
+> +Required properties:
+> +- compatible: must be "nxp,ohci-nxp"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: The OHCI interrupt
+> +
+> +Example (LPC32xx):
+> +
+> +	ohci at 31020000 {
+> +		compatible = "nxp,ohci-nxp";
+> +		reg = <0x31020000 0x300>;
+> +		interrupt-parent = <&mic>;
+> +		interrupts = <0x3b 0>;
+> +	};
+> --- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
+> +++ linux-2.6/drivers/usb/host/ohci-nxp.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c.h>
+> +#include <linux/of.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <asm/mach-types.h>
+> @@ -29,7 +30,6 @@
+>  
+>  #include <mach/platform.h>
+>  #include <mach/irqs.h>
+> -#include <asm/gpio.h>
+>  
+>  #define USB_CONFIG_BASE		0x31020000
+>  #define PWRMAN_BASE		0x40004000
+> @@ -38,6 +38,7 @@
+>  
+>  /* USB_CTRL bit defines */
+>  #define USB_SLAVE_HCLK_EN	(1 << 24)
+> +#define USB_DEV_NEED_CLK_EN	(1 << 22)
+>  #define USB_HOST_NEED_CLK_EN	(1 << 21)
+>  
+>  #define USB_OTG_CLK_CTRL	IO_ADDRESS(USB_CONFIG_BASE + 0xFF4)
+> @@ -117,7 +118,6 @@ static struct i2c_driver isp1301_driver;
+>  static struct i2c_client *isp1301_i2c_client;
+>  
+>  extern int usb_disabled(void);
+> -extern int ocpi_enable(void);
+>  
+>  static struct clk *usb_clk;
+>  
+> @@ -220,7 +220,7 @@ static void isp1301_configure_lpc32xx(vo
+>  		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR, ~0);
+>  
+>  	/* Enable usb_need_clk clock after transceiver is initialized */
+> -	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
+> +	__raw_writel((__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN), USB_CTRL);
+>  
+>  	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n",
+>  	      i2c_smbus_read_word_data(isp1301_i2c_client, 0x00));
+> @@ -266,7 +266,7 @@ static void nxp_stop_hc(void)
+>  	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
+>  }
+>  
 
-Seems like this issue is resolved, but something else came up. In the !OF
-builds, of_pwm_request() no longer builds because of_property_match_string()
-and of_parse_phandle_with_args() have no dummies for !OF. I've posted patches
-for these on Friday and they need to go in before the PWM subsystem. I could
-also revert the IS_ENABLED() parts and go back to a #ifdef CONFIG_OF but I'd
-rather not.
+The above changes aren't related to the DT conversion. Should they perhaps go
+into a separate patch?
+
+> -static int __devinit ohci_nxp_start(struct usb_hcd *hcd)
+> +static int ohci_nxp_start(struct usb_hcd *hcd)
+>  {
+>  	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+>  	int ret;
+> @@ -367,16 +367,20 @@ static void nxp_unset_usb_bits(void)
+>  	}
+>  }
+>  
+> -static int __devinit usb_hcd_nxp_probe(struct platform_device *pdev)
+> +static int usb_hcd_nxp_probe(struct platform_device *pdev)
+
+What's the reason for dropping __devinit?
+
+>  {
+>  	struct usb_hcd *hcd = 0;
+>  	struct ohci_hcd *ohci;
+>  	const struct hc_driver *driver = &ohci_nxp_hc_driver;
+>  	struct i2c_adapter *i2c_adap;
+>  	struct i2c_board_info i2c_info;
+> +	struct resource *res;
+>  
+>  	int ret = 0, irq;
+>  
+> +	pdev->dev.coherent_dma_mask = 0xFFFFFFFF;
+
+DMA_BIT_MASK(32)?
+
+> +	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> +
+>  	dev_dbg(&pdev->dev, "%s: " DRIVER_DESC " (nxp)\n", hcd_name);
+>  	if (usb_disabled()) {
+>  		err("USB is disabled");
+> @@ -384,16 +388,10 @@ static int __devinit usb_hcd_nxp_probe(s
+>  		goto out;
+>  	}
+>  
+> -	if (pdev->num_resources != 2
+> -	    || pdev->resource[0].flags != IORESOURCE_MEM
+> -	    || pdev->resource[1].flags != IORESOURCE_IRQ) {
+> -		err("Invalid resource configuration");
+> -		ret = -ENODEV;
+> -		goto out;
+> -	}
+> -
+>  	/* Enable AHB slave USB clock, needed for further USB clock control */
+> -	__raw_writel(USB_SLAVE_HCLK_EN | (1 << 19), USB_CTRL);
+> +	__raw_writel(__raw_readl(USB_CTRL) | USB_SLAVE_HCLK_EN, USB_CTRL);
+> +	__raw_writel(__raw_readl(USB_CTRL) & ~(1 << 20), USB_CTRL);
+> +	__raw_writel(__raw_readl(USB_CTRL) | (1 << 19), USB_CTRL);
+
+You're already adding a define for bit 22 (USB_DEV_NEED_CLK_EN) above, why
+not add one for bits 19 and 20 as well?
+
+>  
+>  	ret = i2c_add_driver(&isp1301_driver);
+>  	if (ret < 0) {
+> @@ -401,6 +399,11 @@ static int __devinit usb_hcd_nxp_probe(s
+>  		goto out;
+>  	}
+>  	i2c_adap = i2c_get_adapter(2);
+> +	if (!i2c_adap) {
+> +		err("failed on i2c_get_adapter");
+> +		goto out_i2c_driver;
+> +	}
+> +
+>  	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
+>  	strlcpy(i2c_info.type, "isp1301_nxp", I2C_NAME_SIZE);
+>  	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
+> @@ -435,6 +438,7 @@ static int __devinit usb_hcd_nxp_probe(s
+>  	}
+>  
+>  	__raw_writel(__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN, USB_CTRL);
+> +	__raw_writel(__raw_readl(USB_CTRL) & ~USB_DEV_NEED_CLK_EN, USB_CTRL);
+>  
+>  	/* Set to enable all needed USB clocks */
+>  	__raw_writel(USB_CLOCK_MASK, USB_OTG_CLK_CTRL);
+> @@ -442,7 +446,7 @@ static int __devinit usb_hcd_nxp_probe(s
+>  	while ((__raw_readl(USB_OTG_CLK_STAT) & USB_CLOCK_MASK) !=
+>  	       USB_CLOCK_MASK) ;
+>  
+> -	hcd = usb_create_hcd (driver, &pdev->dev, dev_name(&pdev->dev));
+> +	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+>  	if (!hcd) {
+>  		err("Failed to allocate HC buffer");
+>  		ret = -ENOMEM;
+> @@ -452,19 +456,30 @@ static int __devinit usb_hcd_nxp_probe(s
+>  	/* Set all USB bits in the Start Enable register */
+>  	nxp_set_usb_bits();
+>  
+> -	hcd->rsrc_start = pdev->resource[0].start;
+> -	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "Failed to get MEM resource");
+> +		ret =  -ENOMEM;
+> +		goto out4;
+> +	}
+> +	hcd->rsrc_start = IO_ADDRESS(res->start);
+
+This looks wrong.
+
+> +	hcd->rsrc_len = resource_size(res);
+>  	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+> -		dev_dbg(&pdev->dev, "request_mem_region failed\n");
+> +		dev_err(&pdev->dev, "request_mem_region failed\n");
+>  		ret =  -ENOMEM;
+>  		goto out4;
+>  	}
+> -	hcd->regs = (void __iomem *)pdev->resource[0].start;
+> +	hcd->regs = ioremap(res->start, hcd->rsrc_len);
+> +	if (!hcd->regs) {
+> +		err("Failed to ioremap");
+> +		ret =  -ENOMEM;
+> +		goto out5;
+> +	}
+
+Since this is pretty much boilerplate, can you not replace it by
+devm_request_and_ioremap()?
+
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+>  		ret = -ENXIO;
+> -		goto out4;
+> +		goto out6;
+>  	}
+>  
+>  	nxp_start_hc();
+> @@ -478,6 +493,10 @@ static int __devinit usb_hcd_nxp_probe(s
+>  		return ret;
+>  
+>  	nxp_stop_hc();
+> +out6:
+> +	iounmap(hcd->regs);
+> +out5:
+> +	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+
+If you use devm_request_and_ioremap() this cleanup is no longer necessary.
+
+>  out4:
+>  	nxp_unset_usb_bits();
+>  	usb_put_hcd(hcd);
+> @@ -517,10 +536,19 @@ static int usb_hcd_nxp_remove(struct pla
+>  /* work with hotplug and coldplug */
+>  MODULE_ALIAS("platform:usb-ohci");
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id usb_hcd_nxp_match[] = {
+> +	{ .compatible = "nxp,ohci-nxp" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, usb_hcd_nxp_match);
+> +#endif
+> +
+>  static struct platform_driver usb_hcd_nxp_driver = {
+>  	.driver = {
+>  		.name = "usb-ohci",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(usb_hcd_nxp_match),
+>  	},
+>  	.probe = usb_hcd_nxp_probe,
+>  	.remove = usb_hcd_nxp_remove,
+
+This hunk and the binding documentation are the only DT related changes, the
+rest should go into a separate patch because they're really only cleanups.
 
 Thierry
 -------------- next part --------------
@@ -55,4 +265,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120416/36702ea1/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120416/57d0d99c/attachment.sig>
