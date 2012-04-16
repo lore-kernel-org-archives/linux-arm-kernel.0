@@ -1,22 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Apr 2012 11:29:49 +0200
-Subject: [PATCH V4 0/5] pinctrl: Add SPEAr pinctrl support
-In-Reply-To: <cover.1334548272.git.viresh.kumar@st.com>
-References: <cover.1334548272.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdbYJ+PnX-N0pjec3A6uaX7S4O6WJDUy9KuK=YGGpaYPZA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 16 Apr 2012 15:04:37 +0530
+Subject: [PATCH 1/1] ARM: OMAP4: Remove un-used control module headers
+ and defines.
+In-Reply-To: <4F86D124.8050405@ti.com>
+References: <1330338743-24097-1-git-send-email-santosh.shilimkar@ti.com>
+ <4F86AF0C.5060806@ti.com> <4F86D124.8050405@ti.com>
+Message-ID: <4F8BE7AD.2040505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 6:13 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On Thursday 12 April 2012 06:27 PM, Cousson, Benoit wrote:
+> Hi Santosh,
+> 
+> On 4/12/2012 12:31 PM, Santosh Shilimkar wrote:
+>> Benoit,
+>>
+>> On Monday 27 February 2012 04:02 PM, Santosh Shilimkar wrote:
+>>> Most of the OMAP4 control module register defines are not used and
+>>> can be removed. Keep only needed defines and move them to common
+>>> control module header just like other OMAP versions.
+>>>
+>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>> ---
+>>
+>> What do you think about this patch ?
+> 
+> I'm fine with it. I'm just wondering if we have to send it right now or
+> along with the control module driver implementation we've just started.
+> 
+Let's do that as part of the driver implementation.
 
-> This patchset replaces existing pinmux framework for SPEAr family of SoC with
-> generic pinctrl framework.
-
-Real nice work on this patchset Viresh, much appreciated!
-
-We're going to establish a merge base with the latest pinctrl
-development in ARM-SoC I think, that would benefit all:
-SPEAr, Tegra, Ux500 maybe i.MX too...
-
-Yours,
-Linus Walleij
+Regards
+Santosh
