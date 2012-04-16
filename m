@@ -1,268 +1,85 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 16 Apr 2012 08:15:31 +0200
-Subject: [PATCH 1/4] ohci-nxp: Device tree support
-In-Reply-To: <1334400790-10892-2-git-send-email-stigge@antcom.de>
+Date: Mon, 16 Apr 2012 08:16:45 +0200
+Subject: [PATCH 2/4] input: Device tree support for LPC32xx touchscreen
+In-Reply-To: <1334400790-10892-3-git-send-email-stigge@antcom.de>
 References: <1334400790-10892-1-git-send-email-stigge@antcom.de>
- <1334400790-10892-2-git-send-email-stigge@antcom.de>
-Message-ID: <20120416061531.GB3037@avionic-0098.adnet.avionic-design.de>
+ <1334400790-10892-3-git-send-email-stigge@antcom.de>
+Message-ID: <20120416061645.GC3037@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Roland Stigge wrote:
-> This patch adds device tree support to ohci-nxp.c
+> This patch adds device tree support for the LPC32xx SoC's touchscreen
+> controller.
 > 
 > Signed-off-by: Roland Stigge <stigge@antcom.de>
 > 
 > ---
 > 
-> Applies to v3.4-rc2
+>  Applies to v3.4-rc2
 > 
->  Documentation/devicetree/bindings/usb/ohci-nxp.txt |   16 ++++
->  drivers/usb/host/ohci-nxp.c                        |   68 ++++++++++++++-------
->  2 files changed, 64 insertions(+), 20 deletions(-)
+>  Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt |   16 ++++++++++
+>  drivers/input/touchscreen/lpc32xx_ts.c                              |   10 ++++++
+>  2 files changed, 26 insertions(+)
 > 
 > --- /dev/null
-> +++ linux-2.6/Documentation/devicetree/bindings/usb/ohci-nxp.txt
+> +++ linux-2.6/Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt
 > @@ -0,0 +1,16 @@
-> +* OHCI controller, NXP ohci-nxp variant
+> +* NXP LPC32xx SoC Touchscreen Controller (TSC)
 > +
 > +Required properties:
-> +- compatible: must be "nxp,ohci-nxp"
+> +- compatible: must be "nxp,lpc32xx-tsc"
 > +- reg: physical base address of the controller and length of memory mapped
 > +  region.
-> +- interrupts: The OHCI interrupt
+> +- interrupts: The TSC/ADC interrupt
 > +
-> +Example (LPC32xx):
+> +Example:
 > +
-> +	ohci at 31020000 {
-> +		compatible = "nxp,ohci-nxp";
-> +		reg = <0x31020000 0x300>;
+> +	tsc at 40048000 {
+> +		compatible = "nxp,lpc32xx-tsc";
+> +		reg = <0x40048000 0x1000>;
 > +		interrupt-parent = <&mic>;
-> +		interrupts = <0x3b 0>;
+> +		interrupts = <39 0>;
 > +	};
-> --- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
-> +++ linux-2.6/drivers/usb/host/ohci-nxp.c
+> --- linux-2.6.orig/drivers/input/touchscreen/lpc32xx_ts.c
+> +++ linux-2.6/drivers/input/touchscreen/lpc32xx_ts.c
 > @@ -22,6 +22,7 @@
 >  #include <linux/clk.h>
->  #include <linux/platform_device.h>
->  #include <linux/i2c.h>
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
 > +#include <linux/of.h>
 >  
->  #include <mach/hardware.h>
->  #include <asm/mach-types.h>
-> @@ -29,7 +30,6 @@
->  
->  #include <mach/platform.h>
->  #include <mach/irqs.h>
-> -#include <asm/gpio.h>
->  
->  #define USB_CONFIG_BASE		0x31020000
->  #define PWRMAN_BASE		0x40004000
-> @@ -38,6 +38,7 @@
->  
->  /* USB_CTRL bit defines */
->  #define USB_SLAVE_HCLK_EN	(1 << 24)
-> +#define USB_DEV_NEED_CLK_EN	(1 << 22)
->  #define USB_HOST_NEED_CLK_EN	(1 << 21)
->  
->  #define USB_OTG_CLK_CTRL	IO_ADDRESS(USB_CONFIG_BASE + 0xFF4)
-> @@ -117,7 +118,6 @@ static struct i2c_driver isp1301_driver;
->  static struct i2c_client *isp1301_i2c_client;
->  
->  extern int usb_disabled(void);
-> -extern int ocpi_enable(void);
->  
->  static struct clk *usb_clk;
->  
-> @@ -220,7 +220,7 @@ static void isp1301_configure_lpc32xx(vo
->  		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR, ~0);
->  
->  	/* Enable usb_need_clk clock after transceiver is initialized */
-> -	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
-> +	__raw_writel((__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN), USB_CTRL);
->  
->  	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n",
->  	      i2c_smbus_read_word_data(isp1301_i2c_client, 0x00));
-> @@ -266,7 +266,7 @@ static void nxp_stop_hc(void)
->  	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
->  }
->  
-
-The above changes aren't related to the DT conversion. Should they perhaps go
-into a separate patch?
-
-> -static int __devinit ohci_nxp_start(struct usb_hcd *hcd)
-> +static int ohci_nxp_start(struct usb_hcd *hcd)
->  {
->  	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
->  	int ret;
-> @@ -367,16 +367,20 @@ static void nxp_unset_usb_bits(void)
->  	}
->  }
->  
-> -static int __devinit usb_hcd_nxp_probe(struct platform_device *pdev)
-> +static int usb_hcd_nxp_probe(struct platform_device *pdev)
-
-What's the reason for dropping __devinit?
-
->  {
->  	struct usb_hcd *hcd = 0;
->  	struct ohci_hcd *ohci;
->  	const struct hc_driver *driver = &ohci_nxp_hc_driver;
->  	struct i2c_adapter *i2c_adap;
->  	struct i2c_board_info i2c_info;
-> +	struct resource *res;
->  
->  	int ret = 0, irq;
->  
-> +	pdev->dev.coherent_dma_mask = 0xFFFFFFFF;
-
-DMA_BIT_MASK(32)?
-
-> +	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> +
->  	dev_dbg(&pdev->dev, "%s: " DRIVER_DESC " (nxp)\n", hcd_name);
->  	if (usb_disabled()) {
->  		err("USB is disabled");
-> @@ -384,16 +388,10 @@ static int __devinit usb_hcd_nxp_probe(s
->  		goto out;
->  	}
->  
-> -	if (pdev->num_resources != 2
-> -	    || pdev->resource[0].flags != IORESOURCE_MEM
-> -	    || pdev->resource[1].flags != IORESOURCE_IRQ) {
-> -		err("Invalid resource configuration");
-> -		ret = -ENODEV;
-> -		goto out;
-> -	}
-> -
->  	/* Enable AHB slave USB clock, needed for further USB clock control */
-> -	__raw_writel(USB_SLAVE_HCLK_EN | (1 << 19), USB_CTRL);
-> +	__raw_writel(__raw_readl(USB_CTRL) | USB_SLAVE_HCLK_EN, USB_CTRL);
-> +	__raw_writel(__raw_readl(USB_CTRL) & ~(1 << 20), USB_CTRL);
-> +	__raw_writel(__raw_readl(USB_CTRL) | (1 << 19), USB_CTRL);
-
-You're already adding a define for bit 22 (USB_DEV_NEED_CLK_EN) above, why
-not add one for bits 19 and 20 as well?
-
->  
->  	ret = i2c_add_driver(&isp1301_driver);
->  	if (ret < 0) {
-> @@ -401,6 +399,11 @@ static int __devinit usb_hcd_nxp_probe(s
->  		goto out;
->  	}
->  	i2c_adap = i2c_get_adapter(2);
-> +	if (!i2c_adap) {
-> +		err("failed on i2c_get_adapter");
-> +		goto out_i2c_driver;
-> +	}
-> +
->  	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
->  	strlcpy(i2c_info.type, "isp1301_nxp", I2C_NAME_SIZE);
->  	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
-> @@ -435,6 +438,7 @@ static int __devinit usb_hcd_nxp_probe(s
->  	}
->  
->  	__raw_writel(__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN, USB_CTRL);
-> +	__raw_writel(__raw_readl(USB_CTRL) & ~USB_DEV_NEED_CLK_EN, USB_CTRL);
->  
->  	/* Set to enable all needed USB clocks */
->  	__raw_writel(USB_CLOCK_MASK, USB_OTG_CLK_CTRL);
-> @@ -442,7 +446,7 @@ static int __devinit usb_hcd_nxp_probe(s
->  	while ((__raw_readl(USB_OTG_CLK_STAT) & USB_CLOCK_MASK) !=
->  	       USB_CLOCK_MASK) ;
->  
-> -	hcd = usb_create_hcd (driver, &pdev->dev, dev_name(&pdev->dev));
-> +	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
->  	if (!hcd) {
->  		err("Failed to allocate HC buffer");
->  		ret = -ENOMEM;
-> @@ -452,19 +456,30 @@ static int __devinit usb_hcd_nxp_probe(s
->  	/* Set all USB bits in the Start Enable register */
->  	nxp_set_usb_bits();
->  
-> -	hcd->rsrc_start = pdev->resource[0].start;
-> -	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get MEM resource");
-> +		ret =  -ENOMEM;
-> +		goto out4;
-> +	}
-> +	hcd->rsrc_start = IO_ADDRESS(res->start);
-
-This looks wrong.
-
-> +	hcd->rsrc_len = resource_size(res);
->  	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-> -		dev_dbg(&pdev->dev, "request_mem_region failed\n");
-> +		dev_err(&pdev->dev, "request_mem_region failed\n");
->  		ret =  -ENOMEM;
->  		goto out4;
->  	}
-> -	hcd->regs = (void __iomem *)pdev->resource[0].start;
-> +	hcd->regs = ioremap(res->start, hcd->rsrc_len);
-> +	if (!hcd->regs) {
-> +		err("Failed to ioremap");
-> +		ret =  -ENOMEM;
-> +		goto out5;
-> +	}
-
-Since this is pretty much boilerplate, can you not replace it by
-devm_request_and_ioremap()?
-
->  
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq < 0) {
->  		ret = -ENXIO;
-> -		goto out4;
-> +		goto out6;
->  	}
->  
->  	nxp_start_hc();
-> @@ -478,6 +493,10 @@ static int __devinit usb_hcd_nxp_probe(s
->  		return ret;
->  
->  	nxp_stop_hc();
-> +out6:
-> +	iounmap(hcd->regs);
-> +out5:
-> +	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-
-If you use devm_request_and_ioremap() this cleanup is no longer necessary.
-
->  out4:
->  	nxp_unset_usb_bits();
->  	usb_put_hcd(hcd);
-> @@ -517,10 +536,19 @@ static int usb_hcd_nxp_remove(struct pla
->  /* work with hotplug and coldplug */
->  MODULE_ALIAS("platform:usb-ohci");
+>  /*
+>   * Touchscreen controller register offsets
+> @@ -383,6 +384,14 @@ static const struct dev_pm_ops lpc32xx_t
+>  #define LPC32XX_TS_PM_OPS NULL
+>  #endif
 >  
 > +#ifdef CONFIG_OF
-> +static const struct of_device_id usb_hcd_nxp_match[] = {
-> +	{ .compatible = "nxp,ohci-nxp" },
-> +	{},
+> +static struct of_device_id lpc32xx_tsc_of_match[] = {
+> +	{ .compatible = "nxp,lpc32xx-tsc", },
+> +	{ },
 > +};
-> +MODULE_DEVICE_TABLE(of, usb_hcd_nxp_match);
+> +MODULE_DEVICE_TABLE(of, lpc32xx_tsc_of_match);
 > +#endif
 > +
->  static struct platform_driver usb_hcd_nxp_driver = {
->  	.driver = {
->  		.name = "usb-ohci",
+>  static struct platform_driver lpc32xx_ts_driver = {
+>  	.probe		= lpc32xx_ts_probe,
+>  	.remove		= __devexit_p(lpc32xx_ts_remove),
+> @@ -390,6 +399,7 @@ static struct platform_driver lpc32xx_ts
+>  		.name	= MOD_NAME,
 >  		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(usb_hcd_nxp_match),
+>  		.pm	= LPC32XX_TS_PM_OPS,
+> +		.of_match_table = of_match_ptr(lpc32xx_tsc_of_match),
 >  	},
->  	.probe = usb_hcd_nxp_probe,
->  	.remove = usb_hcd_nxp_remove,
+>  };
+>  module_platform_driver(lpc32xx_ts_driver);
 
-This hunk and the binding documentation are the only DT related changes, the
-rest should go into a separate patch because they're really only cleanups.
-
-Thierry
+Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120416/57d0d99c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120416/eed66b80/attachment.sig>
