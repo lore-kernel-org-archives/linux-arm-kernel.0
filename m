@@ -1,28 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Apr 2012 11:18:55 +0200
-Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
- variants
-In-Reply-To: <4F8BE131.4090701@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE131.4090701@linaro.org>
-Message-ID: <CACRpkdZ=ZSa2ZXA91Fited5-BnueV8CSKUrnBhdkWFrdEe2Grw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 16 Apr 2012 11:20:51 +0200
+Subject: [PATCH 07/12] ARM: at91: fix rm9200ek flash size
+In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
+References: <cover.1334567594.git.nicolas.ferre@atmel.com>
+Message-ID: <bf66b0d1dad30cc1241dc4e3ac193251a4694f5c.1334567594.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 11:06 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On 16/04/12 09:48, Linus Walleij wrote:
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
->> Can you split this in a clean patch to mmci.c and another patch for all
->> the ux500 stuff? You can add my Acked-by for both.
->
-> I can do that. You'll have it by this afternoon.
+The flash size is 8MiB.
 
-Then it looks like only runtime dependencies exist between the MMCI
-and ux500 patch and they can be merged to different trees right?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/board-rm9200ek.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'll be happy to do that if I know that Russell picks the mmci.c portions.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
+index 11cbaa8..b2e4fe2 100644
+--- a/arch/arm/mach-at91/board-rm9200ek.c
++++ b/arch/arm/mach-at91/board-rm9200ek.c
+@@ -117,7 +117,7 @@ static struct i2c_board_info __initdata ek_i2c_devices[] = {
+ };
+ 
+ #define EK_FLASH_BASE	AT91_CHIPSELECT_0
+-#define EK_FLASH_SIZE	SZ_2M
++#define EK_FLASH_SIZE	SZ_8M
+ 
+ static struct physmap_flash_data ek_flash_data = {
+ 	.width		= 2,
+-- 
+1.7.10
