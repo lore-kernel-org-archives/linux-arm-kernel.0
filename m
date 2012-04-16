@@ -1,39 +1,35 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 16 Apr 2012 20:36:54 +0530
-Subject: [PATCH 0/7] UART: OMAP: Updates
-Message-ID: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+Date: Mon, 16 Apr 2012 20:37:00 +0530
+Subject: [PATCH 6/7] UART: OMAP: Remove the hardcode serial_omap_console_ports
+ array.
+In-Reply-To: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334588821-5224-7-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series collects few previously posted patches 
-and adds some clock fixes to the series.
+Currently the array serial_omap_console_ports is hard coded to 4.
+Make it depend on the maximum uart count.
+Also fixes OMAP5 which has 6 instances of uart.
 
-The patch series does following.
-- Makes the context_loss_cnt signed to make error handling possible.
-- The clock cutting is missed in the error cases, fix it.
-- Make the serial_omap_console_ports depend on the macro
- OMAP_MAX_HSUART_PORTS.
-- use devinit and devexit for the probe and remove functions.
-- Fixes to the software flow control.
+Cc: Govindraj.R <govindraj.raja@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
-
-  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
-
-are available in the git repository at:
-  git://gitorious.org/linus-tree/linus-tree.git uart-omap-next
-
-Shubhrajyoti D (6):
-      ARM: OMAP: UART: Make context_loss_cnt signed
-      UART: OMAP: Cut the clock in the error cases
-      UART: OMAP: Remove the default setting of special character
-      UART: OMAP: Prevent cutting of clocks if put_sync immediately follows
-      UART: OMAP: Remove the hardcode serial_omap_console_ports array.
-      UART: OMAP: Trivial optimisation of the probe and remove
-
-Vikram Pandita (1):
-      UART: OMAP: fix software flow control
-
- arch/arm/plat-omap/include/plat/omap-serial.h |    6 ++--
- drivers/tty/serial/omap-serial.c              |   47 ++++++++++++++-----------
- 2 files changed, 29 insertions(+), 24 deletions(-)
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 1593986..cbc9d64 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1040,7 +1040,7 @@ static int serial_omap_poll_get_char(struct uart_port *port)
+ 
+ #ifdef CONFIG_SERIAL_OMAP_CONSOLE
+ 
+-static struct uart_omap_port *serial_omap_console_ports[4];
++static struct uart_omap_port *serial_omap_console_ports[OMAP_MAX_HSUART_PORTS];
+ 
+ static struct uart_driver serial_omap_reg;
+ 
+-- 
+1.7.4.1
