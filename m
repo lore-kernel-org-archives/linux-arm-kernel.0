@@ -1,40 +1,48 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 16 Apr 2012 21:11:41 +0200
-Subject: [PATCH] Fix asic3 build error
-In-Reply-To: <20120414085709.GQ24211@n2100.arm.linux.org.uk>
-References: <20120414085709.GQ24211@n2100.arm.linux.org.uk>
-Message-ID: <20120416191141.GY24130@sortiz-mobl>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Apr 2012 21:31:38 +0200
+Subject: [PATCH v2] plat-versatile: modernize FPGA IRQ controller
+In-Reply-To: <4F89EE5B.5080709@gmail.com>
+References: <1334422936-28856-1-git-send-email-linus.walleij@linaro.org>
+ <4F89EE5B.5080709@gmail.com>
+Message-ID: <CACRpkdZTacwxc=sn8qiKMjrCRZyymwet3cZb=OE87JkuVSj-MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sat, Apr 14, 2012 at 11:38 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-On Sat, Apr 14, 2012 at 09:57:09AM +0100, Russell King - ARM Linux wrote:
-> OMAP randconfig builds occasionally fail with:
-> 
-> drivers/mfd/asic3.c: In function 'asic3_gpio_to_irq':
-> drivers/mfd/asic3.c:530: error: 'IRQ_BOARD_START' undeclared (first use in this function)
-> drivers/mfd/asic3.c:530: error: (Each undeclared identifier is reported only once
-> drivers/mfd/asic3.c:530: error: for each function it appears in.)
-> 
-> Fix it by using asic->irq_base rather than assuming this value is
-> IRQ_BOARD_START.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Dmitry Artamonow sent the same fix a few days ago and it's now part of my
-for-linus branch.
+>> + ? ? fpga_irq_init(VA_SIC_BASE, "SIC", IRQ_SIC_START,
+>> + ? ? ? ? ? ? IRQ_VICSOURCE31, ~PIC_MASK, np);
+>
+> This needs some work...
+>
+> For DT, you want to be calling of_irq_init and have a fpga_irq_dt_init
+> function which gets all this info from the dts. That's fine to do as a
+> follow on patch.
 
+Yeah I need to do this stepwise or I'll end up tearing my hair.
 
-> ---
-> I don't have the ability to do anything but compile test this.  Please
-> check that it's correct.  Also, I believe that the check for ASIC3_NUM_GPIOS
-> is unnecessary - gpiolib won't call your driver if you don't own the GPIO.
-Yes, you're right. __gpio_to_irq() call gpio_to_chip(), so I should only
-receive requests for GPIOs I own. I'll fix that up as well.
+>> ? ? ? for (i = 0; i < 32; i++) {
+>
+> This loop should be replaced by the domain .map function. For a legacy
+> domain, .map will be called by irq_domain_add_legacy 32 times.
 
-Cheers,
-Samuel.
+OK ... of course it works like a charm. Will post v3 soon-ish.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+On small obstacle: the .map function does not pass the
+void *host_data, so I worked around this by using a static
+file-local but this is a bit ugly...
+
+> If you have a valid mask, then I think you should be able to skip the holes.
+
+Sure can. Works fine.
+
+>> + ? ? f->domain = irq_domain_add_legacy(node, 32, f->irq_start, 0,
+>
+> I think the fact that you always pass in 32 is your problem. You should
+> use "fls(valid) - 1" here.
+
+Since the function takes an absolute number of IRQs I guess
+it's just fls(valid)? It worked for me anyway...
+
+Thanks a lot Rob!
+Linus Walleij
