@@ -1,47 +1,68 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 16 Apr 2012 08:24:48 +0200
-Subject: [PATCH 4/4] ARM: LPC32xx: Device tree support
-In-Reply-To: <1334400790-10892-5-git-send-email-stigge@antcom.de>
-References: <1334400790-10892-1-git-send-email-stigge@antcom.de>
- <1334400790-10892-5-git-send-email-stigge@antcom.de>
-Message-ID: <20120416062444.GD3037@avionic-0098.adnet.avionic-design.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 16 Apr 2012 08:33:45 +0200
+Subject: [PATCH for v3.4-rc3] ARM: Samsung: add missing MMC_CAP2_BROKEN_VOLTAGE
+ capability
+Message-ID: <1334558025-26635-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roland Stigge wrote:
-> This patch adds device tree support for the LPC32xx SoC
-> 
-> arch/arm/boot/dts/lpc32xx.dtsi: Include for devices based on LPC32xx
-> arch/arm/boot/dts/phy3250.dts: Board support for PHYTEC phyCORE-LPC3250
-> arch/arm/boot/mach-lpc32xx/irq.c: irq domain conversion
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> ---
-> 
-> Applies to v3.4-rc2 and requires the previously posted lpc32xx driver dt
-> patches (Set 1: 1..8 + GPIO patch)
-> 
->  Documentation/devicetree/bindings/arm/lpc32xx-mic.txt |   38 ++
->  Documentation/devicetree/bindings/arm/lpc32xx.txt     |    8 
->  arch/arm/Kconfig                                      |    1 
->  arch/arm/boot/dts/lpc32xx.dtsi                        |  303 ++++++++++++++++++
->  arch/arm/boot/dts/phy3250.dts                         |  108 ++++++
->  arch/arm/mach-lpc32xx/Kconfig                         |   26 -
->  arch/arm/mach-lpc32xx/clock.c                         |   77 ++--
->  arch/arm/mach-lpc32xx/common.c                        |  192 -----------
->  arch/arm/mach-lpc32xx/common.h                        |   14 
->  arch/arm/mach-lpc32xx/irq.c                           |   78 +++-
->  arch/arm/mach-lpc32xx/phy3250.c                       |  146 +++-----
->  11 files changed, 613 insertions(+), 378 deletions(-)
+Commit 6e8201f57c935 "mmc: core: add the capability for broken voltage"
+introduced a new quirk to indicate that MMC core should ignore voltage
+change errors reported by the regulators core. This is required to get
+SDHCI working on UniversalC210, NURI and GONI boards again after commit
+ceb6143b2df81c ("mmc: sdhci: fix vmmc handling").
 
-This looks like too many unrelated changes for one patch.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/mach-nuri.c           |    1 +
+ arch/arm/mach-exynos/mach-universal_c210.c |    1 +
+ arch/arm/mach-s5pv210/mach-goni.c          |    2 ++
+ 3 files changed, 4 insertions(+), 0 deletions(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120416/82e7d078/attachment.sig>
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index 91e5986..021dc68 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -112,6 +112,7 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
+ 	.host_caps		= (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
+ 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+ 				MMC_CAP_ERASE),
++	.host_caps2		= MMC_CAP2_BROKEN_VOLTAGE,
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+ };
+ 
+diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+index ef706e9..add55b4 100644
+--- a/arch/arm/mach-exynos/mach-universal_c210.c
++++ b/arch/arm/mach-exynos/mach-universal_c210.c
+@@ -747,6 +747,7 @@ static struct s3c_sdhci_platdata universal_hsmmc0_data __initdata = {
+ 	.max_width		= 8,
+ 	.host_caps		= (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
+ 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
++	.host_caps2		= MMC_CAP2_BROKEN_VOLTAGE,
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+ };
+ 
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index a8933de..3239566 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -25,6 +25,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
++#include <linux/mmc/host.h>
+ #include <linux/interrupt.h>
+ 
+ #include <asm/hardware/vic.h>
+@@ -765,6 +766,7 @@ static void __init goni_pmic_init(void)
+ /* MoviNAND */
+ static struct s3c_sdhci_platdata goni_hsmmc0_data __initdata = {
+ 	.max_width		= 4,
++	.host_caps2		= MMC_CAP2_BROKEN_VOLTAGE,
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+ };
+ 
+-- 
+1.7.1.569.g6f426
