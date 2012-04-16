@@ -1,125 +1,67 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Mon, 16 Apr 2012 22:46:09 +0200
+From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
+Date: Mon, 16 Apr 2012 22:51:33 +0200
 Subject: [PATCH] CLKDEV: Add helper routines to allocate and add clkdevs
  for given struct clk *
-In-Reply-To: <CAOh2x=kXeDOeZbAACOjKiwfdEniXkvAuFbrJ+rmgw=rq_gHQAg@mail.gmail.com>
+In-Reply-To: <20120416204609.GA8548@glitch>
 References: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
  <20120416102503.GA32687@glitch> <4F8BF4DD.2080501@st.com>
  <20120416103822.GU24211@n2100.arm.linux.org.uk>
  <CAOh2x=kXeDOeZbAACOjKiwfdEniXkvAuFbrJ+rmgw=rq_gHQAg@mail.gmail.com>
-Message-ID: <20120416204609.GA8548@glitch>
+ <20120416204609.GA8548@glitch>
+Message-ID: <20120416205133.GW3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 07:09:32PM +0530, viresh kumar wrote:
-> V2:
+On Mon, Apr 16, 2012 at 10:46:09PM +0200, Domenico Andreoli wrote:
+> On Mon, Apr 16, 2012 at 07:09:32PM +0530, viresh kumar wrote:
+> > V2:
+> > 
+> > From: Russell King <rmk+kernel@arm.linux.org.uk>
+> > CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
+> > 
+> > With common clock framework, clks are allocated at runtime. Some of them require
+> > clkdevs to be allocated and added in global clkdev list.
+> > 
+> > This patch introduces helper routines to:
+> > 
+> >  - allocate and add single clkdev for a single clk structure.
+> >  - add multiple clkdevs for a single clk structure.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> > ---
+> > +struct clk_lookup * __init_refok
+> > +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+> > +{
+> > +	struct clk_lookup * cl;
+> > +	va_list ap = NULL;
 > 
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
+> gcc complains because of this initialization:
 > 
-> With common clock framework, clks are allocated at runtime. Some of them require
-> clkdevs to be allocated and added in global clkdev list.
+> drivers/clk/clkdev.c: In function 'clkdev_alloc':
+> drivers/clk/clkdev.c:149:2: error: invalid initializer
+> drivers/clk/clkdev.c: In function 'clk_register_single_clkdev':
+> drivers/clk/clkdev.c:197:2: error: invalid initializer
+> make[2]: *** [drivers/clk/clkdev.o] Error 1
+> make[1]: *** [drivers/clk] Error 2
 > 
-> This patch introduces helper routines to:
 > 
->  - allocate and add single clkdev for a single clk structure.
->  - add multiple clkdevs for a single clk structure.
+> so I finally tested it with this modification:
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/clk/clkdev.c   |   64 +++++++++++++++++++++++++++++++++++++++++++----
->  include/linux/clkdev.h |    3 ++
->  2 files changed, 61 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 6db161f..0a28374 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -116,8 +116,9 @@ struct clk_lookup_alloc {
->  	char	con_id[MAX_CON_ID];
->  };
-> 
-> -struct clk_lookup * __init_refok
-> -clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
-> +static struct clk_lookup * __init_refok
-> +clkdev_alloc_valist(struct clk *clk, const char *con_id, const char *dev_fmt,
-> +		va_list ap)
->  {
->  	struct clk_lookup_alloc *cla;
-> 
-> @@ -132,16 +133,29 @@ clkdev_alloc(struct clk *clk, const char
-> *con_id, const char *dev_fmt, ...)
->  	}
-> 
->  	if (dev_fmt) {
-> -		va_list ap;
-> -
-> -		va_start(ap, dev_fmt);
->  		vscnprintf(cla->dev_id, sizeof(cla->dev_id), dev_fmt, ap);
->  		cla->cl.dev_id = cla->dev_id;
-> -		va_end(ap);
->  	}
-> 
->  	return &cla->cl;
->  }
-> +
-> +struct clk_lookup * __init_refok
-> +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
-> +{
-> +	struct clk_lookup * cl;
-> +	va_list ap = NULL;
+> 	if (dev_fmt) {
+> 		va_start(ap, dev_fmt);
+> 		cl = clkdev_alloc_valist(clk, con_id, dev_fmt, ap);
+> 		va_end(ap);
+> 	} else
+> 		cl = clkdev_alloc(clk, con_id, NULL);
 
-gcc complains because of this initialization:
+Same here. The correct fix is simply not to initialize ap.
 
-drivers/clk/clkdev.c: In function 'clkdev_alloc':
-drivers/clk/clkdev.c:149:2: error: invalid initializer
-drivers/clk/clkdev.c: In function 'clk_register_single_clkdev':
-drivers/clk/clkdev.c:197:2: error: invalid initializer
-make[2]: *** [drivers/clk/clkdev.o] Error 1
-make[1]: *** [drivers/clk] Error 2
+Sascha
 
 
-so I finally tested it with this modification:
-
-	if (dev_fmt) {
-		va_start(ap, dev_fmt);
-		cl = clkdev_alloc_valist(clk, con_id, dev_fmt, ap);
-		va_end(ap);
-	} else
-		cl = clkdev_alloc(clk, con_id, NULL);
-
-> +
-> +	return cl;
-> +}
->  EXPORT_SYMBOL(clkdev_alloc);
-> 
->  int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
-> @@ -173,3 +187,41 @@ void clkdev_drop(struct clk_lookup *cl)
->  	kfree(cl);
->  }
->  EXPORT_SYMBOL(clkdev_drop);
-> +
-> +int clk_register_single_clkdev(struct clk *clk, const char *con_id,
-> +		const char *dev_fmt, ...)
-> +{
-> +	struct clk_lookup * cl;
-> +	va_list ap = NULL;
-> +
-> +	if (dev_fmt)
-> +		va_start(ap, dev_fmt);
-> +
-> +	cl = clkdev_alloc_valist(clk, con_id, dev_fmt, ap);
-> +
-> +	if (dev_fmt)
-> +		va_end(ap);
-> +
-> +	if (!cl)
-> +		return -ENOMEM;
-
-same as above
-
-I'm not a C legal, why this error? Thanks.
-
-cheers,
-Domenico
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
