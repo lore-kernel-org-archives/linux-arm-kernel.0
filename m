@@ -1,45 +1,33 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 16 Apr 2012 17:52:08 +0200
-Subject: [PATCH v2 1/3] USB: Add driver for NXP ISP1301 USB transceiver
-In-Reply-To: <Pine.LNX.4.44L0.1204161106410.1408-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1204161106410.1408-100000@iolanthe.rowland.org>
-Message-ID: <4F8C4028.5090602@antcom.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 16 Apr 2012 17:52:19 +0200
+Subject: [PATCH 00/12] at91: 3.4-rc3 fixes
+In-Reply-To: <201204161540.08389.arnd@arndb.de>
+References: <cover.1334567594.git.nicolas.ferre@atmel.com>
+ <201204161540.08389.arnd@arndb.de>
+Message-ID: <4F8C4033.2050600@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2012 05:09 PM, Alan Stern wrote:
->>  drivers/usb/Makefile        |    5 ++
->>  drivers/usb/misc/Kconfig    |   12 ++++++
->>  drivers/usb/misc/Makefile   |    1 
->>  drivers/usb/misc/isp1301.c  |   64 ++++++++++++++++++++++++++++++++++
->>  include/linux/usb/isp1301.h |   82 ++++++++++++++++++++++++++++++++++++++++++++
+On 04/16/2012 05:40 PM, Arnd Bergmann :
+> On Monday 16 April 2012, Nicolas Ferre wrote:
+>> Here is another fixes series for AT91 that will go on top of 3.4-rc3.
+>> We experienced some issues while compiling some drivers as modules: Joachim has
+>> corrected several of them. We may reduce this number of exported values by
+>> reworking some drivers, in the future.
+>> Some drivers are also modified here, I would like to keep them in the series
+>> as the modifications are really related with our recent move to irqdomains or
+>> simply related with compiler annotations.
 > 
-> You know, drivers/usb/misc is meant for miscellaneous USB device 
-> drivers.  Not for host or transceiver drivers.
-> 
-> You should put the new file somewhere else.  Maybe in the otg 
-> directory, although that may not be completely appropriate either.  
-> Maybe something under the host directory.
+> I looked at all the patches, they look good to me, but patch 9 does not
+> seem to be an actual bug-fix rather than a cleanup, so you might want
+> to put that into a different series.
 
-The driver is used by drivers in the following directories:
+Yes, it is dead code that can go in a cleanup series for 3.5...
 
-drivers/usb/host/    (ohci-nxp.c)
-drivers/usb/otg/     (isp1301_omap.c)
-drivers/usb/gadget/  (lpc32xx_udc.c)
+I can remove it and build a "pull request" tomorrow.
 
-So host/ and otg/ don't look much better.
+Thanks for this review Arnd.
 
-Maybe one of (new):
-
-    drivers/usb/transceiver/
-    drivers/usb/phy/
-    drivers/usb/lowlevel/
-
-?
-
-Otherwise, I will put it in drivers/usb/otg/ even of it doesn't look
-better to me but the chip is advertised as "OTG transceiver". ;-)
-
-Thanks in advance,
-
-Roland
+Cheers,
+-- 
+Nicolas Ferre
