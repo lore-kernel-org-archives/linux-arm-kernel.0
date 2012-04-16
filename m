@@ -1,182 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Apr 2012 23:07:56 +0200
-Subject: [PATCH 28/40] ARM i.MX1: implement clocks using common clock
- framework
-In-Reply-To: <1334065553-7565-29-git-send-email-s.hauer@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-29-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120416210756.GK20478@pengutronix.de>
+From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
+Date: Mon, 16 Apr 2012 23:12:32 +0200
+Subject: [PATCH] CLKDEV: Add helper routines to allocate and add clkdevs
+ for given struct clk *
+In-Reply-To: <20120416210617.GA22932@glitch>
+References: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
+ <20120416102503.GA32687@glitch> <4F8BF4DD.2080501@st.com>
+ <20120416103822.GU24211@n2100.arm.linux.org.uk>
+ <CAOh2x=kXeDOeZbAACOjKiwfdEniXkvAuFbrJ+rmgw=rq_gHQAg@mail.gmail.com>
+ <20120416205655.GJ20478@pengutronix.de>
+ <20120416210617.GA22932@glitch>
+Message-ID: <20120416211232.GL20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is a new version of the i.MX1 support which does not register the
-clk lookups based on string names for the clks.
+On Mon, Apr 16, 2012 at 11:06:18PM +0200, Domenico Andreoli wrote:
+> > >  - allocate and add single clkdev for a single clk structure.
+> > >  - add multiple clkdevs for a single clk structure.
+> > > 
+> > > +
+> > > +int clk_register_single_clkdev(struct clk *clk, const char *con_id,
+> > > +		const char *dev_fmt, ...)
+> > 
+> > Can we drop the 'single' in the name? Otherwise it's quite a long
+> > function name. I think name clk_register_clkdev makes it clear already
+> > that we only register a single clkdev.
+> 
+> clkdev_register?
 
-Before converting the rest I'd like to know whether everyones happy
-with this.
+Maybe even this. I just though that it might be too easy to confuse with
+clkdev_add (In fact I think clkdev_register would be a good name for
+what clkdev_add currently does, but it's probably not worth the churn
+changing this).
 
-Comments?
-
-Thanks
- Sascha
-
-8<---------------------------------------------------
-
-[PATCH] ARM i.MX1: implement clocks using common clock framework
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/Kconfig    |    1 +
- arch/arm/mach-imx/Makefile   |    2 +-
- arch/arm/mach-imx/clk-imx1.c |  115 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 117 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-imx1.c
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0b832b1..c03920a 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -34,6 +34,7 @@ config ARCH_MX53
- config SOC_IMX1
- 	bool
- 	select ARCH_MX1
-+	select COMMON_CLK
- 	select CPU_ARM920T
- 	select IMX_HAVE_IOMUX_V1
- 	select MXC_AVIC
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 173e869..52b3af4 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -1,4 +1,4 @@
--obj-$(CONFIG_SOC_IMX1) += clock-imx1.o mm-imx1.o
-+obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
- obj-$(CONFIG_SOC_IMX21) += clock-imx21.o mm-imx21.o
- 
- obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
-diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-new file mode 100644
-index 0000000..3b3df4d
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-imx1.c
-@@ -0,0 +1,115 @@
-+/*
-+ *  Copyright (C) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/common.h>
-+#include "clk.h"
-+
-+/* CCM register addresses */
-+#define IO_ADDR_CCM(off)	(MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR + (off)))
-+
-+#define CCM_CSCR	IO_ADDR_CCM(0x0)
-+#define CCM_MPCTL0	IO_ADDR_CCM(0x4)
-+#define CCM_SPCTL0	IO_ADDR_CCM(0xc)
-+#define CCM_PCDR	IO_ADDR_CCM(0x20)
-+
-+/* SCM register addresses */
-+#define IO_ADDR_SCM(off)	(MX1_IO_ADDRESS(MX1_SCM_BASE_ADDR + (off)))
-+
-+#define SCM_GCCR	IO_ADDR_SCM(0xc)
-+
-+static char *prem_sel_clks[] = { "clk32_premult", "clk16m", };
-+static char *clko_sel_clks[] = { "per1", "hclk", "clk48m", "clk16m", "prem",
-+				"fclk", };
-+enum imx1_clks {
-+	dummy, clk32, clk16m_ext, clk16m, clk32_premult, prem, mpll, spll, mcu,
-+	fclk, hclk, clk48m, per1, per2, per3, clko, dma_gate, csi_gate,
-+	mma_gate, usbd_gate, clk_max
-+};
-+
-+static struct clk *clk[clk_max];
-+
-+int __init mx1_clocks_init(unsigned long fref)
-+{
-+	int i;
-+
-+	clk[dummy] = imx_clk_fixed("dummy", 0);
-+	clk[clk32] = imx_clk_fixed("clk32", fref);
-+	clk[clk16m_ext] = imx_clk_fixed("clk16m_ext", 16000000);
-+	clk[clk16m] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
-+	clk[clk32_premult] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
-+	clk[prem] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks,
-+			ARRAY_SIZE(prem_sel_clks));
-+	clk[mpll] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
-+	clk[spll] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
-+	clk[mcu] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
-+	clk[fclk] = imx_clk_divider("fclk", "mpll", CCM_CSCR, 15, 1);
-+	clk[hclk] = imx_clk_divider("hclk", "spll", CCM_CSCR, 10, 4);
-+	clk[clk48m] = imx_clk_divider("clk48m", "spll", CCM_CSCR, 26, 3);
-+	clk[per1] = imx_clk_divider("per1", "spll", CCM_PCDR, 0, 4);
-+	clk[per2] = imx_clk_divider("per2", "spll", CCM_PCDR, 4, 4);
-+	clk[per3] = imx_clk_divider("per3", "spll", CCM_PCDR, 16, 7);
-+	clk[clko] = imx_clk_mux("clko", CCM_CSCR, 29, 3, clko_sel_clks,
-+			ARRAY_SIZE(clko_sel_clks));
-+	clk[dma_gate] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 4);
-+	clk[csi_gate] = imx_clk_gate("csi_gate", "hclk", SCM_GCCR, 2);
-+	clk[mma_gate] = imx_clk_gate("mma_gate", "hclk", SCM_GCCR, 1);
-+	clk[usbd_gate] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
-+
-+	for (i = 0; i < ARRAY_SIZE(clk); i++)
-+		if (IS_ERR(clk[i]))
-+			pr_err("imx1 clk %d: register failed with %ld\n",
-+				i, PTR_ERR(clk[i]));
-+
-+	clk_register_single_clkdev(clk[dma_gate], "dma", NULL);
-+	clk_register_single_clkdev(clk[csi_gate], NULL, "mx1-camera.0");
-+	clk_register_single_clkdev(clk[mma_gate], "mma", NULL);
-+	clk_register_single_clkdev(clk[usbd_gate], NULL, "imx_udc.0");
-+	clk_register_single_clkdev(clk[per1], "per", "imx-gpt.0");
-+	clk_register_single_clkdev(clk[hclk], "ipg", "imx-gpt.0");
-+	clk_register_single_clkdev(clk[per1], "per", "imx1-uart.0");
-+	clk_register_single_clkdev(clk[hclk], "ipg", "imx1-uart.0");
-+	clk_register_single_clkdev(clk[per1], "per", "imx1-uart.1");
-+	clk_register_single_clkdev(clk[hclk], "ipg", "imx1-uart.1");
-+	clk_register_single_clkdev(clk[per1], "per", "imx1-uart.2");
-+	clk_register_single_clkdev(clk[hclk], "ipg", "imx1-uart.2");
-+	clk_register_single_clkdev(clk[hclk], NULL, "imx-i2c.0");
-+	clk_register_single_clkdev(clk[per2], "per", "imx1-cspi.0");
-+	clk_register_single_clkdev(clk[dummy], "ipg", "imx1-cspi.0");
-+	clk_register_single_clkdev(clk[per2], "per", "imx1-cspi.1");
-+	clk_register_single_clkdev(clk[dummy], "ipg", "imx1-cspi.1");
-+	clk_register_single_clkdev(clk[per2], NULL, "imx-mmc.0");
-+	clk_register_single_clkdev(clk[per2], "per", "imx-fb.0");
-+	clk_register_single_clkdev(clk[dummy], "ipg", "imx-fb.0");
-+	clk_register_single_clkdev(clk[dummy], "ahb", "imx-fb.0");
-+	clk_register_single_clkdev(clk[hclk], "mshc", NULL);
-+	clk_register_single_clkdev(clk[per3], "ssi", NULL);
-+	clk_register_single_clkdev(clk[clk32], NULL, "mxc_rtc.0");
-+	clk_register_single_clkdev(clk[clko], "clko", NULL);
-+
-+	mxc_timer_init(NULL, MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR),
-+			MX1_TIM1_INT);
-+
-+	return 0;
-+}
--- 
-1.7.10
+Sascha
 
 
 -- 
