@@ -1,33 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 16 Apr 2012 09:06:56 -0600
-Subject: [PATCH V4 1/5] of: Implement managed of_iomap()
-In-Reply-To: <201204161442.38725.arnd@arndb.de>
-References: <cover.1334548272.git.viresh.kumar@st.com>
- <6a0872f9d8959bc9d66d179e4911d6f09a219b42.1334548272.git.viresh.kumar@st.com>
- <201204161442.38725.arnd@arndb.de>
-Message-ID: <CACxGe6tec7y-9VNb9vNiPZhN6bt5MuMV0J18P_7Gk_pDwk-V=Q@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 16 Apr 2012 11:09:25 -0400 (EDT)
+Subject: [PATCH v2 1/3] USB: Add driver for NXP ISP1301 USB transceiver
+In-Reply-To: <1334582166-5485-1-git-send-email-stigge@antcom.de>
+Message-ID: <Pine.LNX.4.44L0.1204161106410.1408-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 8:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 16 April 2012, Viresh Kumar wrote:
->> This simplifies cleanup paths of user code by providing managed version of
->> of_iomap().
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->
->
-> This one looks good,
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> but I wonder if we should also have a devm_of_request_and_ioremap
-> (maybe with a shorter name) that combines this with request_resource.
+On Mon, 16 Apr 2012, Roland Stigge wrote:
 
-Why is this function needed?  I'm directing drivers away from using
-of_iomap now since the resource table is populated with the address
-ranges at device registration time now.  New code should be using
-platform_get_resource() if it is a platform device.
+> This very-lowlevel driver registers the NXP ISP1301 chip via the I2C subsystem.
+> The chip is the USB transceiver shared by ohci-nxp, lpc32xx_udc (gadget) and
+> isp1301_omap.
+> 
+> Following patches let the respective USB host and gadget drivers use this
+> driver, instead of duplicating ISP1301 handling.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> ---
+> 
+> Applies to v3.4-rc3
+> 
+> This driver needs to be probe()d before the respective USB driver using it. For
+> modules, this is handled via the module dependency. When linking statically, it
+> is done via linking order in the Makefile (misc/ before host/ and the gadget/).
+> 
+> Currently, only one ISP1301 chip is supported. To support multiple instances,
+> we would need a mechanism to identify the respective chips via DT (and static
+> resources or platform data) to be referenced by the higher level USB driver at
+> isp1301_get_client(). Any suggestions?
+> 
+> 
+>  drivers/usb/Makefile        |    5 ++
+>  drivers/usb/misc/Kconfig    |   12 ++++++
+>  drivers/usb/misc/Makefile   |    1 
+>  drivers/usb/misc/isp1301.c  |   64 ++++++++++++++++++++++++++++++++++
+>  include/linux/usb/isp1301.h |   82 ++++++++++++++++++++++++++++++++++++++++++++
 
-g.
+You know, drivers/usb/misc is meant for miscellaneous USB device 
+drivers.  Not for host or transceiver drivers.
+
+You should put the new file somewhere else.  Maybe in the otg 
+directory, although that may not be completely appropriate either.  
+Maybe something under the host directory.
+
+Alan Stern
