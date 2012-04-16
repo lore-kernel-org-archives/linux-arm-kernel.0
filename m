@@ -1,42 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 15 Apr 2012 22:24:25 -0700
-Subject: [PATCH] ARM: bcmring: fix build error due to bad AMBA_APB_DEVICE init
-Message-ID: <1334553865-10874-1-git-send-email-olof@lixom.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 16 Apr 2012 10:49:37 +0530
+Subject: [PATCH] CLKDEV: Add helper routines to allocate and add clkdevs for
+ given struct clk *
+Message-ID: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seems to have been introduced by:
-8ede1ae65 ARM: amba: bcmring: use common amba device initializers
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-'id' is the missing parameter, and with the old initializer the value
-used was 0. Use the same here.
+With common clock framework, clks are allocated at runtime. Some of them require
+clkdevs to be allocated and added in global clkdev list.
 
-arch/arm/mach-bcmring/core.c:55:77: error: macro "AMBA_APB_DEVICE" requires 6 arguments, but only 5 given
-arch/arm/mach-bcmring/core.c:55:8: warning: type defaults to 'int' in declaration of 'AMBA_APB_DEVICE' [-Wimplicit-int]
-arch/arm/mach-bcmring/core.c:56:77: error: macro "AMBA_APB_DEVICE" requires 6 arguments, but only 5 given
-arch/arm/mach-bcmring/core.c:56:8: warning: type defaults to 'int' in declaration of 'AMBA_APB_DEVICE' [-Wimplicit-int]
+This patch introduces helper routines to:
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jiandong Zheng <jdzheng@broadcom.com>
+ - allocate and add single clkdev for a single clk structure.
+ - add multiple clkdevs for a single clk structure.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-bcmring/core.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/clkdev.c   |   33 +++++++++++++++++++++++++++++++++
+ include/linux/clkdev.h |    3 +++
+ 2 files changed, 36 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
-index 22e4e0a..56d8b0f 100644
---- a/arch/arm/mach-bcmring/core.c
-+++ b/arch/arm/mach-bcmring/core.c
-@@ -52,8 +52,8 @@
- #include <mach/csp/chipcHw_inline.h>
- #include <mach/csp/tmrHw_reg.h>
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 6db161f..6a98177 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -173,3 +173,36 @@ void clkdev_drop(struct clk_lookup *cl)
+ 	kfree(cl);
+ }
+ EXPORT_SYMBOL(clkdev_drop);
++
++int clk_register_single_clkdev(struct clk *clk, const char *dev_id,
++		const char *con_id)
++{
++	struct clk_lookup *cl;
++
++	if (!clk || (!dev_id && !con_id))
++		return -ENOMEM;
++
++	cl = clkdev_alloc(clk, con_id, "%s", dev_id);
++	if (!cl)
++		return -ENOMEM;
++
++	clkdev_add(cl);
++	return 0;
++}
++EXPORT_SYMBOL(clk_register_single_clkdev);
++
++int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
++{
++	unsigned i;
++
++	if (!clk || !cl || !num)
++		return -ENOMEM;
++
++	for (i = 0; i < num; i++, cl++) {
++		cl->clk = clk;
++		clkdev_add(cl);
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL(clk_register_clkdevs);
+diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+index d9a4fd0..3579e0a 100644
+--- a/include/linux/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -39,5 +39,8 @@ void clkdev_drop(struct clk_lookup *cl);
  
--static AMBA_APB_DEVICE(uartA, "uarta", MM_ADDR_IO_UARTA, { IRQ_UARTA }, NULL);
--static AMBA_APB_DEVICE(uartB, "uartb", MM_ADDR_IO_UARTB, { IRQ_UARTB }, NULL);
-+static AMBA_APB_DEVICE(uartA, "uarta", 0, MM_ADDR_IO_UARTA, { IRQ_UARTA }, NULL);
-+static AMBA_APB_DEVICE(uartB, "uartb", 0, MM_ADDR_IO_UARTB, { IRQ_UARTB }, NULL);
+ void clkdev_add_table(struct clk_lookup *, size_t);
+ int clk_add_alias(const char *, const char *, char *, struct device *);
++int clk_register_single_clkdev(struct clk *clk, const char *dev_id,
++		const char *con_id);
++int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num);
  
- static struct clk pll1_clk = {
- 	.name = "PLL1",
+ #endif
 -- 
-1.7.9.2.359.gebfc2
+1.7.9
