@@ -1,23 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Apr 2012 15:40:08 +0000
-Subject: [PATCH 00/12] at91: 3.4-rc3 fixes
-In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
-References: <cover.1334567594.git.nicolas.ferre@atmel.com>
-Message-ID: <201204161540.08389.arnd@arndb.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 16 Apr 2012 17:40:34 +0200
+Subject: [PATCH v2 1/3] USB: Add driver for NXP ISP1301 USB transceiver
+In-Reply-To: <201204161414.14624.arnd@arndb.de>
+References: <1334582166-5485-1-git-send-email-stigge@antcom.de>
+ <201204161414.14624.arnd@arndb.de>
+Message-ID: <4F8C3D72.8040307@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 April 2012, Nicolas Ferre wrote:
-> Here is another fixes series for AT91 that will go on top of 3.4-rc3.
-> We experienced some issues while compiling some drivers as modules: Joachim has
-> corrected several of them. We may reduce this number of exported values by
-> reworking some drivers, in the future.
-> Some drivers are also modified here, I would like to keep them in the series
-> as the modifications are really related with our recent move to irqdomains or
-> simply related with compiler annotations.
+On 04/16/2012 04:14 PM, Arnd Bergmann wrote:
+>> This driver needs to be probe()d before the respective USB driver using it. For
+>> modules, this is handled via the module dependency. When linking statically, it
+>> is done via linking order in the Makefile (misc/ before host/ and the gadget/).
+> 
+> You can easily avoid the link order restriction now by returning -EPROBE_DEFER
+> from the probe function of the device that needs this one.
 
-I looked at all the patches, they look good to me, but patch 9 does not
-seem to be an actual bug-fix rather than a cleanup, so you might want
-to put that into a different series.
+That's exactly what I was looking for! :-)
 
-	Arnd
+Same for the phandle idea.
+
+Will include the resp. changes in the next update
+
+Thanks,
+
+Roland
