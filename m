@@ -1,221 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Apr 2012 22:30:16 +0200
-Subject: [PATCH 12/13] clk: core: copy parent_names & return error codes
-In-Reply-To: <1334192572-12499-13-git-send-email-mturquette@linaro.org>
-References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334192572-12499-13-git-send-email-mturquette@linaro.org>
-Message-ID: <20120416203016.GH20478@pengutronix.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 16 Apr 2012 22:29:58 +0200
+Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi,
+ regulator and mmc DTS updates
+In-Reply-To: <CAOesGMjJMgQF9jUUUMbm22oaEzan6eLW+-kWN9iB85buJxp4Dg@mail.gmail.com>
+References: <4F612C29.40608@ti.com> <20120315004638.GW12083@atomide.com>
+ <201203150801.13183.arnd@arndb.de> <4F746CC0.9050507@ti.com>
+ <CAOesGMg+xLrVNxF0XwO8poAtuduwEcxrXLN9pXa+T+y7kKMy7Q@mail.gmail.com>
+ <CAOesGMjJMgQF9jUUUMbm22oaEzan6eLW+-kWN9iB85buJxp4Dg@mail.gmail.com>
+Message-ID: <4F8C8146.6070603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 06:02:50PM -0700, Mike Turquette wrote:
-> This patch cleans up clk_register and solves a few bugs by teaching
-> clk_register and __clk_init to return error codes (instead of just NULL)
-> to better align with the existing clk.h api.
-> 
-> Along with that change this patch also introduces a new behavior whereby
-> clk_register copies the parent_names array, thus allowing platforms to
-> declare their parent_names arrays as __initdata.
-> 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Richard Zhao <richard.zhao@linaro.org>
-> Cc: Saravana Kannan <skannan@codeaurora.org>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/clk/clk.c            |   61 +++++++++++++++++++++++++++++++++--------
->  include/linux/clk-private.h  |    4 ++-
->  include/linux/clk-provider.h |    3 +-
->  3 files changed, 54 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index ddade87..af2bf12 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1185,34 +1185,41 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
->   * very large numbers of clocks that need to be statically initialized.  It is
->   * a layering violation to include clk-private.h from any code which implements
->   * a clock's .ops; as such any statically initialized clock data MUST be in a
-> - * separate C file from the logic that implements it's operations.
-> + * separate C file from the logic that implements it's operations.  Returns 0
-> + * on success, otherwise an error code.
->   */
-> -void __clk_init(struct device *dev, struct clk *clk)
-> +int __clk_init(struct device *dev, struct clk *clk)
->  {
-> -	int i;
-> +	int i, ret = 0;
->  	struct clk *orphan;
->  	struct hlist_node *tmp, *tmp2;
->  
->  	if (!clk)
-> -		return;
-> +		return -EINVAL;
->  
->  	mutex_lock(&prepare_lock);
->  
->  	/* check to see if a clock with this name is already registered */
-> -	if (__clk_lookup(clk->name))
-> +	if (__clk_lookup(clk->name)) {
-> +		pr_debug("%s: clk %s already initialized\n",
-> +				__func__, clk->name);
-> +		ret = -EEXIST;
->  		goto out;
-> +	}
->  
->  	/* check that clk_ops are sane.  See Documentation/clk.txt */
->  	if (clk->ops->set_rate &&
->  			!(clk->ops->round_rate && clk->ops->recalc_rate)) {
->  		pr_warning("%s: %s must implement .round_rate & .recalc_rate\n",
->  				__func__, clk->name);
-> +		ret = -EINVAL;
->  		goto out;
->  	}
->  
->  	if (clk->ops->set_parent && !clk->ops->get_parent) {
->  		pr_warning("%s: %s must implement .get_parent & .set_parent\n",
->  				__func__, clk->name);
-> +		ret = -EINVAL;
->  		goto out;
->  	}
->  
-> @@ -1308,7 +1315,7 @@ void __clk_init(struct device *dev, struct clk *clk)
->  out:
->  	mutex_unlock(&prepare_lock);
->  
-> -	return;
-> +	return ret;
->  }
->  
->  /**
-> @@ -1324,29 +1331,59 @@ out:
->   * clk_register is the primary interface for populating the clock tree with new
->   * clock nodes.  It returns a pointer to the newly allocated struct clk which
->   * cannot be dereferenced by driver code but may be used in conjuction with the
-> - * rest of the clock API.
-> + * rest of the clock API.  In the event of an error clk_register will return an
-> + * error code; drivers must test for an error code after calling clk_register.
->   */
->  struct clk *clk_register(struct device *dev, const char *name,
->  		const struct clk_ops *ops, struct clk_hw *hw,
->  		const char **parent_names, u8 num_parents, unsigned long flags)
->  {
-> +	int i, ret = -ENOMEM;
+Hi Olof,
 
-I suggest to move the initialization of ret from here...
+On 4/15/2012 3:19 AM, Olof Johansson wrote:
+> Benoit, Tony,
+>
+> On Thu, Mar 29, 2012 at 11:31 AM, Olof Johansson<olof@lixom.net>  wrote:
+>> On Thu, Mar 29, 2012 at 7:08 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>>> FYI, MMC DT adaptation just got merged, I2C, GPIO, SPI, regulator DT
+>>> adaptation were already merged before, so it means that this branch can be
+>>> merged to take advantage of all the DT adapted drivers.
+>>
+>> I've pulled this in as late/omap-dt, included in next/dt3 and
+>> for-next. I'll let it sit in linux-next for at least one day before
+>> it's sent in. Since it's just device tree additions, risk for
+>> regressions should be low.
+>
+> As you've noticed, this didn't make it into 3.4 due to the window
+> closing early. :(
 
->  	struct clk *clk;
->  
->  	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> -	if (!clk)
-> -		return NULL;
-> +	if (!clk) {
-> +		pr_err("%s: could not allocate clk\n", __func__);
-> +		goto fail_out;
-> +	}
->  
->  	clk->name = name;
->  	clk->ops = ops;
->  	clk->hw = hw;
->  	clk->flags = flags;
-> -	clk->parent_names = parent_names;
->  	clk->num_parents = num_parents;
->  	hw->clk = clk;
->  
-> -	__clk_init(dev, clk);
-> +	/* allocate local copy in case parent_names is __initdata */
-> +	clk->parent_names = kzalloc((sizeof(char*) * num_parents),
-> +			GFP_KERNEL);
-> +
-> +	if (!clk->parent_names) {
-> +		pr_err("%s: could not allocate clk->parent_names\n", __func__);
-> +		goto fail_parent_names;
-> +	}
-> +
-> +	/* copy each string name in case parent_names is __initdata */
+Yes, I did :-(
 
-... to here.
+> I've renamed the branch in arm-soc to omap/dt-missed-3.4 and merged it
+> into next/dt for the 3.5 merge window.
 
-The rationale is that when this code is changed later someone might use
-ret above and doesn't remember that the code below expects ret to be
-initialized with -ENOMEM. Also it's easier to see that the code is
-correct.
+OK, cool, I was about to ping you about that series. I'll then be able 
+to use it as a stable base for further OMAP DT patches.
 
-Sascha
-
-> +	for (i = 0; i < num_parents; i++) {
-> +		clk->parent_names[i] = kstrdup(parent_names[i], GFP_KERNEL);
-> +		if (!clk->parent_names[i]) {
-> +			pr_err("%s: could not copy parent_names\n", __func__);
-> +			goto fail_parent_names_copy;
-> +		}
-> +	}
-> +
-> +	ret = __clk_init(dev, clk);
-> +	if (!ret)
-> +		return clk;
->  
-> -	return clk;
-> +fail_parent_names_copy:
-> +	while (--i >= 0)
-> +		kfree(clk->parent_names[i]);
-> +	kfree(clk->parent_names);
-> +fail_parent_names:
-> +	kfree(clk);
-> +fail_out:
-> +	return ERR_PTR(ret);
->  }
->  EXPORT_SYMBOL_GPL(clk_register);
->  
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index e9c8b98..e7032fd 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -181,8 +181,10 @@ struct clk {
->   *
->   * It is not necessary to call clk_register if __clk_init is used directly with
->   * statically initialized clock data.
-> + *
-> + * Returns 0 on success, otherwise an error code.
->   */
-> -void __clk_init(struct device *dev, struct clk *clk);
-> +int __clk_init(struct device *dev, struct clk *clk);
->  
->  #endif /* CONFIG_COMMON_CLK */
->  #endif /* CLK_PRIVATE_H */
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 8981435..97f9fab 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -274,7 +274,8 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
->   * clk_register is the primary interface for populating the clock tree with new
->   * clock nodes.  It returns a pointer to the newly allocated struct clk which
->   * cannot be dereferenced by driver code but may be used in conjuction with the
-> - * rest of the clock API.
-> + * rest of the clock API.  In the event of an error clk_register will return an
-> + * error code; drivers must test for an error code after calling clk_register.
->   */
->  struct clk *clk_register(struct device *dev, const char *name,
->  		const struct clk_ops *ops, struct clk_hw *hw,
-> -- 
-> 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Benoit
