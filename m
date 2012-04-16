@@ -1,34 +1,38 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 Apr 2012 15:04:37 +0530
-Subject: [PATCH 1/1] ARM: OMAP4: Remove un-used control module headers
- and defines.
-In-Reply-To: <4F86D124.8050405@ti.com>
-References: <1330338743-24097-1-git-send-email-santosh.shilimkar@ti.com>
- <4F86AF0C.5060806@ti.com> <4F86D124.8050405@ti.com>
-Message-ID: <4F8BE7AD.2040505@ti.com>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Mon, 16 Apr 2012 17:39:24 +0800
+Subject: [PATCH v2 0/3] Add support for Atmel's AT91SAM9N12-EK (With DT)
+Message-ID: <1334569167-7064-1-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 April 2012 06:27 PM, Cousson, Benoit wrote:
-> Hi Santosh,
-> 
-> On 4/12/2012 12:31 PM, Santosh Shilimkar wrote:
->> Benoit,
->>
->> On Monday 27 February 2012 04:02 PM, Santosh Shilimkar wrote:
->>> Most of the OMAP4 control module register defines are not used and
->>> can be removed. Keep only needed defines and move them to common
->>> control module header just like other OMAP versions.
->>>
->>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>> ---
->>
->> What do you think about this patch ?
-> 
-> I'm fine with it. I'm just wondering if we have to send it right now or
-> along with the control module driver implementation we've just started.
-> 
-Let's do that as part of the driver implementation.
+This series adds support for Atmel's AT91SAM9N12-EK.
 
-Regards
-Santosh
+Patches are on top of v3.4-rc2 and target for v3.5
+
+Hong Xu (3):
+  AT91: Add DT description files for AT91SAM9N12-EK
+  AT91: Add machine header file for AT91SAM9N12 SoC
+  AT91: Add machine files for AT91SAM9N12 SoC
+
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |  223 ++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts                |   99 +++++++
+ arch/arm/mach-at91/Kconfig                         |    9 +
+ arch/arm/mach-at91/Makefile                        |    1 +
+ arch/arm/mach-at91/Makefile.boot                   |    2 +
+ arch/arm/mach-at91/at91sam9n12.c                   |  275 ++++++++++++++++++++
+ arch/arm/mach-at91/clock.c                         |   15 +-
+ arch/arm/mach-at91/include/mach/at91sam9n12.h      |   60 +++++
+ .../mach-at91/include/mach/at91sam9n12_matrix.h    |   53 ++++
+ arch/arm/mach-at91/include/mach/cpu.h              |   10 +
+ arch/arm/mach-at91/include/mach/hardware.h         |    2 +
+ arch/arm/mach-at91/setup.c                         |    6 +
+ arch/arm/mach-at91/soc.h                           |    5 +
+ 13 files changed, 755 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9n12.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9n12ek.dts
+ create mode 100644 arch/arm/mach-at91/at91sam9n12.c
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
+
+-- 
+1.7.10
