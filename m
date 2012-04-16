@@ -1,54 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Apr 2012 10:06:57 +0100
-Subject: [PATCH 6/7] MMC: mmci: Enable Device Tree support for ux500
- variants
-In-Reply-To: <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
-Message-ID: <4F8BE131.4090701@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Apr 2012 11:09:35 +0200
+Subject: [PATCH] pinctrl: pinconf: Fix compilation error if PINCONF is not
+ selected
+In-Reply-To: <a342987ffebf0ab79a789011e17081e0169bdf24.1334566321.git.viresh.kumar@st.com>
+References: <a342987ffebf0ab79a789011e17081e0169bdf24.1334566321.git.viresh.kumar@st.com>
+Message-ID: <CACRpkdZFpknFE+WJ7-RnSti1MAJvwr=6QM98MkVrWDO+YHcy=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/12 09:48, Linus Walleij wrote:
-> On Fri, Apr 13, 2012 at 4:05 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+On Mon, Apr 16, 2012 at 10:52 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+
+> When we compile pinctrl layer for platforms without CONFIG_PINCONF, we get
+> following compilation errors:
 >
->> Provide a means to collect attributes specific to ST-Ericsson's
->> ux500 variant series. This patch registers itself as the AMBA
->> driver to be called during the probe process. Once all
->> attributes and ux500 specifics are are collected the normal
->> mmci core probe is called.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->> ---
->>   arch/arm/boot/dts/snowball.dts         |   21 ++++++++++--
->>   arch/arm/mach-ux500/board-mop500-sdi.c |    4 +-
->>   arch/arm/mach-ux500/board-mop500.c     |    3 +-
->>   arch/arm/mach-ux500/board-mop500.h     |    4 ++
->>   drivers/mmc/host/mmci.c                |   58 +++++++++++++++++++++++++++++--
->>   5 files changed, 80 insertions(+), 10 deletions(-)
+> drivers/built-in.o: In function `pinctrl_show':
+> linux-2.6/drivers/pinctrl/core.c:1116: undefined
+> reference to `pinconf_show_setting'
+> drivers/built-in.o: In function `pinctrl_maps_show':
+> linux-2.6/drivers/pinctrl/core.c:1071: undefined
+> reference to `pinconf_show_map'
+> drivers/built-in.o: In function `pinctrl_init_device_debugfs':
+> linux-2.6/drivers/pinctrl/core.c:1224: undefined
+> reference to `pinconf_init_device_debugfs'
+> make[1]: *** [.tmp_vmlinux1] Error 1
 >
-> Can you split this in a clean patch to mmci.c and another patch for all
-> the ux500 stuff? You can add my Acked-by for both.
-
-I can do that. You'll have it by this afternoon.
-
-Thanks.
-
-> Obviously I cannot apply the mmci.c patch without Russell's ACK,
-> (or you have to take it through his patch tracker). Russell has
-> positively affirmed that he's looking after the MMCI driver.
+> This patch fixes this.
 >
-> If you get Russell's ACK I'll behappy to merge it through ux500
-> and ARM SoC.
->
-> Yours,
-> Linus Walleij
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
+Ooops! Patch applied. Will push this for the -rc:s.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Linus Walleij
