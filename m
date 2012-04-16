@@ -1,35 +1,56 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Apr 2012 11:20:54 +0200
-Subject: [PATCH 10/12] leds-atmel-pwm.c: Make pwmled_probe() __devinit
+Date: Mon, 16 Apr 2012 11:20:56 +0200
+Subject: [PATCH 12/12] USB: gadget/at91_udc: add gpio_to_irq() function to
+ vbus interrupt
 In-Reply-To: <cover.1334567594.git.nicolas.ferre@atmel.com>
 References: <cover.1334567594.git.nicolas.ferre@atmel.com>
-Message-ID: <23f8dba8a3e1ae21a5953747b63dc0a21fcba868.1334567594.git.nicolas.ferre@atmel.com>
+Message-ID: <041833f4078b6c28cf8a286fad8982bfae18f4b8.1334567594.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 892a884 (leds: convert led platform drivers to module_platform_driver)
-is omitting the section mismatch error: so change annotation of the probe
-function to __devinit instead of __init.
+Now that we are using irqdomains, we need to convert GPIO pins to Linux
+IRQ numbers using the gpio_to_irq() function.
+This call is added to request/free_irq calls.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Richard Purdie <richard.purdie@linuxfoundation.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: linux-usb at vger.kernel.org
 ---
- drivers/leds/leds-atmel-pwm.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/gadget/at91_udc.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/leds/leds-atmel-pwm.c b/drivers/leds/leds-atmel-pwm.c
-index 800243b..64ad702 100644
---- a/drivers/leds/leds-atmel-pwm.c
-+++ b/drivers/leds/leds-atmel-pwm.c
-@@ -35,7 +35,7 @@ static void pwmled_brightness(struct led_classdev *cdev, enum led_brightness b)
-  * NOTE:  we reuse the platform_data structure of GPIO leds,
-  * but repurpose its "gpio" number as a PWM channel number.
-  */
--static int __init pwmled_probe(struct platform_device *pdev)
-+static int __devinit pwmled_probe(struct platform_device *pdev)
- {
- 	const struct gpio_led_platform_data	*pdata;
- 	struct pwmled				*leds;
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index 0c935d7..9d7bcd9 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -1863,8 +1863,8 @@ static int __devinit at91udc_probe(struct platform_device *pdev)
+ 			mod_timer(&udc->vbus_timer,
+ 				  jiffies + VBUS_POLL_TIMEOUT);
+ 		} else {
+-			if (request_irq(udc->board.vbus_pin, at91_vbus_irq,
+-					0, driver_name, udc)) {
++			if (request_irq(gpio_to_irq(udc->board.vbus_pin),
++					at91_vbus_irq, 0, driver_name, udc)) {
+ 				DBG("request vbus irq %d failed\n",
+ 				    udc->board.vbus_pin);
+ 				retval = -EBUSY;
+@@ -1886,7 +1886,7 @@ static int __devinit at91udc_probe(struct platform_device *pdev)
+ 	return 0;
+ fail4:
+ 	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled)
+-		free_irq(udc->board.vbus_pin, udc);
++		free_irq(gpio_to_irq(udc->board.vbus_pin), udc);
+ fail3:
+ 	if (gpio_is_valid(udc->board.vbus_pin))
+ 		gpio_free(udc->board.vbus_pin);
+@@ -1924,7 +1924,7 @@ static int __exit at91udc_remove(struct platform_device *pdev)
+ 	device_init_wakeup(&pdev->dev, 0);
+ 	remove_debug_file(udc);
+ 	if (gpio_is_valid(udc->board.vbus_pin)) {
+-		free_irq(udc->board.vbus_pin, udc);
++		free_irq(gpio_to_irq(udc->board.vbus_pin), udc);
+ 		gpio_free(udc->board.vbus_pin);
+ 	}
+ 	free_irq(udc->udp_irq, udc);
 -- 
 1.7.10
