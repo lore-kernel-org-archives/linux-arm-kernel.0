@@ -1,37 +1,21 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Apr 2012 14:46:30 +0200
-Subject: [PATCH] dmaengine: at_hdmac: remove clear-on-read in atc_dostart()
-Message-ID: <1334580390-16303-1-git-send-email-nicolas.ferre@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Apr 2012 14:50:47 +0200
+Subject: Pinctrl crash on latest linux-next/master
+In-Reply-To: <4F8BFA3F.5030409@st.com>
+References: <4F8BFA3F.5030409@st.com>
+Message-ID: <CACRpkdb9JOKK=XY0t3GcrOCxyfefi5nw08S4yv=bXREemOM10w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This loop on EBCISR register was designed to clear IRQ sources before enabling
-a DMA channel. This register is clear-on-read so a race condition can appear if
-another channel is already active and has just finished its transfer.
-Removing this read on EBCISR is fixing the issue as there is no case where an IRQ
-could be pending: we already make sure that this register is drained at probe()
-time and during resume.
+On Mon, Apr 16, 2012 at 12:53 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org>
----
- drivers/dma/at_hdmac.c |    4 ----
- 1 file changed, 4 deletions(-)
+> I don't know if the issue is in my patches or something else, but i was
+> able to boot it earlier. Till my V3 for pinctrl. And nothing much changed
+> since then, i just rebased on latest kernel.
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 7aa58d2..445fdf8 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -221,10 +221,6 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
- 
- 	vdbg_dump_regs(atchan);
- 
--	/* clear any pending interrupt */
--	while (dma_readl(atdma, EBCISR))
--		cpu_relax();
--
- 	channel_writel(atchan, SADDR, 0);
- 	channel_writel(atchan, DADDR, 0);
- 	channel_writel(atchan, CTRLA, 0);
--- 
-1.7.10
+Hm I haven't tested the pinctrl tree on v3.4-rc3 yet.
+
+Did you git bisect to figure out which patch broke it?
+
+Yours,
+Linus Walleij
