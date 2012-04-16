@@ -1,51 +1,93 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Apr 2012 17:13:30 +0100
-Subject: [PATCH v3 6/6] ARM: vexpress: plug local timers into the DT code
+Date: Mon, 16 Apr 2012 17:13:27 +0100
+Subject: [PATCH v3 3/6] ARM: architected timers: Add A15 specific sched_clock
+ implementation
 In-Reply-To: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
 References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1334592810-4382-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1334592810-4382-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Provide an A15 sched_clock implementation using the virtual counter,
+which is thought to be more useful than the physical one in a
+virtualised environment, as it can offset the time spent in another
+VM or the hypervisor.
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-vexpress/v2m.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/arch_timer.h |    6 ++++++
+ arch/arm/kernel/arch_timer.c      |   25 +++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 47cdcca..fd62bfe 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -19,8 +19,10 @@
- #include <linux/clkdev.h>
- #include <linux/mtd/physmap.h>
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 827305d..dc008c6 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -9,11 +9,17 @@ struct arch_timer {
  
-+#include <asm/arch_timer.h>
- #include <asm/mach-types.h>
- #include <asm/sizes.h>
-+#include <asm/smp_twd.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-@@ -616,7 +618,6 @@ void __init v2m_dt_init_early(void)
- 	}
- 
- 	clkdev_add_table(v2m_dt_lookups, ARRAY_SIZE(v2m_dt_lookups));
--	versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ int arch_timer_register(struct arch_timer *);
++int arch_timer_sched_clock_init(void);
+ #else
+ static inline int arch_timer_register(struct arch_timer *at)
+ {
+ 	return -ENXIO;
  }
- 
- static  struct of_device_id vexpress_irq_match[] __initdata = {
-@@ -643,6 +644,11 @@ static void __init v2m_dt_timer_init(void)
- 		return;
- 	node = of_find_node_by_path(path);
- 	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
-+	if (arch_timer_of_register())
-+		twd_local_timer_of_register();
 +
-+	if (arch_timer_sched_clock_init())
-+		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
++static inline int arch_timer_sched_clock_init(void)
++{
++	return -ENXIO;
++}
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index ce8c7ed..611859a 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -22,6 +22,7 @@
+ #include <asm/cputype.h>
+ #include <asm/localtimer.h>
+ #include <asm/arch_timer.h>
++#include <asm/sched_clock.h>
+ 
+ static unsigned long arch_timer_rate;
+ static int arch_timer_ppi;
+@@ -203,6 +204,18 @@ static inline cycle_t arch_counter_get_cntvct(void)
+ 	return ((cycle_t) cvalh << 32) | cvall;
  }
  
- static struct sys_timer v2m_dt_timer = {
++static u32 notrace arch_counter_get_cntvct32(void)
++{
++	cycle_t cntvct = arch_counter_get_cntvct();
++
++	/*
++	 * The sched_clock infrastructure only knows about counters
++	 * with@most 32bits. Forget about the upper 24 bits for the
++	 * time being...
++	 */
++	return (u32)(cntvct & (u32)~0);
++}
++
+ static cycle_t arch_counter_read(struct clocksource *cs)
+ {
+ 	return arch_counter_get_cntpct();
+@@ -285,3 +298,15 @@ out_free:
+ 
+ 	return err;
+ }
++
++int __init arch_timer_sched_clock_init(void)
++{
++	int err;
++
++	err = arch_timer_available();
++	if (err)
++		return err;
++
++	setup_sched_clock(arch_counter_get_cntvct32, 32, arch_timer_rate);
++	return 0;
++}
 -- 
 1.7.7.1
