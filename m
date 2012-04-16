@@ -1,11 +1,11 @@
 From: Hong.Xu@atmel.com (Xu, Hong)
-Date: Mon, 16 Apr 2012 02:30:18 +0000
-Subject: [PATCH 2/4] AT91: Add machine header file for AT91SAM9N12 SoC
-In-Reply-To: <4F8851A0.8000807@atmel.com>
+Date: Mon, 16 Apr 2012 02:35:11 +0000
+Subject: [PATCH 3/4] AT91: Add machine files for AT91SAM9N12 SoC
+In-Reply-To: <4F8853EE.9000809@atmel.com>
 References: <1334211996-31572-1-git-send-email-hong.xu@atmel.com>
- <1334211996-31572-3-git-send-email-hong.xu@atmel.com>
- <4F8851A0.8000807@atmel.com>
-Message-ID: <A92DB5DF46DBC241980A99BFD8A00AEE0F62964C@penmbx01>
+ <1334211996-31572-4-git-send-email-hong.xu@atmel.com>
+ <4F8853EE.9000809@atmel.com>
+Message-ID: <A92DB5DF46DBC241980A99BFD8A00AEE0F62966C@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,212 +13,121 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com]
-> Sent: Saturday, April 14, 2012 12:18 AM
+> Sent: Saturday, April 14, 2012 12:27 AM
 > To: Xu, Hong
 > Cc: plagnioj at jcrosoft.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/4] AT91: Add machine header file for AT91SAM9N12 SoC
+> Subject: Re: [PATCH 3/4] AT91: Add machine files for AT91SAM9N12 SoC
 > 
 > On 04/12/2012 08:26 AM, Hong Xu :
 > > Signed-off-by: Hong Xu <hong.xu@atmel.com>
 > > ---
-> >  arch/arm/mach-at91/include/mach/at91sam9n12.h      |   68
-> ++++++++++++++++++++
-> >  .../mach-at91/include/mach/at91sam9n12_matrix.h    |   53
-> +++++++++++++++
-> >  arch/arm/mach-at91/include/mach/cpu.h              |   10 +++
-> >  arch/arm/mach-at91/include/mach/hardware.h         |    2 +
-> >  arch/arm/mach-at91/soc.h                           |    5 ++
-> >  5 files changed, 138 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12.h
-> >  create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
-> >
-> > diff --git a/arch/arm/mach-at91/include/mach/at91sam9n12.h
-> b/arch/arm/mach-at91/include/mach/at91sam9n12.h
-> > new file mode 100644
-> > index 0000000..ff14bbf
-> > --- /dev/null
-> > +++ b/arch/arm/mach-at91/include/mach/at91sam9n12.h
-> > @@ -0,0 +1,68 @@
-[...]
-> > +/*
-> > + * Base addresses for early serial code (uncompress.h)
-> > + */
-> > +#define AT91_DBGU	AT91_BASE_DBGU0
-> > +#define AT91_USART0	AT91SAM9N12_BASE_USART0
-> > +#define AT91_USART1	AT91SAM9N12_BASE_USART1
-> > +#define AT91_USART2	AT91SAM9N12_BASE_USART2
+> >  arch/arm/mach-at91/Kconfig       |    9 ++
+> >  arch/arm/mach-at91/Makefile      |    1 +
 > 
-> You can remove those defines (about uncompress.h) : they will go away soon.
+> An entry is missing in:
+> arch/arm/mach-at91/Makefile.boot
 > 
 
-OK.
+Ok, got it.
+
+> >  arch/arm/mach-at91/at91sam9n12.c |  275
+> ++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-at91/board-dt.c    |    1 +
+> >  arch/arm/mach-at91/clock.c       |   15 ++-
+> >  arch/arm/mach-at91/setup.c       |    6 +
+> >  6 files changed, 302 insertions(+), 5 deletions(-)
+> >  create mode 100644 arch/arm/mach-at91/at91sam9n12.c
+> >
+[...]
+> > diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+> > index c18d4d3..0a21555 100644
+> > --- a/arch/arm/mach-at91/board-dt.c
+> > +++ b/arch/arm/mach-at91/board-dt.c
+> > @@ -51,6 +51,7 @@ static void __init at91_dt_device_init(void)
+> >  static const char *at91_dt_board_compat[] __initdata = {
+> >  	"atmel,at91sam9m10g45ek",
+> >  	"atmel,at91sam9x5ek",
+> > +	"atmel,at91sam9n12ek",
+> 
+> This chunck is not needed anymore: we will use the generic name
+> "atmel,at91sam9"
+> 
+OK, I won't touch it.
 
 BR,
 Eric
-> > +
-> > +/*
-> > + * Internal Memory.
-> > + */
-> > +#define AT91SAM9N12_SRAM_BASE	0x00300000	/* Internal SRAM base address
-> */
-> > +#define AT91SAM9N12_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb)
-> */
-> > +
-> > +#define AT91SAM9N12_ROM_BASE	0x00100000	/* Internal ROM base address
-> */
-> > +#define AT91SAM9N12_ROM_SIZE	SZ_128K		/* Internal ROM size (128Kb)
-> */
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
-> b/arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
-> > new file mode 100644
-> > index 0000000..40060cd
-> > --- /dev/null
-> > +++ b/arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
-> > @@ -0,0 +1,53 @@
-> > +/*
-> > + * Matrix-centric header file for the AT91SAM9N12
-> > + *
-> > + * Copyright (C) 2012 Atmel Corporation.
-> > + *
-> > + * Only EBI related registers.
-> > + * Write Protect register definitions may be useful.
-> > + *
-> > + * Licensed under GPLv2 or later.
-> > + */
-> > +
-> > +#ifndef _AT91SAM9N12_MATRIX_H_
-> > +#define _AT91SAM9N12_MATRIX_H_
-> > +
-> > +#define AT91_MATRIX_EBICSA	(AT91_MATRIX + 0x118)	/* EBI Chip Select
-> Assignment Register */
-> > +#define		AT91_MATRIX_EBI_CS1A		(1 << 1)	/* Chip Select 1
-> Assignment */
-> > +#define			AT91_MATRIX_EBI_CS1A_SMC		(0 << 1)
-> > +#define			AT91_MATRIX_EBI_CS1A_SDRAMC		(1 << 1)
-> > +#define		AT91_MATRIX_EBI_CS3A		(1 << 3)	/* Chip Select 3
-> Assignment */
-> > +#define			AT91_MATRIX_EBI_CS3A_SMC		(0 << 3)
-> > +#define			AT91_MATRIX_EBI_CS3A_SMC_NANDFLASH	(1 << 3)
-> > +#define		AT91_MATRIX_EBI_DBPUC		(1 << 8)	/* Data Bus Pull-up
-> Configuration */
-> > +#define			AT91_MATRIX_EBI_DBPU_ON			(0 << 8)
-> > +#define			AT91_MATRIX_EBI_DBPU_OFF		(1 << 8)
-> > +#define		AT91_MATRIX_EBI_VDDIOMSEL	(1 << 16)	/* Memory voltage
-> selection */
-> > +#define			AT91_MATRIX_EBI_VDDIOMSEL_1_8V		(0 << 16)
-> > +#define			AT91_MATRIX_EBI_VDDIOMSEL_3_3V		(1 << 16)
-> > +#define		AT91_MATRIX_EBI_EBI_IOSR	(1 << 17)	/* EBI I/O slew rate
-> selection */
-> > +#define			AT91_MATRIX_EBI_EBI_IOSR_REDUCED	(0 << 17)
-> > +#define			AT91_MATRIX_EBI_EBI_IOSR_NORMAL		(1 << 17)
-> > +#define		AT91_MATRIX_EBI_DDR_IOSR	(1 << 18)	/* DDR2 dedicated
-> port I/O slew rate selection */
-> > +#define			AT91_MATRIX_EBI_DDR_IOSR_REDUCED	(0 << 18)
-> > +#define			AT91_MATRIX_EBI_DDR_IOSR_NORMAL		(1 << 18)
-> > +#define		AT91_MATRIX_NFD0_SELECT		(1 << 24)	/* NAND Flash Data
-> Bus Selection */
-> > +#define			AT91_MATRIX_NFD0_ON_D0			(0 << 24)
-> > +#define			AT91_MATRIX_NFD0_ON_D16			(1 << 24)
-> > +#define		AT91_MATRIX_DDR_MP_EN		(1 << 25)	/* DDR Multi-port
-> Enable */
-> > +#define			AT91_MATRIX_MP_OFF			(0 << 25)
-> > +#define			AT91_MATRIX_MP_ON			(1 << 25)
-> > +
-> > +#define AT91_MATRIX_WPMR	(AT91_MATRIX + 0x1E4)	/* Write Protect Mode
-> Register */
-> > +#define		AT91_MATRIX_WPMR_WPEN		(1 << 0)	/* Write Protect
-> ENable */
-> > +#define			AT91_MATRIX_WPMR_WP_WPDIS		(0 << 0)
-> > +#define			AT91_MATRIX_WPMR_WP_WPEN		(1 << 0)
-> > +#define		AT91_MATRIX_WPMR_WPKEY		(0xFFFFFF << 8)	/* Write
-> Protect KEY */
-> > +
-> > +#define AT91_MATRIX_WPSR	(AT91_MATRIX + 0x1E8)	/* Write Protect Status
-> Register */
-> > +#define		AT91_MATRIX_WPSR_WPVS		(1 << 0)	/* Write Protect
-> Violation Status */
-> > +#define			AT91_MATRIX_WPSR_NO_WPV		(0 << 0)
-> > +#define			AT91_MATRIX_WPSR_WPV		(1 << 0)
-> > +#define		AT91_MATRIX_WPSR_WPVSRC		(0xFFFF << 8)	/* Write
-> Protect Violation Source */
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-at91/include/mach/cpu.h
-> b/arch/arm/mach-at91/include/mach/cpu.h
-> > index 0118c33..c7c64e9 100644
-> > --- a/arch/arm/mach-at91/include/mach/cpu.h
-> > +++ b/arch/arm/mach-at91/include/mach/cpu.h
-> > @@ -25,6 +25,7 @@
-> >  #define ARCH_ID_AT91SAM9G45MRL	0x819b05a2	/* aka 9G45-ES2 & non ES
-> lots */
-> >  #define ARCH_ID_AT91SAM9G45ES	0x819b05a1	/* 9G45-ES (Engineering
-> Sample) */
-> >  #define ARCH_ID_AT91SAM9X5	0x819a05a0
-> > +#define ARCH_ID_AT91SAM9N12	0x819a07a0
-> >
-> >  #define ARCH_ID_AT91SAM9XE128	0x329973a0
-> >  #define ARCH_ID_AT91SAM9XE256	0x329a93a0
-> > @@ -70,6 +71,9 @@ enum at91_soc_type {
-> >  	/* SAM9X5 */
-> >  	AT91_SOC_SAM9X5,
-> >
-> > +	/* SAM9N12 */
-> > +	AT91_SOC_SAM9N12,
-> > +
-> >  	/* Unknown type */
-> >  	AT91_SOC_NONE
+> >  	"calao,usb-a9g20",
+> >  	NULL
 > >  };
-> > @@ -184,6 +188,12 @@ static inline int at91_soc_is_detected(void)
-> >  #define cpu_is_at91sam9x25()	(0)
-> >  #endif
+> > diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+> > index a0f4d74..46130da 100644
+> > --- a/arch/arm/mach-at91/clock.c
+> > +++ b/arch/arm/mach-at91/clock.c
+> > @@ -57,13 +57,15 @@ void __iomem *at91_pmc_base;
 > >
-> > +#ifdef CONFIG_ARCH_AT91SAM9N12
-> > +#define cpu_is_at91sam9n12()	(at91_soc_initdata.type ==
-> AT91_SOC_SAM9N12)
-> > +#else
-> > +#define cpu_is_at91sam9n12()	(0)
-> > +#endif
-> > +
-> >  /*
-> >   * Since this is ARM, we will never run on any AVR32 CPU. But these
-> >   * definitions may reduce clutter in common drivers.
-> > diff --git a/arch/arm/mach-at91/include/mach/hardware.h
-> b/arch/arm/mach-at91/include/mach/hardware.h
-> > index e9e29a6..39a5654 100644
-> > --- a/arch/arm/mach-at91/include/mach/hardware.h
-> > +++ b/arch/arm/mach-at91/include/mach/hardware.h
-> > @@ -36,6 +36,8 @@
-> >  #include <mach/at91sam9g45.h>
-> >  #elif defined(CONFIG_ARCH_AT91SAM9X5)
-> >  #include <mach/at91sam9x5.h>
-> > +#elif defined(CONFIG_ARCH_AT91SAM9N12)
-> > +#include <mach/at91sam9n12.h>
-> >  #elif defined(CONFIG_ARCH_AT91X40)
-> >  #include <mach/at91x40.h>
-> >  #else
-> > diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-> > index 5db4aa4..0e3fcb8 100644
-> > --- a/arch/arm/mach-at91/soc.h
-> > +++ b/arch/arm/mach-at91/soc.h
-> > @@ -20,6 +20,7 @@ extern struct at91_init_soc at91sam9263_soc;
-> >  extern struct at91_init_soc at91sam9g45_soc;
-> >  extern struct at91_init_soc at91sam9rl_soc;
-> >  extern struct at91_init_soc at91sam9x5_soc;
-> > +extern struct at91_init_soc at91sam9n12_soc;
+> >  #define cpu_has_800M_plla()	(  cpu_is_at91sam9g20() \
+> >  				|| cpu_is_at91sam9g45() \
+> > -				|| cpu_is_at91sam9x5())
+> > +				|| cpu_is_at91sam9x5() \
+> > +				|| cpu_is_at91sam9n12())
 > >
-> >  static inline int at91_soc_is_enabled(void)
-> >  {
-> > @@ -53,3 +54,7 @@ static inline int at91_soc_is_enabled(void)
-> >  #if !defined(CONFIG_ARCH_AT91SAM9X5)
-> >  #define at91sam9x5_soc	at91_boot_soc
-> >  #endif
+> >  #define cpu_has_300M_plla()	(cpu_is_at91sam9g10())
+> >
+> >  #define cpu_has_pllb()		(!(cpu_is_at91sam9rl() \
+> >  				|| cpu_is_at91sam9g45() \
+> > -				|| cpu_is_at91sam9x5()))
+> > +				|| cpu_is_at91sam9x5() \
+> > +				|| cpu_is_at91sam9n12()))
+> >
+> >  #define cpu_has_upll()		(cpu_is_at91sam9g45() \
+> >  				|| cpu_is_at91sam9x5())
+> > @@ -77,12 +79,15 @@ void __iomem *at91_pmc_base;
+> >  				|| cpu_is_at91sam9x5()))
+> >
+> >  #define cpu_has_plladiv2()	(cpu_is_at91sam9g45() \
+> > -				|| cpu_is_at91sam9x5())
+> > +				|| cpu_is_at91sam9x5() \
+> > +				|| cpu_is_at91sam9n12())
+> >
+> >  #define cpu_has_mdiv3()		(cpu_is_at91sam9g45() \
+> > -				|| cpu_is_at91sam9x5())
+> > +				|| cpu_is_at91sam9x5() \
+> > +				|| cpu_is_at91sam9n12())
+> >
+> > -#define cpu_has_alt_prescaler()	(cpu_is_at91sam9x5())
+> > +#define cpu_has_alt_prescaler()	(cpu_is_at91sam9x5() \
+> > +				|| cpu_is_at91sam9n12())
+> >
+> >  static LIST_HEAD(clocks);
+> >  static DEFINE_SPINLOCK(clk_lock);
+> > diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> > index 97cc04d..34c9c27 100644
+> > --- a/arch/arm/mach-at91/setup.c
+> > +++ b/arch/arm/mach-at91/setup.c
+> > @@ -142,6 +142,11 @@ static void __init soc_detect(u32 dbgu_base)
+> >  		at91_soc_initdata.type = AT91_SOC_SAM9X5;
+> >  		at91_boot_soc = at91sam9x5_soc;
+> >  		break;
 > > +
-> > +#if !defined(CONFIG_ARCH_AT91SAM9N12)
-> > +#define at91sam9n12_soc	at91_boot_soc
-> > +#endif
+> > +	case ARCH_ID_AT91SAM9N12:
+> > +		at91_soc_initdata.type = AT91_SOC_SAM9N12;
+> > +		at91_boot_soc = at91sam9n12_soc;
+> > +		break;
+> >  	}
+> >
+> >  	/* at91sam9g10 */
+> > @@ -209,6 +214,7 @@ static const char *soc_name[] = {
+> >  	[AT91_SOC_SAM9G45]	= "at91sam9g45",
+> >  	[AT91_SOC_SAM9RL]	= "at91sam9rl",
+> >  	[AT91_SOC_SAM9X5]	= "at91sam9x5",
+> > +	[AT91_SOC_SAM9N12]	= "at91sam9n12",
+> >  	[AT91_SOC_NONE]		= "Unknown"
+> >  };
+> >
 > 
+> Except those little modifications, the 9n12 port seems neat. Thanks for
+> doing it.
 > 
+> Best regards,
 > --
 > Nicolas Ferre
