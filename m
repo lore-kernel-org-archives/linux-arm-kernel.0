@@ -1,81 +1,42 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Mon, 16 Apr 2012 18:08:34 -0500
-Subject: [PATCH v2] rtc: add support for Freescale SNVS RTC
-In-Reply-To: <1334387237-23519-1-git-send-email-paul.liu@linaro.org>
-References: <1334387237-23519-1-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120416180834.a4578493ab1f747a1b3c2dd0@freescale.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 16 Apr 2012 16:10:56 -0700
+Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
+In-Reply-To: <20120412064920.GH2445@S2101-09.ap.freescale.net>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+ <20120412064920.GH2445@S2101-09.ap.freescale.net>
+Message-ID: <CAJOA=zMPQK-W_nbRztXCNdLHoTJU73ZnrxAS8VvvmzgdaVS2mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 14 Apr 2012 15:07:17 +0800
-"Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org> wrote:
+On Wed, Apr 11, 2012 at 11:49 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Apr 11, 2012 at 06:02:51PM -0700, Mike Turquette wrote:
+> ...
+>> @@ -175,23 +188,32 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+>> ? ? ? div->flags = clk_divider_flags;
+>> ? ? ? div->lock = lock;
+>>
+>> + ? ? /* allocate the temporary parent_names */
+>> ? ? ? if (parent_name) {
+>> - ? ? ? ? ? ? div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+>> - ? ? ? ? ? ? if (!div->parent[0])
+>> - ? ? ? ? ? ? ? ? ? ? goto out;
+>> + ? ? ? ? ? ? parent_names[0] = kstrdup(parent_name, GFP_KERNEL);
+>> + ? ? ? ? ? ? if (!parent_names[0]) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("%s: could not allocate parent_names\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__);
+>> + ? ? ? ? ? ? ? ? ? ? goto fail_parent_names;
+>> + ? ? ? ? ? ? }
+>> ? ? ? }
+>
+> Why do we need to copy the parent_names here at all? ?clk_register()
+> has done that for each basic clk.
 
-> +++ b/Documentation/devicetree/bindings/rtc/snvs-rtc.txt
+Yes, this was a braindead change on my part.  I'll remove the kstrdup
+in my next series (the rest of this patch will stay in).
 
-this conflicts with the "Secure Non-Volatile Storage (SNVS) Node"
-section published in:
+Thanks,
+Mike
 
-Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-
-please use that instead.
-
-> +config RTC_DRV_SNVS
-> +	tristate "Freescale SNVS Real Time Clock"
-> +	depends on ARCH_MXC
-
-|| FSL_SOC
-
-since this h/w also exists in other, non-ARM based, SoCs.
-
-> +struct rtc_drv_data {
-> +	struct rtc_device *rtc;
-> +	void __iomem *ioaddr;
-> +	int irq;
-> +	bool irq_enable;
-> +};
-> +
-> +static DEFINE_SPINLOCK(rtc_lock);
-
-the lock belongs in struct rtc_drv_data.
-
-> +static int64_t time_diff;
-
-time_diff is only being written; it isn't being used.
-
-> +	return IRQ_HANDLED;
-
-return IRQ_NONE if !(lp_status & SNVS_LPSR_LPTA)
-
-> +	alrm->pending =
-> +	    ((readl(ioaddr + SNVS_LPSR) & SNVS_LPSR_LPTA) != 0) ? 1 : 0;
-
-alrm->pending = !!readl(ioaddr + SNVS_LPSR) & SNVS_LPSR_LPTA;
-
-> +	/* initialize glitch detect */
-> +	writel(SNVS_LPPGDR_INIT, ioaddr + SNVS_LPPGDR);
-> +	udelay(100);
-> +
-> +	/* clear lp interrupt status */
-> +	writel(0xFFFFFFFF, ioaddr + SNVS_LPSR);
-> +
-> +	/* Enable RTC */
-> +	lp_cr = readl(ioaddr + SNVS_LPCR);
-> +	if ((lp_cr & SNVS_LPCR_SRTC_ENV) == 0)
-> +		writel(lp_cr | SNVS_LPCR_SRTC_ENV, ioaddr + SNVS_LPCR);
-> +	udelay(100);
-> +
-> +	writel(0xFFFFFFFF, ioaddr + SNVS_LPSR);
-> +	udelay(100);
-
-the manual doesn't state that delays are required after writing
-these registers; it should be safe to remove them.
-
-> +	/* By default, devices should wakeup if they can */
-> +	/* So snvs is set as "should wakeup" as it can */
-
-/*
- * multi-line
- * comment format
- */
-
-Kim
+> Regards,
+> Shawn
