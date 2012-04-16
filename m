@@ -1,31 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Apr 2012 10:00:38 +0100
-Subject: [PATCH 2/7] ARM: ux500: Shorten Snowball's DT compatible gpio
- entry
-In-Reply-To: <CACRpkdYwBoMme179yAzU0sOGexM3ykXzr6Cf3eZdO7w9bVsAMw@mail.gmail.com>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdYwBoMme179yAzU0sOGexM3ykXzr6Cf3eZdO7w9bVsAMw@mail.gmail.com>
-Message-ID: <4F8BDFB6.9080604@linaro.org>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 16 Apr 2012 14:22:34 +0530
+Subject: [PATCH] pinctrl: pinconf: Fix compilation error if PINCONF is not
+ selected
+Message-ID: <a342987ffebf0ab79a789011e17081e0169bdf24.1334566321.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/12 09:36, Linus Walleij wrote:
-> On Fri, Apr 13, 2012 at 4:05 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> It is believed that the gpio compatible match entry is too long
->> and cumbersome in its current form. This patch takes steps to
->> decrease its length by using ST-Mircroelectrics' abbreviation ST.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->
-> Applied with the proper spelling and Arnds ACK.
+When we compile pinctrl layer for platforms without CONFIG_PINCONF, we get
+following compilation errors:
 
-Good catch. :)
+drivers/built-in.o: In function `pinctrl_show':
+linux-2.6/drivers/pinctrl/core.c:1116: undefined
+reference to `pinconf_show_setting'
+drivers/built-in.o: In function `pinctrl_maps_show':
+linux-2.6/drivers/pinctrl/core.c:1071: undefined
+reference to `pinconf_show_map'
+drivers/built-in.o: In function `pinctrl_init_device_debugfs':
+linux-2.6/drivers/pinctrl/core.c:1224: undefined
+reference to `pinconf_init_device_debugfs'
+make[1]: *** [.tmp_vmlinux1] Error 1
 
+This patch fixes this.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/pinctrl/pinconf.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/pinctrl/pinconf.h b/drivers/pinctrl/pinconf.h
+index 32b8354..e3ed8cb 100644
+--- a/drivers/pinctrl/pinconf.h
++++ b/drivers/pinctrl/pinconf.h
+@@ -58,7 +58,7 @@ static inline int pinconf_apply_setting(struct pinctrl_setting const *setting)
+ 
+ #endif
+ 
+-#if defined(CONFIG_PINMUX) && defined(CONFIG_DEBUG_FS)
++#if defined(CONFIG_PINCONF) && defined(CONFIG_DEBUG_FS)
+ 
+ void pinconf_show_map(struct seq_file *s, struct pinctrl_map const *map);
+ void pinconf_show_setting(struct seq_file *s,
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9
