@@ -1,41 +1,95 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Apr 2012 11:44:07 +0100
-Subject: [PATCH 15/16] ARM: ux500: Apply Device Tree settings for the DB8500
- PRCMU
+Date: Tue, 17 Apr 2012 11:44:08 +0100
+Subject: [PATCH 16/16] ARM: ux500: Enable PRCMU Timer 4 (clocksource) via
+ Device Tree
 In-Reply-To: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
 References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334659448-11521-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334659448-11521-17-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In this patch we enable the db8500-prcmu via DT and take out
-any enablement previously carried out by platform code.
+In dbx500 based devices the PRCMU Timer 4 is used as a clocksource
+and sched_clock. Here we fetch all necessary addressing information
+required for correct PRCMU initialisation from the Device Tree
+instead of using hard-coded values.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi |    8 +++++++-
+ arch/arm/mach-ux500/timer.c   |   24 ++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index c97eab7..2512b6a 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -124,7 +124,6 @@ static struct platform_device *platform_devs[] __initdata = {
- static struct platform_device *of_platform_devs[] __initdata = {
- 	&u8500_dma40_device,
- 	&db8500_pmu_device,
--	&db8500_prcmu_device,
- };
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index f633210..9a62f86 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -189,7 +189,13 @@
+ 			reg = <0x80157000 0x1000>;
+ 			interrupts = <46 47>;
+ 			#address-cells = <1>;
+-			#size-cells = <0>;
++			#size-cells = <1>;
++			ranges;
++
++				prcmu-timer-4 at 80157450 {
++				compatible = "stericsson,db8500-prcmu-timer-4";
++				reg = <0x80157450 0xC>;
++			};
  
- static resource_size_t __initdata db8500_gpio_base[] = {
-@@ -234,7 +233,7 @@ struct device * __init u8500_of_init_devices(void)
- 	 * Devices to be DT:ed:
- 	 *   u8500_dma40_device  = todo
- 	 *   db8500_pmu_device   = todo
--	 *   db8500_prcmu_device = todo
-+	 *   db8500_prcmu_device = done
- 	 */
- 	platform_add_devices(of_platform_devs, ARRAY_SIZE(of_platform_devs));
+ 			ab8500 at 5 {
+ 				compatible = "stericsson,ab8500";
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index d37df98..885c742 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -8,6 +8,7 @@
+ #include <linux/errno.h>
+ #include <linux/clksrc-dbx500-prcmu.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
  
+ #include <asm/smp_twd.h>
+ 
+@@ -43,10 +44,17 @@ static void __init ux500_twd_init(void)
+ #define ux500_twd_init()	do { } while(0)
+ #endif
+ 
++const static struct of_device_id prcmu_timer_of_match[] __initconst = {
++	{ .compatible = "stericsson,db8500-prcmu-timer-4", },
++	{ },
++};
++
+ static void __init ux500_timer_init(void)
+ {
+ 	void __iomem *mtu_timer_base;
+ 	void __iomem *prcmu_timer_base;
++	void __iomem *tmp_base;
++	struct device_node *np;
+ 
+ 	if (cpu_is_u5500()) {
+ 		mtu_timer_base = __io_address(U5500_MTU0_BASE);
+@@ -58,6 +66,22 @@ static void __init ux500_timer_init(void)
+ 		ux500_unknown_soc();
+ 	}
+ 
++	/* TODO: Once MTU has been DT:ed place code above into else. */
++	if (of_have_populated_dt()) {
++		np = of_find_matching_node(NULL, prcmu_timer_of_match);
++		if (!np)
++			goto dt_fail;
++
++		tmp_base = of_iomap(np, 0);
++		if (!tmp_base)
++			goto dt_fail;
++
++		prcmu_timer_base = tmp_base;
++	}
++
++dt_fail:
++	/* Doing it the old fashioned way. */
++
+ 	/*
+ 	 * Here we register the timerblocks active in the system.
+ 	 * Localtimers (twd) is started when both cpu is up and running.
 -- 
 1.7.9.1
