@@ -1,88 +1,122 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Tue, 17 Apr 2012 18:17:19 +0530
-Subject: [PATCH 2/2] OMAP2+: UART: Add mechanism to probe uart pins and
- configure rx wakeup
-In-Reply-To: <20120417014103.GA21106@atomide.com>
-References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
- <1334065246-21294-3-git-send-email-govindraj.raja@ti.com>
- <20120410161136.GF6487@atomide.com>
- <CAMrsUdK2ZqCGWtL104tBC_h-XHD0UMMFagch_eSER+92zC1FiQ@mail.gmail.com>
- <20120417014103.GA21106@atomide.com>
-Message-ID: <CAMrsUd+v-qhVPLbJp1ecE2+e5ayJAQrAzALr1sviH9RDJv3aMg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 17 Apr 2012 15:00:47 +0200
+Subject: [PATCH v2 06/10] ARM: at91: pm select memory controler at runtime
+In-Reply-To: <1333899606-30518-6-git-send-email-plagnioj@jcrosoft.com>
+References: <1333899606-30518-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1334667647-8769-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 7:11 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> Few more comments below.
->
-> * Raja, Govindraj <govindraj.raja@ti.com> [120411 04:53]:
-> ...
->
->> +static int ?__init omap_serial_fill_default_pads(struct omap_board_data *bdata,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_uart_state *uart)
->> +{
->> + ? ? struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
->> + ? ? struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
->> + ? ? char *rx_fmt, *tx_fmt;
->> + ? ? int uart_nr = bdata->id + 1;
->> +
->> + ? ? if (bdata->id != 2) {
->> + ? ? ? ? ? ? rx_fmt = "uart%d_rx.uart%d_rx";
->> + ? ? ? ? ? ? tx_fmt = "uart%d_tx.uart%d_tx";
->> + ? ? } else {
->> + ? ? ? ? ? ? rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
->> + ? ? ? ? ? ? tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
->> + ? ? }
->> +
->> + ? ? snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
->> + ? ? ? ? ? ? ? ? ? ? uart_nr, uart_nr);
->> + ? ? snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
->> + ? ? ? ? ? ? ? ? ? ? uart_nr, uart_nr);
->
-> This naming won't work for the fourth port on 3630 as there are no "uart4_rx"
-> or "uart4_tx" mux entries, they are "gpmc_wait2.uart4_tx" and
-> "gpmc_wait3.uart4_tx".
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-But uart4 is unused on 3630 boards and boards trying to use them
-should configure them from board file.
-(I thought we agreed on this approach where only if uarts are
-available in mux mode0 those ports will be dynamically muxed for wakeup
-others should use omap_serial_init_port)
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+[nicolas.ferre at atmel.com: add cpuidle modification]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/cpuidle.c |    8 +++++++-
+ arch/arm/mach-at91/pm.c      |   12 ++++++++----
+ arch/arm/mach-at91/pm.h      |   13 -------------
+ 3 files changed, 15 insertions(+), 18 deletions(-)
 
->
->> @@ -289,8 +354,8 @@ void __init omap_serial_board_init(struct
->> omap_uart_port_info *info)
->> ? ? ? ? ? ? ? bdata.pads = NULL;
->> ? ? ? ? ? ? ? bdata.pads_cnt = 0;
->>
->> - ? ? ? ? ? ? if (cpu_is_omap44xx() || cpu_is_omap34xx())
->> - ? ? ? ? ? ? ? ? ? ? omap_serial_fill_default_pads(&bdata);
->> + ? ? ? ? ? ? if (omap_serial_fill_default_pads(&bdata, uart))
->> + ? ? ? ? ? ? ? ? ? ? continue;
->>
->> ? ? ? ? ? ? ? if (!info)
->> ? ? ? ? ? ? ? ? ? ? ? omap_serial_init_port(&bdata, NULL);
->
-> Can't the omap_serial_board_init() now be just be omap_serial_init(void)
-> as it's not used anywhere else?
-
-Yes sure we can remove that.
-
->
-> Anyways, this is getting too complex for the -rc series as at least 2430sdp
-> is using alternative pins for the first uart. Let's patch to remove just
-> the uart4 entry for 3630 for the -rc and then we can properly fix this
-> for the next merge window.
-
-Okay. in that case the earlier patch [1] should be fine to solve the
-gpmc issue observed
-and ehci issue on beagle-xm.
-
---
-Thanks,
-Govindraj.R
-
-[1]:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/090961.html
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+index ece1f9a..0c63815 100644
+--- a/arch/arm/mach-at91/cpuidle.c
++++ b/arch/arm/mach-at91/cpuidle.c
+@@ -21,6 +21,7 @@
+ #include <linux/export.h>
+ #include <asm/proc-fns.h>
+ #include <asm/cpuidle.h>
++#include <mach/cpu.h>
+ 
+ #include "pm.h"
+ 
+@@ -33,7 +34,12 @@ static int at91_enter_idle(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+ 			       int index)
+ {
+-	at91_standby();
++	if (cpu_is_at91rm9200())
++		at91rm9200_standby();
++	else if (cpu_is_at91sam9g45())
++		at91sam9g45_standby();
++	else
++		at91sam9_standby();
+ 
+ 	return index;
+ }
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index f630250..1bfaad6 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -261,7 +261,12 @@ static int at91_pm_enter(suspend_state_t state)
+ 			 * For ARM 926 based chips, this requirement is weaker
+ 			 * as at91sam9 can access a RAM in self-refresh mode.
+ 			 */
+-			at91_standby();
++			if (cpu_is_at91rm9200())
++				at91rm9200_standby();
++			else if (cpu_is_at91sam9g45())
++				at91sam9g45_standby();
++			else
++				at91sam9_standby();
+ 			break;
+ 
+ 		case PM_SUSPEND_ON:
+@@ -307,10 +312,9 @@ static int __init at91_pm_init(void)
+ 
+ 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+ 
+-#ifdef CONFIG_ARCH_AT91RM9200
+ 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+-	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+-#endif
++	if (cpu_is_at91rm9200())
++		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+ 
+ 	suspend_set_ops(&at91_pm_ops);
+ 
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 89f56f3..1b4865e 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -12,7 +12,6 @@
+ #define __ARCH_ARM_MACH_AT91_PM
+ 
+ #include <mach/at91_ramc.h>
+-#ifdef CONFIG_ARCH_AT91RM9200
+ #include <mach/at91rm9200_sdramc.h>
+ 
+ /*
+@@ -43,10 +42,6 @@ static inline void at91rm9200_standby(void)
+ 		  "r" (lpr));
+ }
+ 
+-#define at91_standby at91rm9200_standby
+-
+-#elif defined(CONFIG_ARCH_AT91SAM9G45)
+-
+ /* We manage both DDRAM/SDRAM controllers, we need more than one value to
+  * remember.
+  */
+@@ -75,10 +70,6 @@ static inline void at91sam9g45_standby(void)
+ 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+ }
+ 
+-#define at91_standby at91sam9g45_standby
+-
+-#else
+-
+ #ifdef CONFIG_ARCH_AT91SAM9263
+ /*
+  * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
+@@ -102,8 +93,4 @@ static inline void at91sam9_standby(void)
+ 	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
+ }
+ 
+-#define at91_standby at91sam9_standby
+-
+-#endif
+-
+ #endif
+-- 
+1.7.10
