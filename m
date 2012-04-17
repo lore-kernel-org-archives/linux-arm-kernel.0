@@ -1,84 +1,88 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Apr 2012 11:16:31 +0530
-Subject: [PATCH 08/12] gpio/samsung: add GPC4 bank instance
+Date: Tue, 17 Apr 2012 11:16:33 +0530
+Subject: [PATCH 10/12] ARM: Exynos: Redefine IRQ_MCT_L0,1 definition
 In-Reply-To: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
 References: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1334641595-25301-9-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1334641595-25301-11-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sangsu Park <sangsu4u.park@samsung.com>
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-Add GPC4 bank instance which is included in rev1 of Exynos5.
+Redefine IRQ_MCT_L0,1 irq definition as it is changed in rev1 of Exynos5.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/gpio.h |    9 ++++++---
- drivers/gpio/gpio-samsung.c              |    8 ++++++++
- 2 files changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/include/mach/irqs.h |    4 ++--
+ arch/arm/mach-exynos/mct.c               |   17 +++++++++++------
+ 2 files changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-index d7498af..df5612b 100644
---- a/arch/arm/mach-exynos/include/mach/gpio.h
-+++ b/arch/arm/mach-exynos/include/mach/gpio.h
-@@ -153,10 +153,11 @@ enum exynos4_gpio_number {
- #define EXYNOS5_GPIO_B2_NR	(4)
- #define EXYNOS5_GPIO_B3_NR	(4)
- #define EXYNOS5_GPIO_C0_NR	(7)
--#define EXYNOS5_GPIO_C1_NR	(7)
-+#define EXYNOS5_GPIO_C1_NR	(4)
- #define EXYNOS5_GPIO_C2_NR	(7)
- #define EXYNOS5_GPIO_C3_NR	(7)
--#define EXYNOS5_GPIO_D0_NR	(8)
-+#define EXYNOS5_GPIO_C4_NR	(8)
-+#define EXYNOS5_GPIO_D0_NR	(4)
- #define EXYNOS5_GPIO_D1_NR	(8)
- #define EXYNOS5_GPIO_Y0_NR	(6)
- #define EXYNOS5_GPIO_Y1_NR	(4)
-@@ -199,7 +200,8 @@ enum exynos5_gpio_number {
- 	EXYNOS5_GPIO_C1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C0),
- 	EXYNOS5_GPIO_C2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C1),
- 	EXYNOS5_GPIO_C3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C2),
--	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
-+	EXYNOS5_GPIO_C4_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
-+	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C4),
- 	EXYNOS5_GPIO_D1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D0),
- 	EXYNOS5_GPIO_Y0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D1),
- 	EXYNOS5_GPIO_Y1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y0),
-@@ -242,6 +244,7 @@ enum exynos5_gpio_number {
- #define EXYNOS5_GPC1(_nr)	(EXYNOS5_GPIO_C1_START + (_nr))
- #define EXYNOS5_GPC2(_nr)	(EXYNOS5_GPIO_C2_START + (_nr))
- #define EXYNOS5_GPC3(_nr)	(EXYNOS5_GPIO_C3_START + (_nr))
-+#define EXYNOS5_GPC4(_nr)	(EXYNOS5_GPIO_C4_START + (_nr))
- #define EXYNOS5_GPD0(_nr)	(EXYNOS5_GPIO_D0_START + (_nr))
- #define EXYNOS5_GPD1(_nr)	(EXYNOS5_GPIO_D1_START + (_nr))
- #define EXYNOS5_GPY0(_nr)	(EXYNOS5_GPIO_Y0_START + (_nr))
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index 4627787..0153bb9 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -2452,6 +2452,12 @@ static struct samsung_gpio_chip exynos5_gpios_1[] = {
- 		},
- 	}, {
- 		.chip	= {
-+			.base	= EXYNOS5_GPC4(0),
-+			.ngpio	= EXYNOS5_GPIO_C4_NR,
-+			.label	= "GPC4",
-+		},
-+	}, {
-+		.chip	= {
- 			.base	= EXYNOS5_GPD0(0),
- 			.ngpio	= EXYNOS5_GPIO_D0_NR,
- 			.label	= "GPD0",
-@@ -2880,6 +2886,8 @@ static __init int samsung_gpiolib_init(void)
- 		for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
- 			chip->base = gpx_base;
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 1161675..86e75f5 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -320,6 +320,8 @@
+ #define EXYNOS5_IRQ_SATA		IRQ_SPI(115)
+ #define EXYNOS5_IRQ_NFCON		IRQ_SPI(116)
  
-+		exynos5_gpios_1[11].base = gpio_base1 + 0x2E0;
-+
- 		chip = exynos5_gpios_1;
- 		nr_chips = ARRAY_SIZE(exynos5_gpios_1);
++#define EXYNOS5_IRQ_MCT_L0		IRQ_SPI(120)
++#define EXYNOS5_IRQ_MCT_L1		IRQ_SPI(121)
+ #define EXYNOS5_IRQ_MMC44		IRQ_SPI(123)
+ #define EXYNOS5_IRQ_MDMA1		IRQ_SPI(124)
+ #define EXYNOS5_IRQ_FIMC_LITE0		IRQ_SPI(125)
+@@ -399,8 +401,6 @@
+ #define EXYNOS5_IRQ_FIMD1_SYSTEM	COMBINER_IRQ(18, 6)
  
+ #define EXYNOS5_IRQ_EINT0		COMBINER_IRQ(23, 0)
+-#define EXYNOS5_IRQ_MCT_L0		COMBINER_IRQ(23, 1)
+-#define EXYNOS5_IRQ_MCT_L1		COMBINER_IRQ(23, 2)
+ #define EXYNOS5_IRQ_MCT_G0		COMBINER_IRQ(23, 3)
+ #define EXYNOS5_IRQ_MCT_G1		COMBINER_IRQ(23, 4)
+ #define EXYNOS5_IRQ_MCT_G2		COMBINER_IRQ(23, 5)
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index 897d9a9..b601fb8 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -388,6 +388,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ {
+ 	struct mct_clock_event_device *mevt;
+ 	unsigned int cpu = smp_processor_id();
++	int mct_lx_irq;
+ 
+ 	mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	mevt->evt = evt;
+@@ -414,14 +415,18 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ 
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (cpu == 0) {
++			mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L0 :
++						EXYNOS5_IRQ_MCT_L0;
+ 			mct_tick0_event_irq.dev_id = mevt;
+-			evt->irq = EXYNOS4_IRQ_MCT_L0;
+-			setup_irq(EXYNOS4_IRQ_MCT_L0, &mct_tick0_event_irq);
++			evt->irq = mct_lx_irq;
++			setup_irq(mct_lx_irq, &mct_tick0_event_irq);
+ 		} else {
++			mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L1 :
++						EXYNOS5_IRQ_MCT_L1;
+ 			mct_tick1_event_irq.dev_id = mevt;
+-			evt->irq = EXYNOS4_IRQ_MCT_L1;
+-			setup_irq(EXYNOS4_IRQ_MCT_L1, &mct_tick1_event_irq);
+-			irq_set_affinity(EXYNOS4_IRQ_MCT_L1, cpumask_of(1));
++			evt->irq = mct_lx_irq;
++			setup_irq(mct_lx_irq, &mct_tick1_event_irq);
++			irq_set_affinity(mct_lx_irq, cpumask_of(1));
+ 		}
+ 	} else {
+ 		enable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER, 0);
+@@ -473,7 +478,7 @@ static void __init exynos4_timer_resources(void)
+ 
+ static void __init exynos4_timer_init(void)
+ {
+-	if (soc_is_exynos4210())
++	if ((soc_is_exynos4210()) || (soc_is_exynos5250()))
+ 		mct_int_type = MCT_INT_SPI;
+ 	else
+ 		mct_int_type = MCT_INT_PPI;
 -- 
 1.6.6.rc2
