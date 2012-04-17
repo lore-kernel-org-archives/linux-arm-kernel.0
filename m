@@ -1,44 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Apr 2012 16:46:00 +0100
-Subject: [PATCH 15/16] ARM: ux500: Apply Device Tree settings for the
- DB8500 PRCMU
-In-Reply-To: <201204171538.10960.arnd@arndb.de>
-References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
- <201204171447.06520.arnd@arndb.de> <4F8D8CAB.5040902@linaro.org>
- <201204171538.10960.arnd@arndb.de>
-Message-ID: <4F8D9038.7070803@linaro.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 17 Apr 2012 19:44:57 +0400
+Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
+ sampling bug
+In-Reply-To: <1334675261-31570-1-git-send-email-marex@denx.de>
+References: <1334675261-31570-1-git-send-email-marex@denx.de>
+Message-ID: <4F8D8FF9.9040909@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/04/12 16:38, Arnd Bergmann wrote:
-> On Tuesday 17 April 2012, Lee Jones wrote:
->>
->> On 17/04/12 15:47, Arnd Bergmann wrote:
->>> On Tuesday 17 April 2012, Lee Jones wrote:
->>>> In this patch we enable the db8500-prcmu via DT and take out
->>>> any enablement previously carried out by platform code.
->>>>
->>>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->>>
->>> This patch by itself is broken, because it relies on patch 16.
->>> I suggest merging the two into a single patch to atomically
->>> move over from the static definition of the prcmu to the
->>> device tree based definition. You can also combine it with
->>> patch 14, which by itself is harmless but also pointless.
->>
->> Not as far as I can tell. This patch relies on 12 and 13. Patch 16 is
->> for the PRCMU timer, which is a different entity.
->>
->
-> Ah, I see. In this case, I would combine patches 13 and 15 because
-> otherwise you end up with a duplicate prcmu device when only patch 13
-> is applied.
+Hello.
 
-Okay, give me 1 minute.
+On 04/17/2012 07:07 PM, Marek Vasut wrote:
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> From: Marek Vasut<marek.vasut@gmail.com>
+
+> Signed-off-by: Marek Vasut<marek.vasut@gmail.com>
+> Cc: Chen Peter-B29397<B29397@freescale.com>
+> Cc: Detlev Zundel<dzu@denx.de>
+> Cc: Fabio Estevam<festevam@gmail.com>
+> Cc: Li Frank-B20596<B20596@freescale.com>
+> Cc: Lin Tony-B19295<B19295@freescale.com>
+> Cc: Linux USB<linux-usb@vger.kernel.org>
+> Cc: Sascha Hauer<s.hauer@pengutronix.de>
+> Cc: Shawn Guo<shawn.guo@freescale.com>
+> Cc: Shawn Guo<shawn.guo@linaro.org>
+> Cc: Stefano Babic<sbabic@denx.de>
+> Cc: Subodh Nijsure<snijsure@grid-net.com>
+> Cc: Tony Lin<tony.lin@freescale.com>
+> Cc: Wolfgang Denk<wd@denx.de>
+> ---
+>   drivers/video/mxsfb.c |   13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+
+    Why post this to linux-usb?
+
+WBR, Sergei
