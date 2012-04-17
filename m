@@ -1,40 +1,91 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 17 Apr 2012 20:01:03 +0200
-Subject: [PATCH 2/8] MXS: Add USB EHCI and USB PHY clock handling
-In-Reply-To: <1334657751-27678-3-git-send-email-marex@denx.de>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
- <1334657751-27678-3-git-send-email-marex@denx.de>
-Message-ID: <20120417180103.GF3852@pengutronix.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 17 Apr 2012 23:41:51 +0530
+Subject: [PATCH v4 1/2] mfd: add irq domain support for max8997 interrupts
+In-Reply-To: <20120330220619.334AC3E054E@localhost>
+References: <1332582590-16382-1-git-send-email-thomas.abraham@linaro.org>
+ <1332582590-16382-2-git-send-email-thomas.abraham@linaro.org>
+ <20120330220619.334AC3E054E@localhost>
+Message-ID: <CAJuYYwRa-_0HWeSuOgAT20dCCDdg=NBruQ9_m28TFZkXMRJhaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 12:15:45PM +0200, Marek Vasut wrote:
-> Based on code by:
-> Tony Lin <tony.lin@freescale.com>
-> 
->  	static struct clk name = {					\
->  		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
-> @@ -636,8 +651,10 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("mxs-mmc.3", NULL, ssp3_clk)
->  	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
->  	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
-> -	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
-> -	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
-> +	_REGISTER_CLOCK("mxs-ehci.0", "usb", usb0_clk)
-> +	_REGISTER_CLOCK("mxs-ehci.1", "usb", usb1_clk)
-> +	_REGISTER_CLOCK("mxs-phy.0", "usb0_phy", usb_phy_clk0)
-> +	_REGISTER_CLOCK("mxs-phy.1", "usb1_phy", usb_phy_clk1)
+On 31 March 2012 03:36, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Sat, 24 Mar 2012 15:19:49 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>> Add irq domain support for max8997 interrupts. The reverse mapping method
+>> used is linear mapping since the sub-drivers of max8997 such as regulator
+>> and charger drivers can use the max8997 irq_domain to get the linux irq
+>> number for max8997 interrupts. All uses of irq_base in platform data and
+>> max8997 driver private data are removed.
+>>
+>> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>> ---
+>> ?arch/arm/mach-exynos/mach-nuri.c ? ?| ? ?4 --
+>> ?arch/arm/mach-exynos/mach-origen.c ?| ? ?1 -
+>> ?drivers/mfd/max8997-irq.c ? ? ? ? ? | ? 61 ++++++++++++++++++++--------------
+>> ?drivers/mfd/max8997.c ? ? ? ? ? ? ? | ? ?1 -
+>> ?include/linux/mfd/max8997-private.h | ? ?4 ++-
+>> ?include/linux/mfd/max8997.h ? ? ? ? | ? ?1 -
+>> ?6 files changed, 39 insertions(+), 33 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+>> index 7ac81ce..b21d85d 100644
+>> --- a/arch/arm/mach-exynos/mach-nuri.c
+>> +++ b/arch/arm/mach-exynos/mach-nuri.c
+>> @@ -1077,12 +1077,8 @@ static struct platform_device nuri_max8903_device = {
+>> ?static void __init nuri_power_init(void)
+>> ?{
+>> ? ? ? int gpio;
+>> - ? ? int irq_base = IRQ_GPIO_END + 1;
+>> ? ? ? int ta_en = 0;
+>>
+>> - ? ? nuri_max8997_pdata.irq_base = irq_base;
+>> - ? ? irq_base += MAX8997_IRQ_NR;
+>> -
+>> ? ? ? gpio = EXYNOS4_GPX0(7);
+>> ? ? ? gpio_request(gpio, "AP_PMIC_IRQ");
+>> ? ? ? s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+>> diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+>> index 827cb99..d3b2e9d 100644
+>> --- a/arch/arm/mach-exynos/mach-origen.c
+>> +++ b/arch/arm/mach-exynos/mach-origen.c
+>> @@ -424,7 +424,6 @@ static struct max8997_platform_data __initdata origen_max8997_pdata = {
+>> ? ? ? .buck1_gpiodvs ?= false,
+>> ? ? ? .buck2_gpiodvs ?= false,
+>> ? ? ? .buck5_gpiodvs ?= false,
+>> - ? ? .irq_base ? ? ? = IRQ_GPIO_END + 1,
+>>
+>> ? ? ? .ignore_gpiodvs_side_effect = true,
+>> ? ? ? .buck125_default_idx = 0x0,
+>> diff --git a/drivers/mfd/max8997-irq.c b/drivers/mfd/max8997-irq.c
+>> index 09274cf..00390a1 100644
+>> --- a/drivers/mfd/max8997-irq.c
+>> +++ b/drivers/mfd/max8997-irq.c
+>> @@ -142,7 +142,8 @@ static void max8997_irq_sync_unlock(struct irq_data *data)
+>> ?static const inline struct max8997_irq_data *
+>> ?irq_to_max8997_irq(struct max8997_dev *max8997, int irq)
+>> ?{
+>> - ? ? return &max8997_irqs[irq - max8997->irq_base];
+>> + ? ? struct irq_data *data = irq_get_irq_data(irq);
+>> + ? ? return &max8997_irqs[data->hwirq];
+>> ?}
+>
+> Haha, this is kind of bogus now. ?There are only two users of this
+> function, and *both* of them already have the irq_data pointer.
+> Instead of this, delete this function entirely and make each caller
+> derefernce max8997_irqs directly:
+>
+> ? ? ? ?const struct max8997_irq_data *irq_data = &max8997_irqs[data->hwirq];
+>
+> Otherwise, looks good. ?After fixing you can add my:
+>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-The phy device name should have 'usb' in it to make clear that it's a
-USB phy and not a network phy. The connection should be simply 'phy'
-because the device context already makes it clear for what kind of
-device the clock is.
+Hi Grant,
 
-Sascha
+Thanks for the suggestion. I have modified the code accordingly and
+included your ack.
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Thomas.
