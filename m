@@ -1,46 +1,173 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 17 Apr 2012 16:35:09 -0600
-Subject: [PATCH 3/3] ARM: dt: tegra_ventana: als and proximity sensor
- isl29018 support
-In-Reply-To: <1334645155-13799-4-git-send-email-ldewangan@nvidia.com>
-References: <1334645155-13799-1-git-send-email-ldewangan@nvidia.com>
- <1334645155-13799-4-git-send-email-ldewangan@nvidia.com>
-Message-ID: <4F8DF01D.9040900@wwwdotorg.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 17 Apr 2012 15:36:01 -0700
+Subject: [PATCH 1/2] ARM: OMAP2+: omap_hwmod: Add interface to incorporate
+ module level wakeup
+In-Reply-To: <1334580053-17242-2-git-send-email-govindraj.raja@ti.com>
+ (Govindraj R.'s message of "Mon, 16 Apr 2012 18:10:52 +0530")
+References: <1334580053-17242-1-git-send-email-govindraj.raja@ti.com>
+ <1334580053-17242-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <87obqqrnou.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2012 12:45 AM, Laxman Dewangan wrote:
-> Add the device info for ALS and proximity sensor isl29018.
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-(There were a ton of irrelevant people CC'd on this patch; I cut them
-out, but kept the lists in case anyone was interested in the replies.
-The most relevant list, linux-tegra, also wasn't CC'd)
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+>
+> On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
+> PM_WKEN1_CORE/PM_WKEN_PER regs. The module level wakeups are enabled by
+> default from bootloader, 
 
-> diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
+Which bootloader?  what board?
 
-> +		/* ALS and proximity sensor */
+We cannot make any assumptions about what bootloader does (or doesn't
+do).  
 
-> +		isl29018: isl29018 at 44 {
+There is also some default init to these PM_WKEN values in prcm_setup_regs()
+for OMAP3 as well, which could be removed (at least for the UARTs) when
+this is handled by the UART init code.
 
-I don't think the label "isl29018:" serves any purpose; nothing else
-needs to refer to this node.
+Kevin
 
-I note from http://patchwork.ozlabs.org/patch/132936/ that:
 
-a) Perhaps the vendor prefix should be "isil" not "isl". Olof, can you
-please comment here?
-
-b) There's an interrupt signal connected to the device. Can you please
-add that, irrespective of whether the driver uses it.
-
-c) This device is also present on Seaboard. Can you update
-tegra-seaboard.dts too? You can find the relevant bus from the link above.
-
-Thanks.
-
-> +			compatible = "isl,isl29018";
-> +			reg = <0x44>;
-> +		};
->  	};
->  
->  	i2c at 7000c400 {
+> however the wakeups can be enabled/disabled
+> using sysfs entry example for uart:
+> echo disabled > /sys/devices/platform/omap/omap_uart.X/power/wakeup
+> [X=0,1,2,3]
+>
+> So expand omap2 prcm structure to incorporate the PM_WKEN reg offset
+> and bit mask to control the module level wakeup. This info from hwmod
+> data can be used hwmod framework omap_hwmod_enable/disable_wakeup.
+>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    6 ++++++
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    6 ++++++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    8 ++++++++
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 ++++
+>  4 files changed, 24 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> index a5409ce..676274b 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+> @@ -791,6 +791,8 @@ static struct omap_hwmod omap2420_uart1_hwmod = {
+>  			.module_bit = OMAP24XX_EN_UART1_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP24XX_EN_UART1_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP24XX_ST_UART1_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap2420_uart1_slaves,
+> @@ -816,6 +818,8 @@ static struct omap_hwmod omap2420_uart2_hwmod = {
+>  			.module_bit = OMAP24XX_EN_UART2_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP24XX_EN_UART2_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP24XX_ST_UART2_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap2420_uart2_slaves,
+> @@ -841,6 +845,8 @@ static struct omap_hwmod omap2420_uart3_hwmod = {
+>  			.module_bit = OMAP24XX_EN_UART3_SHIFT,
+>  			.idlest_reg_id = 2,
+>  			.idlest_idle_bit = OMAP24XX_EN_UART3_SHIFT,
+> +			.module_wakeup_offs = OMAP24XX_PM_WKEN2,
+> +			.module_wakeup_bit = OMAP24XX_ST_UART3_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap2420_uart3_slaves,
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> index c4f56cb..94d4463 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> @@ -864,6 +864,8 @@ static struct omap_hwmod omap2430_uart1_hwmod = {
+>  			.module_bit = OMAP24XX_EN_UART1_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP24XX_EN_UART1_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP24XX_ST_UART1_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap2430_uart1_slaves,
+> @@ -889,6 +891,8 @@ static struct omap_hwmod omap2430_uart2_hwmod = {
+>  			.module_bit = OMAP24XX_EN_UART2_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP24XX_EN_UART2_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP24XX_ST_UART2_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap2430_uart2_slaves,
+> @@ -914,6 +918,8 @@ static struct omap_hwmod omap2430_uart3_hwmod = {
+>  			.module_bit = OMAP24XX_EN_UART3_SHIFT,
+>  			.idlest_reg_id = 2,
+>  			.idlest_idle_bit = OMAP24XX_EN_UART3_SHIFT,
+> +			.module_wakeup_offs = OMAP24XX_PM_WKEN2,
+> +			.module_wakeup_bit = OMAP24XX_ST_UART3_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap2430_uart3_slaves,
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index 34b9766d..9ed038d 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -1248,6 +1248,8 @@ static struct omap_hwmod omap3xxx_uart1_hwmod = {
+>  			.module_bit = OMAP3430_EN_UART1_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP3430_EN_UART1_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP3430_ST_UART1_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap3xxx_uart1_slaves,
+> @@ -1273,6 +1275,8 @@ static struct omap_hwmod omap3xxx_uart2_hwmod = {
+>  			.module_bit = OMAP3430_EN_UART2_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP3430_EN_UART2_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP3430_ST_UART2_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap3xxx_uart2_slaves,
+> @@ -1298,6 +1302,8 @@ static struct omap_hwmod omap3xxx_uart3_hwmod = {
+>  			.module_bit = OMAP3430_EN_UART3_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP3430_EN_UART3_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP3430_ST_UART3_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap3xxx_uart3_slaves,
+> @@ -1334,6 +1340,8 @@ static struct omap_hwmod omap3xxx_uart4_hwmod = {
+>  			.module_bit = OMAP3630_EN_UART4_SHIFT,
+>  			.idlest_reg_id = 1,
+>  			.idlest_idle_bit = OMAP3630_EN_UART4_SHIFT,
+> +			.module_wakeup_offs = PM_WKEN1,
+> +			.module_wakeup_bit = OMAP3630_ST_UART4_MASK,
+>  		},
+>  	},
+>  	.slaves		= omap3xxx_uart4_slaves,
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index 8070145..5c7711b 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -343,6 +343,8 @@ struct omap_hwmod_class_sysconfig {
+>   * @idlest_reg_id: IDLEST register ID (e.g., 3 for CM_IDLEST3)
+>   * @idlest_idle_bit: register bit shift for CM_IDLEST slave idle bit
+>   * @idlest_stdby_bit: register bit shift for CM_IDLEST master standby bit
+> + * @module_wakeup_offs: PRCM register offset for PM_WKEN
+> + * @module_wakeup_bit: regiter bit mask for PM_WKEN
+>   *
+>   * @prcm_reg_id and @module_bit are specific to the AUTOIDLE, WKST,
+>   * WKEN, GRPSEL registers.  In an ideal world, no extra information
+> @@ -357,6 +359,8 @@ struct omap_hwmod_omap2_prcm {
+>  	u8 idlest_reg_id;
+>  	u8 idlest_idle_bit;
+>  	u8 idlest_stdby_bit;
+> +	s16 module_wakeup_offs;
+> +	u32 module_wakeup_bit;
+>  };
