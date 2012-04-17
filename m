@@ -1,91 +1,40 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Apr 2012 23:41:51 +0530
-Subject: [PATCH v4 1/2] mfd: add irq domain support for max8997 interrupts
-In-Reply-To: <20120330220619.334AC3E054E@localhost>
-References: <1332582590-16382-1-git-send-email-thomas.abraham@linaro.org>
- <1332582590-16382-2-git-send-email-thomas.abraham@linaro.org>
- <20120330220619.334AC3E054E@localhost>
-Message-ID: <CAJuYYwRa-_0HWeSuOgAT20dCCDdg=NBruQ9_m28TFZkXMRJhaw@mail.gmail.com>
+From: kosaki.motohiro@gmail.com (KOSAKI Motohiro)
+Date: Tue, 17 Apr 2012 14:18:04 -0400
+Subject: [PATCH 4/4] ARM: remove consistent dma region and use common
+ vmalloc range for dma allocations
+In-Reply-To: <4F8B76B9.1060505@kernel.org>
+References: <1334325950-7881-1-git-send-email-m.szyprowski@samsung.com>
+ <1334325950-7881-5-git-send-email-m.szyprowski@samsung.com>
+ <20120413183813.GO24211@n2100.arm.linux.org.uk> <4F8B76B9.1060505@kernel.org>
+Message-ID: <4F8DB3DC.7000602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 March 2012 03:36, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Sat, 24 Mar 2012 15:19:49 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
->> Add irq domain support for max8997 interrupts. The reverse mapping method
->> used is linear mapping since the sub-drivers of max8997 such as regulator
->> and charger drivers can use the max8997 irq_domain to get the linux irq
->> number for max8997 interrupts. All uses of irq_base in platform data and
->> max8997 driver private data are removed.
+(4/15/12 9:32 PM), Minchan Kim wrote:
+> On 04/14/2012 03:38 AM, Russell King - ARM Linux wrote:
+>> On Fri, Apr 13, 2012 at 04:05:50PM +0200, Marek Szyprowski wrote:
+>>> This patch changes dma-mapping subsystem to use generic vmalloc areas
+>>> for all consistent dma allocations. This increases the total size limit
+>>> of the consistent allocations and removes platform hacks and a lot of
+>>> duplicated code.
 >>
->> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->> ---
->> ?arch/arm/mach-exynos/mach-nuri.c ? ?| ? ?4 --
->> ?arch/arm/mach-exynos/mach-origen.c ?| ? ?1 -
->> ?drivers/mfd/max8997-irq.c ? ? ? ? ? | ? 61 ++++++++++++++++++++--------------
->> ?drivers/mfd/max8997.c ? ? ? ? ? ? ? | ? ?1 -
->> ?include/linux/mfd/max8997-private.h | ? ?4 ++-
->> ?include/linux/mfd/max8997.h ? ? ? ? | ? ?1 -
->> ?6 files changed, 39 insertions(+), 33 deletions(-)
+>> NAK. I don't think you appreciate the contexts from which the dma coherent
+>> code can be called from, and the reason why we pre-allocate the page
+>> tables (so that IRQ-based allocations work.)
 >>
->> diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
->> index 7ac81ce..b21d85d 100644
->> --- a/arch/arm/mach-exynos/mach-nuri.c
->> +++ b/arch/arm/mach-exynos/mach-nuri.c
->> @@ -1077,12 +1077,8 @@ static struct platform_device nuri_max8903_device = {
->> ?static void __init nuri_power_init(void)
->> ?{
->> ? ? ? int gpio;
->> - ? ? int irq_base = IRQ_GPIO_END + 1;
->> ? ? ? int ta_en = 0;
+>> The vmalloc region doesn't allow that because page tables are allocated
+>> using GFP_KERNEL not GFP_ATOMIC.
 >>
->> - ? ? nuri_max8997_pdata.irq_base = irq_base;
->> - ? ? irq_base += MAX8997_IRQ_NR;
->> -
->> ? ? ? gpio = EXYNOS4_GPX0(7);
->> ? ? ? gpio_request(gpio, "AP_PMIC_IRQ");
->> ? ? ? s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
->> diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
->> index 827cb99..d3b2e9d 100644
->> --- a/arch/arm/mach-exynos/mach-origen.c
->> +++ b/arch/arm/mach-exynos/mach-origen.c
->> @@ -424,7 +424,6 @@ static struct max8997_platform_data __initdata origen_max8997_pdata = {
->> ? ? ? .buck1_gpiodvs ?= false,
->> ? ? ? .buck2_gpiodvs ?= false,
->> ? ? ? .buck5_gpiodvs ?= false,
->> - ? ? .irq_base ? ? ? = IRQ_GPIO_END + 1,
+>> Sorry.
 >>
->> ? ? ? .ignore_gpiodvs_side_effect = true,
->> ? ? ? .buck125_default_idx = 0x0,
->> diff --git a/drivers/mfd/max8997-irq.c b/drivers/mfd/max8997-irq.c
->> index 09274cf..00390a1 100644
->> --- a/drivers/mfd/max8997-irq.c
->> +++ b/drivers/mfd/max8997-irq.c
->> @@ -142,7 +142,8 @@ static void max8997_irq_sync_unlock(struct irq_data *data)
->> ?static const inline struct max8997_irq_data *
->> ?irq_to_max8997_irq(struct max8997_dev *max8997, int irq)
->> ?{
->> - ? ? return &max8997_irqs[irq - max8997->irq_base];
->> + ? ? struct irq_data *data = irq_get_irq_data(irq);
->> + ? ? return &max8997_irqs[data->hwirq];
->> ?}
 >
-> Haha, this is kind of bogus now. ?There are only two users of this
-> function, and *both* of them already have the irq_data pointer.
-> Instead of this, delete this function entirely and make each caller
-> derefernce max8997_irqs directly:
+> Off-topic.
 >
-> ? ? ? ?const struct max8997_irq_data *irq_data = &max8997_irqs[data->hwirq];
->
-> Otherwise, looks good. ?After fixing you can add my:
->
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> I don't know why vmalloc functions have gfp_t argument.
+> As Russel pointed out, we allocates page tables with GFP_KERNEL regardless of gfp_t passed.
+> It means gfp_t passed is useless.
+> I see there are many cases calling __vmalloc with GFP_NOFS, even GFP_ATOMIC. Then, it could end up deadlocking in reclaim context or schedule bug.
+> I'm not sure why we can't see such bugs until now.
+> If I didn't miss something, Shouldn't we fix it?
 
-Hi Grant,
-
-Thanks for the suggestion. I have modified the code accordingly and
-included your ack.
-
-Regards,
-Thomas.
+I believe it should be fixed. of course. :)
