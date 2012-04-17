@@ -1,111 +1,79 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Apr 2012 13:45:37 +0530
-Subject: [PATCH 06/12] rtc-s3c: Fix breakage introduced by S3C2443/S3C2416
- support
-In-Reply-To: <CAH9JG2V=5v0hp9rcynywcHYnrPUqN0XrS_hOcU-uY=FkNJ0O9g@mail.gmail.com>
+Date: Tue, 17 Apr 2012 13:49:09 +0530
+Subject: [PATCH 07/12] ARM: Exynos5: Modify the GIC physical address for
+ static io-mapping
+In-Reply-To: <CAH9JG2Wxz3a5O-a-MfnPZph6HjdSSpVzzhkbCcsZQRaXebWZBQ@mail.gmail.com>
 References: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
- <1334641595-25301-7-git-send-email-thomas.abraham@linaro.org>
- <CAH9JG2V=5v0hp9rcynywcHYnrPUqN0XrS_hOcU-uY=FkNJ0O9g@mail.gmail.com>
-Message-ID: <CAJuYYwR14_wxBswzkVcObWAEDFqDXyi751gmiHyJNW+rA0JcQQ@mail.gmail.com>
+ <1334641595-25301-8-git-send-email-thomas.abraham@linaro.org>
+ <CAH9JG2Wxz3a5O-a-MfnPZph6HjdSSpVzzhkbCcsZQRaXebWZBQ@mail.gmail.com>
+Message-ID: <CAJuYYwT9_qqJMM6hpaFwve9L6Pjtq23WTWR3QwVzs+jtLdfOkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2012 12:00, Kyungmin Park <kmpark@infradead.org> wrote:
+On 17 April 2012 12:01, Kyungmin Park <kmpark@infradead.org> wrote:
 > Hi,
 >
-> It's already merged with different patch,
+> On 4/17/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>> From: Changhwan Youn <chaos.youn@samsung.com>
+>>
+>> Adapt to changes in GIC physical address in rev1 of Exynos5.
+>
+> Does it different from rev0 and rev1? and does it support the rev1 only?
 
-This is a repost of the patch from Heiko Stuebner which would be
-required to fix compilation issue for rtc driver. I think you are
-referring to that patch but it is not merged yet. So I am reposting it
-with this series.
+The physical base address of CPU and distributor portions of GIC are
+different on Rev0 and Rev1.0. This patch series overrides Rev0 and
+hence the mainline will support only Rev1.0. If the support for Rev0
+should also be maintained (if there are users of it), then I can
+maintain the support for Rev0 also.
 
 Thanks,
 Thomas.
 
 >
-> #ifdef CONFIG_OF
-> static const struct of_device_id s3c_rtc_dt_match[] = {
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.compatible = "samsung,s3c2410-rtc",
-> ? ? ? ? ? ? ? ?.data = &s3c_rtc_drv_data_array[TYPE_S3C2410],
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.compatible = "samsung,s3c2416-rtc",
-> ? ? ? ? ? ? ? ?.data = &s3c_rtc_drv_data_array[TYPE_S3C2416],
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.compatible = "samsung,s3c2443-rtc",
-> ? ? ? ? ? ? ? ?.data = &s3c_rtc_drv_data_array[TYPE_S3C2443],
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.compatible = "samsung,s3c6410-rtc",
-> ? ? ? ? ? ? ? ?.data = &s3c_rtc_drv_data_array[TYPE_S3C64XX],
-> ? ? ? ?},
-> ? ? ? ?{},
-> };
-> MODULE_DEVICE_TABLE(of, s3c_rtc_dt_match);
-> #else
-> #define s3c_rtc_dt_match NULL
-> #endif
->
 > Thank you,
 > Kyungmin Park
->
-> On 4/17/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
->> From: Heiko Stuebner <heiko@sntech.de>
 >>
->> Commits 7006ee4f (rtc-s3c: make room for more variants in devicetree block)
->> and 6c0a2365 (rtc-s3c: add variants for S3C2443 and S3C2416)
->> introduced build-failures with enabled CONFIG_USE_OF option.
->>
->> This patch fixes missing "," in s3c_rtc_dt_match and wrong handling of
->> the of_device_id.data property.
->>
->> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
 >> ---
->> ?drivers/rtc/rtc-s3c.c | ? 18 +++++++++---------
->> ?1 files changed, 9 insertions(+), 9 deletions(-)
+>> ?arch/arm/mach-exynos/common.c ? ? ? ? ? | ? ?4 ++--
+>> ?arch/arm/mach-exynos/include/mach/map.h | ? ?4 ++--
+>> ?2 files changed, 4 insertions(+), 4 deletions(-)
 >>
->> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
->> index 9ccea13..c792b6d 100644
->> --- a/drivers/rtc/rtc-s3c.c
->> +++ b/drivers/rtc/rtc-s3c.c
->> @@ -449,7 +449,7 @@ static inline int s3c_rtc_get_driver_data(struct
->> platform_device *pdev)
->> ? ? ? if (pdev->dev.of_node) {
->> ? ? ? ? ? ? ? const struct of_device_id *match;
->> ? ? ? ? ? ? ? match = of_match_node(s3c_rtc_dt_match, pdev->dev.of_node);
->> - ? ? ? ? ? ? return match->data;
->> + ? ? ? ? ? ? return (int)match->data;
->> ? ? ? }
->> ?#endif
->> ? ? ? return platform_get_device_id(pdev)->driver_data;
->> @@ -667,17 +667,17 @@ static int s3c_rtc_resume(struct platform_device
->> *pdev)
->> ?#ifdef CONFIG_OF
->> ?static const struct of_device_id s3c_rtc_dt_match[] = {
->> ? ? ? {
->> - ? ? ? ? ? ? .compatible = "samsung,s3c2410-rtc"
->> - ? ? ? ? ? ? .data = TYPE_S3C2410,
->> + ? ? ? ? ? ? .compatible = "samsung,s3c2410-rtc",
->> + ? ? ? ? ? ? .data = (void *)TYPE_S3C2410,
+>> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+>> index 35ac675..457d031 100644
+>> --- a/arch/arm/mach-exynos/common.c
+>> +++ b/arch/arm/mach-exynos/common.c
+>> @@ -265,12 +265,12 @@ static struct map_desc exynos5_iodesc[] __initdata = {
 >> ? ? ? }, {
->> - ? ? ? ? ? ? .compatible = "samsung,s3c2416-rtc"
->> - ? ? ? ? ? ? .data = TYPE_S3C2416,
->> + ? ? ? ? ? ? .compatible = "samsung,s3c2416-rtc",
->> + ? ? ? ? ? ? .data = (void *)TYPE_S3C2416,
+>> ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_GIC_CPU,
+>> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(EXYNOS5_PA_GIC_CPU),
+>> - ? ? ? ? ? ? .length ? ? ? ? = SZ_64K,
+>> + ? ? ? ? ? ? .length ? ? ? ? = SZ_8K,
+>> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
 >> ? ? ? }, {
->> - ? ? ? ? ? ? .compatible = "samsung,s3c2443-rtc"
->> - ? ? ? ? ? ? .data = TYPE_S3C2443,
->> + ? ? ? ? ? ? .compatible = "samsung,s3c2443-rtc",
->> + ? ? ? ? ? ? .data = (void *)TYPE_S3C2443,
->> ? ? ? }, {
->> - ? ? ? ? ? ? .compatible = "samsung,s3c6410-rtc"
->> - ? ? ? ? ? ? .data = TYPE_S3C64XX,
->> + ? ? ? ? ? ? .compatible = "samsung,s3c6410-rtc",
->> + ? ? ? ? ? ? .data = (void *)TYPE_S3C64XX,
+>> ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_GIC_DIST,
+>> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
+>> - ? ? ? ? ? ? .length ? ? ? ? = SZ_64K,
+>> + ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
+>> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
 >> ? ? ? },
->> ? ? ? {},
 >> ?};
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h
+>> b/arch/arm/mach-exynos/include/mach/map.h
+>> index 0e2292d..648d59b 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -78,8 +78,8 @@
+>>
+>> ?#define EXYNOS4_PA_GIC_CPU ? ? ? ? ? 0x10480000
+>> ?#define EXYNOS4_PA_GIC_DIST ? ? ? ? ?0x10490000
+>> -#define EXYNOS5_PA_GIC_CPU ? ? ? ? ? 0x10480000
+>> -#define EXYNOS5_PA_GIC_DIST ? ? ? ? ?0x10490000
+>> +#define EXYNOS5_PA_GIC_CPU ? ? ? ? ? 0x10482000
+>> +#define EXYNOS5_PA_GIC_DIST ? ? ? ? ?0x10481000
+>>
+>> ?#define EXYNOS4_PA_COREPERI ? ? ? ? ?0x10500000
+>> ?#define EXYNOS4_PA_TWD ? ? ? ? ? ? ? ? ? ? ? 0x10500600
 >> --
 >> 1.6.6.rc2
 >>
@@ -115,3 +83,8 @@ Thomas.
 >> the body of a message to majordomo at vger.kernel.org
 >> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
