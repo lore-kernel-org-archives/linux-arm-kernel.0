@@ -1,46 +1,38 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 17 Apr 2012 16:45:45 +0530
-Subject: [PATCH 13/13] SPEAr: Call clk_prepare() before calling clk_enable
+Date: Tue, 17 Apr 2012 16:45:39 +0530
+Subject: [PATCH 07/13] clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is
+ set and clk is enabled
 In-Reply-To: <cover.1334660431.git.viresh.kumar@st.com>
 References: <cover.1334660431.git.viresh.kumar@st.com>
-Message-ID: <0c2dc6d1f11ac1cc4965b8e902d19fb356f0324b.1334660432.git.viresh.kumar@st.com>
+Message-ID: <f34c1238e2b5d8469e172b2d850e2e161cc26486.1334660432.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With common clock framework, it is must to call clk_{un}prepare() before/after
-clk_{dis}enable. This patch fixes this for SPEAr timer.
+This is well documented but isn't implemented. clk_set_rate() must check if
+flags have CLK_SET_RATE_GATE bit set and is enabled too.
+
+Untested patch.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/plat-spear/time.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/clk/clk.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
-index a3164d1..4f05d26 100644
---- a/arch/arm/plat-spear/time.c
-+++ b/arch/arm/plat-spear/time.c
-@@ -218,10 +218,10 @@ void __init spear_setup_timer(resource_size_t base, int irq)
- 		goto err_iomap;
- 	}
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 865d0dd..2bcce5a 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -898,6 +898,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 	if (rate == clk->rate)
+ 		goto out;
  
--	ret = clk_enable(gpt_clk);
-+	ret = clk_prepare_enable(gpt_clk);
- 	if (ret < 0) {
--		pr_err("%s:couldn't enable gpt clock\n", __func__);
--		goto err_clk;
-+		pr_err("%s:couldn't prepare-enable gpt clock\n", __func__);
-+		goto err_prepare_enable_clk;
- 	}
- 
- 	spear_clockevent_init(irq);
-@@ -229,7 +229,7 @@ void __init spear_setup_timer(resource_size_t base, int irq)
- 
- 	return;
- 
--err_clk:
-+err_prepare_enable_clk:
- 	clk_put(gpt_clk);
- err_iomap:
- 	iounmap(gpt_base);
++	if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
++		ret = -EBUSY;
++		goto out;
++	}
++
+ 	/* calculate new rates and get the topmost changed clock */
+ 	top = clk_calc_new_rates(clk, rate);
+ 	if (!top) {
 -- 
 1.7.9
