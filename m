@@ -1,355 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 17 Apr 2012 10:27:10 -0400
-Subject: [patch 1/1] kirkwood: Add iconnect support
-In-Reply-To: <20120416221210.088620090@rtp-net.org>
-References: <20120416220505.002573737@rtp-net.org>
- <20120416221210.088620090@rtp-net.org>
-Message-ID: <20120417142710.GF15711@titan.lakedaemon.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 17 Apr 2012 16:26:12 +0200
+Subject: [GIT PULL] at91: update MAINTAINERS entries
+Message-ID: <4F8D7D84.5000604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 12:05:06AM +0200, Arnaud Patard wrote:
-> Add support for Iomega Iconnect system.
-> 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+Arnd, Olof,
 
-Thanks for the patch, comments below.
+Here is my first signed tag based pull request. It is about additions to
+the MAINTAINERS files. I hope that the format is correct and that you will
+be able to get it easily from github...
 
-> Index: arm-soc/arch/arm/mach-kirkwood/Kconfig
-> ===================================================================
-> --- arm-soc.orig/arch/arm/mach-kirkwood/Kconfig	2012-04-16 08:50:58.321398110 +0200
-> +++ arm-soc/arch/arm/mach-kirkwood/Kconfig	2012-04-16 14:07:10.440563405 +0200
-> @@ -58,6 +58,12 @@ config MACH_DREAMPLUG_DT
->  	  Say 'Y' here if you want your kernel to support the
->  	  Marvell DreamPlug (Flattened Device Tree).
->  
-> +config MACH_ICONNECT_DT
-> +	bool "Iomega Iconnect (Flattened Device Tree)"
-> +	select ARCH_KIRKWOOD_DT
-> +	help
-> +	  Say 'Y' here to enable Iomega Iconnect support.
-> +
->  config MACH_TS219
->  	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
->  	help
-> Index: arm-soc/arch/arm/mach-kirkwood/Makefile
-> ===================================================================
-> --- arm-soc.orig/arch/arm/mach-kirkwood/Makefile	2012-04-16 08:50:58.349398109 +0200
-> +++ arm-soc/arch/arm/mach-kirkwood/Makefile	2012-04-16 14:04:50.660569553 +0200
-> @@ -22,3 +22,4 @@ obj-$(CONFIG_MACH_T5325)		+= t5325-setup
->  obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
->  obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
->  obj-$(CONFIG_MACH_DREAMPLUG_DT)		+= board-dreamplug.o
-> +obj-$(CONFIG_MACH_ICONNECT_DT)		+= board-iconnect.o
-> Index: arm-soc/arch/arm/mach-kirkwood/board-iconnect.c
-> ===================================================================
-> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-> +++ arm-soc/arch/arm/mach-kirkwood/board-iconnect.c	2012-04-16 14:05:51.304566885 +0200
-> @@ -0,0 +1,187 @@
-> +/*
-> + * arch/arm/mach-kirkwood/board-iconnect.c
-> + *
-> + * Iomega i-connect Board Setup
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/mv643xx_eth.h>
-> +#include <linux/gpio.h>
-> +#include <linux/leds.h>
-> +#include <linux/spi/flash.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/spi/orion_spi.h>
-> +#include <linux/i2c.h>
-> +#include <linux/input.h>
-> +#include <linux/gpio_keys.h>
-> +#include <asm/mach/arch.h>
-> +#include <mach/kirkwood.h>
-> +#include "common.h"
-> +#include "mpp.h"
-> +
-> +static struct mv643xx_eth_platform_data iconnect_ge00_data = {
-> +	.phy_addr	= MV643XX_ETH_PHY_ADDR(11),
-> +};
-> +
-> +static struct gpio_led iconnect_led_pins[] = {
-> +	{
-> +		.name		= "led_level",
+The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
 
-This name sounds like a led attribute, not it's name.  Is it correct?
+  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
 
-> +		.gpio		= 41,
-> +		.default_trigger = "default-on",
-> +	}, {
-> +		.name		= "power:blue",
-> +		.gpio		= 42,
-> +		.default_trigger = "timer",
-> +	}, {
-> +		.name		= "power:red",
-> +		.gpio		= 43,
-> +	}, {
-> +		.name		= "usb1",
-> +		.gpio		= 44,
-> +	}, {
-> +		.name		= "usb2",
-> +		.gpio		= 45,
-> +	}, {
-> +		.name		= "usb3",
-> +		.gpio		= 46,
-> +	}, {
-> +		.name		= "usb4",
-> +		.gpio		= 47,
-> +	}, {
-> +		.name		= "otb",
-> +		.gpio		= 48,
-> +	},
-> +};
+are available in the git repository at:
 
-Are usb[1-4] different hcis? are they all ehci?  what color are they?
+  git://github.com/at91linux/linux-at91.git tags/at91-3.5-maintainers
 
-> +
-> +#define ICONNECT_BLINK_HALF_PERIOD	100
-> +
-> +static int iconnect_blink_set(unsigned gpio, int state,
+for you to fetch changes up to 1066c51ee28189aabff073bcd197b84a4f87ea81:
 
-__init ?
+  MAINTAINERS: remove non-responding web link for atmel_usba driver (2012-04-17 15:38:52 +0200)
 
-> +	unsigned long *delay_on, unsigned long *delay_off)
-> +{
-> +	if (delay_on && delay_off && !*delay_on && !*delay_off)
-> +		*delay_on = *delay_off = ICONNECT_BLINK_HALF_PERIOD;
-> +
-> +	switch (state) {
-> +	case GPIO_LED_NO_BLINK_LOW:
-> +	case GPIO_LED_NO_BLINK_HIGH:
-> +		orion_gpio_set_blink(gpio, 0);
-> +		gpio_set_value(gpio, state);
-> +		break;
-> +	case GPIO_LED_BLINK:
-> +		orion_gpio_set_blink(gpio, 1);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct gpio_led_platform_data iconnect_led_data = {
-> +	.leds		= iconnect_led_pins,
-> +	.num_leds	= ARRAY_SIZE(iconnect_led_pins),
-> +	.gpio_blink_set	= iconnect_blink_set,
-> +};
-> +
-> +static struct platform_device iconnect_leds = {
-> +	.name	= "leds-gpio",
-> +	.id	= -1,
-> +	.dev	= {
-> +		.platform_data	= &iconnect_led_data,
-> +	}
-> +};
-> +
-> +static unsigned int iconnect_mpp_config[] __initdata = {
-> +	MPP12_GPIO,
-> +	MPP35_GPIO,
-> +	MPP41_GPIO,
-> +	MPP42_GPIO,
-> +	MPP43_GPIO,
-> +	MPP44_GPIO,
-> +	MPP45_GPIO,
-> +	MPP46_GPIO,
-> +	MPP47_GPIO,
-> +	MPP48_GPIO,
-> +	0
-> +};
+----------------------------------------------------------------
+Here are some additions to the MAINTAINERS file regarding AT91 related drivers.
+Josh and I are adding entries for drivers that we have been taking care of
+for quite some time.
 
-Some comments here would be helpful, 41-48 are gpio_led, what are 12 and
-35?
+----------------------------------------------------------------
+Josh Wu (2):
+      MAINTAINERS: add entry for Atmel isi driver
+      MAINTAINERS: add entry for Atmel touch screen ADC controller driver
 
-> +
-> +static struct i2c_board_info __initdata iconnect_board_info[] = {
-> +	{
-> +		I2C_BOARD_INFO("lm63", 0x4c),
-> +	},
-> +};
-> +
-> +static struct mtd_partition iconnect_nand_parts[] = {
-> +	{
-> +		.name = "flash",
-> +		.offset = 0,
-> +		.size = MTDPART_SIZ_FULL,
-> +	},
-> +};
+Nicolas Ferre (3):
+      MAINTAINERS: add entry for Atmel DMA driver
+      MAINTAINERS: add entry for Atmel timer counter (TC)
+      MAINTAINERS: remove non-responding web link for atmel_usba driver
 
-I was going to suggest moving the partition definitions to here, but
-once orion_nand is fdt aware, we'll specify the partitions in the dts
-anyway.
+ MAINTAINERS |   29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
 
-Unless someone has an objection, I say we leave the hackish commandline
-part table in the dtb and convert it in the dtb once orion_nand had
-devicetree bindings.
 
-> +
-> +/* yikes... theses are the original input buttons */
-> +/* but I'm not convinced by the sw event choices  */
-> +static struct gpio_keys_button iconnect_buttons[] = {
-> +	{
-> +		.type		= EV_SW,
-> +		.code		= SW_LID,
-> +		.gpio		= 12,
-> +		.desc		= "Reset Button",
-> +		.active_low	= 1,
-> +		.debounce_interval = 100,
-> +	}, {
-> +		.type		= EV_SW,
-> +		.code		= SW_TABLET_MODE,
-> +		.gpio		= 35,
-> +		.desc		= "OTB Button",
-> +		.active_low	= 1,
-> +		.debounce_interval = 100,
-> +	},
-> +};
-> +
-> +static struct gpio_keys_platform_data iconnect_button_data = {
-> +	.buttons	= iconnect_buttons,
-> +	.nbuttons	= ARRAY_SIZE(iconnect_buttons),
-> +};
-> +
-> +static struct platform_device iconnect_button_device = {
-> +	.name		= "gpio-keys",
-> +	.id		= -1,
-> +	.num_resources	= 0,
-> +	.dev        = {
-> +		.platform_data  = &iconnect_button_data,
-> +	},
-> +};
-> +
-> +void __init iconnect_init(void)
-> +{
-> +	kirkwood_mpp_conf(iconnect_mpp_config);
-> +	kirkwood_nand_init(ARRAY_AND_SIZE(iconnect_nand_parts), 25);
-> +	kirkwood_i2c_init();
-> +	i2c_register_board_info(0, iconnect_board_info,
-> +		ARRAY_SIZE(iconnect_board_info));
-> +
-> +	kirkwood_ehci_init();
-> +	kirkwood_ge00_init(&iconnect_ge00_data);
-> +
-> +	platform_device_register(&iconnect_button_device);
-> +	platform_device_register(&iconnect_leds);
-> +}
-> +
-> +static int __init iconnect_pci_init(void)
-> +{
-> +	if (of_machine_is_compatible("iomega,iconnect"))
-> +		kirkwood_pcie_init(KW_PCIE0);
-> +	return 0;
-> +}
-> +subsys_initcall(iconnect_pci_init);
-> +
-> Index: arm-soc/arch/arm/boot/dts/kirkwood-iconnect.dts
-> ===================================================================
-> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-> +++ arm-soc/arch/arm/boot/dts/kirkwood-iconnect.dts	2012-04-16 08:59:12.033376388 +0200
-> @@ -0,0 +1,26 @@
-> +/dts-v1/;
-> +
-> +/include/ "kirkwood.dtsi"
-> +
-> +/ {
-> +	model = "Iomega Iconnect";
-> +	compatible = "iomega,iconnect", "mrvl,kirkwood-88f6281", "mrvl,kirkwood";
-
-This should be "iom,iconnect-MODELNUM", "iom,iconnect", "mrvl,...
-
-And, correct elsewhere as needed.
-
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x10000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk mtdparts=orion_nand:0xc0000 at 0x0(uboot),0x20000 at 0xa0000(env),0x300000 at 0x100000(zImage),0x300000 at 0x540000(initrd),0x1f400000 at 0x980000(boot)";
-> +		linux,initrd-start = <0x4500040>;
-> +		linux,initrd-end   = <0x4800000>;
-
-does this need to be specified?  why doesn't the bootloader pass the
-initrd properly?
-
-thx,
-
-Jason.
-
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		serial at 12000 {
-> +			clock-frequency = <200000000>;
-> +			status = "ok";
-> +		};
-> +	};
-> +};
-> Index: arm-soc/arch/arm/mach-kirkwood/Makefile.boot
-> ===================================================================
-> --- arm-soc.orig/arch/arm/mach-kirkwood/Makefile.boot	2012-04-16 08:50:58.329398110 +0200
-> +++ arm-soc/arch/arm/mach-kirkwood/Makefile.boot	2012-04-16 08:51:03.873397866 +0200
-> @@ -3,3 +3,5 @@ params_phys-y	:= 0x00000100
->  initrd_phys-y	:= 0x00800000
->  
->  dtb-$(CONFIG_MACH_DREAMPLUG_DT) += kirkwood-dreamplug.dtb
-> +dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
-> +
-> Index: arm-soc/arch/arm/mach-kirkwood/board-dt.c
-> ===================================================================
-> --- arm-soc.orig/arch/arm/mach-kirkwood/board-dt.c	2012-04-16 08:50:58.337398109 +0200
-> +++ arm-soc/arch/arm/mach-kirkwood/board-dt.c	2012-04-16 08:51:03.881397865 +0200
-> @@ -55,11 +55,15 @@ static void __init kirkwood_dt_init(void
->  	if (of_machine_is_compatible("globalscale,dreamplug"))
->  		dreamplug_init();
->  
-> +	if (of_machine_is_compatible("iomega,iconnect"))
-> +		iconnect_init();
-> +
->  	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
->  }
->  
->  static const char *kirkwood_dt_board_compat[] = {
->  	"globalscale,dreamplug",
-> +	"iomega,iconnect",
->  	NULL
->  };
->  
-> Index: arm-soc/arch/arm/mach-kirkwood/common.h
-> ===================================================================
-> --- arm-soc.orig/arch/arm/mach-kirkwood/common.h	2012-04-16 08:50:58.309398111 +0200
-> +++ arm-soc/arch/arm/mach-kirkwood/common.h	2012-04-16 08:51:03.905397864 +0200
-> @@ -57,6 +57,12 @@ void dreamplug_init(void);
->  #else
->  static inline void dreamplug_init(void) {};
->  #endif
-> +#ifdef CONFIG_MACH_ICONNECT_DT
-> +void iconnect_init(void);
-> +#else
-> +static inline void iconnect_init(void) {};
-> +#endif
-> +
->  
->  /* early init functions not converted to fdt yet */
->  char *kirkwood_id(void);
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks, bye,
+-- 
+Nicolas Ferre
