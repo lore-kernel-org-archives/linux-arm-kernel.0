@@ -1,52 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Apr 2012 20:36:14 +0000
-Subject: [PATCH v2 1/8] ohci-nxp: Driver cleanup
-In-Reply-To: <1334682507-15055-2-git-send-email-stigge@antcom.de>
-References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <1334682507-15055-2-git-send-email-stigge@antcom.de>
-Message-ID: <201204172036.15663.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 17 Apr 2012 22:36:51 +0200
+Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
+ sampling bug
+Message-ID: <1334695011-8188-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2012, Roland Stigge wrote:
->Cleanup for ohci-nxp.c:
->
->* Cleanup of resource handling (mem and irq), use devm_request_and_ioremap()
->* Fixed controller initialization (bits)
->* Use DMA_BIT_MASK()
->* Don't remove __devinit
->* Removed obsolete gpio.h include
->* More consistent bit access symbols
->* Removed unused extern declaration ocpi_enable()
->* Added error handling on i2c_get_adapter()
->* Better USB host and device differentiation, since on LPC32xx, the same
->  controller can be used as USB device controller
->* Whitespace cleanup
->
->Signed-off-by: Roland Stigge <stigge@antcom.de>
+From: Marek Vasut <marek.vasut@gmail.com>
 
-Looks almost good, I just found one more bug that you introduce:
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Cc: Chen Peter-B29397 <B29397@freescale.com>
+Cc: Detlev Zundel <dzu@denx.de>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: Li Frank-B20596 <B20596@freescale.com>
+Cc: Lin Tony-B19295 <B19295@freescale.com>
+Cc: Linux FBDEV <linux-fbdev@vger.kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Subodh Nijsure <snijsure@grid-net.com>
+Cc: Tony Lin <tony.lin@freescale.com>
+Cc: Wolfgang Denk <wd@denx.de>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ drivers/video/mxsfb.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> +
-> +       hcd->regs = devm_request_and_ioremap(&pdev->dev, res);
-> +       if (!hcd->regs) {
-> +               err("Failed to devm_request_and_ioremap");
->                 ret =  -ENOMEM;
->                 goto out4;
->         }
-> -       hcd->regs = (void __iomem *)pdev->resource[0].start;
-> +       hcd->rsrc_start = (u64)(u32)hcd->regs;
-> +       hcd->rsrc_len = resource_size(res);
-
-This is wrong in multiple ways:
-
-* rsrc_start is a physical address, not an __iomem token.
-* you cannot cast a pointer to u32 in general, only to unsigned long.
-
-The fact that you need an ugly type cast like above could have told
-you that you are doing something wrong here. I guess it should
-be
-
-	hcd->rsrc_start = res->start;
-
-	Arnd
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 4a89f88..a265356 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -880,6 +880,18 @@ static int __devexit mxsfb_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++void mxsfb_shutdown(struct platform_device *pdev)
++{
++	struct fb_info *fb_info = platform_get_drvdata(pdev);
++	struct mxsfb_info *host = to_imxfb_host(fb_info);
++
++	/*
++	 * Force stop the LCD controller as keeping it running during reboot
++	 * might interfere with the BootROM's boot mode pads sampling.
++	 */
++	writel(CTRL_RUN, host->base + LCDC_CTRL + REG_CLR);
++}
++
+ static struct platform_device_id mxsfb_devtype[] = {
+ 	{
+ 		.name = "imx23-fb",
+@@ -896,6 +908,7 @@ MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
+ static struct platform_driver mxsfb_driver = {
+ 	.probe = mxsfb_probe,
+ 	.remove = __devexit_p(mxsfb_remove),
++	.shutdown = mxsfb_shutdown,
+ 	.id_table = mxsfb_devtype,
+ 	.driver = {
+ 		   .name = DRIVER_NAME,
+-- 
+1.7.9.5
