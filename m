@@ -1,66 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Apr 2012 14:48:03 -0700
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 17 Apr 2012 15:53:09 -0600 (MDT)
 Subject: [PATCH v4 11/12] ARM: OMAP1: DMTIMER: fix broken timer clock
  source selection
-In-Reply-To: <20120411003559.27059.1315.stgit@dusk>
+In-Reply-To: <20120417214802.GH21106@atomide.com>
 References: <20120411003454.27059.37500.stgit@dusk>
- <20120411003559.27059.1315.stgit@dusk>
-Message-ID: <20120417214802.GH21106@atomide.com>
+ <20120411003559.27059.1315.stgit@dusk> <20120417214802.GH21106@atomide.com>
+Message-ID: <alpine.DEB.2.00.1204171552360.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120410 17:41]:
-> DMTIMER source selection on OMAP1 is broken.  omap1_dm_timer_set_src()
-> tries to use __raw_{read,write}l() to read from and write to physical
-> addresses, but those functions take virtual addresses.
-> 
-> sparse caught this:
-> 
-> arch/arm/mach-omap1/timer.c:50:13: warning: incorrect type in argument 1 (different base types)
-> arch/arm/mach-omap1/timer.c:50:13:    expected void const volatile [noderef] <asn:2>*<noident>
-> arch/arm/mach-omap1/timer.c:50:13:    got unsigned int
-> arch/arm/mach-omap1/timer.c:52:9: warning: incorrect type in argument 1 (different base types)
-> arch/arm/mach-omap1/timer.c:52:9:    expected void const volatile [noderef] <asn:2>*<noident>
-> arch/arm/mach-omap1/timer.c:52:9:    got unsigned int
-> 
-> Fix by using omap_{read,writel}(), just like the other users of the
-> MOD_CONF_CTRL_1 register in the OMAP1 codebase.  Of course, in the long term,
-> removing omap_{read,write}l() is the appropriate thing to do; but
-> this will take some work to do this cleanly.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+On Tue, 17 Apr 2012, Tony Lindgren wrote:
 
-Uhh looks like this was caused by commit 97933d6 (ARM: OMAP1: dmtimer: conversion
-to platform devices) moving code and changing it :(
-
-I'll pick this to fixes.
-
-Tony
-
-> ---
->  arch/arm/mach-omap1/timer.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Uhh looks like this was caused by commit 97933d6 (ARM: OMAP1: dmtimer: conversion
+> to platform devices) moving code and changing it :(
 > 
-> diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
-> index 5536e04..64c65bc 100644
-> --- a/arch/arm/mach-omap1/timer.c
-> +++ b/arch/arm/mach-omap1/timer.c
-> @@ -47,9 +47,9 @@ static int omap1_dm_timer_set_src(struct platform_device *pdev,
->  	int n = (pdev->id - 1) << 1;
->  	u32 l;
->  
-> -	l = __raw_readl(MOD_CONF_CTRL_1) & ~(0x03 << n);
-> +	l = omap_readl(MOD_CONF_CTRL_1) & ~(0x03 << n);
->  	l |= source << n;
-> -	__raw_writel(l, MOD_CONF_CTRL_1);
-> +	omap_writel(l, MOD_CONF_CTRL_1);
->  
->  	return 0;
->  }
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> I'll pick this to fixes.
+
+Sounds good, will drop this from my series and send a new pull request.
+
+
+- Paul
