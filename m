@@ -1,38 +1,53 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Apr 2012 11:16:35 +0530
-Subject: [PATCH 12/12] ARM: Exynos5: Update device tree enabled machine file
-In-Reply-To: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
-References: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1334641595-25301-13-git-send-email-thomas.abraham@linaro.org>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 17 Apr 2012 10:59:49 +0530
+Subject: [PATCH] CLKDEV: Optimize clk_find()
+Message-ID: <f142251c5cc09681c3644519d1d5c13e0cfdd951.1334640503.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add AUXDATA for i2c and MDMA controllers of Exynos5.
+clk_find must return as soon as it gets the correct clock. Currently it check
+all clocks until it found a lookup with both dev_id and con_id matching.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+If only one of them is passed, then we don't actually need to wait for both of
+them to match. We can quit as soon as the requested id (dev_id or con_id)
+matches.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-exynos/mach-exynos5-dt.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ drivers/clk/clkdev.c |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 4711c89..8adc061 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -43,9 +43,14 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"exynos4210-uart.2", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos4210-uart", EXYNOS5_PA_UART3,
- 				"exynos4210-uart.3", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(0),
-+				"s3c2440-i2c.0", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(1),
-+				"s3c2440-i2c.1", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
--	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
-+	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA0, "dma-pl330.2", NULL),
-+	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.3", NULL),
- 	{},
- };
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 9d93d27..3a72022 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -35,7 +35,12 @@ static DEFINE_MUTEX(clocks_mutex);
+ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
+ {
+ 	struct clk_lookup *p, *cl = NULL;
+-	int match, best = 0;
++	int match, best_found = 0, best_possible = 0;
++
++	if (dev_id)
++		best_possible += 2;
++	if (con_id)
++		best_possible += 1;
  
+ 	list_for_each_entry(p, &clocks, node) {
+ 		match = 0;
+@@ -50,10 +55,10 @@ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
+ 			match += 1;
+ 		}
+ 
+-		if (match > best) {
++		if (match > best_found) {
+ 			cl = p;
+-			if (match != 3)
+-				best = match;
++			if (match != best_possible)
++				best_found = match;
+ 			else
+ 				break;
+ 		}
 -- 
-1.6.6.rc2
+1.7.9
