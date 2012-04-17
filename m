@@ -1,125 +1,215 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Apr 2012 11:43:54 +0100
-Subject: [PATCH 02/16] drivers/gpio: gpio-nomadik: Add support for irqdomains
+Date: Tue, 17 Apr 2012 11:43:55 +0100
+Subject: [PATCH 03/16] ARM: ux500: Use correct format for dynamic IRQ
+ assignment
 In-Reply-To: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
 References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334659448-11521-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334659448-11521-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add irq domain support to the gpio-nomadik GPIO driver. This
-enables its users to support dynamic IRQ assignment, which is
-requried by Device Tree.
+This patch applies the correct format requested by the irq
+domain. For chained IRQs which use GPIO lines as IRQs, we
+stipulate that a two cell request is required. The first cell
+contains the requested IRQ and the second can contain flags
+pertaining to edge detection and level sensitive values. The
+zeroth cell specifies the GPIO controller by use of a phandle.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu.c   |    1 +
- drivers/gpio/gpio-nomadik.c |   40 +++++++++++++++++++++++++++++++++++++---
- 2 files changed, 38 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi  |   22 ++++++++++++++++++++--
+ arch/arm/boot/dts/snowball.dts |   20 +++++++++-----------
+ 2 files changed, 29 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index d11f389..af12139 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -30,6 +30,7 @@
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 57d3d35..9e8ff2c 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -24,7 +24,6 @@
+ 			#interrupt-cells = <3>;
+ 			#address-cells = <1>;
+ 			interrupt-controller;
+-			interrupt-parent;
+ 			reg = <0xa0411000 0x1000>,
+ 			      <0xa0410100 0x100>;
+ 		};
+@@ -59,6 +58,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8012e000 0x80>;
+ 			interrupts = <0 119 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -70,6 +71,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8012e080 0x80>;
+ 			interrupts = <0 120 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -81,6 +84,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e000 0x80>;
+ 			interrupts = <0 121 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -92,6 +97,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e080 0x80>;
+ 			interrupts = <0 122 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -103,6 +110,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e100 0x80>;
+ 			interrupts = <0 123 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -114,6 +123,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e180 0x80>;
+ 			interrupts = <0 124 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -125,6 +136,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8011e000 0x80>;
+ 			interrupts = <0 125 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -136,6 +149,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8011e080 0x80>;
+ 			interrupts = <0 126 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -147,6 +162,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0xa03fe000 0x80>;
+ 			interrupts = <0 127 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -230,7 +247,8 @@
+ 			status = "disabled";
  
- void __iomem *_PRCMU_BASE;
+ 			// Add one of these for each child device
+-			cs-gpios = <&gpio0 31 &gpio4 14 &gpio4 16 &gpio6 22 &gpio7 0>;
++			cs-gpios = <&gpio0 31 0x4 &gpio4 14 0x4 &gpio4 16 0x4
++				    &gpio6 22 0x4 &gpio7 0 0x4>;
  
-+/* FIXME: should we set up the GPIO domain here? */
- static const struct of_device_id ux500_dt_irq_match[] = {
- 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
- 	{},
-diff --git a/drivers/gpio/gpio-nomadik.c b/drivers/gpio/gpio-nomadik.c
-index 2c2b53c..1322ca8 100644
---- a/drivers/gpio/gpio-nomadik.c
-+++ b/drivers/gpio/gpio-nomadik.c
-@@ -22,6 +22,7 @@
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/slab.h>
+ 		};
  
- #include <asm/mach/irq.h>
-@@ -677,7 +678,6 @@ static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 	bitmask = nmk_gpio_get_bitmask(gpio);
- 	if (!nmk_chip)
- 		return -EINVAL;
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index fb2a037..0ba0955 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -30,35 +30,35 @@
+ 			wakeup = <1>;
+ 			linux,code = <2>;
+ 			label = "userpb";
+-			gpios = <&gpio1 0 0>;
++			gpios = <&gpio1 0 0x4>;
+ 		};
+ 		button at 2 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <3>;
+ 			label = "extkb1";
+-			gpios = <&gpio4 23 0>;
++			gpios = <&gpio4 23 0x4>;
+ 		};
+ 		button at 3 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <4>;
+ 			label = "extkb2";
+-			gpios = <&gpio4 24 0>;
++			gpios = <&gpio4 24 0x4>;
+ 		};
+ 		button at 4 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <5>;
+ 			label = "extkb3";
+-			gpios = <&gpio5 1 0>;
++			gpios = <&gpio5 1 0x4>;
+ 		};
+ 		button at 5 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <6>;
+ 			label = "extkb4";
+-			gpios = <&gpio5 2 0>;
++			gpios = <&gpio5 2 0x4>;
+ 		};
+ 	};
+ 
+@@ -66,12 +66,11 @@
+ 		compatible = "gpio-leds";
+ 		used-led {
+ 			label = "user_led";
+-			gpios = <&gpio4 14>;
++			gpios = <&gpio4 14 0x4>;
+ 		};
+ 	};
+ 
+ 	soc-u9500 {
 -
- 	if (type & IRQ_TYPE_LEVEL_HIGH)
- 		return -EINVAL;
- 	if (type & IRQ_TYPE_LEVEL_LOW)
-@@ -782,6 +782,33 @@ static void nmk_gpio_secondary_irq_handler(unsigned int irq,
- 	__nmk_gpio_irq_handler(irq, desc, status);
- }
+ 		external-bus at 50000000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x50000000 0x10000000>;
+@@ -82,7 +81,7 @@
+ 			ethernet at 50000000 {
+ 				compatible = "smsc,9111";
+ 				reg = <0x50000000 0x10000>;
+-				interrupts = <12>;
++				interrupts = <12 0x4>;
+ 				interrupt-parent = <&gpio4>;
+ 			};
+ 		};
+@@ -94,8 +93,7 @@
+ 			bus-width = <8>;
+ 			mmc-cap-mmc-highspeed;
  
-+#ifdef CONFIG_IRQ_DOMAIN
-+int nmk_gpio_irq_map(struct irq_domain *d, unsigned int irq,
-+			  irq_hw_number_t hwirq)
-+{
-+	return 0;
-+}
-+
-+const struct irq_domain_ops nmk_gpio_irq_simple_ops = {
-+	.map = nmk_gpio_irq_map,
-+	.xlate = irq_domain_xlate_twocell,
-+};
-+
-+struct irq_domain *nmk_gpio_irq_domain_add(struct device_node *np,
-+					struct nmk_gpio_platform_data *pdata)
-+{
-+	return irq_domain_add_legacy(np, NMK_GPIO_PER_CHIP,
-+			NOMADIK_GPIO_TO_IRQ(pdata->first_gpio),
-+			0, &nmk_gpio_irq_simple_ops, NULL);
-+}
-+#else
-+struct irq_domain *nmk_gpio_irq_domain_add(struct device_node *np,
-+					struct nmk_gpio_platform_data *pdata)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
- {
- 	unsigned int first_irq;
-@@ -1072,6 +1099,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- {
- 	struct nmk_gpio_platform_data *pdata = dev->dev.platform_data;
- 	struct device_node *np = dev->dev.of_node;
-+	struct irq_domain *domain = NULL;
- 	struct nmk_gpio_chip *nmk_chip;
- 	struct gpio_chip *chip;
- 	struct resource *res;
-@@ -1096,13 +1124,20 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- 		if (of_property_read_u32(np, "gpio-bank", &dev->id)) {
- 			dev_err(&dev->dev, "gpio-bank property not found\n");
- 			ret = -EINVAL;
--			goto out_dt;
-+			goto out;
- 		}
+-			#gpio-cells = <1>;
+-			cd-gpios  = <&gpio6 26>; // 218
++			cd-gpios  = <&gpio6 26 0x4>; // 218
+ 			cd-inverted;
  
- 		pdata->first_gpio = dev->id * NMK_GPIO_PER_CHIP;
- 		pdata->num_gpio   = NMK_GPIO_PER_CHIP;
- 	}
- 
-+	domain = nmk_gpio_irq_domain_add(np, pdata);
-+	if (!domain) {
-+		pr_err("%s: Failed to create irqdomain - required for DT\n",
-+			np->full_name);
-+		return -ENOSYS;
-+	}
-+
- 	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		ret = -ENOENT;
-@@ -1189,7 +1224,6 @@ out_release:
- out:
- 	dev_err(&dev->dev, "Failure %i for GPIO %i-%i\n", ret,
- 		  pdata->first_gpio, pdata->first_gpio+31);
--out_dt:
- 	if (np)
- 		kfree(pdata);
- 
+ 			status = "okay";
+@@ -127,7 +125,7 @@
+ 			tc3589x at 42 {
+ 				//compatible = "tc3589x";
+ 				reg = <0x42>;
+-				interrupts = <25>;
++				gpios = <&gpio6 25 0x4>;
+ 				interrupt-parent = <&gpio6>;
+ 			};
+ 			tps61052 at 33 {
 -- 
 1.7.9.1
