@@ -1,43 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 17 Apr 2012 19:38:29 +0100
-Subject: [PATCH v4 2/2] regulator: add device tree support for max8997
-In-Reply-To: <CAJuYYwRsHynt6pBHUgk72Z-UjHj3DM=s4pV4dzbb2hTAZOUSAw@mail.gmail.com>
-References: <1332582590-16382-1-git-send-email-thomas.abraham@linaro.org>
- <1332582590-16382-3-git-send-email-thomas.abraham@linaro.org>
- <4F734460.4060605@samsung.com>
- <CAJuYYwRsHynt6pBHUgk72Z-UjHj3DM=s4pV4dzbb2hTAZOUSAw@mail.gmail.com>
-Message-ID: <20120417183829.GW6652@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 17 Apr 2012 12:43:14 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+In-Reply-To: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1204171241230.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 12:05:59AM +0530, Thomas Abraham wrote:
-> On 28 March 2012 22:33, Karol Lewandowski <k.lewandowsk@samsung.com> wrote:
+On Fri, 13 Apr 2012, Santosh Shilimkar wrote:
 
-> >> + ? ?For BUCK's:
+> The current serial UART code, while fidling with ocp idlemode bits,
+> forget about the smart idle wakeup bit even if it is supported by
+> UART IP block. This will lead to missing the module wakeup on OMAP's
+> where the smart idle wakeup is supported.
+> 
+> This was the root cause of the console sluggishness issue, I have been
+> observing on OMAP4 devices and also can be potential reason for some
+> other UART wakeup issues.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Govindraj.R <govindraj.raja@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
 
-No 's here, BTW.
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
 
-> > ?- EN32KHz_AP
-> > ?- EN32KHz_CP
-> > ?- ENVICHG
-> > ?- ESAFEOUT1
-> > ?- ESAFEOUT2
-> > ?- CHARGER
-> > ?- CHARGER_CV
-> > ?- CHARGER_TOPOFF
+Of course, in the long term, these idlemode tweaking functions need to go 
+through some kind of omap_bus/omap_device abstraction, since platform_data 
+function pointers are going away with the DT conversion.  But since a 
+decent omap_bus/omap_device is still a ways off, this is an important 
+interim step.
 
-> > I wonder if these should be mentioned in documentation too.
 
-> Yes, I missed the above regulators in the documentation. I have
-> included them now and will resubmit this patch.
-
-Please omit the clocks; these are obviously a bodge due to the inability
-to support clocks off-SoC so we shouldn't be enshrining them in the
-device tree bindings.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120417/9df2abff/attachment-0001.sig>
+- Paul
