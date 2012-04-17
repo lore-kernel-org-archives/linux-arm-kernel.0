@@ -1,122 +1,24 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 17 Apr 2012 15:00:47 +0200
-Subject: [PATCH v2 06/10] ARM: at91: pm select memory controler at runtime
-In-Reply-To: <1333899606-30518-6-git-send-email-plagnioj@jcrosoft.com>
-References: <1333899606-30518-6-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1334667647-8769-1-git-send-email-nicolas.ferre@atmel.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 17 Apr 2012 09:34:08 -0400
+Subject: [PATCH] ARM: fix mach-bcmring UART declarations
+In-Reply-To: <4F8C7617.5080902@broadcom.com>
+References: <1334605108-28616-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F8C7617.5080902@broadcom.com>
+Message-ID: <4F8D7150.9060201@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On 12-04-16 03:42 PM, Jiandong Zheng wrote:
+> On 4/16/2012 12:38 PM, Paul Gortmaker wrote:
+>> This error appeared in the bcmring_defconfig build:
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-[nicolas.ferre at atmel.com: add cpuidle modification]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/cpuidle.c |    8 +++++++-
- arch/arm/mach-at91/pm.c      |   12 ++++++++----
- arch/arm/mach-at91/pm.h      |   13 -------------
- 3 files changed, 15 insertions(+), 18 deletions(-)
+[...]
 
-diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-index ece1f9a..0c63815 100644
---- a/arch/arm/mach-at91/cpuidle.c
-+++ b/arch/arm/mach-at91/cpuidle.c
-@@ -21,6 +21,7 @@
- #include <linux/export.h>
- #include <asm/proc-fns.h>
- #include <asm/cpuidle.h>
-+#include <mach/cpu.h>
- 
- #include "pm.h"
- 
-@@ -33,7 +34,12 @@ static int at91_enter_idle(struct cpuidle_device *dev,
- 			struct cpuidle_driver *drv,
- 			       int index)
- {
--	at91_standby();
-+	if (cpu_is_at91rm9200())
-+		at91rm9200_standby();
-+	else if (cpu_is_at91sam9g45())
-+		at91sam9g45_standby();
-+	else
-+		at91sam9_standby();
- 
- 	return index;
- }
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f630250..1bfaad6 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -261,7 +261,12 @@ static int at91_pm_enter(suspend_state_t state)
- 			 * For ARM 926 based chips, this requirement is weaker
- 			 * as at91sam9 can access a RAM in self-refresh mode.
- 			 */
--			at91_standby();
-+			if (cpu_is_at91rm9200())
-+				at91rm9200_standby();
-+			else if (cpu_is_at91sam9g45())
-+				at91sam9g45_standby();
-+			else
-+				at91sam9_standby();
- 			break;
- 
- 		case PM_SUSPEND_ON:
-@@ -307,10 +312,9 @@ static int __init at91_pm_init(void)
- 
- 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
- 
--#ifdef CONFIG_ARCH_AT91RM9200
- 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
--	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
--#endif
-+	if (cpu_is_at91rm9200())
-+		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
- 
- 	suspend_set_ops(&at91_pm_ops);
- 
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 89f56f3..1b4865e 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -12,7 +12,6 @@
- #define __ARCH_ARM_MACH_AT91_PM
- 
- #include <mach/at91_ramc.h>
--#ifdef CONFIG_ARCH_AT91RM9200
- #include <mach/at91rm9200_sdramc.h>
- 
- /*
-@@ -43,10 +42,6 @@ static inline void at91rm9200_standby(void)
- 		  "r" (lpr));
- }
- 
--#define at91_standby at91rm9200_standby
--
--#elif defined(CONFIG_ARCH_AT91SAM9G45)
--
- /* We manage both DDRAM/SDRAM controllers, we need more than one value to
-  * remember.
-  */
-@@ -75,10 +70,6 @@ static inline void at91sam9g45_standby(void)
- 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
- }
- 
--#define at91_standby at91sam9g45_standby
--
--#else
--
- #ifdef CONFIG_ARCH_AT91SAM9263
- /*
-  * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-@@ -102,8 +93,4 @@ static inline void at91sam9_standby(void)
- 	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
- }
- 
--#define at91_standby at91sam9_standby
--
--#endif
--
- #endif
--- 
-1.7.10
+> This is already fixed by Olof Johansson.
+
+Thanks, I guess it just hasn't made it into linux-next yet.
+
+Paul.
+
+> 
+> 
