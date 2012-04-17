@@ -1,46 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Apr 2012 16:02:18 +0000
-Subject: [PATCH 11/16 v2] ARM: ux500: Do not attempt to register
- non-existent i2c devices on Snowball
-In-Reply-To: <4F8D8FD6.1070508@linaro.org>
-References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
- <1334659448-11521-12-git-send-email-lee.jones@linaro.org>
- <4F8D8FD6.1070508@linaro.org>
-Message-ID: <201204171602.19386.arnd@arndb.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 17 Apr 2012 19:08:19 +0200
+Subject: [PATCH v2 0/8] Second patchset for LPC32xx device tree conversion
+Message-ID: <1334682507-15055-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2012, Lee Jones wrote:
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Mon, 16 Apr 2012 15:26:55 +0100
-> Subject: [PATCH 11/16] ARM: ux500: Do not attempt to register non-existent
->  i2c devices on Snowball
-> 
-> This patch prevents i2c devices which are not present on the Snowball
-> low-cost development board from being registered. Devices such as;
-> tc3589x, bu1780 and lp5521 are present on other supported boards,
-> but are not located on Snowball.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+This is the second patch set for device tree conversion of mach-lpc32xx. It
+builds upon and requires the previously posted first set of 8 plus the GPIO
+patch.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+It touches different subsystems (USB/OHCI, input/touchscreen, iio/adc and
+mach-lpc32) to be picked by the respective subsystem maintainer and probably
+applied separately. (?)
 
-> @@ -831,13 +830,16 @@ static void __init u8500_init_machine(void)
->                                 ARRAY_SIZE(mop500_platform_devs));
->  
->                 hrefv60_sdi_init(parent);
-> +
-> +               i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-> +               i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
-> +
-> +               i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
-> +               i2c_register_board_info(2, mop500_i2c2_devices,
-> +                                       ARRAY_SIZE(mop500_i2c2_devices));
->         }
->         mop500_i2c_init(parent);
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-You could still simplify this and get rid of the i2c0_devs variable, but
-this version is fine too, since it does match the hrefv60_init_machine()
-function that has the same code in it.
+--
 
-	Arnd
+Applies to v3.4-rc3
+
+Changes since v1:
+* Separated out DTS files
+* Separated out clock registration update
+* Separated out removal of obsolete Kconfig
+ohci-nxp.c:
+* Separated out cleanup patch from device tree conversion
+* Cleanup of resource handling (mem and irq), use devm_request_and_ioremap()
+* Fixed controller initialization (bits)
+* Use DMA_BIT_MASK()
+* Don't remove __devinit
+* Removed obsolete gpio.h include
+* More consistent bit access symbols
+* Removed unused extern declaration ocpi_enable()
+* Added error handling on i2c_get_adapter()
+* Better USB host and device differentiation, since on LPC32xx, the same
+  controller can be used as USB device controller
+* Whitespace cleanup
+
+Thanks to Thierry Reding for reviewing!
+
+You can also pull from:
+
+	git://git.antcom.de/linux-2.6 lpc32xx/dt2
+
+Roland Stigge (8):
+ohci-nxp: Driver cleanup
+ohci-nxp: Device tree support
+ARM: LPC32xx: clock.c update
+ARM: LPC32xx: Remove obsolete platform Kconfig
+input: Device tree support for LPC32xx touchscreen
+iio: lpc32xx-adc: Remove driver conflict due to device tree
+ARM: LPC32xx: DTS files for device tree conversion
+ARM: LPC32xx: Device tree support
+
+ Documentation/devicetree/bindings/arm/lpc32xx-mic.txt               |   38 +
+ Documentation/devicetree/bindings/arm/lpc32xx.txt                   |    8 
+ Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt |   16 
+ Documentation/devicetree/bindings/usb/ohci-nxp.txt                  |   16 
+ arch/arm/Kconfig                                                    |    1 
+ arch/arm/boot/dts/lpc32xx.dtsi                                      |  303 ++++++++++
+ arch/arm/boot/dts/phy3250.dts                                       |  115 +++
+ arch/arm/mach-lpc32xx/Kconfig                                       |   26 
+ arch/arm/mach-lpc32xx/clock.c                                       |   77 +-
+ arch/arm/mach-lpc32xx/common.c                                      |  192 ------
+ arch/arm/mach-lpc32xx/common.h                                      |   14 
+ arch/arm/mach-lpc32xx/irq.c                                         |   78 +-
+ arch/arm/mach-lpc32xx/phy3250.c                                     |  146 ++--
+ drivers/input/touchscreen/lpc32xx_ts.c                              |   10 
+ drivers/staging/iio/adc/Kconfig                                     |    8 
+ drivers/usb/host/ohci-nxp.c                                         |   55 +
+ 16 files changed, 704 insertions(+), 399 deletions(-)
