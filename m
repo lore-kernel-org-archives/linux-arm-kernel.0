@@ -1,33 +1,32 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 17 Apr 2012 16:45:38 +0530
-Subject: [PATCH 06/13] clk: Don't set clk->new_rate twice
+Date: Tue, 17 Apr 2012 16:45:34 +0530
+Subject: [PATCH 02/13] clk: Fix typo in comment
 In-Reply-To: <cover.1334660431.git.viresh.kumar@st.com>
 References: <cover.1334660431.git.viresh.kumar@st.com>
-Message-ID: <fedbd601aa943e249bfa220faa8ec48949bb4eb2.1334660431.git.viresh.kumar@st.com>
+Message-ID: <3ebf7ae767a0af87a27bb40592e33ff97152edf5.1334660431.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if (!clk->ops->round_rate && (clk->flags & CLK_SET_RATE_PARENT)) is true, then
-we don't need to set clk->new_rate here, as we will call clk_calc_subtree()
-afterwards and it also sets clk->new_rate.
+CLK_GATE_SET_TO_DISABLE is mistakenly written as CLK_GATE_SET_DISABLE in
+comment. Fix it.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/clk.c |    2 +-
+ include/linux/clk-provider.h |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index af2bf12..865d0dd 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -789,7 +789,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
- 
- 	if (!clk->ops->round_rate) {
- 		top = clk_calc_new_rates(clk->parent, rate);
--		new_rate = clk->new_rate = clk->parent->new_rate;
-+		new_rate = clk->parent->new_rate;
- 
- 		goto out;
- 	}
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 50ee80b..d98bdbc 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -166,7 +166,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+  * Clock which can gate its output.  Implements .enable & .disable
+  *
+  * Flags:
+- * CLK_GATE_SET_DISABLE - by default this clock sets the bit at bit_idx to
++ * CLK_GATE_SET_TO_DISABLE - by default this clock sets the bit at bit_idx to
+  * 	enable the clock.  Setting this flag does the opposite: setting the bit
+  * 	disable the clock and clearing it enables the clock
+  */
 -- 
 1.7.9
