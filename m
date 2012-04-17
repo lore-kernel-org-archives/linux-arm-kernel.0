@@ -1,14 +1,14 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Apr 2012 12:15:44 +0200
-Subject: [PATCH 1/8] MXS: Make clk_disable return integer
+Date: Tue, 17 Apr 2012 12:15:45 +0200
+Subject: [PATCH 2/8] MXS: Add USB EHCI and USB PHY clock handling
 In-Reply-To: <1334657751-27678-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
-Message-ID: <1334657751-27678-2-git-send-email-marex@denx.de>
+Message-ID: <1334657751-27678-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows subsequent USB clock patch to interchange enable() and disable()
-calls without adding unnecessary switching cruft.
+Based on code by:
+Tony Lin <tony.lin@freescale.com>
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -25,61 +25,47 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-mxs/clock-mx28.c         |    7 +++++--
- arch/arm/mach-mxs/include/mach/clock.h |    2 +-
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/mach-mxs/clock-mx28.c |   21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index cea29c9..43116ba 100644
+index 43116ba..ae4f7b3 100644
 --- a/arch/arm/mach-mxs/clock-mx28.c
 +++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -86,7 +86,7 @@ static int _raw_clk_enable(struct clk *clk)
- 	return 0;
- }
- 
--static void _raw_clk_disable(struct clk *clk)
-+static int _raw_clk_disable(struct clk *clk)
- {
- 	u32 reg;
- 
-@@ -95,6 +95,8 @@ static void _raw_clk_disable(struct clk *clk)
- 		reg |= 1 << clk->enable_shift;
- 		__raw_writel(reg, clk->enable_reg);
- 	}
-+
-+	return 0;
- }
- 
- /*
-@@ -149,7 +151,7 @@ _CLK_ENABLE_PLL(pll1_clk, PLL1, EN_USB_CLKS)
- _CLK_ENABLE_PLL(pll2_clk, PLL2, CLKGATE)
- 
- #define _CLK_DISABLE_PLL(name, r, g)					\
--static void name##_disable(struct clk *clk)				\
-+static int name##_disable(struct clk *clk)				\
- {									\
- 	__raw_writel(BM_CLKCTRL_##r##CTRL0_POWER,			\
- 		     CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
-@@ -161,6 +163,7 @@ static void name##_disable(struct clk *clk)				\
- 		__raw_writel(BM_CLKCTRL_##r##CTRL0_##g,			\
- 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
- 									\
-+	return 0;							\
- }
- 
- _CLK_DISABLE_PLL(pll0_clk, PLL0, EN_USB_CLKS)
-diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
-index 592c9ab..21d1fad 100644
---- a/arch/arm/mach-mxs/include/mach/clock.h
-+++ b/arch/arm/mach-mxs/include/mach/clock.h
-@@ -50,7 +50,7 @@ struct clk {
- 	int (*enable) (struct clk *);
- 	/* Function ptr to disable the clock. Leave blank if clock can not
- 	   be gated. */
--	void (*disable) (struct clk *);
-+	int (*disable) (struct clk *);
- 	/* Function ptr to set the parent clock of the clock. */
- 	int (*set_parent) (struct clk *, struct clk *);
+@@ -577,6 +577,21 @@ static struct clk usb1_clk = {
+ 	.parent = &pll1_clk,
  };
+ 
++static struct clk usb_phy_clk0 = {
++	.parent = &pll0_clk,
++	.enable = _raw_clk_disable,
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL0CTRL0,
++	.enable_shift = 18,
++};
++
++static struct clk usb_phy_clk1 = {
++	.parent = &pll1_clk,
++	.enable = _raw_clk_disable,
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
++	.enable_shift = 18,
++};
+ #define _DEFINE_CLOCK(name, er, es, p)					\
+ 	static struct clk name = {					\
+ 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
+@@ -636,8 +651,10 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxs-mmc.3", NULL, ssp3_clk)
+ 	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
+ 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+-	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+-	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
++	_REGISTER_CLOCK("mxs-ehci.0", "usb", usb0_clk)
++	_REGISTER_CLOCK("mxs-ehci.1", "usb", usb1_clk)
++	_REGISTER_CLOCK("mxs-phy.0", "usb0_phy", usb_phy_clk0)
++	_REGISTER_CLOCK("mxs-phy.1", "usb1_phy", usb_phy_clk1)
+ 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
 -- 
 1.7.9.5
