@@ -1,92 +1,88 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 17 Apr 2012 14:41:25 +0200
-Subject: [PATCH 11/12] USB: ohci-at91: change annotations for probe/remove
- functions
-In-Reply-To: <79e2edff922c337d1f0e8407f18e506b32df488e.1334567594.git.nicolas.ferre@atmel.com>
-References: <cover.1334567594.git.nicolas.ferre@atmel.com>
- <79e2edff922c337d1f0e8407f18e506b32df488e.1334567594.git.nicolas.ferre@atmel.com>
-Message-ID: <4F8D64F5.5060300@atmel.com>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Tue, 17 Apr 2012 18:17:19 +0530
+Subject: [PATCH 2/2] OMAP2+: UART: Add mechanism to probe uart pins and
+ configure rx wakeup
+In-Reply-To: <20120417014103.GA21106@atomide.com>
+References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
+ <1334065246-21294-3-git-send-email-govindraj.raja@ti.com>
+ <20120410161136.GF6487@atomide.com>
+ <CAMrsUdK2ZqCGWtL104tBC_h-XHD0UMMFagch_eSER+92zC1FiQ@mail.gmail.com>
+ <20120417014103.GA21106@atomide.com>
+Message-ID: <CAMrsUd+v-qhVPLbJp1ecE2+e5ayJAQrAzALr1sviH9RDJv3aMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2012 11:20 AM, Nicolas Ferre :
-> Add __devinit and __devexit on *_probe() and *_remove() functions
-> with proper modification of struct platform_driver.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
+On Tue, Apr 17, 2012 at 7:11 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> Few more comments below.
+>
+> * Raja, Govindraj <govindraj.raja@ti.com> [120411 04:53]:
+> ...
+>
+>> +static int ?__init omap_serial_fill_default_pads(struct omap_board_data *bdata,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_uart_state *uart)
+>> +{
+>> + ? ? struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
+>> + ? ? struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
+>> + ? ? char *rx_fmt, *tx_fmt;
+>> + ? ? int uart_nr = bdata->id + 1;
+>> +
+>> + ? ? if (bdata->id != 2) {
+>> + ? ? ? ? ? ? rx_fmt = "uart%d_rx.uart%d_rx";
+>> + ? ? ? ? ? ? tx_fmt = "uart%d_tx.uart%d_tx";
+>> + ? ? } else {
+>> + ? ? ? ? ? ? rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
+>> + ? ? ? ? ? ? tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
+>> + ? ? }
+>> +
+>> + ? ? snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
+>> + ? ? ? ? ? ? ? ? ? ? uart_nr, uart_nr);
+>> + ? ? snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
+>> + ? ? ? ? ? ? ? ? ? ? uart_nr, uart_nr);
+>
+> This naming won't work for the fourth port on 3630 as there are no "uart4_rx"
+> or "uart4_tx" mux entries, they are "gpmc_wait2.uart4_tx" and
+> "gpmc_wait3.uart4_tx".
 
-Alan,
+But uart4 is unused on 3630 boards and boards trying to use them
+should configure them from board file.
+(I thought we agreed on this approach where only if uarts are
+available in mux mode0 those ports will be dynamically muxed for wakeup
+others should use omap_serial_init_port)
 
-Can I have your "Acked-by" for this modification? I plan to push a
-"fixes" series though arm-soc git tree.
+>
+>> @@ -289,8 +354,8 @@ void __init omap_serial_board_init(struct
+>> omap_uart_port_info *info)
+>> ? ? ? ? ? ? ? bdata.pads = NULL;
+>> ? ? ? ? ? ? ? bdata.pads_cnt = 0;
+>>
+>> - ? ? ? ? ? ? if (cpu_is_omap44xx() || cpu_is_omap34xx())
+>> - ? ? ? ? ? ? ? ? ? ? omap_serial_fill_default_pads(&bdata);
+>> + ? ? ? ? ? ? if (omap_serial_fill_default_pads(&bdata, uart))
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>>
+>> ? ? ? ? ? ? ? if (!info)
+>> ? ? ? ? ? ? ? ? ? ? ? omap_serial_init_port(&bdata, NULL);
+>
+> Can't the omap_serial_board_init() now be just be omap_serial_init(void)
+> as it's not used anywhere else?
 
-Thanks, best regards,
+Yes sure we can remove that.
 
-> Cc: linux-usb at vger.kernel.org
-> ---
->  drivers/usb/host/ohci-at91.c |   12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 09f597a..13ebeca 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -94,7 +94,7 @@ static void at91_stop_hc(struct platform_device *pdev)
->  
->  /*-------------------------------------------------------------------------*/
->  
-> -static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
-> +static void __devexit usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
->  
->  /* configure so an HC device and id are always provided */
->  /* always called with process context; sleeping is OK */
-> @@ -108,7 +108,7 @@ static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
->   * then invokes the start() method for the HCD associated with it
->   * through the hotplug entry's driver_data.
->   */
-> -static int usb_hcd_at91_probe(const struct hc_driver *driver,
-> +static int __devinit usb_hcd_at91_probe(const struct hc_driver *driver,
->  			struct platform_device *pdev)
->  {
->  	int retval;
-> @@ -203,7 +203,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->   * context, "rmmod" or something similar.
->   *
->   */
-> -static void usb_hcd_at91_remove(struct usb_hcd *hcd,
-> +static void __devexit usb_hcd_at91_remove(struct usb_hcd *hcd,
->  				struct platform_device *pdev)
->  {
->  	usb_remove_hcd(hcd);
-> @@ -545,7 +545,7 @@ static int __devinit ohci_at91_of_init(struct platform_device *pdev)
->  
->  /*-------------------------------------------------------------------------*/
->  
-> -static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
-> +static int __devinit ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  {
->  	struct at91_usbh_data	*pdata;
->  	int			i;
-> @@ -620,7 +620,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
->  }
->  
-> -static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
-> +static int __devexit ohci_hcd_at91_drv_remove(struct platform_device *pdev)
->  {
->  	struct at91_usbh_data	*pdata = pdev->dev.platform_data;
->  	int			i;
-> @@ -696,7 +696,7 @@ MODULE_ALIAS("platform:at91_ohci");
->  
->  static struct platform_driver ohci_hcd_at91_driver = {
->  	.probe		= ohci_hcd_at91_drv_probe,
-> -	.remove		= ohci_hcd_at91_drv_remove,
-> +	.remove		= __devexit_p(ohci_hcd_at91_drv_remove),
->  	.shutdown	= usb_hcd_platform_shutdown,
->  	.suspend	= ohci_hcd_at91_drv_suspend,
->  	.resume		= ohci_hcd_at91_drv_resume,
+>
+> Anyways, this is getting too complex for the -rc series as at least 2430sdp
+> is using alternative pins for the first uart. Let's patch to remove just
+> the uart4 entry for 3630 for the -rc and then we can properly fix this
+> for the next merge window.
 
+Okay. in that case the earlier patch [1] should be fine to solve the
+gpmc issue observed
+and ehci issue on beagle-xm.
 
--- 
-Nicolas Ferre
+--
+Thanks,
+Govindraj.R
+
+[1]:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/090961.html
