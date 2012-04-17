@@ -1,38 +1,52 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Apr 2012 22:34:34 +0200
-Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
- sampling bug
-In-Reply-To: <20120417203154.GA28067@pengutronix.de>
-References: <1334675261-31570-1-git-send-email-marex@denx.de>
- <201204172210.31232.marex@denx.de> <20120417203154.GA28067@pengutronix.de>
-Message-ID: <201204172234.34659.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Apr 2012 20:36:14 +0000
+Subject: [PATCH v2 1/8] ohci-nxp: Driver cleanup
+In-Reply-To: <1334682507-15055-2-git-send-email-stigge@antcom.de>
+References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
+ <1334682507-15055-2-git-send-email-stigge@antcom.de>
+Message-ID: <201204172036.15663.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+On Tuesday 17 April 2012, Roland Stigge wrote:
+>Cleanup for ohci-nxp.c:
+>
+>* Cleanup of resource handling (mem and irq), use devm_request_and_ioremap()
+>* Fixed controller initialization (bits)
+>* Use DMA_BIT_MASK()
+>* Don't remove __devinit
+>* Removed obsolete gpio.h include
+>* More consistent bit access symbols
+>* Removed unused extern declaration ocpi_enable()
+>* Added error handling on i2c_get_adapter()
+>* Better USB host and device differentiation, since on LPC32xx, the same
+>  controller can be used as USB device controller
+>* Whitespace cleanup
+>
+>Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-> > > Quite a CC list, but you forgot the main ones:
-> > Do you have a trimmed-down version of the list of mxs-related people
-> > possibly?
-> 
-> I usually CC Shawn, alkml and the driver authors and lists. There is
-> nothing wrong with having more, you just happen to miss the crucial
-> ones here. 'scripts/get_maintainers.pl' may also be helpful.
+Looks almost good, I just found one more bug that you introduce:
 
-A'ight, time for a resend.
+> +
+> +       hcd->regs = devm_request_and_ioremap(&pdev->dev, res);
+> +       if (!hcd->regs) {
+> +               err("Failed to devm_request_and_ioremap");
+>                 ret =  -ENOMEM;
+>                 goto out4;
+>         }
+> -       hcd->regs = (void __iomem *)pdev->resource[0].start;
+> +       hcd->rsrc_start = (u64)(u32)hcd->regs;
+> +       hcd->rsrc_len = resource_size(res);
 
-> 
-> > > FRAMEBUFFER LAYER
-> > > M:      Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> > > L:      linux-fbdev at vger.kernel.org
-> > > 
-> > > Patch itself looks good
-> > 
-> > Who's applying this? The fbdev people or imx tree?
-> 
-> It is in drivers/video, so it should go via fbdev.
+This is wrong in multiple ways:
 
-Right, thanks!
+* rsrc_start is a physical address, not an __iomem token.
+* you cannot cast a pointer to u32 in general, only to unsigned long.
 
-Best regards,
-Marek Vasut
+The fact that you need an ugly type cast like above could have told
+you that you are doing something wrong here. I guess it should
+be
+
+	hcd->rsrc_start = res->start;
+
+	Arnd
