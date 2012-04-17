@@ -1,182 +1,183 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Apr 2012 11:16:32 +0530
-Subject: [PATCH 09/12] ARM: Exynos5: Add pre-divider and fout mux clocks for
- bpll and mpll
+Date: Tue, 17 Apr 2012 11:16:34 +0530
+Subject: [PATCH 11/12] ARM: Exynos5: Update device tree source files
 In-Reply-To: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
 References: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1334641595-25301-10-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1334641595-25301-12-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kisoo Yu <ksoo.yu@samsung.com>
+Updated Exynos5 device tree source files to reflect changes in rev1 of
+Exynos5 SoC. This includes new additions to the Exynos5 dtsi and SMDK5250 dts
+files and few minor fixes.
 
-The fout clock of BPLL and MPLL have a selectable source in rev1 of
-Exynos5. The clock options are a fixed divided by 2 clock and the
-output of the PLL itself. Add support for these new clock instances.
-
-Signed-off-by: Kisoo Yu <ksoo.yu@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/clock-exynos5.c           |   73 +++++++++++++++++++++++-
- arch/arm/mach-exynos/include/mach/regs-clock.h |    2 +
- arch/arm/plat-s5p/clock.c                      |   11 ----
- 3 files changed, 74 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   52 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi         |   44 +++++++-----------------
+ 2 files changed, 65 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index 0230ba8..3aa3fed 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -165,6 +165,39 @@ static struct clksrc_clk exynos5_clk_sclk_apll = {
- 	.reg_div = { .reg = EXYNOS5_CLKDIV_CPU0, .shift = 24, .size = 3 },
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 399d17b..bcc4b89 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -23,4 +23,56 @@
+ 	chosen {
+ 		bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
+ 	};
++
++	i2c at 12C60000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <20000>;
++		gpios = <&gpb3 0 2 3 0>,
++			<&gpb3 1 2 3 0>;
++
++		eeprom at 50 {
++			compatible = "samsung,s524ad0xd1";
++			reg = <0x50>;
++		};
++	};
++
++	i2c at 12C70000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <20000>;
++		gpios = <&gpb3 2 2 3 0>,
++			<&gpb3 3 2 3 0>;
++
++		eeprom at 51 {
++			compatible = "samsung,s524ad0xd1";
++			reg = <0x51>;
++		};
++	};
++
++	i2c at 12C80000 {
++		status = "disabled";
++	};
++
++	i2c at 12C90000 {
++		status = "disabled";
++	};
++
++	i2c at 12CA0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CB0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CC0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CD0000 {
++		status = "disabled";
++	};
  };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index dfc4335..76b7dba 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -23,11 +23,11 @@
+ 	compatible = "samsung,exynos5250";
+ 	interrupt-parent = <&gic>;
  
-+static struct clk clk_fout_bpll_div2 = {
-+	.name	= "fout_bpll_div2",
-+};
-+
-+static struct clk *exynos5_clkset_mout_bpll_fout_list[] = {
-+	[0] = &clk_fout_bpll_div2,
-+	[1] = &clk_fout_bpll,
-+};
-+
-+static struct clksrc_sources exynos5_clkset_mout_bpll_fout = {
-+	.sources	= exynos5_clkset_mout_bpll_fout_list,
-+	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_bpll_fout_list),
-+};
-+
-+static struct clksrc_clk exynos5_clk_mout_bpll_fout = {
-+	.clk	= {
-+		.name		= "mout_bpll_fout",
-+	},
-+	.sources = &exynos5_clkset_mout_bpll_fout,
-+	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 0, .size = 1 },
-+};
-+
-+/* Possible clock sources for BPLL Mux */
-+static struct clk *clk_src_bpll_list[] = {
-+	[0] = &clk_fin_bpll,
-+	[1] = &exynos5_clk_mout_bpll_fout.clk,
-+};
-+
-+struct clksrc_sources clk_src_bpll = {
-+	.sources	= clk_src_bpll_list,
-+	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
-+};
-+
- static struct clksrc_clk exynos5_clk_mout_bpll = {
- 	.clk	= {
- 		.name		= "mout_bpll",
-@@ -207,11 +240,43 @@ static struct clksrc_clk exynos5_clk_mout_epll = {
- 	.reg_src = { .reg = EXYNOS5_CLKSRC_TOP2, .shift = 12, .size = 1 },
- };
+-	gic:interrupt-controller at 10490000 {
++	gic:interrupt-controller at 10481000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
+-		reg = <0x10490000 0x1000>, <0x10480000 0x100>;
++		reg = <0x10481000 0x1000>, <0x10482000 0x2000>;
+ 	};
  
-+static struct clk clk_fout_mpll_div2 = {
-+	.name	= "fout_mpll_div2",
-+};
-+
-+static struct clk *exynos5_clkset_mout_mpll_fout_list[] = {
-+	[0] = &clk_fout_mpll_div2,
-+	[1] = &clk_fout_mpll,
-+};
-+
-+static struct clksrc_sources exynos5_clkset_mout_mpll_fout = {
-+	.sources	= exynos5_clkset_mout_mpll_fout_list,
-+	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_mpll_fout_list),
-+};
-+
-+static struct clksrc_clk exynos5_clk_mout_mpll_fout = {
-+	.clk	= {
-+		.name		= "mout_mpll_fout",
-+	},
-+	.sources = &exynos5_clkset_mout_mpll_fout,
-+	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 4, .size = 1 },
-+};
-+
-+static struct clk *exynos5_clk_src_mpll_list[] = {
-+	[0] = &clk_fin_mpll,
-+	[1] = &exynos5_clk_mout_mpll_fout.clk,
-+};
-+
-+struct clksrc_sources exynos5_clk_src_mpll = {
-+	.sources	= exynos5_clk_src_mpll_list,
-+	.nr_sources	= ARRAY_SIZE(exynos5_clk_src_mpll_list),
-+};
-+
- struct clksrc_clk exynos5_clk_mout_mpll = {
- 	.clk = {
- 		.name		= "mout_mpll",
- 	},
--	.sources = &clk_src_mpll,
-+	.sources = &exynos5_clk_src_mpll,
- 	.reg_src = { .reg = EXYNOS5_CLKSRC_CORE1, .shift = 8, .size = 1 },
- };
+ 	watchdog {
+@@ -42,30 +42,6 @@
+ 		interrupts = <0 43 0>, <0 44 0>;
+ 	};
  
-@@ -1033,10 +1098,12 @@ static struct clksrc_clk *exynos5_sysclks[] = {
- 	&exynos5_clk_mout_apll,
- 	&exynos5_clk_sclk_apll,
- 	&exynos5_clk_mout_bpll,
-+	&exynos5_clk_mout_bpll_fout,
- 	&exynos5_clk_mout_bpll_user,
- 	&exynos5_clk_mout_cpll,
- 	&exynos5_clk_mout_epll,
- 	&exynos5_clk_mout_mpll,
-+	&exynos5_clk_mout_mpll_fout,
- 	&exynos5_clk_mout_mpll_user,
- 	&exynos5_clk_vpllsrc,
- 	&exynos5_clk_sclk_vpll,
-@@ -1101,6 +1168,8 @@ static struct clk *exynos5_clks[] __initdata = {
- 	&exynos5_clk_sclk_hdmi27m,
- 	&exynos5_clk_sclk_hdmiphy,
- 	&clk_fout_bpll,
-+	&clk_fout_bpll_div2,
-+	&clk_fout_mpll_div2,
- 	&clk_fout_cpll,
- 	&exynos5_clk_armclk,
- };
-@@ -1266,8 +1335,10 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
- 
- 	clk_fout_apll.ops = &exynos5_fout_apll_ops;
- 	clk_fout_bpll.rate = bpll;
-+	clk_fout_bpll_div2.rate = bpll >> 1;
- 	clk_fout_cpll.rate = cpll;
- 	clk_fout_mpll.rate = mpll;
-+	clk_fout_mpll_div2.rate = mpll >> 1;
- 	clk_fout_epll.rate = epll;
- 	clk_fout_vpll.rate = vpll;
- 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
-index dba83e9..834ab17 100644
---- a/arch/arm/mach-exynos/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
-@@ -318,6 +318,8 @@
- #define EXYNOS5_CLKGATE_IP_PERIS		EXYNOS_CLKREG(0x10960)
- #define EXYNOS5_CLKGATE_BLOCK			EXYNOS_CLKREG(0x10980)
- 
-+#define EXYNOS5_PLL_DIV2_SEL			EXYNOS_CLKREG(0x20A24)
-+
- #define EXYNOS5_BPLL_CON0			EXYNOS_CLKREG(0x20110)
- #define EXYNOS5_CLKSRC_CDREX			EXYNOS_CLKREG(0x20200)
- #define EXYNOS5_CLKDIV_CDREX			EXYNOS_CLKREG(0x20500)
-diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-index f68a9bb..bea0907 100644
---- a/arch/arm/plat-s5p/clock.c
-+++ b/arch/arm/plat-s5p/clock.c
-@@ -115,17 +115,6 @@ struct clksrc_sources clk_src_apll = {
- 	.nr_sources	= ARRAY_SIZE(clk_src_apll_list),
- };
- 
--/* Possible clock sources for BPLL Mux */
--static struct clk *clk_src_bpll_list[] = {
--	[0] = &clk_fin_bpll,
--	[1] = &clk_fout_bpll,
--};
+-	sdhci at 12200000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12200000 0x100>;
+-		interrupts = <0 75 0>;
+-	};
 -
--struct clksrc_sources clk_src_bpll = {
--	.sources	= clk_src_bpll_list,
--	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
--};
+-	sdhci at 12210000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12210000 0x100>;
+-		interrupts = <0 76 0>;
+-	};
 -
- /* Possible clock sources for CPLL Mux */
- static struct clk *clk_src_cpll_list[] = {
- 	[0] = &clk_fin_cpll,
+-	sdhci at 12220000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12220000 0x100>;
+-		interrupts = <0 77 0>;
+-	};
+-
+-	sdhci at 12230000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12230000 0x100>;
+-		interrupts = <0 78 0>;
+-	};
+-
+ 	serial at 12C00000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x12C00000 0x100>;
+@@ -157,13 +133,13 @@
+ 			interrupts = <0 35 0>;
+ 		};
+ 
+-		mdma0: pdma at 10800000 {
++		mdma0: mdma at 10800000 {
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x10800000 0x1000>;
+ 			interrupts = <0 33 0>;
+ 		};
+ 
+-		mdma1: pdma at 11C10000 {
++		mdma1: mdma at 11C10000 {
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x11C10000 0x1000>;
+ 			interrupts = <0 124 0>;
+@@ -242,6 +218,12 @@
+ 			#gpio-cells = <4>;
+ 		};
+ 
++		gpc4: gpio-controller at 114002E0 {
++			compatible = "samsung,exynos4-gpio";
++			reg = <0x114002E0 0x20>;
++			#gpio-cells = <4>;
++		};
++
+ 		gpd0: gpio-controller at 11400160 {
+ 			compatible = "samsung,exynos4-gpio";
+ 			reg = <0x11400160 0x20>;
+@@ -388,19 +370,19 @@
+ 
+ 		gpv2: gpio-controller at 10D10040 {
+ 			compatible = "samsung,exynos4-gpio";
+-			reg = <0x10D10040 0x20>;
++			reg = <0x10D10060 0x20>;
+ 			#gpio-cells = <4>;
+ 		};
+ 
+ 		gpv3: gpio-controller at 10D10060 {
+ 			compatible = "samsung,exynos4-gpio";
+-			reg = <0x10D10060 0x20>;
++			reg = <0x10D10080 0x20>;
+ 			#gpio-cells = <4>;
+ 		};
+ 
+ 		gpv4: gpio-controller at 10D10080 {
+ 			compatible = "samsung,exynos4-gpio";
+-			reg = <0x10D10080 0x20>;
++			reg = <0x10D100C0 0x20>;
+ 			#gpio-cells = <4>;
+ 		};
+ 
 -- 
 1.6.6.rc2
