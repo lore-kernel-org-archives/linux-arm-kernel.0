@@ -1,36 +1,26 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Tue, 17 Apr 2012 08:15:44 +0100
-Subject: [PATCH 2/3] staging: iio: light: of: Fix vendor prefix of isl29018
-In-Reply-To: <1334645155-13799-3-git-send-email-ldewangan@nvidia.com>
-References: <1334645155-13799-1-git-send-email-ldewangan@nvidia.com>
- <1334645155-13799-3-git-send-email-ldewangan@nvidia.com>
-Message-ID: <4F8D18A0.9030108@cam.ac.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Apr 2012 15:17:57 +0800
+Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
+In-Reply-To: <CAJOA=zPnQhq_3O00F4dfUbnywW-Riov7N76F3wraE67yy2MMuA@mail.gmail.com>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+ <20120412064920.GH2445@S2101-09.ap.freescale.net>
+ <CAJOA=zMPQK-W_nbRztXCNdLHoTJU73ZnrxAS8VvvmzgdaVS2mQ@mail.gmail.com>
+ <CAAQ0ZWRg2jwNZ7Bx5j5NtCVveT_085VmFtPMhWW62-aO+kFfnw@mail.gmail.com>
+ <CAJOA=zPnQhq_3O00F4dfUbnywW-Riov7N76F3wraE67yy2MMuA@mail.gmail.com>
+Message-ID: <CAAQ0ZWQ_haRN-WHNzTMcjFvryRqjM58QoseC8WejBiqcDfSuPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/17/2012 7:45 AM, Laxman Dewangan wrote:
-> ISL29018 is from Intersil Corporation and the vendor prefix
-> for this part should be "isl", at least not "invn" for OF
-> compatibility.
-Fine with me.  Not really my domain other than where it sits though!
-Send on to Greg when you get acks from device tree side.
->
-> Signed-off-by: Laxman Dewangan<ldewangan@nvidia.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
->   drivers/staging/iio/light/isl29018.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/staging/iio/light/isl29018.c b/drivers/staging/iio/light/isl29018.c
-> index 38ec52b..ee220ae 100644
-> --- a/drivers/staging/iio/light/isl29018.c
-> +++ b/drivers/staging/iio/light/isl29018.c
-> @@ -593,7 +593,7 @@ static const struct i2c_device_id isl29018_id[] = {
->   MODULE_DEVICE_TABLE(i2c, isl29018_id);
->
->   static const struct of_device_id isl29018_of_match[] = {
-> -	{ .compatible = "invn,isl29018", },
-> +	{ .compatible = "isl,isl29018", },
->   	{ },
->   };
->   MODULE_DEVICE_TABLE(of, isl29018_of_match);
+On 17 April 2012 11:50, Turquette, Mike <mturquette@ti.com> wrote:
+> That is a good question. ?I think it is worth waiting on Saravana's
+> patch which exposes non-private members of struct clk via struct
+> clk_hw. ?This will have an effect on both platform clock data and
+> code.
+
+Saravana,
+
+(*nudge*) (*nudge*) goes to you now :)
+
+Regards,
+Shawn
