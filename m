@@ -1,38 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Apr 2012 08:39:02 +0200
-Subject: [GIT PULL] ux500 fixes for 3.4-rc series
-Message-ID: <CACRpkdbixRZb_6uT2M52zQ70Jb-uA0Lzhjy2ZG=g8vrKq9KPZg@mail.gmail.com>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Tue, 17 Apr 2012 12:13:53 +0530
+Subject: [PATCH] mmc: omap_hsmmc: release correct resource
+In-Reply-To: <20120414134125.GT24211@n2100.arm.linux.org.uk>
+References: <20120414134125.GT24211@n2100.arm.linux.org.uk>
+Message-ID: <CANfBPZ-ZyQ8Wk1OkR-sgs=OCyDOn7hWqnqNTkzbZyVx0sFXNtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Sat, Apr 14, 2012 at 7:11 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> res can be one of several resources, as this variable is re-used several
+> times during probe. ?This can cause the wrong resource parameters to be
+> passed to release_mem_region().
+>
+> Get the original memory resource before calling release_mem_region().
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> ?drivers/mmc/host/omap_hsmmc.c | ? ?4 +++-
+> ?1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index d12bdbe..4b2e1f0 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2027,7 +2027,9 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+> ?err_alloc:
+> ? ? ? ?omap_hsmmc_gpio_free(pdata);
+> ?err:
+> - ? ? ? release_mem_region(res->start, resource_size(res));
+> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? if (res)
+> + ? ? ? ? ? ? ? release_mem_region(res->start, resource_size(res));
+> ? ? ? ?return ret;
+> ?}
+>
+> --
 
-These are a few -rc fixes for ux500 collected since the merge window.
-
-The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
-
-  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-fixes-for-arm-soc-20120416
-
-for you to fetch changes up to f27962ac68a9b4cf17958522ecd7c10ce2375ee1:
-
-  ARM: ux500: update defconfig (2012-04-16 09:00:53 +0200)
-
-----------------------------------------------------------------
-Jonas Aaberg (1):
-      ARM: ux500: wake secondary cpu via resched
-
-Lee Jones (1):
-      ARM: ux500: Fix unmet direct dependency
-
-Linus Walleij (1):
-      ARM: ux500: update defconfig
-
- arch/arm/configs/u8500_defconfig |    9 ++++-----
- arch/arm/mach-ux500/Kconfig      |    1 +
- arch/arm/mach-ux500/platsmp.c    |    2 +-
- 3 files changed, 6 insertions(+), 6 deletions(-)
+Thanks Russell. I'll send it to Chris to be queued for 3.4-fixes.
