@@ -1,41 +1,142 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 16 Apr 2012 20:50:32 -0700
-Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
-In-Reply-To: <CAAQ0ZWRg2jwNZ7Bx5j5NtCVveT_085VmFtPMhWW62-aO+kFfnw@mail.gmail.com>
-References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334192572-12499-14-git-send-email-mturquette@linaro.org>
- <20120412064920.GH2445@S2101-09.ap.freescale.net>
- <CAJOA=zMPQK-W_nbRztXCNdLHoTJU73ZnrxAS8VvvmzgdaVS2mQ@mail.gmail.com>
- <CAAQ0ZWRg2jwNZ7Bx5j5NtCVveT_085VmFtPMhWW62-aO+kFfnw@mail.gmail.com>
-Message-ID: <CAJOA=zPnQhq_3O00F4dfUbnywW-Riov7N76F3wraE67yy2MMuA@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 17 Apr 2012 09:18:54 +0530
+Subject: [PATCH V3] CLKDEV: Add helper routines to allocate and add clkdevs
+ for given struct clk *
+In-Reply-To: <20120416205133.GW3852@pengutronix.de>
+References: <20120416205133.GW3852@pengutronix.de>
+Message-ID: <71de017a62f9c2032b25d44353df3f9be51e69a2.1334634063.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 6:46 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On 17 April 2012 07:10, Turquette, Mike <mturquette@ti.com> wrote:
-> ...
->> Yes, this was a braindead change on my part. ?I'll remove the kstrdup
->> in my next series (the rest of this patch will stay in).
->>
-> Do you have an ETA on that? ?A few platform porting are waiting for a
-> stable branch with all necessary fixup/cleanup integrated to publish
-> the patches.
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-That is a good question.  I think it is worth waiting on Saravana's
-patch which exposes non-private members of struct clk via struct
-clk_hw.  This will have an effect on both platform clock data and
-code.
+With common clock framework, clks are allocated at runtime. Some of them require
+clkdevs to be allocated and added in global clkdev list.
 
-I do not think that there is a point in pushing another series out
-until I get that in since it will shake things up for platforms trying
-to convert over.  And due to the invasive nature I'm still not sure if
-this stuff will go into an -rc or some -next branch for 3.5.  I don't
-see the harm in keeping it in a -next branch for 3.5 where all
-platforms can base on that branch since they will be queuing up for
-3.5 anyway.
+This patch introduces helper routines to:
 
-Regards,
-Mike
+ - allocate and add single clkdev for a single clk structure.
+ - add multiple clkdevs for a single clk structure.
 
-> Regards,
-> Shawn
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+Arnd,
+
+If this patch is acceptable to everybody, can you push it for v3.5?
+
+V2->V3:
+- Don't initialize ap to NULL, as this gives warnings on some compilers
+- Create macro clkdev_alloc_valist() to avoid duplicate code.
+
+ drivers/clk/clkdev.c   |   64 +++++++++++++++++++++++++++++++++++++++++++----
+ include/linux/clkdev.h |    3 ++
+ 2 files changed, 61 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 6db161f..9d93d27 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -116,8 +116,9 @@ struct clk_lookup_alloc {
+ 	char	con_id[MAX_CON_ID];
+ };
+ 
+-struct clk_lookup * __init_refok
+-clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
++static struct clk_lookup * __init_refok
++__clkdev_alloc_valist(struct clk *clk, const char *con_id, const char *dev_fmt,
++		va_list ap)
+ {
+ 	struct clk_lookup_alloc *cla;
+ 
+@@ -132,16 +133,35 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+ 	}
+ 
+ 	if (dev_fmt) {
+-		va_list ap;
+-
+-		va_start(ap, dev_fmt);
+ 		vscnprintf(cla->dev_id, sizeof(cla->dev_id), dev_fmt, ap);
+ 		cla->cl.dev_id = cla->dev_id;
+-		va_end(ap);
+ 	}
+ 
+ 	return &cla->cl;
+ }
++
++#define clkdev_alloc_valist(_cl, _clk, _con_id, _dev_fmt, _ap)		\
++	do {								\
++		if (_dev_fmt)						\
++			va_start(_ap, _dev_fmt);			\
++									\
++		_cl = __clkdev_alloc_valist(_clk, _con_id, _dev_fmt,	\
++				_ap);					\
++									\
++		if (_dev_fmt)						\
++			va_end(ap);					\
++	} while (0);
++
++struct clk_lookup * __init_refok
++clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
++{
++	struct clk_lookup *cl;
++	va_list ap;
++
++	clkdev_alloc_valist(cl, clk, con_id, dev_fmt, ap);
++
++	return cl;
++}
+ EXPORT_SYMBOL(clkdev_alloc);
+ 
+ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
+@@ -173,3 +193,35 @@ void clkdev_drop(struct clk_lookup *cl)
+ 	kfree(cl);
+ }
+ EXPORT_SYMBOL(clkdev_drop);
++
++int clk_register_clkdev(struct clk *clk, const char *con_id,
++		const char *dev_fmt, ...)
++{
++	struct clk_lookup *cl;
++	va_list ap;
++
++	clkdev_alloc_valist(cl, clk, con_id, dev_fmt, ap);
++
++	if (!cl)
++		return -ENOMEM;
++
++	clkdev_add(cl);
++	return 0;
++}
++EXPORT_SYMBOL(clk_register_clkdev);
++
++int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
++{
++	unsigned i;
++
++	if (!clk)
++		return -ENOMEM;
++
++	for (i = 0; i < num; i++, cl++) {
++		cl->clk = clk;
++		clkdev_add(cl);
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL(clk_register_clkdevs);
+diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+index d9a4fd0..01d8ff6 100644
+--- a/include/linux/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -39,5 +39,8 @@ void clkdev_drop(struct clk_lookup *cl);
+ 
+ void clkdev_add_table(struct clk_lookup *, size_t);
+ int clk_add_alias(const char *, const char *, char *, struct device *);
++int clk_register_clkdev(struct clk *clk, const char *con_id,
++		const char *dev_fmt, ...);
++int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num);
+ 
+ #endif
+-- 
+1.7.9
