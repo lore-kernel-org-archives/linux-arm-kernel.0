@@ -1,107 +1,129 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Apr 2012 13:54:04 +0530
-Subject: [PATCH 08/12] gpio/samsung: add GPC4 bank instance
-In-Reply-To: <CAH9JG2VorCARJie+nrxh13-p0zTkboiRjkyMFpw8Eczb-9V-Bw@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 17 Apr 2012 17:25:48 +0900
+Subject: [PATCH 06/12] rtc-s3c: Fix breakage introduced by S3C2443/S3C2416
+ support
+In-Reply-To: <CAJuYYwR14_wxBswzkVcObWAEDFqDXyi751gmiHyJNW+rA0JcQQ@mail.gmail.com>
 References: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
- <1334641595-25301-9-git-send-email-thomas.abraham@linaro.org>
- <CAH9JG2VorCARJie+nrxh13-p0zTkboiRjkyMFpw8Eczb-9V-Bw@mail.gmail.com>
-Message-ID: <CAJuYYwQb2Ahzc-HX2qDFa6NoSmhp2C1KTtN7OQfMVc=zcUbn-A@mail.gmail.com>
+ <1334641595-25301-7-git-send-email-thomas.abraham@linaro.org>
+ <CAH9JG2V=5v0hp9rcynywcHYnrPUqN0XrS_hOcU-uY=FkNJ0O9g@mail.gmail.com>
+ <CAJuYYwR14_wxBswzkVcObWAEDFqDXyi751gmiHyJNW+rA0JcQQ@mail.gmail.com>
+Message-ID: <CAH9JG2XzszmonUp_vqMEVKr13kK8O-ts8h47H2EDaMvPaZ0BLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2012 12:03, Kyungmin Park <kmpark@infradead.org> wrote:
-> On 4/17/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
->> From: Sangsu Park <sangsu4u.park@samsung.com>
+On 4/17/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> On 17 April 2012 12:00, Kyungmin Park <kmpark@infradead.org> wrote:
+>> Hi,
 >>
->> Add GPC4 bank instance which is included in rev1 of Exynos5.
->>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
->> ---
->> ?arch/arm/mach-exynos/include/mach/gpio.h | ? ?9 ++++++---
->> ?drivers/gpio/gpio-samsung.c ? ? ? ? ? ? ?| ? ?8 ++++++++
->> ?2 files changed, 14 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/include/mach/gpio.h
->> b/arch/arm/mach-exynos/include/mach/gpio.h
->> index d7498af..df5612b 100644
->> --- a/arch/arm/mach-exynos/include/mach/gpio.h
->> +++ b/arch/arm/mach-exynos/include/mach/gpio.h
->> @@ -153,10 +153,11 @@ enum exynos4_gpio_number {
->> ?#define EXYNOS5_GPIO_B2_NR ? (4)
->> ?#define EXYNOS5_GPIO_B3_NR ? (4)
->> ?#define EXYNOS5_GPIO_C0_NR ? (7)
->> -#define EXYNOS5_GPIO_C1_NR ? (7)
->> +#define EXYNOS5_GPIO_C1_NR ? (4)
->> ?#define EXYNOS5_GPIO_C2_NR ? (7)
->> ?#define EXYNOS5_GPIO_C3_NR ? (7)
->> -#define EXYNOS5_GPIO_D0_NR ? (8)
->> +#define EXYNOS5_GPIO_C4_NR ? (8)
->> +#define EXYNOS5_GPIO_D0_NR ? (4)
->> ?#define EXYNOS5_GPIO_D1_NR ? (8)
->> ?#define EXYNOS5_GPIO_Y0_NR ? (6)
->> ?#define EXYNOS5_GPIO_Y1_NR ? (4)
->> @@ -199,7 +200,8 @@ enum exynos5_gpio_number {
->> ? ? ? EXYNOS5_GPIO_C1_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C0),
->> ? ? ? EXYNOS5_GPIO_C2_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C1),
->> ? ? ? EXYNOS5_GPIO_C3_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C2),
->> - ? ? EXYNOS5_GPIO_D0_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
->> + ? ? EXYNOS5_GPIO_C4_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
->> + ? ? EXYNOS5_GPIO_D0_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C4),
->> ? ? ? EXYNOS5_GPIO_D1_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D0),
->> ? ? ? EXYNOS5_GPIO_Y0_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D1),
->> ? ? ? EXYNOS5_GPIO_Y1_START ? ? ? ? ? = EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y0),
->> @@ -242,6 +244,7 @@ enum exynos5_gpio_number {
->> ?#define EXYNOS5_GPC1(_nr) ? ?(EXYNOS5_GPIO_C1_START + (_nr))
->> ?#define EXYNOS5_GPC2(_nr) ? ?(EXYNOS5_GPIO_C2_START + (_nr))
->> ?#define EXYNOS5_GPC3(_nr) ? ?(EXYNOS5_GPIO_C3_START + (_nr))
->> +#define EXYNOS5_GPC4(_nr) ? ?(EXYNOS5_GPIO_C4_START + (_nr))
->> ?#define EXYNOS5_GPD0(_nr) ? ?(EXYNOS5_GPIO_D0_START + (_nr))
->> ?#define EXYNOS5_GPD1(_nr) ? ?(EXYNOS5_GPIO_D1_START + (_nr))
->> ?#define EXYNOS5_GPY0(_nr) ? ?(EXYNOS5_GPIO_Y0_START + (_nr))
->> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
->> index 4627787..0153bb9 100644
->> --- a/drivers/gpio/gpio-samsung.c
->> +++ b/drivers/gpio/gpio-samsung.c
->> @@ -2452,6 +2452,12 @@ static struct samsung_gpio_chip exynos5_gpios_1[] = {
->> ? ? ? ? ? ? ? },
->> ? ? ? }, {
->> ? ? ? ? ? ? ? .chip ? = {
->> + ? ? ? ? ? ? ? ? ? ? .base ? = EXYNOS5_GPC4(0),
->> + ? ? ? ? ? ? ? ? ? ? .ngpio ?= EXYNOS5_GPIO_C4_NR,
->> + ? ? ? ? ? ? ? ? ? ? .label ?= "GPC4",
->> + ? ? ? ? ? ? },
->> + ? ? }, {
->> + ? ? ? ? ? ? .chip ? = {
->> ? ? ? ? ? ? ? ? ? ? ? .base ? = EXYNOS5_GPD0(0),
->> ? ? ? ? ? ? ? ? ? ? ? .ngpio ?= EXYNOS5_GPIO_D0_NR,
->> ? ? ? ? ? ? ? ? ? ? ? .label ?= "GPD0",
->> @@ -2880,6 +2886,8 @@ static __init int samsung_gpiolib_init(void)
->> ? ? ? ? ? ? ? for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
->> ? ? ? ? ? ? ? ? ? ? ? chip->base = gpx_base;
->>
->> + ? ? ? ? ? ? exynos5_gpios_1[11].base = gpio_base1 + 0x2E0;
-> '11' seems dangerous. I think you add comments here and above to know
-> '11' meaning.
+>> It's already merged with different patch,
+>
+> This is a repost of the patch from Heiko Stuebner which would be
+> required to fix compilation issue for rtc driver. I think you are
+> referring to that patch but it is not merged yet. So I am reposting it
+> with this series.
 
-Yes, true. But these will go away when the Samsung pinctrl driver will
-be merged. For now, I will put a comment to explain the meaning of 11.
-
-Thanks for reviewing the patches.
-
-Thanks,
-Thomas.
-
->> +
->> ? ? ? ? ? ? ? chip = exynos5_gpios_1;
->> ? ? ? ? ? ? ? nr_chips = ARRAY_SIZE(exynos5_gpios_1);
+No it's 3.4.0-rc3. it's already included.
+>
+> Thanks,
+> Thomas.
+>
 >>
->> --
->> 1.6.6.rc2
+>> #ifdef CONFIG_OF
+>> static const struct of_device_id s3c_rtc_dt_match[] = {
+>>        {
+>>                .compatible = "samsung,s3c2410-rtc",
+>>                .data = &s3c_rtc_drv_data_array[TYPE_S3C2410],
+>>        }, {
+>>                .compatible = "samsung,s3c2416-rtc",
+>>                .data = &s3c_rtc_drv_data_array[TYPE_S3C2416],
+>>        }, {
+>>                .compatible = "samsung,s3c2443-rtc",
+>>                .data = &s3c_rtc_drv_data_array[TYPE_S3C2443],
+>>        }, {
+>>                .compatible = "samsung,s3c6410-rtc",
+>>                .data = &s3c_rtc_drv_data_array[TYPE_S3C64XX],
+>>        },
+>>        {},
+>> };
+>> MODULE_DEVICE_TABLE(of, s3c_rtc_dt_match);
+>> #else
+>> #define s3c_rtc_dt_match NULL
+>> #endif
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
->> in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>> Thank you,
+>> Kyungmin Park
 >>
+>> On 4/17/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>>> From: Heiko Stuebner <heiko@sntech.de>
+>>>
+>>> Commits 7006ee4f (rtc-s3c: make room for more variants in devicetree
+>>> block)
+>>> and 6c0a2365 (rtc-s3c: add variants for S3C2443 and S3C2416)
+>>> introduced build-failures with enabled CONFIG_USE_OF option.
+>>>
+>>> This patch fixes missing "," in s3c_rtc_dt_match and wrong handling of
+>>> the of_device_id.data property.
+>>>
+>>> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>>> ---
+>>>  drivers/rtc/rtc-s3c.c |   18 +++++++++---------
+>>>  1 files changed, 9 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+>>> index 9ccea13..c792b6d 100644
+>>> --- a/drivers/rtc/rtc-s3c.c
+>>> +++ b/drivers/rtc/rtc-s3c.c
+>>> @@ -449,7 +449,7 @@ static inline int s3c_rtc_get_driver_data(struct
+>>> platform_device *pdev)
+>>>       if (pdev->dev.of_node) {
+>>>               const struct of_device_id *match;
+>>>               match = of_match_node(s3c_rtc_dt_match, pdev->dev.of_node);
+>>> -             return match->data;
+>>> +             return (int)match->data;
+>>>       }
+>>>  #endif
+>>>       return platform_get_device_id(pdev)->driver_data;
+>>> @@ -667,17 +667,17 @@ static int s3c_rtc_resume(struct platform_device
+>>> *pdev)
+>>>  #ifdef CONFIG_OF
+>>>  static const struct of_device_id s3c_rtc_dt_match[] = {
+>>>       {
+>>> -             .compatible = "samsung,s3c2410-rtc"
+>>> -             .data = TYPE_S3C2410,
+>>> +             .compatible = "samsung,s3c2410-rtc",
+>>> +             .data = (void *)TYPE_S3C2410,
+>>>       }, {
+>>> -             .compatible = "samsung,s3c2416-rtc"
+>>> -             .data = TYPE_S3C2416,
+>>> +             .compatible = "samsung,s3c2416-rtc",
+>>> +             .data = (void *)TYPE_S3C2416,
+>>>       }, {
+>>> -             .compatible = "samsung,s3c2443-rtc"
+>>> -             .data = TYPE_S3C2443,
+>>> +             .compatible = "samsung,s3c2443-rtc",
+>>> +             .data = (void *)TYPE_S3C2443,
+>>>       }, {
+>>> -             .compatible = "samsung,s3c6410-rtc"
+>>> -             .data = TYPE_S3C64XX,
+>>> +             .compatible = "samsung,s3c6410-rtc",
+>>> +             .data = (void *)TYPE_S3C64XX,
+>>>       },
+>>>       {},
+>>>  };
+>>> --
+>>> 1.6.6.rc2
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe
+>>> linux-samsung-soc"
+>>> in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
