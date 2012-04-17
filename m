@@ -1,22 +1,140 @@
-From: kosaki.motohiro@gmail.com (KOSAKI Motohiro)
-Date: Tue, 17 Apr 2012 14:24:36 -0400
-Subject: [NEW]: Introducing shrink_all_memory from user space
-In-Reply-To: <1334483226.20721.YahooMailNeo@web162003.mail.bf1.yahoo.com>
-References: <1334483226.20721.YahooMailNeo@web162003.mail.bf1.yahoo.com>
-Message-ID: <4F8DB564.2060205@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 18 Apr 2012 00:05:59 +0530
+Subject: [PATCH v4 2/2] regulator: add device tree support for max8997
+In-Reply-To: <4F734460.4060605@samsung.com>
+References: <1332582590-16382-1-git-send-email-thomas.abraham@linaro.org>
+ <1332582590-16382-3-git-send-email-thomas.abraham@linaro.org>
+ <4F734460.4060605@samsung.com>
+Message-ID: <CAJuYYwRsHynt6pBHUgk72Z-UjHj3DM=s4pV4dzbb2hTAZOUSAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(4/15/12 5:47 AM), PINTU KUMAR wrote:
-> Dear All,
+On 28 March 2012 22:33, Karol Lewandowski <k.lewandowsk@samsung.com> wrote:
+> On 24.03.2012 10:49, Thomas Abraham wrote:
 >
-> This is regarding a small proposal for shrink_all_memory( ) function which is found in mm/vmscan.c.
-> For those who are not aware, this function helps in reclaiming specified amount of physical memory and returns number of freed pages.
+> Hi Thomas!
 >
-> Currently this function is under CONFIG_HIBERNATION flag, so cannot be used by others without enabling hibernation.
-> Moreover this function is not exported to the outside world, so no driver can use it directly without including EXPORT_SYMBOL(shrink_all_memory) and recompiling the kernel.
-> The purpose of using it under hibernation(kernel/power/snapshot.c) is to regain enough physical pages to create hibernation image.
+>> Add device tree based discovery support for max8997.
+> ...
+>> +Regulators: The regulators of max8997 that have to be instantiated should be
+>> +included in a sub-node named 'regulators'. Regulator nodes included in this
+>> +sub-node should be of the format as below. Note: The 'n' in LDOn and BUCKn
+>> +represents the LDO or BUCK number as per the datasheet of max8997.
+>> +
+>> + ? ?For LDO's:
+>> + ? ? ? ? ? ? LDOn {
+>> + ? ? ? ? ? ? ? ? ? ? standard regulator bindings here
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ?For BUCK's:
+>> + ? ? ? ? ? ? BUCKn {
+>> + ? ? ? ? ? ? ? ? ? ? standard regulator bindings here
+>> + ? ? ? ? ? ? };
+>> +
+>
+>
+> Small note - driver supports[1] configuring following regulators by
+> using respective DT node names:
+>
+> ?- EN32KHz_AP
+> ?- EN32KHz_CP
+> ?- ENVICHG
+> ?- ESAFEOUT1
+> ?- ESAFEOUT2
+> ?- CHARGER
+> ?- CHARGER_CV
+> ?- CHARGER_TOPOFF
+>
+> I wonder if these should be mentioned in documentation too.
+>
+> [1] These are used in e.g. mach-nuri.c
 
-This is intended. current shrink_all_memory() is not designed for generic purpose. It doesn't care numa affinity etc..
-In future, we may remove this function completely because actually hibernation don't depend on it. it only help to
-improvement hibernation speed-up a bit.
+Yes, I missed the above regulators in the documentation. I have
+included them now and will resubmit this patch.
+
+>
+>> diff --git a/drivers/regulator/max8997.c b/drivers/regulator/max8997.c> index 9657929..dce8aaf 100644
+>
+>> --- a/drivers/regulator/max8997.c
+>> +++ b/drivers/regulator/max8997.c
+> ..
+>> +static int max8997_pmic_dt_parse_pdata(struct max8997_dev *iodev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct max8997_platform_data *pdata)
+>> +{
+>> + ? ? struct device_node *pmic_np, *regulators_np, *reg_np;
+>> + ? ? struct max8997_regulator_data *rdata;
+>> + ? ? unsigned int i, dvs_voltage_nr = 1, ret;
+>> +
+>> + ? ? pmic_np = iodev->dev->of_node;
+>> + ? ? if (!pmic_np) {
+>> + ? ? ? ? ? ? dev_err(iodev->dev, "could not find pmic sub-node\n");
+>> + ? ? ? ? ? ? return -ENODEV;
+>> + ? ? }
+>> +
+>> + ? ? regulators_np = of_find_node_by_name(pmic_np, "regulators");
+>> + ? ? if (!regulators_np) {
+>> + ? ? ? ? ? ? dev_err(iodev->dev, "could not find regulators sub-node\n");
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>> +
+>> + ? ? /* count the number of regulators to be supported in pmic */
+>> + ? ? pdata->num_regulators = 0;
+>> + ? ? for_each_child_of_node(regulators_np, reg_np)
+>> + ? ? ? ? ? ? pdata->num_regulators++;
+>> +
+>> + ? ? rdata = devm_kzalloc(iodev->dev, sizeof(*rdata) *
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdata->num_regulators, GFP_KERNEL);
+>> + ? ? if (!rdata) {
+>> + ? ? ? ? ? ? dev_err(iodev->dev, "could not allocate memory for "
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "regulator data\n");
+>> + ? ? ? ? ? ? return -ENOMEM;
+>> + ? ? }
+>
+>> + ? ? pdata->regulators = rdata;
+>
+>> + ? ? for_each_child_of_node(regulators_np, reg_np) {
+>> + ? ? ? ? ? ? for (i = 0; i < ARRAY_SIZE(regulators); i++)
+>> + ? ? ? ? ? ? ? ? ? ? if (!of_node_cmp(reg_np->name, regulators[i].name))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? rdata->id = i;
+>
+>
+> rdata->id will be equal to ARRAY_SIZE(regulators) when one adds DT node
+> name (below "regulators") which is different from what can be found in
+> regulators[] table.
+>
+> On my test machine this results in hard lockup - possibly because
+> something tries to access regulators[ARRAY_SIZE(regulators)]
+> later on.
+>
+> Following patch fixes this on my machine (using DTS with misspelled LDO1 for LDx1):
+>
+> diff --git a/drivers/regulator/max8997.c b/drivers/regulator/max8997.c
+> index dce8aaf..c20fd72 100644
+> --- a/drivers/regulator/max8997.c
+> +++ b/drivers/regulator/max8997.c
+> @@ -1011,6 +1011,13 @@ static int max8997_pmic_dt_parse_pdata(struct max8997_dev *iodev,
+> ? ? ? ? ? ? ? ?for (i = 0; i < ARRAY_SIZE(regulators); i++)
+> ? ? ? ? ? ? ? ? ? ? ? ?if (!of_node_cmp(reg_np->name, regulators[i].name))
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?break;
+> +
+> + ? ? ? ? ? ? ? if (i == ARRAY_SIZE(regulators)) {
+> + ? ? ? ? ? ? ? ? ? ? ? dev_warn(iodev->dev, "don't know how to configure regulator %s\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?reg_np->name);
+> + ? ? ? ? ? ? ? ? ? ? ? continue;
+> + ? ? ? ? ? ? ? }
+> +
+> ? ? ? ? ? ? ? ?rdata->id = i;
+> ? ? ? ? ? ? ? ?rdata->initdata = of_get_regulator_init_data(
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?iodev->dev, reg_np);
+>
+
+Thanks for this fix. I have merged this change into this patch.
+
+Regards,
+Thomas.
+
+>
+> Regards,
+> --
+> Karol Lewandowski | Samsung Poland R&D Center | Linux/Platform
