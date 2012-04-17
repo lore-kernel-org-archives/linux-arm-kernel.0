@@ -1,38 +1,66 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 17 Apr 2012 23:28:24 +0200
-Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
- flag
-In-Reply-To: <1334254056.20098.YahooMailClassic@web29010.mail.ird.yahoo.com>
- (Paul Parsons's message of "Thu, 12 Apr 2012 19:07:36 +0100 (BST)")
-References: <1334254056.20098.YahooMailClassic@web29010.mail.ird.yahoo.com>
-Message-ID: <87lilum4jr.fsf@free.fr>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Apr 2012 14:48:03 -0700
+Subject: [PATCH v4 11/12] ARM: OMAP1: DMTIMER: fix broken timer clock
+ source selection
+In-Reply-To: <20120411003559.27059.1315.stgit@dusk>
+References: <20120411003454.27059.37500.stgit@dusk>
+ <20120411003559.27059.1315.stgit@dusk>
+Message-ID: <20120417214802.GH21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Parsons <lost.distance@yahoo.com> writes:
+* Paul Walmsley <paul@pwsan.com> [120410 17:41]:
+> DMTIMER source selection on OMAP1 is broken.  omap1_dm_timer_set_src()
+> tries to use __raw_{read,write}l() to read from and write to physical
+> addresses, but those functions take virtual addresses.
+> 
+> sparse caught this:
+> 
+> arch/arm/mach-omap1/timer.c:50:13: warning: incorrect type in argument 1 (different base types)
+> arch/arm/mach-omap1/timer.c:50:13:    expected void const volatile [noderef] <asn:2>*<noident>
+> arch/arm/mach-omap1/timer.c:50:13:    got unsigned int
+> arch/arm/mach-omap1/timer.c:52:9: warning: incorrect type in argument 1 (different base types)
+> arch/arm/mach-omap1/timer.c:52:9:    expected void const volatile [noderef] <asn:2>*<noident>
+> arch/arm/mach-omap1/timer.c:52:9:    got unsigned int
+> 
+> Fix by using omap_{read,writel}(), just like the other users of the
+> MOD_CONF_CTRL_1 register in the OMAP1 codebase.  Of course, in the long term,
+> removing omap_{read,write}l() is the appropriate thing to do; but
+> this will take some work to do this cleanly.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 
-> --- On Thu, 12/4/12, Paul Parsons <lost.distance@yahoo.com> wrote:
->> The PXA GPIO irq_chip structure
->> (pxa_muxed_gpio_chip) sets neither:
->> 1. The irq_set_wake() handler.
->> 2. The IRQCHIP_SKIP_SET_WAKE flag.
+Uhh looks like this was caused by commit 97933d6 (ARM: OMAP1: dmtimer: conversion
+to platform devices) moving code and changing it :(
 
-Hi Paul and others,
+I'll pick this to fixes.
 
-I tried the v3.4-rc2 today, and it _seems_ gpio button wakeups don't work
-anymore (ie. wakeup set up by gpio-keys driver). More specifically, the GPIO0
-(power button) doesn't wakeup my board from "echo mem > /proc/power/state".
+Tony
 
-I haven't investigated much, but tracing PWER register on suspend,
-while GPIO0 (power button) was set as a wakeup source gives 0x80100000, which
-lacks the bit0 setting (ie. GPIO0 as a wakeup source).
-
-I don't know it this is a recent or known issue, or if I'm have missed a change in
-pxa/gpio-keys driver.
-
-Would anyone have an idea what's happening or should I look for the issue myself ?
-
-Cheers.
-
--- 
-Robert
+> ---
+>  arch/arm/mach-omap1/timer.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
+> index 5536e04..64c65bc 100644
+> --- a/arch/arm/mach-omap1/timer.c
+> +++ b/arch/arm/mach-omap1/timer.c
+> @@ -47,9 +47,9 @@ static int omap1_dm_timer_set_src(struct platform_device *pdev,
+>  	int n = (pdev->id - 1) << 1;
+>  	u32 l;
+>  
+> -	l = __raw_readl(MOD_CONF_CTRL_1) & ~(0x03 << n);
+> +	l = omap_readl(MOD_CONF_CTRL_1) & ~(0x03 << n);
+>  	l |= source << n;
+> -	__raw_writel(l, MOD_CONF_CTRL_1);
+> +	omap_writel(l, MOD_CONF_CTRL_1);
+>  
+>  	return 0;
+>  }
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
