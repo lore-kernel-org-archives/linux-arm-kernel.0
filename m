@@ -1,63 +1,46 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Tue, 17 Apr 2012 09:11:32 -0500
-Subject: [PATCH] ARM: imx: Fix imx5 idle logic bug
-In-Reply-To: <20120417081025.GN20478@pengutronix.de>
-References: <1334619468-25680-1-git-send-email-rob.lee@linaro.org>
- <20120417081025.GN20478@pengutronix.de>
-Message-ID: <CAMXH7KH6rdaUCsJxdj2pU0HrJ5ash5em2PMfyZHKTw+01Z=5nQ@mail.gmail.com>
+From: kiko@linaro.org (Christian Robottom Reis)
+Date: Tue, 17 Apr 2012 11:13:09 -0300
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <CAMXH7KH41kWMPu_dEpetZc8OUD3C0-mtxGbXX0Vqd4EODPWJUg@mail.gmail.com>
+References: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
+ <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
+ <20120417074301.GM20478@pengutronix.de>
+ <CAMXH7KH41kWMPu_dEpetZc8OUD3C0-mtxGbXX0Vqd4EODPWJUg@mail.gmail.com>
+Message-ID: <20120417141309.GH11786@async.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 3:10 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Mon, Apr 16, 2012 at 06:37:48PM -0500, Robert Lee wrote:
->> The imx5_idle() check of the tzic_eanble_wake() return value uses
->> incorrect (inverted) logic causing all attempt to idle to fail.
->>
->
-> Does this have influence on current kernels or does this only trigger
-> with your cpuidle patches?
+On Tue, Apr 17, 2012 at 08:54:03AM -0500, Rob Lee wrote:
+> >> +void __init imx_cpuidle_set_driver(struct cpuidle_driver *p)
+> >> +{
+> >> + ? ? drv = p;
+> >> +}
+> >
+> > You like it complicated, eh? Why do you introduce a function which sets
+> > a variable...
+> 
+> This complication is used to deal with the timing of various levels of
+> init calls.  More explanation below.
 
-This influences non-cpuidle kernels also as imx5_idle is what
-arm_pm_idle points to for imx51.
+Regardless of how you end up solving this, it's probably a good idea
+to document the rationale, perhaps cribbing from what you describe
+below..
 
->
-> Sascha
->
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> ---
->> ?arch/arm/mach-imx/mm-imx5.c | ? ?2 +-
->> ?1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
->> index 05250ae..e10f391 100644
->> --- a/arch/arm/mach-imx/mm-imx5.c
->> +++ b/arch/arm/mach-imx/mm-imx5.c
->> @@ -35,7 +35,7 @@ static void imx5_idle(void)
->> ? ? ? }
->> ? ? ? clk_enable(gpc_dvfs_clk);
->> ? ? ? mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
->> - ? ? if (tzic_enable_wake() != 0)
->> + ? ? if (!tzic_enable_wake())
->> ? ? ? ? ? ? ? cpu_do_idle();
->> ? ? ? clk_disable(gpc_dvfs_clk);
->> ?}
->> --
->> 1.7.10
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+> If I called imx_cpuidle_init directly from imx5 or imx6q init
+> routines, it would be getting called before the coreinit_call of core
+> cpuidle causing a failure.  There were various other directions to
+> take and all seemed less desirable than this one.
+> 
+> One alternative would be to add a function to return the pointer to
+> the cpuidle driver object based on the machine type.  Functionality
+> exists to identify imx5 as a machine type but not imx6q, so I couldn't
+> use that machine based method without adding that extra code.
+> 
+> Another alternative would be to add a general platform lateinit_call
+> function to each platforms that support cpuidle.
+
+..in a comment; without it, the code indeed looks bizarre.
+-- 
+Christian Robottom Reis, Engineering VP
+Brazil (GMT-3) | [+55] 16 9112 6430 | [+1] 612 216 4935
+Linaro.org: Open Source Software for ARM SoCs
