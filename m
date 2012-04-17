@@ -1,37 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 17 Apr 2012 13:55:49 -0600
-Subject: [PATCH v2 2/2] pinctrl: show pin name for pingroups in sysfs
-In-Reply-To: <1334646046-467-2-git-send-email-b29396@freescale.com>
-References: <1334646046-467-1-git-send-email-b29396@freescale.com>
- <1334646046-467-2-git-send-email-b29396@freescale.com>
-Message-ID: <4F8DCAC5.6000706@wwwdotorg.org>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 17 Apr 2012 22:10:31 +0200
+Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
+ sampling bug
+In-Reply-To: <20120417174824.GD22406@pengutronix.de>
+References: <1334675261-31570-1-git-send-email-marex@denx.de>
+ <20120417174824.GD22406@pengutronix.de>
+Message-ID: <201204172210.31232.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2012 01:00 AM, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+Dear Wolfram Sang,
+
+> On Tue, Apr 17, 2012 at 05:07:41PM +0200, Marek Vasut wrote:
+> > From: Marek Vasut <marek.vasut@gmail.com>
+> > 
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > Cc: Chen Peter-B29397 <B29397@freescale.com>
+> > Cc: Detlev Zundel <dzu@denx.de>
+> > Cc: Fabio Estevam <festevam@gmail.com>
+> > Cc: Li Frank-B20596 <B20596@freescale.com>
+> > Cc: Lin Tony-B19295 <B19295@freescale.com>
+> > Cc: Linux USB <linux-usb@vger.kernel.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Shawn Guo <shawn.guo@freescale.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Stefano Babic <sbabic@denx.de>
+> > Cc: Subodh Nijsure <snijsure@grid-net.com>
+> > Cc: Tony Lin <tony.lin@freescale.com>
+> > Cc: Wolfgang Denk <wd@denx.de>
 > 
-> Pin name is more useful to users.
-...
-> @@ -964,10 +984,14 @@ static int pinctrl_groups_show(struct seq_file *s, void *what)
->  			seq_printf(s, "%s [ERROR GETTING PINS]\n",
->  				   gname);
->  		else {
-> -			seq_printf(s, "group: %s, pins = [ ", gname);
-> -			for (i = 0; i < num_pins; i++)
-> -				seq_printf(s, "%d ", pins[i]);
-> -			seq_puts(s, "]\n");
-> +			seq_printf(s, "group: %s\n", gname);
-> +			for (i = 0; i < num_pins; i++) {
-> +				pname = pin_get_name(pctldev, pins[i]);
-> +				if (WARN_ON(!pname))
-> +					return -EINVAL;
+> Quite a CC list, but you forgot the main ones:
 
-The main issue I had here was that the loop should continue rather than
-erroring out. Still, I suppose this condition "can't" happen, so perhaps
-that isn't such a big deal after all. So:
+Do you have a trimmed-down version of the list of mxs-related people possibly?
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> 
+> FRAMEBUFFER LAYER
+> M:      Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> L:      linux-fbdev at vger.kernel.org
+> 
+> Patch itself looks good
 
-> +				seq_printf(s, "pin %d (%s)\n", pins[i], pname);
-> +			}
+Who's applying this? The fbdev people or imx tree?
+
+> 
+> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+
+Best regards,
+Marek Vasut
