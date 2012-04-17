@@ -1,61 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Apr 2012 10:35:31 -0700
-Subject: [GIT PULL]: omap-serial updates for 3.4-rc
-In-Reply-To: <CAMrsUdJ9ehjC4-hChddQRnH0BtpFG3bVBTnm6zFZpU6F0za_bg@mail.gmail.com>
-References: <1334052148-10385-1-git-send-email-govindraj.raja@ti.com>
- <CAMrsUdKDhuDLr2=0uiQtY=r4pvmJQo=pJgERRCXySLghO7yGXA@mail.gmail.com>
- <CAMrsUdJ7wzX+Hnx_wBWNnCQz__0sMw8ruFGVWH+x3NGWG0NVQw@mail.gmail.com>
- <CAMrsUdJ9ehjC4-hChddQRnH0BtpFG3bVBTnm6zFZpU6F0za_bg@mail.gmail.com>
-Message-ID: <20120417173530.GC21106@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 17 Apr 2012 21:40:55 +0400
+Subject: [PATCH 7/8] MXS: Enable USB on M28EVK
+In-Reply-To: <1334657751-27678-8-git-send-email-marex@denx.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <1334657751-27678-8-git-send-email-marex@denx.de>
+Message-ID: <4F8DAB27.90107@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-* Raja, Govindraj <govindraj.raja@ti.com> [120416 03:44]:
-> 
-> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
-> 
->   Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linux-3-x/omap-serial.git for_3.4/uart_fixes
-> 
-> for you to fetch changes up to 381772fefe13e73fc3d01c462d401785767c3775:
-> 
->   ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
-> (2012-04-16 15:46:26 +0530)
-> 
-> ----------------------------------------------------------------
-> Govindraj.R (5):
->       OMAP2+: UART: Remove cpu checks for populating errata flags
+On 04/17/2012 02:15 PM, Marek Vasut wrote:
 
-Not a fix.
+> Enable the second USB port on M28EVK board.
 
->       OMAP2+: UART: enable tx wakeup bit for wer reg
+> Signed-off-by: Marek Vasut<marex@denx.de>
+> Cc: Chen Peter-B29397<B29397@freescale.com>
+> Cc: Detlev Zundel<dzu@denx.de>
+> Cc: Fabio Estevam<festevam@gmail.com>
+> Cc: Li Frank-B20596<B20596@freescale.com>
+> Cc: Lin Tony-B19295<B19295@freescale.com>
+> Cc: Linux USB<linux-usb@vger.kernel.org>
+> Cc: Sascha Hauer<s.hauer@pengutronix.de>
+> Cc: Shawn Guo<shawn.guo@freescale.com>
+> Cc: Shawn Guo<shawn.guo@linaro.org>
+> Cc: Stefano Babic<sbabic@denx.de>
+> Cc: Subodh Nijsure<snijsure@grid-net.com>
+> Cc: Tony Lin<tony.lin@freescale.com>
+> Cc: Wolfgang Denk<wd@denx.de>
+[...]
 
-Not a fix, and should get reviewed and merged via linux-serial mailing
-list.
+> @@ -377,6 +382,11 @@ static void __init m28evk_init(void)
+>   	mx28_add_ts(&touch_pdata);
+>
+>   	mx28_add_gpmi_nand(&m28evk_gpmi_nand_data);
+> +
+> +	gpio_request(MXS_GPIO_NR(3, 13), "USB");
 
->       OMAP2+: UART: replace omap34xx/omap4xx cpu checks with not omap24xx
+    gpio_request() can fail and you don't handle it.
 
-Not a fix.
+> +	gpio_direction_output(MXS_GPIO_NR(3, 13), 0);
 
->       OMAP2+: UART: Fix incorrect population of default uart pads
+    You can use gpio_request_one() instead of the above 2 calls.
 
-I'll apply this directly with updated comments into fixes.
-
->       OMAP2+: UART: Add mechanism to probe uart pins and configure rx wakeup
-
-Not ready and too intrusive for -rc cycle.
- 
-> Santosh Shilimkar (1):
->       ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
-
-It seems this can wait as the wake-up events are anyways broken right
-now when we remove the muxing.
-
-So not pulling.
-
-Tony
+WBR, Sergei
