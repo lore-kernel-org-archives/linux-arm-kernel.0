@@ -1,76 +1,52 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 17 Apr 2012 15:05:32 -0700
-Subject: COMMON_CLK_DISABLE_UNUSED
-In-Reply-To: <4F843778.8050506@gmail.com>
-References: <20120409222903.GA31622@lunn.ch>
- <CAJOA=zP8XFTN1mcAyUky3ovrx4Dg1zb9zaB5r8zUYE46Ec-tMQ@mail.gmail.com>
- <4F843778.8050506@gmail.com>
-Message-ID: <CAJOA=zMQ465nGXobywH0DWQePxL46Nr7MvNgX-Vsuy1y9y2q3g@mail.gmail.com>
+Date: Tue, 17 Apr 2012 15:13:49 -0700
+Subject: [PATCH 1/4] clk: select CLKDEV_LOOKUP for COMMON_CLK
+In-Reply-To: <1334003101-17274-2-git-send-email-robherring2@gmail.com>
+References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
+ <1334003101-17274-2-git-send-email-robherring2@gmail.com>
+Message-ID: <CAJOA=zMPqiH2fQJ5JWJ=COnju7Cmur6J2ATYUTcx41C4WMjFQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2012 at 6:36 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 04/09/2012 06:04 PM, Turquette, Mike wrote:
->> On Mon, Apr 9, 2012 at 3:29 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>> I think it would be good to consider deleting this config option and
->>> just have the code always enabled.
->>
->> I agree. ?We already support the CLK_IGNORE_UNUSED flag, so any
->> platforms that don't want this functionality wholesale can set that
->> bit for every clock.
->>
->> I'll pull out that option.
->>
+On Mon, Apr 9, 2012 at 1:24 PM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> CLK_IGNORE_UNUSED looks a bit broken to me. If you don't have the flag
-> set on the whole chain of parents, then a parent could be turned off.
-> This could happen at boot time or when another child get disabled and
-> the common parent's ref count goes to 0 and gets disabled.
+> Using the common clock infrastructure without the common clkdev code makes
+> little sense, so select CLKDEV_LOOKUP for COMMON_CLK.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> ?drivers/clk/Kconfig | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 165e1fe..f05a60d 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -12,6 +12,7 @@ config HAVE_MACH_CLKDEV
+> ?config COMMON_CLK
+> ? ? ? ?bool
+> ? ? ? ?select HAVE_CLK_PREPARE
+> + ? ? ? select CLKDEV_LOOKUP
+> ? ? ? ?---help---
+> ? ? ? ? ?The common clock framework is a single definition of struct
+> ? ? ? ? ?clk, useful across many platforms, as well as an
 
-Chain of parents is irrelevant.  If the clock data is faulty and
-doesn't mark a clock properly with CLK_IGNORE_UNUSED when it should
-then bad things are expected to happen.
+Hi Rob,
 
-> I think a better solution would be a force enable or enable on boot flag
-> that sets ref counts correctly. Otherwise, each platform has to call
-> clk_prepare and clk_enable for all the clocks it wants to keep on.
-
-I'm happy with platforms calling clk_prepare and clk_enable for clocks
-that are not traditionally controlled by drivers.  Doing so makes for
-a more easily understood clocking scheme and takes the magic out of
-"why is that clock enabled/disabled?" during debug.
-
-> Here's a simple case that needs work. You have a cpu clock controlled by
-> cpufreq driver. If the cpufreq driver is not loaded, we want the cpu
-> clock always enabled and don't want the clk infrastructure turning it
-> off. If the cpufreq driver is loaded, then we potentially want it to be
-> able to enable and disable the cpu clock if we switch parents. I guess
-> the easiest solution is the cpufreq driver needs to assume the cpu clock
-> is already enabled with a ref count of 1.
-
-This feels cumbersome to me.  So the core increments the prepare and
-enable usecounts and defers to the driver code to do the right thing?
-This sounds like an easy way to end up with an imbalance of usecounts.
- Even worse drivers might end up doing something awful such as:
-
-clk_enable(clk);
-...
-driver_does_stuff();
-...
-clk_disable(clk); // usecount is still 1
-clk_disable(clk); // usecount is now zero
-
-In the other thread on this topic started by Viresh a good question
-was put forward by Shawn: can your hardware not tolerate having
-.clk_enable run against a clock that is already enabled?  For SoCs
-this is typically setting (or clearing) a bit that is already set (or
-cleared, respectively).  That allows your cpufreq driver to still do
-the typical clk_enable/clk_disable routine without having to make any
-assumptions about the clock being enabled AND it allows proper use of
-the CLK_IGNORE_UNUSED flag in the event that your cpufreq driver is
-never loaded.
+I agree that the common clk framework is not particularly useful
+without clkdev.  However the core code has no dependency on clkdev.
+Why not just select it from an arch Kconfig, or even make it a
+dependency based on your own platform clock data/code?
 
 Regards,
 Mike
 
-> Rob
+> --
+> 1.7.5.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
