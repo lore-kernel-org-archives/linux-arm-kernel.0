@@ -1,47 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Apr 2012 11:44:00 +0100
-Subject: [PATCH 08/16] drivers/mmc: MMCI: Use correct GPIO binding for IRQ
- requests
+Date: Tue, 17 Apr 2012 11:44:02 +0100
+Subject: [PATCH 10/16] drivers/gpio: represent gpio-nomadik as an IRQ
+ controller in DT documentation
 In-Reply-To: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
 References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334659448-11521-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334659448-11521-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now there are irqdomains in place for Snowball, we can request
-GPIO IRQs directly by their binding. This replaces the previous method
-of hard-coding the hwirq using u32 values in the DT.
+Now gpio-nomadik has proper bindings devices initialised by Device Tree
+entries are able to use the chained GPIO IRQ lines it provides. This
+patch aims to reflect that in the gpio-nmk documentation.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mmc/host/mmci.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/gpio/gpio-nmk.txt          |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5a7da17..2303a16 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -26,6 +26,7 @@
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #include <linux/regulator/consumer.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
-@@ -1203,11 +1204,11 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
- {
- 	int bus_width = 0;
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+index 3856789..d0381fe 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+@@ -13,6 +13,7 @@ Required properties:
+                                   4 = active high level-sensitive.
+                                   8 = active low level-sensitive.
+ - gpio-controller       : Marks the device node as a GPIO controller.
++- gpio-interrupt        : Marks the device node as a GPIO controller.
+ - gpio-bank             : Specifies which bank a controller owns.
+ - st,supports-sleepmode : Specifies whether controller can sleep or not
  
--	of_property_read_u32(np, "wp-gpios", &pdata->gpio_wp);
-+	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
- 	if (!pdata->gpio_wp)
- 		pdata->gpio_wp = -1;
- 
--	of_property_read_u32(np, "cd-gpios", &pdata->gpio_cd);
-+	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
- 	if (!pdata->gpio_cd)
- 		pdata->gpio_cd = -1;
- 
+@@ -24,6 +25,7 @@ Example:
+                         interrupts = <0 120 0x4>;
+                         #gpio-cells = <2>;
+                         gpio-controller;
++                        interrupt-controller;
+                         supports-sleepmode;
+                         gpio-bank = <1>;
+                 };
 -- 
 1.7.9.1
