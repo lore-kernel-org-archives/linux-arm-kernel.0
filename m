@@ -1,185 +1,140 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 17 Apr 2012 06:45:44 -0700
-Subject: [PATCHv8 04/18] I2C: OMAP: I2C register restore only if context
- is lost
-In-Reply-To: <1334235995-6727-5-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Thu, 12 Apr 2012 18:36:21 +0530")
-References: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
- <1334235995-6727-5-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87d376zd2v.fsf@ti.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Tue, 17 Apr 2012 08:54:03 -0500
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <20120417074301.GM20478@pengutronix.de>
+References: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
+ <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
+ <20120417074301.GM20478@pengutronix.de>
+Message-ID: <CAMXH7KH41kWMPu_dEpetZc8OUD3C0-mtxGbXX0Vqd4EODPWJUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
-
->  Currently i2c register restore is done always.
->  Adding conditional restore.
->  The i2c register restore is done only if the context is lost.
-
-OK, minor comment below.
-
->  Also remove the definition of SYSS_RESETDONE_MASK and use the
->  one in omap_hwmod.h.
-
-The definition is removed, but I don't see any of the users removed.
-If the users were cleaned up earlier in the series, then the removal of
-this should be done with that, or as a separate patch.  I don't see why
-it belongs with this patch.
-
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  arch/arm/plat-omap/i2c.c      |    3 ++
->  drivers/i2c/busses/i2c-omap.c |   52 ++++++++++++++++++++++++++--------------
->  include/linux/i2c-omap.h      |    1 +
->  3 files changed, 38 insertions(+), 18 deletions(-)
+On Tue, Apr 17, 2012 at 2:43 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Apr 16, 2012 at 06:50:12PM -0500, Robert Lee wrote:
+>> Add common cpuidle init functionality that can be used by various
+>> imx platforms.
+>>
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+>> index e81290c..7c9e05f 100644
+>> --- a/arch/arm/plat-mxc/Makefile
+>> +++ b/arch/arm/plat-mxc/Makefile
+>> @@ -16,6 +16,8 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+>> ?obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+>> ?obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+>> ?obj-$(CONFIG_CPU_FREQ_IMX) ? ?+= cpufreq.o
+>> +obj-$(CONFIG_CPU_IDLE) ? ?+= cpuidle.o
+>> +
+>> ?ifdef CONFIG_SND_IMX_SOC
+>> ?obj-y += ssi-fiq.o
+>> ?obj-y += ssi-fiq-ksym.o
+>> diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
+>> new file mode 100644
+>> index 0000000..d1c9301
+>> --- /dev/null
+>> +++ b/arch/arm/plat-mxc/cpuidle.c
+>> @@ -0,0 +1,89 @@
+>> +/*
+>> + * Copyright 2012 Freescale Semiconductor, Inc.
+>> + * Copyright 2012 Linaro Ltd.
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/io.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/hrtimer.h>
+>> +#include <linux/err.h>
+>> +#include <linux/slab.h>
+>> +
+>> +static struct cpuidle_device __percpu * imx_cpuidle_devices;
+>> +static struct cpuidle_driver *drv;
+>> +
+>> +void __init imx_cpuidle_set_driver(struct cpuidle_driver *p)
+>> +{
+>> + ? ? drv = p;
+>> +}
 >
-> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-> index db071bc..4ccab07 100644
-> --- a/arch/arm/plat-omap/i2c.c
-> +++ b/arch/arm/plat-omap/i2c.c
-> @@ -179,6 +179,9 @@ static inline int omap2_i2c_add_bus(int bus_id)
->  	 */
->  	if (cpu_is_omap34xx())
->  		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
-> +
-> +	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
-> +
->  	pdev = omap_device_build(name, bus_id, oh, pdata,
->  			sizeof(struct omap_i2c_bus_platform_data),
->  			NULL, 0, 0);
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index a882558..45389db 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -43,6 +43,7 @@
->  #include <linux/slab.h>
->  #include <linux/i2c-omap.h>
->  #include <linux/pm_runtime.h>
-> +#include <plat/omap_device.h>
->  
->  /* I2C controller revisions */
->  #define OMAP_I2C_OMAP1_REV_2		0x20
-> @@ -157,9 +158,6 @@ enum {
->  #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
->  #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
->  
-> -/* OCP_SYSSTATUS bit definitions */
-> -#define SYSS_RESETDONE_MASK		(1 << 0)
-> -
->  /* OCP_SYSCONFIG bit definitions */
->  #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
->  #define SYSC_SIDLEMODE_MASK		(0x3 << 3)
-> @@ -184,6 +182,7 @@ struct omap_i2c_dev {
->  	u32			latency;	/* maximum mpu wkup latency */
->  	void			(*set_mpu_wkup_lat)(struct device *dev,
->  						    long latency);
-> +	int			(*get_context_loss_count)(struct device *dev);
->  	u32			speed;		/* Speed of bus in kHz */
->  	u32			dtrev;		/* extra revision from DT */
->  	u32			flags;
-> @@ -206,6 +205,7 @@ struct omap_i2c_dev {
->  	u16			syscstate;
->  	u16			westate;
->  	u16			errata;
-> +	int			dev_lost_count;
->  };
->  
->  static const u8 reg_map_ip_v1[] = {
-> @@ -1025,6 +1025,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  		dev->speed = pdata->clkrate;
->  		dev->flags = pdata->flags;
->  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
-> +		dev->get_context_loss_count = pdata->get_context_loss_count;
->  		dev->dtrev = pdata->rev;
->  	}
->  
-> @@ -1151,12 +1152,32 @@ omap_i2c_remove(struct platform_device *pdev)
->  }
->  
->  #ifdef CONFIG_PM_RUNTIME
-> +static void omap_i2c_restore(struct omap_i2c_dev *dev)
-> +{
-> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-> +	/*
-> +	 * Don't write to this register if the IE state is 0 as it can
-> +	 * cause deadlock.
-> +	 */
-> +	if (dev->iestate)
-> +		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
-> +
-> +}
->  static int omap_i2c_runtime_suspend(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
->  	u16 iv;
->  
-> +	if (_dev->get_context_loss_count)
-> +		_dev->dev_lost_count = _dev->get_context_loss_count(dev);
-> +
->  	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
->  	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
->  		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
-> @@ -1179,24 +1200,19 @@ static int omap_i2c_runtime_resume(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-> +	int loss_cnt;
->  
-> -	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-> +	if (_dev->get_context_loss_count) {
-> +		loss_cnt = _dev->get_context_loss_count(dev);
-> +		if (loss_cnt < 0)
-> +			return loss_cnt;
+> You like it complicated, eh? Why do you introduce a function which sets
+> a variable...
+>
 
-To avoid messing up driver state, upon error, you should probably
-restore context, not abort.
+This complication is used to deal with the timing of various levels of
+init calls.  More explanation below.
 
-> +		if (_dev->dev_lost_count == loss_cnt && _dev->dev_lost_count)
-> +			return 0;
+>> +
+>> +void imx_cpuidle_devices_uninit(void)
+>> +{
+>> + ? ? int cpu_id;
+>> + ? ? struct cpuidle_device *dev;
+>> +
+>> + ? ? for_each_possible_cpu(cpu_id) {
+>> + ? ? ? ? ? ? dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
+>> + ? ? ? ? ? ? cpuidle_unregister_device(dev);
+>> + ? ? }
+>> +
+>> + ? ? free_percpu(imx_cpuidle_devices);
+>> +}
+>> +
+>> +static int __init imx_cpuidle_init(void)
+>
+> ... instead of passing it directly to the function which uses it?
+>
 
-Why the non-zero check?
+If I called imx_cpuidle_init directly from imx5 or imx6q init
+routines, it would be getting called before the coreinit_call of core
+cpuidle causing a failure.  There were various other directions to
+take and all seemed less desirable than this one.
 
-Seems like all you need to check is if (_dev->dev_lost_count != loss_cnt).
+One alternative would be to add a function to return the pointer to
+the cpuidle driver object based on the machine type.  Functionality
+exists to identify imx5 as a machine type but not imx6q, so I couldn't
+use that machine based method without adding that extra code.
 
-Kevin
+Another alternative would be to add a general platform lateinit_call
+function to each platforms that support cpuidle.
 
->  	}
->  
-> -	/*
-> -	 * Don't write to this register if the IE state is 0 as it can
-> -	 * cause deadlock.
-> -	 */
-> -	if (_dev->iestate)
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
-> +	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
-> +		omap_i2c_restore(_dev);
->  
->  	return 0;
->  }
-> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-> index 92a0dc7..c76cbc0 100644
-> --- a/include/linux/i2c-omap.h
-> +++ b/include/linux/i2c-omap.h
-> @@ -35,6 +35,7 @@ struct omap_i2c_bus_platform_data {
->  	u32		rev;
->  	u32		flags;
->  	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
-> +	int		(*get_context_loss_count)(struct device *dev);
->  };
->  
->  #endif
+>> +{
+>> + ? ? struct cpuidle_device *dev;
+>> + ? ? int cpu_id, ret;
+>> +
+>> + ? ? if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
+>> + ? ? ? ? ? ? pr_err("%s: Invalid Input\n", __func__);
+>
+> You introduce a pointless error message on SoCs not setting a cpuidle
+> driver. When will people learn that initcalls do not only run on
+> machines they have on their desk?
+>
+
+Will fix in next version.
+
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>> +
+>> + ? ? ret = cpuidle_register_driver(drv);
+>> +
+>> + ? ? if (ret) {
+>> + ? ? ? ? ? ? pr_err("%s: Failed to register cpuidle driver\n", __func__);
+>
+> It's always nice to add the return value to the error message to get a
+> clue *what* went wrong. The function name though is rather
+> uninteresting.
+
+Will add the return value in the next version.
+
+>
+> Sascha
+>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
