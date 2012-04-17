@@ -1,183 +1,69 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Tue, 17 Apr 2012 01:56:27 +0200 (CEST)
-Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
-In-Reply-To: <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
-References: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
- <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
-Message-ID: <alpine.LNX.2.00.1204170152380.23403@swampdragon.chaosbits.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Apr 2012 18:41:03 -0700
+Subject: [PATCH 2/2] OMAP2+: UART: Add mechanism to probe uart pins and
+ configure rx wakeup
+In-Reply-To: <CAMrsUdK2ZqCGWtL104tBC_h-XHD0UMMFagch_eSER+92zC1FiQ@mail.gmail.com>
+References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
+ <1334065246-21294-3-git-send-email-govindraj.raja@ti.com>
+ <20120410161136.GF6487@atomide.com>
+ <CAMrsUdK2ZqCGWtL104tBC_h-XHD0UMMFagch_eSER+92zC1FiQ@mail.gmail.com>
+Message-ID: <20120417014103.GA21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Apr 2012, Robert Lee wrote:
+Hi,
 
-> Add common cpuidle init functionality that can be used by various
-> imx platforms.
-> 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
->  arch/arm/plat-mxc/Makefile               |    2 +
->  arch/arm/plat-mxc/cpuidle.c              |   89 ++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/cpuidle.h |   26 +++++++++
->  3 files changed, 117 insertions(+)
->  create mode 100644 arch/arm/plat-mxc/cpuidle.c
->  create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
-> 
+Few more comments below.
 
-A few pedantic/ignorable comments below.
-
-
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index e81290c..7c9e05f 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -16,6 +16,8 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
->  obj-$(CONFIG_MXC_USE_EPIT) += epit.o
->  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
-> +obj-$(CONFIG_CPU_IDLE)    += cpuidle.o
-> +
->  ifdef CONFIG_SND_IMX_SOC
->  obj-y += ssi-fiq.o
->  obj-y += ssi-fiq-ksym.o
-> diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
-> new file mode 100644
-> index 0000000..d1c9301
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/cpuidle.c
-> @@ -0,0 +1,89 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2012 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/hrtimer.h>
-> +#include <linux/err.h>
-> +#include <linux/slab.h>
-> +
-> +static struct cpuidle_device __percpu * imx_cpuidle_devices;
-> +static struct cpuidle_driver *drv;
-> +
-> +void __init imx_cpuidle_set_driver(struct cpuidle_driver *p)
+* Raja, Govindraj <govindraj.raja@ti.com> [120411 04:53]:
+...
+ 
+> +static int  __init omap_serial_fill_default_pads(struct omap_board_data *bdata,
+> +						struct omap_uart_state *uart)
 > +{
-> +	drv = p;
-> +}
+> +	struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
+> +	struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
+> +	char *rx_fmt, *tx_fmt;
+> +	int uart_nr = bdata->id + 1;
 > +
-> +void imx_cpuidle_devices_uninit(void)
-> +{
-> +	int cpu_id;
-> +	struct cpuidle_device *dev;
-> +
-> +	for_each_possible_cpu(cpu_id) {
-> +		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
-> +		cpuidle_unregister_device(dev);
+> +	if (bdata->id != 2) {
+> +		rx_fmt = "uart%d_rx.uart%d_rx";
+> +		tx_fmt = "uart%d_tx.uart%d_tx";
+> +	} else {
+> +		rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
+> +		tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
 > +	}
 > +
-> +	free_percpu(imx_cpuidle_devices);
-> +}
-> +
-> +static int __init imx_cpuidle_init(void)
-> +{
-> +	struct cpuidle_device *dev;
-> +	int cpu_id, ret;
-> +
-> +	if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
-> +		pr_err("%s: Invalid Input\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +
+> +	snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
+> +			uart_nr, uart_nr);
+> +	snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
+> +			uart_nr, uart_nr);
 
-Pointless blank line. I'd suggest removing it.
+This naming won't work for the fourth port on 3630 as there are no "uart4_rx"
+or "uart4_tx" mux entries, they are "gpmc_wait2.uart4_tx" and
+"gpmc_wait3.uart4_tx".
 
-> +	if (ret) {
-> +		pr_err("%s: Failed to register cpuidle driver\n", __func__);
-> +		return ret;
-> +	}
-> +
-> +	imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
-> +
-
-Same here. Pointless blank line.
-
-> +	if (imx_cpuidle_devices == NULL) {
-> +		ret = -ENOMEM;
-> +		goto unregister_drv;
-> +	}
-> +
-> +	/* initialize state data for each cpuidle_device */
-> +	for_each_possible_cpu(cpu_id) {
-> +		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
-> +		dev->cpu = cpu_id;
-> +		dev->state_count = drv->state_count;
-> +
-> +		ret = cpuidle_register_device(dev);
-> +		if (ret) {
-> +			pr_err("%s: Failed to register cpu %u\n",
-> +				__func__, cpu_id);
-> +			goto uninit;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +
-> +uninit:
-> +	imx_cpuidle_devices_uninit();
-> +
-> +unregister_drv:
-> +	cpuidle_unregister_driver(drv);
-> +
-
-Blank line here seems pointless.
-
-> +	return ret;
-> +}
-> +late_initcall(imx_cpuidle_init);
-> diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
-> new file mode 100644
-> index 0000000..6509f19
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
-> @@ -0,0 +1,26 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2012 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/cpuidle.h>
-> +
-> +extern int imx5_cpuidle_init(void);
-> +extern int imx6q_cpuidle_init(void);
-> +
-> +#ifdef CONFIG_CPU_IDLE
-> +extern void imx_cpuidle_devices_uninit(void);
-> +extern void imx_cpuidle_set_driver(struct cpuidle_driver *p);
-> +extern int imx5_cpuidle_init(void);
-> +extern int imx6q_cpuidle_init(void);
-> +#else
-> +static inline void imx_cpuidle_devices_uninit(void) {}
-> +static inline void imx_cpuidle_set_driver(struct cpuidle_driver *p) {}
-> +#endif
+> @@ -289,8 +354,8 @@ void __init omap_serial_board_init(struct
+> omap_uart_port_info *info)
+>  		bdata.pads = NULL;
+>  		bdata.pads_cnt = 0;
 > 
+> -		if (cpu_is_omap44xx() || cpu_is_omap34xx())
+> -			omap_serial_fill_default_pads(&bdata);
+> +		if (omap_serial_fill_default_pads(&bdata, uart))
+> +			continue;
+> 
+>  		if (!info)
+>  			omap_serial_init_port(&bdata, NULL);
 
--- 
-Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
-Don't top-post http://www.catb.org/jargon/html/T/top-post.html
-Plain text mails only, please.
+Can't the omap_serial_board_init() now be just be omap_serial_init(void)
+as it's not used anywhere else?
+
+Anyways, this is getting too complex for the -rc series as at least 2430sdp
+is using alternative pins for the first uart. Let's patch to remove just
+the uart4 entry for 3630 for the -rc and then we can properly fix this
+for the next merge window.
+
+Regards,
+
+Tony
