@@ -1,56 +1,84 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 17 Apr 2012 11:16:30 +0530
-Subject: [PATCH 07/12] ARM: Exynos5: Modify the GIC physical address for static
- io-mapping
+Date: Tue, 17 Apr 2012 11:16:31 +0530
+Subject: [PATCH 08/12] gpio/samsung: add GPC4 bank instance
 In-Reply-To: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
 References: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1334641595-25301-8-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1334641595-25301-9-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changhwan Youn <chaos.youn@samsung.com>
+From: Sangsu Park <sangsu4u.park@samsung.com>
 
-Adapt to changes in GIC physical address in rev1 of Exynos5.
+Add GPC4 bank instance which is included in rev1 of Exynos5.
 
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
 ---
- arch/arm/mach-exynos/common.c           |    4 ++--
- arch/arm/mach-exynos/include/mach/map.h |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-exynos/include/mach/gpio.h |    9 ++++++---
+ drivers/gpio/gpio-samsung.c              |    8 ++++++++
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 35ac675..457d031 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -265,12 +265,12 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
+index d7498af..df5612b 100644
+--- a/arch/arm/mach-exynos/include/mach/gpio.h
++++ b/arch/arm/mach-exynos/include/mach/gpio.h
+@@ -153,10 +153,11 @@ enum exynos4_gpio_number {
+ #define EXYNOS5_GPIO_B2_NR	(4)
+ #define EXYNOS5_GPIO_B3_NR	(4)
+ #define EXYNOS5_GPIO_C0_NR	(7)
+-#define EXYNOS5_GPIO_C1_NR	(7)
++#define EXYNOS5_GPIO_C1_NR	(4)
+ #define EXYNOS5_GPIO_C2_NR	(7)
+ #define EXYNOS5_GPIO_C3_NR	(7)
+-#define EXYNOS5_GPIO_D0_NR	(8)
++#define EXYNOS5_GPIO_C4_NR	(8)
++#define EXYNOS5_GPIO_D0_NR	(4)
+ #define EXYNOS5_GPIO_D1_NR	(8)
+ #define EXYNOS5_GPIO_Y0_NR	(6)
+ #define EXYNOS5_GPIO_Y1_NR	(4)
+@@ -199,7 +200,8 @@ enum exynos5_gpio_number {
+ 	EXYNOS5_GPIO_C1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C0),
+ 	EXYNOS5_GPIO_C2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C1),
+ 	EXYNOS5_GPIO_C3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C2),
+-	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
++	EXYNOS5_GPIO_C4_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
++	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C4),
+ 	EXYNOS5_GPIO_D1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D0),
+ 	EXYNOS5_GPIO_Y0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D1),
+ 	EXYNOS5_GPIO_Y1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y0),
+@@ -242,6 +244,7 @@ enum exynos5_gpio_number {
+ #define EXYNOS5_GPC1(_nr)	(EXYNOS5_GPIO_C1_START + (_nr))
+ #define EXYNOS5_GPC2(_nr)	(EXYNOS5_GPIO_C2_START + (_nr))
+ #define EXYNOS5_GPC3(_nr)	(EXYNOS5_GPIO_C3_START + (_nr))
++#define EXYNOS5_GPC4(_nr)	(EXYNOS5_GPIO_C4_START + (_nr))
+ #define EXYNOS5_GPD0(_nr)	(EXYNOS5_GPIO_D0_START + (_nr))
+ #define EXYNOS5_GPD1(_nr)	(EXYNOS5_GPIO_D1_START + (_nr))
+ #define EXYNOS5_GPY0(_nr)	(EXYNOS5_GPIO_Y0_START + (_nr))
+diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+index 4627787..0153bb9 100644
+--- a/drivers/gpio/gpio-samsung.c
++++ b/drivers/gpio/gpio-samsung.c
+@@ -2452,6 +2452,12 @@ static struct samsung_gpio_chip exynos5_gpios_1[] = {
+ 		},
  	}, {
- 		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
- 		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_CPU),
--		.length		= SZ_64K,
-+		.length		= SZ_8K,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
- 		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
--		.length		= SZ_64K,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	},
- };
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 0e2292d..648d59b 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -78,8 +78,8 @@
+ 		.chip	= {
++			.base	= EXYNOS5_GPC4(0),
++			.ngpio	= EXYNOS5_GPIO_C4_NR,
++			.label	= "GPC4",
++		},
++	}, {
++		.chip	= {
+ 			.base	= EXYNOS5_GPD0(0),
+ 			.ngpio	= EXYNOS5_GPIO_D0_NR,
+ 			.label	= "GPD0",
+@@ -2880,6 +2886,8 @@ static __init int samsung_gpiolib_init(void)
+ 		for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
+ 			chip->base = gpx_base;
  
- #define EXYNOS4_PA_GIC_CPU		0x10480000
- #define EXYNOS4_PA_GIC_DIST		0x10490000
--#define EXYNOS5_PA_GIC_CPU		0x10480000
--#define EXYNOS5_PA_GIC_DIST		0x10490000
-+#define EXYNOS5_PA_GIC_CPU		0x10482000
-+#define EXYNOS5_PA_GIC_DIST		0x10481000
++		exynos5_gpios_1[11].base = gpio_base1 + 0x2E0;
++
+ 		chip = exynos5_gpios_1;
+ 		nr_chips = ARRAY_SIZE(exynos5_gpios_1);
  
- #define EXYNOS4_PA_COREPERI		0x10500000
- #define EXYNOS4_PA_TWD			0x10500600
 -- 
 1.6.6.rc2
