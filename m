@@ -1,40 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Apr 2012 20:30:24 +0000
-Subject: [PATCH 09/13] SPEAr: clk: Add Auxiliary Synthesizer clock
-In-Reply-To: <20120417185111.GH3852@pengutronix.de>
-References: <cover.1334660431.git.viresh.kumar@st.com>
- <e5ea0b5c1511fe29d1b452fb3095f4380db58455.1334660432.git.viresh.kumar@st.com>
- <20120417185111.GH3852@pengutronix.de>
-Message-ID: <201204172030.25267.arnd@arndb.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 17 Apr 2012 22:31:54 +0200
+Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
+ sampling bug
+In-Reply-To: <201204172210.31232.marex@denx.de>
+References: <1334675261-31570-1-git-send-email-marex@denx.de>
+ <20120417174824.GD22406@pengutronix.de>
+ <201204172210.31232.marex@denx.de>
+Message-ID: <20120417203154.GA28067@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2012, Sascha Hauer wrote:
-> > +{
-> > +     struct clk_aux *aux = to_clk_aux(hw);
-> > +     unsigned int num = 1, den = 1, val, eqn;
-> > +     unsigned long flags = 0;
-> > +
-> > +     if (aux->lock)
-> > +             spin_lock_irqsave(aux->lock, flags);
-> > +
-> > +     val = readl_relaxed(aux->reg);
-> > +
-> > +     if (aux->lock)
-> > +             spin_unlock_irqrestore(aux->lock, flags);
-> > +
+
+> > Quite a CC list, but you forgot the main ones:
 > 
-> A single read is atomic and needs no lock.
+> Do you have a trimmed-down version of the list of mxs-related people possibly?
 
-That depends on whether the read has any side-effects. There
-is another function that does a read-modify-write on the
-same register, and you might need to prevent this one from
-reading the register between the other read and the following
-write.
+I usually CC Shawn, alkml and the driver authors and lists. There is
+nothing wrong with having more, you just happen to miss the crucial
+ones here. 'scripts/get_maintainers.pl' may also be helpful.
 
-The spinlock also has the benefit of enforcing the ordering
-of the read with regard to your instruction stream, otherwise
-it can be delayed on out-of-order CPUs until the value
-is actually used.
+> > 
+> > FRAMEBUFFER LAYER
+> > M:      Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> > L:      linux-fbdev at vger.kernel.org
+> > 
+> > Patch itself looks good
+> 
+> Who's applying this? The fbdev people or imx tree?
 
-	Arnd
+It is in drivers/video, so it should go via fbdev.
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120417/2b21ad48/attachment.sig>
