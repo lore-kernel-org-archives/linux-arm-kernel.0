@@ -1,54 +1,87 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 17 Apr 2012 13:29:10 +0200
-Subject: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <1334657751-27678-1-git-send-email-marex@denx.de>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
-Message-ID: <20120417112910.GA3852@pengutronix.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 17 Apr 2012 16:45:32 +0530
+Subject: [PATCH 00/13] SPEAr: Move to common clock framework
+Message-ID: <cover.1334660431.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Arnd,
 
-On Tue, Apr 17, 2012 at 12:15:43PM +0200, Marek Vasut wrote:
-> This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
-> generic USB PHY infrastructure.
-> 
+SPEAr now supports common clock framework. This patchset contains changes
+related to this. It also contain few dependency commits for clock framework that
+are earlier sent separately.
 
-Your patches won't work when more than one USB port is enabled because
-of the singular usb transceiver present in the kernel. That of course is
-not your fault. I think Heikki (Added to Cc) is working on this issue,
-but I don't know the status here.
+@Mike: It would be easiest to get these through ARM-SoC tree. So, would need
+your Acked-by on these patches. But firstly they must get reivewed :)
 
-Another problem is that what you are doing does not integrate at all
-with otg. I don't ask you to implement otg support because you are
-likely not interested in this, but since you are adding a new ehci
-glue driver anyway I suggest another approach:
+This patchset is rebased over:
+- clk: add a fixed factor clock - by Sascha Hauer
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/090680.html
 
-Put a driver under drivers/usb/otg which:
+- common clk framework misc fixes - by Mike Turquette
+https://lkml.org/lkml/2012/4/11/780
 
-- matches a 'imx-usb' device
-- gets/enables all clocks needed for USB
-- finds the transceiver
-- registers a ehci device
+- V4: pinctrl: Add SPEAr pinctrl support
+http://www.spinics.net/lists/arm-kernel/msg169387.html
 
-Future additions would be:
+- V3: SPEAr DT support updates
+http://comments.gmane.org/gmane.linux.drivers.devicetree/14197
 
-- Put a USB_MODE_HOST/DEVICE flag into platform_data, and register a
-  host or gadget driver depending on this flag
-- Add a USB_MODE_OTG flag to platform_data and implement otg in this
-  driver (or use whatever infrastructure present in the kernel then)
+Russell King (1):
+  CLKDEV: Add helper routines to allocate and add clkdevs for given
+    struct clk *
 
-This is similar to what msm does. This way we have the clocks and phys
-handled where they are needed. We may use this code on i.MX later.
+Viresh Kumar (12):
+  clk: Fix typo in comment
+  clk: Fix typo in comment
+  clk: clk-private: Add DEFINE_CLK macro
+  clk: clk-gate: Create clk_gate_endisable()
+  clk: Don't set clk->new_rate twice
+  clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is set and clk is
+    enabled
+  SPEAr: clk: Add VCO-PLL Synthesizer clock
+  SPEAr: clk: Add Auxiliary Synthesizer clock
+  SPEAr: clk: Add Fractional Synthesizer clock
+  SPEAr: clk: Add General Purpose Timer Synthesizer clock
+  SPEAr: Switch to common clock framework
+  SPEAr: Call clk_prepare() before calling clk_enable
 
-We did this wrong on i.MX (and several other architectures) and getting
-this right will be hard work. No need to introduce the same flaws again
-with a new architecture.
-
-Sascha
+ MAINTAINERS                                     |    4 +-
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/mach-spear3xx/clock.c                  | 1354 +++++++++--------------
+ arch/arm/mach-spear3xx/include/mach/generic.h   |    4 +-
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h |    2 +
+ arch/arm/mach-spear3xx/include/mach/spear.h     |   13 +
+ arch/arm/mach-spear3xx/spear300.c               |    1 -
+ arch/arm/mach-spear3xx/spear310.c               |    1 -
+ arch/arm/mach-spear3xx/spear320.c               |   12 +-
+ arch/arm/mach-spear3xx/spear3xx.c               |    2 +
+ arch/arm/mach-spear6xx/clock.c                  | 1015 +++++------------
+ arch/arm/mach-spear6xx/include/mach/misc_regs.h |    2 +
+ arch/arm/mach-spear6xx/spear6xx.c               |    5 +-
+ arch/arm/plat-spear/Makefile                    |    3 +-
+ arch/arm/plat-spear/clk-aux-synth.c             |  195 ++++
+ arch/arm/plat-spear/clk-frac-synth.c            |  156 +++
+ arch/arm/plat-spear/clk-gpt-synth.c             |  145 +++
+ arch/arm/plat-spear/clk-vco-pll.c               |  346 ++++++
+ arch/arm/plat-spear/clock.c                     | 1005 -----------------
+ arch/arm/plat-spear/include/plat/clk.h          |  143 +++
+ arch/arm/plat-spear/include/plat/clock.h        |  249 -----
+ arch/arm/plat-spear/time.c                      |    8 +-
+ drivers/clk/clk-gate.c                          |   54 +-
+ drivers/clk/clk.c                               |    7 +-
+ drivers/clk/clkdev.c                            |   64 +-
+ include/linux/clk-private.h                     |   59 +-
+ include/linux/clk-provider.h                    |    4 +-
+ include/linux/clkdev.h                          |    3 +
+ 28 files changed, 1963 insertions(+), 2894 deletions(-)
+ create mode 100644 arch/arm/plat-spear/clk-aux-synth.c
+ create mode 100644 arch/arm/plat-spear/clk-frac-synth.c
+ create mode 100644 arch/arm/plat-spear/clk-gpt-synth.c
+ create mode 100644 arch/arm/plat-spear/clk-vco-pll.c
+ delete mode 100644 arch/arm/plat-spear/clock.c
+ create mode 100644 arch/arm/plat-spear/include/plat/clk.h
+ delete mode 100644 arch/arm/plat-spear/include/plat/clock.h
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9
