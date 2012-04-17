@@ -1,11 +1,14 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Apr 2012 12:15:45 +0200
-Subject: [PATCH 2/8] MXS: Add USB EHCI and USB PHY clock handling
+Date: Tue, 17 Apr 2012 12:15:46 +0200
+Subject: [PATCH 3/8] MXS: Fixup i.MX233 USB base address name
 In-Reply-To: <1334657751-27678-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
-Message-ID: <1334657751-27678-3-git-send-email-marex@denx.de>
+Message-ID: <1334657751-27678-4-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Modify USB EHCI and USB PHY base addresses on the i.MX233 to nicely fit into the
+whole USB registration scheme.
 
 Based on code by:
 Tony Lin <tony.lin@freescale.com>
@@ -25,47 +28,34 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-mxs/clock-mx28.c |   21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ arch/arm/mach-mxs/include/mach/mx23.h |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 43116ba..ae4f7b3 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -577,6 +577,21 @@ static struct clk usb1_clk = {
- 	.parent = &pll1_clk,
- };
+diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
+index 599094b..7955b75 100644
+--- a/arch/arm/mach-mxs/include/mach/mx23.h
++++ b/arch/arm/mach-mxs/include/mach/mx23.h
+@@ -64,8 +64,8 @@
+ #define MX23_AUART1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06c000)
+ #define MX23_AUART2_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06e000)
+ #define MX23_DUART_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x070000)
+-#define MX23_USBPHY_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
+-#define MX23_USBCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
++#define MX23_USBPHY0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
++#define MX23_USBCTRL0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
+ #define MX23_DRAM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x0e0000)
  
-+static struct clk usb_phy_clk0 = {
-+	.parent = &pll0_clk,
-+	.enable = _raw_clk_disable,
-+	.disable = _raw_clk_enable,
-+	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL0CTRL0,
-+	.enable_shift = 18,
-+};
-+
-+static struct clk usb_phy_clk1 = {
-+	.parent = &pll1_clk,
-+	.enable = _raw_clk_disable,
-+	.disable = _raw_clk_enable,
-+	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
-+	.enable_shift = 18,
-+};
- #define _DEFINE_CLOCK(name, er, es, p)					\
- 	static struct clk name = {					\
- 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
-@@ -636,8 +651,10 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxs-mmc.3", NULL, ssp3_clk)
- 	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
- 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
--	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
--	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
-+	_REGISTER_CLOCK("mxs-ehci.0", "usb", usb0_clk)
-+	_REGISTER_CLOCK("mxs-ehci.1", "usb", usb1_clk)
-+	_REGISTER_CLOCK("mxs-phy.0", "usb0_phy", usb_phy_clk0)
-+	_REGISTER_CLOCK("mxs-phy.1", "usb1_phy", usb_phy_clk1)
- 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
+ #define MX23_IO_P2V(x)			MXS_IO_P2V(x)
+@@ -89,8 +89,8 @@
+ #define MX23_INT_SPDIF_ERROR		10
+ #define MX23_INT_SAIF1_IRQ		10
+ #define MX23_INT_SAIF2_IRQ		10
+-#define MX23_INT_USB_CTRL		11
+-#define MX23_INT_USB_WAKEUP		12
++#define MX23_INT_USB0			11
++#define MX23_INT_USB0_WAKEUP		12
+ #define MX23_INT_GPMI_DMA		13
+ #define MX23_INT_SSP1_DMA		14
+ #define MX23_INT_SSP1_ERROR		15
 -- 
 1.7.9.5
