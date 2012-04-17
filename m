@@ -1,26 +1,35 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 17 Apr 2012 13:34:18 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
-Message-ID: <20120417133418.2280ccb3897436e6c8e82398@canb.auug.org.au>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 17 Apr 2012 09:04:15 +0530
+Subject: [PATCH] CLKDEV: Add helper routines to allocate and add clkdevs
+ for given struct clk *
+In-Reply-To: <20120416204609.GA8548@glitch>
+References: <cfe2a4ef4a7903696200ca3880b96b4aa98c4820.1334553491.git.viresh.kumar@st.com>
+ <20120416102503.GA32687@glitch> <4F8BF4DD.2080501@st.com>
+ <20120416103822.GU24211@n2100.arm.linux.org.uk>
+ <CAOh2x=kXeDOeZbAACOjKiwfdEniXkvAuFbrJ+rmgw=rq_gHQAg@mail.gmail.com>
+ <20120416204609.GA8548@glitch>
+Message-ID: <4F8CE4B7.8090003@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 4/17/2012 2:16 AM, Domenico Andreoli wrote:
+>> > +struct clk_lookup * __init_refok
+>> > +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+>> > +{
+>> > +	struct clk_lookup * cl;
+>> > +	va_list ap = NULL;
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-omap2/board-generic.c between commit aa1d7775696c ("mfd:
-Convert twl6040 to i2c driver, and separate it from twl core") from the
-mfd tree and commit 93651b85bbd1 ("ARM: OMAP2+: board-generic: Remove i2c
-static init") from the arm-soc tree.
+> so I finally tested it with this modification:
+> 
+> 	if (dev_fmt) {
+> 		va_start(ap, dev_fmt);
+> 		cl = clkdev_alloc_valist(clk, con_id, dev_fmt, ap);
+> 		va_end(ap);
+> 	} else
+> 		cl = clkdev_alloc(clk, con_id, NULL);
 
-The latter seems to supercede the former, so I used that.
+Isn't this a infinite loop now, when dev_fmt is passed as NULL?
+
+
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120417/d853f3fa/attachment.sig>
+viresh
