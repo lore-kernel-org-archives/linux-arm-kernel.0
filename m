@@ -1,35 +1,101 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Apr 2012 15:38:10 +0000
-Subject: [PATCH 15/16] ARM: ux500: Apply Device Tree settings for the
- DB8500 PRCMU
-In-Reply-To: <4F8D8CAB.5040902@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Apr 2012 16:44:22 +0100
+Subject: [PATCH 11/16 v2] ARM: ux500: Do not attempt to register
+ non-existent i2c devices on Snowball
+In-Reply-To: <1334659448-11521-12-git-send-email-lee.jones@linaro.org>
 References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
- <201204171447.06520.arnd@arndb.de> <4F8D8CAB.5040902@linaro.org>
-Message-ID: <201204171538.10960.arnd@arndb.de>
+ <1334659448-11521-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <4F8D8FD6.1070508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2012, Lee Jones wrote:
-> 
-> On 17/04/12 15:47, Arnd Bergmann wrote:
-> > On Tuesday 17 April 2012, Lee Jones wrote:
-> >> In this patch we enable the db8500-prcmu via DT and take out
-> >> any enablement previously carried out by platform code.
-> >>
-> >> Signed-off-by: Lee Jones<lee.jones@linaro.org>
-> >
-> > This patch by itself is broken, because it relies on patch 16.
-> > I suggest merging the two into a single patch to atomically
-> > move over from the static definition of the prcmu to the
-> > device tree based definition. You can also combine it with
-> > patch 14, which by itself is harmless but also pointless.
-> 
-> Not as far as I can tell. This patch relies on 12 and 13. Patch 16 is 
-> for the PRCMU timer, which is a different entity.
-> 
+From: Lee Jones <lee.jones@linaro.org>
+Date: Mon, 16 Apr 2012 15:26:55 +0100
+Subject: [PATCH 11/16] ARM: ux500: Do not attempt to register non-existent
+ i2c devices on Snowball
 
-Ah, I see. In this case, I would combine patches 13 and 15 because
-otherwise you end up with a duplicate prcmu device when only patch 13
-is applied.
+This patch prevents i2c devices which are not present on the Snowball
+low-cost development board from being registered. Devices such as;
+tc3589x, bu1780 and lp5521 are present on other supported boards,
+but are not located on Snowball.
 
-	Arnd
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |   24 +++++++++++++-----------
+ 1 files changed, 13 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index a46345e..ed92456 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -652,7 +652,6 @@ static void __init mop500_init_machine(void)
+ static void __init snowball_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+-	int i2c0_devs;
+ 	int i;
+ 
+ 	parent = u8500_init_devices();
+@@ -670,11 +669,6 @@ static void __init snowball_init_machine(void)
+ 	mop500_spi_init(parent);
+ 	mop500_uart_init(parent);
+ 
+-	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+-	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+-	i2c_register_board_info(2, mop500_i2c2_devices,
+-				ARRAY_SIZE(mop500_i2c2_devices));
+-
+ 	/* This board has full regulator constraints */
+ 	regulator_has_full_constraints();
+ }
+@@ -787,7 +781,6 @@ static void __init u8500_init_machine(void)
+ 	int i;
+ 
+ 	parent = u8500_of_init_devices();
+-	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
+ 		mop500_platform_devs[i]->dev.parent = parent;
+@@ -805,6 +798,12 @@ static void __init u8500_init_machine(void)
+ 				ARRAY_SIZE(mop500_platform_devs));
+ 
+ 		mop500_sdi_init(parent);
++
++		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
++		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
++		i2c_register_board_info(2, mop500_i2c2_devices,
++					ARRAY_SIZE(mop500_i2c2_devices));
++
+ 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+ 		snowball_pins_init();
+ 
+@@ -831,13 +830,16 @@ static void __init u8500_init_machine(void)
+ 				ARRAY_SIZE(mop500_platform_devs));
+ 
+ 		hrefv60_sdi_init(parent);
++
++		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
++		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
++
++		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
++		i2c_register_board_info(2, mop500_i2c2_devices,
++					ARRAY_SIZE(mop500_i2c2_devices));
+ 	}
+ 	mop500_i2c_init(parent);
+ 
+-	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+-	i2c_register_board_info(2, mop500_i2c2_devices,
+-				ARRAY_SIZE(mop500_i2c2_devices));
+-
+ 	/* This board has full regulator constraints */
+ 	regulator_has_full_constraints();
+ }
+-- 
+1.7.9.1
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515 
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
