@@ -1,49 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 17 Apr 2012 15:13:45 +0800
-Subject: [Query] Common Clock Framework: How to handle clks enabled by
- default
-In-Reply-To: <4F8D0BF9.7080802@st.com>
-References: <4F8D0BF9.7080802@st.com>
-Message-ID: <CAAQ0ZWT_xJAp4H_k_Mr24Fcj5tKAhpev4nr8gpK3-3zpM_MobA@mail.gmail.com>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Tue, 17 Apr 2012 09:15:39 +0200
+Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F00206987A3BFE@AUSP01VMBX24.collaborationhost.net>
+References: <4F683B36.8090101@metasoft.pl>
+ <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48E3E@AUSP01VMBX24.collaborationhost.net>
+ <20120323070446.GC5812@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
+ <20120410172853.GA25697@mwesterb-mobl>
+ <ADE657CA350FB648AAC2C43247A983F00206986C01D4@AUSP01VMBX24.collaborationhost.net>
+ <4F853053.7040800@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F00206987A3BFE@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F8D189B.3010100@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2012 14:21, Viresh Kumar <viresh.kumar@st.com> wrote:
-> Hi,
->
-> How are we handling clocks which are enabled by bootloaders and are
-> required to be enabled, like, pll, cpu, ahb?
->
-Call clk_prepare_enable on the clocks in platform clock init function.
+On 2012-04-16 20:59, H Hartley Sweeten wrote:
+> On Wednesday, April 11, 2012 12:19 AM, Rafal Prylowski wrote:
+> 
+> Rafal,
+> 
+> This patch still doesn't work on my ep93xx system.
 
-> Following is example clk hierarchy:
-> osc(root)->pll->cpu->ahb->dma
->
-> Issue1: Now, when we do clk_enable() for dma, all these already enabled clocks
-> are re-enabled.
+<snip>
 
-What's the problem with doing that?  Your hardware does not cope with
-setting/clearing a bit that already set/cleared.  Even if that is the
-case, you can easily handle that in your .enable/.disable ops.
+> It appears your patch is causing an interrupt storm on my system.
+> 
 
-> Issue2: On clk_disable() all are disabled and system hangs :(
->
-It should not.  It means you have other clocks in the hierarchy not
-manged well.  The parent of the clock will not be gated by calling
-clk_disable, if there are other sibling clocks are enabled.
+Could you please apply the following patch on top of double buffering
+patch? I would like to know the state of dma channel when you get
+that interrupt storm.
 
-> There is one option CLK_IGNORE_UNUSED, which is used only for disabling
-> unused clocks. So that is not helpful here.
->
-> One way i could think of is not to give clk_gate support for these clocks,
-> so that they can never be disabled. Is this the preferred way?
->
-It only makes sense on those completely internal clocks which will
-never need managing.
+Thanks,
+RP
 
-Regards,
-Shawn
-
-> I can't guarantee, but these clocks might be required to be disabled
-> for standby/sleep cases.
->
+Index: linux-2.6/drivers/dma/ep93xx_dma.c
+===================================================================
+--- linux-2.6.orig/drivers/dma/ep93xx_dma.c
++++ linux-2.6/drivers/dma/ep93xx_dma.c
+@@ -606,6 +606,7 @@ static int m2m_hw_interrupt(struct ep93x
+ 	 */
+ 	last = list_first_entry(edmac->active.next,
+ 		struct ep93xx_dma_desc, node)->txd.cookie;
++	printk("M2M: %x %s\n", status, last ? "last" : "");
+ 
+ 	/*
+ 	 * Use M2M DMA Buffer FSM and Control FSM to check current state of
