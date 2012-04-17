@@ -1,69 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Apr 2012 18:41:03 -0700
-Subject: [PATCH 2/2] OMAP2+: UART: Add mechanism to probe uart pins and
- configure rx wakeup
-In-Reply-To: <CAMrsUdK2ZqCGWtL104tBC_h-XHD0UMMFagch_eSER+92zC1FiQ@mail.gmail.com>
-References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
- <1334065246-21294-3-git-send-email-govindraj.raja@ti.com>
- <20120410161136.GF6487@atomide.com>
- <CAMrsUdK2ZqCGWtL104tBC_h-XHD0UMMFagch_eSER+92zC1FiQ@mail.gmail.com>
-Message-ID: <20120417014103.GA21106@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 17 Apr 2012 09:46:58 +0800
+Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
+In-Reply-To: <CAJOA=zMPQK-W_nbRztXCNdLHoTJU73ZnrxAS8VvvmzgdaVS2mQ@mail.gmail.com>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+ <20120412064920.GH2445@S2101-09.ap.freescale.net>
+ <CAJOA=zMPQK-W_nbRztXCNdLHoTJU73ZnrxAS8VvvmzgdaVS2mQ@mail.gmail.com>
+Message-ID: <CAAQ0ZWRg2jwNZ7Bx5j5NtCVveT_085VmFtPMhWW62-aO+kFfnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Few more comments below.
-
-* Raja, Govindraj <govindraj.raja@ti.com> [120411 04:53]:
+On 17 April 2012 07:10, Turquette, Mike <mturquette@ti.com> wrote:
 ...
- 
-> +static int  __init omap_serial_fill_default_pads(struct omap_board_data *bdata,
-> +						struct omap_uart_state *uart)
-> +{
-> +	struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
-> +	struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
-> +	char *rx_fmt, *tx_fmt;
-> +	int uart_nr = bdata->id + 1;
-> +
-> +	if (bdata->id != 2) {
-> +		rx_fmt = "uart%d_rx.uart%d_rx";
-> +		tx_fmt = "uart%d_tx.uart%d_tx";
-> +	} else {
-> +		rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
-> +		tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
-> +	}
-> +
-> +	snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
-> +			uart_nr, uart_nr);
-> +	snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
-> +			uart_nr, uart_nr);
-
-This naming won't work for the fourth port on 3630 as there are no "uart4_rx"
-or "uart4_tx" mux entries, they are "gpmc_wait2.uart4_tx" and
-"gpmc_wait3.uart4_tx".
-
-> @@ -289,8 +354,8 @@ void __init omap_serial_board_init(struct
-> omap_uart_port_info *info)
->  		bdata.pads = NULL;
->  		bdata.pads_cnt = 0;
-> 
-> -		if (cpu_is_omap44xx() || cpu_is_omap34xx())
-> -			omap_serial_fill_default_pads(&bdata);
-> +		if (omap_serial_fill_default_pads(&bdata, uart))
-> +			continue;
-> 
->  		if (!info)
->  			omap_serial_init_port(&bdata, NULL);
-
-Can't the omap_serial_board_init() now be just be omap_serial_init(void)
-as it's not used anywhere else?
-
-Anyways, this is getting too complex for the -rc series as at least 2430sdp
-is using alternative pins for the first uart. Let's patch to remove just
-the uart4 entry for 3630 for the -rc and then we can properly fix this
-for the next merge window.
+> Yes, this was a braindead change on my part. ?I'll remove the kstrdup
+> in my next series (the rest of this patch will stay in).
+>
+Do you have an ETA on that?  A few platform porting are waiting for a
+stable branch with all necessary fixup/cleanup integrated to publish
+the patches.
 
 Regards,
-
-Tony
+Shawn
