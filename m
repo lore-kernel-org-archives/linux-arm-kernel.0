@@ -1,56 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 17 Apr 2012 10:36:42 -0500
-Subject: [PATCH v2] plat-versatile: modernize FPGA IRQ controller
-In-Reply-To: <CACRpkdZTacwxc=sn8qiKMjrCRZyymwet3cZb=OE87JkuVSj-MA@mail.gmail.com>
-References: <1334422936-28856-1-git-send-email-linus.walleij@linaro.org>
- <4F89EE5B.5080709@gmail.com>
- <CACRpkdZTacwxc=sn8qiKMjrCRZyymwet3cZb=OE87JkuVSj-MA@mail.gmail.com>
-Message-ID: <4F8D8E0A.7040006@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Apr 2012 15:38:10 +0000
+Subject: [PATCH 15/16] ARM: ux500: Apply Device Tree settings for the
+ DB8500 PRCMU
+In-Reply-To: <4F8D8CAB.5040902@linaro.org>
+References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
+ <201204171447.06520.arnd@arndb.de> <4F8D8CAB.5040902@linaro.org>
+Message-ID: <201204171538.10960.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2012 02:31 PM, Linus Walleij wrote:
-> On Sat, Apr 14, 2012 at 11:38 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Tuesday 17 April 2012, Lee Jones wrote:
 > 
->>> +     fpga_irq_init(VA_SIC_BASE, "SIC", IRQ_SIC_START,
->>> +             IRQ_VICSOURCE31, ~PIC_MASK, np);
->>
->> This needs some work...
->>
->> For DT, you want to be calling of_irq_init and have a fpga_irq_dt_init
->> function which gets all this info from the dts. That's fine to do as a
->> follow on patch.
+> On 17/04/12 15:47, Arnd Bergmann wrote:
+> > On Tuesday 17 April 2012, Lee Jones wrote:
+> >> In this patch we enable the db8500-prcmu via DT and take out
+> >> any enablement previously carried out by platform code.
+> >>
+> >> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> >
+> > This patch by itself is broken, because it relies on patch 16.
+> > I suggest merging the two into a single patch to atomically
+> > move over from the static definition of the prcmu to the
+> > device tree based definition. You can also combine it with
+> > patch 14, which by itself is harmless but also pointless.
 > 
-> Yeah I need to do this stepwise or I'll end up tearing my hair.
+> Not as far as I can tell. This patch relies on 12 and 13. Patch 16 is 
+> for the PRCMU timer, which is a different entity.
 > 
->>>       for (i = 0; i < 32; i++) {
->>
->> This loop should be replaced by the domain .map function. For a legacy
->> domain, .map will be called by irq_domain_add_legacy 32 times.
-> 
-> OK ... of course it works like a charm. Will post v3 soon-ish.
-> 
-> On small obstacle: the .map function does not pass the
-> void *host_data, so I worked around this by using a static
-> file-local but this is a bit ugly...
 
-You can't use domain->host_data ptr?
+Ah, I see. In this case, I would combine patches 13 and 15 because
+otherwise you end up with a duplicate prcmu device when only patch 13
+is applied.
 
->> If you have a valid mask, then I think you should be able to skip the holes.
-> 
-> Sure can. Works fine.
-> 
->>> +     f->domain = irq_domain_add_legacy(node, 32, f->irq_start, 0,
->>
->> I think the fact that you always pass in 32 is your problem. You should
->> use "fls(valid) - 1" here.
-> 
-> Since the function takes an absolute number of IRQs I guess
-> it's just fls(valid)? It worked for me anyway...
-
-Ah, you're right. I was thinking bit position, not number.
-
-Rob
-> 
-> Thanks a lot Rob!
-> Linus Walleij
+	Arnd
