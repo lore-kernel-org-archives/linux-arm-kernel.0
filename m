@@ -1,57 +1,43 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 17 Apr 2012 14:18:00 +0200
-Subject: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <201204171345.07851.marex@denx.de>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
- <20120417112910.GA3852@pengutronix.de>
- <201204171345.07851.marex@denx.de>
-Message-ID: <20120417121800.GB3852@pengutronix.de>
+Date: Tue, 17 Apr 2012 14:30:06 +0200
+Subject: [PATCH 1/3] pinctrl: pinctrl-imx: add imx pinctrl core driver
+In-Reply-To: <20120417095722.GF17173@shlinux2.ap.freescale.net>
+References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
+ <20120414134814.GA3852@pengutronix.de>
+ <CAA+hA=T0FAfuGKcW0vAKO+OWyFdM-6vQqVo53xKf8y28m7gPOQ@mail.gmail.com>
+ <20120415141736.GG24997@S2101-09.ap.freescale.net>
+ <20120416034713.GB17173@shlinux2.ap.freescale.net>
+ <20120416034646.GI24997@S2101-09.ap.freescale.net>
+ <20120417095722.GF17173@shlinux2.ap.freescale.net>
+Message-ID: <20120417123006.GC3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 01:45:07PM +0200, Marek Vasut wrote:
-> Dear Sascha Hauer,
+On Tue, Apr 17, 2012 at 05:57:23PM +0800, Dong Aisheng wrote:
+> Sascha & Shawn,
 > 
-> > Hi Marek,
-> > 
-> > On Tue, Apr 17, 2012 at 12:15:43PM +0200, Marek Vasut wrote:
-> > > This patchset introduces the USB Host driver for i.MX28 CPU, utilising
-> > > the generic USB PHY infrastructure.
-> > 
-> > Your patches won't work when more than one USB port is enabled because
-> > of the singular usb transceiver present in the kernel. That of course is
-> > not your fault. I think Heikki (Added to Cc) is working on this issue,
-> > but I don't know the status here.
+> Just let you know:
+> After changes the pinctrl table may look like:
+> (i also removed fsl,* config properties since it was introduced for better
+> readability before, but after dtc macro support is available, it could also
+> be removed. So i removed now. Then the using is much similar as iomux-v3).
 > 
-> All right, I'll let Heikki hack on that. I'm not sure if we have any mx28 based 
-> device with multiple USB ports in kernel. Do we ?
+> iomuxc at 020e0000 {
+>         compatible = "fsl,imx6q-iomuxc";
+>         reg = <0x020e0000 0x4000>;
 > 
-> > Another problem is that what you are doing does not integrate at all
-> > with otg.
-> 
-> Well, how should this be done to integrate with OTG then?
-> 
-> > I don't ask you to implement otg support because you are
-> > likely not interested in this, but since you are adding a new ehci
-> > glue driver anyway I suggest another approach:
-> > 
-> > Put a driver under drivers/usb/otg which:
-> > 
-> > - matches a 'imx-usb' device
-> > - gets/enables all clocks needed for USB
-> > - finds the transceiver
-> > - registers a ehci device
-> 
-> So the PHY actually registers the EHCI driver (plat_bus->phy->ehci)? That's 
-> slightly weird, don't you think?
+>         /* shared pinctrl settings */
+>         uart4 {
+>                 pinctrl_uart4_1: uart4grp-1 {
+>                         fsl,pins = <58 61>;
+>                         fsl,configs = <0x12407>
 
-Your hardware device is a device consisting of a ehci core and a USB device
-core. Currently we register the child devices independently which leads
-to the mentioned problems. Instead we should register the USB core as a
-whole and pass the resources to either the client or the host driver.
+Why do we have a hex value for the config now? This should be
+independent on how we describe the mux settings.
 
-The phys are completely independent devices (from a bus topology point
-of view). The USB core just happens to use the phys.
+Also I think a single fsl,configs entry for a pin group is not
+enough, what for example with I2C where the data line needs a pullup
+whereas the clock line does not?
 
 Sascha
 
