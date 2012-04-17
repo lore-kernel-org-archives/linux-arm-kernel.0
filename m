@@ -1,52 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 17 Apr 2012 15:20:55 -0700
-Subject: [PATCH] ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
-In-Reply-To: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Fri, 13 Apr 2012 23:25:04 +0530")
-References: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <878vhut2yg.fsf@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Apr 2012 16:35:09 -0600
+Subject: [PATCH 3/3] ARM: dt: tegra_ventana: als and proximity sensor
+ isl29018 support
+In-Reply-To: <1334645155-13799-4-git-send-email-ldewangan@nvidia.com>
+References: <1334645155-13799-1-git-send-email-ldewangan@nvidia.com>
+ <1334645155-13799-4-git-send-email-ldewangan@nvidia.com>
+Message-ID: <4F8DF01D.9040900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On 04/17/2012 12:45 AM, Laxman Dewangan wrote:
+> Add the device info for ALS and proximity sensor isl29018.
 
-> The current serial UART code, while fidling with ocp idlemode bits,
-> forget about the smart idle wakeup bit even if it is supported by
-> UART IP block. This will lead to missing the module wakeup on OMAP's
-> where the smart idle wakeup is supported.
->
-> This was the root cause of the console sluggishness issue, I have been
-> observing on OMAP4 devices and also can be potential reason for some
-> other UART wakeup issues.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Govindraj.R <govindraj.raja@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
+(There were a ton of irrelevant people CC'd on this patch; I cut them
+out, but kept the lists in case anyone was interested in the replies.
+The most relevant list, linux-tegra, also wasn't CC'd)
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+> diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
 
-> ---
->  arch/arm/mach-omap2/serial.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index c9503a7..b28aae1 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -108,8 +108,14 @@ static void omap_uart_set_noidle(struct platform_device *pdev)
->  static void omap_uart_set_smartidle(struct platform_device *pdev)
->  {
->  	struct omap_device *od = to_omap_device(pdev);
-> +	u8 idlemode;
+> +		/* ALS and proximity sensor */
+
+> +		isl29018: isl29018 at 44 {
+
+I don't think the label "isl29018:" serves any purpose; nothing else
+needs to refer to this node.
+
+I note from http://patchwork.ozlabs.org/patch/132936/ that:
+
+a) Perhaps the vendor prefix should be "isil" not "isl". Olof, can you
+please comment here?
+
+b) There's an interrupt signal connected to the device. Can you please
+add that, irrespective of whether the driver uses it.
+
+c) This device is also present on Seaboard. Can you update
+tegra-seaboard.dts too? You can find the relevant bus from the link above.
+
+Thanks.
+
+> +			compatible = "isl,isl29018";
+> +			reg = <0x44>;
+> +		};
+>  	};
 >  
-> -	omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_SMART);
-> +	if (od->hwmods[0]->class->sysc->idlemodes & SIDLE_SMART_WKUP)
-> +		idlemode = HWMOD_IDLEMODE_SMART_WKUP;
-> +	else
-> +		idlemode = HWMOD_IDLEMODE_SMART;
-> +
-> +	omap_hwmod_set_slave_idlemode(od->hwmods[0], idlemode);
->  }
->  
->  #else
+>  	i2c at 7000c400 {
