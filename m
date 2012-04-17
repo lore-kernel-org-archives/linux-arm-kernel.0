@@ -1,78 +1,63 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Apr 2012 12:15:51 +0200
-Subject: [PATCH 8/8] MXS: Enable USB on MX28EVK
-In-Reply-To: <1334657751-27678-1-git-send-email-marex@denx.de>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
-Message-ID: <1334657751-27678-9-git-send-email-marex@denx.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 17 Apr 2012 15:45:55 +0530
+Subject: [PATCH 02/40] clk: add a fixed factor clock
+In-Reply-To: <1334065553-7565-3-git-send-email-s.hauer@pengutronix.de>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4F8D42DB.3080406@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Chen Peter-B29397 <B29397@freescale.com>
-Cc: Detlev Zundel <dzu@denx.de>
-Cc: Fabio Estevam <festevam@gmail.com>
-Cc: Li Frank-B20596 <B20596@freescale.com>
-Cc: Lin Tony-B19295 <B19295@freescale.com>
-Cc: Linux USB <linux-usb@vger.kernel.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Stefano Babic <sbabic@denx.de>
-Cc: Subodh Nijsure <snijsure@grid-net.com>
-Cc: Tony Lin <tony.lin@freescale.com>
-Cc: Wolfgang Denk <wd@denx.de>
----
- arch/arm/mach-mxs/Kconfig        |    2 ++
- arch/arm/mach-mxs/mach-mx28evk.c |   10 ++++++++++
- 2 files changed, 12 insertions(+)
+On 4/10/2012 7:15 PM, Sascha Hauer wrote:
+> Having fixed factors/dividers in hardware is a common pattern, so
+> add a basic clock type doing this. It basically describes a fixed
+> factor clock using a nominator and a denominator.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/clk/Makefile           |    2 +-
+>  drivers/clk/clk-fixed-factor.c |   97 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h   |    4 ++
+>  3 files changed, 102 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/clk-fixed-factor.c
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 5b5566c..696e1d1 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -53,6 +53,8 @@ config MACH_MX28EVK
- 	select MXS_HAVE_PLATFORM_MXS_SAIF
- 	select MXS_HAVE_PLATFORM_MXS_I2C
- 	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
-+	select MXS_HAVE_PLATFORM_USB
-+	select USB_ARCH_HAS_EHCI
- 	select MXS_OCOTP
- 	help
- 	  Include support for MX28EVK platform. This includes specific
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index e386c14..8bdd416 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -37,6 +37,7 @@
- #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
- #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
- #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
-+#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
+Please see if below changes look fine to you. They would be required once
+you rebase over latest patches floated by Mike:
+
+---
+ drivers/clk/clk-fixed-factor.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 7c5e1fc..45a4823 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -16,7 +16,7 @@ struct clk_fixed_factor {
+        struct clk_hw   hw;
+        unsigned int    mult;
+        unsigned int    div;
+-       char            *parent[1];
++       const char      *parent[1];
+ };
  
- #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
- #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
-@@ -186,6 +187,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
- 
- 	/* led */
- 	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
-+	/* usb1 */
-+	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
- 
- 	/* I2C */
- 	MX28_PAD_I2C0_SCL__I2C0_SCL |
-@@ -451,6 +454,13 @@ static void __init mx28evk_init(void)
- 	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
- 	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
- 
-+	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_OUT_INIT_HIGH,
-+				"usb1-power-en");
-+	if (ret)
-+		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
+ #define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
+@@ -86,11 +86,13 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+                        fix->parent,
+                        (parent_name ? 1 : 0),
+                        flags);
 +
-+	mx28_add_mxs_usbh(1);
++       if (parent_name)
++               kfree(fix->parent[0]);
 +
- 	mx28_add_rtc_stmp3xxx();
+        if (clk)
+                return clk;
+-
+ out:
+-       kfree(fix->parent[0]);
+        kfree(fix);
  
- 	gpio_led_register_device(0, &mx28evk_led_data);
+        return NULL;
+
+
 -- 
-1.7.9.5
+viresh
