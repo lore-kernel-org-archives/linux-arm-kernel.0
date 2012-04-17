@@ -1,45 +1,72 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 17 Apr 2012 10:46:28 -0500
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <4F8D189B.3010100@metasoft.pl>
-References: <4F683B36.8090101@metasoft.pl>
- <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48E3E@AUSP01VMBX24.collaborationhost.net>
- <20120323070446.GC5812@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
- <20120410172853.GA25697@mwesterb-mobl>
- <ADE657CA350FB648AAC2C43247A983F00206986C01D4@AUSP01VMBX24.collaborationhost.net>
- <4F853053.7040800@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F00206987A3BFE@AUSP01VMBX24.collaborationhost.net>
- <4F8D189B.3010100@metasoft.pl>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F00206987A3E66@AUSP01VMBX24.collaborationhost.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Apr 2012 16:56:06 +0100
+Subject: [PATCH 13&15/16 v2] ARM: ux500: Apply Device Tree settings for
+ the DB8500 PRCMU
+In-Reply-To: <1334659448-11521-16-git-send-email-lee.jones@linaro.org>
+References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
+ <1334659448-11521-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <4F8D9296.6020004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 17, 2012 12:16 AM, Rafal Prylowski wrote:
-> On 2012-04-16 20:59, H Hartley Sweeten wrote:
->> It appears your patch is causing an interrupt storm on my system.
->> 
->
-> Could you please apply the following patch on top of double buffering
-> patch? I would like to know the state of dma channel when you get
-> that interrupt storm.
+From: Lee Jones <lee.jones@linaro.org>
+Date: Tue, 17 Apr 2012 10:42:41 +0100
+Subject: [PATCH 1/2] mfd/db8500-prcmu: Add Device Tree support and enable
+ ux500 platforms
 
-Rafal,
+Here we see the db8500-prcmu driver obtain DT support. In its
+current state, all we have to do is offer a matching compatible
+node and the driver will register and initialise correctly. We
+Also remove any initialisation completed in platform code to
+prevent any device duplication.
 
-Here's the output:
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/cpu-db8500.c |    3 +--
+ drivers/mfd/db8500-prcmu.c       |    5 +++++
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-mmc_spi spi0.1: SD/MMC host mmc0, no poweroff
-M2M: 20c3
-M2M: 20c3
-M2M: 21c3
-M2M: 21c3
-M2M: 21c3
-M2M: 21c3
-M2M: 21c3
-M2M: 21c3
-
-The "M2M: 21c3" keeps getting output until the system is turned off.
-
-Regards,
-Hartley
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index c97eab7..2512b6a 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -124,7 +124,6 @@ static struct platform_device *platform_devs[] __initdata = {
+ static struct platform_device *of_platform_devs[] __initdata = {
+ 	&u8500_dma40_device,
+ 	&db8500_pmu_device,
+-	&db8500_prcmu_device,
+ };
+ 
+ static resource_size_t __initdata db8500_gpio_base[] = {
+@@ -234,7 +233,7 @@ struct device * __init u8500_of_init_devices(void)
+ 	 * Devices to be DT:ed:
+ 	 *   u8500_dma40_device  = todo
+ 	 *   db8500_pmu_device   = todo
+-	 *   db8500_prcmu_device = todo
++	 *   db8500_prcmu_device = done
+ 	 */
+ 	platform_add_devices(of_platform_devs, ARRAY_SIZE(of_platform_devs));
+ 
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 839e70b..3c2e4a9 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2992,11 +2992,16 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
+ no_irq_return:
+ 	return err;
+ }
++static const struct of_device_id db8500_prcmu_match[] = {
++	{ .compatible = "stericsson,db8500-prcmu"},
++	{ },
++};
+ 
+ static struct platform_driver db8500_prcmu_driver = {
+ 	.driver = {
+ 		.name = "db8500-prcmu",
+ 		.owner = THIS_MODULE,
++		.of_match_table = db8500_prcmu_match,
+ 	},
+ 	.probe = db8500_prcmu_probe,
+ };
+-- 
+1.7.9.1
