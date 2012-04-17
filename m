@@ -1,75 +1,75 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 17 Apr 2012 19:08:24 +0200
-Subject: [PATCH v2 5/8] input: Device tree support for LPC32xx touchscreen
+Date: Tue, 17 Apr 2012 19:08:21 +0200
+Subject: [PATCH v2 2/8] ohci-nxp: Device tree support
 In-Reply-To: <1334682507-15055-1-git-send-email-stigge@antcom.de>
 References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
-Message-ID: <1334682507-15055-6-git-send-email-stigge@antcom.de>
+Message-ID: <1334682507-15055-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support for the LPC32xx SoC's touchscreen
-controller.
+This patch adds device tree support to ohci-nxp.c
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
 
 ---
 
 Applies to v3.4-rc3
 
- Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt |   16 ++++++++++
- drivers/input/touchscreen/lpc32xx_ts.c                              |   10 ++++++
+Changes since v1:
+* Separated out cleanup patch
+
+Thanks to Thierry Reding for reviewing!
+
+ Documentation/devicetree/bindings/usb/ohci-nxp.txt |   16 ++++++++++++++++
+ drivers/usb/host/ohci-nxp.c                        |   10 ++++++++++
  2 files changed, 26 insertions(+)
 
 --- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt
++++ linux-2.6/Documentation/devicetree/bindings/usb/ohci-nxp.txt
 @@ -0,0 +1,16 @@
-+* NXP LPC32xx SoC Touchscreen Controller (TSC)
++* OHCI controller, NXP ohci-nxp variant
 +
 +Required properties:
-+- compatible: must be "nxp,lpc32xx-tsc"
++- compatible: must be "nxp,ohci-nxp"
 +- reg: physical base address of the controller and length of memory mapped
 +  region.
-+- interrupts: The TSC/ADC interrupt
++- interrupts: The OHCI interrupt
 +
-+Example:
++Example (LPC32xx):
 +
-+	tsc at 40048000 {
-+		compatible = "nxp,lpc32xx-tsc";
-+		reg = <0x40048000 0x1000>;
++	ohci at 31020000 {
++		compatible = "nxp,ohci-nxp";
++		reg = <0x31020000 0x300>;
 +		interrupt-parent = <&mic>;
-+		interrupts = <39 0>;
++		interrupts = <0x3b 0>;
 +	};
---- linux-2.6.orig/drivers/input/touchscreen/lpc32xx_ts.c
-+++ linux-2.6/drivers/input/touchscreen/lpc32xx_ts.c
+--- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
++++ linux-2.6/drivers/usb/host/ohci-nxp.c
 @@ -22,6 +22,7 @@
  #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
 +#include <linux/of.h>
  
- /*
-  * Touchscreen controller register offsets
-@@ -383,6 +384,14 @@ static const struct dev_pm_ops lpc32xx_t
- #define LPC32XX_TS_PM_OPS NULL
- #endif
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -526,10 +527,19 @@ static int usb_hcd_nxp_remove(struct pla
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:usb-ohci");
  
 +#ifdef CONFIG_OF
-+static struct of_device_id lpc32xx_tsc_of_match[] = {
-+	{ .compatible = "nxp,lpc32xx-tsc", },
-+	{ },
++static const struct of_device_id usb_hcd_nxp_match[] = {
++	{ .compatible = "nxp,ohci-nxp" },
++	{},
 +};
-+MODULE_DEVICE_TABLE(of, lpc32xx_tsc_of_match);
++MODULE_DEVICE_TABLE(of, usb_hcd_nxp_match);
 +#endif
 +
- static struct platform_driver lpc32xx_ts_driver = {
- 	.probe		= lpc32xx_ts_probe,
- 	.remove		= __devexit_p(lpc32xx_ts_remove),
-@@ -390,6 +399,7 @@ static struct platform_driver lpc32xx_ts
- 		.name	= MOD_NAME,
+ static struct platform_driver usb_hcd_nxp_driver = {
+ 	.driver = {
+ 		.name = "usb-ohci",
  		.owner	= THIS_MODULE,
- 		.pm	= LPC32XX_TS_PM_OPS,
-+		.of_match_table = of_match_ptr(lpc32xx_tsc_of_match),
++		.of_match_table = of_match_ptr(usb_hcd_nxp_match),
  	},
- };
- module_platform_driver(lpc32xx_ts_driver);
+ 	.probe = usb_hcd_nxp_probe,
+ 	.remove = usb_hcd_nxp_remove,
