@@ -1,52 +1,52 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 17 Apr 2012 15:13:49 -0700
-Subject: [PATCH 1/4] clk: select CLKDEV_LOOKUP for COMMON_CLK
-In-Reply-To: <1334003101-17274-2-git-send-email-robherring2@gmail.com>
-References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
- <1334003101-17274-2-git-send-email-robherring2@gmail.com>
-Message-ID: <CAJOA=zMPqiH2fQJ5JWJ=COnju7Cmur6J2ATYUTcx41C4WMjFQQ@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 17 Apr 2012 15:20:55 -0700
+Subject: [PATCH] ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+In-Reply-To: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Fri, 13 Apr 2012 23:25:04 +0530")
+References: <1334339704-4554-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <878vhut2yg.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 9, 2012 at 1:24 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+
+> The current serial UART code, while fidling with ocp idlemode bits,
+> forget about the smart idle wakeup bit even if it is supported by
+> UART IP block. This will lead to missing the module wakeup on OMAP's
+> where the smart idle wakeup is supported.
 >
-> Using the common clock infrastructure without the common clkdev code makes
-> little sense, so select CLKDEV_LOOKUP for COMMON_CLK.
+> This was the root cause of the console sluggishness issue, I have been
+> observing on OMAP4 devices and also can be potential reason for some
+> other UART wakeup issues.
 >
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Govindraj.R <govindraj.raja@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+
+Acked-by: Kevin Hilman <khilman@ti.com>
+
 > ---
-> ?drivers/clk/Kconfig | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>  arch/arm/mach-omap2/serial.c |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
 >
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 165e1fe..f05a60d 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -12,6 +12,7 @@ config HAVE_MACH_CLKDEV
-> ?config COMMON_CLK
-> ? ? ? ?bool
-> ? ? ? ?select HAVE_CLK_PREPARE
-> + ? ? ? select CLKDEV_LOOKUP
-> ? ? ? ?---help---
-> ? ? ? ? ?The common clock framework is a single definition of struct
-> ? ? ? ? ?clk, useful across many platforms, as well as an
-
-Hi Rob,
-
-I agree that the common clk framework is not particularly useful
-without clkdev.  However the core code has no dependency on clkdev.
-Why not just select it from an arch Kconfig, or even make it a
-dependency based on your own platform clock data/code?
-
-Regards,
-Mike
-
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index c9503a7..b28aae1 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -108,8 +108,14 @@ static void omap_uart_set_noidle(struct platform_device *pdev)
+>  static void omap_uart_set_smartidle(struct platform_device *pdev)
+>  {
+>  	struct omap_device *od = to_omap_device(pdev);
+> +	u8 idlemode;
+>  
+> -	omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_SMART);
+> +	if (od->hwmods[0]->class->sysc->idlemodes & SIDLE_SMART_WKUP)
+> +		idlemode = HWMOD_IDLEMODE_SMART_WKUP;
+> +	else
+> +		idlemode = HWMOD_IDLEMODE_SMART;
+> +
+> +	omap_hwmod_set_slave_idlemode(od->hwmods[0], idlemode);
+>  }
+>  
+>  #else
