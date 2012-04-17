@@ -1,45 +1,16 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Apr 2012 12:15:43 +0200
-Subject: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
-Message-ID: <1334657751-27678-1-git-send-email-marex@denx.de>
+Date: Tue, 17 Apr 2012 12:15:44 +0200
+Subject: [PATCH 1/8] MXS: Make clk_disable return integer
+In-Reply-To: <1334657751-27678-1-git-send-email-marex@denx.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+Message-ID: <1334657751-27678-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
-generic USB PHY infrastructure.
+This allows subsequent USB clock patch to interchange enable() and disable()
+calls without adding unnecessary switching cruft.
 
-Marek Vasut (8):
-  MXS: Make clk_disable return integer
-  MXS: Add USB EHCI and USB PHY clock handling
-  MXS: Fixup i.MX233 USB base address name
-  MXS: Add platform registration hooks for USB EHCI
-  MXS: Add USB PHY driver
-  MXS: Add separate MXS EHCI HCD driver
-  MXS: Enable USB on M28EVK
-  MXS: Enable USB on MX28EVK
-
- arch/arm/mach-mxs/Kconfig                       |    4 +
- arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
- arch/arm/mach-mxs/devices-mx28.h                |    4 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-usb.c        |   79 ++++++
- arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
- arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
- arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
- arch/arm/mach-mxs/mach-m28evk.c                 |   10 +
- arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
- drivers/usb/host/Kconfig                        |    7 +
- drivers/usb/host/ehci-hcd.c                     |    5 +
- drivers/usb/host/ehci-mxs.c                     |  309 +++++++++++++++++++++++
- drivers/usb/otg/Kconfig                         |    9 +
- drivers/usb/otg/Makefile                        |    1 +
- drivers/usb/otg/mxs-phy.c                       |  256 +++++++++++++++++++
- 17 files changed, 736 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
- create mode 100644 drivers/usb/host/ehci-mxs.c
- create mode 100644 drivers/usb/otg/mxs-phy.c
-
+Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
 Cc: Detlev Zundel <dzu@denx.de>
 Cc: Fabio Estevam <festevam@gmail.com>
@@ -53,6 +24,62 @@ Cc: Stefano Babic <sbabic@denx.de>
 Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
+---
+ arch/arm/mach-mxs/clock-mx28.c         |    7 +++++--
+ arch/arm/mach-mxs/include/mach/clock.h |    2 +-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index cea29c9..43116ba 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -86,7 +86,7 @@ static int _raw_clk_enable(struct clk *clk)
+ 	return 0;
+ }
+ 
+-static void _raw_clk_disable(struct clk *clk)
++static int _raw_clk_disable(struct clk *clk)
+ {
+ 	u32 reg;
+ 
+@@ -95,6 +95,8 @@ static void _raw_clk_disable(struct clk *clk)
+ 		reg |= 1 << clk->enable_shift;
+ 		__raw_writel(reg, clk->enable_reg);
+ 	}
++
++	return 0;
+ }
+ 
+ /*
+@@ -149,7 +151,7 @@ _CLK_ENABLE_PLL(pll1_clk, PLL1, EN_USB_CLKS)
+ _CLK_ENABLE_PLL(pll2_clk, PLL2, CLKGATE)
+ 
+ #define _CLK_DISABLE_PLL(name, r, g)					\
+-static void name##_disable(struct clk *clk)				\
++static int name##_disable(struct clk *clk)				\
+ {									\
+ 	__raw_writel(BM_CLKCTRL_##r##CTRL0_POWER,			\
+ 		     CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+@@ -161,6 +163,7 @@ static void name##_disable(struct clk *clk)				\
+ 		__raw_writel(BM_CLKCTRL_##r##CTRL0_##g,			\
+ 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+ 									\
++	return 0;							\
+ }
+ 
+ _CLK_DISABLE_PLL(pll0_clk, PLL0, EN_USB_CLKS)
+diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
+index 592c9ab..21d1fad 100644
+--- a/arch/arm/mach-mxs/include/mach/clock.h
++++ b/arch/arm/mach-mxs/include/mach/clock.h
+@@ -50,7 +50,7 @@ struct clk {
+ 	int (*enable) (struct clk *);
+ 	/* Function ptr to disable the clock. Leave blank if clock can not
+ 	   be gated. */
+-	void (*disable) (struct clk *);
++	int (*disable) (struct clk *);
+ 	/* Function ptr to set the parent clock of the clock. */
+ 	int (*set_parent) (struct clk *, struct clk *);
+ };
 -- 
 1.7.9.5
