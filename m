@@ -1,32 +1,62 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 17 Apr 2012 16:45:34 +0530
-Subject: [PATCH 02/13] clk: Fix typo in comment
-In-Reply-To: <cover.1334660431.git.viresh.kumar@st.com>
-References: <cover.1334660431.git.viresh.kumar@st.com>
-Message-ID: <3ebf7ae767a0af87a27bb40592e33ff97152edf5.1334660431.git.viresh.kumar@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 17 Apr 2012 14:18:00 +0200
+Subject: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <201204171345.07851.marex@denx.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <20120417112910.GA3852@pengutronix.de>
+ <201204171345.07851.marex@denx.de>
+Message-ID: <20120417121800.GB3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLK_GATE_SET_TO_DISABLE is mistakenly written as CLK_GATE_SET_DISABLE in
-comment. Fix it.
+On Tue, Apr 17, 2012 at 01:45:07PM +0200, Marek Vasut wrote:
+> Dear Sascha Hauer,
+> 
+> > Hi Marek,
+> > 
+> > On Tue, Apr 17, 2012 at 12:15:43PM +0200, Marek Vasut wrote:
+> > > This patchset introduces the USB Host driver for i.MX28 CPU, utilising
+> > > the generic USB PHY infrastructure.
+> > 
+> > Your patches won't work when more than one USB port is enabled because
+> > of the singular usb transceiver present in the kernel. That of course is
+> > not your fault. I think Heikki (Added to Cc) is working on this issue,
+> > but I don't know the status here.
+> 
+> All right, I'll let Heikki hack on that. I'm not sure if we have any mx28 based 
+> device with multiple USB ports in kernel. Do we ?
+> 
+> > Another problem is that what you are doing does not integrate at all
+> > with otg.
+> 
+> Well, how should this be done to integrate with OTG then?
+> 
+> > I don't ask you to implement otg support because you are
+> > likely not interested in this, but since you are adding a new ehci
+> > glue driver anyway I suggest another approach:
+> > 
+> > Put a driver under drivers/usb/otg which:
+> > 
+> > - matches a 'imx-usb' device
+> > - gets/enables all clocks needed for USB
+> > - finds the transceiver
+> > - registers a ehci device
+> 
+> So the PHY actually registers the EHCI driver (plat_bus->phy->ehci)? That's 
+> slightly weird, don't you think?
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- include/linux/clk-provider.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Your hardware device is a device consisting of a ehci core and a USB device
+core. Currently we register the child devices independently which leads
+to the mentioned problems. Instead we should register the USB core as a
+whole and pass the resources to either the client or the host driver.
 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 50ee80b..d98bdbc 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -166,7 +166,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
-  * Clock which can gate its output.  Implements .enable & .disable
-  *
-  * Flags:
-- * CLK_GATE_SET_DISABLE - by default this clock sets the bit at bit_idx to
-+ * CLK_GATE_SET_TO_DISABLE - by default this clock sets the bit at bit_idx to
-  * 	enable the clock.  Setting this flag does the opposite: setting the bit
-  * 	disable the clock and clearing it enables the clock
-  */
+The phys are completely independent devices (from a bus topology point
+of view). The USB core just happens to use the phys.
+
+Sascha
+
 -- 
-1.7.9
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
