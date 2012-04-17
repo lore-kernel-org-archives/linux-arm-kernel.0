@@ -1,63 +1,114 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 17 Apr 2012 12:55:25 +0530
-Subject: [Query] Common Clock Framework: How to handle clks enabled by
- default
-In-Reply-To: <CAAQ0ZWT_xJAp4H_k_Mr24Fcj5tKAhpev4nr8gpK3-3zpM_MobA@mail.gmail.com>
-References: <4F8D0BF9.7080802@st.com>
- <CAAQ0ZWT_xJAp4H_k_Mr24Fcj5tKAhpev4nr8gpK3-3zpM_MobA@mail.gmail.com>
-Message-ID: <4F8D1AE5.9000509@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 17 Apr 2012 09:43:01 +0200
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
+References: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
+ <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <20120417074301.GM20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/17/2012 12:43 PM, Shawn Guo wrote:
-> On 17 April 2012 14:21, Viresh Kumar <viresh.kumar@st.com> wrote:
->> Hi,
->>
->> How are we handling clocks which are enabled by bootloaders and are
->> required to be enabled, like, pll, cpu, ahb?
->>
-> Call clk_prepare_enable on the clocks in platform clock init function.
-
-Probably that is what i need.
-
->> Following is example clk hierarchy:
->> osc(root)->pll->cpu->ahb->dma
->>
->> Issue1: Now, when we do clk_enable() for dma, all these already enabled clocks
->> are re-enabled.
+On Mon, Apr 16, 2012 at 06:50:12PM -0500, Robert Lee wrote:
+> Add common cpuidle init functionality that can be used by various
+> imx platforms.
 > 
-> What's the problem with doing that?  Your hardware does not cope with
-> setting/clearing a bit that already set/cleared.  Even if that is the
-> case, you can easily handle that in your .enable/.disable ops.
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+> index e81290c..7c9e05f 100644
+> --- a/arch/arm/plat-mxc/Makefile
+> +++ b/arch/arm/plat-mxc/Makefile
+> @@ -16,6 +16,8 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+>  obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+>  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+>  obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
+> +obj-$(CONFIG_CPU_IDLE)    += cpuidle.o
+> +
+>  ifdef CONFIG_SND_IMX_SOC
+>  obj-y += ssi-fiq.o
+>  obj-y += ssi-fiq-ksym.o
+> diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
+> new file mode 100644
+> index 0000000..d1c9301
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/cpuidle.c
+> @@ -0,0 +1,89 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2012 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/io.h>
+> +#include <linux/cpuidle.h>
+> +#include <linux/hrtimer.h>
+> +#include <linux/err.h>
+> +#include <linux/slab.h>
+> +
+> +static struct cpuidle_device __percpu * imx_cpuidle_devices;
+> +static struct cpuidle_driver *drv;
+> +
+> +void __init imx_cpuidle_set_driver(struct cpuidle_driver *p)
+> +{
+> +	drv = p;
+> +}
 
-No issues with my hardware atleast, but seems to be logically incorrect.
+You like it complicated, eh? Why do you introduce a function which sets
+a variable...
 
-If we could have scanned hardware at boot time, to see which are enabled
-by bootloader and updated clk_prepare/enable count for them in clk framework,
-picture would have been much clearer.
+> +
+> +void imx_cpuidle_devices_uninit(void)
+> +{
+> +	int cpu_id;
+> +	struct cpuidle_device *dev;
+> +
+> +	for_each_possible_cpu(cpu_id) {
+> +		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
+> +		cpuidle_unregister_device(dev);
+> +	}
+> +
+> +	free_percpu(imx_cpuidle_devices);
+> +}
+> +
+> +static int __init imx_cpuidle_init(void)
 
-We can disable clks (enabled by bootloader), that lacks a specific flag in
-their flags field during this scan.
+... instead of passing it directly to the function which uses it?
 
->> Issue2: On clk_disable() all are disabled and system hangs :(
->>
-> It should not.  It means you have other clocks in the hierarchy not
-> manged well.  The parent of the clock will not be gated by calling
-> clk_disable, if there are other sibling clocks are enabled.
+> +{
+> +	struct cpuidle_device *dev;
+> +	int cpu_id, ret;
+> +
+> +	if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
+> +		pr_err("%s: Invalid Input\n", __func__);
 
-Yes. This happens at boot time, where clk_enable for none of the siblings
-is called.
+You introduce a pointless error message on SoCs not setting a cpuidle
+driver. When will people learn that initcalls do not only run on
+machines they have on their desk?
 
->> There is one option CLK_IGNORE_UNUSED, which is used only for disabling
->> unused clocks. So that is not helpful here.
->>
->> One way i could think of is not to give clk_gate support for these clocks,
->> so that they can never be disabled. Is this the preferred way?
->>
-> It only makes sense on those completely internal clocks which will
-> never need managing.
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = cpuidle_register_driver(drv);
+> +
+> +	if (ret) {
+> +		pr_err("%s: Failed to register cpuidle driver\n", __func__);
 
-Hmm.
+It's always nice to add the return value to the error message to get a
+clue *what* went wrong. The function name though is rather
+uninteresting.
+
+Sascha
+
 
 -- 
-viresh
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
