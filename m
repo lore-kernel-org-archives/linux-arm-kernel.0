@@ -1,168 +1,30 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 17 Apr 2012 15:51:47 -0500
-Subject: [PATCH] ep93xx: Implement double buffering for M2M DMA channels
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F00206987A3E66@AUSP01VMBX24.collaborationhost.net>
-References: <4F683B36.8090101@metasoft.pl>
- <20120321193836.GC3740@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48E3E@AUSP01VMBX24.collaborationhost.net>
- <20120323070446.GC5812@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F0020696D48EEB@AUSP01VMBX24.collaborationhost.net>
- <20120410172853.GA25697@mwesterb-mobl>
- <ADE657CA350FB648AAC2C43247A983F00206986C01D4@AUSP01VMBX24.collaborationhost.net>
- <4F853053.7040800@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F00206987A3BFE@AUSP01VMBX24.collaborationhost.net>
- <4F8D189B.3010100@metasoft.pl>
- <ADE657CA350FB648AAC2C43247A983F00206987A3E66@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F00206987A4034@AUSP01VMBX24.collaborationhost.net>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 17 Apr 2012 23:57:41 +0300
+Subject: [PATCH v2 1/8] ohci-nxp: Driver cleanup
+In-Reply-To: <1334682507-15055-2-git-send-email-stigge@antcom.de>
+References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
+ <1334682507-15055-2-git-send-email-stigge@antcom.de>
+Message-ID: <20120417205740.GI6498@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 17, 2012 8:46 AM, H Hartley Sweeten wrote:
-> On Tuesday, April 17, 2012 12:16 AM, Rafal Prylowski wrote:
->> On 2012-04-16 20:59, H Hartley Sweeten wrote:
->>> It appears your patch is causing an interrupt storm on my system.
->>> 
->>
->> Could you please apply the following patch on top of double buffering
->> patch? I would like to know the state of dma channel when you get
->> that interrupt storm.
->
-> Rafal,
->
-> Here's the output:
->
-> mmc_spi spi0.1: SD/MMC host mmc0, no poweroff
-> M2M: 20c3
-> M2M: 20c3
-> M2M: 21c3
-> M2M: 21c3
-> M2M: 21c3
-> M2M: 21c3
-> M2M: 21c3
-> M2M: 21c3
->
-> The "M2M: 21c3" keeps getting output until the system is turned off.
+On Tue, Apr 17, 2012 at 07:08:20PM +0200, Roland Stigge wrote:
+> @@ -435,6 +436,7 @@ static int __devinit usb_hcd_nxp_probe(s
+>  	}
+>  
+>  	__raw_writel(__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN, USB_CTRL);
+> +	__raw_writel(__raw_readl(USB_CTRL) & ~USB_DEV_NEED_CLK_EN, USB_CTRL);
+>  
+>  	/* Set to enable all needed USB clocks */
+>  	__raw_writel(USB_CLOCK_MASK, USB_OTG_CLK_CTRL);
 
-Rafal,
+What does this chunk do?  Is this part of the "* Fixed controller
+initialization (bits)" bullet point?  How does it affect the user?
+Should it be included in the 3.4 kernel?
 
-It appears that the M2M_CONTROL_NFBINT bit is never getting set when
-dma is used with the spi-ep93xx.c and mmc_spi.c drivers.
+Generally bug fixes, cleanups, and new features should go into
+different patches.  If you use "git citool" then you can highlight
+and right click on the lines you want to go into the patch.
 
-I added a prink in msm_hw_submit():
-
-	if (ep93xx_dma_advance_active(edmac)) {
-		m2m_fill_desc(edmac);
-		control |= M2M_CONTROL_NFBINT;
-		printk("%s: NFB enabled\n", __func__);
-	}
-
-This message is never displayed.
-
-And for some reason the txd.cookie is not getting set correctly to detect
-the last entry in m2m_hw_interrupt.
-
-	/*
-	 * Check whether we are done with descriptors or not. This, together
-	 * with DMA channel state, determines action to take in interrupt.
-	 */
-	last = list_first_entry(edmac->active.next,
-		struct ep93xx_dma_desc, node)->txd.cookie;
-
-This is causing the code for the INTERRUPT_NEXT_BUFFER to be executed
-even though a "next" buffer does not exist.
-
-I think your handling logic in m2m_hw_interrupt needs a bit more work.
-
-I hacked it to test and this appears to work but it's not optimal...
-
-Here's the whole function:
-
-
-static int m2m_hw_interrupt(struct ep93xx_dma_chan *edmac)
-{
-	u32 status = readl(edmac->regs + M2M_STATUS);
-	u32 ctl_fsm = status & M2M_STATUS_CTL_MASK;
-	u32 buf_fsm = status & M2M_STATUS_BUF_MASK;
-	bool done = status & M2M_STATUS_DONE;
-	bool last;
-	u32 control;
-
-	/* Accept only DONE and NFB interrupts */
-	if (!(readl(edmac->regs + M2M_INTERRUPT) & M2M_INTERRUPT_MASK))
-		return INTERRUPT_UNKNOWN;
-
-	if (done)
-		/* Clear the DONE bit */
-		writel(0, edmac->regs + M2M_INTERRUPT);
-
-	/*
-	 * Check whether we are done with descriptors or not. This, together
-	 * with DMA channel state, determines action to take in interrupt.
-	 */
-	last = list_first_entry(edmac->active.next,
-		struct ep93xx_dma_desc, node)->txd.cookie;
-
-	/*
-	 * Use M2M DMA Buffer FSM and Control FSM to check current state of
-	 * DMA channel. Using DONE and NFB bits from channel status register
-	 * or bits from channel interrupt register was proven not to be
-	 * reliable.
-	 */
-	if (!last &&
-	    (buf_fsm == M2M_STATUS_BUF_NO ||
-	     buf_fsm == M2M_STATUS_BUF_ON)) {
-		/*
-		 * Two buffers are ready for update when Buffer FSM is in
-		 * DMA_NO_BUF state. Only one buffer can be prepared without
-		 * disabling the channel, or polling the DONE bit.
-		 * To simplify things, always prepare only one buffer.
-		 */
-		if (ep93xx_dma_advance_active(edmac)) {
-			m2m_fill_desc(edmac);
-			if (done && !edmac->chan.private) {
-				/* Software trigger for memcpy channel */
-				control = readl(edmac->regs + M2M_CONTROL);
-				control |= M2M_CONTROL_START;
-				writel(control, edmac->regs + M2M_CONTROL);
-			}
-			return INTERRUPT_NEXT_BUFFER;
-		} else {
-			/*
-			 * HACK: We don't have another buffer to prepare.
-			 * Just disable the channel.
-			 */
-			control = readl(edmac->regs + M2M_CONTROL);
-			control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_NFBINT
-				| M2M_CONTROL_ENABLE);
-			writel(control, edmac->regs + M2M_CONTROL);
-			return INTERRUPT_DONE;
-		}
-	}
-
-	/*
-	 * Disable the channel only when Buffer FSM is in DMA_NO_BUF state
-	 * and Control FSM is in DMA_STALL state.
-	 */
-	if (last &&
-	    buf_fsm == M2M_STATUS_BUF_NO &&
-	    ctl_fsm == M2M_STATUS_CTL_STALL) {
-		ep93xx_dma_advance_active(edmac);
-		/* Disable interrupts and the channel */
-		control = readl(edmac->regs + M2M_CONTROL);
-		control &= ~(M2M_CONTROL_DONEINT | M2M_CONTROL_NFBINT
-			    | M2M_CONTROL_ENABLE);
-		writel(control, edmac->regs + M2M_CONTROL);
-		return INTERRUPT_DONE;
-	}
-
-	/*
-	 * Nothing to do this time.
-	 */
-	return INTERRUPT_NEXT_BUFFER;
-}
-
-
-With this I am able to boot my system and use the mmc card.
-
-Regards,
-Hartley
+regards,
+dan carpenter
