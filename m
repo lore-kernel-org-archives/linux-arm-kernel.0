@@ -1,46 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Apr 2012 22:10:42 +0200
-Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
- sampling bug
-In-Reply-To: <4F8D8FF9.9040909@mvista.com>
-References: <1334675261-31570-1-git-send-email-marex@denx.de>
- <4F8D8FF9.9040909@mvista.com>
-Message-ID: <201204172210.42616.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Apr 2012 14:12:50 -0600
+Subject: [PATCH 2/3] pinctrl: pinctrl-imx: add imx6q pinctrl driver
+In-Reply-To: <1334333915-1174-2-git-send-email-b29396@freescale.com>
+References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
+ <1334333915-1174-2-git-send-email-b29396@freescale.com>
+Message-ID: <4F8DCEC2.2060800@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sergei Shtylyov,
-
-> Hello.
+On 04/13/2012 10:18 AM, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> On 04/17/2012 07:07 PM, Marek Vasut wrote:
-> > From: Marek Vasut<marek.vasut@gmail.com>
-> > 
-> > Signed-off-by: Marek Vasut<marek.vasut@gmail.com>
-> > Cc: Chen Peter-B29397<B29397@freescale.com>
-> > Cc: Detlev Zundel<dzu@denx.de>
-> > Cc: Fabio Estevam<festevam@gmail.com>
-> > Cc: Li Frank-B20596<B20596@freescale.com>
-> > Cc: Lin Tony-B19295<B19295@freescale.com>
-> > Cc: Linux USB<linux-usb@vger.kernel.org>
-> > Cc: Sascha Hauer<s.hauer@pengutronix.de>
-> > Cc: Shawn Guo<shawn.guo@freescale.com>
-> > Cc: Shawn Guo<shawn.guo@linaro.org>
-> > Cc: Stefano Babic<sbabic@denx.de>
-> > Cc: Subodh Nijsure<snijsure@grid-net.com>
-> > Cc: Tony Lin<tony.lin@freescale.com>
-> > Cc: Wolfgang Denk<wd@denx.de>
-> > ---
-> > 
-> >   drivers/video/mxsfb.c |   13 +++++++++++++
-> >   1 file changed, 13 insertions(+)
-> 
->     Why post this to linux-usb?
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Copy-paste mistake
+> diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
 
-> 
-> WBR, Sergei
+>  static const struct of_device_id imx_pmx_dt_ids[] = {
+> +#ifdef CONFIG_PINCTRL_IMX6Q
+> +	{ .compatible = "fsl,imx6q-iomuxc", .data = (void *) &imx6q_pinctrl_info, },
+> +#endif
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, imx_pmx_dt_ids);
 
-Best regards,
-Marek Vasut
+Sorry for the slow review.
+
+Based on SPEAr pinctrl review comments, we shouldn't have a single
+driver that knows about all the different SoCs that it could support,
+but rather one driver per SoC, with each of those calling into some
+utility code in the core driver to do all the probe/remove work.
+
+For more details, see commit a4c0738 "pinctrl: tegra: refactor probe
+handling" in
+git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+(in branch for-3.5/gpio-pinmux).
