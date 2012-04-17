@@ -1,48 +1,17 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Apr 2012 16:58:43 +0100
-Subject: [PATCH 10/16 v2] drivers/gpio: represent gpio-nomadik as an IRQ
- controller in DT documentation
-In-Reply-To: <201204171438.33051.arnd@arndb.de>
-References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
- <1334659448-11521-11-git-send-email-lee.jones@linaro.org>
- <201204171438.33051.arnd@arndb.de>
-Message-ID: <4F8D9333.6030303@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 17 Apr 2012 18:02:11 +0200
+Subject: [GIT PULL] at91: fist cleanup branch for 3.5
+In-Reply-To: <4F8D9037.9010401@atmel.com>
+References: <4F8D9037.9010401@atmel.com>
+Message-ID: <4F8D9403.5000706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Fri, 13 Apr 2012 16:05:26 +0100
-Subject: [PATCH 10/16] drivers/gpio: represent gpio-nomadik as an IRQ
- controller in DT documentation
+Obviously:
 
-Now gpio-nomadik has proper bindings devices initialised by Device Tree
-entries are able to use the chained GPIO IRQ lines it provides. This
-patch aims to reflect that in the gpio-nmk documentation.
+s/fist/first/ on Subject:
+s/branch/tag/ on Subject:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/gpio/gpio-nmk.txt          |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-index 3856789..ee87467 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-@@ -13,6 +13,7 @@ Required properties:
-                                   4 = active high level-sensitive.
-                                   8 = active low level-sensitive.
- - gpio-controller       : Marks the device node as a GPIO controller.
-+- interrupt-controller  : Marks the device node as an interrupt controller.
- - gpio-bank             : Specifies which bank a controller owns.
- - st,supports-sleepmode : Specifies whether controller can sleep or not
- 
-@@ -24,6 +25,7 @@ Example:
-                         interrupts = <0 120 0x4>;
-                         #gpio-cells = <2>;
-                         gpio-controller;
-+                        interrupt-controller;
-                         supports-sleepmode;
-                         gpio-bank = <1>;
-                 };
+Bye,
 -- 
-1.7.9.1
+Nicolas Ferre
