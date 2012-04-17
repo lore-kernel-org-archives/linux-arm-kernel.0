@@ -1,28 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Apr 2012 21:20:10 +0200
-Subject: [PATCH v2] plat-versatile: modernize FPGA IRQ controller
-In-Reply-To: <4F8D8E0A.7040006@gmail.com>
-References: <1334422936-28856-1-git-send-email-linus.walleij@linaro.org>
- <4F89EE5B.5080709@gmail.com>
- <CACRpkdZTacwxc=sn8qiKMjrCRZyymwet3cZb=OE87JkuVSj-MA@mail.gmail.com>
- <4F8D8E0A.7040006@gmail.com>
-Message-ID: <CACRpkdY1V3Ge=n7MFtatFmH1Q3E1Tam7aCXvhQRKKieJqnE+Vw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Apr 2012 12:22:01 -0700
+Subject: [GIT PULL]: omap-serial updates for 3.4-rc
+In-Reply-To: <CAMQu2gx6FOC2RhSYMqUEb1qqF2c+QidzRR-ZJTH_PWDL-qymUQ@mail.gmail.com>
+References: <1334052148-10385-1-git-send-email-govindraj.raja@ti.com>
+ <CAMrsUdKDhuDLr2=0uiQtY=r4pvmJQo=pJgERRCXySLghO7yGXA@mail.gmail.com>
+ <CAMrsUdJ7wzX+Hnx_wBWNnCQz__0sMw8ruFGVWH+x3NGWG0NVQw@mail.gmail.com>
+ <CAMrsUdJ9ehjC4-hChddQRnH0BtpFG3bVBTnm6zFZpU6F0za_bg@mail.gmail.com>
+ <20120417173530.GC21106@atomide.com>
+ <CAMQu2gx6FOC2RhSYMqUEb1qqF2c+QidzRR-ZJTH_PWDL-qymUQ@mail.gmail.com>
+Message-ID: <20120417192201.GF21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 5:36 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 04/16/2012 02:31 PM, Linus Walleij wrote:
->> On small obstacle: the .map function does not pass the
->> void *host_data, so I worked around this by using a static
->> file-local but this is a bit ugly...
->
-> You can't use domain->host_data ptr?
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120417 11:27]:
+> On Apr 17, 2012 11:05 PM, "Tony Lindgren" <tony@atomide.com> wrote:
+> >
+> > > Santosh Shilimkar (1):
+> > >       ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+> >
+> > It seems this can wait as the wake-up events are anyways broken right
+> > now when we remove the muxing.
+> >
+> This patch has no dependency on other patches in
+> this series. It is an indepedent fix for uart module wakeup which solves
+> the console slugishness. It should be taken and should even go to stable.
+> But I let you decide on it.
 
-Oh didn't notice .. of course it work.
+OK, will apply to fixes then with Cc stable.
 
-Sending out v3 it should be a nice piece of code.
-
-Thanks for mentoring!
-
-Yours,
-Linus Walleij
+Tony
