@@ -1,80 +1,39 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 18 Apr 2012 12:54:23 +0200
-Subject: [PATCH 1/1] dt: Add general DMA window parser
-In-Reply-To: <20120418.133629.1664781135413277375.hdoyu@nvidia.com>
-References: <20120418092613.GA8632@avionic-0098.mockup.avionic-design.de>
- <20120418.131907.2172387798112620167.hdoyu@nvidia.com>
- <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
- <20120418.133629.1664781135413277375.hdoyu@nvidia.com>
-Message-ID: <20120418105423.GA5667@avionic-0098.mockup.avionic-design.de>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 18 Apr 2012 11:58:05 +0100 (BST)
+Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
+ flag
+In-Reply-To: <1334711058.19852.YahooMailClassic@web29008.mail.ird.yahoo.com>
+Message-ID: <1334746685.22354.YahooMailClassic@web29008.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiroshi Doyu wrote:
-> diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
-> new file mode 100644
-> index 0000000..45c9e88
-> --- /dev/null
-> +++ b/drivers/of/of_dma.c
-> @@ -0,0 +1,35 @@
-> +/*
-> + * Stolen from:
-> + *	"arch/microblaze/kernel/prom_parse.c"
-> + *	"arch/powerpc/kernel/prom_parse.c"
-> + */
-> +
-> +#include <linux/of_address.h>
-> +
-> +void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
-> +		unsigned long *busno, unsigned long *phys, unsigned long *size)
-> +{
-> +	const __be32 *dma_window;
-> +	u32 cells;
-> +	const unsigned char *prop;
+--- On Wed, 18/4/12, Paul Parsons <lost.distance@yahoo.com> wrote:
+> > I tried the v3.4-rc2 today, and it _seems_ gpio button
+> > wakeups don't work
+> > anymore (ie. wakeup set up by gpio-keys driver). More
+> > specifically, the GPIO0
+> > (power button) doesn't wakeup my board from "echo mem >
+> > /proc/power/state".
 
-There's no need for this to be const unsigned char *, const void * will do
-just as well.
+...
 
-> +
-> +	dma_window = dma_window_prop;
-> +
-> +	/* busno is always one cell */
-> +	if (busno)
-> +		*busno = be32_to_cpup(dma_window++);
-> +
-> +	prop = of_get_property(dn, "#dma-address-cells", NULL);
-> +	if (!prop)
-> +		prop = of_get_property(dn, "#address-cells", NULL);
-> +
-> +	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
-> +	*phys = of_read_number(dma_window, cells);
+> > I don't know it this is a recent or known issue, or if I'm
+> > have missed a change in
+> > pxa/gpio-keys driver.
+> 
+> I can only comment on the hx4700 platform, which has 4
+> pending
+> patches for suspend/resume, plus 1 more still to be
+> submitted.
+> These fix hx4700 suspend/resume, which has never worked.
+> None of the patches touch the gpio-keys driver, however.
 
-This should probably fail gracefully if phys == NULL, similar to what you do
-for busno.
+Just to clarify, the generic pxa/gpio suspend/resume support does
+seem to work OK; the hx4700 patches are platform specific, apart
+from this SKIP_SET_WAKE patch to fix the Unbalanced IRQ warnings.
 
-> +
-> +	dma_window += cells;
-> +
-> +	prop = of_get_property(dn, "#dma-size-cells", NULL);
-> +	cells = prop ? be32_to_cpup(prop) : of_n_size_cells(dn);
-> +	*size = of_read_number(dma_window, cells);
+Consequently it seems likely that your problem is also platform
+specific.
 
-Same here.
-
-> +}
-> +
-
-And you might want to add a EXPORT_SYMBOL(of_parse_dma_window) here so the
-function can be used from modules.
-
-Sorry for having you go through another round. I should have looked more
-closely before.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/44c7e319/attachment-0001.sig>
+Regards,
+Paul
