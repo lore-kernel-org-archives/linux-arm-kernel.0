@@ -1,46 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Apr 2012 16:12:33 +0100
-Subject: [PATCH 7/7] MMC: mmci: Add required documentation for Device
- Tree bindings
-In-Reply-To: <1334759484.26922.11.camel@hornet>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-8-git-send-email-lee.jones@linaro.org>
- <1334759484.26922.11.camel@hornet>
-Message-ID: <4F8ED9E1.8060604@linaro.org>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Wed, 18 Apr 2012 20:43:40 +0530
+Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
+In-Reply-To: <87bompp2bk.fsf@ti.com>
+References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+ <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
+ <87bomprjic.fsf@ti.com> <4F8E62D2.9080206@ti.com> <87bompp2bk.fsf@ti.com>
+Message-ID: <4F8EDA24.5020209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/12 15:31, Pawel Moll wrote:
-> On Fri, 2012-04-13 at 15:05 +0100, Lee Jones wrote:
->> +Required properties:
->> +- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
+On Wednesday 18 April 2012 07:30 PM, Kevin Hilman wrote:
+>>>> >>>  		if (ret < 0) {
+>>>> >>>  			serial_omap_enable_ier_thri(up);
+>>>> >>> +			pm_runtime_mark_last_busy(&up->pdev->dev);
+>>>> >>> +			pm_runtime_put_autosuspend(&up->pdev->dev);
+>>> >> Why the autosuspend version here?
+>>> >>
+>>> >> Kevin
+>>> >>
+>>> >>
+>> > In case the request_dma fails we enable the thri( effectively like intr
+>> > mode) so
+>> > I thought of using the autosuspend version here .
+>> >
+>> > Do you prefer put version instead ?
+> Not necessarily, it should just be well described in the changelog.
 >
-> I'd say that this is _very_ optional (as in: don't use this, unless you
-> know what are you doing ;-)
-
-Okay.
-
-Who is pulling this patch by the way? Chris is it you?
-
-I'll draft another one with the arm,primecell-periphid moved to optional 
-properties and reply to the original [PATCH 7/7] mail with Arnd's Acked-by.
-
-> Also, how are you planning to represent the ".ocr_mask" part of the
-> platform data? (I'm asking about this particular one, because it's the
-> only I need on vexpress ;-)
-
-Short answer; I'm not.
-
-Long answer; I'm not ... until the DMA mess is sorted out. Once it is, 
-I'll use the correct bindings to associate DMA settings with the device. 
-Until this time the ocr_mask (operation conditions register mask - see 
-Russell, I'm learning ;)) will continue to be set using platform code. 
-If you require it before that point, I have no qualms with you adding it 
-yourself. :D
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Kevin
+Yes agree completely. Will describe that in the changelog.
