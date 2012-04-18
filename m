@@ -1,16 +1,14 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 04:07:43 +0200
-Subject: [PATCH 04/10] MXS: Add data shared between imx-usb,
- PHY and EHCI driver
+Date: Wed, 18 Apr 2012 04:07:48 +0200
+Subject: [PATCH 09/10] MXS: Enable USB on M28EVK
 In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
  <1334714869-19282-1-git-send-email-marex@denx.de>
-Message-ID: <1334714869-19282-5-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-10-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds common data shared between the MXS USB PHY driver, the MXS EHCI
-HCD driver and the imx-usb composite driver.
+Enable the second USB port on M28EVK board.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -27,41 +25,49 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- include/linux/fsl_devices.h |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/mach-mxs/Kconfig       |    2 ++
+ arch/arm/mach-mxs/mach-m28evk.c |    9 +++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
-index fffdf00..20038c0 100644
---- a/include/linux/fsl_devices.h
-+++ b/include/linux/fsl_devices.h
-@@ -18,6 +18,7 @@
- #define _FSL_DEVICE_H_
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 9dbf29f..5b5566c 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -83,6 +83,8 @@ config MODULE_M28
+ 	select MXS_HAVE_PLATFORM_MXS_LRADC
+ 	select MXS_HAVE_PLATFORM_MXS_MMC
+ 	select MXS_HAVE_PLATFORM_MXSFB
++	select MXS_HAVE_PLATFORM_USB
++	select USB_ARCH_HAS_EHCI
+ 	select MXS_OCOTP
  
- #include <linux/types.h>
-+#include <linux/platform_device.h>
+ config MODULE_APX4
+diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+index f32fadb..ecdb0ff 100644
+--- a/arch/arm/mach-mxs/mach-m28evk.c
++++ b/arch/arm/mach-mxs/mach-m28evk.c
+@@ -212,6 +212,11 @@ static const iomux_cfg_t m28evk_pads[] __initconst = {
  
- /*
-  * Some conventions on how we handle peripherals on Freescale chips
-@@ -97,6 +98,20 @@ struct fsl_usb2_platform_data {
- 	u32		pm_usbgenctrl;
+ 	/* Backlight */
+ 	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
++
++	/* USB */
++	MX28_PAD_SSP2_SS1__USB1_OVERCURRENT,
++	MX28_PAD_AUART3_TX__GPIO_3_13 |
++		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
  };
  
-+struct imx_usb_data {
-+	struct clk	*clk;
-+	struct resource	*mem_res;
-+	void __iomem	*mem;
-+	int		irq;
-+};
+ /* led */
+@@ -377,6 +382,10 @@ static void __init m28evk_init(void)
+ 	mx28_add_ts(&touch_pdata);
+ 
+ 	mx28_add_gpmi_nand(&m28evk_gpmi_nand_data);
 +
-+struct imx_usb {
-+	struct platform_device	*host_dev;
-+	struct platform_device	*phy_dev;
-+	struct imx_usb_data	host;
-+	struct imx_usb_data	phy;
-+};
++	gpio_request_one(MXS_GPIO_NR(3, 13), GPIOF_OUT_INIT_LOW, "USB Power");
 +
- /* Flags in fsl_usb2_mph_platform_data */
- #define FSL_USB2_PORT0_ENABLED	0x00000001
- #define FSL_USB2_PORT1_ENABLED	0x00000002
++	mx28_add_mxs_usbh(1);
+ }
+ 
+ static void __init m28evk_timer_init(void)
 -- 
 1.7.9.5
