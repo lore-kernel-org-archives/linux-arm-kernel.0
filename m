@@ -1,24 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 19 Apr 2012 01:53:45 +0530
-Subject: [PATCH] arm: davinci: pdctl next bit position incorrect
-In-Reply-To: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
-References: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <4F8F22D1.8080309@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Apr 2012 21:24:47 +0100
+Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
+ initialization
+In-Reply-To: <20120418200214.GP21106@atomide.com>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRsg-0004bX-4w@rmk-PC.arm.linux.org.uk>
+ <CANrkHUajRzoCp7K8L3cJArWN3xdqpft8L4k-o4gFTRTo8nmhmg@mail.gmail.com>
+ <20120418152956.GP25053@n2100.arm.linux.org.uk>
+ <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
+ <20120418194224.GS25053@n2100.arm.linux.org.uk>
+ <20120418200214.GP21106@atomide.com>
+Message-ID: <20120418202447.GT25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
+On Wed, Apr 18, 2012 at 01:02:15PM -0700, Tony Lindgren wrote:
+> The scatterlist entries are separate DMA requests on omap1, there's no
+> chaining support in the DMA hardware on omap1. So yes, it's for every
+> scatterlist entry on omap1.
 
-On 4/18/2012 4:11 PM, m-karicheri2 at ti.com wrote:
-> From: Murali Karicheri <m-karicheri2@ti.com>
-> 
-> The PDCTL NEXT bit is incorrectly set to bit 1 instead of bit 0. This
-> patch fixes this issue
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+There's no direct scatterlist support on OMAP2 either (omap_hsmmc _used_
+to do each scatterlist entry separately too).  The DMA engine driver
+does the same, but will walk the scatterlist internally rather than the
+driver having to do it.
 
-Applying this for v3.5. Note that the "arm:" prefix in subject has to be
-capitalized. I fixed it while comitting. Please take care next time on.
-
-Thanks,
-Sekhar
+I'd like to have the same thing happen on OMAP1 as well (it's actually
+quite simple to do) and it means that this DMA engine implementation
+detail is (correctly) hidden from the drivers - provided there's no
+dependencies on each individual scatterlist entry back to the peripheral
+driver.
