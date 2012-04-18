@@ -1,69 +1,77 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Apr 2012 14:28:32 +0200
-Subject: [PATCH 1/1] pinctrl: handle dummy state in core
-In-Reply-To: <CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>
-References: <1334586289-13078-1-git-send-email-b29396@freescale.com>
- <4F8C42D6.2000607@wwwdotorg.org>
- <20120417034210.GD17173@shlinux2.ap.freescale.net>
- <CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>
-Message-ID: <20120418122832.GP20478@pengutronix.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 18 Apr 2012 14:30:20 +0200
+Subject: [PATCH v2 8/8] ARM: LPC32xx: Device tree support
+In-Reply-To: <20120418060230.GC17506@avionic-0098.adnet.avionic-design.de>
+References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
+ <1334682507-15055-9-git-send-email-stigge@antcom.de>
+ <20120418060230.GC17506@avionic-0098.adnet.avionic-design.de>
+Message-ID: <4F8EB3DC.3060203@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 01:31:17PM +0200, Linus Walleij wrote:
-> On Tue, Apr 17, 2012 at 5:42 AM, Dong Aisheng
-> <aisheng.dong@freescale.com> wrote:
+Hi Thierry,
+
+thanks for your suggestions.
+
+On 04/18/2012 08:02 AM, Thierry Reding wrote:
+>> arch/arm/mach-lpc32xx/irq.c                           |   78
+>> +++++--
 > 
-> > I think the main issue is for one platform neither supports dt nor using pinctrl
-> > subsystem, do you think it still makes too much sense to force that platform
-> > to define a _PINCTRL_ dummy state in their machine code?
-> >
-> > But the driver is commonly shared between these different platforms(using pinctrl
-> > or not).
+> Could this perhaps be split into another patch. Basically this is
+> a conversion to IRQ domain *and* device tree support. But maybe it
+> isn't worth the effort.
+
+I was thinking the same. :-) Specifically, using
+irq_domain_add_legacy() already builds upon available DT nodes. DT for
+irq in turn seems to require irqdomain. So  would only split those two
+on explicit request of reviewers when we have a reasonable solution to
+this dilemma. Otherwise, I'd keep it in one patch.
+
+>> arch/arm/mach-lpc32xx/phy3250.c                       |  146
+>> +++++--------
 > 
-> So this is for the situation where some machines have pinctrl and some haven't.
+> While at it, this should probably be renamed board-dt.c or
+> something similar since it is no longer phy3250 specific.
+
+As Arnd wrote, there are board specific bits left (open questions
+about how to DT'ize spi's controller_data, and DT-conversion of AMBA
+CLCD). However, I will move board-independent stuff over to common.c.
+(Keeping lpc32xx_auxdata_lookup[] in phy3250.c due to remaining
+platform_data, though.)
+
+>> -	platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs)); -
+>> for (i = 0; i < ARRAY_SIZE(amba_devs); i++) { -		struct
+>> amba_device *d = amba_devs[i]; -		amba_device_register(d,
+>> &iomem_resource); -	} +	tmp =
+>> __raw_readl(LPC32XX_CLKPWR_DMA_CLK_CTRL); +	__raw_writel((tmp |
+>> LPC32XX_CLKPWR_DMACLKCTRL_CLK_EN), +
+>> LPC32XX_CLKPWR_DMA_CLK_CTRL); /* Test clock needed for UDA1380
+>> initial init */ __raw_writel(LPC32XX_CLKPWR_TESTCLK2_SEL_MOSC | 
+>> LPC32XX_CLKPWR_TESTCLK_TESTCLK2_EN, 
+>> LPC32XX_CLKPWR_TEST_CLK_SEL);
 > 
-> And I think that's how some archs have used the regulator dummies earlier,
-> so I clearly see the point. So if converting a subset of machines in an
-> architecture you will need this for a transitional period.
-> 
-> Is this helpful to get i.MX support in place?
-> 
-> On one hand I'd say we merge it for that reason alone, instead of requiring
-> all i.MX machines to be converted at once.
-> 
-> On the other hand, I fear that this will be used to avoid *ever* migrating
-> the old machines to pinctrl. And it's a generic disease that people working
-> in the arch/arm/* tree want to ditch old hardware without actually deleting
-> the code.
+> A lot of these seem to be gratuitous here. Can control of these
+> clocks not be exposed via the clock framework? That would allow the
+> controllers to only activate them when actually needed. This could
+> also be done in follow up patches, though.
 
-'existing' doesn't necessarily mean 'old'
+Correct, clock framework is on my list of following patches.
 
 > 
-> I'd like Sascha's view on this to make a good decision.
+> [...]
+>> +	/* Register GPIOs used on this board */ +	if
+>> (gpio_request(SPI0_CS_GPIO, "spi0 cs")) +		printk(KERN_ERR "Error
+>> requesting gpio %u", +			SPI0_CS_GPIO); +	else if
+>> (gpio_direction_output(SPI0_CS_GPIO, 1)) +		printk(KERN_ERR
+>> "Error setting gpio %u to output", +			SPI0_CS_GPIO);
+> 
+> This should be initialized based on data from the device tree.
 
-Currently Dong Aisheng is working on i.MX6, we have i.MX31, i.MX35,
-i.MX51 and i.MX53 enabled in the same defconfig. Waiting for all
-machines turn over at once to pinctrl is illusionary. We have to make
-drivers work with and without pinctrl. We have a bunch of bad choices:
+Correct. This will be done in the later patch regarding spi controller
+DT conversion. Still discussing this with Grant. For now, I'm
+considering the above hunk as just moving around the resp. lines
+without change. Please let me keep it until the SPI issue is solved.
 
-- create a dummy pinctrl for all boards which do not have real pinmux
-  support
-- ignore pinctrl_request errors in drivers.
-- generate and return a dummy pinctrl in the core if no real pinctrl is
-  found.
+Thanks,
 
-(replace pinctrl with regulators or clocks, it's the same situation, and
-it's not only i.MX specific)
-
-I don't have a good solution for this, only the idea that it should be
-possible to attach these kinds of resources to a device and then a
-driver would only call a make_me_work(dev).
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Roland
