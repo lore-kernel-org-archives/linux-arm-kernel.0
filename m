@@ -1,49 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Apr 2012 22:16:42 +0200
-Subject: [PATCH 07/10] MXS: Add USB PHY driver
-In-Reply-To: <201204182202.02627.marex@denx.de>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <1334771194-18688-8-git-send-email-marex@denx.de>
- <20120418193654.GZ3852@pengutronix.de>
- <201204182202.02627.marex@denx.de>
-Message-ID: <20120418201642.GC3852@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Apr 2012 13:18:07 -0700
+Subject: [PATCH 02/10] ARM: OMAP2+: SmartReflex: move the platform
+ specific macros in plat-omap
+In-Reply-To: <CAORVsuUp9VBX1XbkQkcq91XsbRSut1RC6KCNPFHrX+RfWv7hQA@mail.gmail.com>
+References: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
+ <1331829845-9526-3-git-send-email-j-pihet@ti.com>
+ <20120315171359.GA7276@atomide.com>
+ <CAORVsuUp9VBX1XbkQkcq91XsbRSut1RC6KCNPFHrX+RfWv7hQA@mail.gmail.com>
+Message-ID: <20120418201807.GQ21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 10:02:02PM +0200, Marek Vasut wrote:
-> Dear Sascha Hauer,
+* Jean Pihet <jean.pihet@newoldbits.com> [120316 08:22]:
+> Hi Tony,
 > 
-> > > +static void mxs_usb_work(struct work_struct *w)
-> > > +{
-> > > +	struct mxs_usb_phy *phy = container_of(w, struct mxs_usb_phy, work);
-> > > +	struct usb_otg *otg = phy->phy.otg;
-> > > +	struct usb_hcd *hcd;
-> > > +
-> > > +	switch (otg->phy->state) {
-> > > +	case OTG_STATE_A_HOST:
-> > > +		if (otg->host) {
-> > > +			hcd = bus_to_hcd(otg->host);
-> > > +			usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
-> > > +		}
-> > > +		break;
-> > > +	default:
-> > > +		break;
-> > > +	}
-> > > +}
-> > 
-> > This function should be in imx-otg.
-> 
-> You mean imx-usb? What'd it do in there?
+> On Thu, Mar 15, 2012 at 6:14 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [120315 09:47]:
+> >> From: Jean Pihet <j-pihet@ti.com>
+> >>
+> >> Move the platform specific macros from the smartreflex header file
+> >> (arch/arm/mach-omap2/smartreflex.h) in a new header file in plat-omap
+> >> (arch/arm/plat-omap/include/plat/smartreflex.h).
+> >>
+> >> This change makes the SmartReflex implementation ready for the move
+> >> to drivers/.
+> >
+> > Glad to see this happening!
+> >
+> > This would be better located in linux/power/smartreflex.h rather than
+> > plat/smartreflex.h.
+> Ok. Is the file name still Ok in that case? Should it mention OMAP?
 
-otg/imx-usb.c, yes (though I would prefer imx-otg.c)
+Well I guess smartreflex is enough, in theory it could be on other
+processors than omap too.
 
-It should be there because it's the imx-otg.c driver which manages the
-state. The phy driver is only a helper.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
