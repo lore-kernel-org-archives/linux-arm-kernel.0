@@ -1,41 +1,61 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 18 Apr 2012 12:36:04 +0300
-Subject: [PATCH v2 0/8] Second patchset for LPC32xx device tree conversion
-In-Reply-To: <201204180806.16848.arnd@arndb.de>
-References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <20120417205001.GH6498@mwanda> <201204180806.16848.arnd@arndb.de>
-Message-ID: <20120418093604.GL6498@mwanda>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 18 Apr 2012 03:40:59 -0600 (MDT)
+Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
+ both clk and hwmod
+In-Reply-To: <4F8E84DC.70600@ti.com>
+References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
+ <4F8E76C3.7080803@ti.com>
+ <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
+ <4F8E84DC.70600@ti.com>
+Message-ID: <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 08:06:16AM +0000, Arnd Bergmann wrote:
-> On Tuesday 17 April 2012, Dan Carpenter wrote:
-> > On Tue, Apr 17, 2012 at 07:08:19PM +0200, Roland Stigge wrote:
-> > > Applies to v3.4-rc3
-> > > 
-> > 
-> > This probably applies fine (the previous version did a couple days
-> > ago), but it's always best to submit patches against linux-next.
-> > The 3.4 kernel is in -rc already so this is 3.5 material.
+On Wed, 18 Apr 2012, Cousson, Benoit wrote:
+
+> Well, the point is that we do not need this warning even for that. This 
+> is something we have to ensure by reviewing carefully the code. 
+
+My perspective is slightly different.
+
+Until we're sure that we don't need clock framework-based clockdomain 
+control in mainline for main clocks, we shouldn't remove that warning.  
+That is because clock framework-based clockdomain control works via the 
+struct clk's clkdm field.  So until we switch away from that model, we 
+should ensure that each clock is associated with the clockdomain that its 
+clock control FSM is associated with (in OMAP3 terms).
+
+I don't have a problem with switching away from that model, or switching 
+individual SoCs away from that model, as long as regressions aren't 
+introduced.  But until that switch happens, it seems wise to avoid 
+weakening its consistency assumptions.
+
+> If you look today, the warning is complaining about clocks that are 
+> perfectly fine.
+
+Actually, mainline is only complaining about one clock:
+
+http://www.pwsan.com/omap/bootlogs/20120417/sparse_cppcheck_cleanup_3.5__0b93afd5d945a8c002f4d380a88b5d7a61c49289/4430es2panda_bootlog.txt
+
+In the current model, the right fix for that clock is to associate it with 
+a CM clockdomain (see for example the 4430 TRM vX Figure 3-70 "CD_DMA 
+Overview").
+
+> So keeping it will just add some noise and not necessarily highlighting 
+> the real issue.
 > 
-> I disagree. The patches won't get applied on -next, they get applied
-> on an -rc release, so they should be submitted against that version
-> as well. I agree that it makes sense to test patches against -next
-> when there is reason to believe there might be conflicts, but it's
-> not mandatory. When you know about conflicts against other patches
-> that are already in -next, I suggest listing them in the cover 
-> letter (the patch 0/x) and suggest a resolution.
+> FYI here is what we have after the clock cleanup on OMAP4 (i.e removal of modulemode clock nodes):
 > 
 
-I'm not sure I understand.  I thought everyone used the develop
-against linux-next and backport the fixes model.  Are we going to
-try merge these in 3.4?  It will still spend some time in linux-next
-before we submit it, right?
+[ lots of warnings elided ]
 
-To be honest, I mostly am familiar with staging/ where driver wide
-white space cleanups are the norm.  Working against linux-next is
-the only option for us or otherwise the conflicts would be too
-much.
+> That's a lot of noise for nothing. That's why Rajendra's patch is needed now.
 
-regards,
-dan carpenter
+Sounds like the patch to alter the warnings should be associated with this 
+clock cleanup series, then, since it sounds like it changes the 
+clockdomain control model.  And if the model change is only affecting 
+OMAP4+, then the warning change should also only apply to OMAP4+.
+
+
+- Paul
