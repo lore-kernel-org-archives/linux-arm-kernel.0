@@ -1,232 +1,88 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 18 Apr 2012 15:41:17 +0200
-Subject: [PATCH] ARM: u300: bump all IRQ numbers by one
-Message-ID: <1334756477-12067-1-git-send-email-linus.walleij@stericsson.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 18 Apr 2012 15:44:04 +0200
+Subject: [PATCHv9 02/10] ARM: dma-mapping: use pr_* instread of printk
+In-Reply-To: <1334756652-30830-1-git-send-email-m.szyprowski@samsung.com>
+References: <1334756652-30830-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1334756652-30830-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Replace all calls to printk with pr_* functions family.
 
-Since the VIC was converted to use generic IRQ domains IRQ 0
-is silently ignored. This IRQ is used on the U300 so we're
-missing it now. Bump all IRQ numbers by one since they are
-now decoupled from the hardware IRQ numbers.
-
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested-By: Subash Patel <subash.ramaswamy@linaro.org>
 ---
-I suspect this may be hitting some more VIC users, but I guess
-not everyone is actively using IRQ 0?
----
- arch/arm/mach-u300/core.c              |    6 +-
- arch/arm/mach-u300/include/mach/irqs.h |  150 ++++++++++++++++----------------
- 2 files changed, 79 insertions(+), 77 deletions(-)
+ arch/arm/mm/dma-mapping.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 1621ad0..3333974 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -1667,8 +1667,10 @@ void __init u300_init_irq(void)
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index db23ae4..366f3a2 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -184,14 +184,14 @@ static int __init consistent_init(void)
  
- 	for (i = 0; i < U300_VIC_IRQS_END; i++)
- 		set_bit(i, (unsigned long *) &mask[0]);
--	vic_init((void __iomem *) U300_INTCON0_VBASE, 0, mask[0], mask[0]);
--	vic_init((void __iomem *) U300_INTCON1_VBASE, 32, mask[1], mask[1]);
-+	vic_init((void __iomem *) U300_INTCON0_VBASE, IRQ_U300_INTCON0_START,
-+		 mask[0], mask[0]);
-+	vic_init((void __iomem *) U300_INTCON1_VBASE, IRQ_U300_INTCON1_START,
-+		 mask[1], mask[1]);
- }
+ 		pud = pud_alloc(&init_mm, pgd, base);
+ 		if (!pud) {
+-			printk(KERN_ERR "%s: no pud tables\n", __func__);
++			pr_err("%s: no pud tables\n", __func__);
+ 			ret = -ENOMEM;
+ 			break;
+ 		}
  
+ 		pmd = pmd_alloc(&init_mm, pud, base);
+ 		if (!pmd) {
+-			printk(KERN_ERR "%s: no pmd tables\n", __func__);
++			pr_err("%s: no pmd tables\n", __func__);
+ 			ret = -ENOMEM;
+ 			break;
+ 		}
+@@ -199,7 +199,7 @@ static int __init consistent_init(void)
  
-diff --git a/arch/arm/mach-u300/include/mach/irqs.h b/arch/arm/mach-u300/include/mach/irqs.h
-index ee78a26..ec09c1e 100644
---- a/arch/arm/mach-u300/include/mach/irqs.h
-+++ b/arch/arm/mach-u300/include/mach/irqs.h
-@@ -12,101 +12,101 @@
- #ifndef __MACH_IRQS_H
- #define __MACH_IRQS_H
+ 		pte = pte_alloc_kernel(pmd, base);
+ 		if (!pte) {
+-			printk(KERN_ERR "%s: no pte tables\n", __func__);
++			pr_err("%s: no pte tables\n", __func__);
+ 			ret = -ENOMEM;
+ 			break;
+ 		}
+@@ -222,7 +222,7 @@ __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
+ 	int bit;
  
--#define IRQ_U300_INTCON0_START		0
--#define IRQ_U300_INTCON1_START		32
-+#define IRQ_U300_INTCON0_START		1
-+#define IRQ_U300_INTCON1_START		33
- /* These are on INTCON0 - 30 lines */
--#define IRQ_U300_IRQ0_EXT		0
--#define IRQ_U300_IRQ1_EXT		1
--#define IRQ_U300_DMA			2
--#define IRQ_U300_VIDEO_ENC_0		3
--#define IRQ_U300_VIDEO_ENC_1		4
--#define IRQ_U300_AAIF_RX		5
--#define IRQ_U300_AAIF_TX		6
--#define IRQ_U300_AAIF_VGPIO		7
--#define IRQ_U300_AAIF_WAKEUP		8
--#define IRQ_U300_PCM_I2S0_FRAME		9
--#define IRQ_U300_PCM_I2S0_FIFO		10
--#define IRQ_U300_PCM_I2S1_FRAME		11
--#define IRQ_U300_PCM_I2S1_FIFO		12
--#define IRQ_U300_XGAM_GAMCON		13
--#define IRQ_U300_XGAM_CDI		14
--#define IRQ_U300_XGAM_CDICON		15
-+#define IRQ_U300_IRQ0_EXT		1
-+#define IRQ_U300_IRQ1_EXT		2
-+#define IRQ_U300_DMA			3
-+#define IRQ_U300_VIDEO_ENC_0		4
-+#define IRQ_U300_VIDEO_ENC_1		5
-+#define IRQ_U300_AAIF_RX		6
-+#define IRQ_U300_AAIF_TX		7
-+#define IRQ_U300_AAIF_VGPIO		8
-+#define IRQ_U300_AAIF_WAKEUP		9
-+#define IRQ_U300_PCM_I2S0_FRAME		10
-+#define IRQ_U300_PCM_I2S0_FIFO		11
-+#define IRQ_U300_PCM_I2S1_FRAME		12
-+#define IRQ_U300_PCM_I2S1_FIFO		13
-+#define IRQ_U300_XGAM_GAMCON		14
-+#define IRQ_U300_XGAM_CDI		15
-+#define IRQ_U300_XGAM_CDICON		16
- #if defined(CONFIG_MACH_U300_BS2X) || defined(CONFIG_MACH_U300_BS330)
- /* MMIACC not used on the DB3210 or DB3350 chips */
--#define IRQ_U300_XGAM_MMIACC		16
-+#define IRQ_U300_XGAM_MMIACC		17
- #endif
--#define IRQ_U300_XGAM_PDI		17
--#define IRQ_U300_XGAM_PDICON		18
--#define IRQ_U300_XGAM_GAMEACC		19
--#define IRQ_U300_XGAM_MCIDCT		20
--#define IRQ_U300_APEX			21
--#define IRQ_U300_UART0			22
--#define IRQ_U300_SPI			23
--#define IRQ_U300_TIMER_APP_OS		24
--#define IRQ_U300_TIMER_APP_DD		25
--#define IRQ_U300_TIMER_APP_GP1		26
--#define IRQ_U300_TIMER_APP_GP2		27
--#define IRQ_U300_TIMER_OS		28
--#define IRQ_U300_TIMER_MS		29
--#define IRQ_U300_KEYPAD_KEYBF		30
--#define IRQ_U300_KEYPAD_KEYBR		31
-+#define IRQ_U300_XGAM_PDI		18
-+#define IRQ_U300_XGAM_PDICON		19
-+#define IRQ_U300_XGAM_GAMEACC		20
-+#define IRQ_U300_XGAM_MCIDCT		21
-+#define IRQ_U300_APEX			22
-+#define IRQ_U300_UART0			23
-+#define IRQ_U300_SPI			24
-+#define IRQ_U300_TIMER_APP_OS		25
-+#define IRQ_U300_TIMER_APP_DD		26
-+#define IRQ_U300_TIMER_APP_GP1		27
-+#define IRQ_U300_TIMER_APP_GP2		28
-+#define IRQ_U300_TIMER_OS		29
-+#define IRQ_U300_TIMER_MS		30
-+#define IRQ_U300_KEYPAD_KEYBF		31
-+#define IRQ_U300_KEYPAD_KEYBR		32
- /* These are on INTCON1 - 32 lines */
--#define IRQ_U300_GPIO_PORT0		32
--#define IRQ_U300_GPIO_PORT1		33
--#define IRQ_U300_GPIO_PORT2		34
-+#define IRQ_U300_GPIO_PORT0		33
-+#define IRQ_U300_GPIO_PORT1		34
-+#define IRQ_U300_GPIO_PORT2		35
+ 	if (!consistent_pte) {
+-		printk(KERN_ERR "%s: not initialised\n", __func__);
++		pr_err("%s: not initialised\n", __func__);
+ 		dump_stack();
+ 		return NULL;
+ 	}
+@@ -281,14 +281,14 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
  
- #if defined(CONFIG_MACH_U300_BS2X) || defined(CONFIG_MACH_U300_BS330) || \
-     defined(CONFIG_MACH_U300_BS335)
- /* These are for DB3150, DB3200 and DB3350 */
--#define IRQ_U300_WDOG			35
--#define IRQ_U300_EVHIST			36
--#define IRQ_U300_MSPRO			37
--#define IRQ_U300_MMCSD_MCIINTR0		38
--#define IRQ_U300_MMCSD_MCIINTR1		39
--#define IRQ_U300_I2C0			40
--#define IRQ_U300_I2C1			41
--#define IRQ_U300_RTC			42
--#define IRQ_U300_NFIF			43
--#define IRQ_U300_NFIF2			44
-+#define IRQ_U300_WDOG			36
-+#define IRQ_U300_EVHIST			37
-+#define IRQ_U300_MSPRO			38
-+#define IRQ_U300_MMCSD_MCIINTR0		39
-+#define IRQ_U300_MMCSD_MCIINTR1		40
-+#define IRQ_U300_I2C0			41
-+#define IRQ_U300_I2C1			42
-+#define IRQ_U300_RTC			43
-+#define IRQ_U300_NFIF			44
-+#define IRQ_U300_NFIF2			45
- #endif
+ 	c = arm_vmregion_find_remove(&consistent_head, (unsigned long)cpu_addr);
+ 	if (!c) {
+-		printk(KERN_ERR "%s: trying to free invalid coherent area: %p\n",
++		pr_err("%s: trying to free invalid coherent area: %p\n",
+ 		       __func__, cpu_addr);
+ 		dump_stack();
+ 		return;
+ 	}
  
- /* DB3150 and DB3200 have only 45 IRQs */
- #if defined(CONFIG_MACH_U300_BS2X) || defined(CONFIG_MACH_U300_BS330)
--#define U300_VIC_IRQS_END		45
-+#define U300_VIC_IRQS_END		46
- #endif
+ 	if ((c->vm_end - c->vm_start) != size) {
+-		printk(KERN_ERR "%s: freeing wrong coherent size (%ld != %d)\n",
++		pr_err("%s: freeing wrong coherent size (%ld != %d)\n",
+ 		       __func__, c->vm_end - c->vm_start, size);
+ 		dump_stack();
+ 		size = c->vm_end - c->vm_start;
+@@ -310,8 +310,8 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
+ 		}
  
- /* The DB3350-specific interrupt lines */
- #ifdef CONFIG_MACH_U300_BS335
--#define IRQ_U300_ISP_F0			45
--#define IRQ_U300_ISP_F1			46
--#define IRQ_U300_ISP_F2			47
--#define IRQ_U300_ISP_F3			48
--#define IRQ_U300_ISP_F4			49
--#define IRQ_U300_GPIO_PORT3		50
--#define IRQ_U300_SYSCON_PLL_LOCK	51
--#define IRQ_U300_UART1			52
--#define IRQ_U300_GPIO_PORT4		53
--#define IRQ_U300_GPIO_PORT5		54
--#define IRQ_U300_GPIO_PORT6		55
--#define U300_VIC_IRQS_END		56
-+#define IRQ_U300_ISP_F0			46
-+#define IRQ_U300_ISP_F1			47
-+#define IRQ_U300_ISP_F2			48
-+#define IRQ_U300_ISP_F3			49
-+#define IRQ_U300_ISP_F4			50
-+#define IRQ_U300_GPIO_PORT3		51
-+#define IRQ_U300_SYSCON_PLL_LOCK	52
-+#define IRQ_U300_UART1			53
-+#define IRQ_U300_GPIO_PORT4		54
-+#define IRQ_U300_GPIO_PORT5		55
-+#define IRQ_U300_GPIO_PORT6		56
-+#define U300_VIC_IRQS_END		57
- #endif
+ 		if (pte_none(pte) || !pte_present(pte))
+-			printk(KERN_CRIT "%s: bad page in kernel page table\n",
+-			       __func__);
++			pr_crit("%s: bad page in kernel page table\n",
++				__func__);
+ 	} while (size -= PAGE_SIZE);
  
- /* The DB3210-specific interrupt lines */
- #ifdef CONFIG_MACH_U300_BS365
--#define IRQ_U300_GPIO_PORT3		35
--#define IRQ_U300_GPIO_PORT4		36
--#define IRQ_U300_WDOG			37
--#define IRQ_U300_EVHIST			38
--#define IRQ_U300_MSPRO			39
--#define IRQ_U300_MMCSD_MCIINTR0		40
--#define IRQ_U300_MMCSD_MCIINTR1		41
--#define IRQ_U300_I2C0			42
--#define IRQ_U300_I2C1			43
--#define IRQ_U300_RTC			44
--#define IRQ_U300_NFIF			45
--#define IRQ_U300_NFIF2			46
--#define IRQ_U300_SYSCON_PLL_LOCK	47
--#define U300_VIC_IRQS_END		48
-+#define IRQ_U300_GPIO_PORT3		36
-+#define IRQ_U300_GPIO_PORT4		37
-+#define IRQ_U300_WDOG			38
-+#define IRQ_U300_EVHIST			39
-+#define IRQ_U300_MSPRO			40
-+#define IRQ_U300_MMCSD_MCIINTR0		41
-+#define IRQ_U300_MMCSD_MCIINTR1		42
-+#define IRQ_U300_I2C0			43
-+#define IRQ_U300_I2C1			44
-+#define IRQ_U300_RTC			45
-+#define IRQ_U300_NFIF			46
-+#define IRQ_U300_NFIF2			47
-+#define IRQ_U300_SYSCON_PLL_LOCK	48
-+#define U300_VIC_IRQS_END		49
- #endif
- 
- /* Maximum 8*7 GPIO lines */
-@@ -117,6 +117,6 @@
- #define IRQ_U300_GPIO_END		(U300_VIC_IRQS_END)
- #endif
- 
--#define NR_IRQS				(IRQ_U300_GPIO_END)
-+#define NR_IRQS				(IRQ_U300_GPIO_END - IRQ_U300_INTCON0_START)
- 
- #endif
+ 	flush_tlb_kernel_range(c->vm_start, c->vm_end);
 -- 
-1.7.9.2
+1.7.1.569.g6f426
