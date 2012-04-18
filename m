@@ -1,36 +1,49 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 18 Apr 2012 21:10:32 +0100
-Subject: [NEW]: Introducing shrink_all_memory from user space
-In-Reply-To: <CAFLxGvz5tmEi-39CZbJN+0zNd3ZpHXzZcNSFUpUWS_aMDJ4t6Q@mail.gmail.com>
-References: <1334483226.20721.YahooMailNeo@web162003.mail.bf1.yahoo.com>
- <CAFLxGvwJCMoiXFn3OgwiX+B50FTzGZmo6eG3xQ1KaPsEVZVA1g@mail.gmail.com>
- <1334490429.67558.YahooMailNeo@web162006.mail.bf1.yahoo.com>
- <CAFLxGvz5tmEi-39CZbJN+0zNd3ZpHXzZcNSFUpUWS_aMDJ4t6Q@mail.gmail.com>
-Message-ID: <20120418211032.47b243da@pyramind.ukuu.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 22:16:42 +0200
+Subject: [PATCH 07/10] MXS: Add USB PHY driver
+In-Reply-To: <201204182202.02627.marex@denx.de>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334771194-18688-8-git-send-email-marex@denx.de>
+ <20120418193654.GZ3852@pengutronix.de>
+ <201204182202.02627.marex@denx.de>
+Message-ID: <20120418201642.GC3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 Apr 2012 14:10:00 +0200
-richard -rw- weinberger <richard.weinberger@gmail.com> wrote:
-
-> On Sun, Apr 15, 2012 at 1:47 PM, PINTU KUMAR <pintu_agarwal@yahoo.com> wrote:
-> > Moreover, this is mainly meant for mobile phones where there is only *one* user.
+On Wed, Apr 18, 2012 at 10:02:02PM +0200, Marek Vasut wrote:
+> Dear Sascha Hauer,
 > 
-> I see. Jet another awful hack.
-> Mobile phones are nothing special. They are computers
+> > > +static void mxs_usb_work(struct work_struct *w)
+> > > +{
+> > > +	struct mxs_usb_phy *phy = container_of(w, struct mxs_usb_phy, work);
+> > > +	struct usb_otg *otg = phy->phy.otg;
+> > > +	struct usb_hcd *hcd;
+> > > +
+> > > +	switch (otg->phy->state) {
+> > > +	case OTG_STATE_A_HOST:
+> > > +		if (otg->host) {
+> > > +			hcd = bus_to_hcd(otg->host);
+> > > +			usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
+> > > +		}
+> > > +		break;
+> > > +	default:
+> > > +		break;
+> > > +	}
+> > > +}
+> > 
+> > This function should be in imx-otg.
+> 
+> You mean imx-usb? What'd it do in there?
 
-Correct - so if it is showing up useful situations then they are also
-useful beyond mobile phone.
+otg/imx-usb.c, yes (though I would prefer imx-otg.c)
 
-> Every program which is allowed to use this interface will (ab)use it.
+It should be there because it's the imx-otg.c driver which manages the
+state. The phy driver is only a helper.
 
-If you expose it to userspace then you would want it very tightly
-controlled and very much special case. Within the kernel using it
-internally within things like CMA allocators seems to make more sense.
+Sascha
 
-I think you overestimate the abuse. It's an interface which pushes clean
-pages that can be cheaply recovered out of memory. It doesn't guarantee
-the caller reaps the benefit of that, and the vm will continue to try and
-share out any new resource fairly.
-
-Alan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
