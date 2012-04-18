@@ -1,28 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Apr 2012 08:06:16 +0000
-Subject: [PATCH v2 0/8] Second patchset for LPC32xx device tree conversion
-In-Reply-To: <20120417205001.GH6498@mwanda>
+Date: Wed, 18 Apr 2012 08:15:28 +0000
+Subject: [PATCH v2 8/8] ARM: LPC32xx: Device tree support
+In-Reply-To: <20120418060230.GC17506@avionic-0098.adnet.avionic-design.de>
 References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <20120417205001.GH6498@mwanda>
-Message-ID: <201204180806.16848.arnd@arndb.de>
+ <1334682507-15055-9-git-send-email-stigge@antcom.de>
+ <20120418060230.GC17506@avionic-0098.adnet.avionic-design.de>
+Message-ID: <201204180815.29234.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2012, Dan Carpenter wrote:
-> On Tue, Apr 17, 2012 at 07:08:19PM +0200, Roland Stigge wrote:
-> > Applies to v3.4-rc3
-> > 
+On Wednesday 18 April 2012, Thierry Reding wrote:
+> >  arch/arm/mach-lpc32xx/phy3250.c                       |  146 +++++--------
 > 
-> This probably applies fine (the previous version did a couple days
-> ago), but it's always best to submit patches against linux-next.
-> The 3.4 kernel is in -rc already so this is 3.5 material.
+> While at it, this should probably be renamed board-dt.c or something similar
+> since it is no longer phy3250 specific.
 
-I disagree. The patches won't get applied on -next, they get applied
-on an -rc release, so they should be submitted against that version
-as well. I agree that it makes sense to test patches against -next
-when there is reason to believe there might be conflicts, but it's
-not mandatory. When you know about conflicts against other patches
-that are already in -next, I suggest listing them in the cover 
-letter (the patch 0/x) and suggest a resolution.
+I believe there are still a few phy3250 specific bits left in there, using auxdata,
+right? In that case, I think it's fine to leave the file name for now, but I
+think everyhting that is not phy3250 specific should just get moved into common.c
+since we don't want to support any other board files for lpc32xx any more.
 
 	Arnd
