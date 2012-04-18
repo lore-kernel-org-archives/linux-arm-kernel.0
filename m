@@ -1,185 +1,115 @@
 From: jm@lentin.co.uk (Jamie Lentin)
-Date: Wed, 18 Apr 2012 11:06:41 +0100
-Subject: [PATCH V5 2/4] mtd: Add orion_nand devicetree bindings
+Date: Wed, 18 Apr 2012 11:06:43 +0100
+Subject: [PATCH V5 4/4] ARM: kirkwood: Define DNS-320/DNS-325 NAND in fdt
 In-Reply-To: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
 References: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1334743603-8488-3-git-send-email-jm@lentin.co.uk>
+Message-ID: <1334743603-8488-5-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a NAND chip using the orion_nand driver to be described using devicetree.
+Use devicetree to define NAND partitions. Use D-link partition scheme by
+default, to be vaguely compatible with their userland.
 
-Changes since last submission (V4) [Addressing comments by]:-
-* WARN when bank-width is out of range [Andrew Lunn]
+Changes since last submission (V4):-
+* Don't add NAND support then throw it away immediately after [Grant Likely]
 
-Changes since last submission (V3):-
-* Document all parameters [Grant Likely]
-* Convert bank-width to be in bytes
-* Add explicit defaults for cle, ale and bank-width
-
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 ---
- .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++++++++++++++++++
- drivers/mtd/nand/orion_nand.c                      |   45 +++++++++++++++++-
- 2 files changed, 93 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
+ arch/arm/boot/dts/kirkwood-dns320.dts |   35 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-dns325.dts |   35 +++++++++++++++++++++++++++++++++
+ 2 files changed, 70 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/orion-nand.txt b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-new file mode 100644
-index 0000000..b2356b7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/orion-nand.txt
-@@ -0,0 +1,50 @@
-+NAND support for Marvell Orion SoC platforms
+diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
+index 78c834f..dc09a73 100644
+--- a/arch/arm/boot/dts/kirkwood-dns320.dts
++++ b/arch/arm/boot/dts/kirkwood-dns320.dts
+@@ -25,5 +25,40 @@
+ 			clock-frequency = <166666667>;
+ 			status = "okay";
+ 		};
 +
-+Required properties:
-+- compatible : "mrvl,orion-nand".
-+- reg : Base physical address of the NAND and length of memory mapped
-+	region
++		nand at 3000000 {
++			status = "okay";
 +
-+Optional properties:
-+- cle : Address line number connected to CLE. Default is 0
-+- ale : Address line number connected to ALE. Default is 1
-+- bank-width : Width in bytes of the device. Default is 1
-+- chip-delay : Chip dependent delay for transferring data from array to read
-+               registers in usecs
++			partition at 0 {
++				label = "u-boot";
++				reg = <0x0000000 0x100000>;
++				read-only;
++			};
 +
-+The device tree may optionally contain sub-nodes describing partitions of the
-+address space. See partition.txt for more detail.
++			partition at 100000 {
++				label = "uImage";
++				reg = <0x0100000 0x500000>;
++			};
 +
-+Example:
++			partition at 600000 {
++				label = "ramdisk";
++				reg = <0x0600000 0x500000>;
++			};
 +
-+nand at f4000000 {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	cle = <0>;
-+	ale = <1>;
-+	bank-width = <1>;
-+	chip-delay = <25>;
-+	compatible = "mrvl,orion-nand";
-+	reg = <0xf4000000 0x400>;
++			partition at b00000 {
++				label = "image";
++				reg = <0x0b00000 0x6600000>;
++			};
 +
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0000000 0x100000>;
-+		read-only;
-+	};
++			partition at 7100000 {
++				label = "mini firmware";
++				reg = <0x7100000 0xa00000>;
++			};
 +
-+	partition at 100000 {
-+		label = "uImage";
-+		reg = <0x0100000 0x200000>;
-+	};
-+
-+	partition at 300000 {
-+		label = "dtb";
-+		reg = <0x0300000 0x100000>;
-+	};
-+
-+	partition at 400000 {
-+		label = "root";
-+		reg = <0x0400000 0x7d00000>;
-+	};
-+};
-diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-index 29f505a..0f50ef3 100644
---- a/drivers/mtd/nand/orion_nand.c
-+++ b/drivers/mtd/nand/orion_nand.c
-@@ -13,6 +13,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-@@ -74,11 +75,13 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- static int __init orion_nand_probe(struct platform_device *pdev)
- {
- 	struct mtd_info *mtd;
-+	struct mtd_part_parser_data ppdata = {};
- 	struct nand_chip *nc;
- 	struct orion_nand_data *board;
- 	struct resource *res;
- 	void __iomem *io_base;
- 	int ret = 0;
-+	u32 val = 0;
- 
- 	nc = kzalloc(sizeof(struct nand_chip) + sizeof(struct mtd_info), GFP_KERNEL);
- 	if (!nc) {
-@@ -101,7 +104,32 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 		goto no_res;
- 	}
- 
--	board = pdev->dev.platform_data;
-+	if (pdev->dev.of_node) {
-+		board = devm_kzalloc(&pdev->dev, sizeof(struct orion_nand_data),
-+					GFP_KERNEL);
-+		if (!board) {
-+			printk(KERN_ERR "orion_nand: failed to allocate board structure.\n");
-+			ret = -ENOMEM;
-+			goto no_res;
-+		}
-+		if (!of_property_read_u32(pdev->dev.of_node, "cle", &val))
-+			board->cle = (u8)val;
-+		else
-+			board->cle = 0;
-+		if (!of_property_read_u32(pdev->dev.of_node, "ale", &val))
-+			board->ale = (u8)val;
-+		else
-+			board->ale = 1;
-+		if (!of_property_read_u32(pdev->dev.of_node,
-+						"bank-width", &val))
-+			board->width = (u8)val * 8;
-+		else
-+			board->width = 8;
-+		if (!of_property_read_u32(pdev->dev.of_node,
-+						"chip-delay", &val))
-+			board->chip_delay = (u8)val;
-+	} else
-+		board = pdev->dev.platform_data;
- 
- 	mtd->priv = nc;
- 	mtd->owner = THIS_MODULE;
-@@ -115,6 +143,10 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	if (board->chip_delay)
- 		nc->chip_delay = board->chip_delay;
- 
-+	WARN(board->width > 16,
-+		"%d bit bus width out of range",
-+		board->width);
-+
- 	if (board->width == 16)
- 		nc->options |= NAND_BUSWIDTH_16;
- 
-@@ -129,7 +161,8 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	}
- 
- 	mtd->name = "orion_nand";
--	ret = mtd_device_parse_register(mtd, NULL, 0,
-+	ppdata.of_node = pdev->dev.of_node;
-+	ret = mtd_device_parse_register(mtd, NULL, &ppdata,
- 			board->parts, board->nr_parts);
- 	if (ret) {
- 		nand_release(mtd);
-@@ -161,11 +194,19 @@ static int __devexit orion_nand_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id orion_nand_of_match_table[] = {
-+	{ .compatible = "mrvl,orion-nand", },
-+	{},
-+};
-+#endif
-+
- static struct platform_driver orion_nand_driver = {
- 	.remove		= __devexit_p(orion_nand_remove),
- 	.driver		= {
- 		.name	= "orion_nand",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(orion_nand_of_match_table),
- 	},
++			partition at 7b00000 {
++				label = "config";
++				reg = <0x7b00000 0x500000>;
++			};
++		};
+ 	};
  };
- 
+diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
+index 23241ab..c2a5562 100644
+--- a/arch/arm/boot/dts/kirkwood-dns325.dts
++++ b/arch/arm/boot/dts/kirkwood-dns325.dts
+@@ -20,5 +20,40 @@
+ 			clock-frequency = <200000000>;
+ 			status = "okay";
+ 		};
++
++		nand at 3000000 {
++			status = "okay";
++
++			partition at 0 {
++				label = "u-boot";
++				reg = <0x0000000 0x100000>;
++				read-only;
++			};
++
++			partition at 100000 {
++				label = "uImage";
++				reg = <0x0100000 0x500000>;
++			};
++
++			partition at 600000 {
++				label = "ramdisk";
++				reg = <0x0600000 0x500000>;
++			};
++
++			partition at b00000 {
++				label = "image";
++				reg = <0x0b00000 0x6600000>;
++			};
++
++			partition at 7100000 {
++				label = "mini firmware";
++				reg = <0x7100000 0xa00000>;
++			};
++
++			partition at 7b00000 {
++				label = "config";
++				reg = <0x7b00000 0x500000>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.1
