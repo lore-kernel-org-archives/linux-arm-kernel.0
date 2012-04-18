@@ -1,23 +1,24 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 18 Apr 2012 20:08:33 +0100
-Subject: [PATCH] tty: omap-serial: Keep the wakeup mechanism enabled by
- default
-In-Reply-To: <87mx69nms2.fsf@ti.com>
-References: <1334579407-16970-1-git-send-email-govindraj.raja@ti.com>
- <87vckyq6ti.fsf@ti.com>
- <CAMrsUdL1S5GiyG0egS=CHg2fdNkyZVF-wuCNGDg547kfTUODng@mail.gmail.com>
- <87mx69nms2.fsf@ti.com>
-Message-ID: <20120418200833.24ef25ff@pyramind.ukuu.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Apr 2012 20:09:23 +0100
+Subject: [PATCH 6/8] mmc: omap_hsmmc: add DMA engine support
+In-Reply-To: <20120418181112.GK21106@atomide.com>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRs1-0004bP-HH@rmk-PC.arm.linux.org.uk>
+ <20120418181112.GK21106@atomide.com>
+Message-ID: <20120418190923.GQ25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The point is that wakeups should be enabled whenever driver is in use,
-> and disabled when the driver is not in use.
+On Wed, Apr 18, 2012 at 11:11:12AM -0700, Tony Lindgren wrote:
+> * Russell King <rmk+kernel@arm.linux.org.uk> [120418 03:15]:
+> > Add DMA engine support to the OMAP HSMMC driver.  This supplements the
+> > private DMA API implementation contained within this driver, and the
+> > driver can be switched at build time between using DMA engine and the
+> > private DMA API.
+> 
+> Glad to see this happening!
+> 
+> No luck here though, after a quick test I'm getting the following with MMC
+> not working:
 
-
-Which is the tty_port methods for initialisation and shutdown, which are
-mutex protected against each other and hang up.
-
-Not sure how the uart layer glue exposes that.
-
-Alan
+Did you enable OMAP DMA engine support?
