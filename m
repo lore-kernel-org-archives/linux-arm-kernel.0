@@ -1,29 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Apr 2012 15:33:50 +0200
-Subject: [PATCHv2] Add ADC driver for G20 and G45 evaluation boards
-Message-ID: <1334756036-15944-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 18 Apr 2012 15:33:51 +0200
+Subject: [PATCH 1/6] ARM: AT91: Add platform data for the AT91 ADCs
+In-Reply-To: <1334756036-15944-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1334756036-15944-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1334756036-15944-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The AT91 SoCs often embeds an ADC. This patch adds the needed
+platform data to specify the informations required by the driver
+to work properly.
 
-Here is the improved version of what I've been posting some time ago.
-Some things changed since last version:
-  - Support for Hardware triggers for the G20 has been added
-  - Support for the AT91SAM9M10G45 board has been added too, both for
-    software and hardware triggers
-  - The driver is now in drivers/staging/iio to include all these features.
+For now, we only need the reference voltage and which channels
+are available on the board.
 
-The first three patches should not have changed much since last post, so it
-should be pretty ok.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
 
-Changes since v1:
-  - Added DT bindings
-  - Removed the clock_name field and used adc_clk instead. Used CLKDEV_CON_ID
-    for the G45.
-  - Misc fixes:
-    * Added clk_prepare
-    * Replaced kcalloc by devm_kzalloc for the trigger allocation
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ include/linux/platform_data/at91_adc.h |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
+ create mode 100644 include/linux/platform_data/at91_adc.h
 
-Thanks,
-Maxime
+diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
+new file mode 100644
+index 0000000..8b51ee6
+--- /dev/null
++++ b/include/linux/platform_data/at91_adc.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2011 Free Electrons
++ *
++ * Licensed under the GPLv2 or later.
++ */
++
++#ifndef _AT91_ADC_H_
++#define _AT91_ADC_H_
++
++/**
++ * struct at91_adc_data - platform data for ADC driver
++ * @channels_used:	channels in use on the board as a bitmask
++ * @vref:		Reference voltage for the ADC in millivolts
++ */
++struct at91_adc_data {
++	unsigned long	channels_used;
++	u16		vref;
++};
++
++extern void __init at91_add_device_adc(struct at91_adc_data *data);
++
++#endif
+-- 
+1.7.5.4
