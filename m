@@ -1,47 +1,126 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Apr 2012 12:17:46 +0200
-Subject: [GIT PULL] i.MX fixes for -rc
-Message-ID: <20120418101746.GS3852@pengutronix.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 18 Apr 2012 12:19:07 +0200
+Subject: [PATCH 1/1] dt: Add general DMA window parser
+In-Reply-To: <20120418092613.GA8632@avionic-0098.mockup.avionic-design.de>
+References: <201204180731.54064.arnd@arndb.de><20120418.121824.1894043789811063795.hdoyu@nvidia.com><20120418092613.GA8632@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120418.131907.2172387798112620167.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+Hi,
 
-Please pull the following for -rc.
+Try again with fixing Thierry's commnets, Thanks.
 
-Thanks
- Sascha
+>From 9a632c24949e46df197a216ca95f684edd1db693 Mon Sep 17 00:00:00 2001
+From: Hiroshi DOYU <hdoyu@nvidia.com>
+Date: Wed, 18 Apr 2012 12:09:03 +0300
+Subject: [PATCH 1/1] dt: Add general DMA window parser
 
+This code was stolen from:
+	"arch/microblaze/kernel/prom_parse.c"
+	"arch/powerpc/kernel/prom_parse.c"
 
-The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+Once "ibm," prefix is removed from dts file. This generic one could
+replace the originals.
 
-  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+---
+ drivers/of/Kconfig         |    4 ++++
+ drivers/of/Makefile        |    1 +
+ drivers/of/of_dma.c        |   35 +++++++++++++++++++++++++++++++++++
+ include/linux/of_address.h |   10 ++++++++++
+ 4 files changed, 50 insertions(+), 0 deletions(-)
 
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.4-rc3-imx-fixes
-
-for you to fetch changes up to 4659b7f1fa3eb33a8f9a9dd209a5823602dc6dcf:
-
-  ARM: imx: Fix imx5 idle logic bug (2012-04-18 11:52:24 +0200)
-
-----------------------------------------------------------------
-ARM i.MX misc fixes for -rc
-
-----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: imx_v4_v5_defconfig: Add support for CONFIG_REGULATOR_FIXED_VOLTAGE
-      ARM: imx27-dt: Fix build due to removal of irq_domain_add_simple()
-
-Robert Lee (1):
-      ARM: imx: Fix imx5 idle logic bug
-
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- arch/arm/mach-imx/imx27-dt.c         |    6 ++++--
- arch/arm/mach-imx/mm-imx5.c          |    2 +-
- 3 files changed, 6 insertions(+), 3 deletions(-)
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index dfba3e6..3b0298b 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -83,4 +83,8 @@ config OF_MTD
+ 	depends on MTD
+ 	def_bool y
+ 
++config OF_DMA
++	depends on HAS_DMA
++	def_bool y
++
+ endmenu # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index e027f44..711ff5b 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -11,3 +11,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+ obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
++obj-$(CONFIG_OF_DMA)	+= of_dma.o
+diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
+new file mode 100644
+index 0000000..a34db5a
+--- /dev/null
++++ b/drivers/of/of_dma.c
+@@ -0,0 +1,35 @@
++/*
++ * Stolen from:
++ *	"arch/microblaze/kernel/prom_parse.c"
++ *	"arch/powerpc/kernel/prom_parse.c"
++ */
++
++#include <linux/of_address.h>
++
++void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
++		unsigned long *busno, unsigned long *phys, unsigned long *size)
++{
++	const __be32 *dma_window;
++	u32 cells;
++	const unsigned char *prop;
++
++	dma_window = dma_window_prop;
++
++	/* busno is always one cell */
++	if (busno)
++		*busno = be32_to_cpup(dma_window++);
++
++	prop = of_get_property(dn, "#dma-address-cells", NULL);
++	if (!prop)
++		prop = of_get_property(dn, "#address-cells", NULL);
++
++	cells = prop ? *(__be32 *)prop : of_n_addr_cells(dn);
++	*phys = of_read_number(dma_window, cells);
++
++	dma_window += cells;
++
++	prop = of_get_property(dn, "#dma-size-cells", NULL);
++	cells = prop ? *(__be32 *)prop : of_n_size_cells(dn);
++	*size = of_read_number(dma_window, cells);
++}
++
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 01b925a..2a0f7c6 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -21,6 +21,10 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
+ extern const u32 *of_get_address(struct device_node *dev, int index,
+ 			   u64 *size, unsigned int *flags);
+ 
++extern void of_parse_dma_window(struct device_node *dn,
++		       const void *dma_window_prop, unsigned long *busno,
++			       unsigned long *phys, unsigned long *size);
++
+ #ifndef pci_address_to_pio
+ static inline unsigned long pci_address_to_pio(phys_addr_t addr) { return -1; }
+ #define pci_address_to_pio pci_address_to_pio
+@@ -48,6 +52,12 @@ static inline const u32 *of_get_address(struct device_node *dev, int index,
+ {
+ 	return NULL;
+ }
++
++static inline void of_parse_dma_window(struct device_node *dn,
++		       const void *dma_window_prop, unsigned long *busno,
++			       unsigned long *phys, unsigned long *size)
++{
++}
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.5.4
