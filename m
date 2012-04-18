@@ -1,64 +1,62 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Apr 2012 18:02:36 -0600 (MDT)
-Subject: [PATCH 2/2] ARM: OMAP2+: omap_hwmod: Add api to enable/disable
- module level wakeup events
-In-Reply-To: <1334580053-17242-3-git-send-email-govindraj.raja@ti.com>
-References: <1334580053-17242-1-git-send-email-govindraj.raja@ti.com>
- <1334580053-17242-3-git-send-email-govindraj.raja@ti.com>
-Message-ID: <alpine.DEB.2.00.1204171800120.29048@utopia.booyaka.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 17 Apr 2012 17:06:19 -0700
+Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
+In-Reply-To: <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
+ (Shubhrajyoti D.'s message of "Mon, 16 Apr 2012 20:36:56 +0530")
+References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+ <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87bomprjic.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-On Mon, 16 Apr 2012, Govindraj.R wrote:
+> In the error cases the clock cut is missed. This patch intends to fix the
+> same.
 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 2c27fdb..05576ae 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -382,6 +382,35 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
->  }
+Please change the references to 'cut clocks' in subject/changelog here
+(and in other patches) to use runtime suspend instead.   First, runtime PM
+calls do more than cut clocks, but they only do so when
+usecounting/autosuspend timeouts permit.
+
+
+> Cc: stable at vger.kernel.org
+
+Please hold off on Cc'ing stable until your patches are reviewed and accepted.
+
+> Cc: Govindraj.R <govindraj.raja@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/tty/serial/omap-serial.c |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index fe099bb..10e80bb 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
 >  
->  /**
-> + * _enable_module_level_wakeup - enable/disable module level wakeup on hwmod.
-> + * @oh: struct omap_hwmod *
-> + * @set_wake: bool value indicating to set (true) or clear (false) module level
-> + *		wakeup enable
-> + *
-> + * Set or clear the  module level wakeup capability the
-> + * hwmod @oh. This function configures th PM_WKEN reg bits if they
-> + * are available from hwmod. No return value
-> + */
-> +static void _enable_module_level_wakeup(struct omap_hwmod *oh, bool set_wake)
-> +{
-> +	u32 v;
-> +
-> +	if (oh->prcm.omap2.module_wakeup_offs &&
-> +			oh->prcm.omap2.module_wakeup_bit) {
-> +		v = omap2_prm_read_mod_reg(oh->prcm.omap2.module_offs,
-> +				oh->prcm.omap2.module_wakeup_offs);
-> +
-> +		if (set_wake)
-> +			v |= oh->prcm.omap2.module_wakeup_bit;
-> +		else
-> +			v &= ~oh->prcm.omap2.module_wakeup_bit;
-> +
-> +		omap2_prm_write_mod_reg(v, oh->prcm.omap2.module_offs,
-> +				oh->prcm.omap2.module_wakeup_offs);
+>  		if (ret < 0) {
+>  			serial_omap_enable_ier_thri(up);
+> +			pm_runtime_mark_last_busy(&up->pdev->dev);
+> +			pm_runtime_put_autosuspend(&up->pdev->dev);
+
+Why the autosuspend version here?
+
+Kevin
+
+>  			return;
+>  		}
+>  	}
+> @@ -1029,8 +1031,10 @@ static int serial_omap_poll_get_char(struct uart_port *port)
+>  
+>  	pm_runtime_get_sync(&up->pdev->dev);
+>  	status = serial_in(up, UART_LSR);
+> -	if (!(status & UART_LSR_DR))
+> +	if (!(status & UART_LSR_DR)) {
+> +		pm_runtime_put(&up->pdev->dev);
+>  		return NO_POLL_CHAR;
 > +	}
-> +}
-
-Please move the direct PRM register accesses to the PRM code, such as 
-prm2xxx_3xxx.c and prm44xx.c, as mentioned here:
-
-    http://www.spinics.net/lists/linux-serial/msg05945.html
-
-We are trying to move the PRM code to drivers/ and the only code that 
-should be doing direct PRM register accesses is the PRM code itself.  
-Other code (like the hwmod code) should be calling higher-level 
-functions exported by the PRM code, such as something like 
-"omap_prm_enable_prcm_module_wakeup()"
-
-
-- Paul
+>  
+>  	status = serial_in(up, UART_RX);
+>  	pm_runtime_put(&up->pdev->dev);
