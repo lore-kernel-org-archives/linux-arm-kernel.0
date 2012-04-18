@@ -1,95 +1,196 @@
-From: subashrp@gmail.com (Subash Patel)
-Date: Wed, 18 Apr 2012 12:44:39 +0530
-Subject: [PATCHv8 00/10] ARM: DMA-mapping framework redesign
-In-Reply-To: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
-References: <1334055852-19500-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4F8E69DF.9030003@gmail.com>
+From: shubhrajyoti@ti.com (Datta, Shubhrajyoti)
+Date: Wed, 18 Apr 2012 12:49:27 +0530
+Subject: [PATCHv8 04/18] I2C: OMAP: I2C register restore only if context
+ is lost
+In-Reply-To: <CAM=Q2cvGFgNtvCX=TXAioAUKH9z+VzeKW2ZHhpxUC+s2_yS1QA@mail.gmail.com>
+References: <1334235995-6727-1-git-send-email-shubhrajyoti@ti.com>
+ <1334235995-6727-5-git-send-email-shubhrajyoti@ti.com>
+ <87d376zd2v.fsf@ti.com>
+ <CAM=Q2cvGFgNtvCX=TXAioAUKH9z+VzeKW2ZHhpxUC+s2_yS1QA@mail.gmail.com>
+Message-ID: <CANQgH-aUyx97rDUUTy8L1qHSSgdC2YaP7LaQor4RAGPfb2JX=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+Hi Kevin,
 
-I have tested below patch series for vanilla 3.4-rc2 (without videobuf2 
-support for dmabuf patches) with and without IOMMU support on origen 
-board. These patches are good now. You can add:
+> Hi Kevin,
+> Thanks for your review,
+>
+> On Tue, Apr 17, 2012 at 7:15 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+>>
+>>> ?Currently i2c register restore is done always.
+>>> ?Adding conditional restore.
+>>> ?The i2c register restore is done only if the context is lost.
+>>
+>> OK, minor comment below.
 
-Tested-By: Subash Patel <subash.ramaswamy@linaro.org> for whole series.
+Thanks for the suggestion of the error case restore.
+Updated the patch. Also added Tony's ack for the plat part.
 
-Regards,
-Subash
 
-On 04/10/2012 04:34 PM, Marek Szyprowski wrote:
-> Hello,
->
-> Linux v3.4-rc2, which include dma-mapping preparation patches, has been
-> released two days ago, now it's time for the next spin of ARM
-> dma-mapping redesign patches. This version includes various fixes posted
-> separately to v7, mainly related to incorrect io address space bitmap
-> setup and a major issue with broken mmap for memory which comes from
-> dma_declare_coherent(). The patches have been also rebased onto Linux
-> v3.4-rc2 which comes with dma_map_ops related changes.
->
-> The code has been tested on Samsung Exynos4 'UniversalC210' and NURI
-> boards with IOMMU driver posted by KyongHo Cho, I will put separate
-> branch which shows how to integrate this driver with this patchset.
->
-> The patches are also available on my git repository at:
-> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc2-arm-dma-v8
->
->
-> History of the development:
->
-> v1: (initial version of the DMA-mapping redesign patches):
-> http://www.spinics.net/lists/linux-mm/msg21241.html
->
-> v2:
-> http://lists.linaro.org/pipermail/linaro-mm-sig/2011-September/000571.html
-> http://lists.linaro.org/pipermail/linaro-mm-sig/2011-September/000577.html
->
-> v3:
-> http://www.spinics.net/lists/linux-mm/msg25490.html
->
-> v4 and v5:
-> http://www.spinics.net/lists/arm-kernel/msg151147.html
-> http://www.spinics.net/lists/arm-kernel/msg154889.html
->
-> v6:
-> http://www.spinics.net/lists/linux-mm/msg29903.html
->
-> v7:
-> http://www.spinics.net/lists/arm-kernel/msg162149.html
->
-> Best regards
-> Marek Szyprowski
-> Samsung Poland R&D Center
->
->
-> Patch summary:
->
-> Marek Szyprowski (10):
->    common: add dma_mmap_from_coherent() function
->    ARM: dma-mapping: use pr_* instread of printk
->    ARM: dma-mapping: introduce ARM_DMA_ERROR constant
->    ARM: dma-mapping: remove offset parameter to prepare for generic
->      dma_ops
->    ARM: dma-mapping: use asm-generic/dma-mapping-common.h
->    ARM: dma-mapping: implement dma sg methods on top of any generic dma
->      ops
->    ARM: dma-mapping: move all dma bounce code to separate dma ops
->      structure
->    ARM: dma-mapping: remove redundant code and cleanup
->    ARM: dma-mapping: use alloc, mmap, free from dma_ops
->    ARM: dma-mapping: add support for IOMMU mapper
->
->   arch/arm/Kconfig                   |    9 +
->   arch/arm/common/dmabounce.c        |   84 +++-
->   arch/arm/include/asm/device.h      |    4 +
->   arch/arm/include/asm/dma-iommu.h   |   34 ++
->   arch/arm/include/asm/dma-mapping.h |  407 ++++-----------
->   arch/arm/mm/dma-mapping.c          | 1019 ++++++++++++++++++++++++++++++------
->   arch/arm/mm/vmregion.h             |    2 +-
->   drivers/base/dma-coherent.c        |   42 ++
->   include/asm-generic/dma-coherent.h |    4 +-
->   9 files changed, 1138 insertions(+), 467 deletions(-)
->   create mode 100644 arch/arm/include/asm/dma-iommu.h
->
+>From 1ca222f6f50868e07d9a46575e73dd66fd2d542e Mon Sep 17 00:00:00 2001
+From: Shubhrajyoti D <shubhrajyoti@ti.com>
+Date: Tue, 17 Jan 2012 16:13:03 +0530
+Subject: [PATCH] I2C: OMAP: I2C register restore only if context is lost
+
+ Currently i2c register restore is done always.
+ Adding conditional restore.
+ The i2c register restore is done only if the context is lost
+ or in case of error to be on the safe side.
+ Also remove the definition of SYSS_RESETDONE_MASK and use the
+ one in omap_hwmod.h.
+
+Cc: Kevin Hilman <khilman@ti.com>
+[For the arch/arm/plat-omap/i2c.c part]
+Acked-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ arch/arm/plat-omap/i2c.c      |    3 ++
+ drivers/i2c/busses/i2c-omap.c |   53 +++++++++++++++++++++++++++--------------
+ include/linux/i2c-omap.h      |    1 +
+ 3 files changed, 39 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index db071bc..4ccab07 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -179,6 +179,9 @@ static inline int omap2_i2c_add_bus(int bus_id)
+ 	 */
+ 	if (cpu_is_omap34xx())
+ 		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
++
++	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
++
+ 	pdev = omap_device_build(name, bus_id, oh, pdata,
+ 			sizeof(struct omap_i2c_bus_platform_data),
+ 			NULL, 0, 0);
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index a882558..76cf066 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -43,6 +43,7 @@
+ #include <linux/slab.h>
+ #include <linux/i2c-omap.h>
+ #include <linux/pm_runtime.h>
++#include <plat/omap_device.h>
+
+ /* I2C controller revisions */
+ #define OMAP_I2C_OMAP1_REV_2		0x20
+@@ -157,9 +158,6 @@ enum {
+ #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
+ #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
+
+-/* OCP_SYSSTATUS bit definitions */
+-#define SYSS_RESETDONE_MASK		(1 << 0)
+-
+ /* OCP_SYSCONFIG bit definitions */
+ #define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
+ #define SYSC_SIDLEMODE_MASK		(0x3 << 3)
+@@ -184,6 +182,7 @@ struct omap_i2c_dev {
+ 	u32			latency;	/* maximum mpu wkup latency */
+ 	void			(*set_mpu_wkup_lat)(struct device *dev,
+ 						    long latency);
++	int			(*get_context_loss_count)(struct device *dev);
+ 	u32			speed;		/* Speed of bus in kHz */
+ 	u32			dtrev;		/* extra revision from DT */
+ 	u32			flags;
+@@ -206,6 +205,7 @@ struct omap_i2c_dev {
+ 	u16			syscstate;
+ 	u16			westate;
+ 	u16			errata;
++	int			dev_lost_count;
+ };
+
+ static const u8 reg_map_ip_v1[] = {
+@@ -1025,6 +1025,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->speed = pdata->clkrate;
+ 		dev->flags = pdata->flags;
+ 		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
++		dev->get_context_loss_count = pdata->get_context_loss_count;
+ 		dev->dtrev = pdata->rev;
+ 	}
+
+@@ -1151,12 +1152,32 @@ omap_i2c_remove(struct platform_device *pdev)
+ }
+
+ #ifdef CONFIG_PM_RUNTIME
++static void omap_i2c_restore(struct omap_i2c_dev *dev)
++{
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
++	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
++	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
++	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
++	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
++	omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
++	/*
++	 * Don't write to this register if the IE state is 0 as it can
++	 * cause deadlock.
++	 */
++	if (dev->iestate)
++		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
++
++}
+ static int omap_i2c_runtime_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+ 	u16 iv;
+
++	if (_dev->get_context_loss_count)
++		_dev->dev_lost_count = _dev->get_context_loss_count(dev);
++
+ 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+ 	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
+ 		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
+@@ -1179,24 +1200,20 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
++	int loss_cnt;
+
+-	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+-		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
++	if (_dev->get_context_loss_count) {
++		loss_cnt = _dev->get_context_loss_count(dev);
++		if (loss_cnt < 0) {
++			omap_i2c_restore(_dev);
++			return 0;
++		}
++		if (_dev->dev_lost_count == loss_cnt && _dev->dev_lost_count)
++			return 0;
+ 	}
+
+-	/*
+-	 * Don't write to this register if the IE state is 0 as it can
+-	 * cause deadlock.
+-	 */
+-	if (_dev->iestate)
+-		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
++	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
++		omap_i2c_restore(_dev);
+
+ 	return 0;
+ }
+diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+index 92a0dc7..c76cbc0 100644
+--- a/include/linux/i2c-omap.h
++++ b/include/linux/i2c-omap.h
+@@ -35,6 +35,7 @@ struct omap_i2c_bus_platform_data {
+ 	u32		rev;
+ 	u32		flags;
+ 	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
++	int		(*get_context_loss_count)(struct device *dev);
+ };
+
+ #endif
+-- 
+1.7.5.4
