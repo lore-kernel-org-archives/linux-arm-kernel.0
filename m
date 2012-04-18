@@ -1,100 +1,115 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 18 Apr 2012 22:41:33 +0200
-Subject: [PATCH 5/9] ARM: OMAP3: hwmod: rename the smartreflex entries
-In-Reply-To: <87k41dkks0.fsf@ti.com>
-References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
- <1332173578-27422-6-git-send-email-j-pihet@ti.com>
- <87k41dkks0.fsf@ti.com>
-Message-ID: <CAORVsuXO5jxBZOEjTpJ4NTwOugmkK2JdsPE6yU_HbJ6iSALSGg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 22:43:01 +0200
+Subject: [PATCH 08/10] MXS: Add separate MXS EHCI HCD driver
+In-Reply-To: <201204182207.30516.marex@denx.de>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334771194-18688-9-git-send-email-marex@denx.de>
+ <20120418195033.GA3852@pengutronix.de>
+ <201204182207.30516.marex@denx.de>
+Message-ID: <20120418204301.GD3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+On Wed, Apr 18, 2012 at 10:07:30PM +0200, Marek Vasut wrote:
+> Dear Sascha Hauer,
+> 
+> > On Wed, Apr 18, 2012 at 07:46:32PM +0200, Marek Vasut wrote:
+> > > This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I tried to
+> > > keep this separate from the MXC EHCI to avoid further polution of the
+> > > MXC EHCI, though eventually these two might be merged.
+> > > 
+> > > NOTE: I still haven't figured out how to enable/disable the disconnection
+> > > detector, it can't be enabled all the time, so I toggle PHY stuff from
+> > > this driver, which I doubt is correct.
+> > 
+> > [...]
+> > 
+> > > +static int ehci_mxs_drv_probe(struct platform_device *pdev)
+> > > +{
+> > > +	struct device *dev = &pdev->dev;
+> > > +	struct imx_usb *data = pdev->dev.platform_data;
+> > > +	struct usb_hcd *hcd;
+> > > +	struct ehci_hcd *ehci;
+> > > +	struct usb_phy *phy;
+> > > +	int ret;
+> > > +
+> > > +	dev_info(dev, "Initializing i.MX28 USB Controller\n");
+> > 
+> > This is not (only) i.MX28
+> 
+> Let's keep it like that until we get further testing on other platforms.
 
-On Wed, Apr 18, 2012 at 7:33 PM, Kevin Hilman <khilman@ti.com> wrote:
-> +Benoit
->
-> jean.pihet at newoldbits.com writes:
->
->> From: Jean Pihet <j-pihet@ti.com>
->>
->> Change the name field value to better reflect the smartreflex
->> integration in the system
->>
->> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->> ---
->> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? ?8 ++++----
->> ?arch/arm/mach-omap2/smartreflex.c ? ? ? ? ?| ? ?2 +-
->> ?2 files changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> index d7d4c70..40f57c4 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> @@ -2751,7 +2751,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr1_slaves[] = {
->> ?};
->>
->> ?static struct omap_hwmod omap34xx_sr1_hwmod = {
->> - ? ? .name ? ? ? ? ? = "sr1",
->> + ? ? .name ? ? ? ? ? = "mpu_iva",
->
-> Should this be "smartreflex_mpu_iva"?
->
-> The OMAP4 SR hwmods have a 'smartreflex_' prefix which seems better.
->
->> ? ? ? .class ? ? ? ? ?= &omap34xx_smartreflex_hwmod_class,
->> ? ? ? .main_clk ? ? ? = "sr1_fck",
->> ? ? ? .prcm ? ? ? ? ? = {
->> @@ -2775,7 +2775,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr1_slaves[] = {
->> ?};
->>
->> ?static struct omap_hwmod omap36xx_sr1_hwmod = {
->> - ? ? .name ? ? ? ? ? = "sr1",
->> + ? ? .name ? ? ? ? ? = "mpu_iva",
->> ? ? ? .class ? ? ? ? ?= &omap36xx_smartreflex_hwmod_class,
->> ? ? ? .main_clk ? ? ? = "sr1_fck",
->> ? ? ? .prcm ? ? ? ? ? = {
->> @@ -2803,7 +2803,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr2_slaves[] = {
->> ?};
->>
->> ?static struct omap_hwmod omap34xx_sr2_hwmod = {
->> - ? ? .name ? ? ? ? ? = "sr2",
->> + ? ? .name ? ? ? ? ? = "core",
->> ? ? ? .class ? ? ? ? ?= &omap34xx_smartreflex_hwmod_class,
->> ? ? ? .main_clk ? ? ? = "sr2_fck",
->> ? ? ? .prcm ? ? ? ? ? = {
->> @@ -2827,7 +2827,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr2_slaves[] = {
->> ?};
->>
->> ?static struct omap_hwmod omap36xx_sr2_hwmod = {
->> - ? ? .name ? ? ? ? ? = "sr2",
->> + ? ? .name ? ? ? ? ? = "core",
->> ? ? ? .class ? ? ? ? ?= &omap36xx_smartreflex_hwmod_class,
->> ? ? ? .main_clk ? ? ? = "sr2_fck",
->> ? ? ? .prcm ? ? ? ? ? = {
->> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
->> index c18d47d..b2728a5 100644
->> --- a/arch/arm/mach-omap2/smartreflex.c
->> +++ b/arch/arm/mach-omap2/smartreflex.c
->> @@ -184,7 +184,7 @@ static void sr_set_regfields(struct omap_sr *sr)
->> ? ? ? ? ? ? ? sr->err_weight = OMAP3430_SR_ERRWEIGHT;
->> ? ? ? ? ? ? ? sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
->> ? ? ? ? ? ? ? sr->accum_data = OMAP3430_SR_ACCUMDATA;
->> - ? ? ? ? ? ? if (!(strcmp(sr->name, "sr1"))) {
->> + ? ? ? ? ? ? if (!(strcmp(sr->name, "sr_mpu_iva"))) {
->
-> Why the 'sr_' prefix?
-Historically the sr instance name is generated from hwmod name
-prepended with "sr_".
-I agree it is better to change the hwmod name and remove the "sr_"
-prefix from the sr init code.
+I see no reason for doing that. It does work on all i.MX for sure.
 
->
->> ? ? ? ? ? ? ? ? ? ? ? sr->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
->> ? ? ? ? ? ? ? ? ? ? ? sr->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
->> ? ? ? ? ? ? ? } else {
->
-> Kevin
+> > > +		ret = -ENODEV;
+> > > +		goto err_phy_init;
+> > > +	}
+> > > +#else
+> > > +	dev_info(dev, "USB_MXS_PHY must have CONFIG_USB_OTG_UTILS enabled\n");
+> > > +	goto err_phy;
+> > > +#endif
+> > 
+> > If your code does not work without CONFIG_USB_OTG_UTILS then why doesn't
+> > the driver depend on this option?
+> > It doesn't matter, all code inside these ifdefs should go to imx-otg.c.
+> 
+> Again, you mean imx-usb (the driver registering ehci host) or mxs-usb-phy? 
 
-Thanks,
-Jean
+I mean otg/imx-usb.c (and I'll stick with the name imx-otg)
+
+> Either way, why should it be moved there, why shouldn't it sit in this file? Can 
+> you elaborate?
+
+It's the imx-otg driver that manages the state. It's the imx-otg driver
+which knows how to configure the phy
+
+> 
+> > > +
+> > > +	/* Set up the PORTSCx register */
+> > > +	ehci_writel(ehci, 0, &ehci->regs->port_status[0]);
+> > > +
+> > 
+> > Should also be in imx-otg.c
+> 
+> This is clearly EHCI thing, why?
+
+This is not ehci specific. This is specific to the whole USB controller.
+You have to set it up for device mode aswell, grep -i for portsc in
+drivers/usb/gadget.
+
+> > > +	struct usb_phy *phy = usb_get_transceiver();
+> > > +
+> > > +	if (phy)
+> > > +		usb_phy_shutdown(phy);
+> > > +
+> > > +	usb_remove_hcd(hcd);
+> > 
+> > usb_add_hcd is in imx-otg.c so usb_remove_hcd should be aswell.
+> 
+> Why would that be?
+
+Let me try to rephrase my intention:
+
+We have to deal with a 2-in-1 device here, a usb host and a usb device
+controller. Both share some resources, namely:
+
+- the io space
+- the clocks
+- the interrupt
+- while being a seperate device they both share the phy
+
+Everything that is shared should be handled by imx-otg.c. Whenever
+imx-otg.c detects host mode it passes control to the ehci driver. When
+imx-otg.c detects that the device is unplugged then it should remove the
+host via usb_remove_hcd. device mode would be similar.
+For now we don't implement device mode and do not automatically detect
+host/device mode which makes things simpler. Still the calls have to be
+in the right place.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
