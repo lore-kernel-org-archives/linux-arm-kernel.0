@@ -1,91 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2012 14:45:20 +0100
-Subject: [PATCH 4/8] mmc: mmci: Use ios_handler to save power
-In-Reply-To: <CAMJBoFOBVXQHpjNyy7LDpXuNUbEyRosOVvuVt_MYeOrWbQutnw@mail.gmail.com>
-References: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
- <1326810867-5346-5-git-send-email-ulf.hansson@stericsson.com>
- <CAMJBoFOBVXQHpjNyy7LDpXuNUbEyRosOVvuVt_MYeOrWbQutnw@mail.gmail.com>
-Message-ID: <20120418134520.GA24211@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Wed, 18 Apr 2012 15:45:14 +0200
+Subject: [PATCH v7 0/6] PM QoS: implement the OMAP low level constraints
+ management code
+Message-ID: <1334756720-29166-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 01:57:27PM +0200, Vitaly Wool wrote:
-> Hi Ulf,
-> 
-> On Tue, Jan 17, 2012 at 3:34 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> > To disable a levelshifter when we are in an idle state will
-> > decrease current consumption. We make use of the ios_handler
-> > at runtime suspend and at regular suspend to accomplish this.
-> >
-> > Of course depending on the used levelshifter the decrease of
-> > current differs. For ST6G3244ME the value is up to ~200 uA.
-> >
-> > Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> > ?drivers/mmc/host/mmci.c | ? 19 ++++++++++++++++++-
-> > ?1 files changed, 18 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> > index a7c8f8f..76ce2cd 100644
-> > --- a/drivers/mmc/host/mmci.c
-> > +++ b/drivers/mmc/host/mmci.c
-> > @@ -1505,10 +1505,22 @@ static int mmci_save(struct amba_device *dev)
-> > ?{
-> > ? ? ? ?struct mmc_host *mmc = amba_get_drvdata(dev);
-> > ? ? ? ?unsigned long flags;
-> > + ? ? ? struct mmc_ios ios;
-> > + ? ? ? int ret = 0;
-> >
-> > ? ? ? ?if (mmc) {
-> > ? ? ? ? ? ? ? ?struct mmci_host *host = mmc_priv(mmc);
-> >
-> > + ? ? ? ? ? ? ? /* Let the ios_handler act on a POWER_OFF to save power. */
-> > + ? ? ? ? ? ? ? if (host->plat->ios_handler) {
-> > + ? ? ? ? ? ? ? ? ? ? ? memcpy(&ios, &mmc->ios, sizeof(struct mmc_ios));
-> > + ? ? ? ? ? ? ? ? ? ? ? ios.power_mode = MMC_POWER_OFF;
-> > + ? ? ? ? ? ? ? ? ? ? ? ret = host->plat->ios_handler(mmc_dev(mmc),
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &ios);
-> > + ? ? ? ? ? ? ? ? ? ? ? if (ret)
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return ret;
-> > + ? ? ? ? ? ? ? }
-> > +
-> > ? ? ? ? ? ? ? ?spin_lock_irqsave(&host->lock, flags);
-> >
-> > ? ? ? ? ? ? ? ?/*
-> > @@ -1527,7 +1539,7 @@ static int mmci_save(struct amba_device *dev)
-> > ? ? ? ? ? ? ? ?amba_vcore_disable(dev);
-> > ? ? ? ?}
-> >
-> > - ? ? ? return 0;
-> > + ? ? ? return ret;
-> > ?}
-> >
-> > ?static int mmci_restore(struct amba_device *dev)
-> > @@ -1550,6 +1562,11 @@ static int mmci_restore(struct amba_device *dev)
-> > ? ? ? ? ? ? ? ?writel(MCI_IRQENABLE, host->base + MMCIMASK0);
-> >
-> > ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&host->lock, flags);
-> > +
-> > + ? ? ? ? ? ? ? /* Restore settings done by the ios_handler. */
-> > + ? ? ? ? ? ? ? if (host->plat->ios_handler)
-> > + ? ? ? ? ? ? ? ? ? ? ? host->plat->ios_handler(mmc_dev(mmc),
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &mmc->ios);
-> > ? ? ? ?}
-> >
-> > ? ? ? ?return 0;
-> 
-> this patch is a disaster because it cuts off the chip's power on
-> suspend regardless of whether MMC_PM_KEEP_POWER flag has been set or
-> not. Simply put: it breaks everything This patch therefore gets a
-> strongest *NACK* from me.
+From: Jean Pihet <j-pihet@ti.com>
 
-Thank you for backing up what I've already said about this patch (which
-is why I stopped applying Ulf's MMC patches at this patch.)
+. Implement the devices wake-up latency constraints using the global
+  device PM QoS notification handler which applies the constraints to the
+  underlying layer,
+. Implement the low level code which controls the power domains next
+  functional power states [3], through the hwmod and pwrdm layers,
+. Add cpuidle and power domains wake-up latency figures for OMAP3, cf. 
+  comments in the code and [1] for the details on where the numbers
+  are magically coming from,
+. Implement the relation between the cpuidle and per-device PM QoS frameworks
+  in the OMAP3 specific idle callbacks.
+  The chosen C-state shall satisfy the following conditions:
+   . the 'valid' field is enabled,
+   . it satisfies the enable_off_mode flag,
+   . the next state for MPU and CORE power domains is not lower than the
+     state programmed by the per-device PM QoS.
 
-I've also been concerned with the mere saving and restoring of the
-clock and power registers in this patch - something which the ARM version
-of the primecell does not actually support.
 
-I've said that before...
+ToDo:
+1. support OMAP4 chipset when the low power modes will be supported
+2. validate the constraints framework on OMAP4 HW (done on OMAP3)
+3. Re-visit the OMAP power domains states initialization procedure. Currently
+   the power states that have been changed from the constraints API which were
+   applied before the initialization of the power domains are lost
+4. Further clean-up the OMAP PM layer, use the generic frameworks instead (OPP,
+   PM QoS for throughput constraints ...)
+
+
+Based on the pm-qos branch of the linux-omap git tree (3.4.0-rc2) [2] with
+the functional power states changes applied [3].
+
+Tested cpuidle and suspend on OMAP3 Beagleboard (ES2.x) with constraints
+on MPU, CORE, PER in RETention and OFF modes.
+
+[1] http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+[3] http://marc.info/?l=linux-omap&m=133475291911194&w=2
+
+
+History:
+
+v7:
+. rebased on top of the functional power state changes [3]
+
+v6:
+. minor change in the commits description after Kevin's review
+. added Kevin's Reviewed-by
+
+v5:
+. rebased on latest linux-omap [2]
+. rework after Kevin's comments on the MLs
+
+v4:
+. split up the patches which remove the omap_pm_ code from the patch set.
+  Those patches are to be submitted later, on top of this patch set.
+. latency numbers: provide the measurements setup and conditions in the code
+  comments, added the link to the details on wiki [1].
+. improved kerneldoc
+. split big functions into smaller ones, in order to improve the readability
+
+v3: reworked the error return path and improved the kerneldoc
+
+v2: reworked the OMAP specific cpuidle code to demote the initial C-state to
+     a valid C-state which fulfills the per-device constraints
+
+v1: initial version
+
+
+Jean Pihet (6):
+  ARM: OMAP2+: PM QoS: control the power domains next state from the
+    constraints
+  ARM: OMAP2+: PM QoS: manage the per-device latency constraints in
+    hwmod
+  ARM: OMAP: omap_device: register to the per-device PM QoS framework
+  ARM: OMAP3: cpuidle: next C-state decision depends on the PM QoS MPU
+    and CORE constraints
+  ARM: OMAP3: update cpuidle latency and threshold figures
+  ARM: OMAP3: powerdomain data: add wake-up latency figures
+
+ arch/arm/mach-omap2/cpuidle34xx.c           |  109 ++++++++------
+ arch/arm/mach-omap2/omap_hwmod.c            |   22 +--
+ arch/arm/mach-omap2/pm.h                    |   17 ++-
+ arch/arm/mach-omap2/powerdomain.c           |  216 +++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h           |   17 ++
+ arch/arm/mach-omap2/powerdomains3xxx_data.c |   83 ++++++++++
+ arch/arm/plat-omap/omap_device.c            |   81 ++++++++++-
+ 7 files changed, 481 insertions(+), 64 deletions(-)
+
+-- 
+1.7.7.6
