@@ -1,57 +1,66 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 17 Apr 2012 18:07:25 -0700
-Subject: [PATCH 3/3] clk: propagate round_rate for CLK_SET_RATE_PARENT case
-In-Reply-To: <1334235019-15553-3-git-send-email-shawn.guo@linaro.org>
-References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334235019-15553-1-git-send-email-shawn.guo@linaro.org>
- <1334235019-15553-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAJOA=zOYTUA7d2bAXfuN2xYeUOhQ5oQ16FHNn+GkgsFpncJXUw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 18 Apr 2012 04:07:39 +0200
+Subject: [RFC PATCH 00/10 V2]  MXS: Add i.MX28 USB Host driver
+In-Reply-To: <1334657751-27678-1-git-send-email-marex@denx.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2012 at 5:50 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Need to propagate round_rate call for the clk that has no .round_rate
-> operation but with flag CLK_SET_RATE_PARENT set.
->
-> For example, clk_mux is a clk with no .round_rate operation. ?However,
-> it could likely be in a clk_set_rate propagation path, saying it has
-> parent clk who has .round_rate and .set_rate operations.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
+generic USB PHY infrastructure.
 
-Thanks for the patch Shawn.  I've pulled this into my -next branch.
+V2: Introduce stub imx-usb driver that then registers the PHY and EHCI drivers.
 
-Regards,
-Mike
+Marek Vasut (10):
+  MXS: Make clk_disable return integer
+  MXS: Add USB EHCI and USB PHY clock handling
+  MXS: Fixup i.MX233 USB base address name
+  MXS: Add data shared between imx-usb, PHY and EHCI driver
+  MXS: Add platform registration hooks for USB EHCI
+  MXS: Add composite imx-usb driver
+  MXS: Add USB PHY driver
+  MXS: Add separate MXS EHCI HCD driver
+  MXS: Enable USB on M28EVK
+  MXS: Enable USB on MX28EVK
 
-> ---
-> ?drivers/clk/clk.c | ? ?8 ++++++--
-> ?1 files changed, 6 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index d04e1e4..1f1fff1 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -587,8 +587,12 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
-> ? ? ? ?if (!clk)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> - ? ? ? if (!clk->ops->round_rate)
-> - ? ? ? ? ? ? ? return clk->rate;
-> + ? ? ? if (!clk->ops->round_rate) {
-> + ? ? ? ? ? ? ? if (clk->flags & CLK_SET_RATE_PARENT)
-> + ? ? ? ? ? ? ? ? ? ? ? return __clk_round_rate(clk->parent, rate);
-> + ? ? ? ? ? ? ? else
-> + ? ? ? ? ? ? ? ? ? ? ? return clk->rate;
-> + ? ? ? }
->
-> ? ? ? ?if (clk->parent)
-> ? ? ? ? ? ? ? ?parent_rate = clk->parent->rate;
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm/mach-mxs/Kconfig                       |    4 +
+ arch/arm/mach-mxs/clock-mx28.c                  |   28 ++-
+ arch/arm/mach-mxs/devices-mx28.h                |    4 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-usb.c        |   67 +++++
+ arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
+ arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
+ arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
+ arch/arm/mach-mxs/mach-m28evk.c                 |    9 +
+ arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
+ drivers/usb/host/Kconfig                        |    7 +
+ drivers/usb/host/ehci-hcd.c                     |    5 +
+ drivers/usb/host/ehci-mxs.c                     |  254 +++++++++++++++++++
+ drivers/usb/otg/Kconfig                         |   16 ++
+ drivers/usb/otg/Makefile                        |    2 +
+ drivers/usb/otg/imx-usb.c                       |  303 +++++++++++++++++++++++
+ drivers/usb/otg/mxs-phy.c                       |  201 +++++++++++++++
+ include/linux/fsl_devices.h                     |   15 ++
+ 19 files changed, 939 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
+ create mode 100644 drivers/usb/host/ehci-mxs.c
+ create mode 100644 drivers/usb/otg/imx-usb.c
+ create mode 100644 drivers/usb/otg/mxs-phy.c
+
+Cc: Chen Peter-B29397 <B29397@freescale.com>
+Cc: Detlev Zundel <dzu@denx.de>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Li Frank-B20596 <B20596@freescale.com>
+Cc: Lin Tony-B19295 <B19295@freescale.com>
+Cc: Linux USB <linux-usb@vger.kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Subodh Nijsure <snijsure@grid-net.com>
+Cc: Tony Lin <tony.lin@freescale.com>
+Cc: Wolfgang Denk <wd@denx.de>
+-- 
+1.7.9.5
