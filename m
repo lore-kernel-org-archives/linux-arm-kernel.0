@@ -1,34 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Apr 2012 16:32:01 +0000
-Subject: [PATCH 7/7] MMC: mmci: Add required documentation for Device Tree
- bindings
-In-Reply-To: <4F8ECFB9.6020304@linaro.org>
-References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
- <1334759120.26922.5.camel@hornet> <4F8ECFB9.6020304@linaro.org>
-Message-ID: <201204181632.01858.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 18 Apr 2012 18:35:05 +0200
+Subject: [PATCH 13/16] mfd/db8500-prcmu: Add Device Tree support
+In-Reply-To: <1334659448-11521-14-git-send-email-lee.jones@linaro.org>
+References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
+ <1334659448-11521-14-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZ54DL00p+ZbG2mepzAFuZNSN0zkWoGe4n5v9NQnjw8qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 April 2012, Lee Jones wrote:
-> On 18/04/12 15:25, Pawel Moll wrote:
-> > Hi Arnd,
-> >
-> > On Wed, 2012-04-18 at 13:04 +0000, Arnd Bergmann wrote:
-> >> On Thursday 05 April 2012, Lee Jones wrote:
-> >>> This provides full documentation detailing each compulsory,
-> >>> optional and device (variant) specific properties available
-> >>> for use within the MMCI Device Tree.
-> >>>
-> >>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
-> >>
-> >> Acked-by: Arnd Bergmann<arnd@arndb.de>
-> >
-> > Did you really mean to ack this version or the newer one, with
-> > "max-frequency" instead of "clock-frequency"?
-> 
-> He meant the newer one. :)
-> 
+On Tue, Apr 17, 2012 at 12:44 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Yes, of course. Sorry for the confusion.
+> Here we see the db8500-prcmu driver obtain DT support. In its
+> current state, all we have to do is offer a matching compatible
+> node and the driver will register and initialise correctly.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> ?drivers/mfd/db8500-prcmu.c | ? ?5 +++++
+> ?1 files changed, 5 insertions(+), 0 deletions(-)
 
-	Arnd
+Goes through the MFD tree or I need Sam's ACK.
+
+Yours,
+Linus Walleij
