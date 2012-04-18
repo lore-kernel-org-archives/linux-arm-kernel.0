@@ -1,56 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 18 Apr 2012 02:52:07 -0600 (MDT)
-Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
- both clk and hwmod
-In-Reply-To: <4F8E76C3.7080803@ti.com>
-References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
- <4F8E76C3.7080803@ti.com>
-Message-ID: <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 18 Apr 2012 17:05:52 +0800
+Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
+In-Reply-To: <20120329064320.GA20840@pengutronix.de>
+References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
+ <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+ <4F73CCC6.6000001@freescale.com>
+ <20120329064320.GA20840@pengutronix.de>
+Message-ID: <20120418090551.GA30966@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Apr 2012, Cousson, Benoit wrote:
+Hi Wolfram,
 
-> On 4/12/2012 7:06 PM, Paul Walmsley wrote:
-> > On Thu, 12 Apr 2012, Rajendra Nayak wrote:
-> > 
-> > > On OMAP4+, the clkdm association is moved to hwmod while on older OMAPs'
-> > > its associated with a clk.
-> > 
-> > Sounds like this should be conditional based on the platform, then,
-> > rather than weakening the warning for all platforms ?
+On Thu, Mar 29, 2012 at 08:43:20AM +0200, Wolfram Sang wrote:
+> Hi,
 > 
-> Well, as already discussed the clockdomain information is mostly useless for
-> most clock nodes because the HW is taking care of the dependencies, so
-> highlighting only the ones missing in hwmod is far from enough and will avoid
-> scaring people with something that is normal.
-
-Sounds to me like the right time to make this change for OMAP4 is when the 
-call to omap2_clk_disable_clkdm_control() is removed from 
-clock44xx_data.c.  Hopefully that can happen as soon as someone can finish 
-the analysis work that we discussed to figure out what drivers still 
-aren't converted to using runtime PM, backed with omap_device & 
-omap_hwmod.
-
-And at that point, there shouldn't be any reason to test oh->_clk->clkdm 
-at all on OMAP4, no?  OMAP4 should only warn if oh->clkdm_name is missing 
-or can't be resolved.
-
-> Considering that OMAP4 clock domain partition is way more complex than it was
-> on OMAP2 & 3, if OMAP4 can leave without that, I doubt OMAP2 & 3 clock nodes
-> will ever need it, except HW bugs, as usual.
+> > >  include/linux/stmp_device.h |   20 +++++++++++
+> > IMHO, this header should be placed at include/linux/fsl/.
 > 
-> But still, it is an exception more than the regular case.
+> Hmm, one never knows if somewhen in the future some other vendor decides to do
+> do a device with this register layout. It is just a layout, not an IP core per
+> se. So, I'd prefer to leave it as is.
+> 
 
-As far as OMAP2/3 goes, when OMAP2/3 is converted to use the hwmod 
-clockdomain enable sequence, that seems like a good time to drop the 
-oh->_clk->clkdm test for main clocks.
+Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-I'm also wondering if we should be checking clockdomains for the optional 
-clocks in _init_opt_clks()... at least on OMAP2/3, unsure about OMAP4.  
-Right now we don't implement any hwmod clockdomain enable sequence for the 
-optional clocks.
+I'm converting mxs-dma driver to be mach-independent which also needs
+this patch.
 
+Do you know when this will be merged?
 
-- Paul
+BTW, one small question:
+Is it possible that stmp_reset_block also be used by other vendors?
+If not, i guess include/linux/fsl which already exists may be the
+right place.
+
+Regards
+Dong Aisheng
