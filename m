@@ -1,35 +1,44 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 18 Apr 2012 12:26:29 +0200
-Subject: [PATCH 1/1] dt: Add general DMA window parser
-In-Reply-To: <20120418.131907.2172387798112620167.hdoyu@nvidia.com>
-References: <201204180731.54064.arnd@arndb.de>
- <20120418.121824.1894043789811063795.hdoyu@nvidia.com>
- <20120418092613.GA8632@avionic-0098.mockup.avionic-design.de>
- <20120418.131907.2172387798112620167.hdoyu@nvidia.com>
-Message-ID: <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Apr 2012 11:26:39 +0100
+Subject: [PATCH 1/8] ARM: OMAP: fix DMA vs memory ordering
+In-Reply-To: <20120418101854.GV13842@arwen.pp.htv.fi>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRqN-0004b4-Me@rmk-PC.arm.linux.org.uk>
+ <20120418101519.GU13842@arwen.pp.htv.fi>
+ <20120418101733.GL25053@n2100.arm.linux.org.uk>
+ <20120418101854.GV13842@arwen.pp.htv.fi>
+Message-ID: <20120418102639.GN25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiroshi Doyu wrote:
-> +	cells = prop ? *(__be32 *)prop : of_n_addr_cells(dn);
+On Wed, Apr 18, 2012 at 01:18:55PM +0300, Felipe Balbi wrote:
+> On Wed, Apr 18, 2012 at 11:17:33AM +0100, Russell King - ARM Linux wrote:
+> > Has anyone seen a problem (other than me when trying to get DMA engine
+> > working with omap-serial transmit paths) ?
+> 
+> probably not since omap-serial isn't using DMA anyway. Nevermind
 
-I think this needs to be:
+... which is a good thing because the driver is rather broken for DMA
+support (take a look at what the set_termios() method does, and consider
+what happens if that function is called when there's DMA activity
+outstanding.)
 
-	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
+I've come to the conclusion that it's not worth the effort to try to
+convert omap-serial to DMAengine support.  Firstly, DMA support requires
+hardware assisted flow control to work - which it currently doesn't for
+many many reasons.  Not only because of wrong defines, but also because
+the programming examples in the OMAP4430 TRM is wrong.  You'd do much
+better going to the TI16C752B data sheet and seeing how the original IP
+was described.  Why TI didn't include a copy of that in the TRM...
 
-Only casting isn't enough, you need the bytes to be swapped.
+Secondly, the problem I mention above wrt set_termios(), with the flow
+control fixed, results in a nice race condition causing the TX DMA to
+write into registers other than the FIFO data register, corrupting the
+UART configuration and halting system boot.
 
-> +	cells = prop ? *(__be32 *)prop : of_n_size_cells(dn);
-
-Similarly:
-
-	cells = prop ? be32_to_cpup(prop) : of_n_size_cells(dn);
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/d8de2877/attachment.sig>
+(I have a series of patches to fix the flow control issues, and this
+requires some work outside of the omap-serial driver to achieve that.
+I'll post those patches when they're fully ready.  At the moment, it's
+probably better to rip out all the hardware assisted flow control code
+from omap-serial so that we fall back on the standard software driven
+flow control.)
