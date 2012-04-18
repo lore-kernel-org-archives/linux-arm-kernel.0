@@ -1,54 +1,112 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Apr 2012 16:20:19 +0100
-Subject: [PATCH 7/7 v2] MMC: mmci: Add required documentation for Device Tree
- bindings
-In-Reply-To: <1334325909-5779-8-git-send-email-lee.jones@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <4F8EDBB3.7070506@linaro.org>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Wed, 18 Apr 2012 20:53:32 +0530
+Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
+ initialization
+In-Reply-To: <E1SKRsg-0004bX-4w@rmk-PC.arm.linux.org.uk>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRsg-0004bX-4w@rmk-PC.arm.linux.org.uk>
+Message-ID: <CANrkHUajRzoCp7K8L3cJArWN3xdqpft8L4k-o4gFTRTo8nmhmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Wed, 14 Mar 2012 13:58:34 +0000
-Subject: [PATCH] MMC: mmci: Add required documentation for Device Tree bindings
+On Wed, Apr 18, 2012 at 3:42 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> DMAengine uses the DMA engine device structure when mapping/unmapping
+> memory for DMA, so the MMC devices do not need their DMA masks
+> initialized (this reflects hardware: the MMC device is not the device
+> doing DMA.)
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> ?arch/arm/mach-omap1/board-h2-mmc.c ? ?| ? ?1 -
+> ?arch/arm/mach-omap1/board-h3-mmc.c ? ?| ? ?1 -
+> ?arch/arm/mach-omap1/board-nokia770.c ?| ? ?1 -
+> ?arch/arm/mach-omap2/board-n8x0.c ? ? ?| ? ?1 -
+> ?arch/arm/mach-omap2/hsmmc.c ? ? ? ? ? | ? ?1 -
+> ?arch/arm/plat-omap/include/plat/mmc.h | ? ?2 --
+Hi,
 
-This provides full documentation detailing each compulsory,
-optional and device (variant) specific properties available
-for use within the MMCI Device Tree.
+drivers/mmc/host/omap.c is also using dma_mask should that also be removed
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/mmc/mmci.txt |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/mmci.txt
-
-diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-new file mode 100644
-index 0000000..5b68c93
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-@@ -0,0 +1,19 @@
-+* ARM PrimeCell MultiMedia Card Interface (MMCI) PL180/1
-+
-+The ARM PrimeCell MMCI PL180 and PL181 provides and interface for
-+reading and writing to MultiMedia and SD cards alike.
-+
-+Required properties:
-+- compatible             : contains "arm,pl18x", "arm,primecell".
-+- reg                    : contains pl18x registers and length.
-+- interrupts             : contains the device IRQ(s).
-+
-+Optional properties:
-+- wp-gpios               : contains any write protect (ro) gpios
-+- cd-gpios               : contains any card detection gpios
-+- cd-inverted            : indicates whether the cd gpio is inverted
-+- max-frequency          : contains the maximum operating frequency
-+- bus-width              : number of data lines, can be <1>, <4>, or <8>
-+- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable
-+- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable
-+- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
--- 
-1.7.9.1
+> ?6 files changed, 0 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/board-h2-mmc.c b/arch/arm/mach-omap1/board-h2-mmc.c
+> index da0e37d..e1362ce 100644
+> --- a/arch/arm/mach-omap1/board-h2-mmc.c
+> +++ b/arch/arm/mach-omap1/board-h2-mmc.c
+> @@ -54,7 +54,6 @@ static struct omap_mmc_platform_data mmc1_data = {
+> ? ? ? ?.nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
+> ? ? ? ?.init ? ? ? ? ? ? ? ? ? ? ? ? ? = mmc_late_init,
+> ? ? ? ?.cleanup ? ? ? ? ? ? ? ? ? ? ? ?= mmc_cleanup,
+> - ? ? ? .dma_mask ? ? ? ? ? ? ? ? ? ? ? = 0xffffffff,
+> ? ? ? ?.slots[0] ? ? ? = {
+> ? ? ? ? ? ? ? ?.set_power ? ? ? ? ? ? ?= mmc_set_power,
+> ? ? ? ? ? ? ? ?.ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> diff --git a/arch/arm/mach-omap1/board-h3-mmc.c b/arch/arm/mach-omap1/board-h3-mmc.c
+> index f8242aa..c74daac 100644
+> --- a/arch/arm/mach-omap1/board-h3-mmc.c
+> +++ b/arch/arm/mach-omap1/board-h3-mmc.c
+> @@ -36,7 +36,6 @@ static int mmc_set_power(struct device *dev, int slot, int power_on,
+> ?*/
+> ?static struct omap_mmc_platform_data mmc1_data = {
+> ? ? ? ?.nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
+> - ? ? ? .dma_mask ? ? ? ? ? ? ? ? ? ? ? = 0xffffffff,
+> ? ? ? ?.slots[0] ? ? ? = {
+> ? ? ? ? ? ? ? ?.set_power ? ? ? ? ? ? ?= mmc_set_power,
+> ? ? ? ? ? ? ? ?.ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
+> index d21dcc2..cac9954 100644
+> --- a/arch/arm/mach-omap1/board-nokia770.c
+> +++ b/arch/arm/mach-omap1/board-nokia770.c
+> @@ -185,7 +185,6 @@ static int nokia770_mmc_get_cover_state(struct device *dev, int slot)
+>
+> ?static struct omap_mmc_platform_data nokia770_mmc2_data = {
+> ? ? ? ?.nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
+> - ? ? ? .dma_mask ? ? ? ? ? ? ? ? ? ? ? = 0xffffffff,
+> ? ? ? ?.max_freq ? ? ? ? ? ? ? ? ? ? ? = 12000000,
+> ? ? ? ?.slots[0] ? ? ? = {
+> ? ? ? ? ? ? ? ?.set_power ? ? ? ? ? ? ?= nokia770_mmc_set_power,
+> diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+> index 518091c..1003748 100644
+> --- a/arch/arm/mach-omap2/board-n8x0.c
+> +++ b/arch/arm/mach-omap2/board-n8x0.c
+> @@ -470,7 +470,6 @@ static struct omap_mmc_platform_data mmc1_data = {
+> ? ? ? ?.cleanup ? ? ? ? ? ? ? ? ? ? ? ?= n8x0_mmc_cleanup,
+> ? ? ? ?.shutdown ? ? ? ? ? ? ? ? ? ? ? = n8x0_mmc_shutdown,
+> ? ? ? ?.max_freq ? ? ? ? ? ? ? ? ? ? ? = 24000000,
+> - ? ? ? .dma_mask ? ? ? ? ? ? ? ? ? ? ? = 0xffffffff,
+> ? ? ? ?.slots[0] = {
+> ? ? ? ? ? ? ? ?.wires ? ? ? ? ? ? ? ? ?= 4,
+> ? ? ? ? ? ? ? ?.set_power ? ? ? ? ? ? ?= n8x0_mmc_set_power,
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index b0268ea..41e5277 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -315,7 +315,6 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+> ? ? ? ?mmc->slots[0].caps = c->caps;
+> ? ? ? ?mmc->slots[0].pm_caps = c->pm_caps;
+> ? ? ? ?mmc->slots[0].internal_clock = !c->ext_clock;
+> - ? ? ? mmc->dma_mask = 0xffffffff;
+> ? ? ? ?mmc->max_freq = c->max_freq;
+> ? ? ? ?if (cpu_is_omap44xx())
+> ? ? ? ? ? ? ? ?mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
+> diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+> index 7a38750..9fe87a7 100644
+> --- a/arch/arm/plat-omap/include/plat/mmc.h
+> +++ b/arch/arm/plat-omap/include/plat/mmc.h
+> @@ -80,8 +80,6 @@ struct omap_mmc_platform_data {
+> ? ? ? ?/* Return context loss count due to PM states changing */
+> ? ? ? ?int (*get_context_loss_count)(struct device *dev);
+>
+> - ? ? ? u64 dma_mask;
+> -
+> ? ? ? ?/* Integrating attributes from the omap_hwmod layer */
+> ? ? ? ?u8 controller_flags;
+>
+> --
+> 1.7.4.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
