@@ -1,21 +1,20 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 18 Apr 2012 18:49:17 -0300
-Subject: [PATCH 3/3] ARM: mx28evk: Add SPI NOR flash support
-In-Reply-To: <201204182342.43269.marek.vasut@gmail.com>
-References: <1333480807-10480-1-git-send-email-festevam@gmail.com>
- <1333480807-10480-3-git-send-email-festevam@gmail.com>
- <20120403192653.GA2201@pengutronix.de>
- <201204182342.43269.marek.vasut@gmail.com>
-Message-ID: <CAOMZO5AD+FZjWBqJ4-GV0LCjvdmQBTLg2GWS+N7aUVP5sW4NqQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 18 Apr 2012 15:02:26 -0700
+Subject: [PATCH v3 7/10] iio: lpc32xx-adc: Remove driver conflict due to
+ device tree
+In-Reply-To: <1334756176-25144-8-git-send-email-stigge@antcom.de>
+References: <1334756176-25144-1-git-send-email-stigge@antcom.de>
+ <1334756176-25144-8-git-send-email-stigge@antcom.de>
+Message-ID: <20120418220226.GA8035@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Wed, Apr 18, 2012 at 03:36:12PM +0200, Roland Stigge wrote:
+> Previously, the touchscreen and ADC drivers of the LPC32xx SoC had a Kconfig
+> conflict declared because they use the same hardware. Upon the introduction of
+> device tree support in both drivers, the conflict must be removed to enable
+> the same kernel to support different hardware (configured via the device tree).
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-On Wed, Apr 18, 2012 at 6:42 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-
-> Hey, did you get anywhere with this?
-
-I had it working a few weeks ago, but I still need to convert it to DT.
-
-After I convert it to DT I will post the patch.
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
