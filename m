@@ -1,62 +1,57 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 18 Apr 2012 07:00:31 -0700
-Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
-In-Reply-To: <4F8E62D2.9080206@ti.com> (shubhrajyoti@ti.com's message of "Wed,
- 18 Apr 2012 12:14:34 +0530")
-References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
- <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
- <87bomprjic.fsf@ti.com> <4F8E62D2.9080206@ti.com>
-Message-ID: <87bompp2bk.fsf@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 16:00:46 +0200
+Subject: [PATCH 1/1] pinctrl: handle dummy state in core
+In-Reply-To: <CACRpkdZw6iv=PjvvU4s5L8yV6813gCD7t8Vk-S66v-nXPaf+=Q@mail.gmail.com>
+References: <1334586289-13078-1-git-send-email-b29396@freescale.com>
+ <4F8C42D6.2000607@wwwdotorg.org>
+ <20120417034210.GD17173@shlinux2.ap.freescale.net>
+ <CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>
+ <20120418122832.GP20478@pengutronix.de>
+ <CACRpkdZw6iv=PjvvU4s5L8yV6813gCD7t8Vk-S66v-nXPaf+=Q@mail.gmail.com>
+Message-ID: <20120418140046.GU3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti <shubhrajyoti@ti.com> writes:
+On Wed, Apr 18, 2012 at 03:52:23PM +0200, Linus Walleij wrote:
+> On Wed, Apr 18, 2012 at 2:28 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> > Currently Dong Aisheng is working on i.MX6, we have i.MX31, i.MX35,
+> > i.MX51 and i.MX53 enabled in the same defconfig. Waiting for all
+> > machines turn over at once to pinctrl is illusionary. We have to make
+> > drivers work with and without pinctrl. We have a bunch of bad choices:
+> >
+> > - create a dummy pinctrl for all boards which do not have real pinmux
+> > ?support
+> 
+> Viable compromise.
+> 
+> > - ignore pinctrl_request errors in drivers.
+> 
+> Ugh. Not good.
+> 
+> > - generate and return a dummy pinctrl in the core if no real pinctrl is
+> > ?found.
+> >
+> > (replace pinctrl with regulators or clocks, it's the same situation, and
+> > it's not only i.MX specific)
+> 
+> Since we have dummy regulators, we should not break the design
+> pattern creating more confusion.
+> 
+> Stephen can you live with dummy pinctrl handles emitted by the
+> core, if explictly enabled by a Kconfig option?
 
-> Hi Kevin,
-> Thanks for the review.
->
-> On Wednesday 18 April 2012 05:36 AM, Kevin Hilman wrote:
->> Shubhrajyoti D <shubhrajyoti@ti.com> writes:
->>
->>> In the error cases the clock cut is missed. This patch intends to fix the
->>> same.
->> Please change the references to 'cut clocks' in subject/changelog here
->> (and in other patches) to use runtime suspend instead.   First, runtime PM
->> calls do more than cut clocks, but they only do so when
->> usecounting/autosuspend timeouts permit.
-> Yes thanks will fix it.
->>
->>
->>> Cc: stable at vger.kernel.org
->> Please hold off on Cc'ing stable until your patches are reviewed and accepted.
-> OK
->>> Cc: Govindraj.R <govindraj.raja@ti.com>
->>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->>> ---
->>>  drivers/tty/serial/omap-serial.c |    6 +++++-
->>>  1 files changed, 5 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
->>> index fe099bb..10e80bb 100644
->>> --- a/drivers/tty/serial/omap-serial.c
->>> +++ b/drivers/tty/serial/omap-serial.c
->>> @@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
->>>  
->>>  		if (ret < 0) {
->>>  			serial_omap_enable_ier_thri(up);
->>> +			pm_runtime_mark_last_busy(&up->pdev->dev);
->>> +			pm_runtime_put_autosuspend(&up->pdev->dev);
->> Why the autosuspend version here?
->>
->> Kevin
->>
->>
-> In case the request_dma fails we enable the thri( effectively like intr
-> mode) so
-> I thought of using the autosuspend version here .
->
-> Do you prefer put version instead ?
+I'd rather not make it a Kconfig option but a runtime option. With a
+Kconfig option we can only chose in the defconfigs whether it won't
+work on some boards or it will hide pinctrl errors on all other boards.
 
-Not necessarily, it should just be well described in the changelog.
+Create a pinctrl_provide_dummies() functions which boards can call when
+they do not have pinctrl support.
 
-Kevin
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
