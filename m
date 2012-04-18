@@ -1,49 +1,100 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 18 Apr 2012 22:36:05 +0200
-Subject: [PATCH 1/9] ARM: OMAP3+: voltage: export functions to
- plat/voltage.h
-In-Reply-To: <87y5ptkl0u.fsf@ti.com>
+Date: Wed, 18 Apr 2012 22:41:33 +0200
+Subject: [PATCH 5/9] ARM: OMAP3: hwmod: rename the smartreflex entries
+In-Reply-To: <87k41dkks0.fsf@ti.com>
 References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
- <1332173578-27422-2-git-send-email-j-pihet@ti.com>
- <87y5ptkl0u.fsf@ti.com>
-Message-ID: <CAORVsuWBHVhHnqBeKQ8hb2p+UsRP84O-Hq=bXYQv2wBJyfELGA@mail.gmail.com>
+ <1332173578-27422-6-git-send-email-j-pihet@ti.com>
+ <87k41dkks0.fsf@ti.com>
+Message-ID: <CAORVsuXO5jxBZOEjTpJ4NTwOugmkK2JdsPE6yU_HbJ6iSALSGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Kevin,
 
-Adding Keerthy J
-
-On Wed, Apr 18, 2012 at 7:27 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Hi Jean,
+On Wed, Apr 18, 2012 at 7:33 PM, Kevin Hilman <khilman@ti.com> wrote:
+> +Benoit
 >
 > jean.pihet at newoldbits.com writes:
 >
 >> From: Jean Pihet <j-pihet@ti.com>
 >>
->> Move some functions from mach-omap2/ dir to the plat/ dir.
->> The SmartReflex class driver is a user of the basic voltage domains
->> functions (enable, disable, reset).
+>> Change the name field value to better reflect the smartreflex
+>> integration in the system
 >>
 >> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->> Cc: Kevin Hilman <khilman@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? ?8 ++++----
+>> ?arch/arm/mach-omap2/smartreflex.c ? ? ? ? ?| ? ?2 +-
+>> ?2 files changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>> index d7d4c70..40f57c4 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>> @@ -2751,7 +2751,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr1_slaves[] = {
+>> ?};
+>>
+>> ?static struct omap_hwmod omap34xx_sr1_hwmod = {
+>> - ? ? .name ? ? ? ? ? = "sr1",
+>> + ? ? .name ? ? ? ? ? = "mpu_iva",
 >
-> Rather than expose the VP functions directly, how about adding a new API
-> at the voltdm layer to start/stop AVS. ?Maybe something like:
+> Should this be "smartreflex_mpu_iva"?
 >
-> ?voltdm_avs_start(struct voltagedomain *voltdm)
-> ?voltdm_avs_stop(struct voltagedomain *voltdm)
+> The OMAP4 SR hwmods have a 'smartreflex_' prefix which seems better.
 >
-> These will internally just call VP enable/disable for now, but we may
-> have more to add to these in the future to support other SR classes.
-Agree.
-That would be a first step in the definition of the API between SR and
-VP. Implementing other SR classes might require more than that, this
-is still under investigation for now.
+>> ? ? ? .class ? ? ? ? ?= &omap34xx_smartreflex_hwmod_class,
+>> ? ? ? .main_clk ? ? ? = "sr1_fck",
+>> ? ? ? .prcm ? ? ? ? ? = {
+>> @@ -2775,7 +2775,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr1_slaves[] = {
+>> ?};
+>>
+>> ?static struct omap_hwmod omap36xx_sr1_hwmod = {
+>> - ? ? .name ? ? ? ? ? = "sr1",
+>> + ? ? .name ? ? ? ? ? = "mpu_iva",
+>> ? ? ? .class ? ? ? ? ?= &omap36xx_smartreflex_hwmod_class,
+>> ? ? ? .main_clk ? ? ? = "sr1_fck",
+>> ? ? ? .prcm ? ? ? ? ? = {
+>> @@ -2803,7 +2803,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr2_slaves[] = {
+>> ?};
+>>
+>> ?static struct omap_hwmod omap34xx_sr2_hwmod = {
+>> - ? ? .name ? ? ? ? ? = "sr2",
+>> + ? ? .name ? ? ? ? ? = "core",
+>> ? ? ? .class ? ? ? ? ?= &omap34xx_smartreflex_hwmod_class,
+>> ? ? ? .main_clk ? ? ? = "sr2_fck",
+>> ? ? ? .prcm ? ? ? ? ? = {
+>> @@ -2827,7 +2827,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr2_slaves[] = {
+>> ?};
+>>
+>> ?static struct omap_hwmod omap36xx_sr2_hwmod = {
+>> - ? ? .name ? ? ? ? ? = "sr2",
+>> + ? ? .name ? ? ? ? ? = "core",
+>> ? ? ? .class ? ? ? ? ?= &omap36xx_smartreflex_hwmod_class,
+>> ? ? ? .main_clk ? ? ? = "sr2_fck",
+>> ? ? ? .prcm ? ? ? ? ? = {
+>> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+>> index c18d47d..b2728a5 100644
+>> --- a/arch/arm/mach-omap2/smartreflex.c
+>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>> @@ -184,7 +184,7 @@ static void sr_set_regfields(struct omap_sr *sr)
+>> ? ? ? ? ? ? ? sr->err_weight = OMAP3430_SR_ERRWEIGHT;
+>> ? ? ? ? ? ? ? sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
+>> ? ? ? ? ? ? ? sr->accum_data = OMAP3430_SR_ACCUMDATA;
+>> - ? ? ? ? ? ? if (!(strcmp(sr->name, "sr1"))) {
+>> + ? ? ? ? ? ? if (!(strcmp(sr->name, "sr_mpu_iva"))) {
+>
+> Why the 'sr_' prefix?
+Historically the sr instance name is generated from hwmod name
+prepended with "sr_".
+I agree it is better to change the hwmod name and remove the "sr_"
+prefix from the sr init code.
 
+>
+>> ? ? ? ? ? ? ? ? ? ? ? sr->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
+>> ? ? ? ? ? ? ? ? ? ? ? sr->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
+>> ? ? ? ? ? ? ? } else {
 >
 > Kevin
->
 
-Thanks for reviewing,
+Thanks,
 Jean
