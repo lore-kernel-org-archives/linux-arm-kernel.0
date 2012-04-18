@@ -1,33 +1,21 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Apr 2012 13:33:55 +0200
-Subject: [PATCH 34/40] ARM: imx6: implement clocks using common clock
- framework
-In-Reply-To: <1334065553-7565-35-git-send-email-s.hauer@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-35-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120418113355.GO20478@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 18 Apr 2012 13:38:51 +0200
+Subject: [PATCH v2 1/2] pinctrl: show pin name when request pins
+In-Reply-To: <1334646046-467-1-git-send-email-b29396@freescale.com>
+References: <1334646046-467-1-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdaBUDmHhq=Cr17F9TTy=Qp+RQaVj=N2BCExZBTYsU9Z6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Tue, Apr 17, 2012 at 9:00 AM, Dong Aisheng <b29396@freescale.com> wrote:
 
-> +
-> +static const char * const clks_init_on[] __initconst = {
-> +	"mmdc_ch0_axi", "mmdc_ch1_axi", "uart_ipg", "uart_serial",
-> +};
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+>
+> Pin name is more useful to users.
+>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-I assume uart_ipg and uart_serial is here for the earlyprintk case. This
-is not needed anymore. earlyprintk depends on an enabled uart anyway, so
-we can safely assume that the clock is turned on when Linux starts. The
-clock framework will disable the clock in a late initcall, long after
-the real driver has taken over and enabled the clock.
+Thanks, applied with Stephen's ACK.
 
-I'll fix that on my side.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
