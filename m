@@ -1,19 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Apr 2012 13:04:15 +0000
-Subject: [PATCH 7/7] MMC: mmci: Add required documentation for Device Tree
- bindings
-In-Reply-To: <1333619748-16126-8-git-send-email-lee.jones@linaro.org>
-References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
- <1333619748-16126-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <201204181304.15807.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 18 Apr 2012 09:16:35 -0400
+Subject: [PATCH V5 0/4] ARM: Kirkwood: Add support for DNS-320 and
+ DNS-325 using devicetree
+In-Reply-To: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
+References: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120418131635.GK15711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 April 2012, Lee Jones wrote:
-> This provides full documentation detailing each compulsory,
-> optional and device (variant) specific properties available
-> for use within the MMCI Device Tree.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Apr 18, 2012 at 11:06:39AM +0100, Jamie Lentin wrote:
+> Reworked patch for latest feedback. I'm still basing this on Jason Cooper's
+> tree, given how much time has passed should I be rebasing against something
+> else or is this still fine?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Typically, work should be based against a stable tag.  In this case, the
+changes in my branch were merged in for 3.4-rc1, so you could base from
+there.
+
+It's fine the way it is, I'll let you know if I run into any problems.
+
+> One thing I noticed is that with only the first patch applied (which no
+> longer calls kirkwood_nand_init) the device either locks up or serial console
+> dies at "Gating clock of unused units", presumably as CGC_RUNIT isn't set.
+> Is this something known or is it worth further investigation?
+
+That could potentially mess up a future bisect.  However, it would only
+crop up for dnskw boards.  I'll let Grant weigh in on this since he's
+the one who asked that the nand init be removed.
+
+thx,
+
+Jason.
