@@ -1,144 +1,66 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 18 Apr 2012 11:18:24 +0200
-Subject: [PATCH 1/1] arm/dts: Tegra30: Add device tree support for SMMU
-In-Reply-To: <201204180731.54064.arnd@arndb.de>
-References: <20120418054140.GA17506@avionic-0098.adnet.avionic-design.de><20120418.094448.2234414220947028341.hdoyu@nvidia.com><201204180731.54064.arnd@arndb.de>
-Message-ID: <20120418.121824.1894043789811063795.hdoyu@nvidia.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 18 Apr 2012 11:20:19 +0200
+Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
+In-Reply-To: <20120418090551.GA30966@shlinux2.ap.freescale.net>
+References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
+ <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+ <4F73CCC6.6000001@freescale.com>
+ <20120329064320.GA20840@pengutronix.de>
+ <20120418090551.GA30966@shlinux2.ap.freescale.net>
+Message-ID: <20120418092019.GB2232@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCH 1/1] arm/dts: Tegra30: Add device tree support for SMMU
-Date: Wed, 18 Apr 2012 09:31:53 +0200
-Message-ID: <201204180731.54064.arnd@arndb.de>
-
-> On Wednesday 18 April 2012, Hiroshi Doyu wrote:
-> > If we can consider IOMMU as one of the implementation of DMA(Direct
-> > Memory Access), the prefix "dma-(window)" may make sense here. Then,
-> > we don't have to introduce a new concept "IO virtual address(iova)" in
-> > addition to the existing "bus address"(?)
-> > 
-> > Anyway, either name would be ok for me;)
+On Wed, Apr 18, 2012 at 05:05:52PM +0800, Dong Aisheng wrote:
+> Hi Wolfram,
 > 
-> I would just use dma-window, without the "ibm," prefix but following the
-> same conventions. Note that the of_parse_dma_window function is currently
-> only defined in powerpc specific code, and should get moved to
-> drivers/of from arch/powerpc/kernel/prom_parse.c.
+> On Thu, Mar 29, 2012 at 08:43:20AM +0200, Wolfram Sang wrote:
+> > Hi,
+> > 
+> > > >  include/linux/stmp_device.h |   20 +++++++++++
+> > > IMHO, this header should be placed at include/linux/fsl/.
+> > 
+> > Hmm, one never knows if somewhen in the future some other vendor decides to do
+> > do a device with this register layout. It is just a layout, not an IP core per
+> > se. So, I'd prefer to leave it as is.
+> > 
+> 
+> Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Something like below?
+Thanks!
 
-At least, I verified that this works with "tegra-smmu".
+> 
+> I'm converting mxs-dma driver to be mach-independent which also needs
+> this patch.
+> 
+> Do you know when this will be merged?
 
->From 67c1dd493637c9e972d04e061a8e67049687021a Mon Sep 17 00:00:00 2001
-From: Hiroshi DOYU <hdoyu@nvidia.com>
-Date: Wed, 18 Apr 2012 12:09:03 +0300
-Subject: [PATCH 1/1] dt: Add general DMA window parser
+Nope. I assumed it could go in via arm-soc, since it makes sense and
+Arnd used to comment this series. He is probably busy, currently.
 
-This code was stolen from:
-	"arch/microblaze/kernel/prom_parse.c"
-	"arch/powerpc/kernel/prom_parse.c"
+> BTW, one small question:
+> Is it possible that stmp_reset_block also be used by other vendors?
 
-Once "ibm," prefix is removed from dts file. This generic one could
-replace the originals.
+Sure, why not? I could ask a friend to to do an FPGA for me with this
+layout.
 
-Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
----
- drivers/of/Kconfig         |    4 ++++
- drivers/of/Makefile        |    1 +
- drivers/of/of_dma.c        |   35 +++++++++++++++++++++++++++++++++++
- include/linux/of_address.h |   10 ++++++++++
- 4 files changed, 50 insertions(+), 0 deletions(-)
+> If not, i guess include/linux/fsl which already exists may be the
+> right place.
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index dfba3e6..3b0298b 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -83,4 +83,8 @@ config OF_MTD
- 	depends on MTD
- 	def_bool y
- 
-+config OF_DMA
-+	depends on HAS_DMA
-+	def_bool y
-+
- endmenu # OF
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index e027f44..711ff5b 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -11,3 +11,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
- obj-$(CONFIG_OF_PCI)	+= of_pci.o
- obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
- obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-+obj-$(CONFIG_OF_DMA)	+= of_dma.o
-diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
-new file mode 100644
-index 0000000..1db1ccd
---- /dev/null
-+++ b/drivers/of/of_dma.c
-@@ -0,0 +1,35 @@
-+/*
-+ * Stealed from:
-+ *	"arch/microblaze/kernel/prom_parse.c"
-+ *	"arch/powerpc/kernel/prom_parse.c"
-+ */
-+
-+#include <linux/of_address.h>
-+
-+void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
-+		unsigned long *busno, unsigned long *phys, unsigned long *size)
-+{
-+	const u32 *dma_window;
-+	u32 cells;
-+	const unsigned char *prop;
-+
-+	dma_window = dma_window_prop;
-+
-+	/* busno is always one cell */
-+	if (busno)
-+		*busno = *(dma_window++);
-+
-+	prop = of_get_property(dn, "#dma-address-cells", NULL);
-+	if (!prop)
-+		prop = of_get_property(dn, "#address-cells", NULL);
-+
-+	cells = prop ? *(u32 *)prop : of_n_addr_cells(dn);
-+	*phys = of_read_number(dma_window, cells);
-+
-+	dma_window += cells;
-+
-+	prop = of_get_property(dn, "#dma-size-cells", NULL);
-+	cells = prop ? *(u32 *)prop : of_n_size_cells(dn);
-+	*size = of_read_number(dma_window, cells);
-+}
-+
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index 01b925a..2a0f7c6 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -21,6 +21,10 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
- extern const u32 *of_get_address(struct device_node *dev, int index,
- 			   u64 *size, unsigned int *flags);
- 
-+extern void of_parse_dma_window(struct device_node *dn,
-+		       const void *dma_window_prop, unsigned long *busno,
-+			       unsigned long *phys, unsigned long *size);
-+
- #ifndef pci_address_to_pio
- static inline unsigned long pci_address_to_pio(phys_addr_t addr) { return -1; }
- #define pci_address_to_pio pci_address_to_pio
-@@ -48,6 +52,12 @@ static inline const u32 *of_get_address(struct device_node *dev, int index,
- {
- 	return NULL;
- }
-+
-+static inline void of_parse_dma_window(struct device_node *dn,
-+		       const void *dma_window_prop, unsigned long *busno,
-+			       unsigned long *phys, unsigned long *size)
-+{
-+}
- #endif /* CONFIG_OF_ADDRESS */
- 
- 
+Which is a bad choice in my book. linux/dma would have been the proper
+thing for mxs-dma.h, I'd think.
+
+Regards,
+
+   Wolfram
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/e219cda9/attachment.sig>
