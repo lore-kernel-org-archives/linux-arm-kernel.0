@@ -1,44 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2012 11:26:39 +0100
-Subject: [PATCH 1/8] ARM: OMAP: fix DMA vs memory ordering
-In-Reply-To: <20120418101854.GV13842@arwen.pp.htv.fi>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRqN-0004b4-Me@rmk-PC.arm.linux.org.uk>
- <20120418101519.GU13842@arwen.pp.htv.fi>
- <20120418101733.GL25053@n2100.arm.linux.org.uk>
- <20120418101854.GV13842@arwen.pp.htv.fi>
-Message-ID: <20120418102639.GN25053@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 18 Apr 2012 12:29:40 +0200
+Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
+ both clk and hwmod
+In-Reply-To: <alpine.DEB.2.00.1204180406550.29048@utopia.booyaka.com>
+References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
+ <4F8E76C3.7080803@ti.com>
+ <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
+ <4F8E84DC.70600@ti.com>
+ <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
+ <4F8E8FF7.4000706@ti.com>
+ <alpine.DEB.2.00.1204180406550.29048@utopia.booyaka.com>
+Message-ID: <4F8E9794.5090403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 01:18:55PM +0300, Felipe Balbi wrote:
-> On Wed, Apr 18, 2012 at 11:17:33AM +0100, Russell King - ARM Linux wrote:
-> > Has anyone seen a problem (other than me when trying to get DMA engine
-> > working with omap-serial transmit paths) ?
-> 
-> probably not since omap-serial isn't using DMA anyway. Nevermind
+On 4/18/2012 12:12 PM, Paul Walmsley wrote:
+> On Wed, 18 Apr 2012, Cousson, Benoit wrote:
+>
+>> On 4/18/2012 11:40 AM, Paul Walmsley wrote:
+>>
+>>> Sounds like the patch to alter the warnings should be associated with this
+>>> clock cleanup series, then, since it sounds like it changes the
+>>> clockdomain control model.
+>>
+>> It just removes the modulemode clock nodes we were using so far. And since
+>> these nodes were the only ones with a clkdm on OMAP4, it is now complaining,
+>> because their parents clock does not have a clkdm.
+>
+> If that series doesn't change the model, then maybe the right fix is just
+> to associate those clocks with clockdomains in clock44xx_data.c, until the
+> model changes?
 
-... which is a good thing because the driver is rather broken for DMA
-support (take a look at what the set_termios() method does, and consider
-what happens if that function is called when there's DMA activity
-outstanding.)
+But the model is already different for OMAP4. Since the clkdm is 
+associated with the hwmod, we already ensure that the clkdm is properly 
+enabled before enabling the modulemode.
+In fact the clkdm associated with the fake modulemode clk node was 
+already useless for OMAP4 as soon as we had introduced the modulemode 
+support in hwmod.
 
-I've come to the conclusion that it's not worth the effort to try to
-convert omap-serial to DMAengine support.  Firstly, DMA support requires
-hardware assisted flow control to work - which it currently doesn't for
-many many reasons.  Not only because of wrong defines, but also because
-the programming examples in the OMAP4430 TRM is wrong.  You'd do much
-better going to the TI16C752B data sheet and seeing how the original IP
-was described.  Why TI didn't include a copy of that in the TRM...
+The only need for that today is for the few broken drivers that does use 
+the clock fmwk to enable the modulemode instead of using pm_runtime.
 
-Secondly, the problem I mention above wrt set_termios(), with the flow
-control fixed, results in a nice race condition causing the TX DMA to
-write into registers other than the FIFO data register, corrupting the
-UART configuration and halting system boot.
+> I looked up some of those clocks in the OMAP4430 TRM vX.  Most of them
+> would be associated with either a CM clockdomain or a PRM clockdomain. The
+> TRM does actually mention these two clockdomains.  Two examples (out of
+> several) that mention CD_PRM and CD_CM are Figure 3-58 "CD_L4_PER
+> Overview" and Figure 3-59 "CD_L3_INIT Overview".
+>
+> Of course, from the software's perspective, these associations would
+> effectively be no-ops, as they are on OMAP2/3; but they seem to match the
+> view of the hardware as described in the TRM, so at least they make sense.
 
-(I have a series of patches to fix the flow control issues, and this
-requires some work outside of the omap-serial driver to achieve that.
-I'll post those patches when they're fully ready.  At the moment, it's
-probably better to rip out all the hardware assisted flow control code
-from omap-serial so that we fall back on the standard software driven
-flow control.)
+Yeah, I'm just reluctant to add some more data in an already big file, 
+knowing that this information will be useless, just because a couple of 
+broken drivers does need that.
+
+What we plan to do with the migration to CCF is to keep these specific 
+nodes only for the broken drivers to highlight that these ones need to 
+be fixed. And thus only these nodes will need the clkdm information.
+
+Regards,
+Benoit
