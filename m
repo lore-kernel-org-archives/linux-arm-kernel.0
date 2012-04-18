@@ -1,69 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 20:03:42 +0200
-Subject: [PATCH 5/5] ARM: mx28evk: add mxs-dma dt support
-In-Reply-To: <1334753197-12032-6-git-send-email-b29396@freescale.com>
-References: <1334753197-12032-1-git-send-email-b29396@freescale.com>
- <1334753197-12032-6-git-send-email-b29396@freescale.com>
-Message-ID: <201204182003.43051.marex@denx.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 18 Apr 2012 20:03:59 +0200
+Subject: [PATCH v3 6/8] i2c-pnx.c: Use resources in platforms
+In-Reply-To: <1333528480-17134-7-git-send-email-stigge@antcom.de>
+References: <1333528480-17134-1-git-send-email-stigge@antcom.de>
+ <1333528480-17134-7-git-send-email-stigge@antcom.de>
+Message-ID: <20120418180359.GB2548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Dong Aisheng,
+On Wed, Apr 04, 2012 at 10:34:38AM +0200, Roland Stigge wrote:
+> As a precondition for device tree conversion, the platforms using i2c-pnx.c are
+> converted to using mem and irq resources instead of platform data.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Marek Vasut <marek.vasut@gmail.com>
-> Cc: Huang Shijie <b32955@freescale.com>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+I trust you and Arnd on the mach stuff. i2c looked okay, devm_*
+could have been used, but well... Applied to next.
 
-Reviewed-by: Marek Vasut <marex@denx.de>
-
-> ---
->  arch/arm/boot/dts/imx28.dtsi   |    4 ++--
->  arch/arm/mach-mxs/clock-mx28.c |    2 ++
->  2 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index d1f4f8c..5f61777 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -52,8 +52,8 @@
->  			};
-> 
->  			dma-apbh at 80004000 {
-> +				compatible = "fsl,imx28-dma-apbh";
->  				reg = <0x80004000 2000>;
-> -				status = "disabled";
->  			};
-> 
->  			perfmon at 80006000 {
-> @@ -115,8 +115,8 @@
->  			};
-> 
->  			dma-apbx at 80024000 {
-> +				compatible = "fsl,imx28-dma-apbx";
->  				reg = <0x80024000 2000>;
-> -				status = "disabled";
->  			};
-> 
->  			dcp at 80028000 {
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c
-> b/arch/arm/mach-mxs/clock-mx28.c index cca2cf7..9c926b6 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -652,6 +652,8 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("80074000.serial", NULL, uart_clk)
->  	_REGISTER_CLOCK("800f0000.ethernet", NULL, fec_clk)
->  	_REGISTER_CLOCK("800f4000.ethernet", NULL, fec_clk)
-> +	_REGISTER_CLOCK("80004000.dma-apbh", NULL, hbus_clk)
-> +	_REGISTER_CLOCK("80024000.dma-apbx", NULL, xbus_clk)
->  };
-> 
->  static int clk_misc_init(void)
-
-Best regards,
-Marek Vasut
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/1a060666/attachment.sig>
