@@ -1,59 +1,45 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 18 Apr 2012 14:17:17 -0700
-Subject: [PATCH 13/13] SPEAr: Call clk_prepare() before calling clk_enable
-In-Reply-To: <0c2dc6d1f11ac1cc4965b8e902d19fb356f0324b.1334660432.git.viresh.kumar@st.com>
+Date: Wed, 18 Apr 2012 14:22:06 -0700
+Subject: [PATCH 00/13] SPEAr: Move to common clock framework
+In-Reply-To: <20120418211303.GE3852@pengutronix.de>
 References: <cover.1334660431.git.viresh.kumar@st.com>
- <0c2dc6d1f11ac1cc4965b8e902d19fb356f0324b.1334660432.git.viresh.kumar@st.com>
-Message-ID: <CAJOA=zOKeSf5XvAAFgs=CnmzEWHRgNRT1FscGE0q-NHnxt8yrg@mail.gmail.com>
+ <201204171434.06178.arnd@arndb.de>
+ <CAJOA=zNnZXdEwdswj31WHDoWjvRGz0fYUb99R0U=Qq9kX0EZHQ@mail.gmail.com>
+ <20120418211303.GE3852@pengutronix.de>
+Message-ID: <CAJOA=zNPKrSSL5wjNBwL9qie5sGv9j=k3rSAmsjbK-6jfJwbgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 4:15 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> With common clock framework, it is must to call clk_{un}prepare() before/after
-> clk_{dis}enable. This patch fixes this for SPEAr timer.
+On Wed, Apr 18, 2012 at 2:13 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Apr 18, 2012 at 01:45:42PM -0700, Turquette, Mike wrote:
+>> On Tue, Apr 17, 2012 at 7:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 17 April 2012, Viresh Kumar wrote:
+>> >> SPEAr now supports common clock framework. This patchset contains changes
+>> >> related to this. It also contain few dependency commits for clock framework that
+>> >> are earlier sent separately.
+>> >>
+>> >> @Mike: It would be easiest to get these through ARM-SoC tree. So, would need
+>> >> your Acked-by on these patches. But firstly they must get reivewed :)
+>> >
+>> > We should agree on how we want to do the common clk patches for v3.5.
+>> > The two options I see are either we take all the patches that Mike
+>> > Acks into arm-soc, or Mike applies the patches in his own tree and
+>> > submits them to arm-soc. I think either way is fine for me, but
+>> > some people might feel strongly one way or another.
+>>
+>> I would prefer the latter (I maintain a branch and submit it). ?Is
+>> arm-soc still the right place for common clk patches in 3.5 and
+>> beyond? ?I don't mind hosting a branch for inclusion into linux-next
+>> and sending a pull request to Linus. ?There is nothing ARM-specific
+>> about the common framework.
 >
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
-> ?arch/arm/plat-spear/time.c | ? ?8 ++++----
-> ?1 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
-> index a3164d1..4f05d26 100644
-> --- a/arch/arm/plat-spear/time.c
-> +++ b/arch/arm/plat-spear/time.c
-> @@ -218,10 +218,10 @@ void __init spear_setup_timer(resource_size_t base, int irq)
-> ? ? ? ? ? ? ? ?goto err_iomap;
-> ? ? ? ?}
->
-> - ? ? ? ret = clk_enable(gpt_clk);
-> + ? ? ? ret = clk_prepare_enable(gpt_clk);
+> Either way is fine with me, but it's really important that all the
+> floating clock framework patches begin to materialize in a visible
+> branch.
 
-Where do you call clk_enable?  Further down in the code somewhere?
-
-Also does this change break git bisect for your platform?  Maybe you
-should move this change before patch 12/13 to prevent run-time
-breakage?
+Agreed.  I've been busy the last several days with some tasks besides
+common clk maintenance, but I'm going through all the patches now and
+will have a -next branch up soon on git.linaro.org.
 
 Regards,
 Mike
-
-> ? ? ? ?if (ret < 0) {
-> - ? ? ? ? ? ? ? pr_err("%s:couldn't enable gpt clock\n", __func__);
-> - ? ? ? ? ? ? ? goto err_clk;
-> + ? ? ? ? ? ? ? pr_err("%s:couldn't prepare-enable gpt clock\n", __func__);
-> + ? ? ? ? ? ? ? goto err_prepare_enable_clk;
-> ? ? ? ?}
->
-> ? ? ? ?spear_clockevent_init(irq);
-> @@ -229,7 +229,7 @@ void __init spear_setup_timer(resource_size_t base, int irq)
->
-> ? ? ? ?return;
->
-> -err_clk:
-> +err_prepare_enable_clk:
-> ? ? ? ?clk_put(gpt_clk);
-> ?err_iomap:
-> ? ? ? ?iounmap(gpt_base);
-> --
-> 1.7.9
->
