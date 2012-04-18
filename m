@@ -1,64 +1,140 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 18 Apr 2012 12:29:40 +0200
-Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
- both clk and hwmod
-In-Reply-To: <alpine.DEB.2.00.1204180406550.29048@utopia.booyaka.com>
-References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
- <4F8E76C3.7080803@ti.com>
- <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
- <4F8E84DC.70600@ti.com>
- <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
- <4F8E8FF7.4000706@ti.com>
- <alpine.DEB.2.00.1204180406550.29048@utopia.booyaka.com>
-Message-ID: <4F8E9794.5090403@ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 18 Apr 2012 12:36:29 +0200
+Subject: [PATCH 1/1] dt: Add general DMA window parser
+In-Reply-To: <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
+References: <20120418092613.GA8632@avionic-0098.mockup.avionic-design.de><20120418.131907.2172387798112620167.hdoyu@nvidia.com><20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120418.133629.1664781135413277375.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/18/2012 12:12 PM, Paul Walmsley wrote:
-> On Wed, 18 Apr 2012, Cousson, Benoit wrote:
->
->> On 4/18/2012 11:40 AM, Paul Walmsley wrote:
->>
->>> Sounds like the patch to alter the warnings should be associated with this
->>> clock cleanup series, then, since it sounds like it changes the
->>> clockdomain control model.
->>
->> It just removes the modulemode clock nodes we were using so far. And since
->> these nodes were the only ones with a clkdm on OMAP4, it is now complaining,
->> because their parents clock does not have a clkdm.
->
-> If that series doesn't change the model, then maybe the right fix is just
-> to associate those clocks with clockdomains in clock44xx_data.c, until the
-> model changes?
+From: Thierry Reding <thierry.reding@avionic-design.de>
+Subject: Re: [PATCH 1/1] dt: Add general DMA window parser
+Date: Wed, 18 Apr 2012 12:26:29 +0200
+Message-ID: <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
 
-But the model is already different for OMAP4. Since the clkdm is 
-associated with the hwmod, we already ensure that the clkdm is properly 
-enabled before enabling the modulemode.
-In fact the clkdm associated with the fake modulemode clk node was 
-already useless for OMAP4 as soon as we had introduced the modulemode 
-support in hwmod.
+> * PGP Signed by an unknown key
+> 
+> * Hiroshi Doyu wrote:
+> > +	cells = prop ? *(__be32 *)prop : of_n_addr_cells(dn);
+> 
+> I think this needs to be:
+> 
+> 	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
+> 
+> Only casting isn't enough, you need the bytes to be swapped.
 
-The only need for that today is for the few broken drivers that does use 
-the clock fmwk to enable the modulemode instead of using pm_runtime.
+Right. Try again. Sorry for spamming.
 
-> I looked up some of those clocks in the OMAP4430 TRM vX.  Most of them
-> would be associated with either a CM clockdomain or a PRM clockdomain. The
-> TRM does actually mention these two clockdomains.  Two examples (out of
-> several) that mention CD_PRM and CD_CM are Figure 3-58 "CD_L4_PER
-> Overview" and Figure 3-59 "CD_L3_INIT Overview".
->
-> Of course, from the software's perspective, these associations would
-> effectively be no-ops, as they are on OMAP2/3; but they seem to match the
-> view of the hardware as described in the TRM, so at least they make sense.
+>From 1ee8a9b3a839456b170af74b11a4304bfda965c4 Mon Sep 17 00:00:00 2001
+From: Hiroshi DOYU <hdoyu@nvidia.com>
+Date: Wed, 18 Apr 2012 12:09:03 +0300
+Subject: [PATCH 1/1] dt: Add general DMA window parser
 
-Yeah, I'm just reluctant to add some more data in an already big file, 
-knowing that this information will be useless, just because a couple of 
-broken drivers does need that.
+This code was stolen from:
+	"arch/microblaze/kernel/prom_parse.c"
+	"arch/powerpc/kernel/prom_parse.c"
 
-What we plan to do with the migration to CCF is to keep these specific 
-nodes only for the broken drivers to highlight that these ones need to 
-be fixed. And thus only these nodes will need the clkdm information.
+Once "ibm," prefix is removed from dts file. This generic one could
+replace the originals.
 
-Regards,
-Benoit
+Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+---
+ drivers/of/Kconfig         |    4 ++++
+ drivers/of/Makefile        |    1 +
+ drivers/of/of_dma.c        |   35 +++++++++++++++++++++++++++++++++++
+ include/linux/of_address.h |   10 ++++++++++
+ 4 files changed, 50 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index dfba3e6..3b0298b 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -83,4 +83,8 @@ config OF_MTD
+ 	depends on MTD
+ 	def_bool y
+ 
++config OF_DMA
++	depends on HAS_DMA
++	def_bool y
++
+ endmenu # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index e027f44..711ff5b 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -11,3 +11,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+ obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
++obj-$(CONFIG_OF_DMA)	+= of_dma.o
+diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
+new file mode 100644
+index 0000000..45c9e88
+--- /dev/null
++++ b/drivers/of/of_dma.c
+@@ -0,0 +1,35 @@
++/*
++ * Stolen from:
++ *	"arch/microblaze/kernel/prom_parse.c"
++ *	"arch/powerpc/kernel/prom_parse.c"
++ */
++
++#include <linux/of_address.h>
++
++void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
++		unsigned long *busno, unsigned long *phys, unsigned long *size)
++{
++	const __be32 *dma_window;
++	u32 cells;
++	const unsigned char *prop;
++
++	dma_window = dma_window_prop;
++
++	/* busno is always one cell */
++	if (busno)
++		*busno = be32_to_cpup(dma_window++);
++
++	prop = of_get_property(dn, "#dma-address-cells", NULL);
++	if (!prop)
++		prop = of_get_property(dn, "#address-cells", NULL);
++
++	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
++	*phys = of_read_number(dma_window, cells);
++
++	dma_window += cells;
++
++	prop = of_get_property(dn, "#dma-size-cells", NULL);
++	cells = prop ? be32_to_cpup(prop) : of_n_size_cells(dn);
++	*size = of_read_number(dma_window, cells);
++}
++
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 01b925a..2a0f7c6 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -21,6 +21,10 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
+ extern const u32 *of_get_address(struct device_node *dev, int index,
+ 			   u64 *size, unsigned int *flags);
+ 
++extern void of_parse_dma_window(struct device_node *dn,
++		       const void *dma_window_prop, unsigned long *busno,
++			       unsigned long *phys, unsigned long *size);
++
+ #ifndef pci_address_to_pio
+ static inline unsigned long pci_address_to_pio(phys_addr_t addr) { return -1; }
+ #define pci_address_to_pio pci_address_to_pio
+@@ -48,6 +52,12 @@ static inline const u32 *of_get_address(struct device_node *dev, int index,
+ {
+ 	return NULL;
+ }
++
++static inline void of_parse_dma_window(struct device_node *dn,
++		       const void *dma_window_prop, unsigned long *busno,
++			       unsigned long *phys, unsigned long *size)
++{
++}
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ 
+-- 
+1.7.5.4
