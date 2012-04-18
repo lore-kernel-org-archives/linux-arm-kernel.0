@@ -1,53 +1,141 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2012 20:42:24 +0100
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRsg-0004bX-4w@rmk-PC.arm.linux.org.uk>
- <CANrkHUajRzoCp7K8L3cJArWN3xdqpft8L4k-o4gFTRTo8nmhmg@mail.gmail.com>
- <20120418152956.GP25053@n2100.arm.linux.org.uk>
- <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
-Message-ID: <20120418194224.GS25053@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 21:50:33 +0200
+Subject: [PATCH 08/10] MXS: Add separate MXS EHCI HCD driver
+In-Reply-To: <1334771194-18688-9-git-send-email-marex@denx.de>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334771194-18688-1-git-send-email-marex@denx.de>
+ <1334771194-18688-9-git-send-email-marex@denx.de>
+Message-ID: <20120418195033.GA3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 09:05:56PM +0530, T Krishnamoorthy, Balaji wrote:
-> On Wed, Apr 18, 2012 at 8:59 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Apr 18, 2012 at 08:53:32PM +0530, T Krishnamoorthy, Balaji wrote:
-> >> Hi,
-> >>
-> >> drivers/mmc/host/omap.c is also using dma_mask should that also be removed
-> >
-> > Does this driver make use of this platform data?
-> >
-> > If so, it needs converting to DMA engine _before_ this patch (which is
-> > one reason why its a good idea to do these changes as separate patches...
-> > as I've done.) ?It means stuff like this can be slotted in as necessary
-> > in the patch order.
-> >
-> > I'm told that driver is OMAP2 only - I don't have any OMAP2 platforms to
-> > be able to test it on (I only have OMAP3 and OMAP4.)
+On Wed, Apr 18, 2012 at 07:46:32PM +0200, Marek Vasut wrote:
+> This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I tried to keep
+> this separate from the MXC EHCI to avoid further polution of the MXC EHCI,
+> though eventually these two might be merged.
 > 
-> Yes, this driver is for omap2420 and omap1 devices.
+> NOTE: I still haven't figured out how to enable/disable the disconnection
+> detector, it can't be enabled all the time, so I toggle PHY stuff from this
+> driver, which I doubt is correct.
+> 
 
-Looking at this driver, there seems to be some interaction between how
-the DMA is programmed for each part of the scatterlist, and how the
-MMC interface is programmed, specifically:
+[...]
 
-        frame = data->blksz;
-        if (cpu_is_omap15xx() && frame > 32)
-                frame = 32;
-        else if (frame > 64)
-                frame = 64;
-        frame >>= 1;
-        if (!(data->flags & MMC_DATA_WRITE)) {
-                buf = 0x800f | ((frame - 1) << 8);
-        } else {
-                buf = 0x0f80 | ((frame - 1) << 0);
-        }
-        OMAP_MMC_WRITE(host, BUF, buf);
+> +static int ehci_mxs_drv_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct imx_usb *data = pdev->dev.platform_data;
+> +	struct usb_hcd *hcd;
+> +	struct ehci_hcd *ehci;
+> +	struct usb_phy *phy;
+> +	int ret;
+> +
+> +	dev_info(dev, "Initializing i.MX28 USB Controller\n");
 
-Does this register have to be written on every scatterlist entry, or can
-it be written once@the start of request processing?
+This is not (only) i.MX28
+
+> +
+> +	if (!data) {
+> +		dev_err(dev, "USB Host platform data missing!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	/* Create HCD controller instance. */
+> +	hcd = usb_create_hcd(&ehci_mxs_hc_driver, dev, dev_name(dev));
+> +	if (!hcd) {
+> +		dev_err(dev, "Failed to create HCD instance!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	hcd->rsrc_start = data->mem_res->start;
+> +	hcd->rsrc_len = resource_size(data->mem_res);
+> +	hcd->regs = data->mem;
+> +	hcd->irq = data->irq;
+> +
+> +	clk_enable(data->clk);
+
+The clock shouldn't be here. move this to imx-otg.c
+
+> +
+> +	/* Wait for the controller to stabilize. */
+> +	mdelay(10);
+> +
+> +	ehci = hcd_to_ehci(hcd);
+> +
+> +	/* EHCI registers start at offset 0x100 */
+> +	ehci->caps = hcd->regs + 0x100;
+> +	ehci->regs = hcd->regs + 0x100 +
+> +		HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
+> +
+> +	platform_set_drvdata(pdev, hcd);
+> +
+> +	/* Initialize the transceiver */
+> +#ifdef CONFIG_USB_OTG_UTILS
+> +	phy = usb_get_transceiver();
+> +	if (!phy) {
+> +		dev_err(dev, "Unable to find transceiver.\n");
+> +		ret = -ENODEV;
+> +		goto err_phy;
+> +	}
+> +
+> +	ret = otg_set_host(phy->otg, &hcd->self);
+> +	if (ret < 0) {
+> +		dev_err(dev, "Unable to set transceiver host\n");
+> +		ret = -ENODEV;
+> +		goto err_phy_set_host;
+> +	}
+> +
+> +	ret = usb_phy_init(phy);
+> +	if (ret < 0) {
+> +		dev_err(dev, "Unable init transceiver\n");
+> +		ret = -ENODEV;
+> +		goto err_phy_init;
+> +	}
+> +#else
+> +	dev_info(dev, "USB_MXS_PHY must have CONFIG_USB_OTG_UTILS enabled\n");
+> +	goto err_phy;
+> +#endif
+
+If your code does not work without CONFIG_USB_OTG_UTILS then why doesn't
+the driver depend on this option?
+It doesn't matter, all code inside these ifdefs should go to imx-otg.c.
+
+> +
+> +	/* Set up the PORTSCx register */
+> +	ehci_writel(ehci, 0, &ehci->regs->port_status[0]);
+> +
+
+Should also be in imx-otg.c
+
+> +err_phy_init:
+> +err_phy_set_host:
+> +#ifdef CONFIG_USB_OTG_UTILS
+> +	if (phy)
+> +		usb_put_transceiver(phy);
+> +#endif
+> +err_phy:
+> +	clk_disable(data->clk);
+> +	usb_put_hcd(hcd);
+> +	return ret;
+> +}
+> +
+> +static int __exit ehci_mxs_drv_remove(struct platform_device *pdev)
+> +{
+> +	struct imx_usb *data = pdev->dev.platform_data;
+> +	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+> +	struct usb_phy *phy = usb_get_transceiver();
+> +
+> +	if (phy)
+> +		usb_phy_shutdown(phy);
+> +
+> +	usb_remove_hcd(hcd);
+
+usb_add_hcd is in imx-otg.c so usb_remove_hcd should be aswell.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
