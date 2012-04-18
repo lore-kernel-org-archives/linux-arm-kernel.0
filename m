@@ -1,16 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 19:46:28 +0200
-Subject: [PATCH 04/10] MXS: Add data shared between imx-usb and EHCI driver
+Date: Wed, 18 Apr 2012 19:46:29 +0200
+Subject: [PATCH 05/10] MXS: Add platform registration hooks for USB EHCI
 In-Reply-To: <1334771194-18688-1-git-send-email-marex@denx.de>
 References: <1334714869-19282-1-git-send-email-marex@denx.de>
  <1334771194-18688-1-git-send-email-marex@denx.de>
-Message-ID: <1334771194-18688-5-git-send-email-marex@denx.de>
+Message-ID: <1334771194-18688-6-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds common data shared between the MXS EHCI HCD driver
-and the imx-usb driver. These data allow passing clock and memory stuff
-from imx-usb driver into the host driver.
+Based on code by:
+Tony Lin <tony.lin@freescale.com>
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -27,36 +26,152 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- include/linux/fsl_devices.h |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-mxs/devices-mx28.h                |    4 ++
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-usb.c        |   78 +++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/devices-common.h |    9 +++
+ 5 files changed, 95 insertions(+)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
 
-diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
-index fffdf00..a1ed1a8 100644
---- a/include/linux/fsl_devices.h
-+++ b/include/linux/fsl_devices.h
-@@ -18,6 +18,7 @@
- #define _FSL_DEVICE_H_
+diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+index 9dbeae1..f1a76d7 100644
+--- a/arch/arm/mach-mxs/devices-mx28.h
++++ b/arch/arm/mach-mxs/devices-mx28.h
+@@ -47,6 +47,10 @@ extern const struct mxs_mxs_mmc_data mx28_mxs_mmc_data[] __initconst;
  
- #include <linux/types.h>
-+#include <linux/platform_device.h>
+ #define mx28_add_mxs_pwm(id)		mxs_add_mxs_pwm(MX28_PWM_BASE_ADDR, id)
  
- /*
-  * Some conventions on how we handle peripherals on Freescale chips
-@@ -97,6 +98,15 @@ struct fsl_usb2_platform_data {
- 	u32		pm_usbgenctrl;
- };
- 
-+struct imx_usb {
-+	struct platform_device	*pdev;
++extern const struct mxs_usbh_data mx28_mxs_usbh_data[] __initconst;
++#define mx28_add_mxs_usbh(id) \
++	mxs_add_mxs_usbh(&mx28_mxs_usbh_data[id])
 +
-+	struct clk		*clk;
-+	struct resource		*mem_res;
-+	void __iomem		*mem;
-+	int			irq;
+ struct platform_device *__init mx28_add_mxsfb(
+ 		const struct mxsfb_platform_data *pdata);
+ 
+diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+index b8913df..f6709bc 100644
+--- a/arch/arm/mach-mxs/devices/Kconfig
++++ b/arch/arm/mach-mxs/devices/Kconfig
+@@ -32,3 +32,6 @@ config MXS_HAVE_PLATFORM_MXS_SAIF
+ 
+ config MXS_HAVE_PLATFORM_RTC_STMP3XXX
+ 	bool
++
++config MXS_HAVE_PLATFORM_USB
++	bool
+diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+index c8f5c95..be4cc9e 100644
+--- a/arch/arm/mach-mxs/devices/Makefile
++++ b/arch/arm/mach-mxs/devices/Makefile
+@@ -11,3 +11,4 @@ obj-y += platform-gpio-mxs.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_MXSFB) += platform-mxsfb.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_SAIF) += platform-mxs-saif.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_RTC_STMP3XXX) += platform-rtc-stmp3xxx.o
++obj-$(CONFIG_MXS_HAVE_PLATFORM_USB) += platform-usb.o
+diff --git a/arch/arm/mach-mxs/devices/platform-usb.c b/arch/arm/mach-mxs/devices/platform-usb.c
+new file mode 100644
+index 0000000..a76e015
+--- /dev/null
++++ b/arch/arm/mach-mxs/devices/platform-usb.c
+@@ -0,0 +1,78 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++
++#include <linux/compiler.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/fsl_devices.h>
++
++#include <mach/mx23.h>
++#include <mach/mx28.h>
++#include <mach/devices-common.h>
++
++#define mxs_usbh_data_entry_single(soc, _id, hwid)			\
++	{								\
++		.id = _id,						\
++		.usb_irq = soc ## _INT_USB ## hwid,			\
++		.usb_iobase = soc ## _USBCTRL ## hwid ## _BASE_ADDR,	\
++		.phy_iobase = soc ## _USBPHY ## hwid ## _BASE_ADDR,	\
++	}
++
++#define mxs_usbh_data_entry(soc, _id, hwid)				\
++	[_id] = mxs_usbh_data_entry_single(soc, _id, hwid)
++
++#ifdef CONFIG_SOC_IMX23
++const struct mxs_usbh_data mx23_mxs_usbh_data[] __initconst = {
++	mxs_usbh_data_entry(MX23, 0, 0),
 +};
++#endif
 +
- /* Flags in fsl_usb2_mph_platform_data */
- #define FSL_USB2_PORT0_ENABLED	0x00000001
- #define FSL_USB2_PORT1_ENABLED	0x00000002
++#ifdef CONFIG_SOC_IMX28
++const struct mxs_usbh_data mx28_mxs_usbh_data[] __initconst = {
++	mxs_usbh_data_entry(MX28, 0, 0),
++	mxs_usbh_data_entry(MX28, 1, 1),
++};
++#endif
++
++void __init mxs_add_mxs_usbh(const struct mxs_usbh_data *data)
++{
++	struct platform_device *pdev;
++	struct resource phy_res[] = {
++		{
++			.start	= data->phy_iobase,
++			.end	= data->phy_iobase + SZ_256 - 1,
++			.flags	= IORESOURCE_MEM,
++		},
++	};
++
++	struct resource usb_res[] = {
++		{
++			.start	= data->usb_iobase,
++			.end	= data->usb_iobase + SZ_64K - 1,
++			.flags	= IORESOURCE_MEM,
++		}, {
++			.start	= data->usb_irq,
++			.end	= data->usb_irq,
++			.flags	= IORESOURCE_IRQ,
++		},
++	};
++
++	pdev = mxs_add_platform_device_dmamask("mxs-usb-phy", data->id,
++					phy_res, ARRAY_SIZE(phy_res),
++					NULL, 0,
++					DMA_BIT_MASK(32));
++	if (!pdev)
++		pr_err("Failed to register USB PHY driver!\n");
++
++	pdev = mxs_add_platform_device_dmamask("imx-usb", data->id,
++					usb_res, ARRAY_SIZE(usb_res),
++					NULL, 0,
++					DMA_BIT_MASK(32));
++	if (!pdev)
++		pr_err("Failed to register USB Host driver!\n");
++}
+diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+index f2e3839..9f319b0 100644
+--- a/arch/arm/mach-mxs/include/mach/devices-common.h
++++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+@@ -42,6 +42,15 @@ struct mxs_auart_data {
+ struct platform_device *__init mxs_add_auart(
+ 		const struct mxs_auart_data *data);
+ 
++/* usb host */
++struct mxs_usbh_data {
++	int id;
++	resource_size_t usb_irq;
++	resource_size_t usb_iobase;
++	resource_size_t phy_iobase;
++};
++void __init mxs_add_mxs_usbh(const struct mxs_usbh_data *data);
++
+ /* fec */
+ #include <linux/fec.h>
+ struct mxs_fec_data {
 -- 
 1.7.9.5
