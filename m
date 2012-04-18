@@ -1,86 +1,117 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 18 Apr 2012 20:09:17 +0200
-Subject: [PATCH v3 8/8] i2c: Add device tree support to i2c-pnx.c
-In-Reply-To: <1333528480-17134-9-git-send-email-stigge@antcom.de>
-References: <1333528480-17134-1-git-send-email-stigge@antcom.de>
- <1333528480-17134-9-git-send-email-stigge@antcom.de>
-Message-ID: <20120418180917.GD2548@pengutronix.de>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Wed, 18 Apr 2012 13:09:41 -0500
+Subject: [PATCH v2] iommu: OMAP: device detach on domain destroy
+Message-ID: <1334772581-32015-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 10:34:40AM +0200, Roland Stigge wrote:
-> This patch adds device tree support to the pnx-i2c driver by using platform
-> resources for memory region and irq and removing dependency on mach includes.
-> 
-> The following platforms are affected:
-> 
-> * PNX
-> * LPC31xx (WIP)
-> * LPC32xx
-> 
-> The patch is based on a patch by Jon Smirl, working on lpc31xx integration
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+'domain_destroy with devices attached' case isn't yet handled, instead
+code assumes that the device was already detached.
 
-I added devicetree-discuss to the (quite long) CC list. I am not sure
-about all of the bindings.
+If the domain is destroyed the hardware still has access to invalid
+pointers to its page table and internal iommu object. In order to
+detach the users we need to track devices using the iommu, current
+use cases only have one user of iommu per instance. When required
+this can evolve to a list with the devices using the iommu_dev.
 
-> 
-> ---
-> 
->  Applies to v3.4-rc1
-> 
->  Documentation/devicetree/bindings/i2c/pnx.txt |   40 ++++++++++++++++
->  drivers/i2c/busses/i2c-pnx.c                  |   65 +++++++++++++++++++-------
->  include/linux/i2c-pnx.h                       |    1 
->  3 files changed, 89 insertions(+), 17 deletions(-)
-> 
-> --- /dev/null
-> +++ linux-2.6/Documentation/devicetree/bindings/i2c/pnx.txt
-> @@ -0,0 +1,40 @@
-> +* NXP PNX I2C Controller
-> +
-> +Required properties:
-> +
-> + - reg: Offset and length of the register set for the device
-> + - compatible: should be "nxp,pnx-i2c"
-> + - interrupts: configure one interrupt line
-> + - #address-cells: always 1 (for i2c addresses)
-> + - #size-cells: always 0
-> +
-> +Optional properties:
-> +
-> + - interrupt-parent: the phandle for the interrupt controller that
-> +   services interrupts for this device.
+Reported-by: Joerg Roedel <joro@8bytes.org>
+Reviewed-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+---
 
-That one is not optional, or? You always need it but in most cases it
-gets inherited as I understand.
+v2: rebased onto v3.4-rc2
 
-> + - clock-frequency: desired I2C bus clock frequency in Hz, Default: 100000 Hz
-> + - pnx,timeout: I2C bus timeout in milliseconds, Default: 10 ms
+ drivers/iommu/omap-iommu.c |   32 +++++++++++++++++++++++---------
+ 1 files changed, 23 insertions(+), 9 deletions(-)
 
-To devicetree-folks: Can we argue this is a hardware property of the
-bus? Then we could introduce a generic "timeout" property? I see, there
-is already "fsl,timeout", and it won't make sense to have that per
-vendor?
-
-> + - slave-addr: Address used by the controller, Hardware default: 110
-
-I'd prefer the hex value here, I2C addresses are mostly specified in
-hex.
-
-Regards,
-
-   Wolfram
-
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index 6899dcd..e70ee2b 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -41,11 +41,13 @@
+  * @pgtable:	the page table
+  * @iommu_dev:	an omap iommu device attached to this domain. only a single
+  *		iommu device can be attached for now.
++ * @dev:	Device using this domain.
+  * @lock:	domain lock, should be taken when attaching/detaching
+  */
+ struct omap_iommu_domain {
+ 	u32 *pgtable;
+ 	struct omap_iommu *iommu_dev;
++	struct device *dev;
+ 	spinlock_t lock;
+ };
+ 
+@@ -1081,6 +1083,7 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	}
+ 
+ 	omap_domain->iommu_dev = arch_data->iommu_dev = oiommu;
++	omap_domain->dev = dev;
+ 	oiommu->domain = domain;
+ 
+ out:
+@@ -1088,19 +1091,16 @@ out:
+ 	return ret;
+ }
+ 
+-static void omap_iommu_detach_dev(struct iommu_domain *domain,
+-				 struct device *dev)
++static void _omap_iommu_detach_dev(struct omap_iommu_domain *omap_domain,
++			struct device *dev)
+ {
+-	struct omap_iommu_domain *omap_domain = domain->priv;
+-	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
+ 	struct omap_iommu *oiommu = dev_to_omap_iommu(dev);
+-
+-	spin_lock(&omap_domain->lock);
++	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
+ 
+ 	/* only a single device is supported per domain for now */
+ 	if (omap_domain->iommu_dev != oiommu) {
+ 		dev_err(dev, "invalid iommu device\n");
+-		goto out;
++		return;
+ 	}
+ 
+ 	iopgtable_clear_entry_all(oiommu);
+@@ -1108,8 +1108,16 @@ static void omap_iommu_detach_dev(struct iommu_domain *domain,
+ 	omap_iommu_detach(oiommu);
+ 
+ 	omap_domain->iommu_dev = arch_data->iommu_dev = NULL;
++	omap_domain->dev = NULL;
++}
+ 
+-out:
++static void omap_iommu_detach_dev(struct iommu_domain *domain,
++				 struct device *dev)
++{
++	struct omap_iommu_domain *omap_domain = domain->priv;
++
++	spin_lock(&omap_domain->lock);
++	_omap_iommu_detach_dev(omap_domain, dev);
+ 	spin_unlock(&omap_domain->lock);
+ }
+ 
+@@ -1148,13 +1156,19 @@ out:
+ 	return -ENOMEM;
+ }
+ 
+-/* assume device was already detached */
+ static void omap_iommu_domain_destroy(struct iommu_domain *domain)
+ {
+ 	struct omap_iommu_domain *omap_domain = domain->priv;
+ 
+ 	domain->priv = NULL;
+ 
++	/*
++	 * An iommu device is still attached
++	 * (currently, only one device can be attached) ?
++	 */
++	if (omap_domain->iommu_dev)
++		_omap_iommu_detach_dev(omap_domain, omap_domain->dev);
++
+ 	kfree(omap_domain->pgtable);
+ 	kfree(omap_domain);
+ }
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/1cafc3d8/attachment-0001.sig>
+1.7.4.1
