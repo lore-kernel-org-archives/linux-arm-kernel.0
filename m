@@ -1,59 +1,119 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 18 Apr 2012 23:40:17 +0100 (BST)
-Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
- flag
-In-Reply-To: <8762cwhi29.fsf@free.fr>
-Message-ID: <1334788817.8003.YahooMailClassic@web29002.mail.ird.yahoo.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 Apr 2012 00:41:47 +0200
+Subject: [PATCH] ARM: nomadik: bump all IRQ numbers by one
+Message-ID: <1334788907-2113-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Wed, 18/4/12, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> > I had a quick look at arch/arm/mach-pxa/mioa701.c and
-> > noticed that it didn't call gpio_set_wake() for GPIO0.
-> > Does this help:
-> >
-> > diff --git a/arch/arm/mach-pxa/mioa701.c
-> b/arch/arm/mach-pxa/mioa701.c
-> > index 061d570..23190bf 100644
-> > --- a/arch/arm/mach-pxa/mioa701.c
-> > +++ b/arch/arm/mach-pxa/mioa701.c
-> > @@ -726,6 +726,7 @@ static void __init
-> mioa701_machine_init(void)
-> >? 
-> >? 
-> >? ???
-> pxa2xx_mfp_config(ARRAY_AND_SIZE(mioa701_pin_config));
-> > +??? gpio_set_wake(GPIO0_KEY_POWER, 1);
-> >? ??? pxa_set_ffuart_info(NULL);
-> >? ??? pxa_set_btuart_info(NULL);
-> >? ??? pxa_set_stuart_info(NULL);
-> 
-> Yes, the wakeup works again with the gpio_set_wake() call.
-> But that shouldn't be necessary. The legacy method that
-> worked, if I remember
-> correctly, was :
->  - suspend is triggered
->  - gpio_keys.c: gpio_keys_suspend() is called
->  - as mioa701 setup the platform data for gpio_keys_data as
-> :
-> ???MIO_KEY(KEY_EXIT, GPIO0_KEY_POWER, "Power
-> button", 1),
-> ? ???=> implies struct
-> gpio_keys_button has the button with .wakeup=1
-> ???This triggers in gpio_keys_suspend():
-> ? ? ? ? ? ? ? ?
-> ? ???->
-> enable_irq_wake(bdata->irq)
-> 
-> This enable_irq_wake() should in the end call
-> gpio_set_wake(0, 1), but apparently
-> it doesn't for some reason. This the part I have to check.
+Since the VIC was converted to use generic IRQ domains IRQ 0
+is silently ignored. This IRQ is used on the Nomadik so we're
+missing it now. Bump all IRQ numbers by one since they are
+now decoupled from the hardware IRQ numbers.
 
-I posted a question about that 6 days ago: whether the irq_chip
-irq_set_wake() handler (which is called from enable_irq_wake())
-should call gpio_set_wake():
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-nomadik/include/mach/irqs.h |   79 ++++++++++++++---------------
+ 1 files changed, 39 insertions(+), 40 deletions(-)
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-April/093953.html
-
-Regards,
-Paul
+diff --git a/arch/arm/mach-nomadik/include/mach/irqs.h b/arch/arm/mach-nomadik/include/mach/irqs.h
+index 8faabc5..ffa0deb 100644
+--- a/arch/arm/mach-nomadik/include/mach/irqs.h
++++ b/arch/arm/mach-nomadik/include/mach/irqs.h
+@@ -22,49 +22,49 @@
+ 
+ #include <mach/hardware.h>
+ 
+-#define IRQ_VIC_START		0	/* first VIC interrupt is 0 */
++#define IRQ_VIC_START		1	/* first VIC interrupt is 1 */
+ 
+ /*
+  * Interrupt numbers generic for all Nomadik Chip cuts
+  */
+-#define IRQ_WATCHDOG			0
+-#define IRQ_SOFTINT			1
+-#define IRQ_CRYPTO			2
+-#define IRQ_OWM				3
+-#define IRQ_MTU0			4
+-#define IRQ_MTU1			5
+-#define IRQ_GPIO0			6
+-#define IRQ_GPIO1			7
+-#define IRQ_GPIO2			8
+-#define IRQ_GPIO3			9
+-#define IRQ_RTC_RTT			10
+-#define IRQ_SSP				11
+-#define IRQ_UART0			12
+-#define IRQ_DMA1			13
+-#define IRQ_CLCD_MDIF			14
+-#define IRQ_DMA0			15
+-#define IRQ_PWRFAIL			16
+-#define IRQ_UART1			17
+-#define IRQ_FIRDA			18
+-#define IRQ_MSP0			19
+-#define IRQ_I2C0			20
+-#define IRQ_I2C1			21
+-#define IRQ_SDMMC			22
+-#define IRQ_USBOTG			23
+-#define IRQ_SVA_IT0			24
+-#define IRQ_SVA_IT1			25
+-#define IRQ_SAA_IT0			26
+-#define IRQ_SAA_IT1			27
+-#define IRQ_UART2			28
+-#define IRQ_MSP2			31
+-#define IRQ_L2CC			48
+-#define IRQ_HPI				49
+-#define IRQ_SKE				50
+-#define IRQ_KP				51
+-#define IRQ_MEMST			54
+-#define IRQ_SGA_IT			58
+-#define IRQ_USBM			60
+-#define IRQ_MSP1			62
++#define IRQ_WATCHDOG			1
++#define IRQ_SOFTINT			2
++#define IRQ_CRYPTO			3
++#define IRQ_OWM				4
++#define IRQ_MTU0			5
++#define IRQ_MTU1			6
++#define IRQ_GPIO0			7
++#define IRQ_GPIO1			8
++#define IRQ_GPIO2			9
++#define IRQ_GPIO3			10
++#define IRQ_RTC_RTT			11
++#define IRQ_SSP				12
++#define IRQ_UART0			13
++#define IRQ_DMA1			14
++#define IRQ_CLCD_MDIF			15
++#define IRQ_DMA0			16
++#define IRQ_PWRFAIL			17
++#define IRQ_UART1			18
++#define IRQ_FIRDA			19
++#define IRQ_MSP0			20
++#define IRQ_I2C0			21
++#define IRQ_I2C1			22
++#define IRQ_SDMMC			23
++#define IRQ_USBOTG			24
++#define IRQ_SVA_IT0			25
++#define IRQ_SVA_IT1			26
++#define IRQ_SAA_IT0			27
++#define IRQ_SAA_IT1			28
++#define IRQ_UART2			29
++#define IRQ_MSP2			30
++#define IRQ_L2CC			49
++#define IRQ_HPI				50
++#define IRQ_SKE				51
++#define IRQ_KP				52
++#define IRQ_MEMST			55
++#define IRQ_SGA_IT			59
++#define IRQ_USBM			61
++#define IRQ_MSP1			63
+ 
+ #define NOMADIK_SOC_NR_IRQS		64
+ 
+@@ -79,4 +79,3 @@
+ #define VIC_REG_IRQSR1		0x20
+ 
+ #endif /* __ASM_ARCH_IRQS_H */
+-
+-- 
+1.7.7.6
