@@ -1,42 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 18 Apr 2012 10:33:20 -0400
-Subject: [patch 1/1] kirkwood: Add iconnect support
-In-Reply-To: <871unlyze3.fsf@lebrac.rtp-net.org>
-References: <20120418104002.GA15924@lunn.ch>
- <871unlyze3.fsf@lebrac.rtp-net.org>
-Message-ID: <20120418143320.GM15711@titan.lakedaemon.net>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 18 Apr 2012 16:39:20 +0200
+Subject: [PATCH] i2c-at91: fix data-loss issue
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D0905D5A1AA@wm021.weinmann.com>
+References: <20120413103937.GH7154@arwen.pp.htv.fi>
+ <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
+ <EF2E73589CA71846A15D0B2CDF79505D0905D5A1AA@wm021.weinmann.com>
+Message-ID: <20120418143920.GA19802@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 02:53:40PM +0200, Arnaud Patard wrote:
-> Andrew Lunn <andrew@lunn.ch> writes:
-> 
-> Hi,
-> 
-> >> > + 
-> >> > +#define ICONNECT_BLINK_HALF_PERIOD   100
-> >> > +
-> >> > +static int iconnect_blink_set(unsigned gpio, int state,
-> >>
-> >>__init ?
-> >
-> > Hi Jason
-> >
-> > It is correct without __init. This function will get called when you
-> > play with /sys/class/leds/*/trigger.
-> >
-> > However, this is the second public instance of this function, it is
-> > also in mach-orion5x/dns323-setup.c.
-> 
-> yeah, I know. I initially planned to send a patchset adding iconnect
-> support and putting this function into something like gpio.c but I
-> forgot about it when converting my first iconnect patch into DT. Any
-> objection about sending a patch doing that once I manage to merge the
-> iconnect support (and of course, in this case, feel free to remind me
-> of it if I forget to do it ) ?
 
-I'd prefer to have the fixes first, then base new stuff off of the fix.
+> I'll repost the driver with your fix on positive feedback from you.
+> Thanks for tracking this down.
+> 
+> Ben, is there any chance to get this driver into next?
 
-thx,
+I think sending a new series would be good. It depends a bit on the amount
+of donated tags (Tested-by, especially) if it will make it into 3.5.
 
-Jason.
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/133c3334/attachment.sig>
