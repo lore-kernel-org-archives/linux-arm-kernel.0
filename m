@@ -1,43 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Apr 2012 15:52:23 +0200
-Subject: [PATCH 1/1] pinctrl: handle dummy state in core
-In-Reply-To: <20120418122832.GP20478@pengutronix.de>
-References: <1334586289-13078-1-git-send-email-b29396@freescale.com>
- <4F8C42D6.2000607@wwwdotorg.org>
- <20120417034210.GD17173@shlinux2.ap.freescale.net>
- <CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>
- <20120418122832.GP20478@pengutronix.de>
-Message-ID: <CACRpkdZw6iv=PjvvU4s5L8yV6813gCD7t8Vk-S66v-nXPaf+=Q@mail.gmail.com>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Wed, 18 Apr 2012 15:55:12 +0200
+Subject: [PATCH 0/2] ARM: OMAP: PM: remove the latency related functions from
+ the API
+Message-ID: <1334757314-29325-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 2:28 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+From: Jean Pihet <j-pihet@ti.com>
 
-> Currently Dong Aisheng is working on i.MX6, we have i.MX31, i.MX35,
-> i.MX51 and i.MX53 enabled in the same defconfig. Waiting for all
-> machines turn over at once to pinctrl is illusionary. We have to make
-> drivers work with and without pinctrl. We have a bunch of bad choices:
->
-> - create a dummy pinctrl for all boards which do not have real pinmux
-> ?support
+Remove the following functions from the OMAP PM API and the callers
+(currently only I2C driver):
+ omap_pm_set_max_mpu_wakeup_lat
+ omap_pm_set_max_dev_wakeup_lat
+ omap_pm_set_max_sdma_lat
+and updated the kernel Documentation accordingly.
 
-Viable compromise.
+The generic per-device PM QoS functions shall be used instead of the
+OMAP PM API, cf. include/linux/pm_qos.h and
+Documentation/power/pm_qos_interface.txt.
 
-> - ignore pinctrl_request errors in drivers.
+Based on the pm-qos branch of the linux-omap git tree (3.4.0-rc2) [1] with
+the changes for the functional power states [2] and the per-device PM
+QoS support for OMAP [3].
 
-Ugh. Not good.
+Tested cpuidle and suspend on OMAP3 Beagleboard (ES2.x) with constraints
+on MPU, CORE, PER in RETention and OFF modes.
 
-> - generate and return a dummy pinctrl in the core if no real pinctrl is
-> ?found.
->
-> (replace pinctrl with regulators or clocks, it's the same situation, and
-> it's not only i.MX specific)
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+[2] http://marc.info/?l=linux-omap&m=133475291911194&w=2
+[3] http://marc.info/?l=linux-omap&m=133475685213067&w=2
 
-Since we have dummy regulators, we should not break the design
-pattern creating more confusion.
 
-Stephen can you live with dummy pinctrl handles emitted by the
-core, if explictly enabled by a Kconfig option?
+Jean Pihet (2):
+  ARM: OMAP: convert I2C driver to PM QoS for latency constraints
+  ARM: OMAP: PM: remove the latency related functions from the API
 
-Yours,
-Linus Walleij
+ Documentation/arm/OMAP/omap_pm            |   68 ++++++--------------
+ arch/arm/plat-omap/i2c.c                  |   21 ------
+ arch/arm/plat-omap/include/plat/omap-pm.h |   99 -----------------------------
+ arch/arm/plat-omap/omap-pm-noop.c         |   88 -------------------------
+ drivers/i2c/busses/i2c-omap.c             |   28 +++++---
+ include/linux/i2c-omap.h                  |    1 -
+ 6 files changed, 38 insertions(+), 267 deletions(-)
+
+-- 
+1.7.7.6
