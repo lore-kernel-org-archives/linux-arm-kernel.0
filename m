@@ -1,42 +1,80 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 18 Apr 2012 04:53:58 -0600 (MDT)
-Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
- both clk and hwmod
-In-Reply-To: <4F8E9794.5090403@ti.com>
-References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
- <4F8E76C3.7080803@ti.com>
- <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
- <4F8E84DC.70600@ti.com>
- <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
- <4F8E8FF7.4000706@ti.com>
- <alpine.DEB.2.00.1204180406550.29048@utopia.booyaka.com>
- <4F8E9794.5090403@ti.com>
-Message-ID: <alpine.DEB.2.00.1204180448350.29048@utopia.booyaka.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 18 Apr 2012 12:54:23 +0200
+Subject: [PATCH 1/1] dt: Add general DMA window parser
+In-Reply-To: <20120418.133629.1664781135413277375.hdoyu@nvidia.com>
+References: <20120418092613.GA8632@avionic-0098.mockup.avionic-design.de>
+ <20120418.131907.2172387798112620167.hdoyu@nvidia.com>
+ <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
+ <20120418.133629.1664781135413277375.hdoyu@nvidia.com>
+Message-ID: <20120418105423.GA5667@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Apr 2012, Cousson, Benoit wrote:
+* Hiroshi Doyu wrote:
+> diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
+> new file mode 100644
+> index 0000000..45c9e88
+> --- /dev/null
+> +++ b/drivers/of/of_dma.c
+> @@ -0,0 +1,35 @@
+> +/*
+> + * Stolen from:
+> + *	"arch/microblaze/kernel/prom_parse.c"
+> + *	"arch/powerpc/kernel/prom_parse.c"
+> + */
+> +
+> +#include <linux/of_address.h>
+> +
+> +void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
+> +		unsigned long *busno, unsigned long *phys, unsigned long *size)
+> +{
+> +	const __be32 *dma_window;
+> +	u32 cells;
+> +	const unsigned char *prop;
 
-> But the model is already different for OMAP4.
+There's no need for this to be const unsigned char *, const void * will do
+just as well.
 
-We're running both models at the same time in mainline for OMAP4, 
-effectively.
+> +
+> +	dma_window = dma_window_prop;
+> +
+> +	/* busno is always one cell */
+> +	if (busno)
+> +		*busno = be32_to_cpup(dma_window++);
+> +
+> +	prop = of_get_property(dn, "#dma-address-cells", NULL);
+> +	if (!prop)
+> +		prop = of_get_property(dn, "#address-cells", NULL);
+> +
+> +	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
+> +	*phys = of_read_number(dma_window, cells);
 
-> Yeah, I'm just reluctant to add some more data in an already big file, 
-> knowing that this information will be useless, just because a couple of 
-> broken drivers does need that.
-> 
-> What we plan to do with the migration to CCF is to keep these specific 
-> nodes only for the broken drivers to highlight that these ones need to 
-> be fixed. And thus only these nodes will need the clkdm information.
+This should probably fail gracefully if phys == NULL, similar to what you do
+for busno.
 
-Sounds like after your series, we'll only take both approaches for the 
-broken drivers, and then just do the hwmod clockdomain sequence for the 
-majority?  That sounds reasonable to me.  We should probably log a warning 
-for those cases too.
+> +
+> +	dma_window += cells;
+> +
+> +	prop = of_get_property(dn, "#dma-size-cells", NULL);
+> +	cells = prop ? be32_to_cpup(prop) : of_n_size_cells(dn);
+> +	*size = of_read_number(dma_window, cells);
 
+Same here.
 
-regards,
+> +}
+> +
 
-- Paul
+And you might want to add a EXPORT_SYMBOL(of_parse_dma_window) here so the
+function can be used from modules.
+
+Sorry for having you go through another round. I should have looked more
+closely before.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/44c7e319/attachment-0001.sig>
