@@ -1,12 +1,40 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 18 Apr 2012 23:16:40 +0200
-Subject: [patch v2 2/3] orion/kirkwood: create a generic function for gpio led
- blinking
-References: <20120418211638.691400727@rtp-net.org>
-Message-ID: <20120418213147.402406405@rtp-net.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 18 Apr 2012 23:42:43 +0200
+Subject: [PATCH 3/3] ARM: mx28evk: Add SPI NOR flash support
+In-Reply-To: <20120403192653.GA2201@pengutronix.de>
+References: <1333480807-10480-1-git-send-email-festevam@gmail.com>
+ <1333480807-10480-3-git-send-email-festevam@gmail.com>
+ <20120403192653.GA2201@pengutronix.de>
+Message-ID: <201204182342.43269.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An embedded and charset-unspecified text was scrubbed...
-Name: orion_gpio_led_blink_set.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/157609cb/attachment.ksh>
+Dear Wolfram Sang,
+
+> Hi Fabio,
+> 
+> On Tue, Apr 03, 2012 at 04:20:07PM -0300, Fabio Estevam wrote:
+> > Add SPI NOR flash support.
+> > 
+> > By default, the mx28evk board does not come with a SPI NOR flash
+> > populated.
+> > 
+> > Soldered a sst25vf016b and tested it using mtd-utils.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> > I will submit the spi-mxs driver in a day or so.
+> 
+> \o/ Looking forward to that one!
+
+Hey, did you get anywhere with this?
+
+> However, I think this patch should include registering the spi-device as
+> well?
+> 
+> Regards,
+> 
+>    Wolfram
+
+Best regards,
+Marek Vasut
