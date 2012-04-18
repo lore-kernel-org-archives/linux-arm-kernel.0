@@ -1,45 +1,50 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 18 Apr 2012 10:09:39 +0200
-Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
- both clk and hwmod
-In-Reply-To: <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
-References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
-Message-ID: <4F8E76C3.7080803@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 18 Apr 2012 13:46:58 +0530
+Subject: [PATCH v4 2/2] regulator: add device tree support for max8997
+In-Reply-To: <20120417183829.GW6652@opensource.wolfsonmicro.com>
+References: <1332582590-16382-1-git-send-email-thomas.abraham@linaro.org>
+ <1332582590-16382-3-git-send-email-thomas.abraham@linaro.org>
+ <4F734460.4060605@samsung.com>
+ <CAJuYYwRsHynt6pBHUgk72Z-UjHj3DM=s4pV4dzbb2hTAZOUSAw@mail.gmail.com>
+ <20120417183829.GW6652@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwSg-VkWe=0PFNj2snX4+_fN7Lc1-YU1xdUvTM9uJvha7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Mark,
 
-On 4/12/2012 7:06 PM, Paul Walmsley wrote:
-> Hi
+On 18 April 2012 00:08, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Apr 18, 2012 at 12:05:59AM +0530, Thomas Abraham wrote:
+>> On 28 March 2012 22:33, Karol Lewandowski <k.lewandowsk@samsung.com> wrote:
 >
-> On Thu, 12 Apr 2012, Rajendra Nayak wrote:
+>> >> + ? ?For BUCK's:
 >
->> On OMAP4+, the clkdm association is moved to hwmod while on older OMAPs'
->> its associated with a clk.
+> No 's here, BTW.
+
+Ok.
+
 >
-> Sounds like this should be conditional based on the platform, then,
-> rather than weakening the warning for all platforms ?
+>> > ?- EN32KHz_AP
+>> > ?- EN32KHz_CP
+>> > ?- ENVICHG
+>> > ?- ESAFEOUT1
+>> > ?- ESAFEOUT2
+>> > ?- CHARGER
+>> > ?- CHARGER_CV
+>> > ?- CHARGER_TOPOFF
+>
+>> > I wonder if these should be mentioned in documentation too.
+>
+>> Yes, I missed the above regulators in the documentation. I have
+>> included them now and will resubmit this patch.
+>
+> Please omit the clocks; these are obviously a bodge due to the inability
+> to support clocks off-SoC so we shouldn't be enshrining them in the
+> device tree bindings.
 
-Well, as already discussed the clockdomain information is mostly useless 
-for most clock nodes because the HW is taking care of the dependencies, 
-so highlighting only the ones missing in hwmod is far from enough and 
-will avoid scaring people with something that is normal.
-
-Considering that OMAP4 clock domain partition is way more complex than 
-it was on OMAP2 & 3, if OMAP4 can leave without that, I doubt OMAP2 & 3 
-clock nodes will ever need it, except HW bugs, as usual.
-
-But still, it is an exception more than the regular case.
-
->> Hence look for a clkdm in both clk and hwmod and warn only when
->> its missing in both. Also fix the pr_warning() to print the correct
->> hwmod name.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-
-Acked-by: Benoit Cousson <b-cousson@ti.com>
+Thanks for the suggestion. I have removed EN32KHz_AP and EN32KHz_CP
+from the list. The rest are either voltage (fixed) or current
+regulators.
 
 Regards,
-Benoit
+Thomas.
