@@ -1,29 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Apr 2012 22:53:25 +0200
-Subject: [RFC 00/14] Convert Orion to generic clk framework
-In-Reply-To: <1334755830-17581-1-git-send-email-andrew@lunn.ch>
-References: <1334755830-17581-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20120418205325.GQ20478@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 18 Apr 2012 22:59:58 +0200
+Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
+ flag
+In-Reply-To: <1334777684.34148.YahooMailClassic@web29014.mail.ird.yahoo.com>
+ (Paul Parsons's message of "Wed, 18 Apr 2012 20:34:44 +0100 (BST)")
+References: <1334777684.34148.YahooMailClassic@web29014.mail.ird.yahoo.com>
+Message-ID: <8762cwhi29.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Paul Parsons <lost.distance@yahoo.com> writes:
 
-On Wed, Apr 18, 2012 at 03:30:16PM +0200, Andrew Lunn wrote:
-> The generic clock framework is still exhibiting some flux, so these
-> patches are RFC, against 3.4.0-rc3. The changes to the drivers will be
-> least effected by clk flux, while the last patch will probably be most
-> affected. There will also be minor merge conflicts with the DT work.
+> I had a quick look at arch/arm/mach-pxa/mioa701.c and
+> noticed that it didn't call gpio_set_wake() for GPIO0.
+> Does this help:
 >
+> diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+> index 061d570..23190bf 100644
+> --- a/arch/arm/mach-pxa/mioa701.c
+> +++ b/arch/arm/mach-pxa/mioa701.c
+> @@ -726,6 +726,7 @@ static void __init mioa701_machine_init(void)
+>  
+>  
+>  	pxa2xx_mfp_config(ARRAY_AND_SIZE(mioa701_pin_config));
+> +	gpio_set_wake(GPIO0_KEY_POWER, 1);
+>  	pxa_set_ffuart_info(NULL);
+>  	pxa_set_btuart_info(NULL);
+>  	pxa_set_stuart_info(NULL);
 
-For some reason your patches do not make it to the list. All we receive
-is the introdutory mail. This happened with your last orion clock series
-also.
+Yes, the wakeup works again with the gpio_set_wake() call.
+But that shouldn't be necessary. The legacy method that worked, if I remember
+correctly, was :
+ - suspend is triggered
+ - gpio_keys.c: gpio_keys_suspend() is called
+ - as mioa701 setup the platform data for gpio_keys_data as :
+   MIO_KEY(KEY_EXIT, GPIO0_KEY_POWER, "Power button", 1),
+     => implies struct gpio_keys_button has the button with .wakeup=1
+   This triggers in gpio_keys_suspend():
+                     -> enable_irq_wake(bdata->irq)
 
-Sascha
+This enable_irq_wake() should in the end call gpio_set_wake(0, 1), but apparently
+it doesn't for some reason. This the part I have to check.
+
+Cheers.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Robert
