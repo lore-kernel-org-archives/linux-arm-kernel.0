@@ -1,147 +1,247 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Apr 2012 15:33:53 +0200
-Subject: [PATCH 3/6] ARM: AT91: Add the ADC to the sam9g20ek board
+Date: Wed, 18 Apr 2012 15:33:56 +0200
+Subject: [PATCH 6/6] IIO: AT91: Add DT support to at91_adc driver
 In-Reply-To: <1334756036-15944-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1334756036-15944-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1334756036-15944-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1334756036-15944-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds platform data for the AT91 ADC driver support for
-the AT91SAM9G20-EK board.
-
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-at91/at91sam9260_devices.c |   53 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/board-sam9g20ek.c     |   13 +++++++
- drivers/staging/iio/adc/at91_adc.c       |    1 -
- 3 files changed, 66 insertions(+), 1 deletions(-)
+ .../devicetree/bindings/arm/atmel-adc.txt          |   21 +++++
+ drivers/staging/iio/adc/at91_adc.c                 |   88 +++++++++++++++-----
+ 2 files changed, 87 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/atmel-adc.txt
 
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 5652dde..758c629 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -17,6 +17,8 @@
- #include <linux/platform_device.h>
- #include <linux/i2c-gpio.h>
- 
-+#include <linux/platform_data/at91_adc.h>
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+new file mode 100644
+index 0000000..ac62847
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -0,0 +1,21 @@
++* AT91's Analog to Digital Converter (ADC)
 +
- #include <mach/board.h>
- #include <mach/cpu.h>
- #include <mach/at91sam9260.h>
-@@ -1369,6 +1371,57 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- void __init at91_add_device_cf(struct at91_cf_data * data) {}
- #endif
- 
-+/* --------------------------------------------------------------------
-+ *  ADCs
-+ * -------------------------------------------------------------------- */
++Required properties:
++  - compatible: Should be "atmel,at91-adc"
++  - reg: Should contain ADC registers location and length
++  - interrupts: Should contain the IRQ line for the ADC
++  - atmel,adc-use-external: Boolean to enable the muxing and the use of external
++    triggers
++  - atmel,adc-vref: Reference voltage in millivolts for the conversions
++  - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
++    device
 +
-+#if defined(CONFIG_AT91_ADC) || defined(CONFIG_AT91_ADC_MODULE)
-+static struct at91_adc_data adc_data;
-+
-+static struct resource adc_resources[] = {
-+	[0] = {
-+		.start	= AT91SAM9260_BASE_ADC,
-+		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= AT91SAM9260_ID_ADC,
-+		.end	= AT91SAM9260_ID_ADC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device at91_adc_device = {
-+	.name		= "at91_adc",
-+	.id		= -1,
-+	.dev		= {
-+				.platform_data		= &adc_data,
-+	},
-+	.resource	= adc_resources,
-+	.num_resources	= ARRAY_SIZE(adc_resources),
-+};
-+
-+void __init at91_add_device_adc(struct at91_adc_data *data)
-+{
-+	if (!data)
-+		return;
-+
-+	if (test_bit(0, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC0, 0);
-+	if (test_bit(1, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC1, 0);
-+	if (test_bit(2, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC2, 0);
-+	if (test_bit(3, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC3, 0);
-+
-+	adc_data = *data;
-+	platform_device_register(&at91_adc_device);
-+}
-+#else
-+void __init at91_add_device_adc(struct at91_adc_data *data) {}
-+#endif
-+
- /* -------------------------------------------------------------------- */
- /*
-  * These devices are always present and don't need any board-specific
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 8923ec9..2ce4e26 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -32,6 +32,8 @@
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/consumer.h>
- 
-+#include <linux/platform_data/at91_adc.h>
-+
- #include <mach/hardware.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -318,6 +320,15 @@ static void __init ek_add_device_buttons(void)
- static void __init ek_add_device_buttons(void) {}
- #endif
- 
-+/*
-+ * ADCs
-+ */
-+
-+static struct at91_adc_data ek_adc_data = {
-+	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3),
-+	.vref = 3300,
-+};
-+
- #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
- static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
- 	REGULATOR_SUPPLY("AVDD", "0-001b"),
-@@ -393,6 +404,8 @@ static void __init ek_board_init(void)
- 	ek_add_device_gpio_leds();
- 	/* Push Buttons */
- 	ek_add_device_buttons();
-+	/* ADCs */
-+	at91_add_device_adc(&ek_adc_data);
- 	/* PCK0 provides MCLK to the WM8731 */
- 	at91_set_B_periph(AT91_PIN_PC1, 0);
- 	/* SSC (for WM8731) */
++Examples:
++	adc at f804c000 {
++		compatible = "atmel,at91-adc";
++		reg = <0xf804c000 0x100>;
++		interrupts = <19 4>;
++		atmel,adc-use-external;
++		atmel,adc-channels-used = <0xff>;
++		atmel,adc-vref = <3300>;
++	};
 diff --git a/drivers/staging/iio/adc/at91_adc.c b/drivers/staging/iio/adc/at91_adc.c
-index 6d14277..9af036a 100644
+index 7c93cde..d655cba 100644
 --- a/drivers/staging/iio/adc/at91_adc.c
 +++ b/drivers/staging/iio/adc/at91_adc.c
-@@ -56,7 +56,6 @@ struct at91_adc_state {
- 
- static struct at91_adc_desc at91_adc_desc_sam9g20 = {
- 	.clock = 5000000,
--	.clock_name = "adc_clk",
- 	.num_channels = 4,
- 	.startup_time = 10,
+@@ -15,6 +15,8 @@
+ #include <linux/jiffies.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+ #include <linux/slab.h>
+@@ -81,6 +83,7 @@ struct at91_adc_state {
+ 	struct mutex		lock;
+ 	void __iomem		*reg_base;
+ 	struct iio_trigger	**trig;
++	bool			use_external;
+ 	u32			vref_mv;
+ 	wait_queue_head_t	wq_data_avail;
  };
+@@ -245,14 +248,13 @@ static irqreturn_t at91_adc_eoc_trigger(int irq, void *private)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int at91_adc_channel_init(struct iio_dev *idev,
+-				 struct at91_adc_data *pdata)
++static int at91_adc_channel_init(struct iio_dev *idev)
+ {
+ 	struct at91_adc_state *st = iio_priv(idev);
+ 	struct iio_chan_spec *chan_array;
+ 	int bit, idx = 0;
+ 
+-	idev->num_channels = bitmap_weight(&pdata->channels_used,
++	idev->num_channels = bitmap_weight(&st->channels_mask,
+ 					   st->desc->num_channels) + 1;
+ 
+ 	chan_array = devm_kzalloc(&idev->dev,
+@@ -262,7 +264,7 @@ static int at91_adc_channel_init(struct iio_dev *idev,
+ 	if (chan_array == NULL)
+ 		return -ENOMEM;
+ 
+-	for_each_set_bit(bit, &pdata->channels_used, st->desc->num_channels) {
++	for_each_set_bit(bit, &st->channels_mask, st->desc->num_channels) {
+ 		struct iio_chan_spec *chan = chan_array + idx;
+ 		chan->type = IIO_VOLTAGE;
+ 		chan->indexed = 1;
+@@ -400,8 +402,7 @@ static struct iio_trigger *at91_adc_allocate_trigger(struct iio_dev *idev,
+ 	return trig;
+ }
+ 
+-static int at91_adc_trigger_init(struct iio_dev *idev,
+-				 struct at91_adc_data *pdata)
++static int at91_adc_trigger_init(struct iio_dev *idev)
+ {
+ 	struct at91_adc_state *st = iio_priv(idev);
+ 	int i, ret;
+@@ -416,7 +417,7 @@ static int at91_adc_trigger_init(struct iio_dev *idev,
+ 	}
+ 
+ 	for (i = 0; st->desc->triggers[i].name != NULL; i++) {
+-		if (st->desc->triggers[i].is_external && !(pdata->use_external))
++		if (st->desc->triggers[i].is_external && !(st->use_external))
+ 			continue;
+ 
+ 		st->trig[i] = at91_adc_allocate_trigger(idev,
+@@ -555,6 +556,39 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+ 	return -EINVAL;
+ }
+ 
++static int at91_adc_probe_dt(struct at91_adc_state *st,
++			     struct platform_device *pdev)
++{
++	struct device_node *node = pdev->dev.of_node;
++
++	if (!node)
++		return -EINVAL;
++
++	if (of_get_property(node, "atmel,adc-use-external", NULL))
++		st->use_external = true;
++
++	of_property_read_u32(node, "atmel,adc-channels-used",
++			     (u32*)&st->channels_mask);
++	of_property_read_u32(node, "atmel,adc-vref", &st->vref_mv);
++
++	return 0;
++}
++
++static int at91_adc_probe_pdata(struct at91_adc_state *st,
++				struct platform_device *pdev)
++{
++	struct at91_adc_data *pdata = pdev->dev.platform_data;
++
++	if (!pdata)
++		return -EINVAL;
++
++	st->use_external = pdata->use_external;
++	st->vref_mv = pdata->vref;
++	st->channels_mask = pdata->channels_used;
++
++	return 0;
++}
++
+ static const struct iio_info at91_adc_info = {
+ 	.driver_module = THIS_MODULE,
+ 	.read_raw = &at91_adc_read_raw,
+@@ -567,12 +601,25 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 	struct iio_dev *idev;
+ 	struct at91_adc_state *st;
+ 	struct resource *res;
+-	struct at91_adc_data *pdata = pdev->dev.platform_data;
+ 
+-	if (!pdata) {
++	idev = iio_allocate_device(sizeof(struct at91_adc_state));
++	if (idev == NULL) {
++		ret = -ENOMEM;
++		goto error_ret;
++	}
++
++	st = iio_priv(idev);
++
++	if (pdev->dev.of_node) {
++		ret = at91_adc_probe_dt(st, pdev);
++	} else {
++		ret = at91_adc_probe_pdata(st, pdev);
++	}
++
++	if (ret) {
+ 		dev_err(&pdev->dev, "No platform data available.\n");
+ 		ret = -EINVAL;
+-		goto error_ret;
++		goto error_free_device;
+ 	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -582,12 +629,6 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 		goto error_ret;
+ 	}
+ 
+-	idev = iio_allocate_device(sizeof(struct at91_adc_state));
+-	if (idev == NULL) {
+-		ret = -ENOMEM;
+-		goto error_ret;
+-	}
+-
+ 	platform_set_drvdata(pdev, idev);
+ 
+ 	idev->dev.parent = &pdev->dev;
+@@ -595,7 +636,6 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 	idev->modes = INDIO_DIRECT_MODE;
+ 	idev->info = &at91_adc_info;
+ 
+-	st = iio_priv(idev);
+ 	ret = at91_adc_select_soc(st);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "SoC unknown\n");
+@@ -689,7 +729,7 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 			  (AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+ 
+ 	/* Setup the ADC channels available on the board */
+-	ret = at91_adc_channel_init(idev, pdata);
++	ret = at91_adc_channel_init(idev);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Couldn't initialize the channels.\n");
+ 		goto error_disable_clk;
+@@ -698,16 +738,13 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 	init_waitqueue_head(&st->wq_data_avail);
+ 	mutex_init(&st->lock);
+ 
+-	st->vref_mv = pdata->vref;
+-	st->channels_mask = pdata->channels_used;
+-
+ 	ret = at91_adc_buffer_init(idev);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Couldn't initialize the buffer.\n");
+ 		goto error_free_channels;
+ 	}
+ 
+-	ret = at91_adc_trigger_init(idev, pdata);
++	ret = at91_adc_trigger_init(idev);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Couldn't setup the triggers.\n");
+ 		goto error_unregister_buffer;
+@@ -766,11 +803,18 @@ static int __devexit at91_adc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id at91_adc_dt_ids[] = {
++	{ .compatible = "atmel,at91-adc" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, at91_adc_dt_ids);
++
+ static struct platform_driver at91_adc_driver = {
+ 	.probe = at91_adc_probe,
+ 	.remove = __devexit_p(at91_adc_remove),
+ 	.driver = {
+ 		   .name = "at91_adc",
++		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
+ 	},
+ };
+ 
 -- 
 1.7.5.4
