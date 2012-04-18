@@ -1,15 +1,12 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 04:07:46 +0200
-Subject: [PATCH 07/10] MXS: Add USB PHY driver
+Date: Wed, 18 Apr 2012 04:07:49 +0200
+Subject: [PATCH 10/10] MXS: Enable USB on MX28EVK
 In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
  <1334714869-19282-1-git-send-email-marex@denx.de>
-Message-ID: <1334714869-19282-8-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-11-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Add driver that controls the built-in USB PHY in the i.MX233/i.MX28. This
-enables the PHY upon powerup and shuts it down on shutdown.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -26,249 +23,57 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- drivers/usb/otg/Kconfig   |   10 +++
- drivers/usb/otg/Makefile  |    1 +
- drivers/usb/otg/mxs-phy.c |  201 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 212 insertions(+)
- create mode 100644 drivers/usb/otg/mxs-phy.c
+ arch/arm/mach-mxs/Kconfig        |    2 ++
+ arch/arm/mach-mxs/mach-mx28evk.c |   10 ++++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-index e7c6325..1de1495 100644
---- a/drivers/usb/otg/Kconfig
-+++ b/drivers/usb/otg/Kconfig
-@@ -122,6 +122,16 @@ config USB_IMX_COMPOSITE
- 	  Composite driver that handles clock and memory mapping for
- 	  i.MX USB host and USB PHY.
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 5b5566c..696e1d1 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -53,6 +53,8 @@ config MACH_MX28EVK
+ 	select MXS_HAVE_PLATFORM_MXS_SAIF
+ 	select MXS_HAVE_PLATFORM_MXS_I2C
+ 	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
++	select MXS_HAVE_PLATFORM_USB
++	select USB_ARCH_HAS_EHCI
+ 	select MXS_OCOTP
+ 	help
+ 	  Include support for MX28EVK platform. This includes specific
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index e386c14..8bdd416 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -37,6 +37,7 @@
+ #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
+ #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
+ #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
++#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
  
-+config USB_MXS_PHY
-+	tristate "Freescale i.MX28 USB PHY support"
-+	select USB_OTG_UTILS
-+	select USB_IMX_COMPOSITE
-+	help
-+	  Say Y here if you want to build Freescale i.MX28 USB PHY
-+	  driver in kernel.
+ #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
+ #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
+@@ -186,6 +187,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+ 
+ 	/* led */
+ 	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
++	/* usb1 */
++	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
+ 
+ 	/* I2C */
+ 	MX28_PAD_I2C0_SCL__I2C0_SCL |
+@@ -451,6 +454,13 @@ static void __init mx28evk_init(void)
+ 	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
+ 	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
+ 
++	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_OUT_INIT_HIGH,
++				"usb1-power-en");
++	if (ret)
++		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
 +
-+	  To compile this driver as a module, choose M here.
++	mx28_add_mxs_usbh(1);
 +
- config USB_MV_OTG
- 	tristate "Marvell USB OTG support"
- 	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
-diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
-index e3feaca..56700b3 100644
---- a/drivers/usb/otg/Makefile
-+++ b/drivers/usb/otg/Makefile
-@@ -21,4 +21,5 @@ obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
- fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
- obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
- obj-$(CONFIG_USB_IMX_COMPOSITE)	+= imx-usb.o
-+obj-$(CONFIG_USB_MXS_PHY)	+= mxs-phy.o
- obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
-diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
-new file mode 100644
-index 0000000..3c6c5a2
---- /dev/null
-+++ b/drivers/usb/otg/mxs-phy.c
-@@ -0,0 +1,201 @@
-+/*
-+ * drivers/usb/otg/mxs-phy.c
-+ *
-+ * Freescale i.MX28 USB PHY driver.
-+ *
-+ * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-+ * on behalf of DENX Software Engineering GmbH
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/usb/otg.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/fsl_devices.h>
-+
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/devices-common.h>
-+#include <mach/mx28.h>
-+
-+#define HW_USBPHY_PWD				0x00
-+
-+#define HW_USBPHY_CTRL				0x30
-+#define HW_USBPHY_CTRL_SET			0x34
-+#define HW_USBPHY_CTRL_CLR			0x38
-+#define HW_USBPHY_CTRL_TOG			0x3c
-+
-+#define BM_USBPHY_CTRL_SFTRST			(1 << 31)
-+#define BM_USBPHY_CTRL_CLKGATE			(1 << 30)
-+#define BM_USBPHY_CTRL_ENUTMILEVEL3		(1 << 15)
-+#define BM_USBPHY_CTRL_ENUTMILEVEL2		(1 << 14)
-+#define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	(1 << 1)
-+
-+static int phy_init(struct usb_phy *x)
-+{
-+	struct imx_usb_data *data = x->dev->platform_data;
-+	uint32_t val;
-+
-+	/* Enable clock to the PHY. */
-+	clk_enable(data->clk);
-+
-+	/* Reset the PHY block. */
-+	mxs_reset_block(data->mem + HW_USBPHY_CTRL);
-+
-+	/* Power up the PHY. */
-+	writel(0, data->mem + HW_USBPHY_PWD);
-+
-+	/* Enable FS/LS compatibility and HS disconnection detector. */
-+	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
-+		BM_USBPHY_CTRL_ENHOSTDISCONDETECT;
-+	writel(val, data->mem + HW_USBPHY_CTRL_SET);
-+
-+	return 0;
-+}
-+
-+static void phy_shutdown(struct usb_phy *x)
-+{
-+	struct imx_usb_data *data = x->dev->platform_data;
-+
-+	/* Gate off the PHY. */
-+	writel(BM_USBPHY_CTRL_CLKGATE, data->mem + HW_USBPHY_CTRL_SET);
-+
-+	/* Disable clock to the PHY. */
-+	clk_disable(data->clk);
-+}
-+
-+static int phy_set_vbus(struct usb_otg *otg, bool enabled)
-+{
-+	struct usb_phy *x = otg->phy;
-+	struct imx_usb_data *data = x->dev->platform_data;
-+
-+	if (enabled)
-+		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-+			data->mem + HW_USBPHY_CTRL_CLR);
-+	else
-+		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-+			data->mem + HW_USBPHY_CTRL_SET);
-+
-+	return 0;
-+}
-+
-+static int __devinit mxs_phy_probe(struct platform_device *pdev)
-+{
-+	struct imx_usb_data *data = pdev->dev.platform_data;
-+	struct usb_phy *phy;
-+	int ret;
-+
-+	if (!data) {
-+		dev_err(&pdev->dev, "USB PHY platform data missing!\n");
-+		return -ENODEV;
-+	}
-+
-+	/* Allocate PHY driver's private date. */
-+	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
-+	if (!phy) {
-+		dev_err(&pdev->dev, "Failed to allocate USB PHY structure!\n");
-+		ret = -ENOMEM;
-+		goto err_alloc_phy;
-+
-+	}
-+
-+	phy->otg = kzalloc(sizeof(*phy->otg), GFP_KERNEL);
-+	if (!phy->otg) {
-+		dev_err(&pdev->dev, "Failed to allocate USB OTG structure!\n");
-+		ret = -ENOMEM;
-+		goto err_alloc_otg;
-+	}
-+
-+	/* Setup the PHY structures. */
-+	phy->dev		= &pdev->dev;
-+	phy->label		= "mxs-usb-phy";
-+	phy->init		= phy_init;
-+	phy->shutdown		= phy_shutdown;
-+	phy->state		= OTG_STATE_A_HOST;
-+
-+	phy->otg->phy		= phy;
-+	phy->otg->set_vbus	= phy_set_vbus;
-+
-+	platform_set_drvdata(pdev, phy);
-+
-+	ATOMIC_INIT_NOTIFIER_HEAD(&phy->notifier);
-+
-+	/* Register the transceiver with kernel. */
-+	ret = usb_set_transceiver(phy);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't register transceiver, (%d)\n", ret);
-+		goto err_set_transceiver;
-+	}
-+
-+	return 0;
-+
-+err_set_transceiver:
-+	platform_set_drvdata(pdev, NULL);
-+	kfree(phy->otg);
-+err_alloc_otg:
-+	kfree(phy);
-+err_alloc_phy:
-+	return ret;
-+}
-+
-+static int __devexit mxs_phy_remove(struct platform_device *pdev)
-+{
-+	struct imx_usb_data *data = pdev->dev.platform_data;
-+	struct usb_phy *phy = platform_get_drvdata(pdev);
-+
-+	/* Power down the PHY. */
-+	phy_shutdown(phy);
-+
-+	/* Stop the PHY clock. */
-+	clk_disable(data->clk);
-+
-+	/* Free the rest. */
-+	usb_set_transceiver(NULL);
-+	platform_set_drvdata(pdev, NULL);
-+	kfree(phy);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver mxs_phy_driver = {
-+	.probe		= mxs_phy_probe,
-+	.remove		= __devexit_p(mxs_phy_remove),
-+	.driver		= {
-+		.name	= "mxs-usb-phy",
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+static int __init mxs_phy_init(void)
-+{
-+	return platform_driver_register(&mxs_phy_driver);
-+}
-+
-+static void __exit mxs_phy_exit(void)
-+{
-+	platform_driver_unregister(&mxs_phy_driver);
-+}
-+
-+module_init(mxs_phy_init);
-+module_exit(mxs_phy_exit);
-+
-+MODULE_ALIAS("platform:mxs-usb-phy");
-+MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
-+MODULE_DESCRIPTION("Freescale i.MX28 USB PHY driver");
-+MODULE_LICENSE("GPL");
+ 	mx28_add_rtc_stmp3xxx();
+ 
+ 	gpio_led_register_device(0, &mx28evk_led_data);
 -- 
 1.7.9.5
