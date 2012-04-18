@@ -1,92 +1,55 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 18 Apr 2012 08:05:00 +0000
-Subject: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <20120418070223.GJ3852@pengutronix.de>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
- <201204171345.07851.marex@denx.de> <20120417121800.GB3852@pengutronix.de>
- <201204172229.22062.marex@denx.de> <20120418070223.GJ3852@pengutronix.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B7677A@039-SN2MPN1-023.039d.mgd.msft.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 18 Apr 2012 09:07:12 +0100
+Subject: [PATCH 1/2] clk: Provide dummy clk_unregister()
+Message-ID: <1334736433-3402-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> On Tue, Apr 17, 2012 at 10:29:21PM +0200, Marek Vasut wrote:
-> > > >
-> > > > So the PHY actually registers the EHCI driver (plat_bus->phy->ehci)?
-> > > > That's slightly weird, don't you think?
-> > >
-> > > Your hardware device is a device consisting of a ehci core and a USB
-> device
-> > > core. Currently we register the child devices independently which
-> leads
-> > > to the mentioned problems. Instead we should register the USB core as
-> a
-> > > whole and pass the resources to either the client or the host driver.
-> >
-> > Ok, giving it a second thought -- you mean to create "stub" driver,
-> which claims
-> > and toggles the clock _and_ registers both the EHCI host driver and PHY
-> driver
-> > under itself in the hierarchy. Is that correct?
-> 
-> No, the registration of the phy is fine the way it is. The stub driver
-> should only register the ehci and the usb device. Maybe some pseudo code
-> helps describing what I mean:
-> 
-> arch/arm/mach-mxs:
-> 
-> 	mx28_register_usbphy0();
-> 	mx28_register_usb0();
-> 
-> drivers/usb/otg/mxs-otg.c:
-> 
-> 	probe() {
-> 		clk_get();
-> 		clk_prepare_enable();
-> 
-> 		usb_get_phy(&pdev->dev);
-> 
-> 		if (pdata->mode == USB_OTG_MODE_HOST)
-> 			usb_add_hcd(priv->host);
-> 		else
-> 			usb_gadget_vbus_connect(priv->gadget);
-> 	}
-> 
-> 	module_platform_driver(mxs_otg_driver);
-> 
-> drivers/usb/otg/mxs-otg-phy.c:
-> 
-> 	probe() {
-> 		clk_get();
-> 		clk_prepare_enable();
-> 		usb_register_phy(phy, "mxs-otg.0");
-> 	}
-> 
-> 	module_platform_driver(mxs_otg_phy_driver);
-> 
-A similar file is drivers/usb/host/fsl-mph-dr-of.c.
+While there's no actual implementation behind it having the call to use
+in drivers makes them feel neater from a driver author point of view. An
+actual implementation can wait for someone who needs to use the function
+in a real system.
 
-> 
-> The mxs-otg part can be reused on i.MX aswell, whereas mxs-otg-phy is
-> mxs (and i.MX6 how we just learned) specific.
-> What currently is missing is a usb_get_phy() with a device argument to
-> get the phy specific to a device. That's a problem, but you currently
-> have it aswell with your current approach
-> 
-As there are many things need to do, how about finish PHY layer first,
-then the OTG driver part. After PHY layer and FSL PHY driver finish, the both
-ports at i.mx28 can be used, and the operation mode (device or host) can
-be decided by platform code.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ drivers/clk/clk.c            |   12 ++++++++++++
+ include/linux/clk-provider.h |    1 +
+ 2 files changed, 13 insertions(+)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 33ef0df..31419ca 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1344,6 +1344,18 @@ struct clk *clk_register(struct device *dev, const char *name,
+ }
+ EXPORT_SYMBOL_GPL(clk_register);
  
-> Sascha
-> 
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
++/**
++ * clk_unregister - unregister a currently registered clock
++ * @clk: clock to unregister
++ *
++ * Currently unimplemented.
++ */
++int clk_unregister(struct clk *clk)
++{
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(clk_unregister);
++
+ /***        clk rate change notifiers        ***/
+ 
+ /**
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 340acbc..57c0bd1 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -275,6 +275,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ struct clk *clk_register(struct device *dev, const char *name,
+ 		const struct clk_ops *ops, struct clk_hw *hw,
+ 		const char **parent_names, u8 num_parents, unsigned long flags);
++int clk_unregister(struct clk *clk);
+ 
+ /* helper functions */
+ const char *__clk_get_name(struct clk *clk);
+-- 
+1.7.10
