@@ -1,15 +1,20 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 04:07:44 +0200
-Subject: [PATCH 05/10] MXS: Add platform registration hooks for USB EHCI
+Date: Wed, 18 Apr 2012 04:07:47 +0200
+Subject: [PATCH 08/10] MXS: Add separate MXS EHCI HCD driver
 In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
  <1334714869-19282-1-git-send-email-marex@denx.de>
-Message-ID: <1334714869-19282-6-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-9-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on code by:
-Tony Lin <tony.lin@freescale.com>
+This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I tried to keep
+this separate from the MXC EHCI to avoid further polution of the MXC EHCI,
+though eventually these two might be merged.
+
+NOTE: I still haven't figured out how to enable/disable the disconnection
+detector, it can't be enabled all the time, so I toggle PHY stuff from this
+driver, which I doubt is correct.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -26,141 +31,305 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-mxs/devices-mx28.h                |    4 ++
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-usb.c        |   67 +++++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/devices-common.h |    9 +++
- 5 files changed, 84 insertions(+)
- create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
+ drivers/usb/host/Kconfig    |    7 ++
+ drivers/usb/host/ehci-hcd.c |    5 +
+ drivers/usb/host/ehci-mxs.c |  254 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 266 insertions(+)
+ create mode 100644 drivers/usb/host/ehci-mxs.c
 
-diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-index 5f71bb2..428b184 100644
---- a/arch/arm/mach-mxs/devices-mx28.h
-+++ b/arch/arm/mach-mxs/devices-mx28.h
-@@ -47,6 +47,10 @@ extern const struct mxs_mxs_mmc_data mx28_mxs_mmc_data[] __initconst;
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index f788eb8..85ed593 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -148,6 +148,13 @@ config USB_EHCI_MXC
+ 	---help---
+ 	  Variation of ARC USB block used in some Freescale chips.
  
- #define mx28_add_mxs_pwm(id)		mxs_add_mxs_pwm(MX28_PWM_BASE_ADDR, id)
- 
-+extern const struct mxs_usbh_data mx28_mxs_usbh_data[] __initconst;
-+#define mx28_add_mxs_usbh(id) \
-+	mxs_add_mxs_usbh(&mx28_mxs_usbh_data[id])
++config USB_EHCI_MXS
++	bool "Support for Freescale i.MX28 on-chip EHCI USB controller"
++	depends on USB_EHCI_HCD && ARCH_MXS
++	select USB_EHCI_ROOT_HUB_TT
++	---help---
++	  Enable USB support for i.MX28.
 +
- struct platform_device *__init mx28_add_mxsfb(
- 		const struct mxsfb_platform_data *pdata);
+ config USB_EHCI_HCD_OMAP
+ 	bool "EHCI support for OMAP3 and later chips"
+ 	depends on USB_EHCI_HCD && ARCH_OMAP
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 806cc95..d0df8be 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1263,6 +1263,11 @@ MODULE_LICENSE ("GPL");
+ #define PLATFORM_DRIVER		ehci_mxc_driver
+ #endif
  
-diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
-index abad78d..a297d12 100644
---- a/arch/arm/mach-mxs/devices/Kconfig
-+++ b/arch/arm/mach-mxs/devices/Kconfig
-@@ -35,3 +35,6 @@ config MXS_HAVE_PLATFORM_MXS_SAIF
- 
- config MXS_HAVE_PLATFORM_RTC_STMP3XXX
- 	bool
++#ifdef CONFIG_USB_EHCI_MXS
++#include "ehci-mxs.c"
++#define PLATFORM_DRIVER		ehci_mxs_driver
++#endif
 +
-+config MXS_HAVE_PLATFORM_USB
-+	bool
-diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-index 3e6fb12..2dbdf99 100644
---- a/arch/arm/mach-mxs/devices/Makefile
-+++ b/arch/arm/mach-mxs/devices/Makefile
-@@ -12,3 +12,4 @@ obj-y += platform-gpio-mxs.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXSFB) += platform-mxsfb.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_SAIF) += platform-mxs-saif.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_RTC_STMP3XXX) += platform-rtc-stmp3xxx.o
-+obj-$(CONFIG_MXS_HAVE_PLATFORM_USB) += platform-usb.o
-diff --git a/arch/arm/mach-mxs/devices/platform-usb.c b/arch/arm/mach-mxs/devices/platform-usb.c
+ #ifdef CONFIG_USB_EHCI_SH
+ #include "ehci-sh.c"
+ #define PLATFORM_DRIVER		ehci_hcd_sh_driver
+diff --git a/drivers/usb/host/ehci-mxs.c b/drivers/usb/host/ehci-mxs.c
 new file mode 100644
-index 0000000..479267d
+index 0000000..47e6502
 --- /dev/null
-+++ b/arch/arm/mach-mxs/devices/platform-usb.c
-@@ -0,0 +1,67 @@
++++ b/drivers/usb/host/ehci-mxs.c
+@@ -0,0 +1,254 @@
 +/*
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Freescale i.MX28 EHCI driver
 + *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
++ * Copyright (c) 2012 Marek Vasut <marex@denx.de>
++ * on behalf of DENX Software Engineering GmbH
++ *
++ * Based on MXC EHCI driver:
++ *
++ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ * Copyright (c) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 + */
 +
-+#include <linux/compiler.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
++#include <linux/slab.h>
 +#include <linux/fsl_devices.h>
 +
-+#include <mach/mx23.h>
-+#include <mach/mx28.h>
++#include <mach/hardware.h>
 +#include <mach/devices-common.h>
++#include <mach/mx28.h>
 +
-+#define mxs_usbh_data_entry_single(soc, _id, hwid)			\
-+	{								\
-+		.id = _id,						\
-+		.usb_irq = soc ## _INT_USB ## hwid,			\
-+		.usb_iobase = soc ## _USBCTRL ## hwid ## _BASE_ADDR,	\
-+		.phy_iobase = soc ## _USBPHY ## hwid ## _BASE_ADDR,	\
++#include <asm/mach-types.h>
++
++#define MXC_EHCI_MODE_ULPI	(2 << 30)
++
++/* Called during probe() after chip reset completes */
++static int ehci_mxs_setup(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	int retval;
++
++	dbg_hcs_params(ehci, "reset");
++	dbg_hcc_params(ehci, "reset");
++
++	/* Cache this readonly data; minimize chip reads. */
++	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
++
++	hcd->has_tt = 1;
++
++	retval = ehci_halt(ehci);
++	if (retval)
++		return retval;
++
++	/* Data structure init. */
++	retval = ehci_init(hcd);
++	if (retval)
++		return retval;
++
++	ehci->sbrn = 0x20;
++
++	ehci_reset(ehci);
++
++	ehci_port_power(ehci, 0);
++
++	return 0;
++}
++
++static irqreturn_t mxs_ehci_irq(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	struct usb_phy *phy = usb_get_transceiver();
++	uint32_t status;
++	static uint32_t discon;
++
++	if (phy && phy->otg && phy->otg->set_vbus) {
++		status = ehci_readl(ehci, &ehci->regs->status);
++		status = !!(status & STS_PCD);
++		if (status != discon) {
++			discon = status;
++			phy->otg->set_vbus(phy->otg, status);
++		}
 +	}
 +
-+#define mxs_usbh_data_entry(soc, _id, hwid)				\
-+	[_id] = mxs_usbh_data_entry_single(soc, _id, hwid)
-+
-+#ifdef CONFIG_SOC_IMX23
-+const struct mxs_usbh_data mx23_mxs_usbh_data[] __initconst = {
-+	mxs_usbh_data_entry(MX23, 0, 0),
-+};
-+#endif
-+
-+#ifdef CONFIG_SOC_IMX28
-+const struct mxs_usbh_data mx28_mxs_usbh_data[] __initconst = {
-+	mxs_usbh_data_entry(MX28, 0, 0),
-+	mxs_usbh_data_entry(MX28, 1, 1),
-+};
-+#endif
-+
-+void __init mxs_add_mxs_usbh(const struct mxs_usbh_data *data)
-+{
-+	struct platform_device *pdev;
-+	struct resource usb_res[] = {
-+		{
-+			.start	= data->usb_iobase,
-+			.end	= data->usb_iobase + SZ_64K - 1,
-+			.flags	= IORESOURCE_MEM,
-+		}, {
-+			.start	= data->phy_iobase,
-+			.end	= data->phy_iobase + SZ_256 - 1,
-+			.flags	= IORESOURCE_MEM,
-+		}, {
-+			.start	= data->usb_irq,
-+			.end	= data->usb_irq,
-+			.flags	= IORESOURCE_IRQ,
-+		},
-+	};
-+
-+	pdev = mxs_add_platform_device_dmamask("imx-usb", data->id,
-+					usb_res, ARRAY_SIZE(usb_res),
-+					NULL, 0,
-+					DMA_BIT_MASK(32));
-+	if (!pdev)
-+		pr_err("Failed to register USB composite driver!\n");
++	return ehci_irq(hcd);
 +}
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-index 3bffcd5..8fdd936 100644
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -42,6 +42,15 @@ struct mxs_auart_data {
- struct platform_device *__init mxs_add_auart(
- 		const struct mxs_auart_data *data);
- 
-+/* usb host */
-+struct mxs_usbh_data {
-+	int id;
-+	resource_size_t usb_irq;
-+	resource_size_t usb_iobase;
-+	resource_size_t phy_iobase;
-+};
-+void __init mxs_add_mxs_usbh(const struct mxs_usbh_data *data);
 +
- /* fec */
- #include <linux/fec.h>
- struct mxs_fec_data {
++static const struct hc_driver ehci_mxs_hc_driver = {
++	.description	= hcd_name,
++	.product_desc	= "Freescale i.MX28 On-Chip EHCI Host Controller",
++	.hcd_priv_size	= sizeof(struct ehci_hcd),
++
++	/*
++	 * Generic hardware linkage
++	 */
++	.irq		= mxs_ehci_irq,
++	.flags		= HCD_USB2 | HCD_MEMORY,
++
++	/*
++	 * Basic lifecycle operations
++	 */
++	.reset		= ehci_mxs_setup,
++	.start		= ehci_run,
++	.stop		= ehci_stop,
++	.shutdown	= ehci_shutdown,
++
++	/*
++	 * managing i/o requests and associated device resources
++	 */
++	.urb_enqueue		= ehci_urb_enqueue,
++	.urb_dequeue		= ehci_urb_dequeue,
++	.endpoint_disable	= ehci_endpoint_disable,
++	.endpoint_reset		= ehci_endpoint_reset,
++
++	/*
++	 * scheduling support
++	 */
++	.get_frame_number	= ehci_get_frame,
++
++	/*
++	 * root hub support
++	 */
++	.hub_status_data	= ehci_hub_status_data,
++	.hub_control		= ehci_hub_control,
++	.bus_suspend		= ehci_bus_suspend,
++	.bus_resume		= ehci_bus_resume,
++	.relinquish_port	= ehci_relinquish_port,
++	.port_handed_over	= ehci_port_handed_over,
++
++	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
++};
++
++static int ehci_mxs_drv_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct imx_usb_data *data = pdev->dev.platform_data;
++	struct usb_hcd *hcd;
++	struct ehci_hcd *ehci;
++	struct usb_phy *phy;
++	int ret;
++
++	dev_info(dev, "Initializing i.MX28 USB Controller\n");
++
++	if (!data) {
++		dev_err(dev, "USB Host platform data missing!\n");
++		return -ENODEV;
++	}
++
++	/* Create HCD controller instance. */
++	hcd = usb_create_hcd(&ehci_mxs_hc_driver, dev, dev_name(dev));
++	if (!hcd) {
++		dev_err(dev, "Failed to create HCD instance!\n");
++		return -ENOMEM;
++	}
++
++	hcd->rsrc_start = data->mem_res->start;
++	hcd->rsrc_len = resource_size(data->mem_res);
++	hcd->regs = data->mem;
++
++	clk_enable(data->clk);
++
++	/* Wait for the controller to stabilize. */
++	mdelay(10);
++
++	/* Initialize the transceiver */
++#ifdef CONFIG_USB_OTG_UTILS
++	phy = usb_get_transceiver();
++	if (!phy) {
++		dev_err(dev, "Unable to find transceiver.\n");
++		ret = -ENODEV;
++		goto err_phy;
++	}
++
++	ret = usb_phy_init(phy);
++	if (ret < 0) {
++		dev_err(dev, "Unable init transceiver\n");
++		ret = -ENODEV;
++		goto err_phy_init;
++	}
++#else
++	dev_info(dev, "USB_MXS_PHY must have CONFIG_USB_OTG_UTILS enabled\n");
++	goto err_phy;
++#endif
++
++	ehci = hcd_to_ehci(hcd);
++
++	/* EHCI registers start@offset 0x100 */
++	ehci->caps = hcd->regs + 0x100;
++	ehci->regs = hcd->regs + 0x100 +
++		HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
++
++	/* Set up the PORTSCx register */
++	ehci_writel(ehci, MXC_EHCI_MODE_ULPI, &ehci->regs->port_status[0]);
++
++	platform_set_drvdata(pdev, hcd);
++
++	ret = usb_add_hcd(hcd, data->irq, IRQF_SHARED);
++	if (ret)
++		goto err_phy_init;
++
++	return 0;
++
++err_phy_init:
++#ifdef CONFIG_USB_OTG_UTILS
++	if (phy)
++		usb_put_transceiver(phy);
++#endif
++err_phy:
++	clk_disable(data->clk);
++	usb_put_hcd(hcd);
++	return ret;
++}
++
++static int __exit ehci_mxs_drv_remove(struct platform_device *pdev)
++{
++	struct imx_usb_data *data = pdev->dev.platform_data;
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct usb_phy *phy = usb_get_transceiver();
++
++	if (phy)
++		usb_phy_shutdown(phy);
++
++	usb_remove_hcd(hcd);
++	usb_put_hcd(hcd);
++	platform_set_drvdata(pdev, NULL);
++	clk_disable(data->clk);
++
++	return 0;
++}
++
++static void ehci_mxs_drv_shutdown(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++
++	if (hcd->driver->shutdown)
++		hcd->driver->shutdown(hcd);
++}
++
++static struct platform_driver ehci_mxs_driver = {
++	.probe		= ehci_mxs_drv_probe,
++	.remove		= __exit_p(ehci_mxs_drv_remove),
++	.shutdown	= ehci_mxs_drv_shutdown,
++	.driver		= {
++		   .name	= "mxs-ehci",
++	},
++};
++
++MODULE_ALIAS("platform:mxs-ehci");
 -- 
 1.7.9.5
