@@ -1,39 +1,34 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 18 Apr 2012 11:58:05 +0100 (BST)
-Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
- flag
-In-Reply-To: <1334711058.19852.YahooMailClassic@web29008.mail.ird.yahoo.com>
-Message-ID: <1334746685.22354.YahooMailClassic@web29008.mail.ird.yahoo.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Apr 2012 11:00:39 +0000
+Subject: [PATCH v2 0/8] Second patchset for LPC32xx device tree conversion
+In-Reply-To: <20120418093604.GL6498@mwanda>
+References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
+ <201204180806.16848.arnd@arndb.de> <20120418093604.GL6498@mwanda>
+Message-ID: <201204181100.40123.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Wed, 18/4/12, Paul Parsons <lost.distance@yahoo.com> wrote:
-> > I tried the v3.4-rc2 today, and it _seems_ gpio button
-> > wakeups don't work
-> > anymore (ie. wakeup set up by gpio-keys driver). More
-> > specifically, the GPIO0
-> > (power button) doesn't wakeup my board from "echo mem >
-> > /proc/power/state".
+On Wednesday 18 April 2012, Dan Carpenter wrote:
+> I'm not sure I understand.  I thought everyone used the develop
+> against linux-next and backport the fixes model.  Are we going to
+> try merge these in 3.4?  It will still spend some time in linux-next
+> before we submit it, right?
 
-...
+Correct, but the point is that you cannot add patches on top of -next
+and have them included in a future -next version, because they never
+merge cleanly.
 
-> > I don't know it this is a recent or known issue, or if I'm
-> > have missed a change in
-> > pxa/gpio-keys driver.
-> 
-> I can only comment on the hx4700 platform, which has 4
-> pending
-> patches for suspend/resume, plus 1 more still to be
-> submitted.
-> These fix hx4700 suspend/resume, which has never worked.
-> None of the patches touch the gpio-keys driver, however.
+The ideal workflow is:
 
-Just to clarify, the generic pxa/gpio suspend/resume support does
-seem to work OK; the hx4700 patches are platform specific, apart
-from this SKIP_SET_WAKE patch to fix the Unbalanced IRQ warnings.
+1. develop on -rc
+2. merge with latest -next, test and make sure it works there
+3. submit for review against -rc
+4. have patches included in -next once reviewed, but based on -rc
+5. when merge window opens, have patches sent for upstream inclusion
 
-Consequently it seems likely that your problem is also platform
-specific.
+The last two steps are slightly different for your own subsystem
+compared to someone else's subsystem: In this case, Roland is the
+author and sends the patches to me to have them included in -next
+and I send them to Linus in the next merge window.
 
-Regards,
-Paul
+	Arnd
