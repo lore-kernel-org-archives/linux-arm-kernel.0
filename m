@@ -1,75 +1,75 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 18 Apr 2012 11:57:11 +0200
-Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
- both clk and hwmod
-In-Reply-To: <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
-References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
- <4F8E76C3.7080803@ti.com>
- <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
- <4F8E84DC.70600@ti.com>
- <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
-Message-ID: <4F8E8FF7.4000706@ti.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Wed, 18 Apr 2012 11:06:39 +0100
+Subject: [PATCH V5 0/4] ARM: Kirkwood: Add support for DNS-320 and DNS-325
+ using devicetree
+Message-ID: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/18/2012 11:40 AM, Paul Walmsley wrote:
-> On Wed, 18 Apr 2012, Cousson, Benoit wrote:
->
->> Well, the point is that we do not need this warning even for that. This
->> is something we have to ensure by reviewing carefully the code.
->
-> My perspective is slightly different.
->
-> Until we're sure that we don't need clock framework-based clockdomain
-> control in mainline for main clocks, we shouldn't remove that warning.
-> That is because clock framework-based clockdomain control works via the
-> struct clk's clkdm field.  So until we switch away from that model, we
-> should ensure that each clock is associated with the clockdomain that its
-> clock control FSM is associated with (in OMAP3 terms).
->
-> I don't have a problem with switching away from that model, or switching
-> individual SoCs away from that model, as long as regressions aren't
-> introduced.  But until that switch happens, it seems wise to avoid
-> weakening its consistency assumptions.
->
->> If you look today, the warning is complaining about clocks that are
->> perfectly fine.
->
-> Actually, mainline is only complaining about one clock:
+Reworked patch for latest feedback. I'm still basing this on Jason Cooper's
+tree, given how much time has passed should I be rebasing against something
+else or is this still fine?
 
-Hehe, sure, this is because we still have a bunch of clock nodes that 
-should not be there at the first place... But once you are trying to 
-remove them...
+One thing I noticed is that with only the first patch applied (which no
+longer calls kirkwood_nand_init) the device either locks up or serial console
+dies at "Gating clock of unused units", presumably as CGC_RUNIT isn't set.
+Is this something known or is it worth further investigation?
 
-> http://www.pwsan.com/omap/bootlogs/20120417/sparse_cppcheck_cleanup_3.5__0b93afd5d945a8c002f4d380a88b5d7a61c49289/4430es2panda_bootlog.txt
->
-> In the current model, the right fix for that clock is to associate it with
-> a CM clockdomain (see for example the 4430 TRM vX Figure 3-70 "CD_DMA
-> Overview").
->
->> So keeping it will just add some noise and not necessarily highlighting
->> the real issue.
->>
->> FYI here is what we have after the clock cleanup on OMAP4 (i.e removal of modulemode clock nodes):
->>
->
-> [ lots of warnings elided ]
->
->> That's a lot of noise for nothing. That's why Rajendra's patch is needed now.
->
-> Sounds like the patch to alter the warnings should be associated with this
-> clock cleanup series, then, since it sounds like it changes the
-> clockdomain control model.
+Thanks again to everyone reviewing.
 
-It just removes the modulemode clock nodes we were using so far. And 
-since these nodes were the only ones with a clkdm on OMAP4, it is now 
-complaining, because their parents clock does not have a clkdm.
+Changes since v4: Convert DNS-325 & DNS-320 to access nand via devicetree
+* Add initial support patch back in to address following comments
+** One MACH_DLINK_KIRKWOOD_DT for all dtb files [Grant Likely, Jason Cooper]
+** Drop brain-dead select "select CONFIG_MTD_OF_PARTS" [Grant Likely]
+** Don't add NAND support then throw it away immediately after [Grant Likely]
+* WARN when bank-width is out of range [Andrew Lunn]
+* Describe purpose of MPP 41, 42 & 49
 
-> And if the model change is only affecting
-> OMAP4+, then the warning change should also only apply to OMAP4+.
+Changes since v3: Add support for DNS-320 and DNS-325 using devicetree
+* Remove patches that are already merged
+* Add documentation on orion_nand devicetree bindings
+* Convert bank-width to be in bytes to match other properties
+* Make defaults more explicit
 
-OK, fair enough. Let's reduce the scope of that change to OMAP4+ only.
+Changes since v2: Add support for DNS-320 and DNS-325 using devicetree
+* Split patches further, separating orion_nand and kirkwood changes
+* dts renames: "bank-width", not "width". "okay", not "ok"
+* Separate documentation out into separate patch, add references to
+  partition.txt to all mtd bindings.
 
-Regards,
-Benoit
+Changes since v1: Add support for DNS-320 and DNS-325 using devicetree
+* Rebase against kirkwood_dt_for_3.4, removing premature devicetree ports.
+* Move additions into a separate board-dnskw.c. It could be separated further
+  into a board-dns320.c and board-dns325.c but it probably isn't worth it.
+* s/marvell,/mrvl,/g
+* Include an example dtb partition in documentation
+* Copy structure of serial nodes to allow common options for NAND to be set
+  in kirkwood.dtsi
+* Simplifications in orion-nand.c
+
+Jamie Lentin (4):
+  ARM: kirkwood: Basic support for DNS-320 and DNS-325
+  mtd: Add orion_nand devicetree bindings
+  kirkwood: Allow nand to be configured via. devicetree
+  ARM: kirkwood: Define DNS-320/DNS-325 NAND in fdt
+
+ .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++
+ arch/arm/boot/dts/kirkwood-dns320.dts              |   64 +++++
+ arch/arm/boot/dts/kirkwood-dns325.dts              |   59 +++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |   15 +-
+ arch/arm/mach-kirkwood/Kconfig                     |    8 +
+ arch/arm/mach-kirkwood/Makefile                    |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot               |    2 +
+ arch/arm/mach-kirkwood/board-dnskw.c               |  275 ++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c                  |    5 +
+ arch/arm/mach-kirkwood/common.c                    |   12 +
+ arch/arm/mach-kirkwood/common.h                    |    6 +
+ drivers/mtd/nand/orion_nand.c                      |   45 +++-
+ 12 files changed, 539 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-dnskw.c
+
+-- 
+1.7.9.1
