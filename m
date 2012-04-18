@@ -1,32 +1,36 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 18 Apr 2012 06:55:40 +0200
-Subject: [PATCH v2 1/8] ohci-nxp: Driver cleanup
-In-Reply-To: <1334682507-15055-2-git-send-email-stigge@antcom.de>
-References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <1334682507-15055-2-git-send-email-stigge@antcom.de>
-Message-ID: <20120418045540.GA16990@avionic-0098.adnet.avionic-design.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 18 Apr 2012 10:38:28 +0530
+Subject: [PATCH V2 00/22] watchdog: ARM watchdogs: sp805 & mpcore updates
+ & fixes
+In-Reply-To: <4F83FEE0.8020709@st.com>
+References: <cover.1331524811.git.viresh.kumar@st.com>
+ <4F83FEE0.8020709@st.com>
+Message-ID: <4F8E4C4C.5030702@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roland Stigge wrote:
-> --- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
-> +++ linux-2.6/drivers/usb/host/ohci-nxp.c
-[...]
-> @@ -220,7 +220,7 @@ static void isp1301_configure_lpc32xx(vo
->  		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR, ~0);
->  
->  	/* Enable usb_need_clk clock after transceiver is initialized */
-> -	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
-> +	__raw_writel((__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN), USB_CTRL);
+On 4/10/2012 3:05 PM, Viresh KUMAR wrote:
+> On 3/12/2012 9:51 AM, Viresh KUMAR wrote:
+>> Hello,
+>>
+>> This patchset contains fixes and updates for ARM watchdog drivers sp805 and
+>> mpcore.
+>>
+>> Changes since V1:
+>> - Included patches for sp805 driver.
+>> - Removed: wdt->clk = NULL from mpcore driver, and use IS_ERR() to check if
+>>   clock is supported or not.
+>> - Adapted to watchdog core for both the drivers.
+>> - two patches for watchdog core added
+>> - add patch to use __raw_readl{writel} instead of readl{writel}
+>> - taken care of few more review comments.
+>>
+> 
+> Hi Wim,
+> 
+> Have you applied patches left in this patchset for linux-next?
 
-There's a pair of gratuitous parentheses here. Since you're changing the line
-anyway you can just drop them as well.
+Ping!!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/d5fa2d60/attachment.sig>
+-- 
+viresh
