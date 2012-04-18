@@ -1,75 +1,32 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 18 Apr 2012 04:31:50 +0000
-Subject: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <20120417112910.GA3852@pengutronix.de>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
- <20120417112910.GA3852@pengutronix.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B76562@039-SN2MPN1-023.039d.mgd.msft.net>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 18 Apr 2012 06:55:40 +0200
+Subject: [PATCH v2 1/8] ohci-nxp: Driver cleanup
+In-Reply-To: <1334682507-15055-2-git-send-email-stigge@antcom.de>
+References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
+ <1334682507-15055-2-git-send-email-stigge@antcom.de>
+Message-ID: <20120418045540.GA16990@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> Your patches won't work when more than one USB port is enabled because
-> of the singular usb transceiver present in the kernel. That of course is
-> not your fault. I think Heikki (Added to Cc) is working on this issue,
-> but I don't know the status here.
-> 
-> Another problem is that what you are doing does not integrate at all
-> with otg. I don't ask you to implement otg support because you are
-> likely not interested in this, but since you are adding a new ehci
-> glue driver anyway I suggest another approach:
-> 
-> Put a driver under drivers/usb/otg which:
-> 
-> - matches a 'imx-usb' device
-> - gets/enables all clocks needed for USB
-> - finds the transceiver
-> - registers a ehci device
-> 
-> Future additions would be:
-> 
-> - Put a USB_MODE_HOST/DEVICE flag into platform_data, and register a
->   host or gadget driver depending on this flag
-> - Add a USB_MODE_OTG flag to platform_data and implement otg in this
->   driver (or use whatever infrastructure present in the kernel then)
-> 
-> This is similar to what msm does. This way we have the clocks and phys
-> handled where they are needed. We may use this code on i.MX later.
-> 
-> We did this wrong on i.MX (and several other architectures) and getting
-> this right will be hard work. No need to introduce the same flaws again
-> with a new architecture.
-> 
-Hi Sascha,
+* Roland Stigge wrote:
+> --- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
+> +++ linux-2.6/drivers/usb/host/ohci-nxp.c
+[...]
+> @@ -220,7 +220,7 @@ static void isp1301_configure_lpc32xx(vo
+>  		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR, ~0);
+>  
+>  	/* Enable usb_need_clk clock after transceiver is initialized */
+> -	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
+> +	__raw_writel((__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN), USB_CTRL);
 
-We have been discussing i.mx usb re-structure at freescale internal during
-this periods, one side does not agree with otg driver manages PHY/clock
-solution due to below reasons:
+There's a pair of gratuitous parentheses here. Since you're changing the line
+anyway you can just drop them as well.
 
-- May confuse the users who only use device or host function, the users may
-double "why I need to include otg file to support device/host only function"?
- 
-- For some special cases, like device sends resume signal(remote wakeup)
-after host suspend, but before otg suspend (system needs to refuse to suspend) .
-It needs to add hcd flag to judge if there is a remote wakeup after host suspend, 
-and if the port is sending resume signal now (when the port is sending resume signal, 
-we can't put power to low power mode). Is it suitable to put some hcd stuffs at otg driver?
-
-- Any disadvantages three individual drivers manage PHY/clock separately after the generic PHY
-layer/FSL PHY driver have finished? It can define where to get/put PHY/clock operation at
-individual drivers clearly. When OTG switch, for host mode, the hcd struct (includes interrupt)
-will be free/created using usb_remove_hcd/usb_add_hcd, for device mode, 
-we can deinit/init udc like current ci13xxx_udc.c at ci13xxx_vbus_session does. 
-
-> Sascha
-> 
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/d5fa2d60/attachment.sig>
