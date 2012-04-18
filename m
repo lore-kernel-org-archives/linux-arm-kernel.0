@@ -1,66 +1,87 @@
 From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Wed, 18 Apr 2012 14:39:36 +0200
-Subject: [PATCH v3 0/6] ARM: OMAP2+: PM: introduce the power domains
- functional states
-Message-ID: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
+Date: Wed, 18 Apr 2012 14:39:37 +0200
+Subject: [PATCH 1/6] ARM: OMAP2+: PM: protect the power domain state change by
+ a mutex
+In-Reply-To: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
+References: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
+Message-ID: <1334752782-28804-2-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean Pihet <j-pihet@ti.com>
 
-Implement the functional states for the power domains:
-- protect the power domain state change by a mutex in
-  omap_set_pwrdm_state,
-- introduce the functional states for power domains power states and
-  logic power states, and the conversion functions between the
-  functional and internal states,
-- unify the API to use the functional states,
-- program the logic power state of power domains from the functional
-  states, in omap_set_pwrdm_state
-- convert the OMAP2/3/4 PM code to use the updated API,
-- provide the power domains statistics by functional states.
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+---
+ arch/arm/mach-omap2/pm.c          |    8 ++++++--
+ arch/arm/mach-omap2/powerdomain.c |    1 +
+ arch/arm/mach-omap2/powerdomain.h |    3 ++-
+ 3 files changed, 9 insertions(+), 3 deletions(-)
 
-Tested on OMAP3 Beagleboard, with suspend and cpuidle in RET and
-OFF modes.
-
-
-History:
- v3:
- - fix a bug in OMAP3 cpuidle which prevented the IO wake-ups in PER
-
- v2:
- - add the logic power states,
- - provide the power domains statistics by functional states
-
- v1:
- - initial implementation, in RFC state
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index d0c1c96..6918a13 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -100,15 +100,17 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
+ 	if (!pwrdm || IS_ERR(pwrdm))
+ 		return -EINVAL;
  
-
-Jean Pihet (6):
-  ARM: OMAP2+: PM: protect the power domain state change by a mutex
-  ARM: OMAP2+: PM: introduce power domains functional states
-  ARM: OMAP2+: PM: use the functional power states API
-  ARM: OMAP2+: PM: introduce power domains logic and memory functional
-    states
-  ARM: OMAP2+: PM: use the functional power states API for logic and
-    memory
-  ARM: OMAP2+: PM: use power domain functional state in stats counters
-
- arch/arm/mach-omap2/cpuidle34xx.c          |   61 ++++----
- arch/arm/mach-omap2/cpuidle44xx.c          |   28 ++--
- arch/arm/mach-omap2/omap-hotplug.c         |    2 +-
- arch/arm/mach-omap2/omap-mpuss-lowpower.c  |   39 +++---
- arch/arm/mach-omap2/pm-debug.c             |   15 +-
- arch/arm/mach-omap2/pm.c                   |   62 -------
- arch/arm/mach-omap2/pm24xx.c               |   14 +-
- arch/arm/mach-omap2/pm34xx.c               |   80 +++++-----
- arch/arm/mach-omap2/pm44xx.c               |   15 +--
- arch/arm/mach-omap2/powerdomain-common.c   |   85 ++++++++++
- arch/arm/mach-omap2/powerdomain.c          |  244 ++++++++++++++++++++++++++--
- arch/arm/mach-omap2/powerdomain.h          |   42 +++++-
- arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |    7 +
- arch/arm/mach-omap2/powerdomain44xx.c      |    3 +
- 14 files changed, 489 insertions(+), 208 deletions(-)
-
++	mutex_lock(&pwrdm->lock);
++
+ 	while (!(pwrdm->pwrsts & (1 << pwrst))) {
+ 		if (pwrst == PWRDM_POWER_OFF)
+-			return ret;
++			goto out;
+ 		pwrst--;
+ 	}
+ 
+ 	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
+ 	if (next_pwrst == pwrst)
+-		return ret;
++		goto out;
+ 
+ 	curr_pwrst = pwrdm_read_pwrst(pwrdm);
+ 	if (curr_pwrst < PWRDM_POWER_ON) {
+@@ -141,6 +143,8 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
+ 		break;
+ 	}
+ 
++out:
++	mutex_unlock(&pwrdm->lock);
+ 	return ret;
+ }
+ 
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 96ad3dbe..319b277 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -102,6 +102,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 	INIT_LIST_HEAD(&pwrdm->voltdm_node);
+ 	voltdm_add_pwrdm(voltdm, pwrdm);
+ 
++	mutex_init(&pwrdm->lock);
+ 	list_add(&pwrdm->node, &pwrdm_list);
+ 
+ 	/* Initialize the powerdomain's state counter */
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 0d72a8a..6c6567d 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -19,7 +19,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/list.h>
+-
++#include <linux/mutex.h>
+ #include <linux/atomic.h>
+ 
+ #include <plat/cpu.h>
+@@ -116,6 +116,7 @@ struct powerdomain {
+ 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
+ 	struct list_head node;
+ 	struct list_head voltdm_node;
++	struct mutex lock;
+ 	int state;
+ 	unsigned state_counter[PWRDM_MAX_PWRSTS];
+ 	unsigned ret_logic_off_counter;
 -- 
 1.7.7.6
