@@ -1,31 +1,74 @@
-From: balajitk@ti.com (T Krishnamoorthy, Balaji)
-Date: Wed, 18 Apr 2012 21:05:56 +0530
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <20120418152956.GP25053@n2100.arm.linux.org.uk>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRsg-0004bX-4w@rmk-PC.arm.linux.org.uk>
- <CANrkHUajRzoCp7K8L3cJArWN3xdqpft8L4k-o4gFTRTo8nmhmg@mail.gmail.com>
- <20120418152956.GP25053@n2100.arm.linux.org.uk>
-Message-ID: <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Wed, 18 Apr 2012 15:43:50 +0000
+Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
+ sampling bug
+In-Reply-To: <1334695011-8188-1-git-send-email-marex@denx.de>
+References: <1334695011-8188-1-git-send-email-marex@denx.de>
+Message-ID: <4F8EE136.30704@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 8:59 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 18, 2012 at 08:53:32PM +0530, T Krishnamoorthy, Balaji wrote:
->> Hi,
->>
->> drivers/mmc/host/omap.c is also using dma_mask should that also be removed
->
-> Does this driver make use of this platform data?
->
-> If so, it needs converting to DMA engine _before_ this patch (which is
-> one reason why its a good idea to do these changes as separate patches...
-> as I've done.) ?It means stuff like this can be slotted in as necessary
-> in the patch order.
->
-> I'm told that driver is OMAP2 only - I don't have any OMAP2 platforms to
-> be able to test it on (I only have OMAP3 and OMAP4.)
+Hi,
 
-Yes, this driver is for omap2420 and omap1 devices.
+On 04/17/2012 08:36 PM, Marek Vasut wrote:
+> From: Marek Vasut <marek.vasut@gmail.com>
+
+please write a commit message that describes the bug you want to fix and
+why/how your patch fixes it.
+
+
+Thanks,
+
+Florian Tobias Schandinat
+
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> Cc: Chen Peter-B29397 <B29397@freescale.com>
+> Cc: Detlev Zundel <dzu@denx.de>
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> Cc: Li Frank-B20596 <B20596@freescale.com>
+> Cc: Lin Tony-B19295 <B19295@freescale.com>
+> Cc: Linux FBDEV <linux-fbdev@vger.kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> Cc: Subodh Nijsure <snijsure@grid-net.com>
+> Cc: Tony Lin <tony.lin@freescale.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+>  drivers/video/mxsfb.c |   13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+> index 4a89f88..a265356 100644
+> --- a/drivers/video/mxsfb.c
+> +++ b/drivers/video/mxsfb.c
+> @@ -880,6 +880,18 @@ static int __devexit mxsfb_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +void mxsfb_shutdown(struct platform_device *pdev)
+> +{
+> +	struct fb_info *fb_info = platform_get_drvdata(pdev);
+> +	struct mxsfb_info *host = to_imxfb_host(fb_info);
+> +
+> +	/*
+> +	 * Force stop the LCD controller as keeping it running during reboot
+> +	 * might interfere with the BootROM's boot mode pads sampling.
+> +	 */
+> +	writel(CTRL_RUN, host->base + LCDC_CTRL + REG_CLR);
+> +}
+> +
+>  static struct platform_device_id mxsfb_devtype[] = {
+>  	{
+>  		.name = "imx23-fb",
+> @@ -896,6 +908,7 @@ MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
+>  static struct platform_driver mxsfb_driver = {
+>  	.probe = mxsfb_probe,
+>  	.remove = __devexit_p(mxsfb_remove),
+> +	.shutdown = mxsfb_shutdown,
+>  	.id_table = mxsfb_devtype,
+>  	.driver = {
+>  		   .name = DRIVER_NAME,
