@@ -1,74 +1,54 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Wed, 18 Apr 2012 15:43:50 +0000
-Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid bootrom
- sampling bug
-In-Reply-To: <1334695011-8188-1-git-send-email-marex@denx.de>
-References: <1334695011-8188-1-git-send-email-marex@denx.de>
-Message-ID: <4F8EE136.30704@gmx.de>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Wed, 18 Apr 2012 16:44:16 +0100
+Subject: [PATCH V5 0/4] ARM: Kirkwood: Add support for DNS-320 and DNS-325
+ using devicetree
+In-Reply-To: <20120418140440.GL15711@titan.lakedaemon.net>
+References: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
+ <20120418131635.GK15711@titan.lakedaemon.net> <20120418132445.GB25584@lunn.ch>
+ <20120418140440.GL15711@titan.lakedaemon.net>
+Message-ID: <op.wcywn2et4cuzmg@gonzo.lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 18 Apr 2012 15:04:40 +0100, Jason Cooper <jason@lakedaemon.net>  
+wrote:
 
-On 04/17/2012 08:36 PM, Marek Vasut wrote:
-> From: Marek Vasut <marek.vasut@gmail.com>
+> On Wed, Apr 18, 2012 at 03:24:45PM +0200, Andrew Lunn wrote:
+>> > > dies at "Gating clock of unused units", presumably as CGC_RUNIT  
+>> isn't set.
+>> > > Is this something known or is it worth further investigation?
+>> >
+>> > That could potentially mess up a future bisect.  However, it would  
+>> only
+>> > crop up for dnskw boards.  I'll let Grant weigh in on this since he's
+>> > the one who asked that the nand init be removed.
+>>
+>> Turning off RUNIT is bad. Both the NAND and SPI controllers use this
+>> clock. You can only safely turn it off if none of these are active.
 
-please write a commit message that describes the bug you want to fix and
-why/how your patch fixes it.
+So would u-boot using the NAND count as the controller being active in  
+this case?
+
+> If we hear no objections, call kirkwood_nand_init() with no partition
+> entries, then put the partition entries in the commandline in the dts.
+> This is what Arnaud Patard is doing with the Iomega iConnect:
+>
+> mtdparts=orion_nand:0xc0000 at 0x0(uboot),0x20000 at 0xa0000(env),0x300000 at 0x100000(zImage),0x300000 at 0x540000(initrd)...
+>
+> Then, in the last patch remove the mtdparts from the commandline in the
+> dts and add the partition entries appropriately.
+
+Certainly can do, although I'm not entirely convinced it addresses Grant's  
+comment. Another option would be to change the patch order and add DNS-320  
+support after all NAND support patches are merged, although that would go  
+against the initial advice of how to layout the patchset. Will do whatever  
+is considered best though.
+
+>
+> thx,
+>
+> Jason.
 
 
-Thanks,
-
-Florian Tobias Schandinat
-
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> Cc: Chen Peter-B29397 <B29397@freescale.com>
-> Cc: Detlev Zundel <dzu@denx.de>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> Cc: Li Frank-B20596 <B20596@freescale.com>
-> Cc: Lin Tony-B19295 <B19295@freescale.com>
-> Cc: Linux FBDEV <linux-fbdev@vger.kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Subodh Nijsure <snijsure@grid-net.com>
-> Cc: Tony Lin <tony.lin@freescale.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-> ---
->  drivers/video/mxsfb.c |   13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-> index 4a89f88..a265356 100644
-> --- a/drivers/video/mxsfb.c
-> +++ b/drivers/video/mxsfb.c
-> @@ -880,6 +880,18 @@ static int __devexit mxsfb_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +void mxsfb_shutdown(struct platform_device *pdev)
-> +{
-> +	struct fb_info *fb_info = platform_get_drvdata(pdev);
-> +	struct mxsfb_info *host = to_imxfb_host(fb_info);
-> +
-> +	/*
-> +	 * Force stop the LCD controller as keeping it running during reboot
-> +	 * might interfere with the BootROM's boot mode pads sampling.
-> +	 */
-> +	writel(CTRL_RUN, host->base + LCDC_CTRL + REG_CLR);
-> +}
-> +
->  static struct platform_device_id mxsfb_devtype[] = {
->  	{
->  		.name = "imx23-fb",
-> @@ -896,6 +908,7 @@ MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
->  static struct platform_driver mxsfb_driver = {
->  	.probe = mxsfb_probe,
->  	.remove = __devexit_p(mxsfb_remove),
-> +	.shutdown = mxsfb_shutdown,
->  	.id_table = mxsfb_devtype,
->  	.driver = {
->  		   .name = DRIVER_NAME,
+-- 
+Jamie Lentin
