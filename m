@@ -1,15 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 04:07:45 +0200
-Subject: [PATCH 06/10] MXS: Add composite imx-usb driver
+Date: Wed, 18 Apr 2012 04:07:46 +0200
+Subject: [PATCH 07/10] MXS: Add USB PHY driver
 In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
  <1334714869-19282-1-git-send-email-marex@denx.de>
-Message-ID: <1334714869-19282-7-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-8-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver handles claiming of clocks and memory areas. These are later
-properly delegated to it's child devices, the USB PHY and USB Host.
+Add driver that controls the built-in USB PHY in the i.MX233/i.MX28. This
+enables the PHY upon powerup and shuts it down on shutdown.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -26,49 +26,53 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- drivers/usb/otg/Kconfig   |    6 +
+ drivers/usb/otg/Kconfig   |   10 +++
  drivers/usb/otg/Makefile  |    1 +
- drivers/usb/otg/imx-usb.c |  303 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 310 insertions(+)
- create mode 100644 drivers/usb/otg/imx-usb.c
+ drivers/usb/otg/mxs-phy.c |  201 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 212 insertions(+)
+ create mode 100644 drivers/usb/otg/mxs-phy.c
 
 diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-index 5c87db0..e7c6325 100644
+index e7c6325..1de1495 100644
 --- a/drivers/usb/otg/Kconfig
 +++ b/drivers/usb/otg/Kconfig
-@@ -116,6 +116,12 @@ config FSL_USB2_OTG
- 	help
- 	  Enable this to support Freescale USB OTG transceiver.
+@@ -122,6 +122,16 @@ config USB_IMX_COMPOSITE
+ 	  Composite driver that handles clock and memory mapping for
+ 	  i.MX USB host and USB PHY.
  
-+config USB_IMX_COMPOSITE
-+	bool
++config USB_MXS_PHY
++	tristate "Freescale i.MX28 USB PHY support"
++	select USB_OTG_UTILS
++	select USB_IMX_COMPOSITE
 +	help
-+	  Composite driver that handles clock and memory mapping for
-+	  i.MX USB host and USB PHY.
++	  Say Y here if you want to build Freescale i.MX28 USB PHY
++	  driver in kernel.
++
++	  To compile this driver as a module, choose M here.
 +
  config USB_MV_OTG
  	tristate "Marvell USB OTG support"
  	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
 diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
-index 41aa509..e3feaca 100644
+index e3feaca..56700b3 100644
 --- a/drivers/usb/otg/Makefile
 +++ b/drivers/usb/otg/Makefile
-@@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
- obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
+@@ -21,4 +21,5 @@ obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
  fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
  obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
-+obj-$(CONFIG_USB_IMX_COMPOSITE)	+= imx-usb.o
+ obj-$(CONFIG_USB_IMX_COMPOSITE)	+= imx-usb.o
++obj-$(CONFIG_USB_MXS_PHY)	+= mxs-phy.o
  obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
-diff --git a/drivers/usb/otg/imx-usb.c b/drivers/usb/otg/imx-usb.c
+diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
 new file mode 100644
-index 0000000..8062dfa
+index 0000000..3c6c5a2
 --- /dev/null
-+++ b/drivers/usb/otg/imx-usb.c
-@@ -0,0 +1,303 @@
++++ b/drivers/usb/otg/mxs-phy.c
+@@ -0,0 +1,201 @@
 +/*
-+ * drivers/usb/otg/imx-usb.c
++ * drivers/usb/otg/mxs-phy.c
 + *
-+ * Freescale i.MX USB composite driver.
++ * Freescale i.MX28 USB PHY driver.
 + *
 + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
 + * on behalf of DENX Software Engineering GmbH
@@ -95,278 +99,176 @@ index 0000000..8062dfa
 +#include <linux/slab.h>
 +#include <linux/delay.h>
 +#include <linux/fsl_devices.h>
-+#include <linux/io.h>
 +
 +#include <mach/common.h>
 +#include <mach/hardware.h>
 +#include <mach/devices-common.h>
++#include <mach/mx28.h>
 +
-+/*
-+ * Allocate platform device with the DMA mask, this is borrowed from
-+ * arch/arm/mach-mxs/devices.c
-+ */
-+static struct platform_device *__devinit add_platform_device(
-+		const char *name, int id,
-+		const void *data, size_t size_data, u64 dmamask)
++#define HW_USBPHY_PWD				0x00
++
++#define HW_USBPHY_CTRL				0x30
++#define HW_USBPHY_CTRL_SET			0x34
++#define HW_USBPHY_CTRL_CLR			0x38
++#define HW_USBPHY_CTRL_TOG			0x3c
++
++#define BM_USBPHY_CTRL_SFTRST			(1 << 31)
++#define BM_USBPHY_CTRL_CLKGATE			(1 << 30)
++#define BM_USBPHY_CTRL_ENUTMILEVEL3		(1 << 15)
++#define BM_USBPHY_CTRL_ENUTMILEVEL2		(1 << 14)
++#define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	(1 << 1)
++
++static int phy_init(struct usb_phy *x)
 +{
-+	int ret = -ENOMEM;
-+	struct platform_device *pdev;
++	struct imx_usb_data *data = x->dev->platform_data;
++	uint32_t val;
 +
-+	pdev = platform_device_alloc(name, id);
-+	if (!pdev)
-+		goto err;
++	/* Enable clock to the PHY. */
++	clk_enable(data->clk);
 +
-+	if (dmamask) {
-+		/*
-+		 * This memory isn't freed when the device is put,
-+		 * I don't have a nice idea for that though.  Conceptually
-+		 * dma_mask in struct device should not be a pointer.
-+		 * See http://thread.gmane.org/gmane.linux.kernel.pci/9081
-+		 */
-+		pdev->dev.dma_mask =
-+			kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-+		if (!pdev->dev.dma_mask)
-+			/* ret is still -ENOMEM; */
-+			goto err;
++	/* Reset the PHY block. */
++	mxs_reset_block(data->mem + HW_USBPHY_CTRL);
 +
-+		*pdev->dev.dma_mask = dmamask;
-+		pdev->dev.coherent_dma_mask = dmamask;
-+	}
++	/* Power up the PHY. */
++	writel(0, data->mem + HW_USBPHY_PWD);
 +
-+	if (data) {
-+		ret = platform_device_add_data(pdev, data, size_data);
-+		if (ret)
-+			goto err;
-+	}
++	/* Enable FS/LS compatibility and HS disconnection detector. */
++	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
++		BM_USBPHY_CTRL_ENHOSTDISCONDETECT;
++	writel(val, data->mem + HW_USBPHY_CTRL_SET);
 +
-+	ret = platform_device_add(pdev);
-+	if (ret) {
-+err:
-+		if (dmamask)
-+			kfree(pdev->dev.dma_mask);
-+		platform_device_put(pdev);
-+		return ERR_PTR(ret);
-+	}
-+
-+	return pdev;
++	return 0;
 +}
 +
-+static int __devinit imx_usb_probe(struct platform_device *pdev)
++static void phy_shutdown(struct usb_phy *x)
 +{
-+	struct imx_usb *data;
-+	struct imx_usb_data *host_data, *phy_data;
++	struct imx_usb_data *data = x->dev->platform_data;
++
++	/* Gate off the PHY. */
++	writel(BM_USBPHY_CTRL_CLKGATE, data->mem + HW_USBPHY_CTRL_SET);
++
++	/* Disable clock to the PHY. */
++	clk_disable(data->clk);
++}
++
++static int phy_set_vbus(struct usb_otg *otg, bool enabled)
++{
++	struct usb_phy *x = otg->phy;
++	struct imx_usb_data *data = x->dev->platform_data;
++
++	if (enabled)
++		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
++			data->mem + HW_USBPHY_CTRL_CLR);
++	else
++		writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
++			data->mem + HW_USBPHY_CTRL_SET);
++
++	return 0;
++}
++
++static int __devinit mxs_phy_probe(struct platform_device *pdev)
++{
++	struct imx_usb_data *data = pdev->dev.platform_data;
++	struct usb_phy *phy;
 +	int ret;
-+	void *retp = NULL;
 +
-+	/*
-+	 * Until further notice, this claims all necessary resources.
-+	 */
-+
-+	/* Allocate driver's private date. */
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
 +	if (!data) {
++		dev_err(&pdev->dev, "USB PHY platform data missing!\n");
++		return -ENODEV;
++	}
++
++	/* Allocate PHY driver's private date. */
++	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
++	if (!phy) {
++		dev_err(&pdev->dev, "Failed to allocate USB PHY structure!\n");
 +		ret = -ENOMEM;
-+		goto err_alloc_data;
++		goto err_alloc_phy;
++
 +	}
 +
-+	host_data = &data->host;
-+	phy_data = &data->phy;
-+
-+	/* Claim the Host clock. */
-+	host_data->clk = clk_get(&pdev->dev, "usb");
-+	if (IS_ERR(host_data->clk)) {
-+		dev_err(&pdev->dev, "Failed to claim clock for USB Host\n");
-+		ret = PTR_ERR(host_data->clk);
-+		goto err_claim_host_clock;
++	phy->otg = kzalloc(sizeof(*phy->otg), GFP_KERNEL);
++	if (!phy->otg) {
++		dev_err(&pdev->dev, "Failed to allocate USB OTG structure!\n");
++		ret = -ENOMEM;
++		goto err_alloc_otg;
 +	}
 +
-+	/* Claim the PHY clock. */
-+	phy_data->clk = clk_get(&pdev->dev, "phy");
-+	if (!phy_data->clk) {
-+		dev_err(&pdev->dev, "Failed to claim clock for USB PHY\n");
-+		ret = PTR_ERR(host_data->clk);
-+		goto err_claim_phy_clock;
-+	}
++	/* Setup the PHY structures. */
++	phy->dev		= &pdev->dev;
++	phy->label		= "mxs-usb-phy";
++	phy->init		= phy_init;
++	phy->shutdown		= phy_shutdown;
++	phy->state		= OTG_STATE_A_HOST;
 +
-+	/* Prepare Host clock. */
-+	ret = clk_prepare(host_data->clk);
++	phy->otg->phy		= phy;
++	phy->otg->set_vbus	= phy_set_vbus;
++
++	platform_set_drvdata(pdev, phy);
++
++	ATOMIC_INIT_NOTIFIER_HEAD(&phy->notifier);
++
++	/* Register the transceiver with kernel. */
++	ret = usb_set_transceiver(phy);
 +	if (ret) {
-+		dev_err(&pdev->dev, "Failed to prepare clock for USB Host.\n");
-+		goto err_prepare_host_clock;
-+	}
-+
-+	/* Prepare PHY clock. */
-+	ret = clk_prepare(phy_data->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to prepare clock for USB PHY.\n");
-+		goto err_prepare_phy_clock;
-+	}
-+
-+	/* Get memory area for EHCI host from resources. */
-+	host_data->mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!host_data->mem_res) {
-+		dev_err(&pdev->dev, "Specify memory area for this USB Host!\n");
-+		ret = -ENODEV;
-+		goto err_get_host_resource;
-+	}
-+
-+	/* Get memory area for PHY from resources. */
-+	phy_data->mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!phy_data->mem_res) {
-+		dev_err(&pdev->dev, "Specify memory area for this USB PHY!\n");
-+		ret = -ENODEV;
-+		goto err_get_phy_resource;
-+	}
-+
-+	/* Request the memory region for this USB Host. */
-+	retp = devm_request_mem_region(&pdev->dev, host_data->mem_res->start,
-+			resource_size(host_data->mem_res), pdev->name);
-+	if (!retp) {
-+		dev_err(&pdev->dev, "USB Host memory area already in use!\n");
-+		ret = -EBUSY;
-+		goto err_get_host_mem;
-+	}
-+
-+	/* Request the memory region for this USB PHY. */
-+	retp = devm_request_mem_region(&pdev->dev, phy_data->mem_res->start,
-+			resource_size(phy_data->mem_res), pdev->name);
-+	if (!retp) {
-+		dev_err(&pdev->dev, "USB PHY memory area already in use!\n");
-+		ret = -EBUSY;
-+		goto err_get_phy_mem;
-+	}
-+
-+	/* Map the memory region for USB Host. */
-+	host_data->mem = devm_ioremap(&pdev->dev, host_data->mem_res->start,
-+				resource_size(host_data->mem_res));
-+	if (!host_data->mem) {
-+		dev_err(&pdev->dev, "Memory mapping of USB Host failed!\n");
-+		ret = -EFAULT;
-+		goto err_map_host_mem;
-+	}
-+
-+	/* Map the memory region for USB PHY. */
-+	phy_data->mem = devm_ioremap(&pdev->dev, phy_data->mem_res->start,
-+				resource_size(phy_data->mem_res));
-+	if (!phy_data->mem) {
-+		dev_err(&pdev->dev, "Memory mapping of USB PHY failed!\n");
-+		ret = -EFAULT;
-+		goto err_map_phy_mem;
-+	}
-+
-+	/* Get IRQ for EHCI host from resources. */
-+	host_data->irq = platform_get_irq(pdev, 0);
-+	if (host_data->irq < 0) {
-+		dev_err(&pdev->dev, "Specify IRQ for this USB Host!\n");
-+		ret = -ENODEV;
-+		goto err_get_host_irq;
-+	}
-+
-+	/*
-+	 * Now finally probe the Host and PHY drivers!
-+	 */
-+	data->phy_dev = add_platform_device("mxs-usb-phy", -1, &data->phy,
-+					sizeof(data->phy), DMA_BIT_MASK(32));
-+	if (!data->phy_dev) {
-+		dev_err(&pdev->dev, "Failed registering PHY!\n");
-+		ret = -ENODEV;
-+		goto err_register_phy;
-+	}
-+
-+	data->host_dev = add_platform_device("mxs-ehci", -1, &data->host,
-+					sizeof(data->host), DMA_BIT_MASK(32));
-+	if (!data->host_dev) {
-+		dev_err(&pdev->dev, "Failed registering Host!\n");
-+		ret = -ENODEV;
-+		goto err_register_host;
++		dev_err(&pdev->dev, "Can't register transceiver, (%d)\n", ret);
++		goto err_set_transceiver;
 +	}
 +
 +	return 0;
 +
-+err_register_host:
-+err_register_phy:
-+	platform_device_unregister(data->phy_dev);
-+err_get_host_irq:
-+	iounmap(phy_data->mem);
-+err_map_phy_mem:
-+	iounmap(host_data->mem);
-+err_map_host_mem:
-+	release_mem_region(phy_data->mem_res->start,
-+			resource_size(phy_data->mem_res));
-+err_get_phy_mem:
-+	release_mem_region(host_data->mem_res->start,
-+			resource_size(host_data->mem_res));
-+err_get_host_mem:
-+	phy_data->mem_res = NULL;
-+err_get_phy_resource:
-+	host_data->mem_res = NULL;
-+err_get_host_resource:
-+	clk_unprepare(phy_data->clk);
-+err_prepare_phy_clock:
-+	clk_unprepare(host_data->clk);
-+err_prepare_host_clock:
-+	clk_put(phy_data->clk);
-+err_claim_phy_clock:
-+	clk_put(host_data->clk);
-+err_claim_host_clock:
-+	kfree(data);
-+err_alloc_data:
++err_set_transceiver:
++	platform_set_drvdata(pdev, NULL);
++	kfree(phy->otg);
++err_alloc_otg:
++	kfree(phy);
++err_alloc_phy:
 +	return ret;
 +}
 +
-+static int __devexit imx_usb_remove(struct platform_device *pdev)
++static int __devexit mxs_phy_remove(struct platform_device *pdev)
 +{
-+	struct imx_usb *data = platform_get_drvdata(pdev);
-+	struct imx_usb_data *host_data, *phy_data;
++	struct imx_usb_data *data = pdev->dev.platform_data;
++	struct usb_phy *phy = platform_get_drvdata(pdev);
 +
-+	host_data = &data->host;
-+	phy_data = &data->phy;
++	/* Power down the PHY. */
++	phy_shutdown(phy);
 +
-+	platform_device_unregister(data->host_dev);
-+	platform_device_unregister(data->phy_dev);
++	/* Stop the PHY clock. */
++	clk_disable(data->clk);
 +
-+	iounmap(host_data->mem);
-+	iounmap(host_data->mem);
-+	release_mem_region(phy_data->mem_res->start,
-+			resource_size(phy_data->mem_res));
-+	release_mem_region(host_data->mem_res->start,
-+			resource_size(host_data->mem_res));
-+	phy_data->mem_res = NULL;
-+	host_data->mem_res = NULL;
-+	clk_unprepare(phy_data->clk);
-+	clk_unprepare(host_data->clk);
-+	clk_put(phy_data->clk);
-+	clk_put(host_data->clk);
-+	kfree(data);
++	/* Free the rest. */
++	usb_set_transceiver(NULL);
++	platform_set_drvdata(pdev, NULL);
++	kfree(phy);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver imx_usb_driver = {
-+	.probe		= imx_usb_probe,
-+	.remove		= __devexit_p(imx_usb_remove),
++static struct platform_driver mxs_phy_driver = {
++	.probe		= mxs_phy_probe,
++	.remove		= __devexit_p(mxs_phy_remove),
 +	.driver		= {
-+		.name	= "imx-usb",
++		.name	= "mxs-usb-phy",
 +		.owner	= THIS_MODULE,
 +	},
 +};
 +
-+static int __init imx_usb_init(void)
++static int __init mxs_phy_init(void)
 +{
-+	return platform_driver_register(&imx_usb_driver);
++	return platform_driver_register(&mxs_phy_driver);
 +}
 +
-+static void __exit imx_usb_exit(void)
++static void __exit mxs_phy_exit(void)
 +{
-+	platform_driver_unregister(&imx_usb_driver);
++	platform_driver_unregister(&mxs_phy_driver);
 +}
 +
-+module_init(imx_usb_init);
-+module_exit(imx_usb_exit);
++module_init(mxs_phy_init);
++module_exit(mxs_phy_exit);
 +
-+MODULE_ALIAS("platform:imx-usb");
++MODULE_ALIAS("platform:mxs-usb-phy");
 +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
-+MODULE_DESCRIPTION("Freescale i.MX USB composite driver");
++MODULE_DESCRIPTION("Freescale i.MX28 USB PHY driver");
 +MODULE_LICENSE("GPL");
 -- 
 1.7.9.5
