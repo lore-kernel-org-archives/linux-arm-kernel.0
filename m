@@ -1,39 +1,24 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 18 Apr 2012 17:05:52 +0800
-Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
-In-Reply-To: <20120329064320.GA20840@pengutronix.de>
-References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
- <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
- <4F73CCC6.6000001@freescale.com>
- <20120329064320.GA20840@pengutronix.de>
-Message-ID: <20120418090551.GA30966@shlinux2.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 18 Apr 2012 03:08:33 -0600 (MDT)
+Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
+ both clk and hwmod
+In-Reply-To: <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
+References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
+ <4F8E76C3.7080803@ti.com>
+ <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1204180307530.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Wed, 18 Apr 2012, Paul Walmsley wrote:
 
-On Thu, Mar 29, 2012 at 08:43:20AM +0200, Wolfram Sang wrote:
-> Hi,
-> 
-> > >  include/linux/stmp_device.h |   20 +++++++++++
-> > IMHO, this header should be placed at include/linux/fsl/.
-> 
-> Hmm, one never knows if somewhen in the future some other vendor decides to do
-> do a device with this register layout. It is just a layout, not an IP core per
-> se. So, I'd prefer to leave it as is.
-> 
+> Sounds to me like the right time to make this change for OMAP4 is when the 
+> call to omap2_clk_disable_clkdm_control() is removed from 
+> clock44xx_data.c.
 
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+Sorry, this should have read "when the call to 
+omap2_clk_disable_clkdm_control() is _uncommented_"
 
-I'm converting mxs-dma driver to be mach-independent which also needs
-this patch.
 
-Do you know when this will be merged?
-
-BTW, one small question:
-Is it possible that stmp_reset_block also be used by other vendors?
-If not, i guess include/linux/fsl which already exists may be the
-right place.
-
-Regards
-Dong Aisheng
+- Paul
