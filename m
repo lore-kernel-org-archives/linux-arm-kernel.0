@@ -1,33 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2012 11:17:33 +0100
-Subject: [PATCH 1/8] ARM: OMAP: fix DMA vs memory ordering
-In-Reply-To: <20120418101519.GU13842@arwen.pp.htv.fi>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRqN-0004b4-Me@rmk-PC.arm.linux.org.uk>
- <20120418101519.GU13842@arwen.pp.htv.fi>
-Message-ID: <20120418101733.GL25053@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 12:17:46 +0200
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20120418101746.GS3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 01:15:20PM +0300, Felipe Balbi wrote:
-> On Wed, Apr 18, 2012 at 11:10:35AM +0100, Russell King wrote:
-> > Using coherent DMA memory with the OMAP DMA engine results in
-> > unpredictable behaviour due to memory ordering issues; as things stand,
-> > there is no guarantee that data written to coherent DMA memory will be
-> > visible to the DMA hardware.
-> > 
-> > This is because the OMAP dma_write() accessor contains no barriers,
-> > necessary on ARMv6 and above.  The effect of this can be seen in comments
-> > in the OMAP serial driver, which incorrectly talks about cache flushing
-> > for the coherent DMA stuff.
-> > 
-> > Rather than adding barriers to the accessors, add it in the DMA support
-> > code just before we enable DMA, and just after we disable DMA.  This
-> > avoids having barriers for every DMA register access.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> cool, should this go to stable too ?
+Hi Olof, Arnd,
 
-Has anyone seen a problem (other than me when trying to get DMA engine
-working with omap-serial transmit paths) ?
+Please pull the following for -rc.
+
+Thanks
+ Sascha
+
+
+The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+
+  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.4-rc3-imx-fixes
+
+for you to fetch changes up to 4659b7f1fa3eb33a8f9a9dd209a5823602dc6dcf:
+
+  ARM: imx: Fix imx5 idle logic bug (2012-04-18 11:52:24 +0200)
+
+----------------------------------------------------------------
+ARM i.MX misc fixes for -rc
+
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: imx_v4_v5_defconfig: Add support for CONFIG_REGULATOR_FIXED_VOLTAGE
+      ARM: imx27-dt: Fix build due to removal of irq_domain_add_simple()
+
+Robert Lee (1):
+      ARM: imx: Fix imx5 idle logic bug
+
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ arch/arm/mach-imx/imx27-dt.c         |    6 ++++--
+ arch/arm/mach-imx/mm-imx5.c          |    2 +-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
