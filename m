@@ -1,89 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 18 Apr 2012 10:33:03 -0700
-Subject: [PATCH 5/9] ARM: OMAP3: hwmod: rename the smartreflex entries
-In-Reply-To: <1332173578-27422-6-git-send-email-j-pihet@ti.com> (jean pihet's
- message of "Mon, 19 Mar 2012 17:12:54 +0100")
-References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
- <1332173578-27422-6-git-send-email-j-pihet@ti.com>
-Message-ID: <87k41dkks0.fsf@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 18 Apr 2012 19:33:45 +0200
+Subject: [PATCH] ARM: davinci: mark spi_board_info arg to
+ da8xx_register_spi as const
+In-Reply-To: <4F8EEADF.60505@ti.com>
+References: <1333138433-14637-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <4F8EEADF.60505@ti.com>
+Message-ID: <20120418173345.GA20039@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Benoit
+Hi Sekhar,
 
-jean.pihet at newoldbits.com writes:
+On Wed, Apr 18, 2012 at 09:55:03PM +0530, Sekhar Nori wrote:
+> On 3/31/2012 1:43 AM, Uwe Kleine-K?nig wrote:
+> > No further changes necessary
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> Thanks for the patch. I extended this to include some other spi
+> registration routines being used for DM355 and DM365. Here is the
+> updated patch. Can you see if this is OK.
+apart from being exchange-or-outlook-scrambled it looks ok. But actually
+checking that the compiler doesn't yield any new warnings would be a
+better check ...
 
-> From: Jean Pihet <j-pihet@ti.com>
->
-> Change the name field value to better reflect the smartreflex
-> integration in the system
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 ++++----
->  arch/arm/mach-omap2/smartreflex.c          |    2 +-
->  2 files changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> index d7d4c70..40f57c4 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> @@ -2751,7 +2751,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr1_slaves[] = {
->  };
->  
->  static struct omap_hwmod omap34xx_sr1_hwmod = {
-> -	.name		= "sr1",
-> +	.name		= "mpu_iva",
+> Also, please also Cc davinci-linux-open-source at linux.davincidsp.com on
+> davinci patches.
+I asked get_maintainer.pl who to Cc (and cut the list down a bit). Maybe
+get_maintainer.pl doesn't include
+davinci-linux-open-source at linux.davincidsp.com because it's
+subscribers-only?
 
-Should this be "smartreflex_mpu_iva"?  
+Best regards
+Uwe
 
-The OMAP4 SR hwmods have a 'smartreflex_' prefix which seems better.
-
->  	.class		= &omap34xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr1_fck",
->  	.prcm		= {
-> @@ -2775,7 +2775,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr1_slaves[] = {
->  };
->  
->  static struct omap_hwmod omap36xx_sr1_hwmod = {
-> -	.name		= "sr1",
-> +	.name		= "mpu_iva",
->  	.class		= &omap36xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr1_fck",
->  	.prcm		= {
-> @@ -2803,7 +2803,7 @@ static struct omap_hwmod_ocp_if *omap34xx_sr2_slaves[] = {
->  };
->  
->  static struct omap_hwmod omap34xx_sr2_hwmod = {
-> -	.name		= "sr2",
-> +	.name		= "core",
->  	.class		= &omap34xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr2_fck",
->  	.prcm		= {
-> @@ -2827,7 +2827,7 @@ static struct omap_hwmod_ocp_if *omap36xx_sr2_slaves[] = {
->  };
->  
->  static struct omap_hwmod omap36xx_sr2_hwmod = {
-> -	.name		= "sr2",
-> +	.name		= "core",
->  	.class		= &omap36xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr2_fck",
->  	.prcm		= {
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index c18d47d..b2728a5 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -184,7 +184,7 @@ static void sr_set_regfields(struct omap_sr *sr)
->  		sr->err_weight = OMAP3430_SR_ERRWEIGHT;
->  		sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
->  		sr->accum_data = OMAP3430_SR_ACCUMDATA;
-> -		if (!(strcmp(sr->name, "sr1"))) {
-> +		if (!(strcmp(sr->name, "sr_mpu_iva"))) {
-
-Why the 'sr_' prefix?
-
->  			sr->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
->  			sr->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
->  		} else {
-
-Kevin
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
