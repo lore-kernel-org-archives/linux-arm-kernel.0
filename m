@@ -1,44 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 18 Apr 2012 11:37:09 -0600
-Subject: [PATCH 1/1] pinctrl: handle dummy state in core
-In-Reply-To: <CACRpkdZw6iv=PjvvU4s5L8yV6813gCD7t8Vk-S66v-nXPaf+=Q@mail.gmail.com>
-References: <1334586289-13078-1-git-send-email-b29396@freescale.com>	<4F8C42D6.2000607@wwwdotorg.org>	<20120417034210.GD17173@shlinux2.ap.freescale.net>	<CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>	<20120418122832.GP20478@pengutronix.de>
- <CACRpkdZw6iv=PjvvU4s5L8yV6813gCD7t8Vk-S66v-nXPaf+=Q@mail.gmail.com>
-Message-ID: <4F8EFBC5.1030607@wwwdotorg.org>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 18 Apr 2012 19:46:24 +0200
+Subject: [RFC PATCH 00/10 V3]  MXS: Add i.MX28 USB Host driver
+In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+Message-ID: <1334771194-18688-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2012 07:52 AM, Linus Walleij wrote:
-> On Wed, Apr 18, 2012 at 2:28 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
->> Currently Dong Aisheng is working on i.MX6, we have i.MX31, i.MX35,
->> i.MX51 and i.MX53 enabled in the same defconfig. Waiting for all
->> machines turn over at once to pinctrl is illusionary. We have to make
->> drivers work with and without pinctrl. We have a bunch of bad choices:
->>
->> - create a dummy pinctrl for all boards which do not have real pinmux
->>  support
-> 
-> Viable compromise.
-> 
->> - ignore pinctrl_request errors in drivers.
-> 
-> Ugh. Not good.
-> 
->> - generate and return a dummy pinctrl in the core if no real pinctrl is
->>  found.
->>
->> (replace pinctrl with regulators or clocks, it's the same situation, and
->> it's not only i.MX specific)
-> 
-> Since we have dummy regulators, we should not break the design
-> pattern creating more confusion.
-> 
-> Stephen can you live with dummy pinctrl handles emitted by the
-> core, if explicitly enabled by a Kconfig option?
+This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
+generic USB PHY infrastructure.
 
-Yes, I'm happy with the pinctrl core having the ability to "magically"
-work when the dummy mapping table entries (or DT entries) are missing,
-so long as there is a default-off Kconfig or runtime option that enables
-that feature, which I'd expect to be use only for boards/platforms/...
-that are "under conversion".
+V2: Introduce stub imx-usb driver that then registers the PHY and EHCI drivers.
+V3: Add the HCD on demand based on the PHY's state (only add HCD if it's host).
+    Currently, only the HOST mode is supported.
+
+Marek Vasut (10):
+  MXS: Make clk_disable return integer
+  MXS: Add USB EHCI and USB PHY clock handling
+  MXS: Fixup i.MX233 USB base address name
+  MXS: Add data shared between imx-usb and EHCI driver
+  MXS: Add platform registration hooks for USB EHCI
+  MXS: Add imx-usb driver
+  MXS: Add USB PHY driver
+  MXS: Add separate MXS EHCI HCD driver
+  MXS: Enable USB on M28EVK
+  MXS: Enable USB on MX28EVK
+
+ arch/arm/mach-mxs/Kconfig                       |    4 +
+ arch/arm/mach-mxs/clock-mx28.c                  |   28 ++-
+ arch/arm/mach-mxs/devices-mx28.h                |    4 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-usb.c        |   78 ++++++
+ arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
+ arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
+ arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
+ arch/arm/mach-mxs/mach-m28evk.c                 |   15 ++
+ arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
+ drivers/usb/host/Kconfig                        |    7 +
+ drivers/usb/host/ehci-hcd.c                     |    5 +
+ drivers/usb/host/ehci-mxs.c                     |  228 +++++++++++++++++
+ drivers/usb/otg/Kconfig                         |   16 ++
+ drivers/usb/otg/Makefile                        |    2 +
+ drivers/usb/otg/imx-usb.c                       |  226 +++++++++++++++++
+ drivers/usb/otg/mxs-phy.c                       |  305 +++++++++++++++++++++++
+ include/linux/fsl_devices.h                     |   10 +
+ 19 files changed, 952 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
+ create mode 100644 drivers/usb/host/ehci-mxs.c
+ create mode 100644 drivers/usb/otg/imx-usb.c
+ create mode 100644 drivers/usb/otg/mxs-phy.c
+
+Cc: Chen Peter-B29397 <B29397@freescale.com>
+Cc: Detlev Zundel <dzu@denx.de>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Li Frank-B20596 <B20596@freescale.com>
+Cc: Lin Tony-B19295 <B19295@freescale.com>
+Cc: Linux USB <linux-usb@vger.kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Subodh Nijsure <snijsure@grid-net.com>
+Cc: Tony Lin <tony.lin@freescale.com>
+Cc: Wolfgang Denk <wd@denx.de>
+
+-- 
+1.7.9.5
