@@ -1,22 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2012 10:55:56 +0100
-Subject: [PATCH 2/2] clk: wm831x: Add initial WM831x clock driver
-In-Reply-To: <1334736433-3402-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1334736433-3402-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1334736433-3402-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20120418095556.GY24211@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 18 Apr 2012 11:57:11 +0200
+Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
+ both clk and hwmod
+In-Reply-To: <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
+References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
+ <4F8E76C3.7080803@ti.com>
+ <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
+ <4F8E84DC.70600@ti.com>
+ <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
+Message-ID: <4F8E8FF7.4000706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 09:07:13AM +0100, Mark Brown wrote:
-> +static __devexit int wm831x_clk_remove(struct platform_device *pdev)
-> +{
-> +	struct wm831x_clk *clkdata = dev_get_drvdata(&pdev->dev);
-> +
-> +	clk_unregister(clkdata->clkout_hw.clk);
-> +	clk_unregister(clkdata->fll_hw.clk);
-> +	clk_unregister(clkdata->xtal_hw.clk);
+On 4/18/2012 11:40 AM, Paul Walmsley wrote:
+> On Wed, 18 Apr 2012, Cousson, Benoit wrote:
+>
+>> Well, the point is that we do not need this warning even for that. This
+>> is something we have to ensure by reviewing carefully the code.
+>
+> My perspective is slightly different.
+>
+> Until we're sure that we don't need clock framework-based clockdomain
+> control in mainline for main clocks, we shouldn't remove that warning.
+> That is because clock framework-based clockdomain control works via the
+> struct clk's clkdm field.  So until we switch away from that model, we
+> should ensure that each clock is associated with the clockdomain that its
+> clock control FSM is associated with (in OMAP3 terms).
+>
+> I don't have a problem with switching away from that model, or switching
+> individual SoCs away from that model, as long as regressions aren't
+> introduced.  But until that switch happens, it seems wise to avoid
+> weakening its consistency assumptions.
+>
+>> If you look today, the warning is complaining about clocks that are
+>> perfectly fine.
+>
+> Actually, mainline is only complaining about one clock:
 
-And another reason returning error codes from unregister functions is a
-bad idea - you've just demonstrated above why that is.  You created this
-function which returns an error code, but you're not checking it.
+Hehe, sure, this is because we still have a bunch of clock nodes that 
+should not be there at the first place... But once you are trying to 
+remove them...
+
+> http://www.pwsan.com/omap/bootlogs/20120417/sparse_cppcheck_cleanup_3.5__0b93afd5d945a8c002f4d380a88b5d7a61c49289/4430es2panda_bootlog.txt
+>
+> In the current model, the right fix for that clock is to associate it with
+> a CM clockdomain (see for example the 4430 TRM vX Figure 3-70 "CD_DMA
+> Overview").
+>
+>> So keeping it will just add some noise and not necessarily highlighting
+>> the real issue.
+>>
+>> FYI here is what we have after the clock cleanup on OMAP4 (i.e removal of modulemode clock nodes):
+>>
+>
+> [ lots of warnings elided ]
+>
+>> That's a lot of noise for nothing. That's why Rajendra's patch is needed now.
+>
+> Sounds like the patch to alter the warnings should be associated with this
+> clock cleanup series, then, since it sounds like it changes the
+> clockdomain control model.
+
+It just removes the modulemode clock nodes we were using so far. And 
+since these nodes were the only ones with a clkdm on OMAP4, it is now 
+complaining, because their parents clock does not have a clkdm.
+
+> And if the model change is only affecting
+> OMAP4+, then the warning change should also only apply to OMAP4+.
+
+OK, fair enough. Let's reduce the scope of that change to OMAP4+ only.
+
+Regards,
+Benoit
