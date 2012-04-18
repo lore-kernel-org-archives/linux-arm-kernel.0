@@ -1,53 +1,67 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 18 Apr 2012 18:54:38 +0100
-Subject: [PATCH 3/6] ARM: AT91: Add the ADC to the sam9g20ek board
-In-Reply-To: <1334756036-15944-4-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 18 Apr 2012 18:57:09 +0100
+Subject: [PATCH 4/6] IIO: AT91: ADC: Add support for the AT91SAM9M10G45-EK
+ board
+In-Reply-To: <1334756036-15944-5-git-send-email-maxime.ripard@free-electrons.com>
 References: <1334756036-15944-1-git-send-email-maxime.ripard@free-electrons.com>
- <1334756036-15944-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4F8EFFDE.7030206@kernel.org>
+ <1334756036-15944-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <4F8F0075.9010303@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/18/2012 02:33 PM, Maxime Ripard wrote:
-> This patch adds platform data for the AT91 ADC driver support for
-> the AT91SAM9G20-EK board.
-There is a question of whether config variables from staging can be used
-outside but hopefully that'll become a moot point soon anyway.
-
-This looks fine to me.
+> This patch adds the necessary logic and the required platform_data to
+> support the ADC present in the AT91SAM9M10G45-EK board from Atmel. It
+> only supports software triggers for now.
+Same possible issue as with the other one...  Actually, not sure why
+I acked that given I know very little about the particular platform.
+Hence I'm fine with these, but not really for me to say whether they
+are good!
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
 > 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
->  arch/arm/mach-at91/at91sam9260_devices.c |   53 ++++++++++++++++++++++++++++++
->  arch/arm/mach-at91/board-sam9g20ek.c     |   13 +++++++
->  drivers/staging/iio/adc/at91_adc.c       |    1 -
->  3 files changed, 66 insertions(+), 1 deletions(-)
+>  arch/arm/mach-at91/at91sam9g45.c         |    2 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c |   61 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/board-sam9m10g45ek.c  |   11 +++++
+>  drivers/staging/iio/adc/at91_adc.c       |   11 +++++
+>  4 files changed, 85 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> index 5652dde..758c629 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> @@ -17,6 +17,8 @@
->  #include <linux/platform_device.h>
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index d222f83..c6c35bc 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -242,6 +242,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_ID("pioC", &pioC_clk),
+>  	CLKDEV_CON_ID("pioD", &pioDE_clk),
+>  	CLKDEV_CON_ID("pioE", &pioDE_clk),
+> +	/* Fake adc clock */
+> +	CLKDEV_CON_ID("adc_clk", &tsc_clk),
+>  };
+>  
+>  static struct clk_lookup usart_clocks_lookups[] = {
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 6b008ae..05bc673 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -19,6 +19,8 @@
 >  #include <linux/i2c-gpio.h>
+>  #include <linux/atmel-mci.h>
 >  
 > +#include <linux/platform_data/at91_adc.h>
 > +
->  #include <mach/board.h>
->  #include <mach/cpu.h>
->  #include <mach/at91sam9260.h>
-> @@ -1369,6 +1371,57 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
->  void __init at91_add_device_cf(struct at91_cf_data * data) {}
->  #endif
+>  #include <linux/fb.h>
+>  #include <video/atmel_lcdc.h>
 >  
-> +/* --------------------------------------------------------------------
-> + *  ADCs
+> @@ -1207,6 +1209,65 @@ void __init at91_add_device_tsadcc(struct at91_tsadcc_data *data) {}
+>  
+>  
+>  /* --------------------------------------------------------------------
+> + *  ADC
 > + * -------------------------------------------------------------------- */
 > +
 > +#if defined(CONFIG_AT91_ADC) || defined(CONFIG_AT91_ADC_MODULE)
@@ -55,22 +69,22 @@ Acked-by: Jonathan Cameron <jic23@kernel.org>
 > +
 > +static struct resource adc_resources[] = {
 > +	[0] = {
-> +		.start	= AT91SAM9260_BASE_ADC,
-> +		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
+> +		.start	= AT91SAM9G45_BASE_TSC,
+> +		.end	= AT91SAM9G45_BASE_TSC + SZ_16K - 1,
 > +		.flags	= IORESOURCE_MEM,
 > +	},
 > +	[1] = {
-> +		.start	= AT91SAM9260_ID_ADC,
-> +		.end	= AT91SAM9260_ID_ADC,
+> +		.start	= AT91SAM9G45_ID_TSC,
+> +		.end	= AT91SAM9G45_ID_TSC,
 > +		.flags	= IORESOURCE_IRQ,
-> +	},
+> +	}
 > +};
 > +
 > +static struct platform_device at91_adc_device = {
 > +	.name		= "at91_adc",
 > +	.id		= -1,
 > +	.dev		= {
-> +				.platform_data		= &adc_data,
+> +				.platform_data	= &adc_data,
 > +	},
 > +	.resource	= adc_resources,
 > +	.num_resources	= ARRAY_SIZE(adc_resources),
@@ -82,13 +96,21 @@ Acked-by: Jonathan Cameron <jic23@kernel.org>
 > +		return;
 > +
 > +	if (test_bit(0, &data->channels_used))
-> +		at91_set_A_periph(AT91_PIN_PC0, 0);
+> +		at91_set_gpio_input(AT91_PIN_PD20, 0);
 > +	if (test_bit(1, &data->channels_used))
-> +		at91_set_A_periph(AT91_PIN_PC1, 0);
+> +		at91_set_gpio_input(AT91_PIN_PD21, 0);
 > +	if (test_bit(2, &data->channels_used))
-> +		at91_set_A_periph(AT91_PIN_PC2, 0);
+> +		at91_set_gpio_input(AT91_PIN_PD22, 0);
 > +	if (test_bit(3, &data->channels_used))
-> +		at91_set_A_periph(AT91_PIN_PC3, 0);
+> +		at91_set_gpio_input(AT91_PIN_PD23, 0);
+> +	if (test_bit(4, &data->channels_used))
+> +		at91_set_gpio_input(AT91_PIN_PD24, 0);
+> +	if (test_bit(5, &data->channels_used))
+> +		at91_set_gpio_input(AT91_PIN_PD25, 0);
+> +	if (test_bit(6, &data->channels_used))
+> +		at91_set_gpio_input(AT91_PIN_PD26, 0);
+> +	if (test_bit(7, &data->channels_used))
+> +		at91_set_gpio_input(AT91_PIN_PD27, 0);
 > +
 > +	adc_data = *data;
 > +	platform_device_register(&at91_adc_device);
@@ -97,56 +119,72 @@ Acked-by: Jonathan Cameron <jic23@kernel.org>
 > +void __init at91_add_device_adc(struct at91_adc_data *data) {}
 > +#endif
 > +
->  /* -------------------------------------------------------------------- */
->  /*
->   * These devices are always present and don't need any board-specific
-> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-> index 8923ec9..2ce4e26 100644
-> --- a/arch/arm/mach-at91/board-sam9g20ek.c
-> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
-> @@ -32,6 +32,8 @@
->  #include <linux/regulator/fixed.h>
->  #include <linux/regulator/consumer.h>
+> +/* --------------------------------------------------------------------
+>   *  RTT
+>   * -------------------------------------------------------------------- */
+>  
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index c88e908..fb122ba 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -27,6 +27,8 @@
+>  #include <linux/atmel-mci.h>
+>  #include <linux/delay.h>
 >  
 > +#include <linux/platform_data/at91_adc.h>
 > +
 >  #include <mach/hardware.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
-> @@ -318,6 +320,15 @@ static void __init ek_add_device_buttons(void)
->  static void __init ek_add_device_buttons(void) {}
->  #endif
+>  #include <video/atmel_lcdc.h>
+>  #include <media/soc_camera.h>
+> @@ -315,6 +317,13 @@ static struct at91_tsadcc_data ek_tsadcc_data = {
+>  	.ts_sample_hold_time	= 0x0a,
+>  };
 >  
 > +/*
 > + * ADCs
 > + */
-> +
 > +static struct at91_adc_data ek_adc_data = {
-> +	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3),
+> +	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7),
 > +	.vref = 3300,
 > +};
-> +
->  #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
->  static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
->  	REGULATOR_SUPPLY("AVDD", "0-001b"),
-> @@ -393,6 +404,8 @@ static void __init ek_board_init(void)
->  	ek_add_device_gpio_leds();
+>  
+>  /*
+>   * GPIO Buttons
+> @@ -480,6 +489,8 @@ static void __init ek_board_init(void)
+>  	at91_add_device_lcdc(&ek_lcdc_data);
+>  	/* Touch Screen */
+>  	at91_add_device_tsadcc(&ek_tsadcc_data);
+> +	/* ADC */
+> +	at91_add_device_adc(&ek_adc_data);
 >  	/* Push Buttons */
 >  	ek_add_device_buttons();
-> +	/* ADCs */
-> +	at91_add_device_adc(&ek_adc_data);
->  	/* PCK0 provides MCLK to the WM8731 */
->  	at91_set_B_periph(AT91_PIN_PC1, 0);
->  	/* SSC (for WM8731) */
+>  	/* AC97 */
 > diff --git a/drivers/staging/iio/adc/at91_adc.c b/drivers/staging/iio/adc/at91_adc.c
-> index 6d14277..9af036a 100644
+> index 9af036a..b3517bb 100644
 > --- a/drivers/staging/iio/adc/at91_adc.c
 > +++ b/drivers/staging/iio/adc/at91_adc.c
-> @@ -56,7 +56,6 @@ struct at91_adc_state {
+> @@ -54,6 +54,12 @@ struct at91_adc_state {
+>  	wait_queue_head_t	wq_data_avail;
+>  };
 >  
+> +static struct at91_adc_desc at91_adc_desc_sam9g45 = {
+> +	.clock = 13200000,
+> +	.num_channels = 8,
+> +	.startup_time = 40,
+> +};
+> +
 >  static struct at91_adc_desc at91_adc_desc_sam9g20 = {
 >  	.clock = 5000000,
-> -	.clock_name = "adc_clk",
 >  	.num_channels = 4,
->  	.startup_time = 10,
->  };
+> @@ -67,6 +73,11 @@ static int at91_adc_select_soc(struct at91_adc_state *st)
+>  		return 0;
+>  	}
+>  
+> +	if (cpu_is_at91sam9g45()) {
+> +		st->desc = &at91_adc_desc_sam9g45;
+> +		return 0;
+> +	}
+> +
+>  	return -ENODEV;
+>  }
+>  
