@@ -1,64 +1,69 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 14:24:29 +0200
-Subject: [PATCH 09/10] MXS: Enable USB on M28EVK
-In-Reply-To: <4F8EAED1.3040307@mvista.com>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
- <1334714869-19282-10-git-send-email-marex@denx.de>
- <4F8EAED1.3040307@mvista.com>
-Message-ID: <201204181424.29477.marex@denx.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 14:28:32 +0200
+Subject: [PATCH 1/1] pinctrl: handle dummy state in core
+In-Reply-To: <CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>
+References: <1334586289-13078-1-git-send-email-b29396@freescale.com>
+ <4F8C42D6.2000607@wwwdotorg.org>
+ <20120417034210.GD17173@shlinux2.ap.freescale.net>
+ <CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>
+Message-ID: <20120418122832.GP20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sergei Shtylyov,
+On Wed, Apr 18, 2012 at 01:31:17PM +0200, Linus Walleij wrote:
+> On Tue, Apr 17, 2012 at 5:42 AM, Dong Aisheng
+> <aisheng.dong@freescale.com> wrote:
+> 
+> > I think the main issue is for one platform neither supports dt nor using pinctrl
+> > subsystem, do you think it still makes too much sense to force that platform
+> > to define a _PINCTRL_ dummy state in their machine code?
+> >
+> > But the driver is commonly shared between these different platforms(using pinctrl
+> > or not).
+> 
+> So this is for the situation where some machines have pinctrl and some haven't.
+> 
+> And I think that's how some archs have used the regulator dummies earlier,
+> so I clearly see the point. So if converting a subset of machines in an
+> architecture you will need this for a transitional period.
+> 
+> Is this helpful to get i.MX support in place?
+> 
+> On one hand I'd say we merge it for that reason alone, instead of requiring
+> all i.MX machines to be converted at once.
+> 
+> On the other hand, I fear that this will be used to avoid *ever* migrating
+> the old machines to pinctrl. And it's a generic disease that people working
+> in the arch/arm/* tree want to ditch old hardware without actually deleting
+> the code.
 
-> Hello.
-> 
-> On 18-04-2012 6:07, Marek Vasut wrote:
-> > Enable the second USB port on M28EVK board.
-> > 
-> > Signed-off-by: Marek Vasut<marex@denx.de>
-> > Cc: Chen Peter-B29397<B29397@freescale.com>
-> > Cc: Detlev Zundel<dzu@denx.de>
-> > Cc: Fabio Estevam<festevam@gmail.com>
-> > Cc: Li Frank-B20596<B20596@freescale.com>
-> > Cc: Lin Tony-B19295<B19295@freescale.com>
-> > Cc: Linux USB<linux-usb@vger.kernel.org>
-> > Cc: Sascha Hauer<s.hauer@pengutronix.de>
-> > Cc: Shawn Guo<shawn.guo@freescale.com>
-> > Cc: Shawn Guo<shawn.guo@linaro.org>
-> > Cc: Stefano Babic<sbabic@denx.de>
-> > Cc: Subodh Nijsure<snijsure@grid-net.com>
-> > Cc: Tony Lin<tony.lin@freescale.com>
-> > Cc: Wolfgang Denk<wd@denx.de>
-> > ---
-> > 
-> >   arch/arm/mach-mxs/Kconfig       |    2 ++
-> >   arch/arm/mach-mxs/mach-m28evk.c |    9 +++++++++
-> >   2 files changed, 11 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> > index 9dbf29f..5b5566c 100644
-> > --- a/arch/arm/mach-mxs/Kconfig
-> > +++ b/arch/arm/mach-mxs/Kconfig
-> 
-> [...]
-> 
-> > @@ -377,6 +382,10 @@ static void __init m28evk_init(void)
-> > 
-> >   	mx28_add_ts(&touch_pdata);
-> >   	
-> >   	mx28_add_gpmi_nand(&m28evk_gpmi_nand_data);
-> > 
-> > +
-> > +	gpio_request_one(MXS_GPIO_NR(3, 13), GPIOF_OUT_INIT_LOW, "USB Power");
-> 
->     Still can fail, and you don't handle it (unlike the next patch).
-
-Hey, it was 4am in the morning when I was submitting this stuff, pardon my 
-mistake ;-) Will be fixed in the new revision, thanks!
+'existing' doesn't necessarily mean 'old'
 
 > 
-> WBR, Sergei
+> I'd like Sascha's view on this to make a good decision.
 
-Best regards,
-Marek Vasut
+Currently Dong Aisheng is working on i.MX6, we have i.MX31, i.MX35,
+i.MX51 and i.MX53 enabled in the same defconfig. Waiting for all
+machines turn over at once to pinctrl is illusionary. We have to make
+drivers work with and without pinctrl. We have a bunch of bad choices:
+
+- create a dummy pinctrl for all boards which do not have real pinmux
+  support
+- ignore pinctrl_request errors in drivers.
+- generate and return a dummy pinctrl in the core if no real pinctrl is
+  found.
+
+(replace pinctrl with regulators or clocks, it's the same situation, and
+it's not only i.MX specific)
+
+I don't have a good solution for this, only the idea that it should be
+possible to attach these kinds of resources to a device and then a
+driver would only call a make_me_work(dev).
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
