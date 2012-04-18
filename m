@@ -1,88 +1,172 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 18 Apr 2012 15:44:04 +0200
-Subject: [PATCHv9 02/10] ARM: dma-mapping: use pr_* instread of printk
+Date: Wed, 18 Apr 2012 15:44:10 +0200
+Subject: [PATCHv9 08/10] ARM: dma-mapping: remove redundant code and cleanup
 In-Reply-To: <1334756652-30830-1-git-send-email-m.szyprowski@samsung.com>
 References: <1334756652-30830-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1334756652-30830-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1334756652-30830-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace all calls to printk with pr_* functions family.
+This patch just performs a global cleanup in DMA mapping implementation
+for ARM architecture. Some of the tiny helper functions have been moved
+to the caller code, some have been merged together.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Tested-By: Subash Patel <subash.ramaswamy@linaro.org>
 ---
- arch/arm/mm/dma-mapping.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mm/dma-mapping.c |   88 ++++++++++++--------------------------------
+ 1 files changed, 24 insertions(+), 64 deletions(-)
 
 diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index db23ae4..366f3a2 100644
+index a4db5ec..615fabd 100644
 --- a/arch/arm/mm/dma-mapping.c
 +++ b/arch/arm/mm/dma-mapping.c
-@@ -184,14 +184,14 @@ static int __init consistent_init(void)
+@@ -40,64 +40,12 @@
+  * the CPU does do speculative prefetches, which means we clean caches
+  * before transfers and delay cache invalidation until transfer completion.
+  *
+- * Private support functions: these are not part of the API and are
+- * liable to change.  Drivers must not use these.
+  */
+-static inline void __dma_single_cpu_to_dev(const void *kaddr, size_t size,
+-	enum dma_data_direction dir)
+-{
+-	extern void ___dma_single_cpu_to_dev(const void *, size_t,
+-		enum dma_data_direction);
+-
+-	if (!arch_is_coherent())
+-		___dma_single_cpu_to_dev(kaddr, size, dir);
+-}
+-
+-static inline void __dma_single_dev_to_cpu(const void *kaddr, size_t size,
+-	enum dma_data_direction dir)
+-{
+-	extern void ___dma_single_dev_to_cpu(const void *, size_t,
+-		enum dma_data_direction);
+-
+-	if (!arch_is_coherent())
+-		___dma_single_dev_to_cpu(kaddr, size, dir);
+-}
+-
+-static inline void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+-	size_t size, enum dma_data_direction dir)
+-{
+-	extern void ___dma_page_cpu_to_dev(struct page *, unsigned long,
++static void __dma_page_cpu_to_dev(struct page *, unsigned long,
+ 		size_t, enum dma_data_direction);
+-
+-	if (!arch_is_coherent())
+-		___dma_page_cpu_to_dev(page, off, size, dir);
+-}
+-
+-static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+-	size_t size, enum dma_data_direction dir)
+-{
+-	extern void ___dma_page_dev_to_cpu(struct page *, unsigned long,
++static void __dma_page_dev_to_cpu(struct page *, unsigned long,
+ 		size_t, enum dma_data_direction);
  
- 		pud = pud_alloc(&init_mm, pgd, base);
- 		if (!pud) {
--			printk(KERN_ERR "%s: no pud tables\n", __func__);
-+			pr_err("%s: no pud tables\n", __func__);
- 			ret = -ENOMEM;
- 			break;
- 		}
+-	if (!arch_is_coherent())
+-		___dma_page_dev_to_cpu(page, off, size, dir);
+-}
+-
+-
+-static inline dma_addr_t __dma_map_page(struct device *dev, struct page *page,
+-	     unsigned long offset, size_t size, enum dma_data_direction dir)
+-{
+-	__dma_page_cpu_to_dev(page, offset, size, dir);
+-	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+-}
+-
+-static inline void __dma_unmap_page(struct device *dev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir)
+-{
+-	__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
+-		handle & ~PAGE_MASK, size, dir);
+-}
+-
+ /**
+  * arm_dma_map_page - map a portion of a page for streaming DMA
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+@@ -112,11 +60,13 @@ static inline void __dma_unmap_page(struct device *dev, dma_addr_t handle,
+  * The device owns this memory once this call has completed.  The CPU
+  * can regain ownership by calling dma_unmap_page().
+  */
+-static inline dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
++static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+ 	     struct dma_attrs *attrs)
+ {
+-	return __dma_map_page(dev, page, offset, size, dir);
++	if (!arch_is_coherent())
++		__dma_page_cpu_to_dev(page, offset, size, dir);
++	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+ }
  
- 		pmd = pmd_alloc(&init_mm, pud, base);
- 		if (!pmd) {
--			printk(KERN_ERR "%s: no pmd tables\n", __func__);
-+			pr_err("%s: no pmd tables\n", __func__);
- 			ret = -ENOMEM;
- 			break;
- 		}
-@@ -199,7 +199,7 @@ static int __init consistent_init(void)
+ /**
+@@ -133,27 +83,31 @@ static inline dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+  * After this call, reads by the CPU to the buffer are guaranteed to see
+  * whatever the device wrote there.
+  */
+-static inline void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
++static void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+ 		struct dma_attrs *attrs)
+ {
+-	__dma_unmap_page(dev, handle, size, dir);
++	if (!arch_is_coherent())
++		__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
++				      handle & ~PAGE_MASK, size, dir);
+ }
  
- 		pte = pte_alloc_kernel(pmd, base);
- 		if (!pte) {
--			printk(KERN_ERR "%s: no pte tables\n", __func__);
-+			pr_err("%s: no pte tables\n", __func__);
- 			ret = -ENOMEM;
- 			break;
- 		}
-@@ -222,7 +222,7 @@ __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
- 	int bit;
+-static inline void arm_dma_sync_single_for_cpu(struct device *dev,
++static void arm_dma_sync_single_for_cpu(struct device *dev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+ 	unsigned int offset = handle & (PAGE_SIZE - 1);
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle-offset));
+-	__dma_page_dev_to_cpu(page, offset, size, dir);
++	if (!arch_is_coherent())
++		__dma_page_dev_to_cpu(page, offset, size, dir);
+ }
  
- 	if (!consistent_pte) {
--		printk(KERN_ERR "%s: not initialised\n", __func__);
-+		pr_err("%s: not initialised\n", __func__);
- 		dump_stack();
- 		return NULL;
- 	}
-@@ -281,14 +281,14 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
+-static inline void arm_dma_sync_single_for_device(struct device *dev,
++static void arm_dma_sync_single_for_device(struct device *dev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+ 	unsigned int offset = handle & (PAGE_SIZE - 1);
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle-offset));
+-	__dma_page_cpu_to_dev(page, offset, size, dir);
++	if (!arch_is_coherent())
++		__dma_page_cpu_to_dev(page, offset, size, dir);
+ }
  
- 	c = arm_vmregion_find_remove(&consistent_head, (unsigned long)cpu_addr);
- 	if (!c) {
--		printk(KERN_ERR "%s: trying to free invalid coherent area: %p\n",
-+		pr_err("%s: trying to free invalid coherent area: %p\n",
- 		       __func__, cpu_addr);
- 		dump_stack();
- 		return;
- 	}
+ static int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+@@ -644,7 +598,13 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 	} while (left);
+ }
  
- 	if ((c->vm_end - c->vm_start) != size) {
--		printk(KERN_ERR "%s: freeing wrong coherent size (%ld != %d)\n",
-+		pr_err("%s: freeing wrong coherent size (%ld != %d)\n",
- 		       __func__, c->vm_end - c->vm_start, size);
- 		dump_stack();
- 		size = c->vm_end - c->vm_start;
-@@ -310,8 +310,8 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
- 		}
+-void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
++/*
++ * Make an area consistent for devices.
++ * Note: Drivers should NOT use this function directly, as it will break
++ * platforms with CONFIG_DMABOUNCE.
++ * Use the driver DMA support - see dma-mapping.h (dma_sync_*)
++ */
++static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+ 	size_t size, enum dma_data_direction dir)
+ {
+ 	unsigned long paddr;
+@@ -660,7 +620,7 @@ void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
+ 	/* FIXME: non-speculating: flush on bidirectional mappings? */
+ }
  
- 		if (pte_none(pte) || !pte_present(pte))
--			printk(KERN_CRIT "%s: bad page in kernel page table\n",
--			       __func__);
-+			pr_crit("%s: bad page in kernel page table\n",
-+				__func__);
- 	} while (size -= PAGE_SIZE);
- 
- 	flush_tlb_kernel_range(c->vm_start, c->vm_end);
+-void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
++static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+ 	size_t size, enum dma_data_direction dir)
+ {
+ 	unsigned long paddr = page_to_phys(page) + off;
 -- 
 1.7.1.569.g6f426
