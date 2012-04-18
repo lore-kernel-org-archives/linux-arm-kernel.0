@@ -1,62 +1,66 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 18 Apr 2012 20:46:37 +0800
-Subject: [PATCH 5/5] ARM: mx28evk: add mxs-dma dt support
-In-Reply-To: <1334753197-12032-1-git-send-email-b29396@freescale.com>
-References: <1334753197-12032-1-git-send-email-b29396@freescale.com>
-Message-ID: <1334753197-12032-6-git-send-email-b29396@freescale.com>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Wed, 18 Apr 2012 14:39:36 +0200
+Subject: [PATCH v3 0/6] ARM: OMAP2+: PM: introduce the power domains
+ functional states
+Message-ID: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+From: Jean Pihet <j-pihet@ti.com>
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Marek Vasut <marek.vasut@gmail.com>
-Cc: Huang Shijie <b32955@freescale.com>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
- arch/arm/boot/dts/imx28.dtsi   |    4 ++--
- arch/arm/mach-mxs/clock-mx28.c |    2 ++
- 2 files changed, 4 insertions(+), 2 deletions(-)
+Implement the functional states for the power domains:
+- protect the power domain state change by a mutex in
+  omap_set_pwrdm_state,
+- introduce the functional states for power domains power states and
+  logic power states, and the conversion functions between the
+  functional and internal states,
+- unify the API to use the functional states,
+- program the logic power state of power domains from the functional
+  states, in omap_set_pwrdm_state
+- convert the OMAP2/3/4 PM code to use the updated API,
+- provide the power domains statistics by functional states.
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index d1f4f8c..5f61777 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -52,8 +52,8 @@
- 			};
+Tested on OMAP3 Beagleboard, with suspend and cpuidle in RET and
+OFF modes.
+
+
+History:
+ v3:
+ - fix a bug in OMAP3 cpuidle which prevented the IO wake-ups in PER
+
+ v2:
+ - add the logic power states,
+ - provide the power domains statistics by functional states
+
+ v1:
+ - initial implementation, in RFC state
  
- 			dma-apbh at 80004000 {
-+				compatible = "fsl,imx28-dma-apbh";
- 				reg = <0x80004000 2000>;
--				status = "disabled";
- 			};
- 
- 			perfmon at 80006000 {
-@@ -115,8 +115,8 @@
- 			};
- 
- 			dma-apbx at 80024000 {
-+				compatible = "fsl,imx28-dma-apbx";
- 				reg = <0x80024000 2000>;
--				status = "disabled";
- 			};
- 
- 			dcp at 80028000 {
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index cca2cf7..9c926b6 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -652,6 +652,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("80074000.serial", NULL, uart_clk)
- 	_REGISTER_CLOCK("800f0000.ethernet", NULL, fec_clk)
- 	_REGISTER_CLOCK("800f4000.ethernet", NULL, fec_clk)
-+	_REGISTER_CLOCK("80004000.dma-apbh", NULL, hbus_clk)
-+	_REGISTER_CLOCK("80024000.dma-apbx", NULL, xbus_clk)
- };
- 
- static int clk_misc_init(void)
+
+Jean Pihet (6):
+  ARM: OMAP2+: PM: protect the power domain state change by a mutex
+  ARM: OMAP2+: PM: introduce power domains functional states
+  ARM: OMAP2+: PM: use the functional power states API
+  ARM: OMAP2+: PM: introduce power domains logic and memory functional
+    states
+  ARM: OMAP2+: PM: use the functional power states API for logic and
+    memory
+  ARM: OMAP2+: PM: use power domain functional state in stats counters
+
+ arch/arm/mach-omap2/cpuidle34xx.c          |   61 ++++----
+ arch/arm/mach-omap2/cpuidle44xx.c          |   28 ++--
+ arch/arm/mach-omap2/omap-hotplug.c         |    2 +-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c  |   39 +++---
+ arch/arm/mach-omap2/pm-debug.c             |   15 +-
+ arch/arm/mach-omap2/pm.c                   |   62 -------
+ arch/arm/mach-omap2/pm24xx.c               |   14 +-
+ arch/arm/mach-omap2/pm34xx.c               |   80 +++++-----
+ arch/arm/mach-omap2/pm44xx.c               |   15 +--
+ arch/arm/mach-omap2/powerdomain-common.c   |   85 ++++++++++
+ arch/arm/mach-omap2/powerdomain.c          |  244 ++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/powerdomain.h          |   42 +++++-
+ arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |    7 +
+ arch/arm/mach-omap2/powerdomain44xx.c      |    3 +
+ 14 files changed, 489 insertions(+), 208 deletions(-)
+
 -- 
-1.7.0.4
+1.7.7.6
