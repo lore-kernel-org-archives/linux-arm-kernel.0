@@ -1,15 +1,18 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 04:07:40 +0200
-Subject: [PATCH 01/10] MXS: Make clk_disable return integer
+Date: Wed, 18 Apr 2012 04:07:42 +0200
+Subject: [PATCH 03/10] MXS: Fixup i.MX233 USB base address name
 In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
  <1334714869-19282-1-git-send-email-marex@denx.de>
-Message-ID: <1334714869-19282-2-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-4-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows subsequent USB clock patch to interchange enable() and disable()
-calls without adding unnecessary switching cruft.
+Modify USB EHCI and USB PHY base addresses on the i.MX233 to nicely fit into the
+whole USB registration scheme.
+
+Based on code by:
+Tony Lin <tony.lin@freescale.com>
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -26,61 +29,34 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-mxs/clock-mx28.c         |    7 +++++--
- arch/arm/mach-mxs/include/mach/clock.h |    2 +-
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/mach-mxs/include/mach/mx23.h |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index cea29c9..43116ba 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -86,7 +86,7 @@ static int _raw_clk_enable(struct clk *clk)
- 	return 0;
- }
+diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
+index 599094b..7955b75 100644
+--- a/arch/arm/mach-mxs/include/mach/mx23.h
++++ b/arch/arm/mach-mxs/include/mach/mx23.h
+@@ -64,8 +64,8 @@
+ #define MX23_AUART1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06c000)
+ #define MX23_AUART2_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06e000)
+ #define MX23_DUART_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x070000)
+-#define MX23_USBPHY_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
+-#define MX23_USBCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
++#define MX23_USBPHY0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
++#define MX23_USBCTRL0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
+ #define MX23_DRAM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x0e0000)
  
--static void _raw_clk_disable(struct clk *clk)
-+static int _raw_clk_disable(struct clk *clk)
- {
- 	u32 reg;
- 
-@@ -95,6 +95,8 @@ static void _raw_clk_disable(struct clk *clk)
- 		reg |= 1 << clk->enable_shift;
- 		__raw_writel(reg, clk->enable_reg);
- 	}
-+
-+	return 0;
- }
- 
- /*
-@@ -149,7 +151,7 @@ _CLK_ENABLE_PLL(pll1_clk, PLL1, EN_USB_CLKS)
- _CLK_ENABLE_PLL(pll2_clk, PLL2, CLKGATE)
- 
- #define _CLK_DISABLE_PLL(name, r, g)					\
--static void name##_disable(struct clk *clk)				\
-+static int name##_disable(struct clk *clk)				\
- {									\
- 	__raw_writel(BM_CLKCTRL_##r##CTRL0_POWER,			\
- 		     CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
-@@ -161,6 +163,7 @@ static void name##_disable(struct clk *clk)				\
- 		__raw_writel(BM_CLKCTRL_##r##CTRL0_##g,			\
- 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
- 									\
-+	return 0;							\
- }
- 
- _CLK_DISABLE_PLL(pll0_clk, PLL0, EN_USB_CLKS)
-diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
-index 592c9ab..21d1fad 100644
---- a/arch/arm/mach-mxs/include/mach/clock.h
-+++ b/arch/arm/mach-mxs/include/mach/clock.h
-@@ -50,7 +50,7 @@ struct clk {
- 	int (*enable) (struct clk *);
- 	/* Function ptr to disable the clock. Leave blank if clock can not
- 	   be gated. */
--	void (*disable) (struct clk *);
-+	int (*disable) (struct clk *);
- 	/* Function ptr to set the parent clock of the clock. */
- 	int (*set_parent) (struct clk *, struct clk *);
- };
+ #define MX23_IO_P2V(x)			MXS_IO_P2V(x)
+@@ -89,8 +89,8 @@
+ #define MX23_INT_SPDIF_ERROR		10
+ #define MX23_INT_SAIF1_IRQ		10
+ #define MX23_INT_SAIF2_IRQ		10
+-#define MX23_INT_USB_CTRL		11
+-#define MX23_INT_USB_WAKEUP		12
++#define MX23_INT_USB0			11
++#define MX23_INT_USB0_WAKEUP		12
+ #define MX23_INT_GPMI_DMA		13
+ #define MX23_INT_SSP1_DMA		14
+ #define MX23_INT_SSP1_ERROR		15
 -- 
 1.7.9.5
