@@ -1,51 +1,66 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 18 Apr 2012 15:36:10 +0200
-Subject: [PATCH v3 5/10] ARM: LPC32xx: Remove obsolete platform Kconfig
-In-Reply-To: <1334756176-25144-1-git-send-email-stigge@antcom.de>
-References: <1334756176-25144-1-git-send-email-stigge@antcom.de>
-Message-ID: <1334756176-25144-6-git-send-email-stigge@antcom.de>
+Date: Wed, 18 Apr 2012 15:36:05 +0200
+Subject: [PATCH v3 0/10] Second patchset for LPC32xx device tree conversion
+Message-ID: <1334756176-25144-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes two Kconfig options now unused (the network driver is
-configured via DT now).
+This is the second patch set for device tree conversion of mach-lpc32xx. It
+builds upon and requires the previously posted first set of 8 plus the GPIO
+patch.
+
+It touches different subsystems (USB/OHCI, input/touchscreen, iio/adc and
+mach-lpc32) to be picked by the respective subsystem maintainer and probably
+applied separately. (?)
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
----
+--
 
 Applies to v3.4-rc3
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/Kconfig
-+++ linux-2.6/arch/arm/mach-lpc32xx/Kconfig
-@@ -29,30 +29,4 @@ config ARCH_LPC32XX_UART6_SELECT
- 
- endmenu
- 
--menu "LPC32XX chip components"
--
--config ARCH_LPC32XX_IRAM_FOR_NET
--	bool "Use IRAM for network buffers"
--	default y
--	help
--	  Say Y here to use the LPC internal fast IRAM (i.e. 256KB SRAM) as
--	  network buffer.  If the total combined required buffer sizes is
--	  larger than the size of IRAM, then SDRAM will be used instead.
--
--	  This can be enabled safely if the IRAM is not intended for other
--	  uses.
--
--config ARCH_LPC32XX_MII_SUPPORT
--	bool "Check to enable MII support or leave disabled for RMII support"
--	help
--	  Say Y here to enable MII support, or N for RMII support. Regardless of
--	  which support is selected, the ethernet interface driver needs to be
--	  selected in the device driver networking section.
--
--	  The PHY3250 reference board uses RMII, so users of this board should
--	  say N.
--
--endmenu
--
- endif
--
+Changes since v2:
+* ohci-nxp: Fixed hcd->rsrc_start physical address
+* ohci-nxp: Remove USB host initialization hunk (USB_DEV_NEED_CLK_EN bit
+  already cleared)
+* ohci-nxp: Remove gratuitous parentheses
+* clock.c: Separated out dma clock adjustment (new patch)
+* lpc32xx.dtsi: Moved interrupt-parent property to top-level node
+* lpc32xx.dtsi: Removed chosen/bootargs
+* phy3250.dts: Added SLC NAND partitioning according to layout as shipped
+  previously
+* phy3250.c: Moved lpc32xx_display_uid() to common.c (leaving the rest in
+  phy3250 for now due to temporary platform_data passed via auxdata) - new
+  patch
+
+Thanks to Arnd Bergmann, Dan Carpenter and Thierry Reding for reviewing!
+
+Roland Stigge (10):
+ohci-nxp: Driver cleanup
+ohci-nxp: Device tree support
+ARM: LPC32xx: clock.c cleanup
+ARM: LPC32xx: clock.c dma adjustment
+ARM: LPC32xx: Remove obsolete platform Kconfig
+input: Device tree support for LPC32xx touchscreen
+iio: lpc32xx-adc: Remove driver conflict due to device tree
+ARM: LPC32xx: DTS files for device tree conversion
+ARM: LPC32xx: Device tree support
+ARM: LPC32xx: Move common code to common.c
+
+ Documentation/devicetree/bindings/arm/lpc32xx-mic.txt               |   38 +
+ Documentation/devicetree/bindings/arm/lpc32xx.txt                   |    8 
+ Documentation/devicetree/bindings/input/touchscreen/lpc32xx-tsc.txt |   16 
+ Documentation/devicetree/bindings/usb/ohci-nxp.txt                  |   16 
+ arch/arm/Kconfig                                                    |    1 
+ arch/arm/boot/dts/lpc32xx.dtsi                                      |  303 ++++++++++
+ arch/arm/boot/dts/phy3250.dts                                       |  115 +++
+ arch/arm/mach-lpc32xx/Kconfig                                       |   26 
+ arch/arm/mach-lpc32xx/clock.c                                       |   77 +-
+ arch/arm/mach-lpc32xx/common.c                                      |  192 ------
+ arch/arm/mach-lpc32xx/common.h                                      |   14 
+ arch/arm/mach-lpc32xx/irq.c                                         |   78 +-
+ arch/arm/mach-lpc32xx/phy3250.c                                     |  146 ++--
+ drivers/input/touchscreen/lpc32xx_ts.c                              |   10 
+ drivers/staging/iio/adc/Kconfig                                     |    8 
+ drivers/usb/host/ohci-nxp.c                                         |   55 +
+ 16 files changed, 704 insertions(+), 399 deletions(-)
