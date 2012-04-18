@@ -1,77 +1,42 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 18 Apr 2012 14:30:20 +0200
-Subject: [PATCH v2 8/8] ARM: LPC32xx: Device tree support
-In-Reply-To: <20120418060230.GC17506@avionic-0098.adnet.avionic-design.de>
-References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <1334682507-15055-9-git-send-email-stigge@antcom.de>
- <20120418060230.GC17506@avionic-0098.adnet.avionic-design.de>
-Message-ID: <4F8EB3DC.3060203@antcom.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 18 Apr 2012 20:46:32 +0800
+Subject: [PATCH 0/5] dma: mxs-dma: make driver mach-independent and add dt
+ support
+Message-ID: <1334753197-12032-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+This patch series make the mxs-dma driver mach-independent which can be
+used by imx6q and other compatible platforms in the future and also add
+the dt support.
 
-thanks for your suggestions.
+This first patch depends on Wolfram's
+[PATCH V2 1/3] lib: add support for stmp-style devices
+http://www.spinics.net/lists/arm-kernel/msg166232.html
+which is still not in mainline.
 
-On 04/18/2012 08:02 AM, Thierry Reding wrote:
->> arch/arm/mach-lpc32xx/irq.c                           |   78
->> +++++--
-> 
-> Could this perhaps be split into another patch. Basically this is
-> a conversion to IRQ domain *and* device tree support. But maybe it
-> isn't worth the effort.
+Dong Aisheng (5):
+  dma: mxs-dma: use global stmp_device functionality
+  dma: mxs-dma: make platform_device_id more generic
+  dma: mxs-dma: add device tree probe support
+  ARM: mxs: do not add dma device by default
+  ARM: mx28evk: add mxs-dma dt support
 
-I was thinking the same. :-) Specifically, using
-irq_domain_add_legacy() already builds upon available DT nodes. DT for
-irq in turn seems to require irqdomain. So  would only split those two
-on explicit request of reviewers when we have a reasonable solution to
-this dilemma. Otherwise, I'd keep it in one patch.
-
->> arch/arm/mach-lpc32xx/phy3250.c                       |  146
->> +++++--------
-> 
-> While at it, this should probably be renamed board-dt.c or
-> something similar since it is no longer phy3250 specific.
-
-As Arnd wrote, there are board specific bits left (open questions
-about how to DT'ize spi's controller_data, and DT-conversion of AMBA
-CLCD). However, I will move board-independent stuff over to common.c.
-(Keeping lpc32xx_auxdata_lookup[] in phy3250.c due to remaining
-platform_data, though.)
-
->> -	platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs)); -
->> for (i = 0; i < ARRAY_SIZE(amba_devs); i++) { -		struct
->> amba_device *d = amba_devs[i]; -		amba_device_register(d,
->> &iomem_resource); -	} +	tmp =
->> __raw_readl(LPC32XX_CLKPWR_DMA_CLK_CTRL); +	__raw_writel((tmp |
->> LPC32XX_CLKPWR_DMACLKCTRL_CLK_EN), +
->> LPC32XX_CLKPWR_DMA_CLK_CTRL); /* Test clock needed for UDA1380
->> initial init */ __raw_writel(LPC32XX_CLKPWR_TESTCLK2_SEL_MOSC | 
->> LPC32XX_CLKPWR_TESTCLK_TESTCLK2_EN, 
->> LPC32XX_CLKPWR_TEST_CLK_SEL);
-> 
-> A lot of these seem to be gratuitous here. Can control of these
-> clocks not be exposed via the clock framework? That would allow the
-> controllers to only activate them when actually needed. This could
-> also be done in follow up patches, though.
-
-Correct, clock framework is on my list of following patches.
-
-> 
-> [...]
->> +	/* Register GPIOs used on this board */ +	if
->> (gpio_request(SPI0_CS_GPIO, "spi0 cs")) +		printk(KERN_ERR "Error
->> requesting gpio %u", +			SPI0_CS_GPIO); +	else if
->> (gpio_direction_output(SPI0_CS_GPIO, 1)) +		printk(KERN_ERR
->> "Error setting gpio %u to output", +			SPI0_CS_GPIO);
-> 
-> This should be initialized based on data from the device tree.
-
-Correct. This will be done in the later patch regarding spi controller
-DT conversion. Still discussing this with Grant. For now, I'm
-considering the above hunk as just moving around the resp. lines
-without change. Please let me keep it until the SPI issue is solved.
-
-Thanks,
-
-Roland
+ .../devicetree/bindings/dma/fsl-mxs-dma.txt        |   19 +++
+ arch/arm/boot/dts/imx28.dtsi                       |    4 +-
+ arch/arm/mach-mxs/clock-mx23.c                     |    4 +-
+ arch/arm/mach-mxs/clock-mx28.c                     |    6 +-
+ arch/arm/mach-mxs/devices-mx23.h                   |    2 +
+ arch/arm/mach-mxs/devices-mx28.h                   |    2 +
+ arch/arm/mach-mxs/devices/platform-dma.c           |   17 +-
+ arch/arm/mach-mxs/include/mach/devices-common.h    |    3 +
+ arch/arm/mach-mxs/mach-apx4devkit.c                |    1 +
+ arch/arm/mach-mxs/mach-m28evk.c                    |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c                   |    1 +
+ arch/arm/mach-mxs/mach-stmp378x_devb.c             |    1 +
+ arch/arm/mach-mxs/mach-tx28.c                      |    1 +
+ drivers/dma/Kconfig                                |    1 +
+ drivers/dma/mxs-dma.c                              |  163 +++++++++++++++-----
+ include/linux/fsl/mxs-dma.h                        |   12 +--
+ 16 files changed, 174 insertions(+), 64 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
