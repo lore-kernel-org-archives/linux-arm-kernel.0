@@ -1,140 +1,45 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 18 Apr 2012 12:36:29 +0200
-Subject: [PATCH 1/1] dt: Add general DMA window parser
-In-Reply-To: <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
-References: <20120418092613.GA8632@avionic-0098.mockup.avionic-design.de><20120418.131907.2172387798112620167.hdoyu@nvidia.com><20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120418.133629.1664781135413277375.hdoyu@nvidia.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 18 Apr 2012 11:45:43 +0100
+Subject: [PATCH v2 0/8] Second patchset for LPC32xx device tree conversion
+In-Reply-To: <201204180806.16848.arnd@arndb.de>
+References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
+ <20120417205001.GH6498@mwanda> <201204180806.16848.arnd@arndb.de>
+Message-ID: <20120418104543.GH3021@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
-Subject: Re: [PATCH 1/1] dt: Add general DMA window parser
-Date: Wed, 18 Apr 2012 12:26:29 +0200
-Message-ID: <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de>
+On Wed, Apr 18, 2012 at 08:06:16AM +0000, Arnd Bergmann wrote:
+> On Tuesday 17 April 2012, Dan Carpenter wrote:
 
-> * PGP Signed by an unknown key
-> 
-> * Hiroshi Doyu wrote:
-> > +	cells = prop ? *(__be32 *)prop : of_n_addr_cells(dn);
-> 
-> I think this needs to be:
-> 
-> 	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
-> 
-> Only casting isn't enough, you need the bytes to be swapped.
+> > This probably applies fine (the previous version did a couple days
+> > ago), but it's always best to submit patches against linux-next.
+> > The 3.4 kernel is in -rc already so this is 3.5 material.
 
-Right. Try again. Sorry for spamming.
+> I disagree. The patches won't get applied on -next, they get applied
+> on an -rc release, so they should be submitted against that version
+> as well. I agree that it makes sense to test patches against -next
+> when there is reason to believe there might be conflicts, but it's
+> not mandatory. When you know about conflicts against other patches
+> that are already in -next, I suggest listing them in the cover 
+> letter (the patch 0/x) and suggest a resolution.
 
->From 1ee8a9b3a839456b170af74b11a4304bfda965c4 Mon Sep 17 00:00:00 2001
-From: Hiroshi DOYU <hdoyu@nvidia.com>
-Date: Wed, 18 Apr 2012 12:09:03 +0300
-Subject: [PATCH 1/1] dt: Add general DMA window parser
+Dan's advice is generally sensible for most subsystems - it's not so
+much that you should submit against -next itself but rather that you
+should be checking what you're submitting against the latest versions of
+the subsystems to make sure that you're up to date with the latest APIs
+and best practices.  -next is (or should be) a good proxy for this.
 
-This code was stolen from:
-	"arch/microblaze/kernel/prom_parse.c"
-	"arch/powerpc/kernel/prom_parse.c"
-
-Once "ibm," prefix is removed from dts file. This generic one could
-replace the originals.
-
-Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
----
- drivers/of/Kconfig         |    4 ++++
- drivers/of/Makefile        |    1 +
- drivers/of/of_dma.c        |   35 +++++++++++++++++++++++++++++++++++
- include/linux/of_address.h |   10 ++++++++++
- 4 files changed, 50 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index dfba3e6..3b0298b 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -83,4 +83,8 @@ config OF_MTD
- 	depends on MTD
- 	def_bool y
- 
-+config OF_DMA
-+	depends on HAS_DMA
-+	def_bool y
-+
- endmenu # OF
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index e027f44..711ff5b 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -11,3 +11,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
- obj-$(CONFIG_OF_PCI)	+= of_pci.o
- obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
- obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-+obj-$(CONFIG_OF_DMA)	+= of_dma.o
-diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
-new file mode 100644
-index 0000000..45c9e88
---- /dev/null
-+++ b/drivers/of/of_dma.c
-@@ -0,0 +1,35 @@
-+/*
-+ * Stolen from:
-+ *	"arch/microblaze/kernel/prom_parse.c"
-+ *	"arch/powerpc/kernel/prom_parse.c"
-+ */
-+
-+#include <linux/of_address.h>
-+
-+void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
-+		unsigned long *busno, unsigned long *phys, unsigned long *size)
-+{
-+	const __be32 *dma_window;
-+	u32 cells;
-+	const unsigned char *prop;
-+
-+	dma_window = dma_window_prop;
-+
-+	/* busno is always one cell */
-+	if (busno)
-+		*busno = be32_to_cpup(dma_window++);
-+
-+	prop = of_get_property(dn, "#dma-address-cells", NULL);
-+	if (!prop)
-+		prop = of_get_property(dn, "#address-cells", NULL);
-+
-+	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
-+	*phys = of_read_number(dma_window, cells);
-+
-+	dma_window += cells;
-+
-+	prop = of_get_property(dn, "#dma-size-cells", NULL);
-+	cells = prop ? be32_to_cpup(prop) : of_n_size_cells(dn);
-+	*size = of_read_number(dma_window, cells);
-+}
-+
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index 01b925a..2a0f7c6 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -21,6 +21,10 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
- extern const u32 *of_get_address(struct device_node *dev, int index,
- 			   u64 *size, unsigned int *flags);
- 
-+extern void of_parse_dma_window(struct device_node *dn,
-+		       const void *dma_window_prop, unsigned long *busno,
-+			       unsigned long *phys, unsigned long *size);
-+
- #ifndef pci_address_to_pio
- static inline unsigned long pci_address_to_pio(phys_addr_t addr) { return -1; }
- #define pci_address_to_pio pci_address_to_pio
-@@ -48,6 +52,12 @@ static inline const u32 *of_get_address(struct device_node *dev, int index,
- {
- 	return NULL;
- }
-+
-+static inline void of_parse_dma_window(struct device_node *dn,
-+		       const void *dma_window_prop, unsigned long *busno,
-+			       unsigned long *phys, unsigned long *size)
-+{
-+}
- #endif /* CONFIG_OF_ADDRESS */
- 
- 
--- 
-1.7.5.4
+If you know the relevant subsystem and driver are pretty stable then
+it's generally not going to be an issue to just use the -rcs but there's
+enough areas where there's rapid development of one form or another it's
+likely to save you at least one round trip of "that's nice but needs
+some updates because it won't apply/won't build/isn't using this new
+feature we want to convert everyone to" that it's a good default to
+check with -next first.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/3b1c0685/attachment.sig>
