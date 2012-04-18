@@ -1,20 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Apr 2012 13:15:46 +0200
-Subject: [PATCH 2/3] pinctrl: a minor fix of pin config debug information
-In-Reply-To: <1334585244-10249-2-git-send-email-b29396@freescale.com>
-References: <1334585244-10249-1-git-send-email-b29396@freescale.com>
- <1334585244-10249-2-git-send-email-b29396@freescale.com>
-Message-ID: <CACRpkdbQr9-x_M067eGeMi+71eRKa1z9deS5T8VkWYVMHYTfLg@mail.gmail.com>
+Date: Wed, 18 Apr 2012 13:24:14 +0200
+Subject: [PATCH V4 3/5] pinctrl: Add SPEAr pinctrl drivers
+In-Reply-To: <4F8D2A88.6060309@st.com>
+References: <cover.1334548272.git.viresh.kumar@st.com>
+ <f9cc539f87a9c73546fe6671d55d86838886adce.1334548272.git.viresh.kumar@st.com>
+ <4F8D2A88.6060309@st.com>
+Message-ID: <CACRpkda6fPPsHiCoKAJScOsdGNxFru2baPxj7B88La+axboC-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 4:07 PM, Dong Aisheng <b29396@freescale.com> wrote:
+On Tue, Apr 17, 2012 at 10:32 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+> This was the place that caused crash for me.
 >
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> I would apply following change in my patch before sending pull request
+> to Arnd.
+>
+> - ? ? ? *map = kzalloc(sizeof(*map) * count, GFP_KERNEL);
+> + ? ? ? *map = kzalloc(sizeof(**map) * count, GFP_KERNEL);
 
-Obviously correct, so applied this.
+Ah, great you found it!
 
 Thanks,
 Linus Walleij
