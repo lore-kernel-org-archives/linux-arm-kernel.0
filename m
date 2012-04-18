@@ -1,76 +1,41 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 18 Apr 2012 11:26:13 +0200
-Subject: [PATCH 1/1] arm/dts: Tegra30: Add device tree support for SMMU
-In-Reply-To: <20120418.121824.1894043789811063795.hdoyu@nvidia.com>
-References: <20120418054140.GA17506@avionic-0098.adnet.avionic-design.de>
- <20120418.094448.2234414220947028341.hdoyu@nvidia.com>
- <201204180731.54064.arnd@arndb.de>
- <20120418.121824.1894043789811063795.hdoyu@nvidia.com>
-Message-ID: <20120418092613.GA8632@avionic-0098.mockup.avionic-design.de>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 18 Apr 2012 12:36:04 +0300
+Subject: [PATCH v2 0/8] Second patchset for LPC32xx device tree conversion
+In-Reply-To: <201204180806.16848.arnd@arndb.de>
+References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
+ <20120417205001.GH6498@mwanda> <201204180806.16848.arnd@arndb.de>
+Message-ID: <20120418093604.GL6498@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiroshi Doyu wrote:
-> diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
-> new file mode 100644
-> index 0000000..1db1ccd
-> --- /dev/null
-> +++ b/drivers/of/of_dma.c
-> @@ -0,0 +1,35 @@
-> +/*
-> + * Stealed from:
+On Wed, Apr 18, 2012 at 08:06:16AM +0000, Arnd Bergmann wrote:
+> On Tuesday 17 April 2012, Dan Carpenter wrote:
+> > On Tue, Apr 17, 2012 at 07:08:19PM +0200, Roland Stigge wrote:
+> > > Applies to v3.4-rc3
+> > > 
+> > 
+> > This probably applies fine (the previous version did a couple days
+> > ago), but it's always best to submit patches against linux-next.
+> > The 3.4 kernel is in -rc already so this is 3.5 material.
+> 
+> I disagree. The patches won't get applied on -next, they get applied
+> on an -rc release, so they should be submitted against that version
+> as well. I agree that it makes sense to test patches against -next
+> when there is reason to believe there might be conflicts, but it's
+> not mandatory. When you know about conflicts against other patches
+> that are already in -next, I suggest listing them in the cover 
+> letter (the patch 0/x) and suggest a resolution.
+> 
 
-"Stolen from"
+I'm not sure I understand.  I thought everyone used the develop
+against linux-next and backport the fixes model.  Are we going to
+try merge these in 3.4?  It will still spend some time in linux-next
+before we submit it, right?
 
-> + *	"arch/microblaze/kernel/prom_parse.c"
-> + *	"arch/powerpc/kernel/prom_parse.c"
-> + */
-> +
-> +#include <linux/of_address.h>
-> +
-> +void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
-> +		unsigned long *busno, unsigned long *phys, unsigned long *size)
-> +{
-> +	const u32 *dma_window;
+To be honest, I mostly am familiar with staging/ where driver wide
+white space cleanups are the norm.  Working against linux-next is
+the only option for us or otherwise the conflicts would be too
+much.
 
-Should be __be32.
-
-> +	u32 cells;
-> +	const unsigned char *prop;
-> +
-> +	dma_window = dma_window_prop;
-> +
-> +	/* busno is always one cell */
-> +	if (busno)
-> +		*busno = *(dma_window++);
-
-This needs endianness conversion:
-
-	*busno = be32_to_cpup(dma_window++);
-
-> +
-> +	prop = of_get_property(dn, "#dma-address-cells", NULL);
-> +	if (!prop)
-> +		prop = of_get_property(dn, "#address-cells", NULL);
-> +
-> +	cells = prop ? *(u32 *)prop : of_n_addr_cells(dn);
-
-Same here.
-
-> +	*phys = of_read_number(dma_window, cells);
-> +
-> +	dma_window += cells;
-> +
-> +	prop = of_get_property(dn, "#dma-size-cells", NULL);
-> +	cells = prop ? *(u32 *)prop : of_n_size_cells(dn);
-
-And here.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/e02078d4/attachment.sig>
+regards,
+dan carpenter
