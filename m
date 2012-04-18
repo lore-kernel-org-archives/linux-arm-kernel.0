@@ -1,44 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Apr 2012 23:13:03 +0200
-Subject: [PATCH 00/13] SPEAr: Move to common clock framework
-In-Reply-To: <CAJOA=zNnZXdEwdswj31WHDoWjvRGz0fYUb99R0U=Qq9kX0EZHQ@mail.gmail.com>
-References: <cover.1334660431.git.viresh.kumar@st.com>
- <201204171434.06178.arnd@arndb.de>
- <CAJOA=zNnZXdEwdswj31WHDoWjvRGz0fYUb99R0U=Qq9kX0EZHQ@mail.gmail.com>
-Message-ID: <20120418211303.GE3852@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Apr 2012 22:16:06 +0100
+Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
+ initialization
+In-Reply-To: <20120418210142.GR21106@atomide.com>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRsg-0004bX-4w@rmk-PC.arm.linux.org.uk>
+ <CANrkHUajRzoCp7K8L3cJArWN3xdqpft8L4k-o4gFTRTo8nmhmg@mail.gmail.com>
+ <20120418152956.GP25053@n2100.arm.linux.org.uk>
+ <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
+ <20120418194224.GS25053@n2100.arm.linux.org.uk>
+ <20120418200214.GP21106@atomide.com>
+ <20120418202447.GT25053@n2100.arm.linux.org.uk>
+ <20120418210142.GR21106@atomide.com>
+Message-ID: <20120418211606.GU25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 01:45:42PM -0700, Turquette, Mike wrote:
-> On Tue, Apr 17, 2012 at 7:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 17 April 2012, Viresh Kumar wrote:
-> >> SPEAr now supports common clock framework. This patchset contains changes
-> >> related to this. It also contain few dependency commits for clock framework that
-> >> are earlier sent separately.
-> >>
-> >> @Mike: It would be easiest to get these through ARM-SoC tree. So, would need
-> >> your Acked-by on these patches. But firstly they must get reivewed :)
-> >
-> > We should agree on how we want to do the common clk patches for v3.5.
-> > The two options I see are either we take all the patches that Mike
-> > Acks into arm-soc, or Mike applies the patches in his own tree and
-> > submits them to arm-soc. I think either way is fine for me, but
-> > some people might feel strongly one way or another.
+On Wed, Apr 18, 2012 at 02:01:44PM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120418 13:28]:
+> > I'd like to have the same thing happen on OMAP1 as well (it's actually
+> > quite simple to do) and it means that this DMA engine implementation
+> > detail is (correctly) hidden from the drivers - provided there's no
+> > dependencies on each individual scatterlist entry back to the peripheral
+> > driver.
 > 
-> I would prefer the latter (I maintain a branch and submit it).  Is
-> arm-soc still the right place for common clk patches in 3.5 and
-> beyond?  I don't mind hosting a branch for inclusion into linux-next
-> and sending a pull request to Linus.  There is nothing ARM-specific
-> about the common framework.
+> That would be nice. If the DMA engine driver can't dynamically adjust the
+> frame size for each SG entry, then maybe we can work around that by not doing
+> DMA for entries that are below the frame sizes?
 
-Either way is fine with me, but it's really important that all the
-floating clock framework patches begin to materialize in a visible
-branch.
+I don't think it has to in this case, though I am thinking that we
+may have to adjust the frame size for other peripherals.
 
-Sascha
+In the case of the OMAP1 MMC driver, let me pull out that chunk of code
+again:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+        frame = data->blksz;
+        if (cpu_is_omap15xx() && frame > 32)
+                frame = 32;
+        else if (frame > 64)
+                frame = 64;
+        frame >>= 1;
+        if (!(data->flags & MMC_DATA_WRITE)) {
+                buf = 0x800f | ((frame - 1) << 8);
+        } else {
+                buf = 0x0f80 | ((frame - 1) << 0);
+        }
+        OMAP_MMC_WRITE(host, BUF, buf);
+
+Nothing there depends on the size of an individual scatterlist entry -
+the dependencies for the frame size are the smaller of the FIFO size
+and the data block size.  I believe we can cope with that quite well on
+a per-transfer basis, and I _think_ we can get away with writing this
+BUF register just once per transfer (similar to what happens for PIO
+transfers.)
+
+However, this is going to be rather hit and miss for me - all I can do
+is create a patch and check that it builds.  I have no way (that I know
+of) to test this change as I don't have any OMAP1 nor OMAP2 hardware.
