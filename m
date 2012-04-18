@@ -1,33 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 18 Apr 2012 09:16:35 -0400
-Subject: [PATCH V5 0/4] ARM: Kirkwood: Add support for DNS-320 and
- DNS-325 using devicetree
-In-Reply-To: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
-References: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <20120418131635.GK15711@titan.lakedaemon.net>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Wed, 18 Apr 2012 18:46:31 +0530
+Subject: [PATCH] tty: omap-serial: Keep the wakeup mechanism enabled by
+ default
+In-Reply-To: <87vckyq6ti.fsf@ti.com>
+References: <1334579407-16970-1-git-send-email-govindraj.raja@ti.com>
+ <87vckyq6ti.fsf@ti.com>
+Message-ID: <CAMrsUdL1S5GiyG0egS=CHg2fdNkyZVF-wuCNGDg547kfTUODng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 11:06:39AM +0100, Jamie Lentin wrote:
-> Reworked patch for latest feedback. I'm still basing this on Jason Cooper's
-> tree, given how much time has passed should I be rebasing against something
-> else or is this still fine?
+On Wed, Apr 18, 2012 at 4:55 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> From: "Govindraj.R" <govindraj.raja@ti.com>
+>>
+>> The wakeups can be left enabled by default and should be disabled
+>> only when disabled from sysfs and while entering suspend.
+>
+> Left enabled? ?That assumes something else has initizlied them, but we
+> can't make that assumption.
+>
+> First, wakeups should be disabled when ->probe has finished. ?Then,
+> they should be enabled whenever driver is in use, and disabled when
+> the driver is not in use.
+>
+> I'm not familiar enough with uart_ops, but it looks like they should
+> probably be enabled in uart_ops->startup and disabled in
+> uart_ops->shutdown.
 
-Typically, work should be based against a stable tag.  In this case, the
-changes in my branch were merged in for 3.4-rc1, so you could base from
-there.
+uart_ops->shutdown gets called in suspend path also
+serial_omap_suspend => uart_suspend_port = > ops->shutdown(uport);
 
-It's fine the way it is, I'll let you know if I run into any problems.
+This will leave uart wakeup disabled in suspend path.
 
-> One thing I noticed is that with only the first patch applied (which no
-> longer calls kirkwood_nand_init) the device either locks up or serial console
-> dies at "Gating clock of unused units", presumably as CGC_RUNIT isn't set.
-> Is this something known or is it worth further investigation?
-
-That could potentially mess up a future bisect.  However, it would only
-crop up for dnskw boards.  I'll let Grant weigh in on this since he's
-the one who asked that the nand init be removed.
-
-thx,
-
-Jason.
+--
+Thanks,
+Govindraj.R
