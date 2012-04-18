@@ -1,62 +1,113 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 17 Apr 2012 17:06:19 -0700
-Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
-In-Reply-To: <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Mon, 16 Apr 2012 20:36:56 +0530")
-References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
- <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87bomprjic.fsf@ti.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Wed, 18 Apr 2012 01:00:18 +0000
+Subject: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <201204171324.12528.marex@denx.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <4F8D47FB.4050205@de.bosch.com> <201204171324.12528.marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B763C5@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+ 
+> >
+> > On 17.04.2012 12:15, Marek Vasut wrote:
+> > > This patchset introduces the USB Host driver for i.MX28 CPU,
+> utilising
+> > > the generic USB PHY infrastructure.
+> >
+> > Great, many thanks!
+> 
+> Hey, this is still RFC and will need a great discussion.
+> 
+> >
+> > Unfortunately, I lost the overview over the i.MXxx USB discussion ;)
+> 
+> Well I put parts together from the old patchset, did some coding on my
+> own ... I
+> still have a few places where I'm very uncertain about so please, review
+> thoroughly.
+> 
+> >
+> > Could this be used to add support for the mx53 and mx6, too? If yes,
+> > what do you think would be needed for this?
+> 
+> Yes, that's the plan actually. But, isn't mx53 supported by ehci-mxc? I
+> thought
+> the USB PHY core from mx28 was then reused only in mx6q.
+> 
+mx53 is still not supported by ehci-mxc.
+Yes, the mx28 and mx6q use the same PHY.
 
-> In the error cases the clock cut is missed. This patch intends to fix the
-> same.
-
-Please change the references to 'cut clocks' in subject/changelog here
-(and in other patches) to use runtime suspend instead.   First, runtime PM
-calls do more than cut clocks, but they only do so when
-usecounting/autosuspend timeouts permit.
-
-
-> Cc: stable at vger.kernel.org
-
-Please hold off on Cc'ing stable until your patches are reviewed and accepted.
-
-> Cc: Govindraj.R <govindraj.raja@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/tty/serial/omap-serial.c |    6 +++++-
->  1 files changed, 5 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index fe099bb..10e80bb 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
->  
->  		if (ret < 0) {
->  			serial_omap_enable_ier_thri(up);
-> +			pm_runtime_mark_last_busy(&up->pdev->dev);
-> +			pm_runtime_put_autosuspend(&up->pdev->dev);
-
-Why the autosuspend version here?
-
-Kevin
-
->  			return;
->  		}
->  	}
-> @@ -1029,8 +1031,10 @@ static int serial_omap_poll_get_char(struct uart_port *port)
->  
->  	pm_runtime_get_sync(&up->pdev->dev);
->  	status = serial_in(up, UART_LSR);
-> -	if (!(status & UART_LSR_DR))
-> +	if (!(status & UART_LSR_DR)) {
-> +		pm_runtime_put(&up->pdev->dev);
->  		return NO_POLL_CHAR;
-> +	}
->  
->  	status = serial_in(up, UART_RX);
->  	pm_runtime_put(&up->pdev->dev);
+> You'd have to add support for some clock handling probably (enabling the
+> USB
+> clock on mx53 and maybe some other clock, I'm not quite sure now without
+> the
+> manual), but that should be about it. The MX6q PHY on the other hand
+> looks quite
+> similar to mx28 so it should be easy hacking.
+> 
+> >
+> > Best regards
+> >
+> > Dirk
+> >
+> > P.S.: What I read from the discussion:
+> >
+> > -- cut --
+> > All recent Freescale SoC's USB controller are the same, they are mx23,
+> > mx25, mx28, mx31, mx35, mx37, mx50, mx51, mx53, and mx6. But, the
+> > transceiver is different between them
+> > * mx23, mx28, mx6 (Transceiver A)
+> > * mx25 mx31, mx35,mx37, mx50, mx51, mx53 (Transceiver B)
+> > -- cut --
+> >
+> > > Marek Vasut (8):
+> > >   MXS: Make clk_disable return integer
+> > >   MXS: Add USB EHCI and USB PHY clock handling
+> > >   MXS: Fixup i.MX233 USB base address name
+> > >   MXS: Add platform registration hooks for USB EHCI
+> > >   MXS: Add USB PHY driver
+> > >   MXS: Add separate MXS EHCI HCD driver
+> > >   MXS: Enable USB on M28EVK
+> > >   MXS: Enable USB on MX28EVK
+> > >
+> > >  arch/arm/mach-mxs/Kconfig                       |    4 +
+> > >  arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
+> > >  arch/arm/mach-mxs/devices-mx28.h                |    4 +
+> > >  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+> > >  arch/arm/mach-mxs/devices/Makefile              |    1 +
+> > >  arch/arm/mach-mxs/devices/platform-usb.c        |   79 ++++++
+> > >  arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
+> > >  arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
+> > >  arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
+> > >  arch/arm/mach-mxs/mach-m28evk.c                 |   10 +
+> > >  arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
+> > >  drivers/usb/host/Kconfig                        |    7 +
+> > >  drivers/usb/host/ehci-hcd.c                     |    5 +
+> > >  drivers/usb/host/ehci-mxs.c                     |  309
+> > >  +++++++++++++++++++++++ drivers/usb/otg/Kconfig
+> > >  |    9 +
+> > >  drivers/usb/otg/Makefile                        |    1 +
+> > >  drivers/usb/otg/mxs-phy.c                       |  256
+> > >  +++++++++++++++++++ 17 files changed, 736 insertions(+), 9
+> deletions(-)
+> > >  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
+> > >  create mode 100644 drivers/usb/host/ehci-mxs.c
+> > >  create mode 100644 drivers/usb/otg/mxs-phy.c
+> > >
+> > > Cc: Chen Peter-B29397 <B29397@freescale.com>
+> > > Cc: Detlev Zundel <dzu@denx.de>
+> > > Cc: Fabio Estevam <festevam@gmail.com>
+> > > Cc: Li Frank-B20596 <B20596@freescale.com>
+> > > Cc: Lin Tony-B19295 <B19295@freescale.com>
+> > > Cc: Linux USB <linux-usb@vger.kernel.org>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Shawn Guo <shawn.guo@freescale.com>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Stefano Babic <sbabic@denx.de>
+> > > Cc: Subodh Nijsure <snijsure@grid-net.com>
+> > > Cc: Tony Lin <tony.lin@freescale.com>
+> > > Cc: Wolfgang Denk <wd@denx.de>
+> 
+> Best regards,
+> Marek Vasut
