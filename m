@@ -1,88 +1,86 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 18 Apr 2012 12:06:30 -0600
-Subject: [PATCH 1/3] pinctrl: pinctrl-imx: add imx pinctrl core driver
-In-Reply-To: <20120418071920.GC18021@shlinux2.ap.freescale.net>
-References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
- <4F8DD986.9080702@wwwdotorg.org>
- <20120418071920.GC18021@shlinux2.ap.freescale.net>
-Message-ID: <4F8F02A6.6030106@wwwdotorg.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 18 Apr 2012 20:09:17 +0200
+Subject: [PATCH v3 8/8] i2c: Add device tree support to i2c-pnx.c
+In-Reply-To: <1333528480-17134-9-git-send-email-stigge@antcom.de>
+References: <1333528480-17134-1-git-send-email-stigge@antcom.de>
+ <1333528480-17134-9-git-send-email-stigge@antcom.de>
+Message-ID: <20120418180917.GD2548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2012 01:19 AM, Dong Aisheng wrote:
-> On Wed, Apr 18, 2012 at 04:58:46AM +0800, Stephen Warren wrote:
->> On 04/13/2012 10:18 AM, Dong Aisheng wrote:
->>> From: Dong Aisheng <dong.aisheng@linaro.org>
->>>
->>> The driver has mux and config support while the gpio is still
->>> not supported.
->>> For select input setting, the driver will handle it internally
->>> and do not need user to take care of it.
->>>
->>> The pinctrl-imx core driver will parse the dts file and dynamically
->>> create the pinmux functions and groups.
->>>
->>> Each IMX SoC pinctrl driver should register pins with a pin register map
->>> including mux register and config register and select input map to core
->>> for proper operations.
-
->>> +static int __devinit imx_pmx_parse_functions(struct device_node *np,
->>> +			struct imx_pinctrl_info *info, u32 index)
->>
->> Oh, I see.
->>
->> You're defining the set of functions exported from the driver based on
->> the content of the pin configuration nodes in device tree. I must admit,
->> I don't like that much, and I didn't get that impression at all from
->> reading the binding document.
->
-> I will rich the document but i'm not sure i should talk too much about the
-> driver specific things in binding doc.
-> It seems the binding doc should represents more hw things, right?
-
-Yes, the binding documentation should be basically a hardware
-description, although I think it's reasonable for the documentation to
-describe how a driver should use the data in the binding; that's more to
-do with the binding that driver implementation details.
-
-I think that once you've enhanced the documentation to describe what the
-func-a/group-a nodes are, that will probably be enough to resolve this
-issue for me.
-
->> I know that there's some disagreement over whether the groups that a pin
->> controller driver exposes should be limited to groups that actually
->> exist in HW registers or not, but surely at least the functions that the
->> driver exposes should actually correspond directly to the function in
->> the HW registers?
->
-> I have slightly different opinions, they're related.
-> As GROUP, FUNCTION is also an abstract idea.
-> (some SoCs may not have hw pin GROUP like IMX)
-> People use GROUP since we can group a set of pins for one device/FUNCTION to use.
-> If we exposes functions per pin based on hw registers, then the GROUP idea may not
-> suitable for pin based SoC.
-> (Thinking current pinctrl subsystem only enables functions per GROUP)
-> The only way is as you did for tegra3, one pin is a group.
-> This is option and it works. But i think, in the future, we may be better
-> make the pinctrl subsystem also supports mux per pin since the idea of one
-> pin GROUP is a little not very suitable for the GROUP idea from literal meaning.
+On Wed, Apr 04, 2012 at 10:34:40AM +0200, Roland Stigge wrote:
+> This patch adds device tree support to the pnx-i2c driver by using platform
+> resources for memory region and irq and removing dependency on mach includes.
 > 
-> For IMX, we may not choose one pin based group since it's not easy to use
-> and will make the driver much bigger.
+> The following platforms are affected:
 > 
-> As we already agree that we do not limit people to define GROUP which
-> should only exist in HW register(hw GROUP), IOW we allow to use 'virtual' group,
-> then we should not force people to define FUNCTION per hw GROUP too, right?
+> * PNX
+> * LPC31xx (WIP)
+> * LPC32xx
 > 
-> So IMX defines FUNCTION per device or 'virtual' group(a set of pins for that device)
-> since IMX does not have hw pin GROUP.
+> The patch is based on a patch by Jon Smirl, working on lpc31xx integration
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-Yes, I see your point. I still dislike virtual groups (I think it makes
-more sense to represent the same thing as multiple mapping table
-entries), but I guess if we allow virtual groups, then maybe allowing
-virtual functions is roughly the same thing.
+I added devicetree-discuss to the (quite long) CC list. I am not sure
+about all of the bindings.
 
-It would be nice to enhance pinctrl to allow muxing directly on pins
-too, instead of only groups. That would be a nice cleanup, and a better
-fit for many SoCs. It'd probably reduce the size of pinctrl-tegra30.c a
-bit too.
+> 
+> ---
+> 
+>  Applies to v3.4-rc1
+> 
+>  Documentation/devicetree/bindings/i2c/pnx.txt |   40 ++++++++++++++++
+>  drivers/i2c/busses/i2c-pnx.c                  |   65 +++++++++++++++++++-------
+>  include/linux/i2c-pnx.h                       |    1 
+>  3 files changed, 89 insertions(+), 17 deletions(-)
+> 
+> --- /dev/null
+> +++ linux-2.6/Documentation/devicetree/bindings/i2c/pnx.txt
+> @@ -0,0 +1,40 @@
+> +* NXP PNX I2C Controller
+> +
+> +Required properties:
+> +
+> + - reg: Offset and length of the register set for the device
+> + - compatible: should be "nxp,pnx-i2c"
+> + - interrupts: configure one interrupt line
+> + - #address-cells: always 1 (for i2c addresses)
+> + - #size-cells: always 0
+> +
+> +Optional properties:
+> +
+> + - interrupt-parent: the phandle for the interrupt controller that
+> +   services interrupts for this device.
+
+That one is not optional, or? You always need it but in most cases it
+gets inherited as I understand.
+
+> + - clock-frequency: desired I2C bus clock frequency in Hz, Default: 100000 Hz
+> + - pnx,timeout: I2C bus timeout in milliseconds, Default: 10 ms
+
+To devicetree-folks: Can we argue this is a hardware property of the
+bus? Then we could introduce a generic "timeout" property? I see, there
+is already "fsl,timeout", and it won't make sense to have that per
+vendor?
+
+> + - slave-addr: Address used by the controller, Hardware default: 110
+
+I'd prefer the hex value here, I2C addresses are mostly specified in
+hex.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/1cafc3d8/attachment-0001.sig>
