@@ -1,35 +1,83 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Apr 2012 13:41:21 +0200
-Subject: [PATCH v2 2/2] pinctrl: show pin name for pingroups in sysfs
-In-Reply-To: <1334646046-467-2-git-send-email-b29396@freescale.com>
-References: <1334646046-467-1-git-send-email-b29396@freescale.com>
- <1334646046-467-2-git-send-email-b29396@freescale.com>
-Message-ID: <CACRpkdYhsOV-5FqXk3kesQaQtxE8it1QKq2jzcy3if4eQHYtUQ@mail.gmail.com>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Wed, 18 Apr 2012 13:57:27 +0200
+Subject: [PATCH 4/8] mmc: mmci: Use ios_handler to save power
+In-Reply-To: <1326810867-5346-5-git-send-email-ulf.hansson@stericsson.com>
+References: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
+ <1326810867-5346-5-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CAMJBoFOBVXQHpjNyy7LDpXuNUbEyRosOVvuVt_MYeOrWbQutnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 9:00 AM, Dong Aisheng <b29396@freescale.com> wrote:
+Hi Ulf,
 
-> After change, when cat pingroups in sysfs, it becomes:
-> root at freescale /sys/kernel/debug/pinctrl/20e0000.iomuxc$ cat pingroups
-> registered pin groups:
-> group: uart4grp-1
-> pin 219 (MX6Q_PAD_KEY_ROW0)
-> pin 218 (MX6Q_PAD_KEY_COL0)
+On Tue, Jan 17, 2012 at 3:34 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+> To disable a levelshifter when we are in an idle state will
+> decrease current consumption. We make use of the ios_handler
+> at runtime suspend and at regular suspend to accomplish this.
 >
-> group: usdhc4grp-1
-> pin 305 (MX6Q_PAD_SD4_CMD)
-> pin 306 (MX6Q_PAD_SD4_CLK)
-> pin 315 (MX6Q_PAD_SD4_DAT0)
-> pin 316 (MX6Q_PAD_SD4_DAT1)
-> pin 317 (MX6Q_PAD_SD4_DAT2)
-> pin 318 (MX6Q_PAD_SD4_DAT3)
-> pin 319 (MX6Q_PAD_SD4_DAT4)
-> pin 320 (MX6Q_PAD_SD4_DAT5)
-> pin 321 (MX6Q_PAD_SD4_DAT6)
-> pin 322 (MX6Q_PAD_SD4_DAT7)
+> Of course depending on the used levelshifter the decrease of
+> current differs. For ST6G3244ME the value is up to ~200 uA.
+>
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ?drivers/mmc/host/mmci.c | ? 19 ++++++++++++++++++-
+> ?1 files changed, 18 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index a7c8f8f..76ce2cd 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -1505,10 +1505,22 @@ static int mmci_save(struct amba_device *dev)
+> ?{
+> ? ? ? ?struct mmc_host *mmc = amba_get_drvdata(dev);
+> ? ? ? ?unsigned long flags;
+> + ? ? ? struct mmc_ios ios;
+> + ? ? ? int ret = 0;
+>
+> ? ? ? ?if (mmc) {
+> ? ? ? ? ? ? ? ?struct mmci_host *host = mmc_priv(mmc);
+>
+> + ? ? ? ? ? ? ? /* Let the ios_handler act on a POWER_OFF to save power. */
+> + ? ? ? ? ? ? ? if (host->plat->ios_handler) {
+> + ? ? ? ? ? ? ? ? ? ? ? memcpy(&ios, &mmc->ios, sizeof(struct mmc_ios));
+> + ? ? ? ? ? ? ? ? ? ? ? ios.power_mode = MMC_POWER_OFF;
+> + ? ? ? ? ? ? ? ? ? ? ? ret = host->plat->ios_handler(mmc_dev(mmc),
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &ios);
+> + ? ? ? ? ? ? ? ? ? ? ? if (ret)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return ret;
+> + ? ? ? ? ? ? ? }
+> +
+> ? ? ? ? ? ? ? ?spin_lock_irqsave(&host->lock, flags);
+>
+> ? ? ? ? ? ? ? ?/*
+> @@ -1527,7 +1539,7 @@ static int mmci_save(struct amba_device *dev)
+> ? ? ? ? ? ? ? ?amba_vcore_disable(dev);
+> ? ? ? ?}
+>
+> - ? ? ? return 0;
+> + ? ? ? return ret;
+> ?}
+>
+> ?static int mmci_restore(struct amba_device *dev)
+> @@ -1550,6 +1562,11 @@ static int mmci_restore(struct amba_device *dev)
+> ? ? ? ? ? ? ? ?writel(MCI_IRQENABLE, host->base + MMCIMASK0);
+>
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&host->lock, flags);
+> +
+> + ? ? ? ? ? ? ? /* Restore settings done by the ios_handler. */
+> + ? ? ? ? ? ? ? if (host->plat->ios_handler)
+> + ? ? ? ? ? ? ? ? ? ? ? host->plat->ios_handler(mmc_dev(mmc),
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &mmc->ios);
+> ? ? ? ?}
+>
+> ? ? ? ?return 0;
 
-Applied with this bit copied into the commit message and Stepgen's ACK.
+this patch is a disaster because it cuts off the chip's power on
+suspend regardless of whether MMC_PM_KEEP_POWER flag has been set or
+not. Simply put: it breaks everything This patch therefore gets a
+strongest *NACK* from me.
 
-Thanks!
-Linus Walleij
+Thanks,
+   Vitaly
