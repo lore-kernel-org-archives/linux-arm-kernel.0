@@ -1,135 +1,58 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 18 Apr 2012 08:02:30 +0200
-Subject: [PATCH v2 8/8] ARM: LPC32xx: Device tree support
-In-Reply-To: <1334682507-15055-9-git-send-email-stigge@antcom.de>
-References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <1334682507-15055-9-git-send-email-stigge@antcom.de>
-Message-ID: <20120418060230.GC17506@avionic-0098.adnet.avionic-design.de>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Wed, 18 Apr 2012 12:14:34 +0530
+Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
+In-Reply-To: <87bomprjic.fsf@ti.com>
+References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+ <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
+ <87bomprjic.fsf@ti.com>
+Message-ID: <4F8E62D2.9080206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roland Stigge wrote:
-> This patch does the actual device tree switch for the LPC32xx SoC.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> ---
-> 
-> Applies to v3.4-rc3
-> 
->  Documentation/devicetree/bindings/arm/lpc32xx-mic.txt |   38 +++
->  Documentation/devicetree/bindings/arm/lpc32xx.txt     |    8 
->  arch/arm/Kconfig                                      |    1 
->  arch/arm/mach-lpc32xx/Kconfig                         |   26 --
->  arch/arm/mach-lpc32xx/clock.c                         |   77 +++----
->  arch/arm/mach-lpc32xx/common.c                        |  192 ------------------
->  arch/arm/mach-lpc32xx/common.h                        |   14 -
->  arch/arm/mach-lpc32xx/irq.c                           |   78 +++++--
+Hi Kevin,
+Thanks for the review.
 
-Could this perhaps be split into another patch. Basically this is a
-conversion to IRQ domain *and* device tree support. But maybe it isn't worth
-the effort.
+On Wednesday 18 April 2012 05:36 AM, Kevin Hilman wrote:
+> Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+>
+>> In the error cases the clock cut is missed. This patch intends to fix the
+>> same.
+> Please change the references to 'cut clocks' in subject/changelog here
+> (and in other patches) to use runtime suspend instead.   First, runtime PM
+> calls do more than cut clocks, but they only do so when
+> usecounting/autosuspend timeouts permit.
+Yes thanks will fix it.
+>
+>
+>> Cc: stable at vger.kernel.org
+> Please hold off on Cc'ing stable until your patches are reviewed and accepted.
+OK
+>> Cc: Govindraj.R <govindraj.raja@ti.com>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>>  drivers/tty/serial/omap-serial.c |    6 +++++-
+>>  1 files changed, 5 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>> index fe099bb..10e80bb 100644
+>> --- a/drivers/tty/serial/omap-serial.c
+>> +++ b/drivers/tty/serial/omap-serial.c
+>> @@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
+>>  
+>>  		if (ret < 0) {
+>>  			serial_omap_enable_ier_thri(up);
+>> +			pm_runtime_mark_last_busy(&up->pdev->dev);
+>> +			pm_runtime_put_autosuspend(&up->pdev->dev);
+> Why the autosuspend version here?
+>
+> Kevin
+>
+>
+In case the request_dma fails we enable the thri( effectively like intr
+mode) so
+I thought of using the autosuspend version here .
 
->  arch/arm/mach-lpc32xx/phy3250.c                       |  146 +++++--------
+Do you prefer put version instead ?
 
-While at it, this should probably be renamed board-dt.c or something similar
-since it is no longer phy3250 specific.
-
-[...]
-> --- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-> +++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-[...]
-> -static void __init phy3250_board_init(void)
-> +static void __init lpc3250_machine_init(void)
->  {
->  	u32 tmp;
-> -	int i;
-> -
-> -	lpc32xx_gpio_init();
-> -
-> -	/* Register GPIOs used on this board */
-> -	if (gpio_request(SPI0_CS_GPIO, "spi0 cs"))
-> -		printk(KERN_ERR "Error requesting gpio %u",
-> -			SPI0_CS_GPIO);
-> -	else if (gpio_direction_output(SPI0_CS_GPIO, 1))
-> -		printk(KERN_ERR "Error setting gpio %u to output",
-> -			SPI0_CS_GPIO);
-> -
-> -	/* Setup network interface for RMII mode */
-> -	tmp = __raw_readl(LPC32XX_CLKPWR_MACCLK_CTRL);
-> -	tmp &= ~LPC32XX_CLKPWR_MACCTRL_PINS_MSK;
-> -	tmp |= LPC32XX_CLKPWR_MACCTRL_USE_RMII_PINS;
-> -	__raw_writel(tmp, LPC32XX_CLKPWR_MACCLK_CTRL);
->  
->  	/* Setup SLC NAND controller muxing */
->  	__raw_writel(LPC32XX_CLKPWR_NANDCLK_SEL_SLC,
-> @@ -300,6 +265,12 @@ static void __init phy3250_board_init(vo
->  	tmp |= LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_TFT16;
->  	__raw_writel(tmp, LPC32XX_CLKPWR_LCDCLK_CTRL);
->  
-> +	/* Set up USB power */
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
-> +	tmp |= LPC32XX_CLKPWR_USBCTRL_HCLK_EN |
-> +		LPC32XX_CLKPWR_USBCTRL_USBI2C_EN;
-> +	__raw_writel(tmp, LPC32XX_CLKPWR_USB_CTRL);
-> +
->  	/* Set up I2C pull levels */
->  	tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
->  	tmp |= LPC32XX_CLKPWR_I2CCLK_USBI2CHI_DRIVE |
-> @@ -321,33 +292,35 @@ static void __init phy3250_board_init(vo
->  	/*
->  	 * AMBA peripheral clocks need to be enabled prior to AMBA device
->  	 * detection or a data fault will occur, so enable the clocks
-> -	 * here. However, we don't want to enable them if the peripheral
-> -	 * isn't included in the image
-> +	 * here.
->  	 */
-> -#ifdef CONFIG_FB_ARMCLCD
->  	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
->  	__raw_writel((tmp | LPC32XX_CLKPWR_LCDCTRL_CLK_EN),
->  		LPC32XX_CLKPWR_LCDCLK_CTRL);
-> -#endif
-> -#ifdef CONFIG_SPI_PL022
-> +
->  	tmp = __raw_readl(LPC32XX_CLKPWR_SSP_CLK_CTRL);
->  	__raw_writel((tmp | LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN),
->  		LPC32XX_CLKPWR_SSP_CLK_CTRL);
-> -#endif
->  
-> -	platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs));
-> -	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
-> -		struct amba_device *d = amba_devs[i];
-> -		amba_device_register(d, &iomem_resource);
-> -	}
-> +	tmp = __raw_readl(LPC32XX_CLKPWR_DMA_CLK_CTRL);
-> +	__raw_writel((tmp | LPC32XX_CLKPWR_DMACLKCTRL_CLK_EN),
-> +		     LPC32XX_CLKPWR_DMA_CLK_CTRL);
->  	/* Test clock needed for UDA1380 initial init */
->  	__raw_writel(LPC32XX_CLKPWR_TESTCLK2_SEL_MOSC |
->  		LPC32XX_CLKPWR_TESTCLK_TESTCLK2_EN,
->  		LPC32XX_CLKPWR_TEST_CLK_SEL);
-
-A lot of these seem to be gratuitous here. Can control of these clocks not be
-exposed via the clock framework? That would allow the controllers to only
-activate them when actually needed. This could also be done in follow up
-patches, though.
-
-[...]
-> +	/* Register GPIOs used on this board */
-> +	if (gpio_request(SPI0_CS_GPIO, "spi0 cs"))
-> +		printk(KERN_ERR "Error requesting gpio %u",
-> +			SPI0_CS_GPIO);
-> +	else if (gpio_direction_output(SPI0_CS_GPIO, 1))
-> +		printk(KERN_ERR "Error setting gpio %u to output",
-> +			SPI0_CS_GPIO);
-
-This should be initialized based on data from the device tree.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/97cf50b6/attachment.sig>
+With Regards,
+Shubhro
