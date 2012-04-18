@@ -1,61 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 18 Apr 2012 03:40:59 -0600 (MDT)
-Subject: [PATCH] ARM: omap: hwmod: warn only when clkdm is missing from
- both clk and hwmod
-In-Reply-To: <4F8E84DC.70600@ti.com>
-References: <1334238098-29859-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1204121106010.29473@utopia.booyaka.com>
- <4F8E76C3.7080803@ti.com>
- <alpine.DEB.2.00.1204180217380.29048@utopia.booyaka.com>
- <4F8E84DC.70600@ti.com>
-Message-ID: <alpine.DEB.2.00.1204180312160.29048@utopia.booyaka.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 11:45:46 +0200
+Subject: [PATCH 08/10] MXS: Add separate MXS EHCI HCD driver
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B767E8@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334714869-19282-9-git-send-email-marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B766FD@039-SN2MPN1-023.039d.mgd.msft.net>
+ <20120418084001.GN3852@pengutronix.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B767E8@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <20120418094546.GO3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Apr 2012, Cousson, Benoit wrote:
-
-> Well, the point is that we do not need this warning even for that. This 
-> is something we have to ensure by reviewing carefully the code. 
-
-My perspective is slightly different.
-
-Until we're sure that we don't need clock framework-based clockdomain 
-control in mainline for main clocks, we shouldn't remove that warning.  
-That is because clock framework-based clockdomain control works via the 
-struct clk's clkdm field.  So until we switch away from that model, we 
-should ensure that each clock is associated with the clockdomain that its 
-clock control FSM is associated with (in OMAP3 terms).
-
-I don't have a problem with switching away from that model, or switching 
-individual SoCs away from that model, as long as regressions aren't 
-introduced.  But until that switch happens, it seems wise to avoid 
-weakening its consistency assumptions.
-
-> If you look today, the warning is complaining about clocks that are 
-> perfectly fine.
-
-Actually, mainline is only complaining about one clock:
-
-http://www.pwsan.com/omap/bootlogs/20120417/sparse_cppcheck_cleanup_3.5__0b93afd5d945a8c002f4d380a88b5d7a61c49289/4430es2panda_bootlog.txt
-
-In the current model, the right fix for that clock is to associate it with 
-a CM clockdomain (see for example the 4430 TRM vX Figure 3-70 "CD_DMA 
-Overview").
-
-> So keeping it will just add some noise and not necessarily highlighting 
-> the real issue.
+On Wed, Apr 18, 2012 at 09:18:23AM +0000, Chen Peter-B29397 wrote:
 > 
-> FYI here is what we have after the clock cleanup on OMAP4 (i.e removal of modulemode clock nodes):
-> 
+>  
+> > > >
+> > > > This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I
+> > tried to
+> > > > keep
+> > > > this separate from the MXC EHCI to avoid further polution of the MXC
+> > EHCI,
+> > > > though eventually these two might be merged.
+> > > >
+> > > As mxc and mxs platforms use the same USB controller (chipidea's), I
+> > wonder if
+> > > you can use ehci-mxc, or change name from ehci-mxc to ehci-imx?
+> > > Sascha, what's your opinion?
+> > 
+> > Maybe better ehci-imx. I think it's a good idea to not use the ehci-mxc
+> > glue code but instead write a mxs specific glue code with having in
+> > mind that later we want to drop ehci-mxc and use ehci-imx for all imx
+> > including mxs. This assumes the USB folks are ok with this, I don't
+> > know.
+> > 
+> How about create a patch changing name from ehci-mxc to ehci-imx first, then add
+> mx28/mx23/mx6q host ehci driver. I can do it.
 
-[ lots of warnings elided ]
+ehci-imx won't need clock handling and it won't need phy handling. Also
+the setup of the portsc register won't be in the new driver. The
+clk_get(dev, "usb_phy1") part is horribly broken anyway. It's more than
+just a rename.
 
-> That's a lot of noise for nothing. That's why Rajendra's patch is needed now.
+Sascha
 
-Sounds like the patch to alter the warnings should be associated with this 
-clock cleanup series, then, since it sounds like it changes the 
-clockdomain control model.  And if the model change is only affecting 
-OMAP4+, then the warning change should also only apply to OMAP4+.
-
-
-- Paul
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
