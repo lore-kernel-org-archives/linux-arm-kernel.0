@@ -1,54 +1,18 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 04:07:39 +0200
-Subject: [RFC PATCH 00/10 V2]  MXS: Add i.MX28 USB Host driver
-In-Reply-To: <1334657751-27678-1-git-send-email-marex@denx.de>
+Date: Wed, 18 Apr 2012 04:07:43 +0200
+Subject: [PATCH 04/10] MXS: Add data shared between imx-usb,
+ PHY and EHCI driver
+In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
-Message-ID: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334714869-19282-1-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
-generic USB PHY infrastructure.
+This patch adds common data shared between the MXS USB PHY driver, the MXS EHCI
+HCD driver and the imx-usb composite driver.
 
-V2: Introduce stub imx-usb driver that then registers the PHY and EHCI drivers.
-
-Marek Vasut (10):
-  MXS: Make clk_disable return integer
-  MXS: Add USB EHCI and USB PHY clock handling
-  MXS: Fixup i.MX233 USB base address name
-  MXS: Add data shared between imx-usb, PHY and EHCI driver
-  MXS: Add platform registration hooks for USB EHCI
-  MXS: Add composite imx-usb driver
-  MXS: Add USB PHY driver
-  MXS: Add separate MXS EHCI HCD driver
-  MXS: Enable USB on M28EVK
-  MXS: Enable USB on MX28EVK
-
- arch/arm/mach-mxs/Kconfig                       |    4 +
- arch/arm/mach-mxs/clock-mx28.c                  |   28 ++-
- arch/arm/mach-mxs/devices-mx28.h                |    4 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-usb.c        |   67 +++++
- arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
- arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
- arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
- arch/arm/mach-mxs/mach-m28evk.c                 |    9 +
- arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
- drivers/usb/host/Kconfig                        |    7 +
- drivers/usb/host/ehci-hcd.c                     |    5 +
- drivers/usb/host/ehci-mxs.c                     |  254 +++++++++++++++++++
- drivers/usb/otg/Kconfig                         |   16 ++
- drivers/usb/otg/Makefile                        |    2 +
- drivers/usb/otg/imx-usb.c                       |  303 +++++++++++++++++++++++
- drivers/usb/otg/mxs-phy.c                       |  201 +++++++++++++++
- include/linux/fsl_devices.h                     |   15 ++
- 19 files changed, 939 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
- create mode 100644 drivers/usb/host/ehci-mxs.c
- create mode 100644 drivers/usb/otg/imx-usb.c
- create mode 100644 drivers/usb/otg/mxs-phy.c
-
+Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
 Cc: Detlev Zundel <dzu@denx.de>
 Cc: Fabio Estevam <festevam@gmail.com>
@@ -62,5 +26,42 @@ Cc: Stefano Babic <sbabic@denx.de>
 Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
+---
+ include/linux/fsl_devices.h |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
+index fffdf00..20038c0 100644
+--- a/include/linux/fsl_devices.h
++++ b/include/linux/fsl_devices.h
+@@ -18,6 +18,7 @@
+ #define _FSL_DEVICE_H_
+ 
+ #include <linux/types.h>
++#include <linux/platform_device.h>
+ 
+ /*
+  * Some conventions on how we handle peripherals on Freescale chips
+@@ -97,6 +98,20 @@ struct fsl_usb2_platform_data {
+ 	u32		pm_usbgenctrl;
+ };
+ 
++struct imx_usb_data {
++	struct clk	*clk;
++	struct resource	*mem_res;
++	void __iomem	*mem;
++	int		irq;
++};
++
++struct imx_usb {
++	struct platform_device	*host_dev;
++	struct platform_device	*phy_dev;
++	struct imx_usb_data	host;
++	struct imx_usb_data	phy;
++};
++
+ /* Flags in fsl_usb2_mph_platform_data */
+ #define FSL_USB2_PORT0_ENABLED	0x00000001
+ #define FSL_USB2_PORT1_ENABLED	0x00000002
 -- 
 1.7.9.5
