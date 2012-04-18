@@ -1,64 +1,40 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 18 Apr 2012 08:44:48 +0200
-Subject: [PATCH 1/1] arm/dts: Tegra30: Add device tree support for SMMU
-In-Reply-To: <20120418054140.GA17506@avionic-0098.adnet.avionic-design.de>
-References: <201204161534.20089.arnd@arndb.de><20120418081746.995724e27bdc726049cd4965@nvidia.com><20120418054140.GA17506@avionic-0098.adnet.avionic-design.de>
-Message-ID: <20120418.094448.2234414220947028341.hdoyu@nvidia.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Wed, 18 Apr 2012 07:01:07 +0000
+Subject: [PATCH 08/10] MXS: Add separate MXS EHCI HCD driver
+In-Reply-To: <1334714869-19282-9-git-send-email-marex@denx.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334714869-19282-9-git-send-email-marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B766FD@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
-Subject: Re: [PATCH 1/1] arm/dts: Tegra30: Add device tree support for SMMU
-Date: Wed, 18 Apr 2012 07:41:40 +0200
-Message-ID: <20120418054140.GA17506@avionic-0098.adnet.avionic-design.de>
 
-> * PGP Signed by an unknown key
+
+ 
 > 
-> * Hiroshi Doyu wrote:
-> > On Mon, 16 Apr 2012 17:34:19 +0200
-> > Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > > On Monday 16 April 2012, Hiroshi Doyu wrote:
-> > > > What about using "dma-window" property to specify IOVA range in dtsi as below?
-> > > > 
-> > > > arch/powerpc/platforms/cell/iommu.c:
-> > > > 
-> > > > 698 static int __init cell_iommu_get_window(struct device_node *np,
-> > > > 699                                          unsigned long *base,
-> > > > 700                                          unsigned long *size)
-> > > > 701 {
-> > > > 702         const void *dma_window;
-> > > > 703         unsigned long index;
-> > > > 704
-> > > > 705         /* Use ibm,dma-window if available, else, hard code ! */
-> > > > 706         dma_window = of_get_property(np, "ibm,dma-window", NULL);
-> > > > 707         if (dma_window == NULL) {          ^^^^^^^^^^^^^^
-> > > > 708                 *base = 0;
-> > > > 709                 *size = 0x80000000u;
-> > > > 710                 return -ENODEV;
-> > > > 711         }
-> > > > 712
-> > > > 713         of_parse_dma_window(np, dma_window, &index, base, size);
-> > > > 714         return 0;
-> > > > 715 }
-> > > > 
-> > > 
-> > > Yes, that's the right way to do it, but I would use the more generic
-> > > "dma-window" name rather than "ibm,dma-window", which was originally
-> > > introduced for pseries and for some reason copied into the cell qs2x
-> > > firmware.
-> > 
-> > Which name is better, "dma-window" or "iova-window"?
-> > Considering DMA IOMMU mapping API, "dma-window" may sound appropriate to me.
+> This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I tried to
+> keep
+> this separate from the MXC EHCI to avoid further polution of the MXC EHCI,
+> though eventually these two might be merged.
 > 
-> But the window isn't necessarily used for DMA transfers. I was going to
-> propose "aperture", but that doesn't seem quite right since it is a very
-> GART-specific term. "iova-window" sounds like the best fit for what it
-> really is.
+As mxc and mxs platforms use the same USB controller (chipidea's), I wonder if
+you can use ehci-mxc, or change name from ehci-mxc to ehci-imx?
+Sascha, what's your opinion?
 
-If we can consider IOMMU as one of the implementation of DMA(Direct
-Memory Access), the prefix "dma-(window)" may make sense here. Then,
-we don't have to introduce a new concept "IO virtual address(iova)" in
-addition to the existing "bus address"(?)
+> NOTE: I still haven't figured out how to enable/disable the disconnection
+> detector, it can't be enabled all the time, so I toggle PHY stuff from
+> this
+> driver, which I doubt is correct.
+For HS disconnect detector, please use like below:
+- When there is no device at port, disable it
+- When there is a device on the port, enable it
+- When bus suspend occurs, disable it
+- When bus resume has finishes, enable it.
 
-Anyway, either name would be ok for me;)
+ 
+> +	/* Set up the PORTSCx register */
+> +	ehci_writel(ehci, MXC_EHCI_MODE_ULPI, &ehci->regs->port_status[0]);
+It is UTMI PHY, why you use ULPI mode?
+
+ 
