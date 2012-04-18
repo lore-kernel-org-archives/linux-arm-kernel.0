@@ -1,14 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 18 Apr 2012 04:07:48 +0200
-Subject: [PATCH 09/10] MXS: Enable USB on M28EVK
+Date: Wed, 18 Apr 2012 04:07:40 +0200
+Subject: [PATCH 01/10] MXS: Make clk_disable return integer
 In-Reply-To: <1334714869-19282-1-git-send-email-marex@denx.de>
 References: <1334657751-27678-1-git-send-email-marex@denx.de>
  <1334714869-19282-1-git-send-email-marex@denx.de>
-Message-ID: <1334714869-19282-10-git-send-email-marex@denx.de>
+Message-ID: <1334714869-19282-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the second USB port on M28EVK board.
+This allows subsequent USB clock patch to interchange enable() and disable()
+calls without adding unnecessary switching cruft.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -25,49 +26,61 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-mxs/Kconfig       |    2 ++
- arch/arm/mach-mxs/mach-m28evk.c |    9 +++++++++
- 2 files changed, 11 insertions(+)
+ arch/arm/mach-mxs/clock-mx28.c         |    7 +++++--
+ arch/arm/mach-mxs/include/mach/clock.h |    2 +-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 9dbf29f..5b5566c 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -83,6 +83,8 @@ config MODULE_M28
- 	select MXS_HAVE_PLATFORM_MXS_LRADC
- 	select MXS_HAVE_PLATFORM_MXS_MMC
- 	select MXS_HAVE_PLATFORM_MXSFB
-+	select MXS_HAVE_PLATFORM_USB
-+	select USB_ARCH_HAS_EHCI
- 	select MXS_OCOTP
- 
- config MODULE_APX4
-diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
-index f32fadb..ecdb0ff 100644
---- a/arch/arm/mach-mxs/mach-m28evk.c
-+++ b/arch/arm/mach-mxs/mach-m28evk.c
-@@ -212,6 +212,11 @@ static const iomux_cfg_t m28evk_pads[] __initconst = {
- 
- 	/* Backlight */
- 	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
-+
-+	/* USB */
-+	MX28_PAD_SSP2_SS1__USB1_OVERCURRENT,
-+	MX28_PAD_AUART3_TX__GPIO_3_13 |
-+		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
- };
- 
- /* led */
-@@ -377,6 +382,10 @@ static void __init m28evk_init(void)
- 	mx28_add_ts(&touch_pdata);
- 
- 	mx28_add_gpmi_nand(&m28evk_gpmi_nand_data);
-+
-+	gpio_request_one(MXS_GPIO_NR(3, 13), GPIOF_OUT_INIT_LOW, "USB Power");
-+
-+	mx28_add_mxs_usbh(1);
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index cea29c9..43116ba 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -86,7 +86,7 @@ static int _raw_clk_enable(struct clk *clk)
+ 	return 0;
  }
  
- static void __init m28evk_timer_init(void)
+-static void _raw_clk_disable(struct clk *clk)
++static int _raw_clk_disable(struct clk *clk)
+ {
+ 	u32 reg;
+ 
+@@ -95,6 +95,8 @@ static void _raw_clk_disable(struct clk *clk)
+ 		reg |= 1 << clk->enable_shift;
+ 		__raw_writel(reg, clk->enable_reg);
+ 	}
++
++	return 0;
+ }
+ 
+ /*
+@@ -149,7 +151,7 @@ _CLK_ENABLE_PLL(pll1_clk, PLL1, EN_USB_CLKS)
+ _CLK_ENABLE_PLL(pll2_clk, PLL2, CLKGATE)
+ 
+ #define _CLK_DISABLE_PLL(name, r, g)					\
+-static void name##_disable(struct clk *clk)				\
++static int name##_disable(struct clk *clk)				\
+ {									\
+ 	__raw_writel(BM_CLKCTRL_##r##CTRL0_POWER,			\
+ 		     CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+@@ -161,6 +163,7 @@ static void name##_disable(struct clk *clk)				\
+ 		__raw_writel(BM_CLKCTRL_##r##CTRL0_##g,			\
+ 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+ 									\
++	return 0;							\
+ }
+ 
+ _CLK_DISABLE_PLL(pll0_clk, PLL0, EN_USB_CLKS)
+diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
+index 592c9ab..21d1fad 100644
+--- a/arch/arm/mach-mxs/include/mach/clock.h
++++ b/arch/arm/mach-mxs/include/mach/clock.h
+@@ -50,7 +50,7 @@ struct clk {
+ 	int (*enable) (struct clk *);
+ 	/* Function ptr to disable the clock. Leave blank if clock can not
+ 	   be gated. */
+-	void (*disable) (struct clk *);
++	int (*disable) (struct clk *);
+ 	/* Function ptr to set the parent clock of the clock. */
+ 	int (*set_parent) (struct clk *, struct clk *);
+ };
 -- 
 1.7.9.5
