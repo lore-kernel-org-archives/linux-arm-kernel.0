@@ -1,34 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 18 Apr 2012 16:39:20 +0200
-Subject: [PATCH] i2c-at91: fix data-loss issue
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D0905D5A1AA@wm021.weinmann.com>
-References: <20120413103937.GH7154@arwen.pp.htv.fi>
- <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
- <EF2E73589CA71846A15D0B2CDF79505D0905D5A1AA@wm021.weinmann.com>
-Message-ID: <20120418143920.GA19802@pengutronix.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 18 Apr 2012 16:01:36 +0100
+Subject: [PATCH 7/7] MMC: mmci: Add required documentation for Device
+ Tree bindings
+In-Reply-To: <1334759484.26922.11.camel@hornet>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-8-git-send-email-lee.jones@linaro.org>
+ <1334759484.26922.11.camel@hornet>
+Message-ID: <1334761296.26922.13.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> I'll repost the driver with your fix on positive feedback from you.
-> Thanks for tracking this down.
+On Wed, 2012-04-18 at 15:31 +0100, Pawel Moll wrote:
+> On Fri, 2012-04-13 at 15:05 +0100, Lee Jones wrote:
+> > +Required properties:
+> > +- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
 > 
-> Ben, is there any chance to get this driver into next?
+> I'd say that this is _very_ optional (as in: don't use this, unless you
+> know what are you doing ;-)
+> 
+> Also, how are you planning to represent the ".ocr_mask" part of the
+> platform data? (I'm asking about this particular one, because it's the
+> only I need on vexpress ;-)
 
-I think sending a new series would be good. It depends a bit on the amount
-of donated tags (Tested-by, especially) if it will make it into 3.5.
+I forgot to mention: those are minors, generally it looks good to me
 
-Regards,
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-   Wolfram
+Cheers!
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120418/133c3334/attachment.sig>
+Pawe?
