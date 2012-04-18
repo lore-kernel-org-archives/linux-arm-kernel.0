@@ -1,43 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Apr 2012 08:36:53 +0000
-Subject: [PATCH v2 7/8] ARM: LPC32xx: DTS files for device tree conversion
-In-Reply-To: <1334682507-15055-8-git-send-email-stigge@antcom.de>
-References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <1334682507-15055-8-git-send-email-stigge@antcom.de>
-Message-ID: <201204180836.53268.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Apr 2012 10:40:01 +0200
+Subject: [PATCH 08/10] MXS: Add separate MXS EHCI HCD driver
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B766FD@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334714869-19282-9-git-send-email-marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B766FD@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <20120418084001.GN3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2012, Roland Stigge wrote:
-> +	ahb {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		ranges = <0x20000000 0x20000000 0x30000000>;
-> +
-> +		slc: flash at 20020000 {
-> +			compatible = "nxp,nand-slc";
-> +			reg = <0x20020000 0x1000>;
-> +			status = "disable";
-> +		};
-> +
-> +		mlc: flash at 200B0000 {
-> +			compatible = "nxp,nand-mlc";
-> +			reg = <0x200B0000 0x1000>;
-> +			status = "disable";
-> +		};
+On Wed, Apr 18, 2012 at 07:01:07AM +0000, Chen Peter-B29397 wrote:
+> 
+> 
+>  
+> > 
+> > This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I tried to
+> > keep
+> > this separate from the MXC EHCI to avoid further polution of the MXC EHCI,
+> > though eventually these two might be merged.
+> > 
+> As mxc and mxs platforms use the same USB controller (chipidea's), I wonder if
+> you can use ehci-mxc, or change name from ehci-mxc to ehci-imx?
+> Sascha, what's your opinion?
 
-You have the flash chips in here, which seem right, but I would expect
-to see the phy3250 file pick this up again and define partitions in
-it, at least if there is a well-defined partition layout for that
-board.
+Maybe better ehci-imx. I think it's a good idea to not use the ehci-mxc
+glue code but instead write a mxs specific glue code with having in
+mind that later we want to drop ehci-mxc and use ehci-imx for all imx
+including mxs. This assumes the USB folks are ok with this, I don't
+know.
 
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n81 root=/dev/ram0";
-> +	};
+Sascha
 
-I think in general it's better not to list a command line like this,
-it should instead get set by the boot loader or using ARM_ATAG_DTB_COMPAT.
-
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
