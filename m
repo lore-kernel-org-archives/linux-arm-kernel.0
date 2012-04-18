@@ -1,48 +1,74 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Apr 2012 11:45:46 +0200
-Subject: [PATCH 08/10] MXS: Add separate MXS EHCI HCD driver
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B767E8@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
- <1334714869-19282-1-git-send-email-marex@denx.de>
- <1334714869-19282-9-git-send-email-marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B766FD@039-SN2MPN1-023.039d.mgd.msft.net>
- <20120418084001.GN3852@pengutronix.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B767E8@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <20120418094546.GO3852@pengutronix.de>
+Date: Wed, 18 Apr 2012 11:54:47 +0200
+Subject: [PATCH] ARM: imx: Fix imx5 idle logic bug
+In-Reply-To: <CAMXH7KH6rdaUCsJxdj2pU0HrJ5ash5em2PMfyZHKTw+01Z=5nQ@mail.gmail.com>
+References: <1334619468-25680-1-git-send-email-rob.lee@linaro.org>
+ <20120417081025.GN20478@pengutronix.de>
+ <CAMXH7KH6rdaUCsJxdj2pU0HrJ5ash5em2PMfyZHKTw+01Z=5nQ@mail.gmail.com>
+Message-ID: <20120418095447.GP3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 09:18:23AM +0000, Chen Peter-B29397 wrote:
+On Tue, Apr 17, 2012 at 09:11:32AM -0500, Rob Lee wrote:
+> On Tue, Apr 17, 2012 at 3:10 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Mon, Apr 16, 2012 at 06:37:48PM -0500, Robert Lee wrote:
+> >> The imx5_idle() check of the tzic_eanble_wake() return value uses
+> >> incorrect (inverted) logic causing all attempt to idle to fail.
+> >>
+> >
+> > Does this have influence on current kernels or does this only trigger
+> > with your cpuidle patches?
 > 
->  
-> > > >
-> > > > This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I
-> > tried to
-> > > > keep
-> > > > this separate from the MXC EHCI to avoid further polution of the MXC
-> > EHCI,
-> > > > though eventually these two might be merged.
-> > > >
-> > > As mxc and mxs platforms use the same USB controller (chipidea's), I
-> > wonder if
-> > > you can use ehci-mxc, or change name from ehci-mxc to ehci-imx?
-> > > Sascha, what's your opinion?
-> > 
-> > Maybe better ehci-imx. I think it's a good idea to not use the ehci-mxc
-> > glue code but instead write a mxs specific glue code with having in
-> > mind that later we want to drop ehci-mxc and use ehci-imx for all imx
-> > including mxs. This assumes the USB folks are ok with this, I don't
-> > know.
-> > 
-> How about create a patch changing name from ehci-mxc to ehci-imx first, then add
-> mx28/mx23/mx6q host ehci driver. I can do it.
+> This influences non-cpuidle kernels also as imx5_idle is what
+> arm_pm_idle points to for imx51.
 
-ehci-imx won't need clock handling and it won't need phy handling. Also
-the setup of the portsc register won't be in the new driver. The
-clk_get(dev, "usb_phy1") part is horribly broken anyway. It's more than
-just a rename.
+Ok, Applied this one for -rc then
 
 Sascha
+
+> 
+> >
+> > Sascha
+> >
+> >> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> >> ---
+> >> ?arch/arm/mach-imx/mm-imx5.c | ? ?2 +-
+> >> ?1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+> >> index 05250ae..e10f391 100644
+> >> --- a/arch/arm/mach-imx/mm-imx5.c
+> >> +++ b/arch/arm/mach-imx/mm-imx5.c
+> >> @@ -35,7 +35,7 @@ static void imx5_idle(void)
+> >> ? ? ? }
+> >> ? ? ? clk_enable(gpc_dvfs_clk);
+> >> ? ? ? mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+> >> - ? ? if (tzic_enable_wake() != 0)
+> >> + ? ? if (!tzic_enable_wake())
+> >> ? ? ? ? ? ? ? cpu_do_idle();
+> >> ? ? ? clk_disable(gpc_dvfs_clk);
+> >> ?}
+> >> --
+> >> 1.7.10
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>
+> >
+> > --
+> > Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> > Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> > Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at ?http://www.tux.org/lkml/
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
