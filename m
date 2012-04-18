@@ -1,34 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Apr 2012 11:00:39 +0000
-Subject: [PATCH v2 0/8] Second patchset for LPC32xx device tree conversion
-In-Reply-To: <20120418093604.GL6498@mwanda>
-References: <1334682507-15055-1-git-send-email-stigge@antcom.de>
- <201204180806.16848.arnd@arndb.de> <20120418093604.GL6498@mwanda>
-Message-ID: <201204181100.40123.arnd@arndb.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 18 Apr 2012 13:13:01 +0200
+Subject: [PATCH 1/1] dt: Add general DMA window parser
+In-Reply-To: <20120418105423.GA5667@avionic-0098.mockup.avionic-design.de>
+References: <20120418102629.GA14533@avionic-0098.mockup.avionic-design.de><20120418.133629.1664781135413277375.hdoyu@nvidia.com><20120418105423.GA5667@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120418.141301.716316488779792574.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 April 2012, Dan Carpenter wrote:
-> I'm not sure I understand.  I thought everyone used the develop
-> against linux-next and backport the fixes model.  Are we going to
-> try merge these in 3.4?  It will still spend some time in linux-next
-> before we submit it, right?
+From: Thierry Reding <thierry.reding@avionic-design.de>
+Subject: Re: [PATCH 1/1] dt: Add general DMA window parser
+Date: Wed, 18 Apr 2012 12:54:23 +0200
+Message-ID: <20120418105423.GA5667@avionic-0098.mockup.avionic-design.de>
 
-Correct, but the point is that you cannot add patches on top of -next
-and have them included in a future -next version, because they never
-merge cleanly.
+> * PGP Signed by an unknown key
+> 
+> * Hiroshi Doyu wrote:
+> > diff --git a/drivers/of/of_dma.c b/drivers/of/of_dma.c
+> > new file mode 100644
+> > index 0000000..45c9e88
+> > --- /dev/null
+> > +++ b/drivers/of/of_dma.c
+> > @@ -0,0 +1,35 @@
+> > +/*
+> > + * Stolen from:
+> > + *	"arch/microblaze/kernel/prom_parse.c"
+> > + *	"arch/powerpc/kernel/prom_parse.c"
+> > + */
+> > +
+> > +#include <linux/of_address.h>
+> > +
+> > +void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
+> > +		unsigned long *busno, unsigned long *phys, unsigned long *size)
+> > +{
+> > +	const __be32 *dma_window;
+> > +	u32 cells;
+> > +	const unsigned char *prop;
+> 
+> There's no need for this to be const unsigned char *, const void * will do
+> just as well.
+> 
+> > +
+> > +	dma_window = dma_window_prop;
+> > +
+> > +	/* busno is always one cell */
+> > +	if (busno)
+> > +		*busno = be32_to_cpup(dma_window++);
+> > +
+> > +	prop = of_get_property(dn, "#dma-address-cells", NULL);
+> > +	if (!prop)
+> > +		prop = of_get_property(dn, "#address-cells", NULL);
+> > +
+> > +	cells = prop ? be32_to_cpup(prop) : of_n_addr_cells(dn);
+> > +	*phys = of_read_number(dma_window, cells);
+> 
+> This should probably fail gracefully if phys == NULL, similar to what you do
+> for busno.
+> 
+> > +
+> > +	dma_window += cells;
+> > +
+> > +	prop = of_get_property(dn, "#dma-size-cells", NULL);
+> > +	cells = prop ? be32_to_cpup(prop) : of_n_size_cells(dn);
+> > +	*size = of_read_number(dma_window, cells);
+> 
+> Same here.
+> 
+> > +}
+> > +
+> 
+> And you might want to add a EXPORT_SYMBOL(of_parse_dma_window) here so the
+> function can be used from modules.
+> 
+> Sorry for having you go through another round. I should have looked more
+> closely before.
 
-The ideal workflow is:
-
-1. develop on -rc
-2. merge with latest -next, test and make sure it works there
-3. submit for review against -rc
-4. have patches included in -next once reviewed, but based on -rc
-5. when merge window opens, have patches sent for upstream inclusion
-
-The last two steps are slightly different for your own subsystem
-compared to someone else's subsystem: In this case, Roland is the
-author and sends the patches to me to have them included in -next
-and I send them to Linus in the next merge window.
-
-	Arnd
+No problem, I'll wait for another comments, and post again later. Thank you for reivew.
