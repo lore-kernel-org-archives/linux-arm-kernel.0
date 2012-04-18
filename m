@@ -1,58 +1,120 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 18 Apr 2012 02:04:18 +0100 (BST)
-Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
- flag
-In-Reply-To: <87lilum4jr.fsf@free.fr>
-Message-ID: <1334711058.19852.YahooMailClassic@web29008.mail.ird.yahoo.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 17 Apr 2012 18:05:28 -0700
+Subject: [PATCH 1/3] clk: always pass parent_rate into .round_rate
+In-Reply-To: <1334235019-15553-1-git-send-email-shawn.guo@linaro.org>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334235019-15553-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAJOA=zMytn8i69wHOvnwfks=Ze8wVwh+Q97cPcR5+o1MwmQHhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Robert,
+On Thu, Apr 12, 2012 at 5:50 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> The parent_rate will likely be used by most .round_rate implementation
+> no matter whether flag CLK_SET_RATE_PARENT is set or not, so let's
+> always pass parent_rate into .round_rate.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
---- On Tue, 17/4/12, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> >> The PXA GPIO irq_chip structure
-> >> (pxa_muxed_gpio_chip) sets neither:
-> >> 1. The irq_set_wake() handler.
-> >> 2. The IRQCHIP_SKIP_SET_WAKE flag.
-> 
-> Hi Paul and others,
-> 
-> I tried the v3.4-rc2 today, and it _seems_ gpio button
-> wakeups don't work
-> anymore (ie. wakeup set up by gpio-keys driver). More
-> specifically, the GPIO0
-> (power button) doesn't wakeup my board from "echo mem >
-> /proc/power/state".
-
-Which board are you using?
-
-> 
-> I haven't investigated much, but tracing PWER register on
-> suspend,
-> while GPIO0 (power button) was set as a wakeup source gives
-> 0x80100000, which
-> lacks the bit0 setting (ie. GPIO0 as a wakeup source).
-
-PWER bit 0 (WE0) has a reset value of 1 on the PXA250/PXA270.
-If your WE0 is 0 then presumably either your bootloader or kernel
-has cleared it.
-
-> 
-> I don't know it this is a recent or known issue, or if I'm
-> have missed a change in
-> pxa/gpio-keys driver.
-
-I can only comment on the hx4700 platform, which has 4 pending
-patches for suspend/resume, plus 1 more still to be submitted.
-These fix hx4700 suspend/resume, which has never worked.
-None of the patches touch the gpio-keys driver, however.
-
-> 
-> Would anyone have an idea what's happening or should I look
-> for the issue myself ?
-
-If you are using the hx4700 then I can point you towards the
-pending patches.
+Thanks for the patch Shawn.  I've pulled this into my -next branch.
 
 Regards,
-Paul
+Mike
+
+> ---
+> ?drivers/clk/clk-divider.c | ? 12 +++---------
+> ?drivers/clk/clk.c ? ? ? ? | ? 16 +++++++---------
+> ?2 files changed, 10 insertions(+), 18 deletions(-)
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index add784b..04439f1 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -67,8 +67,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+> ? ? ? ?if (divider->flags & CLK_DIVIDER_ONE_BASED)
+> ? ? ? ? ? ? ? ?maxdiv--;
+>
+> - ? ? ? if (!best_parent_rate) {
+> - ? ? ? ? ? ? ? parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
+> + ? ? ? if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
+> + ? ? ? ? ? ? ? parent_rate = *best_parent_rate;
+> ? ? ? ? ? ? ? ?bestdiv = DIV_ROUND_UP(parent_rate, rate);
+> ? ? ? ? ? ? ? ?bestdiv = bestdiv == 0 ? 1 : bestdiv;
+> ? ? ? ? ? ? ? ?bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
+> @@ -108,13 +108,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+> ? ? ? ?int div;
+> ? ? ? ?div = clk_divider_bestdiv(hw, rate, prate);
+>
+> - ? ? ? if (prate)
+> - ? ? ? ? ? ? ? return *prate / div;
+> - ? ? ? else {
+> - ? ? ? ? ? ? ? unsigned long r;
+> - ? ? ? ? ? ? ? r = __clk_get_rate(__clk_get_parent(hw->clk));
+> - ? ? ? ? ? ? ? return r / div;
+> - ? ? ? }
+> + ? ? ? return *prate / div;
+> ?}
+>
+> ?static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index af2bf12..19caa0a 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -582,7 +582,7 @@ EXPORT_SYMBOL_GPL(clk_get_rate);
+> ?*/
+> ?unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> ?{
+> - ? ? ? unsigned long unused;
+> + ? ? ? unsigned long parent_rate = 0;
+>
+> ? ? ? ?if (!clk)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> @@ -590,10 +590,10 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> ? ? ? ?if (!clk->ops->round_rate)
+> ? ? ? ? ? ? ? ?return clk->rate;
+>
+> - ? ? ? if (clk->flags & CLK_SET_RATE_PARENT)
+> - ? ? ? ? ? ? ? return clk->ops->round_rate(clk->hw, rate, &unused);
+> - ? ? ? else
+> - ? ? ? ? ? ? ? return clk->ops->round_rate(clk->hw, rate, NULL);
+> + ? ? ? if (clk->parent)
+> + ? ? ? ? ? ? ? parent_rate = clk->parent->rate;
+> +
+> + ? ? ? return clk->ops->round_rate(clk->hw, rate, &parent_rate);
+> ?}
+>
+> ?/**
+> @@ -763,7 +763,7 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
+> ?static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+> ?{
+> ? ? ? ?struct clk *top = clk;
+> - ? ? ? unsigned long best_parent_rate;
+> + ? ? ? unsigned long best_parent_rate = 0;
+> ? ? ? ?unsigned long new_rate;
+>
+> ? ? ? ?/* sanity */
+> @@ -775,9 +775,6 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+> ? ? ? ? ? ? ? ?if (!clk->ops->round_rate) {
+> ? ? ? ? ? ? ? ? ? ? ? ?clk->new_rate = clk->rate;
+> ? ? ? ? ? ? ? ? ? ? ? ?return NULL;
+> - ? ? ? ? ? ? ? } else {
+> - ? ? ? ? ? ? ? ? ? ? ? new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
+> - ? ? ? ? ? ? ? ? ? ? ? goto out;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+> @@ -794,6 +791,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+> ? ? ? ? ? ? ? ?goto out;
+> ? ? ? ?}
+>
+> + ? ? ? best_parent_rate = clk->parent->rate;
+> ? ? ? ?new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
+>
+> ? ? ? ?if (best_parent_rate != clk->parent->rate) {
+> --
+> 1.7.5.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
