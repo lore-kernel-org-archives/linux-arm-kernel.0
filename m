@@ -1,54 +1,85 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Wed, 18 Apr 2012 16:44:16 +0100
-Subject: [PATCH V5 0/4] ARM: Kirkwood: Add support for DNS-320 and DNS-325
- using devicetree
-In-Reply-To: <20120418140440.GL15711@titan.lakedaemon.net>
-References: <1334743603-8488-1-git-send-email-jm@lentin.co.uk>
- <20120418131635.GK15711@titan.lakedaemon.net> <20120418132445.GB25584@lunn.ch>
- <20120418140440.GL15711@titan.lakedaemon.net>
-Message-ID: <op.wcywn2et4cuzmg@gonzo.lentin.co.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 18 Apr 2012 17:48:57 +0200
+Subject: [PATCH 5/6] ARM: OMAP3: update cpuidle latency and threshold
+ figures
+In-Reply-To: <CANOLnOOmshFXKK73qY+rY7yak3hjwR7i=TCShv-GdMEwOvRdLw@mail.gmail.com>
+References: <1334756720-29166-1-git-send-email-j-pihet@ti.com>
+ <1334756720-29166-6-git-send-email-j-pihet@ti.com>
+ <CANOLnOOmshFXKK73qY+rY7yak3hjwR7i=TCShv-GdMEwOvRdLw@mail.gmail.com>
+Message-ID: <CAORVsuUmskZxgS+S+cu-NqN4OdBK2xBO7yS+8NegaoVL_X5P9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Apr 2012 15:04:40 +0100, Jason Cooper <jason@lakedaemon.net>  
-wrote:
-
-> On Wed, Apr 18, 2012 at 03:24:45PM +0200, Andrew Lunn wrote:
->> > > dies at "Gating clock of unused units", presumably as CGC_RUNIT  
->> isn't set.
->> > > Is this something known or is it worth further investigation?
->> >
->> > That could potentially mess up a future bisect.  However, it would  
->> only
->> > crop up for dnskw boards.  I'll let Grant weigh in on this since he's
->> > the one who asked that the nand init be removed.
+On Wed, Apr 18, 2012 at 5:18 PM, Grazvydas Ignotas <notasas@gmail.com> wrote:
+> On Wed, Apr 18, 2012 at 4:45 PM, ?<jean.pihet@newoldbits.com> wrote:
+>> From: Jean Pihet <j-pihet@ti.com>
 >>
->> Turning off RUNIT is bad. Both the NAND and SPI controllers use this
->> clock. You can only safely turn it off if none of these are active.
-
-So would u-boot using the NAND count as the controller being active in  
-this case?
-
-> If we hear no objections, call kirkwood_nand_init() with no partition
-> entries, then put the partition entries in the commandline in the dts.
-> This is what Arnaud Patard is doing with the Iomega iConnect:
+>> Update the data from the measurements performed at HW and SW levels.
+>>
+>> Cf. http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement
+>> for a detailed explanation on where are the numbers coming from.
+>>
+>> ...
+>> ToDo:
+>> - Measure the wake-up latencies for all power domains for OMAP3
+>> - Correct some numbers when sys_clkreq and sys_offmode are supported
+>>
+>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>> Reviewed-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 52 +++++++++++++++++++++++-------------
+>> ?1 files changed, 33 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+>> index 2f95cfc..e406d7b 100644
+>> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+>> @@ -39,27 +39,41 @@
+> <snip>
+>> ?static struct cpuidle_params cpuidle_params_table[] = {
+>> - ? ? ? /* C1 */
+>> - ? ? ? {2 + 2, 5, 1},
+>> - ? ? ? /* C2 */
+>> - ? ? ? {10 + 10, 30, 1},
+>> - ? ? ? /* C3 */
+>> - ? ? ? {50 + 50, 300, 1},
+>> - ? ? ? /* C4 */
+>> - ? ? ? {1500 + 1800, 4000, 1},
+>> - ? ? ? /* C5 */
+>> - ? ? ? {2500 + 7500, 12000, 1},
+>> - ? ? ? /* C6 */
+>> - ? ? ? {3000 + 8500, 15000, 1},
+>> - ? ? ? /* C7 */
+>> - ? ? ? {10000 + 30000, 300000, 1},
+>> + ? ? ? /* C1 . MPU WFI + Core active */
+>> + ? ? ? {73 + 78, 152, 1},
+>> + ? ? ? /* C2 . MPU WFI + Core inactive */
+>> + ? ? ? {165 + 88, 345, 1},
+>> + ? ? ? /* C3 . MPU CSWR + Core inactive */
+>> + ? ? ? {163 + 182, 345, 1},
+>> + ? ? ? /* C4 . MPU OFF + Core inactive */
+>> + ? ? ? {2852 + 605, 150000, 1},
+>> + ? ? ? /* C5 . MPU RET + Core RET */
+>> + ? ? ? {800 + 366, 2120, 1},
+>> + ? ? ? /* C6 . MPU OFF + Core RET */
+>> + ? ? ? {4080 + 801, 215000, 1},
+>> + ? ? ? /* C7 . MPU OFF + Core OFF */
+>> + ? ? ? {4300 + 13000, 215000, 1},
+>> ?};
 >
-> mtdparts=orion_nand:0xc0000 at 0x0(uboot),0x20000 at 0xa0000(env),0x300000 at 0x100000(zImage),0x300000 at 0x540000(initrd)...
+> These (C1 at least) seem to look quite a bit better than what we see here:
+> http://marc.info/?t=133375282700004&r=1&w=2
+> according to that wiki log, some of those measurements are from 2010,
+> I wonder if that still matches today's code well.
+Those figures are for the HW part of the low power transitions
+assuming that the SW overhead (in omap_sram_idle) is minimal, which
+seems to not be true anymore.
+I need to measure the latencies again on the latest SW.
+
+Thanks,
+Jean
+
 >
-> Then, in the last patch remove the mtdparts from the commandline in the
-> dts and add the partition entries appropriately.
-
-Certainly can do, although I'm not entirely convinced it addresses Grant's  
-comment. Another option would be to change the patch order and add DNS-320  
-support after all NAND support patches are merged, although that would go  
-against the initial advice of how to layout the patchset. Will do whatever  
-is considered best though.
-
 >
-> thx,
->
-> Jason.
-
-
--- 
-Jamie Lentin
+> --
+> Gra?vydas
