@@ -1,37 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Apr 2012 13:18:07 -0700
-Subject: [PATCH 02/10] ARM: OMAP2+: SmartReflex: move the platform
- specific macros in plat-omap
-In-Reply-To: <CAORVsuUp9VBX1XbkQkcq91XsbRSut1RC6KCNPFHrX+RfWv7hQA@mail.gmail.com>
-References: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
- <1331829845-9526-3-git-send-email-j-pihet@ti.com>
- <20120315171359.GA7276@atomide.com>
- <CAORVsuUp9VBX1XbkQkcq91XsbRSut1RC6KCNPFHrX+RfWv7hQA@mail.gmail.com>
-Message-ID: <20120418201807.GQ21106@atomide.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 19 Apr 2012 01:53:45 +0530
+Subject: [PATCH] arm: davinci: pdctl next bit position incorrect
+In-Reply-To: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
+References: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <4F8F22D1.8080309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jean Pihet <jean.pihet@newoldbits.com> [120316 08:22]:
-> Hi Tony,
+Hi Murali,
+
+On 4/18/2012 4:11 PM, m-karicheri2 at ti.com wrote:
+> From: Murali Karicheri <m-karicheri2@ti.com>
 > 
-> On Thu, Mar 15, 2012 at 6:14 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [120315 09:47]:
-> >> From: Jean Pihet <j-pihet@ti.com>
-> >>
-> >> Move the platform specific macros from the smartreflex header file
-> >> (arch/arm/mach-omap2/smartreflex.h) in a new header file in plat-omap
-> >> (arch/arm/plat-omap/include/plat/smartreflex.h).
-> >>
-> >> This change makes the SmartReflex implementation ready for the move
-> >> to drivers/.
-> >
-> > Glad to see this happening!
-> >
-> > This would be better located in linux/power/smartreflex.h rather than
-> > plat/smartreflex.h.
-> Ok. Is the file name still Ok in that case? Should it mention OMAP?
+> The PDCTL NEXT bit is incorrectly set to bit 1 instead of bit 0. This
+> patch fixes this issue
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-Well I guess smartreflex is enough, in theory it could be on other
-processors than omap too.
+Applying this for v3.5. Note that the "arm:" prefix in subject has to be
+capitalized. I fixed it while comitting. Please take care next time on.
 
-Tony
+Thanks,
+Sekhar
