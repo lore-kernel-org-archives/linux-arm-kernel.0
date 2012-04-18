@@ -1,29 +1,51 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 18 Apr 2012 15:36:09 +0200
-Subject: [PATCH v3 4/10] ARM: LPC32xx: clock.c dma adjustment
+Date: Wed, 18 Apr 2012 15:36:10 +0200
+Subject: [PATCH v3 5/10] ARM: LPC32xx: Remove obsolete platform Kconfig
 In-Reply-To: <1334756176-25144-1-git-send-email-stigge@antcom.de>
 References: <1334756176-25144-1-git-send-email-stigge@antcom.de>
-Message-ID: <1334756176-25144-5-git-send-email-stigge@antcom.de>
+Message-ID: <1334756176-25144-6-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adjusts the DMA clock of the LPC32xx to "pl08xdmac" to be picked up
-correctly by the AMBA dmaengine driver.
+This patch removes two Kconfig options now unused (the network driver is
+configured via DT now).
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- arch/arm/mach-lpc32xx/clock.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -1109,7 +1109,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_INIT(NULL, "timer2_ck", &clk_timer2),
- 	CLKDEV_INIT(NULL, "timer3_ck", &clk_timer3),
- 	CLKDEV_INIT(NULL, "vfp9_ck", &clk_vfp9),
--	CLKDEV_INIT(NULL, "clk_dmac", &clk_dma),
-+	CLKDEV_INIT("pl08xdmac", NULL, &clk_dma),
- 	CLKDEV_INIT("pnx4008-watchdog", NULL, &clk_wdt),
- 	CLKDEV_INIT(NULL, "uart3_ck", &clk_uart3),
- 	CLKDEV_INIT(NULL, "uart4_ck", &clk_uart4),
+Applies to v3.4-rc3
+
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/Kconfig
++++ linux-2.6/arch/arm/mach-lpc32xx/Kconfig
+@@ -29,30 +29,4 @@ config ARCH_LPC32XX_UART6_SELECT
+ 
+ endmenu
+ 
+-menu "LPC32XX chip components"
+-
+-config ARCH_LPC32XX_IRAM_FOR_NET
+-	bool "Use IRAM for network buffers"
+-	default y
+-	help
+-	  Say Y here to use the LPC internal fast IRAM (i.e. 256KB SRAM) as
+-	  network buffer.  If the total combined required buffer sizes is
+-	  larger than the size of IRAM, then SDRAM will be used instead.
+-
+-	  This can be enabled safely if the IRAM is not intended for other
+-	  uses.
+-
+-config ARCH_LPC32XX_MII_SUPPORT
+-	bool "Check to enable MII support or leave disabled for RMII support"
+-	help
+-	  Say Y here to enable MII support, or N for RMII support. Regardless of
+-	  which support is selected, the ethernet interface driver needs to be
+-	  selected in the device driver networking section.
+-
+-	  The PHY3250 reference board uses RMII, so users of this board should
+-	  say N.
+-
+-endmenu
+-
+ endif
+-
