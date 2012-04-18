@@ -1,59 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2012 22:16:06 +0100
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <20120418210142.GR21106@atomide.com>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRsg-0004bX-4w@rmk-PC.arm.linux.org.uk>
- <CANrkHUajRzoCp7K8L3cJArWN3xdqpft8L4k-o4gFTRTo8nmhmg@mail.gmail.com>
- <20120418152956.GP25053@n2100.arm.linux.org.uk>
- <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
- <20120418194224.GS25053@n2100.arm.linux.org.uk>
- <20120418200214.GP21106@atomide.com>
- <20120418202447.GT25053@n2100.arm.linux.org.uk>
- <20120418210142.GR21106@atomide.com>
-Message-ID: <20120418211606.GU25053@n2100.arm.linux.org.uk>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 18 Apr 2012 14:17:17 -0700
+Subject: [PATCH 13/13] SPEAr: Call clk_prepare() before calling clk_enable
+In-Reply-To: <0c2dc6d1f11ac1cc4965b8e902d19fb356f0324b.1334660432.git.viresh.kumar@st.com>
+References: <cover.1334660431.git.viresh.kumar@st.com>
+ <0c2dc6d1f11ac1cc4965b8e902d19fb356f0324b.1334660432.git.viresh.kumar@st.com>
+Message-ID: <CAJOA=zOKeSf5XvAAFgs=CnmzEWHRgNRT1FscGE0q-NHnxt8yrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 02:01:44PM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120418 13:28]:
-> > I'd like to have the same thing happen on OMAP1 as well (it's actually
-> > quite simple to do) and it means that this DMA engine implementation
-> > detail is (correctly) hidden from the drivers - provided there's no
-> > dependencies on each individual scatterlist entry back to the peripheral
-> > driver.
-> 
-> That would be nice. If the DMA engine driver can't dynamically adjust the
-> frame size for each SG entry, then maybe we can work around that by not doing
-> DMA for entries that are below the frame sizes?
+On Tue, Apr 17, 2012 at 4:15 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> With common clock framework, it is must to call clk_{un}prepare() before/after
+> clk_{dis}enable. This patch fixes this for SPEAr timer.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+> ?arch/arm/plat-spear/time.c | ? ?8 ++++----
+> ?1 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
+> index a3164d1..4f05d26 100644
+> --- a/arch/arm/plat-spear/time.c
+> +++ b/arch/arm/plat-spear/time.c
+> @@ -218,10 +218,10 @@ void __init spear_setup_timer(resource_size_t base, int irq)
+> ? ? ? ? ? ? ? ?goto err_iomap;
+> ? ? ? ?}
+>
+> - ? ? ? ret = clk_enable(gpt_clk);
+> + ? ? ? ret = clk_prepare_enable(gpt_clk);
 
-I don't think it has to in this case, though I am thinking that we
-may have to adjust the frame size for other peripherals.
+Where do you call clk_enable?  Further down in the code somewhere?
 
-In the case of the OMAP1 MMC driver, let me pull out that chunk of code
-again:
+Also does this change break git bisect for your platform?  Maybe you
+should move this change before patch 12/13 to prevent run-time
+breakage?
 
-        frame = data->blksz;
-        if (cpu_is_omap15xx() && frame > 32)
-                frame = 32;
-        else if (frame > 64)
-                frame = 64;
-        frame >>= 1;
-        if (!(data->flags & MMC_DATA_WRITE)) {
-                buf = 0x800f | ((frame - 1) << 8);
-        } else {
-                buf = 0x0f80 | ((frame - 1) << 0);
-        }
-        OMAP_MMC_WRITE(host, BUF, buf);
+Regards,
+Mike
 
-Nothing there depends on the size of an individual scatterlist entry -
-the dependencies for the frame size are the smaller of the FIFO size
-and the data block size.  I believe we can cope with that quite well on
-a per-transfer basis, and I _think_ we can get away with writing this
-BUF register just once per transfer (similar to what happens for PIO
-transfers.)
-
-However, this is going to be rather hit and miss for me - all I can do
-is create a patch and check that it builds.  I have no way (that I know
-of) to test this change as I don't have any OMAP1 nor OMAP2 hardware.
+> ? ? ? ?if (ret < 0) {
+> - ? ? ? ? ? ? ? pr_err("%s:couldn't enable gpt clock\n", __func__);
+> - ? ? ? ? ? ? ? goto err_clk;
+> + ? ? ? ? ? ? ? pr_err("%s:couldn't prepare-enable gpt clock\n", __func__);
+> + ? ? ? ? ? ? ? goto err_prepare_enable_clk;
+> ? ? ? ?}
+>
+> ? ? ? ?spear_clockevent_init(irq);
+> @@ -229,7 +229,7 @@ void __init spear_setup_timer(resource_size_t base, int irq)
+>
+> ? ? ? ?return;
+>
+> -err_clk:
+> +err_prepare_enable_clk:
+> ? ? ? ?clk_put(gpt_clk);
+> ?err_iomap:
+> ? ? ? ?iounmap(gpt_base);
+> --
+> 1.7.9
+>
