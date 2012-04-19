@@ -1,45 +1,54 @@
 From: viresh.linux@gmail.com (Viresh Kumar)
-Date: Thu, 19 Apr 2012 21:58:17 +0530
-Subject: [PATCH V2 2/6] SPEAr: clk: Add Auxiliary Synthesizer clock
+Date: Thu, 19 Apr 2012 21:58:18 +0530
+Subject: [PATCH V2 3/6] SPEAr: clk: Add Fractional Synthesizer clock
 In-Reply-To: <cover.1334852393.git.viresh.kumar@st.com>
 References: <cover.1334852393.git.viresh.kumar@st.com>
-Message-ID: <e5af9ce5a6b0621b6f18af8206d6c43da1e35e52.1334852394.git.viresh.kumar@st.com>
+Message-ID: <55a49fd716f119d6f06baaf45bcb686aa3a83be1.1334852394.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All SPEAr SoC's contain Auxiliary Synthesizers. Their Fout is derived based on
-values of eq, x and y.
+All SPEAr SoC's contain Fractional Synthesizers. Their Fout is derived from
+following equations:
 
-Fout from synthesizer can be given from two equations:
-Fout1 = (Fin * X/Y)/2		EQ1
-Fout2 = Fin * X/Y		EQ2
+Fout = Fin / (2 * div) (division factor)
+div is 17 bits:-
+     0-13 (fractional part)
+     14-16 (integer part)
+     div is (16-14 bits).(13-0 bits) (in binary)
+
+     Fout = Fin/(2 * div)
+     Fout = ((Fin / 10000)/(2 * div)) * 10000
+     Fout = (2^14 * (Fin / 10000)/(2^14 * (2 * div))) * 10000
+     Fout = (((Fin / 10000) << 14)/(2 * (div << 14))) * 10000
+
+div << 14 is simply 17 bit value written at register.
 
 This patch adds in support for this type of clock.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/clk/spear/Makefile        |    2 +-
- drivers/clk/spear/clk-aux-synth.c |  187 +++++++++++++++++++++++++++++++++++++
- drivers/clk/spear/clk.h           |   43 +++++++++
- 3 files changed, 231 insertions(+), 1 deletions(-)
- create mode 100644 drivers/clk/spear/clk-aux-synth.c
+ drivers/clk/spear/Makefile         |    2 +-
+ drivers/clk/spear/clk-frac-synth.c |  156 ++++++++++++++++++++++++++++++++++++
+ drivers/clk/spear/clk.h            |   16 ++++
+ 3 files changed, 173 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/clk/spear/clk-frac-synth.c
 
 diff --git a/drivers/clk/spear/Makefile b/drivers/clk/spear/Makefile
-index f59469f..407a8e0 100644
+index 407a8e0..3c722e0 100644
 --- a/drivers/clk/spear/Makefile
 +++ b/drivers/clk/spear/Makefile
 @@ -2,4 +2,4 @@
  # SPEAr Clock specific Makefile
  #
  
--obj-y	+= clk-vco-pll.o
-+obj-y	+= clk-aux-synth.o clk-vco-pll.o
-diff --git a/drivers/clk/spear/clk-aux-synth.c b/drivers/clk/spear/clk-aux-synth.c
+-obj-y	+= clk-aux-synth.o clk-vco-pll.o
++obj-y	+= clk-aux-synth.o clk-frac-synth.o clk-vco-pll.o
+diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
 new file mode 100644
-index 0000000..1a7ab7d
+index 0000000..c6ccdab
 --- /dev/null
-+++ b/drivers/clk/spear/clk-aux-synth.c
-@@ -0,0 +1,187 @@
++++ b/drivers/clk/spear/clk-frac-synth.c
+@@ -0,0 +1,156 @@
 +/*
 + * Copyright (C) 2012 ST Microelectronics
 + * Viresh Kumar <viresh.kumar@st.com>
@@ -48,10 +57,10 @@ index 0000000..1a7ab7d
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + *
-+ * Auxiliary Synthesizer clock implementation
++ * Fractional Synthesizer clock implementation
 + */
 +
-+#define pr_fmt(fmt) "clk-aux-synth: " fmt
++#define pr_fmt(fmt) "clk-frac-synth: " fmt
 +
 +#include <linux/clk-provider.h>
 +#include <linux/slab.h>
@@ -59,217 +68,160 @@ index 0000000..1a7ab7d
 +#include <linux/err.h>
 +#include "clk.h"
 +
++#define DIV_FACTOR_MASK		0x1FFFF
++
 +/*
-+ * DOC: Auxiliary Synthesizer clock
++ * DOC: Fractional Synthesizer clock
 + *
-+ * Aux synth gives rate for different values of eq, x and y
++ * Fout from synthesizer can be given from below equation:
 + *
-+ * Fout from synthesizer can be given from two equations:
-+ * Fout1 = (Fin * X/Y)/2		EQ1
-+ * Fout2 = Fin * X/Y			EQ2
++ * Fout= Fin/2*div (division factor)
++ * div is 17 bits:-
++ *	0-13 (fractional part)
++ *	14-16 (integer part)
++ *	div is (16-14 bits).(13-0 bits) (in binary)
++ *
++ *	Fout = Fin/(2 * div)
++ *	Fout = ((Fin / 10000)/(2 * div)) * 10000
++ *	Fout = (2^14 * (Fin / 10000)/(2^14 * (2 * div))) * 10000
++ *	Fout = (((Fin / 10000) << 14)/(2 * (div << 14))) * 10000
++ *
++ * div << 14 simply 17 bit value written@register.
++ * Max error due to scaling down by 10000 is 10 KHz
 + */
 +
-+#define to_clk_aux(_hw) container_of(_hw, struct clk_aux, hw)
++#define to_clk_frac(_hw) container_of(_hw, struct clk_frac, hw)
 +
-+static struct aux_clk_masks default_aux_masks = {
-+	.eq_sel_mask = AUX_EQ_SEL_MASK,
-+	.eq_sel_shift = AUX_EQ_SEL_SHIFT,
-+	.eq1_mask = AUX_EQ1_SEL,
-+	.eq2_mask = AUX_EQ2_SEL,
-+	.xscale_sel_mask = AUX_XSCALE_MASK,
-+	.xscale_sel_shift = AUX_XSCALE_SHIFT,
-+	.yscale_sel_mask = AUX_YSCALE_MASK,
-+	.yscale_sel_shift = AUX_YSCALE_SHIFT,
-+	.enable_bit = AUX_SYNT_ENB,
-+};
-+
-+static unsigned long aux_calc_rate(struct clk_hw *hw, unsigned long prate,
++static unsigned long frac_calc_rate(struct clk_hw *hw, unsigned long prate,
 +		int index)
 +{
-+	struct clk_aux *aux = to_clk_aux(hw);
-+	struct aux_rate_tbl *rtbl = aux->rtbl;
-+	u8 eq = rtbl[index].eq ? 1 : 2;
++	struct clk_frac *frac = to_clk_frac(hw);
++	struct frac_rate_tbl *rtbl = frac->rtbl;
 +
-+	return (((prate / 10000) * rtbl[index].xscale) /
-+			(rtbl[index].yscale * eq)) * 10000;
++	prate /= 10000;
++	prate <<= 14;
++	prate /= (2 * rtbl[index].div);
++	prate *= 10000;
++
++	return prate;
 +}
 +
-+static long clk_aux_round_rate(struct clk_hw *hw, unsigned long drate,
++static long clk_frac_round_rate(struct clk_hw *hw, unsigned long drate,
 +		unsigned long *prate)
 +{
-+	struct clk_aux *aux = to_clk_aux(hw);
++	struct clk_frac *frac = to_clk_frac(hw);
 +	int unused;
 +
-+	return clk_round_rate_index(hw, drate, aux_calc_rate, aux->rtbl_cnt,
++	return clk_round_rate_index(hw, drate, frac_calc_rate, frac->rtbl_cnt,
 +			&unused);
 +}
 +
-+static unsigned long clk_aux_recalc_rate(struct clk_hw *hw,
++static unsigned long clk_frac_recalc_rate(struct clk_hw *hw,
 +		unsigned long parent_rate)
 +{
-+	struct clk_aux *aux = to_clk_aux(hw);
-+	unsigned int num = 1, den = 1, val, eqn;
++	struct clk_frac *frac = to_clk_frac(hw);
 +	unsigned long flags = 0;
++	unsigned int div = 1, val;
 +
-+	if (aux->lock)
-+		spin_lock_irqsave(aux->lock, flags);
++	if (frac->lock)
++		spin_lock_irqsave(frac->lock, flags);
 +
-+	val = readl_relaxed(aux->reg);
++	val = readl_relaxed(frac->reg);
 +
-+	if (aux->lock)
-+		spin_unlock_irqrestore(aux->lock, flags);
++	if (frac->lock)
++		spin_unlock_irqrestore(frac->lock, flags);
 +
-+	eqn = (val >> aux->masks->eq_sel_shift) & aux->masks->eq_sel_mask;
-+	if (eqn == aux->masks->eq1_mask)
-+		den = 2;
++	div = val & DIV_FACTOR_MASK;
 +
-+	/* calculate numerator */
-+	num = (val >> aux->masks->xscale_sel_shift) &
-+		aux->masks->xscale_sel_mask;
-+
-+	/* calculate denominator */
-+	den *= (val >> aux->masks->yscale_sel_shift) &
-+		aux->masks->yscale_sel_mask;
-+
-+	if (!den)
++	if (!div)
 +		return 0;
 +
-+	return (((parent_rate / 10000) * num) / den) * 10000;
++	parent_rate = parent_rate / 10000;
++
++	parent_rate = (parent_rate << 14) / (2 * div);
++	return parent_rate * 10000;
 +}
 +
-+/* Configures new clock rate of aux */
-+static int clk_aux_set_rate(struct clk_hw *hw, unsigned long drate)
++/* Configures new clock rate of frac */
++static int clk_frac_set_rate(struct clk_hw *hw, unsigned long drate)
 +{
-+	struct clk_aux *aux = to_clk_aux(hw);
-+	struct aux_rate_tbl *rtbl = aux->rtbl;
-+	unsigned long val, flags = 0;
++	struct clk_frac *frac = to_clk_frac(hw);
++	struct frac_rate_tbl *rtbl = frac->rtbl;
++	unsigned long flags = 0, val;
 +	int i;
 +
-+	clk_round_rate_index(hw, drate, aux_calc_rate, aux->rtbl_cnt, &i);
++	clk_round_rate_index(hw, drate, frac_calc_rate, frac->rtbl_cnt, &i);
 +
-+	if (aux->lock)
-+		spin_lock_irqsave(aux->lock, flags);
++	if (frac->lock)
++		spin_lock_irqsave(frac->lock, flags);
 +
-+	val = readl_relaxed(aux->reg) &
-+		~(aux->masks->eq_sel_mask << aux->masks->eq_sel_shift);
-+	val |= (rtbl[i].eq & aux->masks->eq_sel_mask) <<
-+		aux->masks->eq_sel_shift;
-+	val &= ~(aux->masks->xscale_sel_mask << aux->masks->xscale_sel_shift);
-+	val |= (rtbl[i].xscale & aux->masks->xscale_sel_mask) <<
-+		aux->masks->xscale_sel_shift;
-+	val &= ~(aux->masks->yscale_sel_mask << aux->masks->yscale_sel_shift);
-+	val |= (rtbl[i].yscale & aux->masks->yscale_sel_mask) <<
-+		aux->masks->yscale_sel_shift;
-+	writel_relaxed(val, aux->reg);
++	val = readl_relaxed(frac->reg) & ~DIV_FACTOR_MASK;
++	val |= rtbl[i].div & DIV_FACTOR_MASK;
++	writel_relaxed(val, frac->reg);
 +
-+	if (aux->lock)
-+		spin_unlock_irqrestore(aux->lock, flags);
++	if (frac->lock)
++		spin_unlock_irqrestore(frac->lock, flags);
 +
 +	return 0;
 +}
 +
-+static struct clk_ops clk_aux_ops = {
-+	.recalc_rate = clk_aux_recalc_rate,
-+	.round_rate = clk_aux_round_rate,
-+	.set_rate = clk_aux_set_rate,
++struct clk_ops clk_frac_ops = {
++	.recalc_rate = clk_frac_recalc_rate,
++	.round_rate = clk_frac_round_rate,
++	.set_rate = clk_frac_set_rate,
 +};
 +
-+struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
-+		const char *parent_name, unsigned long flags, void __iomem *reg,
-+		struct aux_clk_masks *masks, struct aux_rate_tbl *rtbl,
-+		u8 rtbl_cnt, spinlock_t *lock, struct clk **gate_clk)
++struct clk *clk_register_frac(const char *name, const char *parent_name,
++		unsigned long flags, void __iomem *reg,
++		struct frac_rate_tbl *rtbl, u8 rtbl_cnt, spinlock_t *lock)
 +{
-+	struct clk_aux *aux;
++	struct clk_frac *frac;
 +	struct clk *clk;
 +
-+	if (!aux_name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
++	if (!name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
 +		pr_err("Invalid arguments passed");
 +		return ERR_PTR(-EINVAL);
 +	}
 +
-+	aux = kzalloc(sizeof(*aux), GFP_KERNEL);
-+	if (!aux) {
-+		pr_err("could not allocate aux clk\n");
++	frac = kzalloc(sizeof(*frac), GFP_KERNEL);
++	if (!frac) {
++		pr_err("could not allocate frac clk\n");
 +		return ERR_PTR(-ENOMEM);
 +	}
 +
-+	/* struct clk_aux assignments */
-+	if (!masks)
-+		aux->masks = &default_aux_masks;
++	/* struct clk_frac assignments */
++	frac->reg = reg;
++	frac->rtbl = rtbl;
++	frac->rtbl_cnt = rtbl_cnt;
++	frac->lock = lock;
 +
-+	aux->reg = reg;
-+	aux->rtbl = rtbl;
-+	aux->rtbl_cnt = rtbl_cnt;
-+	aux->lock = lock;
-+
-+	clk = clk_register(NULL, aux_name, &clk_aux_ops, &aux->hw, &parent_name,
++	clk = clk_register(NULL, name, &clk_frac_ops, &frac->hw, &parent_name,
 +			1, flags);
-+	if (IS_ERR_OR_NULL(clk))
-+		goto free_aux;
++	if (!IS_ERR_OR_NULL(clk))
++		return clk;
 +
-+	if (gate_name) {
-+		struct clk *tgate_clk;
-+
-+		tgate_clk = clk_register_gate(NULL, gate_name, aux_name, 0, reg,
-+				aux->masks->enable_bit, 0, lock);
-+		if (IS_ERR_OR_NULL(tgate_clk))
-+			goto free_aux;
-+
-+		if (gate_clk)
-+			*gate_clk = tgate_clk;
-+	}
-+
-+	return clk;
-+
-+free_aux:
-+	kfree(aux);
 +	pr_err("clk register failed\n");
++	kfree(frac);
 +
 +	return NULL;
 +}
 diff --git a/drivers/clk/spear/clk.h b/drivers/clk/spear/clk.h
-index a66024e..5e279ee 100644
+index 5e279ee..e67e6cf 100644
 --- a/drivers/clk/spear/clk.h
 +++ b/drivers/clk/spear/clk.h
-@@ -16,6 +16,45 @@
- #include <linux/spinlock_types.h>
- #include <linux/types.h>
+@@ -55,6 +55,19 @@ struct clk_aux {
+ 	spinlock_t		*lock;
+ };
  
-+/* Auxiliary Synth clk */
-+/* Default masks */
-+#define AUX_EQ_SEL_SHIFT	30
-+#define AUX_EQ_SEL_MASK		1
-+#define AUX_EQ1_SEL		0
-+#define AUX_EQ2_SEL		1
-+#define AUX_XSCALE_SHIFT	16
-+#define AUX_XSCALE_MASK		0xFFF
-+#define AUX_YSCALE_SHIFT	0
-+#define AUX_YSCALE_MASK		0xFFF
-+#define AUX_SYNT_ENB		31
-+
-+struct aux_clk_masks {
-+	u32 eq_sel_mask;
-+	u32 eq_sel_shift;
-+	u32 eq1_mask;
-+	u32 eq2_mask;
-+	u32 xscale_sel_mask;
-+	u32 xscale_sel_shift;
-+	u32 yscale_sel_mask;
-+	u32 yscale_sel_shift;
-+	u32 enable_bit;
++/* Fractional Synth clk */
++struct frac_rate_tbl {
++	u32 div;
 +};
 +
-+struct aux_rate_tbl {
-+	u16 xscale;
-+	u16 yscale;
-+	u8 eq;
-+};
-+
-+struct clk_aux {
++struct clk_frac {
 +	struct			clk_hw hw;
 +	void __iomem		*reg;
-+	struct aux_clk_masks	*masks;
-+	struct aux_rate_tbl	*rtbl;
++	struct frac_rate_tbl	*rtbl;
 +	u8			rtbl_cnt;
 +	spinlock_t		*lock;
 +};
@@ -277,14 +229,13 @@ index a66024e..5e279ee 100644
  /* VCO-PLL clk */
  struct pll_rate_tbl {
  	u8 mode;
-@@ -44,6 +83,10 @@ typedef unsigned long (*clk_calc_rate)(struct clk_hw *hw, unsigned long prate,
- 		int index);
- 
- /* clk register routines */
-+struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
-+		const char *parent_name, unsigned long flags, void __iomem *reg,
-+		struct aux_clk_masks *masks, struct aux_rate_tbl *rtbl,
-+		u8 rtbl_cnt, spinlock_t *lock, struct clk **gate_clk);
+@@ -87,6 +100,9 @@ struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
+ 		const char *parent_name, unsigned long flags, void __iomem *reg,
+ 		struct aux_clk_masks *masks, struct aux_rate_tbl *rtbl,
+ 		u8 rtbl_cnt, spinlock_t *lock, struct clk **gate_clk);
++struct clk *clk_register_frac(const char *name, const char *parent_name,
++		unsigned long flags, void __iomem *reg,
++		struct frac_rate_tbl *rtbl, u8 rtbl_cnt, spinlock_t *lock);
  struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
  		const char *vco_gate_name, const char *parent_name,
  		unsigned long flags, void __iomem *mode_reg, void __iomem
