@@ -1,28 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Apr 2012 11:51:46 +0000
-Subject: [PATCH 05/10] MXS: Add platform registration hooks for USB EHCI
-In-Reply-To: <1334771194-18688-6-git-send-email-marex@denx.de>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <1334771194-18688-1-git-send-email-marex@denx.de>
- <1334771194-18688-6-git-send-email-marex@denx.de>
-Message-ID: <201204191151.46590.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 19 Apr 2012 14:05:56 +0200
+Subject: [PATCH v2 3/8] ARM: OMAP2+: hwmod: reorganize and document the
+ setup process
+In-Reply-To: <alpine.DEB.2.00.1204190346350.29048@utopia.booyaka.com>
+References: <20120228053524.16278.59430.stgit@dusk>
+ <20120228053651.16278.22844.stgit@dusk>
+ <alpine.DEB.2.00.1204190208470.29048@utopia.booyaka.com>
+ <alpine.DEB.2.00.1204190214250.29048@utopia.booyaka.com>
+ <4F8FCB4A.3080805@ti.com>
+ <alpine.DEB.2.00.1204190346350.29048@utopia.booyaka.com>
+Message-ID: <4F8FFFA4.7050607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 April 2012, Marek Vasut wrote:
->  arch/arm/mach-mxs/devices-mx28.h                |    4 ++
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-usb.c        |   78 +++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/devices-common.h |    9 +++
->  5 files changed, 95 insertions(+)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
+On 4/19/2012 11:49 AM, Paul Walmsley wrote:
+> Hi Beno?t,
+>
+> On Thu, 19 Apr 2012, Cousson, Benoit wrote:
+>
+>> On 4/19/2012 10:17 AM, Paul Walmsley wrote:
+>>
+>>>    static int __init omap_hwmod_setup_all(void)
+>>>    {
+>>> -	int r;
+>>> -
+>>> -	if (!mpu_oh) {
+>>> -		pr_err("omap_hwmod: %s: MPU initiator hwmod %s not yet
+>>> registered\n",
+>>> -		       __func__, MPU_INITIATOR_NAME);
+>>> -		return -EINVAL;
+>>> -	}
+>>> -
+>>> -	r = omap_hwmod_for_each(_populate_mpu_rt_base, NULL);
+>>> -
+>>> -	r = omap_hwmod_for_each(_init_clocks, NULL);
+>>> -	WARN(IS_ERR_VALUE(r),
+>>> -	     "omap_hwmod: %s: _init_clocks failed\n", __func__);
+>>> +	_ensure_mpu_hwmod_is_setup(NULL);
+>>>
+>>> +	omap_hwmod_for_each(_init, NULL);
+>>>    	omap_hwmod_for_each(_setup, NULL);
+>>
+>> Does it make sense to iterate twice? Cannot we just iterate over a _init +
+>> _setup single call?
+>
+> It's a good idea but I don't think we can do that until we add the code to
+> walk the hwmod data in dependency order.  The DSS custom reset function
+> accesses registers in another hwmod, which won't have its clocks
+> initialized yet if _init() and setup() are combined.
 
-What's the state of the device tree support for mach-mxs now? Since we
-allow booting at least the mx28evk with device tree now in -next, it
-would be really nice if we didn't have to add this registration code
-for non-DT platforms any more and just mandate that everyone who
-wants to use USB on that board uses DT. Is that possible already
-or are we missing too much other stuff?
+Outch, that's unfortunate!
 
-	Arnd
+I'm wondering if the whole automatic reset management at hwmod level 
+does make sense for such IP.
+
+In the case of the DSS, having some reset support in the driver model 
+should allow potentially a reset done at parent level to be broadcasted 
+to every children.
+
+Regards,
+Benoit
