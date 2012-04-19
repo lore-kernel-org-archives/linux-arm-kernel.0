@@ -1,185 +1,232 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 19 Apr 2012 15:24:14 +0400
-Subject: [PATCH] i.MX51 iomux: add missed definitions for SION-bit and mode
- for some pads
-Message-ID: <1334834654-12126-1-git-send-email-shc_work@mail.ru>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Thu, 19 Apr 2012 16:57:34 +0530
+Subject: [PATCHv2] Input: omap-keypad: dynamically handle register offsets
+In-Reply-To: <1334216338-29977-1-git-send-email-sourav.poddar@ti.com>
+References: <1334216338-29977-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <CAKdam577T_rmvq4S4=yEu7m8_84hj81mS+ibWGSBRvvzmYrsgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Dmitry,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |   48 +++++++++++++-------------
- 1 files changed, 24 insertions(+), 24 deletions(-)
+Any comments on this?
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index c7f5169a..36c8989 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -256,13 +256,13 @@
- #define MX51_PAD_NANDF_RB1__GPIO3_9		IOMUX_PAD(0x4fc, 0x120, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB1__NANDF_RB1		IOMUX_PAD(0x4fc, 0x120, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB1__PATA_IORDY		IOMUX_PAD(0x4fc, 0x120, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_NANDF_RB1__SD4_CMD		IOMUX_PAD(0x4fc, 0x120, 5, __NA_, 0, MX51_SDHCI_PAD_CTRL)
-+#define MX51_PAD_NANDF_RB1__SD4_CMD		IOMUX_PAD(0x4fc, 0x120, 0x15, __NA_, 0, MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__DISP2_WAIT		IOMUX_PAD(0x500, 0x124, 5, 0x9a8, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__ECSPI2_SCLK		IOMUX_PAD(0x500, 0x124, 2, __NA_, 0, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__FEC_COL		IOMUX_PAD(0x500, 0x124, 1, 0x94c, 0, MX51_PAD_CTRL_2)
- #define MX51_PAD_NANDF_RB2__GPIO3_10		IOMUX_PAD(0x500, 0x124, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__NANDF_RB2		IOMUX_PAD(0x500, 0x124, 0, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_NANDF_RB2__USBH3_H3_DP		IOMUX_PAD(0x500, 0x124, 7, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_RB2__USBH3_H3_DP		IOMUX_PAD(0x500, 0x124, 0x17, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__USBH3_NXT		IOMUX_PAD(0x500, 0x124, 6, 0xa20, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB3__DISP1_WAIT		IOMUX_PAD(0x504, 0x128, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB3__ECSPI2_MISO		IOMUX_PAD(0x504, 0x128, 2, __NA_, 0, MX51_ECSPI_PAD_CTRL)
-@@ -270,7 +270,7 @@
- #define MX51_PAD_NANDF_RB3__GPIO3_11		IOMUX_PAD(0x504, 0x128, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB3__NANDF_RB3		IOMUX_PAD(0x504, 0x128, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB3__USBH3_CLK		IOMUX_PAD(0x504, 0x128, 6, 0x9f8, 0, NO_PAD_CTRL)
--#define MX51_PAD_NANDF_RB3__USBH3_H3_DM		IOMUX_PAD(0x504, 0x128, 7, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_RB3__USBH3_H3_DM		IOMUX_PAD(0x504, 0x128, 0x17, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO_NAND__GPIO_NAND		IOMUX_PAD(0x514, 0x12c, 0, 0x998, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO_NAND__PATA_INTRQ		IOMUX_PAD(0x514, 0x12c, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS0__GPIO3_16		IOMUX_PAD(0x518, 0x130, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
-@@ -283,13 +283,13 @@
- #define MX51_PAD_NANDF_CS2__NANDF_CS2		IOMUX_PAD(0x520, 0x138, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS2__PATA_CS_0		IOMUX_PAD(0x520, 0x138, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS2__SD4_CLK		IOMUX_PAD(0x520, 0x138, 5, __NA_, 0, MX51_SDHCI_PAD_CTRL | PAD_CTL_HYS)
--#define MX51_PAD_NANDF_CS2__USBH3_H1_DP		IOMUX_PAD(0x520, 0x138, 7, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_CS2__USBH3_H1_DP		IOMUX_PAD(0x520, 0x138, 0x17, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS3__FEC_MDC		IOMUX_PAD(0x524, 0x13c, 2, __NA_, 0, MX51_PAD_CTRL_5)
- #define MX51_PAD_NANDF_CS3__GPIO3_19		IOMUX_PAD(0x524, 0x13c, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS3__NANDF_CS3		IOMUX_PAD(0x524, 0x13c, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS3__PATA_CS_1		IOMUX_PAD(0x524, 0x13c, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS3__SD4_DAT0		IOMUX_PAD(0x524, 0x13c, 5, __NA_, 0, MX51_SDHCI_PAD_CTRL)
--#define MX51_PAD_NANDF_CS3__USBH3_H1_DM		IOMUX_PAD(0x524, 0x13c, 7, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_CS3__USBH3_H1_DM		IOMUX_PAD(0x524, 0x13c, 0x17, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS4__FEC_TDATA1		IOMUX_PAD(0x528, 0x140, 2, __NA_, 0, MX51_PAD_CTRL_5)
- #define MX51_PAD_NANDF_CS4__GPIO3_20		IOMUX_PAD(0x528, 0x140, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_CS4__NANDF_CS4		IOMUX_PAD(0x528, 0x140, 0, __NA_, 0, NO_PAD_CTRL)
-@@ -316,7 +316,7 @@
- #define MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK	IOMUX_PAD(0x538, 0x150, 1, 0x974, 0, MX51_PAD_CTRL_4)
- #define MX51_PAD_NANDF_RDY_INT__GPIO3_24	IOMUX_PAD(0x538, 0x150, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_RDY_INT__NANDF_RDY_INT	IOMUX_PAD(0x538, 0x150, 0, 0x938, 0, NO_PAD_CTRL)
--#define MX51_PAD_NANDF_RDY_INT__SD3_CMD		IOMUX_PAD(0x538, 0x150, 5, __NA_, 0, MX51_SDHCI_PAD_CTRL)
-+#define MX51_PAD_NANDF_RDY_INT__SD3_CMD		IOMUX_PAD(0x538, 0x150, 0x15, __NA_, 0, MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_NANDF_D15__ECSPI2_MOSI		IOMUX_PAD(0x53c, 0x154, 2, __NA_, 0, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_NANDF_D15__GPIO3_25		IOMUX_PAD(0x53c, 0x154, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_NANDF_D15__NANDF_D15		IOMUX_PAD(0x53c, 0x154, 0, __NA_, 0, NO_PAD_CTRL)
-@@ -672,23 +672,23 @@
- #define MX51_PAD_DISP2_DAT5__DISP2_DAT5		IOMUX_PAD(0x770, 0x368, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT6__DISP2_DAT6		IOMUX_PAD(0x774, 0x36c, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT6__FEC_TDATA1		IOMUX_PAD(0x774, 0x36c, 2, __NA_, 0, MX51_PAD_CTRL_5)
--#define MX51_PAD_DISP2_DAT6__GPIO1_19		IOMUX_PAD(0x774, 0x36c, 5, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DISP2_DAT6__GPIO1_19		IOMUX_PAD(0x774, 0x36c, 5, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT6__KEY_ROW4		IOMUX_PAD(0x774, 0x36c, 4, 0x9d0, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT6__USBH3_STP		IOMUX_PAD(0x774, 0x36c, 3, 0xa24, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT7__DISP2_DAT7		IOMUX_PAD(0x778, 0x370, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT7__FEC_TDATA2		IOMUX_PAD(0x778, 0x370, 2, __NA_, 0, MX51_PAD_CTRL_5)
--#define MX51_PAD_DISP2_DAT7__GPIO1_29		IOMUX_PAD(0x778, 0x370, 5, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DISP2_DAT7__GPIO1_29		IOMUX_PAD(0x778, 0x370, 5, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT7__KEY_ROW5		IOMUX_PAD(0x778, 0x370, 4, 0x9d4, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT7__USBH3_NXT		IOMUX_PAD(0x778, 0x370, 3, 0xa20, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT8__DISP2_DAT8		IOMUX_PAD(0x77c, 0x374, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT8__FEC_TDATA3		IOMUX_PAD(0x77c, 0x374, 2, __NA_, 0, MX51_PAD_CTRL_5)
--#define MX51_PAD_DISP2_DAT8__GPIO1_30		IOMUX_PAD(0x77c, 0x374, 5, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DISP2_DAT8__GPIO1_30		IOMUX_PAD(0x77c, 0x374, 5, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT8__KEY_ROW6		IOMUX_PAD(0x77c, 0x374, 4, 0x9d8, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT8__USBH3_DATA0	IOMUX_PAD(0x77c, 0x374, 3, 0x9fc, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT9__AUD6_RXC		IOMUX_PAD(0x780, 0x378, 4, 0x8f4, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT9__DISP2_DAT9		IOMUX_PAD(0x780, 0x378, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT9__FEC_TX_EN		IOMUX_PAD(0x780, 0x378, 2, __NA_, 0, MX51_PAD_CTRL_5)
--#define MX51_PAD_DISP2_DAT9__GPIO1_31		IOMUX_PAD(0x780, 0x378, 5, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DISP2_DAT9__GPIO1_31		IOMUX_PAD(0x780, 0x378, 5, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT9__USBH3_DATA1	IOMUX_PAD(0x780, 0x378, 3, 0xa00, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT10__DISP2_DAT10	IOMUX_PAD(0x784, 0x37c, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT10__DISP2_SER_CS	IOMUX_PAD(0x784, 0x37c, 5, __NA_, 0, NO_PAD_CTRL)
-@@ -698,7 +698,7 @@
- #define MX51_PAD_DISP2_DAT11__AUD6_TXD		IOMUX_PAD(0x788, 0x380, 4, 0x8f0, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT11__DISP2_DAT11	IOMUX_PAD(0x788, 0x380, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT11__FEC_RX_CLK	IOMUX_PAD(0x788, 0x380, 2, 0x968, 1, NO_PAD_CTRL)
--#define MX51_PAD_DISP2_DAT11__GPIO1_10		IOMUX_PAD(0x788, 0x380, 7, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_DISP2_DAT11__GPIO1_10		IOMUX_PAD(0x788, 0x380, 7, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT11__USBH3_DATA3	IOMUX_PAD(0x788, 0x380, 3, 0xa08, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT12__AUD6_RXD		IOMUX_PAD(0x78c, 0x384, 4, 0x8ec, 1, NO_PAD_CTRL)
- #define MX51_PAD_DISP2_DAT12__DISP2_DAT12	IOMUX_PAD(0x78c, 0x384, 0, __NA_, 0, NO_PAD_CTRL)
-@@ -746,16 +746,16 @@
- #define MX51_PAD_SD1_DATA3__CSPI_SS1		IOMUX_PAD(0x7b0, 0x3a8, 2, 0x920, 1, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_SD1_DATA3__SD1_DATA3		IOMUX_PAD(0x7b0, 0x3a8, 0x10, __NA_, 0, MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_GPIO1_0__CSPI_SS2		IOMUX_PAD(0x7b4, 0x3ac, 2, 0x924, 0, MX51_ECSPI_PAD_CTRL)
--#define MX51_PAD_GPIO1_0__GPIO1_0		IOMUX_PAD(0x7b4, 0x3ac, 1, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_0__GPIO1_0		IOMUX_PAD(0x7b4, 0x3ac, 1, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_0__SD1_CD		IOMUX_PAD(0x7b4, 0x3ac, 0, __NA_, 0, MX51_ESDHC_PAD_CTRL)
- #define MX51_PAD_GPIO1_1__CSPI_MISO		IOMUX_PAD(0x7b8, 0x3b0, 2, 0x918, 2, MX51_ECSPI_PAD_CTRL)
--#define MX51_PAD_GPIO1_1__GPIO1_1		IOMUX_PAD(0x7b8, 0x3b0, 1, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_1__GPIO1_1		IOMUX_PAD(0x7b8, 0x3b0, 1, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_1__SD1_WP		IOMUX_PAD(0x7b8, 0x3b0, 0, __NA_, 0, MX51_ESDHC_PAD_CTRL)
- #define MX51_PAD_EIM_DA12__EIM_DA12		IOMUX_PAD(__NA_, 0x04c, 0, 0x000, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_DA13__EIM_DA13		IOMUX_PAD(__NA_, 0x050, 0, 0x000, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_DA14__EIM_DA14		IOMUX_PAD(__NA_, 0x054, 0, 0x000, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_DA15__EIM_DA15		IOMUX_PAD(__NA_, 0x058, 0, 0x000, 0, NO_PAD_CTRL)
--#define MX51_PAD_SD2_CMD__CSPI_MOSI		IOMUX_PAD(__NA_, 0x3b4, 2, 0x91c, 3, MX51_ECSPI_PAD_CTRL)
-+#define MX51_PAD_SD2_CMD__CSPI_MOSI		IOMUX_PAD(0x7bc, 0x3b4, 2, 0x91c, 3, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_SD2_CMD__I2C1_SCL		IOMUX_PAD(0x7bc, 0x3b4, 0x11, 0x9b0, 2, MX51_I2C_PAD_CTRL)
- #define MX51_PAD_SD2_CMD__SD2_CMD		IOMUX_PAD(0x7bc, 0x3b4, 0x10, __NA_, 0, MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_SD2_CLK__CSPI_SCLK		IOMUX_PAD(0x7c0, 0x3b8, 2, 0x914, 3, MX51_ECSPI_PAD_CTRL)
-@@ -766,19 +766,19 @@
- #define MX51_PAD_SD2_DATA0__SD2_DATA0		IOMUX_PAD(0x7c4, 0x3bc, 0x10, __NA_, 0, MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_SD2_DATA1__SD1_DAT5		IOMUX_PAD(0x7c8, 0x3c0, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_SD2_DATA1__SD2_DATA1		IOMUX_PAD(0x7c8, 0x3c0, 0x10, __NA_, 0, MX51_SDHCI_PAD_CTRL)
--#define MX51_PAD_SD2_DATA1__USBH3_H2_DP		IOMUX_PAD(0x7c8, 0x3c0, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_SD2_DATA1__USBH3_H2_DP		IOMUX_PAD(0x7c8, 0x3c0, 0x12, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_SD2_DATA2__SD1_DAT6		IOMUX_PAD(0x7cc, 0x3c4, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_SD2_DATA2__SD2_DATA2		IOMUX_PAD(0x7cc, 0x3c4, 0x10, __NA_, 0, MX51_SDHCI_PAD_CTRL)
--#define MX51_PAD_SD2_DATA2__USBH3_H2_DM		IOMUX_PAD(0x7cc, 0x3c4, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_SD2_DATA2__USBH3_H2_DM		IOMUX_PAD(0x7cc, 0x3c4, 0x12, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_SD2_DATA3__CSPI_SS2		IOMUX_PAD(0x7d0, 0x3c8, 2, 0x924, 1, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_SD2_DATA3__SD1_DAT7		IOMUX_PAD(0x7d0, 0x3c8, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_SD2_DATA3__SD2_DATA3		IOMUX_PAD(0x7d0, 0x3c8, 0x10, __NA_, 0, MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_GPIO1_2__CCM_OUT_2		IOMUX_PAD(0x7d4, 0x3cc, 5, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_2__GPIO1_2		IOMUX_PAD(0x7d4, 0x3cc, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_2__GPIO1_2		IOMUX_PAD(0x7d4, 0x3cc, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_2__I2C2_SCL		IOMUX_PAD(0x7d4, 0x3cc, 0x12, 0x9b8, 3, MX51_I2C_PAD_CTRL)
- #define MX51_PAD_GPIO1_2__PLL1_BYP		IOMUX_PAD(0x7d4, 0x3cc, 7, 0x90c, 1, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_2__PWM1_PWMO		IOMUX_PAD(0x7d4, 0x3cc, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_3__GPIO1_3		IOMUX_PAD(0x7d8, 0x3d0, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_3__GPIO1_3		IOMUX_PAD(0x7d8, 0x3d0, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_3__I2C2_SDA		IOMUX_PAD(0x7d8, 0x3d0, 0x12, 0x9bc, 3, MX51_I2C_PAD_CTRL)
- #define MX51_PAD_GPIO1_3__PLL2_BYP		IOMUX_PAD(0x7d8, 0x3d0, 7, 0x910, 1, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_3__PWM2_PWMO		IOMUX_PAD(0x7d8, 0x3d0, 1, __NA_, 0, NO_PAD_CTRL)
-@@ -786,27 +786,27 @@
- #define MX51_PAD_PMIC_INT_REQ__PMIC_PMU_IRQ_B	IOMUX_PAD(0x7fc, 0x3d4, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_4__DISP2_EXT_CLK		IOMUX_PAD(0x804, 0x3d8, 4, 0x908, 1, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_4__EIM_RDY		IOMUX_PAD(0x804, 0x3d8, 3, 0x938, 1, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_4__GPIO1_4		IOMUX_PAD(0x804, 0x3d8, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_4__GPIO1_4		IOMUX_PAD(0x804, 0x3d8, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_4__WDOG1_WDOG_B		IOMUX_PAD(0x804, 0x3d8, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_5__CSI2_MCLK		IOMUX_PAD(0x808, 0x3dc, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_5__DISP2_PIN16		IOMUX_PAD(0x808, 0x3dc, 3, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_5__GPIO1_5		IOMUX_PAD(0x808, 0x3dc, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_5__GPIO1_5		IOMUX_PAD(0x808, 0x3dc, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_5__WDOG2_WDOG_B		IOMUX_PAD(0x808, 0x3dc, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_6__DISP2_PIN17		IOMUX_PAD(0x80c, 0x3e0, 4, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_6__GPIO1_6		IOMUX_PAD(0x80c, 0x3e0, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_6__GPIO1_6		IOMUX_PAD(0x80c, 0x3e0, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_6__REF_EN_B		IOMUX_PAD(0x80c, 0x3e0, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_7__CCM_OUT_0		IOMUX_PAD(0x810, 0x3e4, 3, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_7__GPIO1_7		IOMUX_PAD(0x810, 0x3e4, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_7__GPIO1_7		IOMUX_PAD(0x810, 0x3e4, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_7__SD2_WP		IOMUX_PAD(0x810, 0x3e4, 6, __NA_, 0, MX51_ESDHC_PAD_CTRL)
- #define MX51_PAD_GPIO1_7__SPDIF_OUT1		IOMUX_PAD(0x810, 0x3e4, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_8__CSI2_DATA_EN		IOMUX_PAD(0x814, 0x3e8, 2, 0x99c, 2, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_8__GPIO1_8		IOMUX_PAD(0x814, 0x3e8, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_8__GPIO1_8		IOMUX_PAD(0x814, 0x3e8, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_8__SD2_CD		IOMUX_PAD(0x814, 0x3e8, 6, __NA_, 0, MX51_ESDHC_PAD_CTRL)
- #define MX51_PAD_GPIO1_8__USBH3_PWR		IOMUX_PAD(0x814, 0x3e8, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__CCM_OUT_1		IOMUX_PAD(0x818, 0x3ec, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__DISP2_D1_CS		IOMUX_PAD(0x818, 0x3ec, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__DISP2_SER_CS		IOMUX_PAD(0x818, 0x3ec, 7, __NA_, 0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO1_9__GPIO1_9		IOMUX_PAD(0x818, 0x3ec, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_GPIO1_9__GPIO1_9		IOMUX_PAD(0x818, 0x3ec, 0, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__SD2_LCTL		IOMUX_PAD(0x818, 0x3ec, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_GPIO1_9__USBH3_OC		IOMUX_PAD(0x818, 0x3ec, 1, __NA_, 0, NO_PAD_CTRL)
- 
--- 
-1.7.3.4
+~Sourav
+
+On Thu, Apr 12, 2012 at 1:08 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
+> From: G, Manjunath Kondaiah <manjugk@ti.com>
+>
+> Keypad controller register offsets are different for omap4
+> and omap5. Handle these offsets through static mapping and
+> assign these mappings during run time.
+>
+> Tested on omap4430 sdp with 3.4-rc2.
+> Tested on omap5430evm with 3.1-custom kernel.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+> Changes since v1:
+> - Fix Felipe's comment about getting rid
+> ?of one argument from irqstatus/irqenable api
+> - Fix Dmitry's comment:
+> ?- get rid of revision check in readl/writel
+> ?- Relace ENODEV with proper macro.
+> ?- Use switch statement
+> ?drivers/input/keyboard/Kconfig ? ? ? ?| ? ?6 +-
+> ?drivers/input/keyboard/omap4-keypad.c | ?115 ++++++++++++++++++++++++++-------
+> ?2 files changed, 95 insertions(+), 26 deletions(-)
+>
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index f354813..9a0e1a9 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -511,10 +511,10 @@ config KEYBOARD_OMAP
+> ? ? ? ? ?To compile this driver as a module, choose M here: the
+> ? ? ? ? ?module will be called omap-keypad.
+>
+> -config KEYBOARD_OMAP4
+> - ? ? ? tristate "TI OMAP4 keypad support"
+> +config KEYBOARD_OMAP4+
+> + ? ? ? tristate "TI OMAP4+ keypad support"
+> ? ? ? ?help
+> - ? ? ? ? Say Y here if you want to use the OMAP4 keypad.
+> + ? ? ? ? Say Y here if you want to use the OMAP4+ keypad.
+>
+> ? ? ? ? ?To compile this driver as a module, choose M here: the
+> ? ? ? ? ?module will be called omap4-keypad.
+> diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
+> index e809ac0..8e46563 100644
+> --- a/drivers/input/keyboard/omap4-keypad.c
+> +++ b/drivers/input/keyboard/omap4-keypad.c
+> @@ -68,6 +68,11 @@
+>
+> ?#define OMAP4_MASK_IRQSTATUSDISABLE ? ?0xFFFF
+>
+> +enum {
+> + ? ? ? KBD_REVISION_OMAP4 = 0,
+> + ? ? ? KBD_REVISION_OMAP5,
+> +};
+> +
+> ?struct omap4_keypad {
+> ? ? ? ?struct input_dev *input;
+>
+> @@ -76,11 +81,61 @@ struct omap4_keypad {
+>
+> ? ? ? ?unsigned int rows;
+> ? ? ? ?unsigned int cols;
+> + ? ? ? unsigned int revision;
+> + ? ? ? u32 irqstatus;
+> + ? ? ? u32 irqenable;
+> + ? ? ? u32 reg_offset;
+> ? ? ? ?unsigned int row_shift;
+> ? ? ? ?unsigned char key_state[8];
+> ? ? ? ?unsigned short keymap[];
+> ?};
+>
+> +static int kbd_read_irqstatus(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> + ? ? ? return __raw_readl(keypad_data->base + offset);
+> +}
+> +
+> +static int kbd_write_irqstatus(struct omap4_keypad *keypad_data,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u32 value)
+> +{
+> + ? ? ? return __raw_writel(value, keypad_data->base + keypad_data->irqstatus);
+> +}
+> +
+> +static int kbd_write_irqenable(struct omap4_keypad *keypad_data,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u32 value)
+> +{
+> + ? ? ? return __raw_writel(value, keypad_data->base + keypad_data->irqenable);
+> +}
+> +
+> +static int kbd_readl(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> + ? ? ? return __raw_readl(keypad_data->base +
+> + ? ? ? ? ? ? ? ? ? ? ? keypad_data->reg_offset + offset);
+> +}
+> +
+> +static void kbd_writel(struct omap4_keypad *keypad_data, u32 offset, u32 value)
+> +{
+> + ? ? ? __raw_writel(value, keypad_data->base +
+> + ? ? ? ? ? ? ? ? ? ? ? keypad_data->reg_offset + offset);
+> +}
+> +
+> +static int kbd_read_revision(struct omap4_keypad *keypad_data, u32 offset)
+> +{
+> + ? ? ? int reg;
+> + ? ? ? reg = __raw_readl(keypad_data->base + offset);
+> + ? ? ? reg &= 0x03 << 30;
+> + ? ? ? reg >>= 30;
+> +
+> + ? ? ? switch (reg) {
+> + ? ? ? case 1:
+> + ? ? ? ? ? ? ? return KBD_REVISION_OMAP5;
+> + ? ? ? case 0:
+> + ? ? ? ? ? ? ? return KBD_REVISION_OMAP4;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +}
+> +
+> ?/* Interrupt handler */
+> ?static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+> ?{
+> @@ -91,12 +146,10 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+> ? ? ? ?u32 *new_state = (u32 *) key_state;
+>
+> ? ? ? ?/* Disable interrupts */
+> - ? ? ? __raw_writel(OMAP4_VAL_IRQDISABLE,
+> - ? ? ? ? ? ? ? ? ? ?keypad_data->base + OMAP4_KBD_IRQENABLE);
+> + ? ? ? kbd_write_irqenable(keypad_data, OMAP4_VAL_IRQDISABLE);
+>
+> - ? ? ? *new_state = __raw_readl(keypad_data->base + OMAP4_KBD_FULLCODE31_0);
+> - ? ? ? *(new_state + 1) = __raw_readl(keypad_data->base
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP4_KBD_FULLCODE63_32);
+> + ? ? ? *new_state = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE31_0);
+> + ? ? ? *(new_state + 1) = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE63_32);
+>
+> ? ? ? ?for (row = 0; row < keypad_data->rows; row++) {
+> ? ? ? ? ? ? ? ?changed = key_state[row] ^ keypad_data->key_state[row];
+> @@ -121,12 +174,12 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
+> ? ? ? ? ? ? ? ?sizeof(keypad_data->key_state));
+>
+> ? ? ? ?/* clear pending interrupts */
+> - ? ? ? __raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> + ? ? ? kbd_write_irqstatus(keypad_data,
+> + ? ? ? ? ? ? ? kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
+>
+> ? ? ? ?/* enable interrupts */
+> - ? ? ? __raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQENABLE);
+> + ? ? ? kbd_write_irqenable(keypad_data, OMAP4_DEF_IRQENABLE_EVENTEN |
+> + ? ? ? ? ? ? ? ? ? ? ? OMAP4_DEF_IRQENABLE_LONGKEY);
+>
+> ? ? ? ?return IRQ_HANDLED;
+> ?}
+> @@ -139,16 +192,33 @@ static int omap4_keypad_open(struct input_dev *input)
+>
+> ? ? ? ?disable_irq(keypad_data->irq);
+>
+> - ? ? ? __raw_writel(OMAP4_VAL_FUNCTIONALCFG,
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_CTRL);
+> - ? ? ? __raw_writel(OMAP4_VAL_DEBOUNCINGTIME,
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_DEBOUNCINGTIME);
+> - ? ? ? __raw_writel(OMAP4_VAL_IRQDISABLE,
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> - ? ? ? __raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQENABLE);
+> - ? ? ? __raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
+> + ? ? ? keypad_data->revision = kbd_read_revision(keypad_data,
+> + ? ? ? ? ? ? ? ? ? ? ? OMAP4_KBD_REVISION);
+> + ? ? ? switch (keypad_data->revision) {
+> + ? ? ? case 1:
+> + ? ? ? ? ? ? ? keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS + 0x0c;
+> + ? ? ? ? ? ? ? keypad_data->irqenable = OMAP4_KBD_IRQENABLE + 0x0c;
+> + ? ? ? ? ? ? ? keypad_data->reg_offset = 0x10;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case 0:
+> + ? ? ? ? ? ? ? keypad_data->irqstatus = OMAP4_KBD_IRQSTATUS;
+> + ? ? ? ? ? ? ? keypad_data->irqenable = OMAP4_KBD_IRQENABLE;
+> + ? ? ? ? ? ? ? keypad_data->reg_offset = 0x00;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? pr_err("Omap keypad not found\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? kbd_writel(keypad_data, OMAP4_KBD_CTRL,
+> + ? ? ? ? ? ? ? ? ? ? ? OMAP4_VAL_FUNCTIONALCFG);
+> + ? ? ? kbd_writel(keypad_data, OMAP4_KBD_DEBOUNCINGTIME,
+> + ? ? ? ? ? ? ? ? ? ? ? OMAP4_VAL_DEBOUNCINGTIME);
+> + ? ? ? kbd_write_irqstatus(keypad_data, OMAP4_VAL_IRQDISABLE);
+> + ? ? ? kbd_write_irqenable(keypad_data, OMAP4_DEF_IRQENABLE_EVENTEN |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_DEF_IRQENABLE_LONGKEY);
+> + ? ? ? kbd_writel(keypad_data, OMAP4_KBD_WAKEUPENABLE,
+> + ? ? ? ? ? ? ? ? ? ? ? OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA);
+>
+> ? ? ? ?enable_irq(keypad_data->irq);
+>
+> @@ -162,12 +232,11 @@ static void omap4_keypad_close(struct input_dev *input)
+> ? ? ? ?disable_irq(keypad_data->irq);
+>
+> ? ? ? ?/* Disable interrupts */
+> - ? ? ? __raw_writel(OMAP4_VAL_IRQDISABLE,
+> - ? ? ? ? ? ? ? ? ? ?keypad_data->base + OMAP4_KBD_IRQENABLE);
+> + ? ? ? kbd_write_irqenable(keypad_data, OMAP4_VAL_IRQDISABLE);
+>
+> ? ? ? ?/* clear pending interrupts */
+> - ? ? ? __raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+> - ? ? ? ? ? ? ? ? ? ? ? keypad_data->base + OMAP4_KBD_IRQSTATUS);
+> + ? ? ? kbd_write_irqstatus(keypad_data,
+> + ? ? ? ? ? ? ? kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
+>
+> ? ? ? ?enable_irq(keypad_data->irq);
+>
+> --
+> 1.7.1
+>
