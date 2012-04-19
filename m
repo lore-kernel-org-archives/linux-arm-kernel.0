@@ -1,39 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Apr 2012 14:07:19 +0100
-Subject: [PATCH v3 4/6] ARM: architected timers: add DT support
-In-Reply-To: <201204191255.39952.arnd@arndb.de>
-References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
- <1334592810-4382-5-git-send-email-marc.zyngier@arm.com>
- <201204191255.39952.arnd@arndb.de>
-Message-ID: <4F900E07.404@arm.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Thu, 19 Apr 2012 15:09:54 +0200
+Subject: [PATCH v2] iommu: OMAP: device detach on domain destroy
+In-Reply-To: <1334772581-32015-1-git-send-email-omar.luna@linaro.org>
+References: <1334772581-32015-1-git-send-email-omar.luna@linaro.org>
+Message-ID: <20120419130954.GD2428@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/12 13:55, Arnd Bergmann wrote:
-> On Monday 16 April 2012, Marc Zyngier wrote:
->> Add runtime DT support and documentation for the Cortex A7/A15
->> architected timers.
->>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  .../devicetree/bindings/arm/arch_timer.txt         |   27 ++++++++++
->>  arch/arm/include/asm/arch_timer.h                  |    6 ++
->>  arch/arm/kernel/arch_timer.c                       |   53 +++++++++++++++++---
->>  3 files changed, 79 insertions(+), 7 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
->>
+On Wed, Apr 18, 2012 at 01:09:41PM -0500, Omar Ramirez Luna wrote:
+> 'domain_destroy with devices attached' case isn't yet handled, instead
+> code assumes that the device was already detached.
 > 
-> This looks good, but do we actually still need the non-DT case?
+> If the domain is destroyed the hardware still has access to invalid
+> pointers to its page table and internal iommu object. In order to
+> detach the users we need to track devices using the iommu, current
+> use cases only have one user of iommu per instance. When required
+> this can evolve to a list with the devices using the iommu_dev.
 > 
-> Both vexpress and exynos5 allow booting through DT and we are not
-> planning to add any new platforms with these timers that don't.
+> Reported-by: Joerg Roedel <joro@8bytes.org>
+> Reviewed-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+> ---
+> 
+> v2: rebased onto v3.4-rc2
 
-Yes, the non-DT code is a leftover from dark ages we'd rather forget.
-I'll remove that code for the next iteration.
+Applied, thanks.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
