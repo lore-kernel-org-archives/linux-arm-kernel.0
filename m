@@ -1,40 +1,46 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Thu, 19 Apr 2012 20:00:12 +0530
-Subject: [PATCH] tty: omap-serial: Keep the wakeup mechanism enabled by
- default
-In-Reply-To: <20120418200833.24ef25ff@pyramind.ukuu.org.uk>
-References: <1334579407-16970-1-git-send-email-govindraj.raja@ti.com>
- <87vckyq6ti.fsf@ti.com>
- <CAMrsUdL1S5GiyG0egS=CHg2fdNkyZVF-wuCNGDg547kfTUODng@mail.gmail.com>
- <87mx69nms2.fsf@ti.com> <20120418200833.24ef25ff@pyramind.ukuu.org.uk>
-Message-ID: <CAMrsUdJ_ewe1td9nOO+0ociP4O_tyPgjH=w11r_mFW_yc7PDAQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Apr 2012 22:41:23 +0800
+Subject: [PATCH] i.MX28: Shut down the LCD controller to avoid BootROM
+ sampling bug
+In-Reply-To: <1334767680-12688-1-git-send-email-marex@denx.de>
+References: <1334695011-8188-1-git-send-email-marex@denx.de>
+ <1334767680-12688-1-git-send-email-marex@denx.de>
+Message-ID: <20120419144119.GD22219@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 12:38 AM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
->> The point is that wakeups should be enabled whenever driver is in use,
->> and disabled when the driver is not in use.
->
->
-> Which is the tty_port methods for initialisation and shutdown, which are
-> mutex protected against each other and hang up.
->
-> Not sure how the uart layer glue exposes that.
+On Wed, Apr 18, 2012 at 06:48:00PM +0200, Marek Vasut wrote:
+...
+> +void mxsfb_shutdown(struct platform_device *pdev)
 
-Is it okay to read the port flags to identify the port state in
-driver whether the serial port shutdown ops is called from
-port_suspend or due to port closure.
+static?
 
-Since port_shutdown gets called even from uart_suspend_port
+Otherwise,
 
-Is things like
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-test_bit(ASYNCB_SUSPENDED, &port->flags);
-or
-test_bit(ASYNCB_CLOSING, &port->flags);
-
-allowed in low level driver ?
-
---
-Thanks,
-Govindraj.R
+> +{
+> +	struct fb_info *fb_info = platform_get_drvdata(pdev);
+> +	struct mxsfb_info *host = to_imxfb_host(fb_info);
+> +
+> +	/*
+> +	 * Force stop the LCD controller as keeping it running during reboot
+> +	 * might interfere with the BootROM's boot mode pads sampling.
+> +	 */
+> +	writel(CTRL_RUN, host->base + LCDC_CTRL + REG_CLR);
+> +}
+> +
+>  static struct platform_device_id mxsfb_devtype[] = {
+>  	{
+>  		.name = "imx23-fb",
+> @@ -896,6 +908,7 @@ MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
+>  static struct platform_driver mxsfb_driver = {
+>  	.probe = mxsfb_probe,
+>  	.remove = __devexit_p(mxsfb_remove),
+> +	.shutdown = mxsfb_shutdown,
+>  	.id_table = mxsfb_devtype,
+>  	.driver = {
+>  		   .name = DRIVER_NAME,
+> -- 
+> 1.7.9.5
+> 
