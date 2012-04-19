@@ -1,58 +1,70 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 19 Apr 2012 18:58:16 +0530
-Subject: [PATCHv8 05/10] I2C: OMAP: Don't check if
- wait_for_completion_timeout() returns less than zero
+Date: Thu, 19 Apr 2012 18:58:18 +0530
+Subject: [PATCHv8 07/10] I2C: OMAP: Handle error check for pm runtime
 In-Reply-To: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
 References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334842101-20670-6-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1334842101-20670-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By definition, wait_for_completion_timeout() returns an unsigned value and
-therefore, it is not necessary to check if the return value is less than zero
-as this is not possible.
+If PM runtime get_sync fails return with the error
+so that no further reads/writes goes through the interface.
+This will avoid possible abort. Add a error message in case
+of failure with the cause of the failure.
 
-This is based on a patch from Jon Hunter <jon-hunter@ti.com>
-Changes from his patch
-- Declare a long as the wait_for_completion_timeout returns long.
-
-Original patch is
-http://git.omapzoom.org/?p=kernel/omap.git;a=commitdiff;h=ea02cece7b0000bc736e60c4188a11aaa74bc6e6
-
-Cc : Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   10 ++++------
- 1 files changed, 4 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   19 ++++++++++++++++---
+ 1 files changed, 16 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 1777d79..fec8d5c 100644
+index 44e8cfa..d555dcd 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -473,7 +473,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 			     struct i2c_msg *msg, int stop)
- {
- 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
--	int r;
-+	unsigned long timeout;
- 	u16 w;
+@@ -585,7 +585,11 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 	int i;
+ 	int r;
  
- 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
-@@ -541,12 +541,10 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	 * REVISIT: We should abort the transfer on signals, but the bus goes
- 	 * into arbitration and we're currently unable to recover from it.
- 	 */
--	r = wait_for_completion_timeout(&dev->cmd_complete,
--					OMAP_I2C_TIMEOUT);
-+	timeout = wait_for_completion_timeout(&dev->cmd_complete,
-+						OMAP_I2C_TIMEOUT);
- 	dev->buf_len = 0;
--	if (r < 0)
--		return r;
--	if (r == 0) {
-+	if (timeout == 0) {
- 		dev_err(dev->dev, "controller timed out\n");
- 		omap_i2c_init(dev);
- 		return -ETIMEDOUT;
+-	pm_runtime_get_sync(dev->dev);
++	r = pm_runtime_get_sync(dev->dev);
++	if (r < 0) {
++		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", r);
++		return r;
++	}
+ 
+ 	r = omap_i2c_wait_for_bb(dev);
+ 	if (r < 0)
+@@ -1011,7 +1015,11 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
+-	pm_runtime_get_sync(dev->dev);
++	r = pm_runtime_get_sync(dev->dev);
++	if (r < 0) {
++		dev_err(dev->dev, "pm_runtime_get_sync failed:%d\n", r);
++		return r;
++	}
+ 
+ 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
+ 
+@@ -1103,12 +1111,17 @@ omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	struct resource		*mem;
++	int ret;
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
+-	pm_runtime_get_sync(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", ret);
++		return ret;
++	}
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
 -- 
 1.7.5.4
