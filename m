@@ -1,99 +1,221 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Thu, 19 Apr 2012 02:37:08 +0000
-Subject: [RFC PATCH 00/10 V2]  MXS: Add i.MX28 USB Host driver
-In-Reply-To: <201204181949.00404.marex@denx.de>
-References: <1334657751-27678-1-git-send-email-marex@denx.de>
- <1334714869-19282-1-git-send-email-marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B76759@039-SN2MPN1-023.039d.mgd.msft.net>
- <201204181949.00404.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B76E94@039-SN2MPN1-023.039d.mgd.msft.net>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 19 Apr 2012 10:44:57 +0800
+Subject: [PATCH 01/18] led-triggers: create a trigger for CPU activity
+In-Reply-To: <20120417155241.0f619a9a.akpm@linux-foundation.org>
+References: <1334660025-20442-1-git-send-email-bryan.wu@canonical.com>
+ <1334660025-20442-2-git-send-email-bryan.wu@canonical.com>
+ <20120417155241.0f619a9a.akpm@linux-foundation.org>
+Message-ID: <CAK5ve-+mw=PDs9diahCPNyYQhMYxdKZU-2LAL5rxkWMNRk4zHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> >
-> > - Now, the PHY and OTG is separated, it is better to put PHY driver to
-> > drivers/usb/phy/
-> 
-> There is no drivers/usb/phy ...
-> 
-You can discuss with Felipe Balbi <balbi@ti.com>, if it is ok to create
-it to put PHY driver.
+On Wed, Apr 18, 2012 at 6:52 AM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Tue, 17 Apr 2012 18:53:28 +0800
+> Bryan Wu <bryan.wu@canonical.com> wrote:
+>
+>> Attempting to consolidate the ARM LED code, this removes the
+>> custom RealView LED trigger code to turn LEDs on and off in
+>> response to CPU activity and replace it with a standard trigger.
+>>
+>> (bryan.wu at canonical.com:
+>> It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
+>
+> No, the patch doesn't alter arch/arm/kernel/leds.c at all. ?This text
+> is either misleadingly phrased, or stale or something.
+>
 
-> >
-> > - mx23, mx28, mx6q uses the same PHY (FSL PHY), it is better to use the
-> phy
-> > driver name as imx-phy.c.
-> 
-> Why? mxs == mx23,28,6q and mxc == the rest ... seems to me to be pretty
-> well
-> rooted terminology already.
-mx23, 28, 6q uses Freescale itself PHY. 
-mxc uses chipidea PHY.
-Originally, I thought it should use IP vendor's name. After thinking it more,
-it is ok use mxs for mx23,28,6q's PHY.
+OK, Fixed
 
-> 
-> >
-> > > Marek Vasut (10):
-> > >   MXS: Make clk_disable return integer
-> > >   MXS: Add USB EHCI and USB PHY clock handling
-> > >   MXS: Fixup i.MX233 USB base address name
-> > >   MXS: Add data shared between imx-usb, PHY and EHCI driver
-> > >   MXS: Add platform registration hooks for USB EHCI
-> > >   MXS: Add composite imx-usb driver
-> > >   MXS: Add USB PHY driver
-> > >   MXS: Add separate MXS EHCI HCD driver
-> > >   MXS: Enable USB on M28EVK
-> > >   MXS: Enable USB on MX28EVK
-> > >
-> > >  arch/arm/mach-mxs/Kconfig                       |    4 +
-> > >  arch/arm/mach-mxs/clock-mx28.c                  |   28 ++-
-> > >  arch/arm/mach-mxs/devices-mx28.h                |    4 +
-> > >  arch/arm/mach-mxs/devices/Kconfig               |    3 +
-> > >  arch/arm/mach-mxs/devices/Makefile              |    1 +
-> > >  arch/arm/mach-mxs/devices/platform-usb.c        |   67 +++++
-> > >  arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
-> > >  arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
-> > >  arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
-> > >  arch/arm/mach-mxs/mach-m28evk.c                 |    9 +
-> > >  arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
-> > >  drivers/usb/host/Kconfig                        |    7 +
-> > >  drivers/usb/host/ehci-hcd.c                     |    5 +
-> > >  drivers/usb/host/ehci-mxs.c                     |  254
-> > >
-> > > +++++++++++++++++++
-> > >
-> > >  drivers/usb/otg/Kconfig                         |   16 ++
-> > >  drivers/usb/otg/Makefile                        |    2 +
-> > >  drivers/usb/otg/imx-usb.c                       |  303
-> > >
-> > > +++++++++++++++++++++++
-> > >
-> > >  drivers/usb/otg/mxs-phy.c                       |  201
-> +++++++++++++++
-> > >  include/linux/fsl_devices.h                     |   15 ++
-> > >  19 files changed, 939 insertions(+), 9 deletions(-)
-> > >  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
-> > >  create mode 100644 drivers/usb/host/ehci-mxs.c
-> > >  create mode 100644 drivers/usb/otg/imx-usb.c
-> > >  create mode 100644 drivers/usb/otg/mxs-phy.c
-> > >
-> > > Cc: Chen Peter-B29397 <B29397@freescale.com>
-> > > Cc: Detlev Zundel <dzu@denx.de>
-> > > Cc: Fabio Estevam <festevam@gmail.com>
-> > > Cc: Li Frank-B20596 <B20596@freescale.com>
-> > > Cc: Lin Tony-B19295 <B19295@freescale.com>
-> > > Cc: Linux USB <linux-usb@vger.kernel.org>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Shawn Guo <shawn.guo@freescale.com>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Stefano Babic <sbabic@denx.de>
-> > > Cc: Subodh Nijsure <snijsure@grid-net.com>
-> > > Cc: Tony Lin <tony.lin@freescale.com>
-> > > Cc: Wolfgang Denk <wd@denx.de>
-> > > --
-> > > 1.7.9.5
-> 
-> Best regards,
-> Marek Vasut
+>> It also provides ledtrig_cpu trigger event stub in <linux/leds.h>.
+>> Although it was inspired by ARM work, it can be used in other arch.)
+>>
+>> Cc: Richard Purdie <rpurdie@rpsys.net>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+>>
+>
+> A spurious newline.
+>
+
+OK, Fixed
+
+>> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+>> Tested-by: Jochen Friedrich <jochen@scram.de>
+>>
+>> ...
+>>
+>> +config LEDS_TRIGGER_CPU
+>> + ? ? tristate "LED CPU Trigger"
+>> + ? ? depends on LEDS_TRIGGERS
+>> + ? ? help
+>> + ? ? ? This allows LEDs to be controlled by active CPUs. This shows
+>> + ? ? ? the active CPUs across an array of LEDs so you can see what
+>
+> s/what/which/ ? (I think ;))
+>
+
+Fixed
+
+>> + ? ? ? CPUs are active on the system at any given moment.
+>> +
+>> + ? ? ? If unsure, say N.
+>> +
+>>
+>> ...
+>>
+>> +static int __init ledtrig_cpu_init(void)
+>> +{
+>> + ? ? int cpu;
+>> +
+>> + ? ? /* Supports up to 9999 cpu cores */
+>> + ? ? BUILD_BUG_ON(CONFIG_NR_CPUS > 9999);
+>
+> hm, I wonder if this can be prevented in Kconfig logic. ?I guess
+> "depends on NR_CPUS <= 9999" isn't available.
+>
+
+"default N if (NR_CPUS > 9999)" isn't available, either.
+
+>> + ? ? /*
+>> + ? ? ?* Registering CPU led trigger for each CPU cores here
+>
+> s/cores/core/
+>
+
+Fixed
+
+>> + ? ? ?* ignores CPU hotplug, but after this CPU hotplug works
+>> + ? ? ?* fine with this trigger.
+>> + ? ? ?*/
+>> + ? ? for_each_possible_cpu(cpu) {
+>> + ? ? ? ? ? ? struct led_trigger *trig;
+>> + ? ? ? ? ? ? char *name = per_cpu(trig_name, cpu);
+>> + ? ? ? ? ? ? struct rw_semaphore *lock = &per_cpu(trig_lock, cpu);
+>> +
+>> + ? ? ? ? ? ? init_rwsem(lock);
+>> +
+>> + ? ? ? ? ? ? snprintf(name, MAX_NAME_LEN, "cpu%d", cpu);
+>> +
+>> + ? ? ? ? ? ? down_write(lock);
+>> + ? ? ? ? ? ? led_trigger_register_simple(name, &trig);
+>
+> OK, problem.
+>
+> led_trigger_register_simple() calls kzalloc() and
+> led_trigger_register(), both of which can fail.
+> led_trigger_register_simple() just returns void, failing to propagate
+> the error back. ?This is bad, and we (ie you ;)) should fix
+> led_trigger_register_simple() before proceeding to use it. ?If at all
+> possible. ?Please. ?Let us not propagate the badness further. ?Sorry.
+>
+>> + ? ? ? ? ? ? per_cpu(cpu_trig, cpu) = trig;
+>> + ? ? ? ? ? ? up_write(lock);
+>> + ? ? }
+>> +
+>> + ? ? register_syscore_ops(&ledtrig_cpu_syscore_ops);
+>> +
+>> + ? ? pr_info("ledtrig-cpu: registered to indicate activity on CPUs\n");
+>> +
+>> + ? ? return 0;
+>> +}
+>> +module_init(ledtrig_cpu_init);
+>> +
+>> +static void __exit ledtrig_cpu_exit(void)
+>> +{
+>> + ? ? int cpu;
+>> +
+>> + ? ? for_each_possible_cpu(cpu) {
+>> + ? ? ? ? ? ? struct led_trigger *trig = per_cpu(cpu_trig, cpu);
+>
+> grr. ?drivers/leds/led-triggers.c sometimes does
+>
+> ? ? ? ?struct led_trigger trigger;
+>
+> and sometimes
+>
+> ? ? ? ?struct led_trigger trig;
+>
+> which makes the code needlessly more difficult to follow. ?So if you're
+> fiddling with drivers/leds/led-triggers.c, please fix that up - use
+> "trig" everywhere?
+>
+
+If Richard has no objection, I will do this.
+
+>> + ? ? ? ? ? ? char *name = per_cpu(trig_name, cpu);
+>> +
+>> + ? ? ? ? ? ? led_trigger_unregister_simple(trig);
+>
+> And what happens if led_trigger_register_simple() had silently failed
+> to register this trigger? ?afacit, nothing: your code handles the
+> trig==NULL case OK. ?Still, we should be checking for those failures!
+>
+>> + ? ? ? ? ? ? per_cpu(cpu_trig, cpu) = NULL;
+>> + ? ? ? ? ? ? memset(name, 0, MAX_NAME_LEN);
+>> + ? ? }
+>> +
+>> + ? ? unregister_syscore_ops(&ledtrig_cpu_syscore_ops);
+>> +}
+>> +module_exit(ledtrig_cpu_exit);
+>> +
+>> +MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
+>> +MODULE_AUTHOR("Bryan Wu <bryan.wu@canonical.com>");
+>> +MODULE_DESCRIPTION("CPU LED trigger");
+>> +MODULE_LICENSE("GPL");
+>> diff --git a/include/linux/leds.h b/include/linux/leds.h
+>> index 5884def..1215b94 100644
+>> --- a/include/linux/leds.h
+>> +++ b/include/linux/leds.h
+>> @@ -210,4 +210,27 @@ struct gpio_led_platform_data {
+>> ?struct platform_device *gpio_led_register_device(
+>> ? ? ? ? ? ? ? int id, const struct gpio_led_platform_data *pdata);
+>>
+>> +enum cpu_led_event {
+>> + ? ? CPU_LED_IDLE_START, ? ? /* CPU enters idle */
+>> + ? ? CPU_LED_IDLE_END, ? ? ? /* CPU idle ends */
+>> + ? ? CPU_LED_START, ? ? ? ? ?/* Machine starts, especially resume */
+>> + ? ? CPU_LED_STOP, ? ? ? ? ? /* Machine stops, especially suspend */
+>> + ? ? CPU_LED_HALTED, ? ? ? ? /* Machine shutdown */
+>> +};
+>> +#if defined(CONFIG_LEDS_TRIGGER_CPU) || defined(CONFIG_LEDS_TRIGGER_CPU_MODULE)
+>
+> See lkml subject "RFC: strip 15,000 lines from a typical autoconf.h".
+> We might be able to simplify this. ?But the above is OK for now.
+>
+>> +/**
+>> + * ledtrig_cpu - emit a CPU event as a trigger
+>> + * @evt: CPU event to be emitted
+>> + *
+>> + * Emit a CPU event on a CPU core, which will trigger a
+>> + * binded LED to turn on or turn off.
+>> + */
+>
+> It's conventional to add kerneldoc at the function definition site, not
+> at the declaration. ?Nobody thinks to look in the .h file for
+> documentation.
+>
+Fixed.
+
+>> +extern void ledtrig_cpu(enum cpu_led_event evt);
+>> +#else
+>> +static inline void ledtrig_cpu(enum cpu_led_event evt)
+>> +{
+>> + ? ? return;
+>> +}
+>> +#endif
+>> +
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.186-168-78255 Mobile
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
