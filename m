@@ -1,27 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Apr 2012 08:57:19 +0000
-Subject: [PATCH 00/13] SPEAr: Move to common clock framework
-In-Reply-To: <CAJOA=zO4E0YJ0OU9n-abbNd+0VXQGsFi5Tnu5y=riHSgqk=xMw@mail.gmail.com>
-References: <cover.1334660431.git.viresh.kumar@st.com>
- <CAJOA=zNPKrSSL5wjNBwL9qie5sGv9j=k3rSAmsjbK-6jfJwbgQ@mail.gmail.com>
- <CAJOA=zO4E0YJ0OU9n-abbNd+0VXQGsFi5Tnu5y=riHSgqk=xMw@mail.gmail.com>
-Message-ID: <201204190857.19770.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Apr 2012 10:03:25 +0100
+Subject: [PATCH] ARM: SAMSUNG: Should check for IS_ERR(clk) instead of NULL
+In-Reply-To: <4F8FCC00.10807@samsung.com>
+References: <1334722134-14545-1-git-send-email-jhbird.choi@samsung.com>
+ <4F8F586C.3020401@samsung.com> <4F8FCC00.10807@samsung.com>
+Message-ID: <20120419090325.GC24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 April 2012, Turquette, Mike wrote:
-> I've taken patches 02 - 06 into my -next branch.  Patch 01 isn't for
-> me really, and I've not yet tested patch 07 (I'll take it everything
-> looks good).  The rest of your series (08 - 13) should probably go
-> through Arnd.
+On Thu, Apr 19, 2012 at 10:25:36AM +0200, Sylwester Nawrocki wrote:
+> On 04/19/2012 02:12 AM, Kukjin Kim wrote:
+> >> --- a/arch/arm/plat-samsung/include/plat/watchdog-reset.h
+> >> +++ b/arch/arm/plat-samsung/include/plat/watchdog-reset.h
+> >> @@ -25,7 +25,7 @@ static inline void arch_wdt_reset(void)
+> >>
+> >>   	__raw_writel(0, S3C2410_WTCON);	  /* disable watchdog, to be safe  */
+> >>
+> >> -	if (s3c2410_wdtclk)
+> >> +	if (!IS_ERR(s3c2410_wdtclk))
+> > 
+> > Yeah, right. BTW don't we need to check NULL here?
+> 
+> It might make sense to check for NULL as well, but only if it happens
+> that a clock entry is ever added to clkdev with null struct clk_lookup:clk
+> member.
 
-My preference would be to have the whole series go through your tree
-and move the implementation of the spear clock code to drivers/clk
-in the process. This will reduce interdependencies between the spear
-clock branch and other branches that have spear patches.
+Not quite the correct answer.  The correct answer is:
 
-I also think it's a good idea if you submit the clk patches to Linus
-directly for the next merge window, but it's ok to use arm-soc if
-that makes you feel more confident about it.
+Drivers have no business interpreting anything but IS_ERR() values from
+clk_get() as errors.  Everything else they _MUST_ assume is valid for
+the rest of the clk API.
 
-	Arnd
+The clue: struct clk is an opaque cookie as far as drivers are concerned.
+The only interpretation drivers are allowed to make is that IS_ERR()
+values indicate an error.  Everything else is potentially valid.
