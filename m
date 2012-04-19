@@ -1,115 +1,41 @@
-From: tim.schendekehl@egnite.de (Tim Schendekehl)
-Date: Thu, 19 Apr 2012 12:14:48 +0200
-Subject: [PATCH V2] Ethernut 5 board support
-Message-ID: <4F8FE598.5090409@egnite.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 19 Apr 2012 13:23:57 +0300
+Subject: [RFC PATCH] cpuidle: allow per cpu latencies
+In-Reply-To: <4F8FD773.5030500@linaro.org>
+References: <1333619620-21201-1-git-send-email-pdeschrijver@nvidia.com>
+ <4F7DA009.4010802@linux.intel.com>
+ <CAMQu2gzwe0F3qcaTqASEPUASdG1SjpUxrBrSp-RrYLgy3W24OQ@mail.gmail.com>
+ <4F7F0D52.8080305@linaro.org>
+ <20120410102857.GA22721@tbergstrom-lnx.Nvidia.com>
+ <20120416153456.GB514@tbergstrom-lnx.Nvidia.com>
+ <4F8FD773.5030500@linaro.org>
+Message-ID: <20120419102357.GJ514@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Ethernut 5 open hardware design, based
-on Atmel's AT91SAM9XE512 SoC.
+On Thu, Apr 19, 2012 at 11:14:27AM +0200, Daniel Lezcano wrote:
+> On 04/16/2012 05:34 PM, Peter De Schrijver wrote:
+> >>
+> >> Maybe we also want to make the 'disabled' flag per CPU then or provide some
+> >> other way the number of C states can be different per CPU?
+> >
+> > What do you think about this? Do we also want to make the disabled flag per
+> > CPU? Or how should we deal with a different number of C states per CPU?
+> 
+> Hi Peter,
+> 
+> yes, that could makes sense. But in most of the architecture, this is 
+> not needed, so duplicating the state's array and latencies is unneeded 
+> memory consumption.
+> 
+> Maybe we can look for a COW approach, similar to what is done for the 
+> nsproxy structure, no ?
+> 
 
-Signed-off-by: Tim Schendekehl <tim.schendekehl@egnite.de>
----
-This version uses Device-Tree.
+That could be easily solved by just having a pointer to the state table in the
+per CPU datastructure I think?
 
- arch/arm/boot/dts/ethernut5.dts |   89 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 89 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/ethernut5.dts
 
-diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
-new file mode 100644
-index 0000000..c683cc2
---- /dev/null
-+++ b/arch/arm/boot/dts/ethernut5.dts
-@@ -0,0 +1,89 @@
-+/*
-+ * ethernut5.dts - Device Tree file for Ethernut 5 board
-+ *
-+ * Copyright (C) 2012 egnite GmbH <info@egnite.de>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9260.dtsi"
-+
-+/ {
-+	model = "Ethernut 5";
-+	compatible = "egnite,ethernut5", "atmel,at91sam9260", "atmel,at91sam9";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=/dev/mtdblock0 mtdparts=atmel_nand:128m(root),896m(data) rw rootfstype=jffs2";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x08000000>;
-+	};
-+
-+	ahb {
-+		apb {
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			usart0: serial at fffb0000 {
-+				status = "okay";
-+			};
-+
-+			usart1: serial at fffb4000 {
-+				status = "okay";
-+			};
-+
-+			macb0: ethernet at fffc4000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+			};
-+
-+			usb1: gadget at fffa4000 {
-+				atmel,vbus-gpio = <&pioC 5 0>;
-+				status = "okay";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt;
-+			status = "okay";
-+
-+			gpios = <0
-+				 &pioC 14 0
-+				 0
-+				>;
-+
-+			root at 0 {
-+				label = "root";
-+				reg = <0x0 0x08000000>;
-+			};
-+
-+			data at 20000 {
-+				label = "data";
-+				reg = <0x08000000 0x38000000>;
-+			};
-+		};
-+
-+		usb0: ohci at 00500000 {
-+			num-ports = <2>;
-+			status = "okay";
-+		};
-+	};
-+
-+	i2c at 0 {
-+		status = "okay";
-+
-+		pcf8563 at 50 {
-+			compatible = "pcf8563";
-+			reg = <0x51>;
-+		};
-+
-+		pmmc at 22 {
-+			compatible = "pmmc";
-+			reg = <0x22>;
-+		};
-+	};
-+};
--- 
-1.7.1
+Cheers,
+
+Peter.
