@@ -1,59 +1,39 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 19 Apr 2012 15:00:15 +0200
-Subject: [PATCH v4 10/10] ARM: LPC32xx: Move common code to common.c
-In-Reply-To: <1334840415-14287-1-git-send-email-stigge@antcom.de>
-References: <1334840415-14287-1-git-send-email-stigge@antcom.de>
-Message-ID: <1334840415-14287-11-git-send-email-stigge@antcom.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Apr 2012 14:07:19 +0100
+Subject: [PATCH v3 4/6] ARM: architected timers: add DT support
+In-Reply-To: <201204191255.39952.arnd@arndb.de>
+References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
+ <1334592810-4382-5-git-send-email-marc.zyngier@arm.com>
+ <201204191255.39952.arnd@arndb.de>
+Message-ID: <4F900E07.404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves non-boardspecific LPC32xx code to common.c
+On 19/04/12 13:55, Arnd Bergmann wrote:
+> On Monday 16 April 2012, Marc Zyngier wrote:
+>> Add runtime DT support and documentation for the Cortex A7/A15
+>> architected timers.
+>>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  .../devicetree/bindings/arm/arch_timer.txt         |   27 ++++++++++
+>>  arch/arm/include/asm/arch_timer.h                  |    6 ++
+>>  arch/arm/kernel/arch_timer.c                       |   53 +++++++++++++++++---
+>>  3 files changed, 79 insertions(+), 7 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
+>>
+> 
+> This looks good, but do we actually still need the non-DT case?
+> 
+> Both vexpress and exynos5 allow booting through DT and we are not
+> planning to add any new platforms with these timers that don't.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Yes, the non-DT code is a leftover from dark ages we'd rather forget.
+I'll remove that code for the next iteration.
 
----
- arch/arm/mach-lpc32xx/common.c  |   13 +++++++++++++
- arch/arm/mach-lpc32xx/phy3250.c |   13 -------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+Thanks,
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.c
-@@ -223,3 +223,16 @@ void lpc23xx_restart(char mode, const ch
- 	while (1)
- 		;
- }
-+
-+static int __init lpc32xx_display_uid(void)
-+{
-+	u32 uid[4];
-+
-+	lpc32xx_get_uid(uid);
-+
-+	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
-+		uid[3], uid[2], uid[1], uid[0]);
-+
-+	return 1;
-+}
-+arch_initcall(lpc32xx_display_uid);
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -310,19 +310,6 @@ static void __init lpc3250_machine_init(
- 			SPI0_CS_GPIO);
- }
- 
--static int __init lpc32xx_display_uid(void)
--{
--	u32 uid[4];
--
--	lpc32xx_get_uid(uid);
--
--	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
--		uid[3], uid[2], uid[1], uid[0]);
--
--	return 1;
--}
--arch_initcall(lpc32xx_display_uid);
--
- static char const *lpc32xx_dt_compat[] __initdata = {
- 	"nxp,lpc32xx",
- 	NULL
+	M.
+-- 
+Jazz is not dead. It just smells funny...
