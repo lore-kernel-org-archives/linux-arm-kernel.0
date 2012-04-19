@@ -1,30 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Apr 2012 21:26:38 -0700
-Subject: [GIT PULL] i.MX fixes for -rc
-In-Reply-To: <20120418101746.GS3852@pengutronix.de>
-References: <20120418101746.GS3852@pengutronix.de>
-Message-ID: <CAOesGMg7eFOhcJFDwgkH6TJpbJSrtj1-jpjO+mEzrEotx+RPkQ@mail.gmail.com>
+Date: Wed, 18 Apr 2012 21:29:29 -0700
+Subject: [GIT PULL] ux500 fixes for 3.4-rc series
+In-Reply-To: <CACRpkdbixRZb_6uT2M52zQ70Jb-uA0Lzhjy2ZG=g8vrKq9KPZg@mail.gmail.com>
+References: <CACRpkdbixRZb_6uT2M52zQ70Jb-uA0Lzhjy2ZG=g8vrKq9KPZg@mail.gmail.com>
+Message-ID: <CAOesGMichoCWrUv0P6CMQw=nobwQPgHbsz0UD_Zjz1wQTsQg_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 3:17 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Olof, Arnd,
+Hi,
+
+
+On Mon, Apr 16, 2012 at 11:39 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> Hi Arnd, Olof,
 >
-> Please pull the following for -rc.
+> These are a few -rc fixes for ux500 collected since the merge window.
 >
-> Thanks
-> ?Sascha
+> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
 >
->
-> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
->
-> ?Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+> ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
 >
 > are available in the git repository at:
 >
-> ?git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.4-rc3-imx-fixes
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> fixes-for-arm-soc-20120416
 
 Thanks, pulled.
+
+In the future, there's no need to encode the date in the tag -- the
+tag itself contains the timestamp of when it was created/signed and
+you can just overwrite it with the same tag when you prepare fixes
+again next time (it's what we do).
 
 
 -Olof
