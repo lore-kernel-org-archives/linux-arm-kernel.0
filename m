@@ -1,56 +1,52 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu, 19 Apr 2012 23:32:56 +0200
-Subject: [PATCH 05/10] MXS: Add platform registration hooks for USB EHCI
-In-Reply-To: <20120419142452.GC22219@S2101-09.ap.freescale.net>
+Date: Fri, 20 Apr 2012 00:06:35 +0200
+Subject: [PATCH 07/10] MXS: Add USB PHY driver
+In-Reply-To: <20120418201642.GC3852@pengutronix.de>
 References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <201204191151.46590.arnd@arndb.de>
- <20120419142452.GC22219@S2101-09.ap.freescale.net>
-Message-ID: <201204192332.56957.marex@denx.de>
+ <201204182202.02627.marex@denx.de> <20120418201642.GC3852@pengutronix.de>
+Message-ID: <201204200006.35966.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Dear Sascha Hauer,
 
-> On Thu, Apr 19, 2012 at 11:51:46AM +0000, Arnd Bergmann wrote:
-> > On Wednesday 18 April 2012, Marek Vasut wrote:
-> > >  arch/arm/mach-mxs/devices-mx28.h                |    4 ++
-> > >  arch/arm/mach-mxs/devices/Kconfig               |    3 +
-> > >  arch/arm/mach-mxs/devices/Makefile              |    1 +
-> > >  arch/arm/mach-mxs/devices/platform-usb.c        |   78
-> > >  +++++++++++++++++++++++
-> > >  arch/arm/mach-mxs/include/mach/devices-common.h |    9 +++
-> > >  5 files changed, 95 insertions(+)
-> > >  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
+> On Wed, Apr 18, 2012 at 10:02:02PM +0200, Marek Vasut wrote:
+> > Dear Sascha Hauer,
 > > 
-> > What's the state of the device tree support for mach-mxs now?
+> > > > +static void mxs_usb_work(struct work_struct *w)
+> > > > +{
+> > > > +	struct mxs_usb_phy *phy = container_of(w, struct mxs_usb_phy,
+> > > > work); +	struct usb_otg *otg = phy->phy.otg;
+> > > > +	struct usb_hcd *hcd;
+> > > > +
+> > > > +	switch (otg->phy->state) {
+> > > > +	case OTG_STATE_A_HOST:
+> > > > +		if (otg->host) {
+> > > > +			hcd = bus_to_hcd(otg->host);
+> > > > +			usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
+> > > > +		}
+> > > > +		break;
+> > > > +	default:
+> > > > +		break;
+> > > > +	}
+> > > > +}
+> > > 
+> > > This function should be in imx-otg.
+> > 
+> > You mean imx-usb? What'd it do in there?
 > 
-> The pinctrl-mxs (DT only) was just posted today.  The gpio-mxs will
-> be the next one I will work on, and I think Dong Aisheng is adding
-> DT support for mxs-dma and mxs-mmc.  I believe we will reach a pretty
-> good state when in the v3.5 merge window.
-
-This is very good to hear, I'm really interested to see this development :)
-
-> > Since we
-> > allow booting at least the mx28evk with device tree now in -next, it
-> > would be really nice if we didn't have to add this registration code
-> > for non-DT platforms any more and just mandate that everyone who
-> > wants to use USB on that board uses DT.
+> otg/imx-usb.c, yes (though I would prefer imx-otg.c)
 > 
-> I share the same view on this.
+> It should be there because it's the imx-otg.c driver which manages the
+> state. The phy driver is only a helper.
 
-The Device Tree code for MXS is not ripe yet. We still miss a lot in there. 
-Flipping this usb stuff to DT should be easy, I see no point disallowing this 
-(and that stands also for the MXS SPI actually) into kernel so more people can 
-test it only because you'd like this to wait for who knows how long for the DT 
-support to arrive. Don't take it personally, but I still believe it's too early 
-to enforce DT on MXS.
+I believe the imx-otg should only call otg_set_host()/otg_set_peripheral() on 
+the particular PHY, in this case mxs-usb-phy, correct? The mxs_usb_work() should 
+stay in the PHY's driver, because it'll likely frob with the PHY's own registers 
+once peripheral support is added.
 
-> Regards,
-> Shawn
 > 
-> > Is that possible already
-> > or are we missing too much other stuff?
+> Sascha
 
 Best regards,
 Marek Vasut
