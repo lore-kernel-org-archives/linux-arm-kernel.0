@@ -1,51 +1,45 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 19 Apr 2012 18:58:19 +0530
-Subject: [PATCHv8 08/10] I2C: OMAP: fix missing handling of errata
- I2C_OMAP3_1P153
-In-Reply-To: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
-References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334842101-20670-9-git-send-email-shubhrajyoti@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Apr 2012 13:33:01 +0000
+Subject: irq_to_gpio support
+In-Reply-To: <20120419113019.GB26682@b20223-02.ap.freescale.net>
+References: <20120419113019.GB26682@b20223-02.ap.freescale.net>
+Message-ID: <201204191333.01914.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tasslehoff Kjappfot <tasskjapp@gmail.com>
+On Thursday 19 April 2012, Richard Zhao wrote:
+> Hi Grant & Linus
+> 
+> I saw gpio lib didn't provide irq_to_gpio support. Are we dropping it?
+> git grep irq_to_gpio still return a lot of things.
 
-i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
-Move the errata handling to i2c_probe.
+There are not that many actually if you count only the users, not the
+files that define them, and you ignore the files in drivers/gpio 
+that define their own.
 
-Signed-off-by: Tasslehoff Kjappfot <tasskjapp@gmail.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+drivers/ata/pata_rb532_cf.c:    gpio = irq_to_gpio(irq);
+drivers/input/touchscreen/eeti_ts.c:    return gpio_get_value(irq_to_gpio(priv->irq)) == priv->irq_active_high;
+drivers/input/touchscreen/egalax_ts.c:  int gpio = irq_to_gpio(client->irq);
+drivers/mfd/ezx-pcap.c: } while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
+drivers/pcmcia/db1xxx_ss.c:     return !gpio_get_value(irq_to_gpio(sock->insert_irq));
+drivers/power/tosa_battery.c:   pr_info("tosa_bat_gpio irq: %d\n", gpio_get_value(irq_to_gpio(irq)));
+drivers/staging/iio/accel/lis3l02dq_core.c:     if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0) {
+drivers/staging/iio/accel/lis3l02dq_core.c:     if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0)
+drivers/staging/iio/accel/lis3l02dq_core.c:     if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0)
+drivers/staging/iio/accel/lis3l02dq_ring.c:             if (gpio_get_value(irq_to_gpio(st->us->irq)))
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index d555dcd..9323201 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -427,11 +427,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 	/* Take the I2C module out of reset: */
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
- 
--	dev->errata = 0;
--
--	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
--		dev->errata |= I2C_OMAP_ERRATA_I207;
--
- 	/* Enable interrupts */
- 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
- 			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
-@@ -1023,6 +1018,11 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
- 
-+	dev->errata = 0;
-+
-+	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
-+		dev->errata |= I2C_OMAP_ERRATA_I207;
-+
- 	if (dev->rev <= OMAP_I2C_REV_ON_3430)
- 		dev->errata |= I2C_OMAP3_1P153;
- 
--- 
-1.7.5.4
+The pata_rb532_cf and db1xxx_ss drivers are only used on MIPS,
+most of the other ones are for arm/pxa and are currently broken.
+
+> I'm looking at drivers/input/touchscreen/egalax_ts.c driver.
+> It failed to compile without irq_to_gpio. It's a i2c client device and
+> use irq line configured as gpio to wakeup touchscreen controller.
+> If we don't have irq_to_gpio, I'm afraid it has to use plat data or
+> of property to pass gpio number.
+
+Yes, I think that is correct. The drivers should really have been
+fixed at the time when the irq_to_gpio function was removed from
+the respective platforms using those drivers, and in some cases
+this has already happened.
+
+	Arnd
