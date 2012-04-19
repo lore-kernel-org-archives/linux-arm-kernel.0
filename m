@@ -1,49 +1,35 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 19 Apr 2012 11:58:47 -0700
-Subject: [PATCH] arm: omap3: am35x: Don't mark missing features as present
-Message-ID: <1334861927-1741-1-git-send-email-mgreer@animalcreek.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 19 Apr 2012 12:01:08 -0700
+Subject: [PATCH 00/13] SPEAr: Move to common clock framework
+In-Reply-To: <201204190857.19770.arnd@arndb.de>
+References: <cover.1334660431.git.viresh.kumar@st.com>
+ <CAJOA=zNPKrSSL5wjNBwL9qie5sGv9j=k3rSAmsjbK-6jfJwbgQ@mail.gmail.com>
+ <CAJOA=zO4E0YJ0OU9n-abbNd+0VXQGsFi5Tnu5y=riHSgqk=xMw@mail.gmail.com>
+ <201204190857.19770.arnd@arndb.de>
+Message-ID: <CAJOA=zNLhDHqXyEWkryMSRUCctsSPBUfjLUP7w8ck1PoDtxioQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Thu, Apr 19, 2012 at 1:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 18 April 2012, Turquette, Mike wrote:
+>> I've taken patches 02 - 06 into my -next branch. ?Patch 01 isn't for
+>> me really, and I've not yet tested patch 07 (I'll take it everything
+>> looks good). ?The rest of your series (08 - 13) should probably go
+>> through Arnd.
+>
+> My preference would be to have the whole series go through your tree
+> and move the implementation of the spear clock code to drivers/clk
+> in the process. This will reduce interdependencies between the spear
+> clock branch and other branches that have spear patches.
 
-The Chip Identification register on the am35x family of SoCs
-has bits 12, 7:5, and 3:2 marked as reserved and are read as
-zeroes.  Unfortunately, on other omap SoCs, a 0 bit means a
-feature is "Full Use" so the OMAP3_CHECK_FEATURE() macro
-called by omap3_check_features() will incorrectly interpret
-those zeroes to mean that a feature is present even though it
-isn't.  To fix that, the feature bits that are incorrectly
-set (namely, OMAP3_HAS_IVA and OMAP3_HAS_ISP) need to be
-cleared after all of the calls to OMAP3_CHECK_FEATURE() in
-omap3_check_features() are made.
+If Viresh moves his code to drivers/clk/ then I'll take it.
 
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
----
- arch/arm/mach-omap2/id.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+> I also think it's a good idea if you submit the clk patches to Linus
+> directly for the next merge window, but it's ok to use arm-soc if
+> that makes you feel more confident about it.
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 0e79b7b..9736049 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -248,6 +248,17 @@ void __init omap3xxx_check_features(void)
- 	omap_features |= OMAP3_HAS_SDRC;
- 
- 	/*
-+	 * am35x fixups:
-+	 * - The am35x Chip ID register has bits 12, 7:5, and 3:2 marked as
-+	 *   reserved and therefore return 0 when read.  Unfortunately,
-+	 *   OMAP3_CHECK_FEATURE() will interpret some of those zeroes to
-+	 *   mean that a feature is present even though it isn't so clear
-+	 *   the incorrectly set feature bits.
-+	 */
-+	if (cpu_is_omap3505() || cpu_is_omap3517())
-+		omap_features &= ~(OMAP3_HAS_IVA | OMAP3_HAS_ISP);
-+
-+	/*
- 	 * TODO: Get additional info (where applicable)
- 	 *       e.g. Size of L2 cache.
- 	 */
--- 
-1.7.9.4
+As I said in my previous mail, I'd prefer to send to Linus directly.
+Sounds like we're in agreement.
+
+Regards,
+Mike
