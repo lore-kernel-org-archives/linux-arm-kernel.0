@@ -1,33 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Apr 2012 21:24:48 -0700
-Subject: [GIT PULL] omap fixes for v3.4-rc3
-In-Reply-To: <20120418182349.GM21106@atomide.com>
-References: <20120418182349.GM21106@atomide.com>
-Message-ID: <CAOesGMjD22nqUg6k=e-U9Dbs_ueE2o-_cfvaZMDv34SZE9U-=Q@mail.gmail.com>
+Date: Wed, 18 Apr 2012 21:26:38 -0700
+Subject: [GIT PULL] i.MX fixes for -rc
+In-Reply-To: <20120418101746.GS3852@pengutronix.de>
+References: <20120418101746.GS3852@pengutronix.de>
+Message-ID: <CAOesGMg7eFOhcJFDwgkH6TJpbJSrtj1-jpjO+mEzrEotx+RPkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 11:23 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Arnd & Olof,
+On Wed, Apr 18, 2012 at 3:17 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Olof, Arnd,
 >
-> Here are some fixes for the -rc cycle. The biggest change is to
-> remove bad muxing for serial ports that was causing random oopses
-> with at least zoom3 and nfsroot.
+> Please pull the following for -rc.
 >
-> Now using a signed tag.
->
-> Regards,
->
-> Tony
+> Thanks
+> ?Sascha
 >
 >
-> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
 >
-> ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+> ?Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
 >
 > are available in the git repository at:
 >
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.4-rc3
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git tags/v3.4-rc3-imx-fixes
 
 Thanks, pulled.
 
