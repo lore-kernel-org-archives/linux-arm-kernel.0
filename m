@@ -1,58 +1,31 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 19 Apr 2012 15:00:09 +0200
-Subject: [PATCH v4 4/10] ARM: LPC32xx: clock.c dma adjustment
-In-Reply-To: <1334840415-14287-1-git-send-email-stigge@antcom.de>
-References: <1334840415-14287-1-git-send-email-stigge@antcom.de>
-Message-ID: <1334840415-14287-5-git-send-email-stigge@antcom.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Apr 2012 13:23:32 +0000
+Subject: [PATCH 0/7] ARM: S5P: moving plat-s5p stuff into plat-samsung
+In-Reply-To: <1334802036-16768-1-git-send-email-kgene.kim@samsung.com>
+References: <1334802036-16768-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <201204191323.32301.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adjusts the DMA clock of the LPC32xx to "pl08xdmac" to be picked up
-correctly by the AMBA dmaengine driver.
+On Thursday 19 April 2012, Kukjin Kim wrote:
+> This patches move plat-s5p stuff into plat-samsung for keep just one
+> plat directory, plat-samsung for Samsung stuff. Actually, it includes
+> small things for common s5p and there is no problem this moving.
+> Of course, I'm working on removing plat-s3c24xx and will be submitted
+> before v3.4 release.
+> 
+> NOTE, now the plat-s5p directory which is including Kconfig and dummy
+> Makefile is not removed yet because need to cleanup CONFIG_PLAT_S5P
+> and will be removed soon.
+> 
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Very nice!
 
----
- arch/arm/mach-lpc32xx/clock.c |   20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+Out of curiosity, how far are you planning to take the consolidation
+of the various directories in the end?
+I assume all the s3c24* directories end up getting merged into
+s3c24xx, but what about s3c64xx, s5p64x0, s5pc100 and s5pcv210?
+Are they going to stay separate or do they get merged together
+or with exynos?
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -1109,27 +1109,27 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_INIT(NULL, "timer2_ck", &clk_timer2),
- 	CLKDEV_INIT(NULL, "timer3_ck", &clk_timer3),
- 	CLKDEV_INIT(NULL, "vfp9_ck", &clk_vfp9),
--	CLKDEV_INIT(NULL, "clk_dmac", &clk_dma),
--	CLKDEV_INIT("pnx4008-watchdog", NULL, &clk_wdt),
-+	CLKDEV_INIT("pl08xdmac", NULL, &clk_dma),
-+	CLKDEV_INIT("4003c000.watchdog", NULL, &clk_wdt),
- 	CLKDEV_INIT(NULL, "uart3_ck", &clk_uart3),
- 	CLKDEV_INIT(NULL, "uart4_ck", &clk_uart4),
- 	CLKDEV_INIT(NULL, "uart5_ck", &clk_uart5),
- 	CLKDEV_INIT(NULL, "uart6_ck", &clk_uart6),
--	CLKDEV_INIT("pnx-i2c.0", NULL, &clk_i2c0),
--	CLKDEV_INIT("pnx-i2c.1", NULL, &clk_i2c1),
--	CLKDEV_INIT("pnx-i2c.2", NULL, &clk_i2c2),
-+	CLKDEV_INIT("400a0000.i2c", NULL, &clk_i2c0),
-+	CLKDEV_INIT("400a8000.i2c", NULL, &clk_i2c1),
-+	CLKDEV_INIT("31020300.i2c", NULL, &clk_i2c2),
- 	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
- 	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
- 	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
- 	CLKDEV_INIT("lpc32xx-nand.0", "nand_ck", &clk_nand),
--	CLKDEV_INIT("lpc32xx-adc", NULL, &clk_adc),
-+	CLKDEV_INIT("40048000.adc", NULL, &clk_adc),
- 	CLKDEV_INIT(NULL, "i2s0_ck", &clk_i2s0),
- 	CLKDEV_INIT(NULL, "i2s1_ck", &clk_i2s1),
--	CLKDEV_INIT("ts-lpc32xx", NULL, &clk_tsc),
--	CLKDEV_INIT("dev:mmc0", NULL, &clk_mmc),
--	CLKDEV_INIT("lpc-eth.0", NULL, &clk_net),
-+	CLKDEV_INIT("40048000.tsc", NULL, &clk_tsc),
-+	CLKDEV_INIT("20098000.sd", NULL, &clk_mmc),
-+	CLKDEV_INIT("31060000.ethernet", NULL, &clk_net),
- 	CLKDEV_INIT("dev:clcd", NULL, &clk_lcd),
--	CLKDEV_INIT("lpc32xx_udc", "ck_usbd", &clk_usbd),
-+	CLKDEV_INIT("31020000.usbd", "ck_usbd", &clk_usbd),
- 	CLKDEV_INIT("lpc32xx_rtc", NULL, &clk_rtc),
- };
- 
+	Arnd
