@@ -1,35 +1,123 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 19 Apr 2012 12:01:08 -0700
-Subject: [PATCH 00/13] SPEAr: Move to common clock framework
-In-Reply-To: <201204190857.19770.arnd@arndb.de>
-References: <cover.1334660431.git.viresh.kumar@st.com>
- <CAJOA=zNPKrSSL5wjNBwL9qie5sGv9j=k3rSAmsjbK-6jfJwbgQ@mail.gmail.com>
- <CAJOA=zO4E0YJ0OU9n-abbNd+0VXQGsFi5Tnu5y=riHSgqk=xMw@mail.gmail.com>
- <201204190857.19770.arnd@arndb.de>
-Message-ID: <CAJOA=zNLhDHqXyEWkryMSRUCctsSPBUfjLUP7w8ck1PoDtxioQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 19 Apr 2012 21:14:37 +0200
+Subject: [PATCH v2 4/8] ARM: OMAP2+: hwmod: revise hardreset behavior
+In-Reply-To: <alpine.DEB.2.00.1204191050110.29048@utopia.booyaka.com>
+References: <20120228053524.16278.59430.stgit@dusk>
+ <20120228053654.16278.73632.stgit@dusk>
+ <alpine.DEB.2.00.1204182253550.29048@utopia.booyaka.com>
+ <4F90001E.8060201@ti.com>
+ <alpine.DEB.2.00.1204191050110.29048@utopia.booyaka.com>
+Message-ID: <4F90641D.3090208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 1:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 18 April 2012, Turquette, Mike wrote:
->> I've taken patches 02 - 06 into my -next branch. ?Patch 01 isn't for
->> me really, and I've not yet tested patch 07 (I'll take it everything
->> looks good). ?The rest of your series (08 - 13) should probably go
->> through Arnd.
+Hi Paul,
+
+On 4/19/2012 7:17 PM, Paul Walmsley wrote:
+> Hi Beno?t,
 >
-> My preference would be to have the whole series go through your tree
-> and move the implementation of the spear clock code to drivers/clk
-> in the process. This will reduce interdependencies between the spear
-> clock branch and other branches that have spear patches.
+> On Thu, 19 Apr 2012, Cousson, Benoit wrote:
+>
+>> The concern of the people doing SW in these embedded processors was mainly
+>> because we were releasing the reset of processor without loading any SW first
+>> and thus the processor was executing some random instructions.
+>>
+>> So if we consider a better hwmods definition, we can potentially fix the MMU
+>> case:
+>>
+>>      'mmu_ipu':
+>>          'rst_ipu_mmu_cache'
+>>
+>>      'mmu_dsp':
+>>          'rst_dsp_mmu_cache'
+>>
+>>      'iva_config':
+>>          'rst_logic'
+>
+> Wouldn't these still be "pseudo-hwmods?"  Or do each of these actually
+> have address space, interconnect ports, etc.?
 
-If Viresh moves his code to drivers/clk/ then I'll take it.
+Yes, these ones are the only real IPs for MPU stand point, with 
+interconnect port and configuration registers.
 
-> I also think it's a good idea if you submit the clk patches to Linus
-> directly for the next merge window, but it's ok to use arm-soc if
-> that makes you feel more confident about it.
+> Another approach that might not require defining pseudo-hwmods is to
+> define a per-hard-reset-line flag that could be used to alter the way the
+> hwmod code handles the hardreset line.
 
-As I said in my previous mail, I'd prefer to send to Linus directly.
-Sounds like we're in agreement.
+Yes, I think this is what Rajendra proposed long time ago...
+
+>> But then we do have the processor resets that have to be exposed somewhere.
+>>
+>>      'ipu':
+>>          'rst_cpu0'
+>>          'rst_cpu1'
+>>
+>>      'dsp':
+>>          'rst_dsp'
+>>
+>>      'iva':
+>>          'rst_seq1'
+>>          'rst_seq2'
+>>
+>> None of these one should be controlled automatically.
+>
+> Don't we still want to put these IP blocks into reset until a driver for
+> these IP blocks is loaded?
+
+Yes, indeed, my point is where are we going to declare these reset lines 
+if we do not have any fake hwmods to store them.
+
+>>>    	/*
+>>> -	 * If an IP contains HW reset lines, then de-assert them in order
+>>> -	 * to allow the module state transition. Otherwise the PRCM will
+>>> return
+>>> -	 * Intransition status, and the init will failed.
+>>> +	 * If an IP block contains HW reset lines and any of them are
+>>> +	 * asserted, we let integration code associated with that
+>>> +	 * block handle the enable.  We've received very little
+>>> +	 * information on what those driver authors need, and until
+>>> +	 * detailed information is provided and the driver code is
+>>> +	 * posted to the public lists, this is probably the best we
+>>> +	 * can do.
+>>
+>> Maybe we should keep that with some mechanism to prevent it for some IP like
+>> processors .
+>>
+>> I guess that with that patch, we cannot enable anymore IPU/DSP and IVA at boot
+>> time.
+>
+> I am probably misunderstanding your comment, but I don't think there's any
+> way at the moment to generically enable those IP blocks without driver
+> integration code assistance.
+
+Well, for the MMU we can, these are regular IPs (almost). The real 
+issues was for the processors.
+
+> If we leave the hardreset lines asserted in _enable(), then the PRCM
+> status for those modules will be stuck in In-transition state, according
+> to the previous comments in the code.  I think this will block PM idle
+> transitions.  Also we have no way to restore the clockdomain idle settings
+> during the second part of the hwmod enable sequence, I think, since it
+> will need to be executed by driver integration code :-(
+>
+> And I don't think we can deassert the hardreset lines in _enable() right
+> now, for the reason that you mentioned in your message: unless the driver
+> integration code implements a custom reset function, we don't have any way
+> to load code into the IP block before deasserting the hardreset.
+
+Fully agree, what I was trying to highlight is that we do have two types 
+of hardreset here: the processors ones and the MMU / Logic ones.
+Only the processors do require some special management because a 
+firmware has to be loaded first.
+
+> So at this point I'd propose that we encourage these driver authors to
+> implement custom reset functions for their IP blocks that load firmware if
+> needed, and put them into idle, similar to what omap3_iva_idle() does in
+> mach-omap2/pm34xx.c.  If the custom reset function takes the IP block out
+> of hardreset, then the subsequent hwmod enable/idle/shutdown calls should
+> work, after this patch.
+
+First they will have to release their driver :-)
 
 Regards,
-Mike
+Benoit
