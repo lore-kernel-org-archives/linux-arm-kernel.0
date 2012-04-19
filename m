@@ -1,56 +1,145 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 Apr 2012 19:20:29 -0700
-Subject: [PATCH 0/7] ARM: S5P: moving plat-s5p stuff into plat-samsung
-Message-ID: <1334802036-16768-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed, 18 Apr 2012 19:20:31 -0700
+Subject: [PATCH 2/7] ARM: SAMSUNG: move interrupt part for common s5p into
+ plat-samsung
+In-Reply-To: <1334802036-16768-1-git-send-email-kgene.kim@samsung.com>
+References: <1334802036-16768-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1334802036-16768-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches move plat-s5p stuff into plat-samsung for keep just one
-plat directory, plat-samsung for Samsung stuff. Actually, it includes
-small things for common s5p and there is no problem this moving.
-Of course, I'm working on removing plat-s3c24xx and will be submitted
-before v3.4 release.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/plat-s5p/Kconfig                          |   11 -----------
+ arch/arm/plat-s5p/Makefile                         |    3 ---
+ arch/arm/plat-samsung/Kconfig                      |   16 ++++++++++++++++
+ arch/arm/plat-samsung/Makefile                     |    3 +++
+ .../irq-eint.c => plat-samsung/s5p-irq-eint.c}     |    3 +--
+ .../s5p-irq-gpioint.c}                             |    3 +--
+ .../arm/{plat-s5p/irq.c => plat-samsung/s5p-irq.c} |    3 +--
+ 7 files changed, 22 insertions(+), 20 deletions(-)
+ rename arch/arm/{plat-s5p/irq-eint.c => plat-samsung/s5p-irq-eint.c} (99%)
+ rename arch/arm/{plat-s5p/irq-gpioint.c => plat-samsung/s5p-irq-gpioint.c} (99%)
+ rename arch/arm/{plat-s5p/irq.c => plat-samsung/s5p-irq.c} (96%)
 
-NOTE, now the plat-s5p directory which is including Kconfig and dummy
-Makefile is not removed yet because need to cleanup CONFIG_PLAT_S5P
-and will be removed soon.
-
-The following changes since commit b1a797eb3759e1c166561c8bc035dbf3d40b8710:
-
-  Merge branch 'next/cleanup-samsung-iommu' into topic/cleanup-plat-s5p (2012-04-16 21:13:20 -0700)
-
-[PATCH 1/7] ARM: SAMSUNG: move clock part for common s5p into plat-samsung
-[PATCH 2/7] ARM: SAMSUNG: move interrupt part for common s5p into plat-samsung
-[PATCH 3/7] ARM: SAMSUNG: move pm part for common s5p into plat-samsung
-[PATCH 4/7] ARM: SAMSUNG: move hr timer for common s5p into plat-samsung
-[PATCH 5/7] ARM: SAMSUNG: move platform device for s5p uart into plat-samsung
-[PATCH 6/7] ARM: SAMSUNG: move setup code for s5p mfc and mipiphy into plat-samsung
-[PATCH 7/7] ARM: SAMSUNG: move options for common s5p into plat-samsung/Kconfig
-
-arch/arm/plat-s5p/Kconfig                          |  108 -----------------
-arch/arm/plat-s5p/Makefile                         |   16 ---
-arch/arm/plat-samsung/Kconfig                      |  122 ++++++++++++++++++++
-arch/arm/plat-samsung/Makefile                     |   13 ++
-.../{plat-s5p/clock.c => plat-samsung/s5p-clock.c} |    3 +-
-.../dev-mfc.c => plat-samsung/s5p-dev-mfc.c}       |    4 +-
-.../dev-uart.c => plat-samsung/s5p-dev-uart.c}     |   78 +++----------
-.../irq-eint.c => plat-samsung/s5p-irq-eint.c}     |    3 +-
-.../s5p-irq-gpioint.c}                             |    3 +-
-.../irq-pm.c => plat-samsung/s5p-irq-pm.c}         |    3 +-
-.../arm/{plat-s5p/irq.c => plat-samsung/s5p-irq.c} |    3 +-
-arch/arm/{plat-s5p/pm.c => plat-samsung/s5p-pm.c}  |    3 +-
-.../{plat-s5p/sleep.S => plat-samsung/s5p-sleep.S} |    3 +-
-arch/arm/{plat-s5p => plat-samsung}/s5p-time.c     |    3 +-
-.../arm/{plat-s5p => plat-samsung}/setup-mipiphy.c |    0
-15 files changed, 159 insertions(+), 206 deletions(-)
-rename arch/arm/{plat-s5p/clock.c => plat-samsung/s5p-clock.c} (99%)
-rename arch/arm/{plat-s5p/dev-mfc.c => plat-samsung/s5p-dev-mfc.c} (97%)
-rename arch/arm/{plat-s5p/dev-uart.c => plat-samsung/s5p-dev-uart.c} (57%)
-rename arch/arm/{plat-s5p/irq-eint.c => plat-samsung/s5p-irq-eint.c} (99%)
-rename arch/arm/{plat-s5p/irq-gpioint.c => plat-samsung/s5p-irq-gpioint.c} (99%)
-rename arch/arm/{plat-s5p/irq-pm.c => plat-samsung/s5p-irq-pm.c} (98%)
-rename arch/arm/{plat-s5p/irq.c => plat-samsung/s5p-irq.c} (96%)
-rename arch/arm/{plat-s5p/pm.c => plat-samsung/s5p-pm.c} (95%)
-rename arch/arm/{plat-s5p/sleep.S => plat-samsung/s5p-sleep.S} (98%)
-rename arch/arm/{plat-s5p => plat-samsung}/s5p-time.c (99%)
-rename arch/arm/{plat-s5p => plat-samsung}/setup-mipiphy.c (100%)
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index 2c1193c..efff0a3 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -23,17 +23,6 @@ config PLAT_S5P
+ 	help
+ 	  Base platform code for Samsung's S5P series SoC.
+ 
+-config S5P_EXT_INT
+-	bool
+-	help
+-	  Use the external interrupts (other than GPIO interrupts.)
+-	  Note: Do not choose this for S5P6440 and S5P6450.
+-
+-config S5P_GPIO_INT
+-	bool
+-	help
+-	  Common code for the GPIO interrupts (other than external interrupts.)
+-
+ config S5P_HRT
+ 	bool
+ 	select SAMSUNG_DEV_PWM
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index 8315210..8701c3c 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -12,9 +12,6 @@ obj-				:=
+ 
+ # Core files
+ 
+-obj-y				+= irq.o
+-obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
+-obj-$(CONFIG_S5P_GPIO_INT)	+= irq-gpioint.o
+ obj-$(CONFIG_S5P_PM)		+= pm.o irq-pm.o
+ obj-$(CONFIG_S5P_SLEEP)		+= sleep.o
+ obj-$(CONFIG_S5P_HRT) 		+= s5p-time.o
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 4283765..9ae8036 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -70,6 +70,22 @@ config SAMSUNG_IRQ_VIC_TIMER
+        help
+          Internal configuration to build the VIC timer interrupt code.
+ 
++config S5P_IRQ
++	def_bool (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS)
++	help
++	  Support common interrup part for ARCH_S5P and ARCH_EXYNOS SoCs
++
++config S5P_EXT_INT
++	bool
++	help
++	  Use the external interrupts (other than GPIO interrupts.)
++	  Note: Do not choose this for S5P6440 and S5P6450.
++
++config S5P_GPIO_INT
++	bool
++	help
++	  Common code for the GPIO interrupts (other than external interrupts.)
++
+ # options for gpio configuration support
+ 
+ config SAMSUNG_GPIOLIB_4BIT
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 997ce10..5b65009 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -20,6 +20,9 @@ obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
+ obj-$(CONFIG_S5P_CLOCK)		+= s5p-clock.o
+ 
+ obj-$(CONFIG_SAMSUNG_IRQ_VIC_TIMER) += irq-vic-timer.o
++obj-$(CONFIG_S5P_IRQ)		+= s5p-irq.o
++obj-$(CONFIG_S5P_EXT_INT)	+= s5p-irq-eint.o
++obj-$(CONFIG_S5P_GPIO_INT)	+= s5p-irq-gpioint.o
+ 
+ # ADC
+ 
+diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-samsung/s5p-irq-eint.c
+similarity index 99%
+rename from arch/arm/plat-s5p/irq-eint.c
+rename to arch/arm/plat-samsung/s5p-irq-eint.c
+index 139c050..33bd3f3 100644
+--- a/arch/arm/plat-s5p/irq-eint.c
++++ b/arch/arm/plat-samsung/s5p-irq-eint.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s5p/irq-eint.c
+- *
++/*
+  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+diff --git a/arch/arm/plat-s5p/irq-gpioint.c b/arch/arm/plat-samsung/s5p-irq-gpioint.c
+similarity index 99%
+rename from arch/arm/plat-s5p/irq-gpioint.c
+rename to arch/arm/plat-samsung/s5p-irq-gpioint.c
+index 82c7311..f9431fe 100644
+--- a/arch/arm/plat-s5p/irq-gpioint.c
++++ b/arch/arm/plat-samsung/s5p-irq-gpioint.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s5p/irq-gpioint.c
+- *
++/*
+  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+  * Author: Kyungmin Park <kyungmin.park@samsung.com>
+  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
+diff --git a/arch/arm/plat-s5p/irq.c b/arch/arm/plat-samsung/s5p-irq.c
+similarity index 96%
+rename from arch/arm/plat-s5p/irq.c
+rename to arch/arm/plat-samsung/s5p-irq.c
+index afdaa10..dfb47d6 100644
+--- a/arch/arm/plat-s5p/irq.c
++++ b/arch/arm/plat-samsung/s5p-irq.c
+@@ -1,5 +1,4 @@
+-/* arch/arm/plat-s5p/irq.c
+- *
++/*
+  * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+  *
+-- 
+1.7.2.3
