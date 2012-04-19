@@ -1,20 +1,31 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 19 Apr 2012 19:30:20 +0800
-Subject: irq_to_gpio support
-Message-ID: <20120419113019.GB26682@b20223-02.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Apr 2012 11:32:01 +0000
+Subject: [PATCH V2] Ethernut 5 board support
+In-Reply-To: <4F8FE598.5090409@egnite.de>
+References: <4F8FE598.5090409@egnite.de>
+Message-ID: <201204191132.02009.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant & Linus
+On Thursday 19 April 2012, Tim Schendekehl wrote:
+> +       i2c at 0 {
+> +               status = "okay";
+> +
+> +               pcf8563 at 50 {
+> +                       compatible = "pcf8563";
+> +                       reg = <0x51>;
+> +               };
+> +
+> +               pmmc at 22 {
+> +                       compatible = "pmmc";
+> +                       reg = <0x22>;
+> +               };
+> +       };
 
-I saw gpio lib didn't provide irq_to_gpio support. Are we dropping it?
-git grep irq_to_gpio still return a lot of things.
+Please make the compatible properties more specific. The first one should be
+compatible="nxp,pcf8563". For the second one, it's not clear what this
+refers to. What is a pmmc?
 
-I'm looking at drivers/input/touchscreen/egalax_ts.c driver.
-It failed to compile without irq_to_gpio. It's a i2c client device and
-use irq line configured as gpio to wakeup touchscreen controller.
-If we don't have irq_to_gpio, I'm afraid it has to use plat data or
-of property to pass gpio number.
+Everything else looks good to me.
 
-Thanks
-Richard
+	Arnd
