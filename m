@@ -1,44 +1,34 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 19 Apr 2012 10:22:34 +0200
-Subject: [PATCH v2 3/8] ARM: OMAP2+: hwmod: reorganize and document the
- setup process
-In-Reply-To: <alpine.DEB.2.00.1204190214250.29048@utopia.booyaka.com>
-References: <20120228053524.16278.59430.stgit@dusk>
- <20120228053651.16278.22844.stgit@dusk>
- <alpine.DEB.2.00.1204190208470.29048@utopia.booyaka.com>
- <alpine.DEB.2.00.1204190214250.29048@utopia.booyaka.com>
-Message-ID: <4F8FCB4A.3080805@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 19 Apr 2012 10:25:36 +0200
+Subject: [PATCH] ARM: SAMSUNG: Should check for IS_ERR(clk) instead of NULL
+In-Reply-To: <4F8F586C.3020401@samsung.com>
+References: <1334722134-14545-1-git-send-email-jhbird.choi@samsung.com>
+ <4F8F586C.3020401@samsung.com>
+Message-ID: <4F8FCC00.10807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 04/19/2012 02:12 AM, Kukjin Kim wrote:
+>> --- a/arch/arm/plat-samsung/include/plat/watchdog-reset.h
+>> +++ b/arch/arm/plat-samsung/include/plat/watchdog-reset.h
+>> @@ -25,7 +25,7 @@ static inline void arch_wdt_reset(void)
+>>
+>>   	__raw_writel(0, S3C2410_WTCON);	  /* disable watchdog, to be safe  */
+>>
+>> -	if (s3c2410_wdtclk)
+>> +	if (!IS_ERR(s3c2410_wdtclk))
+> 
+> Yeah, right. BTW don't we need to check NULL here?
 
-On 4/19/2012 10:17 AM, Paul Walmsley wrote:
+It might make sense to check for NULL as well, but only if it happens
+that a clock entry is ever added to clkdev with null struct clk_lookup:clk
+member. This in turn seems impossible with the current clock code at
+plat-samsung/clock.c.
 
-...
+>>   		clk_enable(s3c2410_wdtclk);
+>>
+>>   	/* put initial values into count and data */
 
->   static int __init omap_hwmod_setup_all(void)
->   {
-> -	int r;
-> -
-> -	if (!mpu_oh) {
-> -		pr_err("omap_hwmod: %s: MPU initiator hwmod %s not yet registered\n",
-> -		       __func__, MPU_INITIATOR_NAME);
-> -		return -EINVAL;
-> -	}
-> -
-> -	r = omap_hwmod_for_each(_populate_mpu_rt_base, NULL);
-> -
-> -	r = omap_hwmod_for_each(_init_clocks, NULL);
-> -	WARN(IS_ERR_VALUE(r),
-> -	     "omap_hwmod: %s: _init_clocks failed\n", __func__);
-> +	_ensure_mpu_hwmod_is_setup(NULL);
->
-> +	omap_hwmod_for_each(_init, NULL);
->   	omap_hwmod_for_each(_setup, NULL);
-
-Does it make sense to iterate twice? Cannot we just iterate over a _init 
-+ _setup single call?
-
+--
 Regards,
-Benoit
+Sylwester
