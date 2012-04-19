@@ -1,81 +1,34 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Apr 2012 15:58:27 +0200
-Subject: [PATCH 02/17][V2] ARM: OMAP4: cpuidle - Declare the states with
- the driver declaration
-In-Reply-To: <87vcl8a5wb.fsf@ti.com>
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
- <1333570371-1389-3-git-send-email-daniel.lezcano@linaro.org>
- <87vcl8a5wb.fsf@ti.com>
-Message-ID: <4F901A03.9080000@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 19 Apr 2012 21:56:32 +0800
+Subject: [PATCH 34/40] ARM: imx6: implement clocks using common clock
+ framework
+In-Reply-To: <20120418113355.GO20478@pengutronix.de>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-35-git-send-email-s.hauer@pengutronix.de>
+ <20120418113355.GO20478@pengutronix.de>
+Message-ID: <20120419135628.GB22219@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2012 12:37 AM, Kevin Hilman wrote:
-> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
->
->> The cpuidle API allows to declare statically the states in the driver
->> structure. Let's use it.
->> We do no longer need the fill_cstate function called at runtime and
->> by the way adding more instructions at boot time.
->>
->> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->> Reviewed-by: Jean Pihet<j-pihet@ti.com>
->> Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> ---
->>   arch/arm/mach-omap2/cpuidle44xx.c |   57 +++++++++++++++++++++---------------
->>   1 files changed, 33 insertions(+), 24 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
->> index ee0bc50..6d86b59 100644
->> --- a/arch/arm/mach-omap2/cpuidle44xx.c
->> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
->> @@ -132,21 +132,39 @@ struct cpuidle_driver omap4_idle_driver = {
->>   	.name				= "omap4_idle",
->>   	.owner				= THIS_MODULE,
->>   	.en_core_tk_irqen		= 1,
->> +	.states = {
->> +		{
->> +			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
->> +			.exit_latency = 2 + 2,
->> +			.target_residency = 5,
->> +			.flags = CPUIDLE_FLAG_TIME_VALID,
->> +			.enter = omap4_enter_idle,
->> +			.name = "C1",
->> +			.desc = "MPUSS ON"
->> +		},
->> +		{
->> +                        /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
->> +			.exit_latency = 328 + 440,
->> +			.target_residency = 960,
->> +			.flags = CPUIDLE_FLAG_TIME_VALID,
->> +			.enter = omap4_enter_idle,
->> +			.name = "C2",
->> +			.desc = "MPUSS CSWR",
->> +		},
->> +		{
->> +			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
->> +			.exit_latency = 460 + 518,
->> +			.target_residency = 1100,
->> +			.flags = CPUIDLE_FLAG_TIME_VALID,
->> +			.enter = omap4_enter_idle,
->> +			.name = "C3",
->> +			.desc = "MPUSS OSWR",
->> +		},
->> +	},
->> +	.state_count = OMAP4_NUM_STATES,
->
-> I think you can drop OMAP4_NUM_STATES here, and just use:
->
-> 	.state_count = ARRAY_SIZE(omap4_idle_driver.states),
->
-> Then drop OMAP4_NUM_STATES all together in patch 3.
-
-Ok.
-
+On Wed, Apr 18, 2012 at 01:33:55PM +0200, Sascha Hauer wrote:
+> Hi Shawn,
+> 
+> > +
+> > +static const char * const clks_init_on[] __initconst = {
+> > +	"mmdc_ch0_axi", "mmdc_ch1_axi", "uart_ipg", "uart_serial",
+> > +};
+> 
+> I assume uart_ipg and uart_serial is here for the earlyprintk case. This
+> is not needed anymore. earlyprintk depends on an enabled uart anyway, so
+> we can safely assume that the clock is turned on when Linux starts. The
+> clock framework will disable the clock in a late initcall, long after
+> the real driver has taken over and enabled the clock.
+> 
+Yes, that's the case for the last 2 clocks, but the first 2 clocks are
+for memory and need to be kept there.  Also, currently I do not have
+uart_ipg in the clkdev for uart driver to look up, so if we remove it
+from clks_init_on, we need to add it into clkdev.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Shawn
