@@ -1,96 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Apr 2012 21:36:44 +0100
-Subject: [PATCH 15/15] ARM: ux500: Enable PRCMU Timer 4 (clocksource) via
- Device Tree
-In-Reply-To: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334867804-31942-16-git-send-email-lee.jones@linaro.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 19 Apr 2012 22:39:15 +0200
+Subject: [PATCH v4] i2c: Add device tree support to i2c-pnx.c
+In-Reply-To: <4F903E0C.6010604@antcom.de>
+References: <1334850612-24151-1-git-send-email-stigge@antcom.de>
+ <20120419160715.GD24987@pengutronix.de>
+ <4F903E0C.6010604@antcom.de>
+Message-ID: <20120419203915.GB28005@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In dbx500 based devices the PRCMU Timer 4 is used as a clocksource
-and sched_clock. Here we fetch all necessary addressing information
-required for correct PRCMU initialisation from the Device Tree
-instead of using hard-coded values.
+On Thu, Apr 19, 2012 at 06:32:12PM +0200, Roland Stigge wrote:
+> Hi,
+> 
+> On 04/19/2012 06:07 PM, Wolfram Sang wrote:
+> >> + - clock-frequency: desired I2C bus clock frequency in Hz,
+> >> Default: 100000 Hz + - pnx,timeout: I2C bus timeout in
+> >> milliseconds, Default: 10 ms
+> > 
+> > I'd like to repeat my question to the devicetree folks here: Can we
+> > have timeout generic? It doesn't make sense to me to have that per
+> > vendor again and again.
+> 
+> Sounds completely reasonable.
+> 
+> To help make the devicetree conversion into 3.5, I would prefer to
+> integrate the "vendor,timeout" as-is if a longish standardization
+> process would block this, considering that we luckily only have 2-3 of
+> such timeout definitions currently.
 
-CC: Samuel Ortiz <sameo@linux.intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/db8500.dtsi |    8 +++++++-
- arch/arm/mach-ux500/timer.c   |   24 ++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 1 deletions(-)
+The "blocking" argument will be true for most dt-conversions. Only thing
+that might change is that the argument will then be "we already have
+9-10 of such timeouts, so we can have another one" ;)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index f633210..9a62f86 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -189,7 +189,13 @@
- 			reg = <0x80157000 0x1000>;
- 			interrupts = <46 47>;
- 			#address-cells = <1>;
--			#size-cells = <0>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+				prcmu-timer-4 at 80157450 {
-+				compatible = "stericsson,db8500-prcmu-timer-4";
-+				reg = <0x80157450 0xC>;
-+			};
+I've been there before, if you make one exception once, other people
+will nail you on that. I'd like to avoid that.
+
+Let's just hope we can agree on "timeout" quickly and all will be fine.
+
+> I'd volunteer to clean up later by preparing a patch when there is a
+> standard timeout defined.
+
+The problem with bindings is that you must support them forever once
+introduced. Old device-trees should still work with newer kernels.
  
- 			ab8500 at 5 {
- 				compatible = "stericsson,ab8500";
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index d37df98..885c742 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -8,6 +8,7 @@
- #include <linux/errno.h>
- #include <linux/clksrc-dbx500-prcmu.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- 
- #include <asm/smp_twd.h>
- 
-@@ -43,10 +44,17 @@ static void __init ux500_twd_init(void)
- #define ux500_twd_init()	do { } while(0)
- #endif
- 
-+const static struct of_device_id prcmu_timer_of_match[] __initconst = {
-+	{ .compatible = "stericsson,db8500-prcmu-timer-4", },
-+	{ },
-+};
-+
- static void __init ux500_timer_init(void)
- {
- 	void __iomem *mtu_timer_base;
- 	void __iomem *prcmu_timer_base;
-+	void __iomem *tmp_base;
-+	struct device_node *np;
- 
- 	if (cpu_is_u5500()) {
- 		mtu_timer_base = __io_address(U5500_MTU0_BASE);
-@@ -58,6 +66,22 @@ static void __init ux500_timer_init(void)
- 		ux500_unknown_soc();
- 	}
- 
-+	/* TODO: Once MTU has been DT:ed place code above into else. */
-+	if (of_have_populated_dt()) {
-+		np = of_find_matching_node(NULL, prcmu_timer_of_match);
-+		if (!np)
-+			goto dt_fail;
-+
-+		tmp_base = of_iomap(np, 0);
-+		if (!tmp_base)
-+			goto dt_fail;
-+
-+		prcmu_timer_base = tmp_base;
-+	}
-+
-+dt_fail:
-+	/* Doing it the old fashioned way. */
-+
- 	/*
- 	 * Here we register the timerblocks active in the system.
- 	 * Localtimers (twd) is started when both cpu is up and running.
+> If we have a solution soon, I will prepare a new version of the patch,
+> of course, in the next days.
+
+Thanks. One question, though: Will it really block dt-conversion? The
+whole conversion should not be depending on the i2c-driver?
+
+> > Did you change this, too? Timeouts are better readable in dec :)
+> 
+> Right. But even when removing the "0x" in the timeout line above, it's
+> still hex, see Documentation/devicetree/booting-without-of.txt
+> 
+> Or did I get sth. wrong?
+
+I think the document is probably outdated :( "clock-frequency" is also
+without 0x and dec.
+
+Regards,
+
+   Wolfram
+
 -- 
-1.7.9.1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120419/eb09c00a/attachment.sig>
