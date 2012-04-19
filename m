@@ -1,25 +1,39 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 19 Apr 2012 14:42:41 +0530
-Subject: [PATCH 3/3] ARM: dt: tegra_ventana: als and proximity sensor
- isl29018 support
-In-Reply-To: <4F8DF01D.9040900@wwwdotorg.org>
-References: <1334645155-13799-1-git-send-email-ldewangan@nvidia.com>
- <1334645155-13799-4-git-send-email-ldewangan@nvidia.com>
- <4F8DF01D.9040900@wwwdotorg.org>
-Message-ID: <4F8FD709.60308@nvidia.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 19 Apr 2012 11:14:27 +0200
+Subject: [RFC PATCH] cpuidle: allow per cpu latencies
+In-Reply-To: <20120416153456.GB514@tbergstrom-lnx.Nvidia.com>
+References: <1333619620-21201-1-git-send-email-pdeschrijver@nvidia.com>
+ <4F7DA009.4010802@linux.intel.com>
+ <CAMQu2gzwe0F3qcaTqASEPUASdG1SjpUxrBrSp-RrYLgy3W24OQ@mail.gmail.com>
+ <4F7F0D52.8080305@linaro.org>
+ <20120410102857.GA22721@tbergstrom-lnx.Nvidia.com>
+ <20120416153456.GB514@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4F8FD773.5030500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 April 2012 04:05 AM, Stephen Warren wrote:
-> On 04/17/2012 12:45 AM, Laxman Dewangan wrote:
->> Add the device info for ALS and proximity sensor isl29018.
+On 04/16/2012 05:34 PM, Peter De Schrijver wrote:
+>>
+>> Maybe we also want to make the 'disabled' flag per CPU then or provide some
+>> other way the number of C states can be different per CPU?
 >
-> a) Perhaps the vendor prefix should be "isil" not "isl". Olof, can you
-> please comment here?
->
+> What do you think about this? Do we also want to make the disabled flag per
+> CPU? Or how should we deal with a different number of C states per CPU?
 
-Any comments on this? I think "isil" is good as it is the symbol in 
-nasdaq also: Intersil Corporation (ISIL).
-If no objection than I can send my next version of patch ;)
+Hi Peter,
 
-Adding LinusW, Mark and Grant if they have any comment here.
+yes, that could makes sense. But in most of the architecture, this is 
+not needed, so duplicating the state's array and latencies is unneeded 
+memory consumption.
+
+Maybe we can look for a COW approach, similar to what is done for the 
+nsproxy structure, no ?
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
