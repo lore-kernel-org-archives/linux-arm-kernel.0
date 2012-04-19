@@ -1,88 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Apr 2012 21:36:40 +0100
-Subject: [PATCH 11/15] ARM: ux500: Do not attempt to register non-existent i2c
- devices on Snowball
+Date: Thu, 19 Apr 2012 21:36:41 +0100
+Subject: [PATCH 12/15] mfd/db8500-prcmu: Register as a platform driver instead
+ of only probing
 In-Reply-To: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334867804-31942-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334867804-31942-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prevents i2c devices which are not present on the Snowball
-low-cost development board from being registered. Devices such as;
-tc3589x, bu1780 and lp5521 are present on other supported boards,
-but are not located on Snowball.
+Pass the probe function as part of the platform_driver struct and
+register using the more common platform_driver_register call. In
+subsequent patches we'll also add DT support into the struct.
 
+CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |   24 +++++++++++++-----------
- 1 files changed, 13 insertions(+), 11 deletions(-)
+ drivers/mfd/db8500-prcmu.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 9dbd34b..a471c4a 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -652,7 +652,6 @@ static void __init mop500_init_machine(void)
- static void __init snowball_init_machine(void)
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index ebc1e86..839e70b 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2957,7 +2957,7 @@ static struct mfd_cell db8500_prcmu_devs[] = {
+  * prcmu_fw_init - arch init call for the Linux PRCMU fw init logic
+  *
+  */
+-static int __init db8500_prcmu_probe(struct platform_device *pdev)
++static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
  {
- 	struct device *parent = NULL;
--	int i2c0_devs;
- 	int i;
+ 	int err = 0;
  
- 	parent = u8500_init_devices();
-@@ -670,11 +669,6 @@ static void __init snowball_init_machine(void)
- 	mop500_spi_init(parent);
- 	mop500_uart_init(parent);
+@@ -2998,11 +2998,12 @@ static struct platform_driver db8500_prcmu_driver = {
+ 		.name = "db8500-prcmu",
+ 		.owner = THIS_MODULE,
+ 	},
++	.probe = db8500_prcmu_probe,
+ };
  
--	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
--	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
--	i2c_register_board_info(2, mop500_i2c2_devices,
--				ARRAY_SIZE(mop500_i2c2_devices));
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
+ static int __init db8500_prcmu_init(void)
+ {
+-	return platform_driver_probe(&db8500_prcmu_driver, db8500_prcmu_probe);
++	return platform_driver_register(&db8500_prcmu_driver);
  }
-@@ -787,7 +781,6 @@ static void __init u8500_init_machine(void)
- 	int i;
  
- 	parent = u8500_of_init_devices();
--	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
- 
- 	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
- 		mop500_platform_devs[i]->dev.parent = parent;
-@@ -805,6 +798,12 @@ static void __init u8500_init_machine(void)
- 				ARRAY_SIZE(mop500_platform_devs));
- 
- 		mop500_sdi_init(parent);
-+
-+		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-+		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
-+		i2c_register_board_info(2, mop500_i2c2_devices,
-+					ARRAY_SIZE(mop500_i2c2_devices));
-+
- 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
- 		snowball_pins_init();
- 
-@@ -831,13 +830,16 @@ static void __init u8500_init_machine(void)
- 				ARRAY_SIZE(mop500_platform_devs));
- 
- 		hrefv60_sdi_init(parent);
-+
-+		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-+		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
-+
-+		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
-+		i2c_register_board_info(2, mop500_i2c2_devices,
-+					ARRAY_SIZE(mop500_i2c2_devices));
- 	}
- 	mop500_i2c_init(parent);
- 
--	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
--	i2c_register_board_info(2, mop500_i2c2_devices,
--				ARRAY_SIZE(mop500_i2c2_devices));
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
+ arch_initcall(db8500_prcmu_init);
 -- 
 1.7.9.1
