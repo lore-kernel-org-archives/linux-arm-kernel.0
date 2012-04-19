@@ -1,25 +1,55 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 19 Apr 2012 11:22:43 -0700
-Subject: [PATCH] arm: omap3: am35x: Register davinci_mdio before
- davinci_emac
-In-Reply-To: <1334859578-14446-1-git-send-email-mgreer@animalcreek.com>
-References: <1334859578-14446-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <20120419182243.GB14705@animalcreek.com>
+Date: Thu, 19 Apr 2012 11:17:45 -0700
+Subject: [PATCH] arm: omap3: Only access IVA if one exists
+Message-ID: <1334859465-14352-1-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 11:19:38AM -0700, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
-> 
-> Problem:
-> --------
-> When resuming from a Suspend-to-RAM event, the eth0 device
-> (davinci emac/mdio) on am35xx boards wouldn't work and the
-> following error message appeared on the console:
-> 
-> "net eth0: could not connect to phy davinci_mdio-0:00"
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-I'm sorry, please ignore.  This patch has already been pooh-pooh'd.
+prcm_setup_regs() blindly accesses IVA bits
+in the PRM and calls omap3_iva_idle() which
+does more IVA related register accesses.
+Only do this if the IVA hardware actually
+exists.
 
-Mark
---
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |   15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 703bd10..ec92676 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -583,10 +583,13 @@ static void __init prcm_setup_regs(void)
+ 			  OMAP3430_PER_MOD, OMAP3430_PM_MPUGRPSEL);
+ 
+ 	/* Don't attach IVA interrupts */
+-	omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
+-	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
+-	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
+-	omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD, OMAP3430_PM_IVAGRPSEL);
++	if (omap3_has_iva()) {
++		omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
++		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
++		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
++		omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD,
++					OMAP3430_PM_IVAGRPSEL);
++	}
+ 
+ 	/* Clear any pending 'reset' flags */
+ 	omap2_prm_write_mod_reg(0xffffffff, MPU_MOD, OMAP2_RM_RSTST);
+@@ -600,7 +603,9 @@ static void __init prcm_setup_regs(void)
+ 	/* Clear any pending PRCM interrupts */
+ 	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
+ 
+-	omap3_iva_idle();
++	if (omap3_has_iva())
++		omap3_iva_idle();
++
+ 	omap3_d2d_idle();
+ }
+ 
+-- 
+1.7.9.4
