@@ -1,47 +1,68 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Apr 2012 21:36:37 +0100
-Subject: [PATCH 08/15] drivers/mmc: MMCI: Use correct GPIO binding for IRQ
- requests
+Date: Thu, 19 Apr 2012 21:36:38 +0100
+Subject: [PATCH 09/15] ARM: ux500: Correctly describe SMSC9115 for Snowball in
+ DT
 In-Reply-To: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334867804-31942-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334867804-31942-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now there are irqdomains in place for Snowball, we can request
-GPIO IRQs directly by their binding. This replaces the previous method
-of hard-coding the hwirq using u32 values in the DT.
+Here we split the description of the external-bus at 50000000 over
+two description files. In the more generic db8500 description file
+we only specify the external-bus. Normally this would be used to
+communicate with a NOR-flash device. On the Snowball however, the
+SMSC9115 Ethernet chip occupies it. In the Snowball board specific
+description file is where we actually specify that it is in fact the
+Ethernet device which lives here.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mmc/host/mmci.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi  |    9 +++++++++
+ arch/arm/boot/dts/snowball.dts |   10 +++-------
+ 2 files changed, 12 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5a7da17..2303a16 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -26,6 +26,7 @@
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #include <linux/regulator/consumer.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
-@@ -1203,11 +1204,11 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
- {
- 	int bus_width = 0;
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 9e8ff2c..f633210 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -307,5 +307,14 @@
+ 			interrupts = <0 100 0x4>;
+ 			status = "disabled";
+ 		};
++
++		external-bus at 50000000 {
++			compatible = "simple-bus";
++			reg = <0x50000000 0x4000000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x50000000 0x4000000>;
++			status = "disabled";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 22b82cc..56f8a76 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -72,15 +72,11 @@
  
--	of_property_read_u32(np, "wp-gpios", &pdata->gpio_wp);
-+	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
- 	if (!pdata->gpio_wp)
- 		pdata->gpio_wp = -1;
+ 	soc-u9500 {
+ 		external-bus at 50000000 {
+-			compatible = "simple-bus";
+-			reg = <0x50000000 0x10000000>;
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges;
++			status = "okay";
  
--	of_property_read_u32(np, "cd-gpios", &pdata->gpio_cd);
-+	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
- 	if (!pdata->gpio_cd)
- 		pdata->gpio_cd = -1;
+-			ethernet at 50000000 {
++			ethernet at 0 {
+ 				compatible = "smsc,lan9115";
+-				reg = <0x50000000 0x10000>;
++				reg = <0 0x10000>;
+ 				interrupts = <12 0x1>;
+ 				interrupt-parent = <&gpio4>;
  
 -- 
 1.7.9.1
