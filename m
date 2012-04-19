@@ -1,42 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Apr 2012 16:23:06 +0000
-Subject: [PATCH 02/16] drivers/gpio: gpio-nomadik: Add support for
- irqdomains
-In-Reply-To: <CACRpkdaTFatBK4GyzCzm=U6+h8Knnf6xY9X6Uc26sLxQb2OhtA@mail.gmail.com>
-References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
- <201204181622.34692.arnd@arndb.de>
- <CACRpkdaTFatBK4GyzCzm=U6+h8Knnf6xY9X6Uc26sLxQb2OhtA@mail.gmail.com>
-Message-ID: <201204191623.07445.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 Apr 2012 19:22:44 +0200
+Subject: [PATCH 1/1] pinctrl: handle dummy state in core
+In-Reply-To: <20120418143839.GB30966@shlinux2.ap.freescale.net>
+References: <1334586289-13078-1-git-send-email-b29396@freescale.com>
+ <4F8C42D6.2000607@wwwdotorg.org>
+ <20120417034210.GD17173@shlinux2.ap.freescale.net>
+ <CACRpkdYH06_kGbSdozKPWZcOG0FvoOyHvjHwhz-xUL1pfSX9DQ@mail.gmail.com>
+ <20120418122832.GP20478@pengutronix.de>
+ <CACRpkdZw6iv=PjvvU4s5L8yV6813gCD7t8Vk-S66v-nXPaf+=Q@mail.gmail.com>
+ <20120418140046.GU3852@pengutronix.de>
+ <20120418143839.GB30966@shlinux2.ap.freescale.net>
+Message-ID: <CACRpkdbPG3eNJ0aYv_C=94wqjswV0Ycx0fKrj3jrcDge=EawMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 April 2012, Linus Walleij wrote:
-> 
-> On Wed, Apr 18, 2012 at 6:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > The problem is that we cannot put the interrupt resources into the platform
-> > device until the irq domain has been added. Right now, we set the gic
-> > interrupt domain from init_IRQ(), then add the load the gpio
-> > driver from core_initcall(nmk_gpio_init) and add the platform devices
-> > from arch_initcall(customize_machine).
-> >
-> > This feels fragile because it depends on the gpio device getting probed
-> > before any device using the gpio interrupts. It does seem to work fine
-> > right now, but I'm not convinced that this is just coincidence.
-> 
-> Aha OK. Why not put in that big comment then, thus nobody will
-> ever miss the point like I did :-)
-> 
+On Wed, Apr 18, 2012 at 4:38 PM, Dong Aisheng
+<aisheng.dong@freescale.com> wrote:
+> On Wed, Apr 18, 2012 at 10:00:46PM +0800, Sascha Hauer wrote:
 
-I think I've just come up with a solution to this problem and would
-like to hear what Rob and Grant think about this:
+>> Create a pinctrl_provide_dummies() functions which boards can call when
+>> they do not have pinctrl support.
+>>
+> I think this is a feasible method and do better than Kconfig but it also
+> needs more changes.
 
-If we move the code that adds the resources to a platform_device
-from of_device_alloc() to  platform_drv_probe(), we can defer
-looking up the interrupt number until the driver actually gets
-probed and bail out early with -EPROBE_DEFER if the irq domain
-is not available yet. That will even work when we have a builtin
-driver for a device that uses a GPIO interrupt and the gpio controller
-driver is a loadable module.
+If you are both happy with this (and I suspect Stephen can also accept
+it), I'd say just do it.
 
-	Arnd
+Yours,
+Linus Walleij
