@@ -1,55 +1,73 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 19 Apr 2012 11:17:45 -0700
-Subject: [PATCH] arm: omap3: Only access IVA if one exists
-Message-ID: <1334859465-14352-1-git-send-email-mgreer@animalcreek.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 19 Apr 2012 20:31:02 +0200
+Subject: [PATCH V2] i.MX28: Shut down the LCD controller to avoid BootROM
+ sampling bug
+In-Reply-To: <1334767680-12688-1-git-send-email-marex@denx.de>
+References: <1334767680-12688-1-git-send-email-marex@denx.de>
+Message-ID: <1334860263-9389-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+From: Marek Vasut <marek.vasut@gmail.com>
 
-prcm_setup_regs() blindly accesses IVA bits
-in the PRM and calls omap3_iva_idle() which
-does more IVA related register accesses.
-Only do this if the IVA hardware actually
-exists.
+If there's some traffic on the LCD controller pads, the BootROM has trouble with
+sampling the bootmode from these pads. The BootROM usually ends in a loop.
 
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Cc: Chen Peter-B29397 <B29397@freescale.com>
+Cc: Detlev Zundel <dzu@denx.de>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: Li Frank-B20596 <B20596@freescale.com>
+Cc: Lin Tony-B19295 <B19295@freescale.com>
+Cc: Linux FBDEV <linux-fbdev@vger.kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Subodh Nijsure <snijsure@grid-net.com>
+Cc: Tony Lin <tony.lin@freescale.com>
+Cc: Wolfgang Denk <wd@denx.de>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Wolfgang Denk <wd@denx.de>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Tested-by: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-omap2/pm34xx.c |   15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ drivers/video/mxsfb.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 703bd10..ec92676 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -583,10 +583,13 @@ static void __init prcm_setup_regs(void)
- 			  OMAP3430_PER_MOD, OMAP3430_PM_MPUGRPSEL);
- 
- 	/* Don't attach IVA interrupts */
--	omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
--	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
--	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
--	omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD, OMAP3430_PM_IVAGRPSEL);
-+	if (omap3_has_iva()) {
-+		omap2_prm_write_mod_reg(0, WKUP_MOD, OMAP3430_PM_IVAGRPSEL);
-+		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430_PM_IVAGRPSEL1);
-+		omap2_prm_write_mod_reg(0, CORE_MOD, OMAP3430ES2_PM_IVAGRPSEL3);
-+		omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD,
-+					OMAP3430_PM_IVAGRPSEL);
-+	}
- 
- 	/* Clear any pending 'reset' flags */
- 	omap2_prm_write_mod_reg(0xffffffff, MPU_MOD, OMAP2_RM_RSTST);
-@@ -600,7 +603,9 @@ static void __init prcm_setup_regs(void)
- 	/* Clear any pending PRCM interrupts */
- 	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
- 
--	omap3_iva_idle();
-+	if (omap3_has_iva())
-+		omap3_iva_idle();
-+
- 	omap3_d2d_idle();
+V2: Make shutdown() call static
+
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 4a89f88..dcf29bf 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -880,6 +880,18 @@ static int __devexit mxsfb_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
++static void mxsfb_shutdown(struct platform_device *pdev)
++{
++	struct fb_info *fb_info = platform_get_drvdata(pdev);
++	struct mxsfb_info *host = to_imxfb_host(fb_info);
++
++	/*
++	 * Force stop the LCD controller as keeping it running during reboot
++	 * might interfere with the BootROM's boot mode pads sampling.
++	 */
++	writel(CTRL_RUN, host->base + LCDC_CTRL + REG_CLR);
++}
++
+ static struct platform_device_id mxsfb_devtype[] = {
+ 	{
+ 		.name = "imx23-fb",
+@@ -896,6 +908,7 @@ MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
+ static struct platform_driver mxsfb_driver = {
+ 	.probe = mxsfb_probe,
+ 	.remove = __devexit_p(mxsfb_remove),
++	.shutdown = mxsfb_shutdown,
+ 	.id_table = mxsfb_devtype,
+ 	.driver = {
+ 		   .name = DRIVER_NAME,
 -- 
-1.7.9.4
+1.7.9.5
