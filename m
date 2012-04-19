@@ -1,7 +1,7 @@
 From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Thu, 19 Apr 2012 20:45:36 +0530
+Date: Thu, 19 Apr 2012 20:47:57 +0530
 Subject: [PATCHv2 1/2] drivers: input: keypad: Add device tree support
-Message-ID: <1334848537-823-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <1334848679-882-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
