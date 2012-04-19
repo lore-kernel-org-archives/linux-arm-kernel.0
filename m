@@ -1,28 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Apr 2012 21:20:25 -0700
-Subject: [PATCH] ARM: fix mach-bcmring UART declarations
-In-Reply-To: <4F8D7150.9060201@windriver.com>
-References: <1334605108-28616-1-git-send-email-paul.gortmaker@windriver.com>
- <4F8C7617.5080902@broadcom.com> <4F8D7150.9060201@windriver.com>
-Message-ID: <CAOesGMh8EA66uajVeauJj8vviATLEnNHODeNyyas0iC1vQjMww@mail.gmail.com>
+Date: Wed, 18 Apr 2012 21:24:48 -0700
+Subject: [GIT PULL] omap fixes for v3.4-rc3
+In-Reply-To: <20120418182349.GM21106@atomide.com>
+References: <20120418182349.GM21106@atomide.com>
+Message-ID: <CAOesGMjD22nqUg6k=e-U9Dbs_ueE2o-_cfvaZMDv34SZE9U-=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 6:34 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> On 12-04-16 03:42 PM, Jiandong Zheng wrote:
->> On 4/16/2012 12:38 PM, Paul Gortmaker wrote:
->>> This error appeared in the bcmring_defconfig build:
+On Wed, Apr 18, 2012 at 11:23 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Arnd & Olof,
 >
-> [...]
+> Here are some fixes for the -rc cycle. The biggest change is to
+> remove bad muxing for serial ports that was causing random oopses
+> with at least zoom3 and nfsroot.
 >
->> This is already fixed by Olof Johansson.
+> Now using a signed tag.
 >
-> Thanks, I guess it just hasn't made it into linux-next yet.
+> Regards,
+>
+> Tony
+>
+>
+> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+>
+> ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.4-rc3
 
-Actually, I didn't fix the bus id case error, so I'll apply your
-version. I could just fix up mine the same way, but git am -s is
-quicker. :)
+Thanks, pulled.
 
 
 -Olof
