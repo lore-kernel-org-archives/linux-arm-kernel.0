@@ -1,46 +1,49 @@
-From: viresh.linux@gmail.com (Viresh Kumar)
-Date: Thu, 19 Apr 2012 21:58:20 +0530
-Subject: [PATCH V2 5/6] SPEAr: Call clk_prepare() before calling clk_enable
-In-Reply-To: <cover.1334852393.git.viresh.kumar@st.com>
-References: <cover.1334852393.git.viresh.kumar@st.com>
-Message-ID: <c9b0162d52355c0faf611579f0fe622eb9393fb8.1334852395.git.viresh.kumar@st.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 19 Apr 2012 18:32:12 +0200
+Subject: [PATCH v4] i2c: Add device tree support to i2c-pnx.c
+In-Reply-To: <20120419160715.GD24987@pengutronix.de>
+References: <1334850612-24151-1-git-send-email-stigge@antcom.de>
+ <20120419160715.GD24987@pengutronix.de>
+Message-ID: <4F903E0C.6010604@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With common clock framework, it is must to call clk_{un}prepare() before/after
-clk_{dis}enable. This patch fixes this for SPEAr timer.
+Hi,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/plat-spear/time.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+On 04/19/2012 06:07 PM, Wolfram Sang wrote:
+>> + - clock-frequency: desired I2C bus clock frequency in Hz,
+>> Default: 100000 Hz + - pnx,timeout: I2C bus timeout in
+>> milliseconds, Default: 10 ms
+> 
+> I'd like to repeat my question to the devicetree folks here: Can we
+> have timeout generic? It doesn't make sense to me to have that per
+> vendor again and again.
 
-diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
-index a3164d1..4f05d26 100644
---- a/arch/arm/plat-spear/time.c
-+++ b/arch/arm/plat-spear/time.c
-@@ -218,10 +218,10 @@ void __init spear_setup_timer(resource_size_t base, int irq)
- 		goto err_iomap;
- 	}
- 
--	ret = clk_enable(gpt_clk);
-+	ret = clk_prepare_enable(gpt_clk);
- 	if (ret < 0) {
--		pr_err("%s:couldn't enable gpt clock\n", __func__);
--		goto err_clk;
-+		pr_err("%s:couldn't prepare-enable gpt clock\n", __func__);
-+		goto err_prepare_enable_clk;
- 	}
- 
- 	spear_clockevent_init(irq);
-@@ -229,7 +229,7 @@ void __init spear_setup_timer(resource_size_t base, int irq)
- 
- 	return;
- 
--err_clk:
-+err_prepare_enable_clk:
- 	clk_put(gpt_clk);
- err_iomap:
- 	iounmap(gpt_base);
--- 
-1.7.9
+Sounds completely reasonable.
+
+To help make the devicetree conversion into 3.5, I would prefer to
+integrate the "vendor,timeout" as-is if a longish standardization
+process would block this, considering that we luckily only have 2-3 of
+such timeout definitions currently.
+
+I'd volunteer to clean up later by preparing a patch when there is a
+standard timeout defined.
+
+If we have a solution soon, I will prepare a new version of the patch,
+of course, in the next days.
+
+>> +	i2c2: i2c at 400a8000 { +		compatible = "nxp,pnx-i2c"; +		reg =
+>> <0x400a8000 0x100>; +		interrupt-parent = <&mic>; +		interrupts =
+>> <50 0>; +		#address-cells = <1>; +		#size-cells = <0>; +
+>> clock-frequency = <0x186a0>; +		pnx,timeout = <0x64>;
+> 
+> Did you change this, too? Timeouts are better readable in dec :)
+
+Right. But even when removing the "0x" in the timeout line above, it's
+still hex, see Documentation/devicetree/booting-without-of.txt
+
+Or did I get sth. wrong?
+
+Thanks,
+
+Roland
