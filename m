@@ -1,30 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Apr 2012 12:55:39 +0000
-Subject: [PATCH v3 4/6] ARM: architected timers: add DT support
-In-Reply-To: <1334592810-4382-5-git-send-email-marc.zyngier@arm.com>
-References: <1334592810-4382-1-git-send-email-marc.zyngier@arm.com>
- <1334592810-4382-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <201204191255.39952.arnd@arndb.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 19 Apr 2012 15:00:07 +0200
+Subject: [PATCH v4 2/10] ohci-nxp: Device tree support
+In-Reply-To: <1334840415-14287-1-git-send-email-stigge@antcom.de>
+References: <1334840415-14287-1-git-send-email-stigge@antcom.de>
+Message-ID: <1334840415-14287-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 April 2012, Marc Zyngier wrote:
-> Add runtime DT support and documentation for the Cortex A7/A15
-> architected timers.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  .../devicetree/bindings/arm/arch_timer.txt         |   27 ++++++++++
->  arch/arm/include/asm/arch_timer.h                  |    6 ++
->  arch/arm/kernel/arch_timer.c                       |   53 +++++++++++++++++---
->  3 files changed, 79 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
-> 
+This patch adds device tree support to ohci-nxp.c
 
-This looks good, but do we actually still need the non-DT case?
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Both vexpress and exynos5 allow booting through DT and we are not
-planning to add any new platforms with these timers that don't.
+---
 
-	Arnd
+Applies to v3.4-rc3
+
+ Documentation/devicetree/bindings/usb/ohci-nxp.txt |   16 ++++++++++++++++
+ drivers/usb/host/ohci-nxp.c                        |   10 ++++++++++
+ 2 files changed, 26 insertions(+)
+
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/usb/ohci-nxp.txt
+@@ -0,0 +1,16 @@
++* OHCI controller, NXP ohci-nxp variant
++
++Required properties:
++- compatible: must be "nxp,ohci-nxp"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: The OHCI interrupt
++
++Example (LPC32xx):
++
++	ohci at 31020000 {
++		compatible = "nxp,ohci-nxp";
++		reg = <0x31020000 0x300>;
++		interrupt-parent = <&mic>;
++		interrupts = <0x3b 0>;
++	};
+--- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
++++ linux-2.6/drivers/usb/host/ohci-nxp.c
+@@ -22,6 +22,7 @@
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
++#include <linux/of.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -525,10 +526,19 @@ static int usb_hcd_nxp_remove(struct pla
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:usb-ohci");
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id usb_hcd_nxp_match[] = {
++	{ .compatible = "nxp,ohci-nxp" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, usb_hcd_nxp_match);
++#endif
++
+ static struct platform_driver usb_hcd_nxp_driver = {
+ 	.driver = {
+ 		.name = "usb-ohci",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(usb_hcd_nxp_match),
+ 	},
+ 	.probe = usb_hcd_nxp_probe,
+ 	.remove = usb_hcd_nxp_remove,
