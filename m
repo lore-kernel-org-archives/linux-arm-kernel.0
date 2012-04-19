@@ -1,39 +1,158 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Apr 2012 11:14:27 +0200
-Subject: [RFC PATCH] cpuidle: allow per cpu latencies
-In-Reply-To: <20120416153456.GB514@tbergstrom-lnx.Nvidia.com>
-References: <1333619620-21201-1-git-send-email-pdeschrijver@nvidia.com>
- <4F7DA009.4010802@linux.intel.com>
- <CAMQu2gzwe0F3qcaTqASEPUASdG1SjpUxrBrSp-RrYLgy3W24OQ@mail.gmail.com>
- <4F7F0D52.8080305@linaro.org>
- <20120410102857.GA22721@tbergstrom-lnx.Nvidia.com>
- <20120416153456.GB514@tbergstrom-lnx.Nvidia.com>
-Message-ID: <4F8FD773.5030500@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 19 Apr 2012 03:18:27 -0600 (MDT)
+Subject: [PATCH 12/12] ARM: OMAP2xxx: hwmod data: start to fix the IVA1,
+ IVA2 and DSP
+In-Reply-To: <20120308023840.8205.51532.stgit@dusk>
+References: <20120308023614.8205.78768.stgit@dusk>
+ <20120308023840.8205.51532.stgit@dusk>
+Message-ID: <alpine.DEB.2.00.1204190317030.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2012 05:34 PM, Peter De Schrijver wrote:
->>
->> Maybe we also want to make the 'disabled' flag per CPU then or provide some
->> other way the number of C states can be different per CPU?
->
-> What do you think about this? Do we also want to make the disabled flag per
-> CPU? Or how should we deal with a different number of C states per CPU?
+Hi
 
-Hi Peter,
+On Wed, 7 Mar 2012, Paul Walmsley wrote:
 
-yes, that could makes sense. But in most of the architecture, this is 
-not needed, so duplicating the state's array and latencies is unneeded 
-memory consumption.
+> N800 logs this message on boot:
+> 
+> [    0.182281] omap_hwmod: iva: cannot be enabled for reset (3)
+> 
+> Fix by creating basic IVA1 and DSP hwmods for OMAP2420, and a basic IVA2
+> hwmod for OMAP2430.  There is still more information to be added, but
+> this should resolve the immediate issue.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
 
-Maybe we can look for a COW approach, similar to what is done for the 
-nsproxy structure, no ?
+Tony tested this on his 2430SDP while my board was down and discovered 
+that it didn't boot on that platform.  Turns out that one of the hwmods 
+was using an incorrect clock name.  Fixed in the updated patch, below.
 
 
+- Paul
 
+From: Paul Walmsley <paul@pwsan.com>
+Date: Thu, 19 Apr 2012 03:00:02 -0600
+Subject: [PATCH] ARM: OMAP2xxx: hwmod data: start to fix the IVA1, IVA2 and
+ DSP
+
+N800 logs this message on boot:
+
+[    0.182281] omap_hwmod: iva: cannot be enabled for reset (3)
+
+Fix by creating basic IVA1 and DSP hwmods for OMAP2420, and a basic IVA2
+hwmod for OMAP2430.  There is still more information to be added, but
+this should resolve the immediate issue.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |   46 ++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |   11 ++++++-
+ 2 files changed, 53 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index b01b66a..2c087ff 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -43,10 +43,41 @@
+  * IP blocks
+  */
+ 
+-/* IVA2 (IVA2) */
++/* IVA1 (IVA1) */
++static struct omap_hwmod_class iva1_hwmod_class = {
++	.name		= "iva1",
++};
++
++static struct omap_hwmod_rst_info omap2420_iva_resets[] = {
++	{ .name = "iva", .rst_shift = 8 },
++};
++
+ static struct omap_hwmod omap2420_iva_hwmod = {
+ 	.name		= "iva",
+-	.class		= &iva_hwmod_class,
++	.class		= &iva1_hwmod_class,
++	.clkdm_name	= "iva1_clkdm",
++	.rst_lines	= omap2420_iva_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap2420_iva_resets),
++	.main_clk	= "iva1_ifck",
++};
++
++/* DSP */
++static struct omap_hwmod_class dsp_hwmod_class = {
++	.name		= "dsp",
++};
++
++static struct omap_hwmod_rst_info omap2420_dsp_resets[] = {
++	{ .name = "logic", .rst_shift = 0 },
++	{ .name = "mmu", .rst_shift = 1 },
++};
++
++static struct omap_hwmod omap2420_dsp_hwmod = {
++	.name		= "dsp",
++	.class		= &dsp_hwmod_class,
++	.clkdm_name	= "dsp_clkdm",
++	.rst_lines	= omap2420_dsp_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap2420_dsp_resets),
++	.main_clk	= "dsp_fck",
+ };
+ 
+ /* I2C common */
+@@ -234,7 +265,15 @@ static struct omap_hwmod_ocp_if omap2420_l4_core__i2c2 = {
+ static struct omap_hwmod_ocp_if omap2420_l3__iva = {
+ 	.master		= &omap2xxx_l3_main_hwmod,
+ 	.slave		= &omap2420_iva_hwmod,
+-	.clk		= "iva1_ifck",
++	.clk		= "core_l3_ck",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* DSP <- L3 interface */
++static struct omap_hwmod_ocp_if omap2420_l3__dsp = {
++	.master		= &omap2xxx_l3_main_hwmod,
++	.slave		= &omap2420_dsp_hwmod,
++	.clk		= "dsp_ick",
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
+@@ -402,6 +441,7 @@ static struct omap_hwmod_ocp_if *omap2420_hwmod_ocp_ifs[] __initdata = {
+ 	&omap2420_l4_core__i2c1,
+ 	&omap2420_l4_core__i2c2,
+ 	&omap2420_l3__iva,
++	&omap2420_l3__dsp,
+ 	&omap2420_l4_wkup__timer1,
+ 	&omap2xxx_l4_core__timer2,
+ 	&omap2xxx_l4_core__timer3,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 23ca551..71d9f88 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -45,9 +45,18 @@
+  */
+ 
+ /* IVA2 (IVA2) */
++static struct omap_hwmod_rst_info omap2430_iva_resets[] = {
++	{ .name = "logic", .rst_shift = 0 },
++	{ .name = "mmu", .rst_shift = 1 },
++};
++
+ static struct omap_hwmod omap2430_iva_hwmod = {
+ 	.name		= "iva",
+ 	.class		= &iva_hwmod_class,
++	.clkdm_name	= "dsp_clkdm",
++	.rst_lines	= omap2430_iva_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap2430_iva_resets),
++	.main_clk	= "dsp_fck",
+ };
+ 
+ /* I2C common */
+@@ -599,7 +608,7 @@ static struct omap_hwmod_ocp_if omap2430_l4_core__mcspi3 = {
+ static struct omap_hwmod_ocp_if omap2430_l3__iva = {
+ 	.master		= &omap2xxx_l3_main_hwmod,
+ 	.slave		= &omap2430_iva_hwmod,
+-	.clk		= "dsp_fck",
++	.clk		= "core_l3_ck",
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.10
