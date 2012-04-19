@@ -1,64 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Apr 2012 16:49:12 +0200
-Subject: [PATCH 06/17][V2] ARM: OMAP4: cpuidle - use the omap4_idle_data
- variable directly
-In-Reply-To: <87r4vw8qfd.fsf@ti.com>
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
- <1333570371-1389-7-git-send-email-daniel.lezcano@linaro.org>
- <87r4vw8qfd.fsf@ti.com>
-Message-ID: <4F9025E8.9020707@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Apr 2012 09:59:36 -0500
+Subject: [PATCH 1/4] clk: select CLKDEV_LOOKUP for COMMON_CLK
+In-Reply-To: <20120418070721.GL3852@pengutronix.de>
+References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
+ <1334003101-17274-2-git-send-email-robherring2@gmail.com>
+ <CAJOA=zMPqiH2fQJ5JWJ=COnju7Cmur6J2ATYUTcx41C4WMjFQQ@mail.gmail.com>
+ <20120418070721.GL3852@pengutronix.de>
+Message-ID: <4F902858.9040905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2012 12:56 AM, Kevin Hilman wrote:
-> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
->
->> We are storing the 'omap4_idle_data' in the private data field
->> of the cpuidle device. As we are using this variable only in this file,
->> that does not really make sense. Let's use the global variable directly
->> instead dereferencing pointers in an idle critical loop.
->
-> Did you notice a performance impact before this change?
+On 04/18/2012 02:07 AM, Sascha Hauer wrote:
+> On Tue, Apr 17, 2012 at 03:13:49PM -0700, Turquette, Mike wrote:
+>> On Mon, Apr 9, 2012 at 1:24 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Using the common clock infrastructure without the common clkdev code makes
+>>> little sense, so select CLKDEV_LOOKUP for COMMON_CLK.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> ---
+>>>  drivers/clk/Kconfig |    1 +
+>>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+>>> index 165e1fe..f05a60d 100644
+>>> --- a/drivers/clk/Kconfig
+>>> +++ b/drivers/clk/Kconfig
+>>> @@ -12,6 +12,7 @@ config HAVE_MACH_CLKDEV
+>>>  config COMMON_CLK
+>>>        bool
+>>>        select HAVE_CLK_PREPARE
+>>> +       select CLKDEV_LOOKUP
+>>>        ---help---
+>>>          The common clock framework is a single definition of struct
+>>>          clk, useful across many platforms, as well as an
+>>
+>> Hi Rob,
+>>
+>> I agree that the common clk framework is not particularly useful
+>> without clkdev.  However the core code has no dependency on clkdev.
+>> Why not just select it from an arch Kconfig, or even make it a
+>> dependency based on your own platform clock data/code?
+> 
+> Selecting it from COMMON_CLK means that the compiler/linker will point
+> everybody trying to implement it without CLKDEV into the right
+> direction.
 
-No, I didn't and I don't think I will be able to measure it. But by 
-experience, when dereferencing a pointer that could leads to a cache 
-miss and impact the performances. That may not be the case here, so I 
-won't argue with that as I won't able to prove it :)
+Right. That was part of my rationale as well.
 
->> Also, that simplfies the code.
->
-> possibly, but at the expense of clean abstractions which IMO helps readability.
->
-> Unless there is a real performance hit here (which I doubt), I'd prefer
-> to leave this as is.
+The DT clock support is dependent on both options, so without this patch
+we'll have to add an otherwise unneeded OF_CLOCK option to select both.
 
-There are two reasons of this change. We are storing 'state_count' times 
-a pointer in a private structure for state_usage but the information is 
-already available in the file and easily accessible.
-Also, this is set in the fill_cstate function I am removing to let all 
-the initialization to be done at compile time.
-
-Furthermore, I don't get why we have a 'driver data' area in a structure 
-which is dedicated for the states statistics, IMHO that does not help 
-understanding. My mid-term cleanup is to kill the 'driver_data' field in 
-the cpuidle core because I don't think it is at the right place.
-
-An idea I had for consolidate all the cpuidle driver was to use the 
-containerof macro to define the architecture specific structure and 
-declare inside this structure the cpuidle driver and the devices. It is 
-similar on how are implemented the 'routes' for the network stack or the 
-cgroup subsystems, there is a core engine handling generic structure 
-which a contained by the specific structure related to the engine's 
-user. That helps a lot for readability.
-
-Well this is an idea but before I have to unify the cpuidle drivers code 
-to make it clear what is doable or not.
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Rob
