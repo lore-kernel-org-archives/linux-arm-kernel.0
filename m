@@ -1,34 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Apr 2012 16:21:35 -0700
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <alpine.DEB.2.00.1204130440390.25832@utopia.booyaka.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204130440390.25832@utopia.booyaka.com>
-Message-ID: <20120418232135.GU21106@atomide.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 18 Apr 2012 17:08:42 -0700
+Subject: [PATCH v2 0/9] PM: Create the AVS class of drivers
+In-Reply-To: <CAORVsuV-GJAabY49G0fOgcBcg-CNdpNiTE+AcBN07wrWZH3qcQ@mail.gmail.com>
+References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
+ <CAORVsuV-GJAabY49G0fOgcBcg-CNdpNiTE+AcBN07wrWZH3qcQ@mail.gmail.com>
+Message-ID: <20120419000842.GA24575@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120413 03:46]:
-> Hi Vaibhav,
+On Wed, Apr 18, 2012 at 10:04:22AM +0200, Jean Pihet wrote:
+> Hi Andrew, Greg,
 > 
-> On Fri, 13 Apr 2012, Hiremath, Vaibhav wrote:
+> Can you please look at this patch set?
+> The idea is to create a framework and drivers for the AVS class of
+> devices. This patch set implements the first step by moving the
+> existing code to drivers/power/avs. Next steps will be to implement
+> class support and notifications, add more classes of operations for
+> OMAP chips, etc.
 > 
-> > Yes, we are using am3517evm file for AM33XX MACHINE_INIT definition here.
-> > These patches have been reviewed and accepted in the list, only thing is
-> > they couldn't make it to upstream during v3.4 merge window.
-> > 
-> > I believe Tony is going to push them for v3.5 now.
+> Keerthy J is taking over the ownership of this code and will continue
+> the development further.
 > 
-> Hmm, but if you modify the AM3517EVM board file to call 
-> am33xx_init_early(), won't that break the AM3517EVM board?
-> Wouldn't a separate board file be needed for the AM33xx?
+> What do you think?
 
-You can have multiple MACHINE_START entries in a board-*.c file
-if that's what you're asking.
+I think Kevin and Rafael's comments need to be addressed.
 
-Regards,
-
-Tony
+greg k-h
