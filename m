@@ -1,34 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 19 Apr 2012 21:56:32 +0800
-Subject: [PATCH 34/40] ARM: imx6: implement clocks using common clock
- framework
-In-Reply-To: <20120418113355.GO20478@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-35-git-send-email-s.hauer@pengutronix.de>
- <20120418113355.GO20478@pengutronix.de>
-Message-ID: <20120419135628.GB22219@S2101-09.ap.freescale.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 19 Apr 2012 16:02:02 +0200
+Subject: [PATCH 10/17][V2] ARM: OMAP3: cpuidle - remove the 'valid' field
+In-Reply-To: <874nss8pn9.fsf@ti.com>
+References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
+ <1333570371-1389-11-git-send-email-daniel.lezcano@linaro.org>
+ <874nss8pn9.fsf@ti.com>
+Message-ID: <4F901ADA.1020302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 01:33:55PM +0200, Sascha Hauer wrote:
-> Hi Shawn,
-> 
-> > +
-> > +static const char * const clks_init_on[] __initconst = {
-> > +	"mmdc_ch0_axi", "mmdc_ch1_axi", "uart_ipg", "uart_serial",
-> > +};
-> 
-> I assume uart_ipg and uart_serial is here for the earlyprintk case. This
-> is not needed anymore. earlyprintk depends on an enabled uart anyway, so
-> we can safely assume that the clock is turned on when Linux starts. The
-> clock framework will disable the clock in a late initcall, long after
-> the real driver has taken over and enabled the clock.
-> 
-Yes, that's the case for the last 2 clocks, but the first 2 clocks are
-for memory and need to be kept there.  Also, currently I do not have
-uart_ipg in the clkdev for uart driver to look up, so if we remove it
-from clks_init_on, we need to add it into clkdev.
+On 04/10/2012 01:13 AM, Kevin Hilman wrote:
+> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
+>
+>> With the previous changes all the states are valid, except
+>> the last state which can be handled by decreasing the number
+>> of states.
+>>
+>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> Reviewed-by: Jean Pihet<j-pihet@ti.com>
+>> ---
+
+[ ... ]
+
+>>   	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583)) {
+>> -		cx->valid = 0;
+>> +		drv->state_count = OMAP3_NUM_STATES - 1;
+>>   		pr_warn("%s: core off state C7 disabled due to i583\n",
+>>   			__func__);
+>
+> I'm not too particular about this one, but it might be cleaner to just
+> remove this check all together.  This errata already has a check in
+> next_valid_state() so strictly speaking, it's not needed here.
+
+Yes, right. Thanks for pointing this.
+
 
 -- 
-Regards,
-Shawn
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
