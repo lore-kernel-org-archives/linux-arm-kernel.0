@@ -1,41 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Apr 2012 21:36:33 +0100
-Subject: [PATCH 04/15] drivers/net: Do not free an IRQ if its request failed
+Date: Thu, 19 Apr 2012 21:36:34 +0100
+Subject: [PATCH 05/15] ARM: ux500: New DT:ed snowball_platform_devs for
+ one-by-one device enablement
 In-Reply-To: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334867804-31942-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334867804-31942-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refrain from attempting to free an interrupt line if the request
-fails and hence, there is no IRQ to free.
+During Device Tree enablement it is necessary to remove
+snowball_<device>* platform_data segments one at at time,
+as and when particular devices are DT enabled. This patch
+provides a temporary solution. Once this new struct is
+empty it will be removed again.
 
-CC: netdev at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/net/ethernet/smsc/smsc911x.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c |   19 +++++++++++++++++--
+ 1 files changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
-index 4a69710..f17a76e 100644
---- a/drivers/net/ethernet/smsc/smsc911x.c
-+++ b/drivers/net/ethernet/smsc/smsc911x.c
-@@ -2382,7 +2382,6 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
- 	SET_NETDEV_DEV(dev, &pdev->dev);
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 7938258..0dbcdd2 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -609,6 +609,13 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ 	&ab8500_device,
+ };
  
- 	pdata = netdev_priv(dev);
--
- 	dev->irq = irq_res->start;
- 	irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
- 	pdata->ioaddr = ioremap_nocache(res->start, res_size);
-@@ -2446,7 +2445,7 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
- 	if (retval) {
- 		SMSC_WARN(pdata, probe,
- 			  "Unable to claim requested irq: %d", dev->irq);
--		goto out_free_irq;
-+		goto out_disable_resources;
- 	}
++static struct platform_device *snowball_of_platform_devs[] __initdata = {
++	&snowball_led_dev,
++	&snowball_key_dev,
++	&snowball_sbnet_dev,
++	&ab8500_device,
++};
++
+ static void __init mop500_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+@@ -801,8 +808,16 @@ static void __init u8500_init_machine(void)
+ 		mop500_sdi_init(parent);
+ 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+ 		snowball_pins_init();
+-		platform_add_devices(snowball_platform_devs,
+-				ARRAY_SIZE(snowball_platform_devs));
++
++		/*
++		 * Devices to be DT:ed:
++		 *   snowball_led_dev   = todo
++		 *   snowball_key_dev   = todo
++		 *   snowball_sbnet_dev = done
++		 *   ab8500_device      = todo
++		 */
++		platform_add_devices(snowball_of_platform_devs,
++				ARRAY_SIZE(snowball_of_platform_devs));
  
- 	retval = register_netdev(dev);
+ 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
+ 		/*
 -- 
 1.7.9.1
