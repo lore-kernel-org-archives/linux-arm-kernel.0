@@ -1,60 +1,215 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Apr 2012 21:36:34 +0100
-Subject: [PATCH 05/15] ARM: ux500: New DT:ed snowball_platform_devs for
- one-by-one device enablement
+Date: Thu, 19 Apr 2012 21:36:32 +0100
+Subject: [PATCH 03/15] ARM: ux500: Use correct format for dynamic IRQ
+ assignment
 In-Reply-To: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334867804-31942-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334867804-31942-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During Device Tree enablement it is necessary to remove
-snowball_<device>* platform_data segments one at at time,
-as and when particular devices are DT enabled. This patch
-provides a temporary solution. Once this new struct is
-empty it will be removed again.
+This patch applies the correct format requested by the irq
+domain. For chained IRQs which use GPIO lines as IRQs, we
+stipulate that a two cell request is required. The first cell
+contains the requested IRQ and the second can contain flags
+pertaining to edge detection and level sensitive values. The
+zeroth cell specifies the GPIO controller by use of a phandle.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi  |   22 ++++++++++++++++++++--
+ arch/arm/boot/dts/snowball.dts |   20 +++++++++-----------
+ 2 files changed, 29 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 7938258..0dbcdd2 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -609,6 +609,13 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
- 	&ab8500_device,
- };
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 57d3d35..9e8ff2c 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -24,7 +24,6 @@
+ 			#interrupt-cells = <3>;
+ 			#address-cells = <1>;
+ 			interrupt-controller;
+-			interrupt-parent;
+ 			reg = <0xa0411000 0x1000>,
+ 			      <0xa0410100 0x100>;
+ 		};
+@@ -59,6 +58,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8012e000 0x80>;
+ 			interrupts = <0 119 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -70,6 +71,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8012e080 0x80>;
+ 			interrupts = <0 120 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -81,6 +84,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e000 0x80>;
+ 			interrupts = <0 121 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -92,6 +97,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e080 0x80>;
+ 			interrupts = <0 122 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -103,6 +110,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e100 0x80>;
+ 			interrupts = <0 123 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -114,6 +123,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8000e180 0x80>;
+ 			interrupts = <0 124 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -125,6 +136,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8011e000 0x80>;
+ 			interrupts = <0 125 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -136,6 +149,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0x8011e080 0x80>;
+ 			interrupts = <0 126 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -147,6 +162,8 @@
+ 				"st,nomadik-gpio";
+ 			reg =  <0xa03fe000 0x80>;
+ 			interrupts = <0 127 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			supports-sleepmode;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -230,7 +247,8 @@
+ 			status = "disabled";
  
-+static struct platform_device *snowball_of_platform_devs[] __initdata = {
-+	&snowball_led_dev,
-+	&snowball_key_dev,
-+	&snowball_sbnet_dev,
-+	&ab8500_device,
-+};
-+
- static void __init mop500_init_machine(void)
- {
- 	struct device *parent = NULL;
-@@ -801,8 +808,16 @@ static void __init u8500_init_machine(void)
- 		mop500_sdi_init(parent);
- 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
- 		snowball_pins_init();
--		platform_add_devices(snowball_platform_devs,
--				ARRAY_SIZE(snowball_platform_devs));
-+
-+		/*
-+		 * Devices to be DT:ed:
-+		 *   snowball_led_dev   = todo
-+		 *   snowball_key_dev   = todo
-+		 *   snowball_sbnet_dev = done
-+		 *   ab8500_device      = todo
-+		 */
-+		platform_add_devices(snowball_of_platform_devs,
-+				ARRAY_SIZE(snowball_of_platform_devs));
+ 			// Add one of these for each child device
+-			cs-gpios = <&gpio0 31 &gpio4 14 &gpio4 16 &gpio6 22 &gpio7 0>;
++			cs-gpios = <&gpio0 31 0x4 &gpio4 14 0x4 &gpio4 16 0x4
++				    &gpio6 22 0x4 &gpio7 0 0x4>;
  
- 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
- 		/*
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index fb2a037..0ba0955 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -30,35 +30,35 @@
+ 			wakeup = <1>;
+ 			linux,code = <2>;
+ 			label = "userpb";
+-			gpios = <&gpio1 0 0>;
++			gpios = <&gpio1 0 0x4>;
+ 		};
+ 		button at 2 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <3>;
+ 			label = "extkb1";
+-			gpios = <&gpio4 23 0>;
++			gpios = <&gpio4 23 0x4>;
+ 		};
+ 		button at 3 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <4>;
+ 			label = "extkb2";
+-			gpios = <&gpio4 24 0>;
++			gpios = <&gpio4 24 0x4>;
+ 		};
+ 		button at 4 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <5>;
+ 			label = "extkb3";
+-			gpios = <&gpio5 1 0>;
++			gpios = <&gpio5 1 0x4>;
+ 		};
+ 		button at 5 {
+ 			debounce_interval = <50>;
+ 			wakeup = <1>;
+ 			linux,code = <6>;
+ 			label = "extkb4";
+-			gpios = <&gpio5 2 0>;
++			gpios = <&gpio5 2 0x4>;
+ 		};
+ 	};
+ 
+@@ -66,12 +66,11 @@
+ 		compatible = "gpio-leds";
+ 		used-led {
+ 			label = "user_led";
+-			gpios = <&gpio4 14>;
++			gpios = <&gpio4 14 0x4>;
+ 		};
+ 	};
+ 
+ 	soc-u9500 {
+-
+ 		external-bus at 50000000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x50000000 0x10000000>;
+@@ -82,7 +81,7 @@
+ 			ethernet at 50000000 {
+ 				compatible = "smsc,9111";
+ 				reg = <0x50000000 0x10000>;
+-				interrupts = <12>;
++				interrupts = <12 0x4>;
+ 				interrupt-parent = <&gpio4>;
+ 			};
+ 		};
+@@ -94,8 +93,7 @@
+ 			bus-width = <8>;
+ 			mmc-cap-mmc-highspeed;
+ 
+-			#gpio-cells = <1>;
+-			cd-gpios  = <&gpio6 26>; // 218
++			cd-gpios  = <&gpio6 26 0x4>; // 218
+ 			cd-inverted;
+ 
+ 			status = "okay";
+@@ -127,7 +125,7 @@
+ 			tc3589x at 42 {
+ 				//compatible = "tc3589x";
+ 				reg = <0x42>;
+-				interrupts = <25>;
++				gpios = <&gpio6 25 0x4>;
+ 				interrupt-parent = <&gpio6>;
+ 			};
+ 			tps61052 at 33 {
 -- 
 1.7.9.1
