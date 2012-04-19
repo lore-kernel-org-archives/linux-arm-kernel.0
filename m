@@ -1,27 +1,96 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 19 Apr 2012 12:40:44 -0700
-Subject: [PATCHv24 00/16] Contiguous Memory Allocator
-In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120419124044.632bfa49.akpm@linux-foundation.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 19 Apr 2012 13:46:40 -0600 (MDT)
+Subject: [PATCH v2 4/8] ARM: OMAP2+: hwmod: revise hardreset behavior
+In-Reply-To: <4F90641D.3090208@ti.com>
+References: <20120228053524.16278.59430.stgit@dusk>
+ <20120228053654.16278.73632.stgit@dusk>
+ <alpine.DEB.2.00.1204182253550.29048@utopia.booyaka.com>
+ <4F90001E.8060201@ti.com>
+ <alpine.DEB.2.00.1204191050110.29048@utopia.booyaka.com>
+ <4F90641D.3090208@ti.com>
+Message-ID: <alpine.DEB.2.00.1204191338370.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Apr 2012 16:10:05 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+Hi Beno?t,
 
-> This is (yet another) update of CMA patches.
+On Thu, 19 Apr 2012, Cousson, Benoit wrote:
 
-Looks OK to me.  It's a lot of code.
+> On 4/19/2012 7:17 PM, Paul Walmsley wrote:
+> > On Thu, 19 Apr 2012, Cousson, Benoit wrote:
+> > 
+> > > The concern of the people doing SW in these embedded processors was mainly
+> > > because we were releasing the reset of processor without loading any SW
+> > > first
+> > > and thus the processor was executing some random instructions.
+> > > 
+> > > So if we consider a better hwmods definition, we can potentially fix the
+> > > MMU
+> > > case:
+> > > 
+> > >      'mmu_ipu':
+> > >          'rst_ipu_mmu_cache'
+> > > 
+> > >      'mmu_dsp':
+> > >          'rst_dsp_mmu_cache'
+> > > 
+> > >      'iva_config':
+> > >          'rst_logic'
+> > 
+> > Wouldn't these still be "pseudo-hwmods?"  Or do each of these actually
+> > have address space, interconnect ports, etc.?
+> 
+> Yes, these ones are the only real IPs for MPU stand point, with interconnect
+> port and configuration registers.
 
-Please move it into linux-next, and if all is well, ask Linus to pull
-the tree into 3.5-rc1.  Please be sure to cc me on that email.
+These are the MMUs documented in Chapter 20 of the OMAP4430 TRM 
+vX, right?  
 
-I suggest that you include additional patches which enable CMA as much
-as possible on as many architectures as possible so that it gets
-maximum coverage testing in linux-next.  Remove those Kconfig patches
-when merging upstream.
+I don't really understand the interaction of the hardreset lines with 
+these IPs.  Chapter 20 doesn't seem to mention the PRCM-controllable 
+hardreset lines at all.  It only mentions the OCP_SYSCONFIG registers 
+associated with them.
 
-All this code will probably mess up my tree, but I'll work that out. 
-It would be more awkward if the CMA code were to later disappear from
-linux-next or were not merged into 3.5-rc1.  Let's avoid that.
+Meanwhile Table 3-375 "RM_DSP_RSTCTRL" mentions a DSP MMU, cache, and 
+slave interface reset line.  Is that referring to the same MMU that is 
+mentioned in Chapter 20?  The end of Section 20.2 "MMU Integration" 
+mentions two different DSP MMUs, a "shared cache MMU" and an "L2 MMU" - 
+maybe the hardreset line only pertains to the first MMU?
+
+> > > But then we do have the processor resets that have to be exposed
+> > > somewhere.
+> > > 
+> > >      'ipu':
+> > >          'rst_cpu0'
+> > >          'rst_cpu1'
+> > > 
+> > >      'dsp':
+> > >          'rst_dsp'
+> > > 
+> > >      'iva':
+> > >          'rst_seq1'
+> > >          'rst_seq2'
+> > > 
+> > > None of these one should be controlled automatically.
+> > 
+> > Don't we still want to put these IP blocks into reset until a driver for
+> > these IP blocks is loaded?
+> 
+> Yes, indeed, my point is where are we going to declare these reset lines if we
+> do not have any fake hwmods to store them.
+
+Wouldn't we associate them with the processor hwmods?  e.g., 
+omap44xx_iva_hwmod, omap44xx_dsp_hwmod ?
+
+> Well, for the MMU we can, these are regular IPs (almost). The real issues was
+> for the processors.
+
+Omar, do you know  how these hardreset lines interact with the MMUs 
+described in the TRM Chapter 20?
+
+> First they will have to release their driver :-)
+
+Hehe, indeed.
+
+
+- Paul
