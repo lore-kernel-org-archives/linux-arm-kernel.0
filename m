@@ -1,39 +1,48 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 Apr 2012 17:28:44 -0700
-Subject: [PATCH 03/12] ARM: Exynos5: Add watchdog timer clock instance
-In-Reply-To: <1334641595-25301-4-git-send-email-thomas.abraham@linaro.org>
+Date: Wed, 18 Apr 2012 17:30:46 -0700
+Subject: [PATCH 04/12] ARM: Exynos5: Remove duplicated instantiation of
+ pdma clock
+In-Reply-To: <1334641595-25301-5-git-send-email-thomas.abraham@linaro.org>
 References: <1334641595-25301-1-git-send-email-thomas.abraham@linaro.org>
- <1334641595-25301-4-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F8F5C3C.2050803@samsung.com>
+ <1334641595-25301-5-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4F8F5CB6.4080505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Thomas Abraham wrote:
-> Add watchdog timer clock instance for Exynos5 watchdog controller.
+> The clock of both the peripheral dma controllers is controlled by a single
+> clock gate. Hence remove the duplicate instantiation of the pdma clock.
 > 
 > Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
 > ---
->   arch/arm/mach-exynos/clock-exynos5.c |    5 +++++
->   1 files changed, 5 insertions(+), 0 deletions(-)
+>   arch/arm/mach-exynos/clock-exynos5.c |   17 ++++-------------
+>   1 files changed, 4 insertions(+), 13 deletions(-)
 > 
 > diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-> index ad3bec4..662615d 100644
+> index 662615d..fb95e9b 100644
 > --- a/arch/arm/mach-exynos/clock-exynos5.c
 > +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -474,6 +474,11 @@ static struct clk exynos5_init_clocks_off[] = {
->   		.enable		= exynos5_clk_ip_peris_ctrl,
->   		.ctrlbit	= (1<<  20),
->   	}, {
-> +		.name		= "watchdog",
-> +		.parent		=&exynos5_clk_aclk_66.clk,
-> +		.enable		= exynos5_clk_ip_peris_ctrl,
-> +		.ctrlbit	= (1<<  19),
-> +	}, {
->   		.name		= "hsmmc",
->   		.devname	= "exynos4-sdhci.0",
->   		.parent		=&exynos5_clk_aclk_200.clk,
+> @@ -762,16 +762,8 @@ static struct clk exynos5_init_clocks_on[] = {
+>   	}
+>   };
+> 
+> -static struct clk exynos5_clk_pdma0 = {
+> +static struct clk exynos5_clk_pdma = {
+>   	.name		= "dma",
+> -	.devname	= "dma-pl330.0",
+> -	.enable		= exynos5_clk_ip_fsys_ctrl,
+> -	.ctrlbit	= (1<<  1),
+> -};
+> -
+> -static struct clk exynos5_clk_pdma1 = {
+> -	.name		= "dma",
+> -	.devname	= "dma-pl330.1",
+>   	.enable		= exynos5_clk_ip_fsys_ctrl,
+>   	.ctrlbit	= (1<<  1),
 
-Looks ok, will apply.
+Since this shuld be (1 << 2), this patch can be dropped.
+
+As I know, Boojin's patch fixes this. If not, please fix this :)
 
 Thanks.
 
