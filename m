@@ -1,240 +1,172 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 19 Apr 2012 02:17:01 -0600 (MDT)
-Subject: [PATCH v2 3/8] ARM: OMAP2+: hwmod: reorganize and document the
- setup process
-In-Reply-To: <alpine.DEB.2.00.1204190208470.29048@utopia.booyaka.com>
+Date: Thu, 19 Apr 2012 02:21:07 -0600 (MDT)
+Subject: [PATCH v2 5/8] ARM: OMAP2+: hwmod: ensure that SYSCONFIG bits
+ are reprogrammed after a reset
+In-Reply-To: <20120228053657.16278.76132.stgit@dusk>
 References: <20120228053524.16278.59430.stgit@dusk>
- <20120228053651.16278.22844.stgit@dusk>
- <alpine.DEB.2.00.1204190208470.29048@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1204190214250.29048@utopia.booyaka.com>
+ <20120228053657.16278.76132.stgit@dusk>
+Message-ID: <alpine.DEB.2.00.1204190219190.29048@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi
 
-On Thu, 19 Apr 2012, Paul Walmsley wrote:
+On Mon, 27 Feb 2012, Paul Walmsley wrote:
 
-> - The changes to the _init function have been split into a separate patch
->   to make it easier to debug.
+> Move the code that reprograms the OCP_SYSCONFIG bits into the _reset()
+> function to ensure that it is called after every reset.  The code was
+> previously in the _setup() function.  So, before this patch, if
+> _reset() was called from another function, the SYSCONFIG register
+> won't be reprogrammed.
 
-Here is the patch that deals specifically with _init().  It's the same 
-code that was originally part of the patch mentioned in the subject line, 
-split into a new patch for clarity.
+As mentioned earlier, the _reset() changes previously in patch 3 have been 
+rolled into this patch, as follows.
 
 
 - Paul
 
 From: Paul Walmsley <paul@pwsan.com>
-Date: Thu, 19 Apr 2012 00:58:22 -0600
-Subject: [PATCH 2/3] ARM: OMAP2+: hwmod: reorganize and document the
- initialization process
+Date: Thu, 19 Apr 2012 00:49:09 -0600
+Subject: [PATCH] ARM: OMAP2+: hwmod: revise the IP block reset process
 
-Reorganize the code involved in initializing the internal data for
-each hwmod to make it easier to read and maintain.  This involves
-improving documentation and removing some duplicated and unnecessary
-code.
+Revise the IP block reset process.  This patch ensures that the
+OCP_SYSCONFIG registers are reloaded after a custom reset.  Since
+OCP_SYSCONFIG bits are cleared during reset, they should be
+reprogrammed unless the IP block is being left in reset.  (The only IP
+blocks that are left in reset are IP blocks with hardreset lines and
+no custom reset function.)  If the IP block is left in reset, then it
+is inaccessible to the MPU, and an access to the OCP_SYSCONFIG
+register will cause an abort.
+
+This version incorporates comments from Omar Ramirez Luna
+<omar.ramirez@ti.com> to skip the OCP_SYSCONFIG access after asserting
+hardreset lines.  This allows the MMU (IOMMU) IP block, which has
+both hardreset lines and an OCP_SYSCONFIG register.
+
+Also, ignore _ocp_softreset() errors if the IP block doesn't include a
+softreset bit.  This is needed since a subsequent patch will start
+taking the return value of the _reset() function seriously.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Omar Ramirez Luna <omar.ramirez@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |  137 ++++++++++++++++++++++----------------
- 1 file changed, 80 insertions(+), 57 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   69 +++++++++++++++++++++++++-------------
+ 1 file changed, 46 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 5b07ad0..253e942 100644
+index 4997c1a..5b07ad0 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1769,6 +1769,56 @@ static int _shutdown(struct omap_hwmod *oh)
- }
- 
- /**
-+ * _init_mpu_rt_base - populate the virtual address for a hwmod
-+ * @oh: struct omap_hwmod * to locate the virtual address
-+ *
-+ * Cache the virtual address used by the MPU to access this IP block's
-+ * registers.  This address is needed early so the OCP registers that
-+ * are part of the device's address space can be ioremapped properly.
-+ * No return value.
-+ */
-+static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
-+{
-+	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
-+		return;
-+
-+	oh->_mpu_rt_va = _find_mpu_rt_base(oh, oh->_mpu_port_index);
-+}
-+
-+/**
-+ * _init - initialize internal data for the hwmod @oh
-+ * @oh: struct omap_hwmod *
-+ * @n: (unused)
-+ *
-+ * Look up the clocks and the address space used by the MPU to access
-+ * registers belonging to the hwmod @oh.  @oh must already be
-+ * registered at this point.  This is the first of two phases for
-+ * hwmod initialization.  Code called here does not touch any hardware
-+ * registers, it simply prepares internal data structures.  Returns 0
-+ * upon success or if the hwmod isn't registered, or -EINVAL upon
-+ * failure.
-+ */
-+static int __init _init(struct omap_hwmod *oh, void *n)
-+{
-+	int r;
-+
-+	if (oh->_state != _HWMOD_STATE_REGISTERED)
-+		return 0;
-+
-+	_init_mpu_rt_base(oh, NULL);
-+
-+	r = _init_clocks(oh, NULL);
-+	if (IS_ERR_VALUE(r)) {
-+		WARN(1, "omap_hwmod: %s: couldn't init clocks\n", oh->name);
-+		return -EINVAL;
-+	}
-+
-+	oh->_state = _HWMOD_STATE_INITIALIZED;
-+
-+	return 0;
-+}
-+
-+/**
-  * _setup - do initial configuration of omap_hwmod
+@@ -2,7 +2,7 @@
+  * omap_hwmod implementation for OMAP2/3/4
+  *
+  * Copyright (C) 2009-2011 Nokia Corporation
+- * Copyright (C) 2011 Texas Instruments, Inc.
++ * Copyright (C) 2011-2012 Texas Instruments, Inc.
+  *
+  * Paul Walmsley, Beno?t Cousson, Kevin Hilman
+  *
+@@ -1382,9 +1382,9 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
   * @oh: struct omap_hwmod *
   *
-@@ -1780,7 +1830,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
- 	int i, r;
- 	u8 postsetup_state;
- 
--	if (oh->_state != _HWMOD_STATE_CLKS_INITED)
-+	if (oh->_state != _HWMOD_STATE_INITIALIZED)
- 		return 0;
- 
- 	/* Set iclk autoidle mode */
-@@ -2052,96 +2102,69 @@ int __init omap_hwmod_register(struct omap_hwmod **ohs)
- 	return 0;
- }
- 
--/*
-- * _populate_mpu_rt_base - populate the virtual address for a hwmod
-+/**
-+ * _ensure_mpu_hwmod_is_setup - ensure the MPU SS hwmod is init'ed and set up
-+ * @oh: pointer to the hwmod currently being set up (usually not the MPU)
+  * Resets an omap_hwmod @oh via the OCP_SYSCONFIG bit.  hwmod must be
+- * enabled for this to work.  Returns -EINVAL if the hwmod cannot be
+- * reset this way or if the hwmod is in the wrong state, -ETIMEDOUT if
+- * the module did not reset in time, or 0 upon success.
++ * enabled for this to work.  Returns -ENOENT if the hwmod cannot be
++ * reset this way, -EINVAL if the hwmod is in the wrong state,
++ * -ETIMEDOUT if the module did not reset in time, or 0 upon success.
   *
-- * Must be called only from omap_hwmod_setup_*() so ioremap works properly.
-- * Assumes the caller takes care of locking if needed.
-+ * If the hwmod data corresponding to the MPU subsystem IP block
-+ * hasn't been initialized and set up yet, do so now.  This must be
-+ * done first since sleep dependencies may be added from other hwmods
-+ * to the MPU.  Intended to be called only by omap_hwmod_setup*().  No
-+ * return value.
-  */
--static int __init _populate_mpu_rt_base(struct omap_hwmod *oh, void *data)
-+static void __init _ensure_mpu_hwmod_is_setup(struct omap_hwmod *oh)
- {
--	if (oh->_state != _HWMOD_STATE_REGISTERED)
--		return 0;
--
--	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
--		return 0;
--
--	oh->_mpu_rt_va = _find_mpu_rt_base(oh, oh->_mpu_port_index);
--
--	return 0;
-+	if (!mpu_oh || mpu_oh->_state == _HWMOD_STATE_UNKNOWN)
-+		pr_err("omap_hwmod: %s: MPU initiator hwmod %s not yet registered\n",
-+		       __func__, MPU_INITIATOR_NAME);
-+	else if (mpu_oh->_state == _HWMOD_STATE_REGISTERED && oh != mpu_oh)
-+		omap_hwmod_setup_one(MPU_INITIATOR_NAME);
- }
+  * In OMAP3 a specific SYSSTATUS register is used to get the reset status.
+  * Starting in OMAP4, some IPs do not have SYSSTATUS registers and instead
+@@ -1401,7 +1401,7 @@ static int _ocp_softreset(struct omap_hwmod *oh)
  
- /**
-  * omap_hwmod_setup_one - set up a single hwmod
-  * @oh_name: const char * name of the already-registered hwmod to set up
-  *
-- * Must be called after omap2_clk_init().  Resolves the struct clk
-- * names to struct clk pointers for each registered omap_hwmod.  Also
-- * calls _setup() on each hwmod.  Returns -EINVAL upon error or 0 upon
-- * success.
-+ * Initialize and set up a single hwmod.  Intended to be used for a
-+ * small number of early devices, such as the timer IP blocks used for
-+ * the scheduler clock.  Must be called after omap2_clk_init().
-+ * Resolves the struct clk names to struct clk pointers for each
-+ * registered omap_hwmod.  Also calls _setup() on each hwmod.  Returns
-+ * -EINVAL upon error or 0 upon success.
-  */
- int __init omap_hwmod_setup_one(const char *oh_name)
- {
- 	struct omap_hwmod *oh;
--	int r;
- 
- 	pr_debug("omap_hwmod: %s: %s\n", oh_name, __func__);
- 
--	if (!mpu_oh) {
--		pr_err("omap_hwmod: %s: cannot setup_one: MPU initiator hwmod %s not yet registered\n",
--		       oh_name, MPU_INITIATOR_NAME);
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
 -		return -EINVAL;
--	}
++		return -ENOENT;
+ 
+ 	/* clocks must be on for this operation */
+ 	if (oh->_state != _HWMOD_STATE_ENABLED) {
+@@ -1462,37 +1462,60 @@ dis_opt_clks:
+  * _reset - reset an omap_hwmod
+  * @oh: struct omap_hwmod *
+  *
+- * Resets an omap_hwmod @oh.  The default software reset mechanism for
+- * most OMAP IP blocks is triggered via the OCP_SYSCONFIG.SOFTRESET
+- * bit.  However, some hwmods cannot be reset via this method: some
+- * are not targets and therefore have no OCP header registers to
+- * access; others (like the IVA) have idiosyncratic reset sequences.
+- * So for these relatively rare cases, custom reset code can be
+- * supplied in the struct omap_hwmod_class .reset function pointer.
+- * Passes along the return value from either _reset() or the custom
+- * reset function - these must return -EINVAL if the hwmod cannot be
+- * reset this way or if the hwmod is in the wrong state, -ETIMEDOUT if
+- * the module did not reset in time, or 0 upon success.
++ * Resets an omap_hwmod @oh.  If the module has a custom reset
++ * function pointer defined, then call it to reset the IP block, and
++ * pass along its return value to the caller.  Otherwise, if the IP
++ * block has an OCP_SYSCONFIG register with a SOFTRESET bitfield
++ * associated with it, call a function to reset the IP block via that
++ * method, and pass along the return value to the caller.  Finally, if
++ * the IP block has some hardreset lines associated with it, assert
++ * all of those, but do _not_ deassert them. (This is because driver
++ * authors have expressed an apparent requirement to control the
++ * deassertion of the hardreset lines themselves.)
++ *
++ * The default software reset mechanism for most OMAP IP blocks is
++ * triggered via the OCP_SYSCONFIG.SOFTRESET bit.  However, some
++ * hwmods cannot be reset via this method.  Some are not targets and
++ * therefore have no OCP header registers to access.  Others (like the
++ * IVA) have idiosyncratic reset sequences.  So for these relatively
++ * rare cases, custom reset code can be supplied in the struct
++ * omap_hwmod_class .reset function pointer.  Passes along the return
++ * value from either _ocp_softreset() or the custom reset function -
++ * these must return -EINVAL if the hwmod cannot be reset this way or
++ * if the hwmod is in the wrong state, -ETIMEDOUT if the module did
++ * not reset in time, or 0 upon success.
+  */
+ static int _reset(struct omap_hwmod *oh)
+ {
+-	int ret;
++	int i, r;
+ 
+ 	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
+ 
++	if (oh->class->reset) {
++		r = oh->class->reset(oh);
++	} else {
++		if (oh->rst_lines_cnt > 0) {
++			for (i = 0; i < oh->rst_lines_cnt; i++)
++				_assert_hardreset(oh, oh->rst_lines[i].name);
++			return 0;
++		} else {
++			r = _ocp_softreset(oh);
++			if (r == -ENOENT)
++				r = 0;
++		}
++	}
++
+ 	/*
+-	 * XXX We're not resetting modules with hardreset lines
+-	 * automatically here.  Should we do this also, or just expect
+-	 * those modules to define custom reset functions?
++	 * OCP_SYSCONFIG bits need to be reprogrammed after a
++	 * softreset.  The _enable() function should be split to avoid
++	 * the rewrite of the OCP_SYSCONFIG register.
+ 	 */
+-	ret = (oh->class->reset) ? oh->class->reset(oh) : _ocp_softreset(oh);
 -
- 	oh = _lookup(oh_name);
- 	if (!oh) {
- 		WARN(1, "omap_hwmod: %s: hwmod not yet registered\n", oh_name);
- 		return -EINVAL;
+ 	if (oh->class->sysc) {
+ 		_update_sysc_cache(oh);
+ 		_enable_sysc(oh);
  	}
  
--	if (mpu_oh->_state == _HWMOD_STATE_REGISTERED && oh != mpu_oh)
--		omap_hwmod_setup_one(MPU_INITIATOR_NAME);
--
--	r = _populate_mpu_rt_base(oh, NULL);
--	if (IS_ERR_VALUE(r)) {
--		WARN(1, "omap_hwmod: %s: couldn't set mpu_rt_base\n", oh_name);
--		return -EINVAL;
--	}
--
--	r = _init_clocks(oh, NULL);
--	if (IS_ERR_VALUE(r)) {
--		WARN(1, "omap_hwmod: %s: couldn't init clocks\n", oh_name);
--		return -EINVAL;
--	}
-+	_ensure_mpu_hwmod_is_setup(oh);
- 
-+	_init(oh, NULL);
- 	_setup(oh, NULL);
- 
- 	return 0;
+-	return ret;
++	return r;
  }
  
  /**
-- * omap_hwmod_setup - do some post-clock framework initialization
-+ * omap_hwmod_setup_all - set up all registered IP blocks
-  *
-- * Must be called after omap2_clk_init().  Resolves the struct clk names
-- * to struct clk pointers for each registered omap_hwmod.  Also calls
-- * _setup() on each hwmod.  Returns 0 upon success.
-+ * Initialize and set up all IP blocks registered with the hwmod code.
-+ * Must be called after omap2_clk_init().  Resolves the struct clk
-+ * names to struct clk pointers for each registered omap_hwmod.  Also
-+ * calls _setup() on each hwmod.  Returns 0 upon success.
-  */
- static int __init omap_hwmod_setup_all(void)
- {
--	int r;
--
--	if (!mpu_oh) {
--		pr_err("omap_hwmod: %s: MPU initiator hwmod %s not yet registered\n",
--		       __func__, MPU_INITIATOR_NAME);
--		return -EINVAL;
--	}
--
--	r = omap_hwmod_for_each(_populate_mpu_rt_base, NULL);
--
--	r = omap_hwmod_for_each(_init_clocks, NULL);
--	WARN(IS_ERR_VALUE(r),
--	     "omap_hwmod: %s: _init_clocks failed\n", __func__);
-+	_ensure_mpu_hwmod_is_setup(NULL);
- 
-+	omap_hwmod_for_each(_init, NULL);
- 	omap_hwmod_for_each(_setup, NULL);
- 
- 	return 0;
 -- 
 1.7.10
