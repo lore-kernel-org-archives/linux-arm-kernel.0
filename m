@@ -1,45 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Apr 2012 13:33:01 +0000
-Subject: irq_to_gpio support
-In-Reply-To: <20120419113019.GB26682@b20223-02.ap.freescale.net>
-References: <20120419113019.GB26682@b20223-02.ap.freescale.net>
-Message-ID: <201204191333.01914.arnd@arndb.de>
+From: pintu_agarwal@yahoo.com (PINTU KUMAR)
+Date: Thu, 19 Apr 2012 06:42:21 -0700 (PDT)
+Subject: [NEW]: Introducing shrink_all_memory from user space
+In-Reply-To: <20120418211032.47b243da@pyramind.ukuu.org.uk>
+References: <1334483226.20721.YahooMailNeo@web162003.mail.bf1.yahoo.com>
+ <CAFLxGvwJCMoiXFn3OgwiX+B50FTzGZmo6eG3xQ1KaPsEVZVA1g@mail.gmail.com>
+ <1334490429.67558.YahooMailNeo@web162006.mail.bf1.yahoo.com>
+ <CAFLxGvz5tmEi-39CZbJN+0zNd3ZpHXzZcNSFUpUWS_aMDJ4t6Q@mail.gmail.com>
+ <20120418211032.47b243da@pyramind.ukuu.org.uk>
+Message-ID: <1334842941.92324.YahooMailNeo@web162006.mail.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 April 2012, Richard Zhao wrote:
-> Hi Grant & Linus
-> 
-> I saw gpio lib didn't provide irq_to_gpio support. Are we dropping it?
-> git grep irq_to_gpio still return a lot of things.
 
-There are not that many actually if you count only the users, not the
-files that define them, and you ignore the files in drivers/gpio 
-that define their own.
+>________________________________
+>From: Alan Cox <alan@lxorguk.ukuu.org.uk>
+>To: richard -rw- weinberger <richard.weinberger@gmail.com>? 
+>Sent: Thursday, 19 April 2012 1:40 AM
+>Subject: Re: [NEW]: Introducing shrink_all_memory from user space
+>
+>On Sun, 15 Apr 2012 14:10:00 +0200
+>richard -rw- weinberger <richard.weinberger@gmail.com> wrote:
+>
+>> On Sun, Apr 15, 2012 at 1:47 PM, PINTU KUMAR <pintu_agarwal@yahoo.com> wrote:
+>> > Moreover, this is mainly meant for mobile phones where there is only *one* user.
+>> 
+>> I see. Jet another awful hack.
+>> Mobile phones are nothing special. They are computers
+>
+>Correct - so if it is showing up useful situations then they are also
+>useful beyond mobile phone.
+>
+>> Every program which is allowed to use this interface will (ab)use it.
+>
+>If you expose it to userspace then you would want it very tightly
+>controlled and very much special case. Within the kernel using it
+>internally within things like CMA allocators seems to make more sense.
+>
+>I think you overestimate the abuse. It's an interface which pushes clean
+>pages that can be cheaply recovered out of memory. It doesn't guarantee
+>the caller reaps the benefit of that, and the vm will continue to try and
+>share out any new resource fairly.
+>
+>Alan
 
-drivers/ata/pata_rb532_cf.c:    gpio = irq_to_gpio(irq);
-drivers/input/touchscreen/eeti_ts.c:    return gpio_get_value(irq_to_gpio(priv->irq)) == priv->irq_active_high;
-drivers/input/touchscreen/egalax_ts.c:  int gpio = irq_to_gpio(client->irq);
-drivers/mfd/ezx-pcap.c: } while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
-drivers/pcmcia/db1xxx_ss.c:     return !gpio_get_value(irq_to_gpio(sock->insert_irq));
-drivers/power/tosa_battery.c:   pr_info("tosa_bat_gpio irq: %d\n", gpio_get_value(irq_to_gpio(irq)));
-drivers/staging/iio/accel/lis3l02dq_core.c:     if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0) {
-drivers/staging/iio/accel/lis3l02dq_core.c:     if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0)
-drivers/staging/iio/accel/lis3l02dq_core.c:     if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0)
-drivers/staging/iio/accel/lis3l02dq_ring.c:             if (gpio_get_value(irq_to_gpio(st->us->irq)))
-
-The pata_rb532_cf and db1xxx_ss drivers are only used on MIPS,
-most of the other ones are for arm/pxa and are currently broken.
-
-> I'm looking at drivers/input/touchscreen/egalax_ts.c driver.
-> It failed to compile without irq_to_gpio. It's a i2c client device and
-> use irq line configured as gpio to wakeup touchscreen controller.
-> If we don't have irq_to_gpio, I'm afraid it has to use plat data or
-> of property to pass gpio number.
-
-Yes, I think that is correct. The drivers should really have been
-fixed at the time when the irq_to_gpio function was removed from
-the respective platforms using those drivers, and in some cases
-this has already happened.
-
-	Arnd
+Dear Alan, thank you very much for your comments and suggestion.
+My plan is to develop a kind of system utility (like defragment) which we can run from user space (as root).
+?
+And yes you are right, my future plan is also to use it for CMA as it also suffers from memory fragmentation.
+Now I think CMA uses memory compaction solution to reclaim pages for its allocation. Similarly we can use this on top of compaction for better results.
+?
+And we can even call this from low memory notifier whenever memory pressure falls below watermark and regain memory state as it was before.
+?
+Well more experiments and findings are in progress.
+?
+?
+?
+Thanks,
+Pintu
