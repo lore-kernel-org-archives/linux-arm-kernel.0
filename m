@@ -1,37 +1,28 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 18 Apr 2012 23:18:55 -0500
-Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
-In-Reply-To: <CAMXH7KFYA24sPUcwgKfwVLNPA0jWQ-QG02y+SfPNnAqdiv0+gg@mail.gmail.com>
-References: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
- <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
- <20120417074301.GM20478@pengutronix.de>
- <CAMXH7KH41kWMPu_dEpetZc8OUD3C0-mtxGbXX0Vqd4EODPWJUg@mail.gmail.com>
- <20120417174213.GD3852@pengutronix.de>
- <CAMXH7KFYA24sPUcwgKfwVLNPA0jWQ-QG02y+SfPNnAqdiv0+gg@mail.gmail.com>
-Message-ID: <CAMXH7KGgSmvfqUTC1bufBz0QXbt01dHsPo1cbRA9jLj9mGmfjg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 Apr 2012 21:20:25 -0700
+Subject: [PATCH] ARM: fix mach-bcmring UART declarations
+In-Reply-To: <4F8D7150.9060201@windriver.com>
+References: <1334605108-28616-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F8C7617.5080902@broadcom.com> <4F8D7150.9060201@windriver.com>
+Message-ID: <CAOesGMh8EA66uajVeauJj8vviATLEnNHODeNyyas0iC1vQjMww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> If I called imx_cpuidle_init directly from imx5 or imx6q init
->>> routines, it would be getting called before the coreinit_call of core
->>> cpuidle causing a failure. ?There were various other directions to
->>> take and all seemed less desirable than this one.
->>>
->>> One alternative would be to add a function to return the pointer to
->>> the cpuidle driver object based on the machine type. ?Functionality
->>> exists to identify imx5 as a machine type but not imx6q, so I couldn't
->>> use that machine based method without adding that extra code.
->>>
->>> Another alternative would be to add a general platform lateinit_call
->>> function to each platforms that support cpuidle.
->>
->> Just put the initcall into mm-imx5.c and check the cpu type. Then you
->> also don't have to make imx5_idle global.
+On Tue, Apr 17, 2012 at 6:34 AM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
+> On 12-04-16 03:42 PM, Jiandong Zheng wrote:
+>> On 4/16/2012 12:38 PM, Paul Gortmaker wrote:
+>>> This error appeared in the bcmring_defconfig build:
 >
-> That solution is currently available for imx5 but for imx6q it implies
-> adding the cpu type support for imx6q. ?Are you ok with that?
+> [...]
+>
+>> This is already fixed by Olof Johansson.
+>
+> Thanks, I guess it just hasn't made it into linux-next yet.
 
-Sascha or Shawn, any further comments on my question?
+Actually, I didn't fix the bus id case error, so I'll apply your
+version. I could just fix up mine the same way, but git am -s is
+quicker. :)
 
-Thanks,
-Rob
+
+-Olof
