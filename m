@@ -1,55 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Apr 2012 21:36:36 +0100
-Subject: [PATCH 07/15] ARM: ux500: Enable the SMSC9115 on Snowball via Device
- Tree
+Date: Thu, 19 Apr 2012 21:36:37 +0100
+Subject: [PATCH 08/15] drivers/mmc: MMCI: Use correct GPIO binding for IRQ
+ requests
 In-Reply-To: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334867804-31942-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334867804-31942-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Ethernet port by providing correct information via DT.
+Now there are irqdomains in place for Snowball, we can request
+GPIO IRQs directly by their binding. This replaces the previous method
+of hard-coding the hwirq using u32 values in the DT.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/snowball.dts     |   10 ++++++++--
- arch/arm/mach-ux500/board-mop500.c |    1 -
- 2 files changed, 8 insertions(+), 3 deletions(-)
+ drivers/mmc/host/mmci.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 0ba0955..22b82cc 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -79,10 +79,16 @@
- 			ranges;
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 5a7da17..2303a16 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -26,6 +26,7 @@
+ #include <linux/clk.h>
+ #include <linux/scatterlist.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/dmaengine.h>
+ #include <linux/dma-mapping.h>
+@@ -1203,11 +1204,11 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
+ {
+ 	int bus_width = 0;
  
- 			ethernet at 50000000 {
--				compatible = "smsc,9111";
-+				compatible = "smsc,lan9115";
- 				reg = <0x50000000 0x10000>;
--				interrupts = <12 0x4>;
-+				interrupts = <12 0x1>;
- 				interrupt-parent = <&gpio4>;
-+
-+				reg-shift = <1>;
-+				reg-io-width = <2>;
-+				smsc,force-internal-phy;
-+				smsc,irq-active-high;
-+				smsc,irq-push-pull;
- 			};
- 		};
+-	of_property_read_u32(np, "wp-gpios", &pdata->gpio_wp);
++	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
+ 	if (!pdata->gpio_wp)
+ 		pdata->gpio_wp = -1;
  
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 50809af..9dbd34b 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -612,7 +612,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
- static struct platform_device *snowball_of_platform_devs[] __initdata = {
- 	&snowball_led_dev,
- 	&snowball_key_dev,
--	&snowball_sbnet_dev,
- 	&ab8500_device,
- };
+-	of_property_read_u32(np, "cd-gpios", &pdata->gpio_cd);
++	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
+ 	if (!pdata->gpio_cd)
+ 		pdata->gpio_cd = -1;
  
 -- 
 1.7.9.1
