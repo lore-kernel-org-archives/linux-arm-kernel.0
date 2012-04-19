@@ -1,47 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Apr 2012 11:07:42 -0700
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <20120419174332.GY25053@n2100.arm.linux.org.uk>
-References: <20120418152956.GP25053@n2100.arm.linux.org.uk>
- <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
- <20120418194224.GS25053@n2100.arm.linux.org.uk>
- <20120418200214.GP21106@atomide.com>
- <20120418202447.GT25053@n2100.arm.linux.org.uk>
- <20120418210142.GR21106@atomide.com>
- <20120418211606.GU25053@n2100.arm.linux.org.uk>
- <20120418213642.GV25053@n2100.arm.linux.org.uk>
- <20120419013914.GV21106@atomide.com>
- <20120419174332.GY25053@n2100.arm.linux.org.uk>
-Message-ID: <20120419180741.GX21106@atomide.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Thu, 19 Apr 2012 11:19:38 -0700
+Subject: [PATCH] arm: omap3: am35x: Register davinci_mdio before davinci_emac
+Message-ID: <1334859578-14446-1-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120419 10:46]:
-> On Wed, Apr 18, 2012 at 06:39:14PM -0700, Tony Lindgren wrote:
-> > Cool, you almost got it. Got it working for n800 and 770 with the following
-> > patch. Only extremely light testing done now so careful with this patch too..
-> > 
-> > Had to hack in support for the src_port and dst_port that's needed for
-> > omap_set_dma_src/dest_params on omap1.
-> 
-> What's the relationship between these ports and the DMA request signal?
-> Is there a document which describes this?
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-It's the source and destination addresses bus port, so it's more related
-to the addresses than request signal. I guess routing of the DMA request
-signal is what it really does.
+Problem:
+--------
+When resuming from a Suspend-to-RAM event, the eth0 device
+(davinci emac/mdio) on am35xx boards wouldn't work and the
+following error message appeared on the console:
 
-I'm now wondering if it might be possible to set it automatically based on
-source and destination address.
+"net eth0: could not connect to phy davinci_mdio-0:00"
 
-There's some information in the omap5912 trm on pages 717 and 718:
+Cause:
+------
+When davinci_emac_resume() calls emac_dev_open() which
+ultimately calls davinci_mdio_read(), the 'data->suspended'
+flag in davinci_mdio.c is still set to 'true'.  This causes
+davinci_mdio_read() to fail which ripples back up the call
+chain causing davinci_emac_resume() to fail.  The reason
+'data->suspended' is still set to 'true' is that
+davinci_mdio_resume() hasn't been called yet as it should
+have been.  davinci_mdio_resume() must be called before
+davinci_emac_resume().
 
-http://www.ti.com/litv/pdf/spru742
+Solution:
+---------
+Register the "davinci_mdio" platform device before registering
+the "davinci_emac" platform device so davinci_mdio_resume()
+is called before davinci_emac_resume() and eth0 can resume.
 
-It says for CSDP source port "This field identifies the port originator of
-the transfer."
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ arch/arm/mach-omap2/am35xx-emac.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
+index 1f97e74..d23bd6c 100644
+--- a/arch/arm/mach-omap2/am35xx-emac.c
++++ b/arch/arm/mach-omap2/am35xx-emac.c
+@@ -97,11 +97,6 @@ void __init am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en)
+ 
+ 	am35xx_emac_pdata.rmii_en = rmii_en;
+ 	am35xx_emac_mdio_pdata.bus_freq = mdio_bus_freq;
+-	err = platform_device_register(&am35xx_emac_device);
+-	if (err) {
+-		pr_err("AM35x: failed registering EMAC device: %d\n", err);
+-		return;
+-	}
+ 
+ 	err = platform_device_register(&am35xx_emac_mdio_device);
+ 	if (err) {
+@@ -110,6 +105,12 @@ void __init am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en)
+ 		return;
+ 	}
+ 
++	err = platform_device_register(&am35xx_emac_device);
++	if (err) {
++		pr_err("AM35x: failed registering EMAC device: %d\n", err);
++		return;
++	}
++
+ 	regval = omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET);
+ 	regval = regval & (~(AM35XX_CPGMACSS_SW_RST));
+ 	omap_ctrl_writel(regval, AM35XX_CONTROL_IP_SW_RESET);
+-- 
+1.7.9.4
