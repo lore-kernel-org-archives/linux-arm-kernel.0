@@ -1,43 +1,42 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Apr 2012 16:03:56 +0200
-Subject: [PATCH 00/17][V2] ARM: OMAP3/4 : cpuidle34xx and cpuidle44xx
- cleanups
-In-Reply-To: <87vcl87am5.fsf@ti.com>
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
- <87vcl87am5.fsf@ti.com>
-Message-ID: <4F901B4C.2090905@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 19 Apr 2012 16:06:05 +0200
+Subject: [PATCH 34/40] ARM: imx6: implement clocks using common clock
+ framework
+In-Reply-To: <20120419135628.GB22219@S2101-09.ap.freescale.net>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-35-git-send-email-s.hauer@pengutronix.de>
+ <20120418113355.GO20478@pengutronix.de>
+ <20120419135628.GB22219@S2101-09.ap.freescale.net>
+Message-ID: <20120419140605.GL3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2012 01:23 AM, Kevin Hilman wrote:
-> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
->
->> This patchset makes some cleanup on these cpuidle drivers
->> and consolidate the code across both architecture.
->
-> Thanks for this really nice cleanup.  I have some comments on specific
-> patches, but here's some general comments:
->
-> Some minor comments:
->
-> First, please be sure all patches have a descriptive changelog.  Yes,
-> even simple ones need changelogs.  In particular, maintainers are
-> looking for the "why" of a patch, not just the "what" or "how".
->
-> Second, this series introduced a couple sparse warnings:
->
-> /work/kernel/omap/pm/arch/arm/mach-omap2/cpuidle44xx.c:134:1: warning: symbol 'omap4_idle_dev' was not declared. Should it be static?
-> /work/kernel/omap/pm/arch/arm/mach-omap2/cpuidle44xx.c:136:23: warning: symbol 'omap4_idle_driver' was not declared. Should it be static?
+On Thu, Apr 19, 2012 at 09:56:32PM +0800, Shawn Guo wrote:
+> On Wed, Apr 18, 2012 at 01:33:55PM +0200, Sascha Hauer wrote:
+> > Hi Shawn,
+> > 
+> > > +
+> > > +static const char * const clks_init_on[] __initconst = {
+> > > +	"mmdc_ch0_axi", "mmdc_ch1_axi", "uart_ipg", "uart_serial",
+> > > +};
+> > 
+> > I assume uart_ipg and uart_serial is here for the earlyprintk case. This
+> > is not needed anymore. earlyprintk depends on an enabled uart anyway, so
+> > we can safely assume that the clock is turned on when Linux starts. The
+> > clock framework will disable the clock in a late initcall, long after
+> > the real driver has taken over and enabled the clock.
+> > 
+> Yes, that's the case for the last 2 clocks, but the first 2 clocks are
+> for memory and need to be kept there.  Also, currently I do not have
+> uart_ipg in the clkdev for uart driver to look up, so if we remove it
+> from clks_init_on, we need to add it into clkdev.
 
-Ok, I probably missed it. I will fix that it in the next version.
+Yes, I already fixed up the uart clocks.
 
-Thanks for reviewing.
-
-   -- Daniel
+Sascha
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
