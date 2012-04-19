@@ -1,44 +1,59 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 19 Apr 2012 18:58:13 +0530
-Subject: [PATCHv8 02/10] I2C: OMAP: Fix the mismatch of pm_runtime enable and
- disable
-In-Reply-To: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
-References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1334842101-20670-3-git-send-email-shubhrajyoti@ti.com>
+Date: Thu, 19 Apr 2012 18:58:11 +0530
+Subject: [PATCHv8 00/10] I2C fixes
+Message-ID: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the i2c driver calls the pm_runtime_enable and never
-the disable. This may cause a warning when pm_runtime_enable
-checks for the count match.Attempting to fix the same by calling
-pm_runtime_disable in the error and the remove path.
+This patch series seperates the fixes from other 
+changes from [2] 
 
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+[2] http://www.spinics.net/lists/linux-omap/msg68056.html
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 4f4188d..c851672 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1090,6 +1090,7 @@ err_unuse_clocks:
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(dev->dev);
- 	iounmap(dev->base);
-+	pm_runtime_disable(&pdev->dev);
- err_free_mem:
- 	platform_set_drvdata(pdev, NULL);
- 	kfree(dev);
-@@ -1110,6 +1111,7 @@ omap_i2c_remove(struct platform_device *pdev)
- 	free_irq(dev->irq, dev);
- 	i2c_del_adapter(&dev->adapter);
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	pm_runtime_disable(&pdev->dev);
- 	iounmap(dev->base);
- 	kfree(dev);
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+The patch series does the following
+
+- Warn fixes if CONFIG_PM_RUNTIME is not selected.
+- In case of i2c remove register access was done without any
+ get_sync fix the same.
+- Folds a patch from Tasslehoff to prevent any merge conflicts.
+- Prevents the XDUF flag to be set if the underflow condition is not met.
+- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
+ use the unique id instead as the section number in the recent errata
+ docs has changed.
+
+
+
+[1] http://www.spinics.net/lists/linux-i2c/msg07607.html
+
+Tested on omap4sdp and omap3sdp.
+
+The following changes since commit 592fe8980688e7cba46897685d014c7fb3018a67:
+
+  Merge tag 'ext4_for_linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2012-04-17 13:30:34 -0700)
+
+are available in the git repository at:
+
+  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-fixes
+
+
+Shubhrajyoti D (9):
+  I2C: OMAP: make omap_i2c_unidle/idle functions depend on
+    CONFIG_PM_RUNTIME
+  I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
+  I2C: OMAP: Fix the interrupt clearing in OMAP4
+  I2C: OMAP: Fix the error handling
+  I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
+    than zero
+  I2C: OMAP: Fix the crash in i2c remove
+  I2C: OMAP: Handle error check for pm runtime
+  I2C: OMAP: Do not set the XUDF if the underflow is not reached
+  I2C: OMAP: Rename the 1p153 to the erratum id i462
+
+Tasslehoff Kjappfot (1):
+  I2C: OMAP: fix missing handling of errata I2C_OMAP3_1P153
+
+ drivers/i2c/busses/i2c-omap.c |  132 +++++++++++++++++++++--------------------
+ 1 files changed, 67 insertions(+), 65 deletions(-)
+
 -- 
 1.7.5.4
