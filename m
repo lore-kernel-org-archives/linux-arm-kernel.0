@@ -1,68 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Apr 2012 21:36:38 +0100
-Subject: [PATCH 09/15] ARM: ux500: Correctly describe SMSC9115 for Snowball in
- DT
+Date: Thu, 19 Apr 2012 21:36:39 +0100
+Subject: [PATCH 10/15] drivers/gpio: represent gpio-nomadik as an IRQ
+ controller in DT documentation
 In-Reply-To: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1334867804-31942-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1334867804-31942-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we split the description of the external-bus at 50000000 over
-two description files. In the more generic db8500 description file
-we only specify the external-bus. Normally this would be used to
-communicate with a NOR-flash device. On the Snowball however, the
-SMSC9115 Ethernet chip occupies it. In the Snowball board specific
-description file is where we actually specify that it is in fact the
-Ethernet device which lives here.
+Now gpio-nomadik has proper bindings devices initialised by Device Tree
+entries are able to use the chained GPIO IRQ lines it provides. This
+patch aims to reflect that in the gpio-nmk documentation.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi  |    9 +++++++++
- arch/arm/boot/dts/snowball.dts |   10 +++-------
- 2 files changed, 12 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/gpio/gpio-nmk.txt          |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index 9e8ff2c..f633210 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -307,5 +307,14 @@
- 			interrupts = <0 100 0x4>;
- 			status = "disabled";
- 		};
-+
-+		external-bus at 50000000 {
-+			compatible = "simple-bus";
-+			reg = <0x50000000 0x4000000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x50000000 0x4000000>;
-+			status = "disabled";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 22b82cc..56f8a76 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -72,15 +72,11 @@
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+index 3856789..ee87467 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+@@ -13,6 +13,7 @@ Required properties:
+                                   4 = active high level-sensitive.
+                                   8 = active low level-sensitive.
+ - gpio-controller       : Marks the device node as a GPIO controller.
++- interrupt-controller  : Marks the device node as an interrupt controller.
+ - gpio-bank             : Specifies which bank a controller owns.
+ - st,supports-sleepmode : Specifies whether controller can sleep or not
  
- 	soc-u9500 {
- 		external-bus at 50000000 {
--			compatible = "simple-bus";
--			reg = <0x50000000 0x10000000>;
--			#address-cells = <1>;
--			#size-cells = <1>;
--			ranges;
-+			status = "okay";
- 
--			ethernet at 50000000 {
-+			ethernet at 0 {
- 				compatible = "smsc,lan9115";
--				reg = <0x50000000 0x10000>;
-+				reg = <0 0x10000>;
- 				interrupts = <12 0x1>;
- 				interrupt-parent = <&gpio4>;
- 
+@@ -24,6 +25,7 @@ Example:
+                         interrupts = <0 120 0x4>;
+                         #gpio-cells = <2>;
+                         gpio-controller;
++                        interrupt-controller;
+                         supports-sleepmode;
+                         gpio-bank = <1>;
+                 };
 -- 
 1.7.9.1
