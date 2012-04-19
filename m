@@ -1,33 +1,24 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Apr 2012 21:34:00 -0700
-Subject: [GIT PULL] at91: 3.4-rc3 fixes
-In-Reply-To: <4F8D860C.8040306@atmel.com>
-References: <4F8D860C.8040306@atmel.com>
-Message-ID: <CAOesGMjuxazjpxxtJXz1zq8NdQQ39sdm0UweqvJVebSrouKRwg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 Apr 2012 08:00:11 +0200
+Subject: [GIT PULL] ux500 fixes for 3.4-rc series
+In-Reply-To: <CAOesGMichoCWrUv0P6CMQw=nobwQPgHbsz0UD_Zjz1wQTsQg_Q@mail.gmail.com>
+References: <CACRpkdbixRZb_6uT2M52zQ70Jb-uA0Lzhjy2ZG=g8vrKq9KPZg@mail.gmail.com>
+ <CAOesGMichoCWrUv0P6CMQw=nobwQPgHbsz0UD_Zjz1wQTsQg_Q@mail.gmail.com>
+Message-ID: <CACRpkdbOLqtAkr61Qp7_c-8w4NiyjOz3hVm5a8-8LtE-dxXqGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 19, 2012 at 6:29 AM, Olof Johansson <olof@lixom.net> wrote:
 
-On Tue, Apr 17, 2012 at 8:02 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Hi Arnd, Olof,
->
-> This is a new fixes series for AT91. I have tried to make it as a
-> signed tag...
->
->
-> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
->
-> ?Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
->
-> are available in the git repository at:
->
-> ?git://github.com/at91linux/linux-at91.git tags/at91-fixes
+> In the future, there's no need to encode the date in the tag -- the
+> tag itself contains the timestamp of when it was created/signed and
+> you can just overwrite it with the same tag when you prepare fixes
+> again next time (it's what we do).
 
-Thanks, pulled.
+Yeah I'll encode the v3.4-rcN or something more meaningful...
+The use of unique tags is mostly a way to avoid conflicts
+between identically named branches I have on my
+local & remote gits.
 
-You should try to get your key signed by a few more kernel developers.
-Remind me next time we're at the same event. :)
-
-
--Olof
+Yours,
+Linus Walleij
