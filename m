@@ -1,32 +1,73 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 19 Apr 2012 22:22:26 +0530
-Subject: [PATCH] arm: davinci: pdctl next bit position incorrect
-In-Reply-To: <4F8FECD6.6050105@mvista.com>
-References: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
- <4F8F22D1.8080309@ti.com> <4F8FECD6.6050105@mvista.com>
-Message-ID: <4F9042CA.7050305@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 19 Apr 2012 10:06:07 -0700
+Subject: [PATCH 2/9] ARM: OMAP2+: SmartReflex: move the driver specific
+ macros in include/linux/power
+In-Reply-To: <201204191354.38874.arnd@arndb.de> (Arnd Bergmann's message of
+ "Thu, 19 Apr 2012 13:54:38 +0000")
+References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
+ <CAORVsuVt5uj5NAsqsce+7f=xMXC9-nck5cPUCOEC8QP3VkxYyA@mail.gmail.com>
+ <4F7D6746.9020504@codeaurora.org> <201204191354.38874.arnd@arndb.de>
+Message-ID: <87sjfzvegw.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 4/19/2012 4:15 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 19-04-2012 0:23, Sekhar Nori wrote:
-> 
->>> The PDCTL NEXT bit is incorrectly set to bit 1 instead of bit 0. This
->>> patch fixes this issue
-> 
->>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> 
->> Applying this for v3.5.
-> 
->    But why not to 3.4? It concerns turning on DSP domain on DM644x.
+> On Thursday 05 April 2012, Trilok Soni wrote:
+>> >> Couple of suggestions:
+>> >>
+>> >> drivers/platform/omap/avs?
+>> >> drivers/misc/omap/avs?
+>> >>
+>
+> I would definitely prefer something under drivers/power,
+> drivers/regulators or a new top-level directory under
+> drivers.
+>
+>> >>> IIRC, David Brownell was referring to the rule of three for such case.
+>> >>> Meaning that it worth having a generic fmwk when at least three
+>> >>> different drivers are doing the same kind of things.
+>> >
+>> > Do OMAP v1 and OMAP v2 implementations count as 2 drivers? ;-)
+>> > More seriously, the OMAP code for SmartReflex is far from complete in
+>> > mainline. There is a plan to provide the following features:
+>> > - OMAP v1 IP,
+>> > - OMAP v2 IP,
+>> > - class 1.5,
+>> > - class 3,
+>> > - class 3.5,
+>> > - and more support for the upcoming chipsets.
+>> 
+>> I don't understand much of these versions right now, but hopefully after 
+>> going through all these docs. My only contention point is to not create 
+>> any directory into the drivers/power, unless it is generic fwk and then 
+>> build up "client" drivers on top of it. Meanwhile we could move this 
+>> driver into above options as I have suggested.
+>
+> I think creating the directory in the place where we want the files
+> to stay in the long run is ok, if the plan is to add more drivers and
+> make the base code more generic. We don't have to wait until it's too
+> late and we absolutely need a framework ;-)
 
-Yes, but I think as you noted sometime before, no one is really
-depending on kernel to turn on DSP domain on DM644x. Its probably being
-done from U-Boot or ROM code. This is not a v3.4 regression either.
+Completely agree, thanks.
 
-Thanks,
-Sekhar
+> The part I don't understand is how this relates to the regulator framework.
+> Is there any overlap between the functionality provided by the
+> smartreflex framework and the regulator framework? If so, would it be
+> better to extend the existing framework so it can do smartreflex as well?
+
+IMO, there isn't any overlap with the regulator framework, and AVS
+drivers/devices should be separate from the regulator framework.
+
+Think of AVS/SmartReflex as a way for hardware to do automatic
+micro-adjustments to the regulator.  The regulator voltage (a.k.a
+nominal voltage) will stay same from the perspective of the regulator
+and regulator framework, but AVS allows the hardware to do micro voltage
+adjustments around the nominal voltage.
+
+We recently extended the regulator framework to have allow get/set
+voltage hooks which can query platform-specific voltage frameworks which
+do hardware voltage control (which in turn can control AVS
+sensors/devices.)
+
+Kevin
