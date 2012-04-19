@@ -1,121 +1,57 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 19 Apr 2012 16:15:12 -0500
-Subject: [PATCH v2 4/8] ARM: OMAP2+: hwmod: revise hardreset behavior
-In-Reply-To: <alpine.DEB.2.00.1204191338370.29048@utopia.booyaka.com>
-References: <20120228053524.16278.59430.stgit@dusk>
- <20120228053654.16278.73632.stgit@dusk>
- <alpine.DEB.2.00.1204182253550.29048@utopia.booyaka.com>
- <4F90001E.8060201@ti.com>
- <alpine.DEB.2.00.1204191050110.29048@utopia.booyaka.com>
- <4F90641D.3090208@ti.com>
- <alpine.DEB.2.00.1204191338370.29048@utopia.booyaka.com>
-Message-ID: <CAB-zwWg4cFV-0zUmc4izrv=o4de9rc-8UNiB4x8-Nd8E9VuVfg@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 19 Apr 2012 23:18:39 +0200
+Subject: [PATCH v4] i2c: Add device tree support to i2c-pnx.c
+In-Reply-To: <20120419203915.GB28005@pengutronix.de>
+References: <1334850612-24151-1-git-send-email-stigge@antcom.de>
+ <20120419160715.GD24987@pengutronix.de> <4F903E0C.6010604@antcom.de>
+ <20120419203915.GB28005@pengutronix.de>
+Message-ID: <4F90812F.5090106@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi!
 
-On Thu, Apr 19, 2012 at 2:46 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi Beno?t,
->
-> On Thu, 19 Apr 2012, Cousson, Benoit wrote:
->
->> On 4/19/2012 7:17 PM, Paul Walmsley wrote:
->> > On Thu, 19 Apr 2012, Cousson, Benoit wrote:
->> >
->> > > The concern of the people doing SW in these embedded processors was mainly
->> > > because we were releasing the reset of processor without loading any SW
->> > > first
->> > > and thus the processor was executing some random instructions.
->> > >
->> > > So if we consider a better hwmods definition, we can potentially fix the
->> > > MMU
->> > > case:
->> > >
->> > > ? ? ?'mmu_ipu':
->> > > ? ? ? ? ?'rst_ipu_mmu_cache'
->> > >
->> > > ? ? ?'mmu_dsp':
->> > > ? ? ? ? ?'rst_dsp_mmu_cache'
->> > >
->> > > ? ? ?'iva_config':
->> > > ? ? ? ? ?'rst_logic'
->> >
->> > Wouldn't these still be "pseudo-hwmods?" ?Or do each of these actually
->> > have address space, interconnect ports, etc.?
->>
->> Yes, these ones are the only real IPs for MPU stand point, with interconnect
->> port and configuration registers.
->
-> These are the MMUs documented in Chapter 20 of the OMAP4430 TRM
-> vX, right?
->
-> I don't really understand the interaction of the hardreset lines with
-> these IPs. ?Chapter 20 doesn't seem to mention the PRCM-controllable
-> hardreset lines at all. ?It only mentions the OCP_SYSCONFIG registers
-> associated with them.
->
-> Meanwhile Table 3-375 "RM_DSP_RSTCTRL" mentions a DSP MMU, cache, and
-> slave interface reset line. ?Is that referring to the same MMU that is
-> mentioned in Chapter 20? ?The end of Section 20.2 "MMU Integration"
-> mentions two different DSP MMUs, a "shared cache MMU" and an "L2 MMU" -
-> maybe the hardreset line only pertains to the first MMU?
+On 19/04/12 22:39, Wolfram Sang wrote:
+>> If we have a solution soon, I will prepare a new version of the 
+>> patch, of course, in the next days.
+> 
+> Thanks. One question, though: Will it really block dt-conversion? 
+> The whole conversion should not be depending on the i2c-driver?
 
-I don't thinks so, because trying to read the L2 MMU registers with
-DSP RST2 asserted causes an L3 error.
+Technically, it would certainly be possible to convert some drivers
+and leave others. But I would highly prefer to convert i2c also. With
+LPC32xx, there are typically many I2C clients depending on DT on a
+reasonable DT enabled mach.
 
-DSP's "shared cache MMU" refers to section 5.3.2.5 Attribute MMU which
-is inside the dsp megamodule, OTOH "L2 MMU" refers to section 5.3.4
-MMU, the latter is the one being referenced in section 20.
+I'm fine with "timeout" also, when you accept it into pnx-i2c.c and
+will certainly provide a "timeout" patch update so you can pick the
+version which suits best.
 
->> > > But then we do have the processor resets that have to be exposed
->> > > somewhere.
->> > >
->> > > ? ? ?'ipu':
->> > > ? ? ? ? ?'rst_cpu0'
->> > > ? ? ? ? ?'rst_cpu1'
->> > >
->> > > ? ? ?'dsp':
->> > > ? ? ? ? ?'rst_dsp'
->> > >
->> > > ? ? ?'iva':
->> > > ? ? ? ? ?'rst_seq1'
->> > > ? ? ? ? ?'rst_seq2'
->> > >
->> > > None of these one should be controlled automatically.
->> >
->> > Don't we still want to put these IP blocks into reset until a driver for
->> > these IP blocks is loaded?
->>
->> Yes, indeed, my point is where are we going to declare these reset lines if we
->> do not have any fake hwmods to store them.
->
-> Wouldn't we associate them with the processor hwmods? ?e.g.,
-> omap44xx_iva_hwmod, omap44xx_dsp_hwmod ?
->
->> Well, for the MMU we can, these are regular IPs (almost). The real issues was
->> for the processors.
->
-> Omar, do you know ?how these hardreset lines interact with the MMUs
-> described in the TRM Chapter 20?
+Another solution would be to not use timeout with the dt enabled
+i2c-pnx for now (using the hard coded default timeout as the current
+i2c-pnx.c does) and possibly introduce the (anyway optional) "timeout"
+later.
 
-For M3, RM_MPU_M3_RSTCTRL[2].RST3 releases both the cache and mmu
-interfaces, this one is needed if you want to program the mmu by
-touching any of the MMU registers, typical initialization is to
-deassert this line and then enable the M3 clock (since it is shared
-with its MMU) which should allow the reset to complete *only* after
-the clock has been enabled.
+Actually, that would be my favour.
 
-For DSP, RM_DSP_RSTCTRL[1].RST2 it also releases dsp, cache and mmu
-(however the dsp doesn't boot until RST1 is deasserted), it is the
-same rationale as above; you deassert RST2, enable dsp clock (so reset
-can complete) and then program mmu.
+What do you think?
 
-Touching any mmu registers without deasserting its reset line (even if
-the associated clock is ON) generates a L3 error.
+>>> Did you change this, too? Timeouts are better readable in dec
+>>> :)
+>> 
+>> Right. But even when removing the "0x" in the timeout line
+>> above, it's still hex, see 
+>> Documentation/devicetree/booting-without-of.txt
+>> 
+>> Or did I get sth. wrong?
+> 
+> I think the document is probably outdated :( "clock-frequency" is 
+> also without 0x and dec.
 
-This can be found in 3.5.6 Reset sequences for DSP and M3.
+Interesting! When the documentation is outdated - how does the parser
+actually decide between hex (e.g. regs/addresses) and dec (e.g.
+clock-frequency) in the absence of "0x"?
 
-Regards,
+Thanks in advance,
 
-Omar
+Roland
