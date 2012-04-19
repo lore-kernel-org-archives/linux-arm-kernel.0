@@ -1,59 +1,54 @@
-From: pintu_agarwal@yahoo.com (PINTU KUMAR)
-Date: Thu, 19 Apr 2012 06:42:21 -0700 (PDT)
-Subject: [NEW]: Introducing shrink_all_memory from user space
-In-Reply-To: <20120418211032.47b243da@pyramind.ukuu.org.uk>
-References: <1334483226.20721.YahooMailNeo@web162003.mail.bf1.yahoo.com>
- <CAFLxGvwJCMoiXFn3OgwiX+B50FTzGZmo6eG3xQ1KaPsEVZVA1g@mail.gmail.com>
- <1334490429.67558.YahooMailNeo@web162006.mail.bf1.yahoo.com>
- <CAFLxGvz5tmEi-39CZbJN+0zNd3ZpHXzZcNSFUpUWS_aMDJ4t6Q@mail.gmail.com>
- <20120418211032.47b243da@pyramind.ukuu.org.uk>
-Message-ID: <1334842941.92324.YahooMailNeo@web162006.mail.bf1.yahoo.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Apr 2012 13:54:38 +0000
+Subject: [PATCH 2/9] ARM: OMAP2+: SmartReflex: move the driver specific
+ macros in include/linux/power
+In-Reply-To: <4F7D6746.9020504@codeaurora.org>
+References: <1332173578-27422-1-git-send-email-j-pihet@ti.com>
+ <CAORVsuVt5uj5NAsqsce+7f=xMXC9-nck5cPUCOEC8QP3VkxYyA@mail.gmail.com>
+ <4F7D6746.9020504@codeaurora.org>
+Message-ID: <201204191354.38874.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 05 April 2012, Trilok Soni wrote:
+> >> Couple of suggestions:
+> >>
+> >> drivers/platform/omap/avs?
+> >> drivers/misc/omap/avs?
+> >>
 
->________________________________
->From: Alan Cox <alan@lxorguk.ukuu.org.uk>
->To: richard -rw- weinberger <richard.weinberger@gmail.com>? 
->Sent: Thursday, 19 April 2012 1:40 AM
->Subject: Re: [NEW]: Introducing shrink_all_memory from user space
->
->On Sun, 15 Apr 2012 14:10:00 +0200
->richard -rw- weinberger <richard.weinberger@gmail.com> wrote:
->
->> On Sun, Apr 15, 2012 at 1:47 PM, PINTU KUMAR <pintu_agarwal@yahoo.com> wrote:
->> > Moreover, this is mainly meant for mobile phones where there is only *one* user.
->> 
->> I see. Jet another awful hack.
->> Mobile phones are nothing special. They are computers
->
->Correct - so if it is showing up useful situations then they are also
->useful beyond mobile phone.
->
->> Every program which is allowed to use this interface will (ab)use it.
->
->If you expose it to userspace then you would want it very tightly
->controlled and very much special case. Within the kernel using it
->internally within things like CMA allocators seems to make more sense.
->
->I think you overestimate the abuse. It's an interface which pushes clean
->pages that can be cheaply recovered out of memory. It doesn't guarantee
->the caller reaps the benefit of that, and the vm will continue to try and
->share out any new resource fairly.
->
->Alan
+I would definitely prefer something under drivers/power,
+drivers/regulators or a new top-level directory under
+drivers.
 
-Dear Alan, thank you very much for your comments and suggestion.
-My plan is to develop a kind of system utility (like defragment) which we can run from user space (as root).
-?
-And yes you are right, my future plan is also to use it for CMA as it also suffers from memory fragmentation.
-Now I think CMA uses memory compaction solution to reclaim pages for its allocation. Similarly we can use this on top of compaction for better results.
-?
-And we can even call this from low memory notifier whenever memory pressure falls below watermark and regain memory state as it was before.
-?
-Well more experiments and findings are in progress.
-?
-?
-?
-Thanks,
-Pintu
+> >>> IIRC, David Brownell was referring to the rule of three for such case.
+> >>> Meaning that it worth having a generic fmwk when at least three
+> >>> different drivers are doing the same kind of things.
+> >
+> > Do OMAP v1 and OMAP v2 implementations count as 2 drivers? ;-)
+> > More seriously, the OMAP code for SmartReflex is far from complete in
+> > mainline. There is a plan to provide the following features:
+> > - OMAP v1 IP,
+> > - OMAP v2 IP,
+> > - class 1.5,
+> > - class 3,
+> > - class 3.5,
+> > - and more support for the upcoming chipsets.
+> 
+> I don't understand much of these versions right now, but hopefully after 
+> going through all these docs. My only contention point is to not create 
+> any directory into the drivers/power, unless it is generic fwk and then 
+> build up "client" drivers on top of it. Meanwhile we could move this 
+> driver into above options as I have suggested.
+
+I think creating the directory in the place where we want the files
+to stay in the long run is ok, if the plan is to add more drivers and
+make the base code more generic. We don't have to wait until it's too
+late and we absolutely need a framework ;-)
+
+The part I don't understand is how this relates to the regulator framework.
+Is there any overlap between the functionality provided by the
+smartreflex framework and the regulator framework? If so, would it be
+better to extend the existing framework so it can do smartreflex as well?
+
+	Arnd
