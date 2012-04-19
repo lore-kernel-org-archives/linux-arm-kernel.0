@@ -1,44 +1,27 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 19 Apr 2012 21:40:05 +0200
-Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
- flag
-In-Reply-To: <1334788817.8003.YahooMailClassic@web29002.mail.ird.yahoo.com>
- (Paul Parsons's message of "Wed, 18 Apr 2012 23:40:17 +0100 (BST)")
-References: <1334788817.8003.YahooMailClassic@web29002.mail.ird.yahoo.com>
-Message-ID: <87vckvfr3e.fsf@free.fr>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 19 Apr 2012 12:40:44 -0700
+Subject: [PATCHv24 00/16] Contiguous Memory Allocator
+In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
+References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120419124044.632bfa49.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 03 Apr 2012 16:10:05 +0200
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-Haojian,
+> This is (yet another) update of CMA patches.
 
-I feel there's some change in PXA gpio wakeup handling that's weird.
+Looks OK to me.  It's a lot of code.
 
-The effect : gpio_keys driver can't wakeup from suspend to RAM on GPIO0
-activation
+Please move it into linux-next, and if all is well, ask Linus to pull
+the tree into 3.5-rc1.  Please be sure to cc me on that email.
 
-A quick analysis (thanks Paul for direction) :
- - gpio_keys() calls irq_set_wake(96, 1) (ie. gpio0)
- - gpio-pxa driver doesn't care (as it doesn't have any irq_set_wake function)
-   (see in [1])
+I suggest that you include additional patches which enable CMA as much
+as possible on as many architectures as possible so that it gets
+maximum coverage testing in linux-next.  Remove those Kconfig patches
+when merging upstream.
 
-Now if I'm directing the mail at is because you're the only one who commited
-between v3.2 and v3.3 in gpio-pxa driver ([2]).
-
-Could you tell me if removing irq_set_wake() was intentional ?
-
-Cheers.
-
--- 
-Robert
-
-[1]
-rj at beldin:~/mio_linux/kernel$ git show v3.2:drivers/gpio/gpio-pxa.c | grep set_wake
-void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
-	pxa_muxed_gpio_chip.irq_set_wake = fn;
-rj at beldin:~/mio_linux/kernel$ git show v3.3:drivers/gpio/gpio-pxa.c | grep set_wake
-rj at beldin:~/mio_linux/kernel$ 
-
-[2]
-rj at beldin:~/mio_linux/kernel$ git log v3.3 ^v3.2 --pretty=format:%an drivers/gpio/gpio-pxa.c | sort -u
-Haojian Zhuang
+All this code will probably mess up my tree, but I'll work that out. 
+It would be more awkward if the CMA code were to later disappear from
+linux-next or were not merged into 3.5-rc1.  Let's avoid that.
