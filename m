@@ -1,24 +1,87 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 Apr 2012 08:00:11 +0200
-Subject: [GIT PULL] ux500 fixes for 3.4-rc series
-In-Reply-To: <CAOesGMichoCWrUv0P6CMQw=nobwQPgHbsz0UD_Zjz1wQTsQg_Q@mail.gmail.com>
-References: <CACRpkdbixRZb_6uT2M52zQ70Jb-uA0Lzhjy2ZG=g8vrKq9KPZg@mail.gmail.com>
- <CAOesGMichoCWrUv0P6CMQw=nobwQPgHbsz0UD_Zjz1wQTsQg_Q@mail.gmail.com>
-Message-ID: <CACRpkdbOLqtAkr61Qp7_c-8w4NiyjOz3hVm5a8-8LtE-dxXqGg@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Thu, 19 Apr 2012 08:16:20 +0200
+Subject: [PATCH 02/40] clk: add a fixed factor clock
+In-Reply-To: <4F8F8AF1.3070802@st.com>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-3-git-send-email-s.hauer@pengutronix.de>
+ <4F8F8AF1.3070802@st.com>
+Message-ID: <20120419061620.GA2790@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 6:29 AM, Olof Johansson <olof@lixom.net> wrote:
+On Thu, Apr 19, 2012 at 09:18:01AM +0530, Viresh Kumar wrote:
+> On 4/10/2012 7:15 PM, Sascha Hauer wrote:
+> > Having fixed factors/dividers in hardware is a common pattern, so
+> > add a basic clock type doing this. It basically describes a fixed
+> > factor clock using a nominator and a denominator.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/clk/Makefile           |    2 +-
+> >  drivers/clk/clk-fixed-factor.c |   97 ++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/clk-provider.h   |    4 ++
+> >  3 files changed, 102 insertions(+), 1 deletion(-)
+> >  create mode 100644 drivers/clk/clk-fixed-factor.c
+> 
+> @Mike: It would be better if you can take this patch atleast ASAP in your next,
+> so that Arnd can pull in SPEAr clk patches.
+> 
+> Hi Sascha/Mike,
+> 
+> Please see if following can be squashed with this patch. This clock is
+> used for SPEAr too :)
+> 
+> ---
+>  drivers/clk/clk-fixed-factor.c |   12 ++----------
+>  1 files changed, 2 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index 7c5e1fc..aaf5a88 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -16,7 +16,6 @@ struct clk_fixed_factor {
+>  	struct clk_hw	hw;
+>  	unsigned int	mult;
+>  	unsigned int	div;
+> -	char		*parent[1];
 
-> In the future, there's no need to encode the date in the tag -- the
-> tag itself contains the timestamp of when it was created/signed and
-> you can just overwrite it with the same tag when you prepare fixes
-> again next time (it's what we do).
+add const here
 
-Yeah I'll encode the v3.4-rcN or something more meaningful...
-The use of unique tags is mostly a way to avoid conflicts
-between identically named branches I have on my
-local & remote gits.
+>  };
+>  
+>  #define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
+> @@ -75,22 +74,15 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>  	fix->mult = mult;
+>  	fix->div = div;
+>  
+> -	if (parent_name) {
 
-Yours,
-Linus Walleij
+		char *tmp = kstrdup(parent_name, GFP_KERNEL);
+		if (!tmp)
+			goto out;
+		fix->parent[0] = tmp;
+	
+> -	}
+> -
+>  	clk = clk_register(dev, name,
+>  			&clk_fixed_factor_ops, &fix->hw,
+> -			fix->parent,
+> +			&parent_name,
+
+&parent_name is a pointer to a stack variable, right? clk_register
+saves it in the clk struct for later use, when the stack is already gone.
+
+>  			(parent_name ? 1 : 0),
+>  			flags);
+> +
+>  	if (clk)
+>  		return clk;
+>  
+> -out:
+> -	kfree(fix->parent[0]);
+>  	kfree(fix);
+>  
+>  	return NULL;
+
+BRs,
+Domenico
