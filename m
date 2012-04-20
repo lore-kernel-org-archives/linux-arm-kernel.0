@@ -1,53 +1,56 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 20 Apr 2012 11:11:48 +0200
-Subject: [PATCH v4 2/2] MTD: AT91: Update atmel_nand_data to support PMECC
-In-Reply-To: <A92DB5DF46DBC241980A99BFD8A00AEE0F62D6EE@penmbx01>
-References: <1334906788-18704-1-git-send-email-hong.xu@atmel.com>
- <1334906788-18704-2-git-send-email-hong.xu@atmel.com>
- <20120420082729.GY16641@game.jcrosoft.org>
- <A92DB5DF46DBC241980A99BFD8A00AEE0F62D6EE@penmbx01>
-Message-ID: <20120420091148.GZ16641@game.jcrosoft.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 20 Apr 2012 12:33:33 +0300
+Subject: [PATCH 00/19] ARM: OMAP4 device off support
+Message-ID: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:24 Fri 20 Apr     , Xu, Hong wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
-> > Sent: Friday, April 20, 2012 4:27 PM
-> > To: Xu, Hong
-> > Cc: linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org;
-> > dedekind1 at gmail.com; Ferre, Nicolas
-> > Subject: Re: [PATCH v4 2/2] MTD: AT91: Update atmel_nand_data to support PMECC
-> > 
-> > On 15:26 Fri 20 Apr     , Hong Xu wrote:
-> > > Added two items,
-> > > * correction_cap: PMECC correction capability
-> > > * sector_size:    Sector size for PMECC
-> > >
-> > > Signed-off-by: Hong Xu <hong.xu@atmel.com>
-> > > ---
-> > >  include/linux/platform_data/atmel.h |    2 ++
-> > >  1 file changed, 2 insertions(+)
-> > >
-> > > diff --git a/include/linux/platform_data/atmel.h
-> > b/include/linux/platform_data/atmel.h
-> > > index b0f2c56..4d9bfd5 100644
-> > > --- a/include/linux/platform_data/atmel.h
-> > > +++ b/include/linux/platform_data/atmel.h
-> > > @@ -20,6 +20,8 @@ struct atmel_nand_data {
-> > >  	u8		bus_width_16;		/* buswidth is 16 bit */
-> > >  	u8		ecc_mode;		/* ecc mode */
-> > >  	u8		on_flash_bbt;		/* bbt on flash */
-> > > +	u8		correction_cap;		/* PMECC capability */
-> > > +	u16		sector_size;		/* Sector size for PMECC */
-> > as this only used by DT
-> > no need to expose it
-> > 
-> 
-> OK, we could put those into struct Atmel_nand_host. But this means PMECC will totally rely on DT.
-yes as none of the non dt-only soc use it
+Hi,
 
-Best Regards,
-J.
+First version for this work. Applies on top of mainline + iochain set +
+OMAP4 core retention set. Working tree available here:
+tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+branch: mainline-3.4-omap4-dev-off
+
+Tested on omap4430 EMU blaze + omap4460 GP panda boards.
+
+Some drivers have issues with device off, most notably MMC, as it breaks
+device off on blaze device after 1 entry to device off mode:
+
+[  208.906921] omap_i2c omap_i2c.1: XRDY IRQ while no data to send
+[  209.905639] omap_i2c omap_i2c.1: controller timed out
+[  209.905792] twl: i2c_read failed to transfer all messages
+[  209.905792] omap_hsmmc omap_hsmmc.1: could not set regulator OCR (-110)
+[  212.296203] mmc0: error -110 during resume (card was removed?)
+[  212.562164] PM: resume of devices complete after 3656.007 msecs
+[  212.660125] Restarting tasks ... done.
+# 
+# echo mem > /sys/power/state 
+[  220.376892] PM: Syncing filesystems ... done.
+[  220.382476] Freezing user space processes ... (elapsed 0.01 seconds) done.
+[  220.408386] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) don
+e.
+[  220.439605] Suspending console(s) (use no_console_suspend to debug)
+[  220.454650] dpm_run_callback(): platform_pm_suspend+0x0/0x54 returns -110
+[  220.454711] PM: Device omap_hsmmc.1 failed to suspend: error -110
+[  220.454711] PM: Some devices failed to suspend
+[  220.718261] PM: resume of devices complete after 263.539 msecs
+[  220.743988] Restarting tasks ... done.
+
+Attempting to disable MMC from config prevented boot completely for me,
+so this issue is likely to stay until someone fixes the MMC driver.
+Panda device works fine though, although the wakeup from device off is
+slow due to problems with some other drivers (most likely I2C.)
+
+Off mode is disabled by default, it can be enabled by either calling
+omap4_pm_enable_off_mode(1) from board files or alternatively writing
+to a debugfs node from userspace:
+
+echo 1 > /debug/pm_debug/enable_off_mode
+
+Device off entry can be tracked through the debugfs also, it increases
+the core_pwrdm OFF state counter / timer, as this is an invalid state
+for the chip normally (core enters OSWR in device off.) Not sure if this
+a good way to do this but comments are welcome.
+
+-Tero
