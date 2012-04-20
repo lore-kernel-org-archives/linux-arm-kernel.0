@@ -1,108 +1,64 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 12:19:51 +0300
-Subject: [PATCHv4 8/8] ARM: OMAP4: PM: Added option for enabling OSWR
-In-Reply-To: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
-References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1334913591-26312-9-git-send-email-t-kristo@ti.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 20 Apr 2012 17:24:18 +0800
+Subject: [PATCH 2/3] ARM: mx28evk: add gpmi-nand dt support
+In-Reply-To: <1334913859-5314-1-git-send-email-b32955@freescale.com>
+References: <1334913859-5314-1-git-send-email-b32955@freescale.com>
+Message-ID: <1334913859-5314-3-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PM debug now contains a file that can be used to control OSWR support
-enable / disable on OMAP4. Also removed the off_mode_enable file for
-the same platform as it is unsupported.
+add gpmi-nand device tree support, and add proper clock for it.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/mach-omap2/pm-debug.c |   20 ++++++++++++++++----
- arch/arm/mach-omap2/pm.h       |    1 +
- arch/arm/mach-omap2/pm44xx.c   |   16 ++++++++++++++++
- 3 files changed, 33 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx28.dtsi   |    9 +++++----
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index 814bcd9..d9a8e42 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -39,6 +39,7 @@
- #include "pm.h"
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index dd209a3..2804a43 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -63,15 +63,16 @@
+ 			};
  
- u32 enable_off_mode;
-+static u32 enable_oswr_mode;
+ 			bch at 8000a000 {
++				compatible = "fsl,imx28-bch";
+ 				reg = <0x8000a000 2000>;
+ 				interrupts = <41>;
+-				status = "disabled";
+ 			};
  
- #ifdef CONFIG_DEBUG_FS
- #include <linux/debugfs.h>
-@@ -247,10 +248,13 @@ static int option_set(void *data, u64 val)
- 			omap_pm_enable_off_mode();
- 		else
- 			omap_pm_disable_off_mode();
--		if (cpu_is_omap34xx())
--			omap3_pm_off_mode_enable(val);
-+
-+		omap3_pm_off_mode_enable(val);
- 	}
+-			gpmi at 8000c000 {
++			gpmi-nand at 8000c000 {
++				compatible = "fsl,imx28-gpmi-nand";
+ 				reg = <0x8000c000 2000>;
+-				interrupts = <42 88>;
+-				status = "disabled";
++				interrupts = <88>;
++				dma_channel = <4>;
+ 			};
  
-+	if (option == &enable_oswr_mode)
-+		omap4_pm_oswr_mode_enable(val);
-+
- 	return 0;
- }
- 
-@@ -274,8 +278,16 @@ static int __init pm_dbg_init(void)
- 
- 	pwrdm_for_each(pwrdms_setup, (void *)d);
- 
--	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
--				   &enable_off_mode, &pm_dbg_option_fops);
-+	if (cpu_is_omap34xx())
-+		(void) debugfs_create_file("enable_off_mode",
-+			S_IRUGO | S_IWUSR, d, &enable_off_mode,
-+			&pm_dbg_option_fops);
-+
-+	if (cpu_is_omap44xx())
-+		(void) debugfs_create_file("enable_oswr_mode",
-+			S_IRUGO | S_IWUSR, d, &enable_oswr_mode,
-+			&pm_dbg_option_fops);
-+
- 	pm_dbg_init_done = 1;
- 
- 	return 0;
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 256e63c..07ad800 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -17,6 +17,7 @@
- 
- extern void *omap3_secure_ram_storage;
- extern void omap3_pm_off_mode_enable(int);
-+extern void omap4_pm_oswr_mode_enable(int);
- extern void omap_sram_idle(void);
- extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
- extern int omap3_idle_init(void);
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index cc85576..07ac0d3 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -115,6 +115,22 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
- }
- 
-+void omap4_pm_oswr_mode_enable(int enable)
-+{
-+	u32 next_logic_state;
-+	struct power_state *pwrst;
-+
-+	if (enable)
-+		next_logic_state = PWRDM_POWER_OFF;
-+	else
-+		next_logic_state = PWRDM_POWER_RET;
-+
-+	list_for_each_entry(pwrst, &pwrst_list, node) {
-+		pwrst->next_logic_state = next_logic_state;
-+		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->next_logic_state);
-+	}
-+}
-+
- /**
-  * omap_default_idle - OMAP4 default ilde routine.'
-  *
+ 			ssp at 80010000 {
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 8401854..6fe6737 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -617,7 +617,6 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("duart", NULL, uart_clk)
+ 	_REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
+ 	_REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
+-	_REGISTER_CLOCK("imx28-gpmi-nand", NULL, gpmi_clk)
+ 	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+ 	_REGISTER_CLOCK("mxs-auart.1", NULL, uart_clk)
+ 	_REGISTER_CLOCK("mxs-auart.2", NULL, uart_clk)
+@@ -649,6 +648,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxs-saif.0", NULL, saif0_clk)
+ 	_REGISTER_CLOCK("mxs-saif.1", NULL, saif1_clk)
+ 	/* for DT */
++	_REGISTER_CLOCK("8000c000.gpmi-nand", NULL, gpmi_clk)
+ 	_REGISTER_CLOCK("80074000.serial", NULL, uart_clk)
+ 	_REGISTER_CLOCK("800f0000.ethernet", NULL, fec_clk)
+ 	_REGISTER_CLOCK("800f4000.ethernet", NULL, fec_clk)
 -- 
-1.7.4.1
+1.7.0.4
