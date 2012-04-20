@@ -1,35 +1,79 @@
-From: galak@kernel.crashing.org (Kumar Gala)
-Date: Fri, 20 Apr 2012 13:31:12 -0500
-Subject: [PATCHv24 00/16] Contiguous Memory Allocator
-In-Reply-To: <20120419124044.632bfa49.akpm@linux-foundation.org>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
- <20120419124044.632bfa49.akpm@linux-foundation.org>
-Message-ID: <4C95F6F5-3B10-42FE-92B7-C1E8AE6A1820@kernel.crashing.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 20 Apr 2012 21:48:26 +0200
+Subject: [PATCH v4] iio: Add device tree support to LPC32xx ADC
+Message-ID: <1334951307-1269-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds device tree support to the LPC32xx's ADC.
 
-On Apr 19, 2012, at 2:40 PM, Andrew Morton wrote:
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-> On Tue, 03 Apr 2012 16:10:05 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> 
->> This is (yet another) update of CMA patches.
-> 
-> Looks OK to me.  It's a lot of code.
-> 
-> Please move it into linux-next, and if all is well, ask Linus to pull
-> the tree into 3.5-rc1.  Please be sure to cc me on that email.
-> 
-> I suggest that you include additional patches which enable CMA as much
-> as possible on as many architectures as possible so that it gets
-> maximum coverage testing in linux-next.  Remove those Kconfig patches
-> when merging upstream.
-> 
-> All this code will probably mess up my tree, but I'll work that out. 
-> It would be more awkward if the CMA code were to later disappear from
-> linux-next or were not merged into 3.5-rc1.  Let's avoid that.
+---
 
-I'm looking at the patches to see if I can contribute arch support for PPC.
+Applies to v3.4-rc3
 
-- k
+Changes since v3:
+* Changed "compatible" strings to non-wildcard versions
+
+Thanks to Arnd Bergmann and Lars-Peter Clausen for reviewing!
+
+ Documentation/devicetree/bindings/staging/iio/adc/lpc32xx-adc.txt |   17 ++++++++++
+ drivers/staging/iio/adc/lpc32xx_adc.c                             |   13 +++++++
+ 2 files changed, 30 insertions(+)
+
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/staging/iio/adc/lpc32xx-adc.txt
+@@ -0,0 +1,17 @@
++* NXP LPC32xx SoC ADC controller
++
++Required properties:
++- compatible: must be "nxp,lpc3220-adc", "nxp,lpc3230-adc", "nxp,lpc3240-adc"
++  or "nxp,lpc3250-adc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: The ADC interrupt
++
++Example:
++
++	adc at 40048000 {
++		compatible = "nxp,lpc3250-adc";
++		reg = <0x40048000 0x1000>;
++		interrupt-parent = <&mic>;
++		interrupts = <39 0>;
++	};
+--- linux-2.6.orig/drivers/staging/iio/adc/lpc32xx_adc.c
++++ linux-2.6/drivers/staging/iio/adc/lpc32xx_adc.c
+@@ -30,6 +30,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/completion.h>
++#include <linux/of.h>
+ 
+ #include "../iio.h"
+ #include "../sysfs.h"
+@@ -221,12 +222,24 @@ static int __devexit lpc32xx_adc_remove(
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id lpc32xx_adc_match[] = {
++	{ .compatible = "nxp,lpc3220-adc" },
++	{ .compatible = "nxp,lpc3230-adc" },
++	{ .compatible = "nxp,lpc3240-adc" },
++	{ .compatible = "nxp,lpc3250-adc" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, lpc32xx_adc_match);
++#endif
++
+ static struct platform_driver lpc32xx_adc_driver = {
+ 	.probe		= lpc32xx_adc_probe,
+ 	.remove		= __devexit_p(lpc32xx_adc_remove),
+ 	.driver		= {
+ 		.name	= MOD_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(lpc32xx_adc_match),
+ 	},
+ };
+ 
