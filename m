@@ -1,59 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 Apr 2012 15:26:47 +0200
-Subject: [RFC PATCH 00/10 V3] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <201204201444.49184.marex@denx.de>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <20120420094805.GS20478@pengutronix.de>
- <CAL411-onyB8SJEBoJ2XK=wyHKR0C7SyJtCsoJCDZGatP8HmYZg@mail.gmail.com>
- <201204201444.49184.marex@denx.de>
-Message-ID: <20120420132647.GQ3852@pengutronix.de>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 20 Apr 2012 15:33:14 +0200
+Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
+ support
+In-Reply-To: <20120420131005.GO3852@pengutronix.de>
+References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
+ <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
+ <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
+ <20120420131005.GO3852@pengutronix.de>
+Message-ID: <20120420133314.GF4217@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 02:44:48PM +0200, Marek Vasut wrote:
-> Dear Peter Chen,
-> 
-> > On Fri, Apr 20, 2012 at 5:48 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > >> btw /wrt USB Gadget etc -- how does the
-> > >> drivers/usb/gadget/fsl_udc_core.c and drivers/usb/gadget/ci13xxx_* fit
-> > >> into the big picture? We're gonna use the ci13xxx stuff for Gadget on
-> > >> mx28, correct? Then how does fsl_udc_core.c fit in?
-> > > 
-> > > From what I have been told by a collegue the ci13xxx driver works
-> > > better, and from what I have seen the code looks better. So I think mxs
-> > > should use it. i.MX can then use it later aswell. We won't need the
-> > > fsl_udc_core driver anymore then.
-> > 
-> > Oh, I find I lost many discussions using company email.
-> > From the function and quality level, fsl_udc_core.c is absolutely the
-> > best one for all
-> > i.mx SoCs, as both internal and upstream fsl code use it.
-> 
-> Internally though, it looks like crap.
+On Fri, Apr 20, 2012 at 03:10:05PM +0200, Sascha Hauer wrote:
+> (BTW each driver in drm has this layer somewhere in it. If I had hidden
+> it in imx specific functions I probably wouldn't have raised any
+> questions, but I don't want to go that way)
 
-+1 on this.
+That's _exactly_ what you should be doing. And once you have more than one
+driver that works in a similar way, you can extract the common code as
+helper functions to make life easier. Like Rob&Alan did with a few gem
+helpers they needed in omapdrm/gma500.
 
-> Also, ci13xxx and fsl_usb_core is duplicated stuff, correct?
+For your case it sounds like a new set of modeset helper functions
+tailored for the embedded use-case would be good (as Dave Airlie
+suggested). Adding yet another middle-layer (like sdrm is) that forces
+drivers to go through it usually ends up in tears. And drm core
+unfortunately still has too much middle-layer heritage: For an awful lot
+of setup and teardown issues it's the core of the problme - because
+drivers can't control when drm sets up and tears down certain things, it's
+done at the wrong time (for certain drivers at least). Same problem when
+the abstraction doesn't quite fit.
 
-Yes.
+Helper functions leave the driver in full control of what's going on, and
+working around hw-specific madness with ease.
 
-> 
-> > I will check with IC guys to see if i.mx's controller is compatible
-> > with CI13412.
-> > If fsl's compatible with CI13412, then mxs can try to use ci13xxx_udc.c to
-> > see if there are any problems, If no problems with kinds of testing,
-> > we can switch all i.mx SoC to ci13xxx_udc.c.
-> 
-> Sascha, did you need to patch this ci13xxx somehow to get it running on MXS ? Or 
-> what was it that said he got it somehow running?
+https://lwn.net/Articles/336262/ is the canonical reference for why a lot
+of kernel people are allergic to anything that looks like a middle-layer.
 
-It basically works out of the box. I think we have some patches for this
-driver, maybe michael can comment on this.
-
-Sascha
-
+Yours, Daniel
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
