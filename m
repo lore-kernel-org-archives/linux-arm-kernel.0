@@ -1,565 +1,306 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 20 Apr 2012 17:24:19 +0800
-Subject: [PATCH 3/3] mtd: gpmi: add device tree support for mx6q-arm2 and
- mx28evk
-In-Reply-To: <1334913859-5314-1-git-send-email-b32955@freescale.com>
-References: <1334913859-5314-1-git-send-email-b32955@freescale.com>
-Message-ID: <1334913859-5314-4-git-send-email-b32955@freescale.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 20 Apr 2012 11:22:35 +0200
+Subject: [PATCH v5] i2c: Add device tree support to i2c-pnx.c
+Message-ID: <1334913755-10466-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add DT support to mx6q-arm2 and mx28evk.
+This patch adds device tree support to the pnx-i2c driver by using platform
+resources for memory region and irq and removing dependency on mach includes.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+The following platforms are affected:
+
+* PNX
+* LPC31xx (WIP)
+* LPC32xx
+
+The patch is based on a patch by Jon Smirl, working on lpc31xx integration
+
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+
 ---
- .../devicetree/bindings/mtd/gpmi-nand.txt          |   30 +++
- drivers/mtd/nand/Kconfig                           |    2 +-
- drivers/mtd/nand/gpmi-nand/bch-regs.h              |   42 +++-
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c              |   18 +-
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c             |  240 +++++++++-----------
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |    6 +-
- 6 files changed, 181 insertions(+), 157 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/gpmi-nand.txt
 
-diff --git a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
-new file mode 100644
-index 0000000..e1181ee
+Applies to v3.4-rc3 + already applied i2c-pnx.c patches from this series
+
+NOTE: I separated out this patch from the first patch series of the LPC32xx
+device tree conversion because most of those patches are already applied to
+-next. This is the last patch of this first series, a precondition for the
+LPC32xx device tree switch.
+
+Changes since v4:
+* Removed OF timeout property (to be added later when there is consensus about
+  how to call and handle it)
+* Changed clock-frequency example to decimal
+
+ Documentation/devicetree/bindings/i2c/pnx.txt |   38 +++++++++++++
+ drivers/i2c/busses/i2c-pnx.c                  |   71 +++++++++++++++++++-------
+ include/linux/i2c-pnx.h                       |    1 
+ 3 files changed, 93 insertions(+), 17 deletions(-)
+
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
-@@ -0,0 +1,30 @@
-+* Freescale General-Purpose Media Interface (GPMI)
++++ linux-2.6/Documentation/devicetree/bindings/i2c/pnx.txt
+@@ -0,0 +1,38 @@
++* NXP PNX I2C Controller
 +
-+The GPMI nand controller provides an interface to control the
-+NAND flash chips. We support only one NAND chips now.
++Required properties:
 +
-+The GPMI nand controller required properties:
-+  - compatible : should be "fsl,<chip>-gpmi-nand"
-+  - reg : should contain registers location and length.
-+  - interrupts : should contain the DMA interrupt number for GPMI.
-+                 We do not use the GPMI interrupt.
-+  - dma_channel: Should contain the dma channel it uses.
++ - reg: Offset and length of the register set for the device
++ - compatible: should be "nxp,pnx-i2c"
++ - interrupts: configure one interrupt line
++ - #address-cells: always 1 (for i2c addresses)
++ - #size-cells: always 0
++ - interrupt-parent: the phandle for the interrupt controller that
++   services interrupts for this device.
 +
-+The BCH required properties:
-+  - compatible : should be "fsl,<chip>-bch"
-+  - reg : should contain registers location and length.
-+  - interrupts : should contain the BCH interrupt.
++Optional properties:
++
++ - clock-frequency: desired I2C bus clock frequency in Hz, Default: 100000 Hz
++ - slave-addr: Address used by the controller, Hardware default: 0x6e
 +
 +Examples:
 +
-+gpmi-nand at 8000c000 {
-+	compatible = "fsl,imx28-gpmi-nand";
-+	reg = <0x8000c000 2000>;
-+	interrupts = <88>;
-+	dma_channel = <4>;
-+};
-+bch at 8000a000 {
-+	compatible = "fsl,imx28-bch";
-+	reg = <0x8000a000 2000>;
-+	interrupts = <41>;
-+};
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 7d17cec..bf0a28d 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -440,7 +440,7 @@ config MTD_NAND_NANDSIM
++	i2c1: i2c at 400a0000 {
++		compatible = "nxp,pnx-i2c";
++		reg = <0x400a0000 0x100>;
++		interrupt-parent = <&mic>;
++		interrupts = <51 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	i2c2: i2c at 400a8000 {
++		compatible = "nxp,pnx-i2c";
++		reg = <0x400a8000 0x100>;
++		interrupt-parent = <&mic>;
++		interrupts = <50 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-frequency = <100000>;
++		slave-addr = <0x11>;
++	};
+--- linux-2.6.orig/drivers/i2c/busses/i2c-pnx.c
++++ linux-2.6/drivers/i2c/busses/i2c-pnx.c
+@@ -23,10 +23,11 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/slab.h>
++#include <linux/of_i2c.h>
  
- config MTD_NAND_GPMI_NAND
-         bool "GPMI NAND Flash Controller driver"
--        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
-+        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
-         help
- 	 Enables NAND Flash support for IMX23 or IMX28.
- 	 The GPMI controller is very powerful, with the help of BCH
-diff --git a/drivers/mtd/nand/gpmi-nand/bch-regs.h b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-index 4effb8c..a092451 100644
---- a/drivers/mtd/nand/gpmi-nand/bch-regs.h
-+++ b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-@@ -51,15 +51,26 @@
+-#define I2C_PNX_TIMEOUT		10 /* msec */
+-#define I2C_PNX_SPEED_KHZ	100
+-#define I2C_PNX_REGION_SIZE	0x100
++#define I2C_PNX_TIMEOUT_DEFAULT		10 /* msec */
++#define I2C_PNX_SPEED_KHZ_DEFAULT	100
++#define I2C_PNX_REGION_SIZE		0x100
  
- #define BP_BCH_FLASH0LAYOUT0_ECC0		12
- #define BM_BCH_FLASH0LAYOUT0_ECC0	(0xf << BP_BCH_FLASH0LAYOUT0_ECC0)
--#define BF_BCH_FLASH0LAYOUT0_ECC0(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT0_ECC0) & BM_BCH_FLASH0LAYOUT0_ECC0)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)
-+#define BF_BCH_FLASH0LAYOUT0_ECC0(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT0_ECC0)		\
-+			& BM_BCH_FLASH0LAYOUT0_ECC0)		\
-+	)
+ enum {
+ 	mstatus_tdi = 0x00000001,
+@@ -74,8 +75,9 @@ enum {
+ #define I2C_REG_TXS(a)	((a)->ioaddr + 0x28)	/* Tx slave FIFO (RO) */
+ #define I2C_REG_STFL(a)	((a)->ioaddr + 0x2c)	/* Tx slave FIFO level (RO) */
  
- #define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE		0
- #define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
--#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)\
--					 & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)		\
-+	)
- 
- #define HW_BCH_FLASH0LAYOUT1			0x00000090
- 
-@@ -72,13 +83,24 @@
- 
- #define BP_BCH_FLASH0LAYOUT1_ECCN		12
- #define BM_BCH_FLASH0LAYOUT1_ECCN	(0xf << BP_BCH_FLASH0LAYOUT1_ECCN)
--#define BF_BCH_FLASH0LAYOUT1_ECCN(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT1_ECCN) & BM_BCH_FLASH0LAYOUT1_ECCN)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)
-+#define BF_BCH_FLASH0LAYOUT1_ECCN(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT1_ECCN)		\
-+			& BM_BCH_FLASH0LAYOUT1_ECCN)		\
-+	)
- 
- #define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE		0
- #define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
--#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE) \
--					 & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
-+	)
- #endif
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index fa5200b..a1f4332 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -224,13 +224,13 @@ int bch_set_geometry(struct gpmi_nand_data *this)
- 	/* Configure layout 0. */
- 	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)
- 			| BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size)
--			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT0);
- 
- 	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)
--			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT1);
- 
- 	/* Set *all* chip selects to use layout 0. */
-@@ -256,11 +256,12 @@ static unsigned int ns_to_cycles(unsigned int time,
- 	return max(k, min);
+-static inline int wait_timeout(long timeout, struct i2c_pnx_algo_data *data)
++static inline int wait_timeout(struct i2c_pnx_algo_data *data)
+ {
++	long timeout = data->timeout;
+ 	while (timeout > 0 &&
+ 			(ioread32(I2C_REG_STS(data)) & mstatus_active)) {
+ 		mdelay(1);
+@@ -84,8 +86,9 @@ static inline int wait_timeout(long time
+ 	return (timeout <= 0);
  }
  
-+#define DEF_MIN_PROP_DELAY	5
-+#define DEF_MAX_PROP_DELAY	9
- /* Apply timing to current hardware conditions. */
- static int gpmi_nfc_compute_hardware_timing(struct gpmi_nand_data *this,
- 					struct gpmi_nfc_hardware_timing *hw)
+-static inline int wait_reset(long timeout, struct i2c_pnx_algo_data *data)
++static inline int wait_reset(struct i2c_pnx_algo_data *data)
  {
--	struct gpmi_nand_platform_data *pdata = this->pdata;
- 	struct timing_threshod *nfc = &timing_default_threshold;
- 	struct nand_chip *nand = &this->nand;
- 	struct nand_timing target = this->timing;
-@@ -277,8 +278,8 @@ static int gpmi_nfc_compute_hardware_timing(struct gpmi_nand_data *this,
- 	int ideal_sample_delay_in_ns;
- 	unsigned int sample_delay_factor;
- 	int tEYE;
--	unsigned int min_prop_delay_in_ns = pdata->min_prop_delay_in_ns;
--	unsigned int max_prop_delay_in_ns = pdata->max_prop_delay_in_ns;
-+	unsigned int min_prop_delay_in_ns = DEF_MIN_PROP_DELAY;
-+	unsigned int max_prop_delay_in_ns = DEF_MAX_PROP_DELAY;
++	long timeout = data->timeout;
+ 	while (timeout > 0 &&
+ 			(ioread32(I2C_REG_CTL(data)) & mcntrl_reset)) {
+ 		mdelay(1);
+@@ -97,7 +100,7 @@ static inline int wait_reset(long timeou
+ static inline void i2c_pnx_arm_timer(struct i2c_pnx_algo_data *alg_data)
+ {
+ 	struct timer_list *timer = &alg_data->mif.timer;
+-	unsigned long expires = msecs_to_jiffies(I2C_PNX_TIMEOUT);
++	unsigned long expires = msecs_to_jiffies(alg_data->timeout);
+ 
+ 	if (expires <= 1)
+ 		expires = 2;
+@@ -135,7 +138,7 @@ static int i2c_pnx_start(unsigned char s
+ 	}
+ 
+ 	/* First, make sure bus is idle */
+-	if (wait_timeout(I2C_PNX_TIMEOUT, alg_data)) {
++	if (wait_timeout(alg_data)) {
+ 		/* Somebody else is monopolizing the bus */
+ 		dev_err(&alg_data->adapter.dev,
+ 			"%s: Bus busy. Slave addr = %02x, cntrl = %x, stat = %x\n",
+@@ -228,7 +231,7 @@ static int i2c_pnx_master_xmit(struct i2
+ 		if (alg_data->mif.len == 0) {
+ 			if (alg_data->last) {
+ 				/* Wait until the STOP is seen. */
+-				if (wait_timeout(I2C_PNX_TIMEOUT, alg_data))
++				if (wait_timeout(alg_data))
+ 					dev_err(&alg_data->adapter.dev,
+ 						"The bus is still active after timeout\n");
+ 			}
+@@ -326,7 +329,7 @@ static int i2c_pnx_master_rcv(struct i2c
+ 		if (alg_data->mif.len == 0) {
+ 			if (alg_data->last)
+ 				/* Wait until the STOP is seen. */
+-				if (wait_timeout(I2C_PNX_TIMEOUT, alg_data))
++				if (wait_timeout(alg_data))
+ 					dev_err(&alg_data->adapter.dev,
+ 						"The bus is still active after timeout\n");
+ 
+@@ -442,7 +445,7 @@ static void i2c_pnx_timeout(unsigned lon
+ 
+ 	ctl |= mcntrl_reset;
+ 	iowrite32(ctl, I2C_REG_CTL(alg_data));
+-	wait_reset(I2C_PNX_TIMEOUT, alg_data);
++	wait_reset(alg_data);
+ 	alg_data->mif.ret = -EIO;
+ 	complete(&alg_data->mif.complete);
+ }
+@@ -457,18 +460,18 @@ static inline void bus_reset_if_active(s
+ 			alg_data->adapter.name);
+ 		iowrite32(ioread32(I2C_REG_CTL(alg_data)) | mcntrl_reset,
+ 			  I2C_REG_CTL(alg_data));
+-		wait_reset(I2C_PNX_TIMEOUT, alg_data);
++		wait_reset(alg_data);
+ 	} else if (!(stat & mstatus_rfe) || !(stat & mstatus_tfe)) {
+ 		/* If there is data in the fifo's after transfer,
+ 		 * flush fifo's by reset.
+ 		 */
+ 		iowrite32(ioread32(I2C_REG_CTL(alg_data)) | mcntrl_reset,
+ 			  I2C_REG_CTL(alg_data));
+-		wait_reset(I2C_PNX_TIMEOUT, alg_data);
++		wait_reset(alg_data);
+ 	} else if (stat & mstatus_nai) {
+ 		iowrite32(ioread32(I2C_REG_CTL(alg_data)) | mcntrl_reset,
+ 			  I2C_REG_CTL(alg_data));
+-		wait_reset(I2C_PNX_TIMEOUT, alg_data);
++		wait_reset(alg_data);
+ 	}
+ }
+ 
+@@ -612,6 +615,8 @@ static int __devinit i2c_pnx_probe(struc
+ 	struct i2c_pnx_algo_data *alg_data;
+ 	unsigned long freq;
+ 	struct resource *res;
++	u32 speed = I2C_PNX_SPEED_KHZ_DEFAULT * 1000;
++	u32 slave_addr = ~0;
+ 
+ 	alg_data = kzalloc(sizeof(*alg_data), GFP_KERNEL);
+ 	if (!alg_data) {
+@@ -626,6 +631,24 @@ static int __devinit i2c_pnx_probe(struc
+ 	alg_data->adapter.algo_data = alg_data;
+ 	alg_data->adapter.nr = pdev->id;
+ 
++	alg_data->timeout = I2C_PNX_TIMEOUT_DEFAULT;
++#ifdef CONFIG_OF
++	alg_data->adapter.dev.of_node = of_node_get(pdev->dev.of_node);
++	if (pdev->dev.of_node) {
++		of_property_read_u32(pdev->dev.of_node, "clock-frequency",
++				     &speed);
++		of_property_read_u32(pdev->dev.of_node, "slave-addr",
++				     &slave_addr);
++		/*
++		 * At this point, it is planned to add an OF timeout property.
++		 * As soon as there is a consensus about how to call and handle
++		 * this, sth. like the following can be put here:
++		 *
++		 * of_property_read_u32(pdev->dev.of_node, "timeout",
++		 *                      &alg_data->timeout);
++		 */
++	}
++#endif
+ 	alg_data->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(alg_data->clk)) {
+ 		ret = PTR_ERR(alg_data->clk);
+@@ -651,7 +674,7 @@ static int __devinit i2c_pnx_probe(struc
+ 		dev_err(&pdev->dev,
+ 		       "I/O region 0x%08x for I2C already in use.\n",
+ 		       res->start);
+-		ret = -ENODEV;
++		ret = -ENOMEM;
+ 		goto out_clkget;
+ 	}
+ 
+@@ -667,6 +690,9 @@ static int __devinit i2c_pnx_probe(struc
+ 	if (ret)
+ 		goto out_unmap;
+ 
++	if (slave_addr != ~0)
++		iowrite32(slave_addr, I2C_REG_ADR(alg_data));
++
+ 	freq = clk_get_rate(alg_data->clk);
  
  	/*
- 	 * If there are multiple chips, we need to relax the timings to allow
-@@ -804,7 +805,8 @@ int gpmi_is_ready(struct gpmi_nand_data *this, unsigned chip)
- 	if (GPMI_IS_MX23(this)) {
- 		mask = MX23_BM_GPMI_DEBUG_READY0 << chip;
- 		reg = readl(r->gpmi_regs + HW_GPMI_DEBUG);
--	} else if (GPMI_IS_MX28(this)) {
-+	} else if (GPMI_IS_MX28(this) || GPMI_IS_MX6Q(this)) {
-+		/* MX28 shares the same R/B register as MX6Q. */
- 		mask = MX28_BF_GPMI_STAT_READY_BUSY(1 << chip);
- 		reg = readl(r->gpmi_regs + HW_GPMI_STAT);
- 	} else
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 75b1dde..5c6af5d 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -24,6 +24,9 @@
- #include <linux/module.h>
- #include <linux/mtd/gpmi-nand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/of_irq.h>
- #include "gpmi-nand.h"
- 
- /* add our owner bbt descriptor */
-@@ -306,36 +309,6 @@ int start_dma_with_bch_irq(struct gpmi_nand_data *this,
- 	return 0;
- }
- 
--static int __devinit
--acquire_register_block(struct gpmi_nand_data *this, const char *res_name)
--{
--	struct platform_device *pdev = this->pdev;
--	struct resources *res = &this->resources;
--	struct resource *r;
--	void *p;
--
--	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res_name);
--	if (!r) {
--		pr_err("Can't get resource for %s\n", res_name);
--		return -ENXIO;
--	}
--
--	p = ioremap(r->start, resource_size(r));
--	if (!p) {
--		pr_err("Can't remap %s\n", res_name);
--		return -ENOMEM;
--	}
--
--	if (!strcmp(res_name, GPMI_NAND_GPMI_REGS_ADDR_RES_NAME))
--		res->gpmi_regs = p;
--	else if (!strcmp(res_name, GPMI_NAND_BCH_REGS_ADDR_RES_NAME))
--		res->bch_regs = p;
--	else
--		pr_err("unknown resource name : %s\n", res_name);
--
--	return 0;
--}
--
- static void release_register_block(struct gpmi_nand_data *this)
- {
- 	struct resources *res = &this->resources;
-@@ -347,32 +320,6 @@ static void release_register_block(struct gpmi_nand_data *this)
- 	res->bch_regs = NULL;
- }
- 
--static int __devinit
--acquire_bch_irq(struct gpmi_nand_data *this, irq_handler_t irq_h)
--{
--	struct platform_device *pdev = this->pdev;
--	struct resources *res = &this->resources;
--	const char *res_name = GPMI_NAND_BCH_INTERRUPT_RES_NAME;
--	struct resource *r;
--	int err;
--
--	r = platform_get_resource_byname(pdev, IORESOURCE_IRQ, res_name);
--	if (!r) {
--		pr_err("Can't get resource for %s\n", res_name);
--		return -ENXIO;
--	}
--
--	err = request_irq(r->start, irq_h, 0, res_name, this);
--	if (err) {
--		pr_err("Can't own %s\n", res_name);
--		return err;
--	}
--
--	res->bch_low_interrupt = r->start;
--	res->bch_high_interrupt = r->end;
--	return 0;
--}
--
- static void release_bch_irq(struct gpmi_nand_data *this)
- {
- 	struct resources *res = &this->resources;
-@@ -385,7 +332,7 @@ static void release_bch_irq(struct gpmi_nand_data *this)
- static bool gpmi_dma_filter(struct dma_chan *chan, void *param)
- {
- 	struct gpmi_nand_data *this = param;
--	struct resource *r = this->private;
-+	int dma_channel = (int)this->private;
- 
- 	if (!mxs_dma_is_apbh(chan))
- 		return false;
-@@ -397,7 +344,7 @@ static bool gpmi_dma_filter(struct dma_chan *chan, void *param)
- 	 *	for mx28 :	MX28_DMA_GPMI0 ~ MX28_DMA_GPMI7
- 	 *		(These eight channels share the same IRQ!)
+@@ -680,14 +706,14 @@ static int __devinit i2c_pnx_probe(struc
+ 	 * the deglitching filter length.
  	 */
--	if (r->start <= chan->chan_id && chan->chan_id <= r->end) {
-+	if (dma_channel == chan->chan_id) {
- 		chan->private = &this->dma_data;
- 		return true;
+ 
+-	tmp = ((freq / 1000) / I2C_PNX_SPEED_KHZ) / 2 - 2;
++	tmp = (freq / speed) / 2 - 2;
+ 	if (tmp > 0x3FF)
+ 		tmp = 0x3FF;
+ 	iowrite32(tmp, I2C_REG_CKH(alg_data));
+ 	iowrite32(tmp, I2C_REG_CKL(alg_data));
+ 
+ 	iowrite32(mcntrl_reset, I2C_REG_CTL(alg_data));
+-	if (wait_reset(I2C_PNX_TIMEOUT, alg_data)) {
++	if (wait_reset(alg_data)) {
+ 		ret = -ENODEV;
+ 		goto out_clock;
  	}
-@@ -414,85 +361,91 @@ static void release_dma_channels(struct gpmi_nand_data *this)
- 		}
- }
- 
--static int __devinit acquire_dma_channels(struct gpmi_nand_data *this)
-+static const char *bch_node_name[] __devinitconst = {
-+	[IS_MX23] = "fsl,imx23-bch",
-+	[IS_MX28] = "fsl,imx28-bch",
-+	[IS_MX6Q] = "fsl,imx6q-bch",
-+};
-+
-+static int __devinit acquire_resources(struct gpmi_nand_data *this)
- {
--	struct platform_device *pdev = this->pdev;
--	struct gpmi_nand_platform_data *pdata = this->pdata;
- 	struct resources *res = &this->resources;
--	struct resource *r, *r_dma;
--	unsigned int i;
-+	struct platform_device *pdev = this->pdev;
-+	struct resource *r;
-+	struct device_node *dn;
-+	unsigned int irq;
-+	int ret = -EINVAL;
-+
-+	/* gpmi */
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!r) {
-+		pr_err("Can't get gpmi resource.\n");
-+		goto exit_regs;
-+	}
- 
--	r = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--					GPMI_NAND_DMA_CHANNELS_RES_NAME);
--	r_dma = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
--					GPMI_NAND_DMA_INTERRUPT_RES_NAME);
--	if (!r || !r_dma) {
--		pr_err("Can't get resource for DMA\n");
--		return -ENXIO;
-+	res->gpmi_regs = ioremap(r->start, resource_size(r));
-+	if (!res->gpmi_regs) {
-+		pr_err("Can't remap for gpmi.\n");
-+		goto exit_regs;
+@@ -699,7 +725,7 @@ static int __devinit i2c_pnx_probe(struc
+ 		goto out_irq;
  	}
- 
--	/* used in gpmi_dma_filter() */
--	this->private = r;
-+	/* bch */
-+	dn = of_find_compatible_node(NULL, NULL,
-+			bch_node_name[pdev->id_entry->driver_data]);
-+	if (dn) {
-+		res->bch_regs = of_iomap(dn, 0);
-+		if (!res->bch_regs) {
-+			of_node_put(dn);
-+			goto exit_regs;
-+		}
-+	} else {
-+		pr_err("Can't find device node for BCH.\n");
-+		goto exit_regs;
-+	}
- 
--	for (i = r->start; i <= r->end; i++) {
-+	irq = irq_of_parse_and_map(dn, 0);
-+	ret = request_irq(irq, bch_irq, 0, NULL, this);
-+	if (ret) {
-+		of_node_put(dn);
-+		pr_err("interrupt request failed\n");
-+		goto exit_regs;
-+	}
-+	res->bch_low_interrupt = res->bch_high_interrupt = irq;
-+	of_node_put(dn);
-+
-+	/* apbh-dma channel */
-+	r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (r) {
- 		struct dma_chan *dma_chan;
- 		dma_cap_mask_t mask;
--
--		if (i - r->start >= pdata->max_chip_count)
--			break;
-+		int dma_channel;
- 
- 		dma_cap_zero(mask);
- 		dma_cap_set(DMA_SLAVE, mask);
- 
--		/* get the DMA interrupt */
--		if (r_dma->start == r_dma->end) {
--			/* only register the first. */
--			if (i == r->start)
--				this->dma_data.chan_irq = r_dma->start;
--			else
--				this->dma_data.chan_irq = NO_IRQ;
--		} else
--			this->dma_data.chan_irq = r_dma->start + (i - r->start);
--
--		dma_chan = dma_request_channel(mask, gpmi_dma_filter, this);
--		if (!dma_chan)
--			goto acquire_err;
--
--		/* fill the first empty item */
--		this->dma_chans[i - r->start] = dma_chan;
--	}
--
--	res->dma_low_channel = r->start;
--	res->dma_high_channel = i;
--	return 0;
--
--acquire_err:
--	pr_err("Can't acquire DMA channel %u\n", i);
--	release_dma_channels(this);
--	return -EINVAL;
--}
--
--static int __devinit acquire_resources(struct gpmi_nand_data *this)
--{
--	struct resources *res = &this->resources;
--	int ret;
--
--	ret = acquire_register_block(this, GPMI_NAND_GPMI_REGS_ADDR_RES_NAME);
--	if (ret)
--		goto exit_regs;
--
--	ret = acquire_register_block(this, GPMI_NAND_BCH_REGS_ADDR_RES_NAME);
--	if (ret)
--		goto exit_regs;
-+		this->dma_data.chan_irq = r->start;
- 
--	ret = acquire_bch_irq(this, bch_irq);
--	if (ret)
--		goto exit_regs;
-+		/* We only support one chip now, so we need one DMA channel.*/
-+		dn = pdev->dev.of_node;
-+		ret = of_property_read_u32(dn, "dma_channel", &dma_channel);
-+		if (ret) {
-+			pr_err("unable to get DMA channel from dt.\n");
-+			goto exit_dma_channels;
-+		}
-+		this->private = (void *)dma_channel;
- 
--	ret = acquire_dma_channels(this);
--	if (ret)
-+		dma_chan = dma_request_channel(mask, gpmi_dma_filter, this);
-+		if (!dma_chan) {
-+			pr_err("dma_request_channel failed.\n");
-+			goto exit_dma_channels;
-+		}
-+		this->dma_chans[0] = dma_chan;
-+	} else {
-+		pr_err("Can't find irq for dma\n");
- 		goto exit_dma_channels;
-+	}
- 
-+	/* gpmi clock */
- 	res->clock = clk_get(&this->pdev->dev, NULL);
- 	if (IS_ERR(res->clock)) {
- 		pr_err("can not get the clock\n");
-@@ -1461,7 +1414,6 @@ void gpmi_nfc_exit(struct gpmi_nand_data *this)
- 
- static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
- {
--	struct gpmi_nand_platform_data *pdata = this->pdata;
- 	struct mtd_info  *mtd = &this->mtd;
- 	struct nand_chip *chip = &this->nand;
- 	int ret;
-@@ -1501,14 +1453,13 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
+ 	ret = request_irq(alg_data->irq, i2c_pnx_interrupt,
+-			0, pdev->name, alg_data);
++			  0, pdev->name, alg_data);
  	if (ret)
- 		goto err_out;
+ 		goto out_clock;
  
--	ret = nand_scan(mtd, pdata->max_chip_count);
-+	ret = nand_scan(mtd, 1);
- 	if (ret) {
- 		pr_err("Chip scan failed\n");
- 		goto err_out;
+@@ -710,6 +736,8 @@ static int __devinit i2c_pnx_probe(struc
+ 		goto out_irq;
  	}
  
--	ret = mtd_device_parse_register(mtd, NULL, NULL,
--			pdata->partitions, pdata->partition_count);
-+	ret = mtd_device_parse_register(mtd, NULL, NULL, NULL, 0);
- 	if (ret)
- 		goto err_out;
- 	return 0;
-@@ -1518,12 +1469,38 @@ err_out:
- 	return ret;
- }
- 
-+static const struct platform_device_id gpmi_ids[] = {
-+	{ .name = "imx23-gpmi-nand", .driver_data = IS_MX23, },
-+	{ .name = "imx28-gpmi-nand", .driver_data = IS_MX28, },
-+	{ .name = "imx6q-gpmi-nand", .driver_data = IS_MX6Q, },
-+	{},
-+};
++	of_i2c_register_devices(&alg_data->adapter);
 +
-+static const struct of_device_id gpmi_nand_id_table[] = {
-+	{
-+		.compatible = "fsl,imx23-gpmi-nand",
-+		.data = (void *)&gpmi_ids[IS_MX23]
-+	}, {
-+		.compatible = "fsl,imx28-gpmi-nand",
-+		.data = (void *)&gpmi_ids[IS_MX28]
-+	}, {
-+		.compatible = "fsl,imx6q-gpmi-nand",
-+		.data = (void *)&gpmi_ids[IS_MX6Q]
-+	}, {}
-+};
-+MODULE_DEVICE_TABLE(of, gpmi_nand_id_table);
-+
- static int __devinit gpmi_nand_probe(struct platform_device *pdev)
- {
- 	struct gpmi_nand_platform_data *pdata = pdev->dev.platform_data;
- 	struct gpmi_nand_data *this;
-+	const struct of_device_id *of_id;
- 	int ret;
+ 	dev_dbg(&pdev->dev, "%s: Master at %#8x, irq %d.\n",
+ 		alg_data->adapter.name, res->start, alg_data->irq);
  
-+	of_id = of_match_device(gpmi_nand_id_table, &pdev->dev);
-+	if (of_id)
-+		pdev->id_entry = of_id->data;
-+
- 	this = kzalloc(sizeof(*this), GFP_KERNEL);
- 	if (!this) {
- 		pr_err("Failed to allocate per-device memory\n");
-@@ -1535,7 +1512,7 @@ static int __devinit gpmi_nand_probe(struct platform_device *pdev)
- 	this->dev   = &pdev->dev;
- 	this->pdata = pdata;
- 
--	if (pdata->platform_init) {
-+	if (pdata && pdata->platform_init) {
- 		ret = pdata->platform_init();
- 		if (ret)
- 			goto platform_init_error;
-@@ -1575,19 +1552,10 @@ static int __exit gpmi_nand_remove(struct platform_device *pdev)
+@@ -748,10 +776,19 @@ static int __devexit i2c_pnx_remove(stru
  	return 0;
  }
  
--static const struct platform_device_id gpmi_ids[] = {
--	{
--		.name = "imx23-gpmi-nand",
--		.driver_data = IS_MX23,
--	}, {
--		.name = "imx28-gpmi-nand",
--		.driver_data = IS_MX28,
--	}, {},
--};
--
- static struct platform_driver gpmi_nand_driver = {
++#ifdef CONFIG_OF
++static const struct of_device_id i2c_pnx_of_match[] = {
++	{ .compatible = "nxp,pnx-i2c" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, i2c_pnx_of_match);
++#endif
++
+ static struct platform_driver i2c_pnx_driver = {
  	.driver = {
- 		.name = "gpmi-nand",
-+		.of_match_table = gpmi_nand_id_table,
+ 		.name = "pnx-i2c",
+ 		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(i2c_pnx_of_match),
  	},
- 	.probe   = gpmi_nand_probe,
- 	.remove  = __exit_p(gpmi_nand_remove),
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index ec6180d..ce5daa1 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -266,8 +266,10 @@ extern int gpmi_read_page(struct gpmi_nand_data *,
- #define STATUS_UNCORRECTABLE	0xfe
+ 	.probe = i2c_pnx_probe,
+ 	.remove = __devexit_p(i2c_pnx_remove),
+--- linux-2.6.orig/include/linux/i2c-pnx.h
++++ linux-2.6/include/linux/i2c-pnx.h
+@@ -32,6 +32,7 @@ struct i2c_pnx_algo_data {
+ 	struct i2c_adapter	adapter;
+ 	phys_addr_t		base;
+ 	int			irq;
++	u32			timeout;
+ };
  
- /* Use the platform_id to distinguish different Archs. */
--#define IS_MX23			0x1
--#define IS_MX28			0x2
-+#define IS_MX23			0x0
-+#define IS_MX28			0x1
-+#define IS_MX6Q			0x2
- #define GPMI_IS_MX23(x)		((x)->pdev->id_entry->driver_data == IS_MX23)
- #define GPMI_IS_MX28(x)		((x)->pdev->id_entry->driver_data == IS_MX28)
-+#define GPMI_IS_MX6Q(x)		((x)->pdev->id_entry->driver_data == IS_MX6Q)
- #endif
--- 
-1.7.0.4
+ #endif /* __I2C_PNX_H__ */
