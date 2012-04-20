@@ -1,79 +1,43 @@
-From: balajitk@ti.com (T Krishnamoorthy, Balaji)
-Date: Fri, 20 Apr 2012 17:50:16 +0530
-Subject: [PATCH 00/19] ARM: OMAP4 device off support
-In-Reply-To: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
-Message-ID: <CANrkHUa5q10FFxsZfgtMqKbzKKFHCcf3yYsaOK+hG8CJiME2TA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 20 Apr 2012 14:22:55 +0200
+Subject: [PATCHv24 00/16] Contiguous Memory Allocator
+In-Reply-To: <20120419124044.632bfa49.akpm@linux-foundation.org>
+References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
+ <20120419124044.632bfa49.akpm@linux-foundation.org>
+Message-ID: <03b201cd1ef0$50ca9350$f25fb9f0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 3:03 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> Hi,
->
-> First version for this work. Applies on top of mainline + iochain set +
-> OMAP4 core retention set. Working tree available here:
-> tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> branch: mainline-3.4-omap4-dev-off
->
-> Tested on omap4430 EMU blaze + omap4460 GP panda boards.
->
-> Some drivers have issues with device off, most notably MMC, as it breaks
-> device off on blaze device after 1 entry to device off mode:
->
-> [ ?208.906921] omap_i2c omap_i2c.1: XRDY IRQ while no data to send
-> [ ?209.905639] omap_i2c omap_i2c.1: controller timed out
-> [ ?209.905792] twl: i2c_read failed to transfer all messages
-> [ ?209.905792] omap_hsmmc omap_hsmmc.1: could not set regulator OCR (-110)
-> [ ?212.296203] mmc0: error -110 during resume (card was removed?)
-Hi Tero,
+Hi Andrew,
 
-I tried your branch on gp/emu devices but could not reproduce this issue.
-My observation is that while resuming, omap_hsmmc.1 eMMC is
-trying to turn on phoenix vaux1 regulator via i2c which fails due
-to controller timeout.
-Note: eMMC is present only on sdp/blaze
+On Thursday, April 19, 2012 9:41 PM Andrew Morton wrote:
 
-> [ ?212.562164] PM: resume of devices complete after 3656.007 msecs
-> [ ?212.660125] Restarting tasks ... done.
-> #
-> # echo mem > /sys/power/state
-> [ ?220.376892] PM: Syncing filesystems ... done.
-> [ ?220.382476] Freezing user space processes ... (elapsed 0.01 seconds) done.
-> [ ?220.408386] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) don
-> e.
-> [ ?220.439605] Suspending console(s) (use no_console_suspend to debug)
-> [ ?220.454650] dpm_run_callback(): platform_pm_suspend+0x0/0x54 returns -110
-> [ ?220.454711] PM: Device omap_hsmmc.1 failed to suspend: error -110
-> [ ?220.454711] PM: Some devices failed to suspend
-> [ ?220.718261] PM: resume of devices complete after 263.539 msecs
-> [ ?220.743988] Restarting tasks ... done.
->
-> Attempting to disable MMC from config prevented boot completely for me,
-> so this issue is likely to stay until someone fixes the MMC driver.
-> Panda device works fine though, although the wakeup from device off is
-> slow due to problems with some other drivers (most likely I2C.)
->
+> On Tue, 03 Apr 2012 16:10:05 +0200
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> 
+> > This is (yet another) update of CMA patches.
+> 
+> Looks OK to me.  It's a lot of code.
+> 
+> Please move it into linux-next, and if all is well, ask Linus to pull
+> the tree into 3.5-rc1.  Please be sure to cc me on that email.
 
-can you try this patch if you want to disable MMC
-http://permalink.gmane.org/gmane.linux.ports.arm.omap/74540
-or
-http://www.spinics.net/lists/linux-omap/msg67879.html
-and build omap_hsmmc as module.
+Ok, thanks! Is it possible to get your acked-by or reviewed-by tag? It
+might help a bit to get the pull request accepted by Linus. :)
 
-> Off mode is disabled by default, it can be enabled by either calling
-> omap4_pm_enable_off_mode(1) from board files or alternatively writing
-> to a debugfs node from userspace:
->
-> echo 1 > /debug/pm_debug/enable_off_mode
->
-> Device off entry can be tracked through the debugfs also, it increases
-> the core_pwrdm OFF state counter / timer, as this is an invalid state
-> for the chip normally (core enters OSWR in device off.) Not sure if this
-> a good way to do this but comments are welcome.
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> I suggest that you include additional patches which enable CMA as much
+> as possible on as many architectures as possible so that it gets
+> maximum coverage testing in linux-next.  Remove those Kconfig patches
+> when merging upstream.
+> 
+> All this code will probably mess up my tree, but I'll work that out.
+> It would be more awkward if the CMA code were to later disappear from
+> linux-next or were not merged into 3.5-rc1.  Let's avoid that.
+
+I've put the patches on my dma-mapping-next branch and we will see the
+result (and/or complaints) on Monday.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
