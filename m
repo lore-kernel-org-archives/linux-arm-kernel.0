@@ -1,86 +1,50 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Fri, 20 Apr 2012 09:40:15 +0200
-Subject: [PATCH 1/2] mfd: Add Freescale's PMIC MC34708 support
-In-Reply-To: <1334853521-23792-1-git-send-email-paul.liu@linaro.org>
-References: <1334853521-23792-1-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120420074015.GD31760@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 20 Apr 2012 09:40:49 +0200
+Subject: [PATCH] dmaengine: at_hdmac: remove clear-on-read in atc_dostart()
+In-Reply-To: <1334580390-16303-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1334580390-16303-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4F911301.9090303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 12:38:40AM +0800, Ying-Chun Liu (PaulLiu) wrote:
-> diff --git a/Documentation/devicetree/bindings/mfd/mc34708.txt b/Documentation/devicetree/bindings/mfd/mc34708.txt
-> new file mode 100644
-> index 0000000..2bb5c9e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/mc34708.txt
-> @@ -0,0 +1,61 @@
-> +* Freescale MC34708 Power Management Integrated Circuit (PMIC)
-> +
-> +Required properties:
-> +- compatible : Must be "fsl,mc34708"
-> +
-> +Optional properties:
-> +- fsl,mc34708-uses-adc   : Indicate the ADC is being used
-> +- fsl,mc34708-uses-rtc   : Indicate the RTC is being used
-> +- fsl,mc34708-uses-ts    : Indicate the touchscreen controller is being used
-> +
-> +Sub-nodes:
-> +- regulators : Contain the regulator nodes.  The MC34708 regulators are
-> +  bound using their names as listed below for enabling.
-> +
-> +    mc34708__sw1a    : regulator SW1A
-> +    mc34708__sw1b    : regulator SW1B
-> +    mc34708__sw2     : regulator SW2
-> +    mc34708__sw3     : regulator SW3
-> +    mc34708__sw4A    : regulator SW4A
-> +    mc34708__sw4b    : regulator SW4B
-> +    mc34708__swbst   : regulator SWBST
-> +    mc34708__vpll    : regulator VPLL
-> +    mc34708__vrefddr : regulator VREFDDR
-> +    mc34708__vusb    : regulator VUSB
-> +    mc34708__vusb2   : regulator VUSB2
-> +    mc34708__vdac    : regulator VDAC
-> +    mc34708__vgen1   : regulator VGEN1
-> +    mc34708__vgen2   : regulator VGEN2
-> +
-> +  The bindings details of individual regulator device can be found in:
-> +  Documentation/devicetree/bindings/regulator/regulator.txt
-> +
-> +Examples:
-> +
-> +i2c at 63fc8000 {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	compatible = "fsl,imx53-i2c", "fsl,imx1-i2c";
-> +	reg = <0x63fc8000 0x4000>;
-> +	interrupts = <62>;
-> +	status = "okay";
-> +
-> +	pmic: mc34708 at 8 {
-> +		compatible = "fsl,mc34708";
-> +		reg = <0x08>;
-> +
-> +		regulators {
-> +			mc34708__sw1a {
-> +				regulator-min-microvolt = <650000>;
-> +				regulator-max-microvolt = <1437500>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			mc34708__vusb {
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +};
+On 04/16/2012 02:46 PM, Nicolas Ferre :
+> This loop on EBCISR register was designed to clear IRQ sources before enabling
+> a DMA channel. This register is clear-on-read so a race condition can appear if
+> another channel is already active and has just finished its transfer.
+> Removing this read on EBCISR is fixing the issue as there is no case where an IRQ
+> could be pending: we already make sure that this register is drained at probe()
+> time and during resume.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: stable <stable@vger.kernel.org>
 
-The oftree parts should be discussed on devicetree-discuss.
+Vinod,
 
-rsc
+Could you please take this patch as a fix for 3.4-rc?
+
+Thanks, best regards,
+
+
+> ---
+>  drivers/dma/at_hdmac.c |    4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index 7aa58d2..445fdf8 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -221,10 +221,6 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
+>  
+>  	vdbg_dump_regs(atchan);
+>  
+> -	/* clear any pending interrupt */
+> -	while (dma_readl(atdma, EBCISR))
+> -		cpu_relax();
+> -
+>  	channel_writel(atchan, SADDR, 0);
+>  	channel_writel(atchan, DADDR, 0);
+>  	channel_writel(atchan, CTRLA, 0);
+
+
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
