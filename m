@@ -1,33 +1,41 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 20 Apr 2012 08:58:17 +0530
-Subject: [PATCH V2 6/6] SPEAr: Switch to common clock framework
-In-Reply-To: <201204191959.15182.arnd@arndb.de>
-References: <cover.1334852393.git.viresh.kumar@st.com>
- <ddade82f0666c3186b8a694aa2b79acd3f7e5d50.1334852395.git.viresh.kumar@st.com>
- <201204191959.15182.arnd@arndb.de>
-Message-ID: <4F90D7D1.4020709@st.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 20 Apr 2012 13:30:17 +0800
+Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
+In-Reply-To: <20120418092019.GB2232@pengutronix.de>
+References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
+ <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+ <4F73CCC6.6000001@freescale.com>
+ <20120329064320.GA20840@pengutronix.de>
+ <20120418090551.GA30966@shlinux2.ap.freescale.net>
+ <20120418092019.GB2232@pengutronix.de>
+Message-ID: <20120420053014.GK22219@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/20/2012 1:29 AM, Arnd Bergmann wrote:
-> On Thursday 19 April 2012, Viresh Kumar wrote:
->> > SPEAr SoCs used its own clock framework since now. From now on they will move to
->> > use common clock framework.
->> > 
->> > This patch updates existing SPEAr machine support to adapt for common clock
->> > framework.
->> > 
->> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Wed, Apr 18, 2012 at 11:20:19AM +0200, Wolfram Sang wrote:
+> > If not, i guess include/linux/fsl which already exists may be the
+> > right place.
 > 
->> >  21 files changed, 994 insertions(+), 2951 deletions(-)
-> Great diffstat!
+> Which is a bad choice in my book. linux/dma would have been the proper
+> thing for mxs-dma.h, I'd think.
+> 
+If it already exists, it will be the proper place.  We do not want to
+be too invasive to create folders in include/linux for every subsystem
+for only the need of fsl drivers.
 
-Thanks Arnd.
+On the other hand, I have seen a clear need for include/linux/fsl.
+The following files are all good candidates to be moved there.
 
-For this set to go through Mike's tree, we would require earlier pull request
-of 3xx DT and pinmux to be upstreamed. When are you planning to do that?
-After that i will ask Mike to apply these patches on latest linux-next. :)
+  include/linux/fsl_devices.h
+  include/linux/fsl-diu-fb.h
+  include/linux/fsl_hypervisor.h
+
+IMO, include/linux/stmp_device.h is just another good candidate.
+
+Oh, today I was asked by Fabio where is the good place for ssp-regs.h
+which will be shared by mxs-mmc and spi-mxs, as we are cleaning up
+<mach/*> from drivers.  I told him include/linux/fsl.
 
 -- 
-viresh
+Regards,
+Shawn
