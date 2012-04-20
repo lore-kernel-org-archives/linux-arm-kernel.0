@@ -1,36 +1,81 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 20 Apr 2012 14:38:43 +0200
-Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
- support
-In-Reply-To: <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
-References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
- <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
- <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
-Message-ID: <20120420123842.GA25662@avionic-0098.adnet.avionic-design.de>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Fri, 20 Apr 2012 18:09:22 +0530
+Subject: [PATCH v2 3/4] ARM: OMAP2+: dmtimer: cleanup iclk usage
+In-Reply-To: <1334925563-20768-1-git-send-email-tarun.kanti@ti.com>
+References: <1334925563-20768-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1334925563-20768-4-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Airlie wrote:
-> I get the feeling the drm can just be a virtual platform device of
-> some sort, then it reads the device tree and binds all the information
-> on what crtc/encoders are available,
+We do not use iclk anywhere in the dmtimer driver and so removing it.
+Hence removing the timer iclk entries from OMAP4 clkdev table as well.
 
-That's pretty much what I've come up with in the second round of Tegra DRM
-patches. Basically display controllers and outputs (RGB, HDMI, TVO, DSI) get
-separate drivers and register themselves with the DRM driver which then looks
-at the device tree to see which display controllers to register as CRTCs and
-parses a list of connector nodes to create encoder/connector pairs that
-define the physical connectors and their corresponding outputs.
+Cc: Cousson, Benoit <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-I did take a brief look at the SDRM patches as well and they didn't quite
-seem to fit what was needed for Tegra. But if time allows I'll take a closer
-look.
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+---
+ arch/arm/mach-omap2/clock44xx_data.c      |   11 -----------
+ arch/arm/mach-omap2/timer.c               |    7 -------
+ arch/arm/plat-omap/include/plat/dmtimer.h |    2 +-
+ 3 files changed, 1 insertions(+), 19 deletions(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120420/704fc456/attachment.sig>
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index fa6ea65..2172f66 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -3355,17 +3355,6 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK(NULL,	"auxclk5_ck",			&auxclk5_ck,	CK_443X),
+ 	CLK(NULL,	"auxclkreq5_ck",		&auxclkreq5_ck,	CK_443X),
+ 	CLK(NULL,	"gpmc_ck",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt1_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt2_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt3_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt4_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt5_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt6_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt7_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt8_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt9_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt10_ick",			&dummy_ck,	CK_443X),
+-	CLK(NULL,	"gpt11_ick",			&dummy_ck,	CK_443X),
+ 	CLK("omap_i2c.1",	"ick",				&dummy_ck,	CK_443X),
+ 	CLK("omap_i2c.2",	"ick",				&dummy_ck,	CK_443X),
+ 	CLK("omap_i2c.3",	"ick",				&dummy_ck,	CK_443X),
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index c512bac..5d7a0ee 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -169,13 +169,6 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	if (IS_ERR(timer->fclk))
+ 		return -ENODEV;
+ 
+-	sprintf(name, "gpt%d_ick", gptimer_id);
+-	timer->iclk = clk_get(NULL, name);
+-	if (IS_ERR(timer->iclk)) {
+-		clk_put(timer->fclk);
+-		return -ENODEV;
+-	}
+-
+ 	omap_hwmod_enable(oh);
+ 
+ 	sys_timer_reserved |= (1 << (gptimer_id - 1));
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index 9418f00..be2b8c4 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -259,7 +259,7 @@ struct omap_dm_timer {
+ 	unsigned long phys_base;
+ 	int id;
+ 	int irq;
+-	struct clk *iclk, *fclk;
++	struct clk *fclk;
+ 
+ 	void __iomem	*io_base;
+ 	void __iomem	*sys_stat;	/* TISTAT timer status */
+-- 
+1.7.0.4
