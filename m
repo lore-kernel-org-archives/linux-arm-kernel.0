@@ -1,66 +1,134 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 12:33:51 +0300
-Subject: [PATCH 18/19] ARM: OMAP4460: wakeupgen: set GIC_CPU0 backup status
- flag always
+Date: Fri, 20 Apr 2012 12:33:44 +0300
+Subject: [PATCH 11/19] ARM: OMAP4: PM: save/restore CM L3INSTR registers when
+ MPU hits OSWR/OFF mode
 In-Reply-To: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
 References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1334914432-26456-19-git-send-email-t-kristo@ti.com>
+Message-ID: <1334914432-26456-12-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this, CPU0 will crash in the ROM code during wakeup from
-device off. This patch also clears the GIC save area, to prevent
-ROM code from writing garbage to the GIC registers during wakeup.
-The actual GIC restore is done by kernel.
+From: Rajendra Nayak <rnayak@ti.com>
 
-This bug fix applies only to OMAP4460, it is fixed on OMAP4470.
+On HS devices on the way out of MPU OSWR and OFF ROM code wrongly
+overwrites the CM L3INSTR registers. So to avoid this, save them and
+restore on the way out from MPU OSWR/OFF.
 
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[t-kristo at ti.com: added omap4 pm errata support]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap-wakeupgen.c   |   14 ++++++++++++++
- arch/arm/mach-omap2/omap4-sar-layout.h |    1 +
- 2 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   35 ++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/pm.h                  |    1 +
+ arch/arm/mach-omap2/pm44xx.c              |    8 ++++++
+ 3 files changed, 43 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index c7c4db4..30da299 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -447,10 +447,24 @@ int __init omap_wakeupgen_init(void)
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 208d4a4..2ae5e2c 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -95,6 +95,12 @@ static struct reg_tuple ivahd_reg[] = {
+ 	{.addr = OMAP4430_PM_IVAHD_PWRSTCTRL}
+ };
  
- 	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
- 		sar_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
-+		/* Clean GIC SAR area */
-+		for (i = SAR_BACKUP_STATUS_OFFSET; i < WAKEUPGENENB_OFFSET_CPU0;
-+			i += 4)
-+			sar_writel(0, i, 0);
++static struct reg_tuple l3instr_reg[] = {
++	{.addr = OMAP4430_CM_L3INSTR_L3_3_CLKCTRL},
++	{.addr = OMAP4430_CM_L3INSTR_L3_INSTR_CLKCTRL},
++	{.addr = OMAP4430_CM_L3INSTR_OCP_WP1_CLKCTRL},
++};
 +
- 		sar_writel(GIC_ISR_NON_SECURE, ICDISR_CPU0_OFFSET, 0);
- 		sar_writel(GIC_ISR_NON_SECURE, ICDISR_CPU1_OFFSET, 0);
- 		for (i = 0; i < max_spi_reg; i++)
- 			sar_writel(GIC_ISR_NON_SECURE, ICDISR_SPI_OFFSET, i);
-+
-+		/*
-+		 * Set CPU0 GIC backup flag permanently for omap4460,
-+		 * this is needed because of the ROM code bug that breaks
-+		 * GIC during wakeup from device off
-+		 */
-+		if (cpu_is_omap446x())
-+			__raw_writel(SAR_BACKUP_STATUS_GIC_CPU0,
-+				     sar_base + SAR_BACKUP_STATUS_OFFSET);
- 		iounmap(sar_base);
- 		sar_base = NULL;
- 	} else {
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
-index 0056667..e621c51 100644
---- a/arch/arm/mach-omap2/omap4-sar-layout.h
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -88,6 +88,7 @@
- #define ICDISR_CPU0_OFFSET			(SAR_BANK3_OFFSET + 0x50c)
- #define ICDISR_CPU1_OFFSET			(SAR_BANK3_OFFSET + 0x510)
- #define ICDISR_SPI_OFFSET			(SAR_BANK3_OFFSET + 0x514)
-+#define SAR_BACKUP_STATUS_GIC_CPU0		0x1
+ /*
+  * Program the wakeup routine address for the CPU0 and CPU1
+  * used for OFF or DORMANT wakeup.
+@@ -262,6 +268,28 @@ static inline void restore_ivahd_tesla_regs(void)
+ 		__raw_writel(ivahd_reg[i].val, ivahd_reg[i].addr);
+ }
  
- /* WakeUpGen save restore offset from OMAP44XX_SAR_RAM_BASE */
- #define WAKEUPGENENB_OFFSET_CPU0		(SAR_BANK3_OFFSET + 0x684)
++static inline void save_l3instr_regs(void)
++{
++	int i;
++
++	if (!IS_PM44XX_ERRATUM(PM_OMAP4_ROM_L3INSTR_ERRATUM))
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(l3instr_reg); i++)
++		l3instr_reg[i].val = __raw_readl(l3instr_reg[i].addr);
++}
++
++static inline void restore_l3instr_regs(void)
++{
++	int i;
++
++	if (!IS_PM44XX_ERRATUM(PM_OMAP4_ROM_L3INSTR_ERRATUM))
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(l3instr_reg); i++)
++		__raw_writel(l3instr_reg[i].val, l3instr_reg[i].addr);
++}
++
+ /**
+  * omap4_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
+  * The purpose of this function is to manage low power programming
+@@ -321,13 +349,16 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 		omap4_cm_prepare_off();
+ 		omap4_dpll_prepare_off();
+ 		save_ivahd_tesla_regs();
++		save_l3instr_regs();
+ 		save_state = 3;
+ 	} else if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
+ 		(pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF)) {
+ 		save_ivahd_tesla_regs();
++		save_l3instr_regs();
+ 		save_state = 2;
+ 	} else if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
+ 		save_ivahd_tesla_regs();
++		save_l3instr_regs();
+ 		save_state = 3;
+ 	}
+ 
+@@ -352,8 +383,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	wakeup_cpu = smp_processor_id();
+ 	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
+ 
+-	if (omap4_mpuss_read_prev_context_state())
++	if (omap4_mpuss_read_prev_context_state()) {
+ 		restore_ivahd_tesla_regs();
++		restore_l3instr_regs();
++	}
+ 
+ 	if (omap4_device_prev_state_off()) {
+ 		omap4_dpll_resume_off();
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 051aeb9..c312d57 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -132,6 +132,7 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+ #endif		/* defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3) */
+ 
+ #define PM_OMAP4_ROM_IVAHD_TESLA_ERRATUM	(1 << 0)
++#define PM_OMAP4_ROM_L3INSTR_ERRATUM		(1 << 1)
+ 
+ #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
+ extern u16 pm44xx_errata;
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 67cb799..0472921 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -272,6 +272,14 @@ static int __init omap4_pm_init(void)
+ 	if (cpu_is_omap443x() && omap_type() != OMAP2_DEVICE_TYPE_GP)
+ 		pm44xx_errata |= PM_OMAP4_ROM_IVAHD_TESLA_ERRATUM;
+ 
++	/*
++	 * Similar to above errata, ROM code modifies L3INSTR clock
++	 * registers also and these must be saved / restored during
++	 * MPU OSWR / device off.
++	 */
++	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
++		pm44xx_errata |= PM_OMAP4_ROM_L3INSTR_ERRATUM;
++
+ #ifdef CONFIG_SUSPEND
+ 	omap_pm_suspend = omap4_pm_suspend;
+ #endif
 -- 
 1.7.4.1
