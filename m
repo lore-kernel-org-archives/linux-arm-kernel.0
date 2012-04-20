@@ -1,44 +1,40 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 20 Apr 2012 15:45:21 +0530
-Subject: [PATCH] dmaengine: at_hdmac: remove clear-on-read in atc_dostart()
-In-Reply-To: <1334580390-16303-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1334580390-16303-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1334916921.31825.41.camel@vkoul-udesk3>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 20 Apr 2012 12:25:01 +0200
+Subject: [PATCH] ARM: SAMSUNG: Should check for IS_ERR(clk) instead of NULL
+In-Reply-To: <20120419090325.GC24211@n2100.arm.linux.org.uk>
+References: <1334722134-14545-1-git-send-email-jhbird.choi@samsung.com>
+ <4F8F586C.3020401@samsung.com> <4F8FCC00.10807@samsung.com>
+ <20120419090325.GC24211@n2100.arm.linux.org.uk>
+Message-ID: <4F91397D.6090509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-04-16 at 14:46 +0200, Nicolas Ferre wrote:
-> This loop on EBCISR register was designed to clear IRQ sources before enabling
-> a DMA channel. This register is clear-on-read so a race condition can appear if
-> another channel is already active and has just finished its transfer.
-> Removing this read on EBCISR is fixing the issue as there is no case where an IRQ
-> could be pending: we already make sure that this register is drained at probe()
-> time and during resume.
+On 04/19/2012 11:03 AM, Russell King - ARM Linux wrote:
+> On Thu, Apr 19, 2012 at 10:25:36AM +0200, Sylwester Nawrocki wrote:
+>> On 04/19/2012 02:12 AM, Kukjin Kim wrote:
+>>>> --- a/arch/arm/plat-samsung/include/plat/watchdog-reset.h
+>>>> +++ b/arch/arm/plat-samsung/include/plat/watchdog-reset.h
+>>>> @@ -25,7 +25,7 @@ static inline void arch_wdt_reset(void)
+>>>>
+>>>>   	__raw_writel(0, S3C2410_WTCON);	  /* disable watchdog, to be safe  */
+>>>>
+>>>> -	if (s3c2410_wdtclk)
+>>>> +	if (!IS_ERR(s3c2410_wdtclk))
+>>>
+>>> Yeah, right. BTW don't we need to check NULL here?
+>>
+>> It might make sense to check for NULL as well, but only if it happens
+>> that a clock entry is ever added to clkdev with null struct clk_lookup:clk
+>> member.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: stable <stable@vger.kernel.org>
-Applied thanks.
-
-> ---
->  drivers/dma/at_hdmac.c |    4 ----
->  1 file changed, 4 deletions(-)
+> Not quite the correct answer.  The correct answer is:
 > 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 7aa58d2..445fdf8 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -221,10 +221,6 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
->  
->  	vdbg_dump_regs(atchan);
->  
-> -	/* clear any pending interrupt */
-> -	while (dma_readl(atdma, EBCISR))
-> -		cpu_relax();
-> -
->  	channel_writel(atchan, SADDR, 0);
->  	channel_writel(atchan, DADDR, 0);
->  	channel_writel(atchan, CTRLA, 0);
+> Drivers have no business interpreting anything but IS_ERR() values from
+> clk_get() as errors.  Everything else they _MUST_ assume is valid for
+> the rest of the clk API.
+> 
+> The clue: struct clk is an opaque cookie as far as drivers are concerned.
+> The only interpretation drivers are allowed to make is that IS_ERR()
+> values indicate an error.  Everything else is potentially valid.
 
-
--- 
-~Vinod
+Thanks for the clarification. I stand corrected.
