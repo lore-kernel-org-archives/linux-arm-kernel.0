@@ -1,130 +1,86 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 20 Apr 2012 22:09:58 +0400
-Subject: [PATCH 5/5] ata/ahci_platform: Add clock framework support
-In-Reply-To: <CAOh2x=noTa93F_ks3tR0CT5uRfS8=8v=eiY6tStNLV9qzCTB=Q@mail.gmail.com>
-References: <cover.1334932338.git.viresh.kumar@st.com>
- <8308fd88100d4af942d920d51bf24184fcb33b72.1334932338.git.viresh.kumar@st.com>
- <4F91799F.1010002@mvista.com>
- <CAOh2x=noTa93F_ks3tR0CT5uRfS8=8v=eiY6tStNLV9qzCTB=Q@mail.gmail.com>
-Message-ID: <4F91A676.9030609@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Apr 2012 18:15:57 +0000
+Subject: [PATCH 2/9] SPEAr13xx: Add source files
+In-Reply-To: <33fcf4e1f6f1d33bcfedc428e0feca74a340b580.1334942163.git.viresh.kumar@st.com>
+References: <cover.1334942163.git.viresh.kumar@st.com>
+ <33fcf4e1f6f1d33bcfedc428e0feca74a340b580.1334942163.git.viresh.kumar@st.com>
+Message-ID: <201204201815.57556.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Friday 20 April 2012, Viresh Kumar wrote:
 
-On 04/20/2012 09:41 PM, viresh kumar wrote:
+> +static struct dw_dma_slave uart1_dma_param[] = {
+> +	{
+> +		/* Tx */
+> +		.cfg_hi = DWC_CFGH_DST_PER(SPEAR1340_DMA_REQ_UART1_TX),
+> +		.cfg_lo = 0,
+> +		.src_master = DMA_MASTER_MEMORY,
+> +		.dst_master = SPEAR1340_DMA_MASTER_UART1,
+> +	}, {
+> +		/* Rx */
+> +		.cfg_hi = DWC_CFGH_SRC_PER(SPEAR1340_DMA_REQ_UART1_RX),
+> +		.cfg_lo = 0,
+> +		.src_master = SPEAR1340_DMA_MASTER_UART1,
+> +		.dst_master = DMA_MASTER_MEMORY,
+> +	}
+> +};
+> +
+> +static struct amba_pl011_data uart1_data = {
+> +	.dma_filter = dw_dma_filter,
+> +	.dma_tx_param = &uart1_dma_param[0],
+> +	.dma_rx_param = &uart1_dma_param[1],
+> +};
 
->>> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
->>> @@ -117,6 +118,20 @@ static int __init ahci_probe(struct platform_device
->>> *pdev)
->>>    		return -ENOMEM;
->>>    	}
->>>
->>> +#ifdef CONFIG_HAVE_CLK
->>> +	hpriv->clk = clk_get(dev, NULL);
->>> +	if (IS_ERR(hpriv->clk)) {
->>> +		dev_err(dev, "Clock not found\n");
->>> +		return PTR_ERR(hpriv->clk);
->>> +	}
->>> +
->>> +	rc = clk_prepare_enable(hpriv->clk);
->>> +	if (rc) {
->>> +		dev_err(dev, "clock prepare enable failed");
->>> +		goto free_clk;
->>> +	}
->>> +#endif
->>> +
->>>    	/*
->>>    	 * Some platforms might need to prepare for mmio region access,
->>>    	 * which could be done in the following init call. So, the mmio
->> [...]
->>> @@ -190,12 +205,18 @@ static int __init ahci_probe(struct platform_device
->>> *pdev)
->>>    	rc = ata_host_activate(host, irq, ahci_interrupt, IRQF_SHARED,
->>>    			&ahci_platform_sht);
->>>    	if (rc)
->>> -		goto err0;
->>> +		goto pdata_exit;
->>>
->>>    	return 0;
->>> -err0:
->>> +pdata_exit:
->>>    	if (pdata&&   pdata->exit)
->>>    		pdata->exit(dev);
->>> +disable_unprepare_clk:
->>> +#ifdef CONFIG_HAVE_CLK
->>> +	clk_disable_unprepare(hpriv->clk);
->>> +free_clk:
->>> +	clk_put(hpriv->clk);
->>> +#endif
->>>    	return rc;
->>>    }
->>>
->>> @@ -204,12 +225,19 @@ static int __devexit ahci_remove(struct
->>> platform_device *pdev)
->>>    	struct device *dev =&pdev->dev;
->>>    	struct ahci_platform_data *pdata = dev_get_platdata(dev);
->>>    	struct ata_host *host = dev_get_drvdata(dev);
->>> +#ifdef CONFIG_HAVE_CLK
->>> +	struct ahci_host_priv *hpriv = host->private_data;
->>> +#endif
->>>
->>>    	ata_host_detach(host);
->>>
->>>    	if (pdata&&   pdata->exit)
->>>    		pdata->exit(dev);
->>>
->>> +#ifdef CONFIG_HAVE_CLK
->>> +	clk_disable_unprepare(hpriv->clk);
->>> +	clk_put(hpriv->clk);
->>> +#endif
->>>    	return 0;
->>>    }
->>>
->>> @@ -244,6 +272,11 @@ static int ahci_suspend(struct device *dev)
->>>
->>>    	if (pdata&&   pdata->suspend)
->>>    		return pdata->suspend(dev);
->>> +
->>> +#ifdef CONFIG_HAVE_CLK
->>> +	clk_disable_unprepare(hpriv->clk);
->>> +#endif
->>> +
->>>    	return 0;
->>>    }
->>>
->>> @@ -253,16 +286,26 @@ static int ahci_resume(struct device *dev)
->>>    	struct ata_host *host = dev_get_drvdata(dev);
->>>    	int rc;
->>>
->>> +#ifdef CONFIG_HAVE_CLK
->>> +	struct ahci_host_priv *hpriv = host->private_data;
->>> +
->>> +	rc = clk_prepare_enable(hpriv->clk);
->>> +	if (rc) {
->>> +		dev_err(dev, "clock prepare enable failed");
->>> +		return rc;
->>> +	}
->>> +#endif
->>> +
->> [...]
->>> @@ -270,6 +313,12 @@ static int ahci_resume(struct device *dev)
->>>    	ata_host_resume(host);
->>>
->>>    	return 0;
->>> +
->>> +disable_unprepare_clk:
->>> +#ifdef CONFIG_HAVE_CLK
->>> +	clk_disable_unprepare(hpriv->clk);
->>> +#endif
+Again, I hope that we can remove this eventually when we have the DMA bindings,
+but it's ok for now.
 
->>      Can't we have empty inlines for !defined(CONFIG_HAVE_CLK) case in
->> <linux/clk.h>. Otherwise there's too much uglye #ifdef'ery.
+> +/* SATA device registration */
+> +static int sata_miphy_init(struct device *dev, void __iomem *addr)
+> +{
+> +	writel(SPEAR1340_SATA_CFG_VAL, SPEAR1340_PCIE_SATA_CFG);
+> +	writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
+> +			SPEAR1340_PCIE_MIPHY_CFG);
+> +	/* Switch on sata power domain */
+> +	writel((readl(SPEAR1340_PCM_CFG) | (0x800)), SPEAR1340_PCM_CFG);
+> +	msleep(20);
+> +	/* Disable PCIE SATA Controller reset */
+> +	writel((readl(SPEAR1340_PERIP1_SW_RST) & (~0x1000)),
+> +			SPEAR1340_PERIP1_SW_RST);
+> +	msleep(20);
+> +
+> +	return 0;
+> +}
+> +
+> +void sata_miphy_exit(struct device *dev)
+> +{
+> +	writel(0, SPEAR1340_PCIE_SATA_CFG);
+> +	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
+> +
+> +	/* Enable PCIE SATA Controller reset */
+> +	writel((readl(SPEAR1340_PERIP1_SW_RST) | (0x1000)),
+> +			SPEAR1340_PERIP1_SW_RST);
+> +	msleep(20);
+> +	/* Switch off sata power domain */
+> +	writel((readl(SPEAR1340_PCM_CFG) & (~0x800)), SPEAR1340_PCM_CFG);
+> +	msleep(20);
+> +}
+> +
+> +int sata_suspend(struct device *dev)
+> +{
+> +	if (dev->power.power_state.event == PM_EVENT_FREEZE)
+> +		return 0;
+> +
+> +	sata_miphy_exit(dev);
+> +
+> +	return 0;
+> +}
 
-> Isn't that simple. Lot of platforms defining these routines clk_get(),
-> clk_put(), etc.
-> So, if we create dummy routines, they will get errors for multiple declarations.
+I'd like to see this done differently, with a ahci_spear driver derived from
+ahci_platform that provides these functions in a modular driver that registers
+to a spear specific identifier string and is able to do the platform specific
+based on information it can find in the device tree. That would however require
+changes to the existing ahci_platform code and I'd first like to hear what
+Jeff and others have to say about this.
 
-    But those platforms should have CONFIG_HAVE_CLK defined...
-
-WBR, Sergei
+	Arnd
