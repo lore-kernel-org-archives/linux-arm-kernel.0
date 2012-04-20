@@ -1,130 +1,102 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 20 Apr 2012 16:40:06 +0530
-Subject: [PATCH v2 2/3] ARM: OMAP2+: omap_hwmod: Add api to enable/disable
- module level wakeup events
-In-Reply-To: <1334920207-19160-1-git-send-email-govindraj.raja@ti.com>
-References: <1334920207-19160-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1334920207-19160-3-git-send-email-govindraj.raja@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 20 Apr 2012 12:42:01 +0100
+Subject: [PATCH 2/2] regulator: Add Freescale's MC34708 regulators
+In-Reply-To: <1334853521-23792-2-git-send-email-paul.liu@linaro.org>
+References: <1334853521-23792-1-git-send-email-paul.liu@linaro.org>
+ <1334853521-23792-2-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120420114201.GA3259@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+On Fri, Apr 20, 2012 at 12:38:41AM +0800, Ying-Chun Liu (PaulLiu) wrote:
 
-On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
-PM_WKEN1_CORE/PM_WKEN_PER regs.
+> +static const int mc34708_sw1A[] = {
+> +	650000, 662500, 675000, 687500, 700000, 712500,
 
-Add api to control the module level wakeup mechanism from info provided from
-hwmod data. If module level wakeups are available from hwmod data then they
-have to be enabled/disabled as per driver request.
+Replace these by direct calculations, using tables is both less
+efficient and less clear.
 
-omap_hwmod_enable/disable_wakeup is used from serial.c which should
-configure those registers to enable or disable the module level wakeup.
+> +	mc34708_lock(priv->mc34708);
+> +	ret = mc34708_reg_rmw(priv->mc34708, mc34708_regulators[id].reg,
+> +			      mc34708_regulators[id].enable_bit,
+> +			      mc34708_regulators[id].enable_bit);
+> +	mc34708_unlock(priv->mc34708);
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c   |   24 ++++++++++++++++++++++++
- arch/arm/mach-omap2/prm2xxx_3xxx.c |    8 ++++++++
- arch/arm/mach-omap2/prm2xxx_3xxx.h |    9 +++++++++
- 3 files changed, 41 insertions(+), 0 deletions(-)
+Having to open code this locking in every single driver is a bit
+painful; just have the default register I/O operations do the locking
+and introduce additional unlocked versions if needed.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 2c27fdb..0200daa 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -382,6 +382,28 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
- }
- 
- /**
-+ * _enable_module_level_wakeup - enable/disable module level wakeup on hwmod.
-+ * @oh: struct omap_hwmod *
-+ * @set_wake: bool value indicating to set (true) or clear (false) module level
-+ *		wakeup enable
-+ *
-+ * Set or clear the  module level wakeup capability the
-+ * hwmod @oh. This function configures th PM_WKEN reg bits if they
-+ * are available from hwmod. No return value
-+ */
-+static void _enable_module_level_wakeup(struct omap_hwmod *oh, bool set_wake)
-+{
-+	if (oh->prcm.omap2.module_wakeup_offs &&
-+				oh->prcm.omap2.module_wakeup_bit &&
-+				oh->prcm.omap2.module_offs)
-+		omap2_prm_enable_prcm_module_wakeup(
-+					oh->prcm.omap2.module_wakeup_bit,
-+					oh->prcm.omap2.module_offs,
-+					oh->prcm.omap2.module_wakeup_offs,
-+					set_wake);
-+}
-+
-+/**
-  * _set_idle_ioring_wakeup - enable/disable IO pad wakeup on hwmod idle for mux
-  * @oh: struct omap_hwmod *
-  * @set_wake: bool value indicating to set (true) or clear (false) wakeup enable
-@@ -2471,6 +2493,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- 		_write_sysconfig(v, oh);
- 	}
- 
-+	_enable_module_level_wakeup(oh, true);
- 	_set_idle_ioring_wakeup(oh, true);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-@@ -2504,6 +2527,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 		_write_sysconfig(v, oh);
- 	}
- 
-+	_enable_module_level_wakeup(oh, false);
- 	_set_idle_ioring_wakeup(oh, false);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index 9ce7654..2b38e34 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -91,6 +91,14 @@ u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
- 	return omap2_prm_rmw_mod_reg_bits(bits, 0x0, module, idx);
- }
- 
-+void omap2_prm_enable_prcm_module_wakeup(u32 bits, s16 module, s16 idx,
-+			bool set_wake)
-+{
-+	if (set_wake)
-+		omap2_prm_set_mod_reg_bits(bits, module, idx);
-+	else
-+		omap2_prm_clear_mod_reg_bits(bits, module, idx);
-+}
- 
- /**
-  * omap2_prm_is_hardreset_asserted - read the HW reset line state of
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-index 70ac2a1..1b4194d 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-@@ -289,6 +289,13 @@ static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift,
- 		"not suppose to be used on omap4\n");
- 	return 0;
- }
-+static inline void omap2_prm_enable_prcm_module_wakeup(u32 bits, s16 module,
-+				s16 idx, bool set_wake)
-+{
-+	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
-+		"not suppose to be used on omap4\n");
-+	return 0;
-+}
- #else
- /* Power/reset management domain register get/set */
- extern u32 omap2_prm_read_mod_reg(s16 module, u16 idx);
-@@ -297,6 +304,8 @@ extern u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module, s16 idx);
- extern u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx);
- extern u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx);
- extern u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask);
-+extern void omap2_prm_enable_prcm_module_wakeup(u32 bits, s16 module,
-+				s16 idx, bool set_wake);
- 
- /* These omap2_ PRM functions apply to both OMAP2 and 3 */
- extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
--- 
-1.7.9
+All this stuff could be factored out if you were using regmap.
+
+> +EXPORT_SYMBOL_GPL(mc34708_regulator_list_voltage);
+
+No, this stuff should only be accessed via the ops.  Why are you doing
+this?
+
+> +int
+> +mc34708_get_best_voltage_index(struct regulator_dev *rdev,
+> +			       int min_uV, int max_uV)
+> +{
+
+You're reimplementing core functionality here, or it'd be even better to
+use calculations.
+
+> +static int mc34708_regulator_get_voltage(struct regulator_dev *rdev)
+> +{
+
+Why is this not get_voltage_sel?
+
+> +static struct regulator_ops mc34708_regulator_ops = {
+> +	.enable = mc34708_regulator_enable,
+> +	.disable = mc34708_regulator_disable,
+> +	.is_enabled = mc34708_regulator_is_enabled,
+> +	.list_voltage = mc34708_regulator_list_voltage,
+> +	.set_voltage = mc34708_regulator_set_voltage,
+> +	.get_voltage = mc34708_regulator_get_voltage,
+> +};
+> +EXPORT_SYMBOL_GPL(mc34708_regulator_ops);
+
+No.  What are you doing this for?
+
+> +int
+> +mc34708_fixed_regulator_set_voltage(struct regulator_dev *rdev, int min_uV,
+> +				    int max_uV, unsigned *selector)
+
+This function makes no sense...
+
+> +int mc34708_sw_regulator_is_enabled(struct regulator_dev *rdev)
+> +{
+> +	return 1;
+> +}
+
+Why are you doing this - this function is redundant.
+
+> +	ret = mc34708_reg_rmw(mc34708, MC34708_SW12OP,
+> +			      MC34708_SW12OP_SW1AMODE_M |
+> +			      MC34708_SW12OP_SW2MODE_M,
+> +			      MC34708_SW12OP_SW1AMODE_VALUE |
+> +			      MC34708_SW12OP_SW2MODE_VALUE);
+> +	if (ret)
+> +		goto err_free;
+> +
+> +	ret = mc34708_reg_rmw(mc34708, MC34708_SW345OP,
+> +			      MC34708_SW345OP_SW3MODE_M |
+> +			      MC34708_SW345OP_SW4AMODE_M |
+> +			      MC34708_SW345OP_SW4BMODE_M |
+> +			      MC34708_SW345OP_SW5MODE_M,
+> +			      MC34708_SW345OP_SW3MODE_VALUE |
+> +			      MC34708_SW345OP_SW4AMODE_VALUE |
+> +			      MC34708_SW345OP_SW4BMODE_VALUE |
+> +			      MC34708_SW345OP_SW5MODE_VALUE);
+> +	if (ret)
+> +		goto err_free;
+
+If this needs to be done unconditionally shouldn't it be being donei in
+the MFD core driver?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120420/5db8aecc/attachment-0001.sig>
