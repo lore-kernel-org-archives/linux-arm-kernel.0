@@ -1,47 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Apr 2012 17:56:35 -0700
-Subject: [GIT PULL] ARM: OMAP2+: hwmod data: add most of the remaining
- OMAP4 hwmods
-In-Reply-To: <alpine.DEB.2.00.1204191428550.29048@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1204191428550.29048@utopia.booyaka.com>
-Message-ID: <20120420005633.GZ21106@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 20 Apr 2012 02:56:50 +0200
+Subject: [PATCH 05/10] MXS: Add platform registration hooks for USB EHCI
+In-Reply-To: <20120420004011.GF22219@S2101-09.ap.freescale.net>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <201204192332.56957.marex@denx.de>
+ <20120420004011.GF22219@S2101-09.ap.freescale.net>
+Message-ID: <201204200256.51011.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120419 13:33]:
-> -----BEGIN PGP SIGNED MESSAGE-----
-> Hash: SHA1
-> 
-> Hi Tony,
-> 
-> The following changes since commit 3af35fbcd088e0b675fa423a879c596384894180:
-> 
->   ARM: OMAP2xxx: hwmod data: start to fix the IVA1, IVA2 and DSP (2012-04-19 04:25:08 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending tags/omap-devel-a-for-3.5
-> 
-> for you to fetch changes up to 96566043b19ae76d3828ce75cbf28dc6d0bcaaf1:
-> 
->   ARM: OMAP4: hwmod data: add DEBUGSS skeleton (2012-04-19 13:33:59 -0600)
-> 
-> - ----------------------------------------------------------------
-> Add in most of the remaining hwmods (IP block descriptions) for the
-> OMAP44xx family of SoCs.  There still seem to be a few missing, such
-> as those for the MMU IP blocks, but this seems to cover the bulk of
-> the remainder.
+Dear Shawn Guo,
 
-Thanks merging this into devel-hwmod and merging into linux-omap master.
+> On Thu, Apr 19, 2012 at 11:32:56PM +0200, Marek Vasut wrote:
+> > The Device Tree code for MXS is not ripe yet. We still miss a lot in
+> > there. Flipping this usb stuff to DT should be easy, I see no point
+> > disallowing this (and that stands also for the MXS SPI actually) into
+> > kernel so more people can test it only because you'd like this to wait
+> > for who knows how long for the DT support to arrive. Don't take it
+> > personally, but I still believe it's too early to enforce DT on MXS.
+> 
+> Let me put it another way.  When you have drivers/usb changes hit
+> mainline, while there is still something not ripe for mxs DT support
+> while stops you adding DT support for usb driver, you have good reason
+> to ask me take the arch/arm/mach-mxs changes in this series then.
 
-Just for reference, I now have omap-cleanup-a2-for-3.5, omap-cleanup-b-for-3.5
-and omap-devel-a-for-3.5 merged, and I've dropped all the earlier branches
-you posted.
+Yes, I'm quite aware this stuff might take a bit to get into mainline shape. I 
+grouped this and MXS SPI together, maybe the MXS SPI stuff is a better 
+representation of what I had in mind (about letting non-DT stuff for mxs slide 
+in).
 
-So I'm assuming you'll be resending what was in hwmod_misc_devel_3.4,
-clock_devel_3.4 and io_chain_devel_3.4 once you're done with your fixes/updates
-for those.
-
-Cheers,
-
-Tony
+Best regards,
+Marek Vasut
