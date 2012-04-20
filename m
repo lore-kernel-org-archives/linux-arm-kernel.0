@@ -1,46 +1,38 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 20 Apr 2012 03:08:45 +0200
-Subject: [PATCH 3/3] ARM: imx6q: switch to use pinctrl driver
-In-Reply-To: <20120416033519.GA17173@shlinux2.ap.freescale.net>
-References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
- <1334333915-1174-3-git-send-email-b29396@freescale.com>
- <20120414135331.GB3852@pengutronix.de>
- <CAA+hA=QhSUZg0bWTss_4ROwZ--OOQfcP=mpt+MP7-ZKPkEwXyA@mail.gmail.com>
- <20120415073751.GF24997@S2101-09.ap.freescale.net>
- <20120416033519.GA17173@shlinux2.ap.freescale.net>
-Message-ID: <20120420010845.GV16641@game.jcrosoft.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 20 Apr 2012 09:34:44 +0800
+Subject: [PATCH 05/10] MXS: Add platform registration hooks for USB EHCI
+In-Reply-To: <201204200256.51011.marex@denx.de>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <201204192332.56957.marex@denx.de>
+ <20120420004011.GF22219@S2101-09.ap.freescale.net>
+ <201204200256.51011.marex@denx.de>
+Message-ID: <20120420013442.GG22219@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:35 Mon 16 Apr     , Dong Aisheng wrote:
-> On Sun, Apr 15, 2012 at 03:37:54PM +0800, Shawn Guo wrote:
-> > On Sun, Apr 15, 2012 at 12:03:16PM +0800, Dong Aisheng wrote:
-> > ...
-> > > For MX3 and MX5, before their pinctrl driver are available, user may
-> > > need to define a dummy in dt to avoid such an error.
-> > > 
-> > That is insane, and will not work.
+On Fri, Apr 20, 2012 at 02:56:50AM +0200, Marek Vasut wrote:
+> Dear Shawn Guo,
+> 
+> > On Thu, Apr 19, 2012 at 11:32:56PM +0200, Marek Vasut wrote:
+> > > The Device Tree code for MXS is not ripe yet. We still miss a lot in
+> > > there. Flipping this usb stuff to DT should be easy, I see no point
+> > > disallowing this (and that stands also for the MXS SPI actually) into
+> > > kernel so more people can test it only because you'd like this to wait
+> > > for who knows how long for the DT support to arrive. Don't take it
+> > > personally, but I still believe it's too early to enforce DT on MXS.
 > > 
-> > 1) We do not have device tree support for MX3 yet.
-> > 2) It's not practical to add dummy entries in dt to avoid the error.
-> > 3) There are still so many non-dt board files support in the tree.
-> > How will they work with that?
-> > 
-> > My suggestion is to not make it an error but a dev_dbg, assuming that
-> > the pins are already set up by platform code if we do not find the
-> > entry from pinctrl system.  We can take it as a transition solution,
-> > and turn the dev_dbg back to error when all the users of the device
-> > driver are converted to device tree.
-> > 
-> My thinking is let pinctrl core handle dummy state as regulator subsystem
-> and does not depend on dt.
-> Linus, Stephen, any comment?
-agreed with Shawn
+> > Let me put it another way.  When you have drivers/usb changes hit
+> > mainline, while there is still something not ripe for mxs DT support
+> > while stops you adding DT support for usb driver, you have good reason
+> > to ask me take the arch/arm/mach-mxs changes in this series then.
+> 
+> Yes, I'm quite aware this stuff might take a bit to get into mainline shape. I 
+> grouped this and MXS SPI together, maybe the MXS SPI stuff is a better 
+> representation of what I had in mind (about letting non-DT stuff for mxs slide 
+> in).
+> 
+I gave Fabio the same comment on his SPI patch.
 
-this is insane if you can an error you do need to report it
-
-I get the same issue on at91 and I'm going to make the pinctrl mandatory for DT
-only
-
-Best Regards,
-J.
+-- 
+Regards,
+Shawn
