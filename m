@@ -1,51 +1,47 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 20 Apr 2012 08:55:29 +0800
-Subject: [PATCH] gpio: pxa: Set PXA GPIO irq_chip IRQCHIP_SKIP_SET_WAKE
- flag
-In-Reply-To: <87vckvfr3e.fsf@free.fr>
-References: <1334788817.8003.YahooMailClassic@web29002.mail.ird.yahoo.com>
- <87vckvfr3e.fsf@free.fr>
-Message-ID: <CAN1soZyQPdcwRd5CtDz+iCV9h=Xq-ar=EBKyQ4ya_hE-PZLNXw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Apr 2012 17:56:35 -0700
+Subject: [GIT PULL] ARM: OMAP2+: hwmod data: add most of the remaining
+ OMAP4 hwmods
+In-Reply-To: <alpine.DEB.2.00.1204191428550.29048@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1204191428550.29048@utopia.booyaka.com>
+Message-ID: <20120420005633.GZ21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 3:40 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->
-> Haojian,
->
-> I feel there's some change in PXA gpio wakeup handling that's weird.
->
-> The effect : gpio_keys driver can't wakeup from suspend to RAM on GPIO0
-> activation
->
-> A quick analysis (thanks Paul for direction) :
-> ?- gpio_keys() calls irq_set_wake(96, 1) (ie. gpio0)
-> ?- gpio-pxa driver doesn't care (as it doesn't have any irq_set_wake function)
-> ? (see in [1])
->
-> Now if I'm directing the mail at is because you're the only one who commited
-> between v3.2 and v3.3 in gpio-pxa driver ([2]).
->
-> Could you tell me if removing irq_set_wake() was intentional ?
->
-> Cheers.
->
-> --
-> Robert
->
-> [1]
-> rj at beldin:~/mio_linux/kernel$ git show v3.2:drivers/gpio/gpio-pxa.c | grep set_wake
-> void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
-> ? ? ? ?pxa_muxed_gpio_chip.irq_set_wake = fn;
-> rj at beldin:~/mio_linux/kernel$ git show v3.3:drivers/gpio/gpio-pxa.c | grep set_wake
-> rj at beldin:~/mio_linux/kernel$
->
-> [2]
-> rj at beldin:~/mio_linux/kernel$ git log v3.3 ^v3.2 --pretty=format:%an drivers/gpio/gpio-pxa.c | sort -u
-> Haojian Zhuang
+* Paul Walmsley <paul@pwsan.com> [120419 13:33]:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+> 
+> Hi Tony,
+> 
+> The following changes since commit 3af35fbcd088e0b675fa423a879c596384894180:
+> 
+>   ARM: OMAP2xxx: hwmod data: start to fix the IVA1, IVA2 and DSP (2012-04-19 04:25:08 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending tags/omap-devel-a-for-3.5
+> 
+> for you to fetch changes up to 96566043b19ae76d3828ce75cbf28dc6d0bcaaf1:
+> 
+>   ARM: OMAP4: hwmod data: add DEBUGSS skeleton (2012-04-19 13:33:59 -0600)
+> 
+> - ----------------------------------------------------------------
+> Add in most of the remaining hwmods (IP block descriptions) for the
+> OMAP44xx family of SoCs.  There still seem to be a few missing, such
+> as those for the MMU IP blocks, but this seems to cover the bulk of
+> the remainder.
 
-Yes, I need to fix this. The set_wake() function will be transfered to
-gpio-pxa driver via platform data.
+Thanks merging this into devel-hwmod and merging into linux-omap master.
 
-Thanks
-Haojian
+Just for reference, I now have omap-cleanup-a2-for-3.5, omap-cleanup-b-for-3.5
+and omap-devel-a-for-3.5 merged, and I've dropped all the earlier branches
+you posted.
+
+So I'm assuming you'll be resending what was in hwmod_misc_devel_3.4,
+clock_devel_3.4 and io_chain_devel_3.4 once you're done with your fixes/updates
+for those.
+
+Cheers,
+
+Tony
