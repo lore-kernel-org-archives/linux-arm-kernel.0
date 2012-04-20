@@ -1,42 +1,62 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 20 Apr 2012 15:14:46 +0200
-Subject: [PATCH v5] i2c: Add device tree support to i2c-pnx.c
-In-Reply-To: <20120420120950.GA15613@pengutronix.de>
-References: <1334913755-10466-1-git-send-email-stigge@antcom.de>
- <20120420120950.GA15613@pengutronix.de>
-Message-ID: <4F916146.1080904@antcom.de>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Fri, 20 Apr 2012 18:50:25 +0530
+Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
+In-Reply-To: <4F8EDA24.5020209@ti.com>
+References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
+ <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
+ <87bomprjic.fsf@ti.com> <4F8E62D2.9080206@ti.com>
+ <87bompp2bk.fsf@ti.com> <4F8EDA24.5020209@ti.com>
+Message-ID: <CAM=Q2cvRs2z7sf1ZeU-tMAZLgjPSM5V2fABLyj7087drThf44A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 18, 2012 at 8:43 PM, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
+>>
+>> Kevin
+> Yes agree completely. Will describe that in the changelog.
+> --
+Does the following changelog look ok?
 
-On 04/20/2012 02:09 PM, Wolfram Sang wrote:
->> Signed-off-by: Roland Stigge <stigge@antcom.de> Reviewed-by: Arnd
->> Bergmann <arnd@arndb.de> Acked-by: Wolfram Sang
->> <w.sang@pengutronix.de>
-> 
-> NACK! I said the approach of dropping "timeout" is OK, but unless I
-> say "you may add my ack after changing this and that", please do
-> not automatically add my ack. Doesn't hurt here, since I have to
-> pick it up anyway.
+>From 37fdc2d40c9b2b19b8c5a9a4b8f7dd547d420f55 Mon Sep 17 00:00:00 2001
+From: Shubhrajyoti D <shubhrajyoti@ti.com>
+Date: Wed, 4 Apr 2012 16:32:37 +0530
+Subject: [PATCH] UART: OMAP: call pm_runtime_put/autosuspend in the error cases
 
-Sorry - my apologies! Removing for next re-post.
+In the error cases the runtime_put call is missed. This patch intends to fix the
+same. In case dma request fails, we fall back to the nondma mode so after
+enabling the threshold call put_autosuspend.
 
->> Changes since v4: * Removed OF timeout property (to be added
->> later when there is consensus about how to call and handle it) *
->> Changed clock-frequency example to decimal
-> 
-> Thanks, I just noticed. Please drop (more precise: remove) the 
-> "slave-addr" for the same reasons as "timeout".
+Cc: Govindraj.R <govindraj.raja@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-OK, will do.
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index fe099bb..10e80bb 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
 
->> ret = request_irq(alg_data->irq, i2c_pnx_interrupt, -			0,
->> pdev->name, alg_data); +			  0, pdev->name, alg_data);
-> 
-> I know that checkpatch complains about this, but I'd prefer to
-> avoid such changes unless the code before was really unreadable.
+ 		if (ret < 0) {
+ 			serial_omap_enable_ier_thri(up);
++			pm_runtime_mark_last_busy(&up->pdev->dev);
++			pm_runtime_put_autosuspend(&up->pdev->dev);
+ 			return;
+ 		}
+ 	}
+@@ -1029,8 +1031,10 @@ static int serial_omap_poll_get_char(struct
+uart_port *port)
 
-OK!
+ 	pm_runtime_get_sync(&up->pdev->dev);
+ 	status = serial_in(up, UART_LSR);
+-	if (!(status & UART_LSR_DR))
++	if (!(status & UART_LSR_DR)) {
++		pm_runtime_put(&up->pdev->dev);
+ 		return NO_POLL_CHAR;
++	}
 
-Roland
+ 	status = serial_in(up, UART_RX);
+ 	pm_runtime_put(&up->pdev->dev);
+-- 
+1.7.5.4
