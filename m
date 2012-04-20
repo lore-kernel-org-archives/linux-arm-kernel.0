@@ -1,79 +1,91 @@
-From: viresh.linux@gmail.com (Viresh Kumar)
-Date: Fri, 20 Apr 2012 20:12:32 +0530
-Subject: [PATCH] watchdog: mpcore: Add DT bindings for ARM mpcore watchdog
-Message-ID: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 20 Apr 2012 17:43:22 +0300
+Subject: [PATCH 00/19] ARM: OMAP4 device off support
+In-Reply-To: <87vckupkxj.fsf@ti.com>
+References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
+ <CANrkHUa5q10FFxsZfgtMqKbzKKFHCcf3yYsaOK+hG8CJiME2TA@mail.gmail.com>
+ <1334926721.2149.40.camel@sokoban>  <87vckupkxj.fsf@ti.com>
+Message-ID: <1334933002.2149.44.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Device tree bindings for ARM Mpcore watchdog. It also updates
-documentation for bindings.
+On Fri, 2012-04-20 at 06:55 -0700, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
+> 
+> [...]
+> 
+> >> I tried your branch on gp/emu devices but could not reproduce this issue.
+> >> My observation is that while resuming, omap_hsmmc.1 eMMC is
+> >> trying to turn on phoenix vaux1 regulator via i2c which fails due
+> >> to controller timeout.
+> >> Note: eMMC is present only on sdp/blaze
+> >
+> > Did you try this with off-mode enabled and did you check the device
+> > actually goes to off? (see pm_debug/count and verify core off count is
+> > increasing.) And as said, I was only able to see this problem on a blaze
+> > device, panda works fine. But yes, you are probably right and it is not
+> > an MMC driver issue but I2C.
+> 
+> Can you try the patch below?  It sounds like the same problem.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- .../bindings/watchdog/arm-mpcore-wdt.txt           |   19 +++++++++++++++++++
- drivers/watchdog/mpcore_wdt.c                      |   10 ++++++++++
- 2 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt
+Doesn't help with this one. I guess I2C loses context during device off
+and it is not restored properly.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt b/Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt
-new file mode 100644
-index 0000000..27a71aa
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt
-@@ -0,0 +1,19 @@
-+* ARM MPCORE WATCHDOG
-+
-+Required properties:
-+- compatible : "arm,mpcore-wdt"
-+- reg : Address range of the wdt registers
-+
-+Optional Properties:
-+- interrupt-parent: Should be the phandle for the interrupt controller
-+  that services interrupts for this device
-+- interrupt: Should contain the wdt interrupt number
-+
-+Example:
-+
-+	wdt at ec800620 {
-+		compatible = "arm,mpcore-wdt";
-+		reg = <0xec800620 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <1 14 0x301>;
-+	};
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 7c00455..f82625f 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -27,6 +27,7 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/pm.h>
- #include <linux/reboot.h>
-@@ -402,6 +403,14 @@ static SIMPLE_DEV_PM_OPS(mpcore_wdt_dev_pm_ops, mpcore_wdt_suspend,
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:mpcore_wdt");
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id mpcore_wdt_id_table[] = {
-+	{ .compatible = "arm,mpcore-wdt" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, mpcore_wdt_id_table);
-+#endif
-+
- static struct platform_driver mpcore_wdt_driver = {
- 	.probe		= mpcore_wdt_probe,
- 	.remove		= __devexit_p(mpcore_wdt_remove),
-@@ -410,6 +419,7 @@ static struct platform_driver mpcore_wdt_driver = {
- 		.owner	= THIS_MODULE,
- 		.name	= "mpcore_wdt",
- 		.pm	= &mpcore_wdt_dev_pm_ops,
-+		.of_match_table = of_match_ptr(mpcore_wdt_id_table),
- 	},
- };
- 
--- 
-1.7.9
+-Tero
+
+> 
+> Kevin
+> 
+> 
+> From 999f34629140f436099050eb7aac514bfd2a2235 Mon Sep 17 00:00:00 2001
+> From: NeilBrown <neilb@suse.de>
+> Date: Fri, 30 Dec 2011 12:40:30 +1100
+> Subject: [PATCH] OMAP/I2C - Fix timeout problem during suspend.
+> 
+> On a board with OMAP3 processor and TWL4030 Power management,
+> we need to talk to the TWL4030 during late suspend but cannot
+> because the I2C interrupt is disabled (as late suspend disables
+> interrupt).
+> 
+> e.g. I get messages like:
+> 
+> [   62.161102] musb-omap2430 musb-omap2430: LATE power domain suspend
+> [   63.167205] omap_i2c omap_i2c.1: controller timed out
+> [   63.183044] twl: i2c_read failed to transfer all messages
+> [   64.182861] omap_i2c omap_i2c.1: controller timed out
+> [   64.198455] twl: i2c_write failed to transfer all messages
+> [   65.198455] omap_i2c omap_i2c.1: controller timed out
+> [   65.203765] twl: i2c_write failed to transfer all messages
+> 
+> The stack shows omap2430_runtime_suspend calling twl4030_set_suspend
+> which tries to power-down the USB PHY (twl4030_phy_suspend ->
+> twl4030_phy_power -> __twl4030_phy_power which as a nice WARN_ON
+> that helps).
+> 
+> Then we get the same in resume:
+> 
+> [   69.603912] musb-omap2430 musb-omap2430: EARLY power domain resume
+> [   70.610473] omap_i2c omap_i2c.1: controller timed out
+> [   70.626129] twl: i2c_write failed to transfer all messages
+> etc.
+> 
+> So don't disable interrupts for I2C.
+> 
+> Signed-off-by: NeilBrown <neilb@suse.de>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 801df60..e024c50 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1092,7 +1092,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  
+>  	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
+>  								   omap_i2c_isr;
+> -	r = request_irq(dev->irq, isr, 0, pdev->name, dev);
+> +	r = request_irq(dev->irq, isr, IRQF_NO_SUSPEND, pdev->name, dev);
+>  
+>  	if (r) {
+>  		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
