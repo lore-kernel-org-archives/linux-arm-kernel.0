@@ -1,62 +1,45 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Fri, 20 Apr 2012 18:50:25 +0530
-Subject: [PATCH 2/7] UART: OMAP: Cut the clock in the error cases
-In-Reply-To: <4F8EDA24.5020209@ti.com>
-References: <1334588821-5224-1-git-send-email-shubhrajyoti@ti.com>
- <1334588821-5224-3-git-send-email-shubhrajyoti@ti.com>
- <87bomprjic.fsf@ti.com> <4F8E62D2.9080206@ti.com>
- <87bompp2bk.fsf@ti.com> <4F8EDA24.5020209@ti.com>
-Message-ID: <CAM=Q2cvRs2z7sf1ZeU-tMAZLgjPSM5V2fABLyj7087drThf44A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 20 Apr 2012 15:20:20 +0200
+Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
+ support
+In-Reply-To: <20120420123842.GA25662@avionic-0098.adnet.avionic-design.de>
+References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
+ <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
+ <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
+ <20120420123842.GA25662@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20120420132020.GP3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 8:43 PM, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
->>
->> Kevin
-> Yes agree completely. Will describe that in the changelog.
-> --
-Does the following changelog look ok?
+On Fri, Apr 20, 2012 at 02:38:43PM +0200, Thierry Reding wrote:
+> * Dave Airlie wrote:
+> > I get the feeling the drm can just be a virtual platform device of
+> > some sort, then it reads the device tree and binds all the information
+> > on what crtc/encoders are available,
+> 
+> That's pretty much what I've come up with in the second round of Tegra DRM
+> patches. Basically display controllers and outputs (RGB, HDMI, TVO, DSI) get
+> separate drivers and register themselves with the DRM driver which then looks
+> at the device tree to see which display controllers to register as CRTCs and
+> parses a list of connector nodes to create encoder/connector pairs that
+> define the physical connectors and their corresponding outputs.
+> 
+> I did take a brief look at the SDRM patches as well and they didn't quite
+> seem to fit what was needed for Tegra. But if time allows I'll take a closer
+> look.
 
->From 37fdc2d40c9b2b19b8c5a9a4b8f7dd547d420f55 Mon Sep 17 00:00:00 2001
-From: Shubhrajyoti D <shubhrajyoti@ti.com>
-Date: Wed, 4 Apr 2012 16:32:37 +0530
-Subject: [PATCH] UART: OMAP: call pm_runtime_put/autosuspend in the error cases
+Can you elaborate which parts don't fit? I am very interested to
+improve this situation, and I think having code to share will be a
+benefit for us all.
 
-In the error cases the runtime_put call is missed. This patch intends to fix the
-same. In case dma request fails, we fall back to the nondma mode so after
-enabling the threshold call put_autosuspend.
+I know that the patches I wrote are no one-solution-fits-for-all yet,
+they are mainly something to show that drm drivers do not have to be
+huge complex drivers.
 
-Cc: Govindraj.R <govindraj.raja@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/tty/serial/omap-serial.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+Sascha
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index fe099bb..10e80bb 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -319,6 +319,8 @@ static void serial_omap_start_tx(struct uart_port *port)
-
- 		if (ret < 0) {
- 			serial_omap_enable_ier_thri(up);
-+			pm_runtime_mark_last_busy(&up->pdev->dev);
-+			pm_runtime_put_autosuspend(&up->pdev->dev);
- 			return;
- 		}
- 	}
-@@ -1029,8 +1031,10 @@ static int serial_omap_poll_get_char(struct
-uart_port *port)
-
- 	pm_runtime_get_sync(&up->pdev->dev);
- 	status = serial_in(up, UART_LSR);
--	if (!(status & UART_LSR_DR))
-+	if (!(status & UART_LSR_DR)) {
-+		pm_runtime_put(&up->pdev->dev);
- 		return NO_POLL_CHAR;
-+	}
-
- 	status = serial_in(up, UART_RX);
- 	pm_runtime_put(&up->pdev->dev);
 -- 
-1.7.5.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
