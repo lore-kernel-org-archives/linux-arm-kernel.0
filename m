@@ -1,31 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Apr 2012 08:47:14 +0200
-Subject: [PATCH 02/16] drivers/gpio: gpio-nomadik: Add support for
- irqdomains
-In-Reply-To: <201204191623.07445.arnd@arndb.de>
-References: <1334659448-11521-1-git-send-email-lee.jones@linaro.org>
- <201204181622.34692.arnd@arndb.de>
- <CACRpkdaTFatBK4GyzCzm=U6+h8Knnf6xY9X6Uc26sLxQb2OhtA@mail.gmail.com>
- <201204191623.07445.arnd@arndb.de>
-Message-ID: <CACRpkdZGBndSvuFa=cFfsd5swW6+mD+PuGESobdEQ4j6oALQQg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 19 Apr 2012 23:59:13 -0700
+Subject: [PATCH 01/18] led-triggers: create a trigger for CPU activity
+In-Reply-To: <1334660025-20442-2-git-send-email-bryan.wu@canonical.com>
+References: <1334660025-20442-1-git-send-email-bryan.wu@canonical.com>
+ <1334660025-20442-2-git-send-email-bryan.wu@canonical.com>
+Message-ID: <4F910941.4000702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 6:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 4/17/2012 3:53 AM, Bryan Wu wrote:
+> +static int __init ledtrig_cpu_init(void)
+> +{
+> +	int cpu;
+> +
+> +	/* Supports up to 9999 cpu cores */
+> +	BUILD_BUG_ON(CONFIG_NR_CPUS > 9999);
+> +
+> +	/*
+> +	 * Registering CPU led trigger for each CPU cores here
+> +	 * ignores CPU hotplug, but after this CPU hotplug works
+> +	 * fine with this trigger.
+> +	 */
+> +	for_each_possible_cpu(cpu) {
+> +		struct led_trigger *trig;
+> +		char *name = per_cpu(trig_name, cpu);
+> +		struct rw_semaphore *lock = &per_cpu(trig_lock, cpu);
+> +
+> +		init_rwsem(lock);
 
-> If we move the code that adds the resources to a platform_device
-> from of_device_alloc() to ?platform_drv_probe(), we can defer
-> looking up the interrupt number until the driver actually gets
-> probed and bail out early with -EPROBE_DEFER if the irq domain
-> is not available yet. That will even work when we have a builtin
-> driver for a device that uses a GPIO interrupt and the gpio controller
-> driver is a loadable module.
+What is this lock protecting?
 
-Sounds like a good idea, we just need to make sure that the
-corresponding AMBA/PrimeCell devices doesn't end up with different
-semantics because of this.
+> +
+> +		snprintf(name, MAX_NAME_LEN, "cpu%d", cpu);
+> +
+> +		down_write(lock);
+> +		led_trigger_register_simple(name, &trig);
+> +		per_cpu(cpu_trig, cpu) = trig;
+> +		up_write(lock);
 
-So might need some patching around that bus as well.
+This is the only place it is locked and unlocked.
 
-Yours,
-Linus Walleij
+I think the previous comment was about how led_trigger_register_simple()
+exposed a live trigger but it wasn't assigned to the per_cpu variable
+yet. Can we not just reorder the assignment so we have
+
+  struct led_trigger *trig = NULL;
+  ...
+  per_cpu(cpu_trig, cpu) = trig;
+  led_trigger_register_simple();
+
+?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
