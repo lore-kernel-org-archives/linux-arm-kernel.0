@@ -1,28 +1,47 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 19 Apr 2012 17:28:02 -0700
-Subject: [PATCH] ARM: MSM: Remove twice included header files
-In-Reply-To: <1334338384-10728-1-git-send-email-thomas@tomweber.eu>
-References: <1334338384-10728-1-git-send-email-thomas@tomweber.eu>
-Message-ID: <20120420002802.GA8441@codeaurora.org>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Thu, 19 Apr 2012 17:31:52 -0700
+Subject: [RESEND PATCH] ARM: BCMRING: Add debug macro
+In-Reply-To: <CAOesGMh8EA66uajVeauJj8vviATLEnNHODeNyyas0iC1vQjMww@mail.gmail.com>
+References: <1334605108-28616-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F8C7617.5080902@broadcom.com> <4F8D7150.9060201@windriver.com>
+ <CAOesGMh8EA66uajVeauJj8vviATLEnNHODeNyyas0iC1vQjMww@mail.gmail.com>
+Message-ID: <4F90AE78.9060108@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2012 at 07:33:04PM +0200, Thomas Weber wrote:
-> Remove twice included gpio.h in board-msm7x30
-> and board-qsd8x50.
+Add debug macro to bcmring so that it supports LL debug and early printk.
 
-This was alread reported in https://lkml.org/lkml/2012/2/15/344
+Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+---
+arch/arm/mach-bcmring/include/mach/debug-macro.S |   19 +++++++++++++++++++
+  1 files changed, 19 insertions(+), 0 deletions(-)
+  create mode 100755 arch/arm/mach-bcmring/include/mach/debug-macro.S
 
-Please make sure you use the MAINTAINERS file
-(scripts/get_maintainer.pl helps here) so that the right people are
-included.  The patch should be sent To the maintainers, and the list
-CC'd.
-
-I've pulled the previous version of the patch in so it will get
-included in 3.5.
-
-David
-
+diff --git a/arch/arm/mach-bcmring/include/mach/debug-macro.S 
+b/arch/arm/mach-bcmring/include/mach/debug-macro.S
+new file mode 100755
+index 0000000..fae01fd
+--- /dev/null
++++ b/arch/arm/mach-bcmring/include/mach/debug-macro.S
+@@ -0,0 +1,19 @@
++/* arch/arm/mach-bcmring/include/mach/debug-macro.S
++ *
++ * Debugging macro include header
++ *
++ *  Based on arch/arm/mach-versatile/include/mach/debug-macro.S
++ *  by Jiandong Zheng
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++*/
++        .macro    addruart, rp, rv, tmp
++        mov    \rp,      #0x00012000
++        orr    \rv, \rp, #0xf8000000    @ virtual base
++        orr    \rp, \rp, #0x80000000    @ physical base
++        .endm
++
++#include <asm/hardware/debug-pl01x.S>
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.9.1
