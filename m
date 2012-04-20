@@ -1,35 +1,58 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 20 Apr 2012 09:53:47 +0200
-Subject: [PATCH v4] i2c: Add device tree support to i2c-pnx.c
-In-Reply-To: <20120420072811.GA9769@pengutronix.de>
-References: <1334850612-24151-1-git-send-email-stigge@antcom.de>
- <20120419160715.GD24987@pengutronix.de> <4F903E0C.6010604@antcom.de>
- <20120419203915.GB28005@pengutronix.de> <4F90812F.5090106@antcom.de>
- <20120420072811.GA9769@pengutronix.de>
-Message-ID: <4F91160B.5070802@antcom.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 20 Apr 2012 11:21:05 +0300
+Subject: [GIT PULL] ARM: OMAP3+: PRM/hwmod: fix and improve I/O chain
+ wakeup support
+In-Reply-To: <alpine.DEB.2.00.1203120413530.11332@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1203120413530.11332@utopia.booyaka.com>
+Message-ID: <1334910066.2149.33.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2012 09:28 AM, Wolfram Sang wrote:
->> Another solution would be to not use timeout with the dt enabled 
->> i2c-pnx for now (using the hard coded default timeout as the
->> current i2c-pnx.c does) and possibly introduce the (anyway
->> optional) "timeout" later.
+Hi,
+
+What happened with this pull request? It doesn't seem to be in 3.4 at
+least.
+
+-Tero
+
+On Mon, 2012-03-12 at 04:15 -0600, Paul Walmsley wrote:
+> Hi Tony
 > 
-> Yeah, let's do it like this.
-
-Good, will do!
-
->> Interesting! When the documentation is outdated - how does the
->> parser actually decide between hex (e.g. regs/addresses) and dec
->> (e.g. clock-frequency) in the absence of "0x"?
+> The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
 > 
-> Are there regs without 0x?
-
-Lots of, in Documentation/devicetree/booting-without-of.txt ;-)
-Admittedly, not in arch/arm/boot/dts/*...
-
-I would like to clarify the hex/dec issue and the various examples to
-prevent confusion of others. Will post a patch.
-
-Roland
+>   Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pwsan.com/linux-2.6 io_chain_devel_3.4
+> 
+> for you to fetch changes up to efd360a8902101148f4fc6325097b94ae1fbb451:
+> 
+>   ARM: OMAP3: PM: Remove IO Daisychain control from cpuidle (2012-03-12 04:11:48 -0600)
+> 
+> 
+> - Paul
+> 
+> ----------------------------------------------------------------
+> Mohan V (1):
+>       ARM: OMAP3: PM: correct enable/disable of daisy io chain
+> 
+> Rajendra Nayak (1):
+>       ARM: OMAP4: PRM: Add IO Daisychain support
+> 
+> Tero Kristo (1):
+>       ARM: OMAP3+: PRM: Enable IO wake up
+> 
+> Vishwanath BS (3):
+>       ARM: OMAP3: PM: Move IO Daisychain function to omap3 prm file
+>       ARM: OMAP3PLUS: hwmod: reconfigure IO Daisychain during hwmod mux
+>       ARM: OMAP3: PM: Remove IO Daisychain control from cpuidle
+> 
+>  arch/arm/mach-omap2/omap_hwmod.c   |   37 +++++++++++++++++++++-
+>  arch/arm/mach-omap2/pm34xx.c       |   44 --------------------------
+>  arch/arm/mach-omap2/prcm-common.h  |    8 +++++
+>  arch/arm/mach-omap2/prm2xxx_3xxx.c |   51 ++++++++++++++++++++++++++++++-
+>  arch/arm/mach-omap2/prm2xxx_3xxx.h |    2 +
+>  arch/arm/mach-omap2/prm44xx.c      |   60 +++++++++++++++++++++++++++++++++++-
+>  arch/arm/mach-omap2/prm44xx.h      |    2 +
+>  7 files changed, 156 insertions(+), 48 deletions(-)
