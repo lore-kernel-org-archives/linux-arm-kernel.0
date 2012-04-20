@@ -1,77 +1,143 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 12:33:45 +0300
-Subject: [PATCH 12/19] ARM: OMAP4: PM: update ROM return address for OSWR and
- OFF
+Date: Fri, 20 Apr 2012 12:33:52 +0300
+Subject: [PATCH 19/19] ARM: OMAP4: powerdomain: update mpu / core off counters
+ during device off
 In-Reply-To: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
 References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1334914432-26456-13-git-send-email-t-kristo@ti.com>
+Message-ID: <1334914432-26456-20-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlos Leija <cileija@ti.com>
+Currently device off does not have any counters / timers of its own
+and it is impossible to track the time spent in this state. In device
+off, MPU / CORE powerdomains enter OSWR, so normally the RETENTION
+state times / counts are increased during device off.
 
-At wakeup from OFF/OSWR CPU1 will call secure HAL service through a local
-secure dispatcher with MMU off, thus ROM will save a PA return address.
-Later in the wakeup, when SMC driver calls an RPC through
-omap4_secure_dispatcher (MMU is on now), ROM code won't log the new return
-address as RPCs are handled different. Thus ROM will attempt to return to
-a PA address when the MMU is on and the system will hang.
+This patch adds a new field to the powerdomain struct for context loss
+register, which is checked during pwrdm_post_transition to see if
+a device off type context loss has happened. If this is the case,
+the counters + timers for OFF state are touched instead of RETENTION.
 
-We need to do this for OSWR state and OFF state of mpu power domain,
-not just for device off(mpu pd OFF).
-
-Signed-off-by: Carlos Leija <cileija@ti.com>
-Signed-off-by: Praneeth Bajjuri <praneeth@ti.com>
-Signed-off-by: Bryan Buckley <bryan.buckley@ti.com>
-[t-kristo at ti.com: merged the two patches into one]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/include/mach/omap-secure.h |    1 +
- arch/arm/mach-omap2/omap-mpuss-lowpower.c      |   13 +++++++++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c   |    1 -
+ arch/arm/mach-omap2/powerdomain.c           |    9 +++++++++
+ arch/arm/mach-omap2/powerdomain.h           |    2 ++
+ arch/arm/mach-omap2/powerdomains44xx_data.c |    2 ++
+ arch/arm/mach-omap2/prm44xx.c               |   15 +++++++++++++++
+ arch/arm/mach-omap2/prm44xx.h               |    2 ++
+ 6 files changed, 30 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/include/mach/omap-secure.h b/arch/arm/mach-omap2/include/mach/omap-secure.h
-index c90a435..d9bde61 100644
---- a/arch/arm/mach-omap2/include/mach/omap-secure.h
-+++ b/arch/arm/mach-omap2/include/mach/omap-secure.h
-@@ -43,6 +43,7 @@
- #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
- 
- /* Secure PPA(Primary Protected Application) APIs */
-+#define OMAP4_PPA_SERVICE_0		0x21
- #define OMAP4_PPA_L2_POR_INDEX		0x23
- #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
- 
 diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index 2ae5e2c..b4ca6f3 100644
+index b4ca6f3..b7d139a 100644
 --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
 +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -52,6 +52,8 @@
- 
- #include <plat/omap44xx.h>
- 
-+#include <mach/omap-secure.h>
-+
- #include "iomap.h"
- #include "common.h"
- #include "omap4-sar-layout.h"
-@@ -384,6 +386,17 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- 	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
- 
- 	if (omap4_mpuss_read_prev_context_state()) {
-+		/*
-+		 * Dummy dispatcher call after OSWR and OFF
-+		 * Restore the right return Kernel address (with MMU on) for
-+		 * subsequent calls to secure ROM. Otherwise the return address
-+		 * will be to a PA return address and the system will hang.
-+		 */
-+		if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-+			omap_secure_dispatcher(OMAP4_PPA_SERVICE_0,
-+					       FLAG_START_CRITICAL,
-+					       0, 0, 0, 0, 0);
-+
- 		restore_ivahd_tesla_regs();
- 		restore_l3instr_regs();
+@@ -404,7 +404,6 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	if (omap4_device_prev_state_off()) {
+ 		omap4_dpll_resume_off();
+ 		omap4_cm_resume_off();
+-		omap4_device_clear_prev_off_state();
  	}
+ 
+ 	pwrdm_post_transition();
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 068f06b..cb3eab2 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -160,6 +160,15 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 		break;
+ 	case PWRDM_STATE_PREV:
+ 		prev = pwrdm_read_prev_pwrst(pwrdm);
++
++		/*
++		 * If powerdomain has context offset defined, check if
++		 * the domain has lost context (i.e. entered off)
++		 */
++		if (pwrdm->context_offs)
++			if (omap4_pwrdm_lost_context_rff(pwrdm->prcm_offs,
++							 pwrdm->context_offs))
++				prev = PWRDM_POWER_OFF;
+ 		if (pwrdm->state != prev)
+ 			pwrdm->state_counter[prev]++;
+ 		if (prev == PWRDM_POWER_RET)
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 0d72a8a..a427645 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -82,6 +82,7 @@ struct powerdomain;
+  * @name: Powerdomain name
+  * @voltdm: voltagedomain containing this powerdomain
+  * @prcm_offs: the address offset from CM_BASE/PRM_BASE
++ * @context_offs: the address offset for the CONTEXT register
+  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
+  * @pwrsts: Possible powerdomain power states
+  * @pwrsts_logic_ret: Possible logic power states when pwrdm in RETENTION
+@@ -106,6 +107,7 @@ struct powerdomain {
+ 		struct voltagedomain *ptr;
+ 	} voltdm;
+ 	const s16 prcm_offs;
++	const s16 context_offs;
+ 	const u8 pwrsts;
+ 	const u8 pwrsts_logic_ret;
+ 	const u8 flags;
+diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+index d8701ce..c4de02f 100644
+--- a/arch/arm/mach-omap2/powerdomains44xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+@@ -36,6 +36,7 @@ static struct powerdomain core_44xx_pwrdm = {
+ 	.voltdm		  = { .name = "core" },
+ 	.prcm_offs	  = OMAP4430_PRM_CORE_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
++	.context_offs	  = OMAP4_RM_L3_1_L3_1_CONTEXT_OFFSET,
+ 	.pwrsts		  = PWRSTS_RET_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 5,
+@@ -205,6 +206,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
+ 	.voltdm		  = { .name = "mpu" },
+ 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
++	.context_offs	  = OMAP4_RM_MPU_MPU_CONTEXT_OFFSET,
+ 	.pwrsts		  = PWRSTS_RET_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 3,
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index ab810cd..cf996a6 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -274,6 +274,21 @@ static void __init omap4_enable_io_wakeup(void)
+ 			OMAP4_PRM_IO_PMCTRL_OFFSET);
+ }
+ 
++bool omap4_pwrdm_lost_context_rff(s16 inst, s16 offset)
++{
++	u32 val;
++
++	val = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION, inst, offset);
++
++	if (val & OMAP4430_LOSTCONTEXT_RFF_MASK) {
++		omap4_prminst_write_inst_reg(val, OMAP4430_PRM_PARTITION, inst,
++					     offset);
++		return true;
++	}
++
++	return false;
++}
++
+ /**
+  * omap4_device_set_state_off() - setup device off state
+  * @enable:	set to off or not.
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index 54a057e..517851b 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -770,6 +770,8 @@ extern void omap44xx_prm_ocp_barrier(void);
+ extern void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask);
+ extern void omap44xx_prm_restore_irqen(u32 *saved_mask);
+ 
++extern bool omap4_pwrdm_lost_context_rff(s16 inst, s16 offset);
++
+ # endif
+ 
+ #endif
 -- 
 1.7.4.1
