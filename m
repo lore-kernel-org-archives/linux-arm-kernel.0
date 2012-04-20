@@ -1,36 +1,21 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 20 Apr 2012 13:01:34 -0700
-Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
-In-Reply-To: <CAAQ0ZWQ_haRN-WHNzTMcjFvryRqjM58QoseC8WejBiqcDfSuPA@mail.gmail.com>
-References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
- <1334192572-12499-14-git-send-email-mturquette@linaro.org>
- <20120412064920.GH2445@S2101-09.ap.freescale.net>
- <CAJOA=zMPQK-W_nbRztXCNdLHoTJU73ZnrxAS8VvvmzgdaVS2mQ@mail.gmail.com>
- <CAAQ0ZWRg2jwNZ7Bx5j5NtCVveT_085VmFtPMhWW62-aO+kFfnw@mail.gmail.com>
- <CAJOA=zPnQhq_3O00F4dfUbnywW-Riov7N76F3wraE67yy2MMuA@mail.gmail.com>
- <CAAQ0ZWQ_haRN-WHNzTMcjFvryRqjM58QoseC8WejBiqcDfSuPA@mail.gmail.com>
-Message-ID: <4F91C09E.8070308@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 20 Apr 2012 14:09:44 -0600 (MDT)
+Subject: [PATCH] OMAP4+: hwmod: fix issue causing IPs not going back to
+ Smart-Standby
+In-Reply-To: <1334926326-26437-1-git-send-email-d-elaidi@ti.com>
+References: <1334926326-26437-1-git-send-email-d-elaidi@ti.com>
+Message-ID: <alpine.DEB.2.00.1204201409330.11306@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2012 12:17 AM, Shawn Guo wrote:
-> On 17 April 2012 11:50, Turquette, Mike<mturquette@ti.com>  wrote:
->> That is a good question.  I think it is worth waiting on Saravana's
->> patch which exposes non-private members of struct clk via struct
->> clk_hw.  This will have an effect on both platform clock data and
->> code.
->
-> Saravana,
->
-> (*nudge*) (*nudge*) goes to you now :)
->
-> Regards,
-> Shawn
+On Fri, 20 Apr 2012, Djamil Elaidi wrote:
 
-Sorry :) Will do soon.
+> If an IP is configured in Smart-Standby-Wakeup, when disabling wakeup feature the
+> IP will not go back to Smart-Standby, but will remain in Smart-Standby-Wakeup.
+> 
+> Signed-off-by: Djamil Elaidi <d-elaidi@ti.com>
 
--Saravana
+Thanks, queued for 3.4-rc fixes.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+- Paul
