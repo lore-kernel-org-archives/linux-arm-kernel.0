@@ -1,123 +1,116 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 Apr 2012 15:10:05 +0200
-Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
- support
-In-Reply-To: <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
-References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
- <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
- <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
-Message-ID: <20120420131005.GO3852@pengutronix.de>
+From: B08287@freescale.com (Liu JunJie-B08287)
+Date: Fri, 20 Apr 2012 13:10:39 +0000
+Subject: =?gb2312?B?tPC4tDogW1JGQyBQQVRDSCAwLzhdIE1YUzogQWRkIGkuTVgyOCBVU0IgSG9z?=
+ =?gb2312?Q?t_driver?=
+In-Reply-To: <20120418074058.GM3852@pengutronix.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <20120417112910.GA3852@pengutronix.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B76562@039-SN2MPN1-023.039d.mgd.msft.net>,
+ <20120418074058.GM3852@pengutronix.de>
+Message-ID: <3A731164757B504AB3594CB17706857808D523@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Added some embedded graphics maintainers to Cc who might be interested
-in this]
+hi Sascha,
+   As the previous mail Peter post, we have two concerns about the new arch of USB drvier as followed:
+   1. If the USB clock and the PHY are centralized managed by the OTG driver, it will introduce an unnecessary dependency between gadget/host function and OTG driver.
+       That means even gadget/host function is the individual function that customer wanted, we need add OTG driver as well, otherwise, without the PHY and clock support provided by OTG driver, the gadget/host function can't work at all. But from the general viewpoint, the gadget/host function is independent of OTG function, this unnecessary dependency or limitation for customer is not reasonable.
+       Furthermore, this dependency will face much difficulty in some extreme case that some customer only needs host function only but with the OTG ID floating, it was a real case we encounted before.
 
-On Fri, Apr 20, 2012 at 11:02:02AM +0100, Dave Airlie wrote:
-> On Wed, Apr 11, 2012 at 4:33 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > This patch adds support for creating simple drm devices. The
-> > basic idea of this patch is that drm drivers using the sdrm layer
-> > no longer have to implement a full drm device but instead only
-> > register crtcs, encoders and connectors with the sdrm layer. The
-> > sdrm layer then registers a drm device with the drm core and
-> > takes care of the drm device.
-> 
-> I'm sorry to say I totally hate this on every level. I think I said to
-> you before that midlayers are not the answer, and this is a hella big
-> midlayer.
-> 
-> I understand the SoC architecture but I can't think this is the way forward.
-> 
-> The problems I see from a highlevel:
-> 
-> This layer is highly restrictive on its users, I get the feeling once
-> you get to implement 2-3 complete drivers or try and implement a
-> driver say on x86 that should work in a similar fashion you are going
-> to realise you made things overly generic and the driver can't change
-> it.
+   2. If the USB clock and the PHY are centralized managed by the OTG driver, it will introduce an unavoidable remote wakup issue that:
+       Since the USB suspend is separated into two parts: the USB host controller suspend (set portsc.suspend bit to 1)  part which is controlled by host driver and PHY suspend part (set portsc.phcd to 1) which is controlled by OTG driver, during the system suspend, these two parts will be executed in sequence, but the interval between these two parts is out of control.
+       Refer to USB spec 2.0, the remote wakeup can happen anytime after 5ms later from bus entered suspended state(set portsc.suspend bit to 1), it means it can happen before, after, even during PHY suspend part executing. Taking the following case into accounted, PHY suspend process is executing, the pseudo code as below:
+       {
+            ...
+            some checking for the remote wakeup;
+                                      <------------------ remote wakeup happen here
+            set portsc.phcd to 1;
+            ...
+        }
+        At such situation, one issue will be generated that the USB controller is pulling up the resume signal (K), but at the same time, the SW may set PHY to low power mode(set PHCD to 1), it may cause unpredictable result.
+        As in our i.MX platform the response to this remote wakeup(pulling up K signal) is out of SW control, and it can happen at anytime (5ms later after bus in suspended state), this issue is unavoidable.
 
-That's maybe where our philosophies clash. I'd say that drivers should just
-have enough freedom to get their job done whereas you want to give
-drivers the freedom to do anything they want. I come from an area where
-we have dozens of drivers which mostly are quite similar, in the ARM
-world we currently try to get the duplication out of the drivers because
-otherwise we can't handle the sheer amount of devices we have.
+        The safest solution for this issue is setting portsc.phcd within 5ms after bus in suspended state(set portsc.suspend bit to 1), it requires USB host controller suspend and PHY suspend must be executed uninterruptably, natively they can't be separated.
 
-> Then the drivers will start to workaround the midlayer and we'll
-> end up worse off. I don't really want to pick on specifics but the
-> taking over of the fb ops is on example,
+     The above is the shortcoming we thought about the new arch, and we want to know what are you thinking about the shortcoming of current arch, what makes you think the current arch had to be changed.
 
-The layer can be extended when we need it, no need to work around it. I
-took over the fb ops because currently I don't need to adjust them. I
-know that some devices have accelerated blit operations and this means
-that we may add a way to overwrite the ops later. Same with the ioctls.
-I didn't provide a way to add device specific ioctls now, partly because
-currently I don't need them, partly to get this series out.
+________________________________________
+???: Sascha Hauer [s.hauer at pengutronix.de]
+????: 2012?4?18? 15:40
+?: Chen Peter-B29397
+Cc: Marek Vasut; linux-arm-kernel at lists.infradead.org; Detlev Zundel; Fabio Estevam; Li Frank-B20596; Linux USB; Guo Shawn-R65073; Shawn Guo; Stefano Babic; Subodh Nijsure; Heikki Krogerus; Liu JunJie-B08287; Shi Make-B15407
+??: Re: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
 
-> 
-> I think this should work as a set of helpers that might work in place
-> of the current set of helpers. The current helpers are very directed
-> towards desktop x86 experience, so a new set of these might be better.
+On Wed, Apr 18, 2012@04:31:50AM +0000, Chen Peter-B29397 wrote:
+>
+> >
+> > Your patches won't work when more than one USB port is enabled because
+> > of the singular usb transceiver present in the kernel. That of course is
+> > not your fault. I think Heikki (Added to Cc) is working on this issue,
+> > but I don't know the status here.
+> >
+> > Another problem is that what you are doing does not integrate at all
+> > with otg. I don't ask you to implement otg support because you are
+> > likely not interested in this, but since you are adding a new ehci
+> > glue driver anyway I suggest another approach:
+> >
+> > Put a driver under drivers/usb/otg which:
+> >
+> > - matches a 'imx-usb' device
+> > - gets/enables all clocks needed for USB
+> > - finds the transceiver
+> > - registers a ehci device
+> >
+> > Future additions would be:
+> >
+> > - Put a USB_MODE_HOST/DEVICE flag into platform_data, and register a
+> >   host or gadget driver depending on this flag
+> > - Add a USB_MODE_OTG flag to platform_data and implement otg in this
+> >   driver (or use whatever infrastructure present in the kernel then)
+> >
+> > This is similar to what msm does. This way we have the clocks and phys
+> > handled where they are needed. We may use this code on i.MX later.
+> >
+> > We did this wrong on i.MX (and several other architectures) and getting
+> > this right will be hard work. No need to introduce the same flaws again
+> > with a new architecture.
+> >
+> Hi Sascha,
+>
+> We have been discussing i.mx usb re-structure at freescale internal during
+> this periods, one side does not agree with otg driver manages PHY/clock
+> solution due to below reasons:
+>
+> - May confuse the users who only use device or host function, the users may
+> double "why I need to include otg file to support device/host only function"?
 
-Hm, this means duplicating the helpers. The KMS support is to a great
-extend defined by the helpers. Duplicating them would mean more code
-fragmentation and different behaviour from a users point of view. I'd
-rather not go this way.
+I can't find anything confusing in this.
 
-> 
-> I get the feeling the drm can just be a virtual platform device of
-> some sort, then it reads the device tree and binds all the information
-> on what crtc/encoders are available,
+>
+> - For some special cases, like device sends resume signal(remote wakeup)
+> after host suspend, but before otg suspend (system needs to refuse to suspend) .
+> It needs to add hcd flag to judge if there is a remote wakeup after host suspend,
+> and if the port is sending resume signal now (when the port is sending resume signal,
+> we can't put power to low power mode). Is it suitable to put some hcd stuffs at otg driver?
 
-We can do that. Currently I use a string matching mechanism to tie
-together the different pieces of a device, but sooner or later it will
-be devicetree anyway, so no problem to convert this sooner instead of
-later. The only problem I see with this is that for example X86 will not
-have devicetree, so I see a value in not binding whatever we come up
-with too tight to devicetree.
+I can't follow you here what the actual problem is, but since the otg
+driver is the driver for host and gadget (which happens to pass control to
+either the host or the gadget driver most of the time) it is ok to do
+whatever it takes in the otg driver to make it work.
 
-> 
-> Also the mode group stuff isn't legacy, the render nodes stuff posted
-> is what is intended to use it for, again it may not be useful on ARM,
-> but on desktop it has a very useful use case.
+>
+> - Any disadvantages three individual drivers manage PHY/clock separately after the generic PHY
+> layer/FSL PHY driver have finished? It can define where to get/put PHY/clock operation at
+> individual drivers clearly. When OTG switch, for host mode, the hcd struct (includes interrupt)
+> will be free/created using usb_remove_hcd/usb_add_hcd, for device mode,
+> we can deinit/init udc like current ci13xxx_udc.c at ci13xxx_vbus_session does.
 
-I didn't remove them because they are not useful, but because currently
-I couldn't add an encoder/connector to a active drm device (see how the
-exynos driver currently works around this, I doubt it will work this way
-once the legacy_mode_group handling is actually used). The fact that this
-is currently unused motivated me to remove it. That said, I can live without
-it, no problem.
+I once made a quick hack using the msm otg driver on i.MX. I had to
+comment out some msm specifics but after that it worked quite well.
 
-> 
-> I'm sorry to not provide the answer I would fine acceptable, maybe if
-> I had a week of time to write something I could figure it out, maybe
-> someone else can give advice on how this sort of thing might look,
-> Linearo/ARM guys can some of you guys look at this?
+Sascga
 
-Take these patches as my try to show that something has to change to
-make drm stuff more widely usable on embedded devices. As said, there
-are dozens of different devices out there, many of them are dumb
-framebuffer devices like the PXA and i.MX driver I posted, others are
-more advanced like the exynos, tegra and the newer i.MX devices. Some of
-the bigger players can effort to write (and maintain?) a 300KB driver,
-others can not. Those who cannot currently stay in drivers/video, but
-this has limitations when it comes to overlay, hot pluggable monitors,
-multiple crtcs, etc.
-
-I'd like to find a solution for this which makes us all happy. In the
-end reducing the amount of code duplication also helps you as a
-maintainer.
-
-(BTW each driver in drm has this layer somewhere in it. If I had hidden
-it in imx specific functions I probably wouldn't have raised any
-questions, but I don't want to go that way)
-
-Sascha
-
-
-
-
--- 
+--
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
