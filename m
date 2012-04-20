@@ -1,31 +1,79 @@
-From: linux-arm@overkiz.com (Boris BREZILLON)
-Date: Fri, 20 Apr 2012 16:31:37 +0200
-Subject: [PATCH V2] ARM: at91: add kizbox board dt support.
-In-Reply-To: <20120420140204.GA30038@game.jcrosoft.org>
-References: <4F91589E.5040904@overkiz.com> <201204201247.08070.arnd@arndb.de>
- <20120420140204.GA30038@game.jcrosoft.org>
-Message-ID: <4F917349.8050209@overkiz.com>
+From: viresh.linux@gmail.com (Viresh Kumar)
+Date: Fri, 20 Apr 2012 20:12:32 +0530
+Subject: [PATCH] watchdog: mpcore: Add DT bindings for ARM mpcore watchdog
+Message-ID: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to Jean-Christophe who helped for the submission of this patch (my first).
+This patch adds Device tree bindings for ARM Mpcore watchdog. It also updates
+documentation for bindings.
 
-Best regards,
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ .../bindings/watchdog/arm-mpcore-wdt.txt           |   19 +++++++++++++++++++
+ drivers/watchdog/mpcore_wdt.c                      |   10 ++++++++++
+ 2 files changed, 29 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt
 
-Boris
-
-On 20/04/2012 16:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 12:47 Fri 20 Apr     , Arnd Bergmann wrote:
->> On Friday 20 April 2012, Boris BREZILLON wrote:
->>> This patch adds support for the kizbox board (based on at91sam9g20 SoC)
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>
->> I really love how we're finally at the point where we can add new board
->> support using just a dts file on some ARM platforms.
-> yeah finally
-> 
-> Best Regards,
-> J.
+diff --git a/Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt b/Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt
+new file mode 100644
+index 0000000..27a71aa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/arm-mpcore-wdt.txt
+@@ -0,0 +1,19 @@
++* ARM MPCORE WATCHDOG
++
++Required properties:
++- compatible : "arm,mpcore-wdt"
++- reg : Address range of the wdt registers
++
++Optional Properties:
++- interrupt-parent: Should be the phandle for the interrupt controller
++  that services interrupts for this device
++- interrupt: Should contain the wdt interrupt number
++
++Example:
++
++	wdt at ec800620 {
++		compatible = "arm,mpcore-wdt";
++		reg = <0xec800620 0x1000>;
++		interrupt-parent = <&gic>;
++		interrupts = <1 14 0x301>;
++	};
+diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
+index 7c00455..f82625f 100644
+--- a/drivers/watchdog/mpcore_wdt.c
++++ b/drivers/watchdog/mpcore_wdt.c
+@@ -27,6 +27,7 @@
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm.h>
+ #include <linux/reboot.h>
+@@ -402,6 +403,14 @@ static SIMPLE_DEV_PM_OPS(mpcore_wdt_dev_pm_ops, mpcore_wdt_suspend,
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:mpcore_wdt");
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id mpcore_wdt_id_table[] = {
++	{ .compatible = "arm,mpcore-wdt" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, mpcore_wdt_id_table);
++#endif
++
+ static struct platform_driver mpcore_wdt_driver = {
+ 	.probe		= mpcore_wdt_probe,
+ 	.remove		= __devexit_p(mpcore_wdt_remove),
+@@ -410,6 +419,7 @@ static struct platform_driver mpcore_wdt_driver = {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "mpcore_wdt",
+ 		.pm	= &mpcore_wdt_dev_pm_ops,
++		.of_match_table = of_match_ptr(mpcore_wdt_id_table),
+ 	},
+ };
+ 
+-- 
+1.7.9
