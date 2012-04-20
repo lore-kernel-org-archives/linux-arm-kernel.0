@@ -1,78 +1,71 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 20 Apr 2012 21:53:11 +0200
-Subject: [PATCH v4] rtc: Add device tree support for LPC32xx
-Message-ID: <1334951591-1323-1-git-send-email-stigge@antcom.de>
+Date: Fri, 20 Apr 2012 21:55:29 +0200
+Subject: [PATCH v4] wdt: Device tree support for pnx4008-wdt
+Message-ID: <1334951729-1388-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support for rtc-lpc32xx.c
+This patch adds device tree support to pnx4008-wdt.c
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
 ---
 
 Applies to v3.4-rc3
 
 Changes since v3:
-* Changed "compatible" strings to non-wildcard versions
+* Fixed typo in patch description
 
- Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt |   16 ++++++++++++++++
- drivers/rtc/rtc-lpc32xx.c                             |   15 ++++++++++++++-
- 2 files changed, 30 insertions(+), 1 deletion(-)
+Thanks to Sergei Shtylyov for reviewing!
+
+ Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt |   13 +++++++++++++
+ drivers/watchdog/pnx4008_wdt.c                             |   10 ++++++++++
+ 2 files changed, 23 insertions(+)
 
 --- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt
-@@ -0,0 +1,16 @@
-+* NXP LPC32xx SoC Real Time Clock controller
++++ linux-2.6/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
+@@ -0,0 +1,13 @@
++* NXP PNX watchdog timer
 +
 +Required properties:
-+- compatible: must be "nxp,lpc3220-rtc", "nxp,lpc3230-rtc", "nxp,lpc3240-rtc"
-+  or "nxp,lpc3250-rtc"
++- compatible: must be "nxp,pnx4008-wdt"
 +- reg: physical base address of the controller and length of memory mapped
 +  region.
-+- interrupts: The RTC interrupt
 +
 +Example:
 +
-+	rtc at 40024000 {
-+		compatible = "nxp,lpc3250-rtc";
-+		reg = <0x40024000 0x1000>;
-+		interrupts = <52 0>;
++	watchdog at 4003C000 {
++		compatible = "nxp,pnx4008-wdt";
++		reg = <0x4003C000 0x1000>;
 +	};
---- linux-2.6.orig/drivers/rtc/rtc-lpc32xx.c
-+++ linux-2.6/drivers/rtc/rtc-lpc32xx.c
-@@ -19,6 +19,7 @@
- #include <linux/rtc.h>
- #include <linux/slab.h>
+--- linux-2.6.orig/drivers/watchdog/pnx4008_wdt.c
++++ linux-2.6/drivers/watchdog/pnx4008_wdt.c
+@@ -32,6 +32,7 @@
  #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
 +#include <linux/of.h>
+ #include <mach/hardware.h>
  
- /*
-  * Clock and Power control register offsets
-@@ -386,13 +387,25 @@ static const struct dev_pm_ops lpc32xx_r
- #define LPC32XX_RTC_PM_OPS NULL
- #endif
+ /* WatchDog Timer - Chapter 23 Page 207 */
+@@ -201,10 +202,19 @@ static int __devexit pnx4008_wdt_remove(
+ 	return 0;
+ }
  
 +#ifdef CONFIG_OF
-+static const struct of_device_id lpc32xx_rtc_match[] = {
-+	{ .compatible = "nxp,lpc3220-rtc" },
-+	{ .compatible = "nxp,lpc3230-rtc" },
-+	{ .compatible = "nxp,lpc3240-rtc" },
-+	{ .compatible = "nxp,lpc3250-rtc" },
++static const struct of_device_id pnx4008_wdt_match[] = {
++	{ .compatible = "nxp,pnx4008-wdt" },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, lpc32xx_rtc_match);
++MODULE_DEVICE_TABLE(of, pnx4008_wdt_match);
 +#endif
 +
- static struct platform_driver lpc32xx_rtc_driver = {
- 	.probe		= lpc32xx_rtc_probe,
- 	.remove		= __devexit_p(lpc32xx_rtc_remove),
+ static struct platform_driver platform_wdt_driver = {
  	.driver = {
- 		.name	= RTC_NAME,
+ 		.name = "pnx4008-watchdog",
  		.owner	= THIS_MODULE,
--		.pm	= LPC32XX_RTC_PM_OPS
-+		.pm	= LPC32XX_RTC_PM_OPS,
-+		.of_match_table = of_match_ptr(lpc32xx_rtc_match),
++		.of_match_table = of_match_ptr(pnx4008_wdt_match),
  	},
- };
- 
+ 	.probe = pnx4008_wdt_probe,
+ 	.remove = __devexit_p(pnx4008_wdt_remove),
