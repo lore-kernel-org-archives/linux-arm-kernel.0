@@ -1,71 +1,36 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 20 Apr 2012 21:55:29 +0200
-Subject: [PATCH v4] wdt: Device tree support for pnx4008-wdt
-Message-ID: <1334951729-1388-1-git-send-email-stigge@antcom.de>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 20 Apr 2012 13:01:34 -0700
+Subject: [PATCH 13/13] clk: basic: improve parent_names & return errors
+In-Reply-To: <CAAQ0ZWQ_haRN-WHNzTMcjFvryRqjM58QoseC8WejBiqcDfSuPA@mail.gmail.com>
+References: <1334192572-12499-1-git-send-email-mturquette@linaro.org>
+ <1334192572-12499-14-git-send-email-mturquette@linaro.org>
+ <20120412064920.GH2445@S2101-09.ap.freescale.net>
+ <CAJOA=zMPQK-W_nbRztXCNdLHoTJU73ZnrxAS8VvvmzgdaVS2mQ@mail.gmail.com>
+ <CAAQ0ZWRg2jwNZ7Bx5j5NtCVveT_085VmFtPMhWW62-aO+kFfnw@mail.gmail.com>
+ <CAJOA=zPnQhq_3O00F4dfUbnywW-Riov7N76F3wraE67yy2MMuA@mail.gmail.com>
+ <CAAQ0ZWQ_haRN-WHNzTMcjFvryRqjM58QoseC8WejBiqcDfSuPA@mail.gmail.com>
+Message-ID: <4F91C09E.8070308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support to pnx4008-wdt.c
+On 04/17/2012 12:17 AM, Shawn Guo wrote:
+> On 17 April 2012 11:50, Turquette, Mike<mturquette@ti.com>  wrote:
+>> That is a good question.  I think it is worth waiting on Saravana's
+>> patch which exposes non-private members of struct clk via struct
+>> clk_hw.  This will have an effect on both platform clock data and
+>> code.
+>
+> Saravana,
+>
+> (*nudge*) (*nudge*) goes to you now :)
+>
+> Regards,
+> Shawn
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Sorry :) Will do soon.
 
----
+-Saravana
 
-Applies to v3.4-rc3
-
-Changes since v3:
-* Fixed typo in patch description
-
-Thanks to Sergei Shtylyov for reviewing!
-
- Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt |   13 +++++++++++++
- drivers/watchdog/pnx4008_wdt.c                             |   10 ++++++++++
- 2 files changed, 23 insertions(+)
-
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
-@@ -0,0 +1,13 @@
-+* NXP PNX watchdog timer
-+
-+Required properties:
-+- compatible: must be "nxp,pnx4008-wdt"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+Example:
-+
-+	watchdog at 4003C000 {
-+		compatible = "nxp,pnx4008-wdt";
-+		reg = <0x4003C000 0x1000>;
-+	};
---- linux-2.6.orig/drivers/watchdog/pnx4008_wdt.c
-+++ linux-2.6/drivers/watchdog/pnx4008_wdt.c
-@@ -32,6 +32,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <mach/hardware.h>
- 
- /* WatchDog Timer - Chapter 23 Page 207 */
-@@ -201,10 +202,19 @@ static int __devexit pnx4008_wdt_remove(
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id pnx4008_wdt_match[] = {
-+	{ .compatible = "nxp,pnx4008-wdt" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pnx4008_wdt_match);
-+#endif
-+
- static struct platform_driver platform_wdt_driver = {
- 	.driver = {
- 		.name = "pnx4008-watchdog",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(pnx4008_wdt_match),
- 	},
- 	.probe = pnx4008_wdt_probe,
- 	.remove = __devexit_p(pnx4008_wdt_remove),
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
