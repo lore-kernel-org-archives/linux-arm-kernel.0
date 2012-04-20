@@ -1,86 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Apr 2012 18:15:57 +0000
-Subject: [PATCH 2/9] SPEAr13xx: Add source files
-In-Reply-To: <33fcf4e1f6f1d33bcfedc428e0feca74a340b580.1334942163.git.viresh.kumar@st.com>
+Date: Fri, 20 Apr 2012 18:21:28 +0000
+Subject: [PATCH 0/9] Add support for SPEAr13xx SoCs
+In-Reply-To: <cover.1334942163.git.viresh.kumar@st.com>
 References: <cover.1334942163.git.viresh.kumar@st.com>
- <33fcf4e1f6f1d33bcfedc428e0feca74a340b580.1334942163.git.viresh.kumar@st.com>
-Message-ID: <201204201815.57556.arnd@arndb.de>
+Message-ID: <201204201821.28266.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 20 April 2012, Viresh Kumar wrote:
+> Sorry for yet another patchset for you :(
+> 
+> This one adds in support for SPEAr1310 and SPEAr1340. It supports:
+> - DT probing
+> - pinctrl drivers
+> - common clock framework
+> 
+> All you requested to get this upstream. :)
+> 
+> I have CC-ed Linus and Mike for their patches and would ask them for their Acks,
+> as this would evantually make through your ARM-SoC tree.
+> 
+> Few devices/drivers mentioned in dts files have their DT probing patches under
+> review.
 
-> +static struct dw_dma_slave uart1_dma_param[] = {
-> +	{
-> +		/* Tx */
-> +		.cfg_hi = DWC_CFGH_DST_PER(SPEAR1340_DMA_REQ_UART1_TX),
-> +		.cfg_lo = 0,
-> +		.src_master = DMA_MASTER_MEMORY,
-> +		.dst_master = SPEAR1340_DMA_MASTER_UART1,
-> +	}, {
-> +		/* Rx */
-> +		.cfg_hi = DWC_CFGH_SRC_PER(SPEAR1340_DMA_REQ_UART1_RX),
-> +		.cfg_lo = 0,
-> +		.src_master = SPEAR1340_DMA_MASTER_UART1,
-> +		.dst_master = DMA_MASTER_MEMORY,
-> +	}
-> +};
-> +
-> +static struct amba_pl011_data uart1_data = {
-> +	.dma_filter = dw_dma_filter,
-> +	.dma_tx_param = &uart1_dma_param[0],
-> +	.dma_rx_param = &uart1_dma_param[1],
-> +};
+I've looked at all the platform specific bits and they look pretty good,
+great work! I have ignored the pinctrl and clock drivers and hope that the
+respective maintainers will be able to judge them well.
 
-Again, I hope that we can remove this eventually when we have the DMA bindings,
-but it's ok for now.
-
-> +/* SATA device registration */
-> +static int sata_miphy_init(struct device *dev, void __iomem *addr)
-> +{
-> +	writel(SPEAR1340_SATA_CFG_VAL, SPEAR1340_PCIE_SATA_CFG);
-> +	writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
-> +			SPEAR1340_PCIE_MIPHY_CFG);
-> +	/* Switch on sata power domain */
-> +	writel((readl(SPEAR1340_PCM_CFG) | (0x800)), SPEAR1340_PCM_CFG);
-> +	msleep(20);
-> +	/* Disable PCIE SATA Controller reset */
-> +	writel((readl(SPEAR1340_PERIP1_SW_RST) & (~0x1000)),
-> +			SPEAR1340_PERIP1_SW_RST);
-> +	msleep(20);
-> +
-> +	return 0;
-> +}
-> +
-> +void sata_miphy_exit(struct device *dev)
-> +{
-> +	writel(0, SPEAR1340_PCIE_SATA_CFG);
-> +	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
-> +
-> +	/* Enable PCIE SATA Controller reset */
-> +	writel((readl(SPEAR1340_PERIP1_SW_RST) | (0x1000)),
-> +			SPEAR1340_PERIP1_SW_RST);
-> +	msleep(20);
-> +	/* Switch off sata power domain */
-> +	writel((readl(SPEAR1340_PCM_CFG) & (~0x800)), SPEAR1340_PCM_CFG);
-> +	msleep(20);
-> +}
-> +
-> +int sata_suspend(struct device *dev)
-> +{
-> +	if (dev->power.power_state.event == PM_EVENT_FREEZE)
-> +		return 0;
-> +
-> +	sata_miphy_exit(dev);
-> +
-> +	return 0;
-> +}
-
-I'd like to see this done differently, with a ahci_spear driver derived from
-ahci_platform that provides these functions in a modular driver that registers
-to a spear specific identifier string and is able to do the platform specific
-based on information it can find in the device tree. That would however require
-changes to the existing ahci_platform code and I'd first like to hear what
-Jeff and others have to say about this.
+There are a few places where you still hardcode stuff that could be turned
+into device tree properties, but those are corner cases and you have an
+existing platform here that you've done a great amount of excellent cleanups
+to in the last weeks, so my feeling is that all the platform code can go in
+when you take care of the stuff that I've commented on, most of those things
+should be simple.
 
 	Arnd
