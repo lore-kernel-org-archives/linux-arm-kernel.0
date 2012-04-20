@@ -1,60 +1,46 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Fri, 20 Apr 2012 01:57:00 +0100
-Subject: [PATCHv2] ARM: orion5x: Fix GPIO enable bits for MPP9
-In-Reply-To: <1333858733.7150.115.camel@deadeye>
-References: <1333858733.7150.115.camel@deadeye>
-Message-ID: <1334883420.3209.230.camel@deadeye>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 20 Apr 2012 03:08:45 +0200
+Subject: [PATCH 3/3] ARM: imx6q: switch to use pinctrl driver
+In-Reply-To: <20120416033519.GA17173@shlinux2.ap.freescale.net>
+References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
+ <1334333915-1174-3-git-send-email-b29396@freescale.com>
+ <20120414135331.GB3852@pengutronix.de>
+ <CAA+hA=QhSUZg0bWTss_4ROwZ--OOQfcP=mpt+MP7-ZKPkEwXyA@mail.gmail.com>
+ <20120415073751.GF24997@S2101-09.ap.freescale.net>
+ <20120416033519.GA17173@shlinux2.ap.freescale.net>
+Message-ID: <20120420010845.GV16641@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-04-08 at 05:18 +0100, Ben Hutchings wrote:
-> Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 ('ARM: orion5x: Refactor
-> mpp code to use common orion platform mpp.') seems to have accidentally
-> inverted the GPIO valid bits for MPP9 (only).  For the mv2120 platform
-> which uses MPP9 as a GPIO LED device, this results in the error:
-> 
-> [   12.711476] leds-gpio: probe of leds-gpio failed with error -22
-> 
-> Reported-by: Henry von Tresckow <hvontres@gmail.com>
+On 11:35 Mon 16 Apr     , Dong Aisheng wrote:
+> On Sun, Apr 15, 2012 at 03:37:54PM +0800, Shawn Guo wrote:
+> > On Sun, Apr 15, 2012 at 12:03:16PM +0800, Dong Aisheng wrote:
+> > ...
+> > > For MX3 and MX5, before their pinctrl driver are available, user may
+> > > need to define a dummy in dt to avoid such an error.
+> > > 
+> > That is insane, and will not work.
+> > 
+> > 1) We do not have device tree support for MX3 yet.
+> > 2) It's not practical to add dummy entries in dt to avoid the error.
+> > 3) There are still so many non-dt board files support in the tree.
+> > How will they work with that?
+> > 
+> > My suggestion is to not make it an error but a dev_dbg, assuming that
+> > the pins are already set up by platform code if we do not find the
+> > entry from pinctrl system.  We can take it as a transition solution,
+> > and turn the dev_dbg back to error when all the users of the device
+> > driver are converted to device tree.
+> > 
+> My thinking is let pinctrl core handle dummy state as regulator subsystem
+> and does not depend on dt.
+> Linus, Stephen, any comment?
+agreed with Shawn
 
-Tested-by: Hans Henry von Tresckow <hvontres@gmail.com>
+this is insane if you can an error you do need to report it
 
-(on the mv2120, and applied to Debian's 3.2 tree)
+I get the same issue on at91 and I'm going to make the pinctrl mandatory for DT
+only
 
-> References: http://bugs.debian.org/667446
-> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> Cc: stable at vger.kernel.org [v3.0+]
-> ---
-> v2: Add subject of the earlier commit
-> 
-> Ben.
-> 
->  arch/arm/mach-orion5x/mpp.h |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
-> index eac6897..db70e79 100644
-> --- a/arch/arm/mach-orion5x/mpp.h
-> +++ b/arch/arm/mach-orion5x/mpp.h
-> @@ -65,8 +65,8 @@
->  #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
->  
->  #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
-> -#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
-> -#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
-> +#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
-> +#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
->  
->  #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
->  #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
-
--- 
-Ben Hutchings
-This sentence contradicts itself - no actually it doesn't.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120420/945f26f1/attachment.sig>
+Best Regards,
+J.
