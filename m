@@ -1,40 +1,26 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 12:19:44 +0300
-Subject: [PATCHv4 1/8] ARM: OMAP4: suspend: Program all domains to retention
-In-Reply-To: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
-References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1334913591-26312-2-git-send-email-t-kristo@ti.com>
+Date: Fri, 20 Apr 2012 12:19:43 +0300
+Subject: [PATCHv4 0/8] ARM: OMAP4: core retention support
+Message-ID: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Changes compared to previous version:
 
-Remove the FIXME's in the suspend sequence since
-we now intend to support system level RET support.
+- rebased on top of 3.4
+- added back TEMP patch for preventing DSP wakeup as Paul's powerdomain
+  fixes are not yet in (patch #2)
+- added open switch retention support (OSWR), can be enabled by
+  echo 1 > /debug/pm_debug/enable_oswr_mode
+- fixed support for 4460 (added patch #3)
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/pm44xx.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+Applies on top of mainline 3.4 + iochain set. May kind of work without
+the iochain set but waking up from retention might be impossible.
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 8856253..31990d5 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -101,12 +101,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	if (!strncmp(pwrdm->name, "cpu", 3))
- 		return 0;
- 
--	/*
--	 * FIXME: Remove this check when core retention is supported
--	 * Only MPUSS power domain is added in the list.
--	 */
--	if (strcmp(pwrdm->name, "mpu_pwrdm"))
--		return 0;
- 
- 	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
- 	if (!pwrst)
--- 
-1.7.4.1
+Tested both CSWR + OSWR modes on omap4430 EMU blaze + omap4460 GP panda.
+
+Working branch available here:
+tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+branch: mainline-3.4-omap4-ret
+
+-Tero
