@@ -1,80 +1,89 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Fri, 20 Apr 2012 18:36:26 +0200
-Subject: [RFC PATCH 00/10 V3] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <20120420132647.GQ3852@pengutronix.de>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <20120420094805.GS20478@pengutronix.de>
- <CAL411-onyB8SJEBoJ2XK=wyHKR0C7SyJtCsoJCDZGatP8HmYZg@mail.gmail.com>
- <201204201444.49184.marex@denx.de>
- <20120420132647.GQ3852@pengutronix.de>
-Message-ID: <20120420163626.GL14876@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Apr 2012 09:43:07 -0700
+Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
+ initialization
+In-Reply-To: <20120420153743.GB24205@n2100.arm.linux.org.uk>
+References: <20120418202447.GT25053@n2100.arm.linux.org.uk>
+ <20120418210142.GR21106@atomide.com>
+ <20120418211606.GU25053@n2100.arm.linux.org.uk>
+ <20120418213642.GV25053@n2100.arm.linux.org.uk>
+ <20120419013914.GV21106@atomide.com>
+ <20120419174332.GY25053@n2100.arm.linux.org.uk>
+ <20120419180741.GX21106@atomide.com>
+ <20120420151034.GA24205@n2100.arm.linux.org.uk>
+ <20120420152623.GA21106@atomide.com>
+ <20120420153743.GB24205@n2100.arm.linux.org.uk>
+Message-ID: <20120420164305.GB21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 03:26:47PM +0200, Sascha Hauer wrote:
-> On Fri, Apr 20, 2012 at 02:44:48PM +0200, Marek Vasut wrote:
-> > Dear Peter Chen,
-> > 
-> > > On Fri, Apr 20, 2012 at 5:48 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > >> btw /wrt USB Gadget etc -- how does the
-> > > >> drivers/usb/gadget/fsl_udc_core.c and drivers/usb/gadget/ci13xxx_* fit
-> > > >> into the big picture? We're gonna use the ci13xxx stuff for Gadget on
-> > > >> mx28, correct? Then how does fsl_udc_core.c fit in?
-> > > > 
-> > > > From what I have been told by a collegue the ci13xxx driver works
-> > > > better, and from what I have seen the code looks better. So I think mxs
-> > > > should use it. i.MX can then use it later aswell. We won't need the
-> > > > fsl_udc_core driver anymore then.
-> > > 
-> > > Oh, I find I lost many discussions using company email.
-> > > From the function and quality level, fsl_udc_core.c is absolutely the
-> > > best one for all
-> > > i.mx SoCs, as both internal and upstream fsl code use it.
-> > 
-> > Internally though, it looks like crap.
-> 
-> +1 on this.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120420 08:41]:
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -83,11 +84,11 @@ static void omap_dma_start_sg(struct omap_chan *c, struct omap_desc *d,
+>  	struct omap_sg *sg = d->sg + idx;
+>  
+>  	if (d->dir == DMA_DEV_TO_MEM)
+> -		omap_set_dma_dest_params(c->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
+> -				sg->addr, 0, 0);
+> +		omap_set_dma_dest_params(c->dma_ch, d->periph_port,
+> +			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
+>  	else
+> -		omap_set_dma_src_params(c->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
+> -				sg->addr, 0, 0);
+> +		omap_set_dma_src_params(c->dma_ch, d->periph_port,
+> +			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
+>  
+>  	omap_set_dma_transfer_params(c->dma_ch, d->es, sg->en, sg->fn,
+>  		d->sync_mode, c->dma_sig, d->sync_type);
 
-+1
+These are now wrong way around, should use OMAP_DMA_PORT_EMIFF here..
 
-We also made some tests with some gadget devices. IMHO we had troubles
-with gadget_zero and testusb on the fsl_udc_core.c. I think the testusb
-results should help to decide which is the most stable implementation.
+> @@ -111,11 +112,11 @@ static void omap_dma_start_desc(struct omap_chan *c)
+>  	c->sgidx = 0;
+>  
+>  	if (d->dir == DMA_DEV_TO_MEM)
+> -		omap_set_dma_src_params(c->dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
+> -			d->dev_addr, 0, 0);
+> +		omap_set_dma_src_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
+> +			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
+>  	else
+> -		omap_set_dma_dest_params(c->dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
+> -			d->dev_addr, 0, 0);
+> +		omap_set_dma_dest_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
+> +			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
+>  
+>  	omap_dma_start_sg(c, d, 0);
+>  }
 
-> 
-> > Also, ci13xxx and fsl_usb_core is duplicated stuff, correct?
-> 
-> Yes.
-> 
-> > 
-> > > I will check with IC guys to see if i.mx's controller is compatible
-> > > with CI13412.
-> > > If fsl's compatible with CI13412, then mxs can try to use ci13xxx_udc.c to
-> > > see if there are any problems, If no problems with kinds of testing,
-> > > we can switch all i.mx SoC to ci13xxx_udc.c.
-> > 
-> > Sascha, did you need to patch this ci13xxx somehow to get it running on MXS ? Or 
-> > what was it that said he got it somehow running?
-> 
-> It basically works out of the box. I think we have some patches for this
-> driver, maybe michael can comment on this.
+..and then use d->periph_port here. So the following is also needed on
+top of this:
 
-Yes, i have some smaller bugfix patches hanging around. I will send them
-to the linux-usb mailinglist until the next week. Additionaly i have
-some platform gluecode and a platform-support patch for the driver but you
-probably have the same.
-
-The ci13xxx_udc_driver has a flags element, which has to be set
-appropriate to the used platform. On the mx23 for example we only were
-able to get all testusb results correct, when the option
-CI13XXX_DISABLE_STREAMING was set. In the OTG case the option
-CI13XXX_REGS_SHARED is mandatory.
-
-Regards,
-Michael
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -84,10 +84,10 @@ static void omap_dma_start_sg(struct omap_chan *c, struct omap_desc *d,
+ 	struct omap_sg *sg = d->sg + idx;
+ 
+ 	if (d->dir == DMA_DEV_TO_MEM)
+-		omap_set_dma_dest_params(c->dma_ch, d->periph_port,
++		omap_set_dma_dest_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
+ 			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
+ 	else
+-		omap_set_dma_src_params(c->dma_ch, d->periph_port,
++		omap_set_dma_src_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
+ 			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
+ 
+ 	omap_set_dma_transfer_params(c->dma_ch, d->es, sg->en, sg->fn,
+@@ -112,10 +112,10 @@ static void omap_dma_start_desc(struct omap_chan *c)
+ 	c->sgidx = 0;
+ 
+ 	if (d->dir == DMA_DEV_TO_MEM)
+-		omap_set_dma_src_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
++		omap_set_dma_src_params(c->dma_ch, d->periph_port,
+ 			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
+ 	else
+-		omap_set_dma_dest_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
++		omap_set_dma_dest_params(c->dma_ch, d->periph_port,
+ 			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
+ 
+ 	omap_dma_start_sg(c, d, 0);
