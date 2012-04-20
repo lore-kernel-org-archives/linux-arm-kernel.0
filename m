@@ -1,102 +1,182 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 20 Apr 2012 12:42:01 +0100
-Subject: [PATCH 2/2] regulator: Add Freescale's MC34708 regulators
-In-Reply-To: <1334853521-23792-2-git-send-email-paul.liu@linaro.org>
-References: <1334853521-23792-1-git-send-email-paul.liu@linaro.org>
- <1334853521-23792-2-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120420114201.GA3259@opensource.wolfsonmicro.com>
+From: linux-arm@overkiz.com (Boris BREZILLON)
+Date: Fri, 20 Apr 2012 13:57:33 +0200
+Subject: [PATCH] ARM: at91: add kizbox board dt support.
+Message-ID: <4F914F2D.70807@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 12:38:41AM +0800, Ying-Chun Liu (PaulLiu) wrote:
+Hi,
 
-> +static const int mc34708_sw1A[] = {
-> +	650000, 662500, 675000, 687500, 700000, 712500,
+This patch adds support for the kizbox board (based on at91sam9g20 SoC)
 
-Replace these by direct calculations, using tables is both less
-efficient and less clear.
 
-> +	mc34708_lock(priv->mc34708);
-> +	ret = mc34708_reg_rmw(priv->mc34708, mc34708_regulators[id].reg,
-> +			      mc34708_regulators[id].enable_bit,
-> +			      mc34708_regulators[id].enable_bit);
-> +	mc34708_unlock(priv->mc34708);
+Best Regards,
 
-Having to open code this locking in every single driver is a bit
-painful; just have the default register I/O operations do the locking
-and introduce additional unlocked versions if needed.
+Boris
 
-All this stuff could be factored out if you were using regmap.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/kizbox.dts     |  138 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/Makefile.boot |    1 +
+ 2 files changed, 139 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kizbox.dts
 
-> +EXPORT_SYMBOL_GPL(mc34708_regulator_list_voltage);
-
-No, this stuff should only be accessed via the ops.  Why are you doing
-this?
-
-> +int
-> +mc34708_get_best_voltage_index(struct regulator_dev *rdev,
-> +			       int min_uV, int max_uV)
-> +{
-
-You're reimplementing core functionality here, or it'd be even better to
-use calculations.
-
-> +static int mc34708_regulator_get_voltage(struct regulator_dev *rdev)
-> +{
-
-Why is this not get_voltage_sel?
-
-> +static struct regulator_ops mc34708_regulator_ops = {
-> +	.enable = mc34708_regulator_enable,
-> +	.disable = mc34708_regulator_disable,
-> +	.is_enabled = mc34708_regulator_is_enabled,
-> +	.list_voltage = mc34708_regulator_list_voltage,
-> +	.set_voltage = mc34708_regulator_set_voltage,
-> +	.get_voltage = mc34708_regulator_get_voltage,
-> +};
-> +EXPORT_SYMBOL_GPL(mc34708_regulator_ops);
-
-No.  What are you doing this for?
-
-> +int
-> +mc34708_fixed_regulator_set_voltage(struct regulator_dev *rdev, int min_uV,
-> +				    int max_uV, unsigned *selector)
-
-This function makes no sense...
-
-> +int mc34708_sw_regulator_is_enabled(struct regulator_dev *rdev)
-> +{
-> +	return 1;
-> +}
-
-Why are you doing this - this function is redundant.
-
-> +	ret = mc34708_reg_rmw(mc34708, MC34708_SW12OP,
-> +			      MC34708_SW12OP_SW1AMODE_M |
-> +			      MC34708_SW12OP_SW2MODE_M,
-> +			      MC34708_SW12OP_SW1AMODE_VALUE |
-> +			      MC34708_SW12OP_SW2MODE_VALUE);
-> +	if (ret)
-> +		goto err_free;
-> +
-> +	ret = mc34708_reg_rmw(mc34708, MC34708_SW345OP,
-> +			      MC34708_SW345OP_SW3MODE_M |
-> +			      MC34708_SW345OP_SW4AMODE_M |
-> +			      MC34708_SW345OP_SW4BMODE_M |
-> +			      MC34708_SW345OP_SW5MODE_M,
-> +			      MC34708_SW345OP_SW3MODE_VALUE |
-> +			      MC34708_SW345OP_SW4AMODE_VALUE |
-> +			      MC34708_SW345OP_SW4BMODE_VALUE |
-> +			      MC34708_SW345OP_SW5MODE_VALUE);
-> +	if (ret)
-> +		goto err_free;
-
-If this needs to be done unconditionally shouldn't it be being donei in
-the MFD core driver?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120420/5db8aecc/attachment-0001.sig>
+diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
+new file mode 100644
+index 0000000..57479dc
+--- /dev/null
++++ b/arch/arm/boot/dts/kizbox.dts
+@@ -0,0 +1,138 @@
++/*
++ * kizbox.dts - Device Tree file for Overkiz Kizbox board
++ *
++ * Copyright (C) 2012 Boris BREZILLON <linux-arm@overkiz.com>
++ *
++ * Licensed under GPLv2.
++ */
++/dts-v1/;
++/include/ "at91sam9g20.dtsi"
++
++/ {
++
++	model = "Overkiz kizbox";
++	compatible = "overkiz,kizbox", "atmel,at91sam9g20", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "panic=5 ubi.mtd=1 rootfstype=ubifs root=ubi0:root";
++	};
++
++	memory {
++		reg = <0x20000000 0x2000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <18432000>;
++		};
++	};
++
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			usart0: serial at fffb0000 {
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				status = "okay";
++			};
++
++			macb0: ethernet at fffc4000 {
++				phy-mode = "mii";
++				status = "okay";
++			};
++
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			status = "okay";
++
++			bootloaderkernel at 0 {
++				label = "bootloader-kernel";
++				reg = <0x0 0xc0000>;
++			};
++
++			ubi at c0000 {
++				label = "ubi";
++				reg = <0xc0000 0x7f40000>;
++			};
++
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <1>;
++			status = "okay";
++		};
++	};
++
++	i2c at 0 {
++		status = "okay";
++
++		pcf8563 at 51 {
++			/* nxp pcf8563 rtc */
++			compatible = "pcf8563";
++			reg = <0x51>;
++		};
++
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led1g {
++			label = "led1:green";
++			gpios = <&pioB 0 1>;
++			linux,default-trigger = "none";
++		};
++
++		led1r {
++			label = "led1:red";
++			gpios = <&pioB 1 1>;
++			linux,default-trigger = "none";
++		};
++
++		led2g {
++			label = "led2:green";
++			gpios = <&pioB 2 1>;
++			linux,default-trigger = "none";
++			default-state = "on";
++		};
++
++		led2r {
++			label = "led2:red";
++			gpios = <&pioB 3 1>;
++			linux,default-trigger = "none";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reset {
++			label = "reset";
++			gpios = <&pioB 30 1>;
++			linux,code = <0x100>;
++			gpio-key,wakeup;
++		};
++
++		mode {
++			label = "mode";
++			gpios = <&pioB 31 1>;
++			linux,code = <0x101>;
++			gpio-key,wakeup;
++		};
++	};
++};
+\ No newline at end of file
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index 0c6e0e9..c36e2df 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -22,6 +22,7 @@ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9263ek.dtb
+ # sam9g20
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g20ek.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g20ek_2mmc.dtb
++dtb-$(CONFIG_MACH_AT91SAM_DT) += kizbox.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9g20.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9g20.dtb
+ # sam9g45
+-- 
+1.7.4.1
