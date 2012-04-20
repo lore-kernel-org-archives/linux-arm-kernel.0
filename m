@@ -1,60 +1,123 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 20 Apr 2012 17:35:38 +0200
-Subject: [PATCH RESEND v3] iio: Add device tree support to LPC32xx ADC
-In-Reply-To: <4F917AE3.7050808@metafoo.de>
-References: <1334932713-19231-1-git-send-email-stigge@antcom.de>
- <4F917AE3.7050808@metafoo.de>
-Message-ID: <4F91824A.10207@antcom.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Apr 2012 16:37:43 +0100
+Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
+ initialization
+In-Reply-To: <20120420152623.GA21106@atomide.com>
+References: <20120418200214.GP21106@atomide.com>
+ <20120418202447.GT25053@n2100.arm.linux.org.uk>
+ <20120418210142.GR21106@atomide.com>
+ <20120418211606.GU25053@n2100.arm.linux.org.uk>
+ <20120418213642.GV25053@n2100.arm.linux.org.uk>
+ <20120419013914.GV21106@atomide.com>
+ <20120419174332.GY25053@n2100.arm.linux.org.uk>
+ <20120419180741.GX21106@atomide.com>
+ <20120420151034.GA24205@n2100.arm.linux.org.uk>
+ <20120420152623.GA21106@atomide.com>
+Message-ID: <20120420153743.GB24205@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/20/2012 05:04 PM, Lars-Peter Clausen wrote:
->> --- /dev/null
->> +++ linux-2.6/Documentation/devicetree/bindings/staging/iio/adc/lpc32xx-adc.txt
->> @@ -0,0 +1,16 @@
->> +* NXP LPC32xx SoC ADC controller
->> +
->> +Required properties:
->> +- compatible: must be "nxp,lpc32xx-adc"
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region.
->> +- interrupts: The ADC interrupt
->> +
->> +Example:
->> +
->> +	adc at 40048000 {
->> +		compatible = "nxp,lpc32xx-adc";
+On Fri, Apr 20, 2012 at 08:26:25AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120420 08:15]:
+> > On Thu, Apr 19, 2012 at 11:07:42AM -0700, Tony Lindgren wrote:
+> > > There's some information in the omap5912 trm on pages 717 and 718:
+> > > 
+> > > http://www.ti.com/litv/pdf/spru742
+> > > 
+> > > It says for CSDP source port "This field identifies the port originator of
+> > > the transfer."
+> > 
+> > Is there a reason not to use EMIFF as for the memory port for any DMA
+> > activity between a peripheral and system (kernel) memory?
 > 
-> In my opinion it seems to be a bad idea to use wildcard names in devicetree
-> compatible strings.
+> I don't think we have any device to device cases, and it's unlikely that
+> we'll get them either.
+>  
+> > It looks to me like TIPB is the right port to use for anything except
+> > camera and LCD?
+> >
+> > If that's true, we can solve the memory side of the problem very easily -
+> > we know that prep_slave_sg() will always souce from system memory, so
+> > the port for that will be known.
+> 
+> OK
+>  
+> > For the peripheral side of the transfer, I think we should case this on
+> > the request signal as the combinations seem to be very limited - and it
+> > looks like this knowledge is specific to the DMA controller rather than
+> > the peripheral.
+> 
+> OK sounds good to me.
 
-In the above case, the situation is as follows:
+Okay, so this turns out to be really quite simple as the first step - as
+below.  This makes us always use EMIFF for the memory side, and TIPB for
+the peripherals, which won't be a problem until we start thinking about
+camera and LCD.
 
-* NXP has LPC3220, LPC3230, LPC3240 and LPC3250 (differing in SRAM size
-  and in the existence of its Ethernet and LCD controllers)
-* The ADC controller is present in every single one of those
-* We already have "lpc32xx" in the kernel everywhere
-* Current state is that NXP isn't planning to issue LPC32xx without ADC
-* I'm providing a lpc32xx.dtsi file to be used by all LPC32xx variants.
-  This one is referencing the above "compatible" string. Splitting up
-  in all possible numbers (see below) doesn't help much, here.
+I'm not going to conditionalise their use because they're merely ignored
+by arch/arm/plat-omap/dma.c on non-OMAP1 targets, so having this driver
+set them to zero for non-OMAP1 makes little sense (other than just making
+things unnecessarily more complicated.)
 
-What would you prefer?
+So, with this patch plus my original patch to omap's mmc host driver, this
+should result in something which works without all the overhead of drivers
+supplying the port information.  Please confirm, and I'll merge this into
+the original omap-dma.c commit.
 
-+static const struct of_device_id lpc32xx_adc_match[] = {
-+       { .compatible = "nxp,lpc3220-adc" },
-+       { .compatible = "nxp,lpc3230-adc" },
-+       { .compatible = "nxp,lpc3240-adc" },
-+       { .compatible = "nxp,lpc3250-adc" },
-+       {},
-+};
+Thanks.
 
-?
+ drivers/dma/omap-dma.c |   18 ++++++++++--------
+ 1 files changed, 10 insertions(+), 8 deletions(-)
 
-What is a better strategy here?
-
-Thanks in advance,
-
-Roland
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 5b12f74..ed1b8f5 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -52,6 +52,7 @@ struct omap_desc {
+ 	uint8_t es;		/* element size */
+ 	uint8_t sync_mode;	/* OMAP_DMA_SYNC_xxx */
+ 	uint8_t sync_type;	/* OMAP_DMA_xxx_SYNC* */
++	uint8_t periph_port;	/* Peripheral port */
+ 
+ 	unsigned sglen;
+ 	struct omap_sg sg[0];
+@@ -83,11 +84,11 @@ static void omap_dma_start_sg(struct omap_chan *c, struct omap_desc *d,
+ 	struct omap_sg *sg = d->sg + idx;
+ 
+ 	if (d->dir == DMA_DEV_TO_MEM)
+-		omap_set_dma_dest_params(c->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
+-				sg->addr, 0, 0);
++		omap_set_dma_dest_params(c->dma_ch, d->periph_port,
++			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
+ 	else
+-		omap_set_dma_src_params(c->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
+-				sg->addr, 0, 0);
++		omap_set_dma_src_params(c->dma_ch, d->periph_port,
++			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
+ 
+ 	omap_set_dma_transfer_params(c->dma_ch, d->es, sg->en, sg->fn,
+ 		d->sync_mode, c->dma_sig, d->sync_type);
+@@ -111,11 +112,11 @@ static void omap_dma_start_desc(struct omap_chan *c)
+ 	c->sgidx = 0;
+ 
+ 	if (d->dir == DMA_DEV_TO_MEM)
+-		omap_set_dma_src_params(c->dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
+-			d->dev_addr, 0, 0);
++		omap_set_dma_src_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
++			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
+ 	else
+-		omap_set_dma_dest_params(c->dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
+-			d->dev_addr, 0, 0);
++		omap_set_dma_dest_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
++			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
+ 
+ 	omap_dma_start_sg(c, d, 0);
+ }
+@@ -269,6 +270,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+ 	d->es = es;
+ 	d->sync_mode = OMAP_DMA_SYNC_FRAME;
+ 	d->sync_type = sync_type;
++	d->periph_port = OMAP_DMA_PORT_TIPB;
+ 
+ 	/*
+ 	 * Build our scatterlist entries: each contains the address,
