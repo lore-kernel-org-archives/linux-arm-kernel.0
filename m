@@ -1,60 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Apr 2012 09:50:00 -0700
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <20120420153743.GB24205@n2100.arm.linux.org.uk>
-References: <20120418202447.GT25053@n2100.arm.linux.org.uk>
- <20120418210142.GR21106@atomide.com>
- <20120418211606.GU25053@n2100.arm.linux.org.uk>
- <20120418213642.GV25053@n2100.arm.linux.org.uk>
- <20120419013914.GV21106@atomide.com>
- <20120419174332.GY25053@n2100.arm.linux.org.uk>
- <20120419180741.GX21106@atomide.com>
- <20120420151034.GA24205@n2100.arm.linux.org.uk>
- <20120420152623.GA21106@atomide.com>
- <20120420153743.GB24205@n2100.arm.linux.org.uk>
-Message-ID: <20120420164957.GC21106@atomide.com>
+Date: Fri, 20 Apr 2012 09:55:16 -0700
+Subject: [GIT PULL] ARM: OMAP3+: PRM/hwmod: fix and improve I/O chain
+ wakeup support
+In-Reply-To: <1334910066.2149.33.camel@sokoban>
+References: <alpine.DEB.2.00.1203120413530.11332@utopia.booyaka.com>
+ <1334910066.2149.33.camel@sokoban>
+Message-ID: <20120420165508.GD21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120420 08:41]:
+* Tero Kristo <t-kristo@ti.com> [120420 01:24]:
+> Hi,
 > 
-> So, with this patch plus my original patch to omap's mmc host driver, this
-> should result in something which works without all the overhead of drivers
-> supplying the port information.  Please confirm, and I'll merge this into
-> the original omap-dma.c commit.
+> What happened with this pull request? It doesn't seem to be in 3.4 at
+> least.
 
-Then something like this is still needed on top of your original mmc driver
-patch for omap2420:
+There was a boot issue on omap3 evm and that branch got dropped.
+Will merge it again after Paul has figured out the issue.
 
---- a/drivers/mmc/host/omap.c
-+++ b/drivers/mmc/host/omap.c
-@@ -1617,11 +1617,14 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
- 	host->dma_tx_burst = -1;
- 	host->dma_rx_burst = -1;
- 
--	sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
-+	if (cpu_is_omap24xx())
-+		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX :  OMAP24XX_DMA_MMC2_TX;
-+	else
-+		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
- 	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
- #if 0
- 	if (!host->dma_tx) {
--		def_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
-+		dev_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
- 			sig);
- 		goto err_dma;
- 	}
-@@ -1632,7 +1635,10 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
- #endif
- #endif
- #ifdef USE_DMA_ENGINE
--	sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
-+	if (cpu_is_omap24xx())
-+		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_RX :  OMAP24XX_DMA_MMC2_RX;
-+	else
-+		sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
- 	host->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
- #if 0
- 	if (!host->dma_rx) {
+Regards,
+
+Tony
