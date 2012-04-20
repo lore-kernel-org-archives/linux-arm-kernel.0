@@ -1,89 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Apr 2012 09:43:07 -0700
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <20120420153743.GB24205@n2100.arm.linux.org.uk>
-References: <20120418202447.GT25053@n2100.arm.linux.org.uk>
- <20120418210142.GR21106@atomide.com>
- <20120418211606.GU25053@n2100.arm.linux.org.uk>
- <20120418213642.GV25053@n2100.arm.linux.org.uk>
- <20120419013914.GV21106@atomide.com>
- <20120419174332.GY25053@n2100.arm.linux.org.uk>
- <20120419180741.GX21106@atomide.com>
- <20120420151034.GA24205@n2100.arm.linux.org.uk>
- <20120420152623.GA21106@atomide.com>
- <20120420153743.GB24205@n2100.arm.linux.org.uk>
-Message-ID: <20120420164305.GB21106@atomide.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 20 Apr 2012 18:49:12 +0200
+Subject: [RFC 00/14] Convert Orion to generic clk framework
+In-Reply-To: <CAJOA=zPCYZH_enifwMSSQ+sPyi5Ef2Ojs7LFVL8YjQb4rAdWTw@mail.gmail.com>
+References: <1334755830-17581-1-git-send-email-andrew@lunn.ch>
+ <20120418205325.GQ20478@pengutronix.de>
+ <CAJOA=zPCYZH_enifwMSSQ+sPyi5Ef2Ojs7LFVL8YjQb4rAdWTw@mail.gmail.com>
+Message-ID: <20120420164912.GJ25584@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120420 08:41]:
-> --- a/drivers/dma/omap-dma.c
-> +++ b/drivers/dma/omap-dma.c
-> @@ -83,11 +84,11 @@ static void omap_dma_start_sg(struct omap_chan *c, struct omap_desc *d,
->  	struct omap_sg *sg = d->sg + idx;
->  
->  	if (d->dir == DMA_DEV_TO_MEM)
-> -		omap_set_dma_dest_params(c->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
-> -				sg->addr, 0, 0);
-> +		omap_set_dma_dest_params(c->dma_ch, d->periph_port,
-> +			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
->  	else
-> -		omap_set_dma_src_params(c->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
-> -				sg->addr, 0, 0);
-> +		omap_set_dma_src_params(c->dma_ch, d->periph_port,
-> +			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
->  
->  	omap_set_dma_transfer_params(c->dma_ch, d->es, sg->en, sg->fn,
->  		d->sync_mode, c->dma_sig, d->sync_type);
+> I got most the series, but I'm missing patches 2, 11 and 12...
+> 
+> Are these hosted on a public git tree somewhere?
 
-These are now wrong way around, should use OMAP_DMA_PORT_EMIFF here..
+Hi Mike
 
-> @@ -111,11 +112,11 @@ static void omap_dma_start_desc(struct omap_chan *c)
->  	c->sgidx = 0;
->  
->  	if (d->dir == DMA_DEV_TO_MEM)
-> -		omap_set_dma_src_params(c->dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
-> -			d->dev_addr, 0, 0);
-> +		omap_set_dma_src_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
-> +			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
->  	else
-> -		omap_set_dma_dest_params(c->dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
-> -			d->dev_addr, 0, 0);
-> +		omap_set_dma_dest_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
-> +			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
->  
->  	omap_dma_start_sg(c, d, 0);
->  }
+git://github.com/lunn/orion-clk.git branch v3.4-clk-orion
 
-..and then use d->periph_port here. So the following is also needed on
-top of this:
-
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -84,10 +84,10 @@ static void omap_dma_start_sg(struct omap_chan *c, struct omap_desc *d,
- 	struct omap_sg *sg = d->sg + idx;
- 
- 	if (d->dir == DMA_DEV_TO_MEM)
--		omap_set_dma_dest_params(c->dma_ch, d->periph_port,
-+		omap_set_dma_dest_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
- 			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
- 	else
--		omap_set_dma_src_params(c->dma_ch, d->periph_port,
-+		omap_set_dma_src_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
- 			OMAP_DMA_AMODE_POST_INC, sg->addr, 0, 0);
- 
- 	omap_set_dma_transfer_params(c->dma_ch, d->es, sg->en, sg->fn,
-@@ -112,10 +112,10 @@ static void omap_dma_start_desc(struct omap_chan *c)
- 	c->sgidx = 0;
- 
- 	if (d->dir == DMA_DEV_TO_MEM)
--		omap_set_dma_src_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
-+		omap_set_dma_src_params(c->dma_ch, d->periph_port,
- 			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
- 	else
--		omap_set_dma_dest_params(c->dma_ch, OMAP_DMA_PORT_EMIFF,
-+		omap_set_dma_dest_params(c->dma_ch, d->periph_port,
- 			OMAP_DMA_AMODE_CONSTANT, d->dev_addr, 0, 0);
- 
- 	omap_dma_start_sg(c, d, 0);
+    Andrew
