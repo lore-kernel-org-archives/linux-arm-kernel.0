@@ -1,26 +1,41 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 12:19:43 +0300
-Subject: [PATCHv4 0/8] ARM: OMAP4: core retention support
-Message-ID: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 20 Apr 2012 12:19:45 +0300
+Subject: [PATCHv4 2/8] TEMP: ARM: OMAP4: hwmod_data: Do not get DSP out of
+ reset at boot time
+In-Reply-To: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1334913591-26312-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes compared to previous version:
+From: Rajendra Nayak <rnayak@ti.com>
 
-- rebased on top of 3.4
-- added back TEMP patch for preventing DSP wakeup as Paul's powerdomain
-  fixes are not yet in (patch #2)
-- added open switch retention support (OSWR), can be enabled by
-  echo 1 > /debug/pm_debug/enable_oswr_mode
-- fixed support for 4460 (added patch #3)
+With no driver handling DSP, if brought out of reset, it stays
+active and does not assert standby. This leads to IVAHD powerdomain not
+transitioning and hence preventing chip retention.
 
-Applies on top of mainline 3.4 + iochain set. May kind of work without
-the iochain set but waking up from retention might be impossible.
+This patch is no longer needed once Paul's powerdomain fixes are merged:
+   http://marc.info/?l=linux-omap&m=133040749621183&w=2
 
-Tested both CSWR + OSWR modes on omap4430 EMU blaze + omap4460 GP panda.
+Just provided for testing purposes.
 
-Working branch available here:
-tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-branch: mainline-3.4-omap4-ret
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
--Tero
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index cc9bd10..86e1b96 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -1160,6 +1160,7 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
+ 	.name		= "dsp",
+ 	.class		= &omap44xx_dsp_hwmod_class,
+ 	.clkdm_name	= "tesla_clkdm",
++	.flags		= HWMOD_INIT_NO_RESET,
+ 	.mpu_irqs	= omap44xx_dsp_irqs,
+ 	.rst_lines	= omap44xx_dsp_resets,
+ 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_dsp_resets),
+-- 
+1.7.4.1
