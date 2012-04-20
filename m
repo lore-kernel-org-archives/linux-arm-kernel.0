@@ -1,20 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Apr 2012 12:47:07 +0000
-Subject: [PATCH V2] ARM: at91: add kizbox board dt support.
-In-Reply-To: <4F91589E.5040904@overkiz.com>
-References: <4F91589E.5040904@overkiz.com>
-Message-ID: <201204201247.08070.arnd@arndb.de>
+From: d-elaidi@ti.com (Djamil Elaidi)
+Date: Fri, 20 Apr 2012 14:52:06 +0200
+Subject: [PATCH] OMAP4+: hwmod: fix issue causing IPs not going back to
+ Smart-Standby
+Message-ID: <1334926326-26437-1-git-send-email-d-elaidi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 April 2012, Boris BREZILLON wrote:
-> This patch adds support for the kizbox board (based on at91sam9g20 SoC)
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+If an IP is configured in Smart-Standby-Wakeup, when disabling wakeup feature the
+IP will not go back to Smart-Standby, but will remain in Smart-Standby-Wakeup.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Djamil Elaidi <d-elaidi@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I really love how we're finally at the point where we can add new board
-support using just a dts file on some ARM platforms.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index d2d4c7a..f1d22d1 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -450,7 +450,7 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
+ 	if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
+ 		_set_slave_idlemode(oh, HWMOD_IDLEMODE_SMART, v);
+ 	if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
+-		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART_WKUP, v);
++		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART, v);
+ 
+ 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
+ 
+-- 
+1.7.0.4
