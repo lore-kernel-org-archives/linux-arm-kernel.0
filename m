@@ -1,23 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 20 Apr 2012 16:02:04 +0200
-Subject: [PATCH V2] ARM: at91: add kizbox board dt support.
-In-Reply-To: <201204201247.08070.arnd@arndb.de>
-References: <4F91589E.5040904@overkiz.com> <201204201247.08070.arnd@arndb.de>
-Message-ID: <20120420140204.GA30038@game.jcrosoft.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 20 Apr 2012 15:25:58 +0100
+Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
+ support
+In-Reply-To: <20120420123842.GA25662@avionic-0098.adnet.avionic-design.de>
+References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
+ <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
+ <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
+ <20120420123842.GA25662@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20120420142558.GB20681@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:47 Fri 20 Apr     , Arnd Bergmann wrote:
-> On Friday 20 April 2012, Boris BREZILLON wrote:
-> > This patch adds support for the kizbox board (based on at91sam9g20 SoC)
-> > 
-> > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> I really love how we're finally at the point where we can add new board
-> support using just a dts file on some ARM platforms.
-yeah finally
+On Fri, Apr 20, 2012 at 02:38:43PM +0200, Thierry Reding wrote:
+> * Dave Airlie wrote:
+> > I get the feeling the drm can just be a virtual platform device of
+> > some sort, then it reads the device tree and binds all the information
+> > on what crtc/encoders are available,
 
-Best Regards,
-J.
+> That's pretty much what I've come up with in the second round of Tegra DRM
+> patches. Basically display controllers and outputs (RGB, HDMI, TVO, DSI) get
+> separate drivers and register themselves with the DRM driver which then looks
+> at the device tree to see which display controllers to register as CRTCs and
+> parses a list of connector nodes to create encoder/connector pairs that
+> define the physical connectors and their corresponding outputs.
+
+> I did take a brief look at the SDRM patches as well and they didn't quite
+> seem to fit what was needed for Tegra. But if time allows I'll take a closer
+> look.
+
+This sounds an awful lot like how ASoC hangs together...
