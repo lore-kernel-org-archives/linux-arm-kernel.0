@@ -1,40 +1,42 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 20 Apr 2012 12:25:01 +0200
-Subject: [PATCH] ARM: SAMSUNG: Should check for IS_ERR(clk) instead of NULL
-In-Reply-To: <20120419090325.GC24211@n2100.arm.linux.org.uk>
-References: <1334722134-14545-1-git-send-email-jhbird.choi@samsung.com>
- <4F8F586C.3020401@samsung.com> <4F8FCC00.10807@samsung.com>
- <20120419090325.GC24211@n2100.arm.linux.org.uk>
-Message-ID: <4F91397D.6090509@samsung.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Fri, 20 Apr 2012 16:40:04 +0530
+Subject: [PATCH v2 0/3] ARM: omap_hwmod: add api to enable/disable module
+ level wakeup
+Message-ID: <1334920207-19160-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2012 11:03 AM, Russell King - ARM Linux wrote:
-> On Thu, Apr 19, 2012 at 10:25:36AM +0200, Sylwester Nawrocki wrote:
->> On 04/19/2012 02:12 AM, Kukjin Kim wrote:
->>>> --- a/arch/arm/plat-samsung/include/plat/watchdog-reset.h
->>>> +++ b/arch/arm/plat-samsung/include/plat/watchdog-reset.h
->>>> @@ -25,7 +25,7 @@ static inline void arch_wdt_reset(void)
->>>>
->>>>   	__raw_writel(0, S3C2410_WTCON);	  /* disable watchdog, to be safe  */
->>>>
->>>> -	if (s3c2410_wdtclk)
->>>> +	if (!IS_ERR(s3c2410_wdtclk))
->>>
->>> Yeah, right. BTW don't we need to check NULL here?
->>
->> It might make sense to check for NULL as well, but only if it happens
->> that a clock entry is ever added to clkdev with null struct clk_lookup:clk
->> member.
-> 
-> Not quite the correct answer.  The correct answer is:
-> 
-> Drivers have no business interpreting anything but IS_ERR() values from
-> clk_get() as errors.  Everything else they _MUST_ assume is valid for
-> the rest of the clk API.
-> 
-> The clue: struct clk is an opaque cookie as far as drivers are concerned.
-> The only interpretation drivers are allowed to make is that IS_ERR()
-> values indicate an error.  Everything else is potentially valid.
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-Thanks for the clarification. I stand corrected.
+On omap2/3 module level wakeup is handled using PM_WKEN registers.
+Expand the hwmod framework to handle the module level wakeup enable 
+registers.
+
+Tested on Beagle-xm by enabling and disabling uart wakeups from sysfs
+Series depends on following patch for testing.
+http://marc.info/?l=linux-omap&m=133457952909998&w=2
+
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+
+Govindraj.R (3):
+  ARM: OMAP2+: omap_hwmod: Add interface to incorporate module level
+    wakeup
+  ARM: OMAP2+: omap_hwmod: Add api to enable/disable module level
+    wakeup events
+  ARM: omap3: pm: Remove uart module level wakeup configurations
+
+ arch/arm/mach-omap2/omap_hwmod.c             |   24 ++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    6 ++++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    6 ++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    8 ++++++++
+ arch/arm/mach-omap2/pm34xx.c                 |   14 +++++---------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c           |    8 ++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h           |    9 +++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 ++++
+ 8 files changed, 70 insertions(+), 9 deletions(-)
+
+-- 
+1.7.9
