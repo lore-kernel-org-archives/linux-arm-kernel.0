@@ -1,47 +1,38 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 18:07:16 +0300
-Subject: [PATCH 00/19] ARM: OMAP4 device off support
-In-Reply-To: <CANQgH-aL42ka+veae0aPaebt=eA8iyF=ThVXGkOzFhNumKnhtw@mail.gmail.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <CANrkHUa5q10FFxsZfgtMqKbzKKFHCcf3yYsaOK+hG8CJiME2TA@mail.gmail.com>
- <1334926721.2149.40.camel@sokoban> <87vckupkxj.fsf@ti.com>
- <1334933002.2149.44.camel@sokoban>
- <CANQgH-aL42ka+veae0aPaebt=eA8iyF=ThVXGkOzFhNumKnhtw@mail.gmail.com>
-Message-ID: <1334934436.2149.49.camel@sokoban>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 20 Apr 2012 19:09:06 +0400
+Subject: [PATCH] arm: davinci: pdctl next bit position incorrect
+In-Reply-To: <4F9042CA.7050305@ti.com>
+References: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
+ <4F8F22D1.8080309@ti.com> <4F8FECD6.6050105@mvista.com>
+ <4F9042CA.7050305@ti.com>
+Message-ID: <4F917C12.8080306@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-04-20 at 20:21 +0530, Datta, Shubhrajyoti wrote:
-> On Fri, Apr 20, 2012 at 8:13 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> > On Fri, 2012-04-20 at 06:55 -0700, Kevin Hilman wrote:
-> >> Tero Kristo <t-kristo@ti.com> writes:
-> >>
-> >> [...]
-> >>
-> >> >> I tried your branch on gp/emu devices but could not reproduce this issue.
-> >> >> My observation is that while resuming, omap_hsmmc.1 eMMC is
-> >> >> trying to turn on phoenix vaux1 regulator via i2c which fails due
-> >> >> to controller timeout.
-> >> >> Note: eMMC is present only on sdp/blaze
-> >> >
-> >> > Did you try this with off-mode enabled and did you check the device
-> >> > actually goes to off? (see pm_debug/count and verify core off count is
-> >> > increasing.) And as said, I was only able to see this problem on a blaze
-> >> > device, panda works fine. But yes, you are probably right and it is not
-> >> > an MMC driver issue but I2C.
-> >>
-> >> Can you try the patch below?  It sounds like the same problem.
-> >
-> > Doesn't help with this one. I guess I2C loses context during device off
-> > and it is not restored properly.
-> >
-> > -Tero
-> Could you try the following patch
-> 
-> https://lkml.org/lkml/2012/3/30/345
+Hello.
 
-That does the trick, after this it is working fine on blaze, and this
-also fixes the timeout issues seen on panda board (meaning wake-up from
-device off is much faster.)
+On 04/19/2012 08:52 PM, Sekhar Nori wrote:
 
--Tero
+>>>> The PDCTL NEXT bit is incorrectly set to bit 1 instead of bit 0. This
+>>>> patch fixes this issue
+
+>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+
+>>> Applying this for v3.5.
+
+>>     But why not to 3.4? It concerns turning on DSP domain on DM644x.
+
+> Yes, but I think as you noted sometime before, no one is really
+> depending on kernel to turn on DSP domain on DM644x.
+
+    Looks like you're right (though I don't remember noting it :-).
+
+> Its probably being
+> done from U-Boot or ROM code. This is not a v3.4 regression either.
+
+    U-Boot does it only when DSPLINK support is not desired.
+
+> Thanks,
+> Sekhar
+
+WBR, Sergei
