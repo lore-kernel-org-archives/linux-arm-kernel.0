@@ -1,143 +1,205 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 12:33:52 +0300
-Subject: [PATCH 19/19] ARM: OMAP4: powerdomain: update mpu / core off counters
- during device off
-In-Reply-To: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1334914432-26456-20-git-send-email-t-kristo@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 20 Apr 2012 11:20:22 +0200
+Subject: [PATCH v4 1/2] MTD: atmel_nand: Update driver to support
+ Programmable HW ECC controller
+In-Reply-To: <A92DB5DF46DBC241980A99BFD8A00AEE0F62D642@penmbx01>
+References: <1334906788-18704-1-git-send-email-hong.xu@atmel.com>
+ <20120420082533.GX16641@game.jcrosoft.org>
+ <A92DB5DF46DBC241980A99BFD8A00AEE0F62D642@penmbx01>
+Message-ID: <20120420092022.GA16641@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently device off does not have any counters / timers of its own
-and it is impossible to track the time spent in this state. In device
-off, MPU / CORE powerdomains enter OSWR, so normally the RETENTION
-state times / counts are increased during device off.
+On 09:13 Fri 20 Apr     , Xu, Hong wrote:
+> Hi JC,
+> 
+> > -----Original Message-----
+> > From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
+> > Sent: Friday, April 20, 2012 4:26 PM
+> > To: Xu, Hong
+> > Cc: linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org;
+> > dedekind1 at gmail.com; Ferre, Nicolas
+> > Subject: Re: [PATCH v4 1/2] MTD: atmel_nand: Update driver to support
+> > Programmable HW ECC controller
+> > 
+> > On 15:26 Fri 20 Apr     , Hong Xu wrote:
+> > > The Programmable Hardware ECC (PMECC) controller is a programmable binary
+> > > BCH(Bose, Chaudhuri and Hocquenghem) encoder and decoder. This controller
+> > > can be used to support both SLC and MLC NAND Flash devices. It supports to
+> > > generate ECC to correct 2, 4, 8, 12 or 24 bits of error per sector of data.
+> > >
+> > > To use this driver, the user needs to pass in the correction capability and
+> > > the sector size.
+> > >
+> > > This driver has been tested on AT91SAM9X5-EK and AT91SAM9N12-EK with JFFS2,
+> > > YAFFS2, UBIFS and mtd-utils.
+> > >
+> > > Signed-off-by: Hong Xu <hong.xu@atmel.com>
+> > what is the status on the other soc?
+> 
+> So far, PMECC appears on SAM9X5 and SAM9N12 (PMECC will be available on the SoCs in the future). And the test is done on the two platforms.
+yes but you have hw ecc on other soc did you test it
+to be sure you break nothing
+> 
+> > > ---
+> > > Changes since v3,
+> > > 	Rebased on AT91 Nand fixes and DT
+> > >
+> > >  drivers/mtd/nand/atmel_nand.c     |  955
+> > ++++++++++++++++++++++++++++++++++---
+> > >  drivers/mtd/nand/atmel_nand_ecc.h |  123 ++++-
+> > >  2 files changed, 998 insertions(+), 80 deletions(-)
+> > >
+> > > diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> > > index 2165576..7d494c8 100644
+> > > --- a/drivers/mtd/nand/atmel_nand.c
+> > > +++ b/drivers/mtd/nand/atmel_nand.c
+> > > @@ -15,6 +15,8 @@
+> > >   *     		(u-boot-1.1.5/board/atmel/at91sam9263ek/nand.c)
+> > >   *     (C) Copyright 2006 ATMEL Rousset, Lacressonniere Nicolas
+> > >   *
+> > > + *  Add Programmable Hardware ECC support for various AT91 SoC
+> > > + *     (C) Copyright 2012 ATMEL, Hong Xu
+> > the comment is wrong the hw ecc is already implemented
+> 
+> Well, original code is Hamming based ECC. New one is based on BCH. But anyway, these two lines can be removed.
+> 
+> > >   *
+> > >   * This program is free software; you can redistribute it and/or modify
+> > >   * it under the terms of the GNU General Public License version 2 as
+> > > @@ -42,19 +44,50 @@
+> > >
+> > >  #include <mach/cpu.h>
+> > >
+> > > +/* Hardware ECC registers */
+> > > +#include "atmel_nand_ecc.h"
+> > > +
+> > >  static int use_dma = 1;
+> > >  module_param(use_dma, int, 0);
+> > >
+> > >  static int on_flash_bbt = 0;
+> > >  module_param(on_flash_bbt, int, 0);
+> > >
+> 
+> [...]
+> 
+> > > +
+> > > +static int cpu_has_pmecc(void)
+> > > +{
+> > > +	if (cpu_is_at91sam9x5())
+> > > +		return 1;
+> > this must be pass via DT do not use cpu_is
+> 
+> Well, I agreed we could add something in the DT of the SoC. But when can we use cpu_is_xxx in the context of DT?
+no decribe it via property
+> 
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static int pmecc_get_clkctrl(void)
+> > > +{
+> > > +	/* See datasheet about PMECC Clock Control Register */
+> > > +	if (cpu_is_at91sam9x5())
+> > > +		return 2;
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static void pmecc_config_ecc_layout(struct nand_ecclayout *layout, int
+> > oobsize,
+> [...]
+> > > +	 */
+> > > +	si = host->si;
+> > > +
+> > > +	for (i = 1; i < 2 * AT_NB_ERROR_MAX; i++)
+> > > +		si[i] = 0;
+> > > +
+> > > +	/* Computation 2t syndromes based on S(x) */
+> > > +	/* Odd syndromes */
+> > > +	for (i = 1; i <= 2 * host->cap - 1; i = i + 2) {
+> > i += 2
+> > < without the -1
+> 
+> I'd keep it as it is. We could find similar lines in datasheet or internal tested code.
+> 
+> > > +		si[i] = 0;
+> > > +		for (j = 0; j < host->degree; j++) {
+> > > +			if (partial_syn[i] & ((unsigned short)0x1 << j))
+> > > +				si[i] = __raw_readw(alpha_to + i * j) ^ si[i];
+> > use relaxed read/write
+> 
+> OK, I'll have a look.
+> 
+> > > +		}
+> > > +	}
+> > > +	/* Even syndrome = (Odd syndrome) ** 2 */
+> > > +	for (i = 2; i <= 2 * host->cap; i = i + 2) {
+> > > +		j = i / 2;
+> > > +		if (si[j] == 0)
+> > > +			si[i] = 0;
+> > > +		else {
+> > > +			int16_t tmp;
+> > please check your patch with checkpath
+> 
+> I've done it before submitting. BTW with checkpatch instead of checkpath.
+so here you miss an empty line
+and I see others
+> 
+> > > +			tmp = __raw_readw(index_of + si[j]);
+> > > +			tmp = (tmp * 2) % host->cw_len;
+> > > +			si[i] = __raw_readw(alpha_to + tmp);
+> > > +		}
+> > > +	}
+> > > +
+> > > +	return;
+> > > +}
+> > > +
+> > > +static void pmecc_get_sigma(struct mtd_info *mtd)
+> > > +{
+> > > +	int			i, j, k;
+> > > +	struct nand_chip	*nand_chip = mtd->priv;
+> > > +	struct atmel_nand_host	*host = nand_chip->priv;
+> > > +
+> > > +	uint32_t		dmu_0_count, tmp;
+> > > +	int16_t			*lmu = host->lmu;
+> > > +	int16_t			*si = host->si;
+> > > +	int16_t			cap = host->cap;
+> > > +	int16_t __iomem		*index_of = host->index_of;
+> > > +	int16_t __iomem		*alpha_to = host->alpha_to;
+> > > +
+> > > +	/* mu */
+> > > +	int mu[AT_NB_ERROR_MAX + 1];
+> > > +
+> > > +	/* discrepancy */
+> > > +	int dmu[AT_NB_ERROR_MAX + 1];
+> > > +
+> > > +	/* delta order */
+> > > +	int delta[AT_NB_ERROR_MAX + 1];
+> > allocate these
+> 
+> OK.
+> 
+> > > +
+> > > +	/* index of largest delta */
+> > > +	int ro;
+> > > +	int largest;
+> > > +	int diff;
+> > > +
+> > > +	dmu_0_count = 0;
+> > > +
+> > > +	/* First Row */
+> > > +
+> > > +	/* Mu */
+> > > +	mu[0] = -1;
+> > > +
+> > > +	for (i = 0; i < 2 * AT_NB_ERROR_MAX + 1; i++)
+> > > +		host->smu[0][i] = 0;
+> > use memeset
+> 
+> A big deal? Or I'd keep this as found in datasheet.
+please forget the datasheet we do it clean
+same upper
 
-This patch adds a new field to the powerdomain struct for context loss
-register, which is checked during pwrdm_post_transition to see if
-a device off type context loss has happened. If this is the case,
-the counters + timers for OFF state are touched instead of RETENTION.
-
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/omap-mpuss-lowpower.c   |    1 -
- arch/arm/mach-omap2/powerdomain.c           |    9 +++++++++
- arch/arm/mach-omap2/powerdomain.h           |    2 ++
- arch/arm/mach-omap2/powerdomains44xx_data.c |    2 ++
- arch/arm/mach-omap2/prm44xx.c               |   15 +++++++++++++++
- arch/arm/mach-omap2/prm44xx.h               |    2 ++
- 6 files changed, 30 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index b4ca6f3..b7d139a 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -404,7 +404,6 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- 	if (omap4_device_prev_state_off()) {
- 		omap4_dpll_resume_off();
- 		omap4_cm_resume_off();
--		omap4_device_clear_prev_off_state();
- 	}
- 
- 	pwrdm_post_transition();
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 068f06b..cb3eab2 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -160,6 +160,15 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
- 		break;
- 	case PWRDM_STATE_PREV:
- 		prev = pwrdm_read_prev_pwrst(pwrdm);
-+
-+		/*
-+		 * If powerdomain has context offset defined, check if
-+		 * the domain has lost context (i.e. entered off)
-+		 */
-+		if (pwrdm->context_offs)
-+			if (omap4_pwrdm_lost_context_rff(pwrdm->prcm_offs,
-+							 pwrdm->context_offs))
-+				prev = PWRDM_POWER_OFF;
- 		if (pwrdm->state != prev)
- 			pwrdm->state_counter[prev]++;
- 		if (prev == PWRDM_POWER_RET)
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 0d72a8a..a427645 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -82,6 +82,7 @@ struct powerdomain;
-  * @name: Powerdomain name
-  * @voltdm: voltagedomain containing this powerdomain
-  * @prcm_offs: the address offset from CM_BASE/PRM_BASE
-+ * @context_offs: the address offset for the CONTEXT register
-  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
-  * @pwrsts: Possible powerdomain power states
-  * @pwrsts_logic_ret: Possible logic power states when pwrdm in RETENTION
-@@ -106,6 +107,7 @@ struct powerdomain {
- 		struct voltagedomain *ptr;
- 	} voltdm;
- 	const s16 prcm_offs;
-+	const s16 context_offs;
- 	const u8 pwrsts;
- 	const u8 pwrsts_logic_ret;
- 	const u8 flags;
-diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
-index d8701ce..c4de02f 100644
---- a/arch/arm/mach-omap2/powerdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
-@@ -36,6 +36,7 @@ static struct powerdomain core_44xx_pwrdm = {
- 	.voltdm		  = { .name = "core" },
- 	.prcm_offs	  = OMAP4430_PRM_CORE_INST,
- 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-+	.context_offs	  = OMAP4_RM_L3_1_L3_1_CONTEXT_OFFSET,
- 	.pwrsts		  = PWRSTS_RET_ON,
- 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
- 	.banks		  = 5,
-@@ -205,6 +206,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
- 	.voltdm		  = { .name = "mpu" },
- 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
- 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-+	.context_offs	  = OMAP4_RM_MPU_MPU_CONTEXT_OFFSET,
- 	.pwrsts		  = PWRSTS_RET_ON,
- 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
- 	.banks		  = 3,
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index ab810cd..cf996a6 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -274,6 +274,21 @@ static void __init omap4_enable_io_wakeup(void)
- 			OMAP4_PRM_IO_PMCTRL_OFFSET);
- }
- 
-+bool omap4_pwrdm_lost_context_rff(s16 inst, s16 offset)
-+{
-+	u32 val;
-+
-+	val = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION, inst, offset);
-+
-+	if (val & OMAP4430_LOSTCONTEXT_RFF_MASK) {
-+		omap4_prminst_write_inst_reg(val, OMAP4430_PRM_PARTITION, inst,
-+					     offset);
-+		return true;
-+	}
-+
-+	return false;
-+}
-+
- /**
-  * omap4_device_set_state_off() - setup device off state
-  * @enable:	set to off or not.
-diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
-index 54a057e..517851b 100644
---- a/arch/arm/mach-omap2/prm44xx.h
-+++ b/arch/arm/mach-omap2/prm44xx.h
-@@ -770,6 +770,8 @@ extern void omap44xx_prm_ocp_barrier(void);
- extern void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask);
- extern void omap44xx_prm_restore_irqen(u32 *saved_mask);
- 
-+extern bool omap4_pwrdm_lost_context_rff(s16 inst, s16 offset);
-+
- # endif
- 
- #endif
--- 
-1.7.4.1
+Best Regards,
+J.
