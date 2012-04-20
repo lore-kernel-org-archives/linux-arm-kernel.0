@@ -1,91 +1,165 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Apr 2012 17:43:22 +0300
-Subject: [PATCH 00/19] ARM: OMAP4 device off support
-In-Reply-To: <87vckupkxj.fsf@ti.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <CANrkHUa5q10FFxsZfgtMqKbzKKFHCcf3yYsaOK+hG8CJiME2TA@mail.gmail.com>
- <1334926721.2149.40.camel@sokoban>  <87vckupkxj.fsf@ti.com>
-Message-ID: <1334933002.2149.44.camel@sokoban>
+From: viresh.linux@gmail.com (Viresh Kumar)
+Date: Fri, 20 Apr 2012 20:14:20 +0530
+Subject: [PATCH] thermal: spear_thermal: add Device Tree probing capability
+Message-ID: <1b5904f4cda57cfc0910d668ad630ee17c2582b6.1334932983.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-04-20 at 06:55 -0700, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
-> [...]
-> 
-> >> I tried your branch on gp/emu devices but could not reproduce this issue.
-> >> My observation is that while resuming, omap_hsmmc.1 eMMC is
-> >> trying to turn on phoenix vaux1 regulator via i2c which fails due
-> >> to controller timeout.
-> >> Note: eMMC is present only on sdp/blaze
-> >
-> > Did you try this with off-mode enabled and did you check the device
-> > actually goes to off? (see pm_debug/count and verify core off count is
-> > increasing.) And as said, I was only able to see this problem on a blaze
-> > device, panda works fine. But yes, you are probably right and it is not
-> > an MMC driver issue but I2C.
-> 
-> Can you try the patch below?  It sounds like the same problem.
+SPEAr platforms now support DT and so must convert all drivers to support DT.
+This patch adds DT probing support for SPEAr thermal sensor driver and updates
+its documentation too.
 
-Doesn't help with this one. I guess I2C loses context during device off
-and it is not restored properly.
+Also, as SPEAr is the only user of this driver and is only available with DT,
+make this an only DT driver. So, platform_data is completely removed and passed
+via DT now.
 
--Tero
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ .../devicetree/bindings/thermal/spear-thermal.txt  |   14 ++++++++++
+ drivers/thermal/Kconfig                            |    1 +
+ drivers/thermal/spear_thermal.c                    |   26 ++++++++++++-------
+ include/linux/platform_data/spear_thermal.h        |   26 --------------------
+ 4 files changed, 31 insertions(+), 36 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/spear-thermal.txt
+ delete mode 100644 include/linux/platform_data/spear_thermal.h
 
-> 
-> Kevin
-> 
-> 
-> From 999f34629140f436099050eb7aac514bfd2a2235 Mon Sep 17 00:00:00 2001
-> From: NeilBrown <neilb@suse.de>
-> Date: Fri, 30 Dec 2011 12:40:30 +1100
-> Subject: [PATCH] OMAP/I2C - Fix timeout problem during suspend.
-> 
-> On a board with OMAP3 processor and TWL4030 Power management,
-> we need to talk to the TWL4030 during late suspend but cannot
-> because the I2C interrupt is disabled (as late suspend disables
-> interrupt).
-> 
-> e.g. I get messages like:
-> 
-> [   62.161102] musb-omap2430 musb-omap2430: LATE power domain suspend
-> [   63.167205] omap_i2c omap_i2c.1: controller timed out
-> [   63.183044] twl: i2c_read failed to transfer all messages
-> [   64.182861] omap_i2c omap_i2c.1: controller timed out
-> [   64.198455] twl: i2c_write failed to transfer all messages
-> [   65.198455] omap_i2c omap_i2c.1: controller timed out
-> [   65.203765] twl: i2c_write failed to transfer all messages
-> 
-> The stack shows omap2430_runtime_suspend calling twl4030_set_suspend
-> which tries to power-down the USB PHY (twl4030_phy_suspend ->
-> twl4030_phy_power -> __twl4030_phy_power which as a nice WARN_ON
-> that helps).
-> 
-> Then we get the same in resume:
-> 
-> [   69.603912] musb-omap2430 musb-omap2430: EARLY power domain resume
-> [   70.610473] omap_i2c omap_i2c.1: controller timed out
-> [   70.626129] twl: i2c_write failed to transfer all messages
-> etc.
-> 
-> So don't disable interrupts for I2C.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.de>
-> ---
->  drivers/i2c/busses/i2c-omap.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 801df60..e024c50 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1092,7 +1092,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  
->  	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
->  								   omap_i2c_isr;
-> -	r = request_irq(dev->irq, isr, 0, pdev->name, dev);
-> +	r = request_irq(dev->irq, isr, IRQF_NO_SUSPEND, pdev->name, dev);
->  
->  	if (r) {
->  		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
+diff --git a/Documentation/devicetree/bindings/thermal/spear-thermal.txt b/Documentation/devicetree/bindings/thermal/spear-thermal.txt
+new file mode 100644
+index 0000000..93e3b67
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/spear-thermal.txt
+@@ -0,0 +1,14 @@
++* SPEAr Thermal
++
++Required properties:
++- compatible : "st,thermal-spear1340"
++- reg : Address range of the thermal registers
++- st,thermal-flags: flags used to enable thermal sensor
++
++Example:
++
++	thermal at fc000000 {
++		compatible = "st,thermal-spear1340";
++		reg = <0xfc000000 0x1000>;
++		st,thermal-flags = <0x7000>;
++	};
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 514a691..3ab2bd5 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -23,6 +23,7 @@ config SPEAR_THERMAL
+ 	bool "SPEAr thermal sensor driver"
+ 	depends on THERMAL
+ 	depends on PLAT_SPEAR
++	depends on OF
+ 	help
+ 	  Enable this to plug the SPEAr thermal sensor driver into the Linux
+ 	  thermal framework
+diff --git a/drivers/thermal/spear_thermal.c b/drivers/thermal/spear_thermal.c
+index c2e32df..ca40d36 100644
+--- a/drivers/thermal/spear_thermal.c
++++ b/drivers/thermal/spear_thermal.c
+@@ -20,9 +20,9 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/of.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+-#include <linux/platform_data/spear_thermal.h>
+ #include <linux/thermal.h>
+ 
+ #define MD_FACTOR	1000
+@@ -103,21 +103,20 @@ static int spear_thermal_probe(struct platform_device *pdev)
+ {
+ 	struct thermal_zone_device *spear_thermal = NULL;
+ 	struct spear_thermal_dev *stdev;
+-	struct spear_thermal_pdata *pdata;
+-	int ret = 0;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct resource *stres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	int ret = 0, val;
++
++	if (!np || !of_property_read_u32(np, "st,thermal-flags", &val)) {
++		dev_err(&pdev->dev, "Failed: DT Pdata not passed\n");
++		return -EINVAL;
++	}
+ 
+ 	if (!stres) {
+ 		dev_err(&pdev->dev, "memory resource missing\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	pdata = dev_get_platdata(&pdev->dev);
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "platform data is NULL\n");
+-		return -EINVAL;
+-	}
+-
+ 	stdev = devm_kzalloc(&pdev->dev, sizeof(*stdev), GFP_KERNEL);
+ 	if (!stdev) {
+ 		dev_err(&pdev->dev, "kzalloc fail\n");
+@@ -144,7 +143,7 @@ static int spear_thermal_probe(struct platform_device *pdev)
+ 		goto put_clk;
+ 	}
+ 
+-	stdev->flags = pdata->thermal_flags;
++	stdev->flags = val;
+ 	writel_relaxed(stdev->flags, stdev->thermal_base);
+ 
+ 	spear_thermal = thermal_zone_device_register("spear_thermal", 0,
+@@ -189,6 +188,12 @@ static int spear_thermal_exit(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id spear_thermal_id_table[] = {
++	{ .compatible = "st,thermal-spear1340" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, spear_thermal_id_table);
++
+ static struct platform_driver spear_thermal_driver = {
+ 	.probe = spear_thermal_probe,
+ 	.remove = spear_thermal_exit,
+@@ -196,6 +201,7 @@ static struct platform_driver spear_thermal_driver = {
+ 		.name = "spear_thermal",
+ 		.owner = THIS_MODULE,
+ 		.pm = &spear_thermal_pm_ops,
++		.of_match_table = of_match_ptr(spear_thermal_id_table),
+ 	},
+ };
+ 
+diff --git a/include/linux/platform_data/spear_thermal.h b/include/linux/platform_data/spear_thermal.h
+deleted file mode 100644
+index 724f2e1..0000000
+--- a/include/linux/platform_data/spear_thermal.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- * SPEAr thermal driver platform data.
+- *
+- * Copyright (C) 2011-2012 ST Microelectronics
+- * Author: Vincenzo Frascino <vincenzo.frascino@st.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-#ifndef SPEAR_THERMAL_H
+-#define SPEAR_THERMAL_H
+-
+-/* SPEAr Thermal Sensor Platform Data */
+-struct spear_thermal_pdata {
+-	/* flags used to enable thermal sensor */
+-	unsigned int thermal_flags;
+-};
+-
+-#endif /* SPEAR_THERMAL_H */
+-- 
+1.7.9
