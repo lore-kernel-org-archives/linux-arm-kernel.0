@@ -1,43 +1,62 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 20 Apr 2012 14:22:55 +0200
-Subject: [PATCHv24 00/16] Contiguous Memory Allocator
-In-Reply-To: <20120419124044.632bfa49.akpm@linux-foundation.org>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
- <20120419124044.632bfa49.akpm@linux-foundation.org>
-Message-ID: <03b201cd1ef0$50ca9350$f25fb9f0$%szyprowski@samsung.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 20 Apr 2012 20:26:33 +0800
+Subject: [RFC PATCH 00/10 V3] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <20120420094805.GS20478@pengutronix.de>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334771194-18688-1-git-send-email-marex@denx.de>
+ <201204200413.56909.marex@denx.de>
+ <20120420094805.GS20478@pengutronix.de>
+Message-ID: <CAL411-onyB8SJEBoJ2XK=wyHKR0C7SyJtCsoJCDZGatP8HmYZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Fri, Apr 20, 2012 at 5:48 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-On Thursday, April 19, 2012 9:41 PM Andrew Morton wrote:
+>>
+>> btw /wrt USB Gadget etc -- how does the drivers/usb/gadget/fsl_udc_core.c and
+>> drivers/usb/gadget/ci13xxx_* fit into the big picture? We're gonna use the
+>> ci13xxx stuff for Gadget on mx28, correct? Then how does fsl_udc_core.c fit in?
+>
+> From what I have been told by a collegue the ci13xxx driver works
+> better, and from what I have seen the code looks better. So I think mxs
+> should use it. i.MX can then use it later aswell. We won't need the
+> fsl_udc_core driver anymore then.
+>
+Oh, I find I lost many discussions using company email.
+>From the function and quality level, fsl_udc_core.c is absolutely the
+best one for all
+i.mx SoCs, as both internal and upstream fsl code use it.
 
-> On Tue, 03 Apr 2012 16:10:05 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> 
-> > This is (yet another) update of CMA patches.
-> 
-> Looks OK to me.  It's a lot of code.
-> 
-> Please move it into linux-next, and if all is well, ask Linus to pull
-> the tree into 3.5-rc1.  Please be sure to cc me on that email.
+It discussed before:
+http://marc.info/?l=linux-usb&m=129906859817430&w=2
 
-Ok, thanks! Is it possible to get your acked-by or reviewed-by tag? It
-might help a bit to get the pull request accepted by Linus. :)
+I just wonder if ci13xxx_udc.c can support fsl's well as it has below
+at comment.
 
-> I suggest that you include additional patches which enable CMA as much
-> as possible on as many architectures as possible so that it gets
-> maximum coverage testing in linux-next.  Remove those Kconfig patches
-> when merging upstream.
-> 
-> All this code will probably mess up my tree, but I'll work that out.
-> It would be more awkward if the CMA code were to later disappear from
-> linux-next or were not merged into 3.5-rc1.  Let's avoid that.
+/*
+ * Description: MIPS USB IP core family device controller
+ *              Currently it only supports IP part number CI13412
+ */
+I will check with IC guys to see if i.mx's controller is compatible
+with CI13412.
+If fsl's compatible with CI13412, then mxs can try to use ci13xxx_udc.c to see
+if there are any problems, If no problems with kinds of testing,
+we can switch all i.mx SoC to ci13xxx_udc.c.
 
-I've put the patches on my dma-mapping-next branch and we will see the
-result (and/or complaints) on Monday.
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 
-Best regards
+
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+BR,
+Peter Chen
