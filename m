@@ -1,27 +1,19 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Apr 2012 15:22:33 -0700
-Subject: [PATCH 1/8] ARM: OMAP: fix DMA vs memory ordering
-In-Reply-To: <E1SKRqN-0004b4-Me@rmk-PC.arm.linux.org.uk>
+Date: Fri, 20 Apr 2012 15:23:07 -0700
+Subject: [PATCH 5/8] mmc: omap_hsmmc: release correct resource
+In-Reply-To: <E1SKRrh-0004bL-3j@rmk-PC.arm.linux.org.uk>
 References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRqN-0004b4-Me@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120420222230.GH21106@atomide.com>
+ <E1SKRrh-0004bL-3j@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120420222305.GI21106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King <rmk+kernel@arm.linux.org.uk> [120418 03:14]:
-> Using coherent DMA memory with the OMAP DMA engine results in
-> unpredictable behaviour due to memory ordering issues; as things stand,
-> there is no guarantee that data written to coherent DMA memory will be
-> visible to the DMA hardware.
+* Russell King <rmk+kernel@arm.linux.org.uk> [120418 03:15]:
+> res can be one of several resources, as this variable is re-used several
+> times during probe.  This can cause the wrong resource parameters to be
+> passed to release_mem_region().
 > 
-> This is because the OMAP dma_write() accessor contains no barriers,
-> necessary on ARMv6 and above.  The effect of this can be seen in comments
-> in the OMAP serial driver, which incorrectly talks about cache flushing
-> for the coherent DMA stuff.
-> 
-> Rather than adding barriers to the accessors, add it in the DMA support
-> code just before we enable DMA, and just after we disable DMA.  This
-> avoids having barriers for every DMA register access.
+> Get the original memory resource before calling release_mem_region().
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
