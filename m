@@ -1,47 +1,52 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 20 Apr 2012 23:55:28 +0200
-Subject: [PULL REQUEST] stmp devices
-Message-ID: <20120420215440.GA24875@nekote.pengutronix.de>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 21 Apr 2012 01:04:18 +0300
+Subject: [PATCH] arm: omap: fix trivial warnings for dspbridge
+Message-ID: <1334959458-2873-1-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+arch/arm/plat-omap/devices.c: In function 'omap_dsp_reserve_sdram_memblock':
+arch/arm/plat-omap/devices.c:170: warning: format '%x' expects type 'unsigned int', but argument 3 has type 'phys_addr_t'
+arch/arm/mach-omap2/dsp.c: In function 'omap_dsp_init':
+arch/arm/mach-omap2/dsp.c:60: warning: format '%x' expects type 'unsigned int', but argument 3 has type 'phys_addr_t'
+arch/arm/mach-omap2/dsp.c:60: warning: format '%x' expects type 'unsigned int', but argument 4 has type 'phys_addr_t'
 
-as requested, here is the pull request for the stmp-device-series which
-makes STMP devices mach independent (they are found on mxs and mx6
-currently). I have rebased them to 3.4-rc3 and dropped the rtc-patch,
-since it does not have a maintainer ack. I kept the I2C patch since I do
-maintain I2C myself and there are no conflicts.
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+---
+ arch/arm/mach-omap2/dsp.c    |    5 +++--
+ arch/arm/plat-omap/devices.c |    4 ++--
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-Please pull.
-
-Thanks,
-
-   Wolfram
-
-The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
-
-  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/wsa/linux.git stmp_device
-
-for you to fetch changes up to 6b866c151ad9ea44799b32c3a8c90a03c5b981da:
-
-  i2c: mxs: use global reset function (2012-04-20 23:27:18 +0200)
-
-----------------------------------------------------------------
-Wolfram Sang (2):
-      lib: add support for stmp-style devices
-      i2c: mxs: use global reset function
-
- drivers/i2c/busses/Kconfig   |    1 +
- drivers/i2c/busses/i2c-mxs.c |    9 ++---
- include/linux/stmp_device.h  |   20 +++++++++++
- lib/Kconfig                  |    3 ++
- lib/Makefile                 |    2 ++
- lib/stmp_device.c            |   80 ++++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 108 insertions(+), 7 deletions(-)
- create mode 100644 include/linux/stmp_device.h
- create mode 100644 lib/stmp_device.c
+diff --git a/arch/arm/mach-omap2/dsp.c b/arch/arm/mach-omap2/dsp.c
+index 74f18f2..7665c49 100644
+--- a/arch/arm/mach-omap2/dsp.c
++++ b/arch/arm/mach-omap2/dsp.c
+@@ -57,8 +57,9 @@ static int __init omap_dsp_init(void)
+ 
+ 	if (pdata->phys_mempool_base) {
+ 		pdata->phys_mempool_size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
+-		pr_info("%s: %x bytes @ %x\n", __func__,
+-			pdata->phys_mempool_size, pdata->phys_mempool_base);
++		pr_info("%s: %llu bytes @ %llu\n", __func__,
++			(unsigned long long)pdata->phys_mempool_size,
++			(unsigned long long)pdata->phys_mempool_base);
+ 	}
+ 
+ 	pdev = platform_device_alloc("omap-dsp", -1);
+diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
+index 60278f4..ffccec7 100644
+--- a/arch/arm/plat-omap/devices.c
++++ b/arch/arm/plat-omap/devices.c
+@@ -167,8 +167,8 @@ void __init omap_dsp_reserve_sdram_memblock(void)
+ 
+ 	paddr = arm_memblock_steal(size, SZ_1M);
+ 	if (!paddr) {
+-		pr_err("%s: failed to reserve %x bytes\n",
+-				__func__, size);
++		pr_err("%s: failed to reserve %llu bytes\n",
++				__func__, (unsigned long long)size);
+ 		return;
+ 	}
+ 
+-- 
+1.7.10
