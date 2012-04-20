@@ -1,33 +1,60 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 20 Apr 2012 02:56:50 +0200
-Subject: [PATCH 05/10] MXS: Add platform registration hooks for USB EHCI
-In-Reply-To: <20120420004011.GF22219@S2101-09.ap.freescale.net>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <201204192332.56957.marex@denx.de>
- <20120420004011.GF22219@S2101-09.ap.freescale.net>
-Message-ID: <201204200256.51011.marex@denx.de>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 20 Apr 2012 01:57:00 +0100
+Subject: [PATCHv2] ARM: orion5x: Fix GPIO enable bits for MPP9
+In-Reply-To: <1333858733.7150.115.camel@deadeye>
+References: <1333858733.7150.115.camel@deadeye>
+Message-ID: <1334883420.3209.230.camel@deadeye>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Thu, Apr 19, 2012 at 11:32:56PM +0200, Marek Vasut wrote:
-> > The Device Tree code for MXS is not ripe yet. We still miss a lot in
-> > there. Flipping this usb stuff to DT should be easy, I see no point
-> > disallowing this (and that stands also for the MXS SPI actually) into
-> > kernel so more people can test it only because you'd like this to wait
-> > for who knows how long for the DT support to arrive. Don't take it
-> > personally, but I still believe it's too early to enforce DT on MXS.
+On Sun, 2012-04-08 at 05:18 +0100, Ben Hutchings wrote:
+> Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 ('ARM: orion5x: Refactor
+> mpp code to use common orion platform mpp.') seems to have accidentally
+> inverted the GPIO valid bits for MPP9 (only).  For the mv2120 platform
+> which uses MPP9 as a GPIO LED device, this results in the error:
 > 
-> Let me put it another way.  When you have drivers/usb changes hit
-> mainline, while there is still something not ripe for mxs DT support
-> while stops you adding DT support for usb driver, you have good reason
-> to ask me take the arch/arm/mach-mxs changes in this series then.
+> [   12.711476] leds-gpio: probe of leds-gpio failed with error -22
+> 
+> Reported-by: Henry von Tresckow <hvontres@gmail.com>
 
-Yes, I'm quite aware this stuff might take a bit to get into mainline shape. I 
-grouped this and MXS SPI together, maybe the MXS SPI stuff is a better 
-representation of what I had in mind (about letting non-DT stuff for mxs slide 
-in).
+Tested-by: Hans Henry von Tresckow <hvontres@gmail.com>
 
-Best regards,
-Marek Vasut
+(on the mv2120, and applied to Debian's 3.2 tree)
+
+> References: http://bugs.debian.org/667446
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> Cc: stable at vger.kernel.org [v3.0+]
+> ---
+> v2: Add subject of the earlier commit
+> 
+> Ben.
+> 
+>  arch/arm/mach-orion5x/mpp.h |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
+> index eac6897..db70e79 100644
+> --- a/arch/arm/mach-orion5x/mpp.h
+> +++ b/arch/arm/mach-orion5x/mpp.h
+> @@ -65,8 +65,8 @@
+>  #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
+>  
+>  #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
+> -#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
+> -#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
+> +#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
+> +#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
+>  
+>  #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
+>  #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
+
+-- 
+Ben Hutchings
+This sentence contradicts itself - no actually it doesn't.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120420/945f26f1/attachment.sig>
