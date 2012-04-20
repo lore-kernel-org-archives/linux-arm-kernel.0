@@ -1,59 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Apr 2012 16:10:34 +0100
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <20120419180741.GX21106@atomide.com>
-References: <CANrkHUYvKdBUZh9UmWcE30ywAAiqhN-KcnSAE2T56WJLFPX1gA@mail.gmail.com>
- <20120418194224.GS25053@n2100.arm.linux.org.uk>
- <20120418200214.GP21106@atomide.com>
- <20120418202447.GT25053@n2100.arm.linux.org.uk>
- <20120418210142.GR21106@atomide.com>
- <20120418211606.GU25053@n2100.arm.linux.org.uk>
- <20120418213642.GV25053@n2100.arm.linux.org.uk>
- <20120419013914.GV21106@atomide.com>
- <20120419174332.GY25053@n2100.arm.linux.org.uk>
- <20120419180741.GX21106@atomide.com>
-Message-ID: <20120420151034.GA24205@n2100.arm.linux.org.uk>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 20 Apr 2012 17:13:47 +0200
+Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
+ support
+In-Reply-To: <20120420150607.GB6828@opensource.wolfsonmicro.com>
+References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
+ <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
+ <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
+ <20120420123842.GA25662@avionic-0098.adnet.avionic-design.de>
+ <20120420142558.GB20681@sirena.org.uk>
+ <20120420144942.GA8327@avionic-0098.adnet.avionic-design.de>
+ <20120420150607.GB6828@opensource.wolfsonmicro.com>
+Message-ID: <20120420151345.GA29767@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 11:07:42AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120419 10:46]:
-> > On Wed, Apr 18, 2012 at 06:39:14PM -0700, Tony Lindgren wrote:
-> > > Cool, you almost got it. Got it working for n800 and 770 with the following
-> > > patch. Only extremely light testing done now so careful with this patch too..
-> > > 
-> > > Had to hack in support for the src_port and dst_port that's needed for
-> > > omap_set_dma_src/dest_params on omap1.
-> > 
-> > What's the relationship between these ports and the DMA request signal?
-> > Is there a document which describes this?
+* Mark Brown wrote:
+> On Fri, Apr 20, 2012 at 04:49:43PM +0200, Thierry Reding wrote:
+> > * Mark Brown wrote:
 > 
-> It's the source and destination addresses bus port, so it's more related
-> to the addresses than request signal. I guess routing of the DMA request
-> signal is what it really does.
+> > > This sounds an awful lot like how ASoC hangs together...
 > 
-> I'm now wondering if it might be possible to set it automatically based on
-> source and destination address.
+> > What in particular sounds awful?
 > 
-> There's some information in the omap5912 trm on pages 717 and 718:
-> 
-> http://www.ti.com/litv/pdf/spru742
-> 
-> It says for CSDP source port "This field identifies the port originator of
-> the transfer."
+> Nothing - "an awful" is an English idiom for "very".
 
-Is there a reason not to use EMIFF as for the memory port for any DMA
-activity between a peripheral and system (kernel) memory?
+I know =) But it has a somewhat negative connotation, from which I deduced
+that you somehow thought it wasn't a good solution.
 
-It looks to me like TIPB is the right port to use for anything except
-camera and LCD?
-
-If that's true, we can solve the memory side of the problem very easily -
-we know that prep_slave_sg() will always souce from system memory, so
-the port for that will be known.
-
-For the peripheral side of the transfer, I think we should case this on
-the request signal as the combinations seem to be very limited - and it
-looks like this knowledge is specific to the DMA controller rather than
-the peripheral.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120420/0367c77e/attachment.sig>
