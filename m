@@ -1,29 +1,75 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 Apr 2012 10:08:18 +0800
-Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
-In-Reply-To: <20120419064308.GH3852@pengutronix.de>
-References: <1334620214-25803-1-git-send-email-rob.lee@linaro.org>
- <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
- <20120417074301.GM20478@pengutronix.de>
- <CAMXH7KH41kWMPu_dEpetZc8OUD3C0-mtxGbXX0Vqd4EODPWJUg@mail.gmail.com>
- <20120417174213.GD3852@pengutronix.de>
- <CAMXH7KFYA24sPUcwgKfwVLNPA0jWQ-QG02y+SfPNnAqdiv0+gg@mail.gmail.com>
- <CAMXH7KGgSmvfqUTC1bufBz0QXbt01dHsPo1cbRA9jLj9mGmfjg@mail.gmail.com>
- <20120419064308.GH3852@pengutronix.de>
-Message-ID: <20120420020816.GH22219@S2101-09.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 20 Apr 2012 04:13:56 +0200
+Subject: [RFC PATCH 00/10 V3]  MXS: Add i.MX28 USB Host driver
+In-Reply-To: <1334771194-18688-1-git-send-email-marex@denx.de>
+References: <1334714869-19282-1-git-send-email-marex@denx.de>
+ <1334771194-18688-1-git-send-email-marex@denx.de>
+Message-ID: <201204200413.56909.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 08:43:08AM +0200, Sascha Hauer wrote:
-> > Sascha or Shawn, any further comments on my question?
+> This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
+> generic USB PHY infrastructure.
 > 
-Sorry for the late response, Rob.
-
-> I don't think we need a cpu_is_imx6q(), but having some i.MX6 specific
-> hook at device_initcall time can't be too wrong. Shawn?
+> V2: Introduce stub imx-usb driver that then registers the PHY and EHCI
+> drivers. V3: Add the HCD on demand based on the PHY's state (only add HCD
+> if it's host). Currently, only the HOST mode is supported.
 > 
-Yep, it works for me.
+> Marek Vasut (10):
+>   MXS: Make clk_disable return integer
+>   MXS: Add USB EHCI and USB PHY clock handling
+>   MXS: Fixup i.MX233 USB base address name
+>   MXS: Add data shared between imx-usb and EHCI driver
+>   MXS: Add platform registration hooks for USB EHCI
+>   MXS: Add imx-usb driver
+>   MXS: Add USB PHY driver
+>   MXS: Add separate MXS EHCI HCD driver
+>   MXS: Enable USB on M28EVK
+>   MXS: Enable USB on MX28EVK
+> 
+>  arch/arm/mach-mxs/Kconfig                       |    4 +
+>  arch/arm/mach-mxs/clock-mx28.c                  |   28 ++-
+>  arch/arm/mach-mxs/devices-mx28.h                |    4 +
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-usb.c        |   78 ++++++
+>  arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
+>  arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
+>  arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
+>  arch/arm/mach-mxs/mach-m28evk.c                 |   15 ++
+>  arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
+>  drivers/usb/host/Kconfig                        |    7 +
+>  drivers/usb/host/ehci-hcd.c                     |    5 +
+>  drivers/usb/host/ehci-mxs.c                     |  228 +++++++++++++++++
+>  drivers/usb/otg/Kconfig                         |   16 ++
+>  drivers/usb/otg/Makefile                        |    2 +
+>  drivers/usb/otg/imx-usb.c                       |  226 +++++++++++++++++
+>  drivers/usb/otg/mxs-phy.c                       |  305
+> +++++++++++++++++++++++ include/linux/fsl_devices.h                     | 
+>  10 +
+>  19 files changed, 952 insertions(+), 9 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
+>  create mode 100644 drivers/usb/host/ehci-mxs.c
+>  create mode 100644 drivers/usb/otg/imx-usb.c
+>  create mode 100644 drivers/usb/otg/mxs-phy.c
+> 
+> Cc: Chen Peter-B29397 <B29397@freescale.com>
+> Cc: Detlev Zundel <dzu@denx.de>
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Li Frank-B20596 <B20596@freescale.com>
+> Cc: Lin Tony-B19295 <B19295@freescale.com>
+> Cc: Linux USB <linux-usb@vger.kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> Cc: Subodh Nijsure <snijsure@grid-net.com>
+> Cc: Tony Lin <tony.lin@freescale.com>
+> Cc: Wolfgang Denk <wd@denx.de>
 
--- 
-Regards,
-Shawn
+btw /wrt USB Gadget etc -- how does the drivers/usb/gadget/fsl_udc_core.c and 
+drivers/usb/gadget/ci13xxx_* fit into the big picture? We're gonna use the 
+ci13xxx stuff for Gadget on mx28, correct? Then how does fsl_udc_core.c fit in?
+
+Best regards,
+Marek Vasut
