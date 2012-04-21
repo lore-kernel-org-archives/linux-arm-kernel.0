@@ -1,60 +1,92 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 21 Apr 2012 23:57:18 +0800
-Subject: [PATCH 6/8] ARM: mxs: switch to common clk framework
+Date: Sat, 21 Apr 2012 23:57:20 +0800
+Subject: [PATCH 8/8] ARM: mxs: remove now unused timer_clk argument from
+ mxs_timer_init
 In-Reply-To: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
 References: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335023840-1394-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335023840-1394-9-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It switches mxs clock support to common clk framework based drivers.
+With old mxs clock support removed, the timer_clk argument of
+mxs_timer_init is unused now, so remove it.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/Kconfig           |    1 +
- arch/arm/mach-mxs/Makefile |    5 +----
- drivers/clk/Makefile       |    2 ++
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-mxs/include/mach/common.h |    4 +---
+ arch/arm/mach-mxs/timer.c               |   14 +++++++-------
+ drivers/clk/mxs/clk-imx23.c             |    2 +-
+ drivers/clk/mxs/clk-imx28.c             |    2 +-
+ 4 files changed, 10 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cf006d4..60bdec7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -468,6 +468,7 @@ config ARCH_MXS
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
-+	select COMMON_CLK
- 	select HAVE_CLK_PREPARE
- 	help
- 	  Support for Freescale MXS-based family of processors
-diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index 908bf9a..6ce21a2 100644
---- a/arch/arm/mach-mxs/Makefile
-+++ b/arch/arm/mach-mxs/Makefile
-@@ -1,12 +1,9 @@
- # Common support
--obj-y := clock.o devices.o icoll.o iomux.o system.o timer.o mm.o
-+obj-y := devices.o icoll.o iomux.o system.o timer.o mm.o
+diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+index e1237ab..9bdc953 100644
+--- a/arch/arm/mach-mxs/include/mach/common.h
++++ b/arch/arm/mach-mxs/include/mach/common.h
+@@ -11,11 +11,9 @@
+ #ifndef __MACH_MXS_COMMON_H__
+ #define __MACH_MXS_COMMON_H__
  
- obj-$(CONFIG_MXS_OCOTP) += ocotp.o
- obj-$(CONFIG_PM) += pm.o
- 
--obj-$(CONFIG_SOC_IMX23) += clock-mx23.o
--obj-$(CONFIG_SOC_IMX28) += clock-mx28.o
+-struct clk;
 -
- obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
- obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
- obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 24aa714..4a5bdbc 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -2,3 +2,5 @@
- obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
- obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
- 				   clk-mux.o clk-divider.o clk-fixed-factor.o
+ extern const u32 *mxs_get_ocotp(void);
+ extern int mxs_reset_block(void __iomem *);
+-extern void mxs_timer_init(struct clk *, int);
++extern void mxs_timer_init(int);
+ extern void mxs_restart(char, const char *);
+ extern int mxs_saif_clkmux_select(unsigned int clkmux);
+ 
+diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+index 575e8fd..02d36de 100644
+--- a/arch/arm/mach-mxs/timer.c
++++ b/arch/arm/mach-mxs/timer.c
+@@ -244,14 +244,14 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
+ 	return 0;
+ }
+ 
+-void __init mxs_timer_init(struct clk *timer_clk, int irq)
++void __init mxs_timer_init(int irq)
+ {
+-	if (!timer_clk) {
+-		timer_clk = clk_get_sys("timrot", NULL);
+-		if (IS_ERR(timer_clk)) {
+-			pr_err("%s: failed to get clk\n", __func__);
+-			return;
+-		}
++	struct clk *timer_clk;
 +
-+obj-$(CONFIG_ARCH_MXS)		+= mxs/
++	timer_clk = clk_get_sys("timrot", NULL);
++	if (IS_ERR(timer_clk)) {
++		pr_err("%s: failed to get clk\n", __func__);
++		return;
+ 	}
+ 
+ 	clk_prepare_enable(timer_clk);
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index 6cce512..ef9c3cf 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -189,7 +189,7 @@ int __init mx23_clocks_init(void)
+ 	if (ret)
+ 		return ret;
+ 
+-	mxs_timer_init(NULL, MX23_INT_TIMER0);
++	mxs_timer_init(MX23_INT_TIMER0);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 0837f1d..70108cb 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -312,7 +312,7 @@ int __init mx28_clocks_init(void)
+ 	if (ret)
+ 		return ret;
+ 
+-	mxs_timer_init(NULL, MX28_INT_TIMER0);
++	mxs_timer_init(MX28_INT_TIMER0);
+ 
+ 	return 0;
+ }
 -- 
 1.7.5.4
