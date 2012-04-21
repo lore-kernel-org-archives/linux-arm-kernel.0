@@ -1,27 +1,20 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 21 Apr 2012 14:31:10 +0200
-Subject: [PATCH] Defconfig update for LPC32xx
-In-Reply-To: <201204211146.29929.arnd@arndb.de>
-References: <1335006394-26810-1-git-send-email-stigge@antcom.de>
- <201204211146.29929.arnd@arndb.de>
-Message-ID: <4F92A88E.1000007@antcom.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 21 Apr 2012 13:40:43 +0100
+Subject: [PATCH 03/13] clk: CLK_PREPARE must depend on HAVE_CLK
+In-Reply-To: <ffaffaeeb39c5b7741ee8e616682d51d213fa512.1335008617.git.viresh.kumar@st.com>
+References: <cover.1335008617.git.viresh.kumar@st.com>
+ <ffaffaeeb39c5b7741ee8e616682d51d213fa512.1335008617.git.viresh.kumar@st.com>
+Message-ID: <20120421124043.GG24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Sat, Apr 21, 2012 at 05:17:30PM +0530, Viresh Kumar wrote:
+> CLK_PREPARE must have dependency on HAVE_CLK. Add it.
 
-On 21/04/12 13:46, Arnd Bergmann wrote:
-> I think the latest version of all of your patches is good, but I've
-> lost track of which ones you want to go through arm-soc. Can you send
-> me pull requests for each series you want applied on monday if you get
-> no more comments?
+No - its possible to have HAVE_CLK_PREPARE selected independently of
+HAVE_CLK.  Why do we want to end up having to add conditionals all
+over the place for 'select HAVE_CLK_PREPARE' ?
 
-Yes, I was planning an arm-soc pull request anyway. First concentrating
-on the other subsystem's patches and then providing the arm-soc bits in
-one go. The other subsystem's patches are not merged completely, yet,
-but arm-soc can already merge on monday - pretty stabilized DT
-conversion now.
-
-Thanks,
-
-Roland
+The only time HAVE_CLK_PREPARE gets used is in a header file, where you're
+already making it conditional on HAVE_CLK.  Nothing else should know about
+HAVE_CLK_PREPARE.
