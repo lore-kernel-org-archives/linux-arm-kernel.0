@@ -1,133 +1,45 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 21 Apr 2012 16:03:36 +0200
-Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
-In-Reply-To: <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
-Message-ID: <13629551.hP3ZV1ajDo@vclass>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 21 Apr 2012 16:09:03 +0200
+Subject: [PATCH] arm: at91: fix build-error for board-dt
+In-Reply-To: <20120421114001.GC9142@game.jcrosoft.org>
+References: <1335004105-3162-1-git-send-email-w.sang@pengutronix.de>
+ <20120421114001.GC9142@game.jcrosoft.org>
+Message-ID: <20120421140903.GA6926@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
-> With register offsets now defined for respective OMAP versions we can get rid
-> of cpu_class_* checks. This function now has common initialization code for
-> all OMAP versions...
+On Sat, Apr 21, 2012 at 01:40:01PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:28 Sat 21 Apr     , Wolfram Sang wrote:
+> > From: Wolfram Sang <wolfram@the-dreams.de>
+> > 
+> > When build-testing i2c-patches, I encountered:
+> > 
+> > arch/arm/mach-at91/built-in.o:(.arch.info.init+0x34): undefined reference to `at91sam926x_timer'
+> > 
+> > (using allnoconfig and roughly only MACH_AT91SAM_DT enabled)
+> > 
+> > Since this boardfile doesn't belong to a specific architecture, directly
+> > add the only supported timer to compilation.
+> > 
+> > Signed-off-by: Wolfram Sang <wolfram@the-dreams.de>
+> no this is selected by the soc
 > 
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> I do not want the timer be compiled un condtionally
 
-Sorry for being so late with my comment for chanes already present in 
-mainline, but this patch breaks GPIO on Amstrad Delta at least, and I 
-have neither enough spare time nor enough experience with non OMAP1 
-machines to provide a solution myself.
-
-> ---
->  arch/arm/mach-omap1/gpio16xx.c |   35 +++++++++++++++++-
->  drivers/gpio/gpio-omap.c       |   77 ++++++++++++----------------------------
->  2 files changed, 57 insertions(+), 55 deletions(-)
-...
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index f39d9e4..a948351 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-...
-> @@ -898,62 +896,30 @@ static void __init omap_gpio_show_rev(struct gpio_bank *bank)
->   */
->  static struct lock_class_key gpio_lock_class;
->  
-> -/* TODO: Cleanup cpu_is_* checks */
->  static void omap_gpio_mod_init(struct gpio_bank *bank)
->  {
-> -	if (cpu_class_is_omap2()) {
-> -		if (cpu_is_omap44xx()) {
-> -			__raw_writel(0xffffffff, bank->base +
-> -					OMAP4_GPIO_IRQSTATUSCLR0);
-> -			__raw_writel(0x00000000, bank->base +
-> -					 OMAP4_GPIO_DEBOUNCENABLE);
-> -			/* Initialize interface clk ungated, module enabled */
-> -			__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
-> -		} else if (cpu_is_omap34xx()) {
-> -			__raw_writel(0x00000000, bank->base +
-> -					OMAP24XX_GPIO_IRQENABLE1);
-> -			__raw_writel(0xffffffff, bank->base +
-> -					OMAP24XX_GPIO_IRQSTATUS1);
-> -			__raw_writel(0x00000000, bank->base +
-> -					OMAP24XX_GPIO_DEBOUNCE_EN);
-> -
-> -			/* Initialize interface clk ungated, module enabled */
-> -			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
-> -		}
-> -	} else if (cpu_class_is_omap1()) {
-> -		if (bank_is_mpuio(bank)) {
-> -			__raw_writew(0xffff, bank->base +
-> -				OMAP_MPUIO_GPIO_MASKIT / bank->stride);
-> -			mpuio_init(bank);
-> -		}
-> -		if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
-> -			__raw_writew(0xffff, bank->base
-> -						+ OMAP1510_GPIO_INT_MASK);
-> -			__raw_writew(0x0000, bank->base
-> -						+ OMAP1510_GPIO_INT_STATUS);
-> -		}
-> -		if (cpu_is_omap16xx() && bank->method == METHOD_GPIO_1610) {
-> -			__raw_writew(0x0000, bank->base
-> -						+ OMAP1610_GPIO_IRQENABLE1);
-> -			__raw_writew(0xffff, bank->base
-> -						+ OMAP1610_GPIO_IRQSTATUS1);
-> -			__raw_writew(0x0014, bank->base
-> -						+ OMAP1610_GPIO_SYSCONFIG);
-> +	void __iomem *base = bank->base;
-> +	u32 l = 0xffffffff;
->  
-> -			/*
-> -			 * Enable system clock for GPIO module.
-> -			 * The CAM_CLK_CTRL *is* really the right place.
-> -			 */
-> -			omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
-> -						ULPD_CAM_CLK_CTRL);
-> -		}
-> -		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
-> -			__raw_writel(0xffffffff, bank->base
-> -						+ OMAP7XX_GPIO_INT_MASK);
-> -			__raw_writel(0x00000000, bank->base
-> -						+ OMAP7XX_GPIO_INT_STATUS);
-> -		}
-> +	if (bank->width == 16)
-> +		l = 0xffff;
-> +
-> +	if (bank_is_mpuio(bank)) {
-> +		__raw_writel(l, bank->base + bank->regs->irqenable);
-> +		return;
->  	}
-> +
-> +	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->irqenable_inv);
-> +	_gpio_rmw(base, bank->regs->irqstatus, l,
-> +					bank->regs->irqenable_inv == false);
-> +	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->debounce_en != 0);
-> +	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->ctrl != 0);
-
-bank->regs->irqenable trgister is manipulated 3 times in a row, each 
-time based on different criteria. This breaks GPIO on Amstrad Delta at 
-least, and generally looks wrong. I was only able to verify that 
-commenting out the above two lines fixes the issue with Amstrad Delta for 
-me.
-
-> +	if (bank->regs->debounce_en)
-> +		_gpio_rmw(base, bank->regs->debounce_en, 0, 1);
-
-This also looks suspicious, I guess the second line should rather be:
-
-		_gpio_rmw(base, bank->regs->debounce, 0, 1);
-
-> +
-> +	 /* Initialize interface clk ungated, module enabled */
-> +	if (bank->regs->ctrl)
-> +		_gpio_rmw(base, bank->regs->ctrl, 0, 1);
-
-Is bank->regs->ctrl a flag, or a register offset? If the latter, is that 
-offset guaranteed to never take a valid value of 0?
+Ok, we can discard this patch and see it as a bug report.
+Since you know best what you'd like, would you send a patch?
 
 Thanks,
-Janusz
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120421/6f706c9f/attachment.sig>
