@@ -1,92 +1,79 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 21 Apr 2012 10:17:58 +0200
-Subject: [RFC PATCH 00/10 V3] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <CAL411-oN3RWQXduWVGrQ+FMEpiR+ZhJ1v-rmFnYwj3-0sJQVKw@mail.gmail.com>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <20120420094805.GS20478@pengutronix.de>
- <CAL411-onyB8SJEBoJ2XK=wyHKR0C7SyJtCsoJCDZGatP8HmYZg@mail.gmail.com>
- <201204201444.49184.marex@denx.de>
- <20120420132647.GQ3852@pengutronix.de>
- <20120420163626.GL14876@pengutronix.de>
- <CAL411-oN3RWQXduWVGrQ+FMEpiR+ZhJ1v-rmFnYwj3-0sJQVKw@mail.gmail.com>
-Message-ID: <20120421081758.GT20478@pengutronix.de>
+Date: Sat, 21 Apr 2012 10:18:46 +0200
+Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
+ support
+In-Reply-To: <20120420133314.GF4217@phenom.ffwll.local>
+References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
+ <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
+ <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
+ <20120420131005.GO3852@pengutronix.de>
+ <20120420133314.GF4217@phenom.ffwll.local>
+Message-ID: <20120421081846.GS3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2012 at 03:42:46PM +0800, Peter Chen wrote:
-> >
-> Your guys all consider ci13xxx is better than fsl_udc_core.c, can you
-> list some reasons?
-> Or just because it can compatible with your prefer OTG structure (like
-> msm_otg.c)?
-> From my point, I also admit OTG structure like msm_otg.c is good one
-> and we can
-> follow it at i.mx USB structure.
+On Fri, Apr 20, 2012 at 03:33:14PM +0200, Daniel Vetter wrote:
+> On Fri, Apr 20, 2012 at 03:10:05PM +0200, Sascha Hauer wrote:
+> > (BTW each driver in drm has this layer somewhere in it. If I had hidden
+> > it in imx specific functions I probably wouldn't have raised any
+> > questions, but I don't want to go that way)
 > 
-> >
-> > We also made some tests with some gadget devices. IMHO we had troubles
-> > with gadget_zero and testusb on the fsl_udc_core.c. I think the testusb
-> > results should help to decide which is the most stable implementation.
-> >
-> ci13xxx one is no problem? Have you checked why it failed at fsl_udc_core.c?
-> 
-> >
-> > >
-> > > > Also, ci13xxx and fsl_usb_core is duplicated stuff, correct?
-> > >
-> > > Yes.
-> > >
-> > > >
-> > > > > I will check with IC guys to see if i.mx's controller is compatible
-> > > > > with CI13412.
-> > > > > If fsl's compatible with CI13412, then mxs can try to use ci13xxx_udc.c to
-> > > > > see if there are any problems, If no problems with kinds of testing,
-> > > > > we can switch all i.mx SoC to ci13xxx_udc.c.
-> > > >
-> > > > Sascha, did you need to patch this ci13xxx somehow to get it running on MXS ? Or
-> > > > what was it that said he got it somehow running?
-> > >
-> > > It basically works out of the box. I think we have some patches for this
-> > > driver, maybe michael can comment on this.
-> >
-> > Yes, i have some smaller bugfix patches hanging around. I will send them
-> > to the linux-usb mailinglist until the next week. Additionaly i have
-> > some platform gluecode and a platform-support patch for the driver but you
-> > probably have the same.
-> >
-> > The ci13xxx_udc_driver has a flags element, which has to be set
-> > appropriate to the used platform. On the mx23 for example we only were
-> > able to get all testusb results correct, when the option
-> > CI13XXX_DISABLE_STREAMING was set. In the OTG case the option
-> > CI13XXX_REGS_SHARED is mandatory.
-> 
-> I have checked with IC guys, but they doesn't know something like
-> "CI13412" stands
-> for.
-> Yes, current many ARM SoC use chipidea SoC,  besides,
-> - ci13xxx_udc
-> - fsl_usb_core
-> - langwell_udc
-> marvell and Tegra are also use this. I have no maintain experiences on
-> abstract one IP driver
-> from kinds of SoC venders, if one SoC platform finds problem at
-> ci13xxx_udc core,
-> and submit the patch, it needs to verify at all SoC platforms, it may
-> increase difficulty
-> for review process and maintenance.
+> That's _exactly_ what you should be doing. And once you have more than one
+> driver that works in a similar way, you can extract the common code as
+> helper functions to make life easier.
 
-It's been some time since I last heard this argument...
+I already have three drivers working in a similar way from which I
+posted two. I could easily throw in some more into the pot. Also the
+code is based on the exynos driver, so I think it's suitable for this
+aswell.
 
-Think about it, with this argument you could start writing your own
-kernel, because how can you be sure that a change to the Linux Kernel
-will work on your system?
-You get much more maintainability from several SoCs sharing the same
-code and more people fixing the bugs in your driver. Yes drivers do
-occasionally break because a certain change is incompatible to a
-particular SoC, but the advantages of sharing code outweigh this
-multiple times.
-(I didn't make this up myself, the Linux community *lives* this for many
-years now)
+> 
+> For your case it sounds like a new set of modeset helper functions
+> tailored for the embedded use-case would be good (as Dave Airlie
+> suggested).
+
+One of my problems is that currently drm is based on the assumption that
+there is a single device which offers all needed resources and
+information to form a drm device. On embedded systems this is simply not
+the case, we have our resources all around the SoC. I have physical
+devices which are crtcs, encoders or connectors, but drm does not
+provide a way to glue them together. You can find this aswell in the
+exynos driver if you grep for exynos_drm_subdrv_register. If you follow
+this function you'll see that a good bunch of the driver actually
+handles the management of these subdevices. Do you have a suggestion
+solving the involved code duplication with helper functions?
+
+Also sooner or later it will happen that the same hdmi controller is
+used on two otherwise different SoCs. Currently the driver can't be
+shared between SoCs because each hdmi driver implements exynos or
+nouveau specific callbacks. I guess the answer is to put the common hdmi
+driver code into helper functions and to implement a middle layer in
+each drm driver wishing to use it.
+
+> Adding yet another middle-layer (like sdrm is) that forces
+> drivers to go through it usually ends up in tears. And drm core
+> unfortunately still has too much middle-layer heritage: For an awful lot
+> of setup and teardown issues it's the core of the problme - because
+> drivers can't control when drm sets up and tears down certain things, it's
+> done at the wrong time (for certain drivers at least). Same problem when
+> the abstraction doesn't quite fit.
+> 
+> Helper functions leave the driver in full control of what's going on, and
+> working around hw-specific madness with ease.
+> 
+> https://lwn.net/Articles/336262/ is the canonical reference for why a lot
+> of kernel people are allergic to anything that looks like a middle-layer.
+
+I have read the article when it was featured on LWN. While I agree to
+several things I have my problems with it. Take for example the MMC
+core. A MMC driver mainly has to implement two callbacks, .request and
+.set_ios. Noone has ever asked to get direct access from the driver to
+the underlying block device and eventually pass control to MMC helper
+functions. This makes the MMC core a middle layer sitting between the
+blockdevice and the driver.  With drm instead it's normal that ioctls
+fall straight through to the driver. This leads to such funny things
+that the kernel itself cannot control the device to bring a console on
+the screen without dedicated help from the driver.
 
 Sascha
 
