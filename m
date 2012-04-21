@@ -1,127 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 21 Apr 2012 14:07:08 -0300
-Subject: [PATCH v3] ARM: dts: Add basic support for imx6q-sabresd
-Message-ID: <1335028028-3214-1-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 21 Apr 2012 18:31:23 +0000
+Subject: [PATCH 2/9] SPEAr13xx: Add source files
+In-Reply-To: <CAOh2x=mFk4j3+5-gMG1gbpJ6tPMDz1ArYQyL2=cBGfH+B9eLWw@mail.gmail.com>
+References: <cover.1334942163.git.viresh.kumar@st.com>
+ <201204201815.57556.arnd@arndb.de>
+ <CAOh2x=mFk4j3+5-gMG1gbpJ6tPMDz1ArYQyL2=cBGfH+B9eLWw@mail.gmail.com>
+Message-ID: <201204211831.24158.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic support for imx6q-sabresd.
+On Saturday 21 April 2012, viresh kumar wrote:
+> On 4/20/12, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Add SDHC2 and SDHC3 support
+> > I'd like to see this done differently, with a ahci_spear driver derived from
+> > ahci_platform that provides these functions in a modular driver that
+> > registers
+> > to a spear specific identifier string and is able to do the platform
+> > specific
+> > based on information it can find in the device tree. That would however
+> > require
+> > changes to the existing ahci_platform code and I'd first like to hear what
+> > Jeff and others have to say about this.
+> 
+> To get platform data for ahci with DT, we need to do as mentioned by you.
+> But for now maybe we can accept this approach. Once somebody fix ahci
+> DT support as you suggested, we could create such drivers.
 
-Changes since v1:
+Ok, fair enough. Right now we have only four platforms using this (davinci,
+exynos, imx and now spear), but the code is still fairly well isolated.
 
-- Added entry into Documentation
-- Added entry in arch/arm/mach-imx/Makefile.boot
-- Fixed ethernet
-- Dropped SDHC for now
- Documentation/devicetree/bindings/arm/fsl.txt |    4 ++
- arch/arm/boot/dts/imx6q-sabresd.dts           |   54 +++++++++++++++++++++++++
- arch/arm/mach-imx/Makefile.boot               |    3 +-
- arch/arm/mach-imx/mach-imx6q.c                |    1 +
- 4 files changed, 61 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6q-sabresd.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index fecb580..0fc2da7 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -33,6 +33,10 @@ i.MX6 Quad SABRE Lite Board
- Required root node properties:
-     - compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
- 
-+i.MX6 Quad SABRE Smart Device Board
-+Required root node properties:
-+    - compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
-+
- Generic i.MX boards
- -------------------
- 
-diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-new file mode 100644
-index 0000000..93d1e17
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-@@ -0,0 +1,54 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx6q.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6Q SABRE Smart Device Board";
-+	compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	soc {
-+
-+		aips-bus at 02000000 { /* AIPS1 */
-+			spba-bus at 02000000 {
-+				uart1: uart at 02020000 {
-+				status = "okay";
-+				};
-+			};
-+		};
-+
-+		aips-bus at 02100000 { /* AIPS2 */
-+			enet at 02188000 {
-+				phy-mode = "rgmii";
-+				status = "okay";
-+			};
-+
-+			usdhc at 02194000 { /* uSDHC2 */
-+				cd-gpios = <&gpio2 2 0>;
-+				wp-gpios = <&gpio2 3 0>;
-+				status = "okay";
-+			};
-+
-+			usdhc at 02198000 { /* uSDHC3 */
-+				cd-gpios = <&gpio2 0 0>;
-+				wp-gpios = <&gpio2 1 0>;
-+				status = "okay";
-+			};
-+
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-index 3851d8a..05541cf 100644
---- a/arch/arm/mach-imx/Makefile.boot
-+++ b/arch/arm/mach-imx/Makefile.boot
-@@ -42,4 +42,5 @@ dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb
- dtb-$(CONFIG_MACH_IMX53_DT) += imx53-ard.dtb imx53-evk.dtb \
- 			       imx53-qsb.dtb imx53-smd.dtb
- dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-arm2.dtb \
--			   imx6q-sabrelite.dtb
-+			   imx6q-sabrelite.dtb \
-+			   imx6q-sabresd.dtb \
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index da6c1d9..512c18d 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -132,6 +132,7 @@ static struct sys_timer imx6q_timer = {
- static const char *imx6q_dt_compat[] __initdata = {
- 	"fsl,imx6q-arm2",
- 	"fsl,imx6q-sabrelite",
-+	"fsl,imx6q-sabresd",
- 	"fsl,imx6q",
- 	NULL,
- };
--- 
-1.7.1
+	Arnd
