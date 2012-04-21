@@ -1,63 +1,101 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 21 Apr 2012 13:11:22 +0400
-Subject: [PATCH 09/17] ARM clps711x: Using a single definition for physical
- address register
+Date: Sat, 21 Apr 2012 13:11:16 +0400
+Subject: [PATCH 03/17] ARM clps711x: Selecting CPU-variant automatically for
+ clps711x targets
 In-Reply-To: <1334999490-27177-1-git-send-email-shc_work@mail.ru>
 References: <1334999490-27177-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1334999490-27177-10-git-send-email-shc_work@mail.ru>
+Message-ID: <1334999490-27177-4-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using a single definition for the physical address register for all
-variants boards clps711x.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/include/asm/hardware/ep7211.h         |    2 --
- arch/arm/include/asm/hardware/ep7212.h         |    2 --
- arch/arm/mach-clps711x/include/mach/hardware.h |    4 ----
- 3 files changed, 0 insertions(+), 8 deletions(-)
+ arch/arm/mach-clps711x/Kconfig |   33 ++++++++++++++++-----------------
+ 1 files changed, 16 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/ep7211.h b/arch/arm/include/asm/hardware/ep7211.h
-index 0b09e38..4b3f86b 100644
---- a/arch/arm/include/asm/hardware/ep7211.h
-+++ b/arch/arm/include/asm/hardware/ep7211.h
-@@ -23,8 +23,6 @@
- #ifndef __ASM_HARDWARE_EP7211_H
- #define __ASM_HARDWARE_EP7211_H
+diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
+index f86aec1..28ac4d6 100644
+--- a/arch/arm/mach-clps711x/Kconfig
++++ b/arch/arm/mach-clps711x/Kconfig
+@@ -2,14 +2,25 @@ if ARCH_CLPS711X
  
--#define EP7211_PHYS_BASE	(0x80000000)
--
- /*
-  * XXX miket at bluemug.com: need to introduce EP7211 registers (those not
-  * present in 7212) here.
-diff --git a/arch/arm/include/asm/hardware/ep7212.h b/arch/arm/include/asm/hardware/ep7212.h
-index 2672291..aad07f7 100644
---- a/arch/arm/include/asm/hardware/ep7212.h
-+++ b/arch/arm/include/asm/hardware/ep7212.h
-@@ -23,8 +23,6 @@
- #ifndef __ASM_HARDWARE_EP7212_H
- #define __ASM_HARDWARE_EP7212_H
+ menu "CLPS711X/EP721X/EP731X Implementations"
  
--#define EP7212_PHYS_BASE	(0x80000000)
--
- /*
-  * These registers are specific to the EP7212 only
-  */
-diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
-index fa9b8f2..50d68c2 100644
---- a/arch/arm/mach-clps711x/include/mach/hardware.h
-+++ b/arch/arm/mach-clps711x/include/mach/hardware.h
-@@ -73,10 +73,6 @@
- #if defined (CONFIG_ARCH_CDB89712)
++config SOC_EP7211
++	bool
++
++config SOC_EP7212
++	bool
++
++config SOC_EP7312
++	bool
++
+ config ARCH_AUTCPU12
+ 	bool "AUTCPU12"
++	select SOC_EP7212
+ 	help
+ 	  Say Y if you intend to run the kernel on the autronix autcpu12
+ 	  board. This board is based on a Cirrus Logic CS89712.
  
- /* static cdb89712_map_io() areas */
--#define REGISTER_START   0x80000000
--#define REGISTER_SIZE    0x4000
--#define REGISTER_BASE    0xff000000
+ config ARCH_CDB89712
+ 	bool "CDB89712"
++	select SOC_EP7212
+ 	select ISA
+ 	help
+ 	  This is an evaluation board from Cirrus for the CS89712 processor.
+@@ -18,17 +29,20 @@ config ARCH_CDB89712
+ 
+ config ARCH_CEIVA
+ 	bool "CEIVA"
++	select SOC_EP7212
+ 	help
+ 	  Say Y here if you intend to run this kernel on the Ceiva/Polaroid
+ 	  PhotoMax Digital Picture Frame.
+ 
+ config ARCH_CLEP7312
+ 	bool "CLEP7312"
++	select SOC_EP7312
+ 	help
+ 	  Boards based on the Cirrus Logic 7212/7312 chips.
+ 
+ config ARCH_EDB7211
+ 	bool "EDB7211"
++	select SOC_EP7211
+ 	select ISA
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select ARCH_SELECT_MEMORY_MODEL
+@@ -38,29 +52,14 @@ config ARCH_EDB7211
+ 
+ config ARCH_P720T
+ 	bool "P720T"
++	select SOC_EP7212
+ 	help
+ 	  Say Y here if you intend to run this kernel on the ARM Prospector
+ 	  720T.
+ 
+ config ARCH_FORTUNET
+ 	bool "FORTUNET"
 -
- #define ETHER_START      0x20000000
- #define ETHER_SIZE       0x1000
- #define ETHER_BASE       0xfe000000
+-# XXX Maybe these should indicate register compatibility
+-# instead of being mutually exclusive.
+-config SOC_EP7211
+-	bool
+-	depends on ARCH_EDB7211
+-	default y
+-
+-config SOC_EP7212
+-	bool
+-	depends on ARCH_P720T || ARCH_CEIVA
+-	default y
+-
+-config SOC_EP7312
+-	bool
+-	depends on ARCH_FORTUNET
+-	default y
++	select SOC_EP7312
+ 
+ config EP72XX_ROM_BOOT
+ 	bool "EP72xx ROM boot"
 -- 
 1.7.3.4
