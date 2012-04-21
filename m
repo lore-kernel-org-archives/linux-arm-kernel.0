@@ -1,44 +1,44 @@
-From: viresh.linux@gmail.com (Viresh Kumar)
-Date: Sat, 21 Apr 2012 17:17:40 +0530
-Subject: [PATCH 13/13] usb/musb: Remove conditional compilation of clk code
-In-Reply-To: <cover.1335008617.git.viresh.kumar@st.com>
-References: <cover.1335008617.git.viresh.kumar@st.com>
-Message-ID: <7cddce64df9197eeb398ad49353fc6d718f5818c.1335008617.git.viresh.kumar@st.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sat, 21 Apr 2012 16:04:02 +0400
+Subject: =?UTF-8?B?UmVbMl06IGNscHM3MTF4IHBhdGNoc2V0?=
+In-Reply-To: <201204211140.21564.arnd@arndb.de>
+References: <1334999490-27177-1-git-send-email-shc_work@mail.ru>
+ <201204211140.21564.arnd@arndb.de>
+Message-ID: <E1SLZ2o-0002iH-SH.shc_work-mail-ru@f105.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
-there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
-macros.
+Sat, 21 Apr 2012 11:40:21 +0000 ?? Arnd Bergmann <arnd@arndb.de>:
+> On Saturday 21 April 2012, Alexander Shiyan wrote:
+> > Hello.
+> > This is patchset contains some cleanups and tricks for CLPS711X ARM target.
+> > Please review and apply it to kernel tree. Comments are welcome :)
+...
+> This looks very nice overall, it's certainly good that you can manage to add
+> support for a new soc with a net removal of lines.
+> 
+> Note that with the current work split, it will be Olof and me who apply
+> these patches in the end, not Russell, although he will probably have
+> to something to say about the patches, too, since he has done almost all the
+> changes to this platform in its more active times.
+> 
+> From my reading of the git history, very little has happened in clps711x
+> since about 2005, and we've never had a subarch maintainer for it. Are you
+> interested in becoming the maintainer for it, or is this more a one-time
+> effort on your side? I don't expect this to be much work for you, but it
+> would be nice to have some person that can review the occasional patch
+> touching multiple platforms.
+> 
+> Do you have any plans to add more stuff to the platform, like additional
+> SoCs or more board files? Do you see value in having it included in
+> a single kernel image that runs on various different ARMv4/ARMv5 based
+> Socs? I assume that the answer to all of these is 'no', but you plan
+> to do them, we should talk about how to make that happen.
 
-musb also has these dummy macros defined locally. Remove them as they aren't
-required anymore.
+The new processors in this series as far as I know there is not and no more will be.
+Existing processors are still produced and used. We use this processor is 4-5 years
+old and still expect to use in the future.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
----
- drivers/usb/musb/musb_core.h |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+I can look at the new code is correct, but check it can only work on our custom board.
 
-diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
-index 93de517..371a3a5 100644
---- a/drivers/usb/musb/musb_core.h
-+++ b/drivers/usb/musb/musb_core.h
-@@ -81,14 +81,6 @@ struct musb_ep;
- #define is_peripheral_active(m)		(!(m)->is_host)
- #define is_host_active(m)		((m)->is_host)
- 
--#ifndef CONFIG_HAVE_CLK
--/* Dummy stub for clk framework */
--#define clk_get(dev, id)	NULL
--#define clk_put(clock)		do {} while (0)
--#define clk_enable(clock)	do {} while (0)
--#define clk_disable(clock)	do {} while (0)
--#endif
--
- #ifdef CONFIG_PROC_FS
- #include <linux/fs.h>
- #define MUSB_CONFIG_PROC_FS
--- 
-1.7.9
+Of the new things I would like to add the ability to use gpiolib with this type of processor.
