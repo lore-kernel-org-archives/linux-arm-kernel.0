@@ -1,91 +1,54 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 21 Apr 2012 17:37:49 +0200
-Subject: [RFC PATCH 00/10 V3]  MXS: Add i.MX28 USB Host driver
-In-Reply-To: <4F92BBD6.6090301@grid-net.com>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <1334771194-18688-1-git-send-email-marex@denx.de>
- <4F92BBD6.6090301@grid-net.com>
-Message-ID: <201204211737.49974.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 21 Apr 2012 23:57:12 +0800
+Subject: [PATCH 0/8] common clk support for mxs
+Message-ID: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Subodh Nijsure,
+The mxs clock porting to common clk framework has been ready for a
+while.  I was planning to post it after Mike's -next branch is
+published.  Since the ETA of the branch is still uncertain while the
+series needs to take some time to go through the review process, I
+can not hold it for any longer, so here it is.
 
-> On 04/18/2012 10:46 AM, Marek Vasut wrote:
-> > This patchset introduces the USB Host driver for i.MX28 CPU, utilising
-> > the generic USB PHY infrastructure.
-> > 
-> > V2: Introduce stub imx-usb driver that then registers the PHY and EHCI
-> > drivers. V3: Add the HCD on demand based on the PHY's state (only add
-> > HCD if it's host).
-> > 
-> >      Currently, only the HOST mode is supported.
-> > 
-> > Marek Vasut (10):
-> >    MXS: Make clk_disable return integer
-> >    MXS: Add USB EHCI and USB PHY clock handling
-> >    MXS: Fixup i.MX233 USB base address name
-> >    MXS: Add data shared between imx-usb and EHCI driver
-> >    MXS: Add platform registration hooks for USB EHCI
-> >    MXS: Add imx-usb driver
-> >    MXS: Add USB PHY driver
-> >    MXS: Add separate MXS EHCI HCD driver
-> >    MXS: Enable USB on M28EVK
-> >    MXS: Enable USB on MX28EVK
-> >   
-> >   arch/arm/mach-mxs/Kconfig                       |    4 +
-> >   arch/arm/mach-mxs/clock-mx28.c                  |   28 ++-
-> >   arch/arm/mach-mxs/devices-mx28.h                |    4 +
-> >   arch/arm/mach-mxs/devices/Kconfig               |    3 +
-> >   arch/arm/mach-mxs/devices/Makefile              |    1 +
-> >   arch/arm/mach-mxs/devices/platform-usb.c        |   78 ++++++
-> >   arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
-> >   arch/arm/mach-mxs/include/mach/devices-common.h |    9 +
-> >   arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
-> >   arch/arm/mach-mxs/mach-m28evk.c                 |   15 ++
-> >   arch/arm/mach-mxs/mach-mx28evk.c                |   10 +
-> >   drivers/usb/host/Kconfig                        |    7 +
-> >   drivers/usb/host/ehci-hcd.c                     |    5 +
-> >   drivers/usb/host/ehci-mxs.c                     |  228
-> >   +++++++++++++++++ drivers/usb/otg/Kconfig                         |  
-> >   16 ++
-> >   drivers/usb/otg/Makefile                        |    2 +
-> >   drivers/usb/otg/imx-usb.c                       |  226
-> >   +++++++++++++++++ drivers/usb/otg/mxs-phy.c                       | 
-> >   305 +++++++++++++++++++++++ include/linux/fsl_devices.h               
-> >        |   10 +
-> >   19 files changed, 952 insertions(+), 9 deletions(-)
-> >   create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
-> >   create mode 100644 drivers/usb/host/ehci-mxs.c
-> >   create mode 100644 drivers/usb/otg/imx-usb.c
-> >   create mode 100644 drivers/usb/otg/mxs-phy.c
-> > 
-> > Cc: Chen Peter-B29397<B29397@freescale.com>
-> > Cc: Detlev Zundel<dzu@denx.de>
-> > Cc: Fabio Estevam<festevam@gmail.com>
-> > Cc: Li Frank-B20596<B20596@freescale.com>
-> > Cc: Lin Tony-B19295<B19295@freescale.com>
-> > Cc: Linux USB<linux-usb@vger.kernel.org>
-> > Cc: Sascha Hauer<s.hauer@pengutronix.de>
-> > Cc: Shawn Guo<shawn.guo@freescale.com>
-> > Cc: Shawn Guo<shawn.guo@linaro.org>
-> > Cc: Stefano Babic<sbabic@denx.de>
-> > Cc: Subodh Nijsure<snijsure@grid-net.com>
-> > Cc: Tony Lin<tony.lin@freescale.com>
-> > Cc: Wolfgang Denk<wd@denx.de>
-> 
-> Tested this (v3) patch set on a MX28 based hardware that I have access
-> to, and things worked as expected.
-> 
-> Tested-by:  Subodh Nijsure <snijsure@grid-net.com>
+It's based on v3.4-rc3 plus various fixup/cleanup patches that Mike
+confirmed pick-up on his -next branch and the clkdev one below.
 
-Thank you for your testing. Today, I was enlightened by some USB celestial being 
-I guess ...  I finally got the UDC working and I see the whole big picture of 
-how to implement this thing altogether :-) Expect V4 with some reworks, esp. 
-about IRQ handling etc.
+  CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
 
-> 
-> -Subodh
+The series originally kept the code in arch/arm/mach-mxs.  With Arnd's
+comment taken, I reworked it a bit to put it into drivers/clk/mxs in
+the same way that spear clock moves.
 
-Best regards,
-Marek Vasut
+Shawn Guo (8):
+      clk: mxs: add mxs specific clocks
+      clk: mxs: add clock support for imx23
+      clk: mxs: add clock support for imx28
+      ARM: mxs: request clock for timer
+      ARM: mxs: change the lookup name for fec phy clock
+      ARM: mxs: switch to common clk framework
+      ARM: mxs: remove old clock support
+      ARM: mxs: remove now unused timer_clk argument from mxs_timer_init
+
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-mxs/Makefile              |    5 +-
+ arch/arm/mach-mxs/clock-mx23.c          |  536 ---------------------
+ arch/arm/mach-mxs/clock-mx28.c          |  803 -------------------------------
+ arch/arm/mach-mxs/clock.c               |  211 --------
+ arch/arm/mach-mxs/include/mach/clock.h  |   62 ---
+ arch/arm/mach-mxs/include/mach/common.h |    6 +-
+ arch/arm/mach-mxs/mach-mx28evk.c        |    2 +-
+ arch/arm/mach-mxs/regs-clkctrl-mx23.h   |  331 -------------
+ arch/arm/mach-mxs/regs-clkctrl-mx28.h   |  486 -------------------
+ arch/arm/mach-mxs/system.c              |   16 -
+ arch/arm/mach-mxs/timer.c               |   11 +-
+ drivers/clk/Makefile                    |    2 +
+ drivers/clk/mxs/Makefile                |    8 +
+ drivers/clk/mxs/clk-div.c               |  102 ++++
+ drivers/clk/mxs/clk-frac.c              |  127 +++++
+ drivers/clk/mxs/clk-imx23.c             |  195 ++++++++
+ drivers/clk/mxs/clk-imx28.c             |  318 ++++++++++++
+ drivers/clk/mxs/clk-pll.c               |  123 +++++
+ drivers/clk/mxs/clk-ref.c               |  139 ++++++
+ drivers/clk/mxs/clk.h                   |   95 ++++
+ 21 files changed, 1123 insertions(+), 2456 deletions(-)
