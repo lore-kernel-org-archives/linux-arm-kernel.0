@@ -1,32 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 21 Apr 2012 18:31:23 +0000
-Subject: [PATCH 2/9] SPEAr13xx: Add source files
-In-Reply-To: <CAOh2x=mFk4j3+5-gMG1gbpJ6tPMDz1ArYQyL2=cBGfH+B9eLWw@mail.gmail.com>
+Date: Sat, 21 Apr 2012 18:37:34 +0000
+Subject: [PATCH 1/9] SPEAr13xx: Add header files
+In-Reply-To: <CAOh2x=ncefojSYBPUVgL1EKcQ+wPFzfCmo+TZ+3BEmwD+=Q=Gg@mail.gmail.com>
 References: <cover.1334942163.git.viresh.kumar@st.com>
- <201204201815.57556.arnd@arndb.de>
- <CAOh2x=mFk4j3+5-gMG1gbpJ6tPMDz1ArYQyL2=cBGfH+B9eLWw@mail.gmail.com>
-Message-ID: <201204211831.24158.arnd@arndb.de>
+ <201204201752.05657.arnd@arndb.de>
+ <CAOh2x=ncefojSYBPUVgL1EKcQ+wPFzfCmo+TZ+3BEmwD+=Q=Gg@mail.gmail.com>
+Message-ID: <201204211837.35023.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Saturday 21 April 2012, viresh kumar wrote:
 > On 4/20/12, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> > I'd like to see this done differently, with a ahci_spear driver derived from
-> > ahci_platform that provides these functions in a modular driver that
-> > registers
-> > to a spear specific identifier string and is able to do the platform
-> > specific
-> > based on information it can find in the device tree. That would however
-> > require
-> > changes to the existing ahci_platform code and I'd first like to hear what
-> > Jeff and others have to say about this.
+> > On Friday 20 April 2012, Viresh Kumar wrote:
+> >> +/* RAS Area Control Register */
+> >> +#define SPEAR1310_RAS_CTRL_REG0			(VA_SPEAR1310_RAS_BASE + 0x000)
+> >> +	#define SPEAR1310_GPT64_SYNC_ENB		0
+> >> +	#define SPEAR1310_GPT64_SYNC_ENB_MASK		1
+> >> +	#define SPEAR1310_GPT64_SYNC_ENB_SHIFT		31
+> >> +	#define SPEAR1310_SSP1_CS_SEL_CS0		0
+> >> +	#define SPEAR1310_SSP1_CS_SEL_CS1		1
+> >> +	#define SPEAR1310_SSP1_CS_SEL_MASK		3
+> >> +	#define SPEAR1310_SSP1_CS_SEL_SHIFT		30
+> >> +	#define SPEAR1310_SSP1_CS_VAL_MASK		1
+> >> +	#define SPEAR1310_SSP1_CS_VAL_SHIFT		28
+> >> +	#define SPEAR1310_SSP1_CS_CTL_HW		0
+> >> +	#define SPEAR1310_SSP1_CS_CTL_SW		1
+> >
+> > Why are the RAS control registers in a global header? It looks like you
+> > only use them from the clock driver, so they can be moved into a local
+> > header file there.
 > 
-> To get platform data for ahci with DT, we need to do as mentioned by you.
-> But for now maybe we can accept this approach. Once somebody fix ahci
-> DT support as you suggested, we could create such drivers.
+> Actually registers serves many different features. Clock, software controlled
+> chip selects for spi, etc. So really can't move to clock drivers.
+> 
+> I didn't wanted half part of a register in one file and other half in other.
+> So kept them here, so that these are accessible from all users.
 
-Ok, fair enough. Right now we have only four platforms using this (davinci,
-exynos, imx and now spear), but the code is still fairly well isolated.
+It's still really ugly to have that in a global header file, including the
+hardcoded register addresses.
+
+What I'd suggest you do instead here is export a function to access the
+registers from device drivers and add a new header file that contains
+only this interface, the register offsets and the register definitions.
+Then you can use proper of_iomap calls to get the area from the device
+tree in the machine init code and it will be clear which drivers use the
+interface because they have to explicitly include that header.
 
 	Arnd
