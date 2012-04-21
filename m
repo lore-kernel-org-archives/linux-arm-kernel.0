@@ -1,74 +1,48 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 21 Apr 2012 13:11:26 +0400
-Subject: [PATCH 13/17] ARM clps711x: Removed unused header mach/time.h
+Date: Sat, 21 Apr 2012 13:11:27 +0400
+Subject: [PATCH 14/17] ARM clps711x: Do not mask interrupts in ack procedure
 In-Reply-To: <1334999490-27177-1-git-send-email-shc_work@mail.ru>
 References: <1334999490-27177-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1334999490-27177-14-git-send-email-shc_work@mail.ru>
+Message-ID: <1334999490-27177-15-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All functions from this header already provided by common.c
+We have separate intX_mask procedure for it.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/include/mach/time.h |   49 ----------------------------
- 1 files changed, 0 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/include/mach/time.h
+ arch/arm/mach-clps711x/common.c |   12 ------------
+ 1 files changed, 0 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/include/mach/time.h b/arch/arm/mach-clps711x/include/mach/time.h
-deleted file mode 100644
-index 5f65865..0000000
---- a/arch/arm/mach-clps711x/include/mach/time.h
-+++ /dev/null
-@@ -1,49 +0,0 @@
--/*
-- *  arch/arm/mach-clps711x/include/mach/time.h
-- *
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#include <asm/leds.h>
--#include <mach/hardware.h>
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 3b6e6b8..b19fa92 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -66,12 +66,6 @@ static void int1_mask(struct irq_data *d)
+ 
+ static void int1_ack(struct irq_data *d)
+ {
+-	u32 intmr1;
 -
--extern void clps711x_setup_timer(void);
+-	intmr1 = clps_readl(INTMR1);
+-	intmr1 &= ~(1 << d->irq);
+-	clps_writel(intmr1, INTMR1);
 -
--/*
-- * IRQ handler for the timer
-- */
--static irqreturn_t
--p720t_timer_interrupt(int irq, void *dev_id)
--{
--	struct pt_regs *regs = get_irq_regs();
--	do_leds();
--	xtime_update(1);
--#ifndef CONFIG_SMP
--	update_process_times(user_mode(regs));
--#endif
--	do_profile(regs);
--	return IRQ_HANDLED;
--}
+ 	switch (d->irq) {
+ 	case IRQ_CSINT:  clps_writel(0, COEOI);  break;
+ 	case IRQ_TC1OI:  clps_writel(0, TC1EOI); break;
+@@ -108,12 +102,6 @@ static void int2_mask(struct irq_data *d)
+ 
+ static void int2_ack(struct irq_data *d)
+ {
+-	u32 intmr2;
 -
--/*
-- * Set up timer interrupt, and return the current time in seconds.
-- */
--void __init time_init(void)
--{
--	clps711x_setup_timer();
--	timer_irq.handler = p720t_timer_interrupt;
--	setup_irq(IRQ_TC2OI, &timer_irq);
--}
+-	intmr2 = clps_readl(INTMR2);
+-	intmr2 &= ~(1 << (d->irq - 16));
+-	clps_writel(intmr2, INTMR2);
+-
+ 	switch (d->irq) {
+ 	case IRQ_KBDINT: clps_writel(0, KBDEOI); break;
+ 	}
 -- 
 1.7.3.4
