@@ -1,39 +1,132 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 21 Apr 2012 14:50:54 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxMi8xN10gQVJNIGNscHM3MTF4OiBTaW1wbGUgb3B0?=
- =?UTF-8?B?aW1pc2UgZGVidWdfbWFjcm8gYnkgcmVtb3Zpbmcgb25lIE5PUA==?=
-In-Reply-To: <20120421104627.GD24211@n2100.arm.linux.org.uk>
-References: <1334999490-27177-1-git-send-email-shc_work@mail.ru>
- <1334999490-27177-13-git-send-email-shc_work@mail.ru>
- <20120421104627.GD24211@n2100.arm.linux.org.uk>
-Message-ID: <E1SLXu2-0004zV-VD.shc_work-mail-ru@f280.mail.ru>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 21 Apr 2012 13:06:34 +0200
+Subject: [PATCH] Defconfig update for LPC32xx
+Message-ID: <1335006394-26810-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sat, 21 Apr 2012 11:46:27 +0100 ?? Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sat, Apr 21, 2012 at 01:11:25PM +0400, Alexander Shiyan wrote:
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/mach-clps711x/include/mach/debug-macro.S |    6 ++----
-> >  1 files changed, 2 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-clps711x/include/mach/debug-macro.S b/arch/arm/mach-clps711x/include/mach/debug-macro.S
-> > index 118b3d9..37c4d8a 100644
-> > --- a/arch/arm/mach-clps711x/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-clps711x/include/mach/debug-macro.S
-> > @@ -14,10 +14,8 @@
-> >  #include <mach/hardware.h>
-> >  
-> >  		.macro	addruart, rp, rv, tmp
-> > -#ifndef CONFIG_DEBUG_CLPS711X_UART2
-> > -		mov	\rp, #0x0000	@ UART1
-> > -#else
-> > -		mov	\rp, #0x1000	@ UART2
-> > +#ifdef CONFIG_DEBUG_CLPS711X_UART2
-> > +		mov	\rp, #0x1000	@ Add offset for UART2 base reg
-> >  #endif
-> 
-> This looks wrong.  How is rp initialized if CONFIG_DEBUG_CLPS711X_UART2 is
-> not set?
-You are right. My mistake.
+This patch updates the defconfig for the LPC32xx SoC after device tree
+conversion:
+
+* Adjustment to DT conversion, added new driver support
+* Added IPv6
+* Increased kernel log buffer
+
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+
+---
+ arch/arm/configs/lpc32xx_defconfig |   44 +++++++++++++++++++++++++++++++------
+ 1 file changed, 38 insertions(+), 6 deletions(-)
+
+--- linux-2.6.orig/arch/arm/configs/lpc32xx_defconfig
++++ linux-2.6/arch/arm/configs/lpc32xx_defconfig
+@@ -2,7 +2,7 @@ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+-CONFIG_LOG_BUF_SHIFT=14
++CONFIG_LOG_BUF_SHIFT=16
+ CONFIG_SYSFS_DEPRECATED=y
+ CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_BLK_DEV_INITRD=y
+@@ -10,6 +10,7 @@ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_SYSCTL_SYSCALL=y
+ CONFIG_EMBEDDED=y
+ CONFIG_SLAB=y
++CONFIG_JUMP_LABEL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+@@ -21,6 +22,8 @@ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
+ CONFIG_CPU_IDLE=y
+ CONFIG_FPE_NWFPE=y
+@@ -40,7 +43,8 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_INET_XFRM_MODE_BEET is not set
+ # CONFIG_INET_LRO is not set
+ # CONFIG_INET_DIAG is not set
+-# CONFIG_IPV6 is not set
++CONFIG_IPV6=y
++CONFIG_IPV6_PRIVACY=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ # CONFIG_FW_LOADER is not set
+@@ -55,13 +59,24 @@ CONFIG_BLK_DEV_CRYPTOLOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=1
+ CONFIG_BLK_DEV_RAM_SIZE=16384
+-CONFIG_MISC_DEVICES=y
+ CONFIG_EEPROM_AT25=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_MII=y
+-CONFIG_PHYLIB=y
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CHELSIO is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++CONFIG_LPC_ENET=y
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
+ CONFIG_SMSC_PHY=y
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+@@ -97,16 +112,22 @@ CONFIG_SND_SEQUENCER=y
+ CONFIG_SND_MIXER_OSS=y
+ CONFIG_SND_PCM_OSS=y
+ CONFIG_SND_SEQUENCER_OSS=y
+-CONFIG_SND_DYNAMIC_MINORS=y
++# CONFIG_SND_SUPPORT_OLD_API is not set
+ # CONFIG_SND_VERBOSE_PROCFS is not set
++CONFIG_SND_DEBUG=y
++CONFIG_SND_DEBUG_VERBOSE=y
+ # CONFIG_SND_DRIVERS is not set
+ # CONFIG_SND_ARM is not set
+ # CONFIG_SND_SPI is not set
+ CONFIG_SND_SOC=y
+ # CONFIG_HID_SUPPORT is not set
+ CONFIG_USB=y
++CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_STORAGE=y
+-CONFIG_USB_LIBUSUAL=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_LPC32XX=y
++CONFIG_USB_MASS_STORAGE=m
++CONFIG_USB_G_SERIAL=m
+ CONFIG_MMC=y
+ # CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_ARMMMCI=y
+@@ -114,10 +135,21 @@ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_BACKLIGHT=y
++CONFIG_LEDS_TRIGGER_GPIO=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
++CONFIG_RTC_DRV_DS1374=y
++CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_LPC32XX=y
++CONFIG_DMADEVICES=y
++CONFIG_AMBA_PL08X=y
++CONFIG_STAGING=y
++CONFIG_IIO=y
++CONFIG_LPC32XX_ADC=y
+ CONFIG_EXT2_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
