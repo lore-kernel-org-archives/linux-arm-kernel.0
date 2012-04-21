@@ -1,84 +1,173 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 21 Apr 2012 10:18:46 +0200
-Subject: [PATCH 3/7] DRM: add sdrm layer for general embedded system
- support
-In-Reply-To: <20120420133314.GF4217@phenom.ffwll.local>
-References: <1334158428-23735-1-git-send-email-s.hauer@pengutronix.de>
- <1334158428-23735-4-git-send-email-s.hauer@pengutronix.de>
- <CAPM=9twdGXNU7kkOnx2GCmofE3KSohdeyuT1dVhvVHTtGA-Ysw@mail.gmail.com>
- <20120420131005.GO3852@pengutronix.de>
- <20120420133314.GF4217@phenom.ffwll.local>
-Message-ID: <20120421081846.GS3852@pengutronix.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 21 Apr 2012 10:19:43 +0200
+Subject: [PATCH v6] gpio: Device tree support for LPC32xx
+Message-ID: <1334996383-15099-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 03:33:14PM +0200, Daniel Vetter wrote:
-> On Fri, Apr 20, 2012 at 03:10:05PM +0200, Sascha Hauer wrote:
-> > (BTW each driver in drm has this layer somewhere in it. If I had hidden
-> > it in imx specific functions I probably wouldn't have raised any
-> > questions, but I don't want to go that way)
-> 
-> That's _exactly_ what you should be doing. And once you have more than one
-> driver that works in a similar way, you can extract the common code as
-> helper functions to make life easier.
+This patch adds device tree support for gpio-lpc32xx.c
 
-I already have three drivers working in a similar way from which I
-posted two. I could easily throw in some more into the pot. Also the
-code is based on the exynos driver, so I think it's suitable for this
-aswell.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-> 
-> For your case it sounds like a new set of modeset helper functions
-> tailored for the embedded use-case would be good (as Dave Airlie
-> suggested).
+---
 
-One of my problems is that currently drm is based on the assumption that
-there is a single device which offers all needed resources and
-information to form a drm device. On embedded systems this is simply not
-the case, we have our resources all around the SoC. I have physical
-devices which are crtcs, encoders or connectors, but drm does not
-provide a way to glue them together. You can find this aswell in the
-exynos driver if you grep for exynos_drm_subdrv_register. If you follow
-this function you'll see that a good bunch of the driver actually
-handles the management of these subdevices. Do you have a suggestion
-solving the involved code duplication with helper functions?
+ Applies to v3.4-rc3
 
-Also sooner or later it will happen that the same hdmi controller is
-used on two otherwise different SoCs. Currently the driver can't be
-shared between SoCs because each hdmi driver implements exynos or
-nouveau specific callbacks. I guess the answer is to put the common hdmi
-driver code into helper functions and to implement a middle layer in
-each drm driver wishing to use it.
+ Changes since last version:
+ * Reduced the "compatible" strings to just the first one
+ 
+ Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   65 ++++++++++++++++
+ arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +-
+ drivers/gpio/gpio-lpc32xx.c                             |   52 ++++++++++++
+ 3 files changed, 123 insertions(+), 3 deletions(-)
 
-> Adding yet another middle-layer (like sdrm is) that forces
-> drivers to go through it usually ends up in tears. And drm core
-> unfortunately still has too much middle-layer heritage: For an awful lot
-> of setup and teardown issues it's the core of the problme - because
-> drivers can't control when drm sets up and tears down certain things, it's
-> done at the wrong time (for certain drivers at least). Same problem when
-> the abstraction doesn't quite fit.
-> 
-> Helper functions leave the driver in full control of what's going on, and
-> working around hw-specific madness with ease.
-> 
-> https://lwn.net/Articles/336262/ is the canonical reference for why a lot
-> of kernel people are allergic to anything that looks like a middle-layer.
-
-I have read the article when it was featured on LWN. While I agree to
-several things I have my problems with it. Take for example the MMC
-core. A MMC driver mainly has to implement two callbacks, .request and
-.set_ios. Noone has ever asked to get direct access from the driver to
-the underlying block device and eventually pass control to MMC helper
-functions. This makes the MMC core a middle layer sitting between the
-blockdevice and the driver.  With drm instead it's normal that ioctls
-fall straight through to the driver. This leads to such funny things
-that the kernel itself cannot control the device to bring a console on
-the screen without dedicated help from the driver.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+@@ -0,0 +1,65 @@
++NXP LPC32xx SoC GPIO controller
++
++Required properties:
++- compatible: must be "nxp,lpc3220-gpio"
++- reg: Physical base address and length of the controller's registers.
++- #address-cells: Always 1, for indexing of the subnodes (GPIO groups of the
++  SoC)
++- #size-cells: Always 0
++
++Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
++- gpio-controller: Marks the device node as a GPIO controller.
++- #gpio-cells: Should be two. The first cell is the pin number and the
++  second cell is used to specify optional parameters:
++  - bit 0 specifies polarity (0 for normal, 1 for inverted)
++- reg: Index of the GPIO group
++
++Optional properties of sub-nodes which describe the GPIO groups of LPC32xx:
++- status: Set to "disabled" if you don't use the respective GPIO group
++  of the LPC32xx SoC
++
++Example:
++
++	gpio: gpio at 40028000 {
++		compatible = "nxp,lpc3220-gpio";
++		reg = <0x40028000 0x1000>;
++		/* create a private address space for enumeration */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		gpio_p0: gpio-bank at 0 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <0>;
++		};
++
++		gpio_p1: gpio-bank at 1 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <1>;
++		};
++
++		gpio_p2: gpio-bank at 2 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <2>;
++		};
++
++		gpio_p3: gpio-bank at 3 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <3>;
++		};
++
++		gpi_p3: gpio-bank at 4 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <4>;
++		};
++
++		gpo_p3: gpio-bank at 5 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <5>;
++		};
++	};
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
++++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
+@@ -1 +1,8 @@
+-/* empty */
++#ifndef __MACH_GPIO_H
++#define __MACH_GPIO_H
++
++#include "gpio-lpc32xx.h"
++
++#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
++
++#endif /* __MACH_GPIO_H */
+--- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
++++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+@@ -21,6 +21,9 @@
+ #include <linux/io.h>
+ #include <linux/errno.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+@@ -454,10 +457,55 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 	},
+ };
+ 
++/* Empty now, can be removed later when mach-lpc32xx is finally switched over
++ * to DT support
++ */
+ void __init lpc32xx_gpio_init(void)
+ {
++}
++
++static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
++{
++	struct device_node *node;
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
+-		gpiochip_add(&lpc32xx_gpiochip[i].chip);
++	if (pdev->dev.of_node) {
++		for_each_child_of_node(pdev->dev.of_node, node) {
++			if (of_device_is_available(node)) {
++				u32 index;
++				struct gpio_chip *chip;
++				if (of_property_read_u32(node,
++							 "reg", &index) <  0)
++					continue;
++				if (index >= ARRAY_SIZE(lpc32xx_gpiochip))
++					continue;
++				chip = &lpc32xx_gpiochip[index].chip;
++				chip->of_node = of_node_get(node);
++				gpiochip_add(chip);
++			}
++		}
++	} else {
++		for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
++			gpiochip_add(&lpc32xx_gpiochip[i].chip);
++	}
++
++	return 0;
+ }
++
++#ifdef CONFIG_OF
++static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
++	{ .compatible = "nxp,lpc3220-gpio", },
++	{ },
++};
++#endif
++
++static struct platform_driver lpc32xx_gpio_driver = {
++	.driver		= {
++		.name	= "lpc32xx-gpio",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(lpc32xx_gpio_of_match),
++	},
++	.probe		= lpc32xx_gpio_probe,
++};
++
++module_platform_driver(lpc32xx_gpio_driver);
