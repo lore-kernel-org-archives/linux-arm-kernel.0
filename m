@@ -1,114 +1,164 @@
 From: viresh.linux@gmail.com (Viresh Kumar)
-Date: Sat, 21 Apr 2012 17:53:31 +0530
-Subject: [PATCH V2 09/10] SPEAr13xx: Add defconfig
+Date: Sat, 21 Apr 2012 17:53:32 +0530
+Subject: [PATCH V2 10/10] SPEAr: Update MAINTAINERS and Documentation
 In-Reply-To: <4a3362a884d1dfa8cdef65a10c97c43be4c17ff6.1335010373.git.viresh.kumar@st.com>
 References: <4a3362a884d1dfa8cdef65a10c97c43be4c17ff6.1335010373.git.viresh.kumar@st.com>
-Message-ID: <5e798145fb703ac8e85cd362f2b5a5d5addeb37f.1335010373.git.viresh.kumar@st.com>
+Message-ID: <e84e3877312da29eb974a0856cdd34b5720003cf.1335010373.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset updates MAINTAINERS files, makes shiraz as second Maintainer for
+SPEAr SoCs.
+
+It also updates Documentation mostly for SPEAr13xx.
+
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/configs/spear13xx_defconfig |   91 ++++++++++++++++++++++++++++++++++
- 1 files changed, 91 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/spear13xx_defconfig
+ Documentation/arm/SPEAr/overview.txt            |   32 ++++++++++++----------
+ Documentation/devicetree/bindings/arm/spear.txt |   14 +++++-----
+ MAINTAINERS                                     |   13 +++++++++
+ 3 files changed, 37 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-new file mode 100644
-index 0000000..587d1f3
---- /dev/null
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -0,0 +1,91 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_PLAT_SPEAR=y
-+CONFIG_ARCH_SPEAR13XX=y
-+CONFIG_MACH_SPEAR1310=y
-+CONFIG_MACH_SPEAR1340=y
-+# CONFIG_SWP_EMULATE is not set
-+CONFIG_SMP=y
-+# CONFIG_SMP_ON_UP is not set
-+# CONFIG_ARM_CPU_TOPOLOGY is not set
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_BINFMT_MISC=y
-+CONFIG_NET=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_FSMC=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_ATA=y
-+# CONFIG_SATA_PMP is not set
-+CONFIG_SATA_AHCI_PLATFORM=y
-+CONFIG_PATA_ARASAN_CF=y
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+CONFIG_STMMAC_ETH=y
-+# CONFIG_WLAN is not set
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_SPEAR=y
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+CONFIG_I2C=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_PL061=y
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_MPCORE_WATCHDOG=y
-+# CONFIG_HID_SUPPORT is not set
-+CONFIG_USB=y
-+# CONFIG_USB_DEVICE_CLASS is not set
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_SPEAR=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_DMADEVICES=y
-+CONFIG_DW_DMAC=y
-+CONFIG_DMATEST=m
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT2_FS_SECURITY=y
-+CONFIG_EXT3_FS=y
-+CONFIG_EXT3_FS_SECURITY=y
-+CONFIG_AUTOFS4_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+CONFIG_TMPFS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ASCII=m
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DEBUG_SPINLOCK=y
-+CONFIG_DEBUG_INFO=y
+diff --git a/Documentation/arm/SPEAr/overview.txt b/Documentation/arm/SPEAr/overview.txt
+index 28a9af9..57aae77 100644
+--- a/Documentation/arm/SPEAr/overview.txt
++++ b/Documentation/arm/SPEAr/overview.txt
+@@ -8,9 +8,8 @@ Introduction
+   weblink : http://www.st.com/spear
+ 
+   The ST Microelectronics SPEAr range of ARM9/CortexA9 System-on-Chip CPUs are
+-  supported by the 'spear' platform of ARM Linux. Currently SPEAr300,
+-  SPEAr310, SPEAr320 and SPEAr600 SOCs are supported. Support for the SPEAr13XX
+-  series is in progress.
++  supported by the 'spear' platform of ARM Linux. Currently SPEAr1310,
++  SPEAr1340, SPEAr300, SPEAr310, SPEAr320 and SPEAr600 SOCs are supported.
+ 
+   Hierarchy in SPEAr is as follows:
+ 
+@@ -26,33 +25,36 @@ Introduction
+ 		- SPEAr600 (SOC)
+ 			- SPEAr600 Evaluation Board
+ 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
+-		- SPEAr1300 (SOC)
++		- SPEAr1310 (SOC)
++			- SPEAr1310 Evaluation Board
++		- SPEAr1340 (SOC)
++			- SPEAr1340 Evaluation Board
+ 
+   Configuration
+   -------------
+ 
+   A generic configuration is provided for each machine, and can be used as the
+   default by
+-	make spear600_defconfig
+-	make spear300_defconfig
+-	make spear310_defconfig
+-	make spear320_defconfig
++	make spear13xx_defconfig
++	make spear3xx_defconfig
++	make spear6xx_defconfig
+ 
+   Layout
+   ------
+ 
+-  The common files for multiple machine families (SPEAr3XX, SPEAr6XX and
+-  SPEAr13XX) are located in the platform code contained in arch/arm/plat-spear
++  The common files for multiple machine families (SPEAr3xx, SPEAr6xx and
++  SPEAr13xx) are located in the platform code contained in arch/arm/plat-spear
+   with headers in plat/.
+ 
+   Each machine series have a directory with name arch/arm/mach-spear followed by
+   series name. Like mach-spear3xx, mach-spear6xx and mach-spear13xx.
+ 
+-  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c and for
+-  spear6xx is mach-spear6xx/spear6xx.c. mach-spear* also contain soc/machine
+-  specific files, like spear300.c, spear310.c, spear320.c and spear600.c.
+-  mach-spear* doesn't contains board specific files as they fully support
+-  Flattened Device Tree.
++  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c, for
++  spear6xx is mach-spear6xx/spear6xx.c and for spear13xx family is
++  mach-spear13xx/spear13xx.c. mach-spear* also contain soc/machine specific
++  files, like spear1310.c, spear1340.c spear300.c, spear310.c, spear320.c and
++  spear600.c.  mach-spear* doesn't contains board specific files as they fully
++  support Flattened Device Tree.
+ 
+ 
+   Document Author
+diff --git a/Documentation/devicetree/bindings/arm/spear.txt b/Documentation/devicetree/bindings/arm/spear.txt
+index aa5f355..0d42949 100644
+--- a/Documentation/devicetree/bindings/arm/spear.txt
++++ b/Documentation/devicetree/bindings/arm/spear.txt
+@@ -2,25 +2,25 @@ ST SPEAr Platforms Device Tree Bindings
+ ---------------------------------------
+ 
+ Boards with the ST SPEAr600 SoC shall have the following properties:
+-
+ Required root node property:
+-
+ compatible = "st,spear600";
+ 
+ Boards with the ST SPEAr300 SoC shall have the following properties:
+-
+ Required root node property:
+-
+ compatible = "st,spear300";
+ 
+ Boards with the ST SPEAr310 SoC shall have the following properties:
+-
+ Required root node property:
+-
+ compatible = "st,spear310";
+ 
+ Boards with the ST SPEAr320 SoC shall have the following properties:
++Required root node property:
++compatible = "st,spear320";
+ 
++Boards with the ST SPEAr1310 SoC shall have the following properties:
+ Required root node property:
++compatible = "st,spear1310";
+ 
+-compatible = "st,spear320";
++Boards with the ST SPEAr1340 SoC shall have the following properties:
++Required root node property:
++compatible = "st,spear1340";
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 618d4fd..103d20a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6285,14 +6285,25 @@ F:	include/linux/compiler.h
+ 
+ SPEAR PLATFORM SUPPORT
+ M:	Viresh Kumar <viresh.kumar@st.com>
++M:	Shiraz Hashim <shiraz.hashim@st.com>
+ L:	spear-devel at list.st.com
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://www.st.com/spear
+ S:	Maintained
+ F:	arch/arm/plat-spear/
+ 
++SPEAR13XX MACHINE SUPPORT
++M:	Viresh Kumar <viresh.kumar@st.com>
++M:	Shiraz Hashim <shiraz.hashim@st.com>
++L:	spear-devel at list.st.com
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++W:	http://www.st.com/spear
++S:	Maintained
++F:	arch/arm/mach-spear13xx/
++
+ SPEAR3XX MACHINE SUPPORT
+ M:	Viresh Kumar <viresh.kumar@st.com>
++M:	Shiraz Hashim <shiraz.hashim@st.com>
+ L:	spear-devel at list.st.com
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://www.st.com/spear
+@@ -6301,6 +6312,8 @@ F:	arch/arm/mach-spear3xx/
+ 
+ SPEAR6XX MACHINE SUPPORT
+ M:	Rajeev Kumar <rajeev-dlh.kumar@st.com>
++M:	Shiraz Hashim <shiraz.hashim@st.com>
++M:	Viresh Kumar <viresh.kumar@st.com>
+ L:	spear-devel at list.st.com
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://www.st.com/spear
 -- 
 1.7.9
