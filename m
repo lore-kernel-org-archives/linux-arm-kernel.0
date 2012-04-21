@@ -1,50 +1,27 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Sat, 21 Apr 2012 17:59:27 +0530
-Subject: [PATCH 0/9] Add support for SPEAr13xx SoCs
-In-Reply-To: <201204211224.47826.arnd@arndb.de>
-References: <cover.1334942163.git.viresh.kumar@st.com>
- <201204201821.28266.arnd@arndb.de>
- <CAOh2x=kX93nDDTfVq-ERBF=UDRZAUSwnwCuO35R+E-SZjcFUag@mail.gmail.com>
- <201204211224.47826.arnd@arndb.de>
-Message-ID: <CAOh2x=kHEzJjj5iQBZ4qM5DSAv_aNBd5ke3ArFAbBuyVS_-PRg@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 21 Apr 2012 14:31:10 +0200
+Subject: [PATCH] Defconfig update for LPC32xx
+In-Reply-To: <201204211146.29929.arnd@arndb.de>
+References: <1335006394-26810-1-git-send-email-stigge@antcom.de>
+ <201204211146.29929.arnd@arndb.de>
+Message-ID: <4F92A88E.1000007@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/21/12, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 21 April 2012, viresh kumar wrote:
->> On 4/20/12, Arnd Bergmann <arnd@arndb.de> wrote:
->> > I've looked at all the platform specific bits and they look pretty
->> > good,
->> > great work! I have ignored the pinctrl and clock drivers and hope that
->> > the
->> > respective maintainers will be able to judge them well.
->> >
->> > There are a few places where you still hardcode stuff that could be
->> > turned
->> > into device tree properties, but those are corner cases and you have an
->> > existing platform here that you've done a great amount of excellent
->> > cleanups
->> > to in the last weeks, so my feeling is that all the platform code can go
->> > in
->> > when you take care of the stuff that I've commented on, most of those
->> > things
->> > should be simple.
->>
->> Have fixed most of stuff you pointed to. Check V2.
->>
->
-> Wow, that was fast ;-)
+Hi Arnd,
 
-Actually i should say it now:
+On 21/04/12 13:46, Arnd Bergmann wrote:
+> I think the latest version of all of your patches is good, but I've
+> lost track of which ones you want to go through arm-soc. Can you send
+> me pull requests for each series you want applied on monday if you get
+> no more comments?
 
-Wow, that was too fast ;-)
+Yes, I was planning an arm-soc pull request anyway. First concentrating
+on the other subsystem's patches and then providing the arm-soc bits in
+one go. The other subsystem's patches are not merged completely, yet,
+but arm-soc can already merge on monday - pretty stabilized DT
+conversion now.
 
-> Can you comment on the ones you did not address? In particular,
-> I'd like to understand why you put the SPEAR1310_RAS_CTRL*
-> register definitions into a globally visible header file.
+Thanks,
 
-I was replying to that mail only when you wrote this. Can check my
-reply there.
-
---
-viresh
+Roland
