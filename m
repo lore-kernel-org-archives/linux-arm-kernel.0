@@ -1,249 +1,34 @@
-From: viresh.linux@gmail.com (Viresh Kumar)
-Date: Sat, 21 Apr 2012 17:53:27 +0530
-Subject: [PATCH V2 05/10] pinctrl: SPEAr: Create macro for declaring GPIO PINS
-In-Reply-To: <4a3362a884d1dfa8cdef65a10c97c43be4c17ff6.1335010373.git.viresh.kumar@st.com>
-References: <4a3362a884d1dfa8cdef65a10c97c43be4c17ff6.1335010373.git.viresh.kumar@st.com>
-Message-ID: <a4af95f52c6dcef03d3026d336c765b807c4d42c.1335010373.git.viresh.kumar@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 21 Apr 2012 12:24:47 +0000
+Subject: [PATCH 0/9] Add support for SPEAr13xx SoCs
+In-Reply-To: <CAOh2x=kX93nDDTfVq-ERBF=UDRZAUSwnwCuO35R+E-SZjcFUag@mail.gmail.com>
+References: <cover.1334942163.git.viresh.kumar@st.com>
+ <201204201821.28266.arnd@arndb.de>
+ <CAOh2x=kX93nDDTfVq-ERBF=UDRZAUSwnwCuO35R+E-SZjcFUag@mail.gmail.com>
+Message-ID: <201204211224.47826.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Same GPIO pins declarations would be required for other SoCs and that will be a
-lot of lines of code. Its better to create common macros for it.
+On Saturday 21 April 2012, viresh kumar wrote:
+> On 4/20/12, Arnd Bergmann <arnd@arndb.de> wrote:
+> > I've looked at all the platform specific bits and they look pretty good,
+> > great work! I have ignored the pinctrl and clock drivers and hope that the
+> > respective maintainers will be able to judge them well.
+> >
+> > There are a few places where you still hardcode stuff that could be turned
+> > into device tree properties, but those are corner cases and you have an
+> > existing platform here that you've done a great amount of excellent cleanups
+> > to in the last weeks, so my feeling is that all the platform code can go in
+> > when you take care of the stuff that I've commented on, most of those things
+> > should be simple.
+> 
+> Have fixed most of stuff you pointed to. Check V2.
+> 
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/spear/pinctrl-spear.h    |  105 ++++++++++++++++++++++++++++++
- drivers/pinctrl/spear/pinctrl-spear3xx.c |  103 +-----------------------------
- 2 files changed, 106 insertions(+), 102 deletions(-)
+Wow, that was fast ;-)
 
-diff --git a/drivers/pinctrl/spear/pinctrl-spear.h b/drivers/pinctrl/spear/pinctrl-spear.h
-index 47a6b5b..1f51dc9 100644
---- a/drivers/pinctrl/spear/pinctrl-spear.h
-+++ b/drivers/pinctrl/spear/pinctrl-spear.h
-@@ -139,4 +139,109 @@ void __devinit pmx_init_addr(struct spear_pinctrl_machdata *machdata, u16 reg);
- int __devinit spear_pinctrl_probe(struct platform_device *pdev,
- 		struct spear_pinctrl_machdata *machdata);
- int __devexit spear_pinctrl_remove(struct platform_device *pdev);
-+
-+#define SPEAR_PIN_0_TO_101		\
-+	PINCTRL_PIN(0, "PLGPIO0"),	\
-+	PINCTRL_PIN(1, "PLGPIO1"),	\
-+	PINCTRL_PIN(2, "PLGPIO2"),	\
-+	PINCTRL_PIN(3, "PLGPIO3"),	\
-+	PINCTRL_PIN(4, "PLGPIO4"),	\
-+	PINCTRL_PIN(5, "PLGPIO5"),	\
-+	PINCTRL_PIN(6, "PLGPIO6"),	\
-+	PINCTRL_PIN(7, "PLGPIO7"),	\
-+	PINCTRL_PIN(8, "PLGPIO8"),	\
-+	PINCTRL_PIN(9, "PLGPIO9"),	\
-+	PINCTRL_PIN(10, "PLGPIO10"),	\
-+	PINCTRL_PIN(11, "PLGPIO11"),	\
-+	PINCTRL_PIN(12, "PLGPIO12"),	\
-+	PINCTRL_PIN(13, "PLGPIO13"),	\
-+	PINCTRL_PIN(14, "PLGPIO14"),	\
-+	PINCTRL_PIN(15, "PLGPIO15"),	\
-+	PINCTRL_PIN(16, "PLGPIO16"),	\
-+	PINCTRL_PIN(17, "PLGPIO17"),	\
-+	PINCTRL_PIN(18, "PLGPIO18"),	\
-+	PINCTRL_PIN(19, "PLGPIO19"),	\
-+	PINCTRL_PIN(20, "PLGPIO20"),	\
-+	PINCTRL_PIN(21, "PLGPIO21"),	\
-+	PINCTRL_PIN(22, "PLGPIO22"),	\
-+	PINCTRL_PIN(23, "PLGPIO23"),	\
-+	PINCTRL_PIN(24, "PLGPIO24"),	\
-+	PINCTRL_PIN(25, "PLGPIO25"),	\
-+	PINCTRL_PIN(26, "PLGPIO26"),	\
-+	PINCTRL_PIN(27, "PLGPIO27"),	\
-+	PINCTRL_PIN(28, "PLGPIO28"),	\
-+	PINCTRL_PIN(29, "PLGPIO29"),	\
-+	PINCTRL_PIN(30, "PLGPIO30"),	\
-+	PINCTRL_PIN(31, "PLGPIO31"),	\
-+	PINCTRL_PIN(32, "PLGPIO32"),	\
-+	PINCTRL_PIN(33, "PLGPIO33"),	\
-+	PINCTRL_PIN(34, "PLGPIO34"),	\
-+	PINCTRL_PIN(35, "PLGPIO35"),	\
-+	PINCTRL_PIN(36, "PLGPIO36"),	\
-+	PINCTRL_PIN(37, "PLGPIO37"),	\
-+	PINCTRL_PIN(38, "PLGPIO38"),	\
-+	PINCTRL_PIN(39, "PLGPIO39"),	\
-+	PINCTRL_PIN(40, "PLGPIO40"),	\
-+	PINCTRL_PIN(41, "PLGPIO41"),	\
-+	PINCTRL_PIN(42, "PLGPIO42"),	\
-+	PINCTRL_PIN(43, "PLGPIO43"),	\
-+	PINCTRL_PIN(44, "PLGPIO44"),	\
-+	PINCTRL_PIN(45, "PLGPIO45"),	\
-+	PINCTRL_PIN(46, "PLGPIO46"),	\
-+	PINCTRL_PIN(47, "PLGPIO47"),	\
-+	PINCTRL_PIN(48, "PLGPIO48"),	\
-+	PINCTRL_PIN(49, "PLGPIO49"),	\
-+	PINCTRL_PIN(50, "PLGPIO50"),	\
-+	PINCTRL_PIN(51, "PLGPIO51"),	\
-+	PINCTRL_PIN(52, "PLGPIO52"),	\
-+	PINCTRL_PIN(53, "PLGPIO53"),	\
-+	PINCTRL_PIN(54, "PLGPIO54"),	\
-+	PINCTRL_PIN(55, "PLGPIO55"),	\
-+	PINCTRL_PIN(56, "PLGPIO56"),	\
-+	PINCTRL_PIN(57, "PLGPIO57"),	\
-+	PINCTRL_PIN(58, "PLGPIO58"),	\
-+	PINCTRL_PIN(59, "PLGPIO59"),	\
-+	PINCTRL_PIN(60, "PLGPIO60"),	\
-+	PINCTRL_PIN(61, "PLGPIO61"),	\
-+	PINCTRL_PIN(62, "PLGPIO62"),	\
-+	PINCTRL_PIN(63, "PLGPIO63"),	\
-+	PINCTRL_PIN(64, "PLGPIO64"),	\
-+	PINCTRL_PIN(65, "PLGPIO65"),	\
-+	PINCTRL_PIN(66, "PLGPIO66"),	\
-+	PINCTRL_PIN(67, "PLGPIO67"),	\
-+	PINCTRL_PIN(68, "PLGPIO68"),	\
-+	PINCTRL_PIN(69, "PLGPIO69"),	\
-+	PINCTRL_PIN(70, "PLGPIO70"),	\
-+	PINCTRL_PIN(71, "PLGPIO71"),	\
-+	PINCTRL_PIN(72, "PLGPIO72"),	\
-+	PINCTRL_PIN(73, "PLGPIO73"),	\
-+	PINCTRL_PIN(74, "PLGPIO74"),	\
-+	PINCTRL_PIN(75, "PLGPIO75"),	\
-+	PINCTRL_PIN(76, "PLGPIO76"),	\
-+	PINCTRL_PIN(77, "PLGPIO77"),	\
-+	PINCTRL_PIN(78, "PLGPIO78"),	\
-+	PINCTRL_PIN(79, "PLGPIO79"),	\
-+	PINCTRL_PIN(80, "PLGPIO80"),	\
-+	PINCTRL_PIN(81, "PLGPIO81"),	\
-+	PINCTRL_PIN(82, "PLGPIO82"),	\
-+	PINCTRL_PIN(83, "PLGPIO83"),	\
-+	PINCTRL_PIN(84, "PLGPIO84"),	\
-+	PINCTRL_PIN(85, "PLGPIO85"),	\
-+	PINCTRL_PIN(86, "PLGPIO86"),	\
-+	PINCTRL_PIN(87, "PLGPIO87"),	\
-+	PINCTRL_PIN(88, "PLGPIO88"),	\
-+	PINCTRL_PIN(89, "PLGPIO89"),	\
-+	PINCTRL_PIN(90, "PLGPIO90"),	\
-+	PINCTRL_PIN(91, "PLGPIO91"),	\
-+	PINCTRL_PIN(92, "PLGPIO92"),	\
-+	PINCTRL_PIN(93, "PLGPIO93"),	\
-+	PINCTRL_PIN(94, "PLGPIO94"),	\
-+	PINCTRL_PIN(95, "PLGPIO95"),	\
-+	PINCTRL_PIN(96, "PLGPIO96"),	\
-+	PINCTRL_PIN(97, "PLGPIO97"),	\
-+	PINCTRL_PIN(98, "PLGPIO98"),	\
-+	PINCTRL_PIN(99, "PLGPIO99"),	\
-+	PINCTRL_PIN(100, "PLGPIO100"),	\
-+	PINCTRL_PIN(101, "PLGPIO101")
-+
- #endif /* __PINMUX_SPEAR_H__ */
-diff --git a/drivers/pinctrl/spear/pinctrl-spear3xx.c b/drivers/pinctrl/spear/pinctrl-spear3xx.c
-index 832049a..91c883b 100644
---- a/drivers/pinctrl/spear/pinctrl-spear3xx.c
-+++ b/drivers/pinctrl/spear/pinctrl-spear3xx.c
-@@ -15,108 +15,7 @@
- 
- /* pins */
- static const struct pinctrl_pin_desc spear3xx_pins[] = {
--	PINCTRL_PIN(0, "PLGPIO0"),
--	PINCTRL_PIN(1, "PLGPIO1"),
--	PINCTRL_PIN(2, "PLGPIO2"),
--	PINCTRL_PIN(3, "PLGPIO3"),
--	PINCTRL_PIN(4, "PLGPIO4"),
--	PINCTRL_PIN(5, "PLGPIO5"),
--	PINCTRL_PIN(6, "PLGPIO6"),
--	PINCTRL_PIN(7, "PLGPIO7"),
--	PINCTRL_PIN(8, "PLGPIO8"),
--	PINCTRL_PIN(9, "PLGPIO9"),
--	PINCTRL_PIN(10, "PLGPIO10"),
--	PINCTRL_PIN(11, "PLGPIO11"),
--	PINCTRL_PIN(12, "PLGPIO12"),
--	PINCTRL_PIN(13, "PLGPIO13"),
--	PINCTRL_PIN(14, "PLGPIO14"),
--	PINCTRL_PIN(15, "PLGPIO15"),
--	PINCTRL_PIN(16, "PLGPIO16"),
--	PINCTRL_PIN(17, "PLGPIO17"),
--	PINCTRL_PIN(18, "PLGPIO18"),
--	PINCTRL_PIN(19, "PLGPIO19"),
--	PINCTRL_PIN(20, "PLGPIO20"),
--	PINCTRL_PIN(21, "PLGPIO21"),
--	PINCTRL_PIN(22, "PLGPIO22"),
--	PINCTRL_PIN(23, "PLGPIO23"),
--	PINCTRL_PIN(24, "PLGPIO24"),
--	PINCTRL_PIN(25, "PLGPIO25"),
--	PINCTRL_PIN(26, "PLGPIO26"),
--	PINCTRL_PIN(27, "PLGPIO27"),
--	PINCTRL_PIN(28, "PLGPIO28"),
--	PINCTRL_PIN(29, "PLGPIO29"),
--	PINCTRL_PIN(30, "PLGPIO30"),
--	PINCTRL_PIN(31, "PLGPIO31"),
--	PINCTRL_PIN(32, "PLGPIO32"),
--	PINCTRL_PIN(33, "PLGPIO33"),
--	PINCTRL_PIN(34, "PLGPIO34"),
--	PINCTRL_PIN(35, "PLGPIO35"),
--	PINCTRL_PIN(36, "PLGPIO36"),
--	PINCTRL_PIN(37, "PLGPIO37"),
--	PINCTRL_PIN(38, "PLGPIO38"),
--	PINCTRL_PIN(39, "PLGPIO39"),
--	PINCTRL_PIN(40, "PLGPIO40"),
--	PINCTRL_PIN(41, "PLGPIO41"),
--	PINCTRL_PIN(42, "PLGPIO42"),
--	PINCTRL_PIN(43, "PLGPIO43"),
--	PINCTRL_PIN(44, "PLGPIO44"),
--	PINCTRL_PIN(45, "PLGPIO45"),
--	PINCTRL_PIN(46, "PLGPIO46"),
--	PINCTRL_PIN(47, "PLGPIO47"),
--	PINCTRL_PIN(48, "PLGPIO48"),
--	PINCTRL_PIN(49, "PLGPIO49"),
--	PINCTRL_PIN(50, "PLGPIO50"),
--	PINCTRL_PIN(51, "PLGPIO51"),
--	PINCTRL_PIN(52, "PLGPIO52"),
--	PINCTRL_PIN(53, "PLGPIO53"),
--	PINCTRL_PIN(54, "PLGPIO54"),
--	PINCTRL_PIN(55, "PLGPIO55"),
--	PINCTRL_PIN(56, "PLGPIO56"),
--	PINCTRL_PIN(57, "PLGPIO57"),
--	PINCTRL_PIN(58, "PLGPIO58"),
--	PINCTRL_PIN(59, "PLGPIO59"),
--	PINCTRL_PIN(60, "PLGPIO60"),
--	PINCTRL_PIN(61, "PLGPIO61"),
--	PINCTRL_PIN(62, "PLGPIO62"),
--	PINCTRL_PIN(63, "PLGPIO63"),
--	PINCTRL_PIN(64, "PLGPIO64"),
--	PINCTRL_PIN(65, "PLGPIO65"),
--	PINCTRL_PIN(66, "PLGPIO66"),
--	PINCTRL_PIN(67, "PLGPIO67"),
--	PINCTRL_PIN(68, "PLGPIO68"),
--	PINCTRL_PIN(69, "PLGPIO69"),
--	PINCTRL_PIN(70, "PLGPIO70"),
--	PINCTRL_PIN(71, "PLGPIO71"),
--	PINCTRL_PIN(72, "PLGPIO72"),
--	PINCTRL_PIN(73, "PLGPIO73"),
--	PINCTRL_PIN(74, "PLGPIO74"),
--	PINCTRL_PIN(75, "PLGPIO75"),
--	PINCTRL_PIN(76, "PLGPIO76"),
--	PINCTRL_PIN(77, "PLGPIO77"),
--	PINCTRL_PIN(78, "PLGPIO78"),
--	PINCTRL_PIN(79, "PLGPIO79"),
--	PINCTRL_PIN(80, "PLGPIO80"),
--	PINCTRL_PIN(81, "PLGPIO81"),
--	PINCTRL_PIN(82, "PLGPIO82"),
--	PINCTRL_PIN(83, "PLGPIO83"),
--	PINCTRL_PIN(84, "PLGPIO84"),
--	PINCTRL_PIN(85, "PLGPIO85"),
--	PINCTRL_PIN(86, "PLGPIO86"),
--	PINCTRL_PIN(87, "PLGPIO87"),
--	PINCTRL_PIN(88, "PLGPIO88"),
--	PINCTRL_PIN(89, "PLGPIO89"),
--	PINCTRL_PIN(90, "PLGPIO90"),
--	PINCTRL_PIN(91, "PLGPIO91"),
--	PINCTRL_PIN(92, "PLGPIO92"),
--	PINCTRL_PIN(93, "PLGPIO93"),
--	PINCTRL_PIN(94, "PLGPIO94"),
--	PINCTRL_PIN(95, "PLGPIO95"),
--	PINCTRL_PIN(96, "PLGPIO96"),
--	PINCTRL_PIN(97, "PLGPIO97"),
--	PINCTRL_PIN(98, "PLGPIO98"),
--	PINCTRL_PIN(99, "PLGPIO99"),
--	PINCTRL_PIN(100, "PLGPIO100"),
--	PINCTRL_PIN(101, "PLGPIO101"),
-+	SPEAR_PIN_0_TO_101,
- };
- 
- /* firda_pins */
--- 
-1.7.9
+Can you comment on the ones you did not address? In particular,
+I'd like to understand why you put the SPEAR1310_RAS_CTRL*
+register definitions into a globally visible header file.
+
+	Arnd
