@@ -1,105 +1,179 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sat, 21 Apr 2012 15:42:46 +0800
-Subject: [RFC PATCH 00/10 V3] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <20120420163626.GL14876@pengutronix.de>
-References: <1334714869-19282-1-git-send-email-marex@denx.de>
- <20120420094805.GS20478@pengutronix.de>
- <CAL411-onyB8SJEBoJ2XK=wyHKR0C7SyJtCsoJCDZGatP8HmYZg@mail.gmail.com>
- <201204201444.49184.marex@denx.de> <20120420132647.GQ3852@pengutronix.de>
- <20120420163626.GL14876@pengutronix.de>
-Message-ID: <CAL411-oN3RWQXduWVGrQ+FMEpiR+ZhJ1v-rmFnYwj3-0sJQVKw@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 21 Apr 2012 09:55:25 +0200
+Subject: [PATCH v5] gpio: Device tree support for LPC32xx
+Message-ID: <1334994925-11842-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> > > Dear Peter Chen,
-> > >
-> > > > On Fri, Apr 20, 2012 at 5:48 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > > >> btw /wrt USB Gadget etc -- how does the
-> > > > >> drivers/usb/gadget/fsl_udc_core.c and drivers/usb/gadget/ci13xxx_* fit
-> > > > >> into the big picture? We're gonna use the ci13xxx stuff for Gadget on
-> > > > >> mx28, correct? Then how does fsl_udc_core.c fit in?
-> > > > >
-> > > > > From what I have been told by a collegue the ci13xxx driver works
-> > > > > better, and from what I have seen the code looks better. So I think mxs
-> > > > > should use it. i.MX can then use it later aswell. We won't need the
-> > > > > fsl_udc_core driver anymore then.
-> > > >
-> > > > Oh, I find I lost many discussions using company email.
-> > > > From the function and quality level, fsl_udc_core.c is absolutely the
-> > > > best one for all
-> > > > i.mx SoCs, as both internal and upstream fsl code use it.
-> > >
-> > > Internally though, it looks like crap.
-> >
-> > +1 on this.
->
-> +1
->
-Your guys all consider ci13xxx is better than fsl_udc_core.c, can you
-list some reasons?
-Or just because it can compatible with your prefer OTG structure (like
-msm_otg.c)?
->From my point, I also admit OTG structure like msm_otg.c is good one
-and we can
-follow it at i.mx USB structure.
+This patch adds device tree support for gpio-lpc32xx.c
 
->
-> We also made some tests with some gadget devices. IMHO we had troubles
-> with gadget_zero and testusb on the fsl_udc_core.c. I think the testusb
-> results should help to decide which is the most stable implementation.
->
-ci13xxx one is no problem? Have you checked why it failed at fsl_udc_core.c?
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
->
-> >
-> > > Also, ci13xxx and fsl_usb_core is duplicated stuff, correct?
-> >
-> > Yes.
-> >
-> > >
-> > > > I will check with IC guys to see if i.mx's controller is compatible
-> > > > with CI13412.
-> > > > If fsl's compatible with CI13412, then mxs can try to use ci13xxx_udc.c to
-> > > > see if there are any problems, If no problems with kinds of testing,
-> > > > we can switch all i.mx SoC to ci13xxx_udc.c.
-> > >
-> > > Sascha, did you need to patch this ci13xxx somehow to get it running on MXS ? Or
-> > > what was it that said he got it somehow running?
-> >
-> > It basically works out of the box. I think we have some patches for this
-> > driver, maybe michael can comment on this.
->
-> Yes, i have some smaller bugfix patches hanging around. I will send them
-> to the linux-usb mailinglist until the next week. Additionaly i have
-> some platform gluecode and a platform-support patch for the driver but you
-> probably have the same.
->
-> The ci13xxx_udc_driver has a flags element, which has to be set
-> appropriate to the used platform. On the mx23 for example we only were
-> able to get all testusb results correct, when the option
-> CI13XXX_DISABLE_STREAMING was set. In the OTG case the option
-> CI13XXX_REGS_SHARED is mandatory.
+---
 
-I have checked with IC guys, but they doesn't know something like
-"CI13412" stands
-for.
-Yes, current many ARM SoC use chipidea SoC,  besides,
-- ci13xxx_udc
-- fsl_usb_core
-- langwell_udc
-marvell and Tegra are also use this. I have no maintain experiences on
-abstract one IP driver
-from kinds of SoC venders, if one SoC platform finds problem at
-ci13xxx_udc core,
-and submit the patch, it needs to verify at all SoC platforms, it may
-increase difficulty
-for review process and maintenance.
-besides, in case this bug-fix is not compatible across kinds of SoC
-vendors, how to do?
-just add the fix at SoC vendor layer's code like ci13xxx_msm.c?
+ Applies to v3.4-rc3
 
+ Changes since last version:
+ * Typo fix in documentation
+ * Changed "compatible" strings to non-wildcard versions
+ * Removed Arnd Bergmann's "Reviewed-by:" due to above change
+ 
+ Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   66 ++++++++++++++++
+ arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +-
+ drivers/gpio/gpio-lpc32xx.c                             |   55 ++++++++++++-
+ 3 files changed, 127 insertions(+), 3 deletions(-)
 
---
-BR,
-Peter Chen
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+@@ -0,0 +1,66 @@
++NXP LPC32xx SoC GPIO controller
++
++Required properties:
++- compatible: must be "nxp,lpc3220-gpio", "nxp,lpc3230-gpio", "nxp,lpc3240-gpio"
++  or "nxp,lpc3250-gpio"
++- reg: Physical base address and length of the controller's registers.
++- #address-cells: Always 1, for indexing of the subnodes (GPIO groups of the
++  SoC)
++- #size-cells: Always 0
++
++Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
++- gpio-controller: Marks the device node as a GPIO controller.
++- #gpio-cells: Should be two. The first cell is the pin number and the
++  second cell is used to specify optional parameters:
++  - bit 0 specifies polarity (0 for normal, 1 for inverted)
++- reg: Index of the GPIO group
++
++Optional properties of sub-nodes which describe the GPIO groups of LPC32xx:
++- status: Set to "disabled" if you don't use the respective GPIO group
++  of the LPC32xx SoC
++
++Example:
++
++	gpio: gpio at 40028000 {
++		compatible = "nxp,lpc3250-gpio";
++		reg = <0x40028000 0x1000>;
++		/* create a private address space for enumeration */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		gpio_p0: gpio-bank at 0 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <0>;
++		};
++
++		gpio_p1: gpio-bank at 1 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <1>;
++		};
++
++		gpio_p2: gpio-bank at 2 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <2>;
++		};
++
++		gpio_p3: gpio-bank at 3 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <3>;
++		};
++
++		gpi_p3: gpio-bank at 4 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <4>;
++		};
++
++		gpo_p3: gpio-bank at 5 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <5>;
++		};
++	};
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
++++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
+@@ -1 +1,8 @@
+-/* empty */
++#ifndef __MACH_GPIO_H
++#define __MACH_GPIO_H
++
++#include "gpio-lpc32xx.h"
++
++#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
++
++#endif /* __MACH_GPIO_H */
+--- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
++++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+@@ -21,6 +21,9 @@
+ #include <linux/io.h>
+ #include <linux/errno.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+@@ -454,10 +457,58 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 	},
+ };
+ 
++/* Empty now, can be removed later when mach-lpc32xx is finally switched over
++ * to DT support
++ */
+ void __init lpc32xx_gpio_init(void)
+ {
++}
++
++static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
++{
++	struct device_node *node;
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
+-		gpiochip_add(&lpc32xx_gpiochip[i].chip);
++	if (pdev->dev.of_node) {
++		for_each_child_of_node(pdev->dev.of_node, node) {
++			if (of_device_is_available(node)) {
++				u32 index;
++				struct gpio_chip *chip;
++				if (of_property_read_u32(node,
++							 "reg", &index) <  0)
++					continue;
++				if (index >= ARRAY_SIZE(lpc32xx_gpiochip))
++					continue;
++				chip = &lpc32xx_gpiochip[index].chip;
++				chip->of_node = of_node_get(node);
++				gpiochip_add(chip);
++			}
++		}
++	} else {
++		for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
++			gpiochip_add(&lpc32xx_gpiochip[i].chip);
++	}
++
++	return 0;
+ }
++
++#ifdef CONFIG_OF
++static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
++	{ .compatible = "nxp,lpc3220-gpio", },
++	{ .compatible = "nxp,lpc3230-gpio", },
++	{ .compatible = "nxp,lpc3240-gpio", },
++	{ .compatible = "nxp,lpc3250-gpio", },
++	{ },
++};
++#endif
++
++static struct platform_driver lpc32xx_gpio_driver = {
++	.driver		= {
++		.name	= "lpc32xx-gpio",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(lpc32xx_gpio_of_match),
++	},
++	.probe		= lpc32xx_gpio_probe,
++};
++
++module_platform_driver(lpc32xx_gpio_driver);
