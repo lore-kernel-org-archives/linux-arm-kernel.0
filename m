@@ -1,36 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 21 Apr 2012 10:48:49 +0100
-Subject: [PATCH 5/8] mmc: omap_hsmmc: release correct resource
-In-Reply-To: <871unhhkvk.fsf@laptop.org>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRrh-0004bL-3j@rmk-PC.arm.linux.org.uk>
- <20120420222305.GI21106@atomide.com> <878vhqggbc.fsf@laptop.org>
- <871unhhkvk.fsf@laptop.org>
-Message-ID: <20120421094849.GZ25053@n2100.arm.linux.org.uk>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 21 Apr 2012 11:55:05 +0200
+Subject: [PATCH v5 10/10] ARM: LPC32xx: Move common code to common.c
+Message-ID: <1335002107-22162-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 10:35:59PM -0400, Chris Ball wrote:
-> Hi,
-> 
-> On Fri, Apr 20 2012, Chris Ball wrote:
-> > On Fri, Apr 20 2012, Tony Lindgren wrote:
-> >> * Russell King <rmk+kernel@arm.linux.org.uk> [120418 03:15]:
-> >>> res can be one of several resources, as this variable is re-used several
-> >>> times during probe.  This can cause the wrong resource parameters to be
-> >>> passed to release_mem_region().
-> >>> 
-> >>> Get the original memory resource before calling release_mem_region().
-> >>> 
-> >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >>
-> >> Acked-by: Tony Lindgren <tony@atomide.com>
-> >
-> > Thanks, pushed to mmc-next for 3.4.
-> 
-> (Actually, that's premature of me, sorry -- just noticed that this
-> is part of an RFC patchset.  I'll wait for the rest of the patches.)
+This patch moves non-boardspecific LPC32xx code to common.c
 
-It was previously posted as an entirely separate patch - the reason its
-part of this RFC is because I needed the patch while developing this
-series.  So please go ahead and take _this_ patch.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+
+---
+ arch/arm/mach-lpc32xx/common.c  |   13 +++++++++++++
+ arch/arm/mach-lpc32xx/phy3250.c |   13 -------------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
+
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
++++ linux-2.6/arch/arm/mach-lpc32xx/common.c
+@@ -223,3 +223,16 @@ void lpc23xx_restart(char mode, const ch
+ 	while (1)
+ 		;
+ }
++
++static int __init lpc32xx_display_uid(void)
++{
++	u32 uid[4];
++
++	lpc32xx_get_uid(uid);
++
++	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
++		uid[3], uid[2], uid[1], uid[0]);
++
++	return 1;
++}
++arch_initcall(lpc32xx_display_uid);
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
++++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
+@@ -310,19 +310,6 @@ static void __init lpc3250_machine_init(
+ 			SPI0_CS_GPIO);
+ }
+ 
+-static int __init lpc32xx_display_uid(void)
+-{
+-	u32 uid[4];
+-
+-	lpc32xx_get_uid(uid);
+-
+-	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
+-		uid[3], uid[2], uid[1], uid[0]);
+-
+-	return 1;
+-}
+-arch_initcall(lpc32xx_display_uid);
+-
+ static char const *lpc32xx_dt_compat[] __initdata = {
+ 	"nxp,lpc3220",
+ 	"nxp,lpc3230",
