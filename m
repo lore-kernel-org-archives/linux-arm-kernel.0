@@ -1,53 +1,28 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 22 Apr 2012 23:24:00 +0200
-Subject: [PATCH] arch/arm: mioa701 add camera output enable gpio
-Message-ID: <1335129840-25387-1-git-send-email-robert.jarzmik@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 Apr 2012 21:28:21 +0000
+Subject: [GIT PULL] LPC32xx: Device tree conversion
+In-Reply-To: <4F93DFB0.4040409@antcom.de>
+References: <4F93DFB0.4040409@antcom.de>
+Message-ID: <201204222128.21993.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Micron MT9M111 camera chip needs its output enable to be
-activated in order to work. The bootloader is not required to
-activate it, so do it in machine code.
+On Sunday 22 April 2012, Roland Stigge wrote:
+> Hi Arnd and Olof,
+> 
+> this is a rearrangement of all mach-lpc32xx specific patches for device
+> tree conversion. Please note that:
+> 
+> * It builds upon the i2c-pnx changes (see previous pull request, branch
+>   lpc32xx/i2c)
+> * Dave Miller gave permission to merge the lpc_eth.c change via arm-soc
+>   (patch 1/8)
+> 
+> The rest of the patches is mach-lpc32xx only.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/include/mach/mioa701.h |    3 +++
- arch/arm/mach-pxa/mioa701.c              |    2 ++
- 2 files changed, 5 insertions(+), 0 deletions(-)
+Pulled into the next/dt branch, with the i2c patches being stored in
+the depends/i2c/lpc32xx branch for reference.
 
-diff --git a/arch/arm/mach-pxa/include/mach/mioa701.h b/arch/arm/mach-pxa/include/mach/mioa701.h
-index 0286844..e57f5c7 100644
---- a/arch/arm/mach-pxa/include/mach/mioa701.h
-+++ b/arch/arm/mach-pxa/include/mach/mioa701.h
-@@ -61,6 +61,9 @@
- #define GPIO93_KEY_VOLUME_UP			93
- #define GPIO94_KEY_VOLUME_DOWN			94
- 
-+/* Camera */
-+#define GPIO56_MT9M111_nOE			56
-+
- extern struct input_dev *mioa701_evdev;
- extern void mioa701_gpio_lpm_set(unsigned long mfp_pin);
- 
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index 061d570..929c62b 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -103,6 +103,7 @@ static unsigned long mioa701_pin_config[] = {
- 	GPIO82_CIF_DD_5,
- 	GPIO84_CIF_FV,
- 	GPIO85_CIF_LV,
-+	MIO_CFG_OUT(GPIO56_MT9M111_nOE, AF0, DRIVE_LOW),
- 
- 	/* Bluetooth */
- 	MIO_CFG_IN(GPIO14_BT_nACTIVITY, AF0),
-@@ -705,6 +706,7 @@ static struct gpio global_gpios[] = {
- 	{ GPIO9_CHARGE_EN, GPIOF_OUT_INIT_HIGH, "Charger enable" },
- 	{ GPIO18_POWEROFF, GPIOF_OUT_INIT_LOW, "Power Off" },
- 	{ GPIO87_LCD_POWER, GPIOF_OUT_INIT_LOW, "LCD Power" },
-+	{ GPIO56_MT9M111_nOE, GPIOF_OUT_INIT_LOW, "Camera nOE" },
- };
- 
- static void __init mioa701_machine_init(void)
--- 
-1.7.5.4
+Thanks,
+
+	Arnd
