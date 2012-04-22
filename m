@@ -1,39 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 22 Apr 2012 22:42:02 +0800
-Subject: [PATCH 02/11] MXS: Add USB EHCI and USB PHY clock handling
-In-Reply-To: <1335099567-21056-3-git-send-email-marex@denx.de>
-References: <1334771194-18688-1-git-send-email-marex@denx.de>
- <1335099567-21056-1-git-send-email-marex@denx.de>
- <1335099567-21056-3-git-send-email-marex@denx.de>
-Message-ID: <20120422144159.GC26306@S2101-09.ap.freescale.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 22 Apr 2012 11:20:18 -0400
+Subject: [PATCH 5/8] mmc: omap_hsmmc: release correct resource
+In-Reply-To: <20120421094849.GZ25053@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sat, 21 Apr 2012 10:48:49 +0100")
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRrh-0004bL-3j@rmk-PC.arm.linux.org.uk>
+ <20120420222305.GI21106@atomide.com> <878vhqggbc.fsf@laptop.org>
+ <871unhhkvk.fsf@laptop.org>
+ <20120421094849.GZ25053@n2100.arm.linux.org.uk>
+Message-ID: <87obqjg5e5.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 22, 2012 at 02:59:18PM +0200, Marek Vasut wrote:
-> Based on code by:
-> Tony Lin <tony.lin@freescale.com>
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Chen Peter-B29397 <B29397@freescale.com>
-> Cc: Detlev Zundel <dzu@denx.de>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Li Frank-B20596 <B20596@freescale.com>
-> Cc: Lin Tony-B19295 <B19295@freescale.com>
-> Cc: Linux USB <linux-usb@vger.kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Subodh Nijsure <snijsure@grid-net.com>
-> Cc: Tony Lin <tony.lin@freescale.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> ---
->  arch/arm/mach-mxs/clock-mx28.c |   21 +++++++++++++++++++--
->  1 file changed, 19 insertions(+), 2 deletions(-)
-> 
-The first 2 patches in series are patching files to be removed.
-We are switching mxs clock to common clk framework.
+Hi,
 
+On Sat, Apr 21 2012, Russell King - ARM Linux wrote:
+>> > Thanks, pushed to mmc-next for 3.4.
+>> 
+>> (Actually, that's premature of me, sorry -- just noticed that this
+>> is part of an RFC patchset.  I'll wait for the rest of the patches.)
+>
+> It was previously posted as an entirely separate patch - the reason its
+> part of this RFC is because I needed the patch while developing this
+> series.  So please go ahead and take _this_ patch.
+
+Okay, thanks.  It's back in mmc-next.
+
+- Chris.
 -- 
-Regards,
-Shawn
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
