@@ -1,56 +1,67 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 22 Apr 2012 12:37:16 +0200
-Subject: [GIT PULL] i2c: pnx: device tree conversion
-Message-ID: <4F93DF5C.5080503@antcom.de>
+Date: Sun, 22 Apr 2012 12:38:40 +0200
+Subject: [GIT PULL] LPC32xx: Device tree conversion
+Message-ID: <4F93DFB0.4040409@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd and Olof,
 
-this is the series of the 4 patches adding device tree support to i2c-pnx
-(used by LPC32xx) that Wolfram Sang already applied to the i2c subsystem.
-Since both drivers/i2c/ and mach-lpc32xx are touched here, there will
-probably be conflicts that you need to be aware of.
+this is a rearrangement of all mach-lpc32xx specific patches for device
+tree conversion. Please note that:
 
-I'm posting this again for arm-soc since the actual mach-lpc32xx specific
-DT conversion builds upon those changes (see next pull request), especially
-in arch/arm/mach-lpc32xx/common.c.
+* It builds upon the i2c-pnx changes (see previous pull request, branch
+  lpc32xx/i2c)
+* Dave Miller gave permission to merge the lpc_eth.c change via arm-soc
+  (patch 1/8)
 
-Wolfram already gave permission to merge this via arm-soc, but please
-coordinate and tell me if I can help resolving this.
+The rest of the patches is mach-lpc32xx only.
 
 Thanks in advance,
 
 Roland
 
 
-The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
-
-  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/i2c
-
-for you to fetch changes up to b41a216dafe4dd23c95cb4203de288f773a097a6:
+The following changes since commit b41a216dafe4dd23c95cb4203de288f773a097a6:
 
   i2c: Add device tree support to i2c-pnx.c (2012-04-22 11:59:47 +0200)
 
-----------------------------------------------------------------
-Roland Stigge (4):
-      i2c: pnx: Disable clk in suspend
-      i2c-pnx.c: Use resources in platforms
-      i2c-pnx.c: Remove duplicated i2c.h
-      i2c: Add device tree support to i2c-pnx.c
+are available in the git repository at:
 
- Documentation/devicetree/bindings/i2c/pnx.txt |   36 ++++++
- arch/arm/mach-lpc32xx/common.c                |   67 +++++++----
- arch/arm/mach-lpc32xx/include/mach/i2c.h      |   63 ----------
- arch/arm/mach-pnx4008/i2c.c                   |   64 ++++++----
- arch/arm/mach-pnx4008/include/mach/i2c.h      |   64 ----------
- drivers/i2c/busses/i2c-pnx.c                  |  160 ++++++++++++++++++-------
- include/linux/i2c-pnx.h                       |   10 +-
- 7 files changed, 238 insertions(+), 226 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/pnx.txt
- delete mode 100644 arch/arm/mach-lpc32xx/include/mach/i2c.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/i2c.h
+  git://git.antcom.de/linux-2.6.git lpc32xx/dt
+
+for you to fetch changes up to 89982a181b0783335d79e6e5264a23009aa7c6e9:
+
+  ARM: LPC32xx: Defconfig update (2012-04-22 12:01:20 +0200)
+
+----------------------------------------------------------------
+Roland Stigge (8):
+      net: Add device tree support to LPC32xx
+      ARM: LPC32xx: clock.c cleanup
+      ARM: LPC32xx: clock.c registration adjustment
+      ARM: LPC32xx: Remove obsolete platform Kconfig
+      ARM: LPC32xx: DTS files for device tree conversion
+      ARM: LPC32xx: Device tree support
+      ARM: LPC32xx: Move common code to common.c
+      ARM: LPC32xx: Defconfig update
+
+ .../devicetree/bindings/arm/lpc32xx-mic.txt        |   38 +++
+ Documentation/devicetree/bindings/arm/lpc32xx.txt  |    8 +
+ Documentation/devicetree/bindings/net/lpc-eth.txt  |   24 ++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/lpc32xx.dtsi                     |  292 ++++++++++++++++++++
+ arch/arm/boot/dts/phy3250.dts                      |  145 ++++++++++
+ arch/arm/configs/lpc32xx_defconfig                 |   44 +++-
+ arch/arm/mach-lpc32xx/Kconfig                      |   26 --
+ arch/arm/mach-lpc32xx/clock.c                      |   77 +++---
+ arch/arm/mach-lpc32xx/common.c                     |  205 +-------------
+ arch/arm/mach-lpc32xx/common.h                     |   14 -
+ arch/arm/mach-lpc32xx/irq.c                        |   78 ++++--
+ arch/arm/mach-lpc32xx/phy3250.c                    |  149 ++++-------
+ drivers/net/ethernet/nxp/lpc_eth.c                 |   71 ++++--
+ 14 files changed, 754 insertions(+), 418 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/lpc32xx-mic.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/lpc32xx.txt
+ create mode 100644 Documentation/devicetree/bindings/net/lpc-eth.txt
+ create mode 100644 arch/arm/boot/dts/lpc32xx.dtsi
+ create mode 100644 arch/arm/boot/dts/phy3250.dts
