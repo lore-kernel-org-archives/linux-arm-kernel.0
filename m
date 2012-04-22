@@ -1,19 +1,17 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 22 Apr 2012 22:39:40 +0800
-Subject: [PATCH 04/11] MXS: Add data shared between imx-otg and EHCI driver
-In-Reply-To: <1335099567-21056-5-git-send-email-marex@denx.de>
+Date: Sun, 22 Apr 2012 22:42:02 +0800
+Subject: [PATCH 02/11] MXS: Add USB EHCI and USB PHY clock handling
+In-Reply-To: <1335099567-21056-3-git-send-email-marex@denx.de>
 References: <1334771194-18688-1-git-send-email-marex@denx.de>
  <1335099567-21056-1-git-send-email-marex@denx.de>
- <1335099567-21056-5-git-send-email-marex@denx.de>
-Message-ID: <20120422143938.GB26306@S2101-09.ap.freescale.net>
+ <1335099567-21056-3-git-send-email-marex@denx.de>
+Message-ID: <20120422144159.GC26306@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 22, 2012 at 02:59:20PM +0200, Marek Vasut wrote:
-> This patch adds common data shared between the MXS EHCI HCD driver,
-> the MXS USB Gadget driver and the imx-otg driver. These data allow
-> passing clock and memory stuff from imx-otg driver into the
-> host/gadget driver.
+On Sun, Apr 22, 2012 at 02:59:18PM +0200, Marek Vasut wrote:
+> Based on code by:
+> Tony Lin <tony.lin@freescale.com>
 > 
 > Signed-off-by: Marek Vasut <marex@denx.de>
 > Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -30,14 +28,12 @@ On Sun, Apr 22, 2012 at 02:59:20PM +0200, Marek Vasut wrote:
 > Cc: Tony Lin <tony.lin@freescale.com>
 > Cc: Wolfgang Denk <wd@denx.de>
 > ---
->  include/linux/fsl/mxs-usb.h |   46 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 include/linux/fsl/mxs-usb.h
+>  arch/arm/mach-mxs/clock-mx28.c |   21 +++++++++++++++++++--
+>  1 file changed, 19 insertions(+), 2 deletions(-)
+> 
+The first 2 patches in series are patching files to be removed.
+We are switching mxs clock to common clk framework.
 
-As what Wolfram and Arnd pointed out in thread [1], include/linux/fsl
-is not a good choice. Instead, it should be include/linux/usb/mxs-usb.h.
-
+-- 
 Regards,
 Shawn
-
-[1] http://thread.gmane.org/gmane.linux.kernel/1271153/focus=163132
