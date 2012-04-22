@@ -1,43 +1,43 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sun, 22 Apr 2012 16:34:20 +0200
-Subject: [PATCH] arm: at91: fix build-error for board-dt
-In-Reply-To: <201204221339.18385.arnd@arndb.de>
-References: <1335004105-3162-1-git-send-email-w.sang@pengutronix.de>
- <201204211839.15535.arnd@arndb.de>
- <20120422015059.GE9142@game.jcrosoft.org>
- <201204221339.18385.arnd@arndb.de>
-Message-ID: <20120422143420.GA3942@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 22 Apr 2012 22:39:40 +0800
+Subject: [PATCH 04/11] MXS: Add data shared between imx-otg and EHCI driver
+In-Reply-To: <1335099567-21056-5-git-send-email-marex@denx.de>
+References: <1334771194-18688-1-git-send-email-marex@denx.de>
+ <1335099567-21056-1-git-send-email-marex@denx.de>
+ <1335099567-21056-5-git-send-email-marex@denx.de>
+Message-ID: <20120422143938.GB26306@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> How about this patch for v3.4 then? It ensures that we don't try to build
-> ARCH_AT91RM9200 or ARCH_AT91X40 with MACH_AT91SAM_DT, which would be broken
-> in v3.4-rc4 as Wolfram pointed out.
+On Sun, Apr 22, 2012 at 02:59:20PM +0200, Marek Vasut wrote:
+> This patch adds common data shared between the MXS EHCI HCD driver,
+> the MXS USB Gadget driver and the imx-otg driver. These data allow
+> passing clock and memory stuff from imx-otg driver into the
+> host/gadget driver.
 > 
-> 8<----
-> ARM: at91: fix DT-enabled builds for non-DT chips
-> 
-> The ARCH_AT91RM9200 and ARCH_AT91X40 variants do not support booting with
-> DT yet, so we must not let the user select MACH_AT91SAM_DT in order
-> to avoid build errors.
-> 
-> It's still possible to enable USE_OF, and we should provide a few stub
-> functions for that case for restart and clock_init.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Chen Peter-B29397 <B29397@freescale.com>
+> Cc: Detlev Zundel <dzu@denx.de>
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Li Frank-B20596 <B20596@freescale.com>
+> Cc: Lin Tony-B19295 <B19295@freescale.com>
+> Cc: Linux USB <linux-usb@vger.kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> Cc: Subodh Nijsure <snijsure@grid-net.com>
+> Cc: Tony Lin <tony.lin@freescale.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> ---
+>  include/linux/fsl/mxs-usb.h |   46 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 include/linux/fsl/mxs-usb.h
 
-Thanks! In case it goes in:
+As what Wolfram and Arnd pointed out in thread [1], include/linux/fsl
+is not a good choice. Instead, it should be include/linux/usb/mxs-usb.h.
 
-Reported-by: Wolfram Sang <w.sang@pengutronix.de>
+Regards,
+Shawn
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120422/638bd040/attachment.sig>
+[1] http://thread.gmane.org/gmane.linux.kernel/1271153/focus=163132
