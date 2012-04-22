@@ -1,23 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Apr 2012 20:59:50 +0000
-Subject: [PULL REQUEST] stmp devices
-In-Reply-To: <20120420215440.GA24875@nekote.pengutronix.de>
-References: <20120420215440.GA24875@nekote.pengutronix.de>
-Message-ID: <201204222059.51331.arnd@arndb.de>
+Date: Sun, 22 Apr 2012 20:14:40 +0000
+Subject: [git pull] Renesas DT changes for v3.5
+In-Reply-To: <201204152320.56147.rjw@sisk.pl>
+References: <201204152320.56147.rjw@sisk.pl>
+Message-ID: <201204222014.40964.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 April 2012, Wolfram Sang wrote:
-> Hi Arnd, Olof
+On Sunday 15 April 2012, Rafael J. Wysocki wrote:
+> Please pull changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
 > 
-> as requested, here is the pull request for the stmp-device-series which
-> makes STMP devices mach independent (they are found on mxs and mx6
-> currently). I have rebased them to 3.4-rc3 and dropped the rtc-patch,
-> since it does not have a maintainer ack. I kept the I2C patch since I do
-> maintain I2C myself and there are no conflicts.
+>     Linux 3.4-rc2
+> 
+> with top-most commit 3b7b70552afe351a8bd8fff1eb2d60aab2206576:
+> 
+>     ARM: mach-shmobile: sh7372 generic board support via DT V2
+> 
+> from the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git dt
+> 
+> to receive material requisite for preliminary support of device trees on
+> Renesas platforms.
 
-I've pulled this into a next/stmp-device branch. I don't know yet if we
-will combine it with other patches, probably this will get sent to
-Linus as a pull request by itself.
+Pulled into next/dt now, thanks and sorry for the delay.
 
 	Arnd
