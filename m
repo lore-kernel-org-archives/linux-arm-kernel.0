@@ -1,139 +1,86 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 22 Apr 2012 13:37:24 +0200
-Subject: [PATCH] arm/pxa: fix gpio wakeup setting
-In-Reply-To: <CAN1soZyQPdcwRd5CtDz+iCV9h=Xq-ar=EBKyQ4ya_hE-PZLNXw@mail.gmail.com>
-References: <CAN1soZyQPdcwRd5CtDz+iCV9h=Xq-ar=EBKyQ4ya_hE-PZLNXw@mail.gmail.com>
-Message-ID: <1335094644-3546-1-git-send-email-robert.jarzmik@free.fr>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 22 Apr 2012 14:59:17 +0200
+Subject: [PATCH 01/11] MXS: Make clk_disable return integer
+In-Reply-To: <1335099567-21056-1-git-send-email-marex@denx.de>
+References: <1334771194-18688-1-git-send-email-marex@denx.de>
+ <1335099567-21056-1-git-send-email-marex@denx.de>
+Message-ID: <1335099567-21056-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 3.3, gpio wakeup setting was broken. The call
-enable_irq_wake() didn't set up the PXA gpio registers
-(PWER, ...) anymore.
+This allows subsequent USB clock patch to interchange enable() and disable()
+calls without adding unnecessary switching cruft.
 
-Fix it at least for pxa27x. The driver doesn't seem to be
-used in pxa25x (weird ...), and the fix doesn't extend to
-pxa3xx and pxa95x (which don't have a gpio_set_wake()
-available).
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Chen Peter-B29397 <B29397@freescale.com>
+Cc: Detlev Zundel <dzu@denx.de>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Li Frank-B20596 <B20596@freescale.com>
+Cc: Lin Tony-B19295 <B19295@freescale.com>
+Cc: Linux USB <linux-usb@vger.kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Subodh Nijsure <snijsure@grid-net.com>
+Cc: Tony Lin <tony.lin@freescale.com>
+Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-pxa/pxa27x.c |    6 +++++-
- drivers/gpio/gpio-pxa.c    |   21 +++++++++++++++++++--
- include/linux/gpio-pxa.h   |    4 ++++
- 3 files changed, 28 insertions(+), 3 deletions(-)
+ arch/arm/mach-mxs/clock-mx28.c         |    7 +++++--
+ arch/arm/mach-mxs/include/mach/clock.h |    2 +-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 6bce78e..4726c24 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -421,8 +421,11 @@ void __init pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info)
- 	pxa_register_device(&pxa27x_device_i2c_power, info);
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index cea29c9..43116ba 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -86,7 +86,7 @@ static int _raw_clk_enable(struct clk *clk)
+ 	return 0;
  }
  
-+static struct pxa_gpio_platform_data pxa27x_gpio_info __initdata = {
-+	.gpio_set_wake = gpio_set_wake,
-+};
-+
- static struct platform_device *devices[] __initdata = {
--	&pxa_device_gpio,
- 	&pxa27x_device_udc,
- 	&pxa_device_pmu,
- 	&pxa_device_i2s,
-@@ -458,6 +461,7 @@ static int __init pxa27x_init(void)
- 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
- 		register_syscore_ops(&pxa2xx_clock_syscore_ops);
+-static void _raw_clk_disable(struct clk *clk)
++static int _raw_clk_disable(struct clk *clk)
+ {
+ 	u32 reg;
  
-+		pxa_register_device(&pxa_device_gpio, &pxa27x_gpio_info);
- 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+@@ -95,6 +95,8 @@ static void _raw_clk_disable(struct clk *clk)
+ 		reg |= 1 << clk->enable_shift;
+ 		__raw_writel(reg, clk->enable_reg);
  	}
- 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 5689ce6..fc3ace3 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -64,6 +64,7 @@ struct pxa_gpio_chip {
- 	unsigned long	irq_mask;
- 	unsigned long	irq_edge_rise;
- 	unsigned long	irq_edge_fall;
-+	int (*set_wake)(unsigned int gpio, unsigned int on);
- 
- #ifdef CONFIG_PM
- 	unsigned long	saved_gplr;
-@@ -269,7 +270,8 @@ static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 				(value ? GPSR_OFFSET : GPCR_OFFSET));
++
++	return 0;
  }
  
--static int __devinit pxa_init_gpio_chip(int gpio_end)
-+static int __devinit pxa_init_gpio_chip(int gpio_end,
-+					int (*set_wake)(unsigned int, unsigned int))
- {
- 	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
- 	struct pxa_gpio_chip *chips;
-@@ -285,6 +287,7 @@ static int __devinit pxa_init_gpio_chip(int gpio_end)
+ /*
+@@ -149,7 +151,7 @@ _CLK_ENABLE_PLL(pll1_clk, PLL1, EN_USB_CLKS)
+ _CLK_ENABLE_PLL(pll2_clk, PLL2, CLKGATE)
  
- 		sprintf(chips[i].label, "gpio-%d", i);
- 		chips[i].regbase = gpio_reg_base + BANK_OFF(i);
-+		chips[i].set_wake = set_wake;
- 
- 		c->base  = gpio;
- 		c->label = chips[i].label;
-@@ -412,6 +415,17 @@ static void pxa_mask_muxed_gpio(struct irq_data *d)
- 	writel_relaxed(gfer, c->regbase + GFER_OFFSET);
+ #define _CLK_DISABLE_PLL(name, r, g)					\
+-static void name##_disable(struct clk *clk)				\
++static int name##_disable(struct clk *clk)				\
+ {									\
+ 	__raw_writel(BM_CLKCTRL_##r##CTRL0_POWER,			\
+ 		     CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+@@ -161,6 +163,7 @@ static void name##_disable(struct clk *clk)				\
+ 		__raw_writel(BM_CLKCTRL_##r##CTRL0_##g,			\
+ 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+ 									\
++	return 0;							\
  }
  
-+static int pxa_gpio_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	int gpio = pxa_irq_to_gpio(d->irq);
-+	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
-+
-+	if (c->set_wake)
-+		return c->set_wake(gpio, on);
-+	else
-+		return 0;
-+}
-+
- static void pxa_unmask_muxed_gpio(struct irq_data *d)
- {
- 	int gpio = pxa_irq_to_gpio(d->irq);
-@@ -427,6 +441,7 @@ static struct irq_chip pxa_muxed_gpio_chip = {
- 	.irq_mask	= pxa_mask_muxed_gpio,
- 	.irq_unmask	= pxa_unmask_muxed_gpio,
- 	.irq_set_type	= pxa_gpio_irq_type,
-+	.irq_set_wake	= pxa_gpio_set_wake,
+ _CLK_DISABLE_PLL(pll0_clk, PLL0, EN_USB_CLKS)
+diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
+index 592c9ab..21d1fad 100644
+--- a/arch/arm/mach-mxs/include/mach/clock.h
++++ b/arch/arm/mach-mxs/include/mach/clock.h
+@@ -50,7 +50,7 @@ struct clk {
+ 	int (*enable) (struct clk *);
+ 	/* Function ptr to disable the clock. Leave blank if clock can not
+ 	   be gated. */
+-	void (*disable) (struct clk *);
++	int (*disable) (struct clk *);
+ 	/* Function ptr to set the parent clock of the clock. */
+ 	int (*set_parent) (struct clk *, struct clk *);
  };
- 
- static int pxa_gpio_nums(void)
-@@ -471,6 +486,7 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
- 	struct pxa_gpio_chip *c;
- 	struct resource *res;
- 	struct clk *clk;
-+	struct pxa_gpio_platform_data *info;
- 	int gpio, irq, ret;
- 	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
- 
-@@ -516,7 +532,8 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Initialize GPIO chips */
--	pxa_init_gpio_chip(pxa_last_gpio);
-+	info = dev_get_platdata(&pdev->dev);
-+	pxa_init_gpio_chip(pxa_last_gpio, info ? info->gpio_set_wake : NULL);
- 
- 	/* clear all GPIO edge detects */
- 	for_each_gpio_chip(gpio, c) {
-diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
-index 05071ee..d755b28 100644
---- a/include/linux/gpio-pxa.h
-+++ b/include/linux/gpio-pxa.h
-@@ -13,4 +13,8 @@ extern int pxa_last_gpio;
- 
- extern int pxa_irq_to_gpio(int irq);
- 
-+struct pxa_gpio_platform_data {
-+	int (*gpio_set_wake)(unsigned int gpio, unsigned int on);
-+};
-+
- #endif /* __GPIO_PXA_H */
 -- 
-1.7.5.4
+1.7.9.5
