@@ -1,15 +1,17 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 22 Apr 2012 14:59:21 +0200
-Subject: [PATCH 05/11] MXS: Modify the ci13xxx_udc to avoid adding UDC
+Date: Sun, 22 Apr 2012 14:59:20 +0200
+Subject: [PATCH 04/11] MXS: Add data shared between imx-otg and EHCI driver
 In-Reply-To: <1335099567-21056-1-git-send-email-marex@denx.de>
 References: <1334771194-18688-1-git-send-email-marex@denx.de>
  <1335099567-21056-1-git-send-email-marex@denx.de>
-Message-ID: <1335099567-21056-6-git-send-email-marex@denx.de>
+Message-ID: <1335099567-21056-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the i.MX platform, we are adding the UDC ourselves from the PHY driver. This
-patch adds a flag into the ci13xxx_udc that avoids adding the UDC if set.
+This patch adds common data shared between the MXS EHCI HCD driver,
+the MXS USB Gadget driver and the imx-otg driver. These data allow
+passing clock and memory stuff from imx-otg driver into the
+host/gadget driver.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -26,51 +28,61 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- drivers/usb/gadget/ci13xxx_udc.c |   12 ++++++++----
- drivers/usb/gadget/ci13xxx_udc.h |    1 +
- 2 files changed, 9 insertions(+), 4 deletions(-)
+ include/linux/fsl/mxs-usb.h |   46 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 include/linux/fsl/mxs-usb.h
 
-diff --git a/drivers/usb/gadget/ci13xxx_udc.c b/drivers/usb/gadget/ci13xxx_udc.c
-index 243ef1a..94f8b19 100644
---- a/drivers/usb/gadget/ci13xxx_udc.c
-+++ b/drivers/usb/gadget/ci13xxx_udc.c
-@@ -2935,9 +2935,11 @@ static int udc_probe(struct ci13xxx_udc_driver *driver, struct device *dev,
- 			goto remove_dbg;
- 	}
- 
--	retval = usb_add_gadget_udc(dev, &udc->gadget);
--	if (retval)
--		goto remove_trans;
-+	if (!(udc->udc_driver->flags & CI13XXX_DONT_REGISTER_GADGET)) {
-+		retval = usb_add_gadget_udc(dev, &udc->gadget);
-+		if (retval)
-+			goto remove_trans;
-+	}
- 
- 	pm_runtime_no_callbacks(&udc->gadget.dev);
- 	pm_runtime_enable(&udc->gadget.dev);
-@@ -2980,7 +2982,9 @@ static void udc_remove(void)
- 		err("EINVAL");
- 		return;
- 	}
--	usb_del_gadget_udc(&udc->gadget);
+diff --git a/include/linux/fsl/mxs-usb.h b/include/linux/fsl/mxs-usb.h
+new file mode 100644
+index 0000000..8326a79
+--- /dev/null
++++ b/include/linux/fsl/mxs-usb.h
+@@ -0,0 +1,46 @@
++/*
++ * include/linux/fsl/mxs-usb.h
++ *
++ * Freescale i.MX USB driver shared data.
++ *
++ * Copyright (C) 2012 Marek Vasut <marex@denx.de>
++ * on behalf of DENX Software Engineering GmbH
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
 +
-+	if (!(udc->udc_driver->flags & CI13XXX_DONT_REGISTER_GADGET))
-+		usb_del_gadget_udc(&udc->gadget);
- 
- 	if (udc->transceiver) {
- 		otg_set_peripheral(udc->transceiver->otg, &udc->gadget);
-diff --git a/drivers/usb/gadget/ci13xxx_udc.h b/drivers/usb/gadget/ci13xxx_udc.h
-index 0d31af5..9f2efa2 100644
---- a/drivers/usb/gadget/ci13xxx_udc.h
-+++ b/drivers/usb/gadget/ci13xxx_udc.h
-@@ -108,6 +108,7 @@ struct ci13xxx_udc_driver {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
-+#define CI13XXX_DONT_REGISTER_GADGET	BIT(4)
- 
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
++#ifndef __INCLUDE_LINUX_FSL_MXS_USB_H__
++#define __INCLUDE_LINUX_FSL_MXS_USB_H__
++
++#include <linux/types.h>
++#include <linux/platform_device.h>
++
++struct imx_usb {
++	struct platform_device	*pdev_host;
++	struct platform_device	*pdev_gadget;
++
++	struct clk		*clk;
++	struct resource		*mem_res;
++	void __iomem		*mem;
++	int			irq;
++};
++
++struct imx_usb_platform_data {
++	uint32_t		gpio_vbus;
++	bool			gpio_vbus_inverted;
++	bool			host_mode;
++};
++
++#endif /* __INCLUDE_LINUX_FSL_MXS_USB_H__ */
 -- 
 1.7.9.5
