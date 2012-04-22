@@ -1,25 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Apr 2012 00:38:50 +0800
-Subject: [PATCH 04/11] MXS: Add data shared between imx-otg and EHCI driver
-In-Reply-To: <201204221742.53825.marex@denx.de>
-References: <1334771194-18688-1-git-send-email-marex@denx.de>
- <1335099567-21056-5-git-send-email-marex@denx.de>
- <20120422143938.GB26306@S2101-09.ap.freescale.net>
- <201204221742.53825.marex@denx.de>
-Message-ID: <20120422163848.GF26306@S2101-09.ap.freescale.net>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sun, 22 Apr 2012 14:17:55 -0400
+Subject: irqdomains and irq_domain_add_linear
+Message-ID: <CAKON4OyceFFfSqJ+fSvBWQURkqyyL=azdNjDbCJgQ5ZLfU=tFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 22, 2012 at 05:42:53PM +0200, Marek Vasut wrote:
-> Ok, noted. Will add in V5. What about the rest of these patches, I'd be 
-> interested to hear your opinion on these :-)
-> 
-I have not looked into drivers/usb patches.  I doubt I have enough
-knowledge about usb subsystem to give constructive comments.  Sorry.
+On ARM with the current Linus tree the irqdomain code doesn't work if
+you have multiple linear domains. In my case I have two interrupt
+controllers. As the device tree is parsed interrupts get randomly
+assigned from each of the two domains. These IRQs get assigned
+sequentially ascending VIRQ numbers and sequentially ascending
+descriptors.
 
-For arch/arm/mach-mxs changes, I think you have known my position,
-device tree.
+But then when an interrupt happens, the ARM interrupt handler looks
+the interrupt up in the descriptor array. This array is based on virq,
+not hwirq. As soon as the 1:1 relationship of virq to hwirq is broken
+(it got broken by alternating assignments to the interrupt
+controllers) the descriptor lookup stops working since it retrieves
+the wrong descriptor. In my case it made the console fail making it
+difficult to debug what was happening. I reverted back to
+irq_domain_add_legacy() which keeps the 1:1 mapping and everything
+started working again.
+
+My initial through to fix this was to add a revmap look up in the
+interrupt handler. But a better way might be to keep the descriptor
+array corresponding to hwirq instead of virq.
 
 -- 
-Regards,
-Shawn
+Jon Smirl
+jonsmirl at gmail.com
