@@ -1,45 +1,43 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 22 Apr 2012 18:24:05 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAwMi8xN10gQVJNIGNscHM3MTF4OiBBZGRlZCBDaXJy?=
- =?UTF-8?B?dXMgTG9naWMgRVA3MzEyIENQVSB2YXJpYW50?=
-In-Reply-To: <201204221358.29315.arnd@arndb.de>
-References: <1334999490-27177-1-git-send-email-shc_work@mail.ru>
- <20120421122044.GF24211@n2100.arm.linux.org.uk>
- <201204221358.29315.arnd@arndb.de>
-Message-ID: <E1SLxht-0000II-Od.shc_work-mail-ru@f23.mail.ru>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sun, 22 Apr 2012 16:34:20 +0200
+Subject: [PATCH] arm: at91: fix build-error for board-dt
+In-Reply-To: <201204221339.18385.arnd@arndb.de>
+References: <1335004105-3162-1-git-send-email-w.sang@pengutronix.de>
+ <201204211839.15535.arnd@arndb.de>
+ <20120422015059.GE9142@game.jcrosoft.org>
+ <201204221339.18385.arnd@arndb.de>
+Message-ID: <20120422143420.GA3942@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+> How about this patch for v3.4 then? It ensures that we don't try to build
+> ARCH_AT91RM9200 or ARCH_AT91X40 with MACH_AT91SAM_DT, which would be broken
+> in v3.4-rc4 as Wolfram pointed out.
+> 
+> 8<----
+> ARM: at91: fix DT-enabled builds for non-DT chips
+> 
+> The ARCH_AT91RM9200 and ARCH_AT91X40 variants do not support booting with
+> DT yet, so we must not let the user select MACH_AT91SAM_DT in order
+> to avoid build errors.
+> 
+> It's still possible to enable USE_OF, and we should provide a few stub
+> functions for that case for restart and clock_init.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
+Thanks! In case it goes in:
 
-Sun, 22 Apr 2012 13:58:28 +0000 ?? Arnd Bergmann <arnd@arndb.de>:
-> On Saturday 21 April 2012, Russell King - ARM Linux wrote:
-> > The headers still have to end up being in an accessible place, and having
-> > drivers include the minimum required is a good idea.  Merely moving them
-> > into include/mach and updating the include statements as far as I'd go.
-> > (and I've never liked the idea of mach/hardware.h being an "include the
-> > world for this platform" header file.)
-> 
-> Digging a bit deeper into clps711x, I found that with Alexander's patch
-> series applied, there is nothing that actually includes the three
-> asm/hardware/ep7*.h files. I wonder about the motivation behind providing
-> them. Any reason we can't just remove those three files altogher?
-> 
-> Note that if we were to actually start using those files, this section
-> of mach/hardware.h would be broken:
-> 
-> #if defined (CONFIG_SOC_EP7211)
-> #include <asm/hardware/ep7211.h>
-> #elif defined (CONFIG_SOC_EP7212)
-> #include <asm/hardware/ep7212.h>
-> #elif defined (CONFIG_SOC_EP7213)
-> #include <asm/hardware/ep7312.h>
-> #endif
-> 
-> Because we can have more than one of these socs enabled in the
-> same configuration and enabling CONFIG_SOC_EP7211 would make the
-> other two headers invisible.
-We can define the ??7312 registers in a single clps7111.h header and just always
-keep in mind that additional registers can be used only with the corresponding processor.
-In any case, additional registers are used in the code for a particular board only.
+Reported-by: Wolfram Sang <w.sang@pengutronix.de>
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120422/638bd040/attachment.sig>
