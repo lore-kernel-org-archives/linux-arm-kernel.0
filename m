@@ -1,15 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 22 Apr 2012 14:59:18 +0200
-Subject: [PATCH 02/11] MXS: Add USB EHCI and USB PHY clock handling
+Date: Sun, 22 Apr 2012 14:59:21 +0200
+Subject: [PATCH 05/11] MXS: Modify the ci13xxx_udc to avoid adding UDC
 In-Reply-To: <1335099567-21056-1-git-send-email-marex@denx.de>
 References: <1334771194-18688-1-git-send-email-marex@denx.de>
  <1335099567-21056-1-git-send-email-marex@denx.de>
-Message-ID: <1335099567-21056-3-git-send-email-marex@denx.de>
+Message-ID: <1335099567-21056-6-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on code by:
-Tony Lin <tony.lin@freescale.com>
+On the i.MX platform, we are adding the UDC ourselves from the PHY driver. This
+patch adds a flag into the ci13xxx_udc that avoids adding the UDC if set.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -26,47 +26,51 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-mxs/clock-mx28.c |   21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ drivers/usb/gadget/ci13xxx_udc.c |   12 ++++++++----
+ drivers/usb/gadget/ci13xxx_udc.h |    1 +
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 43116ba..8784a72 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -577,6 +577,21 @@ static struct clk usb1_clk = {
- 	.parent = &pll1_clk,
- };
+diff --git a/drivers/usb/gadget/ci13xxx_udc.c b/drivers/usb/gadget/ci13xxx_udc.c
+index 243ef1a..94f8b19 100644
+--- a/drivers/usb/gadget/ci13xxx_udc.c
++++ b/drivers/usb/gadget/ci13xxx_udc.c
+@@ -2935,9 +2935,11 @@ static int udc_probe(struct ci13xxx_udc_driver *driver, struct device *dev,
+ 			goto remove_dbg;
+ 	}
  
-+static struct clk usb_phy_clk0 = {
-+	.parent = &pll0_clk,
-+	.enable = _raw_clk_disable,
-+	.disable = _raw_clk_enable,
-+	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL0CTRL0,
-+	.enable_shift = 18,
-+};
+-	retval = usb_add_gadget_udc(dev, &udc->gadget);
+-	if (retval)
+-		goto remove_trans;
++	if (!(udc->udc_driver->flags & CI13XXX_DONT_REGISTER_GADGET)) {
++		retval = usb_add_gadget_udc(dev, &udc->gadget);
++		if (retval)
++			goto remove_trans;
++	}
+ 
+ 	pm_runtime_no_callbacks(&udc->gadget.dev);
+ 	pm_runtime_enable(&udc->gadget.dev);
+@@ -2980,7 +2982,9 @@ static void udc_remove(void)
+ 		err("EINVAL");
+ 		return;
+ 	}
+-	usb_del_gadget_udc(&udc->gadget);
 +
-+static struct clk usb_phy_clk1 = {
-+	.parent = &pll1_clk,
-+	.enable = _raw_clk_disable,
-+	.disable = _raw_clk_enable,
-+	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
-+	.enable_shift = 18,
-+};
- #define _DEFINE_CLOCK(name, er, es, p)					\
- 	static struct clk name = {					\
- 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
-@@ -636,8 +651,10 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxs-mmc.3", NULL, ssp3_clk)
- 	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
- 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
--	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
--	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
-+	_REGISTER_CLOCK("imx-otg.0", "usb", usb0_clk)
-+	_REGISTER_CLOCK("imx-otg.1", "usb", usb1_clk)
-+	_REGISTER_CLOCK("mxs-usb-phy.0", "phy", usb_phy_clk0)
-+	_REGISTER_CLOCK("mxs-usb-phy.1", "phy", usb_phy_clk1)
- 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
++	if (!(udc->udc_driver->flags & CI13XXX_DONT_REGISTER_GADGET))
++		usb_del_gadget_udc(&udc->gadget);
+ 
+ 	if (udc->transceiver) {
+ 		otg_set_peripheral(udc->transceiver->otg, &udc->gadget);
+diff --git a/drivers/usb/gadget/ci13xxx_udc.h b/drivers/usb/gadget/ci13xxx_udc.h
+index 0d31af5..9f2efa2 100644
+--- a/drivers/usb/gadget/ci13xxx_udc.h
++++ b/drivers/usb/gadget/ci13xxx_udc.h
+@@ -108,6 +108,7 @@ struct ci13xxx_udc_driver {
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+ #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+ #define CI13XXX_DISABLE_STREAMING	BIT(3)
++#define CI13XXX_DONT_REGISTER_GADGET	BIT(4)
+ 
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
 -- 
 1.7.9.5
