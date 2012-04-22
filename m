@@ -1,16 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 22 Apr 2012 14:59:24 +0200
-Subject: [PATCH 08/11] MXS: Add imx-otg driver
+Date: Sun, 22 Apr 2012 14:59:26 +0200
+Subject: [PATCH 10/11] MXS: Add platform registration hooks for USB EHCI
 In-Reply-To: <1335099567-21056-1-git-send-email-marex@denx.de>
 References: <1334771194-18688-1-git-send-email-marex@denx.de>
  <1335099567-21056-1-git-send-email-marex@denx.de>
-Message-ID: <1335099567-21056-9-git-send-email-marex@denx.de>
+Message-ID: <1335099567-21056-11-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver handles claiming of clocks and memory areas. These are later
-properly delegated to it's child devices, the USB Host (ehci-mxs) and
-USB Gadget (ci13xxx-mxs).
+Based on code by:
+Tony Lin <tony.lin@freescale.com>
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -27,326 +26,176 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- drivers/usb/otg/Kconfig   |    6 +
- drivers/usb/otg/Makefile  |    1 +
- drivers/usb/otg/imx-otg.c |  282 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 289 insertions(+)
- create mode 100644 drivers/usb/otg/imx-otg.c
+ arch/arm/mach-mxs/devices-mx28.h                |    5 ++
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-usb.c        |   84 +++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/devices-common.h |   12 ++++
+ 5 files changed, 105 insertions(+)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
 
-diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-index 5c87db0..e7c6325 100644
---- a/drivers/usb/otg/Kconfig
-+++ b/drivers/usb/otg/Kconfig
-@@ -116,6 +116,12 @@ config FSL_USB2_OTG
- 	help
- 	  Enable this to support Freescale USB OTG transceiver.
+diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+index 9dbeae1..f0e1d54 100644
+--- a/arch/arm/mach-mxs/devices-mx28.h
++++ b/arch/arm/mach-mxs/devices-mx28.h
+@@ -11,6 +11,7 @@
+ #include <mach/mx28.h>
+ #include <mach/devices-common.h>
+ #include <mach/mxsfb.h>
++#include <linux/fsl/mxs-usb.h>
  
-+config USB_IMX_COMPOSITE
-+	bool
-+	help
-+	  Composite driver that handles clock and memory mapping for
-+	  i.MX USB host and USB PHY.
+ extern const struct amba_device mx28_duart_device __initconst;
+ #define mx28_add_duart() \
+@@ -47,6 +48,10 @@ extern const struct mxs_mxs_mmc_data mx28_mxs_mmc_data[] __initconst;
+ 
+ #define mx28_add_mxs_pwm(id)		mxs_add_mxs_pwm(MX28_PWM_BASE_ADDR, id)
+ 
++extern const struct mxs_usbh_data mx28_mxs_usbh_data[] __initconst;
++#define mx28_add_mxs_usbh(id, pdata) \
++	mxs_add_mxs_usbh(&mx28_mxs_usbh_data[id], pdata)
 +
- config USB_MV_OTG
- 	tristate "Marvell USB OTG support"
- 	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
-diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
-index 41aa509..7d2c631 100644
---- a/drivers/usb/otg/Makefile
-+++ b/drivers/usb/otg/Makefile
-@@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
- obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
- fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
- obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
-+obj-$(CONFIG_USB_IMX_COMPOSITE)	+= imx-otg.o
- obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
-diff --git a/drivers/usb/otg/imx-otg.c b/drivers/usb/otg/imx-otg.c
+ struct platform_device *__init mx28_add_mxsfb(
+ 		const struct mxsfb_platform_data *pdata);
+ 
+diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+index b8913df..f6709bc 100644
+--- a/arch/arm/mach-mxs/devices/Kconfig
++++ b/arch/arm/mach-mxs/devices/Kconfig
+@@ -32,3 +32,6 @@ config MXS_HAVE_PLATFORM_MXS_SAIF
+ 
+ config MXS_HAVE_PLATFORM_RTC_STMP3XXX
+ 	bool
++
++config MXS_HAVE_PLATFORM_USB
++	bool
+diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+index c8f5c95..be4cc9e 100644
+--- a/arch/arm/mach-mxs/devices/Makefile
++++ b/arch/arm/mach-mxs/devices/Makefile
+@@ -11,3 +11,4 @@ obj-y += platform-gpio-mxs.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_MXSFB) += platform-mxsfb.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_SAIF) += platform-mxs-saif.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_RTC_STMP3XXX) += platform-rtc-stmp3xxx.o
++obj-$(CONFIG_MXS_HAVE_PLATFORM_USB) += platform-usb.o
+diff --git a/arch/arm/mach-mxs/devices/platform-usb.c b/arch/arm/mach-mxs/devices/platform-usb.c
 new file mode 100644
-index 0000000..249b6b5
+index 0000000..5d71778
 --- /dev/null
-+++ b/drivers/usb/otg/imx-otg.c
-@@ -0,0 +1,282 @@
++++ b/arch/arm/mach-mxs/devices/platform-usb.c
+@@ -0,0 +1,84 @@
 +/*
-+ * drivers/usb/otg/imx-otg.c
++ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
-+ * Freescale i.MX USB composite driver.
-+ *
-+ * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-+ * on behalf of DENX Software Engineering GmbH
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
 + */
 +
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/usb.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/hcd.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
++#include <linux/compiler.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/fsl_devices.h>
 +#include <linux/fsl/mxs-usb.h>
-+#include <linux/io.h>
 +
-+#include <mach/common.h>
-+#include <mach/hardware.h>
++#include <mach/mx23.h>
++#include <mach/mx28.h>
 +#include <mach/devices-common.h>
 +
-+/*
-+ * Allocate platform device with the DMA mask, this is borrowed from
-+ * arch/arm/mach-mxs/devices.c
-+ */
-+static struct platform_device *__devinit add_platform_device(
-+		const char *name, int id,
-+		const void *data, size_t size_data, u64 dmamask)
-+{
-+	int ret = -ENOMEM;
-+	struct platform_device *pdev;
-+
-+	pdev = platform_device_alloc(name, id);
-+	if (!pdev)
-+		goto err;
-+
-+	if (dmamask) {
-+		/*
-+		 * This memory isn't freed when the device is put,
-+		 * I don't have a nice idea for that though.  Conceptually
-+		 * dma_mask in struct device should not be a pointer.
-+		 * See http://thread.gmane.org/gmane.linux.kernel.pci/9081
-+		 */
-+		pdev->dev.dma_mask =
-+			kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-+		if (!pdev->dev.dma_mask)
-+			/* ret is still -ENOMEM; */
-+			goto err;
-+
-+		*pdev->dev.dma_mask = dmamask;
-+		pdev->dev.coherent_dma_mask = dmamask;
++#define mxs_usbh_data_entry_single(soc, _id, hwid)			\
++	{								\
++		.id = _id,						\
++		.usb_irq = soc ## _INT_USB ## hwid,			\
++		.usb_iobase = soc ## _USBCTRL ## hwid ## _BASE_ADDR,	\
++		.phy_iobase = soc ## _USBPHY ## hwid ## _BASE_ADDR,	\
 +	}
 +
-+	if (data) {
-+		ret = platform_device_add_data(pdev, data, size_data);
-+		if (ret)
-+			goto err;
-+	}
++#define mxs_usbh_data_entry(soc, _id, hwid)				\
++	[_id] = mxs_usbh_data_entry_single(soc, _id, hwid)
 +
-+	ret = platform_device_add(pdev);
-+	if (ret) {
-+err:
-+		if (dmamask)
-+			kfree(pdev->dev.dma_mask);
-+		platform_device_put(pdev);
-+		return ERR_PTR(ret);
-+	}
-+
-+	return pdev;
-+}
-+
-+static int __devinit imx_usb_probe(struct platform_device *pdev)
-+{
-+	struct imx_usb_platform_data *pdata = pdev->dev.platform_data;
-+	struct imx_usb *data;
-+	struct usb_phy *phy;
-+	int ret;
-+	void *retp = NULL;
-+
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "No platform data supplied!\n");
-+		return -ENODEV;
-+	}
-+
-+	phy = usb_get_transceiver();
-+	if (!phy)
-+		return -EPROBE_DEFER;
-+
-+	/*
-+	 * Until further notice, this claims all necessary resources.
-+	 */
-+
-+	/* Allocate driver's private date. */
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data) {
-+		ret = -ENOMEM;
-+		goto err_alloc_data;
-+	}
-+
-+	/* Claim the Host clock. */
-+	data->clk = clk_get(&pdev->dev, "usb");
-+	if (IS_ERR(data->clk)) {
-+		dev_err(&pdev->dev, "Failed to claim clock for USB Host\n");
-+		ret = PTR_ERR(data->clk);
-+		goto err_claim_host_clock;
-+	}
-+
-+	/* Prepare Host clock. */
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to enable clock for USB Host.\n");
-+		goto err_prepare_host_clock;
-+	}
-+
-+	/* Get memory area for EHCI host from resources. */
-+	data->mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!data->mem_res) {
-+		dev_err(&pdev->dev, "Specify memory area for this USB Host!\n");
-+		ret = -ENODEV;
-+		goto err_get_host_resource;
-+	}
-+
-+	/* Request the memory region for this USB Host. */
-+	retp = devm_request_mem_region(&pdev->dev, data->mem_res->start,
-+			resource_size(data->mem_res), pdev->name);
-+	if (!retp) {
-+		dev_err(&pdev->dev, "USB Host memory area already in use!\n");
-+		ret = -EBUSY;
-+		goto err_get_host_mem;
-+	}
-+
-+	/* Map the memory region for USB Host. */
-+	data->mem = devm_ioremap(&pdev->dev, data->mem_res->start,
-+				resource_size(data->mem_res));
-+	if (!data->mem) {
-+		dev_err(&pdev->dev, "Memory mapping of USB Host failed!\n");
-+		ret = -EFAULT;
-+		goto err_map_host_mem;
-+	}
-+
-+	/* Get IRQ for EHCI host from resources. */
-+	data->irq = platform_get_irq(pdev, 0);
-+	if (data->irq < 0) {
-+		dev_err(&pdev->dev, "Specify IRQ for this USB Host!\n");
-+		ret = -ENODEV;
-+		goto err_get_host_irq;
-+	}
-+
-+	/*
-+	 * Now finally probe the Host driver!
-+	 */
-+	if (pdata->host_mode) {
-+		data->pdev_host = add_platform_device("mxs-ehci", -1,
-+							data, sizeof(*data),
-+							DMA_BIT_MASK(32));
-+		if (!data->pdev_host) {
-+			dev_err(&pdev->dev, "Failed registering Host!\n");
-+			ret = -ENODEV;
-+			goto err_register_host;
-+		}
-+	} else {
-+		data->pdev_gadget = add_platform_device("ci13xxx-mxs", -1,
-+							data, sizeof(*data),
-+							DMA_BIT_MASK(32));
-+		if (!data->pdev_gadget) {
-+			dev_err(&pdev->dev, "Failed registering Host!\n");
-+			ret = -ENODEV;
-+			goto err_register_gadget;
-+		}
-+	}
-+
-+	/*
-+	 * Initialize the transceiver
-+	 */
-+	phy = usb_get_transceiver();
-+	if (!phy) {
-+		dev_err(&pdev->dev, "Unable to find transceiver.\n");
-+		ret = -ENODEV;
-+		goto err_phy;
-+	}
-+
-+	ret = usb_phy_init(phy);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Unable init transceiver\n");
-+		ret = -ENODEV;
-+		goto err_phy_init;
-+	}
-+
-+	/* Set up the PORTSCx register */
-+	writel(0, data->mem + 0x144);
-+
-+	return 0;
-+
-+err_phy_init:
-+	if (phy)
-+		usb_put_transceiver(phy);
-+err_phy:
-+	if (data->pdev_gadget)
-+		platform_device_unregister(data->pdev_gadget);
-+err_register_gadget:
-+	if (data->pdev_host)
-+		platform_device_unregister(data->pdev_host);
-+err_register_host:
-+err_get_host_irq:
-+	iounmap(data->mem);
-+err_map_host_mem:
-+	release_mem_region(data->mem_res->start,
-+			resource_size(data->mem_res));
-+err_get_host_mem:
-+	data->mem_res = NULL;
-+err_get_host_resource:
-+	clk_disable_unprepare(data->clk);
-+err_prepare_host_clock:
-+	clk_put(data->clk);
-+err_claim_host_clock:
-+err_alloc_data:
-+	return ret;
-+}
-+
-+static int __devexit imx_usb_remove(struct platform_device *pdev)
-+{
-+	struct imx_usb *data = platform_get_drvdata(pdev);
-+
-+	if (data->pdev_gadget)
-+		platform_device_unregister(data->pdev_gadget);
-+
-+	if (data->pdev_host)
-+		platform_device_unregister(data->pdev_host);
-+
-+	iounmap(data->mem);
-+	release_mem_region(data->mem_res->start,
-+			resource_size(data->mem_res));
-+	data->mem_res = NULL;
-+	clk_disable_unprepare(data->clk);
-+	clk_put(data->clk);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver imx_usb_driver = {
-+	.probe		= imx_usb_probe,
-+	.remove		= __devexit_p(imx_usb_remove),
-+	.driver		= {
-+		.name	= "imx-otg",
-+		.owner	= THIS_MODULE,
-+	},
++#ifdef CONFIG_SOC_IMX23
++const struct mxs_usbh_data mx23_mxs_usbh_data[] __initconst = {
++	mxs_usbh_data_entry(MX23, 0, 0),
 +};
++#endif
 +
-+static int __init imx_usb_init(void)
++#ifdef CONFIG_SOC_IMX28
++const struct mxs_usbh_data mx28_mxs_usbh_data[] __initconst = {
++	mxs_usbh_data_entry(MX28, 0, 0),
++	mxs_usbh_data_entry(MX28, 1, 1),
++};
++#endif
++
++void __init mxs_add_mxs_usbh(const struct mxs_usbh_data *data,
++			const struct imx_usb_platform_data *pdata)
 +{
-+	return platform_driver_register(&imx_usb_driver);
++	struct platform_device *pdev;
++	struct resource phy_res[] = {
++		{
++			.start	= data->phy_iobase,
++			.end	= data->phy_iobase + SZ_256 - 1,
++			.flags	= IORESOURCE_MEM,
++		}, {
++			.start	= data->usb_irq,
++			.end	= data->usb_irq,
++			.flags	= IORESOURCE_IRQ,
++		},
++	};
++
++	struct resource usb_res[] = {
++		{
++			.start	= data->usb_iobase,
++			.end	= data->usb_iobase + SZ_64K - 1,
++			.flags	= IORESOURCE_MEM,
++		}, {
++			.start	= data->usb_irq,
++			.end	= data->usb_irq,
++			.flags	= IORESOURCE_IRQ,
++		},
++	};
++
++	pdev = mxs_add_platform_device_dmamask("mxs-usb-phy", data->id,
++					phy_res, ARRAY_SIZE(phy_res),
++					pdata, sizeof(*pdata),
++					DMA_BIT_MASK(32));
++	if (!pdev)
++		pr_err("Failed to register USB PHY driver!\n");
++
++	pdev = mxs_add_platform_device_dmamask("imx-otg", data->id,
++					usb_res, ARRAY_SIZE(usb_res),
++					pdata, sizeof(*pdata),
++					DMA_BIT_MASK(32));
++	if (!pdev)
++		pr_err("Failed to register USB Host driver!\n");
 +}
+diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+index f2e3839..3024428 100644
+--- a/arch/arm/mach-mxs/include/mach/devices-common.h
++++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+@@ -10,6 +10,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/init.h>
+ #include <linux/amba/bus.h>
++#include <linux/fsl_devices.h>
++#include <linux/fsl/mxs-usb.h>
+ 
+ extern struct device mxs_apbh_bus;
+ 
+@@ -42,6 +44,16 @@ struct mxs_auart_data {
+ struct platform_device *__init mxs_add_auart(
+ 		const struct mxs_auart_data *data);
+ 
++/* usb host */
++struct mxs_usbh_data {
++	int id;
++	resource_size_t usb_irq;
++	resource_size_t usb_iobase;
++	resource_size_t phy_iobase;
++};
++void __init mxs_add_mxs_usbh(const struct mxs_usbh_data *data,
++			const struct imx_usb_platform_data *pdata);
 +
-+static void __exit imx_usb_exit(void)
-+{
-+	platform_driver_unregister(&imx_usb_driver);
-+}
-+
-+module_init(imx_usb_init);
-+module_exit(imx_usb_exit);
-+
-+MODULE_ALIAS("platform:imx-otg");
-+MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
-+MODULE_DESCRIPTION("Freescale i.MX USB composite driver");
-+MODULE_LICENSE("GPL");
+ /* fec */
+ #include <linux/fec.h>
+ struct mxs_fec_data {
 -- 
 1.7.9.5
