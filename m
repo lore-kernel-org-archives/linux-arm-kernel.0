@@ -1,48 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Apr 2012 20:32:48 +0000
-Subject: [GIT PULL] at91: fist cleanup branch for 3.5
-In-Reply-To: <4F8D9037.9010401@atmel.com>
-References: <4F8D9037.9010401@atmel.com>
-Message-ID: <201204222032.48694.arnd@arndb.de>
+From: mattwood2000@gmail.com (Matt Wood)
+Date: Sun, 22 Apr 2012 17:07:21 -0400
+Subject: SPI subsystem delays
+Message-ID: <CADjezmaB7yo6W1dW11JKtH7JNSsgXQvOQy5BMqtAUfe6sy2igA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2012, Nicolas Ferre wrote:
-> Arnd, Olof,
-> 
-> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
-> 
->   Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)   
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-3.5-cleanup
-> 
-> for you to fetch changes up to 39ecc143b4c1f3d42e8300e7f5274681b99f95c2:
-> 
->   ARM: at91: add defconfig for device tree (2012-04-17 14:47:22 +0200)
-> 
-> ----------------------------------------------------------------
-> First batch of AT91 cleanup for 3.5 kernel.
-> - The biggest improvement of this series is the ability to compile several
->   AT91 SoCs in one kernel image.
->   For now on it's limited to the DT-enabled boards but we can compile all
->   the core together.
-> - The Kconfig series is stacked before other patches as it is simple and
->   non-intrusive. Its goal is to remove too restrictive dependencies on
->   SoC names. This will allow to add support for newer SoC seamlessly.
-> - Some very "cosmetic" Kconfig changes are also added (entry names,
->   comments, etc.).
+Hi folks, this is my first post to the list, so I apologize if I
+missed similar topics from the past.
 
-Pulled into the next/cleanup branch, and also pulled the MAINTAINERS
-update into the next/maintainers branch.
+I'm working on a driver for a SPI based peripheral but have run into
+some issues with the timing requirements.  The device I'm working with
+is very slow, and has some specific delay requirements - specifically
+the delay between bytes in a single transfer, delay between chip
+select assertion and the first clock edge, and the delay between
+consecutive transfers.  The platform I'm developing on and most
+comfortable with is the Atmel ARM9 series.
 
-Olof, this is the first pull from a tag I've done, and I think we
-should decide on a method to show these pulls in the log. I've
-set the at91/cleanup branch to the version that Nicolas sent,
-without the merge changeset that is normally generated when you
-pull from a tag. For next/cleanup branch, I've pulled directly from
-the tag and edited the commit message a bit. Do you think that's good
-or do you know a better way to handle these?
+I notice in the spi_device subsystem structure there are no provisions
+for the delays in the mainline instantiation although the comments
+seem to suggest additions such as these are expected or at least
+anticipated.
 
-	Arnd
+So I guess my question is am I the only one who has been working with
+a device that require very specific timings?  I know most modern SPI
+devices are application specific silicon and are designed to run as
+fast as possible (i.e serial flash, etc.), but I know there are some
+devices out there that require more strict timings.
+
+I suppose what I'm getting at is a patch proposal to add attributes
+such as DLYBCT (Delay Between Consecutive Transfers), DLYBS (Delay
+Before Serial Clock), DLYBCS (Delay Between Chip Selects) - again as
+I'm most comfortable with Atmel's ARM SPI peripheral, so I'm used to
+these hardware features.
+
+With the driver I'm working on I have had to patch the SPI subsystem
+to get the device operate correctly, so the code is not a question,
+but I wonder what other people's thoughts are on this, and if there
+are reasons why not to add these attributes - they could simply be
+zeroed out by default for hardware that does not need to or cannot
+implement them.
+
+Thanks for the read.
+
+Regards, Matt.
