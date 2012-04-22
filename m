@@ -1,31 +1,23 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sun, 22 Apr 2012 14:17:55 -0400
-Subject: irqdomains and irq_domain_add_linear
-Message-ID: <CAKON4OyceFFfSqJ+fSvBWQURkqyyL=azdNjDbCJgQ5ZLfU=tFA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 Apr 2012 20:59:50 +0000
+Subject: [PULL REQUEST] stmp devices
+In-Reply-To: <20120420215440.GA24875@nekote.pengutronix.de>
+References: <20120420215440.GA24875@nekote.pengutronix.de>
+Message-ID: <201204222059.51331.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM with the current Linus tree the irqdomain code doesn't work if
-you have multiple linear domains. In my case I have two interrupt
-controllers. As the device tree is parsed interrupts get randomly
-assigned from each of the two domains. These IRQs get assigned
-sequentially ascending VIRQ numbers and sequentially ascending
-descriptors.
+On Friday 20 April 2012, Wolfram Sang wrote:
+> Hi Arnd, Olof
+> 
+> as requested, here is the pull request for the stmp-device-series which
+> makes STMP devices mach independent (they are found on mxs and mx6
+> currently). I have rebased them to 3.4-rc3 and dropped the rtc-patch,
+> since it does not have a maintainer ack. I kept the I2C patch since I do
+> maintain I2C myself and there are no conflicts.
 
-But then when an interrupt happens, the ARM interrupt handler looks
-the interrupt up in the descriptor array. This array is based on virq,
-not hwirq. As soon as the 1:1 relationship of virq to hwirq is broken
-(it got broken by alternating assignments to the interrupt
-controllers) the descriptor lookup stops working since it retrieves
-the wrong descriptor. In my case it made the console fail making it
-difficult to debug what was happening. I reverted back to
-irq_domain_add_legacy() which keeps the 1:1 mapping and everything
-started working again.
+I've pulled this into a next/stmp-device branch. I don't know yet if we
+will combine it with other patches, probably this will get sent to
+Linus as a pull request by itself.
 
-My initial through to fix this was to add a revmap look up in the
-interrupt handler. But a better way might be to keep the descriptor
-array corresponding to hwirq instead of virq.
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+	Arnd
