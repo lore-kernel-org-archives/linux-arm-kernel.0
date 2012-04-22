@@ -1,28 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Apr 2012 21:28:21 +0000
-Subject: [GIT PULL] LPC32xx: Device tree conversion
-In-Reply-To: <4F93DFB0.4040409@antcom.de>
-References: <4F93DFB0.4040409@antcom.de>
-Message-ID: <201204222128.21993.arnd@arndb.de>
+Date: Sun, 22 Apr 2012 21:38:40 +0000
+Subject: [GIT PULL] ARM: spear-soc support for 3.5
+In-Reply-To: <4F8E38B8.20907@st.com>
+References: <4F8E38B8.20907@st.com>
+Message-ID: <201204222138.40732.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 April 2012, Roland Stigge wrote:
-> Hi Arnd and Olof,
+On Wednesday 18 April 2012, Viresh Kumar wrote:
+> Hi Arnd/Olof,
 > 
-> this is a rearrangement of all mach-lpc32xx specific patches for device
-> tree conversion. Please note that:
+> The following changes since commit a82c81fb238811d4eea6d36b5e0b4c4dda004982:
 > 
-> * It builds upon the i2c-pnx changes (see previous pull request, branch
->   lpc32xx/i2c)
-> * Dave Miller gave permission to merge the lpc_eth.c change via arm-soc
->   (patch 1/8)
+>   Add linux-next specific files for 20120416 (2012-04-16 16:00:03 +1000)
 > 
-> The rest of the patches is mach-lpc32xx only.
+> are available in the git repository at:
+> 
+>   git://git.stlinux.com/spear/linux-2.6.git spear-v3.5
+> 
 
-Pulled into the next/dt branch, with the i2c patches being stored in
-the depends/i2c/lpc32xx branch for reference.
+Hi Viresh,
 
-Thanks,
+I could not pull this tree, because it was based off linux-next rather
+than an -rc release. I have instead rebased the commits for you on top of
+v3.4-rc3 and split them into a "dt" and a "pinctrl" part that I've applied
+to the respective branches in arm-soc.
+
+Please check that everything still works in my version and next time
+when you send a pull request do it on top of an -rc release and split
+into topics.
 
 	Arnd
