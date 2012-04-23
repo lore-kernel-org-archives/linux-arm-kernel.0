@@ -1,184 +1,81 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 23 Apr 2012 16:45:57 -0700
-Subject: [PATCH 1/2] OMAP2+: UART: Fix incorrect population of default
- uart pads
-In-Reply-To: <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
- (Govindraj R.'s message of "Tue, 10 Apr 2012 19:10:45 +0530")
-References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
- <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
-Message-ID: <87397uhv0q.fsf@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 24 Apr 2012 07:51:56 +0800
+Subject: [PATCH 2/8] clk: mxs: add clock support for imx23
+In-Reply-To: <CAJOA=zPU+-eQTGbXY15Gr==VzNB1JOLkocW4MD+fQBPe77sbdw@mail.gmail.com>
+References: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
+ <1335023840-1394-3-git-send-email-shawn.guo@linaro.org>
+ <CAJOA=zPU+-eQTGbXY15Gr==VzNB1JOLkocW4MD+fQBPe77sbdw@mail.gmail.com>
+Message-ID: <20120423235154.GY26306@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Govindraj.R" <govindraj.raja@ti.com> writes:
+On Mon, Apr 23, 2012 at 04:07:13PM -0700, Turquette, Mike wrote:
+> On Sat, Apr 21, 2012 at 8:57 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Add imx23 clock support based on common clk framework.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> ...
+> > +int __init mx23_clocks_init(void)
+> > +{
+> > + ? ? ? struct clk *clk;
+> > + ? ? ? int ret;
+> > +
+> > + ? ? ? clk_misc_init();
+> > +
+> > + ? ? ? mxs_clk_fixed("ref_xtal", 24000000);
+> 
+> There is no error checking at all?
+> 
+Right now, the only possible reason that the registration function could
+fail is -ENOMEM.  I thought it's not worth checking tens of function
+returns for the same error which is unlikely to happen.
 
-> From: "Govindraj.R" <govindraj.raja@ti.com>
->
-> The following commit:
-> (7496ba3  ARM: OMAP2+: UART: Add default mux for all uarts)
-> added default pads for all uarts. But not all boards tend to
-> use all uarts and most of unused uart pins are muxed for
-> other purpose. This commit breaks the modules which where trying
-> to use unused uart pins on their boards.
->
-> So remove the default pads adding.
+But if you're strong on this, I can add a check.
 
-I just noticed that this patch breaks runtime PM & wakeups for UART
-console (at least on 3530/Overo with ttyO2 console.)
+> > diff --git a/drivers/clk/mxs/clk.h b/drivers/clk/mxs/clk.h
+> > index deb5c23..fb5937d 100644
+> > --- a/drivers/clk/mxs/clk.h
+> > +++ b/drivers/clk/mxs/clk.h
+> > @@ -12,6 +12,8 @@
+> > ?#ifndef __MXS_CLK_H
+> > ?#define __MXS_CLK_H
+> >
+> > +#include <linux/clk.h>
+> > +#include <linux/clkdev.h>
+> > ?#include <linux/clk-provider.h>
+> > ?#include <linux/err.h>
+> > ?#include <linux/io.h>
+> > @@ -72,4 +74,22 @@ static inline int mxs_clk_wait(void __iomem *reg, u8 shift)
+> > ? ? ? ?return 0;
+> > ?}
+> >
+> > +static inline int mxs_clk_init_on(char **clks_init_on, int num)
+> > +{
+> > + ? ? ? struct clk *clk;
+> > + ? ? ? int i;
+> > +
+> > + ? ? ? for (i = 0; i < num; i++) {
+> > + ? ? ? ? ? ? ? clk = clk_get_sys(clks_init_on[i], NULL);
+> > + ? ? ? ? ? ? ? if (IS_ERR(clk)) {
+> > + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: failed to get clk %s", __func__,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clks_init_on[i]);
+> > + ? ? ? ? ? ? ? ? ? ? ? return PTR_ERR(clk);
+> > + ? ? ? ? ? ? ? }
+> > + ? ? ? ? ? ? ? clk_prepare_enable(clk);
+> > + ? ? ? }
+> > +
+> > + ? ? ? return 0;
+> > +}
+> 
+> Any good reason for this code to live in the header as static inline?
+> 
+It's a small function which is used by both clk-imx23.c and clk-imx28.c.
 
-By removing the pads, the initial device_init_wakeup() is not called on
-port init.  Without this call serial_omap_pm() disables runtime PM
-because it checks device_may_wakeup().
+> Do you call this code any time other than at boot?  Why not __init?
+> 
+Eh, __init for inline function?
 
-Since runtime PM was disabled, I manually re-enabled it and then enabled
-wakeups: 
-
-  echo auto > /sys/devices/platform/omap_uart.2/power/control
-  echo enabled > /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
-
-Then, after enabling auto-suspend timeouts, it seems wakeups are still
-not working since the console hangs.
-
-Reverting $SUBJECT patch gets things working again.
-
-Kevin
-
-
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Russ Dill <russ.dill@gmail.com>
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-> ---
->  arch/arm/mach-omap2/serial.c |  116 ------------------------------------------
->  1 files changed, 0 insertions(+), 116 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index c9503a7..1554233 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -120,124 +120,8 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
->  #endif /* CONFIG_PM */
->  
->  #ifdef CONFIG_OMAP_MUX
-> -static struct omap_device_pad default_uart1_pads[] __initdata = {
-> -	{
-> -		.name	= "uart1_cts.uart1_cts",
-> -		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart1_rts.uart1_rts",
-> -		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart1_tx.uart1_tx",
-> -		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart1_rx.uart1_rx",
-> -		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> -		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> -		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> -	},
-> -};
-> -
-> -static struct omap_device_pad default_uart2_pads[] __initdata = {
-> -	{
-> -		.name	= "uart2_cts.uart2_cts",
-> -		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart2_rts.uart2_rts",
-> -		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart2_tx.uart2_tx",
-> -		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart2_rx.uart2_rx",
-> -		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> -		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> -		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> -	},
-> -};
-> -
-> -static struct omap_device_pad default_uart3_pads[] __initdata = {
-> -	{
-> -		.name	= "uart3_cts_rctx.uart3_cts_rctx",
-> -		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart3_rts_sd.uart3_rts_sd",
-> -		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart3_tx_irtx.uart3_tx_irtx",
-> -		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart3_rx_irrx.uart3_rx_irrx",
-> -		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> -		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> -		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> -	},
-> -};
-> -
-> -static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
-> -	{
-> -		.name   = "gpmc_wait2.uart4_tx",
-> -		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "gpmc_wait3.uart4_rx",
-> -		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> -		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
-> -		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
-> -	},
-> -};
-> -
-> -static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
-> -	{
-> -		.name	= "uart4_tx.uart4_tx",
-> -		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-> -	},
-> -	{
-> -		.name	= "uart4_rx.uart4_rx",
-> -		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-> -		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> -		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-> -	},
-> -};
-> -
->  static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
->  {
-> -	switch (bdata->id) {
-> -	case 0:
-> -		bdata->pads = default_uart1_pads;
-> -		bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
-> -		break;
-> -	case 1:
-> -		bdata->pads = default_uart2_pads;
-> -		bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
-> -		break;
-> -	case 2:
-> -		bdata->pads = default_uart3_pads;
-> -		bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
-> -		break;
-> -	case 3:
-> -		if (cpu_is_omap44xx()) {
-> -			bdata->pads = default_omap4_uart4_pads;
-> -			bdata->pads_cnt =
-> -				ARRAY_SIZE(default_omap4_uart4_pads);
-> -		} else if (cpu_is_omap3630()) {
-> -			bdata->pads = default_omap36xx_uart4_pads;
-> -			bdata->pads_cnt =
-> -				ARRAY_SIZE(default_omap36xx_uart4_pads);
-> -		}
-> -		break;
-> -	default:
-> -		break;
-> -	}
->  }
->  #else
->  static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
+-- 
+Regards,
+Shawn
