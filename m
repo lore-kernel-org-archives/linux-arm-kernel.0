@@ -1,57 +1,51 @@
 From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 23 Apr 2012 00:09:15 -0700
-Subject: [PATCH 6/9] blackfin: Fix possible deadlock in decode_address()
+Date: Mon, 23 Apr 2012 00:09:25 -0700
+Subject: [PATCH 7/9] um: Should hold tasklist_lock while traversing processes
 In-Reply-To: <20120423070641.GA27702@lizard>
 References: <20120423070641.GA27702@lizard>
-Message-ID: <20120423070915.GF30752@lizard>
+Message-ID: <20120423070925.GG30752@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oleg Nesterov found an interesting deadlock possibility:
+Traversing the tasks requires holding tasklist_lock, otherwise it
+is unsafe.
 
-> sysrq_showregs_othercpus() does smp_call_function(showacpu)
-> and showacpu() show_stack()->decode_address(). Now suppose that IPI
-> interrupts the task holding read_lock(tasklist).
+p.s. However, I'm not sure that calling os_kill_ptraced_process()
+in the atomic context is correct. It seem to work, but please
+take a closer look.
 
-To fix this, blackfin should not grab the write_ variant of the
-tasklist lock, read_ one is enough.
-
-Suggested-by: Oleg Nesterov <oleg@redhat.com>
 Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
 ---
- arch/blackfin/kernel/trace.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/um/kernel/reboot.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/blackfin/kernel/trace.c b/arch/blackfin/kernel/trace.c
-index d08f0e3..f7f7a18 100644
---- a/arch/blackfin/kernel/trace.c
-+++ b/arch/blackfin/kernel/trace.c
-@@ -29,7 +29,7 @@ void decode_address(char *buf, unsigned long address)
- {
- 	struct task_struct *p;
- 	struct mm_struct *mm;
--	unsigned long flags, offset;
-+	unsigned long offset;
- 	struct rb_node *n;
+diff --git a/arch/um/kernel/reboot.c b/arch/um/kernel/reboot.c
+index 4d93dff..66d754c 100644
+--- a/arch/um/kernel/reboot.c
++++ b/arch/um/kernel/reboot.c
+@@ -4,6 +4,7 @@
+  */
  
- #ifdef CONFIG_KALLSYMS
-@@ -113,7 +113,7 @@ void decode_address(char *buf, unsigned long address)
- 	 * mappings of all our processes and see if we can't be a whee
- 	 * bit more specific
- 	 */
--	write_lock_irqsave(&tasklist_lock, flags);
-+	read_lock(&tasklist_lock);
- 	for_each_process(p) {
- 		struct task_struct *t;
+ #include "linux/sched.h"
++#include "linux/spinlock.h"
+ #include "linux/slab.h"
+ #include "kern_util.h"
+ #include "os.h"
+@@ -22,6 +23,7 @@ static void kill_off_processes(void)
+ 		struct task_struct *p;
+ 		int pid;
  
-@@ -186,7 +186,7 @@ __continue:
- 	sprintf(buf, "/* kernel dynamic memory */");
- 
- done:
--	write_unlock_irqrestore(&tasklist_lock, flags);
-+	read_unlock(&tasklist_lock);
++		read_lock(&tasklist_lock);
+ 		for_each_process(p) {
+ 			if (p->mm == NULL)
+ 				continue;
+@@ -29,6 +31,7 @@ static void kill_off_processes(void)
+ 			pid = p->mm->context.id.u.pid;
+ 			os_kill_ptraced_process(pid, 1);
+ 		}
++		read_unlock(&tasklist_lock);
+ 	}
  }
  
- #define EXPAND_LEN ((1 << CONFIG_DEBUG_BFIN_HWTRACE_EXPAND_LEN) * 256 - 1)
 -- 
 1.7.9.2
