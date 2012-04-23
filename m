@@ -1,26 +1,27 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 24 Apr 2012 22:37:49 +0800
-Subject: [PATCH] pinctrl: fix dangling comment
-In-Reply-To: <1335273676-22212-1-git-send-email-linus.walleij@stericsson.com>
-References: <1335273676-22212-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120424143748.GD24122@shlinux2.ap.freescale.net>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 23 Apr 2012 10:52:45 -0500
+Subject: [PATCHv4 4/8] ARM: OMAP4: hwmod: flag hwmods/modules supporting
+ module level context status
+In-Reply-To: <1334913591-26312-5-git-send-email-t-kristo@ti.com>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-5-git-send-email-t-kristo@ti.com>
+Message-ID: <4F957ACD.2040103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 03:21:16PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This comment was referring to an older PINMUX define, it should
-> be PINCTRL now.
-> 
-> Reported-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  include/linux/pinctrl/machine.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-Yes, we missed it before.
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+Hi Tero,
 
-Regards
-Dong Aisheng
+On 04/20/2012 04:19 AM, Tero Kristo wrote:
+> From: Rajendra Nayak <rnayak@ti.com>
+> 
+> On OMAP4 most modules/hwmods support module level context status. On
+> OMAP3 and earlier, we relyed on the power domain level context status.
+> Identify all such modules using a 'HWMOD_CONTEXT_REG' flag, all such
+> hwmods already have a valid 'context_offs' populated in .prcm structure.
+
+Is it necessary to add another flag? Can't we just check if context_offs
+is non-zero? Would save adding a lot more lines to an already large file
+:-)
+
+Cheers
+Jon
