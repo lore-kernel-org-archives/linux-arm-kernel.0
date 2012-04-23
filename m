@@ -1,44 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 23 Apr 2012 13:22:07 -0600 (MDT)
-Subject: [PATCH v2 1/3] ARM: OMAP2+: omap_hwmod: Add interface to
- incorporate module level wakeup
-In-Reply-To: <1334920207-19160-2-git-send-email-govindraj.raja@ti.com>
-References: <1334920207-19160-1-git-send-email-govindraj.raja@ti.com>
- <1334920207-19160-2-git-send-email-govindraj.raja@ti.com>
-Message-ID: <alpine.DEB.2.00.1204231318110.15883@utopia.booyaka.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 23 Apr 2012 12:31:35 -0700
+Subject: [PATCH V2 1/6] SPEAr: clk: Add VCO-PLL Synthesizer clock
+In-Reply-To: <24b0bd2794cd2d8ca317d25745fc7d3d5c294bc7.1334852394.git.viresh.kumar@st.com>
+References: <cover.1334852393.git.viresh.kumar@st.com>
+ <24b0bd2794cd2d8ca317d25745fc7d3d5c294bc7.1334852394.git.viresh.kumar@st.com>
+Message-ID: <CAJOA=zOmV12j+hp90dzK=XtNh0QKw2r-jeE2A4bagDmesGpSKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Viresh,
 
-On Fri, 20 Apr 2012, Govindraj.R wrote:
+Sent my first email too quickly.  A couple of small questions below.
 
-> From: "Govindraj.R" <govindraj.raja@ti.com>
-> 
-> On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
-> PM_WKEN1_CORE/PM_WKEN_PER regs. The module level wakeups are enabled by
-> default, by PRM soft reset default value of PM_WKEN reg is all one's which means
-> all module level wakeups are enabled.
-> 
-> However the wakeups can be enabled/disabled using sysfs entry example for uart:
-> echo disabled > /sys/devices/platform/omap/omap_uart.X/power/wakeup
-> [X=0,1,2,3]
-> 
-> So expand omap2 prcm structure to incorporate the PM_WKEN reg offset
-> and bit mask to control the module level wakeup. This info from hwmod
-> data can be used from hwmod framework in omap_hwmod_enable/disable_wakeup
-> api's to configure module level wakeups.
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+On Thu, Apr 19, 2012 at 9:28 AM, Viresh Kumar <viresh.linux@gmail.com> wrote:
+> diff --git a/drivers/clk/spear/clk.h b/drivers/clk/spear/clk.h
+> new file mode 100644
+> index 0000000..a66024e
+> --- /dev/null
+> +++ b/drivers/clk/spear/clk.h
+> @@ -0,0 +1,76 @@
+> +/*
+> + * Clock framework definitions for SPEAr platform
+> + *
+> + * Copyright (C) 2012 ST Microelectronics
+> + * Viresh Kumar <viresh.kumar@st.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef __PLAT_CLOCK_H
+> +#define __PLAT_CLOCK_H
 
-This patch is not needed.  The data contained in your .module_wakeup_offs 
-field can be calculated from the existing struct omap_hwmod.prcm.omap2 
-fields, specifically .prcm_reg_id and .module_offs.  And the 
-module_wakeup_bit shift should be identical to the .module_bit, so there 
-should be no need for a separate field for that either.
+Any reason to use __PLAT_CLOCK_H from drivers/clk/ now?  Is it
+copy/paste from your old platform code?
 
+...
 
-- Paul
+> +static inline long clk_round_rate_index(struct clk_hw *hw, unsigned long drate,
+> + ? ? ? ? ? ? ? clk_calc_rate calc_rate, u8 rtbl_cnt, int *index)
+> +{
+> + ? ? ? unsigned long prev_rate, rate = 0;
+> + ? ? ? unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
+> +
+> + ? ? ? for (*index = 0; *index < rtbl_cnt; (*index)++) {
+> + ? ? ? ? ? ? ? prev_rate = rate;
+> + ? ? ? ? ? ? ? rate = calc_rate(hw, parent_rate, *index);
+> + ? ? ? ? ? ? ? if (drate < rate) {
+> + ? ? ? ? ? ? ? ? ? ? ? /* previous clock was best */
+> + ? ? ? ? ? ? ? ? ? ? ? if (*index) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? rate = prev_rate;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (*index)--;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? return rate;
+> +}
+
+Any reason for this code to exist in a header?  I prefer code in C
+files.  Also it is a bit large for an inline function.
+
+Thanks,
+Mike
