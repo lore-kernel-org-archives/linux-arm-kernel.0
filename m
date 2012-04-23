@@ -1,52 +1,40 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 23 Apr 2012 17:32:29 +0300
-Subject: [PATCH v2] arm: omap: fix trivial warnings for dspbridge
-Message-ID: <1335191549-1047-1-git-send-email-felipe.contreras@gmail.com>
+Date: Mon, 23 Apr 2012 17:34:14 +0300
+Subject: [PATCH] staging: tidspbridge: fix build errors for OMAP2_L4_IO_ADDRESS
+Message-ID: <1335191654-1217-1-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/plat-omap/devices.c: In function 'omap_dsp_reserve_sdram_memblock':
-arch/arm/plat-omap/devices.c:170: warning: format '%x' expects type 'unsigned int', but argument 3 has type 'phys_addr_t'
-arch/arm/mach-omap2/dsp.c: In function 'omap_dsp_init':
-arch/arm/mach-omap2/dsp.c:60: warning: format '%x' expects type 'unsigned int', but argument 3 has type 'phys_addr_t'
-arch/arm/mach-omap2/dsp.c:60: warning: format '%x' expects type 'unsigned int', but argument 4 has type 'phys_addr_t'
+drivers/staging/tidspbridge/core/tiomap3430.c: In function 'bridge_brd_start':
+drivers/staging/tidspbridge/core/tiomap3430.c:425: error: implicit declaration of function 'OMAP2_L4_IO_ADDRESS'
+drivers/staging/tidspbridge/core/wdt.c: In function 'dsp_wdt_init':
+drivers/staging/tidspbridge/core/wdt.c:56: error: implicit declaration of function 'OMAP2_L4_IO_ADDRESS'
+
+The proper fix will come later.
 
 Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 ---
- arch/arm/mach-omap2/dsp.c    |    5 +++--
- arch/arm/plat-omap/devices.c |    4 ++--
- 2 files changed, 5 insertions(+), 4 deletions(-)
+ drivers/staging/tidspbridge/include/dspbridge/dbdefs.h |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/dsp.c b/arch/arm/mach-omap2/dsp.c
-index 74f18f2..3376388 100644
---- a/arch/arm/mach-omap2/dsp.c
-+++ b/arch/arm/mach-omap2/dsp.c
-@@ -57,8 +57,9 @@ static int __init omap_dsp_init(void)
+diff --git a/drivers/staging/tidspbridge/include/dspbridge/dbdefs.h b/drivers/staging/tidspbridge/include/dspbridge/dbdefs.h
+index c8f4645..f9a0d16 100644
+--- a/drivers/staging/tidspbridge/include/dspbridge/dbdefs.h
++++ b/drivers/staging/tidspbridge/include/dspbridge/dbdefs.h
+@@ -28,6 +28,14 @@
+ #define PG_ALIGN_LOW(addr, pg_size) ((addr) & PG_MASK(pg_size))
+ #define PG_ALIGN_HIGH(addr, pg_size) (((addr)+(pg_size)-1) & PG_MASK(pg_size))
  
- 	if (pdata->phys_mempool_base) {
- 		pdata->phys_mempool_size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
--		pr_info("%s: %x bytes @ %x\n", __func__,
--			pdata->phys_mempool_size, pdata->phys_mempool_base);
-+		pr_info("%s: %llx bytes @ %llx\n", __func__,
-+			(unsigned long long)pdata->phys_mempool_size,
-+			(unsigned long long)pdata->phys_mempool_base);
- 	}
- 
- 	pdev = platform_device_alloc("omap-dsp", -1);
-diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
-index 60278f4..09b07d2 100644
---- a/arch/arm/plat-omap/devices.c
-+++ b/arch/arm/plat-omap/devices.c
-@@ -167,8 +167,8 @@ void __init omap_dsp_reserve_sdram_memblock(void)
- 
- 	paddr = arm_memblock_steal(size, SZ_1M);
- 	if (!paddr) {
--		pr_err("%s: failed to reserve %x bytes\n",
--				__func__, size);
-+		pr_err("%s: failed to reserve %llx bytes\n",
-+				__func__, (unsigned long long)size);
- 		return;
- 	}
++/*
++ * NOTE: Please update to use ioremap + read/write
++ */
++
++#define OMAP2_L4_IO_OFFSET	0xb2000000
++#define IOMEM(x)		((void __force __iomem *)(x))
++#define OMAP2_L4_IO_ADDRESS(pa)	IOMEM((pa) + OMAP2_L4_IO_OFFSET)
++
+ /* API return value and calling convention */
+ #define DBAPI                       int
  
 -- 
 1.7.10
