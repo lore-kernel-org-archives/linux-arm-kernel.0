@@ -1,81 +1,59 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Mon, 23 Apr 2012 06:20:42 +0000
-Subject: [PATCH V2] i.MX28: Shut down the LCD controller to avoid BootROM
- sampling bug
-In-Reply-To: <1334860263-9389-1-git-send-email-marex@denx.de>
-References: <1334767680-12688-1-git-send-email-marex@denx.de>
- <1334860263-9389-1-git-send-email-marex@denx.de>
-Message-ID: <4F94F4BA.9020504@gmx.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 23 Apr 2012 08:27:39 +0200
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <20120423051813.GM26306@S2101-09.ap.freescale.net>
+References: <1334620214-25803-2-git-send-email-rob.lee@linaro.org>
+ <20120417074301.GM20478@pengutronix.de>
+ <CAMXH7KH41kWMPu_dEpetZc8OUD3C0-mtxGbXX0Vqd4EODPWJUg@mail.gmail.com>
+ <20120417174213.GD3852@pengutronix.de>
+ <CAMXH7KFYA24sPUcwgKfwVLNPA0jWQ-QG02y+SfPNnAqdiv0+gg@mail.gmail.com>
+ <CAMXH7KGgSmvfqUTC1bufBz0QXbt01dHsPo1cbRA9jLj9mGmfjg@mail.gmail.com>
+ <20120419064308.GH3852@pengutronix.de>
+ <20120420020816.GH22219@S2101-09.ap.freescale.net>
+ <CAMXH7KE2RtdNy3G61guZb2uWy3rn267Z3eEVEgN5e==tHHsiuA@mail.gmail.com>
+ <20120423051813.GM26306@S2101-09.ap.freescale.net>
+Message-ID: <20120423062739.GX3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2012 06:31 PM, Marek Vasut wrote:
-> From: Marek Vasut <marek.vasut@gmail.com>
+On Mon, Apr 23, 2012 at 01:18:21PM +0800, Shawn Guo wrote:
+> On Sun, Apr 22, 2012 at 11:44:39PM -0500, Rob Lee wrote:
+> > >> I don't think we need a cpu_is_imx6q(), but having some i.MX6 specific
+> > >> hook at device_initcall time can't be too wrong. Shawn?
+> > >>
+> > > Yep, it works for me.
+> > >
+> > Sascha, Shawn, thanks for the response.
+> > 
+> > Since device_initcall isn't platform specific, it seems I would still
+> > need a cpu_is_imx6q() function or similiar functionality from a device
+> > tree call.  Or do you have something else in mind that I'm not seeing?
+> > 
+> I guess Sascha is asking for something like the following.
 > 
-> If there's some traffic on the LCD controller pads, the BootROM has trouble with
-> sampling the bootmode from these pads. The BootROM usually ends in a loop.
+> static int __init imx_device_init(void)
+> {
+> 	imx5_device_init();
+> 	imx6_device_init();
+> }
+> device_initcall(imx_device_init)
 > 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> Cc: Chen Peter-B29397 <B29397@freescale.com>
-> Cc: Detlev Zundel <dzu@denx.de>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> Cc: Li Frank-B20596 <B20596@freescale.com>
-> Cc: Lin Tony-B19295 <B19295@freescale.com>
-> Cc: Linux FBDEV <linux-fbdev@vger.kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Subodh Nijsure <snijsure@grid-net.com>
-> Cc: Tony Lin <tony.lin@freescale.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Wolfgang Denk <wd@denx.de>
-> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-> Tested-by: Wolfgang Denk <wd@denx.de>
+> static int __init imx6_device_init(void)
+> {
+> 	/*
+> 	 * do whatever needs to get done in device_initcall time
+> 	 */
+> }
 
-Applied.
+The problem is more how we can detect that we are actually running a
+i.MX6 SoC. We could directly ask the devicetree in an initcall or we
+could introduce a cpu_is_mx6() just like we have a macro for all other
+i.MX SoCs.
 
+Sascha
 
-Thanks,
-
-Florian Tobias Schandinat
-
-> ---
->  drivers/video/mxsfb.c |   13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> V2: Make shutdown() call static
-> 
-> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-> index 4a89f88..dcf29bf 100644
-> --- a/drivers/video/mxsfb.c
-> +++ b/drivers/video/mxsfb.c
-> @@ -880,6 +880,18 @@ static int __devexit mxsfb_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static void mxsfb_shutdown(struct platform_device *pdev)
-> +{
-> +	struct fb_info *fb_info = platform_get_drvdata(pdev);
-> +	struct mxsfb_info *host = to_imxfb_host(fb_info);
-> +
-> +	/*
-> +	 * Force stop the LCD controller as keeping it running during reboot
-> +	 * might interfere with the BootROM's boot mode pads sampling.
-> +	 */
-> +	writel(CTRL_RUN, host->base + LCDC_CTRL + REG_CLR);
-> +}
-> +
->  static struct platform_device_id mxsfb_devtype[] = {
->  	{
->  		.name = "imx23-fb",
-> @@ -896,6 +908,7 @@ MODULE_DEVICE_TABLE(platform, mxsfb_devtype);
->  static struct platform_driver mxsfb_driver = {
->  	.probe = mxsfb_probe,
->  	.remove = __devexit_p(mxsfb_remove),
-> +	.shutdown = mxsfb_shutdown,
->  	.id_table = mxsfb_devtype,
->  	.driver = {
->  		   .name = DRIVER_NAME,
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
