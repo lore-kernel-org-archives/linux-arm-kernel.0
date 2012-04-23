@@ -1,28 +1,32 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Tue, 24 Apr 2012 01:06:59 +0530
-Subject: [PATCH v2 3/4] ARM: OMAP2+: dmtimer: cleanup iclk usage
-In-Reply-To: <87obqijq4j.fsf@ti.com>
-References: <1334925563-20768-1-git-send-email-tarun.kanti@ti.com>
- <1334925563-20768-4-git-send-email-tarun.kanti@ti.com>
- <87obqijq4j.fsf@ti.com>
-Message-ID: <CAC83ZvKrV6yjwj9BoU662p8MRbB-h2JGE6AS3eGgaPy8+z=J7w@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 23 Apr 2012 21:40:42 +0200
+Subject: Sharing header files -- arch/arm/mach-generic  ?
+Message-ID: <20120423194042.GA5734@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 11:18 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> We do not use iclk anywhere in the dmtimer driver and so removing it.
->> Hence removing the timer iclk entries from OMAP4 clkdev table as well.
->
-> What about the OMAP2/3 clkdev tables? ?Can't those be removed as well?
-No, they are being used. In fact I removed them in the beginning only
-to discover they are needed.
+Hi!
 
->
-> Comment applies to PATCH 4/4 also.
-You mean removing iclk from clkdev table? That is already done in this patch!!
---
-Tarun
->
-> Kevin
+I have new architecture I'd like to merge into the mainline. It has
+some code very similar to existing plaforms (for example
+real differences to mach-realview/platsmp.c are two lines.)
+
+Is that a problem?
+
+Should mach-generic/platsmp.c be created, so code can be better
+shared? Or are the code pieces small enough that this duplication can
+be ignored?
+
+headsmp.S is another candidate for sharing. AFAICT we have 4 times
+identical code in the tree already:
+
+./mach-exynos/headsmp.S:   ldmia	r4, {r5, r6}
+./plat-versatile/headsmp.S:		ldmia	 r4, {r5, r6}
+./mach-ux500/headsmp.S:			ldmia	 r4, {r5, r6}
+./mach-msm/headsmp.S:			ldmia	 r4, {r5, r6}
+
+Thoughts?
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
