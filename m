@@ -1,54 +1,56 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 23 Apr 2012 18:02:52 +0530
-Subject: [RFC 0/8] DMA engine conversion
-In-Reply-To: <20120423114615.GB25053@n2100.arm.linux.org.uk>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <20120423114615.GB25053@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gyQ3928VQ9Q9Y0mNiacB+br2oGezGCvhLXikbOTi-JR3Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Apr 2012 12:33:09 +0000
+Subject: [PATCH 1/3] ARM: tegra: Add AHB driver
+In-Reply-To: <1335181043-15348-1-git-send-email-hdoyu@nvidia.com>
+References: <1335181043-15348-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <201204231233.09423.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 5:16 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Here's a patch which converts the SPI driver to use dma engine support.
-> It's more or less a mechanical replacement in this driver. ?Tested on
-> OMAP4430SDP ethernet (which basically means that udhcpc works.)
->
-> One thing to note: the old DMA code programmed the DMA hardware for an
-> element count of N and frame size of 1, with element sync. ?The DMA
-> engine code will program the DMA hardware for an element count of 1 and
-> a frame size of N, with frame sync. ?This appears to work - but at the
-> moment I've not looked to see if there's any implications of this.
->
-> You can enable/disable the DMA engine code for the TX or RX side by
-> tweaking the two definitions at the top of the file if you want to do
-> comparisons.
->
-> Comments? ?If none, I'll see about committing this into the patch set,
-> adding the removal of the private DMA code, and sending it out more
-> "officially" with the next round of RFC for this set.
->
-Element sync vs Frame sync change seems to be fine thought it's
-bit puzzling that why it was not that way first place.
+On Monday 23 April 2012, Hiroshi DOYU wrote:
+> The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+> High-performance Bus (AHB) architecture.
+> 
+> Both Tegra20/30 have this.
+> 
+> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
 
-> Modulo the element vs frame sync issue, I think folk can see that the
-> conversion process is fairly straight forward - it's more or less:
-> 1. add struct dma_chan * pointer to the private structure.
-> 2. add allocation/freeing functions for the DMA engine channels.
-> 3. convert the callbacks to match the DMA engine callback prototype.
-> 4. add code to set the DMA engine channel configuration appropriately
-> ? (avoiding any unnecessary calls) via dmaengine_slave_config().
-> 5. add code to queue the transfer via dmaengine_prep_slave_sg() and
-> ? dmaengine_submit().
-> 6. omap_start_dma() becomes dma_async_issue_pending().
->
-> ?drivers/spi/spi-omap2-mcspi.c | ?186 +++++++++++++++++++++++++++++++++-------
-> ?1 files changed, 153 insertions(+), 33 deletions(-)
+Please explain in the text above why it's a good idea to have this
+driver.
 
-The patch seems to be fine to me.
 
-Am looping Shubro in case he has any comment on "why element sync was used ?"
-and also to test the patch with more peripherals connected over SPI.
+> @@ -122,6 +123,7 @@ void __init tegra20_init_early(void)
+>  	tegra_init_cache(0x331, 0x441);
+>  	tegra_pmc_init();
+>  	tegra_powergate_init();
+> +	tegra_ahb_gizmo_init();
+>  }
+>  #endif
+>  #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> @@ -132,5 +134,6 @@ void __init tegra30_init_early(void)
+>  	tegra_init_cache(0x441, 0x551);
+>  	tegra_pmc_init();
+>  	tegra_powergate_init();
+> +	tegra_ahb_gizmo_init();
+>  }
+>  #endif
 
-Regards
-Santosh
+Does it really have to be "early", rather than an initcall? Why?
+
+> +
+> +static inline unsigned long gizmo_readl(unsigned long offset)
+> +{
+> +	return readl(IO_TO_VIRT(TEGRA_AHB_GIZMO_BASE + offset));
+> +}
+> +
+> +static inline void gizmo_writel(unsigned long value, unsigned long offset)
+> +{
+> +	writel(value, IO_TO_VIRT(TEGRA_AHB_GIZMO_BASE + offset));
+> +}
+
+Please change this to no longer use hardcoded addresses. A good
+implementation would scan the device tree for the physical address
+and then ioremap the registers in the init function, in order to
+save a local __iomem pointer.
+
+	Arnd
