@@ -1,53 +1,184 @@
-From: devel@ayanes.com (Adrian Yanes)
-Date: Mon, 23 Apr 2012 09:24:24 +0300
-Subject: [PATCH] i2c-at91: fix data-loss issue
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D0905DB4657@wm021.weinmann.com>
-References: <20120413103937.GH7154@arwen.pp.htv.fi>
- <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
- <EF2E73589CA71846A15D0B2CDF79505D0905D5A1AA@wm021.weinmann.com>
- <20120418143920.GA19802@pengutronix.de> <4F930B77.8070909@ayanes.com>
- <EF2E73589CA71846A15D0B2CDF79505D0905DB4657@wm021.weinmann.com>
-Message-ID: <4F94F598.1040008@ayanes.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Mon, 23 Apr 2012 18:24:58 +0530
+Subject: [PATCH 2/2 v3] dma/amba-pl08x: add support for the Nomadik variant
+In-Reply-To: <1334214109-15644-1-git-send-email-linus.walleij@linaro.org>
+References: <1334214109-15644-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1335185698.31825.116.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The latter is probably the easiest and most transparent solution.
-> There is no UNRE on G45, it just pauses the clock on an underrun
-> condition.
+On Thu, 2012-04-12 at 09:01 +0200, Linus Walleij wrote:
+> The Nomadik PL080 variant has some extra protection bits that
+> may be set, so we need to check these bits to see if the
+> channels are actually available for the DMAengine to use.
 > 
-> So in case UNRE is set, EIO should be returned similar to the already
-> handled OVRE:
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Alim Akhtar <alim.akhtar@gmail.com>
+> Cc: Alessandro Rubini <rubini@gnudd.com>
+> Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Applied both thanks
+> ---
+> ChangeLog v1->v2:
+> - Fixed these review comments from Viresh Kumar
+> - Use kzalloc to allocate the physical channel structs so
+>   we don't have to assign values to everything and can assume
+>   booleans are default false
+> - unbreak long error message.
+> ChangeLog v2->v3:
+> - Remove an extraneous NULL assignment now that we have
+>   kzalloc for the physical channel info.
+> ---
+>  arch/arm/include/asm/hardware/pl080.h |    2 +
+>  drivers/dma/amba-pl08x.c              |   44 +++++++++++++++++++++++++++-----
+>  include/linux/amba/pl08x.h            |    3 ++
+>  3 files changed, 42 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index a6f9e73..a84e19b 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -238,6 +238,11 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
->  		dev_err(dev->dev, "overrun while reading\n");
->  		return -EIO;
->  	}
-> +	if (dev->transfer_status & AT91_TWI_UNRE && dev->is_rm9200) {
-> +		dev_err(dev->dev, "underrun while writing\n");
-> +		return -EIO;
-> +	}
-> +
->  	dev_dbg(dev->dev, "transfer complete\n");
+> diff --git a/arch/arm/include/asm/hardware/pl080.h b/arch/arm/include/asm/hardware/pl080.h
+> index 33c78d7..4eea210 100644
+> --- a/arch/arm/include/asm/hardware/pl080.h
+> +++ b/arch/arm/include/asm/hardware/pl080.h
+> @@ -102,6 +102,8 @@
+>  #define PL080_WIDTH_16BIT			(0x1)
+>  #define PL080_WIDTH_32BIT			(0x2)
 >  
->  	return 0;
+> +#define PL080N_CONFIG_ITPROT			(1 << 20)
+> +#define PL080N_CONFIG_SECPROT			(1 << 19)
+>  #define PL080_CONFIG_HALT			(1 << 18)
+>  #define PL080_CONFIG_ACTIVE			(1 << 17)  /* RO */
+>  #define PL080_CONFIG_LOCK			(1 << 16)
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index 08589c6..629250e 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -95,10 +95,14 @@ static struct amba_driver pl08x_amba_driver;
+>   * struct vendor_data - vendor-specific config parameters for PL08x derivatives
+>   * @channels: the number of channels available in this variant
+>   * @dualmaster: whether this version supports dual AHB masters or not.
+> + * @nomadik: whether the channels have Nomadik security extension bits
+> + *	that need to be checked for permission before use and some registers are
+> + *	missing
+>   */
+>  struct vendor_data {
+>  	u8 channels;
+>  	bool dualmaster;
+> +	bool nomadik;
+>  };
+>  
+>  /*
+> @@ -385,7 +389,7 @@ pl08x_get_phy_channel(struct pl08x_driver_data *pl08x,
+>  
+>  		spin_lock_irqsave(&ch->lock, flags);
+>  
+> -		if (!ch->serving) {
+> +		if (!ch->locked && !ch->serving) {
+>  			ch->serving = virt_chan;
+>  			ch->signal = -1;
+>  			spin_unlock_irqrestore(&ch->lock, flags);
+> @@ -1483,6 +1487,9 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
+>   */
+>  static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
+>  {
+> +	/* The Nomadik variant does not have the config register */
+> +	if (pl08x->vd->nomadik)
+> +		return;
+>  	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
+>  }
+>  
+> @@ -1772,8 +1779,10 @@ static int pl08x_debugfs_show(struct seq_file *s, void *data)
+>  		spin_lock_irqsave(&ch->lock, flags);
+>  		virt_chan = ch->serving;
+>  
+> -		seq_printf(s, "%d\t\t%s\n",
+> -			   ch->id, virt_chan ? virt_chan->name : "(none)");
+> +		seq_printf(s, "%d\t\t%s%s\n",
+> +			   ch->id,
+> +			   virt_chan ? virt_chan->name : "(none)",
+> +			   ch->locked ? " LOCKED" : "");
+>  
+>  		spin_unlock_irqrestore(&ch->lock, flags);
+>  	}
+> @@ -1917,7 +1926,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+>  	}
+>  
+>  	/* Initialize physical channels */
+> -	pl08x->phy_chans = kmalloc((vd->channels * sizeof(*pl08x->phy_chans)),
+> +	pl08x->phy_chans = kzalloc((vd->channels * sizeof(*pl08x->phy_chans)),
+>  			GFP_KERNEL);
+>  	if (!pl08x->phy_chans) {
+>  		dev_err(&adev->dev, "%s failed to allocate "
+> @@ -1932,8 +1941,23 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+>  		ch->id = i;
+>  		ch->base = pl08x->base + PL080_Cx_BASE(i);
+>  		spin_lock_init(&ch->lock);
+> -		ch->serving = NULL;
+>  		ch->signal = -1;
+> +
+> +		/*
+> +		 * Nomadik variants can have channels that are locked
+> +		 * down for the secure world only. Lock up these channels
+> +		 * by perpetually serving a dummy virtual channel.
+> +		 */
+> +		if (vd->nomadik) {
+> +			u32 val;
+> +
+> +			val = readl(ch->base + PL080_CH_CONFIG);
+> +			if (val & (PL080N_CONFIG_ITPROT | PL080N_CONFIG_SECPROT)) {
+> +				dev_info(&adev->dev, "physical channel %d reserved for secure access only\n", i);
+> +				ch->locked = true;
+> +			}
+> +		}
+> +
+>  		dev_dbg(&adev->dev, "physical channel %d is %s\n",
+>  			i, pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+>  	}
+> @@ -2016,6 +2040,12 @@ static struct vendor_data vendor_pl080 = {
+>  	.dualmaster = true,
+>  };
+>  
+> +static struct vendor_data vendor_nomadik = {
+> +	.channels = 8,
+> +	.dualmaster = true,
+> +	.nomadik = true,
+> +};
+> +
+>  static struct vendor_data vendor_pl081 = {
+>  	.channels = 2,
+>  	.dualmaster = false,
+> @@ -2036,9 +2066,9 @@ static struct amba_id pl08x_ids[] = {
+>  	},
+>  	/* Nomadik 8815 PL080 variant */
+>  	{
+> -		.id	= 0x00280880,
+> +		.id	= 0x00280080,
+>  		.mask	= 0x00ffffff,
+> -		.data	= &vendor_pl080,
+> +		.data	= &vendor_nomadik,
+>  	},
+>  	{ 0, 0 },
+>  };
+> diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+> index e64ce2c..0254901 100644
+> --- a/include/linux/amba/pl08x.h
+> +++ b/include/linux/amba/pl08x.h
+> @@ -92,6 +92,8 @@ struct pl08x_bus_data {
+>   * right now
+>   * @serving: the virtual channel currently being served by this physical
+>   * channel
+> + * @locked: channel unavailable for the system, e.g. dedicated to secure
+> + * world
+>   */
+>  struct pl08x_phy_chan {
+>  	unsigned int id;
+> @@ -99,6 +101,7 @@ struct pl08x_phy_chan {
+>  	spinlock_t lock;
+>  	int signal;
+>  	struct pl08x_dma_chan *serving;
+> +	bool locked;
+>  };
+>  
+>  /**
 
-Indeed, this should be added in order to catch this exception for the
-AT91RM9200.
 
-However, the main issue still there: the board is not able to deliver
-data up to 2 bytes size without to run in the UNRE case.
-
-Measuring the i2c bus, we verified that the data is not even arriving to
-the data bus, i.e. either the kernel driver is too slow to handle it or
-just we are missing some tweak required by the hardware
-(nevertheless the datasheet does not give any clue).
-
-Anyone with a AT91RM9200 that can test the proposed driver as well? it
-will discard that is our hardware/board the issue rather than the
-chipset itself.
-
-Adrian
+-- 
+~Vinod
