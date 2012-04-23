@@ -1,27 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Apr 2012 13:19:07 +0200
-Subject: [PATCH 5/9] gpio/nomadik: use typesafe __io_address()
-In-Reply-To: <20120423091733.GJ24211@n2100.arm.linux.org.uk>
-References: <1335172482-27648-1-git-send-email-linus.walleij@stericsson.com>
- <20120423091733.GJ24211@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdaBePuSE555c5iN9uF9no+2zHDSYp=sMMmevC9ei6R+kA@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 23 Apr 2012 15:19:44 +0400
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that
+ l2x0 is enabled before init
+In-Reply-To: <1335167001-28031-1-git-send-email-ylmao@marvell.com>
+References: <1335167001-28031-1-git-send-email-ylmao@marvell.com>
+Message-ID: <4F953AD0.5020503@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 11:17 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Apr 23, 2012 at 11:14:42AM +0200, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> We were using a custom io_p2v() (physical-to-virtual) translation
->> macro, but with the advent of the cross-platform __io_address()
->> let us try to get rid of this. Inspired by a similar patch by
->> Jonas Aberg.
+Hello.
+
+On 23-04-2012 11:43, Yilu Mao wrote:
+
+> If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
+> register will not be saved in l2x0_saved_regs. Therefore we can not use
+> l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
+> by saving aux ctrl in l2x0_saved_regs just after it's being read from
+> the register.
+
+> Signed-off-by: Yilu Mao<ylmao@marvell.com>
+> ---
+>   arch/arm/mm/cache-l2x0.c |    5 +++++
+>   1 files changed, 5 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 8936595..3b6428b 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -362,6 +362,11 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+>   	l2x0_cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+>   	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
 >
-> Is there any point to io_p2v() or __io_address() anymore? ?Won't ioremap()
-> do here?
+> +	/* In case l2x controller is enabled, the aux ctrl register
+> +	 * can't be set. So the original value should be stored in
+> +	 * the l2x0_saved_regs for restoring when resume. */
 
-Hey it works, I'll delete the static maps as well and send an updated patch.
+    The preferred style of multi-line comments is this:
 
-Thanks Russell,
-Linus Walleij
+/*
+  * bla
+  * bla
+  */
+
+WBR, Sergei
