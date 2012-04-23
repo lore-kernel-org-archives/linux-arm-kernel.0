@@ -1,80 +1,28 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 23 Apr 2012 22:58:01 +0200
-Subject: [Linaro-mm-sig] [PATCH 0/4] ARM: replace custom consistent dma
- region with vmalloc
-In-Reply-To: <CALYq+qSMPoVC5OF+oBbt_i7O+_fmogLCtpqTAqHbsv1TcKrPdA@mail.gmail.com>
-References: <1334325950-7881-1-git-send-email-m.szyprowski@samsung.com>
- <CALYq+qSMPoVC5OF+oBbt_i7O+_fmogLCtpqTAqHbsv1TcKrPdA@mail.gmail.com>
-Message-ID: <20120423205801.GO4935@phenom.ffwll.local>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Apr 2012 15:21:13 -0600
+Subject: Tegra for-next branch status check
+Message-ID: <4F95C7C9.30205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 09:02:25PM +0900, Abhinav Kochhar wrote:
-> Hi,
-> 
-> I see a bottle-neck with the current dma-mapping framework.
-> Issue seems to be with the Virtual memory allocation for access in kernel
-> address space.
-> 
-> 1. In "arch/arm/mm/dma-mapping.c" there is a initialization call to
-> "consistent_init". It reserves size 32MB of Kernel Address space.
-> 2. "consistent_init" allocates memory for kernel page directory and page
-> tables.
-> 
-> 3. "__iommu_alloc_remap" function allocates virtual memory region in kernel
-> address space reserved in step 1.
-> 
-> 4. "__iommu_alloc_remap" function then maps the allocated pages to the
-> address space reserved in step 3.
-> 
-> Since the virtual memory area allocated for mapping these pages in kernel
-> address space is only 32MB,
-> 
-> eventually the calls for allocation and mapping new pages into kernel
-> address space are going to fail once 32 MB is exhausted.
-> 
-> e.g., For Exynos 5 platform Each framebuffer for 1280x800 resolution
-> consumes around 4MB.
-> 
-> We have a scenario where X11 DRI driver would allocate Non-contig pages for
-> all "Pixmaps" through arm_iommu_alloc_attrs" function which will follow the
-> path given above in steps 1 - 4.
-> 
-> Now the problem is the size limitation of 32MB. We may want to allocate
-> more than 8 such buffers when X11 DRI driver is integrated.
-> Possible solutions:
-> 
-> 1. Why do we need to create a kernel virtual address space? Are we going to
-> access these pages in kernel using this address?
-> 
-> If we are not going to access anything in kernel then why do we need to map
-> these pages in kernel address space?. If we can avoid this then the problem
-> can be solved.
-> 
-> OR
-> 
-> 2 Is it used for only book-keeping to retrieve "struct pages" later on for
-> passing/mapping to different devices?
-> 
-> If yes, then we have to find another way.
-> 
-> For "dmabuf" framework one solution could be to add a new member variable
-> "pages" in the exporting driver's local object and use that for
-> passing/mapping to different devices.
-> 
-> Moreover, even if we increase to say 64 MB that would not be enough for our
-> use, we never know how many graphic applications would be spawned by the
-> user.
-> Let me know your opinion on this.
+Arnd, Olof,
 
-This is more or less the reason I'm so massively opposed to adding vmap to
-dma-buf - you _really_ burn through the vmap space ridiculously quickly on
-32bit platforms with too much memory (i.e. everything with more than 1 G).
+Could I please ask you to take a quick look at Tegra's git repo:
 
-You need to map/unmap everything page-by-page with all the usual kmap apis
-the kernel provides.
--Daniel
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+
+... and double-check the construction of all the for-3.5 branches. I've
+tended to mostly put stuff in topic branches rather than separating
+things into the perhaps more typical soc/drivers/dt branches. Is this
+scheme going to work out OK?
+
+Note a couple dependencies in there:
+
+for-3.5/gpio-pinmux-dependency is a copy of pinctrl's "base" tag.
+
+for-3.5/gpio-pinmux depends on for-3.5/gpio-pinmux-dependency
+
+for-3.5/tegra30-audio and for-3.5/usb-ulpi both depend on
+for-3.5/gpio-pinmux.
+
+Thanks for any feedback.
