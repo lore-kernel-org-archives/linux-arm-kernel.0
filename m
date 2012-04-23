@@ -1,30 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Apr 2012 20:15:41 +0000
-Subject: Sharing header files -- arch/arm/mach-generic  ?
-In-Reply-To: <20120423194042.GA5734@elf.ucw.cz>
-References: <20120423194042.GA5734@elf.ucw.cz>
-Message-ID: <201204232015.41963.arnd@arndb.de>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Mon, 23 Apr 2012 13:19:29 -0700
+Subject: Possible integer overflow in mach-bcmring with FPGA11107
+In-Reply-To: <86r4veipp8.fsf@gandalf.zerties.org>
+References: <86r4veipp8.fsf@gandalf.zerties.org>
+Message-ID: <4F95B951.6020700@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 April 2012, Pavel Machek wrote:
-> I have new architecture I'd like to merge into the mainline. It has
-> some code very similar to existing plaforms (for example
-> real differences to mach-realview/platsmp.c are two lines.)
-> 
-> Is that a problem?
-> 
-> Should mach-generic/platsmp.c be created, so code can be better
-> shared? Or are the code pieces small enough that this duplication can
-> be ignored?
+On 4/23/2012 5:43 AM, Christian Dietrich wrote:
+>
+> This seems totally innocent, but when doing the caluculation for
+> rate_hz by hand (or python) the result is slighly bigger than
+> 2^32-1. Therfore an integer overflow should occur and the rate_hz rate
+> will be far too low. It may be that there is a sanity check in
+> hardware, but i don't know the used hardware at all.
+>
+Hi Christian,
 
-Hi Pavel,
+Yes. This is a problem. I will cleanup fpga11107 code including this soon.
 
-I'd suggest you just post the code with the duplicate files
-for review at first, and then we can discuss what to do with them.
-As Russell mentioned, the code might not actually be ideal
-in the duplicate version so you end up rewriting it, or there
-might be a different solution that someone finds when we see the
-patches.
-
-	Arnd
+Thanks,
+JD
