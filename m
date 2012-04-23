@@ -1,24 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 23 Apr 2012 18:49:25 +0100
-Subject: device-tree vs gpio-leds gpio_blink_set
-In-Reply-To: <201204231122.43481.arnd@arndb.de>
-References: <20120423072745.678323582@rtp-net.org>
- <201204231122.43481.arnd@arndb.de>
-Message-ID: <20120423174924.GA457@sirena.org.uk>
+From: wcohen@redhat.com (William Cohen)
+Date: Mon, 23 Apr 2012 13:56:04 -0400
+Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
+ device tree
+In-Reply-To: <20120305103245.GC31189@mudshark.cambridge.arm.com>
+References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
+ <20120305103245.GC31189@mudshark.cambridge.arm.com>
+Message-ID: <4F9597B4.5020208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 11:22:43AM +0000, Arnd Bergmann wrote:
-> On Monday 23 April 2012, Arnaud Patard wrote:
+On 03/05/2012 05:32 AM, Will Deacon wrote:
+> On Sat, Mar 03, 2012 at 02:06:53AM +0000, William Cohen wrote:
+>> The tegra processor has a performance monitoring unit. However, this
+>> was not listed on the board-trimslice.c devices. This patch adds
+>> it to the list of devices and allows one to use hardware performance
+>> monitoring events on the trimslice machine.
+>>
+>> Signed-off-by: William Cohen <wcohen@redhat.com>
+>> ---
+>>  arch/arm/mach-tegra/board-trimslice.c |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+>> index cd52820..0484903 100644
+>> --- a/arch/arm/mach-tegra/board-trimslice.c
+>> +++ b/arch/arm/mach-tegra/board-trimslice.c
+>> @@ -82,6 +82,7 @@ static struct platform_device trimslice_audio_device = {
+>>  
+>>  static struct platform_device *trimslice_devices[] __initdata = {
+>>  	&debug_uart,
+>> +	&tegra_pmu_device,
+>>  	&tegra_sdhci_device1,
+>>  	&tegra_sdhci_device4,
+>>  	&tegra_i2s_device1,
+>> -- 
+>> 1.7.5.2
+> 
+> Olof - would you be able to pick this up please? I've not been able to test
+> it, but since the device is already defined I'm assuming the IRQ numbers are
+> correct.
+> 
+> Cheers,
+> 
+> Will
 
-> > Does anyone know how to solve that ?
+Hi Will and Olof,
 
-> One way to solve it would be to add a blink function to gpiolib so
-> that the gpio-led driver can access it through a common wrapper
-> and we can make the orion_gpio_set_blink() function a pointer in
-> the gpio_chip structure rather than an export from
-> arch/arm/plat-orion/gpio.c. I've put a few people on Cc that might
-> have an opion on this.
-
-Another idea would be to use pinctrl and represent the blink as a
-special function.  Not sure that's sensible though.
+Has this patch been pulled into the git tree?  -Will (Cohen)
