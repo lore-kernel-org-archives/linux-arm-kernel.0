@@ -1,57 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Apr 2012 20:52:14 +0100
-Subject: Sharing header files -- arch/arm/mach-generic  ?
-In-Reply-To: <20120423194042.GA5734@elf.ucw.cz>
-References: <20120423194042.GA5734@elf.ucw.cz>
-Message-ID: <20120423195214.GA24277@n2100.arm.linux.org.uk>
+From: jarod@redhat.com (Jarod Wilson)
+Date: Mon, 23 Apr 2012 16:11:31 -0400
+Subject: [PATCH v3 1/1] rc: Add support for GPIO based IR Receiver driver.
+In-Reply-To: <1330408300-21939-1-git-send-email-kumarrav@codeaurora.org>
+References: <1330408300-21939-1-git-send-email-kumarrav@codeaurora.org>
+Message-ID: <20120423201131.GG31244@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 09:40:42PM +0200, Pavel Machek wrote:
-> I have new architecture I'd like to merge into the mainline. It has
-> some code very similar to existing plaforms (for example
-> real differences to mach-realview/platsmp.c are two lines.)
+On Tue, Feb 28, 2012 at 11:21:40AM +0530, Ravi Kumar V wrote:
+> Adds GPIO based IR Receiver driver. It decodes signals using decoders
+> available in rc framework.
 
-I suspect there's more differences than just that, because 17 lines
-in that file are very specific to realview.  I doubt that you even
-need a scu_base_addr() function as you probably know where the SCU
-is located.
+Been meaning to look at this, but it looks like its already merged
+upstream. Just one question though, inlined below.
 
-So, I bet the reason your example is just two lines different from
-mach-realview/platsmp.c is because someone copied and modified the
-file rather than thinking about what's really required.
+> --- /dev/null
+> +++ b/drivers/media/rc/gpio-ir-recv.c
+> @@ -0,0 +1,205 @@
+> +/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/gpio.h>
+> +#include <linux/slab.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/irq.h>
+> +#include <media/rc-core.h>
+> +#include <media/gpio-ir-recv.h>
+> +
+> +#define GPIO_IR_DRIVER_NAME	"gpio-rc-recv"
+> +#define GPIO_IR_DEVICE_NAME	"gpio_ir_recv"
+> +
+> +struct gpio_rc_dev {
+> +	struct rc_dev *rcdev;
+> +	unsigned int gpio_nr;
+> +	bool active_low;
+> +};
+> +
+> +static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
+> +{
+> +	struct gpio_rc_dev *gpio_dev = dev_id;
+> +	unsigned int gval;
+> +	int rc = 0;
+> +	enum raw_event_type type = IR_SPACE;
+> +
+> +	gval = gpio_get_value_cansleep(gpio_dev->gpio_nr);
+> +
+> +	if (gval < 0)
+> +		goto err_get_value;
+> +
+> +	if (gpio_dev->active_low)
+> +		gval = !gval;
+> +
+> +	if (gval == 1)
+> +		type = IR_PULSE;
 
-> Should mach-generic/platsmp.c be created, so code can be better
-> shared? Or are the code pieces small enough that this duplication can
-> be ignored?
+What happens if gval is > 1?
 
-It should be ignored.
+> +	rc = ir_raw_event_store_edge(gpio_dev->rcdev, type);
+> +	if (rc < 0)
+> +		goto err_get_value;
+> +
+> +	ir_raw_event_handle(gpio_dev->rcdev);
+> +
+> +err_get_value:
+> +	return IRQ_HANDLED;
+> +}
 
-> headsmp.S is another candidate for sharing. AFAICT we have 4 times
-> identical code in the tree already:
-> 
-> ./mach-exynos/headsmp.S:   ldmia	r4, {r5, r6}
-> ./plat-versatile/headsmp.S:		ldmia	 r4, {r5, r6}
-> ./mach-ux500/headsmp.S:			ldmia	 r4, {r5, r6}
-> ./mach-msm/headsmp.S:			ldmia	 r4, {r5, r6}
+Looks like you'll store a space any time you get gval > 1, which may or
+may not be intended here...
 
-Again, because of standard 'lets copy and modify' behaviour.  I'd
-really like to drop the holding pen from versatile stuff - it's not
-really required, as we can wake each CPU individually.  The only
-reason it hasn't happened is because the holding pen stuff is also
-used for holding CPUs in the unplugged state, as realview and versatile
-express have no way to power manage or reset individual CPUs.
 
-Most normal platforms (iow, those fabricated on real SoCs rather than
-test-chips) have ways to power off the unplugged CPU, and don't need
-this holding pen.  Or they only have one additional CPU, and so don't
-even need any holding pen.
-
-Unfortunately, I don't have the time to hit people over the head to
-get them to fix their implementations here, so lots of copy-n-modify
-for the SMP bringup from Realview has happened over the years.  It's
-little surprise though that OMAP (where I've been quite involved with)
-does not suffer from this...
-
-Basically, everything except plat-versatile probably shouldn't be using
-this holding pen stuff.
+-- 
+Jarod Wilson
+jarod at redhat.com
