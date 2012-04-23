@@ -1,36 +1,33 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 23 Apr 2012 17:08:13 +0100
-Subject: [PATCH 12/12] Add removal of old OMAP private DMA implementation to
- feature removal
-In-Reply-To: <20120423160409.GE24299@n2100.arm.linux.org.uk>
-References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
-Message-ID: <E1SMLoD-0002Wr-6z@rmk-PC.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Apr 2012 17:12:18 +0100
+Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM mpcore
+ watchdog
+In-Reply-To: <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
+References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
+ <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
+ <4F9514AA.10403@arm.com>
+ <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
+ <4F9547E3.4000709@arm.com>
+ <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
+ <4F9573B8.9050607@arm.com>
+ <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
+ <4F957A0C.7060607@arm.com>
+ <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
+Message-ID: <4F957F62.5090605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- Documentation/feature-removal-schedule.txt |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+On 23/04/12 17:01, viresh kumar wrote:
+> On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> The TWD watchdog uses a per-cpu interrupt (usually interrupt #30), and
+>> the GIC configuration should flag it as such. With this setup,
+>> request_irq() should fail, and the right API is request_percpu_irq(),
+>> together with enable_percpu_irq()/disable_percpu_irq().
+> 
+> request_irq() doesn't fail for me even if i pass it.
 
-diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
-index 03ca210..aec6f37 100644
---- a/Documentation/feature-removal-schedule.txt
-+++ b/Documentation/feature-removal-schedule.txt
-@@ -539,3 +539,14 @@ When:	3.6
- Why:	setitimer is not returning -EFAULT if user pointer is NULL. This
- 	violates the spec.
- Who:	Sasikantha Babu <sasikanth.v19@gmail.com>
-+
-+----------------------------
-+
-+What:	OMAP private DMA implementation
-+When:	2013
-+Why:	We have a DMA engine implementation; all users should be updated
-+	to use this rather than persisting with the old APIs.  The old APIs
-+	block merging the old DMA engine implementation into the DMA
-+	engine driver.
-+Who:	Russell King <linux@arm.linux.org.uk>,
-+	Santosh Shilimkar <santosh.shilimkar@ti.com>
+Well, it definitely should. Can you share the relevant part of your DT?
+
+	M.
 -- 
-1.7.4.4
+Jazz is not dead. It just smells funny...
