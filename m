@@ -1,36 +1,40 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 23 Apr 2012 21:46:22 +0530
-Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM
- mpcore watchdog
-In-Reply-To: <4F957F62.5090605@arm.com>
-References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
- <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
- <4F9514AA.10403@arm.com>
- <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
- <4F9547E3.4000709@arm.com>
- <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
- <4F9573B8.9050607@arm.com>
- <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
- <4F957A0C.7060607@arm.com>
- <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
- <4F957F62.5090605@arm.com>
-Message-ID: <CAOh2x=n4JdZdZoofHpr+9G254ZL_kxyWEHHRr5W4PB4GgjeHsQ@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 23 Apr 2012 09:19:41 -0700
+Subject: [PATCH 1/2] video: msm: Fix section mismatches in mddi.c
+In-Reply-To: <4F94F3D7.5030904@gmx.de>
+References: <1334256334-8234-1-git-send-email-davidb@codeaurora.org>
+ <4F94F3D7.5030904@gmx.de>
+Message-ID: <20120423161941.GA26903@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Well, it definitely should. Can you share the relevant part of your DT?
+On Mon, Apr 23, 2012 at 06:16:55AM +0000, Florian Tobias Schandinat wrote:
+> On 04/12/2012 06:45 PM, David Brown wrote:
+> > The change
+> >     commit 461cbe77d0a4f887c33a3a95ea68a7daf23b4302
+> >     Author: Gregory Bean <gbean@codeaurora.org>
+> >     Date:   Wed Jul 28 10:22:13 2010 -0700
+> > 
+> >         video: msm: Fix section mismatch in mddi.c.
+> > 
+> > fixes a section mismatch between the board file and the driver's probe
+> > function, however, it misses the additional mismatches between the
+> > probe function and some routines it calls.  Fix these up as well.
+> > 
+> > Signed-off-by: David Brown <davidb@codeaurora.org>
+> 
+> Applied.
 
-I Just tested it once, and will do it tomorrow again.
+Hmm.  I guess it is somewhat my fault, since I sent the message To
+both myself and you.  I've already applied this to the MSM tree, and I
+believe it has been merged into Linus' tree.  I don't think it'll be
+an issue, since git merge will handle the duplicate patch fine.
 
-			wdt at ec800620 {
-				compatible = "arm,cortex-a9-twd-wdt";
-				reg = <0xec800620 0x20>;
-				interrupts = <1 14 0x301>;
-				status = "disabled";
-			};
+Next time, I'll try to be clearer about which tree I'm thinking for a
+patch to go through.
 
-Looking at your confidence, i am starting to feel, i am wrong here ;)
+David
 
---
-viresh
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
