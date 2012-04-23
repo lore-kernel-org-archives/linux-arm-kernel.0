@@ -1,33 +1,34 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 23 Apr 2012 14:09:54 +0200
-Subject: [RFC PATCH 00/11 V4] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B798E4@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <1334771194-18688-1-git-send-email-marex@denx.de>
- <201204230418.40037.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B798E4@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <201204231409.55131.marex@denx.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 23 Apr 2012 15:09:35 +0300
+Subject: [PATCH 2/3] ARM: tegra: Add SMMU enabler in AHB
+In-Reply-To: <1335181043-15348-2-git-send-email-hdoyu@nvidia.com>
+References: <1335181043-15348-1-git-send-email-hdoyu@nvidia.com>
+ <1335181043-15348-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20120423120934.GZ26302@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chen Peter-B29397,
+Hi,
 
-> > > Does the udc work at this patchset? If it is, you have enabled OTG port
-> > > and not host 1 port, correct?
-> > 
-> > Wait for V5. Gadget mode should work, V5 should have some further rebase
-> > issues
-> > fixed.
-> 
-> From my point, you'd better step by step, first, mainline host and phy.
-> then, gadget. At last OTG if you have been interested in.
+On Mon, Apr 23, 2012 at 02:37:22PM +0300, Hiroshi DOYU wrote:
+> diff --git a/arch/arm/mach-tegra/tegra-ahb.c b/arch/arm/mach-tegra/tegra-ahb.c
+> index 411b51f..40877fa 100644
+> --- a/arch/arm/mach-tegra/tegra-ahb.c
+> +++ b/arch/arm/mach-tegra/tegra-ahb.c
+> @@ -20,6 +20,7 @@
+>   */
+>  
+>  #include <linux/kernel.h>
+> +#include <linux/module.h>
 
-OTG is certainly going last, I still have to figure that out. I wanted to add 
-gadget to see how this whole thing will work together to avoid design mistakes.
+EXPORT_SYMBOL() is defined in <linux/export.h>
 
-> It can be easier for your mainline, as some of them have still not
-> implemented at your local. What's your opinion, Sascha?
-
-I don't follow here, what do you mean?
-
-Best regards,
-Marek Vasut
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/e5b0e8eb/attachment.sig>
