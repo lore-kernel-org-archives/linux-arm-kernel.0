@@ -1,92 +1,86 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 23 Apr 2012 10:08:01 -0700
-Subject: [PATCH 02/17][V2] ARM: OMAP4: cpuidle - Declare the states with
- the driver declaration
-In-Reply-To: <4F9561F7.3000306@linaro.org> (Daniel Lezcano's message of "Mon,
- 23 Apr 2012 16:06:47 +0200")
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
- <1333570371-1389-3-git-send-email-daniel.lezcano@linaro.org>
- <87vcl8a5wb.fsf@ti.com> <4F901A03.9080000@linaro.org>
- <4F9561F7.3000306@linaro.org>
-Message-ID: <878vhml6ku.fsf@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 23 Apr 2012 19:10:09 +0200
+Subject: [PATCHv8 04/10] I2C: OMAP: Fix the error handling
+In-Reply-To: <1334842101-20670-5-git-send-email-shubhrajyoti@ti.com>
+References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
+ <1334842101-20670-5-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120423171009.GI27321@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-> On 04/19/2012 03:58 PM, Daniel Lezcano wrote:
->> On 04/10/2012 12:37 AM, Kevin Hilman wrote:
->>> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
->>>
->>>> The cpuidle API allows to declare statically the states in the driver
->>>> structure. Let's use it.
->>>> We do no longer need the fill_cstate function called at runtime and
->>>> by the way adding more instructions at boot time.
->>>>
->>>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->>>> Reviewed-by: Jean Pihet<j-pihet@ti.com>
->>>> Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>>> ---
->>>>   arch/arm/mach-omap2/cpuidle44xx.c |   57
->>>> +++++++++++++++++++++---------------
->>>>   1 files changed, 33 insertions(+), 24 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c
->>>> b/arch/arm/mach-omap2/cpuidle44xx.c
->>>> index ee0bc50..6d86b59 100644
->>>> --- a/arch/arm/mach-omap2/cpuidle44xx.c
->>>> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
->>>> @@ -132,21 +132,39 @@ struct cpuidle_driver omap4_idle_driver = {
->>>>       .name                = "omap4_idle",
->>>>       .owner                = THIS_MODULE,
->>>>       .en_core_tk_irqen        = 1,
->>>> +    .states = {
->>>> +        {
->>>> +            /* C1 - CPU0 ON + CPU1 ON + MPU ON */
->>>> +            .exit_latency = 2 + 2,
->>>> +            .target_residency = 5,
->>>> +            .flags = CPUIDLE_FLAG_TIME_VALID,
->>>> +            .enter = omap4_enter_idle,
->>>> +            .name = "C1",
->>>> +            .desc = "MPUSS ON"
->>>> +        },
->>>> +        {
->>>> +                        /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
->>>> +            .exit_latency = 328 + 440,
->>>> +            .target_residency = 960,
->>>> +            .flags = CPUIDLE_FLAG_TIME_VALID,
->>>> +            .enter = omap4_enter_idle,
->>>> +            .name = "C2",
->>>> +            .desc = "MPUSS CSWR",
->>>> +        },
->>>> +        {
->>>> +            /* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
->>>> +            .exit_latency = 460 + 518,
->>>> +            .target_residency = 1100,
->>>> +            .flags = CPUIDLE_FLAG_TIME_VALID,
->>>> +            .enter = omap4_enter_idle,
->>>> +            .name = "C3",
->>>> +            .desc = "MPUSS OSWR",
->>>> +        },
->>>> +    },
->>>> +    .state_count = OMAP4_NUM_STATES,
->>>
->>> I think you can drop OMAP4_NUM_STATES here, and just use:
->>>
->>>     .state_count = ARRAY_SIZE(omap4_idle_driver.states),
->>>
->>> Then drop OMAP4_NUM_STATES all together in patch 3.
->>
->> Ok.
->
-> I said 'ok' but it is not :)
->
-> omap4_idle_driver.states has a fixed length which is CPUIDLE_STATE_MAX (8).
-> We need to define it manually as 3 for now.
+The subject is too generic. (I don't want to be negative always: The
+following description of the problem is good :))
 
-I don't see the connection between the two.
+On Thu, Apr 19, 2012 at 06:58:15PM +0530, Shubhrajyoti D wrote:
+> Currently in probe
+>       pm_runtime_put(dev->dev);
 
-Why can't you use ARRAY_SIZE(), and just have an error check later in
-the init to see if state_count > max.
+Indentation wrong.
 
-Kevin
+> 
+> ...
+>         /* i2c device drivers may be active on return from add_adapter() */
+>         adap->nr = pdev->id;
+>         r = i2c_add_numbered_adapter(adap);
+>         if (r) {
+>                 dev_err(dev->dev, "failure adding adapter\n");
+>                 goto err_free_irq;
+>         }
+> ...
+> 
+>         return 0;
+> 
+> err_free_irq:
+>         free_irq(dev->irq, dev);
+> err_unuse_clocks:
+>         omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>         pm_runtime_put(dev->dev);
+> 
+> This may access the i2c registers without the clocks.
+> Attempting to fix the same by moving the pm_rintime_put after the error check.
+
+Drop "Attempting".
+
+> 
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index bf07ffd..1777d79 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1061,8 +1061,6 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
+>  		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+>  
+> -	pm_runtime_put(dev->dev);
+> -
+>  	adap = &dev->adapter;
+>  	i2c_set_adapdata(adap, dev);
+>  	adap->owner = THIS_MODULE;
+> @@ -1082,6 +1080,8 @@ omap_i2c_probe(struct platform_device *pdev)
+>  
+>  	of_i2c_register_devices(adap);
+>  
+> +	pm_runtime_put(dev->dev);
+> +
+>  	return 0;
+>  
+>  err_free_irq:
+> -- 
+> 1.7.5.4
+> 
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/31f1c682/attachment.sig>
