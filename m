@@ -1,27 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 23 Apr 2012 11:27:33 +0200
-Subject: [PATCH v4 0/3] ARM: Initial support for Cortex-M3
-In-Reply-To: <20120416082718.GJ15132@pengutronix.de>
-References: <20120404210838.GA23126@pengutronix.de>
- <20120416082718.GJ15132@pengutronix.de>
-Message-ID: <20120423092733.GF20039@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Apr 2012 11:37:32 +0200
+Subject: [PATCH] net/at91_ether: use gpio_to_irq for phy IRQ line
+Message-ID: <1335173852-582-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Use the gpio_to_irq() function to retrieve the phy IRQ line
+from the GPIO pin specification.
+This fix is needed now that we have moved to irqdomains on AT91.
 
-On Mon, Apr 16, 2012 at 10:27:18AM +0200, Uwe Kleine-K?nig wrote:
-> in reply to the last post Arnd suggested to take this series early after
-> the 3.4 merge window for next.
-> 
-> Now that 3.4-rc3 is out, I wonder if you (Russell) already found
-> the time to look at the series?
-would it be ok for you if I put the series into your patch system just
-that it doesn't become forgotten?
+Reported-by: Jamie Iles <jamie@jamieiles.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Andrew Victor <avictor.za@gmail.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: netdev at vger.kernel.org
+---
+ drivers/net/ethernet/cadence/at91_ether.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+index 9061170..236d708 100644
+--- a/drivers/net/ethernet/cadence/at91_ether.c
++++ b/drivers/net/ethernet/cadence/at91_ether.c
+@@ -265,7 +265,7 @@ static void enable_phyirq(struct net_device *dev)
+ 		return;
+ 	}
+ 
+-	irq_number = lp->board_data.phy_irq_pin;
++	irq_number = gpio_to_irq(lp->board_data.phy_irq_pin);
+ 	status = request_irq(irq_number, at91ether_phy_interrupt, 0, dev->name, dev);
+ 	if (status) {
+ 		printk(KERN_ERR "at91_ether: PHY IRQ %d request failed - status %d!\n", irq_number, status);
+@@ -365,7 +365,7 @@ static void disable_phyirq(struct net_device *dev)
+ 	disable_mdi();
+ 	spin_unlock_irq(&lp->lock);
+ 
+-	irq_number = lp->board_data.phy_irq_pin;
++	irq_number = gpio_to_irq(lp->board_data.phy_irq_pin);
+ 	free_irq(irq_number, dev);			/* Free interrupt handler */
+ }
+ 
+@@ -1193,7 +1193,7 @@ static int at91ether_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 
+ 	if (netif_running(net_dev)) {
+ 		if (gpio_is_valid(lp->board_data.phy_irq_pin)) {
+-			int phy_irq = lp->board_data.phy_irq_pin;
++			int phy_irq = gpio_to_irq(lp->board_data.phy_irq_pin);
+ 			disable_irq(phy_irq);
+ 		}
+ 
+@@ -1217,7 +1217,7 @@ static int at91ether_resume(struct platform_device *pdev)
+ 		netif_start_queue(net_dev);
+ 
+ 		if (gpio_is_valid(lp->board_data.phy_irq_pin)) {
+-			int phy_irq = lp->board_data.phy_irq_pin;
++			int phy_irq = gpio_to_irq(lp->board_data.phy_irq_pin);
+ 			enable_irq(phy_irq);
+ 		}
+ 	}
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.10
