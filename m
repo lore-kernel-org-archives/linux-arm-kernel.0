@@ -1,33 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Apr 2012 15:19:24 +0100
-Subject: [PATCH 1/8] ARM: OMAP: fix DMA vs memory ordering
-In-Reply-To: <20120420222230.GH21106@atomide.com>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRqN-0004b4-Me@rmk-PC.arm.linux.org.uk>
- <20120420222230.GH21106@atomide.com>
-Message-ID: <20120423141924.GB24299@n2100.arm.linux.org.uk>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Mon, 23 Apr 2012 19:51:01 +0530
+Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM
+ mpcore watchdog
+In-Reply-To: <4F9547E3.4000709@arm.com>
+References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
+ <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
+ <4F9514AA.10403@arm.com>
+ <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
+ <4F9547E3.4000709@arm.com>
+Message-ID: <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 03:22:33PM -0700, Tony Lindgren wrote:
-> * Russell King <rmk+kernel@arm.linux.org.uk> [120418 03:14]:
-> > Using coherent DMA memory with the OMAP DMA engine results in
-> > unpredictable behaviour due to memory ordering issues; as things stand,
-> > there is no guarantee that data written to coherent DMA memory will be
-> > visible to the DMA hardware.
-> > 
-> > This is because the OMAP dma_write() accessor contains no barriers,
-> > necessary on ARMv6 and above.  The effect of this can be seen in comments
-> > in the OMAP serial driver, which incorrectly talks about cache flushing
-> > for the coherent DMA stuff.
-> > 
-> > Rather than adding barriers to the accessors, add it in the DMA support
-> > code just before we enable DMA, and just after we disable DMA.  This
-> > avoids having barriers for every DMA register access.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Ah, that explains why it worked. I suppose you do have additional
+> patches that fix the IRQ request bit?
 
-Would you like me to push this upstream on my next -rc push (with a
-stable tag?)
+Missed this earlier. That patchset is in review currently and have already
+fixed that. :)
+
+> Given that no in-tree platform seem to be using this watchdog (at least
+> a quick grep didn't reveal anything), I'd be inclined to simply change
+> the offset in smp_twd.h and let them break.
+
+Even i can't find any users of it. :)
+
+@Wim: Please apply following patch before this one.
+Here we go:
+
+From: Viresh Kumar <viresh.kumar@st.com>
+Date: Mon, 23 Apr 2012 19:39:47 +0530
+Subject: [PATCH] ARM: SMP_TWD: WDOG: Start registers from 0x00 instead of
+ 0x20
+
+TWD_WDOG is at offset 0x20 from TWD base address. Current register offsets
+contain this extra 0x20 offset, i.e. users were required to pass base address of
+TWD instead of WDOG to WDOG driver.
+
+Change this, so that users can pass base address of WDOG to WDOG driver instead
+of TWD module. For this, subtract 0x20 from offsets of WDOG registers.
+
+This could break any current users of TWD_WDOG, but i couldn't find any users of
+this driver in current Linux tree. So, haven't fixed any platform code. If some
+platforms are broken please report to me, so that we can get them fixed in this
+patch only.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/include/asm/smp_twd.h |   17 +++++++++++------
+ 1 files changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index 57857d1..ff3f67e 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -6,12 +6,17 @@
+ #define TWD_TIMER_CONTROL		0x08
+ #define TWD_TIMER_INTSTAT		0x0C
+
+-#define TWD_WDOG_LOAD			0x20
+-#define TWD_WDOG_COUNTER		0x24
+-#define TWD_WDOG_CONTROL		0x28
+-#define TWD_WDOG_INTSTAT		0x2C
+-#define TWD_WDOG_RESETSTAT		0x30
+-#define TWD_WDOG_DISABLE		0x34
++/*
++ * TWD_WDOG is at offset 0x20 from TWD base address. Following register offsets
++ * doesn't contain this extra 0x20 offset, i.e. users of TWD_WDOG
+must pass base
++ * address of WDOG to WDOG driver instead of TWD module.
++ */
++#define TWD_WDOG_LOAD			0x00
++#define TWD_WDOG_COUNTER		0x04
++#define TWD_WDOG_CONTROL		0x08
++#define TWD_WDOG_INTSTAT		0x0C
++#define TWD_WDOG_RESETSTAT		0x10
++#define TWD_WDOG_DISABLE		0x14
+
+ #define TWD_WDOG_LOAD_MIN		0x00000000
+ #define TWD_WDOG_LOAD_MAX		0xFFFFFFFF
