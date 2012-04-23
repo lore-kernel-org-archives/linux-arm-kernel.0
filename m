@@ -1,33 +1,63 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 23 Apr 2012 07:27:17 -0700
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <CAMQu2gz2CD+-kcSF2HVGWWrjk3DmsGgcuucBXan5NqtVUSwa2w@mail.gmail.com>
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
- <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
- <20120412030044.GA26236@kroah.com>
- <CAM=4YEQ6_+7xPwi2jucks1P9p8tO3cSG7S0s=VVJVrueb4fB=g@mail.gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E96E7C5@DBDE01.ent.ti.com>
- <CAMQu2gz2CD+-kcSF2HVGWWrjk3DmsGgcuucBXan5NqtVUSwa2w@mail.gmail.com>
-Message-ID: <20120423142717.GA32380@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Apr 2012 07:30:48 -0700
+Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
+ initialization
+In-Reply-To: <20120423141415.GA24299@n2100.arm.linux.org.uk>
+References: <20120418211606.GU25053@n2100.arm.linux.org.uk>
+ <20120418213642.GV25053@n2100.arm.linux.org.uk>
+ <20120419013914.GV21106@atomide.com>
+ <20120419174332.GY25053@n2100.arm.linux.org.uk>
+ <20120419180741.GX21106@atomide.com>
+ <20120420151034.GA24205@n2100.arm.linux.org.uk>
+ <20120420152623.GA21106@atomide.com>
+ <20120420153743.GB24205@n2100.arm.linux.org.uk>
+ <20120420164957.GC21106@atomide.com>
+ <20120423141415.GA24299@n2100.arm.linux.org.uk>
+Message-ID: <20120423143048.GC3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 04:34:46PM +0530, Shilimkar, Santosh wrote:
-> Afzal,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120423 07:17]:
+> On Fri, Apr 20, 2012 at 09:50:00AM -0700, Tony Lindgren wrote:
+> > Then something like this is still needed on top of your original mmc driver
+> > patch for omap2420:
+> > 
+> > --- a/drivers/mmc/host/omap.c
+> > +++ b/drivers/mmc/host/omap.c
+> > @@ -1617,11 +1617,14 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
+> >  	host->dma_tx_burst = -1;
+> >  	host->dma_rx_burst = -1;
+> >  
+> > -	sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
+> > +	if (cpu_is_omap24xx())
+> > +		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX :  OMAP24XX_DMA_MMC2_TX;
+> > +	else
+> > +		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
+> >  	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
+> >  #if 0
+> >  	if (!host->dma_tx) {
+> > -		def_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
+> > +		dev_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
+> >  			sig);
+> >  		goto err_dma;
+> >  	}
+> > @@ -1632,7 +1635,10 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
+> >  #endif
+> >  #endif
+> >  #ifdef USE_DMA_ENGINE
+> > -	sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
+> > +	if (cpu_is_omap24xx())
+> > +		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_RX :  OMAP24XX_DMA_MMC2_RX;
+> > +	else
+> > +		sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
+> >  	host->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
+> >  #if 0
+> >  	if (!host->dma_rx) {
 > 
-> On Mon, Apr 23, 2012 at 4:26 PM, Mohammed, Afzal <afzal@ti.com> wrote:
-> > Hi Aneesh,
-> >
-> > On Fri, Apr 13, 2012 at 01:28:55, V, Aneesh wrote:
-> >
-> >> Thanks. I will wait for your review then. Once I have your comments
-> >> I will re-work and submit in the new directory structure proposed.
-> >
-> > Do you have a plan on submitting EMIF driver in the new proposed
-> > (drivers/memory) directory. Or shall I submit GPMC driver by creating
-> > the new "memory" directory.
-> >
->  Greg mentioned that he plans to do a review of EMIF driver. We were waiting
-> for his comments before sending the updated series.
+> Is there any chance this DMA signal information could be moved into
+> platform resources, like omap_hsmmc has done?  I could then get rid
+> of the plat/dma.h dependence from this driver.
 
-No, don't wait for me, please resend, I was waiting for you :)
+Sure, I'll take a look at that later on today.
+
+Tony
