@@ -1,54 +1,86 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 23 Apr 2012 15:28:04 +0800
-Subject: [PATCH 32/40] ARM i.MX5: implement clocks using common clock
- framework
-In-Reply-To: <20120423065419.GZ3852@pengutronix.de>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-33-git-send-email-s.hauer@pengutronix.de>
- <20120423063949.GB15656@b20223-02.ap.freescale.net>
- <20120423065419.GZ3852@pengutronix.de>
-Message-ID: <20120423072803.GC15656@b20223-02.ap.freescale.net>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 23 Apr 2012 09:28:39 +0200
+Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
+In-Reply-To: <20120422235506.d3377f0e.akpm@linux-foundation.org>
+References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
+ <1332368519-22660-2-git-send-email-w.sang@pengutronix.de>
+ <20120422235506.d3377f0e.akpm@linux-foundation.org>
+Message-ID: <20120423072839.GC4568@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 08:54:19AM +0200, Sascha Hauer wrote:
-> On Mon, Apr 23, 2012 at 02:39:50PM +0800, Richard Zhao wrote:
-> > Hello Sascha,
-> > 
-> > I saw some code removed from clk init code. For example:
-> > mx51_clocks_init:
-> > clk_enable(&cpu_clk);
-> > clk_enable(&main_bus_clk);
-> > /* move usb_phy_clk to 24MHz */
-> > clk_set_parent(&usb_phy1_clk, &osc_clk);
-> > /* set the usboh3_clk parent to pll2_sw_clk */
-> > clk_set_parent(&usboh3_clk, &pll2_sw_clk);
-> > 
-> > mx53_clocks_init:
-> > clk_set_parent(&uart_root_clk, &pll3_sw_clk);
-> > 
-> > Could you explain why you remove them?
-> > If it has reasonable purpose, do you think it's better to put
-> > them in a seperate patch? It makes everyone clear what it changed.
+On Sun, Apr 22, 2012 at 11:55:06PM -0700, Andrew Morton wrote:
+> On Wed, 21 Mar 2012 23:21:57 +0100 Wolfram Sang <w.sang@pengutronix.de> wrote:
 > 
-> I can readd most of them, the setup simply got lost. BTW what is the
-> reason for reparenting the uart clock in the i.MX53 setup? This will
-> break early console support if the bootloader didn't setup the uart
-> clock in the same way already.
-I think you can remove the uart reparent. The original aim is to avoid
-use the same pll as display/ipu. Dispaly requires precise clk which sometimes
-change pll rate.
+> > MX23/28 use IP cores which follow a register layout I have first seen on
+> > STMP3xxx SoCs. In this layout, every register actually has four u32:
+> > 
+> >  1.) to store a value directly
+> >  2.) a SET register where every 1-bit sets the corresponding bit,
+> >      others are unaffected
+> >  3.) same with a CLR register
+> >  4.) same with a TOG (toggle) register
+> > 
+> > Also, the 2 MSBs in register 0 are always the same and can be used to reset
+> > the IP core.
+> > 
+> > All this is strictly speaking not mach-specific (but IP core specific) and,
+> > thus, doesn't need to be in mach-mxs/include. At least, mx6 and mx50 also
+> > utilize IP cores following this stmp-style. So:
+> > 
+> > Introduce a stmp-style device, put the code and defines for that in a public
+> > place (lib/), and let drivers for stmp-style devices select that code.
+> > To avoid regressions and ease reviewing, the actual code is simply copied from
+> > mach-mxs. It definately wants updates, but those need a seperate patch series.
+> > 
+> > Voila, mach dependency gone, reusable code introduced. Note that I didn't
+> > remove the duplicated code from mach-mxs yet, first the drivers have to be
+> > converted.
+> > 
+> > ...
+> >
+> >  include/linux/stmp_device.h |   20 +++++++++++
+> >  lib/Kconfig                 |    3 ++
+> >  lib/Makefile                |    2 +
+> >  lib/stmp_device.c           |   80 +++++++++++++++++++++++++++++++++++++++++++
+> 
+> It's good that this is being presented as library code, rather than
+> being buried in some device-specific directory then copied and pasted
+> ten times.
+> 
+> But ./lib/ does seem rather a strange place for it.  Perhaps we need a
+> drivers/lib/ or something.  We can use ./lib/ for now - it can always
+> be moved later on.
 
-You might need also check other platforms wheter they lost setup code.
+The first version had it in drivers/base/ but that also felt strange.
+I like drivers/lib/. Arnd, do you agree? Shall I resend?
 
-Thanks
-Richard
 > 
-> Sascha
+> > --- /dev/null
+> > +++ b/lib/stmp_device.c
 > 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> The functions in this file look terribly racy on SMP, or even with
+> preemption or interrupts.  What happens if two CPUs or threads run
+> stmp_reset_block() against the same device at the same time?
 > 
+> Perhaps the caller is supposed to prevent that, and the documentation
+> which isn't there forgot to mention it ;)
+
+The code needs even more cleanups, timeouts are terrible as well. But as
+mentioned above, this series only moves existing code to a central
+place. Improvements would be the next, seperate step.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/fc45f0e7/attachment.sig>
