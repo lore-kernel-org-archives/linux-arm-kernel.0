@@ -1,25 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Apr 2012 11:06:31 +0000
-Subject: [PATCH V2 1/3] lib: add support for stmp-style devices
-In-Reply-To: <20120423072839.GC4568@pengutronix.de>
-References: <1332368519-22660-1-git-send-email-w.sang@pengutronix.de>
- <20120422235506.d3377f0e.akpm@linux-foundation.org>
- <20120423072839.GC4568@pengutronix.de>
-Message-ID: <201204231106.31574.arnd@arndb.de>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 23 Apr 2012 11:09:32 +0000
+Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
+In-Reply-To: <CAMQu2gz2CD+-kcSF2HVGWWrjk3DmsGgcuucBXan5NqtVUSwa2w@mail.gmail.com>
+References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
+ <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
+ <20120412030044.GA26236@kroah.com>
+ <CAM=4YEQ6_+7xPwi2jucks1P9p8tO3cSG7S0s=VVJVrueb4fB=g@mail.gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E96E7C5@DBDE01.ent.ti.com>
+ <CAMQu2gz2CD+-kcSF2HVGWWrjk3DmsGgcuucBXan5NqtVUSwa2w@mail.gmail.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E96E7F7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 April 2012, Wolfram Sang wrote:
-> > But ./lib/ does seem rather a strange place for it.  Perhaps we need a
-> > drivers/lib/ or something.  We can use ./lib/ for now - it can always
-> > be moved later on.
-> 
-> The first version had it in drivers/base/ but that also felt strange.
-> I like drivers/lib/. Arnd, do you agree? Shall I resend?
+Hi Santosh,
 
-I think lib/ is fine, but I also suggested putting it there ;-)
+On Mon, Apr 23, 2012 at 16:34:46, Shilimkar, Santosh wrote:
+> Please go ahead in creating directory.
 
-If Andrew or someone else feels strongly about it, we can of course
-change it again before I submit it to Linus.
+Thanks for the quick reply.
 
-	Arnd
+Regards
+Afzal
