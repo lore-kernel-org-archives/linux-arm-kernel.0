@@ -1,29 +1,58 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Mon, 23 Apr 2012 16:06:28 +0200
-Subject: [PATCH] ARM: optimize for FA526 if toolchain supports it
-In-Reply-To: <201204231315.20648.arnd@arndb.de>
-References: <1335184313-27573-1-git-send-email-florian@openwrt.org>
- <201204231315.20648.arnd@arndb.de>
-Message-ID: <4F9561E4.2030100@openwrt.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Apr 2012 15:14:15 +0100
+Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
+ initialization
+In-Reply-To: <20120420164957.GC21106@atomide.com>
+References: <20120418210142.GR21106@atomide.com>
+ <20120418211606.GU25053@n2100.arm.linux.org.uk>
+ <20120418213642.GV25053@n2100.arm.linux.org.uk>
+ <20120419013914.GV21106@atomide.com>
+ <20120419174332.GY25053@n2100.arm.linux.org.uk>
+ <20120419180741.GX21106@atomide.com>
+ <20120420151034.GA24205@n2100.arm.linux.org.uk>
+ <20120420152623.GA21106@atomide.com>
+ <20120420153743.GB24205@n2100.arm.linux.org.uk>
+ <20120420164957.GC21106@atomide.com>
+Message-ID: <20120423141415.GA24299@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Apr 20, 2012 at 09:50:00AM -0700, Tony Lindgren wrote:
+> Then something like this is still needed on top of your original mmc driver
+> patch for omap2420:
+> 
+> --- a/drivers/mmc/host/omap.c
+> +++ b/drivers/mmc/host/omap.c
+> @@ -1617,11 +1617,14 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
+>  	host->dma_tx_burst = -1;
+>  	host->dma_rx_burst = -1;
+>  
+> -	sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
+> +	if (cpu_is_omap24xx())
+> +		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX :  OMAP24XX_DMA_MMC2_TX;
+> +	else
+> +		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
+>  	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
+>  #if 0
+>  	if (!host->dma_tx) {
+> -		def_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
+> +		dev_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
+>  			sig);
+>  		goto err_dma;
+>  	}
+> @@ -1632,7 +1635,10 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
+>  #endif
+>  #endif
+>  #ifdef USE_DMA_ENGINE
+> -	sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
+> +	if (cpu_is_omap24xx())
+> +		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_RX :  OMAP24XX_DMA_MMC2_RX;
+> +	else
+> +		sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
+>  	host->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
+>  #if 0
+>  	if (!host->dma_rx) {
 
-Le 04/23/12 15:15, Arnd Bergmann a ?crit :
-> On Monday 23 April 2012, Florian Fainelli wrote:
->> Currently, when we are targetting a Farady FA526-based system
->> the toolchain will use the arm9tdmi mtune option of gcc, gcc>  4.6
->> supports the FA526 CPU, and allow us to optimize for it.
->>
->> Signed-off-by: Florian Fainelli<florian@openwrt.org>
-> No objections to the patch, but a question out of curiosity:
->
-> Is this the regular gemini platform that you are working on,
-> or something else? Do you have other platform support patches
-> that you are planning to submit for this?
-
-I need this on a different platform (Moschip MCS814x), which I will be 
-submitting once I have all the bits working and converted to device tree.
---
-Florian
+Is there any chance this DMA signal information could be moved into
+platform resources, like omap_hsmmc has done?  I could then get rid
+of the plat/dma.h dependence from this driver.
