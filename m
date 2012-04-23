@@ -1,63 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2012 07:30:48 -0700
-Subject: [PATCH 8/8] ARM: omap_hsmmc: remove platform data dma_mask and
- initialization
-In-Reply-To: <20120423141415.GA24299@n2100.arm.linux.org.uk>
-References: <20120418211606.GU25053@n2100.arm.linux.org.uk>
- <20120418213642.GV25053@n2100.arm.linux.org.uk>
- <20120419013914.GV21106@atomide.com>
- <20120419174332.GY25053@n2100.arm.linux.org.uk>
- <20120419180741.GX21106@atomide.com>
- <20120420151034.GA24205@n2100.arm.linux.org.uk>
- <20120420152623.GA21106@atomide.com>
- <20120420153743.GB24205@n2100.arm.linux.org.uk>
- <20120420164957.GC21106@atomide.com>
- <20120423141415.GA24299@n2100.arm.linux.org.uk>
-Message-ID: <20120423143048.GC3739@atomide.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 23 Apr 2012 17:32:29 +0300
+Subject: [PATCH v2] arm: omap: fix trivial warnings for dspbridge
+Message-ID: <1335191549-1047-1-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120423 07:17]:
-> On Fri, Apr 20, 2012 at 09:50:00AM -0700, Tony Lindgren wrote:
-> > Then something like this is still needed on top of your original mmc driver
-> > patch for omap2420:
-> > 
-> > --- a/drivers/mmc/host/omap.c
-> > +++ b/drivers/mmc/host/omap.c
-> > @@ -1617,11 +1617,14 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
-> >  	host->dma_tx_burst = -1;
-> >  	host->dma_rx_burst = -1;
-> >  
-> > -	sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
-> > +	if (cpu_is_omap24xx())
-> > +		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_TX :  OMAP24XX_DMA_MMC2_TX;
-> > +	else
-> > +		sig = host->id == 0 ? OMAP_DMA_MMC_TX : OMAP_DMA_MMC2_TX;
-> >  	host->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> >  #if 0
-> >  	if (!host->dma_tx) {
-> > -		def_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
-> > +		dev_err(host->dev, "unable to obtain TX DMA engine channel %u\n",
-> >  			sig);
-> >  		goto err_dma;
-> >  	}
-> > @@ -1632,7 +1635,10 @@ static int __init mmc_omap_probe(struct platform_device *pdev)
-> >  #endif
-> >  #endif
-> >  #ifdef USE_DMA_ENGINE
-> > -	sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
-> > +	if (cpu_is_omap24xx())
-> > +		sig = host->id == 0 ? OMAP24XX_DMA_MMC1_RX :  OMAP24XX_DMA_MMC2_RX;
-> > +	else
-> > +		sig = host->id == 0 ? OMAP_DMA_MMC_RX : OMAP_DMA_MMC2_RX;
-> >  	host->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> >  #if 0
-> >  	if (!host->dma_rx) {
-> 
-> Is there any chance this DMA signal information could be moved into
-> platform resources, like omap_hsmmc has done?  I could then get rid
-> of the plat/dma.h dependence from this driver.
+arch/arm/plat-omap/devices.c: In function 'omap_dsp_reserve_sdram_memblock':
+arch/arm/plat-omap/devices.c:170: warning: format '%x' expects type 'unsigned int', but argument 3 has type 'phys_addr_t'
+arch/arm/mach-omap2/dsp.c: In function 'omap_dsp_init':
+arch/arm/mach-omap2/dsp.c:60: warning: format '%x' expects type 'unsigned int', but argument 3 has type 'phys_addr_t'
+arch/arm/mach-omap2/dsp.c:60: warning: format '%x' expects type 'unsigned int', but argument 4 has type 'phys_addr_t'
 
-Sure, I'll take a look at that later on today.
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+---
+ arch/arm/mach-omap2/dsp.c    |    5 +++--
+ arch/arm/plat-omap/devices.c |    4 ++--
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-Tony
+diff --git a/arch/arm/mach-omap2/dsp.c b/arch/arm/mach-omap2/dsp.c
+index 74f18f2..3376388 100644
+--- a/arch/arm/mach-omap2/dsp.c
++++ b/arch/arm/mach-omap2/dsp.c
+@@ -57,8 +57,9 @@ static int __init omap_dsp_init(void)
+ 
+ 	if (pdata->phys_mempool_base) {
+ 		pdata->phys_mempool_size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
+-		pr_info("%s: %x bytes @ %x\n", __func__,
+-			pdata->phys_mempool_size, pdata->phys_mempool_base);
++		pr_info("%s: %llx bytes @ %llx\n", __func__,
++			(unsigned long long)pdata->phys_mempool_size,
++			(unsigned long long)pdata->phys_mempool_base);
+ 	}
+ 
+ 	pdev = platform_device_alloc("omap-dsp", -1);
+diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
+index 60278f4..09b07d2 100644
+--- a/arch/arm/plat-omap/devices.c
++++ b/arch/arm/plat-omap/devices.c
+@@ -167,8 +167,8 @@ void __init omap_dsp_reserve_sdram_memblock(void)
+ 
+ 	paddr = arm_memblock_steal(size, SZ_1M);
+ 	if (!paddr) {
+-		pr_err("%s: failed to reserve %x bytes\n",
+-				__func__, size);
++		pr_err("%s: failed to reserve %llx bytes\n",
++				__func__, (unsigned long long)size);
+ 		return;
+ 	}
+ 
+-- 
+1.7.10
