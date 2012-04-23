@@ -1,46 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 23 Apr 2012 10:21:19 +0200
-Subject: [PATCH 10/12] leds-atmel-pwm.c: Make pwmled_probe() __devinit
-In-Reply-To: <20120420143427.97c08ee5.akpm@linux-foundation.org>
-References: <cover.1334567594.git.nicolas.ferre@atmel.com>
- <23f8dba8a3e1ae21a5953747b63dc0a21fcba868.1334567594.git.nicolas.ferre@atmel.com>
- <20120420143427.97c08ee5.akpm@linux-foundation.org>
-Message-ID: <4F9510FF.9060604@atmel.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 23 Apr 2012 11:31:49 +0300
+Subject: [PATCH] ARM: tegra: Initialize pll_p_out1
+Message-ID: <1335169910-29403-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2012 11:34 PM, Andrew Morton :
-> On Mon, 16 Apr 2012 11:20:54 +0200
-> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> 
->> Commit 892a884 (leds: convert led platform drivers to module_platform_driver)
->> is omitting the section mismatch error: so change annotation of the probe
->> function to __devinit instead of __init.
->>
->> ...
->>
->> --- a/drivers/leds/leds-atmel-pwm.c
->> +++ b/drivers/leds/leds-atmel-pwm.c
->> @@ -35,7 +35,7 @@ static void pwmled_brightness(struct led_classdev *cdev, enum led_brightness b)
->>   * NOTE:  we reuse the platform_data structure of GPIO leds,
->>   * but repurpose its "gpio" number as a PWM channel number.
->>   */
->> -static int __init pwmled_probe(struct platform_device *pdev)
->> +static int __devinit pwmled_probe(struct platform_device *pdev)
->>  {
->>  	const struct gpio_led_platform_data	*pdata;
->>  	struct pwmled				*leds;
-> 
-> This is theoretically oopsable and the patch is probably needed in 3.4
-> and 3.3.x.
+pll_a uses pll_p_out1 as its parent. Therefore this clock needs to be
+initialized to make sure pll_a has a known input clock. Failure to do so
+will cause the system to crash early in the bootup.
 
-Absolutely, I will request it to be included in stable tree then.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-> But you've applied it to linu-next via your own tree so I won't be
-> merging it.
+--
 
-Ok, thanks for having taken this patch into account Andrew.
+Changes in v2:
 
-Best regards,
+* moved pll_p_out1 initialization to early_init to make it similar to the
+  tegra20 code.
+---
+ arch/arm/mach-tegra/common.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index c50f2ee..654a457 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -95,6 +95,17 @@ static __initdata struct tegra_clk_init_table tegra20_clk_init_table[] = {
+ };
+ #endif
+ 
++#ifdef CONFIG_ARCH_TEGRA_3x_SOC
++static __initdata struct tegra_clk_init_table tegra30_clk_init_table[] = {
++	/* name		parent		rate		enabled */
++	{ "clk_m",	NULL,		0,		true },
++	{ "pll_p",	"clk_m",	408000000,	true },
++	{ "pll_p_out1",	"pll_p",	9600000,	true },
++	{ NULL,		NULL,		0,		0},
++};
++#endif
++
++
+ static void __init tegra_init_cache(u32 tag_latency, u32 data_latency)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+@@ -129,6 +140,7 @@ void __init tegra30_init_early(void)
+ {
+ 	tegra_init_fuse();
+ 	tegra30_init_clocks();
++	tegra_clk_init_from_table(tegra30_clk_init_table);
+ 	tegra_init_cache(0x441, 0x551);
+ 	tegra_pmc_init();
+ 	tegra_powergate_init();
 -- 
-Nicolas Ferre
+1.7.7.rc0.72.g4b5ea.dirty
