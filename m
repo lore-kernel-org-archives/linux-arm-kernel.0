@@ -1,61 +1,93 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 23 Apr 2012 17:43:45 +0200
-Subject: [PATCHv8 02/10] I2C: OMAP: Fix the mismatch of pm_runtime enable
- and disable
-In-Reply-To: <1334842101-20670-3-git-send-email-shubhrajyoti@ti.com>
-References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
- <1334842101-20670-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120423154345.GA27321@pengutronix.de>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Mon, 23 Apr 2012 10:45:02 -0500
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <20120423074856.GU20478@pengutronix.de>
+References: <CAMXH7KFYA24sPUcwgKfwVLNPA0jWQ-QG02y+SfPNnAqdiv0+gg@mail.gmail.com>
+ <CAMXH7KGgSmvfqUTC1bufBz0QXbt01dHsPo1cbRA9jLj9mGmfjg@mail.gmail.com>
+ <20120419064308.GH3852@pengutronix.de>
+ <20120420020816.GH22219@S2101-09.ap.freescale.net>
+ <CAMXH7KE2RtdNy3G61guZb2uWy3rn267Z3eEVEgN5e==tHHsiuA@mail.gmail.com>
+ <20120423051813.GM26306@S2101-09.ap.freescale.net>
+ <20120423062739.GX3852@pengutronix.de>
+ <20120423065259.GR26306@S2101-09.ap.freescale.net>
+ <20120423065623.GA3852@pengutronix.de>
+ <20120423071013.GS26306@S2101-09.ap.freescale.net>
+ <20120423074856.GU20478@pengutronix.de>
+Message-ID: <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 06:58:13PM +0530, Shubhrajyoti D wrote:
-> Currently the i2c driver calls the pm_runtime_enable and never
-> the disable. This may cause a warning when pm_runtime_enable
-> checks for the count match.Attempting to fix the same by calling
-> pm_runtime_disable in the error and the remove path.
+>> Let me try last time. ?What about having a late_initcall hook in
+>> machine_desc?
+>
+> Also fine with me.
+>
 
-Why "attempting"?
+Shall I add Shawn's patch to my imx cpuidle patchset or should the
+arch/arm/kernel/setup.c and arch.h changes be submitted separately?
+If separately, Shawn, did you want to submit this patch or should I?
 
-> 
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 4f4188d..c851672 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1090,6 +1090,7 @@ err_unuse_clocks:
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  	pm_runtime_put(dev->dev);
->  	iounmap(dev->base);
-> +	pm_runtime_disable(&pdev->dev);
->  err_free_mem:
->  	platform_set_drvdata(pdev, NULL);
->  	kfree(dev);
-> @@ -1110,6 +1111,7 @@ omap_i2c_remove(struct platform_device *pdev)
->  	free_irq(dev->irq, dev);
->  	i2c_del_adapter(&dev->adapter);
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-> +	pm_runtime_disable(&pdev->dev);
->  	iounmap(dev->base);
->  	kfree(dev);
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -- 
-> 1.7.5.4
-> 
+Thanks,
+Rob
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/31f10c4f/attachment.sig>
+>>
+>> Regards,
+>> Shawn
+>>
+>> 8<---
+>>
+>> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+>> index d7692ca..0b1c94b 100644
+>> --- a/arch/arm/include/asm/mach/arch.h
+>> +++ b/arch/arm/include/asm/mach/arch.h
+>> @@ -43,6 +43,7 @@ struct machine_desc {
+>> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
+>> ? ? ? ? struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
+>> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_machine)(void);
+>> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_late)(void);
+>> ?#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*handle_irq)(struct pt_regs *);
+>> ?#endif
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index ebfac78..549f036 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -800,6 +800,14 @@ static int __init customize_machine(void)
+>> ?}
+>> ?arch_initcall(customize_machine);
+>>
+>> +static int __init init_machine_late(void)
+>> +{
+>> + ? ? ? if (machine_desc->init_late)
+>> + ? ? ? ? ? ? ? machine_desc->init_late();
+>> + ? ? ? return 0;
+>> +}
+>> +late_initcall(init_machine_late);
+>> +
+>> ?#ifdef CONFIG_KEXEC
+>> ?static inline unsigned long long get_total_mem(void)
+>> ?{
+>> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+>> index da6c1d9..0e3640f 100644
+>> --- a/arch/arm/mach-imx/mach-imx6q.c
+>> +++ b/arch/arm/mach-imx/mach-imx6q.c
+>> @@ -142,6 +142,7 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
+>> ? ? ? ? .handle_irq ? ? = imx6q_handle_irq,
+>> ? ? ? ? .timer ? ? ? ? ?= &imx6q_timer,
+>> ? ? ? ? .init_machine ? = imx6q_init_machine,
+>> + ? ? ? .init_late ? ? ?= imx6q_init_late,
+>> ? ? ? ? .dt_compat ? ? ?= imx6q_dt_compat,
+>> ? ? ? ? .restart ? ? ? ?= imx6q_restart,
+>> ?MACHINE_END
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
