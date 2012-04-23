@@ -1,49 +1,39 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Mon, 23 Apr 2012 13:56:04 -0400
-Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
- device tree
-In-Reply-To: <20120305103245.GC31189@mudshark.cambridge.arm.com>
-References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
- <20120305103245.GC31189@mudshark.cambridge.arm.com>
-Message-ID: <4F9597B4.5020208@redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Apr 2012 12:00:13 -0600
+Subject: [PATCH 1/3] ARM: tegra: Add AHB driver
+In-Reply-To: <201204231233.09423.arnd@arndb.de>
+References: <1335181043-15348-1-git-send-email-hdoyu@nvidia.com>
+ <201204231233.09423.arnd@arndb.de>
+Message-ID: <4F9598AD.2030308@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2012 05:32 AM, Will Deacon wrote:
-> On Sat, Mar 03, 2012 at 02:06:53AM +0000, William Cohen wrote:
->> The tegra processor has a performance monitoring unit. However, this
->> was not listed on the board-trimslice.c devices. This patch adds
->> it to the list of devices and allows one to use hardware performance
->> monitoring events on the trimslice machine.
->>
->> Signed-off-by: William Cohen <wcohen@redhat.com>
->> ---
->>  arch/arm/mach-tegra/board-trimslice.c |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
->> index cd52820..0484903 100644
->> --- a/arch/arm/mach-tegra/board-trimslice.c
->> +++ b/arch/arm/mach-tegra/board-trimslice.c
->> @@ -82,6 +82,7 @@ static struct platform_device trimslice_audio_device = {
->>  
->>  static struct platform_device *trimslice_devices[] __initdata = {
->>  	&debug_uart,
->> +	&tegra_pmu_device,
->>  	&tegra_sdhci_device1,
->>  	&tegra_sdhci_device4,
->>  	&tegra_i2s_device1,
->> -- 
->> 1.7.5.2
+On 04/23/2012 06:33 AM, Arnd Bergmann wrote:
+> On Monday 23 April 2012, Hiroshi DOYU wrote:
+>> The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+>> High-performance Bus (AHB) architecture.
+...
+>> @@ -122,6 +123,7 @@ void __init tegra20_init_early(void)
+>>  	tegra_init_cache(0x331, 0x441);
+>>  	tegra_pmc_init();
+>>  	tegra_powergate_init();
+>> +	tegra_ahb_gizmo_init();
+>>  }
+>>  #endif
+>>  #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+>> @@ -132,5 +134,6 @@ void __init tegra30_init_early(void)
+>>  	tegra_init_cache(0x441, 0x551);
+>>  	tegra_pmc_init();
+>>  	tegra_powergate_init();
+>> +	tegra_ahb_gizmo_init();
+>>  }
+>>  #endif
 > 
-> Olof - would you be able to pick this up please? I've not been able to test
-> it, but since the device is already defined I'm assuming the IRQ numbers are
-> correct.
-> 
-> Cheers,
-> 
-> Will
+> Does it really have to be "early", rather than an initcall? Why?
 
-Hi Will and Olof,
-
-Has this patch been pulled into the git tree?  -Will (Cohen)
+I don't know whether it has to be early, but if this driver isn't going
+to be instantiated from device tree, I'd prefer it to be initialized by
+an explicit function call from the boards or common code rather than an
+initcall. It seems a lot easier to keep track of all the initialization
+by doing it explicitly. That said, it's quite possible this API couuld
+be called from say init_machine instead of init_early though.
