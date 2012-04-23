@@ -1,115 +1,112 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 23 Apr 2012 11:23:37 +0200
-Subject: [PATCH 05/10] mtd: mxc_nand: put ecc layout into devtype structs
+Date: Mon, 23 Apr 2012 11:23:38 +0200
+Subject: [PATCH 06/10] mtd: mxc_nand: split chip_select function and put it
+ into devtype struct
 In-Reply-To: <20120423092240.GA18013@pengutronix.de>
 References: <20120423092240.GA18013@pengutronix.de>
-Message-ID: <1335173022-22371-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1335173022-22371-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit makes problems on v1 and v2 regarding 4k pages more obvious.
-As I don't have a 4k flash handy I just keep the status quo.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/mtd/nand/mxc_nand.c |   25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |   33 ++++++++++++++++++++++++++++-----
+ 1 file changed, 28 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index c9cdec2..1389d40 100644
+index 1389d40..be17b7a 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -152,6 +152,7 @@ struct mxc_nand_devtype_data {
- 	int (*check_int)(struct mxc_nand_host *);
+@@ -153,6 +153,7 @@ struct mxc_nand_devtype_data {
  	void (*irq_control)(struct mxc_nand_host *, int);
  	u32 (*get_ecc_status)(struct mxc_nand_host *);
-+	struct nand_ecclayout *ecclayout_512, *ecclayout_2k, *ecclayout_4k;
+ 	struct nand_ecclayout *ecclayout_512, *ecclayout_2k, *ecclayout_4k;
++	void (*select_chip)(struct mtd_info *mtd, int chip);
  };
  
  struct mxc_nand_host {
-@@ -1114,6 +1115,9 @@ static const struct mxc_nand_devtype_data imx21_nand_devtype_data = {
- 	.check_int = check_int_v1_v2,
- 	.irq_control = irq_control_v1_v2,
- 	.get_ecc_status = get_ecc_status_v1,
-+	.ecclayout_512 = &nandv1_hw_eccoob_smallpage,
-+	.ecclayout_2k = &nandv1_hw_eccoob_largepage,
-+	.ecclayout_4k = &nandv1_hw_eccoob_smallpage, /* XXX: needs fix */
+@@ -722,7 +723,7 @@ static int mxc_nand_verify_buf(struct mtd_info *mtd,
+ 
+ /* This function is used by upper layer for select and
+  * deselect of the NAND chip */
+-static void mxc_nand_select_chip(struct mtd_info *mtd, int chip)
++static void mxc_nand_select_chip_v1_v3(struct mtd_info *mtd, int chip)
+ {
+ 	struct nand_chip *nand_chip = mtd->priv;
+ 	struct mxc_nand_host *host = nand_chip->priv;
+@@ -741,11 +742,30 @@ static void mxc_nand_select_chip(struct mtd_info *mtd, int chip)
+ 		clk_enable(host->clk);
+ 		host->clk_act = 1;
+ 	}
++}
++
++static void mxc_nand_select_chip_v2(struct mtd_info *mtd, int chip)
++{
++	struct nand_chip *nand_chip = mtd->priv;
++	struct mxc_nand_host *host = nand_chip->priv;
++
++	if (chip == -1) {
++		/* Disable the NFC clock */
++		if (host->clk_act) {
++			clk_disable(host->clk);
++			host->clk_act = 0;
++		}
++		return;
++	}
+ 
+-	if (nfc_is_v21()) {
+-		host->active_cs = chip;
+-		writew(host->active_cs << 4, NFC_V1_V2_BUF_ADDR);
++	if (!host->clk_act) {
++		/* Enable the NFC clock */
++		clk_enable(host->clk);
++		host->clk_act = 1;
+ 	}
++
++	host->active_cs = chip;
++	writew(host->active_cs << 4, NFC_V1_V2_BUF_ADDR);
+ }
+ 
+ /*
+@@ -1118,6 +1138,7 @@ static const struct mxc_nand_devtype_data imx21_nand_devtype_data = {
+ 	.ecclayout_512 = &nandv1_hw_eccoob_smallpage,
+ 	.ecclayout_2k = &nandv1_hw_eccoob_largepage,
+ 	.ecclayout_4k = &nandv1_hw_eccoob_smallpage, /* XXX: needs fix */
++	.select_chip = mxc_nand_select_chip_v1_v3,
  };
  
  /* v21: 25, 35 */
-@@ -1127,6 +1131,9 @@ static const struct mxc_nand_devtype_data imx25_nand_devtype_data = {
- 	.check_int = check_int_v1_v2,
- 	.irq_control = irq_control_v1_v2,
- 	.get_ecc_status = get_ecc_status_v2,
-+	.ecclayout_512 = &nandv2_hw_eccoob_smallpage,
-+	.ecclayout_2k = &nandv2_hw_eccoob_largepage,
-+	.ecclayout_4k = &nandv2_hw_eccoob_4k,
+@@ -1134,6 +1155,7 @@ static const struct mxc_nand_devtype_data imx25_nand_devtype_data = {
+ 	.ecclayout_512 = &nandv2_hw_eccoob_smallpage,
+ 	.ecclayout_2k = &nandv2_hw_eccoob_largepage,
+ 	.ecclayout_4k = &nandv2_hw_eccoob_4k,
++	.select_chip = mxc_nand_select_chip_v2,
  };
  
  /* v3: 51, 53 */
-@@ -1140,6 +1147,9 @@ static const struct mxc_nand_devtype_data imx51_nand_devtype_data = {
- 	.check_int = check_int_v3,
- 	.irq_control = irq_control_v3,
- 	.get_ecc_status = get_ecc_status_v3,
-+	.ecclayout_512 = &nandv2_hw_eccoob_smallpage,
-+	.ecclayout_2k = &nandv2_hw_eccoob_largepage,
-+	.ecclayout_4k = &nandv2_hw_eccoob_smallpage, /* XXX: needs fix */
+@@ -1150,6 +1172,7 @@ static const struct mxc_nand_devtype_data imx51_nand_devtype_data = {
+ 	.ecclayout_512 = &nandv2_hw_eccoob_smallpage,
+ 	.ecclayout_2k = &nandv2_hw_eccoob_largepage,
+ 	.ecclayout_4k = &nandv2_hw_eccoob_smallpage, /* XXX: needs fix */
++	.select_chip = mxc_nand_select_chip_v1_v3,
  };
  
  static int __init mxcnd_probe(struct platform_device *pdev)
-@@ -1150,7 +1160,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	struct mxc_nand_host *host;
- 	struct resource *res;
- 	int err = 0;
--	struct nand_ecclayout *oob_smallpage, *oob_largepage;
- 
- 	/* Allocate memory for MTD device structure and private data */
- 	host = kzalloc(sizeof(struct mxc_nand_host) + NAND_MAX_PAGESIZE +
-@@ -1212,8 +1221,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 		host->regs = host->base + 0xe00;
- 		host->spare0 = host->base + 0x800;
- 		host->spare_len = 16;
--		oob_smallpage = &nandv1_hw_eccoob_smallpage;
--		oob_largepage = &nandv1_hw_eccoob_largepage;
- 		this->ecc.bytes = 3;
- 		host->eccsize = 1;
- 	} else if (nfc_is_v21()) {
-@@ -1221,8 +1228,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 		host->regs = host->base + 0x1e00;
- 		host->spare0 = host->base + 0x1000;
- 		host->spare_len = 64;
--		oob_smallpage = &nandv2_hw_eccoob_smallpage;
--		oob_largepage = &nandv2_hw_eccoob_largepage;
- 		this->ecc.bytes = 9;
- 	} else if (nfc_is_v3_2()) {
- 		host->devtype_data = &imx51_nand_devtype_data;
-@@ -1239,13 +1244,11 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 		host->regs_axi = host->base + 0x1e00;
- 		host->spare0 = host->base + 0x1000;
- 		host->spare_len = 64;
--		oob_smallpage = &nandv2_hw_eccoob_smallpage;
--		oob_largepage = &nandv2_hw_eccoob_largepage;
+@@ -1184,7 +1207,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 	this->priv = host;
+ 	this->dev_ready = mxc_nand_dev_ready;
+ 	this->cmdfunc = mxc_nand_command;
+-	this->select_chip = mxc_nand_select_chip;
+ 	this->read_byte = mxc_nand_read_byte;
+ 	this->read_word = mxc_nand_read_word;
+ 	this->write_buf = mxc_nand_write_buf;
+@@ -1247,6 +1269,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
  	} else
  		BUG();
  
++	this->select_chip = host->devtype_data->select_chip;
  	this->ecc.size = 512;
--	this->ecc.layout = oob_smallpage;
-+	this->ecc.layout = host->devtype_data->ecclayout_512;
+ 	this->ecc.layout = host->devtype_data->ecclayout_512;
  
- 	if (pdata->hw_ecc) {
- 		this->ecc.calculate = mxc_nand_calculate_ecc;
-@@ -1305,9 +1308,9 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	host->devtype_data->preset(mtd);
- 
- 	if (mtd->writesize == 2048)
--		this->ecc.layout = oob_largepage;
--	if (nfc_is_v21() && mtd->writesize == 4096)
--		this->ecc.layout = &nandv2_hw_eccoob_4k;
-+		this->ecc.layout = host->devtype_data->ecclayout_2k;
-+	else if (mtd->writesize == 4096)
-+		this->ecc.layout = host->devtype_data->ecclayout_4k;
- 
- 	/* second phase scan */
- 	if (nand_scan_tail(mtd)) {
 -- 
 1.7.10
