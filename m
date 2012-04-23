@@ -1,57 +1,36 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 23 Apr 2012 00:09:43 -0700
-Subject: [PATCH 9/9] um: Properly check all process' threads for a live mm
-In-Reply-To: <20120423070641.GA27702@lizard>
-References: <20120423070641.GA27702@lizard>
-Message-ID: <20120423070943.GI30752@lizard>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 23 Apr 2012 09:27:06 +0200
+Subject: [GIT PULL] U300 fixes for the 3.4 series
+Message-ID: <CACRpkdYnV3em1v8VJ9ukoVN6+-6vRa69pf5d7p8JJ1W=8tbCCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kill_off_processes() might miss a valid process, this is because
-checking for process->mm is not enough. Process' main thread may
-exit or detach its mm via use_mm(), but other threads may still
-have a valid mm.
+Hi ARM SoC maintainers,
 
-To catch this we use find_lock_task_mm(), which walks up all
-threads and returns an appropriate task (with task lock held).
+these are some two accumulated fixes for the U300 platform to be included
+in the -rc series for 3.4.
 
-Suggested-by: Oleg Nesterov <oleg@redhat.com>
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/um/kernel/reboot.c |   13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
 
-diff --git a/arch/um/kernel/reboot.c b/arch/um/kernel/reboot.c
-index 1411f4e..3d15243 100644
---- a/arch/um/kernel/reboot.c
-+++ b/arch/um/kernel/reboot.c
-@@ -6,6 +6,7 @@
- #include "linux/sched.h"
- #include "linux/spinlock.h"
- #include "linux/slab.h"
-+#include "linux/oom.h"
- #include "kern_util.h"
- #include "os.h"
- #include "skas.h"
-@@ -25,13 +26,13 @@ static void kill_off_processes(void)
- 
- 		read_lock(&tasklist_lock);
- 		for_each_process(p) {
--			task_lock(p);
--			if (!p->mm) {
--				task_unlock(p);
-+			struct task_struct *t;
-+
-+			t = find_lock_task_mm(p);
-+			if (!t)
- 				continue;
--			}
--			pid = p->mm->context.id.u.pid;
--			task_unlock(p);
-+			pid = t->mm->context.id.u.pid;
-+			task_unlock(t);
- 			os_kill_ptraced_process(pid, 1);
- 		}
- 		read_unlock(&tasklist_lock);
--- 
-1.7.9.2
+  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+
+are available in the git repository at:
+
+ git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+u300-fixes-for-arm-soc
+
+for you to fetch changes up to 1344500e2d79d09db81f748984697cbdd6b02279:
+
+  ARM: u300: bump all IRQ numbers by one (2012-04-20 09:52:58 +0200)
+
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: u300: bump all IRQ numbers by one
+
+Mark Brown (1):
+      ARM: ux300: Fix unimplementable regulation constraints
+
+ arch/arm/mach-u300/core.c              |    6 +-
+ arch/arm/mach-u300/i2c.c               |    9 +-
+ arch/arm/mach-u300/include/mach/irqs.h |  150 ++++++++++++++++----------------
+ 3 files changed, 80 insertions(+), 85 deletions(-)
