@@ -1,42 +1,126 @@
 From: B29397@freescale.com (Chen Peter-B29397)
-Date: Mon, 23 Apr 2012 01:44:10 +0000
-Subject: [PATCH 07/11] MXS: Add separate MXS EHCI HCD driver
-In-Reply-To: <1335099567-21056-8-git-send-email-marex@denx.de>
+Date: Mon, 23 Apr 2012 01:46:12 +0000
+Subject: [PATCH 06/11] MXS: Add small registration glue for ci13xxx_udc
+In-Reply-To: <1335099567-21056-7-git-send-email-marex@denx.de>
 References: <1334771194-18688-1-git-send-email-marex@denx.de>
  <1335099567-21056-1-git-send-email-marex@denx.de>
- <1335099567-21056-8-git-send-email-marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B793FA@039-SN2MPN1-023.039d.mgd.msft.net>
+ <1335099567-21056-7-git-send-email-marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B7941F@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
  
-> NOTE: I still haven't figured out how to enable/disable the disconnection
-> detector, it can't be enabled all the time, so I toggle PHY stuff from
-> this
-> driver, which I doubt is correct.
 > 
-Hi Marek, I have already explain how to use high speed disconnect detector
-in early email.
-
- 
- 
+> +config USB_CI13XXX_MXS
+> +	tristate "MIPS USB CI13xxx for i.MX23/28"
+> +	depends on ARCH_MXS
+> +	select USB_GADGET_DUALSPEED
+> +	select USB_IMX_COMPOSITE
+> +	help
+> +	  i.MX SoC has chipidea USB controller.  This driver uses
+> +	  ci13xxx_udc core.
+> +	  This driver depends on OTG driver for PHY initialization,
+> +	  clock management, powering up VBUS, and power management.
+> +	  This driver is not supported on boards like trout which
+> +	  has an external PHY.
 > +
-> +static irqreturn_t mxs_ehci_irq(struct usb_hcd *hcd)
+> +	  Say "y" to link the driver statically, or "m" to build a
+> +	  dynamically linked module called "ci13xxx_msm" and force all
+> +	  gadget drivers to also be dynamically linked.
+> +
+cil3xxx_msm????? should be cil3xxx_mxs?
+
+
+
+>  #
+>  # LAST -- dummy/emulated controller
+>  #
+> diff --git a/drivers/usb/gadget/Makefile b/drivers/usb/gadget/Makefile
+> index b7f6eef..1f159a9 100644
+> --- a/drivers/usb/gadget/Makefile
+> +++ b/drivers/usb/gadget/Makefile
+> @@ -30,6 +30,7 @@ obj-$(CONFIG_USB_EG20T)		+= pch_udc.o
+>  obj-$(CONFIG_USB_MV_UDC)	+= mv_udc.o
+>  mv_udc-y			:= mv_udc_core.o
+>  obj-$(CONFIG_USB_CI13XXX_MSM)	+= ci13xxx_msm.o
+> +obj-$(CONFIG_USB_CI13XXX_MXS)	+= ci13xxx_mxs.o
+>  obj-$(CONFIG_USB_FUSB300)	+= fusb300_udc.o
+> 
+>  #
+> diff --git a/drivers/usb/gadget/ci13xxx_mxs.c
+> b/drivers/usb/gadget/ci13xxx_mxs.c
+> new file mode 100644
+> index 0000000..35a3dd4
+> --- /dev/null
+> +++ b/drivers/usb/gadget/ci13xxx_mxs.c
+> @@ -0,0 +1,67 @@
+> +/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/usb/ulpi.h>
+> +#include <linux/fsl/mxs-usb.h>
+> +
+> +#include "ci13xxx_udc.c"
+> +
+> +#define MSM_USB_BASE	(udc->regs)
+> +
+> +static irqreturn_t mxs_udc_irq(int irq, void *data)
 > +{
-> +	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-> +	struct usb_phy *phy = usb_get_transceiver();
-> +	uint32_t status;
-> +	static uint32_t discon;
+> +	return udc_irq();
+> +}
 > +
-> +	if (phy && phy->otg && phy->otg->set_vbus) {
-> +		status = ehci_readl(ehci, &ehci->regs->status);
-> +		status = !!(status & STS_PCD);
-> +		if (status != discon) {
-> +			discon = status;
-> +			phy->otg->set_vbus(phy->otg, status);
-> +		}
+> +static struct ci13xxx_udc_driver ci13xxx_mxs_udc_driver = {
+> +	.name			= "ci13xxx-mxs",
+> +	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+> +				  CI13XXX_DISABLE_STREAMING |
+> +				  CI13XXX_DONT_REGISTER_GADGET,
+> +};
+> +
+> +static int ci13xxx_mxs_probe(struct platform_device *pdev)
+> +{
+> +	struct imx_usb *data = pdev->dev.platform_data;
+> +	int ret;
+> +
+> +	ret = devm_request_irq(&pdev->dev, data->irq, mxs_udc_irq,
+> +				IRQF_SHARED, pdev->name, pdev);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "Failed to request IRQ!\n");
+> +		return ret;
 > +	}
-Conflict with your phy interrupt code.
-
- 
- 
+> +
+> +	ret = udc_probe(&ci13xxx_mxs_udc_driver, &pdev->dev, data->mem);
+> +	if (ret < 0)
+> +		dev_err(&pdev->dev, "Failed to probe CI13xxx-mxs!\n");
+> +
+> +	pm_runtime_no_callbacks(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct platform_driver ci13xxx_mxs_driver = {
+> +	.probe		= ci13xxx_mxs_probe,
+> +	.driver		= {
+> +		.name	= "ci13xxx-mxs",
+> +	},
+> +};
+> +
+> +static int __init ci13xxx_mxs_init(void)
+> +{
+> +	return platform_driver_register(&ci13xxx_mxs_driver);
+> +}
+> +
+> +module_init(ci13xxx_mxs_init);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:ci13xxx-mxs");
+> --
+> 1.7.9.5
+> 
