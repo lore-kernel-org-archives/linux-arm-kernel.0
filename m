@@ -1,101 +1,42 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 23 Apr 2012 18:20:08 +0200
-Subject: [PATCHv8 07/10] I2C: OMAP: Handle error check for pm runtime
-In-Reply-To: <1334842101-20670-8-git-send-email-shubhrajyoti@ti.com>
-References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
- <1334842101-20670-8-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120423162008.GB27321@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Apr 2012 17:26:23 +0100
+Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM mpcore
+ watchdog
+In-Reply-To: <CAOh2x=n4JdZdZoofHpr+9G254ZL_kxyWEHHRr5W4PB4GgjeHsQ@mail.gmail.com>
+References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
+ <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
+ <4F9514AA.10403@arm.com>
+ <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
+ <4F9547E3.4000709@arm.com>
+ <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
+ <4F9573B8.9050607@arm.com>
+ <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
+ <4F957A0C.7060607@arm.com>
+ <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
+ <4F957F62.5090605@arm.com>
+ <CAOh2x=n4JdZdZoofHpr+9G254ZL_kxyWEHHRr5W4PB4GgjeHsQ@mail.gmail.com>
+Message-ID: <4F9582AF.6040501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 06:58:18PM +0530, Shubhrajyoti D wrote:
-> If PM runtime get_sync fails return with the error
-> so that no further reads/writes goes through the interface.
-> This will avoid possible abort. Add a error message in case
-> of failure with the cause of the failure.
-
-I don't think the error message is especially helpful. You also use different
-string (probably typo).
-
+On 23/04/12 17:16, viresh kumar wrote:
+> On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Well, it definitely should. Can you share the relevant part of your DT?
 > 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   19 ++++++++++++++++---
->  1 files changed, 16 insertions(+), 3 deletions(-)
+> I Just tested it once, and will do it tomorrow again.
 > 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 44e8cfa..d555dcd 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -585,7 +585,11 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  	int i;
->  	int r;
->  
-> -	pm_runtime_get_sync(dev->dev);
-> +	r = pm_runtime_get_sync(dev->dev);
-> +	if (r < 0) {
-> +		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", r);
-> +		return r;
-> +	}
->  
->  	r = omap_i2c_wait_for_bb(dev);
->  	if (r < 0)
-> @@ -1011,7 +1015,11 @@ omap_i2c_probe(struct platform_device *pdev)
->  		dev->regs = (u8 *)reg_map_ip_v1;
->  
->  	pm_runtime_enable(dev->dev);
-> -	pm_runtime_get_sync(dev->dev);
-> +	r = pm_runtime_get_sync(dev->dev);
-> +	if (r < 0) {
-> +		dev_err(dev->dev, "pm_runtime_get_sync failed:%d\n", r);
-> +		return r;
-> +	}
-
-Smatch says:
-
-drivers/i2c/busses/i2c-omap.c:1021 omap_i2c_probe() warn: 'mem->start' was not released on error
-
-In fact, you are leaking quite more.
-
-> @@ -1103,12 +1111,17 @@ omap_i2c_remove(struct platform_device *pdev)
->  {
->  	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
->  	struct resource		*mem;
-> +	int ret;
->  
->  	platform_set_drvdata(pdev, NULL);
->  
->  	free_irq(dev->irq, dev);
->  	i2c_del_adapter(&dev->adapter);
-> -	pm_runtime_get_sync(&pdev->dev);
-> +	ret = pm_runtime_get_sync(&pdev->dev);
-> +	if (ret < 0) {
-> +		dev_err(dev->dev, "pm_runtime_get_sync failed %d\n", ret);
-> +		return ret;
-> +	}
-
-I am no too familiar with runtime_pm. Is it really so bad to fail remove, when
-get_sync has an error? Why is it checked and e.g. pm_runtime_put later is not?
-Any pointers?
-
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  	pm_runtime_put(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
-> -- 
-> 1.7.5.4
+> 			wdt at ec800620 {
+> 				compatible = "arm,cortex-a9-twd-wdt";
+> 				reg = <0xec800620 0x20>;
+> 				interrupts = <1 14 0x301>;
+> 				status = "disabled";
+> 			};
 > 
+> Looking at your confidence, i am starting to feel, i am wrong here ;)
 
-Thanks,
+Well, having written the code that ensures request_irq() fails when
+passed a PPI, I'd be very worried if the above started to be working... ;-)
 
-   Wolfram
-
+	M.
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/e62475bd/attachment.sig>
+Jazz is not dead. It just smells funny...
