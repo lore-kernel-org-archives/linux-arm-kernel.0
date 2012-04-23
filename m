@@ -1,40 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Apr 2012 10:41:41 -0600
-Subject: [PATCHv3 1/2] drivers: input: keypad: Add device tree support
-In-Reply-To: <CAKdam541af1bU8_64gTZva9VS0R3dTR=3L3J50o9HgHH+WaPYQ@mail.gmail.com>
-References: <1335194839-30193-1-git-send-email-sourav.poddar@ti.com>	<4F95749E.40708@wwwdotorg.org>
- <CAKdam541af1bU8_64gTZva9VS0R3dTR=3L3J50o9HgHH+WaPYQ@mail.gmail.com>
-Message-ID: <4F958645.4080200@wwwdotorg.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 23 Apr 2012 18:42:12 +0200
+Subject: [PATCHv8 09/10] I2C: OMAP: Do not set the XUDF if the underflow
+ is not reached
+In-Reply-To: <1334842101-20670-10-git-send-email-shubhrajyoti@ti.com>
+References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
+ <1334842101-20670-10-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120423164212.GC27321@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2012 09:40 AM, Poddar, Sourav wrote:
-> Hi Stephen,
-> 
-> On Mon, Apr 23, 2012 at 8:56 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 04/23/2012 09:27 AM, Sourav Poddar wrote:
->>> Update the Documentation with omap4 keypad device tree
->>> binding information.
->>> Add device tree support for omap4 keypad driver.
->>
->> Shouldn't this use the already-defined matrix keyboard bindings at
->> Documentation/devicetree/bindings/input/matrix-keymap.txt?
->>
-> True, that is one way of describing the linux-keymap, but i think it can be
-> done  either ways.
+On Thu, Apr 19, 2012 at 06:58:20PM +0530, Shubhrajyoti D wrote:
+> Currently in the 1.153 errata handling while waiting for transmitter
+> underflow if NACK is got the XUDF flag is also set.
+> The flag is set after wait for the condition is over.
 
-Well, there certainly is more than one way to represent the data.
-However, it'd be best to avoid creating new bindings for every piece of
-hardware when there's already an existing binding that can be used. By
-reusing the binding, different HW can be configured in the same way thus
-re-using any knowledge someone has of the binding.
+What does XUDF mean? Please update the commit description, I can't know
+all terminology for all architectures.
 
-> Are you hinting at getting rid of Documentation for each seperate modules and
-> just use a single  Documentation/devicetree/bindings/input/matrix-keymap.txt?
-
-You'd probably still need a device-specific binding in order to define
-which compatible values were necessary, which reg values were necessary,
-to reference the common binding documentation, to document any required
-additional custom properties, and document any limitations. For example,
-see how Olof wrote Documentation/devicetree/bindings/input/tegra-kbc.txt
-based on the common matrix keyboard binding.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/a25575d6/attachment-0001.sig>
