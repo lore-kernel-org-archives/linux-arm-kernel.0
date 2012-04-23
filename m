@@ -1,44 +1,22 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 23 Apr 2012 18:28:27 +0000
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <20120418231837.GT21106@atomide.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <20120418231837.GT21106@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Apr 2012 18:32:15 +0000
+Subject: [PATCH 1/3] ARM: tegra: Add AHB driver
+In-Reply-To: <4F9598AD.2030308@wwwdotorg.org>
+References: <1335181043-15348-1-git-send-email-hdoyu@nvidia.com>
+ <201204231233.09423.arnd@arndb.de> <4F9598AD.2030308@wwwdotorg.org>
+Message-ID: <201204231832.16268.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 04:48:37, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120413 03:39]:
-> > On Thu, Apr 12, 2012 at 13:56:06, Paul Walmsley wrote:
-> > 
-> > Yes, we are using am3517evm file for AM33XX MACHINE_INIT definition here.
-> > These patches have been reviewed and accepted in the list, only thing is
-> > they couldn't make it to upstream during v3.4 merge window.
-> > 
-> > I believe Tony is going to push them for v3.5 now.
-> 
-> Hmm care to clarify which patches are you talking about here?
-> 
+On Monday 23 April 2012, Stephen Warren wrote:
+> I don't know whether it has to be early, but if this driver isn't going
+> to be instantiated from device tree, I'd prefer it to be initialized by
+> an explicit function call from the boards or common code rather than an
+> initcall. It seems a lot easier to keep track of all the initialization
+> by doing it explicitly. That said, it's quite possible this API couuld
+> be called from say init_machine instead of init_early though.
 
-Tony,
-I was referring to initial 2 baseport patches which we have dropped due 
-dependency on mach-types.
+Having it called from init_machine sounds ok, as long as it still
+scans the device tree for the addresses rather than hardcoding.
 
-arm:omap:am33xx: Add AM335XEVM machine support
-arm:omap:am33xx: Add low level debugging support
-
-
-One patch (which was independent) from this series, made its way to upstream,
-ARM: OMAP2+: id: Add am33xx SoC type detection
-
-Can you please make sure that, it gets included into your next pull request?
-
-Thanks,
-Vaibhav
-
-> Tony
-> 
+	Arnd
