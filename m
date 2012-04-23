@@ -1,8 +1,8 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Apr 2012 17:12:18 +0100
-Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM mpcore
- watchdog
-In-Reply-To: <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Mon, 23 Apr 2012 21:46:22 +0530
+Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM
+ mpcore watchdog
+In-Reply-To: <4F957F62.5090605@arm.com>
 References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
  <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
  <4F9514AA.10403@arm.com>
@@ -13,21 +13,24 @@ References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kuma
  <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
  <4F957A0C.7060607@arm.com>
  <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
-Message-ID: <4F957F62.5090605@arm.com>
+ <4F957F62.5090605@arm.com>
+Message-ID: <CAOh2x=n4JdZdZoofHpr+9G254ZL_kxyWEHHRr5W4PB4GgjeHsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/04/12 17:01, viresh kumar wrote:
-> On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> The TWD watchdog uses a per-cpu interrupt (usually interrupt #30), and
->> the GIC configuration should flag it as such. With this setup,
->> request_irq() should fail, and the right API is request_percpu_irq(),
->> together with enable_percpu_irq()/disable_percpu_irq().
-> 
-> request_irq() doesn't fail for me even if i pass it.
+On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Well, it definitely should. Can you share the relevant part of your DT?
 
-Well, it definitely should. Can you share the relevant part of your DT?
+I Just tested it once, and will do it tomorrow again.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+			wdt at ec800620 {
+				compatible = "arm,cortex-a9-twd-wdt";
+				reg = <0xec800620 0x20>;
+				interrupts = <1 14 0x301>;
+				status = "disabled";
+			};
+
+Looking at your confidence, i am starting to feel, i am wrong here ;)
+
+--
+viresh
