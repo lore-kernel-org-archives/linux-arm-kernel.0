@@ -1,33 +1,31 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Mon, 23 Apr 2012 21:10:45 +0530
-Subject: [PATCHv3 1/2] drivers: input: keypad: Add device tree support
-In-Reply-To: <4F95749E.40708@wwwdotorg.org>
-References: <1335194839-30193-1-git-send-email-sourav.poddar@ti.com>
- <4F95749E.40708@wwwdotorg.org>
-Message-ID: <CAKdam541af1bU8_64gTZva9VS0R3dTR=3L3J50o9HgHH+WaPYQ@mail.gmail.com>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Mon, 23 Apr 2012 08:40:27 -0700
+Subject: [PATCH 7/9] um: Should hold tasklist_lock while traversing
+ processes
+In-Reply-To: <4F956DF2.7020408@nod.at>
+References: <20120423070641.GA27702@lizard> <20120423070925.GG30752@lizard>
+ <4F956DF2.7020408@nod.at>
+Message-ID: <20120423154027.GA23066@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Mon, Apr 23, 2012 at 04:57:54PM +0200, Richard Weinberger wrote:
+> On 23.04.2012 09:09, Anton Vorontsov wrote:
+> >Traversing the tasks requires holding tasklist_lock, otherwise it
+> >is unsafe.
+> >
+> >p.s. However, I'm not sure that calling os_kill_ptraced_process()
+> >in the atomic context is correct. It seem to work, but please
+> >take a closer look.
+> >
+> >Signed-off-by: Anton Vorontsov<anton.vorontsov@linaro.org>
+> >---
+> 
+> You forgot my Ack and I've already explained why
+> os_kill_ptraced_process() is fine.
 
-On Mon, Apr 23, 2012 at 8:56 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/23/2012 09:27 AM, Sourav Poddar wrote:
->> Update the Documentation with omap4 keypad device tree
->> binding information.
->> Add device tree support for omap4 keypad driver.
->
-> Shouldn't this use the already-defined matrix keyboard bindings at
-> Documentation/devicetree/bindings/input/matrix-keymap.txt?
->
-True, that is one way of describing the linux-keymap, but i think it can be
-done  either ways.
+Ouch, sorry!
 
-Are you hinting at getting rid of Documentation for each seperate modules and
-just use a single  Documentation/devicetree/bindings/input/matrix-keymap.txt?
-
-
-> (I asked this before, but don't recall seeing any response explaining
-> why a new binding was needed. Sorry if I missed it.)
-Sorry, It was  I  who missed it.
-
-~Sourav
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
