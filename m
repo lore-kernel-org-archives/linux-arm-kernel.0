@@ -1,75 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Apr 2012 09:36:58 +0100
-Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM mpcore
- watchdog
-In-Reply-To: <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
-References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
- <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
-Message-ID: <4F9514AA.10403@arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 23 Apr 2012 11:14:00 +0200
+Subject: [PATCH 0/9] ux500/Nomadik GPIO and pins update
+Message-ID: <1335172440-27470-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/12 12:41, Viresh Kumar wrote:
-> This patch adds Device tree probing support for ARM Mpcore watchdog. Its binding
-> were already documented in Documentation/devicetree/bindings/arm/twd.txt.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
-> V1->V2:
-> - Reuse earlier bindings defined in twd.txt
-> 
->  drivers/watchdog/mpcore_wdt.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-> index 7c00455..98df379 100644
-> --- a/drivers/watchdog/mpcore_wdt.c
-> +++ b/drivers/watchdog/mpcore_wdt.c
-> @@ -27,6 +27,7 @@
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm.h>
->  #include <linux/reboot.h>
-> @@ -402,6 +403,16 @@ static SIMPLE_DEV_PM_OPS(mpcore_wdt_dev_pm_ops, mpcore_wdt_suspend,
->  /* work with hotplug and coldplug */
->  MODULE_ALIAS("platform:mpcore_wdt");
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id mpcore_wdt_id_table[] = {
-> +	{ .compatible = "arm,cortex-a9-twd-wdt" },
-> +	{ .compatible = "arm,cortex-a5-twd-wdt" },
-> +	{ .compatible = "arm,arm11mp-twd-wdt" },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, mpcore_wdt_id_table);
-> +#endif
-> +
->  static struct platform_driver mpcore_wdt_driver = {
->  	.probe		= mpcore_wdt_probe,
->  	.remove		= __devexit_p(mpcore_wdt_remove),
-> @@ -410,6 +421,7 @@ static struct platform_driver mpcore_wdt_driver = {
->  		.owner	= THIS_MODULE,
->  		.name	= "mpcore_wdt",
->  		.pm	= &mpcore_wdt_dev_pm_ops,
-> +		.of_match_table = of_match_ptr(mpcore_wdt_id_table),
->  	},
->  };
->  
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Irk! Have you actually tested this?
+This is basically an update and sync of Nomadik and ux500 GPIO
+development.
 
-The DT binding indicates:
-- reg : Specify the base address and the size of the TWD watchdog
-        register window.
+If you wonder why I introduce a deviant pin configuration path
+not using the pin config subsystem it is because I want to build
+atop of this work which I know works. It will be switched over
+to pinctrl in later patch sets on top of this.
 
-while all the offsets in smp_twd.h are expressed in bytes from the TWD
-*timer* base. So you have to either fix these offsets (which breaks
-potential users of the non-DT version of the driver), or correct the
-base when using DT.
+This is *almost* orthogonal to other ux500 development, but
+there *might* be conflicts with Lee Jones' Device Tree work,
+so I will try to create a separate orthogonal ux500 GPIO branch
+for this stuff.
 
-	M.
+Linus Walleij (4):
+  gpio/nomadik: use typesafe __io_address()
+  plat-nomadik: new sleep mode pincfg macros
+  ARM: ux500: remove a bunch of internal pull-ups
+  ARM: ux500: update pin handling
+
+Rabin Vincent (5):
+  gpio/nomadik: don't set SLPM to 1 for non-wakeup pins
+  gpio/nomadik: cache [rf]w?imsc
+  gpio/nomadik: fix spurious interrupts with SKE
+  gpio/nomadik: support low EMI mode
+  ARM: ux500: implement pin API
+
+ arch/arm/mach-ux500/Makefile                      |    2 +-
+ arch/arm/mach-ux500/board-mop500-pins.c           |  394 ++++++++++++++++-----
+ arch/arm/mach-ux500/board-mop500.h                |    4 +
+ arch/arm/mach-ux500/pins-db8500.h                 |   72 ++--
+ arch/arm/mach-ux500/pins.c                        |   88 +++++
+ arch/arm/mach-ux500/pins.h                        |   46 +++
+ arch/arm/plat-nomadik/include/plat/gpio-nomadik.h |    1 +
+ arch/arm/plat-nomadik/include/plat/pincfg.h       |   19 +
+ drivers/gpio/gpio-nomadik.c                       |  129 +++++--
+ 9 files changed, 591 insertions(+), 164 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/pins.c
+ create mode 100644 arch/arm/mach-ux500/pins.h
+
 -- 
-Jazz is not dead. It just smells funny...
+1.7.9.2
