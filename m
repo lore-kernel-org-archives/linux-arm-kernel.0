@@ -1,19 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Apr 2012 10:17:34 +0100
-Subject: [PATCH 5/9] gpio/nomadik: use typesafe __io_address()
-In-Reply-To: <1335172482-27648-1-git-send-email-linus.walleij@stericsson.com>
-References: <1335172482-27648-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120423091733.GJ24211@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 23 Apr 2012 11:22:40 +0200
+Subject: [PATCH 00/10] allow mxc_nand to be probed via device tree
+Message-ID: <20120423092240.GA18013@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 11:14:42AM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> We were using a custom io_p2v() (physical-to-virtual) translation
-> macro, but with the advent of the cross-platform __io_address()
-> let us try to get rid of this. Inspired by a similar patch by
-> Jonas Aberg.
+Hello,
 
-Is there any point to io_p2v() or __io_address() anymore?  Won't ioremap()
-do here?
+this series aims to be able to probe mxc_nand devices via device tree.
+Most of its patches reorganize the driver to only use cpu_is_mxYZ for
+the case that the device is not probed via device tree.
+
+I split this conversion in several patches to allow easier review. IMHO
+it makes sense to keep this splitting for an eventual bisection.
+
+This is tested on an i.MX27 based machine and works fine including
+passing of partition data.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
