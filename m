@@ -1,36 +1,44 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 23 Apr 2012 21:31:25 +0530
-Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM
- mpcore watchdog
-In-Reply-To: <4F957A0C.7060607@arm.com>
-References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
- <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
- <4F9514AA.10403@arm.com>
- <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
- <4F9547E3.4000709@arm.com>
- <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
- <4F9573B8.9050607@arm.com>
- <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
- <4F957A0C.7060607@arm.com>
-Message-ID: <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Apr 2012 17:04:10 +0100
+Subject: [RFC 00/12] OMAP DMA engine conversion
+Message-ID: <20120423160409.GE24299@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> The TWD watchdog uses a per-cpu interrupt (usually interrupt #30), and
-> the GIC configuration should flag it as such. With this setup,
-> request_irq() should fail, and the right API is request_percpu_irq(),
-> together with enable_percpu_irq()/disable_percpu_irq().
+For the full text, please see 
 
-request_irq() doesn't fail for me even if i pass it.
+http://lists.arm.linux.org.uk/lurker/message/20120418.100954.7fa7acf8.en.html
 
-> So how it works in your environment is a bit puzzling. Unless you're not
-> using GIC?
+This version contains updates for some of the comments received from the
+previous round, and adds the OMAP1/2 MMC and SPI drivers to the conversion.
 
-We use GIC and are running SMP. But we don't use wdt interrupt :)
-We only test it for system reset/reboot.
+I've also added a note to feature-removal noting that the existing APIs
+will be removed around 2013 - I'm planning January for that at the
+moment.  Having drivers around which are unconverted blocks further work
+on the DMA engine conversion, so it's actually important that we get
+as many drivers converted as soon as possible.
 
-I don't have a patch for this. Can you please add that?
+Anything which isn't converted will probably have its DMA code removed,
+or if that results in the driver not being usable, the driver itself
+will be removed.
 
---
-Viresh
+This series is still in RFC mode...
+
+ Documentation/feature-removal-schedule.txt |   11 +
+ arch/arm/mach-omap1/board-h2-mmc.c         |    1 -
+ arch/arm/mach-omap1/board-h3-mmc.c         |    1 -
+ arch/arm/mach-omap1/board-nokia770.c       |    1 -
+ arch/arm/mach-omap2/board-n8x0.c           |    1 -
+ arch/arm/mach-omap2/hsmmc.c                |    1 -
+ arch/arm/plat-omap/dma.c                   |   14 +
+ arch/arm/plat-omap/include/plat/mmc.h      |    2 -
+ drivers/dma/Kconfig                        |   10 +
+ drivers/dma/Makefile                       |    2 +
+ drivers/dma/omap-dma.c                     |  521 ++++++++++++++++++++++++++++
+ drivers/dma/sa11x0-dma.c                   |  249 ++++---------
+ drivers/dma/virt-dma.c                     |   99 ++++++
+ drivers/dma/virt-dma.h                     |  138 ++++++++
+ drivers/mmc/host/omap.c                    |  369 +++++++++-----------
+ drivers/mmc/host/omap_hsmmc.c              |  206 ++++++------
+ drivers/spi/spi-omap2-mcspi.c              |  228 +++++++------
+ 17 files changed, 1268 insertions(+), 586 deletions(-)
