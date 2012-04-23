@@ -1,25 +1,40 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Apr 2012 10:31:22 -0600
-Subject: [PATCH] ARM: tegra: Initialize pll_p_out1
-In-Reply-To: <1335169910-29403-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1335169910-29403-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <4F9583DA.2090107@wwwdotorg.org>
+Date: Mon, 23 Apr 2012 10:41:41 -0600
+Subject: [PATCHv3 1/2] drivers: input: keypad: Add device tree support
+In-Reply-To: <CAKdam541af1bU8_64gTZva9VS0R3dTR=3L3J50o9HgHH+WaPYQ@mail.gmail.com>
+References: <1335194839-30193-1-git-send-email-sourav.poddar@ti.com>	<4F95749E.40708@wwwdotorg.org>
+ <CAKdam541af1bU8_64gTZva9VS0R3dTR=3L3J50o9HgHH+WaPYQ@mail.gmail.com>
+Message-ID: <4F958645.4080200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2012 02:31 AM, Peter De Schrijver wrote:
-> pll_a uses pll_p_out1 as its parent. Therefore this clock needs to be
-> initialized to make sure pll_a has a known input clock. Failure to do so
-> will cause the system to crash early in the bootup.
+On 04/23/2012 09:40 AM, Poddar, Sourav wrote:
+> Hi Stephen,
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> On Mon, Apr 23, 2012 at 8:56 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 04/23/2012 09:27 AM, Sourav Poddar wrote:
+>>> Update the Documentation with omap4 keypad device tree
+>>> binding information.
+>>> Add device tree support for omap4 keypad driver.
+>>
+>> Shouldn't this use the already-defined matrix keyboard bindings at
+>> Documentation/devicetree/bindings/input/matrix-keymap.txt?
+>>
+> True, that is one way of describing the linux-keymap, but i think it can be
+> done  either ways.
 
-Thanks, applied.
+Well, there certainly is more than one way to represent the data.
+However, it'd be best to avoid creating new bindings for every piece of
+hardware when there's already an existing binding that can be used. By
+reusing the binding, different HW can be configured in the same way thus
+re-using any knowledge someone has of the binding.
 
-> --
-> 
-> Changes in v2:
+> Are you hinting at getting rid of Documentation for each seperate modules and
+> just use a single  Documentation/devicetree/bindings/input/matrix-keymap.txt?
 
-
-BTW, that "--" needs to be "---" if you don't intend the changelog to
-end up in git when I apply the patch.
+You'd probably still need a device-specific binding in order to define
+which compatible values were necessary, which reg values were necessary,
+to reference the common binding documentation, to document any required
+additional custom properties, and document any limitations. For example,
+see how Olof wrote Documentation/devicetree/bindings/input/tegra-kbc.txt
+based on the common matrix keyboard binding.
