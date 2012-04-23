@@ -1,125 +1,339 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 23 Apr 2012 04:37:05 +0200
-Subject: [RFC PATCH 00/11 V4] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B79467@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <1334771194-18688-1-git-send-email-marex@denx.de>
- <1335099567-21056-1-git-send-email-marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B79467@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <201204230437.05299.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Apr 2012 11:01:18 +0800
+Subject: [PATCH 2/5] dma: mxs-dma: make platform_device_id more generic
+In-Reply-To: <1334753197-12032-3-git-send-email-b29396@freescale.com>
+References: <1334753197-12032-1-git-send-email-b29396@freescale.com>
+ <1334753197-12032-3-git-send-email-b29396@freescale.com>
+Message-ID: <20120423030114.GI26306@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chen Peter-B29397,
-
-> > This patchset introduces the USB Host driver for i.MX28 CPU, utilising
-> > the
-> > generic USB PHY infrastructure. Also added is glue code for CI13xxx
-> > driver, to
-> > allow device mode. This patchset still does NOT support OTG mode, the
-> > device/host mode is selected via platform data.
+On Wed, Apr 18, 2012 at 08:46:34PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> Does the udc work at this patchset? If it is, you have enabled OTG port
-> and not host 1 port, correct?
+> Rewrite mxs_dma_is_apbh and mxs_dma_is_apbx in order to support
+> other SoCs like imx6q and reform the platform_device_id for the
+> better further dt support.
+> 
+Nice cleanup.  But I would like to ask more.
 
-btw Peter, thanks for the review, you caught some pretty nasty problems.
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Marek Vasut <marek.vasut@gmail.com>
+> Cc: Huang Shijie <b32955@freescale.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+>  arch/arm/mach-mxs/clock-mx23.c           |    4 +-
+>  arch/arm/mach-mxs/clock-mx28.c           |    4 +-
+>  arch/arm/mach-mxs/devices/platform-dma.c |   14 ++--
+>  drivers/dma/mxs-dma.c                    |  111 +++++++++++++++++++++++-------
+>  include/linux/fsl/mxs-dma.h              |   12 +---
+>  5 files changed, 101 insertions(+), 44 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> index e3ac52c..1e67b85 100644
+> --- a/arch/arm/mach-mxs/clock-mx23.c
+> +++ b/arch/arm/mach-mxs/clock-mx23.c
+> @@ -427,8 +427,8 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("duart", NULL, uart_clk)
+>  	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+>  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+> -	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
+> -	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
+> +	_REGISTER_CLOCK("imx23-dma-apbh", NULL, hbus_clk)
+> +	_REGISTER_CLOCK("imx23-dma-apbx", NULL, xbus_clk)
+>  	_REGISTER_CLOCK("mxs-mmc.0", NULL, ssp_clk)
+>  	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp_clk)
+>  	_REGISTER_CLOCK(NULL, "usb", usb_clk)
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 1867a17..cca2cf7 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -625,8 +625,8 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("mxs-auart.4", NULL, uart_clk)
+>  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+>  	_REGISTER_CLOCK("pll2", NULL, pll2_clk)
+> -	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
+> -	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
+> +	_REGISTER_CLOCK("imx28-dma-apbh", NULL, hbus_clk)
+> +	_REGISTER_CLOCK("imx28-dma-apbx", NULL, xbus_clk)
+>  	_REGISTER_CLOCK("mxs-mmc.0", NULL, ssp0_clk)
+>  	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp1_clk)
+>  	_REGISTER_CLOCK("mxs-mmc.2", NULL, ssp2_clk)
+> diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
+> index 6a0202b..aff4813 100644
+> --- a/arch/arm/mach-mxs/devices/platform-dma.c
+> +++ b/arch/arm/mach-mxs/devices/platform-dma.c
+> @@ -32,17 +32,19 @@ static struct platform_device *__init mxs_add_dma(const char *devid,
+>  
+>  static int __init mxs_add_mxs_dma(void)
+>  {
+> -	char *apbh = "mxs-dma-apbh";
+> -	char *apbx = "mxs-dma-apbx";
+> +	char *mx23_apbh = "imx23-dma-apbh";
+> +	char *mx23_apbx = "imx23-dma-apbx";
+> +	char *mx28_apbh = "imx28-dma-apbh";
+> +	char *mx28_apbx = "imx28-dma-apbx";
+>  
+>  	if (cpu_is_mx23()) {
+> -		mxs_add_dma(apbh, MX23_APBH_DMA_BASE_ADDR);
+> -		mxs_add_dma(apbx, MX23_APBX_DMA_BASE_ADDR);
+> +		mxs_add_dma(mx23_apbh, MX23_APBH_DMA_BASE_ADDR);
+> +		mxs_add_dma(mx23_apbx, MX23_APBX_DMA_BASE_ADDR);
+>  	}
+>  
+>  	if (cpu_is_mx28()) {
+> -		mxs_add_dma(apbh, MX28_APBH_DMA_BASE_ADDR);
+> -		mxs_add_dma(apbx, MX28_APBX_DMA_BASE_ADDR);
+> +		mxs_add_dma(mx28_apbh, MX28_APBH_DMA_BASE_ADDR);
+> +		mxs_add_dma(mx28_apbx, MX28_APBX_DMA_BASE_ADDR);
+>  	}
+>  
+>  	return 0;
 
-> > V2: Introduce stub imx-usb driver that then registers the PHY and EHCI
-> > drivers.
-> > V3: Add the HCD on demand based on the PHY's state (only add HCD if it's
-> > host).
-> > 
-> >     Currently, only the HOST mode is supported.
-> > 
-> > V4: * Introduce ci13xxx gadget glue
-> > 
-> >     * Reorder patches in a more sensible order
-> >     * Introduce platform data, containing VBUS GPIO and port mode
-> > 
-> > (device/gadget)
-> > 
-> >     * Rename imx-usb to imx-otg
-> >     * Drop mx28evk usb host patch
-> >     * Use more devm_ function
-> >     * Rework the mxs-phy to register the same interrupt as ehci-mxs (and
-> >     
-> >       effectivelly kill bogus otg_set_vbus() call from ehci-mxs ; use
-> > 
-> > standard
-> > 
-> >       ehci irq handling in ehci-mxs)
-> > 
-> > Marek Vasut (11):
-> >   MXS: Make clk_disable return integer
-> >   MXS: Add USB EHCI and USB PHY clock handling
-> >   MXS: Fixup i.MX233 USB base address name
-> >   MXS: Add data shared between imx-otg and EHCI driver
-> >   MXS: Modify the ci13xxx_udc to avoid adding UDC
-> >   MXS: Add small registration glue for ci13xxx_udc
-> >   MXS: Add separate MXS EHCI HCD driver
-> >   MXS: Add imx-otg driver
-> >   MXS: Add USB PHY driver
-> >   MXS: Add platform registration hooks for USB EHCI
-> >   MXS: Enable USB on M28EVK
-> >  
-> >  arch/arm/mach-mxs/Kconfig                       |    2 +
-> >  arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
-> >  arch/arm/mach-mxs/devices-mx28.h                |    5 +
-> >  arch/arm/mach-mxs/devices/Kconfig               |    3 +
-> >  arch/arm/mach-mxs/devices/Makefile              |    1 +
-> >  arch/arm/mach-mxs/devices/platform-usb.c        |   84 +++++
-> >  arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
-> >  arch/arm/mach-mxs/include/mach/devices-common.h |   12 +
-> >  arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
-> >  arch/arm/mach-mxs/mach-m28evk.c                 |   20 ++
-> >  drivers/usb/gadget/Kconfig                      |   17 +
-> >  drivers/usb/gadget/Makefile                     |    1 +
-> >  drivers/usb/gadget/ci13xxx_mxs.c                |   67 ++++
-> >  drivers/usb/gadget/ci13xxx_udc.c                |   12 +-
-> >  drivers/usb/gadget/ci13xxx_udc.h                |    1 +
-> >  drivers/usb/host/Kconfig                        |    7 +
-> >  drivers/usb/host/ehci-hcd.c                     |    5 +
-> >  drivers/usb/host/ehci-mxs.c                     |  197 ++++++++++
-> >  drivers/usb/otg/Kconfig                         |   16 +
-> >  drivers/usb/otg/Makefile                        |    2 +
-> >  drivers/usb/otg/imx-otg.c                       |  282 +++++++++++++++
-> >  drivers/usb/otg/mxs-phy.c                       |  438
-> > 
-> > +++++++++++++++++++++++
-> > 
-> >  include/linux/fsl/mxs-usb.h                     |   46 +++
-> >  23 files changed, 1243 insertions(+), 13 deletions(-)
-> >  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
-> >  create mode 100644 drivers/usb/gadget/ci13xxx_mxs.c
-> >  create mode 100644 drivers/usb/host/ehci-mxs.c
-> >  create mode 100644 drivers/usb/otg/imx-otg.c
-> >  create mode 100644 drivers/usb/otg/mxs-phy.c
-> >  create mode 100644 include/linux/fsl/mxs-usb.h
-> > 
-> > Cc: Chen Peter-B29397 <B29397@freescale.com>
-> > Cc: Detlev Zundel <dzu@denx.de>
-> > Cc: Fabio Estevam <festevam@gmail.com>
-> > Cc: Li Frank-B20596 <B20596@freescale.com>
-> > Cc: Lin Tony-B19295 <B19295@freescale.com>
-> > Cc: Linux USB <linux-usb@vger.kernel.org>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Shawn Guo <shawn.guo@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Stefano Babic <sbabic@denx.de>
-> > Cc: Subodh Nijsure <snijsure@grid-net.com>
-> > Cc: Tony Lin <tony.lin@freescale.com>
-> > Cc: Wolfgang Denk <wd@denx.de>
-> > 
-> > NOTE: Adding this ci13xxx-mxs driver was really helpful, it helped me to
-> > realise
-> > 
-> >       how this whole monster should look like in the end. Now the mxs-phy
-> > 
-> > is
-> > 
-> >       also much more prepared for the OTG operation.
-> > 
-> > --
-> > 1.7.9.5
+With soc specific hook introduced, we can remove this mxs_add_mxs_dma
+call completely.
 
-Best regards,
-Marek Vasut
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index b0051a8..51a29f9 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -50,7 +50,8 @@
+>  #define HW_APBHX_CTRL2				0x020
+>  #define HW_APBHX_CHANNEL_CTRL			0x030
+>  #define BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL	16
+> -#define HW_APBH_VERSION				(cpu_is_mx23() ? 0x3f0 : 0x800)
+> +#define HW_APBH_VERSION_IMX23			0x3f0
+> +#define HW_APBH_VERSION_IMX28			0x800
+
+Since the VERSION is broken for identifying the dma type and we are
+introduce dma type field, I would suggest to remove the use of VERSION
+completely and use mxs_dma_type everywhere.
+
+>  #define HW_APBX_VERSION				0x800
+>  #define BP_APBHX_VERSION_MAJOR			24
+>  #define HW_APBHX_CHn_NXTCMDAR(n) \
+> @@ -121,7 +122,8 @@ struct mxs_dma_chan {
+>  #define MXS_DMA_CHANNELS_MASK		0xffff
+>  
+>  struct mxs_dma_engine {
+> -	int				dev_id;
+> +	unsigned int			type;
+> +	unsigned int			dev_id;
+>  	unsigned int			version;
+>  	void __iomem			*base;
+>  	struct clk			*clk;
+> @@ -130,6 +132,74 @@ struct mxs_dma_engine {
+>  	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
+>  };
+>  
+> +enum mxs_dma_devtype {
+> +	IMX23_DMA,
+> +	IMX28_DMA,
+> +};
+> +
+> +struct mxs_dma_type {
+> +	unsigned int type;
+> +	unsigned int id;
+> +};
+> +
+> +static struct mxs_dma_type mxs_dma_types[] = {
+> +	{
+> +		.type = IMX23_DMA,
+> +		.id = MXS_DMA_APBH,
+
+To me, IMX23_DMA is more like a id, while MXS_DMA_APBH is more like
+a type.
+
+> +	}, {
+> +		.type = IMX23_DMA,
+> +		.id = MXS_DMA_APBX,
+> +	}, {
+> +		.type = IMX28_DMA,
+> +		.id = MXS_DMA_APBH,
+> +	}, {
+> +		.type = IMX28_DMA,
+> +		.id = MXS_DMA_APBX,
+> +	}, {
+> +		/* end of list */
+> +	}
+
+This end sign is not needed, I think.
+
+> +};
+> +
+> +static struct platform_device_id mxs_dma_idt[] = {
+
+s/mxs_dma_idt/mxs_dma_ids?
+
+> +	{
+> +		.name = "imx23-dma-apbh",
+> +		.driver_data = (kernel_ulong_t) &mxs_dma_types[0],
+> +	}, {
+> +		.name = "imx23-dma-apbx",
+> +		.driver_data = (kernel_ulong_t) &mxs_dma_types[1],
+> +	}, {
+> +		.name = "imx28-dma-apbh",
+> +		.driver_data = (kernel_ulong_t) &mxs_dma_types[2],
+> +	}, {
+> +		.name = "imx28-dma-apbx",
+> +		.driver_data = (kernel_ulong_t) &mxs_dma_types[3],
+> +	}, {
+> +		/* end of list */
+> +	}
+> +};
+> +
+> +static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+> +{
+> +	return container_of(chan, struct mxs_dma_chan, chan);
+> +}
+> +
+> +int mxs_dma_is_apbh(struct dma_chan *chan)
+> +{
+> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +
+> +	return dma_is_apbh();
+
+I would expect it simply be
+
+	return (mxs_dma->dev_id == MXS_DMA_APBH);
+
+And dma_is_apbh() can be removed completely now.
+
+> +}
+> +
+> +int mxs_dma_is_apbx(struct dma_chan *chan)
+> +{
+> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +
+> +	return !dma_is_apbh();
+
+	return (mxs_dma->dev_id == MXS_DMA_APBX);
+
+> +}
+> +
+> +
+>  static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+>  {
+>  	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> @@ -193,11 +263,6 @@ static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
+>  	mxs_chan->status = DMA_IN_PROGRESS;
+>  }
+>  
+> -static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+> -{
+> -	return container_of(chan, struct mxs_dma_chan, chan);
+> -}
+> -
+>  static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+>  {
+>  	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
+> @@ -574,11 +639,18 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
+>  	if (ret)
+>  		goto err_out;
+>  
+> -	/* only major version matters */
+> -	mxs_dma->version = readl(mxs_dma->base +
+> +	if (mxs_dma->type == IMX23_DMA) {
+> +		/* only major version matters */
+> +		mxs_dma->version = readl(mxs_dma->base +
+>  				((mxs_dma->dev_id == MXS_DMA_APBX) ?
+> -				HW_APBX_VERSION : HW_APBH_VERSION)) >>
+> +				HW_APBX_VERSION : HW_APBH_VERSION_IMX23)) >>
+>  				BP_APBHX_VERSION_MAJOR;
+> +	} else if (mxs_dma->type == IMX28_DMA) {
+> +		mxs_dma->version = readl(mxs_dma->base +
+> +				((mxs_dma->dev_id == MXS_DMA_APBX) ?
+> +				HW_APBX_VERSION : HW_APBH_VERSION_IMX28)) >>
+> +				BP_APBHX_VERSION_MAJOR;
+> +	}
+
+Again, let's just get rid of the use of VERSION completely.
+
+>  
+>  	/* enable apbh burst */
+>  	if (dma_is_apbh()) {
+> @@ -601,6 +673,8 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+>  {
+>  	const struct platform_device_id *id_entry =
+>  				platform_get_device_id(pdev);
+> +	const struct mxs_dma_type *mtype =
+> +			(struct mxs_dma_type *)id_entry->driver_data;
+>  	struct mxs_dma_engine *mxs_dma;
+>  	struct resource *iores;
+>  	int ret, i;
+> @@ -609,7 +683,8 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+>  	if (!mxs_dma)
+>  		return -ENOMEM;
+>  
+> -	mxs_dma->dev_id = id_entry->driver_data;
+> +	mxs_dma->type = mtype->type;
+> +	mxs_dma->dev_id = mtype->id;
+>  
+>  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  
+> @@ -692,23 +767,11 @@ err_request_region:
+>  	return ret;
+>  }
+>  
+> -static struct platform_device_id mxs_dma_type[] = {
+> -	{
+> -		.name = "mxs-dma-apbh",
+> -		.driver_data = MXS_DMA_APBH,
+> -	}, {
+> -		.name = "mxs-dma-apbx",
+> -		.driver_data = MXS_DMA_APBX,
+> -	}, {
+> -		/* end of list */
+> -	}
+> -};
+> -
+>  static struct platform_driver mxs_dma_driver = {
+>  	.driver		= {
+>  		.name	= "mxs-dma",
+>  	},
+> -	.id_table	= mxs_dma_type,
+> +	.id_table	= mxs_dma_idt,
+>  };
+>  
+>  static int __init mxs_dma_module_init(void)
+> diff --git a/include/linux/fsl/mxs-dma.h b/include/linux/fsl/mxs-dma.h
+> index 203d7c4..55d8702 100644
+> --- a/include/linux/fsl/mxs-dma.h
+> +++ b/include/linux/fsl/mxs-dma.h
+> @@ -15,14 +15,6 @@ struct mxs_dma_data {
+>  	int chan_irq;
+>  };
+>  
+> -static inline int mxs_dma_is_apbh(struct dma_chan *chan)
+> -{
+> -	return !strcmp(dev_name(chan->device->dev), "mxs-dma-apbh");
+> -}
+> -
+> -static inline int mxs_dma_is_apbx(struct dma_chan *chan)
+> -{
+> -	return !strcmp(dev_name(chan->device->dev), "mxs-dma-apbx");
+> -}
+> -
+> +extern int mxs_dma_is_apbh(struct dma_chan *chan);
+> +extern int mxs_dma_is_apbx(struct dma_chan *chan);
+
+I would expect these two calls still be inline here.
+
+>  #endif /* __MACH_MXS_DMA_H__ */
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+
+-- 
+Regards,
+Shawn
