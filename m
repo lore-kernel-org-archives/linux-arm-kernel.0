@@ -1,81 +1,33 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 23 Apr 2012 19:51:01 +0530
-Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM
- mpcore watchdog
-In-Reply-To: <4F9547E3.4000709@arm.com>
-References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
- <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
- <4F9514AA.10403@arm.com>
- <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
- <4F9547E3.4000709@arm.com>
-Message-ID: <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 23 Apr 2012 07:27:17 -0700
+Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
+In-Reply-To: <CAMQu2gz2CD+-kcSF2HVGWWrjk3DmsGgcuucBXan5NqtVUSwa2w@mail.gmail.com>
+References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
+ <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
+ <20120412030044.GA26236@kroah.com>
+ <CAM=4YEQ6_+7xPwi2jucks1P9p8tO3cSG7S0s=VVJVrueb4fB=g@mail.gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E96E7C5@DBDE01.ent.ti.com>
+ <CAMQu2gz2CD+-kcSF2HVGWWrjk3DmsGgcuucBXan5NqtVUSwa2w@mail.gmail.com>
+Message-ID: <20120423142717.GA32380@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Ah, that explains why it worked. I suppose you do have additional
-> patches that fix the IRQ request bit?
+On Mon, Apr 23, 2012 at 04:34:46PM +0530, Shilimkar, Santosh wrote:
+> Afzal,
+> 
+> On Mon, Apr 23, 2012 at 4:26 PM, Mohammed, Afzal <afzal@ti.com> wrote:
+> > Hi Aneesh,
+> >
+> > On Fri, Apr 13, 2012 at 01:28:55, V, Aneesh wrote:
+> >
+> >> Thanks. I will wait for your review then. Once I have your comments
+> >> I will re-work and submit in the new directory structure proposed.
+> >
+> > Do you have a plan on submitting EMIF driver in the new proposed
+> > (drivers/memory) directory. Or shall I submit GPMC driver by creating
+> > the new "memory" directory.
+> >
+>  Greg mentioned that he plans to do a review of EMIF driver. We were waiting
+> for his comments before sending the updated series.
 
-Missed this earlier. That patchset is in review currently and have already
-fixed that. :)
-
-> Given that no in-tree platform seem to be using this watchdog (at least
-> a quick grep didn't reveal anything), I'd be inclined to simply change
-> the offset in smp_twd.h and let them break.
-
-Even i can't find any users of it. :)
-
-@Wim: Please apply following patch before this one.
-Here we go:
-
-From: Viresh Kumar <viresh.kumar@st.com>
-Date: Mon, 23 Apr 2012 19:39:47 +0530
-Subject: [PATCH] ARM: SMP_TWD: WDOG: Start registers from 0x00 instead of
- 0x20
-
-TWD_WDOG is at offset 0x20 from TWD base address. Current register offsets
-contain this extra 0x20 offset, i.e. users were required to pass base address of
-TWD instead of WDOG to WDOG driver.
-
-Change this, so that users can pass base address of WDOG to WDOG driver instead
-of TWD module. For this, subtract 0x20 from offsets of WDOG registers.
-
-This could break any current users of TWD_WDOG, but i couldn't find any users of
-this driver in current Linux tree. So, haven't fixed any platform code. If some
-platforms are broken please report to me, so that we can get them fixed in this
-patch only.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/include/asm/smp_twd.h |   17 +++++++++++------
- 1 files changed, 11 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 57857d1..ff3f67e 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -6,12 +6,17 @@
- #define TWD_TIMER_CONTROL		0x08
- #define TWD_TIMER_INTSTAT		0x0C
-
--#define TWD_WDOG_LOAD			0x20
--#define TWD_WDOG_COUNTER		0x24
--#define TWD_WDOG_CONTROL		0x28
--#define TWD_WDOG_INTSTAT		0x2C
--#define TWD_WDOG_RESETSTAT		0x30
--#define TWD_WDOG_DISABLE		0x34
-+/*
-+ * TWD_WDOG is at offset 0x20 from TWD base address. Following register offsets
-+ * doesn't contain this extra 0x20 offset, i.e. users of TWD_WDOG
-must pass base
-+ * address of WDOG to WDOG driver instead of TWD module.
-+ */
-+#define TWD_WDOG_LOAD			0x00
-+#define TWD_WDOG_COUNTER		0x04
-+#define TWD_WDOG_CONTROL		0x08
-+#define TWD_WDOG_INTSTAT		0x0C
-+#define TWD_WDOG_RESETSTAT		0x10
-+#define TWD_WDOG_DISABLE		0x14
-
- #define TWD_WDOG_LOAD_MIN		0x00000000
- #define TWD_WDOG_LOAD_MAX		0xFFFFFFFF
+No, don't wait for me, please resend, I was waiting for you :)
