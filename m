@@ -1,11 +1,11 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 23 Apr 2012 04:18:39 +0200
+Date: Mon, 23 Apr 2012 04:37:05 +0200
 Subject: [RFC PATCH 00/11 V4] MXS: Add i.MX28 USB Host driver
 In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B79467@039-SN2MPN1-023.039d.mgd.msft.net>
 References: <1334771194-18688-1-git-send-email-marex@denx.de>
  <1335099567-21056-1-git-send-email-marex@denx.de>
  <F281D0F91ED19E4D8E63A7504E8A649803B79467@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <201204230418.40037.marex@denx.de>
+Message-ID: <201204230437.05299.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,10 +21,8 @@ Dear Chen Peter-B29397,
 > Does the udc work at this patchset? If it is, you have enabled OTG port
 > and not host 1 port, correct?
 
-Wait for V5. Gadget mode should work, V5 should have some further rebase issues 
-fixed.
+btw Peter, thanks for the review, you caught some pretty nasty problems.
 
-> 
 > > V2: Introduce stub imx-usb driver that then registers the PHY and EHCI
 > > drivers.
 > > V3: Add the HCD on demand based on the PHY's state (only add HCD if it's
