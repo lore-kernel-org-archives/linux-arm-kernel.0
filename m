@@ -1,110 +1,53 @@
-From: dietrich@cs.fau.de (Christian Dietrich)
-Date: Mon, 23 Apr 2012 14:43:15 +0200
-Subject: Possible integer overflow in mach-bcmring with FPGA11107
-Message-ID: <86r4veipp8.fsf@gandalf.zerties.org>
+From: devel@ayanes.com (Adrian Yanes)
+Date: Mon, 23 Apr 2012 09:24:24 +0300
+Subject: [PATCH] i2c-at91: fix data-loss issue
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D0905DB4657@wm021.weinmann.com>
+References: <20120413103937.GH7154@arwen.pp.htv.fi>
+ <1334317476-10044-1-git-send-email-h.feurstein@gmail.com>
+ <EF2E73589CA71846A15D0B2CDF79505D0905D5A1AA@wm021.weinmann.com>
+ <20120418143920.GA19802@pengutronix.de> <4F930B77.8070909@ayanes.com>
+ <EF2E73589CA71846A15D0B2CDF79505D0905DB4657@wm021.weinmann.com>
+Message-ID: <4F94F598.1040008@ayanes.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> The latter is probably the easiest and most transparent solution.
+> There is no UNRE on G45, it just pauses the clock on an underrun
+> condition.
+> 
+> So in case UNRE is set, EIO should be returned similar to the already
+> handled OVRE:
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index a6f9e73..a84e19b 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -238,6 +238,11 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+>  		dev_err(dev->dev, "overrun while reading\n");
+>  		return -EIO;
+>  	}
+> +	if (dev->transfer_status & AT91_TWI_UNRE && dev->is_rm9200) {
+> +		dev_err(dev->dev, "underrun while writing\n");
+> +		return -EIO;
+> +	}
+> +
+>  	dev_dbg(dev->dev, "transfer complete\n");
+>  
+>  	return 0;
 
-due to statical analysis, i think i found a possible integer overflow
-in the timer (sp804) code, when mach-bcmring is used together with
-FPGA11107. All following line numbers are according to Linux v3.2, but
-the problem should be still in Linux HEAD (if i haven't missed anything).
+Indeed, this should be added in order to catch this exception for the
+AT91RM9200.
 
-Ok here is the Problem:
+However, the main issue still there: the board is not able to deliver
+data up to 2 bytes size without to run in the UNRE case.
 
-,----[arch/arm/mach-bcmring/clock.h:24]------------------
-| struct clk {
-| [..]
-|         unsigned long rate_hz;  /* clock rate in Hz */
-| [..]
-| };
-`----
+Measuring the i2c bus, we verified that the data is not even arriving to
+the data bus, i.e. either the kernel driver is too slow to handle it or
+just we are missing some tweak required by the hardware
+(nevertheless the datasheet does not give any clue).
 
-,----
-| % arm-linux-gnueabihf-cpp-4.6 -dM /dev/null | grep __SIZEOF_LONG__
-| #define __SIZEOF_LONG__ 4
-`----
+Anyone with a AT91RM9200 that can test the proposed driver as well? it
+will discard that is our hardware/board the issue rather than the
+chipset itself.
 
-As you see rate_hz is defined as long, but long is according to
-gnueabihf (and gnueabi) 4 bytes long. I hope i got the right compiler
-here.
-
-,----[arch/arm/mach-bcmring/include/mach/csp/tmrHw_reg.h]----
-| #if defined(CFG_GLOBAL_CHIP) && (CFG_GLOBAL_CHIP == FPGA11107)
-| #define tmrHw_HIGH_FREQUENCY_MHZ        150     /* Always 150MHz for FPGA */
-| #define tmrHw_HIGH_FREQUENCY_HZ         150000000
-| #else
-| [..]
-| #endif
-`----
-
-When FPGA11107 is used the frequency is set to 150 000 000 Hz.
-
-,----[arch/arm/mach-bcmring/core.c:100]---
-| #if defined(CONFIG_ARCH_FPGA11107)
-| /* fpga cpu/bus are currently 30 times slower so scale frequency as well to */
-| /* slow down Linux's sense of time */
-| [..]
-| #define TIMER3_FREQUENCY_KHZ   (tmrHw_HIGH_FREQUENCY_HZ / 1000 * 30)
-| #else
-| [..]
-| #define TIMER3_FREQUENCY_KHZ  (tmrHw_HIGH_FREQUENCY_HZ / 1000)
-| #endif
-`----
-
-,----[arch/arm/mach-bcmring/core.c:121]---
-| static struct clk sp804_timer3_clk = {
-|         .name = "sp804-timer-3",
-|         .type = CLK_TYPE_PRIMARY,
-|         .mode = CLK_MODE_XTAL,
-|         .rate_hz = TIMER3_FREQUENCY_KHZ * 1000,
-| };
-`----
-
-This seems totally innocent, but when doing the caluculation for
-rate_hz by hand (or python) the result is slighly bigger than
-2^32-1. Therfore an integer overflow should occur and the rate_hz rate
-will be far too low. It may be that there is a sanity check in
-hardware, but i don't know the used hardware at all.
-
-,----[python shell]
-| >>> tmrHw_HIGH_FREQUENCY_HZ = 150000000
-| >>> TIMER3_FREQUENCY_KHZ = (tmrHw_HIGH_FREQUENCY_HZ / 1000 * 30)
-| >>> rate_hz = TIMER3_FREQUENCY_KHZ * 1000
-| >>>
-| >>> import math
-| >>> math.log(rate_hz, 2) # Bits used
-| 32.06727785542857
-| >>> rate_hz % 2**32
-| 205032704L
-`----
-
-I hope my observations are correct, and this is a real bug and i
-didn't just waste your time. For better testing the issue i will
-append the used configuration. I just did:
-
-,----
-| cp ~/mach-bcmring.config .config
-| ARCH=arm make silentoldconfig
-| ARCH=arm SUBARCH=arm KERNELVERSION="v3.2" make arch/arm/mach-bcmring/core.o  CC=arm-linux-gnueabi-gcc-4.5
-| [...]
-|    CC      arch/arm/mach-bcmring/core.o
-| arch/arm/mach-bcmring/core.c:125:34: warning: integer overflow in expression
-`----
-
-chris
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: mach-bcmring.config
-Type: application/octet-stream
-Size: 53541 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/e830d7f7/attachment-0001.obj>
--------------- next part --------------
--- 
-(? x . x x) (? x . x x) -- See how beautiful the lambda is
-? No documentation is better than bad documentation
-? and always be awesome to each other, always.
+Adrian
