@@ -1,31 +1,61 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 23 Apr 2012 08:40:27 -0700
-Subject: [PATCH 7/9] um: Should hold tasklist_lock while traversing
- processes
-In-Reply-To: <4F956DF2.7020408@nod.at>
-References: <20120423070641.GA27702@lizard> <20120423070925.GG30752@lizard>
- <4F956DF2.7020408@nod.at>
-Message-ID: <20120423154027.GA23066@lizard>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 23 Apr 2012 17:43:45 +0200
+Subject: [PATCHv8 02/10] I2C: OMAP: Fix the mismatch of pm_runtime enable
+ and disable
+In-Reply-To: <1334842101-20670-3-git-send-email-shubhrajyoti@ti.com>
+References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
+ <1334842101-20670-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20120423154345.GA27321@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 04:57:54PM +0200, Richard Weinberger wrote:
-> On 23.04.2012 09:09, Anton Vorontsov wrote:
-> >Traversing the tasks requires holding tasklist_lock, otherwise it
-> >is unsafe.
-> >
-> >p.s. However, I'm not sure that calling os_kill_ptraced_process()
-> >in the atomic context is correct. It seem to work, but please
-> >take a closer look.
-> >
-> >Signed-off-by: Anton Vorontsov<anton.vorontsov@linaro.org>
-> >---
-> 
-> You forgot my Ack and I've already explained why
-> os_kill_ptraced_process() is fine.
+On Thu, Apr 19, 2012 at 06:58:13PM +0530, Shubhrajyoti D wrote:
+> Currently the i2c driver calls the pm_runtime_enable and never
+> the disable. This may cause a warning when pm_runtime_enable
+> checks for the count match.Attempting to fix the same by calling
+> pm_runtime_disable in the error and the remove path.
 
-Ouch, sorry!
+Why "attempting"?
+
+> 
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 4f4188d..c851672 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1090,6 +1090,7 @@ err_unuse_clocks:
+>  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>  	pm_runtime_put(dev->dev);
+>  	iounmap(dev->base);
+> +	pm_runtime_disable(&pdev->dev);
+>  err_free_mem:
+>  	platform_set_drvdata(pdev, NULL);
+>  	kfree(dev);
+> @@ -1110,6 +1111,7 @@ omap_i2c_remove(struct platform_device *pdev)
+>  	free_irq(dev->irq, dev);
+>  	i2c_del_adapter(&dev->adapter);
+>  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+> +	pm_runtime_disable(&pdev->dev);
+>  	iounmap(dev->base);
+>  	kfree(dev);
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -- 
+> 1.7.5.4
+> 
 
 -- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/31f10c4f/attachment.sig>
