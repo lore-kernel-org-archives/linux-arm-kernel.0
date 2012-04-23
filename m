@@ -1,51 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Apr 2012 12:16:40 -0600
-Subject: [PATCH v2 1/1] dt: Add general DMA window parser
-In-Reply-To: <20120423.145352.1868450546332033138.hdoyu@nvidia.com>
-References: <20120418.131907.2172387798112620167.hdoyu@nvidia.com><4F8EF99E.3050709@wwwdotorg.org><20120419151920.68ab735a5b9eb8fb938b4d11@nvidia.com>
- <20120423.145352.1868450546332033138.hdoyu@nvidia.com>
-Message-ID: <4F959C88.3090805@wwwdotorg.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 23 Apr 2012 18:28:27 +0000
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <20120418231837.GT21106@atomide.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
+ <20120418231837.GT21106@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2012 05:53 AM, Hiroshi Doyu wrote:
-> From: Hiroshi DOYU <hdoyu@nvidia.com>
+On Thu, Apr 19, 2012 at 04:48:37, Tony Lindgren wrote:
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120413 03:39]:
+> > On Thu, Apr 12, 2012 at 13:56:06, Paul Walmsley wrote:
+> > 
+> > Yes, we are using am3517evm file for AM33XX MACHINE_INIT definition here.
+> > These patches have been reviewed and accepted in the list, only thing is
+> > they couldn't make it to upstream during v3.4 merge window.
+> > 
+> > I believe Tony is going to push them for v3.5 now.
 > 
-> This code was based on:
-> 	"arch/microblaze/kernel/prom_parse.c"
-> 	"arch/powerpc/kernel/prom_parse.c"
+> Hmm care to clarify which patches are you talking about here?
 > 
-> "ibm," prefix could be supported with some modification.
 
-That'd probably be a good idea. If it isn't supported, then this code
-can't be used as a replacement for the PPC and Microblaze code.
+Tony,
+I was referring to initial 2 baseport patches which we have dropped due 
+dependency on mach-types.
 
-> +int of_parse_dma_window(struct device_node *dn,
-> +			const char *propname, int index,
-> +			unsigned long *busno,
-> +			dma_addr_t *addr, size_t *size)
-> +{
-> +	const __be32 *dma_window, *end;
-> +	int bytes, cur_index = 0;
-> +
-> +	if (!dn || !propname || !addr || !size)
-> +		return -EINVAL;
+arm:omap:am33xx: Add AM335XEVM machine support
+arm:omap:am33xx: Add low level debugging support
 
-Instead of erroring out if (!propname), perhaps:
 
-if (!propname)
-    propname = "dma-window";
+One patch (which was independent) from this series, made its way to upstream,
+ARM: OMAP2+: id: Add am33xx SoC type detection
 
-so that only drivers using bindings before this common binding was
-defined actually need to write out the property name?
+Can you please make sure that, it gets included into your next pull request?
 
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-...
-> +extern int of_parse_dma_window(struct device_node *dev,
-> +			       const char *propname, int index,
-> +			       unsigned long *busno,
-> +			       dma_addr_t *phys, size_t *size);
+Thanks,
+Vaibhav
 
-This function has the same name as the PPC and Microblaze code it's
-based on. Is that going to cause compile and link errors due to
-duplicate symbol definitions?
+> Tony
+> 
