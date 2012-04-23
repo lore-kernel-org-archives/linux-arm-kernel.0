@@ -1,34 +1,60 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 23 Apr 2012 11:14:42 +0200
-Subject: [PATCH 5/9] gpio/nomadik: use typesafe __io_address()
-Message-ID: <1335172482-27648-1-git-send-email-linus.walleij@stericsson.com>
+Date: Mon, 23 Apr 2012 11:14:50 +0200
+Subject: [PATCH 6/9] plat-nomadik: new sleep mode pincfg macros
+Message-ID: <1335172490-27683-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-We were using a custom io_p2v() (physical-to-virtual) translation
-macro, but with the advent of the cross-platform __io_address()
-let us try to get rid of this. Inspired by a similar patch by
-Jonas Aberg.
+This adds a few sleep mode pin config macros for sleep mode
+for the Nomadik GPIO/pin controller.
 
+Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
+Signed-off-by: Rikard Olsson <rikard.p.olsson@stericsson.com>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-nomadik.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/plat-nomadik/include/plat/pincfg.h |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/gpio/gpio-nomadik.c b/drivers/gpio/gpio-nomadik.c
-index 7b45d88..edf9a95 100644
---- a/drivers/gpio/gpio-nomadik.c
-+++ b/drivers/gpio/gpio-nomadik.c
-@@ -1186,7 +1186,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- 	 */
- 	nmk_chip->bank = dev->id;
- 	nmk_chip->clk = clk;
--	nmk_chip->addr = io_p2v(res->start);
-+	nmk_chip->addr = __io_address(res->start);
- 	nmk_chip->chip = nmk_gpio_template;
- 	nmk_chip->parent_irq = irq;
- 	nmk_chip->secondary_parent_irq = secondary_irq;
+diff --git a/arch/arm/plat-nomadik/include/plat/pincfg.h b/arch/arm/plat-nomadik/include/plat/pincfg.h
+index da6b1e3..c015133 100644
+--- a/arch/arm/plat-nomadik/include/plat/pincfg.h
++++ b/arch/arm/plat-nomadik/include/plat/pincfg.h
+@@ -24,6 +24,7 @@
+  *	bit 16..18 - SLPM pull up/down state
+  *	bit 19..20 - SLPM direction
+  *	bit 21..22 - SLPM Value (if output)
++ *	bit 23..25 - PDIS value (if input)
+  *
+  * to facilitate the definition, the following macros are provided
+  *
+@@ -67,6 +68,10 @@ typedef unsigned long pin_cfg_t;
+ /* These two replace the above in DB8500v2+ */
+ #define PIN_SLPM_WAKEUP_ENABLE	(NMK_GPIO_SLPM_WAKEUP_ENABLE << PIN_SLPM_SHIFT)
+ #define PIN_SLPM_WAKEUP_DISABLE	(NMK_GPIO_SLPM_WAKEUP_DISABLE << PIN_SLPM_SHIFT)
++#define PIN_SLPM_USE_MUX_SETTINGS_IN_SLEEP PIN_SLPM_WAKEUP_DISABLE
++
++#define PIN_SLPM_GPIO  PIN_SLPM_WAKEUP_ENABLE /* In SLPM, pin is a gpio */
++#define PIN_SLPM_ALTFUNC PIN_SLPM_WAKEUP_DISABLE /* In SLPM, pin is altfunc */
+ 
+ #define PIN_DIR_SHIFT		14
+ #define PIN_DIR_MASK		(0x1 << PIN_DIR_SHIFT)
+@@ -105,6 +110,14 @@ typedef unsigned long pin_cfg_t;
+ #define PIN_SLPM_VAL_LOW	((1 + 0) << PIN_SLPM_VAL_SHIFT)
+ #define PIN_SLPM_VAL_HIGH	((1 + 1) << PIN_SLPM_VAL_SHIFT)
+ 
++#define PIN_SLPM_PDIS_SHIFT		23
++#define PIN_SLPM_PDIS_MASK		(0x3 << PIN_SLPM_PDIS_SHIFT)
++#define PIN_SLPM_PDIS(x)	\
++	(((x) & PIN_SLPM_PDIS_MASK) >> PIN_SLPM_PDIS_SHIFT)
++#define PIN_SLPM_PDIS_NO_CHANGE		(0 << PIN_SLPM_PDIS_SHIFT)
++#define PIN_SLPM_PDIS_DISABLED		(1 << PIN_SLPM_PDIS_SHIFT)
++#define PIN_SLPM_PDIS_ENABLED		(2 << PIN_SLPM_PDIS_SHIFT)
++
+ #define PIN_LOWEMI_SHIFT	25
+ #define PIN_LOWEMI_MASK		(0x1 << PIN_LOWEMI_SHIFT)
+ #define PIN_LOWEMI(x)		(((x) & PIN_LOWEMI_MASK) >> PIN_LOWEMI_SHIFT)
 -- 
 1.7.9.2
