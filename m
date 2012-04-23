@@ -1,109 +1,181 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Mon, 23 Apr 2012 02:01:44 +0000
-Subject: [RFC PATCH 00/11 V4] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <1335099567-21056-1-git-send-email-marex@denx.de>
-References: <1334771194-18688-1-git-send-email-marex@denx.de>
- <1335099567-21056-1-git-send-email-marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B79467@039-SN2MPN1-023.039d.mgd.msft.net>
+From: B08287@freescale.com (Liu JunJie-B08287)
+Date: Mon, 23 Apr 2012 02:02:02 +0000
+Subject: =?utf-8?B?UkU6ICDnrZTlpI06IFtSRkMgUEFUQ0ggMC84XSBNWFM6IEFkZCBpLk1YMjgg?=
+ =?utf-8?Q?USB_Host_driver?=
+In-Reply-To: <201204201825.30833.marex@denx.de>
+References: <1334657751-27678-1-git-send-email-marex@denx.de>
+ <20120418074058.GM3852@pengutronix.de>
+ <3A731164757B504AB3594CB17706857808D523@039-SN2MPN1-012.039d.mgd.msft.net>
+ <201204201825.30833.marex@denx.de>
+Message-ID: <3A731164757B504AB3594CB17706857808F803@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Call me Tony, :), and search [Tony] for the embedded comments.
 
+-----Original Message-----
+From: Marek Vasut [mailto:marex at denx.de] 
+Sent: Saturday, April 21, 2012 00:26
+To: Liu JunJie-B08287
+Cc: Sascha Hauer; Chen Peter-B29397; linux-arm-kernel at lists.infradead.org; Detlev Zundel; Fabio Estevam; Li Frank-B20596; Linux USB; Guo Shawn-R65073; Shawn Guo; Stefano Babic; Subodh Nijsure; Heikki Krogerus; Shi Make-B15407
+Subject: Re: ??: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
 
- 
-> This patchset introduces the USB Host driver for i.MX28 CPU, utilising
-> the
-> generic USB PHY infrastructure. Also added is glue code for CI13xxx
-> driver, to
-> allow device mode. This patchset still does NOT support OTG mode, the
-> device/host mode is selected via platform data.
-> 
-Does the udc work at this patchset? If it is, you have enabled OTG port
-and not host 1 port, correct?
- 
+Dear Liu JunJie-B08287,
 
-> V2: Introduce stub imx-usb driver that then registers the PHY and EHCI
-> drivers.
-> V3: Add the HCD on demand based on the PHY's state (only add HCD if it's
-> host).
->     Currently, only the HOST mode is supported.
-> V4: * Introduce ci13xxx gadget glue
->     * Reorder patches in a more sensible order
->     * Introduce platform data, containing VBUS GPIO and port mode
-> (device/gadget)
->     * Rename imx-usb to imx-otg
->     * Drop mx28evk usb host patch
->     * Use more devm_ function
->     * Rework the mxs-phy to register the same interrupt as ehci-mxs (and
->       effectivelly kill bogus otg_set_vbus() call from ehci-mxs ; use
-> standard
->       ehci irq handling in ehci-mxs)
+> hi Sascha,
+>    As the previous mail Peter post, we have two concerns about the new 
+> arch of USB drvier as followed: 1. If the USB clock and the PHY are 
+> centralized managed by the OTG driver, it will introduce an 
+> unnecessary dependency between gadget/host function and OTG driver. 
+> That means even gadget/host function is the individual function that 
+> customer wanted, we need add OTG driver as well, otherwise, without 
+> the PHY and clock support provided by OTG driver, the gadget/host 
+> function can't work at all. But from the general viewpoint, the 
+> gadget/host function is independent of OTG function, this unnecessary 
+> dependency or limitation for customer is not reasonable. Furthermore, 
+> this dependency will face much difficulty in some extreme case that 
+> some customer only needs host function only but with the OTG ID floating, it was a real case we encounted before.
+
+Can't this be fixed by passing of proper platform data to the imx-otg?
+
+[Tony] Yes, such special patch or say special parameter in the interface between OTG and gadget/host can resolve such issue. But I don't think it is a good way to design the arch, with more and more special parameter added into the interface will make the interface un-readable and hard to understand. 
+
 > 
-> Marek Vasut (11):
->   MXS: Make clk_disable return integer
->   MXS: Add USB EHCI and USB PHY clock handling
->   MXS: Fixup i.MX233 USB base address name
->   MXS: Add data shared between imx-otg and EHCI driver
->   MXS: Modify the ci13xxx_udc to avoid adding UDC
->   MXS: Add small registration glue for ci13xxx_udc
->   MXS: Add separate MXS EHCI HCD driver
->   MXS: Add imx-otg driver
->   MXS: Add USB PHY driver
->   MXS: Add platform registration hooks for USB EHCI
->   MXS: Enable USB on M28EVK
+>    2. If the USB clock and the PHY are centralized managed by the OTG 
+> driver, it will introduce an unavoidable remote wakup issue that: 
+> Since the USB suspend is separated into two parts: the USB host 
+> controller suspend (set portsc.suspend bit to 1)  part which is 
+> controlled by host driver and PHY suspend part (set portsc.phcd to 1) 
+> which is controlled by OTG driver, during the system suspend, these 
+> two parts will be executed in sequence, but the interval between these two parts is out of control.
+> Refer to USB spec 2.0, the remote wakeup can happen anytime after 5ms 
+> later from bus entered suspended state(set portsc.suspend bit to 1), 
+> it means it can happen before, after, even during PHY suspend part executing.
+> Taking the following case into accounted, PHY suspend process is 
+> executing, the pseudo code as below: {
+>             ...
+>             some checking for the remote wakeup;
+>                                       <------------------ remote 
+> wakeup happen here set portsc.phcd to 1;
+>             ...
+>         }
+
+Do we support this yet? Besides, you can make sure phy suspends before the controller ... and if the controller detects RW during suspend, it can fail to suspend and that brings the system back up.
+[Tony] 1. It is a requirement that we must support. If a modem connected to host, if no communication on modem, the host and modem will enter in suspend mode, and system may try to enter suspend mode too; but the modem may issue remote wake up signal at any time which comply with the usb spec 2.0, we must support this to make the modem wakeup system, and keep modem working well. 
+
+       2. How could this happen that phy suspends before the controller? 
+          The phy enter into suspend when the data line state is in J mode, or in 3 ms not receive sof. If suspend phy first but keep controller in running/active mode, means the line state is not J, and the sof will not stop, how could the phy retain in suspend mode.
+
+       3. even phy suspends before the controller comes to be true, the issue still exist, the interval between the time stamp that controller finishes detecting RW during suspend, and the time stamp that controller really enter into suspend still exists, RW happens within this interval will have the same issue with before.  
+    
+
+>         At such situation, one issue will be generated that the USB 
+> controller is pulling up the resume signal (K), but at the same time, 
+> the SW may set PHY to low power mode(set PHCD to 1), it may cause 
+> unpredictable result. As in our i.MX platform the response to this 
+> remote wakeup(pulling up K signal) is out of SW control, and it can 
+> happen at anytime (5ms later after bus in suspended state), this issue 
+> is unavoidable.
 > 
->  arch/arm/mach-mxs/Kconfig                       |    2 +
->  arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
->  arch/arm/mach-mxs/devices-mx28.h                |    5 +
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-usb.c        |   84 +++++
->  arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
->  arch/arm/mach-mxs/include/mach/devices-common.h |   12 +
->  arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
->  arch/arm/mach-mxs/mach-m28evk.c                 |   20 ++
->  drivers/usb/gadget/Kconfig                      |   17 +
->  drivers/usb/gadget/Makefile                     |    1 +
->  drivers/usb/gadget/ci13xxx_mxs.c                |   67 ++++
->  drivers/usb/gadget/ci13xxx_udc.c                |   12 +-
->  drivers/usb/gadget/ci13xxx_udc.h                |    1 +
->  drivers/usb/host/Kconfig                        |    7 +
->  drivers/usb/host/ehci-hcd.c                     |    5 +
->  drivers/usb/host/ehci-mxs.c                     |  197 ++++++++++
->  drivers/usb/otg/Kconfig                         |   16 +
->  drivers/usb/otg/Makefile                        |    2 +
->  drivers/usb/otg/imx-otg.c                       |  282 +++++++++++++++
->  drivers/usb/otg/mxs-phy.c                       |  438
-> +++++++++++++++++++++++
->  include/linux/fsl/mxs-usb.h                     |   46 +++
->  23 files changed, 1243 insertions(+), 13 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
->  create mode 100644 drivers/usb/gadget/ci13xxx_mxs.c
->  create mode 100644 drivers/usb/host/ehci-mxs.c
->  create mode 100644 drivers/usb/otg/imx-otg.c
->  create mode 100644 drivers/usb/otg/mxs-phy.c
->  create mode 100644 include/linux/fsl/mxs-usb.h
+>         The safest solution for this issue is setting portsc.phcd 
+> within 5ms after bus in suspended state(set portsc.suspend bit to 1), 
+> it requires USB host controller suspend and PHY suspend must be 
+> executed uninterruptably, natively they can't be separated.
 > 
-> Cc: Chen Peter-B29397 <B29397@freescale.com>
-> Cc: Detlev Zundel <dzu@denx.de>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Li Frank-B20596 <B20596@freescale.com>
-> Cc: Lin Tony-B19295 <B19295@freescale.com>
-> Cc: Linux USB <linux-usb@vger.kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Subodh Nijsure <snijsure@grid-net.com>
-> Cc: Tony Lin <tony.lin@freescale.com>
-> Cc: Wolfgang Denk <wd@denx.de>
+>      The above is the shortcoming we thought about the new arch, and 
+> we want to know what are you thinking about the shortcoming of current 
+> arch, what makes you think the current arch had to be changed.
 > 
-> NOTE: Adding this ci13xxx-mxs driver was really helpful, it helped me to
-> realise
->       how this whole monster should look like in the end. Now the mxs-phy
-> is
->       also much more prepared for the OTG operation.
+> ________________________________________
+> ???: Sascha Hauer [s.hauer at pengutronix.de]
+> ????: 2012?4?18? 15:40
+> ?: Chen Peter-B29397
+> Cc: Marek Vasut; linux-arm-kernel at lists.infradead.org; Detlev Zundel; 
+> Fabio Estevam; Li Frank-B20596; Linux USB; Guo Shawn-R65073; Shawn 
+> Guo; Stefano Babic; Subodh Nijsure; Heikki Krogerus; Liu 
+> JunJie-B08287; Shi Make-B15407
+> ??: Re: [RFC PATCH 0/8] MXS: Add i.MX28 USB Host driver
+> 
+> On Wed, Apr 18, 2012 at 04:31:50AM +0000, Chen Peter-B29397 wrote:
+> > > Your patches won't work when more than one USB port is enabled 
+> > > because of the singular usb transceiver present in the kernel. 
+> > > That of course is not your fault. I think Heikki (Added to Cc) is 
+> > > working on this issue, but I don't know the status here.
+> > > 
+> > > Another problem is that what you are doing does not integrate at 
+> > > all with otg. I don't ask you to implement otg support because you 
+> > > are likely not interested in this, but since you are adding a new 
+> > > ehci glue driver anyway I suggest another approach:
+> > > 
+> > > Put a driver under drivers/usb/otg which:
+> > > 
+> > > - matches a 'imx-usb' device
+> > > - gets/enables all clocks needed for USB
+> > > - finds the transceiver
+> > > - registers a ehci device
+> > > 
+> > > Future additions would be:
+> > > 
+> > > - Put a USB_MODE_HOST/DEVICE flag into platform_data, and register 
+> > > a
+> > > 
+> > >   host or gadget driver depending on this flag
+> > > 
+> > > - Add a USB_MODE_OTG flag to platform_data and implement otg in 
+> > > this
+> > > 
+> > >   driver (or use whatever infrastructure present in the kernel 
+> > > then)
+> > > 
+> > > This is similar to what msm does. This way we have the clocks and 
+> > > phys handled where they are needed. We may use this code on i.MX later.
+> > > 
+> > > We did this wrong on i.MX (and several other architectures) and 
+> > > getting this right will be hard work. No need to introduce the 
+> > > same flaws again with a new architecture.
+> > 
+> > Hi Sascha,
+> > 
+> > We have been discussing i.mx usb re-structure at freescale internal 
+> > during this periods, one side does not agree with otg driver manages 
+> > PHY/clock solution due to below reasons:
+> > 
+> > - May confuse the users who only use device or host function, the 
+> > users may double "why I need to include otg file to support 
+> > device/host only function"?
+> 
+> I can't find anything confusing in this.
+> 
+> > - For some special cases, like device sends resume signal(remote 
+> > wakeup) after host suspend, but before otg suspend (system needs to 
+> > refuse to
+> > suspend) . It needs to add hcd flag to judge if there is a remote 
+> > wakeup after host suspend, and if the port is sending resume signal 
+> > now (when the port is sending resume signal, we can't put power to 
+> > low power mode). Is it suitable to put some hcd stuffs at otg driver?
+> 
+> I can't follow you here what the actual problem is, but since the otg 
+> driver is the driver for host and gadget (which happens to pass 
+> control to either the host or the gadget driver most of the time) it 
+> is ok to do whatever it takes in the otg driver to make it work.
+> 
+> > - Any disadvantages three individual drivers manage PHY/clock 
+> > separately after the generic PHY layer/FSL PHY driver have finished? 
+> > It can define where to get/put PHY/clock operation at individual 
+> > drivers clearly. When OTG switch, for host mode, the hcd struct 
+> > (includes interrupt) will be free/created using 
+> > usb_remove_hcd/usb_add_hcd, for device mode, we can deinit/init udc like current ci13xxx_udc.c at ci13xxx_vbus_session does.
+> 
+> I once made a quick hack using the msm otg driver on i.MX. I had to 
+> comment out some msm specifics but after that it worked quite well.
+> 
+> Sascga
 > 
 > --
-> 1.7.9.5
-> 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+Best regards,
+Marek Vasut
