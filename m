@@ -1,41 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Apr 2012 15:13:39 +0200
-Subject: [PATCH 03/15] ARM: ux500: Use correct format for dynamic IRQ
- assignment
-In-Reply-To: <1334867804-31942-4-git-send-email-lee.jones@linaro.org>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <1334867804-31942-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZM2m_T5T-96wrXKG=oru8sh9PS9O+z20eEvc97566uzQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Apr 2012 13:15:20 +0000
+Subject: [PATCH] ARM: optimize for FA526 if toolchain supports it
+In-Reply-To: <1335184313-27573-1-git-send-email-florian@openwrt.org>
+References: <1335184313-27573-1-git-send-email-florian@openwrt.org>
+Message-ID: <201204231315.20648.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Monday 23 April 2012, Florian Fainelli wrote:
+> Currently, when we are targetting a Farady FA526-based system
+> the toolchain will use the arm9tdmi mtune option of gcc, gcc > 4.6
+> supports the FA526 CPU, and allow us to optimize for it.
+> 
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
 
-> This patch applies the correct format requested by the irq
-> domain. For chained IRQs which use GPIO lines as IRQs, we
-> stipulate that a two cell request is required. The first cell
-> contains the requested IRQ and the second can contain flags
-> pertaining to edge detection and level sensitive values. The
-> zeroth cell specifies the GPIO controller by use of a phandle.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> ?arch/arm/boot/dts/db8500.dtsi ?| ? 22 ++++++++++++++++++++--
-> ?arch/arm/boot/dts/snowball.dts | ? 20 +++++++++-----------
-> ?2 files changed, 29 insertions(+), 13 deletions(-)
+No objections to the patch, but a question out of curiosity:
 
-So I created a separate ux500-devicetree branch and split off
-the changes under arch/arm/boot/dts/* here. For example
-I have split the patch:
-"drivers/gpio: gpio-nomadik: Apply Device Tree bindings"
+Is this the regular gemini platform that you are working on,
+or something else? Do you have other platform support patches
+that you are planning to submit for this?
 
-Into one changing code and one changing the device tree
-itself. Else this won't be possible to keep separate topic
-branches, and we want that.
-
-Then applied this on top.
-
-I hope you're OK with this?
-
-Yours,
-Linus Walleij
+	Arnd
