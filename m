@@ -1,76 +1,25 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 23 Apr 2012 19:11:08 +0200
-Subject: [PATCHv8 05/10] I2C: OMAP: Don't check if
- wait_for_completion_timeout() returns less than zero
-In-Reply-To: <1334842101-20670-6-git-send-email-shubhrajyoti@ti.com>
-References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
- <1334842101-20670-6-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120423171108.GJ27321@pengutronix.de>
+From: sales@newplayaudio.net (SHURE MICROPHONE)
+Date: Mon, 23 Apr 2012 17:23:37 +0000
+Subject: =?GB2312?B?U0hVUkUgTUlDUk9QSE9ORdPrxPq5ss/twcvV1cas?=
+Message-ID: <e89a8ff1c34204d59a04be5be609@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 06:58:16PM +0530, Shubhrajyoti D wrote:
-> By definition, wait_for_completion_timeout() returns an unsigned value and
-> therefore, it is not necessary to check if the return value is less than zero
-> as this is not possible.
-> 
-> This is based on a patch from Jon Hunter <jon-hunter@ti.com>
-> Changes from his patch
-> - Declare a long as the wait_for_completion_timeout returns long.
-> 
-> Original patch is
-> http://git.omapzoom.org/?p=kernel/omap.git;a=commitdiff;h=ea02cece7b0000bc736e60c4188a11aaa74bc6e6
+Hi,sir
 
-The original patch has a signed-off, so you need to include it here as
-well.
+thank you very much for your time
 
-> 
-> Cc : Jon Hunter <jon-hunter@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   10 ++++------
->  1 files changed, 4 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 1777d79..fec8d5c 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -473,7 +473,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  			     struct i2c_msg *msg, int stop)
->  {
->  	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
-> -	int r;
-> +	unsigned long timeout;
->  	u16 w;
->  
->  	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
-> @@ -541,12 +541,10 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	 * REVISIT: We should abort the transfer on signals, but the bus goes
->  	 * into arbitration and we're currently unable to recover from it.
->  	 */
-> -	r = wait_for_completion_timeout(&dev->cmd_complete,
-> -					OMAP_I2C_TIMEOUT);
-> +	timeout = wait_for_completion_timeout(&dev->cmd_complete,
-> +						OMAP_I2C_TIMEOUT);
->  	dev->buf_len = 0;
-> -	if (r < 0)
-> -		return r;
-> -	if (r == 0) {
-> +	if (timeout == 0) {
->  		dev_err(dev->dev, "controller timed out\n");
->  		omap_i2c_init(dev);
->  		return -ETIMEDOUT;
-> -- 
-> 1.7.5.4
-> 
+attached is shure mic , yamaha speaker and crown amp, dbx speaker  
+andsenhiser mic prices list.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+if you are interest, can you contact us?
+
+Steven
+www.newplayaudio.net
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/08dc2423/attachment-0001.sig>
+Name: ????.jpg
+Type: image/jpeg
+Size: 33131 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/ab300381/attachment-0001.jpg>
