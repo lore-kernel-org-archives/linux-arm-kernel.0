@@ -1,95 +1,34 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 23 Apr 2012 22:34:29 +0200
-Subject: [PATCH] ARM: OMAP4: hwmod data: Update AESS data with memory
- bank area
-In-Reply-To: <1335212747-8006-1-git-send-email-s-guiriec@ti.com>
-References: <1335212747-8006-1-git-send-email-s-guiriec@ti.com>
-Message-ID: <4F95BCD5.3060501@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 23 Apr 2012 13:53:22 -0700
+Subject: [PATCH] drivers/rtc/rtc-m41t93.c: don't let get_time() reset
+ error state
+In-Reply-To: <201204231230.q3NCUbbP015327@gatekeeper.vosshq.de>
+References: <201204231230.q3NCUbbP015327@gatekeeper.vosshq.de>
+Message-ID: <20120423135322.5b9b1635.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ lakml and Paul
+On Mon, 23 Apr 2012 12:51:23 +0200
+Nikolaus Voss <n.voss@weinmann.de> wrote:
 
-On 4/23/2012 10:25 PM, Sebastien Guiriec wrote:
-> Add AESS memory bank data in hwmod in order to provide memory
-> address information to the driver. AESS is divided inside 5
-> memory banks than can be accessed directly by MPU or by L3.
-> - PMEM: Program memory bank.
-> - SMEM: Sample memory bank.
-> - CMEM: Coefficients memory bank
-> - DMEM: Data memory bank.
-> - MPU/DMA: Register of AESS IP.
->
-> Signed-off-by: Sebastien Guiriec<s-guiriec@ti.com>
+> If the rtc reports the time might be invalid due to oscillator
+> failure, this flags must not be reset by get_time() as the read
+> operation doesn't make the time valid.
+> 
+> Instead, the flag is reset in set_time() when a valid time is
+> to be written.
 
-Acked-by: Benoit Cousson <b-cousson@ti.com>
+This is rather vague - what is/are "these flags"?  From the patch I
+think you're referring to (the maddeningly undocumented)
+M41T93_FLAG_ST?  If so, I'd suggest something like
 
-Thanks Seb, I'll take it for my WIP cleanup branch.
+: If the rtc reports the time might be invalid due to oscillator failure,
+: the M41T93_FLAG_ST flag must not be reset by get_time() as the read
+: operation doesn't make the time valid.
+: 
+: Instead, the M41T93_FLAG_ST flag is reset in set_time() when a valid time
+: is to be written.
 
-Regards,
-Benoit
-
-> ---
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   42 ++++++++++++++++++++++++++++
->   1 files changed, 42 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 4906129..b0d333a 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -3999,6 +3999,27 @@ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__ocp_wp_noc = {
->
->   static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
->   	{
-> +		.name		= "dmem",
-> +		.pa_start	= 0x40180000,
-> +		.pa_end		= 0x4018ffff
-> +	},
-> +	{
-> +		.name		= "cmem",
-> +		.pa_start	= 0x401a0000,
-> +		.pa_end		= 0x401a1fff
-> +	},
-> +	{
-> +		.name		= "smem",
-> +		.pa_start	= 0x401c0000,
-> +		.pa_end		= 0x401c5fff
-> +	},
-> +	{
-> +		.name		= "pmem",
-> +		.pa_start	= 0x401e0000,
-> +		.pa_end		= 0x401e1fff
-> +	},
-> +	{
-> +		.name		= "mpu",
->   		.pa_start	= 0x401f1000,
->   		.pa_end		= 0x401f13ff,
->   		.flags		= ADDR_TYPE_RT
-> @@ -4017,6 +4038,27 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__aess = {
->
->   static struct omap_hwmod_addr_space omap44xx_aess_dma_addrs[] = {
->   	{
-> +		.name		= "dmem_dma",
-> +		.pa_start	= 0x49080000,
-> +		.pa_end		= 0x4908ffff
-> +	},
-> +	{
-> +		.name		= "cmem_dma",
-> +		.pa_start	= 0x490a0000,
-> +		.pa_end		= 0x490a1fff
-> +	},
-> +	{
-> +		.name		= "smem_dma",
-> +		.pa_start	= 0x490c0000,
-> +		.pa_end		= 0x490c5fff
-> +	},
-> +	{
-> +		.name		= "pmem_dma",
-> +		.pa_start	= 0x490e0000,
-> +		.pa_end		= 0x490e1fff
-> +	},
-> +	{
-> +		.name		= "dma",
->   		.pa_start	= 0x490f1000,
->   		.pa_end		= 0x490f13ff,
->   		.flags		= ADDR_TYPE_RT
+Secondly, you provided no description of the user-visible effects of
+the bug.  Hence I cannot work out which kernel version(s) this patch
+should be merged into.
