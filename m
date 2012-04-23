@@ -1,56 +1,344 @@
-From: mattwood2000@gmail.com (Matt Wood)
-Date: Mon, 23 Apr 2012 11:20:38 -0400
-Subject: SPI subsystem delays
-In-Reply-To: <CAJe_ZheQZFA_wuCPa+reHU3HOGku-iiQh-GjJOy6Xr=c+ExGiQ@mail.gmail.com>
-References: <CADjezmaB7yo6W1dW11JKtH7JNSsgXQvOQy5BMqtAUfe6sy2igA@mail.gmail.com>
- <CAJe_ZheQZFA_wuCPa+reHU3HOGku-iiQh-GjJOy6Xr=c+ExGiQ@mail.gmail.com>
-Message-ID: <CADjezmabm9t3kwWCbLMBjdH2uf3+7J6Y_v3QXqs=dvrhAnc_ug@mail.gmail.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 23 Apr 2012 20:57:19 +0530
+Subject: [PATCHv3 2/2] arm/dts: omap4-sdp: Add keypad data
+In-Reply-To: <1335194839-30193-1-git-send-email-sourav.poddar@ti.com>
+References: <1335194839-30193-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <1335194839-30193-2-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 4:35 AM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
-> On 23 April 2012 02:37, Matt Wood <mattwood2000@gmail.com> wrote:
->>
->> has some specific delay requirements - specifically
->> the delay between bytes in a single transfer
->>
-> Sounds like your chip specific quirk. Apparently throughput would
-> be the last of your concerns :D
-> Perhaps you have to do single byte transfers with appropriate
-> non-zero 'delay_usecs' and skilfully toggle 'cs_change' for
-> each transfer.
->
->> delay between chip select assertion and the first clock edge
->>
-> IMO that could already be done from within your controller driver.
->
->> and the delay between consecutive transfers.
->>
-> Why not spi_transfer.delay_usecs ?
->
-> -jassi
+Add keypad data node in omap4 device tree file.
+Also fill the device tree binding parameters
+with the required value in "omap4-sdp" dts file.
 
-Hi Jassi, thanks for the reply.
+Tested on omap44330 sdp with 3.4-rc3 kernel.
 
-> Sounds like your chip specific quirk. Apparently throughput would
-> be the last of your concerns :D
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+Changes since v2:
+ -Includes no-autorepeat device tree binding.
+ arch/arm/boot/dts/omap4-sdp.dts |  292 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi    |    5 +
+ 2 files changed, 297 insertions(+), 0 deletions(-)
 
-Indeed, this is a very quirky device and throughput is not an issue.
-
-> Why not spi_transfer.delay_usecs ?
-
-This does not address the delay from chip select assertion to the
-first edge of the serial clock, nor does it address the delay between
-bytes within a single spi_message.  I agree that single byte transfers
-might work especially with spi_transfer.cs_change = 0, however that
-makes the code cumbersome with all those byte transfers and still does
-not help with the CS to SPCK timings as I mentioned.
-
-It would seem to me that if the hardware supports delays, then it
-would be advantageous to add these attributes to the SPI framework.
-Also, it would not be an expensive addition to add these attributes to
-spi_device structure as my patch does.
-
-Thoughts?
-
-Thanks, Matt.
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 63c6b2b..1d2d6cd 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -17,4 +17,296 @@
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
++
++	keypad at 4ae1c000 {
++		keypad,num-rows = <8>;
++		keypad,num-columns = <8>;
++		linux,input-no-autorepeat;
++
++		key_E {
++			keypad,row = <0>;
++			keypad,column = <0>;
++			linux,code = <18>;
++		};
++		key_R {
++			keypad,row = <0>;
++			keypad,column = <1>;
++			linux,code = <19>;
++		};
++		key_T {
++			keypad,row = <0>;
++			keypad,column = <2>;
++			linux,code = <20>;
++		};
++		key_HOME {
++			keypad,row = <0>;
++			keypad,column = <3>;
++			linux,code = <102>;
++		};
++		key_F5 {
++			keypad,row = <0>;
++			keypad,column = <4>;
++			linux,code = <63>;
++		};
++		key_I {
++			keypad,row = <0>;
++			keypad,column = <6>;
++			linux,code = <23>;
++		};
++		key_LEFTSHIFT {
++			keypad,row = <0>;
++			keypad,column = <7>;
++			linux,code = <42>;
++		};
++		key_D {
++			keypad,row = <1>;
++			keypad,column = <0>;
++			linux,code = <32>;
++		};
++		key_F {
++			keypad,row = <1>;
++			keypad,column = <1>;
++			linux,code = <33>;
++		};
++		key_G {
++			keypad,row = <1>;
++			keypad,column = <2>;
++			linux,code = <34>;
++		};
++		key_SEND {
++			keypad,row = <1>;
++			keypad,column = <3>;
++			linux,code = <84>;
++		};
++		key_F6 {
++			keypad,row = <1>;
++			keypad,column = <4>;
++			linux,code = <64>;
++		};
++		key_K {
++			keypad,row = <1>;
++			keypad,column = <6>;
++			linux,code = <37>;
++		};
++		key_ENTER {
++			keypad,row = <1>;
++			keypad,column = <7>;
++			linux,code = <28>;
++		};
++		key_X {
++			keypad,row = <2>;
++			keypad,column = <0>;
++			linux,code = <45>;
++		};
++		key_C {
++			keypad,row = <2>;
++			keypad,column = <1>;
++			linux,code = <46>;
++		};
++		key_V {
++			keypad,row = <2>;
++			keypad,column = <2>;
++			linux,code = <47>;
++		};
++		key_END {
++			keypad,row = <2>;
++			keypad,column = <3>;
++			linux,code = <107>;
++		};
++		key_F7 {
++			keypad,row = <2>;
++			keypad,column = <4>;
++			linux,code = <65>;
++		};
++		key_DOT {
++			keypad,row = <2>;
++			keypad,column = <6>;
++			linux,code = <52>;
++		};
++		key_CAPSLOCK {
++                        keypad,row = <2>;
++                        keypad,column = <7>;
++                        linux,code = <58>;
++                };
++		key_Z {
++			keypad,row = <3>;
++			keypad,column = <0>;
++			linux,code = <44>;
++		};
++		key_KPLUS {
++			keypad,row = <3>;
++			keypad,column = <1>;
++			linux,code = <78>;
++		};
++		key_B {
++			keypad,row = <3>;
++			keypad,column = <2>;
++			linux,code = <48>;
++		};
++		key_F1 {
++			keypad,row = <3>;
++			keypad,column = <3>;
++			linux,code = <59>;
++		};
++		key_F8 {
++			keypad,row = <3>;
++			keypad,column = <4>;
++			linux,code = <66>;
++		};
++		key_O {
++			keypad,row = <3>;
++			keypad,column = <6>;
++			linux,code = <24>;
++                };
++		key_SPACE {
++			keypad,row = <3>;
++			keypad,column = <7>;
++			linux,code = <57>;
++                };
++		key_W {
++			keypad,row = <4>;
++			keypad,column = <0>;
++			linux,code = <17>;
++                };
++		key_Y {
++			keypad,row = <4>;
++			keypad,column = <1>;
++			linux,code = <21>;
++		};
++		key_U {
++			keypad,row = <4>;
++			keypad,column = <2>;
++			linux,code = <22>;
++		};
++		key_F2 {
++			keypad,row = <4>;
++			keypad,column = <3>;
++			linux,code = <60>;
++		};
++		key_VOLUMEUP {
++			keypad,row = <4>;
++			keypad,column = <4>;
++			linux,code = <115>;
++		};
++		key_L {
++			keypad,row = <4>;
++			keypad,column = <6>;
++			linux,code = <38>;
++		};
++		key_LEFT {
++			keypad,row = <4>;
++			keypad,column = <7>;
++			linux,code = <105>;
++		};
++		key_S {
++			keypad,row = <5>;
++			keypad,column = <0>;
++			linux,code = <31>;
++		};
++		key_H {
++			keypad,row = <5>;
++			keypad,column = <1>;
++			linux,code = <35>;
++		};
++		key_J {
++			keypad,row = <5>;
++			keypad,column = <2>;
++			linux,code = <36>;
++		};
++		key_F3 {
++			keypad,row = <5>;
++			keypad,column = <3>;
++			linux,code = <61>;
++		};
++		key_F9 {
++			keypad,row = <5>;
++			keypad,column = <4>;
++			linux,code = <67>;
++		};
++		key_VOLUMEDOWN {
++			keypad,row = <5>;
++			keypad,column = <5>;
++			linux,code = <114>;
++		};
++		key_M {
++			keypad,row = <5>;
++			keypad,column = <6>;
++			linux,code = <50>;
++		};
++		key_RIGHT {
++			keypad,row = <5>;
++			keypad,column = <7>;
++			linux,code = <106>;
++		};
++		key_Q {
++			keypad,row = <6>;
++			keypad,column = <0>;
++			linux,code = <16>;
++		};
++		key_A {
++			keypad,row = <6>;
++			keypad,column = <1>;
++			linux,code = <30>;
++                };
++		key_N {
++			keypad,row = <6>;
++			keypad,column = <2>;
++			linux,code = <49>;
++                };
++		key_BACK {
++			keypad,row = <6>;
++			keypad,column = <3>;
++			linux,code = <92>;
++                };
++		key_BACKSPACE {
++			keypad,row = <6>;
++			keypad,column = <4>;
++			linux,code = <14>;
++		};
++		key_P {
++			keypad,row = <6>;
++			keypad,column = <6>;
++			linux,code = <25>;
++		};
++		key_UP {
++			keypad,row = <6>;
++			keypad,column = <7>;
++			linux,code = <103>;
++		};
++		key_PROG1 {
++			keypad,row = <7>;
++			keypad,column = <0>;
++			linux,code = <148>;
++		};
++		key_PROG2 {
++			keypad,row = <7>;
++			keypad,column = <1>;
++			linux,code = <149>;
++		};
++		key_PROG3 {
++			keypad,row = <7>;
++			keypad,column = <2>;
++			linux,code = <202>;
++                };
++		key_PROG4 {
++			keypad,row = <7>;
++			keypad,column = <3>;
++			linux,code = <203>;
++		};
++		key_F4 {
++			keypad,row = <7>;
++			keypad,column = <4>;
++			linux,code = <62>;
++		};
++		key_Ok {
++			keypad,row = <7>;
++			keypad,column = <6>;
++			linux,code = <352>;
++		};
++		key_DOWN {
++			keypad,row = <7>;
++			keypad,column = <7>;
++			linux,code = <108>;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 3d35559..e0f678a 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -156,4 +156,9 @@
+ 			ti,hwmods = "i2c4";
+ 		};
+ 	};
++
++	keypad at 4ae1c000 {
++		compatible = "ti,omap4-keypad";
++		ti,hwmods = "kbd";
++	};
+ };
+-- 
+1.7.1
