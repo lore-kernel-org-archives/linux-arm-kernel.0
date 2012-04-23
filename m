@@ -1,45 +1,31 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 23 Apr 2012 15:19:44 +0400
-Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that
- l2x0 is enabled before init
-In-Reply-To: <1335167001-28031-1-git-send-email-ylmao@marvell.com>
-References: <1335167001-28031-1-git-send-email-ylmao@marvell.com>
-Message-ID: <4F953AD0.5020503@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Apr 2012 11:22:43 +0000
+Subject: device-tree vs gpio-leds gpio_blink_set
+In-Reply-To: <20120423072745.678323582@rtp-net.org>
+References: <20120423072745.678323582@rtp-net.org>
+Message-ID: <201204231122.43481.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Monday 23 April 2012, Arnaud Patard wrote:
+> The kirkwood/orion gpio have a bit that allows "gpio blinking" (I think
+> it a square signal but the manual doesn't say it clearly) and it's used
+> on dns323 and iconnect. When trying to use DT to declare the leds-gpio
+> stuff, I've noticed that there's no way clearly documented to set the
+> gpio_blink_set() hook. In fact, it even looks like it's not supported at
+> all, which seems to be a regression compared to non-DT support.
 
-On 23-04-2012 11:43, Yilu Mao wrote:
+Yes, that seems to be correct. You are only the third person using
+gpio-led with blinking, aside from two uses in s3c24xx, and they
+don't support DT either yet.
 
-> If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
-> register will not be saved in l2x0_saved_regs. Therefore we can not use
-> l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
-> by saving aux ctrl in l2x0_saved_regs just after it's being read from
-> the register.
+> Does anyone know how to solve that ?
 
-> Signed-off-by: Yilu Mao<ylmao@marvell.com>
-> ---
->   arch/arm/mm/cache-l2x0.c |    5 +++++
->   1 files changed, 5 insertions(+), 0 deletions(-)
+One way to solve it would be to add a blink function to gpiolib so
+that the gpio-led driver can access it through a common wrapper
+and we can make the orion_gpio_set_blink() function a pointer in
+the gpio_chip structure rather than an export from
+arch/arm/plat-orion/gpio.c. I've put a few people on Cc that might
+have an opion on this.
 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 8936595..3b6428b 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -362,6 +362,11 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
->   	l2x0_cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
->   	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
->
-> +	/* In case l2x controller is enabled, the aux ctrl register
-> +	 * can't be set. So the original value should be stored in
-> +	 * the l2x0_saved_regs for restoring when resume. */
-
-    The preferred style of multi-line comments is this:
-
-/*
-  * bla
-  * bla
-  */
-
-WBR, Sergei
+	Arnd
