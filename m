@@ -1,56 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Apr 2012 12:33:09 +0000
-Subject: [PATCH 1/3] ARM: tegra: Add AHB driver
-In-Reply-To: <1335181043-15348-1-git-send-email-hdoyu@nvidia.com>
-References: <1335181043-15348-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <201204231233.09423.arnd@arndb.de>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Mon, 23 Apr 2012 18:03:33 +0530
+Subject: [PATCH V2 2/6] SPEAr: clk: Add Auxiliary Synthesizer clock
+In-Reply-To: <e5af9ce5a6b0621b6f18af8206d6c43da1e35e52.1334852394.git.viresh.kumar@st.com>
+References: <cover.1334852393.git.viresh.kumar@st.com>
+ <e5af9ce5a6b0621b6f18af8206d6c43da1e35e52.1334852394.git.viresh.kumar@st.com>
+Message-ID: <CAOh2x==kMOQDjz4pTeMHFVj60=w4666bFnYWZoUwfM+hWHm5eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 April 2012, Hiroshi DOYU wrote:
-> The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> High-performance Bus (AHB) architecture.
-> 
-> Both Tegra20/30 have this.
-> 
-> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+On 4/19/12, Viresh Kumar <viresh.linux@gmail.com> wrote:
+> All SPEAr SoC's contain Auxiliary Synthesizers. Their Fout is derived based
+> on
+> values of eq, x and y.
+>
+> Fout from synthesizer can be given from two equations:
+> Fout1 = (Fin * X/Y)/2		EQ1
+> Fout2 = Fin * X/Y		EQ2
+>
+> This patch adds in support for this type of clock.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  drivers/clk/spear/Makefile        |    2 +-
+>  drivers/clk/spear/clk-aux-synth.c |  187
 
-Please explain in the text above why it's a good idea to have this
-driver.
+Hi Mike,
 
+What are your plans for this patchset? Can you push this in v3.5?
+SPEAr dependency patches are already pushed by Arnd and are present
+in linux-next now.
 
-> @@ -122,6 +123,7 @@ void __init tegra20_init_early(void)
->  	tegra_init_cache(0x331, 0x441);
->  	tegra_pmc_init();
->  	tegra_powergate_init();
-> +	tegra_ahb_gizmo_init();
->  }
->  #endif
->  #ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> @@ -132,5 +134,6 @@ void __init tegra30_init_early(void)
->  	tegra_init_cache(0x441, 0x551);
->  	tegra_pmc_init();
->  	tegra_powergate_init();
-> +	tegra_ahb_gizmo_init();
->  }
->  #endif
+Please squash following fixup with this patch while applying:
 
-Does it really have to be "early", rather than an initcall? Why?
+From: Viresh Kumar <viresh.kumar@st.com>
+Date: Fri, 20 Apr 2012 17:08:40 +0530
+Subject: [PATCH] fixup! SPEAr: clk: Add Auxiliary Synthesizer clock
 
-> +
-> +static inline unsigned long gizmo_readl(unsigned long offset)
-> +{
-> +	return readl(IO_TO_VIRT(TEGRA_AHB_GIZMO_BASE + offset));
-> +}
-> +
-> +static inline void gizmo_writel(unsigned long value, unsigned long offset)
-> +{
-> +	writel(value, IO_TO_VIRT(TEGRA_AHB_GIZMO_BASE + offset));
-> +}
+Set aux->masks to masks if it is valid.
 
-Please change this to no longer use hardcoded addresses. A good
-implementation would scan the device tree for the physical address
-and then ioremap the registers in the init function, in order to
-save a local __iomem pointer.
+---
+ drivers/clk/spear/clk-aux-synth.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-	Arnd
+diff --git a/drivers/clk/spear/clk-aux-synth.c
+b/drivers/clk/spear/clk-aux-synth.c
+index 1a7ab7d..e01a350 100644
+--- a/drivers/clk/spear/clk-aux-synth.c
++++ b/drivers/clk/spear/clk-aux-synth.c
+@@ -154,6 +154,8 @@ struct clk *clk_register_aux(const char *aux_name,
+const char *gate_name,
+ 	/* struct clk_aux assignments */
+ 	if (!masks)
+ 		aux->masks = &default_aux_masks;
++	else
++		aux->masks = masks;
+
+ 	aux->reg = reg;
+ 	aux->rtbl = rtbl;
+
+--
+Viresh
