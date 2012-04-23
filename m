@@ -1,41 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2012 07:27:47 -0700
-Subject: [PATCH 1/8] ARM: OMAP: fix DMA vs memory ordering
-In-Reply-To: <20120423141924.GB24299@n2100.arm.linux.org.uk>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRqN-0004b4-Me@rmk-PC.arm.linux.org.uk>
- <20120420222230.GH21106@atomide.com>
- <20120423141924.GB24299@n2100.arm.linux.org.uk>
-Message-ID: <20120423142745.GB3739@atomide.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 23 Apr 2012 17:49:11 +0300
+Subject: [PATCH] staging: tidspbridge: fix build errors for
+ OMAP2_L4_IO_ADDRESS
+In-Reply-To: <20120423143917.GD24299@n2100.arm.linux.org.uk>
+References: <1335191654-1217-1-git-send-email-felipe.contreras@gmail.com>
+ <20120423143917.GD24299@n2100.arm.linux.org.uk>
+Message-ID: <CAMP44s0GDu91B5v90NKnOOiz0-N7iGp-q8MX_uBWEWLp8dSAng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120423 07:22]:
-> On Fri, Apr 20, 2012 at 03:22:33PM -0700, Tony Lindgren wrote:
-> > * Russell King <rmk+kernel@arm.linux.org.uk> [120418 03:14]:
-> > > Using coherent DMA memory with the OMAP DMA engine results in
-> > > unpredictable behaviour due to memory ordering issues; as things stand,
-> > > there is no guarantee that data written to coherent DMA memory will be
-> > > visible to the DMA hardware.
-> > > 
-> > > This is because the OMAP dma_write() accessor contains no barriers,
-> > > necessary on ARMv6 and above.  The effect of this can be seen in comments
-> > > in the OMAP serial driver, which incorrectly talks about cache flushing
-> > > for the coherent DMA stuff.
-> > > 
-> > > Rather than adding barriers to the accessors, add it in the DMA support
-> > > code just before we enable DMA, and just after we disable DMA.  This
-> > > avoids having barriers for every DMA register access.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> Would you like me to push this upstream on my next -rc push (with a
-> stable tag?)
+On Mon, Apr 23, 2012 at 5:39 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Apr 23, 2012 at 05:34:14PM +0300, Felipe Contreras wrote:
+>> drivers/staging/tidspbridge/core/tiomap3430.c: In function 'bridge_brd_start':
+>> drivers/staging/tidspbridge/core/tiomap3430.c:425: error: implicit declaration of function 'OMAP2_L4_IO_ADDRESS'
+>> drivers/staging/tidspbridge/core/wdt.c: In function 'dsp_wdt_init':
+>> drivers/staging/tidspbridge/core/wdt.c:56: error: implicit declaration of function 'OMAP2_L4_IO_ADDRESS'
+>>
+>> The proper fix will come later.
+>
+> Hmm. ?Given that this is staging stuff, which hasn't been making much
+> progress out of staging, I'd suggest not doing the quick fix on it, but
+> spending the time to implement the proper fix now and move the code
+> closer to the point where it can move out of staging.
 
-Yes sounds good to me.
+Omar is already on that.
 
-Regards,
+> You might get a gold star from Greg for moving this forward...
 
-Tony
+In my experience gold stars from Greg mean nothing.
+
+Cheers.
+
+-- 
+Felipe Contreras
