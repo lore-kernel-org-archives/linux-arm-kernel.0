@@ -1,26 +1,32 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Mon, 23 Apr 2012 16:57:54 +0200
-Subject: [PATCH 7/9] um: Should hold tasklist_lock while traversing
- processes
-In-Reply-To: <20120423070925.GG30752@lizard>
-References: <20120423070641.GA27702@lizard> <20120423070925.GG30752@lizard>
-Message-ID: <4F956DF2.7020408@nod.at>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Apr 2012 15:02:51 +0000
+Subject: [PATCH] ARM: optimize for FA526 if toolchain supports it
+In-Reply-To: <4F9561E4.2030100@openwrt.org>
+References: <1335184313-27573-1-git-send-email-florian@openwrt.org>
+ <201204231315.20648.arnd@arndb.de> <4F9561E4.2030100@openwrt.org>
+Message-ID: <201204231502.51563.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.04.2012 09:09, Anton Vorontsov wrote:
-> Traversing the tasks requires holding tasklist_lock, otherwise it
-> is unsafe.
->
-> p.s. However, I'm not sure that calling os_kill_ptraced_process()
-> in the atomic context is correct. It seem to work, but please
-> take a closer look.
->
-> Signed-off-by: Anton Vorontsov<anton.vorontsov@linaro.org>
-> ---
+On Monday 23 April 2012, Florian Fainelli wrote:
+> Le 04/23/12 15:15, Arnd Bergmann a ?crit :
+> > On Monday 23 April 2012, Florian Fainelli wrote:
+> >> Currently, when we are targetting a Farady FA526-based system
+> >> the toolchain will use the arm9tdmi mtune option of gcc, gcc>  4.6
+> >> supports the FA526 CPU, and allow us to optimize for it.
+> >>
+> >> Signed-off-by: Florian Fainelli<florian@openwrt.org>
+> > No objections to the patch, but a question out of curiosity:
+> >
+> > Is this the regular gemini platform that you are working on,
+> > or something else? Do you have other platform support patches
+> > that you are planning to submit for this?
+> 
+> I need this on a different platform (Moschip MCS814x), which I will be 
+> submitting once I have all the bits working and converted to device tree.
 
-You forgot my Ack and I've already explained why 
-os_kill_ptraced_process() is fine.
+Ok, good to know. 
 
 Thanks,
-//richard
+
+	Arnd
