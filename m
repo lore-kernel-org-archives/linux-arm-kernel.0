@@ -1,93 +1,46 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Mon, 23 Apr 2012 10:45:02 -0500
-Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
-In-Reply-To: <20120423074856.GU20478@pengutronix.de>
-References: <CAMXH7KFYA24sPUcwgKfwVLNPA0jWQ-QG02y+SfPNnAqdiv0+gg@mail.gmail.com>
- <CAMXH7KGgSmvfqUTC1bufBz0QXbt01dHsPo1cbRA9jLj9mGmfjg@mail.gmail.com>
- <20120419064308.GH3852@pengutronix.de>
- <20120420020816.GH22219@S2101-09.ap.freescale.net>
- <CAMXH7KE2RtdNy3G61guZb2uWy3rn267Z3eEVEgN5e==tHHsiuA@mail.gmail.com>
- <20120423051813.GM26306@S2101-09.ap.freescale.net>
- <20120423062739.GX3852@pengutronix.de>
- <20120423065259.GR26306@S2101-09.ap.freescale.net>
- <20120423065623.GA3852@pengutronix.de>
- <20120423071013.GS26306@S2101-09.ap.freescale.net>
- <20120423074856.GU20478@pengutronix.de>
-Message-ID: <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Apr 2012 16:49:32 +0100
+Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM mpcore
+ watchdog
+In-Reply-To: <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
+References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
+ <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
+ <4F9514AA.10403@arm.com>
+ <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
+ <4F9547E3.4000709@arm.com>
+ <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
+ <4F9573B8.9050607@arm.com>
+ <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
+Message-ID: <4F957A0C.7060607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Let me try last time. ?What about having a late_initcall hook in
->> machine_desc?
->
-> Also fine with me.
->
+On 23/04/12 16:33, viresh kumar wrote:
+> On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 23/04/12 15:21, viresh kumar wrote:
+>>> On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> Ah, that explains why it worked. I suppose you do have additional
+>>>> patches that fix the IRQ request bit?
+>>>
+>>> Missed this earlier. That patchset is in review currently and have
+>>> already fixed that. :)
+>>
+>> Right. Please post that patch as a prerequisite for any other change.
+> 
+> Haah!! I misread your question. I don't know how, but i thought you are
+> asking me to fix this address for SPEAr (My SoC). And that patch set
+> is currently in review.
+> 
+> I didn't get this IRQ request bit thing? Can you please explain.
 
-Shall I add Shawn's patch to my imx cpuidle patchset or should the
-arch/arm/kernel/setup.c and arch.h changes be submitted separately?
-If separately, Shawn, did you want to submit this patch or should I?
+The TWD watchdog uses a per-cpu interrupt (usually interrupt #30), and
+the GIC configuration should flag it as such. With this setup,
+request_irq() should fail, and the right API is request_percpu_irq(),
+together with enable_percpu_irq()/disable_percpu_irq().
 
-Thanks,
-Rob
+So how it works in your environment is a bit puzzling. Unless you're not
+using GIC?
 
->>
->> Regards,
->> Shawn
->>
->> 8<---
->>
->> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
->> index d7692ca..0b1c94b 100644
->> --- a/arch/arm/include/asm/mach/arch.h
->> +++ b/arch/arm/include/asm/mach/arch.h
->> @@ -43,6 +43,7 @@ struct machine_desc {
->> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
->> ? ? ? ? struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
->> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_machine)(void);
->> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_late)(void);
->> ?#ifdef CONFIG_MULTI_IRQ_HANDLER
->> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*handle_irq)(struct pt_regs *);
->> ?#endif
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index ebfac78..549f036 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -800,6 +800,14 @@ static int __init customize_machine(void)
->> ?}
->> ?arch_initcall(customize_machine);
->>
->> +static int __init init_machine_late(void)
->> +{
->> + ? ? ? if (machine_desc->init_late)
->> + ? ? ? ? ? ? ? machine_desc->init_late();
->> + ? ? ? return 0;
->> +}
->> +late_initcall(init_machine_late);
->> +
->> ?#ifdef CONFIG_KEXEC
->> ?static inline unsigned long long get_total_mem(void)
->> ?{
->> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
->> index da6c1d9..0e3640f 100644
->> --- a/arch/arm/mach-imx/mach-imx6q.c
->> +++ b/arch/arm/mach-imx/mach-imx6q.c
->> @@ -142,6 +142,7 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
->> ? ? ? ? .handle_irq ? ? = imx6q_handle_irq,
->> ? ? ? ? .timer ? ? ? ? ?= &imx6q_timer,
->> ? ? ? ? .init_machine ? = imx6q_init_machine,
->> + ? ? ? .init_late ? ? ?= imx6q_init_late,
->> ? ? ? ? .dt_compat ? ? ?= imx6q_dt_compat,
->> ? ? ? ? .restart ? ? ? ?= imx6q_restart,
->> ?MACHINE_END
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+	M.
+-- 
+Jazz is not dead. It just smells funny...
