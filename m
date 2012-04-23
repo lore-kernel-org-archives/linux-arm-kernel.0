@@ -1,307 +1,99 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 23 Apr 2012 20:57:18 +0530
-Subject: [PATCHv3 1/2] drivers: input: keypad: Add device tree support
-Message-ID: <1335194839-30193-1-git-send-email-sourav.poddar@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Apr 2012 16:22:32 +0100
+Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM mpcore
+ watchdog
+In-Reply-To: <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
+References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
+ <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
+ <4F9514AA.10403@arm.com>
+ <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
+ <4F9547E3.4000709@arm.com>
+ <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
+Message-ID: <4F9573B8.9050607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Documentation with omap4 keypad device tree
-binding information.
-Add device tree support for omap4 keypad driver.
+On 23/04/12 15:21, viresh kumar wrote:
+> On 4/23/12, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Ah, that explains why it worked. I suppose you do have additional
+>> patches that fix the IRQ request bit?
+> 
+> Missed this earlier. That patchset is in review currently and have already
+> fixed that. :)
 
-Tested on omap4430 sdp with 3.4-rc3.
+Right. Please post that patch as a prerequisite for any other change.
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Randy Dunlap <rdunlap@xenotime.net>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
-Changes since v2:
-- Include conditional setting of autorepeat feature based
-  on device tree binding.
- .../devicetree/bindings/input/omap-keypad.txt      |   55 +++++++++
- drivers/input/keyboard/omap4-keypad.c              |  121 ++++++++++++++++----
- 2 files changed, 153 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/omap-keypad.txt
+>> Given that no in-tree platform seem to be using this watchdog (at least
+>> a quick grep didn't reveal anything), I'd be inclined to simply change
+>> the offset in smp_twd.h and let them break.
+> 
+> Even i can't find any users of it. :)
+> 
+> @Wim: Please apply following patch before this one.
 
-diff --git a/Documentation/devicetree/bindings/input/omap-keypad.txt b/Documentation/devicetree/bindings/input/omap-keypad.txt
-new file mode 100644
-index 0000000..fda1e26
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/omap-keypad.txt
-@@ -0,0 +1,55 @@
-+* TI's Keypad Controller device tree bindings
-+
-+TI's Keypad controller is used to interface a SoC with a matrix-type
-+keypad device. The keypad controller supports multiple row and column lines.
-+A key can be placed at each intersection of a unique row and a unique column.
-+The keypad controller can sense a key-press and key-release and report the
-+event using a interrupt to the cpu.
-+
-+Required SoC Specific Properties:
-+- compatible: should be one of the following
-+   - "ti,omap4-keypad": For controllers compatible with omap4 keypad
-+      controller.
-+
-+Required Board Specific Properties:
-+- keypad,num-rows: Number of row lines connected to the keypad
-+  controller.
-+
-+- keypad,num-columns: Number of column lines connected to the
-+  keypad controller.
-+
-+- Keys represented as child nodes: Each key connected to the keypad
-+  controller is represented as a child node to the keypad controller
-+  device node and should include the following properties.
-+  - keypad,row: the row number to which the key is connected.
-+  - keypad,column: the column number to which the key is connected.
-+  - linux,code: the key-code to be reported when the key is pressed
-+    and released.
-+
-+Optional Properties specific to linux:
-+- linux,keypad-no-autorepeat: do no enable autorepeat feature.
-+
-+Example:
-+        keypad at 4ae1c000{
-+                compatible = "ti,omap4-keypad";
-+                keypad,num-rows = <2>;
-+                keypad,num-columns = <8>;
-+
-+		key_1 {
-+                        keypad,row = <0>;
-+                        keypad,column = <3>;
-+                        linux,code = <2>;
-+                };
-+
-+                key_2 {
-+                        keypad,row = <0>;
-+                        keypad,column = <4>;
-+                        linux,code = <3>;
-+                };
-+
-+                key_3 {
-+                        keypad,row = <0>;
-+                        keypad,column = <5>;
-+                        linux,code = <4>;
-+                };
-+        };
-diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
-index e809ac0..5dde7b2 100644
---- a/drivers/input/keyboard/omap4-keypad.c
-+++ b/drivers/input/keyboard/omap4-keypad.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_device.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- #include <linux/input.h>
- #include <linux/slab.h>
- #include <linux/pm_runtime.h>
-@@ -70,6 +71,7 @@
- 
- struct omap4_keypad {
- 	struct input_dev *input;
-+	struct matrix_keymap_data *keymap_data;
- 
- 	void __iomem *base;
- 	int irq;
-@@ -77,6 +79,7 @@ struct omap4_keypad {
- 	unsigned int rows;
- 	unsigned int cols;
- 	unsigned int row_shift;
-+	bool no_autorepeat;
- 	unsigned char key_state[8];
- 	unsigned short keymap[];
- };
-@@ -174,24 +177,106 @@ static void omap4_keypad_close(struct input_dev *input)
- 	pm_runtime_put_sync(input->dev.parent);
- }
- 
-+static struct omap4_keypad *omap_keypad_parse_dt(struct device *dev,
-+					uint32_t num_rows, uint32_t num_cols)
-+{
-+	struct matrix_keymap_data *keymap_data;
-+	struct device_node *np = dev->of_node, *key_np;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
-+	uint32_t *keymap;
-+	unsigned int key_count = 0;
-+
-+	keypad_data->rows = num_rows;
-+	keypad_data->cols = num_cols;
-+
-+	keymap_data = devm_kzalloc(dev, sizeof(*keymap_data), GFP_KERNEL);
-+	if (!keymap_data) {
-+		dev_err(dev, "could not allocate memory for keymap data\n");
-+		return NULL;
-+	}
-+	keypad_data->keymap_data = keymap_data;
-+
-+	for_each_child_of_node(np, key_np)
-+		key_count++;
-+
-+	keymap_data->keymap_size = key_count;
-+	keymap = devm_kzalloc(dev, sizeof(uint32_t) * key_count, GFP_KERNEL);
-+	if (!keymap) {
-+		dev_err(dev, "could not allocate memory for keymap\n");
-+		return NULL;
-+	}
-+	keypad_data->keymap_data->keymap = keymap;
-+
-+	for_each_child_of_node(np, key_np) {
-+		u32 row, col, key_code;
-+		of_property_read_u32(key_np, "keypad,row", &row);
-+		of_property_read_u32(key_np, "keypad,column", &col);
-+		of_property_read_u32(key_np, "linux,code", &key_code);
-+		*keymap++ = KEY(row, col, key_code);
-+	}
-+
-+	if (of_get_property(np, "linux,input-no-autorepeat", NULL))
-+		keypad_data->no_autorepeat = true;
-+
-+	return keypad_data;
-+}
-+
- static int __devinit omap4_keypad_probe(struct platform_device *pdev)
- {
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
- 	const struct omap4_keypad_platform_data *pdata;
- 	struct omap4_keypad *keypad_data;
- 	struct input_dev *input_dev;
- 	struct resource *res;
- 	resource_size_t size;
--	unsigned int row_shift, max_keys;
-+	unsigned int row_shift = 0, max_keys = 0;
-+	uint32_t num_rows = 0, num_cols = 0;
- 	int irq;
- 	int error;
- 
- 	/* platform data */
- 	pdata = pdev->dev.platform_data;
--	if (!pdata) {
-+	if (np) {
-+		of_property_read_u32(np, "keypad,num-rows", &num_rows);
-+		of_property_read_u32(np, "keypad,num-columns", &num_cols);
-+		if (!num_rows || !num_cols) {
-+			dev_err(&pdev->dev, "number of keypad rows/columns not specified\n");
-+			return -EINVAL;
-+		}
-+	} else if (pdata) {
-+		num_rows = pdata->rows;
-+		num_cols = pdata->cols;
-+	} else {
- 		dev_err(&pdev->dev, "no platform data defined\n");
- 		return -EINVAL;
- 	}
- 
-+	row_shift = get_count_order(num_cols);
-+	max_keys = num_rows << row_shift;
-+
-+	keypad_data = devm_kzalloc(dev, sizeof(struct omap4_keypad) +
-+			max_keys * sizeof(keypad_data->keymap[0]),
-+				GFP_KERNEL);
-+
-+	if (!keypad_data) {
-+		dev_err(&pdev->dev, "keypad_data memory allocation failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	platform_set_drvdata(pdev, keypad_data);
-+
-+	if (np) {
-+		keypad_data = omap_keypad_parse_dt(&pdev->dev,
-+						num_rows, num_cols);
-+	} else {
-+		keypad_data->rows = num_rows;
-+		keypad_data->cols = num_cols;
-+		keypad_data->keymap_data =
-+				(struct matrix_keymap_data *)pdata->keymap_data;
-+	}
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		dev_err(&pdev->dev, "no base address specified\n");
-@@ -204,22 +289,6 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	if (!pdata->keymap_data) {
--		dev_err(&pdev->dev, "no keymap data defined\n");
--		return -EINVAL;
--	}
--
--	row_shift = get_count_order(pdata->cols);
--	max_keys = pdata->rows << row_shift;
--
--	keypad_data = kzalloc(sizeof(struct omap4_keypad) +
--				max_keys * sizeof(keypad_data->keymap[0]),
--			      GFP_KERNEL);
--	if (!keypad_data) {
--		dev_err(&pdev->dev, "keypad_data memory allocation failed\n");
--		return -ENOMEM;
--	}
--
- 	size = resource_size(res);
- 
- 	res = request_mem_region(res->start, size, pdev->name);
-@@ -238,8 +307,6 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
- 
- 	keypad_data->irq = irq;
- 	keypad_data->row_shift = row_shift;
--	keypad_data->rows = pdata->rows;
--	keypad_data->cols = pdata->cols;
- 
- 	/* input device allocation */
- 	keypad_data->input = input_dev = input_allocate_device();
-@@ -263,13 +330,15 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
- 	input_dev->keycodemax	= max_keys;
- 
- 	__set_bit(EV_KEY, input_dev->evbit);
--	__set_bit(EV_REP, input_dev->evbit);
-+
-+	if (!keypad_data->no_autorepeat)
-+		__set_bit(EV_REP, input_dev->evbit);
- 
- 	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
- 
- 	input_set_drvdata(input_dev, keypad_data);
- 
--	matrix_keypad_build_keymap(pdata->keymap_data, row_shift,
-+	matrix_keypad_build_keymap(keypad_data->keymap_data, row_shift,
- 			input_dev->keycode, input_dev->keybit);
- 
- 	error = request_irq(keypad_data->irq, omap4_keypad_interrupt,
-@@ -288,7 +357,6 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
- 		goto err_pm_disable;
- 	}
- 
--	platform_set_drvdata(pdev, keypad_data);
- 	return 0;
- 
- err_pm_disable:
-@@ -327,12 +395,19 @@ static int __devexit omap4_keypad_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id omap_keypad_dt_match[] = {
-+	{ .compatible = "ti,omap4-keypad" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, omap_keypad_dt_match);
-+
- static struct platform_driver omap4_keypad_driver = {
- 	.probe		= omap4_keypad_probe,
- 	.remove		= __devexit_p(omap4_keypad_remove),
- 	.driver		= {
- 		.name	= "omap4-keypad",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(omap_keypad_dt_match),
- 	},
- };
- module_platform_driver(omap4_keypad_driver);
+Probably it would be better to keep everything in a single series,
+including the above IRQ fixes. It would surely make things easier for
+the maintainer and other people who are reviewing the changes you're
+making to the driver.
+
+> Here we go:
+> 
+> From: Viresh Kumar <viresh.kumar@st.com>
+> Date: Mon, 23 Apr 2012 19:39:47 +0530
+> Subject: [PATCH] ARM: SMP_TWD: WDOG: Start registers from 0x00 instead of
+>  0x20
+> 
+> TWD_WDOG is at offset 0x20 from TWD base address. Current register offsets
+> contain this extra 0x20 offset, i.e. users were required to pass base address of
+> TWD instead of WDOG to WDOG driver.
+> 
+> Change this, so that users can pass base address of WDOG to WDOG driver instead
+> of TWD module. For this, subtract 0x20 from offsets of WDOG registers.
+> 
+> This could break any current users of TWD_WDOG, but i couldn't find any users of
+> this driver in current Linux tree. So, haven't fixed any platform code. If some
+> platforms are broken please report to me, so that we can get them fixed in this
+> patch only.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  arch/arm/include/asm/smp_twd.h |   17 +++++++++++------
+>  1 files changed, 11 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+> index 57857d1..ff3f67e 100644
+> --- a/arch/arm/include/asm/smp_twd.h
+> +++ b/arch/arm/include/asm/smp_twd.h
+> @@ -6,12 +6,17 @@
+>  #define TWD_TIMER_CONTROL		0x08
+>  #define TWD_TIMER_INTSTAT		0x0C
+> 
+> -#define TWD_WDOG_LOAD			0x20
+> -#define TWD_WDOG_COUNTER		0x24
+> -#define TWD_WDOG_CONTROL		0x28
+> -#define TWD_WDOG_INTSTAT		0x2C
+> -#define TWD_WDOG_RESETSTAT		0x30
+> -#define TWD_WDOG_DISABLE		0x34
+> +/*
+> + * TWD_WDOG is at offset 0x20 from TWD base address. Following register offsets
+> + * doesn't contain this extra 0x20 offset, i.e. users of TWD_WDOG
+> must pass base
+> + * address of WDOG to WDOG driver instead of TWD module.
+> + */
+> +#define TWD_WDOG_LOAD			0x00
+> +#define TWD_WDOG_COUNTER		0x04
+> +#define TWD_WDOG_CONTROL		0x08
+> +#define TWD_WDOG_INTSTAT		0x0C
+> +#define TWD_WDOG_RESETSTAT		0x10
+> +#define TWD_WDOG_DISABLE		0x14
+> 
+>  #define TWD_WDOG_LOAD_MIN		0x00000000
+>  #define TWD_WDOG_LOAD_MAX		0xFFFFFFFF
+> 
+
+Now that we made it that far, why not moving the TWD_WDOG_* #defines to
+the driver itself? Nobody else should care about it anyway...
+
+	M.
 -- 
-1.7.1
+Jazz is not dead. It just smells funny...
