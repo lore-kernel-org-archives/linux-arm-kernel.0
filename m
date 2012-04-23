@@ -1,41 +1,39 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 23 Apr 2012 20:14:30 +0530
-Subject: [PATCH v4 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <20120423142717.GA32380@kroah.com>
-References: <1331934707-29487-1-git-send-email-aneesh@ti.com>
- <alpine.DEB.2.00.1204112042070.29473@utopia.booyaka.com>
- <20120412030044.GA26236@kroah.com>
- <CAM=4YEQ6_+7xPwi2jucks1P9p8tO3cSG7S0s=VVJVrueb4fB=g@mail.gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E96E7C5@DBDE01.ent.ti.com>
- <CAMQu2gz2CD+-kcSF2HVGWWrjk3DmsGgcuucBXan5NqtVUSwa2w@mail.gmail.com>
- <20120423142717.GA32380@kroah.com>
-Message-ID: <CAMQu2gxoP8qOT6DP_QJkNVyTp3uzVYgbkJuNz7k9fx4fh2iPmg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 23 Apr 2012 17:43:51 +0300
+Subject: [PATCH v2] arm: omap4: hsmmc: check for null pointer
+In-Reply-To: <1335192067-3666-1-git-send-email-balajitk@ti.com>
+References: <1335192067-3666-1-git-send-email-balajitk@ti.com>
+Message-ID: <20120423144348.GF26302@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 7:57 PM, Greg KH <greg@kroah.com> wrote:
-> On Mon, Apr 23, 2012 at 04:34:46PM +0530, Shilimkar, Santosh wrote:
->> Afzal,
->>
->> On Mon, Apr 23, 2012 at 4:26 PM, Mohammed, Afzal <afzal@ti.com> wrote:
->> > Hi Aneesh,
->> >
->> > On Fri, Apr 13, 2012 at 01:28:55, V, Aneesh wrote:
->> >
->> >> Thanks. I will wait for your review then. Once I have your comments
->> >> I will re-work and submit in the new directory structure proposed.
->> >
->> > Do you have a plan on submitting EMIF driver in the new proposed
->> > (drivers/memory) directory. Or shall I submit GPMC driver by creating
->> > the new "memory" directory.
->> >
->> ?Greg mentioned that he plans to do a review of EMIF driver. We were waiting
->> for his comments before sending the updated series.
->
-> No, don't wait for me, please resend, I was waiting for you :)
+Hi,
 
-Thanks Greg !!
-Will start working on updating the patch set and post it on list.
+On Mon, Apr 23, 2012 at 08:11:07PM +0530, Balaji T K wrote:
+> +int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
+> +{
+> +	struct omap2_hsmmc_info *c;
+> +
+> +	omap_hsmmc_init(controllers);
+> +	for (c = controllers; c->mmc; c++) {
+> +		/* pdev can be null if CONFIG_MMC_OMAP_HS is not set */
+> +		if (!c->pdev)
+> +			continue;
+> +		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
+> +	}
+> +
+> +	return 0;
+> +}
 
-Regards
-Santosh
+why are you even calling this if CONFIG_MMC_OMAP_HS isn't set ? Just
+stub it out if you don't have mmc support.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120423/78dc7f51/attachment.sig>
