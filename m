@@ -1,31 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Apr 2012 11:22:43 +0000
-Subject: device-tree vs gpio-leds gpio_blink_set
-In-Reply-To: <20120423072745.678323582@rtp-net.org>
-References: <20120423072745.678323582@rtp-net.org>
-Message-ID: <201204231122.43481.arnd@arndb.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 23 Apr 2012 13:30:32 +0200
+Subject: [PATCH 5/9 v2] gpio/nomadik: use ioremap() instead of static mappings
+Message-ID: <1335180632-21381-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 April 2012, Arnaud Patard wrote:
-> The kirkwood/orion gpio have a bit that allows "gpio blinking" (I think
-> it a square signal but the manual doesn't say it clearly) and it's used
-> on dns323 and iconnect. When trying to use DT to declare the leds-gpio
-> stuff, I've noticed that there's no way clearly documented to set the
-> gpio_blink_set() hook. In fact, it even looks like it's not supported at
-> all, which seems to be a regression compared to non-DT support.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Yes, that seems to be correct. You are only the third person using
-gpio-led with blinking, aside from two uses in s3c24xx, and they
-don't support DT either yet.
+We were using a custom io_p2v() (physical-to-virtual) translation
+macro, but it's fully possible to just ioremap() this memory
+now, so skip use of static addresses altogether.
 
-> Does anyone know how to solve that ?
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpio-nomadik.c |   14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-One way to solve it would be to add a blink function to gpiolib so
-that the gpio-led driver can access it through a common wrapper
-and we can make the orion_gpio_set_blink() function a pointer in
-the gpio_chip structure rather than an export from
-arch/arm/plat-orion/gpio.c. I've put a few people on Cc that might
-have an opion on this.
-
-	Arnd
+diff --git a/drivers/gpio/gpio-nomadik.c b/drivers/gpio/gpio-nomadik.c
+index 7b45d88..bddc3dd 100644
+--- a/drivers/gpio/gpio-nomadik.c
++++ b/drivers/gpio/gpio-nomadik.c
+@@ -28,7 +28,6 @@
+ 
+ #include <plat/pincfg.h>
+ #include <plat/gpio-nomadik.h>
+-#include <mach/hardware.h>
+ #include <asm/gpio.h>
+ 
+ /*
+@@ -1139,6 +1138,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 	struct resource *res;
+ 	struct clk *clk;
+ 	int secondary_irq;
++	void __iomem *base;
+ 	int irq;
+ 	int ret;
+ 
+@@ -1169,10 +1169,16 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 		goto out;
+ 	}
+ 
++	base = ioremap(res->start, resource_size(res));
++	if (!base) {
++		ret = -ENOMEM;
++		goto out_release;
++	}
++
+ 	clk = clk_get(&dev->dev, NULL);
+ 	if (IS_ERR(clk)) {
+ 		ret = PTR_ERR(clk);
+-		goto out_release;
++		goto out_unmap;
+ 	}
+ 
+ 	nmk_chip = kzalloc(sizeof(*nmk_chip), GFP_KERNEL);
+@@ -1186,7 +1192,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 	 */
+ 	nmk_chip->bank = dev->id;
+ 	nmk_chip->clk = clk;
+-	nmk_chip->addr = io_p2v(res->start);
++	nmk_chip->addr = base;
+ 	nmk_chip->chip = nmk_gpio_template;
+ 	nmk_chip->parent_irq = irq;
+ 	nmk_chip->secondary_parent_irq = secondary_irq;
+@@ -1226,6 +1232,8 @@ out_free:
+ out_clk:
+ 	clk_disable(clk);
+ 	clk_put(clk);
++out_unmap:
++	iounmap(base);
+ out_release:
+ 	release_mem_region(res->start, resource_size(res));
+ out:
+-- 
+1.7.9.2
