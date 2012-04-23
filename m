@@ -1,112 +1,102 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 24 Apr 2012 00:11:46 +0200
-Subject: [PATCH 02/17][V2] ARM: OMAP4: cpuidle - Declare the states with
- the driver declaration
-In-Reply-To: <878vhml6ku.fsf@ti.com>
-References: <1333570371-1389-1-git-send-email-daniel.lezcano@linaro.org>
- <1333570371-1389-3-git-send-email-daniel.lezcano@linaro.org>
- <87vcl8a5wb.fsf@ti.com> <4F901A03.9080000@linaro.org>
- <4F9561F7.3000306@linaro.org> <878vhml6ku.fsf@ti.com>
-Message-ID: <4F95D3A2.9010201@linaro.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 23 Apr 2012 15:47:02 -0700
+Subject: [PATCH] ARM: msm: Fix gic irqdomain support
+Message-ID: <1335221222-30879-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2012 07:08 PM, Kevin Hilman wrote:
-> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
->
->> On 04/19/2012 03:58 PM, Daniel Lezcano wrote:
->>> On 04/10/2012 12:37 AM, Kevin Hilman wrote:
->>>> Daniel Lezcano<daniel.lezcano@linaro.org>   writes:
->>>>
->>>>> The cpuidle API allows to declare statically the states in the driver
->>>>> structure. Let's use it.
->>>>> We do no longer need the fill_cstate function called at runtime and
->>>>> by the way adding more instructions at boot time.
->>>>>
->>>>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->>>>> Reviewed-by: Jean Pihet<j-pihet@ti.com>
->>>>> Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>>>> ---
->>>>>    arch/arm/mach-omap2/cpuidle44xx.c |   57
->>>>> +++++++++++++++++++++---------------
->>>>>    1 files changed, 33 insertions(+), 24 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c
->>>>> b/arch/arm/mach-omap2/cpuidle44xx.c
->>>>> index ee0bc50..6d86b59 100644
->>>>> --- a/arch/arm/mach-omap2/cpuidle44xx.c
->>>>> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
->>>>> @@ -132,21 +132,39 @@ struct cpuidle_driver omap4_idle_driver = {
->>>>>        .name                = "omap4_idle",
->>>>>        .owner                = THIS_MODULE,
->>>>>        .en_core_tk_irqen        = 1,
->>>>> +    .states = {
->>>>> +        {
->>>>> +            /* C1 - CPU0 ON + CPU1 ON + MPU ON */
->>>>> +            .exit_latency = 2 + 2,
->>>>> +            .target_residency = 5,
->>>>> +            .flags = CPUIDLE_FLAG_TIME_VALID,
->>>>> +            .enter = omap4_enter_idle,
->>>>> +            .name = "C1",
->>>>> +            .desc = "MPUSS ON"
->>>>> +        },
->>>>> +        {
->>>>> +                        /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
->>>>> +            .exit_latency = 328 + 440,
->>>>> +            .target_residency = 960,
->>>>> +            .flags = CPUIDLE_FLAG_TIME_VALID,
->>>>> +            .enter = omap4_enter_idle,
->>>>> +            .name = "C2",
->>>>> +            .desc = "MPUSS CSWR",
->>>>> +        },
->>>>> +        {
->>>>> +            /* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
->>>>> +            .exit_latency = 460 + 518,
->>>>> +            .target_residency = 1100,
->>>>> +            .flags = CPUIDLE_FLAG_TIME_VALID,
->>>>> +            .enter = omap4_enter_idle,
->>>>> +            .name = "C3",
->>>>> +            .desc = "MPUSS OSWR",
->>>>> +        },
->>>>> +    },
->>>>> +    .state_count = OMAP4_NUM_STATES,
->>>>
->>>> I think you can drop OMAP4_NUM_STATES here, and just use:
->>>>
->>>>      .state_count = ARRAY_SIZE(omap4_idle_driver.states),
->>>>
->>>> Then drop OMAP4_NUM_STATES all together in patch 3.
->>>
->>> Ok.
->>
->> I said 'ok' but it is not :)
->>
->> omap4_idle_driver.states has a fixed length which is CPUIDLE_STATE_MAX (8).
->> We need to define it manually as 3 for now.
->
-> I don't see the connection between the two.
->
-> Why can't you use ARRAY_SIZE(), and just have an error check later in
-> the init to see if state_count>  max.
+As of
 
+    commit 75294957be1dee7d22dd7d90bd31334ba410e836
+    Author: Grant Likely <grant.likely@secretlab.ca>
+    Date:   Tue Feb 14 14:06:57 2012 -0700
 
-Maybe I misunderstood but you say:
+        irq_domain: Remove 'new' irq_domain in favour of the ppc one
 
-.state_count = ARRAY_SIZE(omap4_idle_driver.states),
+the ARM gic controller uses proper irq domains.  Fix the MSM gic
+initialization and DT so that it works again.
 
-As in the cpuidle structure, the state array is CPUIDLE_STATE_MAX, 
-ARRAY_SIZE will always return 8, not the number of the initialized states.
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+ arch/arm/boot/dts/msm8660-surf.dts |    4 ++--
+ arch/arm/mach-msm/board-msm8x60.c  |   25 +++++++++++++++----------
+ 2 files changed, 17 insertions(+), 12 deletions(-)
 
-Anyway, I modified the patchset to use ARRAY_SIZE on the omap4_idle_data 
-array, so we have:
-
-.state_count = ARRAY_SIZE(omap4_idle_data),
-
-   -- Daniel
-
+diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
+index 15ded0d..45bc4bb 100644
+--- a/arch/arm/boot/dts/msm8660-surf.dts
++++ b/arch/arm/boot/dts/msm8660-surf.dts
+@@ -10,7 +10,7 @@
+ 	intc: interrupt-controller at 02080000 {
+ 		compatible = "qcom,msm-8660-qgic";
+ 		interrupt-controller;
+-		#interrupt-cells = <1>;
++		#interrupt-cells = <3>;
+ 		reg = < 0x02080000 0x1000 >,
+ 		      < 0x02081000 0x1000 >;
+ 	};
+@@ -19,6 +19,6 @@
+ 		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
+ 		reg = <0x19c40000 0x1000>,
+ 		      <0x19c00000 0x1000>;
+-		interrupts = <195>;
++		interrupts = <0 195 0x0>;
+ 	};
+ };
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 962e711..fb3496a 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -17,6 +17,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/memblock.h>
+ 
+@@ -49,10 +50,22 @@ static void __init msm8x60_map_io(void)
+ 	msm_map_msm8x60_io();
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id msm_dt_gic_match[] __initdata = {
++	{ .compatible = "qcom,msm-8660-qgic", .data = gic_of_init },
++	{}
++};
++#endif
++
+ static void __init msm8x60_init_irq(void)
+ {
+-	gic_init(0, GIC_PPI_START, MSM_QGIC_DIST_BASE,
+-		 (void *)MSM_QGIC_CPU_BASE);
++	if (!of_have_populated_dt())
++		gic_init(0, GIC_PPI_START, MSM_QGIC_DIST_BASE,
++			 (void *)MSM_QGIC_CPU_BASE);
++#ifdef CONFIG_OF
++	else
++		of_irq_init(msm_dt_gic_match);
++#endif
+ 
+ 	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
+ 	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
+@@ -73,16 +86,8 @@ static struct of_dev_auxdata msm_auxdata_lookup[] __initdata = {
+ 	{}
+ };
+ 
+-static struct of_device_id msm_dt_gic_match[] __initdata = {
+-	{ .compatible = "qcom,msm-8660-qgic", },
+-	{}
+-};
+-
+ static void __init msm8x60_dt_init(void)
+ {
+-	irq_domain_generate_simple(msm_dt_gic_match, MSM8X60_QGIC_DIST_PHYS,
+-				GIC_SPI_START);
+-
+ 	if (of_machine_is_compatible("qcom,msm8660-surf")) {
+ 		printk(KERN_INFO "Init surf UART registers\n");
+ 		msm8x60_init_uart12dm();
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
