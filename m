@@ -1,35 +1,80 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 23 Apr 2012 13:56:11 -0700
-Subject: [PATCH V2 6/6] SPEAr: Switch to common clock framework
-In-Reply-To: <ddade82f0666c3186b8a694aa2b79acd3f7e5d50.1334852395.git.viresh.kumar@st.com>
-References: <cover.1334852393.git.viresh.kumar@st.com>
- <ddade82f0666c3186b8a694aa2b79acd3f7e5d50.1334852395.git.viresh.kumar@st.com>
-Message-ID: <CAJOA=zPUYkD=pcdJqQA3iDqDe4fMobO34V=QSz01Z5Y8zAkmPg@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 23 Apr 2012 22:58:01 +0200
+Subject: [Linaro-mm-sig] [PATCH 0/4] ARM: replace custom consistent dma
+ region with vmalloc
+In-Reply-To: <CALYq+qSMPoVC5OF+oBbt_i7O+_fmogLCtpqTAqHbsv1TcKrPdA@mail.gmail.com>
+References: <1334325950-7881-1-git-send-email-m.szyprowski@samsung.com>
+ <CALYq+qSMPoVC5OF+oBbt_i7O+_fmogLCtpqTAqHbsv1TcKrPdA@mail.gmail.com>
+Message-ID: <20120423205801.GO4935@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resending to lakml since message length was too long]
+On Mon, Apr 23, 2012 at 09:02:25PM +0900, Abhinav Kochhar wrote:
+> Hi,
+> 
+> I see a bottle-neck with the current dma-mapping framework.
+> Issue seems to be with the Virtual memory allocation for access in kernel
+> address space.
+> 
+> 1. In "arch/arm/mm/dma-mapping.c" there is a initialization call to
+> "consistent_init". It reserves size 32MB of Kernel Address space.
+> 2. "consistent_init" allocates memory for kernel page directory and page
+> tables.
+> 
+> 3. "__iommu_alloc_remap" function allocates virtual memory region in kernel
+> address space reserved in step 1.
+> 
+> 4. "__iommu_alloc_remap" function then maps the allocated pages to the
+> address space reserved in step 3.
+> 
+> Since the virtual memory area allocated for mapping these pages in kernel
+> address space is only 32MB,
+> 
+> eventually the calls for allocation and mapping new pages into kernel
+> address space are going to fail once 32 MB is exhausted.
+> 
+> e.g., For Exynos 5 platform Each framebuffer for 1280x800 resolution
+> consumes around 4MB.
+> 
+> We have a scenario where X11 DRI driver would allocate Non-contig pages for
+> all "Pixmaps" through arm_iommu_alloc_attrs" function which will follow the
+> path given above in steps 1 - 4.
+> 
+> Now the problem is the size limitation of 32MB. We may want to allocate
+> more than 8 such buffers when X11 DRI driver is integrated.
+> Possible solutions:
+> 
+> 1. Why do we need to create a kernel virtual address space? Are we going to
+> access these pages in kernel using this address?
+> 
+> If we are not going to access anything in kernel then why do we need to map
+> these pages in kernel address space?. If we can avoid this then the problem
+> can be solved.
+> 
+> OR
+> 
+> 2 Is it used for only book-keeping to retrieve "struct pages" later on for
+> passing/mapping to different devices?
+> 
+> If yes, then we have to find another way.
+> 
+> For "dmabuf" framework one solution could be to add a new member variable
+> "pages" in the exporting driver's local object and use that for
+> passing/mapping to different devices.
+> 
+> Moreover, even if we increase to say 64 MB that would not be enough for our
+> use, we never know how many graphic applications would be spawned by the
+> user.
+> Let me know your opinion on this.
 
-On Thu, Apr 19, 2012 at 9:28 AM, Viresh Kumar <viresh.linux@gmail.com> wrote:
-> SPEAr SoCs used its own clock framework since now. From now on they will move to
-> use common clock framework.
->
-> This patch updates existing SPEAr machine support to adapt for common clock
-> framework.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+This is more or less the reason I'm so massively opposed to adding vmap to
+dma-buf - you _really_ burn through the vmap space ridiculously quickly on
+32bit platforms with too much memory (i.e. everything with more than 1 G).
 
-Hi Viresh,
-
-This series looks good to me, except for the two small comments I had
-in patch 1/6.
-
-I also think that this code will not be affected by the changes to
-struct clk_hw which are expected from Saravana.  Hopefully you have
-avoided a big rebase.
-
-I'll take these into my clk-next branch unless Arnd has any objection
-based on arm-soc collisions.
-
-Thanks,
-Mike
+You need to map/unmap everything page-by-page with all the usual kmap apis
+the kernel provides.
+-Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
