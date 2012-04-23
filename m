@@ -1,68 +1,36 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 23 Apr 2012 16:07:13 -0700
-Subject: [PATCH 2/8] clk: mxs: add clock support for imx23
-In-Reply-To: <1335023840-1394-3-git-send-email-shawn.guo@linaro.org>
-References: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
- <1335023840-1394-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAJOA=zPU+-eQTGbXY15Gr==VzNB1JOLkocW4MD+fQBPe77sbdw@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 23 Apr 2012 16:09:49 -0700
+Subject: [PATCH] ARM: msm: Fix gic irqdomain support
+In-Reply-To: <CACxGe6sPkW8WviMX=oJEj+-G7XMeaWaQYfe_hg2quB-Sh2gEDA@mail.gmail.com>
+References: <1335221222-30879-1-git-send-email-davidb@codeaurora.org>
+ <CACxGe6sPkW8WviMX=oJEj+-G7XMeaWaQYfe_hg2quB-Sh2gEDA@mail.gmail.com>
+Message-ID: <20120423230949.GA31173@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2012 at 8:57 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Add imx23 clock support based on common clk framework.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-...
-> +int __init mx23_clocks_init(void)
-> +{
-> + ? ? ? struct clk *clk;
-> + ? ? ? int ret;
-> +
-> + ? ? ? clk_misc_init();
-> +
-> + ? ? ? mxs_clk_fixed("ref_xtal", 24000000);
+On Mon, Apr 23, 2012 at 04:55:11PM -0600, Grant Likely wrote:
+> On Mon, Apr 23, 2012 at 4:47 PM, David Brown <davidb@codeaurora.org> wrote:
+> > As of
+> >
+> > ? ?commit 75294957be1dee7d22dd7d90bd31334ba410e836
+> > ? ?Author: Grant Likely <grant.likely@secretlab.ca>
+> > ? ?Date: ? Tue Feb 14 14:06:57 2012 -0700
+> >
+> > ? ? ? ?irq_domain: Remove 'new' irq_domain in favour of the ppc one
+> >
+> > the ARM gic controller uses proper irq domains. ?Fix the MSM gic
+> > initialization and DT so that it works again.
+> >
+> > Signed-off-by: David Brown <davidb@codeaurora.org>
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> 
+> This should go via the arm-soc tree I think
 
-There is no error checking at all?
+I was planning on going that route.
 
-> diff --git a/drivers/clk/mxs/clk.h b/drivers/clk/mxs/clk.h
-> index deb5c23..fb5937d 100644
-> --- a/drivers/clk/mxs/clk.h
-> +++ b/drivers/clk/mxs/clk.h
-> @@ -12,6 +12,8 @@
-> ?#ifndef __MXS_CLK_H
-> ?#define __MXS_CLK_H
->
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> ?#include <linux/clk-provider.h>
-> ?#include <linux/err.h>
-> ?#include <linux/io.h>
-> @@ -72,4 +74,22 @@ static inline int mxs_clk_wait(void __iomem *reg, u8 shift)
-> ? ? ? ?return 0;
-> ?}
->
-> +static inline int mxs_clk_init_on(char **clks_init_on, int num)
-> +{
-> + ? ? ? struct clk *clk;
-> + ? ? ? int i;
-> +
-> + ? ? ? for (i = 0; i < num; i++) {
-> + ? ? ? ? ? ? ? clk = clk_get_sys(clks_init_on[i], NULL);
-> + ? ? ? ? ? ? ? if (IS_ERR(clk)) {
-> + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: failed to get clk %s", __func__,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clks_init_on[i]);
-> + ? ? ? ? ? ? ? ? ? ? ? return PTR_ERR(clk);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? clk_prepare_enable(clk);
-> + ? ? ? }
-> +
-> + ? ? ? return 0;
-> +}
+Thanks
 
-Any good reason for this code to live in the header as static inline?
-
-Do you call this code any time other than at boot?  Why not __init?
-
-Thanks,
-Mike
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
