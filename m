@@ -1,144 +1,138 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Tue, 24 Apr 2012 00:24:26 +0530
-Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
-In-Reply-To: <13629551.hP3ZV1ajDo@vclass>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
- <13629551.hP3ZV1ajDo@vclass>
-Message-ID: <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Apr 2012 13:01:47 -0600
+Subject: [PATCH 1/2] pinctrl: add pinctrl-mxs support
+In-Reply-To: <20120423144623.GU26306@S2101-09.ap.freescale.net>
+References: <1334823125-24159-1-git-send-email-shawn.guo@linaro.org>
+ <20120421164713.GA3408@das-ThinkPad-X61>
+ <20120422163255.GD26306@S2101-09.ap.freescale.net>
+ <20120423074702.GD24843@shlinux2.ap.freescale.net>
+ <20120423144623.GU26306@S2101-09.ap.freescale.net>
+Message-ID: <4F95A71B.6090808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2012 at 7:33 PM, Janusz Krzysztofik
-<jkrzyszt@tis.icnet.pl> wrote:
-> On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
->> With register offsets now defined for respective OMAP versions we can get rid
->> of cpu_class_* checks. This function now has common initialization code for
->> all OMAP versions...
->>
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->> Signed-off-by: Charulatha V <charu@ti.com>
->> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> Sorry for being so late with my comment for chanes already present in
-> mainline, but this patch breaks GPIO on Amstrad Delta at least, and I
-> have neither enough spare time nor enough experience with non OMAP1
-> machines to provide a solution myself.
-Yes, I looked at the omap_gpio_mod_init() and OMAP1 configurations are
-overwritten.
-Also looks like there is issue in making distinction between omap15xx
-and omap16xx.
-I will post a patch and you can help me testing it in OMAP1 platform.
-Thanks for pointing this out.
---
-Tarun
->
->> ---
->> ?arch/arm/mach-omap1/gpio16xx.c | ? 35 +++++++++++++++++-
->> ?drivers/gpio/gpio-omap.c ? ? ? | ? 77 ++++++++++++----------------------------
->> ?2 files changed, 57 insertions(+), 55 deletions(-)
-> ...
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index f39d9e4..a948351 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
-> ...
->> @@ -898,62 +896,30 @@ static void __init omap_gpio_show_rev(struct gpio_bank *bank)
->> ? */
->> ?static struct lock_class_key gpio_lock_class;
->>
->> -/* TODO: Cleanup cpu_is_* checks */
->> ?static void omap_gpio_mod_init(struct gpio_bank *bank)
->> ?{
->> - ? ? if (cpu_class_is_omap2()) {
->> - ? ? ? ? ? ? if (cpu_is_omap44xx()) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0xffffffff, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_IRQSTATUSCLR0);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0x00000000, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_GPIO_DEBOUNCENABLE);
->> - ? ? ? ? ? ? ? ? ? ? /* Initialize interface clk ungated, module enabled */
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
->> - ? ? ? ? ? ? } else if (cpu_is_omap34xx()) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0x00000000, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_IRQENABLE1);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0xffffffff, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_IRQSTATUS1);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0x00000000, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_DEBOUNCE_EN);
->> -
->> - ? ? ? ? ? ? ? ? ? ? /* Initialize interface clk ungated, module enabled */
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
->> - ? ? ? ? ? ? }
->> - ? ? } else if (cpu_class_is_omap1()) {
->> - ? ? ? ? ? ? if (bank_is_mpuio(bank)) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writew(0xffff, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MPUIO_GPIO_MASKIT / bank->stride);
->> - ? ? ? ? ? ? ? ? ? ? mpuio_init(bank);
->> - ? ? ? ? ? ? }
->> - ? ? ? ? ? ? if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writew(0xffff, bank->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP1510_GPIO_INT_MASK);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writew(0x0000, bank->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP1510_GPIO_INT_STATUS);
->> - ? ? ? ? ? ? }
->> - ? ? ? ? ? ? if (cpu_is_omap16xx() && bank->method == METHOD_GPIO_1610) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writew(0x0000, bank->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP1610_GPIO_IRQENABLE1);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writew(0xffff, bank->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP1610_GPIO_IRQSTATUS1);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writew(0x0014, bank->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP1610_GPIO_SYSCONFIG);
->> + ? ? void __iomem *base = bank->base;
->> + ? ? u32 l = 0xffffffff;
->>
->> - ? ? ? ? ? ? ? ? ? ? /*
->> - ? ? ? ? ? ? ? ? ? ? ?* Enable system clock for GPIO module.
->> - ? ? ? ? ? ? ? ? ? ? ?* The CAM_CLK_CTRL *is* really the right place.
->> - ? ? ? ? ? ? ? ? ? ? ?*/
->> - ? ? ? ? ? ? ? ? ? ? omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ULPD_CAM_CLK_CTRL);
->> - ? ? ? ? ? ? }
->> - ? ? ? ? ? ? if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0xffffffff, bank->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP7XX_GPIO_INT_MASK);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0x00000000, bank->base
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP7XX_GPIO_INT_STATUS);
->> - ? ? ? ? ? ? }
->> + ? ? if (bank->width == 16)
->> + ? ? ? ? ? ? l = 0xffff;
->> +
->> + ? ? if (bank_is_mpuio(bank)) {
->> + ? ? ? ? ? ? __raw_writel(l, bank->base + bank->regs->irqenable);
->> + ? ? ? ? ? ? return;
->> ? ? ? }
->> +
->> + ? ? _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->irqenable_inv);
->> + ? ? _gpio_rmw(base, bank->regs->irqstatus, l,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->regs->irqenable_inv == false);
->> + ? ? _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->debounce_en != 0);
->> + ? ? _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->ctrl != 0);
->
-> bank->regs->irqenable trgister is manipulated 3 times in a row, each
-> time based on different criteria. This breaks GPIO on Amstrad Delta at
-> least, and generally looks wrong. I was only able to verify that
-> commenting out the above two lines fixes the issue with Amstrad Delta for
-> me.
->
->> + ? ? if (bank->regs->debounce_en)
->> + ? ? ? ? ? ? _gpio_rmw(base, bank->regs->debounce_en, 0, 1);
->
-> This also looks suspicious, I guess the second line should rather be:
->
-> ? ? ? ? ? ? ? ?_gpio_rmw(base, bank->regs->debounce, 0, 1);
->
->> +
->> + ? ? ?/* Initialize interface clk ungated, module enabled */
->> + ? ? if (bank->regs->ctrl)
->> + ? ? ? ? ? ? _gpio_rmw(base, bank->regs->ctrl, 0, 1);
->
-> Is bank->regs->ctrl a flag, or a register offset? If the latter, is that
-> offset guaranteed to never take a valid value of 0?
->
-> Thanks,
-> Janusz
+On 04/23/2012 08:46 AM, Shawn Guo wrote:
+...
+> Pin based SoC does not necessarily means the same pin configuration data
+> needs to be repeated pointlessly.
+> 
+> Let's look at a vivid example.  The following is the pin group of 24bit
+> display function with the binding I propose here.
+> 
+> 	lcdif_pins_a: lcdif-24bit at 0 {
+> 		reg = <0>;
+> 		fsl,pinmux-ids = <
+> 			0x1000 0x1010 0x1020 0x1030
+> 			0x1040 0x1050 0x1060 0x1070
+> 			0x1080 0x1090 0x10a0 0x10b0
+> 			0x10c0 0x10d0 0x10e0 0x10f0
+> 			0x1100 0x1110 0x1120 0x1130
+> 			0x1140 0x1150 0x1160 0x1170
+> 			0x1181 0x1191 0x11a1 0x11b1>;
+> 		fsl,drive-strength = <0>;
+> 		fsl,voltage = <1>;
+> 		fsl,pull-up = <0>;
+> 	};
+> 
+> With the binding you suggest, we will turn above one into the following.
+> 
+> 	lcdif_pins_a: lcdif-24bit at 0 {
+> 		reg = <0>;
+> 		fsl,pinmux-ids = <0x1000 4
+> 				  0x1010 4
+> 				  0x1020 4
+> 				  0x1030 4
+> 				  0x1040 4
+> 				  0x1050 4
+> 				  0x1060 4
+> 				  0x1070 4
+> 				  0x1080 4
+> 				  0x1090 4
+> 				  0x10a0 4
+> 				  0x10b0 4
+> 				  0x10c0 4
+> 				  0x10d0 4
+> 				  0x10e0 4
+> 				  0x10f0 4
+> 				  0x1100 4
+> 				  0x1110 4
+> 				  0x1120 4
+> 				  0x1130 4
+> 				  0x1140 4
+> 				  0x1150 4
+> 				  0x1160 4
+> 				  0x1170 4
+> 				  0x1181 4
+> 				  0x1191 4
+> 				  0x11a1 4
+> 				  0x11b1 4>;
+> 	};
+> 
+> Supposing magic number <4> stands for the pin configuration of 4 mA
+> drive-strength + 3.3V voltage + internal pull-up disabled, how users
+> could understand this magic number?  And what's the point to repeat
+> this magic number for 28 times?  I really do not have too much to say
+> if you still think it makes more sense than the first one.
+
+I can't really comment on what Dong was suggesting, but. The Tegra
+bindings have a 2-level binding - a top-level node per state, and then
+an arbitrary number of nodes that configuration something (mux, or
+config, or both) for an arbitrary set of pins. That allows you to
+represent any possible set of mux/config variations with no duplication
+of those mux/config values, e.g.:
+
+                state_i2cmux_ddc: pinmux_i2cmux_ddc {
+                        ddc {
+                                nvidia,pins = "ddc";
+                                nvidia,function = "i2c2";
+                        };
+                        pta {
+                                nvidia,pins = "pta";
+                                nvidia,function = "rsvd4";
+                        };
+                        conf {
+                                nvidia,pins = "ddc", "pta";
+                                nvidia,pull = <1>;
+                        };
+                };
+
+This is very flexible and about as minimal as you can get from a
+repetitiveness point-of-view.
+
+However, I guess it doesn't play too well into your desire to create the
+group and function definitions from device tree. That's part of the
+reason I don't like doing that; the SW desire to do that imposes
+artificial restrictions on the rest of the binding.
+
+> I think I have a understanding on "function" defined by pinctrl
+> subsystem.  To me, mmc0-4bit and mmc0-8bit are two functions.
+> Linus, help clarify a little bit?
+
+I suppose there may be disagreement on this, but to me, a function is a
+specific mux option (the HW register value typically) that can be
+selected for a particular pin. Typically, these mux options would
+correspond directly to the HW module whose signals were being muxed onto
+that pin.
+
+So for example, Tegra might have the following mux options for some pin:
+
+SDHCI 1     # controller 1
+SDHCI 2     # controller 2
+
+but would not have these:
+
+SDHCI 1 4 bit    # controller 1
+SDHCI 1 8 bit    # controller 1
+SDHCI 2 4 bit    # controller 2
+SDHCI 2 8 bit    # controller 2
+
+the difference between 4 bit and 8 bit would be purely driven by which
+pins/groups the two controllers were mux'd onto. (Unless the pin
+controller HW needed explicit notification of the difference for some
+reason - certainly not the case for Tegra)
+
+Of course, this is all without virtual functions. If you're doing
+virtual functions, the second set of functions I listed above, with 4
+entries, might well be what you'd end up with. But I dislike that since
+you're not representing the pure HW capabilities as functions, but
+rather some higher level grouped concept.
