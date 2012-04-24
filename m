@@ -1,41 +1,44 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 16:12:07 +0530
-Subject: [PATCH V2 17/22] watchdog/mpcore_wdt: use correct clk_rate to
- program timeout
-In-Reply-To: <4d69b903be5a62ee88aa1017d5dcbf94bbe0dc8e.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
- <4d69b903be5a62ee88aa1017d5dcbf94bbe0dc8e.1331524811.git.viresh.kumar@st.com>
-Message-ID: <4F96837F.8030702@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Apr 2012 11:50:45 +0100
+Subject: [PATCH 3/8] dmaengine: split out virtual channel DMA support
+ from sa11x0 driver
+In-Reply-To: <4F9681F1.2090408@nvidia.com>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRr2-0004bC-8a@rmk-PC.arm.linux.org.uk> <4F9681F1.2090408@nvidia.com>
+Message-ID: <20120424105045.GD25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/12/2012 9:52 AM, Viresh KUMAR wrote:
-> Currently, mpcore wdt driver doesn't use exact clk_rate to program timeout in
-> hardware. This patch provides two ways of doing so:
-> 	- either use clk_get_rate() if clk_get passes
-> 	- use clk_rate passed via module param
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+On Tue, Apr 24, 2012 at 04:05:29PM +0530, Laxman Dewangan wrote:
+> On Wednesday 18 April 2012 03:41 PM, Russell King wrote:
+>> +/**
+>> + * vchan_cookie_complete - report completion of a descriptor
+>> + * vd: virtual descriptor to update
+>> + *
+>> + * vc.lock must be held by caller
+>> + */
+>> +static inline void vchan_cookie_complete(struct virt_dma_desc *vd)
+>> +{
+>> +       struct virt_dma_chan *vc = to_virt_chan(vd->tx.chan);
+>> +
+>> +       dma_cookie_complete(&vd->tx);
+>> +       dev_vdbg(vc->chan.device->dev, "txd %p[%x]: marked complete\n",
+>> +               vd, vd->tx.cookie);
+>> +       list_add_tail(&vd->node,&vc->desc_completed);
+>> +
+>> +       tasklet_schedule(&vc->task);
+>> +}
+>
+> For cyclic case, we will not like to call the  dma_cookie_complete() but  
+> want to put the desc in callback list.
+> So can we have one more arg on this function which byspass the call of  
+> dma_cookie_complete()
 
-Wim,
+See the discussion on what's supposed to happen with cyclic transfers.
+Cyclic transfers don't complete, so adding them to the completed list
+and marking them complete is the wrong thing to be doing.  So arguably
+calling this function is also the wrong thing to be doing because
+you're not completing the transfer.
 
-Will these go in v3.5?
-
-Please squash following with this patch while applying.
-
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 3690af3..e7cadc0 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -370,7 +370,7 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
-                        TIMER_MARGIN);
-        }
- 
--       mpcore_wdt_set_heartbeat(NULL, mpcore_margin);
-+       mpcore_wdt_set_heartbeat(&wdt->wdd, mpcore_margin);
-        dev_info(wdt->dev, "MPcore Watchdog Timer: 0.1. mpcore_noboot=%d "
-                        "mpcore_margin=%d sec (nowayout= %d)\n", mpcore_noboot,
-                        mpcore_margin, nowayout);
-
--- 
-viresh
+I'll be addressing the issue of cyclic transfers when I eventually get
+to sorting out the OMAP ASoC driver.
