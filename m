@@ -1,26 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 11:06:00 +0200
-Subject: [PATCH V2 06/10] pinctrl: Add SPEAr13xx pinctrl drivers
-In-Reply-To: <9b018eacc822876b78e1cd8186b15ccddd6dd85f.1335010373.git.viresh.kumar@st.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 24 Apr 2012 14:34:32 +0530
+Subject: [PATCH V2 05/10] pinctrl: SPEAr: Create macro for declaring GPIO
+ PINS
+In-Reply-To: <CACRpkdYz=DVhEtqK9d_v47U+S0jbM6wwAUOa7DFHJZjGsxwD9Q@mail.gmail.com>
 References: <cover.1335010373.git.viresh.kumar@st.com>
  <4a3362a884d1dfa8cdef65a10c97c43be4c17ff6.1335010373.git.viresh.kumar@st.com>
- <9b018eacc822876b78e1cd8186b15ccddd6dd85f.1335010373.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdbMr5GNDaA-0orWQPfvfdV4-ADWXMMT4E0n7m0m2Et-tQ@mail.gmail.com>
+ <a4af95f52c6dcef03d3026d336c765b807c4d42c.1335010373.git.viresh.kumar@st.com>
+ <CACRpkdYz=DVhEtqK9d_v47U+S0jbM6wwAUOa7DFHJZjGsxwD9Q@mail.gmail.com>
+Message-ID: <4F966CA0.60804@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2012 at 2:23 PM, Viresh Kumar <viresh.linux@gmail.com> wrote:
+On 4/24/2012 2:34 PM, Linus Walleij wrote:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> This adds pinctrl driver for SPEAr13xx family. SPEAr13xx family supports two
-> machines: SPEAr1310 and SPEAr1340.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+Thanks.
 
-Reviewed before so:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> You'll take this through the ARM SoC tree, right?
 
-It goes through ARM SoC I guess?
+Yes.
 
-Thanks,
-Linus Walleij
+-- 
+viresh
