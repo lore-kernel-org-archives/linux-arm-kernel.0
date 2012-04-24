@@ -1,70 +1,123 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Apr 2012 09:07:40 -0700
-Subject: [PATCH v3 1/2] ARM: OMAP2+: omap_hwmod: Add api to
- enable/disable module level wakeup events
-In-Reply-To: <1335276552-24340-2-git-send-email-govindraj.raja@ti.com>
-References: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
- <1335276552-24340-2-git-send-email-govindraj.raja@ti.com>
-Message-ID: <20120424160740.GJ3739@atomide.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 24 Apr 2012 18:13:04 +0200
+Subject: [PATCH 08/11] MXS: Add imx-otg driver
+In-Reply-To: <20120424145030.GX3852@pengutronix.de>
+References: <1335099567-21056-1-git-send-email-marex@denx.de>
+ <1335237523-9053-1-git-send-email-marex@denx.de>
+ <1335237523-9053-9-git-send-email-marex@denx.de>
+ <20374.48430.613673.968143@ipc1.ka-ro>
+ <20120424145030.GX3852@pengutronix.de>
+Message-ID: <20374.53520.690267.206408@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Govindraj.R <govindraj.raja@ti.com> [120424 07:12]:
-> From: "Govindraj.R" <govindraj.raja@ti.com>
-> 
-> On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
-> PM_WKEN1_CORE/PM_WKEN_PER regs.
-> 
-> Add api to control the module level wakeup mechanism from info provided from
-> hwmod data.
-> 
-> omap_hwmod_enable/disable_wakeup is used from serial.c which should
-> configure PM_WKEN register to enable or disable the module level wakeup.
-> 
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod.c   |   22 ++++++++++++++++++++++
->  arch/arm/mach-omap2/prm2xxx_3xxx.c |   16 ++++++++++++++++
->  arch/arm/mach-omap2/prm2xxx_3xxx.h |    9 +++++++++
->  3 files changed, 47 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 2c27fdb..4f10619 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -382,6 +382,26 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
->  }
->  
->  /**
-> + * _enable_module_level_wakeup - enable/disable module level wakeup on hwmod.
-> + * @oh: struct omap_hwmod *
-> + * @set_wake: bool value indicating to set (true) or clear (false) module level
-> + *		wakeup enable
-> + *
-> + * Set or clear the  module level wakeup capability the
-> + * hwmod @oh. This function configures th PM_WKEN reg bits if they
-> + * are available from hwmod. No return value
-> + */
-> +static void _enable_module_level_wakeup(struct omap_hwmod *oh, bool set_wake)
-> +{
-> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-> +		omap2_prm_enable_prcm_module_wakeup(
-> +				oh->prcm.omap2.module_offs,
-> +				oh->prcm.omap2.prcm_reg_id,
-> +				oh->prcm.omap2.idlest_idle_bit,
-> +				set_wake);
-> +}
+Hi,
 
-Please don't sprinkle cpu_is_omap tests into code that gets called multiple times.
-Initialize things properly during init instead.
+Sascha Hauer writes:
+> On Tue, Apr 24, 2012 at 04:48:14PM +0200, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Marek Vasut writes:
+> > > This driver handles claiming of clocks and memory areas. These are later
+> > > properly delegated to it's child devices, the USB Host (ehci-mxs) and
+> > > USB Gadget (ci13xxx-mxs).
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Chen Peter-B29397 <B29397@freescale.com>
+> > > Cc: Detlev Zundel <dzu@denx.de>
+> > > Cc: Fabio Estevam <festevam@gmail.com>
+> > > Cc: Li Frank-B20596 <B20596@freescale.com>
+> > > Cc: Lin Tony-B19295 <B19295@freescale.com>
+> > > Cc: Linux USB <linux-usb@vger.kernel.org>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Shawn Guo <shawn.guo@freescale.com>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Stefano Babic <sbabic@denx.de>
+> > > Cc: Subodh Nijsure <snijsure@grid-net.com>
+> > > Cc: Tony Lin <tony.lin@freescale.com>
+> > > Cc: Wolfgang Denk <wd@denx.de>
+> > > ---
+> > >  drivers/usb/otg/Kconfig   |    6 +
+> > >  drivers/usb/otg/Makefile  |    1 +
+> > >  drivers/usb/otg/imx-otg.c |  473 +++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 480 insertions(+)
+> > >  create mode 100644 drivers/usb/otg/imx-otg.c
+> > > 
+> > > diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
+> > > index 5c87db0..e7c6325 100644
+> > > --- a/drivers/usb/otg/Kconfig
+> > > +++ b/drivers/usb/otg/Kconfig
+> > > @@ -116,6 +116,12 @@ config FSL_USB2_OTG
+> > >  	help
+> > >  	  Enable this to support Freescale USB OTG transceiver.
+> > >  
+> > > +config USB_IMX_COMPOSITE
+> > > +	bool
+> > > +	help
+> > > +	  Composite driver that handles clock and memory mapping for
+> > > +	  i.MX USB host and USB PHY.
+> > > +
+> > >  config USB_MV_OTG
+> > >  	tristate "Marvell USB OTG support"
+> > >  	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
+> > > diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
+> > > index 41aa509..7d2c631 100644
+> > > --- a/drivers/usb/otg/Makefile
+> > > +++ b/drivers/usb/otg/Makefile
+> > > @@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
+> > >  obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
+> > >  fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
+> > >  obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
+> > > +obj-$(CONFIG_USB_IMX_COMPOSITE)	+= imx-otg.o
+> > >  obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
+> > > diff --git a/drivers/usb/otg/imx-otg.c b/drivers/usb/otg/imx-otg.c
+> > > new file mode 100644
+> > > index 0000000..8440d909
+> > > --- /dev/null
+> > > +++ b/drivers/usb/otg/imx-otg.c
+> > > @@ -0,0 +1,473 @@
+> > > +/*
+> > > + * drivers/usb/otg/imx-otg.c
+> > > + *
+> > > + * Freescale i.MX USB composite driver.
+> > > + *
+> > > + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> > > + * on behalf of DENX Software Engineering GmbH
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License as published by
+> > > + * the Free Software Foundation; either version 2 of the License, or
+> > > + * (at your option) any later version.
+> > > + *
+> > > + * This program is distributed in the hope that it will be useful,
+> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > + * GNU General Public License for more details.
+> > > + *
+> > > + * You should have received a copy of the GNU General Public License
+> > > + * along with this program; if not, write to the Free Software
+> > > + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> > > + */
+> > > +
+> > Why do you call this driver imx-otg when it is actually MXS specific?
+> > How would you call a corresponding driver for the remaining i.MX
+> > processors?
+> 
+> This is the driver for the all i.MX processors.
+> 
+If it is for all i.MX processors, it shouldn't access MXS specific
+registers, like:
++		writel(wakeup, x->io_priv + HW_USBPHY_CTRL_SET);
 
-Regards,
 
-Tony
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
