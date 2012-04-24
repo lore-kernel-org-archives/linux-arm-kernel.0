@@ -1,38 +1,72 @@
-From: ylmao@marvell.com (Yilu Mao)
-Date: Tue, 24 Apr 2012 10:41:20 +0800
-Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that l2x0
- is enabled before init
-Message-ID: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 24 Apr 2012 05:18:34 +0200
+Subject: [PATCH 02/11] MXS: Add USB EHCI and USB PHY clock handling
+In-Reply-To: <1335237523-9053-1-git-send-email-marex@denx.de>
+References: <1335099567-21056-1-git-send-email-marex@denx.de>
+ <1335237523-9053-1-git-send-email-marex@denx.de>
+Message-ID: <1335237523-9053-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
-register will not be saved in l2x0_saved_regs. Therefore we can not use
-l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
-by saving aux ctrl in l2x0_saved_regs just after it's being read from
-the register.
+Based on code by:
+Tony Lin <tony.lin@freescale.com>
 
-Signed-off-by: Yilu Mao <ylmao@marvell.com>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Chen Peter-B29397 <B29397@freescale.com>
+Cc: Detlev Zundel <dzu@denx.de>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Li Frank-B20596 <B20596@freescale.com>
+Cc: Lin Tony-B19295 <B19295@freescale.com>
+Cc: Linux USB <linux-usb@vger.kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Subodh Nijsure <snijsure@grid-net.com>
+Cc: Tony Lin <tony.lin@freescale.com>
+Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mm/cache-l2x0.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/clock-mx28.c |   21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a53fd2a..3034b06 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -320,6 +320,12 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
- 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 43116ba..8784a72 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -577,6 +577,21 @@ static struct clk usb1_clk = {
+ 	.parent = &pll1_clk,
+ };
  
-+	/* In case l2x controller is enabled, the aux ctrl register
-+	 * can't be set. So the original value should be stored in
-+	 * the l2x0_saved_regs for restoring when resume.
-+	 */
-+	l2x0_saved_regs.aux_ctrl = aux;
++static struct clk usb_phy_clk0 = {
++	.parent = &pll0_clk,
++	.enable = _raw_clk_disable,
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL0CTRL0,
++	.enable_shift = 18,
++};
 +
- 	aux &= aux_mask;
- 	aux |= aux_val;
- 
++static struct clk usb_phy_clk1 = {
++	.parent = &pll1_clk,
++	.enable = _raw_clk_disable,
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
++	.enable_shift = 18,
++};
+ #define _DEFINE_CLOCK(name, er, es, p)					\
+ 	static struct clk name = {					\
+ 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
+@@ -636,8 +651,10 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxs-mmc.3", NULL, ssp3_clk)
+ 	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
+ 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+-	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+-	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
++	_REGISTER_CLOCK("imx-otg.0", "usb", usb0_clk)
++	_REGISTER_CLOCK("imx-otg.1", "usb", usb1_clk)
++	_REGISTER_CLOCK("mxs-usb-phy.0", "phy", usb_phy_clk0)
++	_REGISTER_CLOCK("mxs-usb-phy.1", "phy", usb_phy_clk1)
+ 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
 -- 
-1.7.5.4
+1.7.10
