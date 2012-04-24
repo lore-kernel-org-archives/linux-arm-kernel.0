@@ -1,34 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 11:02:23 +0200
-Subject: [PATCH v2 1/3] pinctrl: pinctrl-imx: add imx pinctrl core driver
-In-Reply-To: <1334933916-12971-1-git-send-email-b29396@freescale.com>
-References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
-Message-ID: <CACRpkdah8Mr2riXGJXZ2VEYXdORyLznPYG0s-O05vYiGYjQcdw@mail.gmail.com>
+Date: Tue, 24 Apr 2012 11:04:44 +0200
+Subject: [PATCH V2 05/10] pinctrl: SPEAr: Create macro for declaring GPIO
+ PINS
+In-Reply-To: <a4af95f52c6dcef03d3026d336c765b807c4d42c.1335010373.git.viresh.kumar@st.com>
+References: <cover.1335010373.git.viresh.kumar@st.com>
+ <4a3362a884d1dfa8cdef65a10c97c43be4c17ff6.1335010373.git.viresh.kumar@st.com>
+ <a4af95f52c6dcef03d3026d336c765b807c4d42c.1335010373.git.viresh.kumar@st.com>
+Message-ID: <CACRpkdYz=DVhEtqK9d_v47U+S0jbM6wwAUOa7DFHJZjGsxwD9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 4:58 PM, Dong Aisheng <b29396@freescale.com> wrote:
+On Sat, Apr 21, 2012 at 2:23 PM, Viresh Kumar <viresh.linux@gmail.com> wrote:
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+> Same GPIO pins declarations would be required for other SoCs and that will be a
+> lot of lines of code. Its better to create common macros for it.
 >
-> The driver has mux and config support while the gpio is still
-> not supported.
-> For select input setting, the driver will handle it internally
-> and do not need user to take care of it.
->
-> The pinctrl-imx core driver will parse the dts file and dynamically
-> create the pinmux functions and groups.
->
-> Each IMX SoC pinctrl driver should register pins with a pin register map
-> including mux register and config register and select input map to core
-> for proper operations.
->
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-I'm pretty happy with this driver and would love to merge it.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-However it'd be nice to have someone else ACK it first.
-Someone like Sascha or Shawn would work fine :D
+You'll take this through the ARM SoC tree, right?
 
-Yours,
+Thanks,
 Linus Walleij
