@@ -1,112 +1,91 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Apr 2012 21:02:15 +0100
-Subject: [RFC PATCH 00/11 V5] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <1335237523-9053-1-git-send-email-marex@denx.de>
-References: <1335099567-21056-1-git-send-email-marex@denx.de>
- <1335237523-9053-1-git-send-email-marex@denx.de>
-Message-ID: <20120424200215.GD3628@n2100.arm.linux.org.uk>
+Date: Tue, 24 Apr 2012 21:18:02 +0100
+Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation
+ of clk code
+In-Reply-To: <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
+References: <cover.1335266056.git.viresh.kumar@st.com>
+ <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
+ <20120424120019.GE24089@lunn.ch>
+ <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
+Message-ID: <20120424201802.GE3628@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do you really need 138 messages (and counting) all threaded together
-across the entire history of this patch set?  Please stop posting new
-copies of your patch set as followups to the previous set.
+On Tue, Apr 24, 2012 at 07:12:10PM +0530, viresh kumar wrote:
+> On 4/24/12, Andrew Lunn <andrew@lunn.ch> wrote:
+> > Sorry, but still wrong.
+> >
+> > The clock is optional. If we can find a clock, turn it on. If not,
+> > keep going....
+> >
+> > You patch causes the missing clock to become a fatal error.
+> >
+> > This sata_mv exists in multiple forms. It can be part of a SoC. It can
+> > also be on a PCI bus. In the PCI form, it is unlikely to have a clk
+> > which can be controlled. When built into a SoC, namely one of the
+> > Orion family, dove, orion5x, mv78xx0 do not have a clock which can be
+> > controlled. However kirkwood does have a clock.
+> >
+> > So, kirkwood will provide a clock and expects that sata_mv will turn
+> > it on. All the other ways of using sata_mv will not provide a clock,
+> > but still expect the driver to be happy.
+> 
+> Hmm. What this code does now is:
+> If HAVE_CLK is selected, then there must be a clock for the device. Otherwise
+> it will always pass.
+> 
+> You want not to return error if a platform does have HAVE_CLK, but doesn't
+> have a clock for sata? That would be simple to fix, but want to confirm if this
+> is actually required.
+> 
+> @Russell: Can we have your view also?
 
-Not only does it rob horizontal space for reading the subjects in the
-index, but also it either buries your patches ages back or brings the
-entire 138 messages to the front of mailboxes, depending on your sort
-preferences.  Either way it makes threaded reading of the mailing list
-really difficult.
+Look, it's very very simple.
 
-Please stop this antisocial behaviour.  Thanks.
+As far as drivers are concerned:
 
-On Tue, Apr 24, 2012 at 05:18:32AM +0200, Marek Vasut wrote:
-> From: Marek Vasut <marek.vasut@gmail.com>
-> 
-> This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
-> generic USB PHY infrastructure. Also added is glue code for CI13xxx driver, to
-> allow device mode. This patchset still does NOT support OTG mode, the
-> device/host mode is selected via platform data.
-> 
-> V2: Introduce stub imx-usb driver that then registers the PHY and EHCI drivers.
-> V3: Add the HCD on demand based on the PHY's state (only add HCD if it's host).
->     Currently, only the HOST mode is supported.
-> V4: * Introduce ci13xxx gadget glue
->     * Reorder patches in a more sensible order
->     * Introduce platform data, containing VBUS GPIO and port mode (device/gadget)
->     * Rename imx-usb to imx-otg
->     * Drop mx28evk usb host patch
->     * Use more devm_ function
->     * Rework the mxs-phy to register the same interrupt as ehci-mxs (and
->       effectivelly kill bogus otg_set_vbus() call from ehci-mxs ; use standard
->       ehci irq handling in ehci-mxs)
-> V5: * Finally move OTG IRQ handling into imx-otg
->     * Move imx_otg_set_{host,peripheral}() into imx-otg
->     * Move imx_otg_work() into imx-otg driver (now it all makes sense, yay!)
-> 
-> Marek Vasut (11):
->   MXS: Make clk_disable return integer
->   MXS: Add USB EHCI and USB PHY clock handling
->   MXS: Fixup i.MX233 USB base address name
->   MXS: Add data shared between imx-otg and EHCI driver
->   MXS: Modify the ci13xxx_udc to avoid adding UDC
->   MXS: Add small registration glue for ci13xxx_udc
->   MXS: Add separate MXS EHCI HCD driver
->   MXS: Add imx-otg driver
->   MXS: Add USB PHY driver
->   MXS: Add platform registration hooks for USB EHCI
->   MXS: Enable USB on M28EVK
-> 
->  arch/arm/mach-mxs/Kconfig                       |    2 +
->  arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
->  arch/arm/mach-mxs/devices-mx28.h                |    5 +
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-usb.c        |   85 ++++
->  arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
->  arch/arm/mach-mxs/include/mach/devices-common.h |   13 +
->  arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
->  arch/arm/mach-mxs/mach-m28evk.c                 |   21 +
->  drivers/usb/gadget/Kconfig                      |   17 +
->  drivers/usb/gadget/Makefile                     |    1 +
->  drivers/usb/gadget/ci13xxx_mxs.c                |   67 ++++
->  drivers/usb/gadget/ci13xxx_udc.c                |   12 +-
->  drivers/usb/gadget/ci13xxx_udc.h                |    1 +
->  drivers/usb/host/Kconfig                        |    7 +
->  drivers/usb/host/ehci-hcd.c                     |    5 +
->  drivers/usb/host/ehci-mxs.c                     |  178 +++++++++
->  drivers/usb/otg/Kconfig                         |   16 +
->  drivers/usb/otg/Makefile                        |    2 +
->  drivers/usb/otg/imx-otg.c                       |  473 +++++++++++++++++++++++
->  drivers/usb/otg/mxs-phy.c                       |  237 ++++++++++++
->  include/linux/usb/mxs-usb.h                     |   95 +++++
->  23 files changed, 1266 insertions(+), 13 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
->  create mode 100644 drivers/usb/gadget/ci13xxx_mxs.c
->  create mode 100644 drivers/usb/host/ehci-mxs.c
->  create mode 100644 drivers/usb/otg/imx-otg.c
->  create mode 100644 drivers/usb/otg/mxs-phy.c
->  create mode 100644 include/linux/usb/mxs-usb.h
-> 
-> Cc: Chen Peter-B29397 <B29397@freescale.com>
-> Cc: Detlev Zundel <dzu@denx.de>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Li Frank-B20596 <B20596@freescale.com>
-> Cc: Lin Tony-B19295 <B19295@freescale.com>
-> Cc: Linux USB <linux-usb@vger.kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Subodh Nijsure <snijsure@grid-net.com>
-> Cc: Tony Lin <tony.lin@freescale.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> 
-> -- 
-> 1.7.10
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+clk_get() returns an opaque cookie which _happens_ to be called 'struct clk'.
+Drivers _must_ _not_ dereference or interpret this cookie in any way, apart
+from the singular case where they use IS_ERR() to determine if clk_get()
+failed, and PTR_ERR() to translate that into an error value.  As far as
+drivers are concerned _everything_ _else_ is a valid cookie and must
+never be treated specially.
+
+That much I hope is (and has been) totally crystal clear for some time.
+
+Now, for drivers which use the clk API, and are used on platforms which
+have the clk API and those which do not have the CLK API.  Those which
+do have the clk API define HAVE_CLK.  We know how to deal with those,
+and that's through having a correct and valid clk API implementation.
+
+For those which don't, as I've already suggested, we need clk_get() to
+return a non-error value.  I really don't care what value it returns,
+because as far as drivers using the clk API are concerned, they are not
+allowed to interpret the value in _any_ _other_ _way_ other than whether
+it is an error or not.  So NULL is a good value for this.  It's a
+non-error cookie value, but (void *)1 is also good too.
+
+Now, the question comes: do we want to provide a dummy API?  Yes.  How
+do we want to enable the provision of the dummy API?  Through !HAVE_CLK?
+I think that's a sane move, and any driver which _really_ _does_ have a
+hard dependency on the clk API (eg, amba-clcd needing the clk API to
+control the LCD pixel clock rate) should depend on this symbol.
+
+As for drivers printing out crap if they don't have the clk API configured,
+wtf?  What does it matter?  If the clk API is not configured, it means
+the platform has no control over the clocking, and the clocking is fixed.
+So why tell the user of each driver which could have clk API support that
+same fact over and over again during the kernel boot process?  What do you
+expect the user to do about it?  Scream at the manufacturer that they
+didn't implement a feature found on embedded devices on their swankey
+platform?  Maybe its not appropriate there?
+
+Finally, if a platform has clk API support enabled, and a driver requests
+a clock, and clk_get() returns an error, it means the clock was not found.
+That's a fatal error for the driver, because it means that something is
+wrong in the lookup tables - moreover, it means that _potentially_ someone
+screwed up the clk matching and this device has a clock which needs some
+control, but wasn't found.  I don't think ignoring that kind of error,
+even by printing a warning, is a particularly good approach - it seems
+to me it makes things fragile.  What if this missing clock causes the
+bus to your device to ultimately hang?
