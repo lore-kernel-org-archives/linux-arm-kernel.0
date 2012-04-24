@@ -1,74 +1,70 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 24 Apr 2012 16:20:44 -0700
-Subject: [PATCH v5 1/3] USB: Add driver for NXP ISP1301 USB transceiver
-In-Reply-To: <1335002264-22225-1-git-send-email-stigge@antcom.de>
-References: <1335002264-22225-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120424232044.GA2657@kroah.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue, 24 Apr 2012 16:25:06 -0700
+Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
+ wake-ups work
+In-Reply-To: <20120424205105.GA26749@animalcreek.com>
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+ <20120424205105.GA26749@animalcreek.com>
+Message-ID: <20120424232506.GA8850@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2012 at 11:57:42AM +0200, Roland Stigge wrote:
-> This very-lowlevel driver registers the NXP ISP1301 chip via the I2C subsystem.
-> The chip is the USB transceiver shared by ohci-nxp, lpc32xx_udc (gadget) and
-> isp1301_omap.
+On Tue, Apr 24, 2012 at 01:51:05PM -0700, Mark A. Greer wrote:
+> On Wed, Apr 11, 2012 at 03:37:47PM -0600, Paul Walmsley wrote:
+> > Hi
 > 
-> Following patches let the respective USB host and gadget drivers use this
-> driver, instead of duplicating ISP1301 handling.
+> Hi Paul, Kevin.
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > On Wed, 11 Apr 2012, Mark A. Greer wrote:
+> > 
+> > > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> > > 
+> > > Currently, the OMAP3 cpuidle driver calls omap3_enter_idle()
+> > > which calls omap_sram_idle().  omap_sram_idle() eventually
+> > > causes a 'wfi' instruction to be executed effectively putting
+> > > the system to sleep.  It is assumed that an I/O wake-up event
+> > > will occur to wake the system up again.  This doesn't work on
+> > > systems that don't support I/O wake-ups (indicated by
+> > > omap3_has_io_wakeup() returning false).
+> > > 
+> > > To handle this, follow the same path in omap3_enter_idle()
+> > > that would be followed if an interrupt were pending.
+> > 
+> > I don't quite understand this patch.  Are you saying that AM3517/3505 
+> > can't wake from WFI?  That would seem odd.
+> > 
+> > There are other sources of wakeup on the system other than I/O wakeup.  
+> > I/O wakeup only applies to wakeups from the I/O pads when the chip is in 
+> > RETENTION or OFF.  And as I understand it, neither of those apply to 
+> > AM3517/3505?
+> > 
+> > Even if I/O wakeups aren't supported, many of the IP blocks on the system 
+> > should be able to cause the ARM to exit WFI by asserting their 
+> > SWAKEUP lines and raising their interrupt lines.
 > 
-> ---
+> I have changed the code to keep everything in the ON state and use
+> cpu_do_idle()--basically a wfi, cpu_v7_do_idle() in this case--and everything
+> works well (except networking, see below) when using an mmc-based rootfs.
 > 
-> Applies to v3.4-rc3
+> The issue is with the emac--it can't wake the system up unless there
+> is an irq from the PHY to a wakeup-enabled GPIO (confirmed by h/w engr).
+> So, when using networking or using an nfs-based rootfs, there are all
+> kinds of timeouts, etc.  Basically, doing a wfi (i.e., pm_idle or cpuidle)
+> and expecting the emac to wake the system back up won't work.
 > 
-> Changes since v4:
-> * Documentation adjustment of device tree "compatible" string:
->   "nxp,lpc32xx-udc" -> "nxp,lpc3220-udc"
-> 
->  Documentation/devicetree/bindings/usb/isp1301.txt |   25 ++++++
->  drivers/usb/Kconfig                               |    2 
->  drivers/usb/Makefile                              |    1 
->  drivers/usb/phy/Kconfig                           |   17 ++++
->  drivers/usb/phy/Makefile                          |    7 +
->  drivers/usb/phy/isp1301.c                         |   79 ++++++++++++++++++++
+> How would you like me to proceed (to avoid the wfi in pm_idle & cpuidle)?
 
-Nice, but:
+Just thinking out loud...
 
->  include/linux/usb/isp1301.h                       |   84 ++++++++++++++++++++++
+We could chose whether pm_idle & cpuidle issue a wfi based on
+whether there is a davinci-emac present.  The issue with that is
+that someday there may be another SoC that has a davinci-emac that
+can wake up the system.  I know cpu_is_xxx() is frowned upon but
+this does seem like a proper usage of it--the deciding factor
+really is whether its an am35x or not (and CONFIG_TI_DAVINCI_EMAC
+is enabled).
 
-Why this file?  You have a lot of register stuff in here that should be
-in the .c file, right?  Only put what other files need in this .h file,
-which shouldn't be much at all from what I can tell.
-
-> +#define DRV_VERSION		"0.1.0"
-
-Is that really needed?
-
-> +struct i2c_client *isp1301_get_client(struct device_node *node)
-> +{
-> +	if (node) { /* reference of ISP1301 I2C node via DT */
-> +		struct device *dev = bus_find_device(&i2c_bus_type, NULL,
-> +						     node, match);
-> +		if (!dev)
-> +			return NULL;
-> +		return to_i2c_client(dev);
-> +	} else { /* non-DT: only one ISP1301 chip supported */
-> +		return isp1301_i2c_client;
-> +	}
-> +}
-> +EXPORT_SYMBOL(isp1301_get_client);
-
-EXPORT_SYMBOL_GPL()?
-
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-Are you really willing to keep track of where the FSF keeps it's office
-for the next 40 years?  Just delete this paragraph please, it's not
-needed at all.
-
-thanks,
-
-greg k-h
+Mark
+--
