@@ -1,30 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 09:54:47 +0200
-Subject: [PATCH 09/15] ARM: ux500: Correctly describe SMSC9115 for
- Snowball in DT
-In-Reply-To: <1334867804-31942-10-git-send-email-lee.jones@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Apr 2012 08:55:54 +0100
+Subject: [PATCH 03/15] ARM: ux500: Use correct format for dynamic IRQ
+ assignment
+In-Reply-To: <CACRpkdZM2m_T5T-96wrXKG=oru8sh9PS9O+z20eEvc97566uzQ@mail.gmail.com>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <1334867804-31942-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkda7HJ-58gPxiZARvybsV1PByLHF0hZ2yzVQ4iFR7pwy_A@mail.gmail.com>
+ <1334867804-31942-4-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZM2m_T5T-96wrXKG=oru8sh9PS9O+z20eEvc97566uzQ@mail.gmail.com>
+Message-ID: <4F965C8A.3000008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> Here we split the description of the external-bus at 50000000 over
-> two description files. In the more generic db8500 description file
-> we only specify the external-bus. Normally this would be used to
-> communicate with a NOR-flash device. On the Snowball however, the
-> SMSC9115 Ethernet chip occupies it. In the Snowball board specific
-> description file is where we actually specify that it is in fact the
-> Ethernet device which lives here.
+On 23/04/12 14:13, Linus Walleij wrote:
+> On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones<lee.jones@linaro.org>  wrote:
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> This patch applies the correct format requested by the irq
+>> domain. For chained IRQs which use GPIO lines as IRQs, we
+>> stipulate that a two cell request is required. The first cell
+>> contains the requested IRQ and the second can contain flags
+>> pertaining to edge detection and level sensitive values. The
+>> zeroth cell specifies the GPIO controller by use of a phandle.
+>>
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+>> ---
+>>   arch/arm/boot/dts/db8500.dtsi  |   22 ++++++++++++++++++++--
+>>   arch/arm/boot/dts/snowball.dts |   20 +++++++++-----------
+>>   2 files changed, 29 insertions(+), 13 deletions(-)
+>
+> So I created a separate ux500-devicetree branch and split off
+> the changes under arch/arm/boot/dts/* here. For example
+> I have split the patch:
+> "drivers/gpio: gpio-nomadik: Apply Device Tree bindings"
+>
+> Into one changing code and one changing the device tree
+> itself. Else this won't be possible to keep separate topic
+> branches, and we want that.
+>
+> Then applied this on top.
+>
+> I hope you're OK with this?
 
-Can you please squash this into patch 7?
+Yes, of course, thanks.
 
-It seems like I get a bit more development history than I need
-here.
 
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
