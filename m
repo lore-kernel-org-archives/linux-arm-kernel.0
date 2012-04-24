@@ -1,9 +1,10 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 16:51:30 +0530
-Subject: [PATCH V3 08/12] net/c_can: Remove conditional compilation of clk code
+Date: Tue, 24 Apr 2012 16:51:28 +0530
+Subject: [PATCH V3 06/12] ata/pata_arasan: Remove conditional compilation of
+ clk code
 In-Reply-To: <cover.1335266056.git.viresh.kumar@st.com>
 References: <cover.1335266056.git.viresh.kumar@st.com>
-Message-ID: <6f170bf4741a02c2dfeca73ad261fdf599abec37.1335266056.git.viresh.kumar@st.com>
+Message-ID: <240f710aa4a9802fd35c8fe40c84585eeea78bdb.1335266056.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,60 +13,82 @@ there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
 macros.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Bhupesh Sharma <bhupesh.sharma@st.com>
+Cc: Jeff Garzik <jgarzik@redhat.com>
+Cc: linux-ide at vger.kernel.org
 ---
- drivers/net/can/c_can/c_can_platform.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+ drivers/ata/pata_arasan_cf.c |   14 +-------------
+ 1 files changed, 1 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
-index 5e1a5ff..7ec9316 100644
---- a/drivers/net/can/c_can/c_can_platform.c
-+++ b/drivers/net/can/c_can/c_can_platform.c
-@@ -73,7 +73,6 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
- 	struct c_can_priv *priv;
- 	struct resource *mem;
- 	int irq;
+diff --git a/drivers/ata/pata_arasan_cf.c b/drivers/ata/pata_arasan_cf.c
+index fc2db2a..09f0729 100644
+--- a/drivers/ata/pata_arasan_cf.c
++++ b/drivers/ata/pata_arasan_cf.c
+@@ -184,10 +184,8 @@
+ struct arasan_cf_dev {
+ 	/* pointer to ata_host structure */
+ 	struct ata_host *host;
+-	/* clk structure, only if HAVE_CLK is defined */
 -#ifdef CONFIG_HAVE_CLK
++	/* clk structure */
  	struct clk *clk;
+-#endif
  
- 	/* get the appropriate clk */
-@@ -83,7 +82,6 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
- 		ret = -ENODEV;
- 		goto exit;
+ 	/* physical base address of controller */
+ 	dma_addr_t pbase;
+@@ -312,13 +310,11 @@ static int cf_init(struct arasan_cf_dev *acdev)
+ 	unsigned long flags;
+ 	int ret = 0;
+ 
+-#ifdef CONFIG_HAVE_CLK
+ 	ret = clk_enable(acdev->clk);
+ 	if (ret) {
+ 		dev_dbg(acdev->host->dev, "clock enable failed");
+ 		return ret;
  	}
 -#endif
  
- 	/* get the platform data */
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -118,10 +116,8 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
- 
- 	dev->irq = irq;
- 	priv->regs = addr;
+ 	spin_lock_irqsave(&acdev->host->lock, flags);
+ 	/* configure CF interface clock */
+@@ -344,9 +340,7 @@ static void cf_exit(struct arasan_cf_dev *acdev)
+ 	writel(readl(acdev->vbase + OP_MODE) & ~CFHOST_ENB,
+ 			acdev->vbase + OP_MODE);
+ 	spin_unlock_irqrestore(&acdev->host->lock, flags);
 -#ifdef CONFIG_HAVE_CLK
- 	priv->can.clock.freq = clk_get_rate(clk);
- 	priv->priv = clk;
+ 	clk_disable(acdev->clk);
+-#endif
+ }
+ 
+ static void dma_callback(void *dev)
+@@ -828,13 +822,11 @@ static int __devinit arasan_cf_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-#ifdef CONFIG_HAVE_CLK
+ 	acdev->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(acdev->clk)) {
+ 		dev_warn(&pdev->dev, "Clock not found\n");
+ 		return PTR_ERR(acdev->clk);
+ 	}
 -#endif
  
- 	switch (mem->flags & IORESOURCE_MEM_TYPE_MASK) {
- 	case IORESOURCE_MEM_32BIT:
-@@ -157,10 +153,8 @@ exit_iounmap:
- exit_release_mem:
- 	release_mem_region(mem->start, resource_size(mem));
- exit_free_clk:
--#ifdef CONFIG_HAVE_CLK
- 	clk_put(clk);
- exit:
--#endif
- 	dev_err(&pdev->dev, "probe failed\n");
+ 	/* allocate host */
+ 	host = ata_host_alloc(&pdev->dev, 1);
+@@ -899,9 +891,7 @@ static int __devinit arasan_cf_probe(struct platform_device *pdev)
+ 			&arasan_cf_sht);
  
+ free_clk:
+-#ifdef CONFIG_HAVE_CLK
+ 	clk_put(acdev->clk);
+-#endif
  	return ret;
-@@ -181,9 +175,7 @@ static int __devexit c_can_plat_remove(struct platform_device *pdev)
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(mem->start, resource_size(mem));
+ }
  
+@@ -912,9 +902,7 @@ static int __devexit arasan_cf_remove(struct platform_device *pdev)
+ 
+ 	ata_host_detach(host);
+ 	cf_exit(acdev);
 -#ifdef CONFIG_HAVE_CLK
- 	clk_put(priv->priv);
+ 	clk_put(acdev->clk);
 -#endif
  
  	return 0;
