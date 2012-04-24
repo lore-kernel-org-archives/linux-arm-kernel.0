@@ -1,217 +1,101 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Apr 2012 09:51:48 -0700
-Subject: [RFC 00/12] OMAP DMA engine conversion
-In-Reply-To: <20120424103858.GC25053@n2100.arm.linux.org.uk>
-References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
- <20120424103858.GC25053@n2100.arm.linux.org.uk>
-Message-ID: <20120424165147.GP3739@atomide.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Tue, 24 Apr 2012 22:32:14 +0530
+Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
+ clk code
+In-Reply-To: <20120424142939.GG24089@lunn.ch>
+References: <cover.1335266056.git.viresh.kumar@st.com>
+ <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
+ <20120424120019.GE24089@lunn.ch>
+ <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
+ <20120424142939.GG24089@lunn.ch>
+Message-ID: <CAOh2x=kOww+K-VrNJU_v6XXANQUGyBtZ-ekoCAEQV5kEdah7jQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120424 03:42]:
-> Here's another patch - for the OMAP NAND driver.
-> 
-> One thing this doesn't do is configure up the source/destination bursts,
-> which the old code did:
-> 
->                         omap_set_dma_dest_burst_mode(info->dma_ch,
->                                         OMAP_DMA_DATA_BURST_16);
->                         omap_set_dma_src_burst_mode(info->dma_ch,
->                                         OMAP_DMA_DATA_BURST_16);
+On 4/24/12, Andrew Lunn <andrew@lunn.ch> wrote:
+>    This is wrong. Not having the clk is not fatal. The old code would
+>    carefully not call clk_enable(), since it has an error pointer, not
+>    have a valid clk, and would also not call clk_disable during
+>    removal.
 
-Grazvydas, care to give this patch a go?
- 
-> In dma-engine speak, I'm using "burst" for the number of elements to
-> transfer for each frame, with frame sync in place (in other words, the
-> number of transfers to occur for every assertion of the DMA request.)
-> That's how burst is defined on other DMA hardware, so I'm not entirely
-> sure at the moment how critical (or what) the above bursts are doing,
-> whether they're configuring the memory side of the transfer or not.
-> I'll take a deeper look into that this evening, but in the mean time,
-> what's below should be a direct conversion.
+Whatever i wrote was intentional, because i didn't had this expectation
+of yours. :(
+Please see if following is fine:
 
-For omaps it enables multiple access.
- 
-> MTD does have this weirdness that it uses vmalloc regions and passes
-> addresses in vmalloc regions into drivers - I've left that hack in but
-> it is _highly_ undefined whether the DMA activity would be visible via
-> the vmalloc mapping as things currently stand.  (You're probably going
-> to be okay with non-aliasing VIPT caches, but VIVT and aliasing VIPT
-> caches are potential random data corruption candidates.)  That's a
-> short-coming across many MTD drivers, one which needs sorting out across
-> the board.
-> 
->  drivers/mtd/nand/omap2.c |   93 +++++++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 92 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index c2b0bba..bd4ed08 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -9,6 +9,7 @@
->   */
->  
->  #include <linux/platform_device.h>
-> +#include <linux/dmaengine.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/delay.h>
->  #include <linux/module.h>
-> @@ -119,6 +120,7 @@ struct omap_nand_info {
->  	int				gpmc_cs;
->  	unsigned long			phys_base;
->  	struct completion		comp;
-> +	struct dma_chan			*dma;
->  	int				dma_ch;
->  	int				gpmc_irq;
->  	enum {
-> @@ -336,6 +338,10 @@ static void omap_nand_dma_cb(int lch, u16 ch_status, void *data)
->  {
->  	complete((struct completion *) data);
->  }
-> +static void omap_nand_dma_callback(void *data)
-> +{
-> +	complete((struct completion *) data);
-> +}
->  
->  /*
->   * omap_nand_dma_transfer: configer and start dma transfer
-> @@ -373,6 +379,56 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
->  		addr = page_address(p1) + ((size_t)addr & ~PAGE_MASK);
->  	}
->  
-> +	if (info->dma) {
-> +		struct dma_async_tx_descriptor *tx;
-> +		struct scatterlist sg;
-> +		unsigned n;
-> +
-> +		sg_init_one(&sg, addr, len);
-> +		n = dma_map_sg(info->dma->device->dev, &sg, 1, dir);
-> +		if (n == 0) {
-> +			dev_err(&info->pdev->dev,
-> +				"Couldn't DMA map a %d byte buffer\n", len);
-> +			goto out_copy;
-> +		}
-> +
-> +		tx = dmaengine_prep_slave_sg(info->dma, &sg, n,
-> +			is_write ? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM,
-> +			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +		if (!tx) {
-> +			dma_unmap_sg(info->dma->device->dev, &sg, 1, dir);
-> +			goto out_copy;
-> +		}
-> +		tx->callback = omap_nand_dma_callback;
-> +		tx->callback_param = &info->comp;
-> +		dmaengine_submit(tx);
-> +
-> +		/*  configure and start prefetch transfer */
-> +		ret = gpmc_prefetch_enable(info->gpmc_cs,
-> +			PREFETCH_FIFOTHRESHOLD_MAX, 0x1, len, is_write);
-> +		if (ret) {
-> +			/* PFPW engine is busy, use cpu copy method */
-> +			dma_unmap_sg(info->dma->device->dev, &sg, 1, dir);
-> +			goto out_copy;
-> +		}
-> +
-> +		init_completion(&info->comp);
-> +		dma_async_issue_pending(info->dma);
-> +
-> +		/* setup and start DMA using dma_addr */
-> +		wait_for_completion(&info->comp);
-> +		tim = 0;
-> +		limit = (loops_per_jiffy * msecs_to_jiffies(OMAP_NAND_TIMEOUT_MS));
-> +		while (gpmc_read_status(GPMC_PREFETCH_COUNT) && (tim++ < limit))
-> +			cpu_relax();
-> +
-> +		/* disable and stop the PFPW engine */
-> +		gpmc_prefetch_reset(info->gpmc_cs);
-> +
-> +		dma_unmap_sg(info->dma->device->dev, &sg, 1, dir);
-> +		return 0;
-> +	}
-> +
->  	dma_addr = dma_map_single(&info->pdev->dev, addr, len, dir);
->  	if (dma_mapping_error(&info->pdev->dev, dma_addr)) {
->  		dev_err(&info->pdev->dev,
-> @@ -405,7 +461,6 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
->  		goto out_copy;
->  
->  	init_completion(&info->comp);
-> -
->  	omap_start_dma(info->dma_ch);
->  
->  	/* setup and start DMA using dma_addr */
-> @@ -925,12 +980,16 @@ static int omap_dev_ready(struct mtd_info *mtd)
->  	return 1;
->  }
->  
-> +extern bool omap_dma_filter_fn(struct dma_chan *chan, void *param);
-> +
->  static int __devinit omap_nand_probe(struct platform_device *pdev)
->  {
->  	struct omap_nand_info		*info;
->  	struct omap_nand_platform_data	*pdata;
->  	int				err;
->  	int				i, offset;
-> +	dma_cap_mask_t mask;
-> +	unsigned sig;
->  
->  	pdata = pdev->dev.platform_data;
->  	if (pdata == NULL) {
-> @@ -1011,6 +1070,33 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
->  		break;
->  
->  	case NAND_OMAP_PREFETCH_DMA:
-> +		dma_cap_zero(mask);
-> +		dma_cap_set(DMA_SLAVE, mask);
-> +		sig = OMAP24XX_DMA_GPMC;
-> +		info->dma = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> +		if (!info->dma) {
-> +			dev_warn(&pdev->dev, "DMA engine request failed\n");
-> +		} else {
-> +			struct dma_slave_config cfg;
-> +			int rc;
-> +
-> +			memset(&cfg, 0, sizeof(cfg));
-> +			cfg.src_addr = info->phys_base;
-> +			cfg.dst_addr = info->phys_base;
-> +			cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +			cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +			cfg.src_maxburst = 16;
-> +			cfg.dst_maxburst = 16;
-> +			rc = dmaengine_slave_config(info->dma, &cfg);
-> +			if (rc) {
-> +				dev_err(&pdev->dev, "DMA engine slave config failed: %d\n",
-> +					rc);
-> +				goto out_release_mem_region;
-> +			}
-> +			info->nand.read_buf   = omap_read_buf_dma_pref;
-> +			info->nand.write_buf  = omap_write_buf_dma_pref;
-> +			break;
-> +		}
->  		err = omap_request_dma(OMAP24XX_DMA_GPMC, "NAND",
->  				omap_nand_dma_cb, &info->comp, &info->dma_ch);
->  		if (err < 0) {
-> @@ -1110,6 +1196,8 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
->  	return 0;
->  
->  out_release_mem_region:
-> +	if (info->dma)
-> +		dma_release_channel(info->dma);
->  	release_mem_region(info->phys_base, NAND_IO_SIZE);
->  out_free_info:
->  	kfree(info);
-> @@ -1127,6 +1215,9 @@ static int omap_nand_remove(struct platform_device *pdev)
->  	if (info->dma_ch != -1)
->  		omap_free_dma(info->dma_ch);
->  
-> +	if (info->dma)
-> +		dma_release_channel(info->dma);
-> +
->  	if (info->gpmc_irq)
->  		free_irq(info->gpmc_irq, info);
->  
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+From: Viresh Kumar <viresh.kumar@st.com>
+Date: Sat, 21 Apr 2012 11:16:53 +0530
+Subject: [PATCH V3 Resend] ata/sata_mv: Remove conditional compilation
+of clk code
+
+With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
+there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
+macros.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Cc: Jeff Garzik <jgarzik@redhat.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: linux-ide at vger.kernel.org
+---
+ drivers/ata/sata_mv.c |   10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index 7336d4a..37503b8 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -551,9 +551,7 @@ struct mv_host_priv {
+ 	u32			irq_mask_offset;
+ 	u32			unmask_all_irqs;
+
+-#if defined(CONFIG_HAVE_CLK)
+ 	struct clk		*clk;
+-#endif
+ 	/*
+ 	 * These consistent DMA memory pools give us guaranteed
+ 	 * alignment for hardware-accessed data structures,
+@@ -4063,13 +4061,11 @@ static int mv_platform_probe(struct
+platform_device *pdev)
+ 				   resource_size(res));
+ 	hpriv->base -= SATAHC0_REG_BASE;
+
+-#if defined(CONFIG_HAVE_CLK)
+ 	hpriv->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(hpriv->clk))
+ 		dev_notice(&pdev->dev, "cannot get clkdev\n");
+ 	else
+ 		clk_enable(hpriv->clk);
+-#endif
+
+ 	/*
+ 	 * (Re-)program MBUS remapping windows if we are asked to.
+@@ -4096,12 +4092,10 @@ static int mv_platform_probe(struct
+platform_device *pdev)
+ 		return 0;
+
+ err:
+-#if defined(CONFIG_HAVE_CLK)
+ 	if (!IS_ERR(hpriv->clk)) {
+ 		clk_disable(hpriv->clk);
+ 		clk_put(hpriv->clk);
+ 	}
+-#endif
+
+ 	return rc;
+ }
+@@ -4117,17 +4111,13 @@ err:
+ static int __devexit mv_platform_remove(struct platform_device *pdev)
+ {
+ 	struct ata_host *host = platform_get_drvdata(pdev);
+-#if defined(CONFIG_HAVE_CLK)
+ 	struct mv_host_priv *hpriv = host->private_data;
+-#endif
+ 	ata_host_detach(host);
+
+-#if defined(CONFIG_HAVE_CLK)
+ 	if (!IS_ERR(hpriv->clk)) {
+ 		clk_disable(hpriv->clk);
+ 		clk_put(hpriv->clk);
+ 	}
+-#endif
+ 	return 0;
+ }
