@@ -1,79 +1,22 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 24 Apr 2012 05:18:32 +0200
-Subject: [RFC PATCH 00/11 V5] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <1335099567-21056-1-git-send-email-marex@denx.de>
+Date: Tue, 24 Apr 2012 05:18:39 +0200
+Subject: [PATCH 07/11] MXS: Add separate MXS EHCI HCD driver
+In-Reply-To: <1335237523-9053-1-git-send-email-marex@denx.de>
 References: <1335099567-21056-1-git-send-email-marex@denx.de>
-Message-ID: <1335237523-9053-1-git-send-email-marex@denx.de>
+ <1335237523-9053-1-git-send-email-marex@denx.de>
+Message-ID: <1335237523-9053-8-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Vasut <marek.vasut@gmail.com>
+This driver will handle i.MX233/i.MX28 and I hope soon i.MX6Q. I tried to keep
+this separate from the MXC EHCI to avoid further polution of the MXC EHCI,
+though eventually these two might be merged.
 
-This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
-generic USB PHY infrastructure. Also added is glue code for CI13xxx driver, to
-allow device mode. This patchset still does NOT support OTG mode, the
-device/host mode is selected via platform data.
+NOTE: I still haven't figured out how to enable/disable the disconnection
+detector, it can't be enabled all the time, so I toggle PHY stuff from this
+driver, which I doubt is correct.
 
-V2: Introduce stub imx-usb driver that then registers the PHY and EHCI drivers.
-V3: Add the HCD on demand based on the PHY's state (only add HCD if it's host).
-    Currently, only the HOST mode is supported.
-V4: * Introduce ci13xxx gadget glue
-    * Reorder patches in a more sensible order
-    * Introduce platform data, containing VBUS GPIO and port mode (device/gadget)
-    * Rename imx-usb to imx-otg
-    * Drop mx28evk usb host patch
-    * Use more devm_ function
-    * Rework the mxs-phy to register the same interrupt as ehci-mxs (and
-      effectivelly kill bogus otg_set_vbus() call from ehci-mxs ; use standard
-      ehci irq handling in ehci-mxs)
-V5: * Finally move OTG IRQ handling into imx-otg
-    * Move imx_otg_set_{host,peripheral}() into imx-otg
-    * Move imx_otg_work() into imx-otg driver (now it all makes sense, yay!)
-
-Marek Vasut (11):
-  MXS: Make clk_disable return integer
-  MXS: Add USB EHCI and USB PHY clock handling
-  MXS: Fixup i.MX233 USB base address name
-  MXS: Add data shared between imx-otg and EHCI driver
-  MXS: Modify the ci13xxx_udc to avoid adding UDC
-  MXS: Add small registration glue for ci13xxx_udc
-  MXS: Add separate MXS EHCI HCD driver
-  MXS: Add imx-otg driver
-  MXS: Add USB PHY driver
-  MXS: Add platform registration hooks for USB EHCI
-  MXS: Enable USB on M28EVK
-
- arch/arm/mach-mxs/Kconfig                       |    2 +
- arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
- arch/arm/mach-mxs/devices-mx28.h                |    5 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-usb.c        |   85 ++++
- arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
- arch/arm/mach-mxs/include/mach/devices-common.h |   13 +
- arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
- arch/arm/mach-mxs/mach-m28evk.c                 |   21 +
- drivers/usb/gadget/Kconfig                      |   17 +
- drivers/usb/gadget/Makefile                     |    1 +
- drivers/usb/gadget/ci13xxx_mxs.c                |   67 ++++
- drivers/usb/gadget/ci13xxx_udc.c                |   12 +-
- drivers/usb/gadget/ci13xxx_udc.h                |    1 +
- drivers/usb/host/Kconfig                        |    7 +
- drivers/usb/host/ehci-hcd.c                     |    5 +
- drivers/usb/host/ehci-mxs.c                     |  178 +++++++++
- drivers/usb/otg/Kconfig                         |   16 +
- drivers/usb/otg/Makefile                        |    2 +
- drivers/usb/otg/imx-otg.c                       |  473 +++++++++++++++++++++++
- drivers/usb/otg/mxs-phy.c                       |  237 ++++++++++++
- include/linux/usb/mxs-usb.h                     |   95 +++++
- 23 files changed, 1266 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
- create mode 100644 drivers/usb/gadget/ci13xxx_mxs.c
- create mode 100644 drivers/usb/host/ehci-mxs.c
- create mode 100644 drivers/usb/otg/imx-otg.c
- create mode 100644 drivers/usb/otg/mxs-phy.c
- create mode 100644 include/linux/usb/mxs-usb.h
-
+Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
 Cc: Detlev Zundel <dzu@denx.de>
 Cc: Fabio Estevam <festevam@gmail.com>
@@ -87,6 +30,230 @@ Cc: Stefano Babic <sbabic@denx.de>
 Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
+---
+ drivers/usb/host/Kconfig    |    7 ++
+ drivers/usb/host/ehci-hcd.c |    5 ++
+ drivers/usb/host/ehci-mxs.c |  178 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 190 insertions(+)
+ create mode 100644 drivers/usb/host/ehci-mxs.c
 
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index f788eb8..85ed593 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -148,6 +148,13 @@ config USB_EHCI_MXC
+ 	---help---
+ 	  Variation of ARC USB block used in some Freescale chips.
+ 
++config USB_EHCI_MXS
++	bool "Support for Freescale i.MX28 on-chip EHCI USB controller"
++	depends on USB_EHCI_HCD && ARCH_MXS
++	select USB_EHCI_ROOT_HUB_TT
++	---help---
++	  Enable USB support for i.MX28.
++
+ config USB_EHCI_HCD_OMAP
+ 	bool "EHCI support for OMAP3 and later chips"
+ 	depends on USB_EHCI_HCD && ARCH_OMAP
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 4a3bc5b..16e161c 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1268,6 +1268,11 @@ MODULE_LICENSE ("GPL");
+ #define PLATFORM_DRIVER		ehci_mxc_driver
+ #endif
+ 
++#ifdef CONFIG_USB_EHCI_MXS
++#include "ehci-mxs.c"
++#define PLATFORM_DRIVER		ehci_mxs_driver
++#endif
++
+ #ifdef CONFIG_USB_EHCI_SH
+ #include "ehci-sh.c"
+ #define PLATFORM_DRIVER		ehci_hcd_sh_driver
+diff --git a/drivers/usb/host/ehci-mxs.c b/drivers/usb/host/ehci-mxs.c
+new file mode 100644
+index 0000000..4a696b4
+--- /dev/null
++++ b/drivers/usb/host/ehci-mxs.c
+@@ -0,0 +1,178 @@
++/*
++ * Freescale i.MX28 EHCI driver
++ *
++ * Copyright (c) 2012 Marek Vasut <marex@denx.de>
++ * on behalf of DENX Software Engineering GmbH
++ *
++ * Based on MXC EHCI driver:
++ *
++ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ * Copyright (c) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
++#include <linux/slab.h>
++#include <linux/usb/mxs-usb.h>
++
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++#include <mach/mx28.h>
++
++#include <asm/mach-types.h>
++
++/* Called during probe() after chip reset completes */
++static int ehci_mxs_setup(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++
++	hcd->has_tt = 1;
++	ehci_setup(hcd);
++	ehci_port_power(ehci, 0);
++
++	return 0;
++}
++
++static const struct hc_driver ehci_mxs_hc_driver = {
++	.description	= hcd_name,
++	.product_desc	= "Freescale i.MX On-Chip EHCI Host Controller",
++	.hcd_priv_size	= sizeof(struct ehci_hcd),
++
++	/*
++	 * Generic hardware linkage
++	 */
++	.irq		= ehci_irq,
++	.flags		= HCD_USB2 | HCD_MEMORY,
++
++	/*
++	 * Basic lifecycle operations
++	 */
++	.reset		= ehci_mxs_setup,
++	.start		= ehci_run,
++	.stop		= ehci_stop,
++	.shutdown	= ehci_shutdown,
++
++	/*
++	 * managing i/o requests and associated device resources
++	 */
++	.urb_enqueue		= ehci_urb_enqueue,
++	.urb_dequeue		= ehci_urb_dequeue,
++	.endpoint_disable	= ehci_endpoint_disable,
++	.endpoint_reset		= ehci_endpoint_reset,
++
++	/*
++	 * scheduling support
++	 */
++	.get_frame_number	= ehci_get_frame,
++
++	/*
++	 * root hub support
++	 */
++	.hub_status_data	= ehci_hub_status_data,
++	.hub_control		= ehci_hub_control,
++	.bus_suspend		= ehci_bus_suspend,
++	.bus_resume		= ehci_bus_resume,
++	.relinquish_port	= ehci_relinquish_port,
++	.port_handed_over	= ehci_port_handed_over,
++
++	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
++};
++
++static int ehci_mxs_drv_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct imx_otg *data = pdev->dev.platform_data;
++	struct usb_hcd *hcd;
++	struct ehci_hcd *ehci;
++	struct usb_phy *phy;
++	int ret;
++
++	dev_info(dev, "Initializing i.MX USB Controller\n");
++
++	if (!data) {
++		dev_err(dev, "USB Host platform data missing!\n");
++		return -ENODEV;
++	}
++
++	/* This should never fail. */
++	phy = usb_get_transceiver();
++	if (!phy) {
++		dev_err(&pdev->dev, "Unable to find transceiver.\n");
++		return -ENODEV;
++	}
++
++	/* Create HCD controller instance. */
++	hcd = usb_create_hcd(&ehci_mxs_hc_driver, dev, dev_name(dev));
++	if (!hcd) {
++		dev_err(dev, "Failed to create HCD instance!\n");
++		return -ENOMEM;
++	}
++
++	hcd->rsrc_start = data->mem_res->start;
++	hcd->rsrc_len = resource_size(data->mem_res);
++	hcd->regs = data->mem;
++	hcd->irq = data->irq;
++
++	/* Wait for the controller to stabilize. */
++	mdelay(10);
++
++	ehci = hcd_to_ehci(hcd);
++
++	/* EHCI registers start at offset 0x100 */
++	ehci->caps = hcd->regs + 0x100;
++	ehci->regs = hcd->regs + 0x100 +
++		HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
++
++	platform_set_drvdata(pdev, hcd);
++
++	/* Connect this host to the PHY. */
++	ret = otg_set_host(phy->otg, &hcd->self);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Unable to set transceiver host\n");
++		usb_put_hcd(hcd);
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++static int __exit ehci_mxs_drv_remove(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct usb_phy *phy = usb_get_transceiver();
++
++	if (phy)
++		usb_phy_shutdown(phy);
++
++	usb_remove_hcd(hcd);
++	usb_put_hcd(hcd);
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++static struct platform_driver ehci_mxs_driver = {
++	.probe		= ehci_mxs_drv_probe,
++	.remove		= __exit_p(ehci_mxs_drv_remove),
++	.driver		= {
++		   .name	= "mxs-ehci",
++	},
++};
++
++MODULE_ALIAS("platform:mxs-ehci");
 -- 
 1.7.10
