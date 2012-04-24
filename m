@@ -1,243 +1,207 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 12:20:33 +0530
-Subject: [PATCH V3 5/8] SPEAr: clk: Add Fractional Synthesizer clock
+Date: Tue, 24 Apr 2012 12:20:30 +0530
+Subject: [PATCH V3 2/8] clk: add a fixed factor clock
 In-Reply-To: <cover.1335249846.git.viresh.kumar@st.com>
 References: <cover.1335249846.git.viresh.kumar@st.com>
-Message-ID: <0362a8aa32b249be3139b74c688e0a79e0548061.1335249846.git.viresh.kumar@st.com>
+Message-ID: <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All SPEAr SoC's contain Fractional Synthesizers. Their Fout is derived from
-following equations:
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Fout = Fin / (2 * div) (division factor)
-div is 17 bits:-
-     0-13 (fractional part)
-     14-16 (integer part)
-     div is (16-14 bits).(13-0 bits) (in binary)
+Having fixed factors/dividers in hardware is a common pattern, so
+add a basic clock type doing this. It basically describes a fixed
+factor clock using a nominator and a denominator.
 
-     Fout = Fin/(2 * div)
-     Fout = ((Fin / 10000)/(2 * div)) * 10000
-     Fout = (2^14 * (Fin / 10000)/(2^14 * (2 * div))) * 10000
-     Fout = (((Fin / 10000) << 14)/(2 * (div << 14))) * 10000
-
-div << 14 is simply 17 bit value written at register.
-
-This patch adds in support for this type of clock.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/clk/spear/Makefile         |    2 +-
- drivers/clk/spear/clk-frac-synth.c |  156 ++++++++++++++++++++++++++++++++++++
- drivers/clk/spear/clk.h            |   16 ++++
- 3 files changed, 173 insertions(+), 1 deletions(-)
- create mode 100644 drivers/clk/spear/clk-frac-synth.c
+Sascha,
 
-diff --git a/drivers/clk/spear/Makefile b/drivers/clk/spear/Makefile
-index e36d8c6..1827036 100644
---- a/drivers/clk/spear/Makefile
-+++ b/drivers/clk/spear/Makefile
-@@ -2,4 +2,4 @@
- # SPEAr Clock specific Makefile
- #
+I have this patch in my set, because i need this to get SPEAr stuff pushed by
+Mike. I have updated your original patch, with all the review comments you got
+on it. Please check see if i have corrupted something.
+
+ drivers/clk/Makefile           |    2 +-
+ drivers/clk/clk-fixed-factor.c |   94 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-private.h    |   20 ++++++++
+ include/linux/clk-provider.h   |   23 ++++++++++
+ 4 files changed, 138 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/clk/clk-fixed-factor.c
+
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 1f736bc..24aa714 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -1,4 +1,4 @@
  
--obj-y	+= clk.o clk-aux-synth.o clk-vco-pll.o
-+obj-y	+= clk.o clk-aux-synth.o clk-frac-synth.o clk-vco-pll.o
-diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+-				   clk-mux.o clk-divider.o
++				   clk-mux.o clk-divider.o clk-fixed-factor.o
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
 new file mode 100644
-index 0000000..c6ccdab
+index 0000000..7453efe
 --- /dev/null
-+++ b/drivers/clk/spear/clk-frac-synth.c
-@@ -0,0 +1,156 @@
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -0,0 +1,94 @@
 +/*
-+ * Copyright (C) 2012 ST Microelectronics
-+ * Viresh Kumar <viresh.kumar@st.com>
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
 + *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * Fractional Synthesizer clock implementation
++ * Standard functionality for the common clock API.
 + */
-+
-+#define pr_fmt(fmt) "clk-frac-synth: " fmt
-+
++#include <linux/module.h>
 +#include <linux/clk-provider.h>
 +#include <linux/slab.h>
-+#include <linux/io.h>
 +#include <linux/err.h>
-+#include "clk.h"
-+
-+#define DIV_FACTOR_MASK		0x1FFFF
 +
 +/*
-+ * DOC: Fractional Synthesizer clock
++ * DOC: basic fixed multiplier and divider clock that cannot gate
 + *
-+ * Fout from synthesizer can be given from below equation:
-+ *
-+ * Fout= Fin/2*div (division factor)
-+ * div is 17 bits:-
-+ *	0-13 (fractional part)
-+ *	14-16 (integer part)
-+ *	div is (16-14 bits).(13-0 bits) (in binary)
-+ *
-+ *	Fout = Fin/(2 * div)
-+ *	Fout = ((Fin / 10000)/(2 * div)) * 10000
-+ *	Fout = (2^14 * (Fin / 10000)/(2^14 * (2 * div))) * 10000
-+ *	Fout = (((Fin / 10000) << 14)/(2 * (div << 14))) * 10000
-+ *
-+ * div << 14 simply 17 bit value written@register.
-+ * Max error due to scaling down by 10000 is 10 KHz
++ * Traits of this clock:
++ * prepare - clk_prepare only ensures that parents are prepared
++ * enable - clk_enable only ensures that parents are enabled
++ * rate - rate is fixed.  clk->rate = parent->rate / div * mult
++ * parent - fixed parent.  No clk_set_parent support
 + */
 +
-+#define to_clk_frac(_hw) container_of(_hw, struct clk_frac, hw)
++#define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
 +
-+static unsigned long frac_calc_rate(struct clk_hw *hw, unsigned long prate,
-+		int index)
-+{
-+	struct clk_frac *frac = to_clk_frac(hw);
-+	struct frac_rate_tbl *rtbl = frac->rtbl;
-+
-+	prate /= 10000;
-+	prate <<= 14;
-+	prate /= (2 * rtbl[index].div);
-+	prate *= 10000;
-+
-+	return prate;
-+}
-+
-+static long clk_frac_round_rate(struct clk_hw *hw, unsigned long drate,
-+		unsigned long *prate)
-+{
-+	struct clk_frac *frac = to_clk_frac(hw);
-+	int unused;
-+
-+	return clk_round_rate_index(hw, drate, frac_calc_rate, frac->rtbl_cnt,
-+			&unused);
-+}
-+
-+static unsigned long clk_frac_recalc_rate(struct clk_hw *hw,
++static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
 +		unsigned long parent_rate)
 +{
-+	struct clk_frac *frac = to_clk_frac(hw);
-+	unsigned long flags = 0;
-+	unsigned int div = 1, val;
++	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
 +
-+	if (frac->lock)
-+		spin_lock_irqsave(frac->lock, flags);
-+
-+	val = readl_relaxed(frac->reg);
-+
-+	if (frac->lock)
-+		spin_unlock_irqrestore(frac->lock, flags);
-+
-+	div = val & DIV_FACTOR_MASK;
-+
-+	if (!div)
-+		return 0;
-+
-+	parent_rate = parent_rate / 10000;
-+
-+	parent_rate = (parent_rate << 14) / (2 * div);
-+	return parent_rate * 10000;
++	return (parent_rate / fix->div) * fix->mult;
 +}
 +
-+/* Configures new clock rate of frac */
-+static int clk_frac_set_rate(struct clk_hw *hw, unsigned long drate)
++static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
 +{
-+	struct clk_frac *frac = to_clk_frac(hw);
-+	struct frac_rate_tbl *rtbl = frac->rtbl;
-+	unsigned long flags = 0, val;
-+	int i;
++	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
 +
-+	clk_round_rate_index(hw, drate, frac_calc_rate, frac->rtbl_cnt, &i);
++	if (prate) {
++		unsigned long best_parent;
++		best_parent = (rate / fix->mult) * fix->div;
++		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
++				best_parent);
++		return (*prate / fix->div) * fix->mult;
++	} else {
++		return (__clk_get_rate(__clk_get_parent(hw->clk)) / fix->div) *
++			fix->mult;
++	}
++}
 +
-+	if (frac->lock)
-+		spin_lock_irqsave(frac->lock, flags);
-+
-+	val = readl_relaxed(frac->reg) & ~DIV_FACTOR_MASK;
-+	val |= rtbl[i].div & DIV_FACTOR_MASK;
-+	writel_relaxed(val, frac->reg);
-+
-+	if (frac->lock)
-+		spin_unlock_irqrestore(frac->lock, flags);
-+
++static int clk_factor_set_rate(struct clk_hw *hw, unsigned long rate)
++{
 +	return 0;
 +}
 +
-+struct clk_ops clk_frac_ops = {
-+	.recalc_rate = clk_frac_recalc_rate,
-+	.round_rate = clk_frac_round_rate,
-+	.set_rate = clk_frac_set_rate,
++struct clk_ops clk_fixed_factor_ops = {
++	.round_rate = clk_factor_round_rate,
++	.set_rate = clk_factor_set_rate,
++	.recalc_rate = clk_factor_recalc_rate,
 +};
++EXPORT_SYMBOL_GPL(clk_fixed_factor_ops);
 +
-+struct clk *clk_register_frac(const char *name, const char *parent_name,
-+		unsigned long flags, void __iomem *reg,
-+		struct frac_rate_tbl *rtbl, u8 rtbl_cnt, spinlock_t *lock)
++struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		unsigned int mult, unsigned int div)
 +{
-+	struct clk_frac *frac;
++	struct clk_fixed_factor *fix;
 +	struct clk *clk;
 +
-+	if (!name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
-+		pr_err("Invalid arguments passed");
-+		return ERR_PTR(-EINVAL);
-+	}
++	fix = kmalloc(sizeof(*fix), GFP_KERNEL);
 +
-+	frac = kzalloc(sizeof(*frac), GFP_KERNEL);
-+	if (!frac) {
-+		pr_err("could not allocate frac clk\n");
++	if (!fix) {
++		pr_err("%s: could not allocate fixed factor clk\n", __func__);
 +		return ERR_PTR(-ENOMEM);
 +	}
 +
-+	/* struct clk_frac assignments */
-+	frac->reg = reg;
-+	frac->rtbl = rtbl;
-+	frac->rtbl_cnt = rtbl_cnt;
-+	frac->lock = lock;
++	/* struct clk_fixed_factor assignments */
++	fix->mult = mult;
++	fix->div = div;
 +
-+	clk = clk_register(NULL, name, &clk_frac_ops, &frac->hw, &parent_name,
-+			1, flags);
-+	if (!IS_ERR_OR_NULL(clk))
++	clk = clk_register(dev, name,
++			&clk_fixed_factor_ops, &fix->hw,
++			&parent_name,
++			(parent_name ? 1 : 0),
++			flags);
++
++	if (clk)
 +		return clk;
 +
-+	pr_err("clk register failed\n");
-+	kfree(frac);
++	kfree(fix);
 +
 +	return NULL;
 +}
-diff --git a/drivers/clk/spear/clk.h b/drivers/clk/spear/clk.h
-index ae3dc44..c7dbc84 100644
---- a/drivers/clk/spear/clk.h
-+++ b/drivers/clk/spear/clk.h
-@@ -55,6 +55,19 @@ struct clk_aux {
- 	spinlock_t		*lock;
- };
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index eeae7a3..1e0fa93 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -143,6 +143,26 @@ struct clk {
+ 	DEFINE_CLK(_name, clk_mux_ops, _flags, _parent_names,	\
+ 			_parents);
  
-+/* Fractional Synth clk */
-+struct frac_rate_tbl {
-+	u32 div;
++#define DEFINE_CLK_FIXED_FACTOR(_name, _parent_name,		\
++				_parent_ptr, _flags,		\
++				_mult, _div)			\
++	static struct clk _name;				\
++	static char *_name##_parent_names[] = {			\
++		_parent_name,					\
++	};							\
++	static struct clk *_name##_parents[] = {		\
++		_parent_ptr,					\
++	};							\
++	static struct clk_fixed_factor _name##_hw = {		\
++		.hw = {						\
++			.clk = &_name,				\
++		},						\
++		.mult = _mult,					\
++		.div = _div,					\
++	};							\
++	DEFINE_CLK(_name, clk_fixed_factor_ops, _flags,		\
++			_name##_parent_names, _parents);
++
+ /**
+  * __clk_init - initialize the data structures in a struct clk
+  * @dev:	device initializing this clk, placeholder for now
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 8e85a9d..067b04d 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -260,6 +260,29 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		u8 clk_mux_flags, spinlock_t *lock);
+ 
+ /**
++ * struct clk_fixed_factor - fixed multiplier and divider clock
++ *
++ * @hw:		handle between common and hardware-specific interfaces
++ * @mult:	multiplier
++ * @div:	divider
++ *
++ * Clock with a fixed multiplier and divider. The output frequency is the
++ * parent clock rate divided by div and multiplied by mult.
++ * Implements .recalc_rate, .set_rate and .round_rate
++ */
++
++struct clk_fixed_factor {
++	struct clk_hw	hw;
++	unsigned int	mult;
++	unsigned int	div;
 +};
 +
-+struct clk_frac {
-+	struct			clk_hw hw;
-+	void __iomem		*reg;
-+	struct frac_rate_tbl	*rtbl;
-+	u8			rtbl_cnt;
-+	spinlock_t		*lock;
-+};
++extern struct clk_ops clk_fixed_factor_ops;
++struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		unsigned int mult, unsigned int div);
 +
- /* VCO-PLL clk */
- struct pll_rate_tbl {
- 	u8 mode;
-@@ -87,6 +100,9 @@ struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
- 		const char *parent_name, unsigned long flags, void __iomem *reg,
- 		struct aux_clk_masks *masks, struct aux_rate_tbl *rtbl,
- 		u8 rtbl_cnt, spinlock_t *lock, struct clk **gate_clk);
-+struct clk *clk_register_frac(const char *name, const char *parent_name,
-+		unsigned long flags, void __iomem *reg,
-+		struct frac_rate_tbl *rtbl, u8 rtbl_cnt, spinlock_t *lock);
- struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
- 		const char *vco_gate_name, const char *parent_name,
- 		unsigned long flags, void __iomem *mode_reg, void __iomem
++/**
+  * clk_register - allocate a new clock, register it and return an opaque cookie
+  * @dev: device that is registering this clock
+  * @name: clock name
 -- 
 1.7.9
