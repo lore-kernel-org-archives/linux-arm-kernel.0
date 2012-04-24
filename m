@@ -1,9 +1,9 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 11:26:13 +0530
-Subject: [PATCH V2 5/9] net/c_can: Remove conditional compilation of clk code
+Date: Tue, 24 Apr 2012 11:26:14 +0530
+Subject: [PATCH V2 6/9] net/stmmac: Remove conditional compilation of clk code
 In-Reply-To: <cover.1335246730.git.viresh.kumar@st.com>
 References: <cover.1335246730.git.viresh.kumar@st.com>
-Message-ID: <5be32f42382d05c442ea787473806ab85d598874.1335246730.git.viresh.kumar@st.com>
+Message-ID: <4336df4e231467d253e25bbd41dbce6d189ed1e8.1335246730.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,76 +12,176 @@ there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
 macros.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Cc: David S. Miller <davem@davemloft.net>
-Cc: Bhupesh Sharma <bhupesh.sharma@st.com>
 ---
- drivers/net/can/c_can/c_can_platform.c |   28 +++++++++++-----------------
- 1 files changed, 11 insertions(+), 17 deletions(-)
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h      |   41 ---------------------
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c |   31 ++++++++++------
+ 2 files changed, 19 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
-index 5e1a5ff..d28904d 100644
---- a/drivers/net/can/c_can/c_can_platform.c
-+++ b/drivers/net/can/c_can/c_can_platform.c
-@@ -73,17 +73,12 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
- 	struct c_can_priv *priv;
- 	struct resource *mem;
- 	int irq;
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac.h b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+index db2de9a..7f85895 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac.h
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+@@ -81,9 +81,7 @@ struct stmmac_priv {
+ 	struct stmmac_counters mmc;
+ 	struct dma_features dma_cap;
+ 	int hw_cap_support;
 -#ifdef CONFIG_HAVE_CLK
- 	struct clk *clk;
- 
- 	/* get the appropriate clk */
- 	clk = clk_get(&pdev->dev, NULL);
--	if (IS_ERR(clk)) {
-+	if (IS_ERR(clk))
- 		dev_err(&pdev->dev, "no clock defined\n");
--		ret = -ENODEV;
--		goto exit;
--	}
+ 	struct clk *stmmac_clk;
 -#endif
+ 	int clk_csr;
+ };
  
- 	/* get the platform data */
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -118,10 +113,11 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
- 
- 	dev->irq = irq;
- 	priv->regs = addr;
+@@ -103,42 +101,3 @@ int stmmac_dvr_remove(struct net_device *ndev);
+ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 				     struct plat_stmmacenet_data *plat_dat,
+ 				     void __iomem *addr);
+-
 -#ifdef CONFIG_HAVE_CLK
--	priv->can.clock.freq = clk_get_rate(clk);
--	priv->priv = clk;
--#endif
-+
-+	if (!IS_ERR(clk)) {
-+		priv->can.clock.freq = clk_get_rate(clk);
-+		priv->priv = clk;
-+	}
+-static inline int stmmac_clk_enable(struct stmmac_priv *priv)
+-{
+-	if (!IS_ERR(priv->stmmac_clk))
+-		return clk_enable(priv->stmmac_clk);
+-
+-	return 0;
+-}
+-
+-static inline void stmmac_clk_disable(struct stmmac_priv *priv)
+-{
+-	if (IS_ERR(priv->stmmac_clk))
+-		return;
+-
+-	clk_disable(priv->stmmac_clk);
+-}
+-static inline int stmmac_clk_get(struct stmmac_priv *priv)
+-{
+-	priv->stmmac_clk = clk_get(priv->device, NULL);
+-
+-	if (IS_ERR(priv->stmmac_clk))
+-		return PTR_ERR(priv->stmmac_clk);
+-
+-	return 0;
+-}
+-#else
+-static inline int stmmac_clk_enable(struct stmmac_priv *priv)
+-{
+-	return 0;
+-}
+-static inline void stmmac_clk_disable(struct stmmac_priv *priv)
+-{
+-}
+-static inline int stmmac_clk_get(struct stmmac_priv *priv)
+-{
+-	return 0;
+-}
+-#endif /* CONFIG_HAVE_CLK */
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index 1a4cf81..18ce287 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -28,6 +28,7 @@
+ 	https://bugzilla.stlinux.com/
+ *******************************************************************************/
  
- 	switch (mem->flags & IORESOURCE_MEM_TYPE_MASK) {
- 	case IORESOURCE_MEM_32BIT:
-@@ -157,10 +153,9 @@ exit_iounmap:
- exit_release_mem:
- 	release_mem_region(mem->start, resource_size(mem));
- exit_free_clk:
++#include <linux/clk.h>
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
+ #include <linux/ip.h>
+@@ -165,7 +166,6 @@ static void stmmac_verify_args(void)
+ 
+ static void stmmac_clk_csr_set(struct stmmac_priv *priv)
+ {
 -#ifdef CONFIG_HAVE_CLK
--	clk_put(clk);
--exit:
+ 	u32 clk_rate;
+ 
+ 	if (IS_ERR(priv->stmmac_clk))
+@@ -192,7 +192,6 @@ static void stmmac_clk_csr_set(struct stmmac_priv *priv)
+ 	   * we can not estimate the proper divider as it is not known
+ 	   * the frequency of clk_csr_i. So we do not change the default
+ 	   * divider. */
 -#endif
-+	if (!IS_ERR(clk))
-+		clk_put(clk);
-+
- 	dev_err(&pdev->dev, "probe failed\n");
+ }
+ 
+ #if defined(STMMAC_XMIT_DEBUG) || defined(STMMAC_RX_DEBUG)
+@@ -971,7 +970,8 @@ static int stmmac_open(struct net_device *dev)
+ 	} else
+ 		priv->tm->enable = 1;
+ #endif
+-	stmmac_clk_enable(priv);
++	if (!IS_ERR(priv->stmmac_clk))
++		clk_enable(priv->stmmac_clk);
+ 
+ 	stmmac_check_ether_addr(priv);
+ 
+@@ -1075,7 +1075,8 @@ open_error:
+ 	if (priv->phydev)
+ 		phy_disconnect(priv->phydev);
+ 
+-	stmmac_clk_disable(priv);
++	if (!IS_ERR(priv->stmmac_clk))
++		clk_disable(priv->stmmac_clk);
  
  	return ret;
-@@ -181,9 +176,8 @@ static int __devexit c_can_plat_remove(struct platform_device *pdev)
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(mem->start, resource_size(mem));
- 
--#ifdef CONFIG_HAVE_CLK
--	clk_put(priv->priv);
--#endif
-+	if (!IS_ERR(priv->priv))
-+		clk_put(priv->priv);
+ }
+@@ -1128,7 +1129,9 @@ static int stmmac_release(struct net_device *dev)
+ #ifdef CONFIG_STMMAC_DEBUG_FS
+ 	stmmac_exit_fs();
+ #endif
+-	stmmac_clk_disable(priv);
++
++	if (!IS_ERR(priv->stmmac_clk))
++		clk_disable(priv->stmmac_clk);
  
  	return 0;
  }
+@@ -1925,7 +1928,8 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 		goto error;
+ 	}
+ 
+-	if (stmmac_clk_get(priv))
++	priv->stmmac_clk = clk_get(priv->device, NULL);
++	if (IS_ERR(priv->stmmac_clk))
+ 		pr_warning("%s: warning: cannot get CSR clock\n", __func__);
+ 
+ 	/* If a specific clk_csr value is passed from the platform
+@@ -1934,10 +1938,12 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	 * set the MDC clock dynamically according to the csr actual
+ 	 * clock input.
+ 	 */
+-	if (!priv->plat->clk_csr)
+-		stmmac_clk_csr_set(priv);
+-	else
++	if (!priv->plat->clk_csr) {
++		if (!IS_ERR(priv->stmmac_clk))
++			stmmac_clk_csr_set(priv);
++	} else {
+ 		priv->clk_csr = priv->plat->clk_csr;
++	}
+ 
+ 	/* MDIO bus Registration */
+ 	ret = stmmac_mdio_register(ndev);
+@@ -2020,7 +2026,8 @@ int stmmac_suspend(struct net_device *ndev)
+ 	else {
+ 		stmmac_set_mac(priv->ioaddr, false);
+ 		/* Disable clock in case of PWM is off */
+-		stmmac_clk_disable(priv);
++		if (!IS_ERR(priv->stmmac_clk))
++			clk_disable(priv->stmmac_clk);
+ 	}
+ 	spin_unlock(&priv->lock);
+ 	return 0;
+@@ -2042,9 +2049,9 @@ int stmmac_resume(struct net_device *ndev)
+ 	 * from another devices (e.g. serial console). */
+ 	if (device_may_wakeup(priv->device))
+ 		priv->hw->mac->pmt(priv->ioaddr, 0);
+-	else
++	else if (!IS_ERR(priv->stmmac_clk))
+ 		/* enable the clk prevously disabled */
+-		stmmac_clk_enable(priv);
++			clk_enable(priv->stmmac_clk);
+ 
+ 	netif_device_attach(ndev);
+ 
 -- 
 1.7.9
