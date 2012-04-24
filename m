@@ -1,60 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Apr 2012 08:42:03 +0100
-Subject: [PATCH V2 4/9] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120424072653.GB24089@lunn.ch>
-References: <20120424070426.GA24089@lunn.ch> <4F9650B3.9030406@st.com>
- <20120424072653.GB24089@lunn.ch>
-Message-ID: <20120424074202.GO24211@n2100.arm.linux.org.uk>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Tue, 24 Apr 2012 02:49:16 -0500
+Subject: [PATCH/RFC v2] [SCSI] atp870u: Fix bad use of udelay
+In-Reply-To: <1231536107.3235.50.camel@localhost.localdomain>
+References: <200901092028.n09KSAeI024551@imap1.linux-foundation.org>
+ <20090109205835.GB5069@deprecation.cyrius.com>
+ <20090109130308.bfde281e.akpm@linux-foundation.org>
+ <1231536107.3235.50.camel@localhost.localdomain>
+Message-ID: <20120424074916.GA25261@burratino>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 09:26:53AM +0200, Andrew Lunn wrote:
-> On Tue, Apr 24, 2012 at 12:35:23PM +0530, Viresh Kumar wrote:
-> > On 4/24/2012 12:34 PM, Andrew Lunn wrote:
-> > > I don't think this change is correct. With the old semantics, it was:
-> > 
-> > Sorry. :(
-> > 
-> > > If we have CLK support, we expect there to be a clock for sata_mv, and
-> > > if there is no such clock, output a notice message, something is
-> > > probably wrong, i expected there to be a clock.
-> > > 
-> > > The new semantics are:
-> > > 
-> > > We expect there to be a clock for sata_mv, and if there is no such
-> > > clock, output a notice message, something is probably wrong, i
-> > > expected there to be a clock.
-> > > 
-> > > We are going to see this notice message much more, when it is not
-> > > expected.
-> > 
-> > So, the only problem is this message?
-> > How do you suggest to tackle this now. Have #ifdef,#endif around this print?
-> 
-> Well, adding #ifdef defeats the point of adding dummy implementations.
-> 
-> Maybe, rather than return -ENODEV, return -ENOTSUP.
-> 
-> IS_ERR() still returns true, so in most cases, no code needs
-> changing. However, when you need to differentiate between, "clock does
-> not exists" and "Dummy clock functions being used", you can tell the
-> difference. mv_sata could look like:
-> 
->         hpriv->clk = clk_get(&pdev->dev, NULL);
->         if (IS_ERR(hpriv->clk))
-> 	        if (PTR_ERR(hpriv->clk) == -ENODEV)
-> 		        dev_notice(&pdev->dev, "cannot get clkdev\n");
->         else
->                 clk_prepare_enable(hpriv->clk);
-> 
-> 
-> You would however, need to look at all uses of clk_get and see if any
-> are looked for ENODEV, and not just IS_ERR(), and fix those....
+From: Martin Michlmayr <tbm@cyrius.com>
 
-Why bother?
+The ACARD driver calls udelay() with a value > 2000, which leads to
+to the following compilation error on ARM:
+  ERROR: "__bad_udelay" [drivers/scsi/atp870u.ko] undefined!
+  make[1]: *** [__modpost] Error 1
 
-If you don't have the clk API configured, you have no clocks to control.
-So, why not make clk_get() return NULL, and make the rest of the API
-calls do nothing?  That's what you'll end up codifying in the drivers
-anyway.
+This is because udelay is defined on ARM, roughly speaking, as
+
+	#define udelay(n) ((n) > 2000 ? __bad_udelay() : \
+		__const_udelay((n) * ((2199023U*HZ)>>11)))
+
+The argument to __const_udelay is the number of jiffies to wait
+divided by 4, but this does not work unless the multiplication does
+not overflow, and that is what the build error is designed to prevent.
+The intended behavior can be achieved by using mdelay to call udelay
+multiple times in a loop.
+
+[jn: adding context]
+Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Jonathan Nieder <jrnieder@gmail.com>
+Cc: <stable@vger.kernel.org>
+---
+Hi James,
+
+Three years ago, you wrote[1]:
+>>> * akpm at linux-foundation.org <akpm@linux-foundation.org> [2009-01-09 12:28]:
+
+>>>> The ACARD driver calls udelay() with a value > 2000, which leads to
+>>>> to the following compilation error on ARM:
+>>>>   ERROR: "__bad_udelay" [drivers/scsi/atp870u.ko] undefined!
+>>>>   make[1]: *** [__modpost] Error 1
+>>>> Fix this by using a combination of mdelay and udelay.
+[...]
+> It's wrong to silence a warning or build break while keeping the effect
+> it was complaining about it's hiding a bug.  Now if the warning is
+> wrong, we can take it out of the ARM build ... but I've got to say it
+> looks right: the udelay in this driver will lock a UP system solid for
+> 2ms.
+
+Sorry for the very slow response.  I think the patch was inadequately
+explained and that it is actually a good patch.
+
+Here's the patch again with a description that helped me convince
+myself it is ok.  Could you look it over and let me know what you
+think?
+
+Thanks,
+Jonathan
+
+[1] http://thread.gmane.org/gmane.linux.scsi/47523/focus=47533
+
+ drivers/scsi/atp870u.c |   11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/scsi/atp870u.c b/drivers/scsi/atp870u.c
+index 68ce08552f69..a540162ac59c 100644
+--- a/drivers/scsi/atp870u.c
++++ b/drivers/scsi/atp870u.c
+@@ -1173,7 +1173,16 @@ wait_io1:
+ 	outw(val, tmport);
+ 	outb(2, 0x80);
+ TCM_SYNC:
+-	udelay(0x800);
++	/*
++	 * The funny division into multiple delays is to accomodate
++	 * arches like ARM where udelay() multiplies its argument by
++	 * a large number to initialize a loop counter.  To avoid
++	 * overflow, the maximum supported udelay is 2000 microseconds.
++	 *
++	 * XXX it would be more polite to find a way to use msleep()
++	 */
++	mdelay(2);
++	udelay(48);
+ 	if ((inb(tmport) & 0x80) == 0x00) {	/* bsy ? */
+ 		outw(0, tmport--);
+ 		outb(0, tmport);
+-- 
+1.7.10
