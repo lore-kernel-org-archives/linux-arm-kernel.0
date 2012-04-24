@@ -1,71 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 24 Apr 2012 14:46:34 +0200
-Subject: [PATCH v2 3/3] ARM: imx6q: switch to use pinctrl driver
-In-Reply-To: <1334933916-12971-3-git-send-email-b29396@freescale.com>
-References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
- <1334933916-12971-3-git-send-email-b29396@freescale.com>
-Message-ID: <20120424124634.GH9142@game.jcrosoft.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Apr 2012 15:07:35 +0200
+Subject: [PATCH 1/2] pinctrl: add pinctrl-mxs support
+In-Reply-To: <20120424040520.GC26306@S2101-09.ap.freescale.net>
+References: <1334823125-24159-1-git-send-email-shawn.guo@linaro.org>
+ <20120421164713.GA3408@das-ThinkPad-X61>
+ <20120422163255.GD26306@S2101-09.ap.freescale.net>
+ <20120423074702.GD24843@shlinux2.ap.freescale.net>
+ <20120423144623.GU26306@S2101-09.ap.freescale.net>
+ <20120424034010.GA32166@shlinux2.ap.freescale.net>
+ <20120424040520.GC26306@S2101-09.ap.freescale.net>
+Message-ID: <CACRpkdZ0USvyvT-YB3=VM5rb3VQ9-kVRwarZL82jMCz4J_wgUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:58 Fri 20 Apr     , Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> ---
-> This is not a formal patch and is only used for test
-> since before the pinctrl core handle dummy state is in,
-> enable pinctrl in driver will break other platforms.
-> 
-> ChangeLog v1->v2:
-> * using updated binding
-> ---
->  arch/arm/boot/dts/imx6q-arm2.dts   |    2 ++
->  arch/arm/boot/dts/imx6q.dtsi       |   17 +++++++++++++++++
->  arch/arm/mach-imx/Kconfig          |    2 ++
->  drivers/mmc/host/sdhci-esdhc-imx.c |   12 ++++++++++++
->  4 files changed, 33 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-> index ce1c823..68b1d8d 100644
-> --- a/arch/arm/boot/dts/imx6q-arm2.dts
-> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
-> @@ -44,6 +44,8 @@
->  				fsl,card-wired;
->  				vmmc-supply = <&reg_3p3v>;
->  				status = "okay";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usdhc4_1>;
->  			};
->  
->  			uart4: uart at 021f0000 {
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 4905f51..8cbd88b 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -386,7 +386,24 @@
->  			};
->  
->  			iomuxc at 020e0000 {
-> +				compatible = "fsl,imx6q-iomuxc";
->  				reg = <0x020e0000 0x4000>;
-> +
-> +				/* shared pinctrl settings */
-> +				usdhc4 {
-> +					pinctrl_usdhc4_1: usdhc4grp-1 {
-> +						fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
-> +							    1392 0x17059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
-> +							    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
-> +							    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
-> +							    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
-> +							    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
-> +							    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
-> +							    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
-> +							    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
-> +							    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
-Can you on IMX have alternative onfiguration where you use as example just one
-pin on a different pad?
+On Tue, Apr 24, 2012 at 6:05 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Best Regards,
-J.
+> For example, all available mxs pin configuration options are only 3,
+> mA, voltage and pull-up, and they sit on different bit field of
+> different registers. ?I feel much more comfortable with using properties
+> rather than a raw value to represent them, while I feel the raw value
+> binding makes some sense to imx, since it has many pin configuration
+> options and all these options sit in one register.
+
+Hm, that's pretty interesting - but are imx and mxs even going to use the
+same driver then? Maybe I'm not following - are they similar
+in all other aspects than for this pin config stuff?
+
+Whether to use properties or raw values or not I cleverly leave up
+to the platform to define and solve, unless they want to use
+the generic pinprops library.
+
+Yours,
+Linus Walleij
