@@ -1,33 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Apr 2012 09:39:16 -0700
-Subject: [PATCH 12/19] ARM: OMAP4: PM: update ROM return address for
- OSWR and OFF
-In-Reply-To: <1334914432-26456-13-git-send-email-t-kristo@ti.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-13-git-send-email-t-kristo@ti.com>
-Message-ID: <20120424163916.GN3739@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 24 Apr 2012 10:43:58 -0600
+Subject: Tag on pinctrl
+In-Reply-To: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
+References: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
+Message-ID: <4F96D84E.7080204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [120420 02:39]:
-> @@ -384,6 +386,17 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->  	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
->  
->  	if (omap4_mpuss_read_prev_context_state()) {
-> +		/*
-> +		 * Dummy dispatcher call after OSWR and OFF
-> +		 * Restore the right return Kernel address (with MMU on) for
-> +		 * subsequent calls to secure ROM. Otherwise the return address
-> +		 * will be to a PA return address and the system will hang.
-> +		 */
-> +		if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-> +			omap_secure_dispatcher(OMAP4_PPA_SERVICE_0,
-> +					       FLAG_START_CRITICAL,
-> +					       0, 0, 0, 0, 0);
-> +
->  		restore_ivahd_tesla_regs();
->  		restore_l3instr_regs();
+On 04/24/2012 07:15 AM, Linus Walleij wrote:
+> A while back I created a tag:
+> 
+> pinctrl-mergebase-20120418
+> 
+> On the pinctrl tree. It contains stuff up until that date that
+> has since been sitting in linux-next for a while.
+> 
+> I do not expect to rebase these patches further. They
+> are based on v3.4-rc3. So I will base any further pinctrl
+> work on this.
+> 
+> I think Stephen needed to pull this into the ARM SoC tree?
 
-This SoC test here too should be only done once during init.
+Yes, I have pulled that tag into the Tegra tree as
+for-3.5/gpio-pinmux-dependency, and have a Tegra-specific
+for-3.5/gpio-pinmux branch that depends on it. Two other Tegra branches
+in turn (for-3.5/tegra30-audio, for-3.5/usb-ulpi) depend on
+for-3.5/gpio-pinmux.
 
-Tony
+Linus, I think this will get into the ARM SoC tree simply by my saying
+in my for-3.5/gpio-pinmux pull request that the branch depends on your
+tag; I don't /think/ you need to explicitly send a pull request there,
+right?
