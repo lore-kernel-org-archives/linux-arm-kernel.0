@@ -1,125 +1,122 @@
-From: tim.schendekehl@egnite.de (Tim Schendekehl)
-Date: Tue, 24 Apr 2012 18:47:59 +0200
-Subject: [PATCH v4] Ethernut 5 board support
-Message-ID: <4F96D93F.3030508@egnite.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 24 Apr 2012 18:47:51 +0200
+Subject: [PATCH 08/11] MXS: Add imx-otg driver
+In-Reply-To: <20374.53520.690267.206408@ipc1.ka-ro>
+References: <1335099567-21056-1-git-send-email-marex@denx.de>
+ <1335237523-9053-1-git-send-email-marex@denx.de>
+ <1335237523-9053-9-git-send-email-marex@denx.de>
+ <20374.48430.613673.968143@ipc1.ka-ro>
+ <20120424145030.GX3852@pengutronix.de>
+ <20374.53520.690267.206408@ipc1.ka-ro>
+Message-ID: <20120424164751.GY3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Ethernut 5 open hardware design, based
-on Atmel's AT91SAM9XE512 SoC.
+On Tue, Apr 24, 2012 at 06:13:04PM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Sascha Hauer writes:
+> > On Tue, Apr 24, 2012 at 04:48:14PM +0200, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Marek Vasut writes:
+> > > > This driver handles claiming of clocks and memory areas. These are later
+> > > > properly delegated to it's child devices, the USB Host (ehci-mxs) and
+> > > > USB Gadget (ci13xxx-mxs).
+> > > > 
+> > > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > > Cc: Chen Peter-B29397 <B29397@freescale.com>
+> > > > Cc: Detlev Zundel <dzu@denx.de>
+> > > > Cc: Fabio Estevam <festevam@gmail.com>
+> > > > Cc: Li Frank-B20596 <B20596@freescale.com>
+> > > > Cc: Lin Tony-B19295 <B19295@freescale.com>
+> > > > Cc: Linux USB <linux-usb@vger.kernel.org>
+> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > Cc: Shawn Guo <shawn.guo@freescale.com>
+> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > > Cc: Stefano Babic <sbabic@denx.de>
+> > > > Cc: Subodh Nijsure <snijsure@grid-net.com>
+> > > > Cc: Tony Lin <tony.lin@freescale.com>
+> > > > Cc: Wolfgang Denk <wd@denx.de>
+> > > > ---
+> > > >  drivers/usb/otg/Kconfig   |    6 +
+> > > >  drivers/usb/otg/Makefile  |    1 +
+> > > >  drivers/usb/otg/imx-otg.c |  473 +++++++++++++++++++++++++++++++++++++++++++++
+> > > >  3 files changed, 480 insertions(+)
+> > > >  create mode 100644 drivers/usb/otg/imx-otg.c
+> > > > 
+> > > > diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
+> > > > index 5c87db0..e7c6325 100644
+> > > > --- a/drivers/usb/otg/Kconfig
+> > > > +++ b/drivers/usb/otg/Kconfig
+> > > > @@ -116,6 +116,12 @@ config FSL_USB2_OTG
+> > > >  	help
+> > > >  	  Enable this to support Freescale USB OTG transceiver.
+> > > >  
+> > > > +config USB_IMX_COMPOSITE
+> > > > +	bool
+> > > > +	help
+> > > > +	  Composite driver that handles clock and memory mapping for
+> > > > +	  i.MX USB host and USB PHY.
+> > > > +
+> > > >  config USB_MV_OTG
+> > > >  	tristate "Marvell USB OTG support"
+> > > >  	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
+> > > > diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
+> > > > index 41aa509..7d2c631 100644
+> > > > --- a/drivers/usb/otg/Makefile
+> > > > +++ b/drivers/usb/otg/Makefile
+> > > > @@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
+> > > >  obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
+> > > >  fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
+> > > >  obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
+> > > > +obj-$(CONFIG_USB_IMX_COMPOSITE)	+= imx-otg.o
+> > > >  obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
+> > > > diff --git a/drivers/usb/otg/imx-otg.c b/drivers/usb/otg/imx-otg.c
+> > > > new file mode 100644
+> > > > index 0000000..8440d909
+> > > > --- /dev/null
+> > > > +++ b/drivers/usb/otg/imx-otg.c
+> > > > @@ -0,0 +1,473 @@
+> > > > +/*
+> > > > + * drivers/usb/otg/imx-otg.c
+> > > > + *
+> > > > + * Freescale i.MX USB composite driver.
+> > > > + *
+> > > > + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> > > > + * on behalf of DENX Software Engineering GmbH
+> > > > + *
+> > > > + * This program is free software; you can redistribute it and/or modify
+> > > > + * it under the terms of the GNU General Public License as published by
+> > > > + * the Free Software Foundation; either version 2 of the License, or
+> > > > + * (at your option) any later version.
+> > > > + *
+> > > > + * This program is distributed in the hope that it will be useful,
+> > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > > + * GNU General Public License for more details.
+> > > > + *
+> > > > + * You should have received a copy of the GNU General Public License
+> > > > + * along with this program; if not, write to the Free Software
+> > > > + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> > > > + */
+> > > > +
+> > > Why do you call this driver imx-otg when it is actually MXS specific?
+> > > How would you call a corresponding driver for the remaining i.MX
+> > > processors?
+> > 
+> > This is the driver for the all i.MX processors.
+> > 
+> If it is for all i.MX processors, it shouldn't access MXS specific
+> registers, like:
+> +		writel(wakeup, x->io_priv + HW_USBPHY_CTRL_SET);
 
-Signed-off-by: Tim Schendekehl <tim.schendekehl@egnite.de>
----
-V4:
- - Don't use bootargs for partitions.
- - Added entry in arch/arm/mach-at91/Makefile.boot.
+Indeed not. This should be done in the phy driver.
 
- arch/arm/boot/dts/ethernut5.dts  |   84 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Makefile.boot |    1 +
- 2 files changed, 85 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/ethernut5.dts
+Sascha
 
-diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
-new file mode 100644
-index 0000000..1ea9d34
---- /dev/null
-+++ b/arch/arm/boot/dts/ethernut5.dts
-@@ -0,0 +1,84 @@
-+/*
-+ * ethernut5.dts - Device Tree file for Ethernut 5 board
-+ *
-+ * Copyright (C) 2012 egnite GmbH <info@egnite.de>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9260.dtsi"
-+
-+/ {
-+	model = "Ethernut 5";
-+	compatible = "egnite,ethernut5", "atmel,at91sam9260", "atmel,at91sam9";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=/dev/mtdblock0 rw rootfstype=jffs2";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x08000000>;
-+	};
-+
-+	ahb {
-+		apb {
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			usart0: serial at fffb0000 {
-+				status = "okay";
-+			};
-+
-+			usart1: serial at fffb4000 {
-+				status = "okay";
-+			};
-+
-+			macb0: ethernet at fffc4000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+			};
-+
-+			usb1: gadget at fffa4000 {
-+				atmel,vbus-gpio = <&pioC 5 0>;
-+				status = "okay";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt;
-+			status = "okay";
-+
-+			gpios = <0
-+				 &pioC 14 0
-+				 0
-+				>;
-+
-+			root at 0 {
-+				label = "root";
-+				reg = <0x0 0x08000000>;
-+			};
-+
-+			data at 20000 {
-+				label = "data";
-+				reg = <0x08000000 0x38000000>;
-+			};
-+		};
-+
-+		usb0: ohci at 00500000 {
-+			num-ports = <2>;
-+			status = "okay";
-+		};
-+	};
-+
-+	i2c at 0 {
-+		status = "okay";
-+
-+		pcf8563 at 50 {
-+			compatible = "nxp,pcf8563";
-+			reg = <0x51>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
-index 0c6e0e9..2653905 100644
---- a/arch/arm/mach-at91/Makefile.boot
-+++ b/arch/arm/mach-at91/Makefile.boot
-@@ -15,6 +15,7 @@ endif
- 
- # Keep dtb files sorted alphabetically for each SoC
- # sam9260
-+dtb-$(CONFIG_MACH_AT91SAM_DT) += ethernut5.dtb
- dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
- dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9260.dtb
- # sam9263
 -- 
-1.7.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
