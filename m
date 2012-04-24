@@ -1,62 +1,71 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 24 Apr 2012 16:05:26 +0200
-Subject: [PATCH 05/18][V3] ARM: OMAP4: cpuidle - Initialize omap4_idle_data at
- compile time
+Date: Tue, 24 Apr 2012 16:05:27 +0200
+Subject: [PATCH 06/18][V3] ARM: OMAP4: cpuidle - use the omap4_idle_data
+ variable directly
 In-Reply-To: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1335276339-11135-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1335276339-11135-7-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We initialize the omap4_idle_data variable at compile time allowing us
-to remove in the next patch the initialization done at boot time.
+We are storing the 'omap4_idle_data' in the private data field
+of the cpuidle device. As we are using this variable only in this file,
+that does not really make sense. Let's use the global variable directly.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Jean Pihet <j-pihet@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |   21 ++++++++++++++++++---
- 1 files changed, 18 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/cpuidle44xx.c |   13 +++----------
+ 1 files changed, 3 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 38ecd27..9e3effa 100644
+index 9e3effa..f1410f1 100644
 --- a/arch/arm/mach-omap2/cpuidle44xx.c
 +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -31,9 +31,24 @@ struct omap4_idle_statedata {
- 	u32 mpu_state;
- };
+@@ -24,7 +24,7 @@
  
--#define OMAP4_NUM_STATES 3
-+static struct omap4_idle_statedata omap4_idle_data[] = {
-+	{
-+		.cpu_state = PWRDM_POWER_ON,
-+		.mpu_state = PWRDM_POWER_ON,
-+		.mpu_logic_state = PWRDM_POWER_RET,
-+	},
-+	{
-+		.cpu_state = PWRDM_POWER_OFF,
-+		.mpu_state = PWRDM_POWER_RET,
-+		.mpu_logic_state = PWRDM_POWER_RET,
-+	},
-+	{
-+		.cpu_state = PWRDM_POWER_OFF,
-+		.mpu_state = PWRDM_POWER_RET,
-+		.mpu_logic_state = PWRDM_POWER_OFF,
-+	},
-+};
+ #ifdef CONFIG_CPU_IDLE
  
--static struct omap4_idle_statedata omap4_idle_data[OMAP4_NUM_STATES];
- static struct powerdomain *mpu_pd, *cpu0_pd, *cpu1_pd;
+-/* Machine specific information to be recorded in the C-state driver_data */
++/* Machine specific information */
+ struct omap4_idle_statedata {
+ 	u32 cpu_state;
+ 	u32 mpu_logic_state;
+@@ -65,8 +65,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+ 			int index)
+ {
+-	struct omap4_idle_statedata *cx =
+-			cpuidle_get_statedata(&dev->states_usage[index]);
++	struct omap4_idle_statedata *cx = &omap4_idle_data[index];
+ 	u32 cpu1_state;
+ 	int cpu_id = smp_processor_id();
  
+@@ -83,7 +82,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
+ 	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
+ 	if (cpu1_state != PWRDM_POWER_OFF) {
+ 		index = drv->safe_state_index;
+-		cx = cpuidle_get_statedata(&dev->states_usage[index]);
++		cx = &omap4_idle_data[index];
+ 	}
+ 
+ 	if (index > 0)
+@@ -176,15 +175,9 @@ static inline struct omap4_idle_statedata *_fill_cstate_usage(
+ 					int idx)
+ {
+ 	struct omap4_idle_statedata *cx = &omap4_idle_data[idx];
+-	struct cpuidle_state_usage *state_usage = &dev->states_usage[idx];
+-
+-	cpuidle_set_statedata(state_usage, cx);
+-
+ 	return cx;
+ }
+ 
+-
+-
  /**
-@@ -152,7 +167,7 @@ struct cpuidle_driver omap4_idle_driver = {
- 			.desc = "MPUSS OSWR",
- 		},
- 	},
--	.state_count = OMAP4_NUM_STATES,
-+	.state_count = ARRAY_SIZE(omap4_idle_data),
- 	.safe_state_index = 0,
- };
- 
+  * omap4_idle_init - Init routine for OMAP4 idle
+  *
 -- 
 1.7.5.4
