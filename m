@@ -1,122 +1,217 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 Apr 2012 18:47:51 +0200
-Subject: [PATCH 08/11] MXS: Add imx-otg driver
-In-Reply-To: <20374.53520.690267.206408@ipc1.ka-ro>
-References: <1335099567-21056-1-git-send-email-marex@denx.de>
- <1335237523-9053-1-git-send-email-marex@denx.de>
- <1335237523-9053-9-git-send-email-marex@denx.de>
- <20374.48430.613673.968143@ipc1.ka-ro>
- <20120424145030.GX3852@pengutronix.de>
- <20374.53520.690267.206408@ipc1.ka-ro>
-Message-ID: <20120424164751.GY3852@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 Apr 2012 09:51:48 -0700
+Subject: [RFC 00/12] OMAP DMA engine conversion
+In-Reply-To: <20120424103858.GC25053@n2100.arm.linux.org.uk>
+References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
+ <20120424103858.GC25053@n2100.arm.linux.org.uk>
+Message-ID: <20120424165147.GP3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 06:13:04PM +0200, Lothar Wa?mann wrote:
-> Hi,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120424 03:42]:
+> Here's another patch - for the OMAP NAND driver.
 > 
-> Sascha Hauer writes:
-> > On Tue, Apr 24, 2012 at 04:48:14PM +0200, Lothar Wa?mann wrote:
-> > > Hi,
-> > > 
-> > > Marek Vasut writes:
-> > > > This driver handles claiming of clocks and memory areas. These are later
-> > > > properly delegated to it's child devices, the USB Host (ehci-mxs) and
-> > > > USB Gadget (ci13xxx-mxs).
-> > > > 
-> > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > Cc: Chen Peter-B29397 <B29397@freescale.com>
-> > > > Cc: Detlev Zundel <dzu@denx.de>
-> > > > Cc: Fabio Estevam <festevam@gmail.com>
-> > > > Cc: Li Frank-B20596 <B20596@freescale.com>
-> > > > Cc: Lin Tony-B19295 <B19295@freescale.com>
-> > > > Cc: Linux USB <linux-usb@vger.kernel.org>
-> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > Cc: Shawn Guo <shawn.guo@freescale.com>
-> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > > Cc: Stefano Babic <sbabic@denx.de>
-> > > > Cc: Subodh Nijsure <snijsure@grid-net.com>
-> > > > Cc: Tony Lin <tony.lin@freescale.com>
-> > > > Cc: Wolfgang Denk <wd@denx.de>
-> > > > ---
-> > > >  drivers/usb/otg/Kconfig   |    6 +
-> > > >  drivers/usb/otg/Makefile  |    1 +
-> > > >  drivers/usb/otg/imx-otg.c |  473 +++++++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 480 insertions(+)
-> > > >  create mode 100644 drivers/usb/otg/imx-otg.c
-> > > > 
-> > > > diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-> > > > index 5c87db0..e7c6325 100644
-> > > > --- a/drivers/usb/otg/Kconfig
-> > > > +++ b/drivers/usb/otg/Kconfig
-> > > > @@ -116,6 +116,12 @@ config FSL_USB2_OTG
-> > > >  	help
-> > > >  	  Enable this to support Freescale USB OTG transceiver.
-> > > >  
-> > > > +config USB_IMX_COMPOSITE
-> > > > +	bool
-> > > > +	help
-> > > > +	  Composite driver that handles clock and memory mapping for
-> > > > +	  i.MX USB host and USB PHY.
-> > > > +
-> > > >  config USB_MV_OTG
-> > > >  	tristate "Marvell USB OTG support"
-> > > >  	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
-> > > > diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
-> > > > index 41aa509..7d2c631 100644
-> > > > --- a/drivers/usb/otg/Makefile
-> > > > +++ b/drivers/usb/otg/Makefile
-> > > > @@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
-> > > >  obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
-> > > >  fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
-> > > >  obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
-> > > > +obj-$(CONFIG_USB_IMX_COMPOSITE)	+= imx-otg.o
-> > > >  obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
-> > > > diff --git a/drivers/usb/otg/imx-otg.c b/drivers/usb/otg/imx-otg.c
-> > > > new file mode 100644
-> > > > index 0000000..8440d909
-> > > > --- /dev/null
-> > > > +++ b/drivers/usb/otg/imx-otg.c
-> > > > @@ -0,0 +1,473 @@
-> > > > +/*
-> > > > + * drivers/usb/otg/imx-otg.c
-> > > > + *
-> > > > + * Freescale i.MX USB composite driver.
-> > > > + *
-> > > > + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-> > > > + * on behalf of DENX Software Engineering GmbH
-> > > > + *
-> > > > + * This program is free software; you can redistribute it and/or modify
-> > > > + * it under the terms of the GNU General Public License as published by
-> > > > + * the Free Software Foundation; either version 2 of the License, or
-> > > > + * (at your option) any later version.
-> > > > + *
-> > > > + * This program is distributed in the hope that it will be useful,
-> > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > > + * GNU General Public License for more details.
-> > > > + *
-> > > > + * You should have received a copy of the GNU General Public License
-> > > > + * along with this program; if not, write to the Free Software
-> > > > + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-> > > > + */
-> > > > +
-> > > Why do you call this driver imx-otg when it is actually MXS specific?
-> > > How would you call a corresponding driver for the remaining i.MX
-> > > processors?
-> > 
-> > This is the driver for the all i.MX processors.
-> > 
-> If it is for all i.MX processors, it shouldn't access MXS specific
-> registers, like:
-> +		writel(wakeup, x->io_priv + HW_USBPHY_CTRL_SET);
+> One thing this doesn't do is configure up the source/destination bursts,
+> which the old code did:
+> 
+>                         omap_set_dma_dest_burst_mode(info->dma_ch,
+>                                         OMAP_DMA_DATA_BURST_16);
+>                         omap_set_dma_src_burst_mode(info->dma_ch,
+>                                         OMAP_DMA_DATA_BURST_16);
 
-Indeed not. This should be done in the phy driver.
+Grazvydas, care to give this patch a go?
+ 
+> In dma-engine speak, I'm using "burst" for the number of elements to
+> transfer for each frame, with frame sync in place (in other words, the
+> number of transfers to occur for every assertion of the DMA request.)
+> That's how burst is defined on other DMA hardware, so I'm not entirely
+> sure at the moment how critical (or what) the above bursts are doing,
+> whether they're configuring the memory side of the transfer or not.
+> I'll take a deeper look into that this evening, but in the mean time,
+> what's below should be a direct conversion.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+For omaps it enables multiple access.
+ 
+> MTD does have this weirdness that it uses vmalloc regions and passes
+> addresses in vmalloc regions into drivers - I've left that hack in but
+> it is _highly_ undefined whether the DMA activity would be visible via
+> the vmalloc mapping as things currently stand.  (You're probably going
+> to be okay with non-aliasing VIPT caches, but VIVT and aliasing VIPT
+> caches are potential random data corruption candidates.)  That's a
+> short-coming across many MTD drivers, one which needs sorting out across
+> the board.
+> 
+>  drivers/mtd/nand/omap2.c |   93 +++++++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 92 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index c2b0bba..bd4ed08 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -9,6 +9,7 @@
+>   */
+>  
+>  #include <linux/platform_device.h>
+> +#include <linux/dmaengine.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/delay.h>
+>  #include <linux/module.h>
+> @@ -119,6 +120,7 @@ struct omap_nand_info {
+>  	int				gpmc_cs;
+>  	unsigned long			phys_base;
+>  	struct completion		comp;
+> +	struct dma_chan			*dma;
+>  	int				dma_ch;
+>  	int				gpmc_irq;
+>  	enum {
+> @@ -336,6 +338,10 @@ static void omap_nand_dma_cb(int lch, u16 ch_status, void *data)
+>  {
+>  	complete((struct completion *) data);
+>  }
+> +static void omap_nand_dma_callback(void *data)
+> +{
+> +	complete((struct completion *) data);
+> +}
+>  
+>  /*
+>   * omap_nand_dma_transfer: configer and start dma transfer
+> @@ -373,6 +379,56 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
+>  		addr = page_address(p1) + ((size_t)addr & ~PAGE_MASK);
+>  	}
+>  
+> +	if (info->dma) {
+> +		struct dma_async_tx_descriptor *tx;
+> +		struct scatterlist sg;
+> +		unsigned n;
+> +
+> +		sg_init_one(&sg, addr, len);
+> +		n = dma_map_sg(info->dma->device->dev, &sg, 1, dir);
+> +		if (n == 0) {
+> +			dev_err(&info->pdev->dev,
+> +				"Couldn't DMA map a %d byte buffer\n", len);
+> +			goto out_copy;
+> +		}
+> +
+> +		tx = dmaengine_prep_slave_sg(info->dma, &sg, n,
+> +			is_write ? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM,
+> +			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+> +		if (!tx) {
+> +			dma_unmap_sg(info->dma->device->dev, &sg, 1, dir);
+> +			goto out_copy;
+> +		}
+> +		tx->callback = omap_nand_dma_callback;
+> +		tx->callback_param = &info->comp;
+> +		dmaengine_submit(tx);
+> +
+> +		/*  configure and start prefetch transfer */
+> +		ret = gpmc_prefetch_enable(info->gpmc_cs,
+> +			PREFETCH_FIFOTHRESHOLD_MAX, 0x1, len, is_write);
+> +		if (ret) {
+> +			/* PFPW engine is busy, use cpu copy method */
+> +			dma_unmap_sg(info->dma->device->dev, &sg, 1, dir);
+> +			goto out_copy;
+> +		}
+> +
+> +		init_completion(&info->comp);
+> +		dma_async_issue_pending(info->dma);
+> +
+> +		/* setup and start DMA using dma_addr */
+> +		wait_for_completion(&info->comp);
+> +		tim = 0;
+> +		limit = (loops_per_jiffy * msecs_to_jiffies(OMAP_NAND_TIMEOUT_MS));
+> +		while (gpmc_read_status(GPMC_PREFETCH_COUNT) && (tim++ < limit))
+> +			cpu_relax();
+> +
+> +		/* disable and stop the PFPW engine */
+> +		gpmc_prefetch_reset(info->gpmc_cs);
+> +
+> +		dma_unmap_sg(info->dma->device->dev, &sg, 1, dir);
+> +		return 0;
+> +	}
+> +
+>  	dma_addr = dma_map_single(&info->pdev->dev, addr, len, dir);
+>  	if (dma_mapping_error(&info->pdev->dev, dma_addr)) {
+>  		dev_err(&info->pdev->dev,
+> @@ -405,7 +461,6 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
+>  		goto out_copy;
+>  
+>  	init_completion(&info->comp);
+> -
+>  	omap_start_dma(info->dma_ch);
+>  
+>  	/* setup and start DMA using dma_addr */
+> @@ -925,12 +980,16 @@ static int omap_dev_ready(struct mtd_info *mtd)
+>  	return 1;
+>  }
+>  
+> +extern bool omap_dma_filter_fn(struct dma_chan *chan, void *param);
+> +
+>  static int __devinit omap_nand_probe(struct platform_device *pdev)
+>  {
+>  	struct omap_nand_info		*info;
+>  	struct omap_nand_platform_data	*pdata;
+>  	int				err;
+>  	int				i, offset;
+> +	dma_cap_mask_t mask;
+> +	unsigned sig;
+>  
+>  	pdata = pdev->dev.platform_data;
+>  	if (pdata == NULL) {
+> @@ -1011,6 +1070,33 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+>  		break;
+>  
+>  	case NAND_OMAP_PREFETCH_DMA:
+> +		dma_cap_zero(mask);
+> +		dma_cap_set(DMA_SLAVE, mask);
+> +		sig = OMAP24XX_DMA_GPMC;
+> +		info->dma = dma_request_channel(mask, omap_dma_filter_fn, &sig);
+> +		if (!info->dma) {
+> +			dev_warn(&pdev->dev, "DMA engine request failed\n");
+> +		} else {
+> +			struct dma_slave_config cfg;
+> +			int rc;
+> +
+> +			memset(&cfg, 0, sizeof(cfg));
+> +			cfg.src_addr = info->phys_base;
+> +			cfg.dst_addr = info->phys_base;
+> +			cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +			cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +			cfg.src_maxburst = 16;
+> +			cfg.dst_maxburst = 16;
+> +			rc = dmaengine_slave_config(info->dma, &cfg);
+> +			if (rc) {
+> +				dev_err(&pdev->dev, "DMA engine slave config failed: %d\n",
+> +					rc);
+> +				goto out_release_mem_region;
+> +			}
+> +			info->nand.read_buf   = omap_read_buf_dma_pref;
+> +			info->nand.write_buf  = omap_write_buf_dma_pref;
+> +			break;
+> +		}
+>  		err = omap_request_dma(OMAP24XX_DMA_GPMC, "NAND",
+>  				omap_nand_dma_cb, &info->comp, &info->dma_ch);
+>  		if (err < 0) {
+> @@ -1110,6 +1196,8 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  out_release_mem_region:
+> +	if (info->dma)
+> +		dma_release_channel(info->dma);
+>  	release_mem_region(info->phys_base, NAND_IO_SIZE);
+>  out_free_info:
+>  	kfree(info);
+> @@ -1127,6 +1215,9 @@ static int omap_nand_remove(struct platform_device *pdev)
+>  	if (info->dma_ch != -1)
+>  		omap_free_dma(info->dma_ch);
+>  
+> +	if (info->dma)
+> +		dma_release_channel(info->dma);
+> +
+>  	if (info->gpmc_irq)
+>  		free_irq(info->gpmc_irq, info);
+>  
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
