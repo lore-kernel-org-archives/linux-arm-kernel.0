@@ -1,35 +1,31 @@
-From: jrnieder@gmail.com (Jonathan Nieder)
-Date: Tue, 24 Apr 2012 01:10:27 -0500
-Subject: [PATCH 1/2] ARM: ixp4xx: fix compilation, add gpiolib support
-In-Reply-To: <20120412052518.GA3260@netboy.at.omicron.at>
-References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
- <1328729069-21308-2-git-send-email-mkl@blackshift.org>
- <20120412052518.GA3260@netboy.at.omicron.at>
-Message-ID: <20120424061027.GA23859@burratino>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 24 Apr 2012 11:39:49 +0530
+Subject: [PATCH 08/13] net/stmmac: Remove conditional compilation of clk
+ code
+In-Reply-To: <4F964099.7030401@st.com>
+References: <cover.1335008617.git.viresh.kumar@st.com>
+ <03d5825c44251e6cbbdb3c3d8e67208f0fd4619d.1335008617.git.viresh.kumar@st.com>
+ <4F964099.7030401@st.com>
+Message-ID: <4F9643AD.6000906@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Cochran wrote:
-> On Wed, Feb 08, 2012 at 08:24:28PM +0100, Marc Kleine-Budde wrote:
+On 4/24/2012 11:26 AM, Giuseppe CAVALLARO wrote:
+> I like this patch also because reduces ifdef in the code :-)
 
->> From: Imre Kaloz <kaloz@openwrt.org>
->>
->> The problem was introduced with commit:
->> "eb9ae7f gpio: fix build error in include/asm-generic/gpio.h"
->>
->> This patch adds gpiolib support for the IXP4xx platform, which fixes the
->> compilation of several ixp4xx platforms, e.g.:
->
-> Sorry to nag, but is someone going to take this patch?
+thanks.
 
-It looks like Russell's question[*] was never answered:
+> Anyway this patch doesn't apply fine either in net-next and in net.git.
+> Also I wonder if you had already tested the driver build on arch w/o
+> HAVE_CLK ... just to avoid kernel build failures on other platforms.
+> 
+> Let me know if I can help you on that.
 
-| Does anything on ixp4xx require fast access to on-chip GPIOs?  If not,
-| it would be much better to get rid of this and just use the standard
-| wrapping, which can be done by changing this entire file to be just a
-| single line:
+I already sent V2, before i saw this mail. V2 will get rebased cleanly.
+Yes i have tried that.
 
-Hope that helps,
-Jonathan
+BTW, this series must go through Andrew, instead of your tree as it
+has dependency patches. Just for info.
 
-[*] http://thread.gmane.org/gmane.linux.kernel/1250585/focus=1250908
+-- 
+viresh
