@@ -1,41 +1,82 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 24 Apr 2012 16:05:31 +0200
-Subject: [PATCH 10/18][V3] ARM: OMAP3: cpuidle - remove errata check in the
- init function
+Date: Tue, 24 Apr 2012 16:05:34 +0200
+Subject: [PATCH 13/18][V3] ARM: OMAP3: define statically the omap3_idle_data
 In-Reply-To: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1335276339-11135-11-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1335276339-11135-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The errata check is done in the next_valid_state function, no need to check
-that in the omap3_idle_init function.
+Initialize the omap3_idle_data array at compile time, that will allow
+to remove the initialization at boot time.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   10 ----------
- 1 files changed, 0 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |   37 ++++++++++++++++++++++++++++++++-----
+ 1 files changed, 32 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 11a2c23..f394ea6 100644
+index a82a887..93e2450 100644
 --- a/arch/arm/mach-omap2/cpuidle34xx.c
 +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -430,16 +430,6 @@ int __init omap3_idle_init(void)
+@@ -44,9 +44,36 @@ struct omap3_idle_statedata {
+ 	u32 core_state;
+ };
  
- 	/* C7 . MPU OFF + Core OFF */
- 	cx = _fill_cstate_usage(dev, 6);
--	/*
--	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
--	 * enable OFF mode in a stable form for previous revisions.
--	 * We disable C7 state as a result.
--	 */
--	if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583)) {
--		cx->valid = 0;
--		pr_warn("%s: core off state C7 disabled due to i583\n",
--			__func__);
--	}
- 	cx->mpu_state = PWRDM_POWER_OFF;
- 	cx->core_state = PWRDM_POWER_OFF;
+-#define OMAP3_NUM_STATES 7
+-
+-struct omap3_idle_statedata omap3_idle_data[OMAP3_NUM_STATES];
++struct omap3_idle_statedata omap3_idle_data[] = {
++	{
++		.mpu_state = PWRDM_POWER_ON,
++		.core_state = PWRDM_POWER_ON,
++	},
++	{
++		.mpu_state = PWRDM_POWER_ON,
++		.core_state = PWRDM_POWER_ON,
++	},
++	{
++		.mpu_state = PWRDM_POWER_RET,
++		.core_state = PWRDM_POWER_ON,
++	},
++	{
++		.mpu_state = PWRDM_POWER_OFF,
++		.core_state = PWRDM_POWER_ON,
++	},
++	{
++		.mpu_state = PWRDM_POWER_RET,
++		.core_state = PWRDM_POWER_RET,
++	},
++	{
++		.mpu_state = PWRDM_POWER_OFF,
++		.core_state = PWRDM_POWER_RET,
++	},
++	{
++		.mpu_state = PWRDM_POWER_OFF,
++		.core_state = PWRDM_POWER_OFF,
++	},
++};
+ 
+ struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
+ 
+@@ -172,7 +199,7 @@ static int next_valid_state(struct cpuidle_device *dev,
+ 	    (cx->core_state >= core_deepest_state)) {
+ 		return index;
+ 	} else {
+-		int idx = OMAP3_NUM_STATES - 1;
++		int idx = ARRAY_SIZE(omap3_idle_data) - 1;
+ 
+ 		/* Reach the current state starting at highest C-state */
+ 		for (; idx >= 0; idx--) {
+@@ -334,7 +361,7 @@ struct cpuidle_driver omap3_idle_driver = {
+ 			.desc		  = "MPU OFF + CORE OFF",
+ 		},
+ 	},
+-	.state_count = OMAP3_NUM_STATES,
++	.state_count = ARRAY_SIZE(omap3_idle_data),
+ 	.safe_state_index = 0,
+ };
  
 -- 
 1.7.5.4
