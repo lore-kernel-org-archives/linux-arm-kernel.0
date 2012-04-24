@@ -1,131 +1,105 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 24 Apr 2012 17:48:17 +0200
-Subject: [PATCH v2 1/2] arm: imx: make various struct sys_timer static
-In-Reply-To: <1335282498-15896-1-git-send-email-mkl@pengutronix.de>
-References: <1335282498-15896-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1335282498-15896-2-git-send-email-mkl@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 Apr 2012 09:04:48 -0700
+Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
+In-Reply-To: <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
+ <13629551.hP3ZV1ajDo@vclass>
+ <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
+ <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
+Message-ID: <20120424160447.GI3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
+* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120424 08:40]:
+> Hi Janusz,
+> 
+> On Tue, Apr 24, 2012 at 12:24 AM, DebBarma, Tarun Kanti
+> <tarun.kanti@ti.com> wrote:
+> > On Sat, Apr 21, 2012 at 7:33 PM, Janusz Krzysztofik
+> > <jkrzyszt@tis.icnet.pl> wrote:
+> >> On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
+> >>> With register offsets now defined for respective OMAP versions we can get rid
+> >>> of cpu_class_* checks. This function now has common initialization code for
+> >>> all OMAP versions...
+> >>>
+> >>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> >>> Signed-off-by: Charulatha V <charu@ti.com>
+> >>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>> Acked-by: Tony Lindgren <tony@atomide.com>
+> >>
+> >> Sorry for being so late with my comment for chanes already present in
+> >> mainline, but this patch breaks GPIO on Amstrad Delta at least, and I
+> >> have neither enough spare time nor enough experience with non OMAP1
+> >> machines to provide a solution myself.
+> > Yes, I looked at the omap_gpio_mod_init() and OMAP1 configurations are
+> > overwritten.
+> > Also looks like there is issue in making distinction between omap15xx
+> > and omap16xx.
+> > I will post a patch and you can help me testing it in OMAP1 platform.
+> > Thanks for pointing this out.
+...
+ 
+> Here is the patch, with attachment as well. I have just tested on
+> OMAP4 platform.
+> Testing on other OMAP2+ platforms is pending. In the meantime can you please
+> validate on OMAP1 platform and confirm? Thanks.
+> --
+> Tarun
+> 
+> From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Date: Tue, 24 Apr 2012 20:34:32 +0530
+> Subject: [PATCH] gpio/omap: fix omap1 register overwrite in omap_gpio_mod_init
+> 
+> Initialization of irqenable, irqstatus registers is the common
+> operation done in this function for all OMAP platforms, viz.
+> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
+> was overwriting the correctly programmed OMAP1 value at the
+> beginning. As a result, even though it worked on OMAP2+
+> platforms it was breaking OMAP1 functionality.
 
-Changes since v1:
-* add missing static other mach-imx board files, too
+Sounds like the original patch was never tested on omap1?
+ 
+> On closer observation it is found that the first _gpio_rmw()
+> which is supposedly done to take care of OMAP1 platform is
+> generic enough and takes care of OMAP2+ platform as well.
+> Therefore remove the latter _gpio_rmw() to irqenable as they
+> are redundant.
+> 
+> Also, changing the sequence and logic of initializing the
+> irqstatus.
 
- arch/arm/mach-imx/mach-cpuimx35.c    |    2 +-
- arch/arm/mach-imx/mach-mx1ads.c      |    2 +-
- arch/arm/mach-imx/mach-mx31lite.c    |    2 +-
- arch/arm/mach-imx/mach-mx31moboard.c |    2 +-
- arch/arm/mach-imx/mach-mx35_3ds.c    |    2 +-
- arch/arm/mach-imx/mach-pcm037.c      |    2 +-
- arch/arm/mach-imx/mach-pcm043.c      |    2 +-
- arch/arm/mach-imx/mach-vpr200.c      |    2 +-
- 8 files changed, 8 insertions(+), 8 deletions(-)
+Please mention also the breaking commit here and get this fix
+merged as a regression as soon as it's tested for the current
+-rc series.
 
-diff --git a/arch/arm/mach-imx/mach-cpuimx35.c b/arch/arm/mach-imx/mach-cpuimx35.c
-index 8ecc872..c515f8e 100644
---- a/arch/arm/mach-imx/mach-cpuimx35.c
-+++ b/arch/arm/mach-imx/mach-cpuimx35.c
-@@ -194,7 +194,7 @@ static void __init eukrea_cpuimx35_timer_init(void)
- 	mx35_clocks_init();
- }
+Regards,
+
+Tony
+
  
--struct sys_timer eukrea_cpuimx35_timer = {
-+static struct sys_timer eukrea_cpuimx35_timer = {
- 	.init	= eukrea_cpuimx35_timer_init,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-mx1ads.c b/arch/arm/mach-imx/mach-mx1ads.c
-index 9704608..7274e79 100644
---- a/arch/arm/mach-imx/mach-mx1ads.c
-+++ b/arch/arm/mach-imx/mach-mx1ads.c
-@@ -134,7 +134,7 @@ static void __init mx1ads_timer_init(void)
- 	mx1_clocks_init(32000);
- }
- 
--struct sys_timer mx1ads_timer = {
-+static struct sys_timer mx1ads_timer = {
- 	.init	= mx1ads_timer_init,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
-index 0abef5f..686c605 100644
---- a/arch/arm/mach-imx/mach-mx31lite.c
-+++ b/arch/arm/mach-imx/mach-mx31lite.c
-@@ -283,7 +283,7 @@ static void __init mx31lite_timer_init(void)
- 	mx31_clocks_init(26000000);
- }
- 
--struct sys_timer mx31lite_timer = {
-+static struct sys_timer mx31lite_timer = {
- 	.init	= mx31lite_timer_init,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index f17a15f..1dfe3c7 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -580,7 +580,7 @@ static void __init mx31moboard_timer_init(void)
- 	mx31_clocks_init(26000000);
- }
- 
--struct sys_timer mx31moboard_timer = {
-+static struct sys_timer mx31moboard_timer = {
- 	.init	= mx31moboard_timer_init,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 6ae51c6..c433187 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -419,7 +419,7 @@ static void __init mx35pdk_timer_init(void)
- 	mx35_clocks_init();
- }
- 
--struct sys_timer mx35pdk_timer = {
-+static struct sys_timer mx35pdk_timer = {
- 	.init	= mx35pdk_timer_init,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-index 5fddf94..10c9795 100644
---- a/arch/arm/mach-imx/mach-pcm037.c
-+++ b/arch/arm/mach-imx/mach-pcm037.c
-@@ -683,7 +683,7 @@ static void __init pcm037_timer_init(void)
- 	mx31_clocks_init(26000000);
- }
- 
--struct sys_timer pcm037_timer = {
-+static struct sys_timer pcm037_timer = {
- 	.init	= pcm037_timer_init,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-pcm043.c b/arch/arm/mach-imx/mach-pcm043.c
-index 237474f..73585f5 100644
---- a/arch/arm/mach-imx/mach-pcm043.c
-+++ b/arch/arm/mach-imx/mach-pcm043.c
-@@ -399,7 +399,7 @@ static void __init pcm043_timer_init(void)
- 	mx35_clocks_init();
- }
- 
--struct sys_timer pcm043_timer = {
-+static struct sys_timer pcm043_timer = {
- 	.init	= pcm043_timer_init,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-vpr200.c b/arch/arm/mach-imx/mach-vpr200.c
-index 033257e..add8c69 100644
---- a/arch/arm/mach-imx/mach-vpr200.c
-+++ b/arch/arm/mach-imx/mach-vpr200.c
-@@ -310,7 +310,7 @@ static void __init vpr200_timer_init(void)
- 	mx35_clocks_init();
- }
- 
--struct sys_timer vpr200_timer = {
-+static struct sys_timer vpr200_timer = {
- 	.init	= vpr200_timer_init,
- };
- 
--- 
-1.7.4.1
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> ---
+>  drivers/gpio/gpio-omap.c |    5 +----
+>  1 files changed, 1 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 1adc2ec..b8f01c1 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -964,11 +964,8 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
+>                 return;
+>         }
+> 
+> +       _gpio_rmw(base, bank->regs->irqstatus, l,
+> bank->regs->irqenable_inv == 0 );
+>         _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->irqenable_inv);
+> -       _gpio_rmw(base, bank->regs->irqstatus, l,
+> -                                       bank->regs->irqenable_inv == false);
+> -       _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->debounce_en != 0);
+> -       _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->ctrl != 0);
+>         if (bank->regs->debounce_en)
+>                 _gpio_rmw(base, bank->regs->debounce_en, 0, 1);
+> 
+> --
+> 1.7.0.4
