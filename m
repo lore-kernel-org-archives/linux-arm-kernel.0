@@ -1,25 +1,46 @@
-From: sales@newplayaudio.net (SHURE MICROPHONE)
-Date: Tue, 24 Apr 2012 09:33:08 +0000
-Subject: =?GB2312?B?U0hVUkUgTUlDUk9QSE9ORdPrxPq5ss/twcvV1cas?=
-Message-ID: <e89a8ff1c41a4ebcbc04be6971b0@google.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 24 Apr 2012 17:43:20 +0800
+Subject: [PATCH v2 3/3] ARM: imx6q: switch to use pinctrl driver
+In-Reply-To: <20120424090841.GA6987@pengutronix.de>
+References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
+ <1334933916-12971-3-git-send-email-b29396@freescale.com>
+ <CACRpkdbbdkhN-hVF6vP4j6bP-Nsdft5UjjpAVhcKn6KSpEbcuQ@mail.gmail.com>
+ <20120424090841.GA6987@pengutronix.de>
+Message-ID: <20120424094319.GD32166@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,sir
+On Tue, Apr 24, 2012 at 11:08:41AM +0200, Wolfram Sang wrote:
+> On Tue, Apr 24, 2012 at 10:56:43AM +0200, Linus Walleij wrote:
+> > On Fri, Apr 20, 2012 at 4:58 PM, Dong Aisheng <b29396@freescale.com> wrote:
+> > 
+> > > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > >
+> > > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > >
+> > > ---
+> > > This is not a formal patch and is only used for test
+> > > since before the pinctrl core handle dummy state is in,
+> > > enable pinctrl in driver will break other platforms.
+> > >
+> > > ChangeLog v1->v2:
+> > > * using updated binding
+> > > ---
+> > > ?arch/arm/boot/dts/imx6q-arm2.dts ? | ? ?2 ++
+> > > ?arch/arm/boot/dts/imx6q.dtsi ? ? ? | ? 17 +++++++++++++++++
+> > > ?arch/arm/mach-imx/Kconfig ? ? ? ? ?| ? ?2 ++
+> > > ?drivers/mmc/host/sdhci-esdhc-imx.c | ? 12 ++++++++++++
+> > > ?4 files changed, 33 insertions(+), 0 deletions(-)
+> > 
+> > Since this touches the MMC driver I'd like an ACK from the
+> > maintainer, but no maintainer is set for this subdriver, still
+> > it feels like Sascha and/or Wolfram should be involved.
+> 
+> Can we have a more descriptive name for the pinctrl member?
+> 
+Sure, i will update it.
 
-thank you very much for your time
+Thanks
 
-attached is shure mic , yamaha speaker and crown amp, dbx speaker  
-andsenhiser mic prices list.
-
-if you are interest, can you contact us?
-
-Steven
-www.newplayaudio.net
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ????.jpg
-Type: image/jpeg
-Size: 33131 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120424/807d0986/attachment-0001.jpg>
+Regards
+Dong Aisheng
