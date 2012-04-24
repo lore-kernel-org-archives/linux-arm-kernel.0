@@ -1,39 +1,43 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 24 Apr 2012 13:52:02 +0200
-Subject: [PATCH V3 03/12] i2c/i2c-pxa: Remove conditional compilation of
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 24 Apr 2012 14:00:19 +0200
+Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
  clk code
-In-Reply-To: <08a0a53dde1958a395a9950d5e910bcb6e3b02b6.1335266056.git.viresh.kumar@st.com>
+In-Reply-To: <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
 References: <cover.1335266056.git.viresh.kumar@st.com>
- <08a0a53dde1958a395a9950d5e910bcb6e3b02b6.1335266056.git.viresh.kumar@st.com>
-Message-ID: <20120424115202.GB4030@pengutronix.de>
+ <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
+Message-ID: <20120424120019.GE24089@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 04:51:25PM +0530, Viresh Kumar wrote:
-> From: Viresh Kumar <viresh.linux@gmail.com>
-> 
-> With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
-> there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
-> macros.
-> 
-> pxa i2c also has these dummy macros defined locally. Remove them as they aren't
-> required anymore.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: linux-i2c at vger.kernel.org
+> -#if defined(CONFIG_HAVE_CLK)
+>  	hpriv->clk = clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(hpriv->clk))
+> -		dev_notice(&pdev->dev, "cannot get clkdev\n");
+> -	else
+> -		clk_enable(hpriv->clk);
+> -#endif
+> +	if (IS_ERR(hpriv->clk)) {
+> +		dev_err(&pdev->dev, "cannot get clkdev\n");
+> +		return PTR_ERR(hpriv->clk);
+> +	}
+> +
+> +	clk_enable(hpriv->clk);
 
-Shall probably not go in via I2C-tree, so:
+Sorry, but still wrong.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+The clock is optional. If we can find a clock, turn it on. If not,
+keep going....
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120424/e1afffa4/attachment.sig>
+You patch causes the missing clock to become a fatal error.
+
+This sata_mv exists in multiple forms. It can be part of a SoC. It can
+also be on a PCI bus. In the PCI form, it is unlikely to have a clk
+which can be controlled. When built into a SoC, namely one of the
+Orion family, dove, orion5x, mv78xx0 do not have a clock which can be
+controlled. However kirkwood does have a clock.
+
+So, kirkwood will provide a clock and expects that sata_mv will turn
+it on. All the other ways of using sata_mv will not provide a clock,
+but still expect the driver to be happy.
+
+    Andrew
