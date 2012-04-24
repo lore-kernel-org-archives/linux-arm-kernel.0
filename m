@@ -1,63 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 15:01:30 +0200
-Subject: [PATCH 1/2] pinctrl: add pinctrl-mxs support
-In-Reply-To: <4F95A71B.6090808@wwwdotorg.org>
-References: <1334823125-24159-1-git-send-email-shawn.guo@linaro.org>
- <20120421164713.GA3408@das-ThinkPad-X61>
- <20120422163255.GD26306@S2101-09.ap.freescale.net>
- <20120423074702.GD24843@shlinux2.ap.freescale.net>
- <20120423144623.GU26306@S2101-09.ap.freescale.net>
- <4F95A71B.6090808@wwwdotorg.org>
-Message-ID: <CACRpkdYr_=a+c88BjJdrtryS0DP6khjf4tsQPm=EogvZQnZytg@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 24 Apr 2012 15:03:19 +0200
+Subject: [PATCH v2 2/3] ARM: tegra: Add SMMU enabler in AHB
+In-Reply-To: <20120424124115.GL8444@arwen.pp.htv.fi>
+References: <20120424123248.GG8444@arwen.pp.htv.fi><20120424.153930.1438573079107186567.hdoyu@nvidia.com><20120424124115.GL8444@arwen.pp.htv.fi>
+Message-ID: <20120424.160319.1903472399760352200.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 9:01 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/23/2012 08:46 AM, Shawn Guo wrote:
+From: Felipe Balbi <balbi@ti.com>
+Subject: Re: [PATCH v2 2/3] ARM: tegra: Add SMMU enabler in AHB
+Date: Tue, 24 Apr 2012 14:41:18 +0200
+Message-ID: <20120424124115.GL8444@arwen.pp.htv.fi>
 
->> I think I have a understanding on "function" defined by pinctrl
->> subsystem. ?To me, mmc0-4bit and mmc0-8bit are two functions.
->> Linus, help clarify a little bit?
->
-> I suppose there may be disagreement on this, but to me, a function is a
-> specific mux option (the HW register value typically) that can be
-> selected for a particular pin. Typically, these mux options would
-> correspond directly to the HW module whose signals were being muxed onto
-> that pin.
->
-> So for example, Tegra might have the following mux options for some pin:
->
-> SDHCI 1 ? ? # controller 1
-> SDHCI 2 ? ? # controller 2
->
-> but would not have these:
->
-> SDHCI 1 4 bit ? ?# controller 1
-> SDHCI 1 8 bit ? ?# controller 1
-> SDHCI 2 4 bit ? ?# controller 2
-> SDHCI 2 8 bit ? ?# controller 2
->
-> the difference between 4 bit and 8 bit would be purely driven by which
-> pins/groups the two controllers were mux'd onto. (Unless the pin
-> controller HW needed explicit notification of the difference for some
-> reason - certainly not the case for Tegra)
->
-> Of course, this is all without virtual functions. If you're doing
-> virtual functions, the second set of functions I listed above, with 4
-> entries, might well be what you'd end up with. But I dislike that since
-> you're not representing the pure HW capabilities as functions, but
-> rather some higher level grouped concept.
+> * PGP Signed by an unknown key
+> 
+> On Tue, Apr 24, 2012 at 02:39:30PM +0200, Hiroshi Doyu wrote:
+> > From: Felipe Balbi <balbi@ti.com>
+> > Subject: Re: [PATCH v2 2/3] ARM: tegra: Add SMMU enabler in AHB
+> > Date: Tue, 24 Apr 2012 14:32:52 +0200
+> > Message-ID: <20120424123248.GG8444@arwen.pp.htv.fi>
+> > 
+> > > > Old Signed by an unknown key
+> > > 
+> > > Hi,
+> > > 
+> > > On Tue, Apr 24, 2012 at 03:05:15PM +0300, Hiroshi DOYU wrote:
+> > > > @@ -95,6 +98,21 @@ static inline void gizmo_writel(unsigned long value, unsigned long offset)
+> > > >  	writel(value, tegra_ahb->regs + offset);
+> > > >  }
+> > > >  
+> > > > +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> > > > +
+> > > > +void tegra_ahb_enable_smmu(void)
+> > > > +{
+> > > > +	unsigned long val;
+> > > > +
+> > > > +	val = gizmo_readl(AHB_ARBITRATION_XBAR_CTRL);
+> > > > +	val |= AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE_DONE <<
+> > > > +		AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE_SHIFT;
+> > > > +	gizmo_writel(val, AHB_ARBITRATION_XBAR_CTRL);
+> > > > +}
+> > > > +EXPORT_SYMBOL(tegra_ahb_enable_smmu);
+> > > 
+> > > ok, so this is the only place where you need that global pointer. Who
+> > > would call this ? Can you do runtime detection of the SoC and enable
+> > > SMMU based on that ?
+> > > 
+> > > I mean, will this function always be called for TEGRA 3 SoCs or is there
+> > > another condition to that ?
+> > 
+> > Only Tegra3 has SMMU.
+> 
+> but all of them ? In that case, you could call this from probe itself,
+> right ? But an ifdef won't work in all cases, so you need to do runtime
+> detection based on some revision register or cpu detection...
 
-Yeah Stephen pretty much nailed it there.
-
-I am more liberal about what functions represent and I'm happy
-with them representing values poked to several registers, that's
-something we disagree on from time to time.
-
-We all agree (I think) that when there is no pin-level mux control
-(such as in the U300) but several pins are muxed with a single
-register bit or so, then we must define a function encompassing
-many pins.
-
-Yours,
-Linus Walleij
+So far we don't have so many variants, and presently TEGRA_3x_SOC
+always has a SMMU. If there were some variants of TEGRA_3x_SOC, where
+some might not have SMMU, then runtime detection would make sense
+there. Now it's something like TEGRA_3x_SOC == SMMU.
