@@ -1,40 +1,29 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 24 Apr 2012 17:13:18 +0200
-Subject: [PATCH 2/2] arm: imx: add missing select IMX_HAVE_PLATFORM for
- MACH_MX35_3DS in Kconfig
+Date: Tue, 24 Apr 2012 17:13:17 +0200
+Subject: [PATCH 1/2] arm: imx: mx35_3ds: make mx35pdk_timer static
 In-Reply-To: <1335280398-19769-1-git-send-email-mkl@pengutronix.de>
 References: <1335280398-19769-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1335280398-19769-3-git-send-email-mkl@pengutronix.de>
+Message-ID: <1335280398-19769-2-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following linker error:
-arch/arm/mach-imx/built-in.o: In function `mx35_3ds_init':
-mach-mx35_3ds.c:(.init.text+0x4b0): undefined reference to `imx_add_ipu_core'
-mach-mx35_3ds.c:(.init.text+0x4c4): undefined reference to `imx_alloc_mx3_camera'
-mach-mx35_3ds.c:(.init.text+0x520): undefined reference to `imx_add_mx3_sdc_fb'
-mach-mx35_3ds.c:(.init.text+0x590): undefined reference to `imx35_ipu_core_data'
-
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- arch/arm/mach-imx/Kconfig |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-imx/mach-mx35_3ds.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 7561eca..e18d4199 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -571,8 +571,11 @@ config MACH_MX35_3DS
- 	select MXC_DEBUG_BOARD
- 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
-+	select IMX_HAVE_PLATFORM_IMX_FB
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
-+	select IMX_HAVE_PLATFORM_IPU_CORE
-+	select IMX_HAVE_PLATFORM_MX2_CAMERA
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index 6ae51c6..c433187 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -419,7 +419,7 @@ static void __init mx35pdk_timer_init(void)
+ 	mx35_clocks_init();
+ }
+ 
+-struct sys_timer mx35pdk_timer = {
++static struct sys_timer mx35pdk_timer = {
+ 	.init	= mx35pdk_timer_init,
+ };
+ 
 -- 
 1.7.4.1
