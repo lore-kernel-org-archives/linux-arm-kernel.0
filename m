@@ -1,79 +1,112 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 23 Apr 2012 11:09:22 -0500
-Subject: [PATCH 01/19] ARM: OMAP4: PM: save/restore all DPLL settings
- in OFF mode
-In-Reply-To: <1334914432-26456-2-git-send-email-t-kristo@ti.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-2-git-send-email-t-kristo@ti.com>
-Message-ID: <4F957EB2.9080200@ti.com>
+From: tim.schendekehl@egnite.de (Tim Schendekehl)
+Date: Tue, 24 Apr 2012 16:32:37 +0200
+Subject: [PATCH v3] Ethernut 5 board support
+Message-ID: <4F96B985.50807@egnite.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+Add support for the Ethernut 5 open hardware design, based
+on Atmel's AT91SAM9XE512 SoC.
 
-On 04/20/2012 04:33 AM, Tero Kristo wrote:
+Signed-off-by: Tim Schendekehl <tim.schendekehl@egnite.de>
+---
+V3:
+ - More specific compatible property for nxp,pcf8563.
+ - Remove pmmc i2c-device.
 
-[...]
+ arch/arm/boot/dts/ethernut5.dts |   84 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 84 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/ethernut5.dts
 
-> +/**
-> + * omap4_dpll_print_reg - dump out a single DPLL register value
-> + * @dpll_reg: register to dump
-> + * @name: name of the register
-> + * @tuple: content of the register
-> + *
-> + * Helper dump function to print out a DPLL register value in case
-> + * of restore failures.
-> + */
-> +static void omap4_dpll_print_reg(struct omap4_dpll_regs *dpll_reg, char *name,
-> +				 struct dpll_reg *tuple)
-> +{
-> +	if (tuple->offset)
-> +		pr_warn("%s - Address offset = 0x%08x, value=0x%08x\n", name,
-> +			tuple->offset, tuple->val);
-
-Minor nit-pick here ...
-
-1. Offset is 16-bits and so we can just have "offset = 0x%04x"
-2. Consider dropping "Address" from "Address offset"
-3. Can we be consistent in our spaces for "offset = " and "value="?
-
-> +}
-> +
-> +/*
-> + * omap4_dpll_dump_regs - dump out DPLL registers
-> + * @dpll_reg: DPLL to dump
-> + *
-> + * Dump out the contents of the registers for a DPLL. Called if a
-> + * restore for DPLL fails to lock.
-> + */
-> +static void omap4_dpll_dump_regs(struct omap4_dpll_regs *dpll_reg)
-> +{
-> +	pr_warn("%s: Unable to lock dpll %s[part=%x inst=%x]:\n",
-> +		__func__, dpll_reg->name, dpll_reg->mod_partition,
-> +		dpll_reg->mod_inst);
-> +	omap4_dpll_print_reg(dpll_reg, "clksel", &dpll_reg->clksel);
-> +	omap4_dpll_print_reg(dpll_reg, "div_m2", &dpll_reg->div_m2);
-> +	omap4_dpll_print_reg(dpll_reg, "div_m3", &dpll_reg->div_m3);
-> +	omap4_dpll_print_reg(dpll_reg, "div_m4", &dpll_reg->div_m4);
-> +	omap4_dpll_print_reg(dpll_reg, "div_m5", &dpll_reg->div_m5);
-> +	omap4_dpll_print_reg(dpll_reg, "div_m6", &dpll_reg->div_m6);
-> +	omap4_dpll_print_reg(dpll_reg, "div_m7", &dpll_reg->div_m7);
-> +	omap4_dpll_print_reg(dpll_reg, "clkdcoldo", &dpll_reg->clkdcoldo);
-> +	omap4_dpll_print_reg(dpll_reg, "clkmode", &dpll_reg->clkmode);
-> +	omap4_dpll_print_reg(dpll_reg, "autoidle", &dpll_reg->autoidle);
-> +	if (dpll_reg->idlest.offset)
-> +		pr_warn("idlest - Address offset = 0x%08x, before val=0x%08x"
-> +			" after = 0x%08x\n", dpll_reg->idlest.offset,
-> +			dpll_reg->idlest.val,
-> +			omap4_dpll_read_reg(dpll_reg, &dpll_reg->idlest));
-
-Nit-pick ...
-
-1. Same comments as above
-2. Consider dropping "Address offset" altogether here as we print
-"idlest" the offset should be implied.
-3. Also can we be consistent in our naming of "before val and "after"?
-For example, "val before =" and "val now = ".
-
-Cheers
-Jon
+diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
+new file mode 100644
+index 0000000..35c3830
+--- /dev/null
++++ b/arch/arm/boot/dts/ethernut5.dts
+@@ -0,0 +1,84 @@
++/*
++ * ethernut5.dts - Device Tree file for Ethernut 5 board
++ *
++ * Copyright (C) 2012 egnite GmbH <info@egnite.de>
++ *
++ * Licensed under GPLv2.
++ */
++/dts-v1/;
++/include/ "at91sam9260.dtsi"
++
++/ {
++	model = "Ethernut 5";
++	compatible = "egnite,ethernut5", "atmel,at91sam9260", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/mtdblock0 mtdparts=atmel_nand:128m(root),896m(data) rw rootfstype=jffs2";
++	};
++
++	memory {
++		reg = <0x20000000 0x08000000>;
++	};
++
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			usart0: serial at fffb0000 {
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				status = "okay";
++			};
++
++			macb0: ethernet at fffc4000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioC 5 0>;
++				status = "okay";
++			};
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++
++			gpios = <0
++				 &pioC 14 0
++				 0
++				>;
++
++			root at 0 {
++				label = "root";
++				reg = <0x0 0x08000000>;
++			};
++
++			data at 20000 {
++				label = "data";
++				reg = <0x08000000 0x38000000>;
++			};
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++	};
++
++	i2c at 0 {
++		status = "okay";
++
++		pcf8563 at 50 {
++			compatible = "nxp,pcf8563";
++			reg = <0x51>;
++		};
++	};
++};
+-- 
+1.7.1
