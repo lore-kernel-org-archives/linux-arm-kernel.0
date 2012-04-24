@@ -1,39 +1,46 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 16:51:24 +0530
-Subject: [PATCH V3 02/12] clk: Remove redundant depends on from drivers/Kconfig
+Date: Tue, 24 Apr 2012 16:51:25 +0530
+Subject: [PATCH V3 03/12] i2c/i2c-pxa: Remove conditional compilation of clk
+ code
 In-Reply-To: <cover.1335266056.git.viresh.kumar@st.com>
 References: <cover.1335266056.git.viresh.kumar@st.com>
-Message-ID: <645cc6b3f7be68c5d04222533f3f9d1d5ab9ab17.1335266056.git.viresh.kumar@st.com>
+Message-ID: <08a0a53dde1958a395a9950d5e910bcb6e3b02b6.1335266056.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-menu "Common Clock Framework" has "depends on COMMON_CLK" and so configs defined
-within menu don't require these "depends on COMMON_CLK again".
+From: Viresh Kumar <viresh.linux@gmail.com>
+
+With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
+there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
+macros.
+
+pxa i2c also has these dummy macros defined locally. Remove them as they aren't
+required anymore.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: linux-i2c at vger.kernel.org
 ---
- drivers/clk/Kconfig |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-pxa.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 165e1fe..4f10a21 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -24,7 +24,6 @@ menu "Common Clock Framework"
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index a997c7d..1034d93 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -41,13 +41,6 @@
  
- config COMMON_CLK_DISABLE_UNUSED
- 	bool "Disabled unused clocks at boot"
--	depends on COMMON_CLK
- 	---help---
- 	  Traverses the entire clock tree and disables any clocks that are
- 	  enabled in hardware but have not been enabled by any device drivers.
-@@ -35,7 +34,6 @@ config COMMON_CLK_DISABLE_UNUSED
+ #include <asm/irq.h>
  
- config COMMON_CLK_DEBUG
- 	bool "DebugFS representation of clock tree"
--	depends on COMMON_CLK
- 	select DEBUG_FS
- 	---help---
- 	  Creates a directory hierchy in debugfs for visualizing the clk
+-#ifndef CONFIG_HAVE_CLK
+-#define clk_get(dev, id)	NULL
+-#define clk_put(clk)		do { } while (0)
+-#define clk_disable(clk)	do { } while (0)
+-#define clk_enable(clk)		do { } while (0)
+-#endif
+-
+ struct pxa_reg_layout {
+ 	u32 ibmr;
+ 	u32 idbr;
 -- 
 1.7.9
