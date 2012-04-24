@@ -1,28 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 15:19:49 +0200
-Subject: [PATCH 1/1] pinctrl: fix pinctrl_register_mappings
-In-Reply-To: <1335250763-7678-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1335250763-7678-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CACRpkdYjgchvKvs1Wyw9viSUtdc=ZWDtSyDDP2MatEw0_XkVBw@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 24 Apr 2012 15:21:16 +0200
+Subject: [PATCH] pinctrl: fix dangling comment
+Message-ID: <1335273676-22212-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 8:59 AM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-> the function was to pinctrl
->
-> e93bcee00c4 pinctrl: move generic functions to the pinctrl_ namespace
->
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
+This comment was referring to an older PINMUX define, it should
+be PINCTRL now.
 
-This is already fixed in the tree I think, but thanks anyway!
+Reported-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/linux/pinctrl/machine.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
+index e4d1de7..9c4a198 100644
+--- a/include/linux/pinctrl/machine.h
++++ b/include/linux/pinctrl/machine.h
+@@ -163,5 +163,5 @@ static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
+ 	return 0;
+ }
+ 
 -#endif /* !CONFIG_PINMUX */
-
-We forgot to fix that comment though. I'll write a patch.
-
-Thanks,
-Linus Walleij
++#endif /* !CONFIG_PINCTRL */
+ #endif
+-- 
+1.7.9.2
