@@ -1,46 +1,53 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 24 Apr 2012 17:43:20 +0800
-Subject: [PATCH v2 3/3] ARM: imx6q: switch to use pinctrl driver
-In-Reply-To: <20120424090841.GA6987@pengutronix.de>
-References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
- <1334933916-12971-3-git-send-email-b29396@freescale.com>
- <CACRpkdbbdkhN-hVF6vP4j6bP-Nsdft5UjjpAVhcKn6KSpEbcuQ@mail.gmail.com>
- <20120424090841.GA6987@pengutronix.de>
-Message-ID: <20120424094319.GD32166@shlinux2.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Apr 2012 10:48:07 +0100
+Subject: [PATCH 07/15] ARM: ux500: Enable the SMSC9115 on Snowball via
+ Device Tree
+In-Reply-To: <1334867804-31942-8-git-send-email-lee.jones@linaro.org>
+References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
+ <1334867804-31942-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <4F9676D7.1080506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 11:08:41AM +0200, Wolfram Sang wrote:
-> On Tue, Apr 24, 2012 at 10:56:43AM +0200, Linus Walleij wrote:
-> > On Fri, Apr 20, 2012 at 4:58 PM, Dong Aisheng <b29396@freescale.com> wrote:
-> > 
-> > > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > >
-> > > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > >
-> > > ---
-> > > This is not a formal patch and is only used for test
-> > > since before the pinctrl core handle dummy state is in,
-> > > enable pinctrl in driver will break other platforms.
-> > >
-> > > ChangeLog v1->v2:
-> > > * using updated binding
-> > > ---
-> > > ?arch/arm/boot/dts/imx6q-arm2.dts ? | ? ?2 ++
-> > > ?arch/arm/boot/dts/imx6q.dtsi ? ? ? | ? 17 +++++++++++++++++
-> > > ?arch/arm/mach-imx/Kconfig ? ? ? ? ?| ? ?2 ++
-> > > ?drivers/mmc/host/sdhci-esdhc-imx.c | ? 12 ++++++++++++
-> > > ?4 files changed, 33 insertions(+), 0 deletions(-)
-> > 
-> > Since this touches the MMC driver I'd like an ACK from the
-> > maintainer, but no maintainer is set for this subdriver, still
-> > it feels like Sascha and/or Wolfram should be involved.
-> 
-> Can we have a more descriptive name for the pinctrl member?
-> 
-Sure, i will update it.
+From: Lee Jones <lee.jones@linaro.org>
+Date: Tue, 24 Apr 2012 09:50:20 +0100
+Subject: [PATCH 07/16] ARM: ux500: Enable the SMSC9115 on Snowball via Device Tree
 
-Thanks
+Here we split the description of the external-bus at 50000000 over
+two description files. In the more generic db8500 description file
+we only specify the external-bus. Normally this would be used to
+communicate with a NOR-flash device. On the Snowball however, the
+SMSC9115 Ethernet chip occupies it. In the Snowball board specific
+description file is where we actually specify that it is in fact the
+Ethernet device which lives here.
 
-Regards
-Dong Aisheng
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/snowball.dts |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 0ba0955..22b82cc 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -79,10 +79,16 @@
+ 			ranges;
+ 
+ 			ethernet at 50000000 {
+-				compatible = "smsc,9111";
++				compatible = "smsc,lan9115";
+ 				reg = <0x50000000 0x10000>;
+-				interrupts = <12 0x4>;
++				interrupts = <12 0x1>;
+ 				interrupt-parent = <&gpio4>;
++
++				reg-shift = <1>;
++				reg-io-width = <2>;
++				smsc,force-internal-phy;
++				smsc,irq-active-high;
++				smsc,irq-push-pull;
+ 			};
+ 		};
+ 
+-- 
+1.7.9.1
