@@ -1,53 +1,63 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 24 Apr 2012 14:51:00 +0200
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120424120019.GE24089@lunn.ch>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
-Message-ID: <20374.41396.280974.710188@ipc1.ka-ro>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Apr 2012 15:01:30 +0200
+Subject: [PATCH 1/2] pinctrl: add pinctrl-mxs support
+In-Reply-To: <4F95A71B.6090808@wwwdotorg.org>
+References: <1334823125-24159-1-git-send-email-shawn.guo@linaro.org>
+ <20120421164713.GA3408@das-ThinkPad-X61>
+ <20120422163255.GD26306@S2101-09.ap.freescale.net>
+ <20120423074702.GD24843@shlinux2.ap.freescale.net>
+ <20120423144623.GU26306@S2101-09.ap.freescale.net>
+ <4F95A71B.6090808@wwwdotorg.org>
+Message-ID: <CACRpkdYr_=a+c88BjJdrtryS0DP6khjf4tsQPm=EogvZQnZytg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Apr 23, 2012 at 9:01 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/23/2012 08:46 AM, Shawn Guo wrote:
 
-Andrew Lunn writes:
-> > -#if defined(CONFIG_HAVE_CLK)
-> >  	hpriv->clk = clk_get(&pdev->dev, NULL);
-> > -	if (IS_ERR(hpriv->clk))
-> > -		dev_notice(&pdev->dev, "cannot get clkdev\n");
-> > -	else
-> > -		clk_enable(hpriv->clk);
-> > -#endif
-> > +	if (IS_ERR(hpriv->clk)) {
-> > +		dev_err(&pdev->dev, "cannot get clkdev\n");
-> > +		return PTR_ERR(hpriv->clk);
-> > +	}
-> > +
-> > +	clk_enable(hpriv->clk);
-> 
-> Sorry, but still wrong.
-> 
-> The clock is optional. If we can find a clock, turn it on. If not,
-> keep going....
-> 
-> You patch causes the missing clock to become a fatal error.
-> 
-The clock API should accept NULL pointers as valid clocks and
-treat them as NOP.
-Thus drivers wouldn't have to worry about whether they actually got a
-clock to manage or if their clocks are just dummies.
+>> I think I have a understanding on "function" defined by pinctrl
+>> subsystem. ?To me, mmc0-4bit and mmc0-8bit are two functions.
+>> Linus, help clarify a little bit?
+>
+> I suppose there may be disagreement on this, but to me, a function is a
+> specific mux option (the HW register value typically) that can be
+> selected for a particular pin. Typically, these mux options would
+> correspond directly to the HW module whose signals were being muxed onto
+> that pin.
+>
+> So for example, Tegra might have the following mux options for some pin:
+>
+> SDHCI 1 ? ? # controller 1
+> SDHCI 2 ? ? # controller 2
+>
+> but would not have these:
+>
+> SDHCI 1 4 bit ? ?# controller 1
+> SDHCI 1 8 bit ? ?# controller 1
+> SDHCI 2 4 bit ? ?# controller 2
+> SDHCI 2 8 bit ? ?# controller 2
+>
+> the difference between 4 bit and 8 bit would be purely driven by which
+> pins/groups the two controllers were mux'd onto. (Unless the pin
+> controller HW needed explicit notification of the difference for some
+> reason - certainly not the case for Tegra)
+>
+> Of course, this is all without virtual functions. If you're doing
+> virtual functions, the second set of functions I listed above, with 4
+> entries, might well be what you'd end up with. But I dislike that since
+> you're not representing the pure HW capabilities as functions, but
+> rather some higher level grouped concept.
 
+Yeah Stephen pretty much nailed it there.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+I am more liberal about what functions represent and I'm happy
+with them representing values poked to several registers, that's
+something we disagree on from time to time.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+We all agree (I think) that when there is no pin-level mux control
+(such as in the U300) but several pins are muxed with a single
+register bit or so, then we must define a function encompassing
+many pins.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Yours,
+Linus Walleij
