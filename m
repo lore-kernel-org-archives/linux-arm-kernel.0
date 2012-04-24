@@ -1,45 +1,69 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 15:55:09 +0530
-Subject: [PATCH V2] watchdog: mpcore: Add DT probing support for ARM mpcore
- watchdog
-In-Reply-To: <4F9582AF.6040501@arm.com>
-References: <18a4584c24041ceb8a1972dd5ee70cf7c59fed21.1334932839.git.viresh.kumar@st.com>
- <7dbd64f72527cf92af0ec38f45275d71207d5ec5.1335008301.git.viresh.kumar@st.com>
- <4F9514AA.10403@arm.com>
- <CAOh2x=kroSi8MZBhYVOhrDm08q1B9LS_9P7NPAfHC01-MHaOCQ@mail.gmail.com>
- <4F9547E3.4000709@arm.com>
- <CAOh2x=kQvjP5SYfJsTXkZyNe3UsS-=pXUBKoQ=SsMUNcPGjzuA@mail.gmail.com>
- <4F9573B8.9050607@arm.com>
- <CAOh2x=n5Zm9MR5twDY-CUA-ppE9ADXrg25XCT5RKM++v6=tcpA@mail.gmail.com>
- <4F957A0C.7060607@arm.com>
- <CAOh2x=kyJ3tG3go0TQ2LXLOKDf0m9=uz1=KC7asMS0FSxtx9uA@mail.gmail.com>
- <4F957F62.5090605@arm.com>
- <CAOh2x=n4JdZdZoofHpr+9G254ZL_kxyWEHHRr5W4PB4GgjeHsQ@mail.gmail.com>
- <4F9582AF.6040501@arm.com>
-Message-ID: <4F967F85.1030907@st.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 24 Apr 2012 10:33:01 +0000
+Subject: [PATCH-V4 0/3] ARM: OMAP: Make OMAP clocksource source
+ selection runtime
+In-Reply-To: <CAMQu2gzHQ-ku3akGWqUGN+EC3Jo7LtXbohqfVT=fG4Y0VFttng@mail.gmail.com>
+References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
+ <CAMQu2gzHQ-ku3akGWqUGN+EC3Jo7LtXbohqfVT=fG4Y0VFttng@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9FAAFA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/23/2012 9:56 PM, Marc Zyngier wrote:
->> > Looking at your confidence, i am starting to feel, i am wrong here ;)
-> Well, having written the code that ensures request_irq() fails when
-> passed a PPI, I'd be very worried if the above started to be working... 
+On Tue, Apr 24, 2012 at 15:36:43, Shilimkar, Santosh wrote:
+> On Tue, Apr 24, 2012 at 3:15 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+> > Current OMAP code supports couple of clocksource options based
+> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
+> >
+> > This patch series cleans up the existing 32k-sync timer implementation
+> > without any major code changes, uses kernel parameter to override
+> > the default clocksource of "counter_32k", also in order to support
+> > some OMAP based derivative SoCs like AM33XX which doesn't have
+> > 32K sync-timer hardware IP, adds hwmod lookup for omap2+
+> > devices, and if lookup fails then fall back to gp-timer.
+> >
+> > if(use_gptimer_clksrc == true)
+> > ? ? ? ?gptimer clocksource init;
+> > else if (counter_32 init == false)
+> > ? ? ? ?/* Fallback to gptimer */
+> > ? ? ? ?gptimer clocksource init(;
+> >
+> > With this, we should be able to support multi-omap boot
+> > including devices with/without 32k-sync timer.
+> >
+> > This patch-series has been boot tested on AM37xEVM platform, it
+> > would be helpful if somebody help me to validate it on OMAP1/2
+> > platforms.
+> >
+> > The patches are also available at -
+> > https://github.com/hvaibhav/am335x-linux ? 32ksync-timer-cleanup
+> >
+> > History:
+> > ========
+> > Changes from V3:
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg66462.html
+> > ? ? ? ?- Fixed all review comments from Kevin H
+> > ? ? ? ? ? ? ? ?* Moved counter_32k CR register offset handling to
+> > ? ? ? ? ? ? ? ? ?counter_32k.c file, so now, calling funtion don't have
+> > ? ? ? ? ? ? ? ? ?to maintain or add offset to base addr.
+> > ? ? ? ? ? ? ? ?* Added comment for funtion omap_init_clocksource_32k()
+> > ? ? ? ? ? ? ? ?* Used resource_size() for calculate size
+> > ? ? ? ? ? ? ? ?* Convert WARN_ON to pr_warn
+> >
+> Have given my reviewed-by on v2. Just quickly scanned the series
+> based on above minor updates.
+> Feel free to add,
+> 
+> 
+Sorry, I missed to add your Reviewed-by here.
 
-And yes. I was wrong. 
+I believe this should be now last version, and should get merged by 
+either Tony or Paul.
 
-WARNING: at /home/vireshk/work/spear/kernel/linux-2.6/kernel/irq/manage.c:1368 request_threaded_irq+0x128/0x148()
-Modules linked in:
-Backtrace: 
-[<c000c200>] (dump_backtrace+0x0/0x10c) from [<c0249814>] (dump_stack+0x18/0x1c)
- r6:00000558 r5:c005cb34 r4:00000000
-[<c02497fc>] (dump_stack+0x0/0x1c) from [<c00157d4>] (warn_slowpath_common+0x54/0x6c)
-[<c0015780>] (warn_slowpath_common+0x0/0x6c) from [<c0015810>] (warn_slowpath_null+0x24/0x28)
- r8:0000001e r7:c01f69c4 r6:00000000 r5:c033b840 r4:ee21770c
-[<c00157ec>] (warn_slowpath_null+0x0/0x28) from [<c005cb34>] (request_threaded_irq+0x128/0x148)
-[<c005ca0c>] (request_threaded_irq+0x0/0x148) from [<c005e95c>] (devm_request_threaded_irq+0x5c/0x94)
-[<c005e900>] (devm_request_threaded_irq+0x0/0x94) from [<c02460b8>] (mpcore_wdt_probe+0x88/0x2d4)
-[<c0246030>] (mpcore_wdt_probe+0x0/0x2d4) from [<c0180548>] (platform_drv_probe+0x20/0x24)
- r7:00000000 r6:ee101c08 r5:c03601e4 r4:c038abf4
+Tony & Paul,
+Note to add line,
+"Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>"
 
--- 
-viresh
+
+Thanks,
+Vaibhav
