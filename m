@@ -1,41 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 24 Apr 2012 14:08:47 -0700
-Subject: [PATCH 3/3] ARM: dt: tegra_ventana: als and proximity sensor
- isl29018 support
-In-Reply-To: <4F8DF01D.9040900@wwwdotorg.org>
-References: <1334645155-13799-1-git-send-email-ldewangan@nvidia.com>
- <1334645155-13799-4-git-send-email-ldewangan@nvidia.com>
- <4F8DF01D.9040900@wwwdotorg.org>
-Message-ID: <20120424210847.GA12611@quad.lixom.net>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 24 Apr 2012 14:18:50 -0700
+Subject: [PATCH/RFC v2] [SCSI] atp870u: Fix bad use of udelay
+In-Reply-To: <20120424074916.GA25261@burratino>
+References: <200901092028.n09KSAeI024551@imap1.linux-foundation.org>
+ <20090109205835.GB5069@deprecation.cyrius.com>
+ <20090109130308.bfde281e.akpm@linux-foundation.org>
+ <1231536107.3235.50.camel@localhost.localdomain>
+ <20120424074916.GA25261@burratino>
+Message-ID: <20120424141850.e5cdf6c2.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2012 at 04:35:09PM -0600, Stephen Warren wrote:
-> On 04/17/2012 12:45 AM, Laxman Dewangan wrote:
-> > Add the device info for ALS and proximity sensor isl29018.
-> 
-> (There were a ton of irrelevant people CC'd on this patch; I cut them
-> out, but kept the lists in case anyone was interested in the replies.
-> The most relevant list, linux-tegra, also wasn't CC'd)
-> 
-> > diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
-> 
-> > +		/* ALS and proximity sensor */
-> 
-> > +		isl29018: isl29018 at 44 {
-> 
-> I don't think the label "isl29018:" serves any purpose; nothing else
-> needs to refer to this node.
-> 
-> I note from http://patchwork.ozlabs.org/patch/132936/ that:
-> 
-> a) Perhaps the vendor prefix should be "isil" not "isl". Olof, can you
-> please comment here?
+On Tue, 24 Apr 2012 02:49:16 -0500
+Jonathan Nieder <jrnieder@gmail.com> wrote:
 
-The standard practice is to use stock tickers, but if companies aren't public
-then there isn't much you can do. Like Linus said, use your best judgement and
-taste and that's really all we can ask for. :)
+> From: Martin Michlmayr <tbm@cyrius.com>
+> 
+> The ACARD driver calls udelay() with a value > 2000, which leads to
+> to the following compilation error on ARM:
+>   ERROR: "__bad_udelay" [drivers/scsi/atp870u.ko] undefined!
+>   make[1]: *** [__modpost] Error 1
+>
+> ...
+>
+> --- a/drivers/scsi/atp870u.c
+> +++ b/drivers/scsi/atp870u.c
+> @@ -1173,7 +1173,16 @@ wait_io1:
+>  	outw(val, tmport);
+>  	outb(2, 0x80);
+>  TCM_SYNC:
+> -	udelay(0x800);
+> +	/*
+> +	 * The funny division into multiple delays is to accomodate
+> +	 * arches like ARM where udelay() multiplies its argument by
+> +	 * a large number to initialize a loop counter.  To avoid
+> +	 * overflow, the maximum supported udelay is 2000 microseconds.
+> +	 *
+> +	 * XXX it would be more polite to find a way to use msleep()
+> +	 */
+> +	mdelay(2);
+> +	udelay(48);
+>  	if ((inb(tmport) & 0x80) == 0x00) {	/* bsy ? */
+>  		outw(0, tmport--);
+>  		outb(0, tmport);
 
+Fair enough, I say.  Looking at this driver, I do think it's best to
+minimally fix the build and then tiptoe away very delicately lest
+something explode.
 
-
--Olof
+That being said, I'm glad the kernel has a function called "fun_scam".
