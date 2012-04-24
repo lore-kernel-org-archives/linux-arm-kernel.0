@@ -1,61 +1,36 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Tue, 24 Apr 2012 14:08:00 +0530
-Subject: [PATCH 1/2] OMAP2+: UART: Fix incorrect population of default
- uart pads
-In-Reply-To: <87397uhv0q.fsf@ti.com>
-References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
- <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
- <87397uhv0q.fsf@ti.com>
-Message-ID: <CAMrsUdKnDaO7qV2NpNvTb3QdO-XeM_PF645Mc43RozFVex71hQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Apr 2012 10:56:43 +0200
+Subject: [PATCH v2 3/3] ARM: imx6q: switch to use pinctrl driver
+In-Reply-To: <1334933916-12971-3-git-send-email-b29396@freescale.com>
+References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
+ <1334933916-12971-3-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdbbdkhN-hVF6vP4j6bP-Nsdft5UjjpAVhcKn6KSpEbcuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 5:15 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> From: "Govindraj.R" <govindraj.raja@ti.com>
->>
->> The following commit:
->> (7496ba3 ?ARM: OMAP2+: UART: Add default mux for all uarts)
->> added default pads for all uarts. But not all boards tend to
->> use all uarts and most of unused uart pins are muxed for
->> other purpose. This commit breaks the modules which where trying
->> to use unused uart pins on their boards.
->>
->> So remove the default pads adding.
->
-> I just noticed that this patch breaks runtime PM & wakeups for UART
-> console (at least on 3530/Overo with ttyO2 console.)
->
-> By removing the pads, the initial device_init_wakeup() is not called on
-> port init. ?Without this call serial_omap_pm() disables runtime PM
-> because it checks device_may_wakeup().
->
-> Since runtime PM was disabled, I manually re-enabled it and then enabled
-> wakeups:
->
-> ?echo auto > /sys/devices/platform/omap_uart.2/power/control
-> ?echo enabled > /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
->
-> Then, after enabling auto-suspend timeouts, it seems wakeups are still
-> not working since the console hangs.
->
-> Reverting $SUBJECT patch gets things working again.
+On Fri, Apr 20, 2012 at 4:58 PM, Dong Aisheng <b29396@freescale.com> wrote:
 
-This was decided as part of discussion [1]
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>
+> ---
+> This is not a formal patch and is only used for test
+> since before the pinctrl core handle dummy state is in,
+> enable pinctrl in driver will break other platforms.
+>
+> ChangeLog v1->v2:
+> * using updated binding
+> ---
+> ?arch/arm/boot/dts/imx6q-arm2.dts ? | ? ?2 ++
+> ?arch/arm/boot/dts/imx6q.dtsi ? ? ? | ? 17 +++++++++++++++++
+> ?arch/arm/mach-imx/Kconfig ? ? ? ? ?| ? ?2 ++
+> ?drivers/mmc/host/sdhci-esdhc-imx.c | ? 12 ++++++++++++
+> ?4 files changed, 33 insertions(+), 0 deletions(-)
 
-If we are _reconsidering_ taking this patch [2]
-to dynamically probe uart pins and enable rx wakeup.
+Since this touches the MMC driver I'd like an ACK from the
+maintainer, but no maintainer is set for this subdriver, still
+it feels like Sascha and/or Wolfram should be involved.
 
-I can re-work on the patch[2] as per tony's comments[1]
-and re-post it.
-
---
-Thanks,
-Govindraj.R
-
-[1]:
-http://www.spinics.net/lists/linux-omap/msg68226.html
-
-[2]:
-http://www.spinics.net/lists/linux-omap/msg67822.html
+Yours,
+Linus Walleij
