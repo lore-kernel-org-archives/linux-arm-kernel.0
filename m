@@ -1,10 +1,9 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 16:51:26 +0530
-Subject: [PATCH V3 04/12] usb/marvell: Remove conditional compilation of clk
- code
+Date: Tue, 24 Apr 2012 16:51:27 +0530
+Subject: [PATCH V3 05/12] usb/musb: Remove conditional compilation of clk code
 In-Reply-To: <cover.1335266056.git.viresh.kumar@st.com>
 References: <cover.1335266056.git.viresh.kumar@st.com>
-Message-ID: <ac4280d4e8323e86982e6a3ceed93a2e7f30e52e.1335266056.git.viresh.kumar@st.com>
+Message-ID: <40288f19ddb96cef37285dd0fa79a48a7e381fb3.1335266056.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,33 +13,34 @@ With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
 there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
 macros.
 
-Marvell usb also has these dummy macros defined locally. Remove them as they
-aren't required anymore.
+musb also has these dummy macros defined locally. Remove them as they aren't
+required anymore.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: linux-usb at vger.kernel.org
 ---
- include/linux/platform_data/mv_usb.h |    9 ---------
- 1 files changed, 0 insertions(+), 9 deletions(-)
+ drivers/usb/musb/musb_core.h |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
-index d94804a..944b01d 100644
---- a/include/linux/platform_data/mv_usb.h
-+++ b/include/linux/platform_data/mv_usb.h
-@@ -52,13 +52,4 @@ struct mv_usb_platform_data {
- 	int	(*set_vbus)(unsigned int vbus);
- 	int     (*private_init)(void __iomem *opregs, void __iomem *phyregs);
- };
--
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+index 93de517..371a3a5 100644
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -81,14 +81,6 @@ struct musb_ep;
+ #define is_peripheral_active(m)		(!(m)->is_host)
+ #define is_host_active(m)		((m)->is_host)
+ 
 -#ifndef CONFIG_HAVE_CLK
 -/* Dummy stub for clk framework */
--#define clk_get(dev, id)       NULL
--#define clk_put(clock)         do {} while (0)
--#define clk_enable(clock)      do {} while (0)
--#define clk_disable(clock)     do {} while (0)
+-#define clk_get(dev, id)	NULL
+-#define clk_put(clock)		do {} while (0)
+-#define clk_enable(clock)	do {} while (0)
+-#define clk_disable(clock)	do {} while (0)
 -#endif
 -
- #endif
+ #ifdef CONFIG_PROC_FS
+ #include <linux/fs.h>
+ #define MUSB_CONFIG_PROC_FS
 -- 
 1.7.9
