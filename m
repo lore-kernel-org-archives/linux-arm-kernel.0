@@ -1,15 +1,29 @@
-From: thejfasi@gmail.com (Alexander Golec)
-Date: Tue, 24 Apr 2012 09:54:17 -0400
-Subject: [Android-virt] [ANNOUNCE] [OFFTOPIC] Xvisor ARM with and/or
- without virtualization extensions
-In-Reply-To: <CAAhSdy12KufzNtrf6wYY7rK0LZMPC-_-4N+p4JwJsV5MB6HTDg@mail.gmail.com>
-References: <CAAhSdy12KufzNtrf6wYY7rK0LZMPC-_-4N+p4JwJsV5MB6HTDg@mail.gmail.com>
-Message-ID: <393682CA-A7A8-4962-B156-3EBDF5B41E36@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 24 Apr 2012 21:59:43 +0800
+Subject: [PATCH] ARM pxa pcm027: use ioremap to access CPLD
+In-Reply-To: <20120424081714.GS3852@pengutronix.de>
+References: <1334223908-14690-1-git-send-email-s.hauer@pengutronix.de>
+ <CAMPhdO-+AVHmo40tzhADLysnenbD=72hgx5U6sv09HuA9haZ2g@mail.gmail.com>
+ <20120424081714.GS3852@pengutronix.de>
+Message-ID: <CAMPhdO_Doc9doDP1zEKbyiizRs4WibBkKZOoygCgaXY9mA5+9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 24, 2012 at 4:17 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Fri, Apr 20, 2012 at 04:58:01PM +0800, Eric Miao wrote:
+>> On Thu, Apr 12, 2012 at 5:45 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> > The pcm990 baseboard for the pcm027 module used to setup a static
+>> > mapping for accessing the CPLD. It became illegal to call iotable_init
+>> > that late. The pcm027 support is broken since then. This patch
+>> > switches the cpld support to ioremap and removes all references to
+>> > previous static mappings.
+>> >
+>> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>>
+>> Looks good to me.
+>>
+>> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+>
+> Thanks Eric. Who will take this patch?
 
-I'm a graduating senior at Columbia University, and I have spent the past semester working on the KVM on ARM project, specifically on block IO virtualization support. I was wondering if you have any need for an implementation of IO virtualization for block and network operations. If so, then I would be glad to submit a pull request further down the line.
-
-Alex
+Haojian, please help on this.
