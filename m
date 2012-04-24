@@ -1,62 +1,40 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Tue, 24 Apr 2012 19:39:12 +0530
-Subject: [PATCH v3 2/2] ARM: omap3: pm: Remove uart module level wakeup
- configurations
-In-Reply-To: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
-References: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1335276552-24340-3-git-send-email-govindraj.raja@ti.com>
+Date: Tue, 24 Apr 2012 19:39:10 +0530
+Subject: [PATCH v3 0/2] ARM: omap_hwmod: add api to enable/disable module
+ level wakeup
+Message-ID: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Govindraj.R" <govindraj.raja@ti.com>
 
-The uart module level wakeups enabling and disabling
-are now handled from uart driver itself remove the uart module
-level configurations from pm code.
+On omap2/3 module level wakeup is handled using PM_WKEN registers.
+Expand the hwmod framework to handle the module level wakeup enable 
+registers.
+
+Tested on Beagle-xm by enabling and disabling uart wakeups from sysfs
+Series depends on following patches for testing.
+http://marc.info/?l=linux-omap&m=133527588923598&w=2
+http://marc.info/?l=linux-omap&m=133518614022144&w=2
 
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@ti.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
 Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c |   14 +++++---------
- 1 files changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 703bd10..7a19498 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -529,8 +529,6 @@ static void __init omap3_d2d_idle(void)
- 
- static void __init prcm_setup_regs(void)
- {
--	u32 omap3630_en_uart4_mask = cpu_is_omap3630() ?
--					OMAP3630_EN_UART4_MASK : 0;
- 	u32 omap3630_grpsel_uart4_mask = cpu_is_omap3630() ?
- 					OMAP3630_GRPSEL_UART4_MASK : 0;
- 
-@@ -562,13 +560,11 @@ static void __init prcm_setup_regs(void)
- 				OMAP3430_DSS_MOD, PM_WKEN);
- 
- 	/* Enable wakeups in PER */
--	omap2_prm_write_mod_reg(omap3630_en_uart4_mask |
--			  OMAP3430_EN_GPIO2_MASK | OMAP3430_EN_GPIO3_MASK |
--			  OMAP3430_EN_GPIO4_MASK | OMAP3430_EN_GPIO5_MASK |
--			  OMAP3430_EN_GPIO6_MASK | OMAP3430_EN_UART3_MASK |
--			  OMAP3430_EN_MCBSP2_MASK | OMAP3430_EN_MCBSP3_MASK |
--			  OMAP3430_EN_MCBSP4_MASK,
--			  OMAP3430_PER_MOD, PM_WKEN);
-+	omap2_prm_write_mod_reg(OMAP3430_EN_GPIO2_MASK |
-+			OMAP3430_EN_GPIO3_MASK | OMAP3430_EN_GPIO4_MASK |
-+			OMAP3430_EN_GPIO5_MASK | OMAP3430_EN_GPIO6_MASK |
-+			OMAP3430_EN_MCBSP2_MASK | OMAP3430_EN_MCBSP3_MASK |
-+			OMAP3430_EN_MCBSP4_MASK, OMAP3430_PER_MOD, PM_WKEN);
- 	/* and allow them to wake up MPU */
- 	omap2_prm_write_mod_reg(omap3630_grpsel_uart4_mask |
- 			  OMAP3430_GRPSEL_GPIO2_MASK |
+Govindraj.R (2):
+  ARM: OMAP2+: omap_hwmod: Add api to enable/disable module level
+    wakeup events
+  ARM: omap3: pm: Remove uart module level wakeup configurations
+
+ arch/arm/mach-omap2/omap_hwmod.c   |   22 ++++++++++++++++++++++
+ arch/arm/mach-omap2/pm34xx.c       |   14 +++++---------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |   16 ++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |    9 +++++++++
+ 4 files changed, 52 insertions(+), 9 deletions(-)
+
 -- 
 1.7.9
