@@ -1,25 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 15:15:29 +0200
-Subject: Tag on pinctrl
-Message-ID: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
+Date: Tue, 24 Apr 2012 15:19:49 +0200
+Subject: [PATCH 1/1] pinctrl: fix pinctrl_register_mappings
+In-Reply-To: <1335250763-7678-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1335250763-7678-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CACRpkdYjgchvKvs1Wyw9viSUtdc=ZWDtSyDDP2MatEw0_XkVBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A while back I created a tag:
+On Tue, Apr 24, 2012 at 8:59 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
 
-pinctrl-mergebase-20120418
+> the function was to pinctrl
+>
+> e93bcee00c4 pinctrl: move generic functions to the pinctrl_ namespace
+>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
 
-On the pinctrl tree. It contains stuff up until that date that
-has since been sitting in linux-next for a while.
+This is already fixed in the tree I think, but thanks anyway!
 
-I do not expect to rebase these patches further. They
-are based on v3.4-rc3. So I will base any further pinctrl
-work on this.
+-#endif /* !CONFIG_PINMUX */
 
-I think Stephen needed to pull this into the ARM SoC tree?
+We forgot to fix that comment though. I'll write a patch.
 
-Anyone else? Viresh's driver would survive without the
-latest fixes and doings in pinctrl IIRC.
-
-Yours,
+Thanks,
 Linus Walleij
