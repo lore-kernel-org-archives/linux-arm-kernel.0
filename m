@@ -1,42 +1,87 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Tue, 24 Apr 2012 19:12:10 +0530
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120424120019.GE24089@lunn.ch>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
-Message-ID: <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 24 Apr 2012 22:04:25 +0800
+Subject: [PATCH v2 3/3] ARM: imx6q: switch to use pinctrl driver
+In-Reply-To: <20120424124634.GH9142@game.jcrosoft.org>
+References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
+ <1334933916-12971-3-git-send-email-b29396@freescale.com>
+ <20120424124634.GH9142@game.jcrosoft.org>
+Message-ID: <20120424140425.GB24122@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/12, Andrew Lunn <andrew@lunn.ch> wrote:
-> Sorry, but still wrong.
->
-> The clock is optional. If we can find a clock, turn it on. If not,
-> keep going....
->
-> You patch causes the missing clock to become a fatal error.
->
-> This sata_mv exists in multiple forms. It can be part of a SoC. It can
-> also be on a PCI bus. In the PCI form, it is unlikely to have a clk
-> which can be controlled. When built into a SoC, namely one of the
-> Orion family, dove, orion5x, mv78xx0 do not have a clock which can be
-> controlled. However kirkwood does have a clock.
->
-> So, kirkwood will provide a clock and expects that sata_mv will turn
-> it on. All the other ways of using sata_mv will not provide a clock,
-> but still expect the driver to be happy.
+On Tue, Apr 24, 2012 at 08:46:34PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 22:58 Fri 20 Apr     , Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > ---
+> > This is not a formal patch and is only used for test
+> > since before the pinctrl core handle dummy state is in,
+> > enable pinctrl in driver will break other platforms.
+> > 
+> > ChangeLog v1->v2:
+> > * using updated binding
+> > ---
+> >  arch/arm/boot/dts/imx6q-arm2.dts   |    2 ++
+> >  arch/arm/boot/dts/imx6q.dtsi       |   17 +++++++++++++++++
+> >  arch/arm/mach-imx/Kconfig          |    2 ++
+> >  drivers/mmc/host/sdhci-esdhc-imx.c |   12 ++++++++++++
+> >  4 files changed, 33 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+> > index ce1c823..68b1d8d 100644
+> > --- a/arch/arm/boot/dts/imx6q-arm2.dts
+> > +++ b/arch/arm/boot/dts/imx6q-arm2.dts
+> > @@ -44,6 +44,8 @@
+> >  				fsl,card-wired;
+> >  				vmmc-supply = <&reg_3p3v>;
+> >  				status = "okay";
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_usdhc4_1>;
+> >  			};
+> >  
+> >  			uart4: uart at 021f0000 {
+> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> > index 4905f51..8cbd88b 100644
+> > --- a/arch/arm/boot/dts/imx6q.dtsi
+> > +++ b/arch/arm/boot/dts/imx6q.dtsi
+> > @@ -386,7 +386,24 @@
+> >  			};
+> >  
+> >  			iomuxc at 020e0000 {
+> > +				compatible = "fsl,imx6q-iomuxc";
+> >  				reg = <0x020e0000 0x4000>;
+> > +
+> > +				/* shared pinctrl settings */
+> > +				usdhc4 {
+> > +					pinctrl_usdhc4_1: usdhc4grp-1 {
+> > +						fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
+> > +							    1392 0x17059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
+> > +							    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
+> > +							    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
+> > +							    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
+> > +							    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
+> > +							    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
+> > +							    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
+> > +							    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
+> > +							    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
+> Can you on IMX have alternative onfiguration where you use as example just one
+> pin on a different pad?
+> 
+Well, it's a good question.
+If user wants to set a different pad configuration for one pin in a exist group,
+he may need to create a new group node to hold that pin settings.
+This is the limitation since we can not enumerate all available pin
+configurations.
 
-Hmm. What this code does now is:
-If HAVE_CLK is selected, then there must be a clock for the device. Otherwise
-it will always pass.
+I think what we can do may be:
+For those easy changed pins, user could define the pin configuration node in
+board dts file where devices can use one more phandle to reference it to do
+minor fixup. Then we do not need to frequently change the SoC dtsi file.
 
-You want not to return error if a platform does have HAVE_CLK, but doesn't
-have a clock for sata? That would be simple to fix, but want to confirm if this
-is actually required.
+For not easy changed pins, we can just add the new group in soc dtsi file
+for people to use.
 
-@Russell: Can we have your view also?
-
---
-viresh
+Regards
+Dong Aisheng
