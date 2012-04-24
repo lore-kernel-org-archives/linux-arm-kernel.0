@@ -1,44 +1,54 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 24 Apr 2012 08:59:23 +0200
-Subject: [PATCH 1/1] pinctrl: fix pinctrl_register_mappings
-Message-ID: <1335250763-7678-1-git-send-email-plagnioj@jcrosoft.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 24 Apr 2012 09:26:53 +0200
+Subject: [PATCH V2 4/9] ata/sata_mv: Remove conditional compilation of
+ clk code
+In-Reply-To: <4F9650B3.9030406@st.com>
+References: <20120424070426.GA24089@lunn.ch>
+ <4F9650B3.9030406@st.com>
+Message-ID: <20120424072653.GB24089@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the function was to pinctrl
+On Tue, Apr 24, 2012 at 12:35:23PM +0530, Viresh Kumar wrote:
+> On 4/24/2012 12:34 PM, Andrew Lunn wrote:
+> > I don't think this change is correct. With the old semantics, it was:
+> 
+> Sorry. :(
+> 
+> > If we have CLK support, we expect there to be a clock for sata_mv, and
+> > if there is no such clock, output a notice message, something is
+> > probably wrong, i expected there to be a clock.
+> > 
+> > The new semantics are:
+> > 
+> > We expect there to be a clock for sata_mv, and if there is no such
+> > clock, output a notice message, something is probably wrong, i
+> > expected there to be a clock.
+> > 
+> > We are going to see this notice message much more, when it is not
+> > expected.
+> 
+> So, the only problem is this message?
+> How do you suggest to tackle this now. Have #ifdef,#endif around this print?
 
-e93bcee00c4 pinctrl: move generic functions to the pinctrl_ namespace
+Well, adding #ifdef defeats the point of adding dummy implementations.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
----
- include/linux/pinctrl/machine.h |   13 +------------
- 1 files changed, 1 insertions(+), 12 deletions(-)
+Maybe, rather than return -ENODEV, return -ENOTSUP.
 
-diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
-index fee4349..fb6b649 100644
---- a/include/linux/pinctrl/machine.h
-+++ b/include/linux/pinctrl/machine.h
-@@ -148,18 +148,7 @@ struct pinctrl_map {
- #define PIN_MAP_CONFIGS_GROUP_HOG_DEFAULT(dev, grp, cfgs)		\
- 	PIN_MAP_CONFIGS_GROUP(dev, PINCTRL_STATE_DEFAULT, dev, grp, cfgs)
- 
--#ifdef CONFIG_PINMUX
--
--extern int pinctrl_register_mappings(struct pinctrl_map const *map,
-+extern int pinctrl_register_mappings(struct pinctrl_map const *maps,
- 				unsigned num_maps);
- 
--#else
--
--static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
--					   unsigned num_maps)
--{
--	return 0;
--}
--
--#endif /* !CONFIG_PINMUX */
- #endif
--- 
-1.7.9.1
+IS_ERR() still returns true, so in most cases, no code needs
+changing. However, when you need to differentiate between, "clock does
+not exists" and "Dummy clock functions being used", you can tell the
+difference. mv_sata could look like:
+
+        hpriv->clk = clk_get(&pdev->dev, NULL);
+        if (IS_ERR(hpriv->clk))
+	        if (PTR_ERR(hpriv->clk) == -ENODEV)
+		        dev_notice(&pdev->dev, "cannot get clkdev\n");
+        else
+                clk_prepare_enable(hpriv->clk);
+
+
+You would however, need to look at all uses of clk_get and see if any
+are looked for ENODEV, and not just IS_ERR(), and fix those....
+
+	Andrew
