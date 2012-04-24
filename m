@@ -1,24 +1,34 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 16:05:00 +0530
-Subject: [PATCH V3 2/2] watchdog: mpcore: Add DT probing support for ARM
- mpcore watchdog
-In-Reply-To: <4F9671D8.4080308@arm.com>
-References: <31b0b89e21e6a234cb904761a1d0e5106405da82.1335246446.git.viresh.kumar@st.com>
- <27dea103ccf6da5b7376c837d9a95dc7a9ed3be3.1335246446.git.viresh.kumar@st.com>
- <4F9671D8.4080308@arm.com>
-Message-ID: <4F9681D4.9010904@st.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 24 Apr 2012 16:05:29 +0530
+Subject: [PATCH 3/8] dmaengine: split out virtual channel DMA support
+ from sa11x0 driver
+In-Reply-To: <E1SKRr2-0004bC-8a@rmk-PC.arm.linux.org.uk>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRr2-0004bC-8a@rmk-PC.arm.linux.org.uk>
+Message-ID: <4F9681F1.2090408@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2012 2:56 PM, Marc Zyngier wrote:
-> I'm sorry, but I really have to ask: What is the point of adding DT
-> support to this driver when it is obvious that it is already broken?
+On Wednesday 18 April 2012 03:41 PM, Russell King wrote:
+> +/**
+> + * vchan_cookie_complete - report completion of a descriptor
+> + * vd: virtual descriptor to update
+> + *
+> + * vc.lock must be held by caller
+> + */
+> +static inline void vchan_cookie_complete(struct virt_dma_desc *vd)
+> +{
+> +       struct virt_dma_chan *vc = to_virt_chan(vd->tx.chan);
+> +
+> +       dma_cookie_complete(&vd->tx);
+> +       dev_vdbg(vc->chan.device->dev, "txd %p[%x]: marked complete\n",
+> +               vd, vd->tx.cookie);
+> +       list_add_tail(&vd->node,&vc->desc_completed);
+> +
+> +       tasklet_schedule(&vc->task);
+> +}
 
-Interrupt is only for testing. And that's why it worked for me earlier,
-as i didn't passed irq from DT.
-
-So, i believe this patch still makes sense. Obviously we can have another
-patch to get interrupts fixed.
-
--- 
-viresh
+For cyclic case, we will not like to call the  dma_cookie_complete() but 
+want to put the desc in callback list.
+So can we have one more arg on this function which byspass the call of 
+dma_cookie_complete()
