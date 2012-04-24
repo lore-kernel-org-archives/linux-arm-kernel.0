@@ -1,44 +1,29 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 24 Apr 2012 19:14:52 +0200
-Subject: [PATCHv4 4/8] ARM: OMAP4: hwmod: flag hwmods/modules supporting
- module level context status
-In-Reply-To: <1335278815.2149.93.camel@sokoban>
-References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
- <1334913591-26312-5-git-send-email-t-kristo@ti.com> <4F957ACD.2040103@ti.com>
- <1335278815.2149.93.camel@sokoban>
-Message-ID: <4F96DF8C.6040400@ti.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 24 Apr 2012 19:46:18 +0200
+Subject: [PATCH] arm/pxa: fix gpio wakeup setting
+In-Reply-To: <1335094644-3546-1-git-send-email-robert.jarzmik@free.fr> (Robert
+ Jarzmik's message of "Sun, 22 Apr 2012 13:37:24 +0200")
+References: <CAN1soZyQPdcwRd5CtDz+iCV9h=Xq-ar=EBKyQ4ya_hE-PZLNXw@mail.gmail.com>
+ <1335094644-3546-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87ehrdhvkl.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2012 4:46 PM, Tero Kristo wrote:
-> On Mon, 2012-04-23 at 10:52 -0500, Jon Hunter wrote:
->> Hi Tero,
->>
->> On 04/20/2012 04:19 AM, Tero Kristo wrote:
->>> From: Rajendra Nayak<rnayak@ti.com>
->>>
->>> On OMAP4 most modules/hwmods support module level context status. On
->>> OMAP3 and earlier, we relyed on the power domain level context status.
->>> Identify all such modules using a 'HWMOD_CONTEXT_REG' flag, all such
->>> hwmods already have a valid 'context_offs' populated in .prcm structure.
->>
->> Is it necessary to add another flag? Can't we just check if context_offs
->> is non-zero? Would save adding a lot more lines to an already large file
->> :-)
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
+
+> In 3.3, gpio wakeup setting was broken. The call
+> enable_irq_wake() didn't set up the PXA gpio registers
+> (PWER, ...) anymore.
 >
-> Actually one of the older versions of this patch was just checking
-> against a non-zero value, but it was decided to be changed as
-> potentially the context_offs can be zero even if it is a valid offset.
+> Fix it at least for pxa27x. The driver doesn't seem to be
+> used in pxa25x (weird ...), and the fix doesn't extend to
+> pxa3xx and pxa95x (which don't have a gpio_set_wake()
+> available).
 
-Yeah, but still, every OMAP4 IPs are supporting that except two of them 
-I guess, so it is a pity to add that to every IPs.
+Haojian, ping.
+I'd like this to be included in 3.4, are you available nowadays ?
 
-We'd better add a HWMOD_NO_CONTEXT_REG to the few IPs that are not 
-supporting that. Since OMAP 2 & 3 does not have this feature at all, we 
-can check on the cpu revision.
+Cheers.
 
-I think the issue raised by Rajendra was about AM35xx that looks like an 
-OMAP3 variant but does have these registers like an OMAP4 variant:-(
-
-Regards,
-Benoit
+--
+Robert
