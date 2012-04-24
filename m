@@ -1,33 +1,125 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 24 Apr 2012 10:43:58 -0600
-Subject: Tag on pinctrl
-In-Reply-To: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
-References: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
-Message-ID: <4F96D84E.7080204@wwwdotorg.org>
+From: tim.schendekehl@egnite.de (Tim Schendekehl)
+Date: Tue, 24 Apr 2012 18:47:59 +0200
+Subject: [PATCH v4] Ethernut 5 board support
+Message-ID: <4F96D93F.3030508@egnite.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2012 07:15 AM, Linus Walleij wrote:
-> A while back I created a tag:
-> 
-> pinctrl-mergebase-20120418
-> 
-> On the pinctrl tree. It contains stuff up until that date that
-> has since been sitting in linux-next for a while.
-> 
-> I do not expect to rebase these patches further. They
-> are based on v3.4-rc3. So I will base any further pinctrl
-> work on this.
-> 
-> I think Stephen needed to pull this into the ARM SoC tree?
+Add support for the Ethernut 5 open hardware design, based
+on Atmel's AT91SAM9XE512 SoC.
 
-Yes, I have pulled that tag into the Tegra tree as
-for-3.5/gpio-pinmux-dependency, and have a Tegra-specific
-for-3.5/gpio-pinmux branch that depends on it. Two other Tegra branches
-in turn (for-3.5/tegra30-audio, for-3.5/usb-ulpi) depend on
-for-3.5/gpio-pinmux.
+Signed-off-by: Tim Schendekehl <tim.schendekehl@egnite.de>
+---
+V4:
+ - Don't use bootargs for partitions.
+ - Added entry in arch/arm/mach-at91/Makefile.boot.
 
-Linus, I think this will get into the ARM SoC tree simply by my saying
-in my for-3.5/gpio-pinmux pull request that the branch depends on your
-tag; I don't /think/ you need to explicitly send a pull request there,
-right?
+ arch/arm/boot/dts/ethernut5.dts  |   84 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/Makefile.boot |    1 +
+ 2 files changed, 85 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/ethernut5.dts
+
+diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
+new file mode 100644
+index 0000000..1ea9d34
+--- /dev/null
++++ b/arch/arm/boot/dts/ethernut5.dts
+@@ -0,0 +1,84 @@
++/*
++ * ethernut5.dts - Device Tree file for Ethernut 5 board
++ *
++ * Copyright (C) 2012 egnite GmbH <info@egnite.de>
++ *
++ * Licensed under GPLv2.
++ */
++/dts-v1/;
++/include/ "at91sam9260.dtsi"
++
++/ {
++	model = "Ethernut 5";
++	compatible = "egnite,ethernut5", "atmel,at91sam9260", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/mtdblock0 rw rootfstype=jffs2";
++	};
++
++	memory {
++		reg = <0x20000000 0x08000000>;
++	};
++
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			usart0: serial at fffb0000 {
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				status = "okay";
++			};
++
++			macb0: ethernet at fffc4000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioC 5 0>;
++				status = "okay";
++			};
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++
++			gpios = <0
++				 &pioC 14 0
++				 0
++				>;
++
++			root at 0 {
++				label = "root";
++				reg = <0x0 0x08000000>;
++			};
++
++			data at 20000 {
++				label = "data";
++				reg = <0x08000000 0x38000000>;
++			};
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++	};
++
++	i2c at 0 {
++		status = "okay";
++
++		pcf8563 at 50 {
++			compatible = "nxp,pcf8563";
++			reg = <0x51>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index 0c6e0e9..2653905 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -15,6 +15,7 @@ endif
+ 
+ # Keep dtb files sorted alphabetically for each SoC
+ # sam9260
++dtb-$(CONFIG_MACH_AT91SAM_DT) += ethernut5.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9260.dtb
+ # sam9263
+-- 
+1.7.1
