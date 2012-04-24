@@ -1,21 +1,30 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 24 Apr 2012 13:34:50 -0600
-Subject: [PATCH 3/3] arm/dts: Tegra30: Add device tree support for SMMU
-In-Reply-To: <1335182340-17237-3-git-send-email-hdoyu@nvidia.com>
-References: <1335182340-17237-1-git-send-email-hdoyu@nvidia.com>
- <1335182340-17237-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <4F97005A.2010305@wwwdotorg.org>
+Date: Tue, 24 Apr 2012 13:49:22 -0600
+Subject: [PATCH v2 1/3] ARM: tegra: Add AHB driver
+In-Reply-To: <20120424121619.GF8444@arwen.pp.htv.fi>
+References: <1335269116-9578-1-git-send-email-hdoyu@nvidia.com>
+ <20120424121619.GF8444@arwen.pp.htv.fi>
+Message-ID: <4F9703C2.50002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2012 05:58 AM, Hiroshi DOYU wrote:
-> Add device tree support for Tegra30 IOMMU(SMMU).
-
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-
-> +	smmu: smmu at 7000f000 {
+On 04/24/2012 06:16 AM, Felipe Balbi wrote:
+> On Tue, Apr 24, 2012 at 03:05:14PM +0300, Hiroshi DOYU wrote:
+>> The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+>> High-performance Bus (AHB) architecture.
 ...
-> +		interrupts = <0 13 0x40>;
+>> +static int __init tegra_ahb_init(void)
+>> +{
+>> +	return platform_driver_register(&tegra_ahb_driver);
+>> +}
+>> +postcore_initcall(tegra_ahb_init);
+>> +
+>> +static void __exit tegra_ahb_exit(void)
+>> +{
+>> +	platform_driver_unregister(&tegra_ahb_driver);
+>> +}
+>> +module_exit(tegra_ahb_exit);
+> 
+> please use module_platform_driver();
 
-This interrupt is on the 3rd IRQ controller (or GIC bank) so should be
-(2*32)+13, i.e. 75 not 13.
+That won't work for a postcore_initcall.
