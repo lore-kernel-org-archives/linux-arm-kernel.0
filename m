@@ -1,36 +1,44 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Tue, 24 Apr 2012 22:35:26 +0530
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120424142939.GG24089@lunn.ch>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424142939.GG24089@lunn.ch>
-Message-ID: <CAOh2x==itVxwPAFaHgDW4L6FHZrBjWKSV2u4RCEqXHCEWgqHsg@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 24 Apr 2012 19:14:52 +0200
+Subject: [PATCHv4 4/8] ARM: OMAP4: hwmod: flag hwmods/modules supporting
+ module level context status
+In-Reply-To: <1335278815.2149.93.camel@sokoban>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-5-git-send-email-t-kristo@ti.com> <4F957ACD.2040103@ti.com>
+ <1335278815.2149.93.camel@sokoban>
+Message-ID: <4F96DF8C.6040400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/12, Andrew Lunn <andrew@lunn.ch> wrote:
-> static int __clk_enable(struct clk *clk)
-> {
->         int ret = 0;
+On 4/24/2012 4:46 PM, Tero Kristo wrote:
+> On Mon, 2012-04-23 at 10:52 -0500, Jon Hunter wrote:
+>> Hi Tero,
+>>
+>> On 04/20/2012 04:19 AM, Tero Kristo wrote:
+>>> From: Rajendra Nayak<rnayak@ti.com>
+>>>
+>>> On OMAP4 most modules/hwmods support module level context status. On
+>>> OMAP3 and earlier, we relyed on the power domain level context status.
+>>> Identify all such modules using a 'HWMOD_CONTEXT_REG' flag, all such
+>>> hwmods already have a valid 'context_offs' populated in .prcm structure.
+>>
+>> Is it necessary to add another flag? Can't we just check if context_offs
+>> is non-zero? Would save adding a lot more lines to an already large file
+>> :-)
 >
->         if (!clk)
->                 return 0;
->
->         if (WARN_ON(clk->prepare_count == 0))
->                 return -ESHUTDOWN;
->
->    this should actually be clk_prepare_enable(). Did you see my
->    patches adding generic clk framework support for Orion. I fixed
->    this as part of that patch set.
+> Actually one of the older versions of this patch was just checking
+> against a non-zero value, but it was decided to be changed as
+> potentially the context_offs can be zero even if it is a valid offset.
 
-Sorry for missing it earlier. Ya i know it must be clk_prepare_enable(),
-but it wasn't motive of my patchset.
+Yeah, but still, every OMAP4 IPs are supporting that except two of them 
+I guess, so it is a pity to add that to every IPs.
 
-Sorry, i haven't gone through your patches for Orion.
+We'd better add a HWMOD_NO_CONTEXT_REG to the few IPs that are not 
+supporting that. Since OMAP 2 & 3 does not have this feature at all, we 
+can check on the cpu revision.
 
---
-viresh
+I think the issue raised by Rajendra was about AM35xx that looks like an 
+OMAP3 variant but does have these registers like an OMAP4 variant:-(
+
+Regards,
+Benoit
