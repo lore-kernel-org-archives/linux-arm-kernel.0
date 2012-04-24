@@ -1,37 +1,71 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 24 Apr 2012 15:04:28 +0200
-Subject: device-tree vs gpio-leds gpio_blink_set
-In-Reply-To: <20120424123639.GC13747@opensource.wolfsonmicro.com>
-References: <20120423072745.678323582@rtp-net.org>
- <201204231122.43481.arnd@arndb.de>
- <20120423174924.GA457@sirena.org.uk>
- <CACRpkdZ4RSiqrHU60auvCx9xxZp5CQQzjis+Xz6EVMA+7-8_eg@mail.gmail.com>
- <20120424123639.GC13747@opensource.wolfsonmicro.com>
-Message-ID: <20120424130428.GA26784@avionic-0098.adnet.avionic-design.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 24 Apr 2012 14:46:34 +0200
+Subject: [PATCH v2 3/3] ARM: imx6q: switch to use pinctrl driver
+In-Reply-To: <1334933916-12971-3-git-send-email-b29396@freescale.com>
+References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
+ <1334933916-12971-3-git-send-email-b29396@freescale.com>
+Message-ID: <20120424124634.GH9142@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown wrote:
-> On Tue, Apr 24, 2012 at 02:24:16PM +0200, Linus Walleij wrote:
-> > So this would be something that gets to be modeled in the
-> > PWM subsystem, but there is no such thing (I know Sascha et
-> > al was working on that at one point.)
+On 22:58 Fri 20 Apr     , Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> Thierry took over the work and last time I saw it things looked like
-> they were pretty much ready for merge, I'd really expect to see the code
-> in 3.5 based on the previous state (in fact I was pretty surprised 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> ---
+> This is not a formal patch and is only used for test
+> since before the pinctrl core handle dummy state is in,
+> enable pinctrl in driver will break other platforms.
+> 
+> ChangeLog v1->v2:
+> * using updated binding
+> ---
+>  arch/arm/boot/dts/imx6q-arm2.dts   |    2 ++
+>  arch/arm/boot/dts/imx6q.dtsi       |   17 +++++++++++++++++
+>  arch/arm/mach-imx/Kconfig          |    2 ++
+>  drivers/mmc/host/sdhci-esdhc-imx.c |   12 ++++++++++++
+>  4 files changed, 33 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+> index ce1c823..68b1d8d 100644
+> --- a/arch/arm/boot/dts/imx6q-arm2.dts
+> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
+> @@ -44,6 +44,8 @@
+>  				fsl,card-wired;
+>  				vmmc-supply = <&reg_3p3v>;
+>  				status = "okay";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_usdhc4_1>;
+>  			};
+>  
+>  			uart4: uart at 021f0000 {
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 4905f51..8cbd88b 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -386,7 +386,24 @@
+>  			};
+>  
+>  			iomuxc at 020e0000 {
+> +				compatible = "fsl,imx6q-iomuxc";
+>  				reg = <0x020e0000 0x4000>;
+> +
+> +				/* shared pinctrl settings */
+> +				usdhc4 {
+> +					pinctrl_usdhc4_1: usdhc4grp-1 {
+> +						fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
+> +							    1392 0x17059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
+> +							    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
+> +							    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
+> +							    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
+> +							    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
+> +							    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
+> +							    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
+> +							    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
+> +							    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
+Can you on IMX have alternative onfiguration where you use as example just one
+pin on a different pad?
 
-I posted a couple of patches about a week ago that are required to build !OF
-configurations. They still need to be acked by Grant or Rob, though.
-
-	http://lists.ozlabs.org/pipermail/devicetree-discuss/2012-April/014687.html
-	http://lists.ozlabs.org/pipermail/devicetree-discuss/2012-April/014688.html
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120424/9209da77/attachment.sig>
+Best Regards,
+J.
