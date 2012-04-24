@@ -1,23 +1,36 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 25 Apr 2012 00:37:42 +0200
-Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
-In-Reply-To: <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
- <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
-Message-ID: <2991865.CRb195aGPQ@acer>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Wed, 25 Apr 2012 01:47:21 +0300
+Subject: [RFC 00/12] OMAP DMA engine conversion
+In-Reply-To: <20120424165147.GP3739@atomide.com>
+References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
+ <20120424103858.GC25053@n2100.arm.linux.org.uk>
+ <20120424165147.GP3739@atomide.com>
+Message-ID: <CANOLnOOf0znGBSSQp5B3U+1q2OJBXnB_1T0aiuma_rJZDZA08Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dnia wtorek, 24 kwietnia 2012 21:06:59 DebBarma, Tarun Kanti pisze:
-> Hi Janusz,
-> 
-> Here is the patch, with attachment as well. I have just tested on
-> OMAP4 platform.
-> Testing on other OMAP2+ platforms is pending. In the meantime can you please
-> validate on OMAP1 platform and confirm? Thanks.
+On Tue, Apr 24, 2012 at 7:51 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120424 03:42]:
+>> Here's another patch - for the OMAP NAND driver.
+>>
+>> One thing this doesn't do is configure up the source/destination bursts,
+>> which the old code did:
+>>
+>> ? ? ? ? ? ? ? ? ? ? ? ? omap_set_dma_dest_burst_mode(info->dma_ch,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_DMA_DATA_BURST_16);
+>> ? ? ? ? ? ? ? ? ? ? ? ? omap_set_dma_src_burst_mode(info->dma_ch,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_DMA_DATA_BURST_16);
+>
+> Grazvydas, care to give this patch a go?
 
-Hi,
-Please give me a day or two.
-Thanks,
-Janusz
+Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+for:
+- SD card connected over transceiver to MMC2
+- touchscreen connected over SPI
+- NAND on GPMC in DMA mode
+Seems to be working just as they did before, except that I'm not sure
+SPI was crossing PIO threshold.
+
+
+-- 
+Gra?vydas
