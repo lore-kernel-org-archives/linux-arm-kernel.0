@@ -1,43 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 Apr 2012 22:49:47 +0200
-Subject: [PATCH 08/11] MXS: Add imx-otg driver
-In-Reply-To: <201204241949.37938.marex@denx.de>
-References: <1335099567-21056-1-git-send-email-marex@denx.de>
- <20374.53520.690267.206408@ipc1.ka-ro>
- <20120424164751.GY3852@pengutronix.de>
- <201204241949.37938.marex@denx.de>
-Message-ID: <20120424204947.GZ3852@pengutronix.de>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue, 24 Apr 2012 13:51:05 -0700
+Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
+ wake-ups work
+In-Reply-To: <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+Message-ID: <20120424205105.GA26749@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 07:49:37PM +0200, Marek Vasut wrote:
-> > > > > 
-> > > > > Why do you call this driver imx-otg when it is actually MXS specific?
-> > > > > How would you call a corresponding driver for the remaining i.MX
-> > > > > processors?
-> > > > 
-> > > > This is the driver for the all i.MX processors.
-> > > 
-> > > If it is for all i.MX processors, it shouldn't access MXS specific
-> > > registers, like:
-> > > +		writel(wakeup, x->io_priv + HW_USBPHY_CTRL_SET);
-> > 
-> > Indeed not. This should be done in the phy driver.
+On Wed, Apr 11, 2012 at 03:37:47PM -0600, Paul Walmsley wrote:
+> Hi
+
+Hi Paul, Kevin.
+
+> On Wed, 11 Apr 2012, Mark A. Greer wrote:
 > 
-> Ok, so now you figured out that all these set_host() set_peripheral() work() 
-> calls should be back in the phy driver, not in the imx-otg? hm ... so back to 
-> the V4 of the patchset?
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> > 
+> > Currently, the OMAP3 cpuidle driver calls omap3_enter_idle()
+> > which calls omap_sram_idle().  omap_sram_idle() eventually
+> > causes a 'wfi' instruction to be executed effectively putting
+> > the system to sleep.  It is assumed that an I/O wake-up event
+> > will occur to wake the system up again.  This doesn't work on
+> > systems that don't support I/O wake-ups (indicated by
+> > omap3_has_io_wakeup() returning false).
+> > 
+> > To handle this, follow the same path in omap3_enter_idle()
+> > that would be followed if an interrupt were pending.
+> 
+> I don't quite understand this patch.  Are you saying that AM3517/3505 
+> can't wake from WFI?  That would seem odd.
+> 
+> There are other sources of wakeup on the system other than I/O wakeup.  
+> I/O wakeup only applies to wakeups from the I/O pads when the chip is in 
+> RETENTION or OFF.  And as I understand it, neither of those apply to 
+> AM3517/3505?
+> 
+> Even if I/O wakeups aren't supported, many of the IP blocks on the system 
+> should be able to cause the ARM to exit WFI by asserting their 
+> SWAKEUP lines and raising their interrupt lines.
 
-Not really, you are just not allowed to put phy code into imx-otg.c,
-because the phy may be another one on a different SoC.
+I have changed the code to keep everything in the ON state and use
+cpu_do_idle()--basically a wfi, cpu_v7_do_idle() in this case--and everything
+works well (except networking, see below) when using an mmc-based rootfs.
 
-That said, I am a bit confused at the moment. There seems to be no
-method to activate the interrupt in the phy.
+The issue is with the emac--it can't wake the system up unless there
+is an irq from the PHY to a wakeup-enabled GPIO (confirmed by h/w engr).
+So, when using networking or using an nfs-based rootfs, there are all
+kinds of timeouts, etc.  Basically, doing a wfi (i.e., pm_idle or cpuidle)
+and expecting the emac to wake the system back up won't work.
 
-Sascha
+How would you like me to proceed (to avoid the wfi in pm_idle & cpuidle)?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+
+Mark
