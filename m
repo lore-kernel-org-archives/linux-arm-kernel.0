@@ -1,35 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Apr 2012 09:26:52 +0100
-Subject: [PATCH V2 4/9] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <4F965D1C.2010203@st.com>
-References: <20120424070426.GA24089@lunn.ch> <4F9650B3.9030406@st.com>
- <20120424072653.GB24089@lunn.ch>
- <20120424074202.GO24211@n2100.arm.linux.org.uk> <4F965D1C.2010203@st.com>
-Message-ID: <20120424082652.GQ24211@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Apr 2012 09:28:10 +0100
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case
+ that l2x0 is enabled before init
+In-Reply-To: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
+References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
+Message-ID: <20120424082810.GA9367@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 01:28:20PM +0530, Viresh Kumar wrote:
-> On 4/24/2012 1:12 PM, Russell King - ARM Linux wrote:
-> > If you don't have the clk API configured, you have no clocks to control.
-> > So, why not make clk_get() return NULL, and make the rest of the API
-> > calls do nothing?  That's what you'll end up codifying in the drivers
-> > anyway.
+On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
+> If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
+> register will not be saved in l2x0_saved_regs. Therefore we can not use
+> l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
+> by saving aux ctrl in l2x0_saved_regs just after it's being read from
+> the register.
 > 
-> Ok. We can return NULL from calls that return clk *. What about other
-> routines that return integers. Like, clk_enable().
+> Signed-off-by: Yilu Mao <ylmao@marvell.com>
+> ---
+>  arch/arm/mm/cache-l2x0.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
 > 
-> Is returning 0 correct? Which would mean we were able to enable clk, but
-> actually we haven't.
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index a53fd2a..3034b06 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -320,6 +320,12 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+>  	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+>  	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+>  
+> +	/* In case l2x controller is enabled, the aux ctrl register
+> +	 * can't be set. So the original value should be stored in
+> +	 * the l2x0_saved_regs for restoring when resume.
+> +	 */
 
-Think about this case: if you don't have the means to control the clock
-inputs to a device (for example, you don't support the clk API on your
-CPU arch) then for the device to be functional, it must be supplied with
-all its necessary clocks.  Therefore, the clock is already enabled.  It
-makes sense for the clk API to stub-out to be completely transparent and
-non-error inducing to the driver.
+Even better like this ;)
 
-The problem comes with clk_get_rate().  I'd suggest merely returning zero
-for that in this case.  If the clock rate is really required by a driver,
-then the clk API would need to be enabled.
++	/*
++	 * In case l2x controller is enabled, the aux ctrl register
++	 * can't be set. So the original value should be stored in
++	 * the l2x0_saved_regs for restoring when resume.
++	 */
+
+
+> +	l2x0_saved_regs.aux_ctrl = aux;
+> +
+>  	aux &= aux_mask;
+>  	aux |= aux_val;
+
+I think that's the wrong place to save it, it should be after the
+masking was done.
+
+Anyway, if we cannot write this register in l2x0_init() because the L2
+was enabled, do we expect the L2 to be disabled during resume?
+
+-- 
+Catalin
