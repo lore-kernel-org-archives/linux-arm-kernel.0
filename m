@@ -1,35 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Apr 2012 12:48:49 +0100
-Subject: [PATCH V3 2/2] watchdog: mpcore: Add DT probing support for ARM
- mpcore watchdog
-In-Reply-To: <4F9681D4.9010904@st.com>
-References: <31b0b89e21e6a234cb904761a1d0e5106405da82.1335246446.git.viresh.kumar@st.com>
- <27dea103ccf6da5b7376c837d9a95dc7a9ed3be3.1335246446.git.viresh.kumar@st.com>
- <4F9671D8.4080308@arm.com> <4F9681D4.9010904@st.com>
-Message-ID: <4F969321.1090406@arm.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 24 Apr 2012 13:52:02 +0200
+Subject: [PATCH V3 03/12] i2c/i2c-pxa: Remove conditional compilation of
+ clk code
+In-Reply-To: <08a0a53dde1958a395a9950d5e910bcb6e3b02b6.1335266056.git.viresh.kumar@st.com>
+References: <cover.1335266056.git.viresh.kumar@st.com>
+ <08a0a53dde1958a395a9950d5e910bcb6e3b02b6.1335266056.git.viresh.kumar@st.com>
+Message-ID: <20120424115202.GB4030@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/12 11:35, Viresh Kumar wrote:
-> On 4/24/2012 2:56 PM, Marc Zyngier wrote:
->> I'm sorry, but I really have to ask: What is the point of adding DT
->> support to this driver when it is obvious that it is already broken?
+On Tue, Apr 24, 2012 at 04:51:25PM +0530, Viresh Kumar wrote:
+> From: Viresh Kumar <viresh.linux@gmail.com>
 > 
-> Interrupt is only for testing. And that's why it worked for me earlier,
-> as i didn't passed irq from DT.
+> With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
+> there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
+> macros.
 > 
-> So, i believe this patch still makes sense. Obviously we can have another
-> patch to get interrupts fixed.
+> pxa i2c also has these dummy macros defined locally. Remove them as they aren't
+> required anymore.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: linux-i2c at vger.kernel.org
 
-That's exactly what I object to. You're giving a false sense of
-usability ("see, this driver is maintained, it even has DT support!"),
-while the damn thing has not worked for quite a long time. And I don't
-mean only the interrupt. The driver is not working properly on an SMP
-system.
+Shall probably not go in via I2C-tree, so:
 
-At that point, and unless someone is willing to step up and fix it, I'd
-rather make it depend on CONFIG_BROKEN.
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120424/e1afffa4/attachment.sig>
