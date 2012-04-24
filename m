@@ -1,159 +1,92 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2012 17:08:37 -0700
-Subject: [PATCH 6/7] ARM: OMAP: Move omap_mmc_add() to mach-omap1
+Date: Mon, 23 Apr 2012 17:08:39 -0700
+Subject: [PATCH 7/7] ARM: OMAP1: Pass dma request lines in platform data to
+ MMC driver
 In-Reply-To: <20120424000607.17783.81686.stgit@muffinssi.local>
 References: <20120424000607.17783.81686.stgit@muffinssi.local>
-Message-ID: <20120424000837.17783.63424.stgit@muffinssi.local>
+Message-ID: <20120424000839.17783.70410.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that omap2420 is using hwmod for MMC, this code is omap1
-only used on omap1.
+Pass dma request lines in platform data to MMC driver.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/devices.c         |   43 ++++++++++++++++++++++++++++++
- arch/arm/plat-omap/devices.c          |   48 ---------------------------------
- arch/arm/plat-omap/include/plat/mmc.h |    9 ------
- 3 files changed, 43 insertions(+), 57 deletions(-)
+ arch/arm/mach-omap1/devices.c |   18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index b853f61..2192676 100644
+index 2192676..fa1fa4d 100644
 --- a/arch/arm/mach-omap1/devices.c
 +++ b/arch/arm/mach-omap1/devices.c
-@@ -144,6 +144,49 @@ static inline void omap1_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
+@@ -22,6 +22,7 @@
+ #include <plat/tc.h>
+ #include <plat/board.h>
+ #include <plat/mux.h>
++#include <plat/dma.h>
+ #include <plat/mmc.h>
+ #include <plat/omap7xx.h>
+ 
+@@ -144,13 +145,14 @@ static inline void omap1_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
  	}
  }
  
-+#define OMAP_MMC_NR_RES		2
-+
-+/*
-+ * Register MMC devices.
-+ */
-+static int __init omap_mmc_add(const char *name, int id, unsigned long base,
-+				unsigned long size, unsigned int irq,
-+				struct omap_mmc_platform_data *data)
-+{
-+	struct platform_device *pdev;
-+	struct resource res[OMAP_MMC_NR_RES];
-+	int ret;
-+
-+	pdev = platform_device_alloc(name, id);
-+	if (!pdev)
-+		return -ENOMEM;
-+
-+	memset(res, 0, OMAP_MMC_NR_RES * sizeof(struct resource));
-+	res[0].start = base;
-+	res[0].end = base + size - 1;
-+	res[0].flags = IORESOURCE_MEM;
-+	res[1].start = res[1].end = irq;
-+	res[1].flags = IORESOURCE_IRQ;
-+
-+	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
-+	if (ret == 0)
-+		ret = platform_device_add_data(pdev, data, sizeof(*data));
-+	if (ret)
-+		goto fail;
-+
-+	ret = platform_device_add(pdev);
-+	if (ret)
-+		goto fail;
-+
-+	/* return device handle to board setup code */
-+	data->dev = &pdev->dev;
-+	return 0;
-+
-+fail:
-+	platform_device_put(pdev);
-+	return ret;
-+}
-+
- void __init omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
- 			int nr_controllers)
- {
-diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
-index 1151d0b..1cba927 100644
---- a/arch/arm/plat-omap/devices.c
-+++ b/arch/arm/plat-omap/devices.c
-@@ -28,54 +28,6 @@
- #include <plat/menelaus.h>
- #include <plat/omap44xx.h>
- 
--#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE) || \
--	defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
--
 -#define OMAP_MMC_NR_RES		2
--
--/*
-- * Register MMC devices. Called from mach-omap1 and mach-omap2 device init.
-- */
--int __init omap_mmc_add(const char *name, int id, unsigned long base,
--				unsigned long size, unsigned int irq,
--				struct omap_mmc_platform_data *data)
--{
--	struct platform_device *pdev;
--	struct resource res[OMAP_MMC_NR_RES];
--	int ret;
--
--	pdev = platform_device_alloc(name, id);
--	if (!pdev)
--		return -ENOMEM;
--
--	memset(res, 0, OMAP_MMC_NR_RES * sizeof(struct resource));
--	res[0].start = base;
--	res[0].end = base + size - 1;
--	res[0].flags = IORESOURCE_MEM;
--	res[1].start = res[1].end = irq;
--	res[1].flags = IORESOURCE_IRQ;
--
--	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
--	if (ret == 0)
--		ret = platform_device_add_data(pdev, data, sizeof(*data));
--	if (ret)
--		goto fail;
--
--	ret = platform_device_add(pdev);
--	if (ret)
--		goto fail;
--
--	/* return device handle to board setup code */
--	data->dev = &pdev->dev;
--	return 0;
--
--fail:
--	platform_device_put(pdev);
--	return ret;
--}
--
--#endif
--
- /*-------------------------------------------------------------------------*/
++#define OMAP_MMC_NR_RES		4
  
- #if defined(CONFIG_HW_RANDOM_OMAP) || defined(CONFIG_HW_RANDOM_OMAP_MODULE)
-diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-index 7a38750..3ed9250 100644
---- a/arch/arm/plat-omap/include/plat/mmc.h
-+++ b/arch/arm/plat-omap/include/plat/mmc.h
-@@ -176,9 +176,6 @@ extern void omap_mmc_notify_cover_event(struct device *dev, int slot,
- void omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
- 				int nr_controllers);
- void omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data);
--int omap_mmc_add(const char *name, int id, unsigned long base,
--				unsigned long size, unsigned int irq,
--				struct omap_mmc_platform_data *data);
- #else
- static inline void omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
- 				int nr_controllers)
-@@ -187,12 +184,6 @@ static inline void omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
- static inline void omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+ /*
+  * Register MMC devices.
+  */
+ static int __init omap_mmc_add(const char *name, int id, unsigned long base,
+ 				unsigned long size, unsigned int irq,
++				unsigned rx_req, unsigned tx_req,
+ 				struct omap_mmc_platform_data *data)
  {
- }
--static inline int omap_mmc_add(const char *name, int id, unsigned long base,
--				unsigned long size, unsigned int irq,
--				struct omap_mmc_platform_data *data)
--{
--	return 0;
--}
+ 	struct platform_device *pdev;
+@@ -167,6 +169,12 @@ static int __init omap_mmc_add(const char *name, int id, unsigned long base,
+ 	res[0].flags = IORESOURCE_MEM;
+ 	res[1].start = res[1].end = irq;
+ 	res[1].flags = IORESOURCE_IRQ;
++	res[2].start = rx_req;
++	res[2].name = "rx";
++	res[2].flags = IORESOURCE_DMA;
++	res[3].start = tx_req;
++	res[3].name = "tx";
++	res[3].flags = IORESOURCE_DMA;
  
- #endif
- #endif
+ 	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+ 	if (ret == 0)
+@@ -194,6 +202,7 @@ void __init omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
+ 
+ 	for (i = 0; i < nr_controllers; i++) {
+ 		unsigned long base, size;
++		unsigned rx_req, tx_req;
+ 		unsigned int irq = 0;
+ 
+ 		if (!mmc_data[i])
+@@ -205,19 +214,24 @@ void __init omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
+ 		case 0:
+ 			base = OMAP1_MMC1_BASE;
+ 			irq = INT_MMC;
++			rx_req = OMAP_DMA_MMC_RX;
++			tx_req = OMAP_DMA_MMC_TX;
+ 			break;
+ 		case 1:
+ 			if (!cpu_is_omap16xx())
+ 				return;
+ 			base = OMAP1_MMC2_BASE;
+ 			irq = INT_1610_MMC2;
++			rx_req = OMAP_DMA_MMC2_RX;
++			tx_req = OMAP_DMA_MMC2_TX;
+ 			break;
+ 		default:
+ 			continue;
+ 		}
+ 		size = OMAP1_MMC_SIZE;
+ 
+-		omap_mmc_add("mmci-omap", i, base, size, irq, mmc_data[i]);
++		omap_mmc_add("mmci-omap", i, base, size, irq,
++				rx_req, tx_req, mmc_data[i]);
+ 	};
+ }
+ 
