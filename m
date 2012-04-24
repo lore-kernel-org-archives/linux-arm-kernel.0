@@ -1,51 +1,25 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 24 Apr 2012 14:18:50 -0700
-Subject: [PATCH/RFC v2] [SCSI] atp870u: Fix bad use of udelay
-In-Reply-To: <20120424074916.GA25261@burratino>
-References: <200901092028.n09KSAeI024551@imap1.linux-foundation.org>
- <20090109205835.GB5069@deprecation.cyrius.com>
- <20090109130308.bfde281e.akpm@linux-foundation.org>
- <1231536107.3235.50.camel@localhost.localdomain>
- <20120424074916.GA25261@burratino>
-Message-ID: <20120424141850.e5cdf6c2.akpm@linux-foundation.org>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Wed, 25 Apr 2012 00:51:09 +0300
+Subject: [PATCH 06/12] mmc: omap_hsmmc: remove private DMA API
+ implementation
+In-Reply-To: <E1SMLmF-0002WO-Ch@rmk-PC.arm.linux.org.uk>
+References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
+ <E1SMLmF-0002WO-Ch@rmk-PC.arm.linux.org.uk>
+Message-ID: <CANOLnOM29Mn2BTydX=C5FEu6evkS5W8eL87RwNmppJWuVLGjAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Apr 2012 02:49:16 -0500
-Jonathan Nieder <jrnieder@gmail.com> wrote:
-
-> From: Martin Michlmayr <tbm@cyrius.com>
-> 
-> The ACARD driver calls udelay() with a value > 2000, which leads to
-> to the following compilation error on ARM:
->   ERROR: "__bad_udelay" [drivers/scsi/atp870u.ko] undefined!
->   make[1]: *** [__modpost] Error 1
+On Mon, Apr 23, 2012 at 7:06 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Remove the private DMA API implementation from omap_hsmmc, making it
+> use entirely the DMA engine API.
 >
-> ...
->
-> --- a/drivers/scsi/atp870u.c
-> +++ b/drivers/scsi/atp870u.c
-> @@ -1173,7 +1173,16 @@ wait_io1:
->  	outw(val, tmport);
->  	outb(2, 0x80);
->  TCM_SYNC:
-> -	udelay(0x800);
-> +	/*
-> +	 * The funny division into multiple delays is to accomodate
-> +	 * arches like ARM where udelay() multiplies its argument by
-> +	 * a large number to initialize a loop counter.  To avoid
-> +	 * overflow, the maximum supported udelay is 2000 microseconds.
-> +	 *
-> +	 * XXX it would be more polite to find a way to use msleep()
-> +	 */
-> +	mdelay(2);
-> +	udelay(48);
->  	if ((inb(tmport) & 0x80) == 0x00) {	/* bsy ? */
->  		outw(0, tmport--);
->  		outb(0, tmport);
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Fair enough, I say.  Looking at this driver, I do think it's best to
-minimally fix the build and then tiptoe away very delicately lest
-something explode.
+Since the driver becomes useless without DMA_ENGINE, we probably want
+a 'depends on'?
 
-That being said, I'm glad the kernel has a function called "fun_scam".
+
+
+-- 
+Gra?vydas
