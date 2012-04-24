@@ -1,76 +1,35 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 24 Apr 2012 11:39:21 +0530
-Subject: [PATCH] ARM: OMAP2+: watchdog: fix !PM boot crash, disarm timer
- after hwmod reset
-In-Reply-To: <alpine.DEB.2.00.1204201451510.11306@utopia.booyaka.com>
-References: <1334353873-15972-1-git-send-email-khilman@ti.com>
- <alpine.DEB.2.00.1204201451510.11306@utopia.booyaka.com>
-Message-ID: <CAMQu2gwTtGLFaQnRs5CXdkqAf+SaOfBbSe2BxcaJNPJWhcEBOg@mail.gmail.com>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Tue, 24 Apr 2012 01:10:27 -0500
+Subject: [PATCH 1/2] ARM: ixp4xx: fix compilation, add gpiolib support
+In-Reply-To: <20120412052518.GA3260@netboy.at.omicron.at>
+References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+ <1328729069-21308-2-git-send-email-mkl@blackshift.org>
+ <20120412052518.GA3260@netboy.at.omicron.at>
+Message-ID: <20120424061027.GA23859@burratino>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2012 at 2:29 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> cc Santosh
->
-> Hi Kevin,
->
-> Nice changelog!
->
-> On Fri, 13 Apr 2012, Kevin Hilman wrote:
->
->> Without runtime PM enabled, hwmod needs to leave all IP blocks in an
->> enabled state by default so any driver access to the HW will succeed.
->> This is accomplished by seting the postsetup_state to enabled for all
->> hwmods during init when runtime PM is disabled.
->>
->> Currently, we have a special case for WDT in that its postsetup_state
->> is always set to disabled. ?This is done so that the WDT is disabled
->> and the timer is disarmed at boot in case there is no WDT driver.
->> This also means that when runtime PM is disabled, if a WDT driver *is*
->> built in the kernel, the kernel will crash on the first access to the
->> WDT hardware.
->>
->> We can't simply leave the WDT module enabled, because the timer is
->> armed by default after reset. That means that if there is no WDT
->> driver initialzed or loaded before the timer expires, the kernel will
->> reboot.
->>
->> To fix this, a custom reset method is added to the watchdog class of
->> omap_hwmod. ?This method will *always* disarm the timer after hwmod
->> reset. ?The WDT timer then will only be rearmed when/if the driver is
->> loaded for the WDT. ?With the timer disarmed by default, we no longer
->> need a special-case for the postsetup_state of WDT during init, so it
->> is removed.
->>
->> Any platforms wishing to ensure the watchdog remains armed across the
->> entire boot boot can simply disable the reset-on-init feature of the
->> watchdog hwmod using omap_hwmod_no_setup_reset().
->>
->> Tested on 3530/Overo, 4430/Panda.
->>
->> NOTE: on 4430, the hwmod OCP reset does not seem to rearm the timer as
->> documented in the TRM (and what happens on OMAP3.) ?I noticed this
->> because testing the HWMOD_INIT_NO_RESET feature with no driver loaded,
->> I expected a reboot part way through the boot, but did not see a
->> reboot. ?Adding some debug to read the counter, I verified that right
->> after OCP softreset, the counter is not firing. ?After writing the
->> magic start sequence, the timer starts counting. ?This means that the
->> timer disarm sequence added here does not seem to be needed for 4430,
->> but is technically the correct way to ensure the timer is disarmed, so
->> it is left in for OMAP4.
->>
->> Special thanks to Paul Walmsley for helping brainstorm ideas to fix
->> this problem.
->>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->
-> This looks great, looks like it will finally fix this longstanding bug. ?I
-> think Santosh hit it too a long time ago, so I suspect he will be happy
-> too.
->
-Indeed !!
-Thanks a lot Kevin/Paul for getting this sorted out.
+Richard Cochran wrote:
+> On Wed, Feb 08, 2012 at 08:24:28PM +0100, Marc Kleine-Budde wrote:
 
-FWIW,
-Acked-by: Santosh Shilimkar ,santosh.shilimkar at ti.com>
+>> From: Imre Kaloz <kaloz@openwrt.org>
+>>
+>> The problem was introduced with commit:
+>> "eb9ae7f gpio: fix build error in include/asm-generic/gpio.h"
+>>
+>> This patch adds gpiolib support for the IXP4xx platform, which fixes the
+>> compilation of several ixp4xx platforms, e.g.:
+>
+> Sorry to nag, but is someone going to take this patch?
+
+It looks like Russell's question[*] was never answered:
+
+| Does anything on ixp4xx require fast access to on-chip GPIOs?  If not,
+| it would be much better to get rid of this and just use the standard
+| wrapping, which can be done by changing this entire file to be just a
+| single line:
+
+Hope that helps,
+Jonathan
+
+[*] http://thread.gmane.org/gmane.linux.kernel/1250585/focus=1250908
