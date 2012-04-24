@@ -1,46 +1,55 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 24 Apr 2012 13:00:23 -0600
-Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
- for platforms to use
-In-Reply-To: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+Date: Tue, 24 Apr 2012 13:04:27 -0600
+Subject: [PATCH v2 2/2] pinctrl: remove the old pinctrl dt dummy state
+ interfaces
+In-Reply-To: <1335260023-15859-2-git-send-email-b29396@freescale.com>
 References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
-Message-ID: <4F96F847.508@wwwdotorg.org>
+ <1335260023-15859-2-git-send-email-b29396@freescale.com>
+Message-ID: <4F96F93B.2020603@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/24/2012 03:33 AM, Dong Aisheng wrote:
 > From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> Add a interface pinctrl_provide_dummies for platform to indicate
-> whether it needs use pinctrl dummy state and dummy gpio.
+> We already have pinctrl_provide_dummies, so remove the old
+> one to avoid diversity.
 
-> @@ -382,7 +396,12 @@ int pinctrl_request_gpio(unsigned gpio)
->  	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
->  	if (ret) {
->  		mutex_unlock(&pinctrl_mutex);
-> -		return -EINVAL;
-> +		if (pinctrl_dummy_gpio) {
-> +			pr_debug("pinctrl: using dummy gpio(%u)\n", gpio);
-> +			return 0;
-> +		} else {
-> +			return -EINVAL;
-> +		}
->  	}
+Nak, if I may be so bold.
 
-The only thing that should be calling pinctrl_request_gpio() is a GPIO
-driver. It should only be calling it for the GPIOs it manages. I'd
-expect that if a platform's pinctrl driver was not yet written to
-support the GPIO functionality, then the GPIO driver would not be
-calling this function.
+> Hi Stephen,
+> I removed the old dt pinctrl dummy sate interface.
+> The purpose is to get a unified way to handle pinctrl dummy state.
 
-As such, I'm not sure that this part of the change is necessary.
+Well, there are two completely different scenarios being covered here,
+and I don't think it makes sense to unify them:
 
-If it is, then surely all the other pinctrl GPIO APIs need a similar change?
+1) Platform under development without complete pinctrl support yet
+(covered by patch 1 in this series).
 
-Finally, how does this interact with deferred probe: How does the code
-know whether the pinctrl driver and/or GPIO range is simply not yet
-registered, or whether it never will be? That'd be the difference
-between returning -EPROBE_DEFER or 0 in the if block above.
+2) Platform with complete pinctrl support, but using some common HW
+modules whose drivers need to use pinctrl on some platforms, but not on
+all, so that dummy states are required. This patch removes the ability
+to correctly represent this situation.
 
+> One disadvantage is that we may not meet the requirement
+> that for platform which only want to use dummy state for some specific
+> devices while not affect others. For this case, it may reply on users
+> to refer to the pinctrl debug message to see which devices are using
+> dummy state while which are not.
+> However, if keep it we may have two type of user interface to handle
+> dummy state which i'm not sure is a good thing. And as regulator also
+> does not provide per device dummies, so i removed it first.
 
-I'm fine with the other parts of this patch.
+Well, first I'd say that if regulator didn't have this feature, it'd
+probably just be a missing feature in regulator, and not a good
+justification for removing the feature from pinctrl.
+
+But that said, regulator does in fact have this feature - it's called
+the fixed regulator.
+
+> What's your suggestion on it?
+> I reform this clean up into a separate patch, if you do not like it,
+> we can drop it later.
+
+I'd love to drop it, please.
