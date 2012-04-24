@@ -1,131 +1,76 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 11:26:17 +0530
-Subject: [PATCH V2 9/9] usb/host/r8a66597: Remove conditional compilation of
- clk code
-In-Reply-To: <cover.1335246730.git.viresh.kumar@st.com>
-References: <cover.1335246730.git.viresh.kumar@st.com>
-Message-ID: <d212ec874cd1f9e3001aabfe3d083b0104a063ea.1335246730.git.viresh.kumar@st.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 24 Apr 2012 11:39:21 +0530
+Subject: [PATCH] ARM: OMAP2+: watchdog: fix !PM boot crash, disarm timer
+ after hwmod reset
+In-Reply-To: <alpine.DEB.2.00.1204201451510.11306@utopia.booyaka.com>
+References: <1334353873-15972-1-git-send-email-khilman@ti.com>
+ <alpine.DEB.2.00.1204201451510.11306@utopia.booyaka.com>
+Message-ID: <CAMQu2gwTtGLFaQnRs5CXdkqAf+SaOfBbSe2BxcaJNPJWhcEBOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
-there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
-macros.
+On Sat, Apr 21, 2012 at 2:29 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> cc Santosh
+>
+> Hi Kevin,
+>
+> Nice changelog!
+>
+> On Fri, 13 Apr 2012, Kevin Hilman wrote:
+>
+>> Without runtime PM enabled, hwmod needs to leave all IP blocks in an
+>> enabled state by default so any driver access to the HW will succeed.
+>> This is accomplished by seting the postsetup_state to enabled for all
+>> hwmods during init when runtime PM is disabled.
+>>
+>> Currently, we have a special case for WDT in that its postsetup_state
+>> is always set to disabled. ?This is done so that the WDT is disabled
+>> and the timer is disarmed at boot in case there is no WDT driver.
+>> This also means that when runtime PM is disabled, if a WDT driver *is*
+>> built in the kernel, the kernel will crash on the first access to the
+>> WDT hardware.
+>>
+>> We can't simply leave the WDT module enabled, because the timer is
+>> armed by default after reset. That means that if there is no WDT
+>> driver initialzed or loaded before the timer expires, the kernel will
+>> reboot.
+>>
+>> To fix this, a custom reset method is added to the watchdog class of
+>> omap_hwmod. ?This method will *always* disarm the timer after hwmod
+>> reset. ?The WDT timer then will only be rearmed when/if the driver is
+>> loaded for the WDT. ?With the timer disarmed by default, we no longer
+>> need a special-case for the postsetup_state of WDT during init, so it
+>> is removed.
+>>
+>> Any platforms wishing to ensure the watchdog remains armed across the
+>> entire boot boot can simply disable the reset-on-init feature of the
+>> watchdog hwmod using omap_hwmod_no_setup_reset().
+>>
+>> Tested on 3530/Overo, 4430/Panda.
+>>
+>> NOTE: on 4430, the hwmod OCP reset does not seem to rearm the timer as
+>> documented in the TRM (and what happens on OMAP3.) ?I noticed this
+>> because testing the HWMOD_INIT_NO_RESET feature with no driver loaded,
+>> I expected a reboot part way through the boot, but did not see a
+>> reboot. ?Adding some debug to read the counter, I verified that right
+>> after OCP softreset, the counter is not firing. ?After writing the
+>> magic start sequence, the timer starts counting. ?This means that the
+>> timer disarm sequence added here does not seem to be needed for 4430,
+>> but is technically the correct way to ensure the timer is disarmed, so
+>> it is left in for OMAP4.
+>>
+>> Special thanks to Paul Walmsley for helping brainstorm ideas to fix
+>> this problem.
+>>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>
+> This looks great, looks like it will finally fix this longstanding bug. ?I
+> think Santosh hit it too a long time ago, so I suspect he will be happy
+> too.
+>
+Indeed !!
+Thanks a lot Kevin/Paul for getting this sorted out.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
----
- drivers/usb/host/r8a66597-hcd.c |   28 +++++++++-------------------
- drivers/usb/host/r8a66597.h     |    5 -----
- 2 files changed, 9 insertions(+), 24 deletions(-)
-
-diff --git a/drivers/usb/host/r8a66597-hcd.c b/drivers/usb/host/r8a66597-hcd.c
-index 2bf1320..6d11553 100644
---- a/drivers/usb/host/r8a66597-hcd.c
-+++ b/drivers/usb/host/r8a66597-hcd.c
-@@ -95,9 +95,9 @@ static int r8a66597_clock_enable(struct r8a66597 *r8a66597)
- 	int i = 0;
- 
- 	if (r8a66597->pdata->on_chip) {
--#ifdef CONFIG_HAVE_CLK
--		clk_enable(r8a66597->clk);
--#endif
-+		if (!IS_ERR(r8a66597->clk))
-+			clk_enable(r8a66597->clk);
-+
- 		do {
- 			r8a66597_write(r8a66597, SCKE, SYSCFG0);
- 			tmp = r8a66597_read(r8a66597, SYSCFG0);
-@@ -141,9 +141,8 @@ static void r8a66597_clock_disable(struct r8a66597 *r8a66597)
- 	udelay(1);
- 
- 	if (r8a66597->pdata->on_chip) {
--#ifdef CONFIG_HAVE_CLK
--		clk_disable(r8a66597->clk);
--#endif
-+		if (!IS_ERR(r8a66597->clk))
-+			clk_disable(r8a66597->clk);
- 	} else {
- 		r8a66597_bclr(r8a66597, PLLC, SYSCFG0);
- 		r8a66597_bclr(r8a66597, XCKE, SYSCFG0);
-@@ -2406,19 +2405,16 @@ static int __devexit r8a66597_remove(struct platform_device *pdev)
- 	del_timer_sync(&r8a66597->rh_timer);
- 	usb_remove_hcd(hcd);
- 	iounmap(r8a66597->reg);
--#ifdef CONFIG_HAVE_CLK
--	if (r8a66597->pdata->on_chip)
-+	if (r8a66597->pdata->on_chip && !IS_ERR(r8a66597->clk))
- 		clk_put(r8a66597->clk);
--#endif
-+
- 	usb_put_hcd(hcd);
- 	return 0;
- }
- 
- static int __devinit r8a66597_probe(struct platform_device *pdev)
- {
--#ifdef CONFIG_HAVE_CLK
- 	char clk_name[8];
--#endif
- 	struct resource *res = NULL, *ires;
- 	int irq = -1;
- 	void __iomem *reg = NULL;
-@@ -2482,16 +2478,12 @@ static int __devinit r8a66597_probe(struct platform_device *pdev)
- 	r8a66597->irq_sense_low = irq_trigger == IRQF_TRIGGER_LOW;
- 
- 	if (r8a66597->pdata->on_chip) {
--#ifdef CONFIG_HAVE_CLK
- 		snprintf(clk_name, sizeof(clk_name), "usb%d", pdev->id);
- 		r8a66597->clk = clk_get(&pdev->dev, clk_name);
- 		if (IS_ERR(r8a66597->clk)) {
- 			dev_err(&pdev->dev, "cannot get clock \"%s\"\n",
- 				clk_name);
--			ret = PTR_ERR(r8a66597->clk);
--			goto clean_up2;
- 		}
--#endif
- 		r8a66597->max_root_hub = 1;
- 	} else
- 		r8a66597->max_root_hub = 2;
-@@ -2531,11 +2523,9 @@ static int __devinit r8a66597_probe(struct platform_device *pdev)
- 	return 0;
- 
- clean_up3:
--#ifdef CONFIG_HAVE_CLK
--	if (r8a66597->pdata->on_chip)
-+	if (r8a66597->pdata->on_chip && !IS_ERR(r8a66597->clk))
- 		clk_put(r8a66597->clk);
--clean_up2:
--#endif
-+
- 	usb_put_hcd(hcd);
- 
- clean_up:
-diff --git a/drivers/usb/host/r8a66597.h b/drivers/usb/host/r8a66597.h
-index f28782d..672cea3 100644
---- a/drivers/usb/host/r8a66597.h
-+++ b/drivers/usb/host/r8a66597.h
-@@ -26,10 +26,7 @@
- #ifndef __R8A66597_H__
- #define __R8A66597_H__
- 
--#ifdef CONFIG_HAVE_CLK
- #include <linux/clk.h>
--#endif
--
- #include <linux/usb/r8a66597.h>
- 
- #define R8A66597_MAX_NUM_PIPE		10
-@@ -113,9 +110,7 @@ struct r8a66597_root_hub {
- struct r8a66597 {
- 	spinlock_t lock;
- 	void __iomem *reg;
--#ifdef CONFIG_HAVE_CLK
- 	struct clk *clk;
--#endif
- 	struct r8a66597_platdata	*pdata;
- 	struct r8a66597_device		device0;
- 	struct r8a66597_root_hub	root_hub[R8A66597_MAX_ROOT_HUB];
--- 
-1.7.9
+FWIW,
+Acked-by: Santosh Shilimkar ,santosh.shilimkar at ti.com>
