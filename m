@@ -1,33 +1,44 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 12:35:23 +0530
-Subject: [PATCH V2 4/9] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120424070426.GA24089@lunn.ch>
-References: <20120424070426.GA24089@lunn.ch>
-Message-ID: <4F9650B3.9030406@st.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 24 Apr 2012 08:59:23 +0200
+Subject: [PATCH 1/1] pinctrl: fix pinctrl_register_mappings
+Message-ID: <1335250763-7678-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2012 12:34 PM, Andrew Lunn wrote:
-> I don't think this change is correct. With the old semantics, it was:
+the function was to pinctrl
 
-Sorry. :(
+e93bcee00c4 pinctrl: move generic functions to the pinctrl_ namespace
 
-> If we have CLK support, we expect there to be a clock for sata_mv, and
-> if there is no such clock, output a notice message, something is
-> probably wrong, i expected there to be a clock.
-> 
-> The new semantics are:
-> 
-> We expect there to be a clock for sata_mv, and if there is no such
-> clock, output a notice message, something is probably wrong, i
-> expected there to be a clock.
-> 
-> We are going to see this notice message much more, when it is not
-> expected.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+---
+ include/linux/pinctrl/machine.h |   13 +------------
+ 1 files changed, 1 insertions(+), 12 deletions(-)
 
-So, the only problem is this message?
-How do you suggest to tackle this now. Have #ifdef,#endif around this print?
-
+diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
+index fee4349..fb6b649 100644
+--- a/include/linux/pinctrl/machine.h
++++ b/include/linux/pinctrl/machine.h
+@@ -148,18 +148,7 @@ struct pinctrl_map {
+ #define PIN_MAP_CONFIGS_GROUP_HOG_DEFAULT(dev, grp, cfgs)		\
+ 	PIN_MAP_CONFIGS_GROUP(dev, PINCTRL_STATE_DEFAULT, dev, grp, cfgs)
+ 
+-#ifdef CONFIG_PINMUX
+-
+-extern int pinctrl_register_mappings(struct pinctrl_map const *map,
++extern int pinctrl_register_mappings(struct pinctrl_map const *maps,
+ 				unsigned num_maps);
+ 
+-#else
+-
+-static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
+-					   unsigned num_maps)
+-{
+-	return 0;
+-}
+-
+-#endif /* !CONFIG_PINMUX */
+ #endif
 -- 
-viresh
+1.7.9.1
