@@ -1,107 +1,100 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2012 17:08:30 -0700
-Subject: [PATCH 3/7] ARM: OMAP2+: Move omap_dsp_reserve_sdram_memblock() to
- mach-omap2
+Date: Mon, 23 Apr 2012 17:08:32 -0700
+Subject: [PATCH 4/7] ARM: OMAP2: Add MMC hwmod data for 2420
 In-Reply-To: <20120424000607.17783.81686.stgit@muffinssi.local>
 References: <20120424000607.17783.81686.stgit@muffinssi.local>
-Message-ID: <20120424000830.17783.42727.stgit@muffinssi.local>
+Message-ID: <20120424000832.17783.21327.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This hardware exists only on 2430 and later omaps, so there's no
-need to have it in plat-omap/devices.c.
+Add MMC for 2420 so we can pass the DMA request lines the same
+way as we already do on omap2430 and later.
 
-Note that we don't have any users for exported omap_dsp_get_mempool_base(),
-so we can make it static.
-
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/dsp.c    |   27 +++++++++++++++++++++++++--
- arch/arm/plat-omap/devices.c |   29 -----------------------------
- 2 files changed, 25 insertions(+), 31 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |   63 ++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/dsp.c b/arch/arm/mach-omap2/dsp.c
-index 74f18f2..0b8dc3f 100644
---- a/arch/arm/mach-omap2/dsp.c
-+++ b/arch/arm/mach-omap2/dsp.c
-@@ -28,8 +28,6 @@
- 
- #include <plat/dsp.h>
- 
--extern phys_addr_t omap_dsp_get_mempool_base(void);
--
- static struct platform_device *omap_dsp_pdev;
- 
- static struct omap_dsp_platform_data omap_dsp_pdata __initdata = {
-@@ -47,6 +45,31 @@ static struct omap_dsp_platform_data omap_dsp_pdata __initdata = {
- 	.dsp_cm_rmw_bits = omap2_cm_rmw_mod_reg_bits,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index a6bde34..10f04a8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -1512,6 +1512,66 @@ static struct omap_hwmod omap2420_mcbsp2_hwmod = {
+ 	.slaves_cnt	= ARRAY_SIZE(omap2420_mcbsp2_slaves),
  };
  
-+static phys_addr_t omap_dsp_phys_mempool_base;
++static struct omap_hwmod omap2420_mmc_hwmod;
 +
-+void __init omap_dsp_reserve_sdram_memblock(void)
-+{
-+	phys_addr_t size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
-+	phys_addr_t paddr;
++struct omap_hwmod_addr_space omap2420_mmc_addrs[] = {
++	{
++		.pa_start	= 0x4809c000,
++		.pa_end		= 0x4809c000 + SZ_128 - 1,
++		.flags		= ADDR_TYPE_RT,
++	},
++	{ }
++};
 +
-+	if (!size)
-+		return;
++static struct omap_hwmod_class omap2420_mmc_hwmod_class = {
++	.name = "mmci",
++};
 +
-+	paddr = arm_memblock_steal(size, SZ_1M);
-+	if (!paddr) {
-+		pr_err("%s: failed to reserve %x bytes\n",
-+				__func__, size);
-+		return;
-+	}
++/* mmc */
++static struct omap_hwmod_irq_info omap2420_mmc_irqs[] = {
++	{ .irq = 83 },
++	{ .irq = -1 }
++};
 +
-+	omap_dsp_phys_mempool_base = paddr;
-+}
++static struct omap_hwmod_dma_info omap2420_mmc_sdma_reqs[] = {
++	{ .name = "tx", .dma_req = 61 }, /* OMAP24XX_DMA_MMC1_TX */
++	{ .name = "rx", .dma_req = 62 }, /* OMAP24XX_DMA_MMC1_RX */
++	{ .dma_req = -1 }
++};
 +
-+static phys_addr_t omap_dsp_get_mempool_base(void)
-+{
-+	return omap_dsp_phys_mempool_base;
-+}
++/* l4_core -> mmc */
++static struct omap_hwmod_ocp_if omap2420_l4_core__mmc = {
++	.master		= &omap2420_l4_core_hwmod,
++	.slave		= &omap2420_mmc_hwmod,
++	.clk		= "mmc_ick",
++	.addr		= omap2420_mmc_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
 +
- static int __init omap_dsp_init(void)
- {
- 	struct platform_device *pdev;
-diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
-index a0cfe66..1151d0b 100644
---- a/arch/arm/plat-omap/devices.c
-+++ b/arch/arm/plat-omap/devices.c
-@@ -109,35 +109,6 @@ static void omap_init_rng(void)
- static inline void omap_init_rng(void) {}
- #endif
++/* mmc slave ports */
++static struct omap_hwmod_ocp_if *omap2420_mmc_slaves[] = {
++	&omap2420_l4_core__mmc,
++};
++
++static struct omap_hwmod omap2420_mmc_hwmod = {
++	.name		= "mmci",
++	.class		= &omap2420_mmc_hwmod_class,
++	.mpu_irqs	= omap2420_mmc_irqs,
++	.sdma_reqs	= omap2420_mmc_sdma_reqs,
++	.main_clk	= "mmc_fck",
++	.prcm		= {
++		.omap2 = {
++			.prcm_reg_id = 1,
++			.module_bit = OMAP2420_EN_MMC_SHIFT,
++			.module_offs = CORE_MOD,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP2420_ST_MMC_SHIFT,
++		},
++	},
++	.slaves		= omap2420_mmc_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap2420_mmc_slaves),
++};
++
+ static __initdata struct omap_hwmod *omap2420_hwmods[] = {
+ 	&omap2420_l3_main_hwmod,
+ 	&omap2420_l4_core_hwmod,
+@@ -1564,6 +1624,9 @@ static __initdata struct omap_hwmod *omap2420_hwmods[] = {
+ 	/* mcspi class */
+ 	&omap2420_mcspi1_hwmod,
+ 	&omap2420_mcspi2_hwmod,
++
++	&omap2420_mmc_hwmod,
++
+ 	NULL,
+ };
  
--#if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE)
--
--static phys_addr_t omap_dsp_phys_mempool_base;
--
--void __init omap_dsp_reserve_sdram_memblock(void)
--{
--	phys_addr_t size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
--	phys_addr_t paddr;
--
--	if (!size)
--		return;
--
--	paddr = arm_memblock_steal(size, SZ_1M);
--	if (!paddr) {
--		pr_err("%s: failed to reserve %x bytes\n",
--				__func__, size);
--		return;
--	}
--
--	omap_dsp_phys_mempool_base = paddr;
--}
--
--phys_addr_t omap_dsp_get_mempool_base(void)
--{
--	return omap_dsp_phys_mempool_base;
--}
--EXPORT_SYMBOL(omap_dsp_get_mempool_base);
--#endif
--
- /*
-  * This gets called after board-specific INIT_MACHINE, and initializes most
-  * on-chip peripherals accessible on this board (except for few like USB):
