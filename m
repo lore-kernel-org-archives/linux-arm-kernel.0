@@ -1,131 +1,42 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 24 Apr 2012 16:05:38 +0200
-Subject: [PATCH 17/18][V3] ARM: OMAP3/4: consolidate cpuidle Makefile
+Date: Tue, 24 Apr 2012 16:05:39 +0200
+Subject: [PATCH 18/18][V3] ARM: OMAP3: cpuidle - set global variables static
 In-Reply-To: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1335276339-11135-18-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1335276339-11135-19-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a CPU_IDLE section in the makefile, declare the functions in
-the header files conforming to the kernel coding rules and remove the
-'define's in the C files.
+and check the powerdomain lookup is successful.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/Makefile      |   11 +++++++----
- arch/arm/mach-omap2/cpuidle34xx.c |    8 --------
- arch/arm/mach-omap2/cpuidle44xx.c |    8 --------
- arch/arm/mach-omap2/pm.h          |   17 +++++++++++++++--
- 4 files changed, 22 insertions(+), 22 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index d8604a3..92d5fb6 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -64,10 +64,8 @@ endif
- ifeq ($(CONFIG_PM),y)
- obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
- obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
--obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o \
--					   cpuidle34xx.o
--obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o \
--					   cpuidle44xx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
- obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
- obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
- obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
-@@ -81,6 +79,11 @@ endif
- 
- endif
- 
-+ifeq ($(CONFIG_CPU_IDLE),y)
-+obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
-+obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
-+endif
-+
- # PRCM
- obj-y					+= prm_common.o
- obj-$(CONFIG_ARCH_OMAP2)		+= prcm.o cm2xxx_3xxx.o prm2xxx_3xxx.o
 diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index ee02a8c..0d28596 100644
+index 0d28596..116a0d8 100644
 --- a/arch/arm/mach-omap2/cpuidle34xx.c
 +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -36,8 +36,6 @@
- #include "control.h"
- #include "common.h"
+@@ -73,7 +73,7 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
+ 	},
+ };
  
--#ifdef CONFIG_CPU_IDLE
--
- /* Mach specific information to be recorded in the C-state driver_data */
- struct omap3_idle_statedata {
- 	u32 mpu_state;
-@@ -376,9 +374,3 @@ int __init omap3_idle_init(void)
+-struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
++static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
  
- 	return 0;
- }
--#else
--int __init omap3_idle_init(void)
--{
--	return 0;
--}
--#endif /* CONFIG_CPU_IDLE */
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index be1617c..02d15bb 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -22,8 +22,6 @@
- #include "pm.h"
- #include "prm.h"
+ static int _cpuidle_allow_idle(struct powerdomain *pwrdm,
+ 				struct clockdomain *clkdm)
+@@ -252,6 +252,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+ 	 *        its own code.
+ 	 */
  
--#ifdef CONFIG_CPU_IDLE
--
- /* Machine specific information */
- struct omap4_idle_statedata {
- 	u32 cpu_state;
-@@ -199,9 +197,3 @@ int __init omap4_idle_init(void)
- 
- 	return 0;
- }
--#else
--int __init omap4_idle_init(void)
--{
--	return 0;
--}
--#endif /* CONFIG_CPU_IDLE */
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 7856489..ab04d3b 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -15,12 +15,25 @@
- 
- #include "powerdomain.h"
- 
-+#ifdef CONFIG_CPU_IDLE
-+extern int __init omap3_idle_init(void);
-+extern int __init omap4_idle_init(void);
-+#else
-+static inline int omap3_idle_init(void)
-+{
-+	return 0;
-+}
++	if (!mpu_pd || !core_pd || !per_pd || !cam_pd)
++		return -ENODEV;
 +
-+static inline int omap4_idle_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- extern void *omap3_secure_ram_storage;
- extern void omap3_pm_off_mode_enable(int);
- extern void omap_sram_idle(void);
- extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
--extern int omap3_idle_init(void);
--extern int omap4_idle_init(void);
- extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
- extern int (*omap_pm_suspend)(void);
- 
+ 	/*
+ 	 * Prevent PER off if CORE is not in retention or off as this
+ 	 * would disable PER wakeups completely.
 -- 
 1.7.5.4
