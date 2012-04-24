@@ -1,85 +1,90 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 23 Apr 2012 18:16:24 -0700
-Subject: [PATCH 2/8] clk: mxs: add clock support for imx23
-In-Reply-To: <20120424011035.GA26306@S2101-09.ap.freescale.net>
-References: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
- <1335023840-1394-3-git-send-email-shawn.guo@linaro.org>
- <CAJOA=zPU+-eQTGbXY15Gr==VzNB1JOLkocW4MD+fQBPe77sbdw@mail.gmail.com>
- <20120423235154.GY26306@S2101-09.ap.freescale.net>
- <CAJOA=zMjV0juDhnkUuZTbLVh7eby1rDntkfKY2qGJ-2Y9SfmiQ@mail.gmail.com>
- <20120424011035.GA26306@S2101-09.ap.freescale.net>
-Message-ID: <CAJOA=zNhwPAb-EtZ0fAuh8Vuxg5nSrL90Y6yo4Xjos_0zKHhEA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 24 Apr 2012 09:38:43 +0800
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
+References: <20120419064308.GH3852@pengutronix.de>
+ <20120420020816.GH22219@S2101-09.ap.freescale.net>
+ <CAMXH7KE2RtdNy3G61guZb2uWy3rn267Z3eEVEgN5e==tHHsiuA@mail.gmail.com>
+ <20120423051813.GM26306@S2101-09.ap.freescale.net>
+ <20120423062739.GX3852@pengutronix.de>
+ <20120423065259.GR26306@S2101-09.ap.freescale.net>
+ <20120423065623.GA3852@pengutronix.de>
+ <20120423071013.GS26306@S2101-09.ap.freescale.net>
+ <20120423074856.GU20478@pengutronix.de>
+ <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
+Message-ID: <20120424013841.GB26306@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 6:10 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Apr 23, 2012 at 04:59:23PM -0700, Turquette, Mike wrote:
->> The error codes were added in for a good reason and should be honored.
->>
->> >> > diff --git a/drivers/clk/mxs/clk.h b/drivers/clk/mxs/clk.h
->> >> > index deb5c23..fb5937d 100644
->> >> > --- a/drivers/clk/mxs/clk.h
->> >> > +++ b/drivers/clk/mxs/clk.h
->> >> > @@ -12,6 +12,8 @@
->> >> > ?#ifndef __MXS_CLK_H
->> >> > ?#define __MXS_CLK_H
->> >> >
->> >> > +#include <linux/clk.h>
->> >> > +#include <linux/clkdev.h>
->> >> > ?#include <linux/clk-provider.h>
->> >> > ?#include <linux/err.h>
->> >> > ?#include <linux/io.h>
->> >> > @@ -72,4 +74,22 @@ static inline int mxs_clk_wait(void __iomem *reg, u8 shift)
->> >> > ? ? ? ?return 0;
->> >> > ?}
->> >> >
->> >> > +static inline int mxs_clk_init_on(char **clks_init_on, int num)
->> >> > +{
->> >> > + ? ? ? struct clk *clk;
->> >> > + ? ? ? int i;
->> >> > +
->> >> > + ? ? ? for (i = 0; i < num; i++) {
->> >> > + ? ? ? ? ? ? ? clk = clk_get_sys(clks_init_on[i], NULL);
->> >> > + ? ? ? ? ? ? ? if (IS_ERR(clk)) {
->> >> > + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: failed to get clk %s", __func__,
->> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clks_init_on[i]);
->> >> > + ? ? ? ? ? ? ? ? ? ? ? return PTR_ERR(clk);
->> >> > + ? ? ? ? ? ? ? }
->> >> > + ? ? ? ? ? ? ? clk_prepare_enable(clk);
->> >> > + ? ? ? }
->> >> > +
->> >> > + ? ? ? return 0;
->> >> > +}
->> >>
->> >> Any good reason for this code to live in the header as static inline?
->> >>
->> > It's a small function which is used by both clk-imx23.c and clk-imx28.c.
->> >
->> >> Do you call this code any time other than at boot? ?Why not __init?
->> >>
->> > Eh, __init for inline function?
->>
->> __init for a non-lined function. ?If this code is only called at boot
->> then you can move it into a C file and __init it.
->>
->> This issue isn't worth blocking the series, but you could just as
->> easily put the definition in the clock code for the oldest SoC that
->> uses it (imx23 in this case) and declare it in your local clk.h
->>
-> Ok, if you are strong on this, I would prefer to the current way.
-> After all, it's a small function and the callers to it have already
-> been __init.
+On Mon, Apr 23, 2012 at 10:45:02AM -0500, Rob Lee wrote:
+> >> Let me try last time. ?What about having a late_initcall hook in
+> >> machine_desc?
+> >
+> > Also fine with me.
+> >
+> 
+> Shall I add Shawn's patch to my imx cpuidle patchset or should the
+> arch/arm/kernel/setup.c and arch.h changes be submitted separately?
+> If separately, Shawn, did you want to submit this patch or should I?
+> 
+Strange.  Russell is not in the Cc list.  I remember I added Russell
+into Cc when I propose the idea.  Added him again.
 
-I'm OK if you leave it as it is.  It is not a blocking issue for me.
+Rob,
 
-> Should I respin the series to have those registration returns checked?
-
-Yes, please do.  Once the checks are in then I will take this into my
--next branch.
+I suggest you have changes on arch/arm/kernel/setup.c and arch.h be
+a separate patch, but you can still have it in the series to show why
+we need the changes.  Cc Russell when posting the series, and see if
+Russell is fine with the patch.  If he is, we can ask his preference
+how the patch should go in, submitting it to his patch tracker or we
+can have it go though arm-soc along with the series to save the
+dependency.
 
 Regards,
-Mike
+Shawn
 
-> --
-> Regards,
-> Shawn
+> >> 8<---
+> >>
+> >> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> >> index d7692ca..0b1c94b 100644
+> >> --- a/arch/arm/include/asm/mach/arch.h
+> >> +++ b/arch/arm/include/asm/mach/arch.h
+> >> @@ -43,6 +43,7 @@ struct machine_desc {
+> >> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
+> >> ? ? ? ? struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
+> >> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_machine)(void);
+> >> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_late)(void);
+> >> ?#ifdef CONFIG_MULTI_IRQ_HANDLER
+> >> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*handle_irq)(struct pt_regs *);
+> >> ?#endif
+> >> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> >> index ebfac78..549f036 100644
+> >> --- a/arch/arm/kernel/setup.c
+> >> +++ b/arch/arm/kernel/setup.c
+> >> @@ -800,6 +800,14 @@ static int __init customize_machine(void)
+> >> ?}
+> >> ?arch_initcall(customize_machine);
+> >>
+> >> +static int __init init_machine_late(void)
+> >> +{
+> >> + ? ? ? if (machine_desc->init_late)
+> >> + ? ? ? ? ? ? ? machine_desc->init_late();
+> >> + ? ? ? return 0;
+> >> +}
+> >> +late_initcall(init_machine_late);
+> >> +
+> >> ?#ifdef CONFIG_KEXEC
+> >> ?static inline unsigned long long get_total_mem(void)
+> >> ?{
+> >> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> >> index da6c1d9..0e3640f 100644
+> >> --- a/arch/arm/mach-imx/mach-imx6q.c
+> >> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> >> @@ -142,6 +142,7 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
+> >> ? ? ? ? .handle_irq ? ? = imx6q_handle_irq,
+> >> ? ? ? ? .timer ? ? ? ? ?= &imx6q_timer,
+> >> ? ? ? ? .init_machine ? = imx6q_init_machine,
+> >> + ? ? ? .init_late ? ? ?= imx6q_init_late,
+> >> ? ? ? ? .dt_compat ? ? ?= imx6q_dt_compat,
+> >> ? ? ? ? .restart ? ? ? ?= imx6q_restart,
+> >> ?MACHINE_END
