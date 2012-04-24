@@ -1,28 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 10:18:04 +0200
-Subject: [PATCH 14/15] mfd/db8500-prcmu: Add Device Tree support and
- enable ux500 platforms
-In-Reply-To: <1334867804-31942-15-git-send-email-lee.jones@linaro.org>
+Date: Tue, 24 Apr 2012 10:19:39 +0200
+Subject: [PATCH 15/15] ARM: ux500: Enable PRCMU Timer 4 (clocksource) via
+ Device Tree
+In-Reply-To: <1334867804-31942-16-git-send-email-lee.jones@linaro.org>
 References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <1334867804-31942-15-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbQpa+YQ6SNytB-aW9Psr8jE1FO-=iyfJsF71RKmzzqUQ@mail.gmail.com>
+ <1334867804-31942-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaU+1XqXMRfv+3dTLCnw7J=dgFW394TNyAYuRUwupnD8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Here we see the db8500-prcmu driver obtain DT support. In its
-> current state, all we have to do is offer a matching compatible
-> node and the driver will register and initialise correctly. We
-> Also remove any initialisation completed in platform code to
-> prevent any device duplication.
+> In dbx500 based devices the PRCMU Timer 4 is used as a clocksource
+> and sched_clock. Here we fetch all necessary addressing information
+> required for correct PRCMU initialisation from the Device Tree
+> instead of using hard-coded values.
 >
 > CC: Samuel Ortiz <sameo@linux.intel.com>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-OK I need Sam's ACK on this too, then it seems a good idea
-to take all three patches touching the PRCMU driver through the
-ux500-core tree.
+This does not affect MFD so I can take it through ux500 and
+ARM SoC.
 
-Thanks,
+But please split it in two: one touching mach-ux500 and one
+messing with boot/dts/* please.
+
+Thanks!
 Linus Walleij
