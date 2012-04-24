@@ -1,49 +1,88 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 24 Apr 2012 20:18:06 +0200
-Subject: [PATCHv8 06/10] I2C: OMAP: Fix the crash in i2c remove
-In-Reply-To: <4F96ED77.9070503@ti.com>
-References: <1334842101-20670-1-git-send-email-shubhrajyoti@ti.com>
- <1334842101-20670-7-git-send-email-shubhrajyoti@ti.com>
- <20120423164944.GE27321@pengutronix.de> <4F96ED77.9070503@ti.com>
-Message-ID: <20120424181806.GF9007@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 24 Apr 2012 13:22:14 -0500
+Subject: [PATCH 15/19] ARM: OMAP4430: PM: workaround for DDR corruption
+ on second CS
+In-Reply-To: <1334914432-26456-16-git-send-email-t-kristo@ti.com>
+References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
+ <1334914432-26456-16-git-send-email-t-kristo@ti.com>
+Message-ID: <4F96EF56.5020604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 11:44:15PM +0530, Shubhrajyoti wrote:
-> On Monday 23 April 2012 10:19 PM, Wolfram Sang wrote:
-> >>     [  154.901153] Exception stack(0xdf9b9fb0 to 0xdf9b9ff8)
-> >> >     [  154.907104] 9fa0:                                     beaf1f04 4006be00 0000000f 0000000c
-> >> >     [  154.915710] 9fc0: 4006c000 00000000 00008034 ffffff40 00000007 00000000 00000000 0007b8d7
-> >> >     [  154.916778] 9fe0: 00000000 beaf1b68 0000d23c 4005baf0 80000010 ffffffff
-> >> >     [  154.931335]  r6:ffffffff r5:80000010 r4:4005baf0 r3:beaf1f04
-> >> >     [  154.937316] ---[ end trace 1b75b31a2719ed21 ]--
-> >> > 
-> >> > Cc: <stable@vger.kernel.org>
-> >> > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > Is this really the correct solution? I do wonder that every driver using
-> > runtime PM should enable the clocks on their own. That should be done by
-> > the core, 
-> By core you don't mean the i2c core but the pm layer right?
+Hi Tero,
 
-Yes.
+On 04/20/2012 04:33 AM, Tero Kristo wrote:
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
+> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
+> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
+> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
+> is not set properly, we apply the required workaround allowing
+> the restore sequence to work properly.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  .../include/mach/ctrl_module_wkup_44xx.h           |    2 +
+>  arch/arm/mach-omap2/pm44xx.c                       |   24 ++++++++++++++++++++
+>  2 files changed, 26 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+> index a0af9ba..b763a79 100644
+> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+> @@ -28,6 +28,8 @@
+>  #define OMAP4_CTRL_MODULE_WKUP_IP_REVISION		0x0000
+>  #define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO		0x0004
+>  #define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG		0x0010
+> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG	0x0114
+> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG	0x011c
+>  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0	0x0460
+>  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1	0x0464
+>  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2	0x0468
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index 0472921..d4d18d9 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -17,6 +17,9 @@
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+>  #include <asm/system_misc.h>
+> +#include <linux/io.h>
+> +
+> +#include <mach/ctrl_module_wkup_44xx.h>
+>  
+>  #include "common.h"
+>  #include "clockdomain.h"
+> @@ -215,6 +218,27 @@ static int __init omap4_pm_init(void)
+>  
+>  	pr_err("Power Management for TI OMAP4.\n");
+>  
+> +	/*
+> +	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
+> +	 * Mode Transition When CS1 Is Used On EMIF":
+> +	 * Overwrite EMIF1/EMIF2
+> +	 * SECURE_EMIF1_SDRAM_CONFIG2_REG
+> +	 * SECURE_EMIF2_SDRAM_CONFIG2_REG
+> +	 */
+> +	if (cpu_is_omap443x()) {
+> +		void __iomem *secure_ctrl_mod;
+> +
+> +		secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
+> +		BUG_ON(!secure_ctrl_mod);
+> +
+> +		__raw_writel(0x10, secure_ctrl_mod +
+> +			     OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
+> +		__raw_writel(0x10, secure_ctrl_mod +
+> +			     OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
 
-> > I'd say; it is not unusual that drivers need to write to
-> > registers in remove(). If it is correct, can I get some acks?
-> I did see the crash.
+According to the erratum description the above registers are used to
+restore the EMIFx_SDRAM_CONFIG2 registers. So although the value 0x10,
+maybe the value being used for EMIFx_SDRAM_CONFIG2 registers, shouldn't
+we read the EMIFx_SDRAM_CONFIG2 registers and store them in the above
+registers?
 
-That was never a doubt. With "correct" I meant "correct solution".
-
-> Will wait for the pm experts to comment.
-
-Yup.
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120424/683e5f8d/attachment.sig>
+Cheers
+Jon
