@@ -1,44 +1,125 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 24 Apr 2012 14:33:26 +0530
-Subject: [RFC] ARM: SAMSUNG: devs: Use common macro to define resources
-Message-ID: <1335258206-5937-1-git-send-email-tushar.behera@linaro.org>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 24 Apr 2012 17:33:42 +0800
+Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface for
+ platforms to use
+Message-ID: <1335260023-15859-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+From: Dong Aisheng <dong.aisheng@linaro.org>
+
+Add a interface pinctrl_provide_dummies for platform to indicate
+whether it needs use pinctrl dummy state and dummy gpio.
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
-I am not sure whether changes like this are accepted as independent patches,
-as they are not changing the behaviour of the code at all.
+ChangeLog v1->v2:
+* Based on sascha's suggestion, drop using kconfig since it will hide
+  pinctrl errors on all other boards.
+  See: https://lkml.org/lkml/2012/4/18/282
+  It seemed both Linus and Stephen agreed with this way, so i'm ok
+  with it too.
+* add dummy gpio support.
+  pinctrl gpio in the same situation as state.
+* patch name changed.
+  Original is pinctrl: handle dummy state in core.
+* split removing old dt dummy interface into a separate patch
+---
+ drivers/pinctrl/core.c          |   35 ++++++++++++++++++++++++++++++++---
+ include/linux/pinctrl/machine.h |    5 ++++-
+ 2 files changed, 36 insertions(+), 4 deletions(-)
 
-I have a patchset doing similar clean up in various Samsung related arch files.
-If changes like this are acceptable, I will post the complete patchset.
-
- arch/arm/plat-samsung/devs.c |   12 ++----------
- 1 files changed, 2 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index db32ec5..1013a34 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -272,16 +272,8 @@ struct platform_device s5p_device_fimc3 = {
- 
- #ifdef CONFIG_S5P_DEV_G2D
- static struct resource s5p_g2d_resource[] = {
--	[0] = {
--		.start	= S5P_PA_G2D,
--		.end	= S5P_PA_G2D + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_2D,
--		.end	= IRQ_2D,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = DEFINE_RES_MEM(S5P_PA_G2D, SZ_4K),
-+	[1] = DEFINE_RES_IRQ(IRQ_2D),
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 5cd5a5a..c6d0fdb 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -43,6 +43,9 @@ struct pinctrl_maps {
+ 	unsigned num_maps;
  };
  
- struct platform_device s5p_device_g2d = {
++static bool pinctrl_dummy_state;
++static bool pinctrl_dummy_gpio;
++
+ /* Mutex taken by all entry points */
+ DEFINE_MUTEX(pinctrl_mutex);
+ 
+@@ -61,6 +64,17 @@ static LIST_HEAD(pinctrl_maps);
+ 			_i_ < _maps_node_->num_maps; \
+ 			i++, _map_ = &_maps_node_->maps[_i_])
+ 
++/**
++ * pinctrl_provide_dummies() - indicate if provide dummies for state and gpio
++ * @state - provide dummy state
++ * @gpio - provide dummy gpio
++ */
++void pinctrl_provide_dummies(bool state, bool gpio)
++{
++	pinctrl_dummy_state = state;
++	pinctrl_dummy_gpio = gpio;
++}
++
+ const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev)
+ {
+ 	/* We're not allowed to register devices without name */
+@@ -382,7 +396,12 @@ int pinctrl_request_gpio(unsigned gpio)
+ 	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
+ 	if (ret) {
+ 		mutex_unlock(&pinctrl_mutex);
+-		return -EINVAL;
++		if (pinctrl_dummy_gpio) {
++			pr_debug("pinctrl: using dummy gpio(%u)\n", gpio);
++			return 0;
++		} else {
++			return -EINVAL;
++		}
+ 	}
+ 
+ 	/* Convert to the pin controllers number space */
+@@ -719,8 +738,18 @@ static struct pinctrl_state *pinctrl_lookup_state_locked(struct pinctrl *p,
+ 	struct pinctrl_state *state;
+ 
+ 	state = find_state(p, name);
+-	if (!state)
+-		return ERR_PTR(-ENODEV);
++	if (!state) {
++		if (pinctrl_dummy_state) {
++			/* create dummy state */
++			dev_dbg(p->dev, "using pinctrl dummy state (%s)\n",
++				name);
++			state = create_state(p, name);
++			if (IS_ERR(state))
++				return state;
++		} else {
++			return ERR_PTR(-ENODEV);
++		}
++	}
+ 
+ 	return state;
+ }
+diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
+index e4d1de7..849a844 100644
+--- a/include/linux/pinctrl/machine.h
++++ b/include/linux/pinctrl/machine.h
+@@ -154,7 +154,7 @@ struct pinctrl_map {
+ 
+ extern int pinctrl_register_mappings(struct pinctrl_map const *map,
+ 				unsigned num_maps);
+-
++extern void pinctrl_provide_dummies(bool state, bool gpio);
+ #else
+ 
+ static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
+@@ -163,5 +163,8 @@ static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
+ 	return 0;
+ }
+ 
++static inline void pinctrl_provide_dummies(bool state, bool gpio)
++{
++}
+ #endif /* !CONFIG_PINMUX */
+ #endif
 -- 
-1.7.4.1
+1.7.0.4
