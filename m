@@ -1,62 +1,38 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 24 Apr 2012 10:17:04 +0800
-Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
-In-Reply-To: <20120411092034.GV24211@n2100.arm.linux.org.uk>
-References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
- <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
- <20120410143055.GT24211@n2100.arm.linux.org.uk>
- <20120410161142.GG3852@pengutronix.de>
- <20120411011149.GA20818@b20223-02.ap.freescale.net>
- <20120411082401.GA32187@sirena.org.uk>
- <20120411084528.GB20818@b20223-02.ap.freescale.net>
- <20120411092034.GV24211@n2100.arm.linux.org.uk>
-Message-ID: <20120424021703.GA5111@b20223-02.ap.freescale.net>
+From: ylmao@marvell.com (Yilu Mao)
+Date: Tue, 24 Apr 2012 10:41:20 +0800
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that l2x0
+ is enabled before init
+Message-ID: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 10:20:34AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 11, 2012 at 04:45:29PM +0800, Richard Zhao wrote:
-> > On Wed, Apr 11, 2012 at 09:24:02AM +0100, Mark Brown wrote:
-> > > On Wed, Apr 11, 2012 at 09:11:50AM +0800, Richard Zhao wrote:
-> > > 
-> > > > I don't like string loopup either. And after DT binding, we can use
-> > > > phandler to refer clk.
-> > > 
-> > > No, this is only useful on platforms that use DT.  This is a generic
-> > > Linux API so it needs to support architectures and platforms that don't
-> > > use DT as it's vanishingly unlikely that DT will ever be adopted by all
-> > > platforms.
-> > My point is using string lookup as less as possible. When one register
-> > a clk, one already got the struct clk* pointer and could use it in
-> > struct lookup.
-> > 
-> > I'm worried about the performance as I saw string lookup is used more
-> > and more often. In fast boot case, for example, even 5ms is important.
-> 
-> Yes, and you're not the only one who has that concern.  What this patch
-> does is turn a pair of string compares through a table into that plus
-> another set of string compares across all struct clk, which will make
-> the lookup yet more expensive.
-> 
-> I see no reason why you'd register the cl_lookup structures before you
-> know about which clks actually exist - and if they already exist, then
-> you can already find the struct clk pointer and use that to register
-> the proper return value for clk_get() via the clkdev APIs.
-> 
-> As I've said in the past, naming individual clock structures is the
-> stupidest thing that anyone ever did and causes nothing but problems.
-> We've seen that in the drivers with the abuse of clk_get(NULL, name)
-> where people wanted to pass the name in via platform data.  We're
-> starting to see the same thing here as well, except the problem people
-> will see will be boot performance instead caused by multiple levels of
-> string compares.
-I just realized an important benefit of string lookup is we can define
-machine specific lookups at its machine file.
-Without it, we have to expose machine specific clk twice. For example,
-cko1 is SoC internal clock name and is connected to sgtl5000 audio codec.
-{"sgtl5000-dev-name", "function name"} lookup is board specific, and
-{NULL, "cko1"} is SoC specific. We have to expose both of them.
+If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
+register will not be saved in l2x0_saved_regs. Therefore we can not use
+l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
+by saving aux ctrl in l2x0_saved_regs just after it's being read from
+the register.
 
-Thanks
-Richard
-> 
+Signed-off-by: Yilu Mao <ylmao@marvell.com>
+---
+ arch/arm/mm/cache-l2x0.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index a53fd2a..3034b06 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -320,6 +320,12 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+ 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+ 
++	/* In case l2x controller is enabled, the aux ctrl register
++	 * can't be set. So the original value should be stored in
++	 * the l2x0_saved_regs for restoring when resume.
++	 */
++	l2x0_saved_regs.aux_ctrl = aux;
++
+ 	aux &= aux_mask;
+ 	aux |= aux_val;
+ 
+-- 
+1.7.5.4
