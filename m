@@ -1,57 +1,70 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 08:58:54 +0530
-Subject: New ARM build coverage
-In-Reply-To: <201204201737.58922.arnd@arndb.de>
-References: <CAP=VYLrNpskLQDAw3Udnq7grddi-uD6TDjQQoZUd+FVg2rXPnA@mail.gmail.com>
- <201204201737.58922.arnd@arndb.de>
-Message-ID: <4F961DF6.9030504@st.com>
+Date: Tue, 24 Apr 2012 09:10:59 +0530
+Subject: [PATCH V2 1/6] SPEAr: clk: Add VCO-PLL Synthesizer clock
+In-Reply-To: <CAJOA=zOmV12j+hp90dzK=XtNh0QKw2r-jeE2A4bagDmesGpSKw@mail.gmail.com>
+References: <cover.1334852393.git.viresh.kumar@st.com>
+ <24b0bd2794cd2d8ca317d25745fc7d3d5c294bc7.1334852394.git.viresh.kumar@st.com>
+ <CAJOA=zOmV12j+hp90dzK=XtNh0QKw2r-jeE2A4bagDmesGpSKw@mail.gmail.com>
+Message-ID: <4F9620CB.9030801@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/20/2012 11:07 PM, Arnd Bergmann wrote:
->>From d06bce2084e946c3ae4dc3011032d0c23b7cd815 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Fri, 20 Apr 2012 19:33:55 +0200
-> Subject: [PATCH] ARM: spear6xx: remove board selection options
+On 4/24/2012 1:01 AM, Turquette, Mike wrote:
+> On Thu, Apr 19, 2012 at 9:28 AM, Viresh Kumar <viresh.linux@gmail.com> wrote:
+>> diff --git a/drivers/clk/spear/clk.h b/drivers/clk/spear/clk.h
+>> new file mode 100644
+>> index 0000000..a66024e
+>> --- /dev/null
+>> +++ b/drivers/clk/spear/clk.h
+>> @@ -0,0 +1,76 @@
+>> +/*
+>> + * Clock framework definitions for SPEAr platform
+>> + *
+>> + * Copyright (C) 2012 ST Microelectronics
+>> + * Viresh Kumar <viresh.kumar@st.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#ifndef __PLAT_CLOCK_H
+>> +#define __PLAT_CLOCK_H
 > 
-> There are no board specific configurations that need user
-> intervention, so just make MACH_SPEAR600 the silent default
-> for ARCH_SPEAR6XX to prevent users from turning it off, which
-> would result in a build error.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm/mach-spear6xx/Kconfig b/arch/arm/mach-spear6xx/Kconfig
-> index fbe298b..339f397 100644
-> --- a/arch/arm/mach-spear6xx/Kconfig
-> +++ b/arch/arm/mach-spear6xx/Kconfig
-> @@ -2,21 +2,9 @@
->  # SPEAr6XX Machine configuration file
->  #
->  
-> -if ARCH_SPEAR6XX
-> -
-> -menu "SPEAr6xx Implementations"
-> -config BOARD_SPEAR600_DT
-> -	bool "SPEAr600 generic board configured via device-tree"
-> -	select MACH_SPEAR600
-> +config MACH_SPEAR600
-> +	def_bool y
-> +	depends on ARCH_SPEAR6XX
->  	select USE_OF
->  	help
->  	  Supports ST SPEAr600 boards configured via the device-tree
-> -
-> -endmenu
-> -
-> -config MACH_SPEAR600
-> -	bool "SPEAr600"
-> -	help
-> -	  Supports ST SPEAr600 Machine
-> -
-> -endif #ARCH_SPEAR6XX
+> Any reason to use __PLAT_CLOCK_H from drivers/clk/ now?  Is it
+> copy/paste from your old platform code?
 
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
+Ya. Will fix it to __SPEAR_CLK_H
+
+>> +static inline long clk_round_rate_index(struct clk_hw *hw, unsigned long drate,
+>> +               clk_calc_rate calc_rate, u8 rtbl_cnt, int *index)
+>> +{
+>> +       unsigned long prev_rate, rate = 0;
+>> +       unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
+>> +
+>> +       for (*index = 0; *index < rtbl_cnt; (*index)++) {
+>> +               prev_rate = rate;
+>> +               rate = calc_rate(hw, parent_rate, *index);
+>> +               if (drate < rate) {
+>> +                       /* previous clock was best */
+>> +                       if (*index) {
+>> +                               rate = prev_rate;
+>> +                               (*index)--;
+>> +                       }
+>> +                       break;
+>> +               }
+>> +       }
+>> +
+>> +       return rate;
+>> +}
+> 
+> Any reason for this code to exist in a header?  I prefer code in C
+> files.  Also it is a bit large for an inline function.
+
+There is no C file common to entire SPEAr clock framework, so kept it in header.
+Because this is called only from 2-3 places, inline would also be fine.
+
+But if you insist, i can create clk.c in spear, where i can keep it.
 
 -- 
 viresh
