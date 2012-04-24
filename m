@@ -1,31 +1,122 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Tue, 24 Apr 2012 21:47:52 +0530
-Subject: [Android-virt] [ANNOUNCE] [OFFTOPIC] Xvisor ARM with and/or
- without virtualization extensions
-In-Reply-To: <393682CA-A7A8-4962-B156-3EBDF5B41E36@gmail.com>
-References: <CAAhSdy12KufzNtrf6wYY7rK0LZMPC-_-4N+p4JwJsV5MB6HTDg@mail.gmail.com>
- <393682CA-A7A8-4962-B156-3EBDF5B41E36@gmail.com>
-Message-ID: <CAAhSdy3m1eWiWMNA0UQLJHVkwqd3W4hwEAH2jdiLNur2b8QiuQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 Apr 2012 09:20:16 -0700
+Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source
+ selection using kernel param
+In-Reply-To: <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
+References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
+ <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
+Message-ID: <20120424162016.GK3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hi,
 
-Network Virtualization and Block Device Virtualization are at top most
-priority for Xvisor right now. Couple of folks have already started
-working on Network virtualization but Block Device Virtualization
-still unexplored.
+* Vaibhav Hiremath <hvaibhav@ti.com> [120424 02:54]:
+> Current OMAP code supports couple of clocksource options based
+> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+> So there can be 3 options -
+> 
+> 1. 32KHz sync-timer
+> 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+> 3. 32KHz based gptimer.
+> 
+> The optional gptimer based clocksource was added so that it can
+> give the high precision than sync-timer, so expected usage was 2
+> and not 3.
+> Unfortunately option 2, clocksource doesn't meet the requirement of
+> free-running clock as per clocksource need. It stops in low power states
+> when sys_clock is cut. That makes gptimer based clocksource option
+> useless for OMAP2/3/4 devices with sys_clock as a clock input.
+> Option 3 will still work but it is no better than 32K sync-timer
+> based clocksource.
 
-We would be glad to have your contributions. Do join our xvisor-devel
-googlegroup.
+For some cases sys clock based timer is still valid if you don't
+care about PM. In that case deeper idle states need to be disabled,
+not the timer as discussed earlier. Please update the comments accordingly.
+ 
+> So ideally we can kill the gptimer based clocksource option but there
+> are some OMAP based derivative SoCs like AM33XX which doesn't have
+> 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
+> clocksource.
 
-Thanks & Regards,
-Anup Patel
+Maybe just say: "We must support both sync timer and gptimer based
+clocksource as some AM33XX hardware does not have the sync timer."
 
-On Tue, Apr 24, 2012 at 7:24 PM, Alexander Golec <thejfasi@gmail.com> wrote:
-> Hi,
->
-> I'm a graduating senior at Columbia University, and I have spent the past semester working on the KVM on ARM project, specifically on block IO virtualization support. I was wondering if you have any need for an implementation of IO virtualization for block and network operations. If so, then I would be glad to submit a pull request further down the line.
->
-> Alex
->
+> Considering above, make sync-timer and gptimer clocksource runtime
+> selectable so that both OMAP and AMXXXX continue to use the same code.
+> 
+> Also, in order to precisely configure/setup sched_clock for given
+> clocksource, decision has to be made early enough in boot sequence.
+> 
+> So, the solution is,
+> 
+> Use kernel parameter ("clocksource=") to override
+
+Maybe say: "Use standard kernel parameter ("clocksource=")..."
+
+> --- a/arch/arm/mach-omap1/timer32k.c
+> +++ b/arch/arm/mach-omap1/timer32k.c
+> @@ -71,6 +71,7 @@
+> 
+>  /* 16xx specific defines */
+>  #define OMAP1_32K_TIMER_BASE		0xfffb9000
+> +#define OMAP1_32KSYNC_TIMER_BASE	0xfffbc400
+>  #define OMAP1_32K_TIMER_CR		0x08
+>  #define OMAP1_32K_TIMER_TVR		0x00
+>  #define OMAP1_32K_TIMER_TCR		0x04
+> @@ -184,7 +185,10 @@ static __init void omap_init_32k_timer(void)
+>   */
+>  bool __init omap_32k_timer_init(void)
+>  {
+> -	omap_init_clocksource_32k();
+> +	u32 pbase;
+> +
+> +	pbase = cpu_is_omap16xx() ? OMAP1_32KSYNC_TIMER_BASE : NULL;
+> +	omap_init_clocksource_32k(pbase, SZ_1K);
+>  	omap_init_32k_timer();
+> 
+>  	return true;
+
+Has this patch been tested on omap1?
+
+
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -510,3 +540,28 @@ static int __init omap2_dm_timer_init(void)
+>  	return 0;
+>  }
+>  arch_initcall(omap2_dm_timer_init);
+> +
+> +/**
+> + * omap2_override_clocksource - clocksource override with user configuration
+> + *
+> + * Allows user to override default clocksource, using kernel parameter
+> + *   clocksource="gp timer"
+> + *
+> + * Note that, here we are using same standard kernel parameter "clocksource=",
+> + * and not introducing any OMAP specific interface.
+> + */
+> +static int __init omap2_override_clocksource(char *str)
+> +{
+> +	if (!str)
+> +		return 0;
+> +	/*
+> +	 * For OMAP architecture, we only have two options
+> +	 *    - sync_32k (default)
+> +	 *    - gp timer
+> +	 */
+> +	if (!strcmp(str, "gp timer"))
+> +		use_gptimer_clksrc = true;
+> +
+> +	return 0;
+> +}
+> +early_param("clocksource", omap2_override_clocksource);
+
+Should say "For omap2plus architectures" and should say three options.
+If the sys clock based timer is not currently supported, please mention
+that in the comments.
+
+Regards,
+
+Tony
