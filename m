@@ -1,15 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 24 Apr 2012 05:18:37 +0200
-Subject: [PATCH 05/11] MXS: Modify the ci13xxx_udc to avoid adding UDC
+Date: Tue, 24 Apr 2012 05:18:33 +0200
+Subject: [PATCH 01/11] MXS: Make clk_disable return integer
 In-Reply-To: <1335237523-9053-1-git-send-email-marex@denx.de>
 References: <1335099567-21056-1-git-send-email-marex@denx.de>
  <1335237523-9053-1-git-send-email-marex@denx.de>
-Message-ID: <1335237523-9053-6-git-send-email-marex@denx.de>
+Message-ID: <1335237523-9053-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the i.MX platform, we are adding the UDC ourselves from the PHY driver. This
-patch adds a flag into the ci13xxx_udc that avoids adding the UDC if set.
+This allows subsequent USB clock patch to interchange enable() and disable()
+calls without adding unnecessary switching cruft.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -26,51 +26,61 @@ Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Tony Lin <tony.lin@freescale.com>
 Cc: Wolfgang Denk <wd@denx.de>
 ---
- drivers/usb/gadget/ci13xxx_udc.c |   12 ++++++++----
- drivers/usb/gadget/ci13xxx_udc.h |    1 +
- 2 files changed, 9 insertions(+), 4 deletions(-)
+ arch/arm/mach-mxs/clock-mx28.c         |    7 +++++--
+ arch/arm/mach-mxs/include/mach/clock.h |    2 +-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/gadget/ci13xxx_udc.c b/drivers/usb/gadget/ci13xxx_udc.c
-index 243ef1a..94f8b19 100644
---- a/drivers/usb/gadget/ci13xxx_udc.c
-+++ b/drivers/usb/gadget/ci13xxx_udc.c
-@@ -2935,9 +2935,11 @@ static int udc_probe(struct ci13xxx_udc_driver *driver, struct device *dev,
- 			goto remove_dbg;
- 	}
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index cea29c9..43116ba 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -86,7 +86,7 @@ static int _raw_clk_enable(struct clk *clk)
+ 	return 0;
+ }
  
--	retval = usb_add_gadget_udc(dev, &udc->gadget);
--	if (retval)
--		goto remove_trans;
-+	if (!(udc->udc_driver->flags & CI13XXX_DONT_REGISTER_GADGET)) {
-+		retval = usb_add_gadget_udc(dev, &udc->gadget);
-+		if (retval)
-+			goto remove_trans;
-+	}
+-static void _raw_clk_disable(struct clk *clk)
++static int _raw_clk_disable(struct clk *clk)
+ {
+ 	u32 reg;
  
- 	pm_runtime_no_callbacks(&udc->gadget.dev);
- 	pm_runtime_enable(&udc->gadget.dev);
-@@ -2980,7 +2982,9 @@ static void udc_remove(void)
- 		err("EINVAL");
- 		return;
+@@ -95,6 +95,8 @@ static void _raw_clk_disable(struct clk *clk)
+ 		reg |= 1 << clk->enable_shift;
+ 		__raw_writel(reg, clk->enable_reg);
  	}
--	usb_del_gadget_udc(&udc->gadget);
 +
-+	if (!(udc->udc_driver->flags & CI13XXX_DONT_REGISTER_GADGET))
-+		usb_del_gadget_udc(&udc->gadget);
++	return 0;
+ }
  
- 	if (udc->transceiver) {
- 		otg_set_peripheral(udc->transceiver->otg, &udc->gadget);
-diff --git a/drivers/usb/gadget/ci13xxx_udc.h b/drivers/usb/gadget/ci13xxx_udc.h
-index 0d31af5..9f2efa2 100644
---- a/drivers/usb/gadget/ci13xxx_udc.h
-+++ b/drivers/usb/gadget/ci13xxx_udc.h
-@@ -108,6 +108,7 @@ struct ci13xxx_udc_driver {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
-+#define CI13XXX_DONT_REGISTER_GADGET	BIT(4)
+ /*
+@@ -149,7 +151,7 @@ _CLK_ENABLE_PLL(pll1_clk, PLL1, EN_USB_CLKS)
+ _CLK_ENABLE_PLL(pll2_clk, PLL2, CLKGATE)
  
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+ #define _CLK_DISABLE_PLL(name, r, g)					\
+-static void name##_disable(struct clk *clk)				\
++static int name##_disable(struct clk *clk)				\
+ {									\
+ 	__raw_writel(BM_CLKCTRL_##r##CTRL0_POWER,			\
+ 		     CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+@@ -161,6 +163,7 @@ static void name##_disable(struct clk *clk)				\
+ 		__raw_writel(BM_CLKCTRL_##r##CTRL0_##g,			\
+ 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+ 									\
++	return 0;							\
+ }
+ 
+ _CLK_DISABLE_PLL(pll0_clk, PLL0, EN_USB_CLKS)
+diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
+index 592c9ab..21d1fad 100644
+--- a/arch/arm/mach-mxs/include/mach/clock.h
++++ b/arch/arm/mach-mxs/include/mach/clock.h
+@@ -50,7 +50,7 @@ struct clk {
+ 	int (*enable) (struct clk *);
+ 	/* Function ptr to disable the clock. Leave blank if clock can not
+ 	   be gated. */
+-	void (*disable) (struct clk *);
++	int (*disable) (struct clk *);
+ 	/* Function ptr to set the parent clock of the clock. */
+ 	int (*set_parent) (struct clk *, struct clk *);
+ };
 -- 
 1.7.10
