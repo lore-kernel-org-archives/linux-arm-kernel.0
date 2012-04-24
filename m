@@ -1,40 +1,73 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 24 Apr 2012 16:27:14 +0530
-Subject: [PATCH 3/8] dmaengine: split out virtual channel DMA support
- from sa11x0 driver
-In-Reply-To: <20120424105045.GD25053@n2100.arm.linux.org.uk>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRr2-0004bC-8a@rmk-PC.arm.linux.org.uk> <4F9681F1.2090408@nvidia.com>
- <20120424105045.GD25053@n2100.arm.linux.org.uk>
-Message-ID: <4F96870A.5060303@nvidia.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 24 Apr 2012 16:51:22 +0530
+Subject: [PATCH V3 00/12] clk: Add non CONFIG_HAVE_CLK routines
+Message-ID: <cover.1335266056.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 April 2012 04:20 PM, Russell King - ARM Linux wrote:
->
->> For cyclic case, we will not like to call the  dma_cookie_complete() but
->> want to put the desc in callback list.
->> So can we have one more arg on this function which byspass the call of
->> dma_cookie_complete()
-> See the discussion on what's supposed to happen with cyclic transfers.
-> Cyclic transfers don't complete, so adding them to the completed list
-> and marking them complete is the wrong thing to be doing.  So arguably
-> calling this function is also the wrong thing to be doing because
-> you're not completing the transfer.
+Many drivers are shared between architectures that may or may not have HAVE_CLK
+selected for them. To remove compilation errors for them we enclose clk_*()
+calls in these drivers within #ifdef CONFIG_HAVE_CLK, #endif.
 
-OK, we will not call this function but still need to call the callback. 
-So do you suggest to call callback directly from dma driver rather than 
-the virt_chan?
-> I'll be addressing the issue of cyclic transfers when I eventually get
-> to sorting out the OMAP ASoC driver.
+This patchset removes the need of these CONFIG_HAVE_CLK statements, by
+introducing dummy routines when HAVE_CLK is not selected by platforms. So,
+definition of these routines will always be available. These calls will return
+error for platforms that don't select HAVE_CLK.
 
-Here I am developing the dma driver for Tegra in cyclic and normal mode 
-and what is your suggestion here?
-Should I use your virt_chan now or I can go ahead with my first patch 
-without virt_chan and once you are done with your virt_chan with all 
-cyclic support then  port the tegra_dma to use virt chan and next 
-enhanced patch?
+I hope i don't break anything now. ;)
 
-In this way, my Tegra dma will be there in tree, all client will be move 
-to dma engine based driver and then I will comeback to tegra_dma for 
-using the virt_channel.
+V2->V3:
+- Dummy routines now return NULL or 0.
+- All user drivers must fail if clk_get returned error other than NULL.
+- All user drivers don't need to validate their clk pointer before every call to
+  clk_*() routines.
+- Patches dropped earlier are again taken back, as they were following similar
+  approach to what is implemented now.
+
+V1->V2:
+- Removed few patches as they might break working drivers
+- Updated 1st patch, as it doesn't apply cleanly on latest linux-next after this
+  got applied.
+
+	commit a8a97db984bdc5e89d42e41891543d2daaf314cb
+	Author: Mark Brown <broonie@sirena.org.uk>
+	Date:   Thu Apr 5 11:42:09 2012 +0100
+	
+	ARM: 7376/1: clkdev: Implement managed clk_get()
+
+- Similarly, updated stmmac patch as there were updates for it too.
+
+Viresh Kumar (12):
+  clk: Add non CONFIG_HAVE_CLK routines
+  clk: Remove redundant depends on from drivers/Kconfig
+  i2c/i2c-pxa: Remove conditional compilation of clk code
+  usb/marvell: Remove conditional compilation of clk code
+  usb/musb: Remove conditional compilation of clk code
+  ata/pata_arasan: Remove conditional compilation of clk code
+  ata/sata_mv: Remove conditional compilation of clk code
+  net/c_can: Remove conditional compilation of clk code
+  net/stmmac: Remove conditional compilation of clk code
+  gadget/m66592: Remove conditional compilation of clk code
+  gadget/r8a66597: Remove conditional compilation of clk code
+  usb/host/r8a66597: Remove conditional compilation of clk code
+
+ drivers/ata/pata_arasan_cf.c                      |   14 +--
+ drivers/ata/sata_mv.c                             |   32 ++---
+ drivers/clk/Kconfig                               |    2 -
+ drivers/i2c/busses/i2c-pxa.c                      |    7 -
+ drivers/net/can/c_can/c_can_platform.c            |    8 -
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h      |   41 -----
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c |   33 ++--
+ drivers/usb/gadget/m66592-udc.c                   |    9 +-
+ drivers/usb/gadget/m66592-udc.h                   |    5 -
+ drivers/usb/gadget/r8a66597-udc.c                 |   11 +-
+ drivers/usb/gadget/r8a66597-udc.h                 |    5 -
+ drivers/usb/host/r8a66597-hcd.c                   |   12 --
+ drivers/usb/host/r8a66597.h                       |    5 -
+ drivers/usb/musb/musb_core.h                      |    8 -
+ include/linux/clk.h                               |  168 +++++++++++++-------
+ include/linux/platform_data/mv_usb.h              |    9 -
+ 16 files changed, 141 insertions(+), 228 deletions(-)
+
+-- 
+1.7.9
