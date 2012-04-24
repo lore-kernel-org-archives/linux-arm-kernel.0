@@ -1,30 +1,50 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 14:00:43 +0530
-Subject: [PATCH V2 4/9] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120424082652.GQ24211@n2100.arm.linux.org.uk>
-References: <20120424070426.GA24089@lunn.ch> <4F9650B3.9030406@st.com>
- <20120424072653.GB24089@lunn.ch>
- <20120424074202.GO24211@n2100.arm.linux.org.uk> <4F965D1C.2010203@st.com>
- <20120424082652.GQ24211@n2100.arm.linux.org.uk>
-Message-ID: <4F9664B3.6040104@st.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 24 Apr 2012 16:36:06 +0800
+Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
+In-Reply-To: <20120424075426.GP24211@n2100.arm.linux.org.uk>
+References: <CAMXH7KE2RtdNy3G61guZb2uWy3rn267Z3eEVEgN5e==tHHsiuA@mail.gmail.com>
+ <20120423051813.GM26306@S2101-09.ap.freescale.net>
+ <20120423062739.GX3852@pengutronix.de>
+ <20120423065259.GR26306@S2101-09.ap.freescale.net>
+ <20120423065623.GA3852@pengutronix.de>
+ <20120423071013.GS26306@S2101-09.ap.freescale.net>
+ <20120423074856.GU20478@pengutronix.de>
+ <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
+ <20120424013841.GB26306@S2101-09.ap.freescale.net>
+ <20120424075426.GP24211@n2100.arm.linux.org.uk>
+Message-ID: <20120424083603.GE26306@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2012 1:56 PM, Russell King - ARM Linux wrote:
-> Think about this case: if you don't have the means to control the clock
-> inputs to a device (for example, you don't support the clk API on your
-> CPU arch) then for the device to be functional, it must be supplied with
-> all its necessary clocks.  Therefore, the clock is already enabled.  It
-> makes sense for the clk API to stub-out to be completely transparent and
-> non-error inducing to the driver.
+On Tue, Apr 24, 2012 at 08:54:26AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 24, 2012 at 09:38:43AM +0800, Shawn Guo wrote:
+> > On Mon, Apr 23, 2012 at 10:45:02AM -0500, Rob Lee wrote:
+> > > >> Let me try last time. ?What about having a late_initcall hook in
+> > > >> machine_desc?
+> > > >
+> > > > Also fine with me.
+> > > >
+> > > 
+> > > Shall I add Shawn's patch to my imx cpuidle patchset or should the
+> > > arch/arm/kernel/setup.c and arch.h changes be submitted separately?
+> > > If separately, Shawn, did you want to submit this patch or should I?
+> > > 
+> > Strange.  Russell is not in the Cc list.  I remember I added Russell
+> > into Cc when I propose the idea.  Added him again.
 > 
-> The problem comes with clk_get_rate().  I'd suggest merely returning zero
-> for that in this case.  If the clock rate is really required by a driver,
-> then the clk API would need to be enabled.
+> I didn't see any message in this thread cc'd to me, but that's not to
+> say I hadn't already read this patch.  I don't have any comment against
+> it, but I do wonder how often this hook would be used.
+> 
+I guess mach-* that use common cpuidle will likely need this hook.
 
-Ok. Will do as suggested. Will include the patches i dropped earlier, where
-i removed macros for clk_*().
+> We do seem to have quite a number of late_initcall()s in arch/arm/mach-*,
+> so it seems to be a good idea - provided someone's willing to convert all
+> those users of late_initcall()s.
+
+Agreed.  The late_initcall()s in arch/arm/mach-* will not scale for
+long time, since we are moving toward single build.
 
 -- 
-viresh
+Regards,
+Shawn
