@@ -1,33 +1,29 @@
-From: tartler@cs.fau.de (Reinhard Tartler)
-Date: Tue, 24 Apr 2012 14:36:16 +0200
-Subject: [PATCH] ARM: mach-iop13xx: fix parameter declaration of
- iq81340sc_atux_map_irq
-Message-ID: <1335270976-5553-1-git-send-email-tartler@cs.fau.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 24 Apr 2012 14:46:42 +0200
+Subject: [PATCH] ARM: ux500: add the cpuidle driver for WFI and ARM
+ retention
+In-Reply-To: <CACRpkdZ-et-P2jx1WZWdgE87XNsQFocrv2YR1Po4uVv1ztEVLA@mail.gmail.com>
+References: <1334839592-32251-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F94EE2C.1060503@linaro.org>
+ <CACRpkdZ-et-P2jx1WZWdgE87XNsQFocrv2YR1Po4uVv1ztEVLA@mail.gmail.com>
+Message-ID: <4F96A0B2.4070000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Reinhard Tartler <siretart@tauware.de>
+On 04/24/2012 11:09 AM, Linus Walleij wrote:
+> On Mon, Apr 23, 2012 at 7:52 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org>  wrote:
+>
+>> Hi Linus,
+>>
+>> can you consider this patch for inclusion, please ?
+> Yepps, patch applied with Vicent's ACK.
 
-Fixes the following compiler warning:
-arch/arm/mach-iop13xx/iq81340sc.c:63: warning: initialization from incompatible pointer type | warning: (near initialization for ?iq81340sc_pci.map_irq?)
+Great, thanks !
 
-Signed-off-by: Reinhard Tartler <tartler@cs.fau.de>
----
- arch/arm/mach-iop13xx/iq81340sc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-iop13xx/iq81340sc.c b/arch/arm/mach-iop13xx/iq81340sc.c
-index cd9e274..70e8db0 100644
---- a/arch/arm/mach-iop13xx/iq81340sc.c
-+++ b/arch/arm/mach-iop13xx/iq81340sc.c
-@@ -30,7 +30,7 @@
- extern int init_atu;
- 
- static int __init
--iq81340sc_atux_map_irq(struct pci_dev *dev, u8 idsel, u8 pin)
-+iq81340sc_atux_map_irq(const struct pci_dev *dev, u8 idsel, u8 pin)
- {
- 	WARN_ON(idsel < 1 || idsel > 2);
- 
 -- 
-1.7.9.5
+  <http://www.linaro.org/>  Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:<http://www.facebook.com/pages/Linaro>  Facebook |
+<http://twitter.com/#!/linaroorg>  Twitter |
+<http://www.linaro.org/linaro-blog/>  Blog
