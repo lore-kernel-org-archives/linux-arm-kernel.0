@@ -1,47 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 10:23:34 +0200
-Subject: [PATCH 3/3] ARM: imx6q: switch to use pinctrl driver
-In-Reply-To: <20120416033519.GA17173@shlinux2.ap.freescale.net>
-References: <1334333915-1174-1-git-send-email-b29396@freescale.com>
- <1334333915-1174-3-git-send-email-b29396@freescale.com>
- <20120414135331.GB3852@pengutronix.de>
- <CAA+hA=QhSUZg0bWTss_4ROwZ--OOQfcP=mpt+MP7-ZKPkEwXyA@mail.gmail.com>
- <20120415073751.GF24997@S2101-09.ap.freescale.net>
- <20120416033519.GA17173@shlinux2.ap.freescale.net>
-Message-ID: <CACRpkdZWNNz3+LbPtkV4rS4BJpqQdZio0qLkedLamSisgDkm6Q@mail.gmail.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Tue, 24 Apr 2012 10:24:37 +0200
+Subject: [PATCH V2 6/9] net/stmmac: Remove conditional compilation of
+ clk code
+In-Reply-To: <4F964B3A.306@st.com>
+References: <cover.1335246730.git.viresh.kumar@st.com>
+ <4336df4e231467d253e25bbd41dbce6d189ed1e8.1335246730.git.viresh.kumar@st.com>
+ <4F964551.4050507@st.com> <4F96493C.7020309@st.com> <4F964B3A.306@st.com>
+Message-ID: <4F966345.5080303@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2012 at 5:35 AM, Dong Aisheng
-<aisheng.dong@freescale.com> wrote:
-> On Sun, Apr 15, 2012 at 03:37:54PM +0800, Shawn Guo wrote:
->> On Sun, Apr 15, 2012 at 12:03:16PM +0800, Dong Aisheng wrote:
->> ...
->> > For MX3 and MX5, before their pinctrl driver are available, user may
->> > need to define a dummy in dt to avoid such an error.
->> >
->> That is insane, and will not work.
+On 4/24/2012 8:42 AM, Viresh Kumar wrote:
+> On 4/24/2012 12:03 PM, Giuseppe CAVALLARO wrote:
+>> Oops, sorry but on a build I got:
 >>
->> 1) We do not have device tree support for MX3 yet.
->> 2) It's not practical to add dummy entries in dt to avoid the error.
->> 3) There are still so many non-dt board files support in the tree.
->> How will they work with that?
+>>  CC      init/version.o
+>>   LD      init/built-in.o
+>>   LD      .tmp_vmlinux1
+>> drivers/built-in.o: In function `stmmac_release':
+>> /stlinux/cavagiu/git/mirror/net-next.git/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c:1134:
+>> undefined reference to `clk_disable'
+>> drivers/built-in.o: In function `stmmac_open':
+>> /stlinux/cavagiu/git/mirror/net-next.git/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c:974:
+>> undefined reference to `clk_enable'
+>> /stlinux/cavagiu/git/mirror/net-next.git/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c:1079:
+>> undefined reference to `clk_disable'
+>> drivers/built-in.o: In function `stmmac_dvr_probe':
+>> /stlinux/cavagiu/git/mirror/net-next.git/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c:1931:
+>> undefined reference to `clk_get'
+>> drivers/built-in.o: In function `stmmac_clk_csr_set':
+>> /stlinux/cavagiu/git/mirror/net-next.git/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c:174:
+>> undefined reference to `clk_get_rate'
+>> drivers/built-in.o: In function `stmmac_suspend':
+>> /stlinux/cavagiu/git/mirror/net-next.git/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c:2030:
+>> undefined reference to `clk_disable'
+>> drivers/built-in.o: In function `stmmac_resume':
+>> /stlinux/cavagiu/git/mirror/net-next.git/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c:2054:
+>> undefined reference to `clk_enable'
+>> make: *** [.tmp_vmlinux1] Error 1
 >>
->> My suggestion is to not make it an error but a dev_dbg, assuming that
->> the pins are already set up by platform code if we do not find the
->> entry from pinctrl system. ?We can take it as a transition solution,
->> and turn the dev_dbg back to error when all the users of the device
->> driver are converted to device tree.
->>
-> My thinking is let pinctrl core handle dummy state as regulator subsystem
-> and does not depend on dt.
-> Linus, Stephen, any comment?
+>> Pls, can you verify?
+> 
+> I believe, you haven't applied:
+> 
+> [PATCH V2 1/9] clk: Add non CONFIG_HAVE_CLK routines
+> 
+> which must be applied before testing this.
 
-I think this was discussed in another thread and Sascha agreed that
-wee need dummy pinctrl to copy with a smooth transition in i.MX.
+Yes with it applied the build is ok.
 
-So I'm happy with that, we just need to finalize a patch, poke
-me if I missed some patch...
+Peppe
 
-Yours,
-Linus Walleij
+> 
