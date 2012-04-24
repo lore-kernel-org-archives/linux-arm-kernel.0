@@ -1,99 +1,60 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 24 Apr 2012 05:18:43 +0200
-Subject: [PATCH 11/11] MXS: Enable USB on M28EVK
-In-Reply-To: <1335237523-9053-1-git-send-email-marex@denx.de>
-References: <1335099567-21056-1-git-send-email-marex@denx.de>
- <1335237523-9053-1-git-send-email-marex@denx.de>
-Message-ID: <1335237523-9053-12-git-send-email-marex@denx.de>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 24 Apr 2012 11:40:11 +0800
+Subject: [PATCH 1/2] pinctrl: add pinctrl-mxs support
+In-Reply-To: <20120423144623.GU26306@S2101-09.ap.freescale.net>
+References: <1334823125-24159-1-git-send-email-shawn.guo@linaro.org>
+ <20120421164713.GA3408@das-ThinkPad-X61>
+ <20120422163255.GD26306@S2101-09.ap.freescale.net>
+ <20120423074702.GD24843@shlinux2.ap.freescale.net>
+ <20120423144623.GU26306@S2101-09.ap.freescale.net>
+Message-ID: <20120424034010.GA32166@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the second USB port on M28EVK board.
+On Mon, Apr 23, 2012 at 10:46:26PM +0800, Shawn Guo wrote:
+> On Mon, Apr 23, 2012 at 03:47:03PM +0800, Dong Aisheng wrote:
+> > On Mon, Apr 23, 2012 at 12:32:58AM +0800, Shawn Guo wrote:
+> > > On Sun, Apr 22, 2012 at 12:47:13AM +0800, Dong Aisheng wrote:
+> > > > On Thu, Apr 19, 2012 at 04:12:05PM +0800, Shawn Guo wrote:
+> > > > > Add pinctrl support for Freescale MXS SoCs, i.MX23 and i.MX28.
+> > > > > The driver supports device tree probe only.
+> > > > > 
+> > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > > ---
+> > > > First, it seems i.MX23 and i.MX28 have the same situation as
+> > > > other IMX families like i.MX6Q that they're all pin based
+> > > > SoCs. Thus i think the correct thing to do now may be to
+> > > > enhance pinctrl-imx core driver to support them all rather
+> > > > than write a much similar one only for i.MX23 and i.MX28,
+> > > > right?
+> > > > 
+> > > I would think there will be SoCs from other vendors sharing the same
+> > > situation.  My view on this is to have them in and then look for the
+> > > common pattern among these drivers and come up with some generic
+> > > helper functions.
+> > > 
+> > We may get align with all FSL families first.
+> > At least the binding part could be the same.
+> > The most difference between MXS and IMX is different register layout.
+> > For example, pinconf_set/get may be different.
+> > One rough idea in my mind is that one callback in pinctrl-imx may
+> > handle it.
+> > 
+> You haven't convinced me that the imx binding you came up with your
+> v2 series plays well for mxs.
+> 
+Then please feel free to comment on the pinctrl-imx binding if you've
+different option for mxs.
+But i did not receive you comment...
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Chen Peter-B29397 <B29397@freescale.com>
-Cc: Detlev Zundel <dzu@denx.de>
-Cc: Fabio Estevam <festevam@gmail.com>
-Cc: Li Frank-B20596 <B20596@freescale.com>
-Cc: Lin Tony-B19295 <B19295@freescale.com>
-Cc: Linux USB <linux-usb@vger.kernel.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Stefano Babic <sbabic@denx.de>
-Cc: Subodh Nijsure <snijsure@grid-net.com>
-Cc: Tony Lin <tony.lin@freescale.com>
-Cc: Wolfgang Denk <wd@denx.de>
----
- arch/arm/mach-mxs/Kconfig       |    2 ++
- arch/arm/mach-mxs/mach-m28evk.c |   21 +++++++++++++++++++++
- 2 files changed, 23 insertions(+)
+I think we'd better have a face to face discussion when you come to office.
+At least one unified binding for all FSL SoCs is our goal, isn't it?
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index c57f996..05f6e84 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -81,6 +81,8 @@ config MODULE_M28
- 	select MXS_HAVE_PLATFORM_MXS_I2C
- 	select MXS_HAVE_PLATFORM_MXS_MMC
- 	select MXS_HAVE_PLATFORM_MXSFB
-+	select MXS_HAVE_PLATFORM_USB
-+	select USB_ARCH_HAS_EHCI
- 	select MXS_OCOTP
- 
- config MODULE_APX4
-diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
-index 06d7996..fe00921 100644
---- a/arch/arm/mach-mxs/mach-m28evk.c
-+++ b/arch/arm/mach-mxs/mach-m28evk.c
-@@ -39,6 +39,8 @@
- 
- #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
- #define M28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 28)
-+#define M28EVK_USB_ENABLE	MXS_GPIO_NR(3, 13)
-+#define M28EVK_USBOTG_ENABLE	MXS_GPIO_NR(3, 12)
- 
- #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
- #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
-@@ -210,6 +212,16 @@ static const iomux_cfg_t m28evk_pads[] __initconst = {
- 
- 	/* Backlight */
- 	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
-+
-+	/* USB */
-+	MX28_PAD_SSP2_SS2__USB0_OVERCURRENT,
-+	MX28_PAD_SSP2_SS1__USB1_OVERCURRENT,
-+	MX28_PAD_PWM2__USB0_ID |
-+		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
-+	MX28_PAD_AUART3_TX__GPIO_3_13 |
-+		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
-+	MX28_PAD_AUART3_RX__GPIO_3_12 |
-+		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
- };
- 
- /* led */
-@@ -317,6 +329,13 @@ static struct mxs_mmc_platform_data m28evk_mmc_pdata[] __initdata = {
- 	},
- };
- 
-+static struct imx_usb_platform_data m28_usb_data = {
-+	.gpio_vbus		= M28EVK_USBOTG_ENABLE,
-+	.gpio_vbus_inverted	= 1,
-+	.gadget_mode		= 0,
-+	.host_mode		= 1,
-+};
-+
- static void __init m28evk_init(void)
- {
- 	mxs_iomux_setup_multiple_pads(m28evk_pads, ARRAY_SIZE(m28evk_pads));
-@@ -344,6 +363,8 @@ static void __init m28evk_init(void)
- 	mx28_add_mxs_i2c(0);
- 	i2c_register_board_info(0, m28_stk5v3_i2c_boardinfo,
- 			ARRAY_SIZE(m28_stk5v3_i2c_boardinfo));
-+
-+	mx28_add_mxs_usbh(0, &m28_usb_data);
- }
- 
- static void __init m28evk_timer_init(void)
--- 
-1.7.10
+BTW one idea in my mind is that we indeed may want pinctrl subsystem support
+config a group of pins based on pin config which i rasied in my v2 patch.
+I'm going to send a patch and discuss with Linus and Stephen more.
+If that works, we really do not have to do as you did for mxs
+for all FSL SoCs.
+
+Regards
+Dong Aisheng
