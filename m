@@ -1,69 +1,75 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 23 Apr 2012 17:32:57 -0700
-Subject: [PATCH-V3 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9F9AD0@DBDE01.ent.ti.com>
- (Vaibhav Hiremath's message of "Mon, 23 Apr 2012 17:35:19 +0000")
-References: <1334309947-25214-1-git-send-email-hvaibhav@ti.com>
- <1334309947-25214-4-git-send-email-hvaibhav@ti.com>
- <87k41bqm0j.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9F9AD0@DBDE01.ent.ti.com>
-Message-ID: <87ehreezpi.fsf@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 24 Apr 2012 09:10:37 +0800
+Subject: [PATCH 2/8] clk: mxs: add clock support for imx23
+In-Reply-To: <CAJOA=zMjV0juDhnkUuZTbLVh7eby1rDntkfKY2qGJ-2Y9SfmiQ@mail.gmail.com>
+References: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
+ <1335023840-1394-3-git-send-email-shawn.guo@linaro.org>
+ <CAJOA=zPU+-eQTGbXY15Gr==VzNB1JOLkocW4MD+fQBPe77sbdw@mail.gmail.com>
+ <20120423235154.GY26306@S2101-09.ap.freescale.net>
+ <CAJOA=zMjV0juDhnkUuZTbLVh7eby1rDntkfKY2qGJ-2Y9SfmiQ@mail.gmail.com>
+Message-ID: <20120424011035.GA26306@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+On Mon, Apr 23, 2012 at 04:59:23PM -0700, Turquette, Mike wrote:
+> The error codes were added in for a good reason and should be honored.
+> 
+> >> > diff --git a/drivers/clk/mxs/clk.h b/drivers/clk/mxs/clk.h
+> >> > index deb5c23..fb5937d 100644
+> >> > --- a/drivers/clk/mxs/clk.h
+> >> > +++ b/drivers/clk/mxs/clk.h
+> >> > @@ -12,6 +12,8 @@
+> >> > ?#ifndef __MXS_CLK_H
+> >> > ?#define __MXS_CLK_H
+> >> >
+> >> > +#include <linux/clk.h>
+> >> > +#include <linux/clkdev.h>
+> >> > ?#include <linux/clk-provider.h>
+> >> > ?#include <linux/err.h>
+> >> > ?#include <linux/io.h>
+> >> > @@ -72,4 +74,22 @@ static inline int mxs_clk_wait(void __iomem *reg, u8 shift)
+> >> > ? ? ? ?return 0;
+> >> > ?}
+> >> >
+> >> > +static inline int mxs_clk_init_on(char **clks_init_on, int num)
+> >> > +{
+> >> > + ? ? ? struct clk *clk;
+> >> > + ? ? ? int i;
+> >> > +
+> >> > + ? ? ? for (i = 0; i < num; i++) {
+> >> > + ? ? ? ? ? ? ? clk = clk_get_sys(clks_init_on[i], NULL);
+> >> > + ? ? ? ? ? ? ? if (IS_ERR(clk)) {
+> >> > + ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: failed to get clk %s", __func__,
+> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clks_init_on[i]);
+> >> > + ? ? ? ? ? ? ? ? ? ? ? return PTR_ERR(clk);
+> >> > + ? ? ? ? ? ? ? }
+> >> > + ? ? ? ? ? ? ? clk_prepare_enable(clk);
+> >> > + ? ? ? }
+> >> > +
+> >> > + ? ? ? return 0;
+> >> > +}
+> >>
+> >> Any good reason for this code to live in the header as static inline?
+> >>
+> > It's a small function which is used by both clk-imx23.c and clk-imx28.c.
+> >
+> >> Do you call this code any time other than at boot? ?Why not __init?
+> >>
+> > Eh, __init for inline function?
+> 
+> __init for a non-lined function.  If this code is only called at boot
+> then you can move it into a C file and __init it.
+> 
+> This issue isn't worth blocking the series, but you could just as
+> easily put the definition in the clock code for the oldest SoC that
+> uses it (imx23 in this case) and declare it in your local clk.h
+> 
+Ok, if you are strong on this, I would prefer to the current way.
+After all, it's a small function and the callers to it have already
+been __init.
 
-> On Fri, Apr 20, 2012 at 06:04:20, Hilman, Kevin wrote:
+Should I respin the series to have those registration returns checked?
 
-[...]
-
->> Also note that because you're adding an offset of 0x10 to the start, the
->> ioremap later is actually mapping 0x10 past the end.  More on the base
->> address later...
->> 
->
-> Comment on top of this code will enough, isn't it?
->
-
-No.  ioremapping() the range that goes past the end of the device is
-just wrong.  But if you fix the offset as described below, that would be
-fine.
-
-[...]
-
->> > @@ -68,54 +66,43 @@ void read_persistent_clock(struct timespec *ts)
->> >  	*ts = *tsp;
->> >  }
->> >
->> > -int __init omap_init_clocksource_32k(void)
->> > +int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
->> 
->> Now that this takes some arguments, this function wants some kerneldoc.
->> 
->
-> Should I create new documentation inside Documentation/arm/OMAP/
-> with name "counter_32k"?
-
-by kerneldoc, I mean comments in the code, not in Documenation.
-
-IOW, just add a comment before this function in the code, but make sure
-it is of the format described in Documentation/kernel-doc-nano-HOWTO.txt.
-
->> In particular, you should document that 'pbase' is the address of the
->> counter register, not the base of the IP.
->> 
->> That being said, I think the pbase passed in should probably be the base
->> of the IP register, not the address of the counter register. It seems to
->> me that it's at offset 0x10 on all SoCs anyways.
->> 
->> Doing that will also ensure that the ioremap'd range covers the whole
->> IP, and not from the counter register to 0x10 past the end.
->> 
->
-> Yeah, you are right, I can get rid of this offset and move it to 
-> counter_32k.c file.
-
-Perfect.
-
-Kevin
+-- 
+Regards,
+Shawn
