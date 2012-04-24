@@ -1,90 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 24 Apr 2012 09:38:43 +0800
-Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
-In-Reply-To: <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
-References: <20120419064308.GH3852@pengutronix.de>
- <20120420020816.GH22219@S2101-09.ap.freescale.net>
- <CAMXH7KE2RtdNy3G61guZb2uWy3rn267Z3eEVEgN5e==tHHsiuA@mail.gmail.com>
- <20120423051813.GM26306@S2101-09.ap.freescale.net>
- <20120423062739.GX3852@pengutronix.de>
- <20120423065259.GR26306@S2101-09.ap.freescale.net>
- <20120423065623.GA3852@pengutronix.de>
- <20120423071013.GS26306@S2101-09.ap.freescale.net>
- <20120423074856.GU20478@pengutronix.de>
- <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
-Message-ID: <20120424013841.GB26306@S2101-09.ap.freescale.net>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 24 Apr 2012 10:17:04 +0800
+Subject: [PATCH 01/40] clkdev: add clkname to struct clk_lookup
+In-Reply-To: <20120411092034.GV24211@n2100.arm.linux.org.uk>
+References: <1334065553-7565-1-git-send-email-s.hauer@pengutronix.de>
+ <1334065553-7565-2-git-send-email-s.hauer@pengutronix.de>
+ <20120410143055.GT24211@n2100.arm.linux.org.uk>
+ <20120410161142.GG3852@pengutronix.de>
+ <20120411011149.GA20818@b20223-02.ap.freescale.net>
+ <20120411082401.GA32187@sirena.org.uk>
+ <20120411084528.GB20818@b20223-02.ap.freescale.net>
+ <20120411092034.GV24211@n2100.arm.linux.org.uk>
+Message-ID: <20120424021703.GA5111@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 10:45:02AM -0500, Rob Lee wrote:
-> >> Let me try last time. ?What about having a late_initcall hook in
-> >> machine_desc?
-> >
-> > Also fine with me.
-> >
+On Wed, Apr 11, 2012 at 10:20:34AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 11, 2012 at 04:45:29PM +0800, Richard Zhao wrote:
+> > On Wed, Apr 11, 2012 at 09:24:02AM +0100, Mark Brown wrote:
+> > > On Wed, Apr 11, 2012 at 09:11:50AM +0800, Richard Zhao wrote:
+> > > 
+> > > > I don't like string loopup either. And after DT binding, we can use
+> > > > phandler to refer clk.
+> > > 
+> > > No, this is only useful on platforms that use DT.  This is a generic
+> > > Linux API so it needs to support architectures and platforms that don't
+> > > use DT as it's vanishingly unlikely that DT will ever be adopted by all
+> > > platforms.
+> > My point is using string lookup as less as possible. When one register
+> > a clk, one already got the struct clk* pointer and could use it in
+> > struct lookup.
+> > 
+> > I'm worried about the performance as I saw string lookup is used more
+> > and more often. In fast boot case, for example, even 5ms is important.
 > 
-> Shall I add Shawn's patch to my imx cpuidle patchset or should the
-> arch/arm/kernel/setup.c and arch.h changes be submitted separately?
-> If separately, Shawn, did you want to submit this patch or should I?
+> Yes, and you're not the only one who has that concern.  What this patch
+> does is turn a pair of string compares through a table into that plus
+> another set of string compares across all struct clk, which will make
+> the lookup yet more expensive.
 > 
-Strange.  Russell is not in the Cc list.  I remember I added Russell
-into Cc when I propose the idea.  Added him again.
+> I see no reason why you'd register the cl_lookup structures before you
+> know about which clks actually exist - and if they already exist, then
+> you can already find the struct clk pointer and use that to register
+> the proper return value for clk_get() via the clkdev APIs.
+> 
+> As I've said in the past, naming individual clock structures is the
+> stupidest thing that anyone ever did and causes nothing but problems.
+> We've seen that in the drivers with the abuse of clk_get(NULL, name)
+> where people wanted to pass the name in via platform data.  We're
+> starting to see the same thing here as well, except the problem people
+> will see will be boot performance instead caused by multiple levels of
+> string compares.
+I just realized an important benefit of string lookup is we can define
+machine specific lookups at its machine file.
+Without it, we have to expose machine specific clk twice. For example,
+cko1 is SoC internal clock name and is connected to sgtl5000 audio codec.
+{"sgtl5000-dev-name", "function name"} lookup is board specific, and
+{NULL, "cko1"} is SoC specific. We have to expose both of them.
 
-Rob,
-
-I suggest you have changes on arch/arm/kernel/setup.c and arch.h be
-a separate patch, but you can still have it in the series to show why
-we need the changes.  Cc Russell when posting the series, and see if
-Russell is fine with the patch.  If he is, we can ask his preference
-how the patch should go in, submitting it to his patch tracker or we
-can have it go though arm-soc along with the series to save the
-dependency.
-
-Regards,
-Shawn
-
-> >> 8<---
-> >>
-> >> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> >> index d7692ca..0b1c94b 100644
-> >> --- a/arch/arm/include/asm/mach/arch.h
-> >> +++ b/arch/arm/include/asm/mach/arch.h
-> >> @@ -43,6 +43,7 @@ struct machine_desc {
-> >> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
-> >> ? ? ? ? struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
-> >> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_machine)(void);
-> >> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_late)(void);
-> >> ?#ifdef CONFIG_MULTI_IRQ_HANDLER
-> >> ? ? ? ? void ? ? ? ? ? ? ? ? ? ?(*handle_irq)(struct pt_regs *);
-> >> ?#endif
-> >> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> >> index ebfac78..549f036 100644
-> >> --- a/arch/arm/kernel/setup.c
-> >> +++ b/arch/arm/kernel/setup.c
-> >> @@ -800,6 +800,14 @@ static int __init customize_machine(void)
-> >> ?}
-> >> ?arch_initcall(customize_machine);
-> >>
-> >> +static int __init init_machine_late(void)
-> >> +{
-> >> + ? ? ? if (machine_desc->init_late)
-> >> + ? ? ? ? ? ? ? machine_desc->init_late();
-> >> + ? ? ? return 0;
-> >> +}
-> >> +late_initcall(init_machine_late);
-> >> +
-> >> ?#ifdef CONFIG_KEXEC
-> >> ?static inline unsigned long long get_total_mem(void)
-> >> ?{
-> >> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> >> index da6c1d9..0e3640f 100644
-> >> --- a/arch/arm/mach-imx/mach-imx6q.c
-> >> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> >> @@ -142,6 +142,7 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
-> >> ? ? ? ? .handle_irq ? ? = imx6q_handle_irq,
-> >> ? ? ? ? .timer ? ? ? ? ?= &imx6q_timer,
-> >> ? ? ? ? .init_machine ? = imx6q_init_machine,
-> >> + ? ? ? .init_late ? ? ?= imx6q_init_late,
-> >> ? ? ? ? .dt_compat ? ? ?= imx6q_dt_compat,
-> >> ? ? ? ? .restart ? ? ? ?= imx6q_restart,
-> >> ?MACHINE_END
+Thanks
+Richard
+> 
