@@ -1,88 +1,46 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 24 Apr 2012 13:22:14 -0500
-Subject: [PATCH 15/19] ARM: OMAP4430: PM: workaround for DDR corruption
- on second CS
-In-Reply-To: <1334914432-26456-16-git-send-email-t-kristo@ti.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-16-git-send-email-t-kristo@ti.com>
-Message-ID: <4F96EF56.5020604@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 24 Apr 2012 13:00:23 -0600
+Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
+ for platforms to use
+In-Reply-To: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+Message-ID: <4F96F847.508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
-
-On 04/20/2012 04:33 AM, Tero Kristo wrote:
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On 04/24/2012 03:33 AM, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
-> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
-> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
-> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
-> is not set properly, we apply the required workaround allowing
-> the restore sequence to work properly.
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  .../include/mach/ctrl_module_wkup_44xx.h           |    2 +
->  arch/arm/mach-omap2/pm44xx.c                       |   24 ++++++++++++++++++++
->  2 files changed, 26 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
-> index a0af9ba..b763a79 100644
-> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
-> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
-> @@ -28,6 +28,8 @@
->  #define OMAP4_CTRL_MODULE_WKUP_IP_REVISION		0x0000
->  #define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO		0x0004
->  #define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG		0x0010
-> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG	0x0114
-> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG	0x011c
->  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0	0x0460
->  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1	0x0464
->  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2	0x0468
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> index 0472921..d4d18d9 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@ -17,6 +17,9 @@
->  #include <linux/err.h>
->  #include <linux/slab.h>
->  #include <asm/system_misc.h>
-> +#include <linux/io.h>
-> +
-> +#include <mach/ctrl_module_wkup_44xx.h>
->  
->  #include "common.h"
->  #include "clockdomain.h"
-> @@ -215,6 +218,27 @@ static int __init omap4_pm_init(void)
->  
->  	pr_err("Power Management for TI OMAP4.\n");
->  
-> +	/*
-> +	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
-> +	 * Mode Transition When CS1 Is Used On EMIF":
-> +	 * Overwrite EMIF1/EMIF2
-> +	 * SECURE_EMIF1_SDRAM_CONFIG2_REG
-> +	 * SECURE_EMIF2_SDRAM_CONFIG2_REG
-> +	 */
-> +	if (cpu_is_omap443x()) {
-> +		void __iomem *secure_ctrl_mod;
-> +
-> +		secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
-> +		BUG_ON(!secure_ctrl_mod);
-> +
-> +		__raw_writel(0x10, secure_ctrl_mod +
-> +			     OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
-> +		__raw_writel(0x10, secure_ctrl_mod +
-> +			     OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
+> Add a interface pinctrl_provide_dummies for platform to indicate
+> whether it needs use pinctrl dummy state and dummy gpio.
 
-According to the erratum description the above registers are used to
-restore the EMIFx_SDRAM_CONFIG2 registers. So although the value 0x10,
-maybe the value being used for EMIFx_SDRAM_CONFIG2 registers, shouldn't
-we read the EMIFx_SDRAM_CONFIG2 registers and store them in the above
-registers?
+> @@ -382,7 +396,12 @@ int pinctrl_request_gpio(unsigned gpio)
+>  	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
+>  	if (ret) {
+>  		mutex_unlock(&pinctrl_mutex);
+> -		return -EINVAL;
+> +		if (pinctrl_dummy_gpio) {
+> +			pr_debug("pinctrl: using dummy gpio(%u)\n", gpio);
+> +			return 0;
+> +		} else {
+> +			return -EINVAL;
+> +		}
+>  	}
 
-Cheers
-Jon
+The only thing that should be calling pinctrl_request_gpio() is a GPIO
+driver. It should only be calling it for the GPIOs it manages. I'd
+expect that if a platform's pinctrl driver was not yet written to
+support the GPIO functionality, then the GPIO driver would not be
+calling this function.
+
+As such, I'm not sure that this part of the change is necessary.
+
+If it is, then surely all the other pinctrl GPIO APIs need a similar change?
+
+Finally, how does this interact with deferred probe: How does the code
+know whether the pinctrl driver and/or GPIO range is simply not yet
+registered, or whether it never will be? That'd be the difference
+between returning -EPROBE_DEFER or 0 in the if block above.
+
+
+I'm fine with the other parts of this patch.
