@@ -1,44 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 24 Apr 2012 23:31:51 +0300
-Subject: [PATCH v2 1/3] ARM: tegra: Add AHB driver
-In-Reply-To: <4F9703C2.50002@wwwdotorg.org>
-References: <1335269116-9578-1-git-send-email-hdoyu@nvidia.com>
- <20120424121619.GF8444@arwen.pp.htv.fi>
- <4F9703C2.50002@wwwdotorg.org>
-Message-ID: <20120424203150.GA9176@arwen.pp.htv.fi>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 24 Apr 2012 22:49:47 +0200
+Subject: [PATCH 08/11] MXS: Add imx-otg driver
+In-Reply-To: <201204241949.37938.marex@denx.de>
+References: <1335099567-21056-1-git-send-email-marex@denx.de>
+ <20374.53520.690267.206408@ipc1.ka-ro>
+ <20120424164751.GY3852@pengutronix.de>
+ <201204241949.37938.marex@denx.de>
+Message-ID: <20120424204947.GZ3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 01:49:22PM -0600, Stephen Warren wrote:
-> On 04/24/2012 06:16 AM, Felipe Balbi wrote:
-> > On Tue, Apr 24, 2012 at 03:05:14PM +0300, Hiroshi DOYU wrote:
-> >> The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> >> High-performance Bus (AHB) architecture.
-> ...
-> >> +static int __init tegra_ahb_init(void)
-> >> +{
-> >> +	return platform_driver_register(&tegra_ahb_driver);
-> >> +}
-> >> +postcore_initcall(tegra_ahb_init);
-> >> +
-> >> +static void __exit tegra_ahb_exit(void)
-> >> +{
-> >> +	platform_driver_unregister(&tegra_ahb_driver);
-> >> +}
-> >> +module_exit(tegra_ahb_exit);
+On Tue, Apr 24, 2012 at 07:49:37PM +0200, Marek Vasut wrote:
+> > > > > 
+> > > > > Why do you call this driver imx-otg when it is actually MXS specific?
+> > > > > How would you call a corresponding driver for the remaining i.MX
+> > > > > processors?
+> > > > 
+> > > > This is the driver for the all i.MX processors.
+> > > 
+> > > If it is for all i.MX processors, it shouldn't access MXS specific
+> > > registers, like:
+> > > +		writel(wakeup, x->io_priv + HW_USBPHY_CTRL_SET);
 > > 
-> > please use module_platform_driver();
+> > Indeed not. This should be done in the phy driver.
 > 
-> That won't work for a postcore_initcall.
+> Ok, so now you figured out that all these set_host() set_peripheral() work() 
+> calls should be back in the phy driver, not in the imx-otg? hm ... so back to 
+> the V4 of the patchset?
 
-aaah, indeed. Missed that part ;-) My bad.
+Not really, you are just not allowed to put phy code into imx-otg.c,
+because the phy may be another one on a different SoC.
+
+That said, I am a bit confused at the moment. There seems to be no
+method to activate the interrupt in the phy.
+
+Sascha
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120424/98fe68c4/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
