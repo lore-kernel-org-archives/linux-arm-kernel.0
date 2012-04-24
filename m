@@ -1,100 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2012 17:08:32 -0700
-Subject: [PATCH 4/7] ARM: OMAP2: Add MMC hwmod data for 2420
+Date: Mon, 23 Apr 2012 17:08:35 -0700
+Subject: [PATCH 5/7] ARM: OMAP2: Use hwmod to initialize mmc for 2420
 In-Reply-To: <20120424000607.17783.81686.stgit@muffinssi.local>
 References: <20120424000607.17783.81686.stgit@muffinssi.local>
-Message-ID: <20120424000832.17783.21327.stgit@muffinssi.local>
+Message-ID: <20120424000835.17783.50945.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MMC for 2420 so we can pass the DMA request lines the same
-way as we already do on omap2430 and later.
+This allows us to pass dma request lines in platform data to
+MMC driver the same way as we already do for omap2430 and later.
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |   63 ++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm/mach-omap2/devices.c |   19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index a6bde34..10f04a8 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -1512,6 +1512,66 @@ static struct omap_hwmod omap2420_mcbsp2_hwmod = {
- 	.slaves_cnt	= ARRAY_SIZE(omap2420_mcbsp2_slaves),
- };
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index e433603..a2e839a 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -616,7 +616,11 @@ static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
  
-+static struct omap_hwmod omap2420_mmc_hwmod;
-+
-+struct omap_hwmod_addr_space omap2420_mmc_addrs[] = {
-+	{
-+		.pa_start	= 0x4809c000,
-+		.pa_end		= 0x4809c000 + SZ_128 - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+	{ }
-+};
-+
-+static struct omap_hwmod_class omap2420_mmc_hwmod_class = {
-+	.name = "mmci",
-+};
-+
-+/* mmc */
-+static struct omap_hwmod_irq_info omap2420_mmc_irqs[] = {
-+	{ .irq = 83 },
-+	{ .irq = -1 }
-+};
-+
-+static struct omap_hwmod_dma_info omap2420_mmc_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = 61 }, /* OMAP24XX_DMA_MMC1_TX */
-+	{ .name = "rx", .dma_req = 62 }, /* OMAP24XX_DMA_MMC1_RX */
-+	{ .dma_req = -1 }
-+};
-+
-+/* l4_core -> mmc */
-+static struct omap_hwmod_ocp_if omap2420_l4_core__mmc = {
-+	.master		= &omap2420_l4_core_hwmod,
-+	.slave		= &omap2420_mmc_hwmod,
-+	.clk		= "mmc_ick",
-+	.addr		= omap2420_mmc_addrs,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* mmc slave ports */
-+static struct omap_hwmod_ocp_if *omap2420_mmc_slaves[] = {
-+	&omap2420_l4_core__mmc,
-+};
-+
-+static struct omap_hwmod omap2420_mmc_hwmod = {
-+	.name		= "mmci",
-+	.class		= &omap2420_mmc_hwmod_class,
-+	.mpu_irqs	= omap2420_mmc_irqs,
-+	.sdma_reqs	= omap2420_mmc_sdma_reqs,
-+	.main_clk	= "mmc_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP2420_EN_MMC_SHIFT,
-+			.module_offs = CORE_MOD,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP2420_ST_MMC_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2420_mmc_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2420_mmc_slaves),
-+};
-+
- static __initdata struct omap_hwmod *omap2420_hwmods[] = {
- 	&omap2420_l3_main_hwmod,
- 	&omap2420_l4_core_hwmod,
-@@ -1564,6 +1624,9 @@ static __initdata struct omap_hwmod *omap2420_hwmods[] = {
- 	/* mcspi class */
- 	&omap2420_mcspi1_hwmod,
- 	&omap2420_mcspi2_hwmod,
-+
-+	&omap2420_mmc_hwmod,
-+
- 	NULL,
- };
+ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+ {
+-	char *name = "mmci-omap";
++	struct platform_device *pdev;
++	struct omap_hwmod *oh;
++	int id = 0;
++	char *oh_name = "mmci";
++	char *dev_name = "mmci-omap";
  
+ 	if (!mmc_data[0]) {
+ 		pr_err("%s fails: Incomplete platform data\n", __func__);
+@@ -624,8 +628,17 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+ 	}
+ 
+ 	omap242x_mmc_mux(mmc_data[0]);
+-	omap_mmc_add(name, 0, OMAP2_MMC1_BASE, OMAP2420_MMC_SIZE,
+-					INT_24XX_MMC_IRQ, mmc_data[0]);
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh) {
++		pr_err("Could not look up %s\n", oh_name);
++		return;
++	}
++	pdev = omap_device_build(dev_name, id, oh, mmc_data[0],
++				 sizeof(struct omap_mmc_platform_data), NULL, 0, 0);
++	if (IS_ERR(pdev))
++		WARN(1, "Can'd build omap_device for %s:%s.\n",
++					dev_name, oh->name);
+ }
+ 
+ #endif
