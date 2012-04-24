@@ -1,26 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 Apr 2012 11:04:44 +0200
-Subject: [PATCH V2 05/10] pinctrl: SPEAr: Create macro for declaring GPIO
- PINS
-In-Reply-To: <a4af95f52c6dcef03d3026d336c765b807c4d42c.1335010373.git.viresh.kumar@st.com>
-References: <cover.1335010373.git.viresh.kumar@st.com>
- <4a3362a884d1dfa8cdef65a10c97c43be4c17ff6.1335010373.git.viresh.kumar@st.com>
- <a4af95f52c6dcef03d3026d336c765b807c4d42c.1335010373.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdYz=DVhEtqK9d_v47U+S0jbM6wwAUOa7DFHJZjGsxwD9Q@mail.gmail.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 24 Apr 2012 17:15:04 +0800
+Subject: [PATCH v2 3/3] ARM: imx6q: switch to use pinctrl driver
+In-Reply-To: <CACRpkdbbdkhN-hVF6vP4j6bP-Nsdft5UjjpAVhcKn6KSpEbcuQ@mail.gmail.com>
+References: <1334933916-12971-1-git-send-email-b29396@freescale.com>
+ <1334933916-12971-3-git-send-email-b29396@freescale.com>
+ <CACRpkdbbdkhN-hVF6vP4j6bP-Nsdft5UjjpAVhcKn6KSpEbcuQ@mail.gmail.com>
+Message-ID: <20120424091504.GC32166@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2012 at 2:23 PM, Viresh Kumar <viresh.linux@gmail.com> wrote:
+Hi Linus,
 
-> Same GPIO pins declarations would be required for other SoCs and that will be a
-> lot of lines of code. Its better to create common macros for it.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Apr 24, 2012 at 10:56:43AM +0200, Linus Walleij wrote:
+> On Fri, Apr 20, 2012 at 4:58 PM, Dong Aisheng <b29396@freescale.com> wrote:
+> 
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> >
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> >
+> > ---
+> > This is not a formal patch and is only used for test
+> > since before the pinctrl core handle dummy state is in,
+> > enable pinctrl in driver will break other platforms.
+> >
+> > ChangeLog v1->v2:
+> > * using updated binding
+> > ---
+> > ?arch/arm/boot/dts/imx6q-arm2.dts ? | ? ?2 ++
+> > ?arch/arm/boot/dts/imx6q.dtsi ? ? ? | ? 17 +++++++++++++++++
+> > ?arch/arm/mach-imx/Kconfig ? ? ? ? ?| ? ?2 ++
+> > ?drivers/mmc/host/sdhci-esdhc-imx.c | ? 12 ++++++++++++
+> > ?4 files changed, 33 insertions(+), 0 deletions(-)
+> 
+> Since this touches the MMC driver I'd like an ACK from the
+> maintainer, but no maintainer is set for this subdriver, still
+> it feels like Sascha and/or Wolfram should be involved.
+> 
+This is for test.
+Before the pinctrl dummy state patch got in first, we can not get
+it in since it will break other platforms not support pinctrl to
+use this driver.
+I will send a formal patch after dummy state patch is in.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks for the review.
 
-You'll take this through the ARM SoC tree, right?
-
-Thanks,
-Linus Walleij
+Regards
+Dong Aisheng
