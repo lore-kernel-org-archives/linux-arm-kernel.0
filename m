@@ -1,109 +1,46 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 24 Apr 2012 16:51:33 +0530
-Subject: [PATCH V3 11/12] gadget/r8a66597: Remove conditional compilation of
- clk code
+Date: Tue, 24 Apr 2012 16:51:26 +0530
+Subject: [PATCH V3 04/12] usb/marvell: Remove conditional compilation of clk
+ code
 In-Reply-To: <cover.1335266056.git.viresh.kumar@st.com>
 References: <cover.1335266056.git.viresh.kumar@st.com>
-Message-ID: <65bf26c65f3e79540735134b151fe7ff497fd3ef.1335266056.git.viresh.kumar@st.com>
+Message-ID: <ac4280d4e8323e86982e6a3ceed93a2e7f30e52e.1335266056.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Viresh Kumar <viresh.linux@gmail.com>
 
 With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
 there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
 macros.
 
+Marvell usb also has these dummy macros defined locally. Remove them as they
+aren't required anymore.
+
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/gadget/r8a66597-udc.c |   11 +++--------
- drivers/usb/gadget/r8a66597-udc.h |    5 -----
- 2 files changed, 3 insertions(+), 13 deletions(-)
+ include/linux/platform_data/mv_usb.h |    9 ---------
+ 1 files changed, 0 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/usb/gadget/r8a66597-udc.c b/drivers/usb/gadget/r8a66597-udc.c
-index c4401e7..f873023 100644
---- a/drivers/usb/gadget/r8a66597-udc.c
-+++ b/drivers/usb/gadget/r8a66597-udc.c
-@@ -1818,12 +1818,12 @@ static int __exit r8a66597_remove(struct platform_device *pdev)
- 		iounmap(r8a66597->sudmac_reg);
- 	free_irq(platform_get_irq(pdev, 0), r8a66597);
- 	r8a66597_free_request(&r8a66597->ep[0].ep, r8a66597->ep0_req);
--#ifdef CONFIG_HAVE_CLK
-+
- 	if (r8a66597->pdata->on_chip) {
- 		clk_disable(r8a66597->clk);
- 		clk_put(r8a66597->clk);
- 	}
--#endif
-+
- 	device_unregister(&r8a66597->gadget.dev);
- 	kfree(r8a66597);
- 	return 0;
-@@ -1855,9 +1855,7 @@ static int __init r8a66597_sudmac_ioremap(struct r8a66597 *r8a66597,
- 
- static int __init r8a66597_probe(struct platform_device *pdev)
- {
--#ifdef CONFIG_HAVE_CLK
- 	char clk_name[8];
--#endif
- 	struct resource *res, *ires;
- 	int irq;
- 	void __iomem *reg = NULL;
-@@ -1921,7 +1919,6 @@ static int __init r8a66597_probe(struct platform_device *pdev)
- 	r8a66597->timer.data = (unsigned long)r8a66597;
- 	r8a66597->reg = reg;
- 
--#ifdef CONFIG_HAVE_CLK
- 	if (r8a66597->pdata->on_chip) {
- 		snprintf(clk_name, sizeof(clk_name), "usb%d", pdev->id);
- 		r8a66597->clk = clk_get(&pdev->dev, clk_name);
-@@ -1933,7 +1930,7 @@ static int __init r8a66597_probe(struct platform_device *pdev)
- 		}
- 		clk_enable(r8a66597->clk);
- 	}
--#endif
-+
- 	if (r8a66597->pdata->sudmac) {
- 		ret = r8a66597_sudmac_ioremap(r8a66597, pdev);
- 		if (ret < 0)
-@@ -1993,13 +1990,11 @@ err_add_udc:
- clean_up3:
- 	free_irq(irq, r8a66597);
- clean_up2:
--#ifdef CONFIG_HAVE_CLK
- 	if (r8a66597->pdata->on_chip) {
- 		clk_disable(r8a66597->clk);
- 		clk_put(r8a66597->clk);
- 	}
- clean_up_dev:
--#endif
- 	device_unregister(&r8a66597->gadget.dev);
- clean_up:
- 	if (r8a66597) {
-diff --git a/drivers/usb/gadget/r8a66597-udc.h b/drivers/usb/gadget/r8a66597-udc.h
-index 8e3de61..d2a5ad2 100644
---- a/drivers/usb/gadget/r8a66597-udc.h
-+++ b/drivers/usb/gadget/r8a66597-udc.h
-@@ -13,10 +13,7 @@
- #ifndef __R8A66597_H__
- #define __R8A66597_H__
- 
--#ifdef CONFIG_HAVE_CLK
- #include <linux/clk.h>
+diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
+index d94804a..944b01d 100644
+--- a/include/linux/platform_data/mv_usb.h
++++ b/include/linux/platform_data/mv_usb.h
+@@ -52,13 +52,4 @@ struct mv_usb_platform_data {
+ 	int	(*set_vbus)(unsigned int vbus);
+ 	int     (*private_init)(void __iomem *opregs, void __iomem *phyregs);
+ };
+-
+-#ifndef CONFIG_HAVE_CLK
+-/* Dummy stub for clk framework */
+-#define clk_get(dev, id)       NULL
+-#define clk_put(clock)         do {} while (0)
+-#define clk_enable(clock)      do {} while (0)
+-#define clk_disable(clock)     do {} while (0)
 -#endif
 -
- #include <linux/usb/r8a66597.h>
- 
- #define R8A66597_MAX_SAMPLING	10
-@@ -92,9 +89,7 @@ struct r8a66597 {
- 	void __iomem		*reg;
- 	void __iomem		*sudmac_reg;
- 
--#ifdef CONFIG_HAVE_CLK
- 	struct clk *clk;
--#endif
- 	struct r8a66597_platdata	*pdata;
- 
- 	struct usb_gadget		gadget;
+ #endif
 -- 
 1.7.9
