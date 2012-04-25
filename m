@@ -1,99 +1,117 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 25 Apr 2012 11:13:26 +0200
-Subject: [PATCH 06/33] ARM: S3C24XX: dev-uart: Use common macro to define
- resources
-In-Reply-To: <1335327163-11794-7-git-send-email-tushar.behera@linaro.org>
-References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
- <1335327163-11794-7-git-send-email-tushar.behera@linaro.org>
-Message-ID: <201204251113.26333.heiko@sntech.de>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Wed, 25 Apr 2012 14:56:44 +0530
+Subject: [PATCHv4 2/2] arm/dts: omap4-sdp: Add keypad data
+In-Reply-To: <1335346004-18108-1-git-send-email-sourav.poddar@ti.com>
+References: <1335346004-18108-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <1335346004-18108-2-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 25. April 2012, 06:12:16 schrieb Tushar Behera:
-> CC: Ben Dooks <ben-linux@fluff.org>
-> CC: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+Add keypad data node in omap4 device tree file.
+Also fill the device tree binding parameters
+with the required value in "omap4-sdp" dts file.
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+Tested on omap44330 sdp with 3.4-rc3 kernel.
 
-> ---
->  arch/arm/plat-s3c24xx/dev-uart.c |   56
-> +++++++++++--------------------------- 1 files changed, 16 insertions(+),
-> 40 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s3c24xx/dev-uart.c
-> b/arch/arm/plat-s3c24xx/dev-uart.c index 9ab22e6..d779216 100644
-> --- a/arch/arm/plat-s3c24xx/dev-uart.c
-> +++ b/arch/arm/plat-s3c24xx/dev-uart.c
-> @@ -29,55 +29,31 @@
->  /* Serial port registrations */
-> 
->  static struct resource s3c2410_uart0_resource[] = {
-> -	[0] = {
-> -		.start = S3C2410_PA_UART0,
-> -		.end   = S3C2410_PA_UART0 + 0x3fff,
-> -		.flags = IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start = IRQ_S3CUART_RX0,
-> -		.end   = IRQ_S3CUART_ERR0,
-> -		.flags = IORESOURCE_IRQ,
-> -	}
-> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART0, SZ_16K),
-> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX0, \
-> +			IRQ_S3CUART_ERR0 - IRQ_S3CUART_RX0 + 1, \
-> +			NULL, IORESOURCE_IRQ)
->  };
-> 
->  static struct resource s3c2410_uart1_resource[] = {
-> -	[0] = {
-> -		.start = S3C2410_PA_UART1,
-> -		.end   = S3C2410_PA_UART1 + 0x3fff,
-> -		.flags = IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start = IRQ_S3CUART_RX1,
-> -		.end   = IRQ_S3CUART_ERR1,
-> -		.flags = IORESOURCE_IRQ,
-> -	}
-> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART1, SZ_16K),
-> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX1, \
-> +			IRQ_S3CUART_ERR1 - IRQ_S3CUART_RX1 + 1, \
-> +			NULL, IORESOURCE_IRQ)
->  };
-> 
->  static struct resource s3c2410_uart2_resource[] = {
-> -	[0] = {
-> -		.start = S3C2410_PA_UART2,
-> -		.end   = S3C2410_PA_UART2 + 0x3fff,
-> -		.flags = IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start = IRQ_S3CUART_RX2,
-> -		.end   = IRQ_S3CUART_ERR2,
-> -		.flags = IORESOURCE_IRQ,
-> -	}
-> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART2, SZ_16K),
-> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX2, \
-> +			IRQ_S3CUART_ERR2 - IRQ_S3CUART_RX2 + 1, \
-> +			NULL, IORESOURCE_IRQ)
->  };
-> 
->  static struct resource s3c2410_uart3_resource[] = {
-> -	[0] = {
-> -		.start = S3C2443_PA_UART3,
-> -		.end   = S3C2443_PA_UART3 + 0x3fff,
-> -		.flags = IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start = IRQ_S3CUART_RX3,
-> -		.end   = IRQ_S3CUART_ERR3,
-> -		.flags = IORESOURCE_IRQ,
-> -	},
-> +	[0] = DEFINE_RES_MEM(S3C2443_PA_UART3, SZ_16K),
-> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX3, \
-> +			IRQ_S3CUART_ERR3 - IRQ_S3CUART_RX3 + 1, \
-> +			NULL, IORESOURCE_IRQ)
->  };
-> 
->  struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+v3->v4:
+Express keymap binding as (linux,keymap) in the format described in 
+Documentation/devicetree/bindings/input/matrix-keymap.txt
+ arch/arm/boot/dts/omap4-sdp.dts |   63 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi    |    5 +++
+ 2 files changed, 68 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 63c6b2b..0c9b3bf 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -17,4 +17,67 @@
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
++
++	keypad at 4ae1c000 {
++		keypad,num-rows = <8>;
++		keypad,num-columns = <8>;
++		linux,keymap = < 0x00000012
++			0x00010013
++			0x00020014
++			0x00030066
++			0x0004003f
++			0x00060017
++			0x0007002a
++			0x01000020
++			0x01010021
++			0x01020022
++			0x01030054
++			0x01040040
++			0x01060025
++			0x0107001c
++			0x0200002d
++			0x0201002e
++			0x0202002f
++			0x0203006b
++			0x02040041
++			0x02060034
++			0x0207003a
++			0x0300002c
++			0x0301004e
++			0x03020030
++			0x0303003b
++			0x03040042
++			0x03060018
++			0x03070039
++			0x04000011
++			0x04010015
++			0x04020016
++			0x0403003c
++			0x04040073
++			0x04060026
++			0x04070069
++			0x0500001f
++			0x05010023
++			0x05020024
++			0x0503003d
++			0x05040043
++			0x05050072
++			0x05060032
++			0x0507006a
++			0x06000010
++			0x0601001e
++			0x06020031
++			0x0603005c
++			0x0604000e
++			0x06060019
++			0x06070067
++			0x07000094
++			0x07010095
++			0x070200ca
++			0x070300cb
++			0x0704003e
++			0x07060160
++			0x0707006c >;
++		linux,input-no-autorepeat;
++	};
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 3d35559..e0f678a 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -156,4 +156,9 @@
+ 			ti,hwmods = "i2c4";
+ 		};
+ 	};
++
++	keypad at 4ae1c000 {
++		compatible = "ti,omap4-keypad";
++		ti,hwmods = "kbd";
++	};
+ };
+-- 
+1.7.1
