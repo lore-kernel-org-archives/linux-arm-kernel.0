@@ -1,39 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Apr 2012 10:06:10 +0800
-Subject: [PATCH 1/3] ARM: imx: Add common imx cpuidle init functionality.
-In-Reply-To: <20120424195127.GA3628@n2100.arm.linux.org.uk>
-References: <20120423062739.GX3852@pengutronix.de>
- <20120423065259.GR26306@S2101-09.ap.freescale.net>
- <20120423065623.GA3852@pengutronix.de>
- <20120423071013.GS26306@S2101-09.ap.freescale.net>
- <20120423074856.GU20478@pengutronix.de>
- <CAMXH7KH1pwh7hJ=T30zxcWcx19wjXvr6Ff4OLy7fzqY5p79Fwg@mail.gmail.com>
- <20120424013841.GB26306@S2101-09.ap.freescale.net>
- <20120424075426.GP24211@n2100.arm.linux.org.uk>
- <20120424083603.GE26306@S2101-09.ap.freescale.net>
- <CAMXH7KFMcHoGeTRcPWR_ENK2R=nU134HgjnXpFUsYJTL9pbgrQ@mail.gmail.com>
- <20120424195127.GA3628@n2100.arm.linux.org.uk>
-Message-ID: <CAAQ0ZWTR7PAFX6z6PpkBhGoy5qh6u-xjK16mVCHnSoi-0GrD3g@mail.gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 25 Apr 2012 08:32:14 +0530
+Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
+ clk code
+In-Reply-To: <20120424201802.GE3628@n2100.arm.linux.org.uk>
+References: <cover.1335266056.git.viresh.kumar@st.com>
+ <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
+ <20120424120019.GE24089@lunn.ch>
+ <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
+ <20120424201802.GE3628@n2100.arm.linux.org.uk>
+Message-ID: <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2012 03:51, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 24, 2012 at 10:40:35AM -0500, Rob Lee wrote:
->> Thanks for the attention on this. ?From what I've understood, I will
->> send another submission that includes the imx cpuidle patchset and
->> Shawn's device tree late initcall patchset and I'll provide
->> explanation of the two separate patchsets in the cover sheet.
->
-> What I also want to see _along with_ the addition of the init_late
-> callback is a patch set from the _same_ people fixing up the rest
-> of arch/arm/mach-* to use it - you know, like what I do when I
-> introduce these kinds of things.
->
-> Otherwise I'm going to NAK the change. ?We can't have new stuff
-> introduced in this way and the older platforms ignored. ?Forward
-> progress across the board please.
+On Wed, Apr 25, 2012 at 1:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Look, it's very very simple.
 
-I'm working on a series to clean them up.
+Thanks for explaining.
 
-Regards,
-Shawn
+> Finally, if a platform has clk API support enabled, and a driver requests
+> a clock, and clk_get() returns an error, it means the clock was not found.
+> That's a fatal error for the driver, because it means that something is
+> wrong in the lookup tables - moreover, it means that _potentially_ someone
+> screwed up the clk matching and this device has a clock which needs some
+> control, but wasn't found. ?I don't think ignoring that kind of error,
+> even by printing a warning, is a particularly good approach - it seems
+> to me it makes things fragile. ?What if this missing clock causes the
+> bus to your device to ultimately hang?
+
+This is what i was thinking too and thats why floated this version of patch.
+But as Andrew said, clk API support is enabled for them, but still they
+don't have a clk for sata. To get this working, there are two solutions:
+- Create dummy clk for sata for that platform, so clk_get doesn't fail.
+- Check for error before every call to clk APIs after clk_get().
+
+Andrew favored the second one. Which means, even on platforms
+with clk API defined and clk enable required, if there are some issues
+with lookup table, and clk_get() fails, system may hang when registers
+are accessed. For this i favored first one.
+
+--
+viresh
