@@ -1,50 +1,43 @@
 From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 25 Apr 2012 09:42:38 +0530
-Subject: [PATCH 28/33] ARM: S3C64XX: mach-real6410: Use common macro to define
+Date: Wed, 25 Apr 2012 09:42:39 +0530
+Subject: [PATCH 29/33] ARM: S3C64XX: mach-smdk6410: Use common macro to define
  resources
 In-Reply-To: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
 References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1335327163-11794-29-git-send-email-tushar.behera@linaro.org>
+Message-ID: <1335327163-11794-30-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC: Darius Augulis <augulis.darius@gmail.com>
 CC: Ben Dooks <ben-linux@fluff.org>
 CC: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
 ---
- arch/arm/mach-s3c64xx/mach-real6410.c |   19 ++++---------------
- 1 files changed, 4 insertions(+), 15 deletions(-)
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |   13 +++----------
+ 1 files changed, 3 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index be2a9a2..5c08266 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -86,21 +86,10 @@ static struct s3c2410_uartcfg real6410_uartcfgs[] __initdata = {
- /* DM9000AEP 10/100 ethernet controller */
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index d55bc96..1ecd048 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -182,16 +182,9 @@ static struct s3c_fb_platdata smdk6410_lcd_pdata __initdata = {
+  */
  
- static struct resource real6410_dm9k_resource[] = {
+ static struct resource smdk6410_smsc911x_resources[] = {
 -	[0] = {
--		.start	= S3C64XX_PA_XM0CSN1,
--		.end	= S3C64XX_PA_XM0CSN1 + 1,
--		.flags	= IORESOURCE_MEM
+-		.start = S3C64XX_PA_XM0CSN1,
+-		.end   = S3C64XX_PA_XM0CSN1 + SZ_64K - 1,
+-		.flags = IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= S3C64XX_PA_XM0CSN1 + 4,
--		.end	= S3C64XX_PA_XM0CSN1 + 5,
--		.flags	= IORESOURCE_MEM
+-		.start = S3C_EINT(10),
+-		.end   = S3C_EINT(10),
+-		.flags = IORESOURCE_IRQ | IRQ_TYPE_LEVEL_LOW,
 -	},
--	[2] = {
--		.start	= S3C_EINT(7),
--		.end	= S3C_EINT(7),
--		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL
--	}
-+	[0] = DEFINE_RES_MEM(S3C64XX_PA_XM0CSN1, 2),
-+	[1] = DEFINE_RES_MEM(S3C64XX_PA_XM0CSN1 + 4, 2),
-+	[2] = DEFINE_RES_NAMED(S3C_EINT(7), 1, NULL, IORESOURCE_IRQ \
-+					| IORESOURCE_IRQ_HIGHLEVEL),
++	[0] = DEFINE_RES_MEM(S3C64XX_PA_XM0CSN1, SZ_64K),
++	[1] = DEFINE_RES_NAMED(S3C_EINT(10), 1, NULL, IORESOURCE_IRQ \
++					| IRQ_TYPE_LEVEL_LOW),
  };
  
- static struct dm9000_plat_data real6410_dm9k_pdata = {
+ static struct smsc911x_platform_config smdk6410_smsc911x_pdata = {
 -- 
 1.7.4.1
