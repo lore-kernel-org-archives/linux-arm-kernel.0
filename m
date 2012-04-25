@@ -1,61 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 25 Apr 2012 14:33:21 +0200
-Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
- <4F97B891.1020601@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
- <4F97E243.6000500@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
-Message-ID: <4F97EF11.4020300@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Apr 2012 14:38:28 +0200
+Subject: announcing the clk-next branch
+In-Reply-To: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
+References: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
+Message-ID: <20120425123828.GC3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/25/2012 2:26 PM, Hiremath, Vaibhav wrote:
-> On Wed, Apr 25, 2012 at 17:08:43, Cousson, Benoit wrote:
->> On 4/25/2012 12:20 PM, Hiremath, Vaibhav wrote:
->>> On Wed, Apr 25, 2012 at 14:10:49, Cousson, Benoit wrote:
->>
->> ...
->>
-> <snip>
->>
->>> How would I know the rate of this clock in driver? Say for example, I want
->>> to configure my internal divider based on input rate?
->>> OR
->>> I want to change the rate of dss_clk itself?
->>> OR
->>> Looking at debugfs, would I get the rate of dss_clk?
->>
->> No because that clock will not exist anymore, but you will have the real
->> clock rate from the "dss_dss_clk".
->>
->
-> Thanks Benoit, I think I understand your perspective on Module Vs leaf node
-> and now able to digest as well.
-> Probably Last Q, which I think clarify all my doubts,
->
-> Assume we have complete hwmod instance and built a device using
-> omap_device_build() api, and also the driver is completely using runtime pm
-> api's,
-> How can driver get the clk handle (required to get the rate)?
-> Is there any api already available for this?
+On Tue, Apr 24, 2012 at 06:32:20PM -0700, Turquette, Mike wrote:
+> Hi all,
+> 
+> The clock patches that I have signed-off on and picked from the list
+> are all rebased on top of 3.4-rc4.  They can be found here:
+> 
+> git://git.linaro.org/people/mturquette/linux.git clk-next
 
-The omap_device fmwk will auto-magically create a "fck" clkdev entry for 
-the main_clk.
+Thanks Mike!
 
-The API is thus the standard: clk_get(dev, "fck"), to get the clock 
-handle and then you can use the other clock API.
+> 
+> If the branch is missing anything that I have ACK'd then please let me know.
 
-The idea is to enforce the usage of clock alias local to the device and 
-not trying anymore to get the real clock name. It thus allows driver to 
-work on various variant / revision without having to modify the driver.
+You haven't acked it, but for i.MX I need two patches from Viresh I'd
+like to base on:
 
-The fmwk will also create clock alias for any opt_clock present in the 
-hwmod.
+[PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
+[PATCH V3 2/8] clk: add a fixed factor clock
 
-Regards,
-Benoit
+Also I need the patch implementing managed clk_get which currently sits
+in Russells tree.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
