@@ -1,70 +1,100 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 25 Apr 2012 17:49:36 +0800
-Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
- for platforms to use
-In-Reply-To: <4F96F847.508@wwwdotorg.org>
-References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
- <4F96F847.508@wwwdotorg.org>
-Message-ID: <20120425094934.GA17631@shlinux2.ap.freescale.net>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Wed, 25 Apr 2012 15:07:03 +0530
+Subject: [PATCH v2] dma: pl330: fix a couple of compilation warnings
+In-Reply-To: <1333927579-16999-1-git-send-email-olof@lixom.net>
+References: <1333919920-25481-1-git-send-email-olof@lixom.net>
+ <1333927579-16999-1-git-send-email-olof@lixom.net>
+Message-ID: <1335346623.31825.120.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
-> On 04/24/2012 03:33 AM, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > Add a interface pinctrl_provide_dummies for platform to indicate
-> > whether it needs use pinctrl dummy state and dummy gpio.
+On Sun, 2012-04-08 at 16:26 -0700, Olof Johansson wrote:
+> Move a couple of tests and do a minor refactor to avoid:
 > 
-> > @@ -382,7 +396,12 @@ int pinctrl_request_gpio(unsigned gpio)
-> >  	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
-> >  	if (ret) {
-> >  		mutex_unlock(&pinctrl_mutex);
-> > -		return -EINVAL;
-> > +		if (pinctrl_dummy_gpio) {
-> > +			pr_debug("pinctrl: using dummy gpio(%u)\n", gpio);
-> > +			return 0;
-> > +		} else {
-> > +			return -EINVAL;
-> > +		}
-> >  	}
+> drivers/dma/pl330.c: In function 'pl330_probe':
+> drivers/dma/pl330.c:2929:215: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+> drivers/dma/pl330.c: In function 'pl330_tasklet':
+> drivers/dma/pl330.c:2250:8: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
+> drivers/dma/pl330.c:2228:25: note: 'pch' was declared here
+> drivers/dma/pl330.c:2277:130: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
+> drivers/dma/pl330.c:2260:25: note: 'pch' was declared here
 > 
-> The only thing that should be calling pinctrl_request_gpio() is a GPIO
-> driver. It should only be calling it for the GPIOs it manages. I'd
-> expect that if a platform's pinctrl driver was not yet written to
-> support the GPIO functionality, then the GPIO driver would not be
-> calling this function.
-> 
-Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
-driver may be shared between several platforms, with pinctrl support
-or not.
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+Applied thanks
 
-> As such, I'm not sure that this part of the change is necessary.
+> ---
+>  drivers/dma/pl330.c |   25 +++++++++++++++----------
+>  1 file changed, 15 insertions(+), 10 deletions(-)
 > 
-> If it is, then surely all the other pinctrl GPIO APIs need a similar change?
-> 
-Yes, i missed it, will fix.
-Thanks for reminder.
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 282caf11..2ee6e23 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2225,12 +2225,9 @@ static inline void free_desc_list(struct list_head *list)
+>  {
+>  	struct dma_pl330_dmac *pdmac;
+>  	struct dma_pl330_desc *desc;
+> -	struct dma_pl330_chan *pch;
+> +	struct dma_pl330_chan *pch = NULL;
+>  	unsigned long flags;
+>  
+> -	if (list_empty(list))
+> -		return;
+> -
+>  	/* Finish off the work list */
+>  	list_for_each_entry(desc, list, node) {
+>  		dma_async_tx_callback callback;
+> @@ -2247,6 +2244,10 @@ static inline void free_desc_list(struct list_head *list)
+>  		desc->pchan = NULL;
+>  	}
+>  
+> +	/* pch will be unset if list was empty */
+> +	if (!pch)
+> +		return;
+> +
+>  	pdmac = pch->dmac;
+>  
+>  	spin_lock_irqsave(&pdmac->pool_lock, flags);
+> @@ -2257,12 +2258,9 @@ static inline void free_desc_list(struct list_head *list)
+>  static inline void handle_cyclic_desc_list(struct list_head *list)
+>  {
+>  	struct dma_pl330_desc *desc;
+> -	struct dma_pl330_chan *pch;
+> +	struct dma_pl330_chan *pch = NULL;
+>  	unsigned long flags;
+>  
+> -	if (list_empty(list))
+> -		return;
+> -
+>  	list_for_each_entry(desc, list, node) {
+>  		dma_async_tx_callback callback;
+>  
+> @@ -2274,6 +2272,10 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
+>  			callback(desc->txd.callback_param);
+>  	}
+>  
+> +	/* pch will be unset if list was empty */
+> +	if (!pch)
+> +		return;
+> +
+>  	spin_lock_irqsave(&pch->lock, flags);
+>  	list_splice_tail_init(list, &pch->work_list);
+>  	spin_unlock_irqrestore(&pch->lock, flags);
+> @@ -2926,8 +2928,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  	INIT_LIST_HEAD(&pd->channels);
+>  
+>  	/* Initialize channel parameters */
+> -	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
+> -			(u8)pi->pcfg.num_chan);
+> +	if (pdat)
+> +		num_chan = max_t(int, pdat->nr_valid_peri, pi->pcfg.num_chan);
+> +	else
+> +		num_chan = max_t(int, pi->pcfg.num_peri, pi->pcfg.num_chan);
+> +
+>  	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
+>  
+>  	for (i = 0; i < num_chan; i++) {
 
-> Finally, how does this interact with deferred probe: How does the code
-> know whether the pinctrl driver and/or GPIO range is simply not yet
-> registered, or whether it never will be? That'd be the difference
-> between returning -EPROBE_DEFER or 0 in the if block above.
-> 
-Yes, it is an issue.
-I don't have any good idea to distinguish them.
-It seems regulator has the same issue.
-What regulator does is if dummy regulator is used, use dummy gpio instead
-regardless of defer probe.
-I guess we may use the same way as regulator for pinctrl.
-User can decide if using dummy gpio or defer probe since based on their
-driver support.
 
-The rule may be if your pinctrl driver supports gpio, then you should not use
-dummy gpio. Then the dummy gpio support will not affect the defer probe.
-
-> 
-> I'm fine with the other parts of this patch.
-
-Regards
-Dong Aisheng
+-- 
+~Vinod
