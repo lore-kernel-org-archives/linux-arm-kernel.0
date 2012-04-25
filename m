@@ -1,41 +1,77 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 25 Apr 2012 00:17:13 +0000
-Subject: [PATCH 08/11] MXS: Add imx-otg driver
-In-Reply-To: <201204242258.54799.marex@denx.de>
-References: <1335099567-21056-1-git-send-email-marex@denx.de>
- <201204241949.37938.marex@denx.de> <20120424204947.GZ3852@pengutronix.de>
- <201204242258.54799.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B7A1DA@039-SN2MPN1-023.039d.mgd.msft.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 24 Apr 2012 18:22:26 -0600 (MDT)
+Subject: [PATCH-V3 2/3] ARM: OMAP3+: clockdomain33xx: Add clockdomain
+ data and respective operations
+In-Reply-To: <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.00.1204241725430.24864@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> There is more to be confused about -- you don't get the host/device
-> connection
-> interrupt from the PHY, but you dig one of them from the EHCI host and
-> the other
-> from the EHCI host too -- which is pretty messed up already.
-> 
-> We can certainly use IRQF_SHARED to trap some of the interrupts in the
-> PHY code,
-> but that's still quite weird.
-> 
-Below need to be implemented at phy driver:
-- struct usb_phy;
-- phy's interrupt which is only used for handle wakeup issue,
-PHY's interrupt line is NOT the same with controller's, so you don't
-need to use IRQF_SHARED, and request the same irq with controller's.
+Hello Vaibhav, Afzal, Vaibhav,
 
-Below need to be implemented at otg driver:
-- struct usb_otg;
-- manage PHY through PHY interfaces which are implemented at phy driver.
-- OTG interrupt, it only handles ID/vbus interrupt.
-- OTG switch routine, it handles host and device's add/remove operation due to
-id/vbus change and some operation_mode defined at platform_data or DT in fture.
+A few questions while reviewing this patch:
 
+On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
 
-> > Sascha
+> AM33XX PRCM module consist of, various clockdomains, in all
+> total we have 18 clockdomains available, with following
+> controlling options,
+>    - NO Sleep: sleep transition can not be initiated,
+>    - SW Sleep: sw forced sleep transition,
+>    - SW Wakeup: sw forced wakeup transition,
+>    - HW Auto: transitions are based upon hw conditions.
 > 
-> Best regards,
-> Marek Vasut
+> This patch adds all available clockdomain data, respective
+> clockdomain operations for AM33XX family of device, and also
+> integrates it into existing OMAP framework.
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+
+...
+
+> +static struct clockdomain l4ls_am33xx_clkdm = {
+> +	.name		= "l4ls_clkdm",
+> +	.pwrdm		= { .name = "per_pwrdm" },
+> +	.cm_inst	= AM33XX_CM_PER_MOD,
+> +	.clkdm_offs	= AM33XX_CM_PER_L4LS_CLKSTCTRL_OFFSET,
+> +	.clktrctrl_mask	= AM33XX_CLKTRCTRL_MASK,
+> +	.flags		= (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
+
+It looks to me like we don't need the .clktrctrl_mask field, since 
+according to the clockdomains code, the CLKTRCTRL field is at the same bit 
+shift for each clockdomain.
+
+Also, since we're not defining any autodeps for the AM335x platform, we 
+shouldn't need the CLKDM_NO_AUTODEPS flag either?  Since no autodeps are 
+defined, the default will be to not set any autodeps.
+
+Another question is about the CLKTRCTRL bitfields.  According to
+_AM335x ARM Cortex-A8 Microprocessors (MPUs) Technical Reference
+Manual_ Rev. D (SPRUH73D), most of the clockdomains support NO_SLEEP mode 
+(i.e., CLKTRCTRL = 0x0).  That means that technically, we should also set 
+the CLKDM_CAN_DISABLE_AUTO flag.  Unless the documentation is incorrect 
+here?  In another section (Table 8-9 "Clock Transition Mode Settings"), 
+it claims that CLKTRCTRL = 0 is not supported...
+
+Also, a question about the L4_WKUP clockdomain:
+
+> +static struct clockdomain l4_wkup_am33xx_clkdm = {
+> +	.name		= "l4_wkup_clkdm",
+> +	.pwrdm		= { .name = "wkup_pwrdm" },
+> +	.cm_inst	= AM33XX_CM_WKUP_MOD,
+> +	.clkdm_offs	= AM33XX_CM_WKUP_CLKSTCTRL_OFFSET,
+> +	.clktrctrl_mask	= AM33XX_CLKTRCTRL_MASK,
+> +	.flags		= (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
+> +};
+
+Table 8-89 "CM_WKUP_CLKSTCTRL Register Field Descriptions" of SPRUH73D 
+claims that this clockdomain supports hardware-supervised automatic 
+clockdomain transitions.  Again this conflicts with Table 8-9.  Is this a 
+documentation bug, or should we update the patch?
+
+
+- Paul
