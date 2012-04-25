@@ -1,86 +1,103 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 25 Apr 2012 13:44:56 +0000
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FDC71@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Apr 2012 14:45:08 +0100
+Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
+In-Reply-To: <CAC83ZvKN_Qxw-9RPfpJaL5434j0HgysZ364F+b29rdSCQWhm7A@mail.gmail.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
+ <13629551.hP3ZV1ajDo@vclass>
+ <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
+ <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
+ <20120424160447.GI3739@atomide.com>
+ <CAC83Zv+CCLQfZHfqMcbof6JtA-hOK1PfX5Gs0BBVQhBAiWzX_g@mail.gmail.com>
+ <CAMQu2gzwijaSzXprEwTNTie3zCgFcNPonAexzrO_AWc2a8jOkw@mail.gmail.com>
+ <CAC83ZvKN_Qxw-9RPfpJaL5434j0HgysZ364F+b29rdSCQWhm7A@mail.gmail.com>
+Message-ID: <20120425134508.GE25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2012 at 21:33:51, Hiremath, Vaibhav wrote:
-> After some healthy discussion, now we have come to the conclusion and
-> decided to handle AM33XX PRM/CM part separately; as AM33XX-PRCM module is
-> different than OMAP3 and OMAP4 architecture.
-> 
-> The difference becomes very interesting/weird when it comes to
-> the consistency for register offsets in PRM address space and
-> bit-field offsets inside PRM registers,
-> So along with Powerdomain data and PRM api's required for AM33XX
-> device, this patch series adds,
-> 
->  - XXX_RSTST register offset to "struct omap_hwmod_omap4_prcm"
->  - PWRSTCTRL & PWRSTST register offsets to "struct powerdomain"
->  - Logicretstate and mem_on/ret/pwrst/retst mask to "struct
->    powerdomain"
-> 
-> Testing: This patch series has been boot tested on AM37xEVM and AM335x
->          based BeagleBone community board.
-> 
-> Thanks to Paul here...for helping and concluding on this,
-> shortly I will submit similar patch for CM, clockdomain and clock-tree
-> support for AM33xx.
-> 
-> This patch-series is created on top of "linux-omap/cleanup" branch, and
-> also gets applied to "linux-omap/master" branch.
-> The patches are also available at -
-> https://github.com/hvaibhav/am335x-linux/tree/am335x-prm-cm
-> 
-> Changes from previous versions:
-> ===============================
-> From V3:
-> 	- No code change, only added Voltagedomain patch (from V2 series)
-> 	  to this series.
-> 
-> From V1 & V2:
->     	- Rolled back to my original approach, where AM33xx
-> 	  device was handled separately (RFC version).
-> 	- As per Paul's comments, added Register offsets & bit-fields
-> 	  masks.
-> 
-> Vaibhav Hiremath (4):
->   ARM: OMAP3+: am33xx: Add voltage domain data
->   ARM: OMAP3/4: omap_hwmod: Add rstst_off field to struct
->     omap_hwmod_omap4_prcm
->   ARM: OMAP2+: powerdomain: Add offset & mask fields to struct
->     powerdomain
->   ARM: OMAP3+: am33xx: Add powerdomain & PRM support
-> 
->  arch/arm/mach-omap2/Makefile                  |    6 +
->  arch/arm/mach-omap2/io.c                      |    2 +
->  arch/arm/mach-omap2/omap_hwmod.c              |   32 ++-
->  arch/arm/mach-omap2/powerdomain.h             |   23 ++-
->  arch/arm/mach-omap2/powerdomain33xx.c         |  230 ++++++++++++++++
->  arch/arm/mach-omap2/powerdomains33xx_data.c   |  185 +++++++++++++
->  arch/arm/mach-omap2/prm-regbits-33xx.h        |  357 +++++++++++++++++++++++++
->  arch/arm/mach-omap2/prm33xx.c                 |  134 +++++++++
->  arch/arm/mach-omap2/prm33xx.h                 |  129 +++++++++
->  arch/arm/mach-omap2/voltage.h                 |    1 +
->  arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 +++
->  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    2 +
->  12 files changed, 1139 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/powerdomain33xx.c
->  create mode 100644 arch/arm/mach-omap2/powerdomains33xx_data.c
->  create mode 100644 arch/arm/mach-omap2/prm-regbits-33xx.h
->  create mode 100644 arch/arm/mach-omap2/prm33xx.c
->  create mode 100644 arch/arm/mach-omap2/prm33xx.h
->  create mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
-> 
-> 
+On Wed, Apr 25, 2012 at 06:24:14PM +0530, DebBarma, Tarun Kanti wrote:
+> On Wed, Apr 25, 2012 at 12:09 PM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+> > On Wed, Apr 25, 2012 at 10:04 AM, DebBarma, Tarun Kanti
+> > <tarun.kanti@ti.com> wrote:
+> >> On Tue, Apr 24, 2012 at 9:34 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >>> * DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120424 08:40]:
+> >>>> Hi Janusz,
+> >>>>
+> >>>> On Tue, Apr 24, 2012 at 12:24 AM, DebBarma, Tarun Kanti
+> >>>> <tarun.kanti@ti.com> wrote:
+> >>>> > On Sat, Apr 21, 2012 at 7:33 PM, Janusz Krzysztofik
+> >>>> > <jkrzyszt@tis.icnet.pl> wrote:
+> >>>> >> On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
+> >>>> >>> With register offsets now defined for respective OMAP versions we can get rid
+> >>>> >>> of cpu_class_* checks. This function now has common initialization code for
+> >>>> >>> all OMAP versions...
+> >>>> >>>
+> >>>> >>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> >>>> >>> Signed-off-by: Charulatha V <charu@ti.com>
+> >>>> >>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>> >>> Acked-by: Tony Lindgren <tony@atomide.com>
+> >>>> >>
+> >>>> >> Sorry for being so late with my comment for chanes already present in
+> >>>> >> mainline, but this patch breaks GPIO on Amstrad Delta at least, and I
+> >>>> >> have neither enough spare time nor enough experience with non OMAP1
+> >>>> >> machines to provide a solution myself.
+> >>>> > Yes, I looked at the omap_gpio_mod_init() and OMAP1 configurations are
+> >>>> > overwritten.
+> >>>> > Also looks like there is issue in making distinction between omap15xx
+> >>>> > and omap16xx.
+> >>>> > I will post a patch and you can help me testing it in OMAP1 platform.
+> >>>> > Thanks for pointing this out.
+> >>> ...
+> >>>
+> >>>> Here is the patch, with attachment as well. I have just tested on
+> >>>> OMAP4 platform.
+> >>>> Testing on other OMAP2+ platforms is pending. In the meantime can you please
+> >>>> validate on OMAP1 platform and confirm? Thanks.
+> >>>> --
+> >>>> Tarun
+> >>>>
+> >>>> From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> >>>> Date: Tue, 24 Apr 2012 20:34:32 +0530
+> >>>> Subject: [PATCH] gpio/omap: fix omap1 register overwrite in omap_gpio_mod_init
+> >>>>
+> >>>> Initialization of irqenable, irqstatus registers is the common
+> >>>> operation done in this function for all OMAP platforms, viz.
+> >>>> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
+> >>>> was overwriting the correctly programmed OMAP1 value at the
+> >>>> beginning. As a result, even though it worked on OMAP2+
+> >>>> platforms it was breaking OMAP1 functionality.
+> >>>
+> >>> Sounds like the original patch was never tested on omap1?
+> >> That's right, only bootup test was done on OMAP1710-SDP.
+> >>
+> >>>
+> >>>> On closer observation it is found that the first _gpio_rmw()
+> >>>> which is supposedly done to take care of OMAP1 platform is
+> >>>> generic enough and takes care of OMAP2+ platform as well.
+> >>>> Therefore remove the latter _gpio_rmw() to irqenable as they
+> >>>> are redundant.
+> >>>>
+> >>>> Also, changing the sequence and logic of initializing the
+> >>>> irqstatus.
+> >>>
+> >>> Please mention also the breaking commit here and get this fix
+> >>> merged as a regression as soon as it's tested for the current
+> >>> -rc series.
+> >> Sure, I will do that!
+> >
+> > Looks like it is regression on 3.4 as well so CC stable when you
+> > post the patch.
+> Ok, I will do that.
 
-Tony, Paul and Kevin,
+Correction.
 
-Any comments on this patch series?
+Don't email your patch in any way to the stable folk _before_ it has been
+taken into Linus' tree.  However, you _may_ add in the patch attributations
+a Cc: <stable@vger.kernel.org> tag if you want the stable folk to
+automatically pick up your patch when it _does_ end up in Linus' tree.
+But... make sure that git send-email or whatever doesn't automatically
+add that to the recipients for the emailed patch.
 
-Thanks,
-Vaibhav
+If you send the stable people a patch before its in mainline, you'll get
+a whinge telling you to read Documentation/stable_kernel_rules.txt
