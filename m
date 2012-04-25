@@ -1,70 +1,99 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 25 Apr 2012 10:59:46 +0200
-Subject: [PATCH v2 2/2] ARM: LPC32xx: Make platform use key driver
-In-Reply-To: <1335344386-7809-1-git-send-email-stigge@antcom.de>
-References: <1335344386-7809-1-git-send-email-stigge@antcom.de>
-Message-ID: <1335344386-7809-2-git-send-email-stigge@antcom.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 25 Apr 2012 11:13:26 +0200
+Subject: [PATCH 06/33] ARM: S3C24XX: dev-uart: Use common macro to define
+ resources
+In-Reply-To: <1335327163-11794-7-git-send-email-tushar.behera@linaro.org>
+References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
+ <1335327163-11794-7-git-send-email-tushar.behera@linaro.org>
+Message-ID: <201204251113.26333.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch connects the lpc32xx-key driver to the LPC32xx platform (via
-lpc32xx.dtsi), and more specifically to the reference board via its dts file.
-The clock.c file needs to be changed to match the automatic device name to its
-clock.
+Am Mittwoch, 25. April 2012, 06:12:16 schrieb Tushar Behera:
+> CC: Ben Dooks <ben-linux@fluff.org>
+> CC: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 
----
-Applies to v3.4-rc4 + LPC32xx DT patches
-
-Please pick this patch for the arm-soc subsystem.
-
-Changes since v1:
-* None
-
- arch/arm/boot/dts/lpc32xx.dtsi |    2 ++
- arch/arm/boot/dts/phy3250.dts  |   10 ++++++++++
- arch/arm/mach-lpc32xx/clock.c  |    2 +-
- 3 files changed, 13 insertions(+), 1 deletion(-)
-
---- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
-+++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -285,6 +285,8 @@
- 			key at 40050000 {
- 				compatible = "nxp,lpc3220-key";
- 				reg = <0x40050000 0x1000>;
-+				interrupts = <54 0>;
-+				status = "disable";
- 			};
- 
- 		};
---- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
-+++ linux-2.6/arch/arm/boot/dts/phy3250.dts
-@@ -124,6 +124,16 @@
- 			tsc at 40048000 {
- 				status = "okay";
- 			};
-+
-+			key at 40050000 {
-+				status = "okay";
-+				nxp,matrix-size = <1>;
-+				nxp,debounce-delay-ms = <3>;
-+				nxp,scan-delay-ms = <34>;
-+				key_1 {
-+					linux,code = <2>;
-+				};
-+			};
- 		};
- 	};
- 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -1131,7 +1131,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_INIT("31020300.i2c", NULL, &clk_i2c2),
- 	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
- 	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
--	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
-+	CLKDEV_INIT("40050000.key", NULL, &clk_kscan),
- 	CLKDEV_INIT("lpc32xx-nand.0", "nand_ck", &clk_nand),
- 	CLKDEV_INIT("200b0000.flash", "nand_ck_mlc", &clk_nand_mlc),
- 	CLKDEV_INIT("40048000.adc", NULL, &clk_adc),
+> ---
+>  arch/arm/plat-s3c24xx/dev-uart.c |   56
+> +++++++++++--------------------------- 1 files changed, 16 insertions(+),
+> 40 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c24xx/dev-uart.c
+> b/arch/arm/plat-s3c24xx/dev-uart.c index 9ab22e6..d779216 100644
+> --- a/arch/arm/plat-s3c24xx/dev-uart.c
+> +++ b/arch/arm/plat-s3c24xx/dev-uart.c
+> @@ -29,55 +29,31 @@
+>  /* Serial port registrations */
+> 
+>  static struct resource s3c2410_uart0_resource[] = {
+> -	[0] = {
+> -		.start = S3C2410_PA_UART0,
+> -		.end   = S3C2410_PA_UART0 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX0,
+> -		.end   = IRQ_S3CUART_ERR0,
+> -		.flags = IORESOURCE_IRQ,
+> -	}
+> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART0, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX0, \
+> +			IRQ_S3CUART_ERR0 - IRQ_S3CUART_RX0 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
+> 
+>  static struct resource s3c2410_uart1_resource[] = {
+> -	[0] = {
+> -		.start = S3C2410_PA_UART1,
+> -		.end   = S3C2410_PA_UART1 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX1,
+> -		.end   = IRQ_S3CUART_ERR1,
+> -		.flags = IORESOURCE_IRQ,
+> -	}
+> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART1, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX1, \
+> +			IRQ_S3CUART_ERR1 - IRQ_S3CUART_RX1 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
+> 
+>  static struct resource s3c2410_uart2_resource[] = {
+> -	[0] = {
+> -		.start = S3C2410_PA_UART2,
+> -		.end   = S3C2410_PA_UART2 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX2,
+> -		.end   = IRQ_S3CUART_ERR2,
+> -		.flags = IORESOURCE_IRQ,
+> -	}
+> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART2, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX2, \
+> +			IRQ_S3CUART_ERR2 - IRQ_S3CUART_RX2 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
+> 
+>  static struct resource s3c2410_uart3_resource[] = {
+> -	[0] = {
+> -		.start = S3C2443_PA_UART3,
+> -		.end   = S3C2443_PA_UART3 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX3,
+> -		.end   = IRQ_S3CUART_ERR3,
+> -		.flags = IORESOURCE_IRQ,
+> -	},
+> +	[0] = DEFINE_RES_MEM(S3C2443_PA_UART3, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX3, \
+> +			IRQ_S3CUART_ERR3 - IRQ_S3CUART_RX3 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
+> 
+>  struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
