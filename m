@@ -1,9 +1,9 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 17:27:55 +0200
-Subject: [PATCH 05/33] mmc mxcmmc: do not depend on grouped clocks
+Date: Wed, 25 Apr 2012 17:27:53 +0200
+Subject: [PATCH 03/33] video imxfb: do not depend on grouped clocks
 In-Reply-To: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
 References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1335367703-19929-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1335367703-19929-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,109 +23,119 @@ are converted to the generic clock framework
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mmc/host/mxcmmc.c |   39 +++++++++++++++++++++++++--------------
- 1 file changed, 25 insertions(+), 14 deletions(-)
+ drivers/video/imxfb.c |   50 ++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 35 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index b2058b4..28ed52d 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -136,7 +136,8 @@ struct mxcmci_host {
- 	u16			rev_no;
- 	unsigned int		cmdat;
- 
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index f135dbe..caad368 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -131,7 +131,9 @@ struct imxfb_rgb {
+ struct imxfb_info {
+ 	struct platform_device  *pdev;
+ 	void __iomem		*regs;
 -	struct clk		*clk;
 +	struct clk		*clk_ipg;
++	struct clk		*clk_ahb;
 +	struct clk		*clk_per;
  
- 	int			clock;
+ 	/*
+ 	 * These are the addresses we mapped
+@@ -340,7 +342,7 @@ static int imxfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
  
-@@ -672,7 +673,7 @@ static void mxcmci_set_clk_rate(struct mxcmci_host *host, unsigned int clk_ios)
- {
- 	unsigned int divider;
- 	int prescaler = 0;
--	unsigned int clk_in = clk_get_rate(host->clk);
-+	unsigned int clk_in = clk_get_rate(host->clk_per);
+ 	pr_debug("var->bits_per_pixel=%d\n", var->bits_per_pixel);
  
- 	while (prescaler <= 0x800) {
- 		for (divider = 1; divider <= 0xF; divider++) {
-@@ -900,12 +901,20 @@ static int mxcmci_probe(struct platform_device *pdev)
- 	host->res = r;
- 	host->irq = irq;
+-	lcd_clk = clk_get_rate(fbi->clk);
++	lcd_clk = clk_get_rate(fbi->clk_per);
  
--	host->clk = clk_get(&pdev->dev, NULL);
--	if (IS_ERR(host->clk)) {
--		ret = PTR_ERR(host->clk);
-+	host->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(host->clk_ipg)) {
-+		ret = PTR_ERR(host->clk_ipg);
- 		goto out_iounmap;
+ 	tmp = var->pixclock * (unsigned long long)lcd_clk;
+ 
+@@ -455,11 +457,17 @@ static int imxfb_bl_update_status(struct backlight_device *bl)
+ 
+ 	fbi->pwmr = (fbi->pwmr & ~0xFF) | brightness;
+ 
+-	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
+-		clk_enable(fbi->clk);
++	if (bl->props.fb_blank != FB_BLANK_UNBLANK) {
++		clk_prepare_enable(fbi->clk_ipg);
++		clk_prepare_enable(fbi->clk_ahb);
++		clk_prepare_enable(fbi->clk_per);
++	}
+ 	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
+-	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
+-		clk_disable(fbi->clk);
++	if (bl->props.fb_blank != FB_BLANK_UNBLANK) {
++		clk_disable_unprepare(fbi->clk_per);
++		clk_disable_unprepare(fbi->clk_ahb);
++		clk_disable_unprepare(fbi->clk_ipg);
++	}
+ 
+ 	return 0;
+ }
+@@ -522,7 +530,9 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 	 */
+ 	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
+ 
+-	clk_enable(fbi->clk);
++	clk_prepare_enable(fbi->clk_ipg);
++	clk_prepare_enable(fbi->clk_ahb);
++	clk_prepare_enable(fbi->clk_per);
+ 
+ 	if (fbi->backlight_power)
+ 		fbi->backlight_power(1);
+@@ -539,7 +549,9 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	if (fbi->lcd_power)
+ 		fbi->lcd_power(0);
+ 
+-	clk_disable(fbi->clk);
++	clk_disable_unprepare(fbi->clk_per);
++	clk_disable_unprepare(fbi->clk_ipg);
++	clk_disable_unprepare(fbi->clk_ahb);
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
+ }
+@@ -770,10 +782,21 @@ static int __init imxfb_probe(struct platform_device *pdev)
+ 		goto failed_req;
  	}
--	clk_enable(host->clk);
-+
-+	host->clk_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(host->clk_per)) {
-+		ret = PTR_ERR(host->clk_per);
-+		goto out_iounmap;
+ 
+-	fbi->clk = clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(fbi->clk)) {
+-		ret = PTR_ERR(fbi->clk);
+-		dev_err(&pdev->dev, "unable to get clock: %d\n", ret);
++	fbi->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
++	if (IS_ERR(fbi->clk_ipg)) {
++		ret = PTR_ERR(fbi->clk_ipg);
++		goto failed_getclock;
 +	}
 +
-+	clk_prepare_enable(host->clk_per);
-+	clk_prepare_enable(host->clk_ipg);
- 
- 	mxcmci_softreset(host);
- 
-@@ -917,8 +926,8 @@ static int mxcmci_probe(struct platform_device *pdev)
- 		goto out_clk_put;
++	fbi->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
++	if (IS_ERR(fbi->clk_ahb)) {
++		ret = PTR_ERR(fbi->clk_ahb);
++		goto failed_getclock;
++	}
++
++	fbi->clk_per = devm_clk_get(&pdev->dev, "per");
++	if (IS_ERR(fbi->clk_per)) {
++		ret = PTR_ERR(fbi->clk_per);
+ 		goto failed_getclock;
  	}
  
--	mmc->f_min = clk_get_rate(host->clk) >> 16;
--	mmc->f_max = clk_get_rate(host->clk) >> 1;
-+	mmc->f_min = clk_get_rate(host->clk_per) >> 16;
-+	mmc->f_max = clk_get_rate(host->clk_per) >> 1;
+@@ -858,7 +881,6 @@ failed_platform_init:
+ failed_map:
+ 	iounmap(fbi->regs);
+ failed_ioremap:
+-	clk_put(fbi->clk);
+ failed_getclock:
+ 	release_mem_region(res->start, resource_size(res));
+ failed_req:
+@@ -895,8 +917,6 @@ static int __devexit imxfb_remove(struct platform_device *pdev)
  
- 	/* recommended in data sheet */
- 	writew(0x2db4, host->base + MMC_REG_READ_TO);
-@@ -967,8 +976,8 @@ out_free_dma:
- 	if (host->dma)
- 		dma_release_channel(host->dma);
- out_clk_put:
--	clk_disable(host->clk);
--	clk_put(host->clk);
-+	clk_disable_unprepare(host->clk_per);
-+	clk_disable_unprepare(host->clk_ipg);
- out_iounmap:
- 	iounmap(host->base);
- out_free:
-@@ -999,8 +1008,8 @@ static int mxcmci_remove(struct platform_device *pdev)
- 	if (host->dma)
- 		dma_release_channel(host->dma);
+ 	iounmap(fbi->regs);
+ 	release_mem_region(res->start, resource_size(res));
+-	clk_disable(fbi->clk);
+-	clk_put(fbi->clk);
  
--	clk_disable(host->clk);
--	clk_put(host->clk);
-+	clk_disable_unprepare(host->clk_per);
-+	clk_disable_unprepare(host->clk_ipg);
- 
- 	release_mem_region(host->res->start, resource_size(host->res));
- 
-@@ -1018,7 +1027,8 @@ static int mxcmci_suspend(struct device *dev)
- 
- 	if (mmc)
- 		ret = mmc_suspend_host(mmc);
--	clk_disable(host->clk);
-+	clk_disable_unprepare(host->clk_per);
-+	clk_disable_unprepare(host->clk_ipg);
- 
- 	return ret;
- }
-@@ -1029,7 +1039,8 @@ static int mxcmci_resume(struct device *dev)
- 	struct mxcmci_host *host = mmc_priv(mmc);
- 	int ret = 0;
- 
--	clk_enable(host->clk);
-+	clk_prepare_enable(host->clk_per);
-+	clk_prepare_enable(host->clk_ipg);
- 	if (mmc)
- 		ret = mmc_resume_host(mmc);
+ 	platform_set_drvdata(pdev, NULL);
  
 -- 
 1.7.10
