@@ -1,37 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 25 Apr 2012 09:01:57 -0600
-Subject: Tag on pinctrl
-In-Reply-To: <20120425104559.GA16752@sirena.org.uk>
-References: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
- <4F96D84E.7080204@wwwdotorg.org> <20120425104559.GA16752@sirena.org.uk>
-Message-ID: <4F9811E5.4040105@wwwdotorg.org>
+From: mark.asselstine@windriver.com (Mark Asselstine)
+Date: Wed, 25 Apr 2012 11:02:43 -0400
+Subject: [PATCH] ARM:mfd: fix ezx-pcap build failure
+Message-ID: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2012 04:46 AM, Mark Brown wrote:
-> On Tue, Apr 24, 2012 at 10:43:58AM -0600, Stephen Warren wrote:
-> 
->> Yes, I have pulled that tag into the Tegra tree as
->> for-3.5/gpio-pinmux-dependency, and have a Tegra-specific
->> for-3.5/gpio-pinmux branch that depends on it. Two other Tegra branches
->> in turn (for-3.5/tegra30-audio, for-3.5/usb-ulpi) depend on
->> for-3.5/gpio-pinmux.
-> 
->> Linus, I think this will get into the ARM SoC tree simply by my saying
->> in my for-3.5/gpio-pinmux pull request that the branch depends on your
->> tag; I don't /think/ you need to explicitly send a pull request there,
->> right?
-> 
-> If the gpio-pinmux branch is based on Linus' branch (which it really
-> should be if it's a dependency...) then git will do the right thing
-> here.  If it's not then you need to explicitly get things pulled in but
-> there will also be bisection issues.
+Attempting to build the ezx_defconfig we get a build failure:
 
-The Tegra branch is indeed based directly on the pinctrl branch.
+drivers/mfd/ezx-pcap.c: In function 'pcap_isr_work':
+drivers/mfd/ezx-pcap.c:205: error: implicit declaration of function 'irq_to_gpio'
 
-However, I was talking more about how Arnd/Olof are managing arm-soc
-than raw git operation; I believe they like to keep an explicit separate
-branch for each dependency in order to track which commits to wait for
-before sending pull requests for the branches they have that are based
-on them, so the dependent commits come in from their original subsystem
-first.
+Looking at this failure we can find that commit 4929f5a8a99f
+[ARM:pxa: rename gpio_to_irq and irq_to_gpio] renamed irq_to_gpio()
+to pxa_irq_to_gpio() but this change was not made in the ezx-pcap
+driver.
+
+Signed-off-by: Mark Asselstine <mark.asselstine@windriver.com>
+---
+ drivers/mfd/ezx-pcap.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
+index 43a76c4..c49c52a 100644
+--- a/drivers/mfd/ezx-pcap.c
++++ b/drivers/mfd/ezx-pcap.c
+@@ -19,6 +19,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/gpio.h>
+ #include <linux/slab.h>
++#include <linux/gpio-pxa.h>
+ 
+ #define PCAP_ADC_MAXQ		8
+ struct pcap_adc_request {
+@@ -202,7 +203,7 @@ static void pcap_isr_work(struct work_struct *work)
+ 		}
+ 		local_irq_enable();
+ 		ezx_pcap_write(pcap, PCAP_REG_MSR, pcap->msr);
+-	} while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
++	} while (gpio_get_value(pxa_irq_to_gpio(pcap->spi->irq)));
+ }
+ 
+ static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
+-- 
+1.7.5.4
