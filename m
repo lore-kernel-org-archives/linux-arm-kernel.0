@@ -1,36 +1,50 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 24 Apr 2012 17:05:06 -0700
-Subject: arch/arm/mach-s3c2410/Kconfig is unsourced
-In-Reply-To: <1335090082.1814.27.camel@x61.thuisdomein>
-References: <1335090082.1814.27.camel@x61.thuisdomein>
-Message-ID: <4F973FB2.1050004@samsung.com>
+Date: Tue, 24 Apr 2012 17:16:02 -0700
+Subject: [PATCH 0/7] ARM: S5P: moving plat-s5p stuff into plat-samsung
+In-Reply-To: <201204191323.32301.arnd@arndb.de>
+References: <1334802036-16768-1-git-send-email-kgene.kim@samsung.com>
+ <201204191323.32301.arnd@arndb.de>
+Message-ID: <4F974242.9000504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
-> 0) commit 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410: move
-> mach-s3c2410/* into mach-s3c24xx/") orphaned
-> arch/arm/mach-s3c2410/Kconfig: currently nothing sources that file in
-> Linus' tree.
+Arnd Bergmann wrote:
+> On Thursday 19 April 2012, Kukjin Kim wrote:
+>> This patches move plat-s5p stuff into plat-samsung for keep just one
+>> plat directory, plat-samsung for Samsung stuff. Actually, it includes
+>> small things for common s5p and there is no problem this moving.
+>> Of course, I'm working on removing plat-s3c24xx and will be submitted
+>> before v3.4 release.
+>>
+>> NOTE, now the plat-s5p directory which is including Kconfig and dummy
+>> Makefile is not removed yet because need to cleanup CONFIG_PLAT_S5P
+>> and will be removed soon.
+>>
 >
-Oops, you're right.
+> Very nice!
+>
+Thanks :)
 
-> 1) I haven't looked in depth at this, but this made S3C2410_PLLTABLE
-> disappear from the build system (ie, arch/arm/mach-s3c2410/pll.c is dead
-> code now). Moreover, this basically turned both "select S3C2410_CPUFREQ
-> if CPU_FREQ_S3C24XX", under "config CPU_S3C2410", and "select
-> S3C2410_IOTIMING if S3C2410_CPUFREQ", under "config ARCH_BAST", into
-> nops (both in arch/arm/mach-s3c24xx/Kconfig).
->
-> 2) So to me it seems the move has only been done half: either more
-> things needs to be moved or those things can be removed entirely. But
-> perhaps arch/arm/mach-s3c2410/Kconfig should just be sourced again.
->
-Yes, I think, would be better right now, if we could add just sourcing 
-mach-s3c2410/Kconfig but as you said, I need to remove entire mach-s3c24 
-stuff.
+> Out of curiosity, how far are you planning to take the consolidation
+> of the various directories in the end?
 
-Thanks for your pointing out and let me fix it.
+Yes, actually, I need more work for it.
+
+> I assume all the s3c24* directories end up getting merged into
+> s3c24xx, but what about s3c64xx, s5p64x0, s5pc100 and s5pcv210?
+
+Yeah, remained mach-s3c24* directories are including just cpufreq stuff 
+and will be cleaned out soon. Moreover, plat-s3c24xx will be merged into 
+one mach-s3c24xx directory before v3.4 release means for v3.5.
+
+But I think, other s5pxxxx are not for this turn probably next time? ;)
+
+> Are they going to stay separate or do they get merged together
+> or with exynos?
+>
+Actually, I have a plan to merge them.
+
+Thanks.
 
 Best regards,
 Kgene.
