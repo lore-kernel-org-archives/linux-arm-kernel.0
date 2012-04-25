@@ -1,88 +1,36 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 25 Apr 2012 12:09:32 +0530
-Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
-In-Reply-To: <CAC83Zv+CCLQfZHfqMcbof6JtA-hOK1PfX5Gs0BBVQhBAiWzX_g@mail.gmail.com>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
- <13629551.hP3ZV1ajDo@vclass>
- <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
- <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
- <20120424160447.GI3739@atomide.com>
- <CAC83Zv+CCLQfZHfqMcbof6JtA-hOK1PfX5Gs0BBVQhBAiWzX_g@mail.gmail.com>
-Message-ID: <CAMQu2gzwijaSzXprEwTNTie3zCgFcNPonAexzrO_AWc2a8jOkw@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 25 Apr 2012 08:41:21 +0200
+Subject: [PATCH v2 0/3] add gpmi-nand dt support for mx6q and mx28
+In-Reply-To: <1335323184-11233-1-git-send-email-b32955@freescale.com>
+References: <1335323184-11233-1-git-send-email-b32955@freescale.com>
+Message-ID: <4F979C91.9020607@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 10:04 AM, DebBarma, Tarun Kanti
-<tarun.kanti@ti.com> wrote:
-> On Tue, Apr 24, 2012 at 9:34 PM, Tony Lindgren <tony@atomide.com> wrote:
->> * DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120424 08:40]:
->>> Hi Janusz,
->>>
->>> On Tue, Apr 24, 2012 at 12:24 AM, DebBarma, Tarun Kanti
->>> <tarun.kanti@ti.com> wrote:
->>> > On Sat, Apr 21, 2012 at 7:33 PM, Janusz Krzysztofik
->>> > <jkrzyszt@tis.icnet.pl> wrote:
->>> >> On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
->>> >>> With register offsets now defined for respective OMAP versions we can get rid
->>> >>> of cpu_class_* checks. This function now has common initialization code for
->>> >>> all OMAP versions...
->>> >>>
->>> >>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->>> >>> Signed-off-by: Charulatha V <charu@ti.com>
->>> >>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> >>> Acked-by: Tony Lindgren <tony@atomide.com>
->>> >>
->>> >> Sorry for being so late with my comment for chanes already present in
->>> >> mainline, but this patch breaks GPIO on Amstrad Delta at least, and I
->>> >> have neither enough spare time nor enough experience with non OMAP1
->>> >> machines to provide a solution myself.
->>> > Yes, I looked at the omap_gpio_mod_init() and OMAP1 configurations are
->>> > overwritten.
->>> > Also looks like there is issue in making distinction between omap15xx
->>> > and omap16xx.
->>> > I will post a patch and you can help me testing it in OMAP1 platform.
->>> > Thanks for pointing this out.
->> ...
->>
->>> Here is the patch, with attachment as well. I have just tested on
->>> OMAP4 platform.
->>> Testing on other OMAP2+ platforms is pending. In the meantime can you please
->>> validate on OMAP1 platform and confirm? Thanks.
->>> --
->>> Tarun
->>>
->>> From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->>> Date: Tue, 24 Apr 2012 20:34:32 +0530
->>> Subject: [PATCH] gpio/omap: fix omap1 register overwrite in omap_gpio_mod_init
->>>
->>> Initialization of irqenable, irqstatus registers is the common
->>> operation done in this function for all OMAP platforms, viz.
->>> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
->>> was overwriting the correctly programmed OMAP1 value at the
->>> beginning. As a result, even though it worked on OMAP2+
->>> platforms it was breaking OMAP1 functionality.
->>
->> Sounds like the original patch was never tested on omap1?
-> That's right, only bootup test was done on OMAP1710-SDP.
->
->>
->>> On closer observation it is found that the first _gpio_rmw()
->>> which is supposedly done to take care of OMAP1 platform is
->>> generic enough and takes care of OMAP2+ platform as well.
->>> Therefore remove the latter _gpio_rmw() to irqenable as they
->>> are redundant.
->>>
->>> Also, changing the sequence and logic of initializing the
->>> irqstatus.
->>
->> Please mention also the breaking commit here and get this fix
->> merged as a regression as soon as it's tested for the current
->> -rc series.
-> Sure, I will do that!
+Hi Huang Shijie,
 
-Looks like it is regression on 3.4 as well so CC stable when you
-post the patch.
+On 25.04.2012 05:06, Huang Shijie wrote:
+> The mx6q-arm2 and imx28evk have already support the device tree now.
+> So i decide to add the gpmi-nand dt support to them.
+> 
+> The mx23 does not support the device tree now. I will add the gpmi dt support
+> when it is ready.
+> 
+> Test this patch set on both MX6Q(arm2) and mx28(evk).
+> 
+> v1 --> v2
+> 	[1] merge the gpmi/bch device node into one node.
+> 	[2] add partitions support.
+> 	[3] misc
+> 
+> Huang Shijie (3):
+>   mtd: gpmi: add device tree support for mx6q and mx28
+>   ARM: mx28: add gpmi-nand dt support
+>   ARM: mx6q: add gpmi-nand dt support
 
-Regards
-Santosh
+For which kernel are these 3 patches? I tried to apply them on top of 
+3.4-rc4 and got a lot of rejects.
+
+Best regards
+
+Dirk
