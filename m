@@ -1,70 +1,90 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 25 Apr 2012 12:40:28 +0000
-Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-In-Reply-To: <4F97EF11.4020300@ti.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
- <4F97B891.1020601@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
- <4F97E243.6000500@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
- <4F97EF11.4020300@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FDAE7@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Apr 2012 13:41:05 +0100
+Subject: [RFC PATCH 00/11 V5] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <201204251427.59194.marex@denx.de>
+References: <1335099567-21056-1-git-send-email-marex@denx.de>
+ <1335237523-9053-1-git-send-email-marex@denx.de>
+ <20120424200215.GD3628@n2100.arm.linux.org.uk>
+ <201204251427.59194.marex@denx.de>
+Message-ID: <20120425124105.GX24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 18:03:21, Cousson, Benoit wrote:
-> On 4/25/2012 2:26 PM, Hiremath, Vaibhav wrote:
-> > On Wed, Apr 25, 2012 at 17:08:43, Cousson, Benoit wrote:
-> >> On 4/25/2012 12:20 PM, Hiremath, Vaibhav wrote:
-> >>> On Wed, Apr 25, 2012 at 14:10:49, Cousson, Benoit wrote:
-> >>
-> >> ...
-> >>
-> > <snip>
-> >>
-> >>> How would I know the rate of this clock in driver? Say for example, I want
-> >>> to configure my internal divider based on input rate?
-> >>> OR
-> >>> I want to change the rate of dss_clk itself?
-> >>> OR
-> >>> Looking at debugfs, would I get the rate of dss_clk?
-> >>
-> >> No because that clock will not exist anymore, but you will have the real
-> >> clock rate from the "dss_dss_clk".
-> >>
-> >
-> > Thanks Benoit, I think I understand your perspective on Module Vs leaf node
-> > and now able to digest as well.
-> > Probably Last Q, which I think clarify all my doubts,
-> >
-> > Assume we have complete hwmod instance and built a device using
-> > omap_device_build() api, and also the driver is completely using runtime pm
-> > api's,
-> > How can driver get the clk handle (required to get the rate)?
-> > Is there any api already available for this?
+On Wed, Apr 25, 2012 at 02:27:58PM +0200, Marek Vasut wrote:
+> Dear Russell King - ARM Linux,
 > 
-> The omap_device fmwk will auto-magically create a "fck" clkdev entry for 
-> the main_clk.
+> > Do you really need 138 messages (and counting) all threaded together
+> > across the entire history of this patch set?  Please stop posting new
+> > copies of your patch set as followups to the previous set.
 > 
-> The API is thus the standard: clk_get(dev, "fck"), to get the clock 
-> handle and then you can use the other clock API.
-> 
-> The idea is to enforce the usage of clock alias local to the device and 
-> not trying anymore to get the real clock name. It thus allows driver to 
-> work on various variant / revision without having to modify the driver.
-> 
-> The fmwk will also create clock alias for any opt_clock present in the 
-> hwmod.
-> 
+> Well, it's usually to the point where the usb patches change, so instead of 
+> posting 8 patches, I post the whole set ot make it consistent.
 
-Yes, Yes, I missed this. Omap_device_build() internally add "fck" to the 
-clkdev table for both main_clk and opt_clks.
+Sure, no problem with that.
 
-Thanks for describing it for me. I will change AM33XX clock tree for this
-And submit the next version soon.
+> > Not only does it rob horizontal space for reading the subjects in the
+> > index, but also it either buries your patches ages back or brings the
+> > entire 138 messages to the front of mailboxes, depending on your sort
+> > preferences.  Either way it makes threaded reading of the mailing list
+> > really difficult.
+> > 
+> > Please stop this antisocial behaviour.  Thanks.
+> 
+> Can you please suggest better solution? You mean post each new set as a separate 
+> thread ? Or post each patch as an in-reply-to previous one?
 
-Thanks,
-Vaibhav
+Please don't thread the posting of a new version of the patches to
+the previous posting of the older version.  In other words, the
+initial summary mail for V5 should not be threaded to the V4 series,
+and the individual patches for V5 should only be threaded to the
+initial summary mail for V5.
+
+So, rather than this as one massive thread:
+...[PATCH V3 0/N]
+   +-[PATCH V3 1/N]
+   | `-Replies
+   +-[PATCH V3 2/N]
+   | `-Replies
+   +-[PATCH V3 3/N]
+   | `-Replies
+   `-[PATCH V4 0/N]
+     +-[PATCH V4 1/N]
+     | `-Replies
+     +-[PATCH V4 2/N]
+     | `-Replies
+     +-[PATCH V4 3/N]
+     | `-Replies
+     `-[PATCH V5 0/N]
+        +-[PATCH V5 1/N]
+        | `-Replies
+        +-[PATCH V5 2/N]
+        | `-Replies
+        `-[PATCH V5 3/N]
+          `-Replies
+
+It should be:
+[PATCH V4 0/N]
++-[PATCH V4 1/N]
+| `-Replies
++-[PATCH V4 2/N]
+| `-Replies
+`-[PATCH V4 3/N]
+  `-Replies
+
+<some time later>
+
+[PATCH V5 0/N]
++-[PATCH V5 1/N]
+| `-Replies
++-[PATCH V5 2/N]
+| `-Replies
+`-[PATCH V5 3/N]
+  `-Replies
+
+Where the 0/N patches have no parent message.  In other words, these
+sumamry messages have no references or in-reply-to headers.
+
+If you wish to provide a direct reference back to a previous thread,
+please do so via URLs into archives, or providing the message id or
+exact subject of the previous series in the new summary message body.
+But please don't thread each version to the previous version!
