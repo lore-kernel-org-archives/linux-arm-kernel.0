@@ -1,44 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 25 Apr 2012 09:47:26 -0700
-Subject: [TMP] OMAP3EVM: Test gpmc nand & smsc911x
-In-Reply-To: <bb95fec60401f7cf6ac77200a12baf3fc83852f5.1333640054.git.afzal@ti.com>
-References: <cover.1333640054.git.afzal@ti.com>
- <bb95fec60401f7cf6ac77200a12baf3fc83852f5.1333640054.git.afzal@ti.com>
-Message-ID: <20120425164726.GU3739@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 25 Apr 2012 20:51:24 +0400
+Subject: [PATCH 18/33] ARM: S3C24XX: mach-qt2410: Use common macro to
+ define resources
+In-Reply-To: <1335327163-11794-19-git-send-email-tushar.behera@linaro.org>
+References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
+ <1335327163-11794-19-git-send-email-tushar.behera@linaro.org>
+Message-ID: <4F982B8C.3050203@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [120405 09:08]:
-> @@ -114,6 +147,8 @@ static struct omap_smsc911x_platform_data smsc911x_cfg = {
->  
->  static inline void __init omap3evm_init_smsc911x(void)
->  {
-> +	struct gpmc_device_pdata *gpmc_smsc911x_info;
-> +
->  	/* Configure ethernet controller reset gpio */
->  	if (cpu_is_omap3430()) {
->  		if (get_omap3_evm_rev() == OMAP3EVM_BOARD_GEN_1)
-> @@ -122,7 +157,11 @@ static inline void __init omap3evm_init_smsc911x(void)
->  			smsc911x_cfg.gpio_reset = OMAP3EVM_GEN2_ETHR_GPIO_RST;
->  	}
->  
-> -	gpmc_smsc911x_init(&smsc911x_cfg);
-> +	gpmc_smsc911x_info = gpmc_smsc911x_init(&smsc911x_cfg);
-> +	if (gpmc_smsc911x_info)
-> +		*gpmc_data_cur++ = gpmc_smsc911x_info;
-> +	else
-> +		pr_err("error: unable to initilaize gpmc smsc911x\n");
->  }
->  
->  #else
+Hello.
 
-Obviously we can't merge any of this if until all the board-*.c files
-are changed and tested.
+On 04/25/2012 08:12 AM, Tushar Behera wrote:
 
-Can you maybe still keep the old interfaces in addition to the new ones
-so we can do the conversion one board-*.c file at a time while keeping
-things working?
+> CC: Ben Dooks<ben-linux@fluff.org>
+> CC: Kukjin Kim<kgene.kim@samsung.com>
+> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+> ---
+>   arch/arm/mach-s3c24xx/mach-qt2410.c |   12 ++----------
+>   1 files changed, 2 insertions(+), 10 deletions(-)
 
-Regards,
+> diff --git a/arch/arm/mach-s3c24xx/mach-qt2410.c b/arch/arm/mach-s3c24xx/mach-qt2410.c
+> index 91c16d9..b868ddd 100644
+> --- a/arch/arm/mach-s3c24xx/mach-qt2410.c
+> +++ b/arch/arm/mach-s3c24xx/mach-qt2410.c
+> @@ -180,16 +180,8 @@ static struct s3c2410fb_mach_info qt2410_fb_info __initdata = {
+>   /* CS8900 */
+>
+>   static struct resource qt2410_cs89x0_resources[] = {
+> -	[0] = {
+> -		.start	= 0x19000000,
+> -		.end	= 0x19000000 + 16,
 
-Tony
+    Are you sure there was no mistake here, with - 1 missing? It looks suspicious...
+
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start	= IRQ_EINT9,
+> -		.end	= IRQ_EINT9,
+> -		.flags	= IORESOURCE_IRQ,
+> -	},
+> +	[0] = DEFINE_RES_MEM(0x19000000, 17),
+> +	[1] = DEFINE_RES_IRQ(IRQ_EINT9),
+>   };
+>
+>   static struct platform_device qt2410_cs89x0 = {
+
+WBR, Sergei
