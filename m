@@ -1,28 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Apr 2012 12:35:21 +0100
-Subject: [PATCH 00/33] Use common macro to define resources
-In-Reply-To: <201204251121.47358.arnd@arndb.de>
-References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
- <201204250938.58397.heiko@sntech.de>
- <20120425101007.GM9142@game.jcrosoft.org> <201204251121.47358.arnd@arndb.de>
-Message-ID: <20120425113521.GW24211@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 25 Apr 2012 13:38:43 +0200
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
+ <4F97B891.1020601@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
+Message-ID: <4F97E243.6000500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 11:21:47AM +0000, Arnd Bergmann wrote:
-> Note that the point of the DEFINE_RES_*() macros is really to prevent
-> people from coming up with new silly macros to do the same thing, as
-> we've had in the past.
+On 4/25/2012 12:20 PM, Hiremath, Vaibhav wrote:
+> On Wed, Apr 25, 2012 at 14:10:49, Cousson, Benoit wrote:
 
-One of the other reaons was to stop the stream of resources with wrong
-endings (because people kept thinking it was exclusive rather than
-inclusive) - and the resulting stream of additional patches to fix those
-errors.
+...
 
-The legacy platforms do have those kinds of errors - when I converted
-SA11x0 as part of a previous patch set, I found a number suffering from
-this error.  (Were any found in this patch set?  I've not read through
-it.)
+>> That will not change anything, the point is that MODULEMODE_SWCTRL is
+>> uses for module control, not for clock directly, and that's why it is
+>> handled by the hwmod.
+>>
+>> That will just replace the main_clk from the hwmod with the parent of
+>> the current modulemode nodes. Only the enable/disable part will be
+>> handled, if that node used to have a div, then the parent will handle that.
+>>
+>> Today this module mode clock node is just a duplication of the hwmod
+>> node. By removing it, you will reduce the size of the data and have a
+>> much mode accurate representation of the reality.
+>>
+>> Using the clock tree to handle these nodes was a hack we had to do
+>> because the hwmod fmwk was not ready when OMAP4 was introduced and
+>> because most drivers were not using pm_runtime.
+>>
+>
+> Benoit,
+>
+> I completely understand what are trying to explain here, and I completely agree with you on the fact that, MODULEMODE_SWCTRL is for module control and is clock node is just a duplication.
+>
+> Module enable and disable is one part, and I am not at all referring to this.
+> My point is, more from other piece of code which are dependent on clocktree.
+> In order to have proper and complete debugfs representation of all the
+> clocks, somebody has to maintain the information of leaf clocks to parent
+> relation, Isn't it?
 
-I think if this becomes a small %age of the change to Samsung stuff,
-and Kukjin is happy with it, it should go in.
+Nope, not at all. All the clocks will stay in the clock tree. The clock 
+consumers a.k.a hwmods does not have to be in the clock tree.
+Having some fake leaf nodes in the clock tree is just adding some fake 
+intermediate clocks instead of the real consumer. These nodes do not 
+exist, they were added to have a point of control from the driver before 
+runtime_pm was there.
+
+> For example, take OMAP44xx "dss_dss_clk" clock, OR any clock with "followparent_recalc" field, the question I am raising here is,
+
+Then it is not an issue. If this is a real clock, it will then stay in 
+the clock data.
+
+> How would I know the rate of this clock in driver? Say for example, I want
+> to configure my internal divider based on input rate?
+> OR
+> I want to change the rate of dss_clk itself?
+> OR
+> Looking at debugfs, would I get the rate of dss_clk?
+
+No because that clock will not exist anymore, but you will have the real 
+clock rate from the "dss_dss_clk".
+
+> OR
+> Will I have dss_clk present in /debug/clock/?
+> OR
+> Are we expecting user to know parent of such leaf clocks?
+
+Yes, because it is not leaf nodes anymore, but modules.
+
+> OR
+> Are we planning to export hwmod->main_clk (which is parent clk here) to
+> User in debugfs or something?
+
+Well, I used to have a patch do expose hwmod to debugfs, but this is not 
+that useful.
+
+I think this is a non-issue, we are just removing clock nodes that are 
+not real nodes, so it will not change anything practically speaking.
+
+Regards,
+Benoit
