@@ -1,64 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Apr 2012 16:54:19 +0100
-Subject: [PATCH 1/2] ARM: Do not call flush_cache_user_range with mmap_sem held
-Message-ID: <1335369260-9761-1-git-send-email-will.deacon@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 Apr 2012 17:58:59 +0200
+Subject: [GIT PULL] ux500 device tree patches
+Message-ID: <1335369540-5607-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dima Zavin <dima@android.com>
 
-We can't be holding the mmap_sem while calling flush_cache_user_range
-because the flush can fault. If we fault on a user address, the
-page fault handler will try to take mmap_sem again. Since both places
-acquire the read lock, most of the time it succeeds. However, if another
-thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
-between the call to flush_cache_user_range and the fault, the down_read
-in do_page_fault will deadlock.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Also, since we really can't be holding the mmap_sem while calling
-flush_cache_user_range AND vma is actually unused by the flush itself,
-get rid of vma as an argument.
+Hi ARM SoC maintainers,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Dima Zavin <dima@android.com>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+this pull request contains some device tree work by Lee Jones.
+I have tried to keep these patches in the arch/arm/boot/dts/*
+space to get some sanity in the branch proliferation.
 
-Note: I'm including this as a prerequisite to the following patch but if
-      there are still objections to this then I can rebase without it.
+There is still one patch that touches arch/arm/mach-ux500 too
+though (but it should merge fine with the other ux500 stuff).
 
- arch/arm/include/asm/cacheflush.h |    2 +-
- arch/arm/kernel/traps.c           |    4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+The changes to the device tree are of course dependent on some
+core changes and some patching in the GPIO/pin driver, but as
+the device tree files are believed to be a different world
+(and should one day live in their own git) I split this off
+anyway. I don't think people bisect the device trees per se
+and the board code in conjunction anyway.
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index d5d8d5c..1252a26 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -249,7 +249,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
-  * Harvard caches are synchronised for the user space address range.
-  * This is used for the ARM private sys_cacheflush system call.
-  */
--#define flush_cache_user_range(vma,start,end) \
-+#define flush_cache_user_range(start,end) \
- 	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
- 
- /*
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 7784547..63d402f 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -496,7 +496,9 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
- 		if (end > vma->vm_end)
- 			end = vma->vm_end;
- 
--		flush_cache_user_range(vma, start, end);
-+		up_read(&mm->mmap_sem);
-+		flush_cache_user_range(start, end);
-+		return;
- 	}
- 	up_read(&mm->mmap_sem);
- }
--- 
-1.7.4.1
+If you think differently tell me and I'll happily stack
+all three pull requests on top of each other and send one
+big shebang with everything instead :-)
+
+So: please pull this in.
+
+Yours,
+Linus Walleij
+
+The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
+
+  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-devicetree-for-arm-soc
+
+Lee Jones (9):
+      ARM: ux500: Rename the DT compatible entry for i2c devices on Snowball
+      ARM: ux500: Shorten Snowball's DT compatible gpio entry
+      ARM: ux500: Enable the external bus with Device Tree
+      drivers/gpio: gpio-nomadik: Device Tree bindings
+      drivers/gpio: gpio-nomadik: Provide documentation for Device Tree bindings
+      ARM: ux500: Rename gpio_keys in the Device Tree file
+      drivers/gpio: represent gpio-nomadik as an IRQ controller in DT documentation
+      ARM: ux500: Enable the SMSC9115 on Snowball via Device Tree
+      ARM: ux500: Configure the PRCMU Timer for db8500 based devices in DT
+
+ .../devicetree/bindings/gpio/gpio-nmk.txt          |   31 ++++++++++
+ arch/arm/boot/dts/db8500.dtsi                      |   63 +++++++++++++++-----
+ arch/arm/boot/dts/snowball.dts                     |   40 +++++++------
+ arch/arm/mach-ux500/board-mop500.c                 |    5 +-
+ 4 files changed, 103 insertions(+), 36 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-nmk.txt
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJPmB8QAAoJEEEQszewGV1zKtQP/RQT/vf9C6ZozqX8/l5ehTd9
+Ip7O4vlYEfe0d/lJZ/TgRQKIWWgu/56y/ZNh9asoEbKJaLSjkeHUdp6hYqQ+5XcJ
+92Cb5aQNbAlIV+ghkXRofulFgsOc/ZFx7HL8t4rrJZpuKGa8f6SCRYvF82FlxyCk
+6ETXWLswRHS/9Xj2UUf+9XX+YQZQLHzBT8Gh/VYOO2MI8RdEpUh4hfD5VJQgQK6y
+ozaABaVcLEkoZfQwYgLORLAVkTtXuUrBexj6AJ5m+IO16Apup/vlyQriDVA1lrR4
+9MXGxswulAZHUSyBUAdSmw8PQ2YTpf7HMr2KaspXJoN94s4XVa1Gf8Nps6QqVe5A
+0hiXIw7GuWuzT0HhN7d8q9A+Yl8FqWapmUljimpD2XABFfNc1+Mzupuwf+egWF2w
+FEyw7jD86Gh/N/RWevmBoDQ746nrUBMoJoloAC1qCP5b5j6qJvIHgViy9ddTEhTy
+e0LrTirzGGGiJ+3oZdYLY7Y5f0G7/KrKwdajDPw/0xSbCZj/hYGClgw/bGtcYpcN
+SlUkrppfARSRPeQAs+xEPqzgwgaivsNDO5yVkTgXaOrAy3oajmTY2leegH5A0KqK
+rQYeniut/ZnKywCeYpPq2SiIVgqA9QMHCnRTUouubHaPXY+SASQI0S9ShVKqAqhY
+bHAp3sKpTx/nRmUQxock
+=H2Ne
+-----END PGP SIGNATURE-----
