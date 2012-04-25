@@ -1,91 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Apr 2012 07:42:38 +0200
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <CAOh2x=kOww+K-VrNJU_v6XXANQUGyBtZ-ekoCAEQV5kEdah7jQ@mail.gmail.com>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424142939.GG24089@lunn.ch>
- <CAOh2x=kOww+K-VrNJU_v6XXANQUGyBtZ-ekoCAEQV5kEdah7jQ@mail.gmail.com>
-Message-ID: <20120425054238.GG13489@lunn.ch>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 25 Apr 2012 05:48:04 +0000
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Please see if following is fine:
+On Wed, Apr 25, 2012 at 06:33:26, Paul Walmsley wrote:
+> Hello Vaibhav, Afzal, Vaibhav,
+> 
+> On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
+> 
+> > AM33XX clock implementation is different than any existing OMAP
+> > family of devices. Although DPLL module is similar to OMAP4
+> > device, but the usage is very much different than OMAP4.
+> > AM33XX has different peripheral set and each module gets
+> > integrated to the clock framework differently than OMAP
+> > family of devices.
+> > 
+> > This patch adds full Clock tree data for AM33XX family
+> > of devices and also integrates it into existing OMAP framework.
+> 
+> What do you think about the possibility of removing all of the leaf clocks
+> that have AM33XX_MODULEMODE_SWCTRL as their .enable_bit, assuming there 
+> are no .fixed_div or .clksel* fields associated with the clocks?
+> 
+> In theory, I don't think they are needed.  The drivers should be using 
+> runtime PM, and that should enable and disable the module via the hwmod 
+> code, rather than the clock code.
+> 
+> Of course some clocks would still be needed for the main_clk fields for 
+> the hwmods, but the hwmods should be able to use the leaf clock's parent 
+> clocks for that.
+> 
+> That would save quite a few lines of data.  And I think Beno?t is planning 
+> to do that for OMAP4+.
+> 
+> What do you think?
+> 
 
-Hi Viresh
+Paul,
 
-This looks good. Thanks
+Yes, theoretically it is possible to do it. But it will also break some of 
+the existing things, like,
 
-     Andrew
+1. DebugFS clock interface
 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Jeff Garzik <jgarzik@redhat.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: linux-ide at vger.kernel.org
-> ---
->  drivers/ata/sata_mv.c |   10 ----------
->  1 files changed, 0 insertions(+), 10 deletions(-)
+I believe, with this change, you will not have all the leaf nodes as part of clock tree, so they will not be populated in /debug/clock/
+
+2. Enable and disable of the module is one part, but what about, changing 
+   the rate of the clock (followparent_recalc)? 
+   With the proper and complete clock tree, you can traverse the clock and 
+   driver code doesn't need to know about parent. 
+   Driver can simply call clk_set_rate() on leaf clock, and clock tree will 
+   handle it.
+
+If at all we take this path, we have to build the clk node runtime 
+(on-the-fly), AND/OR add new pm_runtime_set_rate() api.
+
+Are you available on IRC chat anytime? We can discuss on this and align 
+quickly.
+I am available on linux-omap irc channel (with the name = "hvaibhav")
+
+Thanks,
+Vaibhav
+
 > 
-> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-> index 7336d4a..37503b8 100644
-> --- a/drivers/ata/sata_mv.c
-> +++ b/drivers/ata/sata_mv.c
-> @@ -551,9 +551,7 @@ struct mv_host_priv {
->  	u32			irq_mask_offset;
->  	u32			unmask_all_irqs;
+> - Paul
 > 
-> -#if defined(CONFIG_HAVE_CLK)
->  	struct clk		*clk;
-> -#endif
->  	/*
->  	 * These consistent DMA memory pools give us guaranteed
->  	 * alignment for hardware-accessed data structures,
-> @@ -4063,13 +4061,11 @@ static int mv_platform_probe(struct
-> platform_device *pdev)
->  				   resource_size(res));
->  	hpriv->base -= SATAHC0_REG_BASE;
-> 
-> -#if defined(CONFIG_HAVE_CLK)
->  	hpriv->clk = clk_get(&pdev->dev, NULL);
->  	if (IS_ERR(hpriv->clk))
->  		dev_notice(&pdev->dev, "cannot get clkdev\n");
->  	else
->  		clk_enable(hpriv->clk);
-> -#endif
-> 
->  	/*
->  	 * (Re-)program MBUS remapping windows if we are asked to.
-> @@ -4096,12 +4092,10 @@ static int mv_platform_probe(struct
-> platform_device *pdev)
->  		return 0;
-> 
->  err:
-> -#if defined(CONFIG_HAVE_CLK)
->  	if (!IS_ERR(hpriv->clk)) {
->  		clk_disable(hpriv->clk);
->  		clk_put(hpriv->clk);
->  	}
-> -#endif
-> 
->  	return rc;
->  }
-> @@ -4117,17 +4111,13 @@ err:
->  static int __devexit mv_platform_remove(struct platform_device *pdev)
->  {
->  	struct ata_host *host = platform_get_drvdata(pdev);
-> -#if defined(CONFIG_HAVE_CLK)
->  	struct mv_host_priv *hpriv = host->private_data;
-> -#endif
->  	ata_host_detach(host);
-> 
-> -#if defined(CONFIG_HAVE_CLK)
->  	if (!IS_ERR(hpriv->clk)) {
->  		clk_disable(hpriv->clk);
->  		clk_put(hpriv->clk);
->  	}
-> -#endif
->  	return 0;
->  }
