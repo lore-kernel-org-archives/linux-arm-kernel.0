@@ -1,147 +1,115 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 25 Apr 2012 19:38:14 +0800
-Subject: [PATCH v3 2/2] pinctrl: add pinctrl_provide_dummies interface for
- platforms to use
-In-Reply-To: <1335353894-22096-1-git-send-email-b29396@freescale.com>
-References: <1335353894-22096-1-git-send-email-b29396@freescale.com>
-Message-ID: <1335353894-22096-2-git-send-email-b29396@freescale.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 25 Apr 2012 14:29:50 +0300
+Subject: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
+In-Reply-To: <1335352072-4001-2-git-send-email-hdoyu@nvidia.com>
+References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
+ <1335352072-4001-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20120425112950.GC3564@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+Hi,
 
-Add a interface pinctrl_provide_dummies for platform to indicate
-whether it needs use pinctrl dummy state and dummy gpio.
+On Wed, Apr 25, 2012 at 02:07:37PM +0300, Hiroshi DOYU wrote:
+> Add extern func, "tegra_ahb_enable_smmu()" to inform AHB that SMMU is
+> ready.
+> 
+> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/mach-tegra/include/mach/tegra-ahb.h |   19 +++++++++++++++++++
+>  drivers/platform/arm/tegra-ahb.c             |   24 ++++++++++++++++++++++++
+>  2 files changed, 43 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/include/mach/tegra-ahb.h b/arch/arm/mach-tegra/include/mach/tegra-ahb.h
+> new file mode 100644
+> index 0000000..296688c
+> --- /dev/null
+> +++ b/arch/arm/mach-tegra/include/mach/tegra-ahb.h
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + */
+> +
+> +#ifndef __MACH_TEGRA_AHB_H__
+> +#define __MACH_TEGRA_AHB_H__
+> +
+> +extern int tegra_ahb_enable_smmu(void);
+> +
+> +#endif	/* __MACH_TEGRA_AHB_H__ */
+> diff --git a/drivers/platform/arm/tegra-ahb.c b/drivers/platform/arm/tegra-ahb.c
+> index dcad2ec..7ad9dfd 100644
+> --- a/drivers/platform/arm/tegra-ahb.c
+> +++ b/drivers/platform/arm/tegra-ahb.c
+> @@ -78,6 +78,10 @@
+>  
+>  #define AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID	0xf8
+>  
+> +#define AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE BIT(17)
+> +
+> +static struct platform_driver tegra_ahb_driver;
+> +
+>  static u32 tegra_ahb_gizmo[] = {
+>  	AHB_ARBITRATION_DISABLE,
+>  	AHB_ARBITRATION_PRIORITY_CTRL,
+> @@ -126,6 +130,26 @@ static inline void gizmo_writel(struct tegra_ahb *ahb, u32 value, u32 offset)
+>  	writel(value, ahb->regs + offset);
+>  }
+>  
+> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> +static int __tegra_ahb_enable_smmu(struct device *dev, void *data)
+> +{
+> +	u32 val;
+> +	struct tegra_ahb *ahb = dev_get_drvdata(dev);
+> +
+> +	val = gizmo_readl(ahb, AHB_ARBITRATION_XBAR_CTRL);
+> +	val |= AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE;
+> +	gizmo_writel(ahb, val, AHB_ARBITRATION_XBAR_CTRL);
+> +	return 0;
+> +}
+> +
+> +int tegra_ahb_enable_smmu(void)
+> +{
+> +	return driver_for_each_device(&tegra_ahb_driver.driver, NULL, NULL,
+> +				      __tegra_ahb_enable_smmu);
+> +}
+> +EXPORT_SYMBOL(tegra_ahb_enable_smmu);
+> +#endif
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
-ChangLog v2->v3:
-* Also changed the missed pinctrl gpio APIs in v1.
-ChangeLog v1->v2:
-* Based on sascha's suggestion, drop using kconfig since it will hide
-  pinctrl errors on all other boards.
-  See: https://lkml.org/lkml/2012/4/18/282
-  It seemed both Linus and Stephen agreed with this way, so i'm ok
-  with it too.
-* add dummy gpio support.
-  pinctrl gpio in the same situation as state.
-* patch name changed.
-  Original is pinctrl: handle dummy state in core.
-* split removing old dt dummy interface into a separate patch
----
- drivers/pinctrl/core.c          |   46 ++++++++++++++++++++++++++++++++++----
- include/linux/pinctrl/machine.h |    5 +++-
- 2 files changed, 45 insertions(+), 6 deletions(-)
+this is still not correct. If you will always call this whenever you run
+on tegra 3, why do you even expose this function ? You can use your
+compatible flag to do runtime detection of where you're running and call
+this accordingly. Something like:
 
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index ea2412a..2330225 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -43,6 +43,9 @@ struct pinctrl_maps {
- 	unsigned num_maps;
- };
- 
-+static bool pinctrl_dummy_state;
-+static bool pinctrl_dummy_gpio;
-+
- /* Mutex taken by all entry points */
- DEFINE_MUTEX(pinctrl_mutex);
- 
-@@ -61,6 +64,17 @@ static LIST_HEAD(pinctrl_maps);
- 			_i_ < _maps_node_->num_maps; \
- 			i++, _map_ = &_maps_node_->maps[_i_])
- 
-+/**
-+ * pinctrl_provide_dummies() - indicate if provide dummies for state and gpio
-+ * @state - provide dummy state
-+ * @gpio - provide dummy gpio
-+ */
-+void pinctrl_provide_dummies(bool state, bool gpio)
-+{
-+	pinctrl_dummy_state = state;
-+	pinctrl_dummy_gpio = gpio;
-+}
-+
- const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev)
- {
- 	/* We're not allowed to register devices without name */
-@@ -383,7 +397,12 @@ int pinctrl_request_gpio(unsigned gpio)
- 	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
- 	if (ret) {
- 		mutex_unlock(&pinctrl_mutex);
--		return ret;
-+		if (pinctrl_dummy_gpio) {
-+			pr_debug("pinctrl: using dummy gpio(%u)\n", gpio);
-+			return 0;
-+		} else {
-+			return ret;
-+		}
- 	}
- 
- 	/* Convert to the pin controllers number space */
-@@ -436,8 +455,15 @@ static int pinctrl_gpio_direction(unsigned gpio, bool input)
- 	int pin;
- 
- 	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
--	if (ret)
--		return ret;
-+	if (ret) {
-+		if (pinctrl_dummy_gpio) {
-+			pr_debug("pinctrl: set dummy gpio(%u) %s\n", gpio,
-+					input ? "input" : "output");
-+			return 0;
-+		} else {
-+			return ret;
-+		}
-+	}
- 
- 	/* Convert to the pin controllers number space */
- 	pin = gpio - range->base + range->pin_base;
-@@ -720,8 +746,18 @@ static struct pinctrl_state *pinctrl_lookup_state_locked(struct pinctrl *p,
- 	struct pinctrl_state *state;
- 
- 	state = find_state(p, name);
--	if (!state)
--		return ERR_PTR(-ENODEV);
-+	if (!state) {
-+		if (pinctrl_dummy_state) {
-+			/* create dummy state */
-+			dev_dbg(p->dev, "using pinctrl dummy state (%s)\n",
-+				name);
-+			state = create_state(p, name);
-+			if (IS_ERR(state))
-+				return state;
-+		} else {
-+			return ERR_PTR(-ENODEV);
-+		}
-+	}
- 
- 	return state;
- }
-diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
-index e4d1de7..849a844 100644
---- a/include/linux/pinctrl/machine.h
-+++ b/include/linux/pinctrl/machine.h
-@@ -154,7 +154,7 @@ struct pinctrl_map {
- 
- extern int pinctrl_register_mappings(struct pinctrl_map const *map,
- 				unsigned num_maps);
--
-+extern void pinctrl_provide_dummies(bool state, bool gpio);
- #else
- 
- static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
-@@ -163,5 +163,8 @@ static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
- 	return 0;
- }
- 
-+static inline void pinctrl_provide_dummies(bool state, bool gpio)
-+{
-+}
- #endif /* !CONFIG_PINMUX */
- #endif
+static const struct of_device_id tegra_ahb_match_table[] = {
+{
+	.compatible = "nvidia,tegra2",
+}, {
+	.compatible = "nvidia,tegra3",
+	.data	= AHB_HAS_SMMU,
+},
+{  }
+};
+
+or something similar, then on probe, you can capture your id and check
+if that bit is true, if it is just call tegra_ahb_enable_smmu(), you
+really don't need all this trickery with driver_for_each_device().
+
 -- 
-1.7.0.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120425/4b5a66be/attachment.sig>
