@@ -1,41 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Apr 2012 11:37:44 +0100
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation
- of clk code
-In-Reply-To: <20120425093109.GC2116@lunn.ch>
-References: <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424201802.GE3628@n2100.arm.linux.org.uk>
- <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
- <20120425052802.GF13489@lunn.ch> <20375.40225.227084.644318@ipc1.ka-ro>
- <20120425071418.GA2116@lunn.ch> <20375.46953.269684.680915@ipc1.ka-ro>
- <20120425093109.GC2116@lunn.ch>
-Message-ID: <20120425103744.GT24211@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 Apr 2012 12:43:57 +0200
+Subject: [PATCH 7.1/15] ARM: ux500: Enable the SMSC9115 on Snowball via
+ Device Tree
+In-Reply-To: <4F96793C.9080709@linaro.org>
+References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
+ <1334867804-31942-8-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZzAQNJ9ejKJJQJhEPjO9VO+fPHmPeCErg8XOj-dLc3gA@mail.gmail.com>
+ <4F96793C.9080709@linaro.org>
+Message-ID: <CACRpkdbm2XBskEOgFhkREAi5T0Vsu6PKAYoFNEjnJiA6kjgzug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 11:31:09AM +0200, Andrew Lunn wrote:
-> > If an arch has HAVE_CLK enabled it must provide valid clocks (be it
-> > dummy clocks) for all devices it supports.
-> 
-> So, lets take the theoretical exaple of a unicore32 PUV3
-> 
-> config ARCH_PUV3
->         def_bool y
->         select CPU_UCV2
->         select GENERIC_CLOCKEVENTS
->         select HAVE_CLK
->         select ARCH_REQUIRE_GPIOLIB
->         select ARCH_HAS_CPUFREQ
-> 
-> Seems like this somewhat unknown, to me at least, architecture, also
-> supports PCI. So i plug in an HP Adaptec AIC8120 SATA host bus adapter
-> into a spare PCI slot. This uses the Marvell 88SX6041, which the
-> SATA_MV driver supports.
-> 
-> Should i expect that the unicore32 PUV3 has created a dummy clk for
-> this case?
+On Tue, Apr 24, 2012 at 11:58 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Are you going to bother answering the detailed email I sent describing
-my POV on this case?
+> From: Lee Jones <lee.jones@linaro.org>
+> Date: Tue, 24 Apr 2012 10:53:18 +0100
+> Subject: [PATCH 07.1/15] ARM: ux500: Enable the SMSC9115 on Snowball via Device Tree
+>
+> Here we split the description of the external-bus at 50000000 over
+> two description files. In the more generic db8500 description file
+> we only specify the external-bus. Normally this would be used to
+> communicate with a NOR-flash device. On the Snowball however, the
+> SMSC9115 Ethernet chip occupies it. In the Snowball board specific
+> description file is where we actually specify that it is in fact the
+> Ethernet device which lives here.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Applied with some manual intervention, don't quite know
+why we don't have identical merge bases but whatever,
+check the end result.
+
+(You can do that by going to the branch ux500-devicetree
+in my linux-stericsson git.)
+
+Linus Walleij
