@@ -1,29 +1,32 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 08:24:27 +0200
-Subject: [GIT PULL] i.MX board feature patches
-In-Reply-To: <20120416075324.GP3852@pengutronix.de>
-References: <20120411083342.GM3852@pengutronix.de>
- <CAOesGMhakTpuXWnHUnJqiEbzPBeXE1digiyJ+LeoPbjhyFAoLA@mail.gmail.com>
- <20120416075324.GP3852@pengutronix.de>
-Message-ID: <20120425062427.GV20478@pengutronix.de>
+Date: Wed, 25 Apr 2012 08:25:18 +0200
+Subject: [GIT PULL] i.MX cleanup patches for next
+In-Reply-To: <20120416080053.GQ3852@pengutronix.de>
+References: <20120411084403.GN3852@pengutronix.de>
+ <CAOesGMhk9tGokNwy1kdFDB+G08OYEEq9Uf1Qu=K=T8ufick2ag@mail.gmail.com>
+ <20120416080053.GQ3852@pengutronix.de>
+Message-ID: <20120425062518.GW20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof,
 
-On Mon, Apr 16, 2012 at 09:53:24AM +0200, Sascha Hauer wrote:
-> > 
-> > Branch otherwise looks reasonable, so respin with that fixed and we'll
-> > pull it in.
+On Mon, Apr 16, 2012 at 10:00:53AM +0200, Sascha Hauer wrote:
 > 
-> Here we go. Hopefully I am aware of this in the future :-/
+> Ok, won't do this in future. I just thought it might be a good idea,
+> because otherwise I end up with the same tag names in the next pull
+> request.
+> 
+> > 
+> > Branch contents otherwise looks OK, so respin and send a fresh pull
+> > request and we'll merge it in.
+> 
+> Here it is:
 
 Still something wrong?
 
 Sascha
 
-> 
-> Sascha
 > 
 > The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
 > 
@@ -31,29 +34,26 @@ Sascha
 > 
 > are available in the git repository at:
 > 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-features-board-20120411-2
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-cleanup
 > 
-> for you to fetch changes up to 435ca24116bc5365a10fa0be1bf1c1e4c5680157:
+> for you to fetch changes up to 33076883bc45bfdd5fa5c9bff7f012a460719aba:
 > 
->   ARM i.MX: Visstrim_M10: Add board version detection. (2012-04-16 09:49:31 +0200)
-> 
-> ----------------------------------------------------------------
-> imx-features-board-20120411
+>   ARM: i.MX: efikamx: match machine descriptions with legacy (2012-04-16 09:54:50 +0200)
 > 
 > ----------------------------------------------------------------
-> Alex Gershgorin (1):
->       ARM: i.MX: i.MX35-PDK: Add regulator support
+> ARM: i.MX: misc board cleanups
 > 
-> Javier Martin (1):
->       ARM i.MX: Visstrim_M10: Add board version detection.
+> ----------------------------------------------------------------
+> Hector Oron (1):
+>       ARM: i.MX: efikamx: match machine descriptions with legacy
 > 
 > Uwe Kleine-K?nig (1):
->       ARM: imx_v4_v5_defconfig: enable adc and touch driver of mc13783
+>       ARM: imx/mx21ads: remove unneeded cast
 > 
->  arch/arm/configs/imx_v4_v5_defconfig        |    4 +-
->  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   55 ++++++++
->  arch/arm/mach-imx/mach-mx35_3ds.c           |  193 +++++++++++++++++++++++++++
->  3 files changed, 251 insertions(+), 1 deletion(-)
+>  arch/arm/mach-imx/mach-mx21ads.c      |    3 +--
+>  arch/arm/mach-imx/mach-mx51_efikamx.c |    3 +--
+>  arch/arm/mach-imx/mach-mx51_efikasb.c |    2 +-
+>  3 files changed, 3 insertions(+), 5 deletions(-)
 > 
 > -- 
 > Pengutronix e.K.                           |                             |
