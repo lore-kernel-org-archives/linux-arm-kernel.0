@@ -1,70 +1,70 @@
-From: neilb@suse.de (NeilBrown)
-Date: Wed, 25 Apr 2012 19:39:16 +1000
-Subject: [PATCH 2/3] IRQ: allow check_wakeup_irqs to notice
- level-triggered interrupts.
-In-Reply-To: <alpine.LFD.2.02.1204251018530.2542@ionos>
-References: <20120425025637.7832.14013.stgit@notabene.brown>
- <20120425030524.7832.85239.stgit@notabene.brown>
- <alpine.LFD.2.02.1204251018530.2542@ionos>
-Message-ID: <20120425193916.0db1b4b1@notabene.brown>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 25 Apr 2012 17:49:36 +0800
+Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
+ for platforms to use
+In-Reply-To: <4F96F847.508@wwwdotorg.org>
+References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+ <4F96F847.508@wwwdotorg.org>
+Message-ID: <20120425094934.GA17631@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Apr 2012 10:50:15 +0200 (CEST) Thomas Gleixner
-<tglx@linutronix.de> wrote:
-
-> On Wed, 25 Apr 2012, NeilBrown wrote:
+On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
+> On 04/24/2012 03:33 AM, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Add a interface pinctrl_provide_dummies for platform to indicate
+> > whether it needs use pinctrl dummy state and dummy gpio.
 > 
-> > Level triggered interrupts do not cause IRQS_PENDING to be set, so
-> > check_wakeup_irqs ignores them.
-> > They don't need to set IRQS_PENDING as the level stays high which
-> > shows that they must be pending.  However if such an interrupt fired
-> > during late suspend, it will have been masked so the fact that it
-> > is still asserted will not cause the suspend to abort.
-> > 
-> > So if any wakeup interrupt is masked, unmask it when checking wakeup
-> > irqs.  If the interrupt is asserted, suspend will abort.
-> > 
-> > Signed-off-by: NeilBrown <neilb@suse.de>
-> > ---
-> > 
-> >  kernel/irq/pm.c |    6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
-> > index 15e53b1..0d26206 100644
-> > --- a/kernel/irq/pm.c
-> > +++ b/kernel/irq/pm.c
-> > @@ -106,6 +106,12 @@ int check_wakeup_irqs(void)
-> >  		if (irqd_is_wakeup_set(&desc->irq_data)) {
-> >  			if (desc->istate & IRQS_PENDING)
-> >  				return -EBUSY;
-> > +			if (irqd_irq_masked(&desc->irq_data))
-> > +				/* Probably a level interrupt
-> > +				 * which fired recently and was
-> > +				 * masked
-> > +				 */
-> > +				unmask_irq(desc);
+> > @@ -382,7 +396,12 @@ int pinctrl_request_gpio(unsigned gpio)
+> >  	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
+> >  	if (ret) {
+> >  		mutex_unlock(&pinctrl_mutex);
+> > -		return -EINVAL;
+> > +		if (pinctrl_dummy_gpio) {
+> > +			pr_debug("pinctrl: using dummy gpio(%u)\n", gpio);
+> > +			return 0;
+> > +		} else {
+> > +			return -EINVAL;
+> > +		}
+> >  	}
 > 
-> Oh no. We don't unmask unconditionally. What about an interrupt which
-> is disabled, has no handler ..... ? That needs more thought.
+> The only thing that should be calling pinctrl_request_gpio() is a GPIO
+> driver. It should only be calling it for the GPIOs it manages. I'd
+> expect that if a platform's pinctrl driver was not yet written to
+> support the GPIO functionality, then the GPIO driver would not be
+> calling this function.
+> 
+Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
+driver may be shared between several platforms, with pinctrl support
+or not.
 
-If there is no handler, then irqd_is_wakeup_set() should fail should it not?
+> As such, I'm not sure that this part of the change is necessary.
+> 
+> If it is, then surely all the other pinctrl GPIO APIs need a similar change?
+> 
+Yes, i missed it, will fix.
+Thanks for reminder.
 
-For disabled: would it be OK to check desc->depth?
-Something like:
-     if (desc->depth == 1 && (desc->state & IRQS_SUSPENDED) &&
-         irqd_irq_masked(&desc->irq_data))
-              unmask_irq(desc);
+> Finally, how does this interact with deferred probe: How does the code
+> know whether the pinctrl driver and/or GPIO range is simply not yet
+> registered, or whether it never will be? That'd be the difference
+> between returning -EPROBE_DEFER or 0 in the if block above.
+> 
+Yes, it is an issue.
+I don't have any good idea to distinguish them.
+It seems regulator has the same issue.
+What regulator does is if dummy regulator is used, use dummy gpio instead
+regardless of defer probe.
+I guess we may use the same way as regulator for pinctrl.
+User can decide if using dummy gpio or defer probe since based on their
+driver support.
 
-??
+The rule may be if your pinctrl driver supports gpio, then you should not use
+dummy gpio. Then the dummy gpio support will not affect the defer probe.
 
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120425/55c249a6/attachment.sig>
+> 
+> I'm fine with the other parts of this patch.
+
+Regards
+Dong Aisheng
