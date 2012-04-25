@@ -1,34 +1,52 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 24 Apr 2012 21:40:41 -0700
-Subject: common clock framework
-In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D1A749F10CC@SC-VEXCH2.marvell.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A749F0DB6@SC-VEXCH2.marvell.com>
- <CAJOA=zPAy3AV6Dg9sE+fro1ZCmbxeCH8aeR5-YqffZphRkUQMQ@mail.gmail.com>
- <AAD1C6EB06EE3649B35B7E026785068D1A749F10CC@SC-VEXCH2.marvell.com>
-Message-ID: <CAJOA=zPfnd97cfkcsA3vpBH5do_LKQzDTazT9FU6mgUKa25RrQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Apr 2012 07:28:02 +0200
+Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
+ clk code
+In-Reply-To: <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
+References: <cover.1335266056.git.viresh.kumar@st.com>
+ <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
+ <20120424120019.GE24089@lunn.ch>
+ <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
+ <20120424201802.GE3628@n2100.arm.linux.org.uk>
+ <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
+Message-ID: <20120425052802.GF13489@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 6:46 PM, Chao Xie <cxie4@marvell.com> wrote:
-> Hi, Mike
-> I have a question about the code layout.
-> Why put the clock implementation for every SOC chip into drivers/clk/XXX/? Why not just put it into arch/arm/XXX?
+> This is what i was thinking too and thats why floated this version of patch.
+> But as Andrew said, clk API support is enabled for them, but still they
+> don't have a clk for sata. To get this working, there are two solutions:
+> - Create dummy clk for sata for that platform, so clk_get doesn't fail.
+> - Check for error before every call to clk APIs after clk_get().
+> 
+> Andrew favored the second one. Which means, even on platforms
+> with clk API defined and clk enable required, if there are some issues
+> with lookup table, and clk_get() fails, system may hang when registers
+> are accessed. For this i favored first one.
 
-Hi Chao,
+I'm not too sure how you are going to achieve 1)
 
-Looping in the rest of LAKML since this these discussions are better
-on the list.
+config SATA_MV
+        tristate "Marvell SATA support"
+        help
+          This option enables support for the Marvell Serial ATA family.
+          Currently supports 88SX[56]0[48][01] PCI(-X) chips,
+          as well as the newer [67]042 PCI-X/PCIe and SOC devices.
 
-The platforms converting over to common clk may put their clock code
-in drivers/clk/ or leave it in arch/arm/.  For OMAP we're leaving the
-code in arch/arm/mach-omap2/ for the time being due to the disruptive
-nature of moving it into drivers/, though we might try to move it into
-drivers some day.
+So this driver can be used with anything which has a PCI(-X) or PCIe
+bus, or Orion SoC and a few PowerPC SoCs.
 
-There is no hard and fast rule forcing you to migrate your code into
-drivers/clk/.  However doing so does expose your code to more eyeballs
-and increases the likelihood that we can find common solutions to
-problems shared by multiple SoCs/devices.
+The SoCs are not too bad, we know which ones they are and we can add
+dummy entries to their device tree. However, how do you want to handle
+the PCI devices? Create the dummy entry somewhere in the middle of the
+PCI core?
 
-Regards,
-Mike
+Thought not.
+
+A comment to:
+> - Check for error before every call to clk APIs after clk_get().
+
+There are only two calls. clk_prepare_enable() in the probe and
+clk_disable_unprepare() in the remove function.
+
+	Andrew
