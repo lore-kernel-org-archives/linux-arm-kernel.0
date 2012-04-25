@@ -1,128 +1,193 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 17:27:50 +0200
-Subject: [PATCH v2] Convert i.MX architecture to generic clock framework
-Message-ID: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 25 Apr 2012 17:28:14 +0200
+Subject: [PATCH 24/33] ARM: imx: add common clock support for pfd
+In-Reply-To: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1335367703-19929-25-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Here is another round of patches to convert i.MX to the generic clock
-framework. It is based on Mikes recently published for-next branch plus:
-
-[PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
-[PATCH V3 2/8] clk: add a fixed factor clock
-clkdev: Implement managed clk_get()
-
-The branch is tested on all SoCs I have available, but regressions are more
-than likely, so please give it a test.
-
-I didn't move the clock support to drivers/clk now as the clock control
-module is shared with several other SoC specific stuff and I need a global
-spinlock. Accessing this somewhere from drivers/ seems odd. Depending on
-how things work out we can move it to drivers/ later.
-
-The remaining cleanups like removing the old clock support posted in the
-last series are not included here, I will respin them once it's clear that
-a series goes in
-
-For your convenience a complete series including dependencies (so not
-meant for upstream) can be pulled here:
-
-git://git.pengutronix.de/git/imx/linux-2.6.git work/v3.4-rc4-imx-clk
-
-Thanks
- Sascha
-
-----------------------------------------------------------------
-Sascha Hauer (29):
-      dmaengine i.MX SDMA: do not depend on grouped clocks
-      spi i.MX: do not depend on grouped clocks
-      video imxfb: do not depend on grouped clocks
-      net fec: do not depend on grouped clocks
-      mmc mxcmmc: do not depend on grouped clocks
-      mmc sdhc i.MX: do not depend on grouped clocks
-      serial i.MX: do not depend on grouped clocks
-      mtd mxc_nand: prepare/unprepare clock
-      USB ehci mxc: prepare/unprepare clock
-      USB ehci mxc: sanitize clock handling
-      w1 i.MX: prepare/unprepare clock
-      watchdog imx2: prepare clk before enabling it
-      media mx3 camera: prepare clk before enabling it
-      dmaengine i.MX ipu: clk_prepare/unprepare clock
-      rtc: imx dryice: Add missing clk_prepare
-      ARM i.MX5: prepare gpc_dvfs_clk
-      ARM i.MX timer: request correct clock
-      ARM i.MX3: Make ccm base address a variable
-      ARM i.MX: prepare for common clock framework
-      ARM i.MX: Add common clock support for pllv1
-      ARM i.MX: Add common clock support for pllv2
-      ARM i.MX: Add common clock support for 2bit gate
-      ARM i.MX25: implement clocks using common clock framework
-      ARM i.MX1: implement clocks using common clock framework
-      ARM i.MX21: implement clocks using common clock framework
-      ARM i.MX27: implement clocks using common clock framework
-      ARM i.MX31: implement clocks using common clock framework
-      ARM i.MX5: implement clocks using common clock framework
-      ARM i.MX35: implement clocks using common clock framework
-
-Shawn Guo (4):
-      ARM: imx: add common clock support for pllv3
-      ARM: imx: add common clock support for pfd
-      ARM: imx: add common clock support for clk busy
-      ARM: i.MX6: implement clocks using common clock framework
-
- arch/arm/mach-imx/Kconfig              |    8 +
- arch/arm/mach-imx/Makefile             |   19 +-
- arch/arm/mach-imx/clk-busy.c           |  173 ++++++++++++
- arch/arm/mach-imx/clk-gate2.c          |  115 ++++++++
- arch/arm/mach-imx/clk-imx1.c           |  115 ++++++++
- arch/arm/mach-imx/clk-imx21.c          |  186 +++++++++++++
- arch/arm/mach-imx/clk-imx25.c          |  248 +++++++++++++++++
- arch/arm/mach-imx/clk-imx27.c          |  290 ++++++++++++++++++++
- arch/arm/mach-imx/clk-imx31.c          |  182 +++++++++++++
- arch/arm/mach-imx/clk-imx35.c          |  278 +++++++++++++++++++
- arch/arm/mach-imx/clk-imx51-imx53.c    |  466 ++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk-imx6q.c          |  439 ++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk-pfd.c            |  138 ++++++++++
- arch/arm/mach-imx/clk-pllv1.c          |   57 ++++
- arch/arm/mach-imx/clk-pllv2.c          |  239 ++++++++++++++++
- arch/arm/mach-imx/clk-pllv3.c          |  409 ++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h                |   83 ++++++
- arch/arm/mach-imx/crmregs-imx3.h       |   79 +++---
- arch/arm/mach-imx/mm-imx3.c            |    6 +
- arch/arm/mach-imx/mm-imx5.c            |    1 +
- arch/arm/mach-imx/pm-imx3.c            |    4 +-
- arch/arm/plat-mxc/clock.c              |   11 +
- arch/arm/plat-mxc/include/mach/clock.h |    4 +
- arch/arm/plat-mxc/time.c               |   14 +
- drivers/dma/imx-sdma.c                 |   40 ++-
- drivers/dma/ipu/ipu_idmac.c            |    6 +-
- drivers/media/video/mx3_camera.c       |    4 +-
- drivers/mmc/host/mxcmmc.c              |   39 ++-
- drivers/mmc/host/sdhci-esdhc-imx.c     |   42 ++-
- drivers/mtd/nand/mxc_nand.c            |    6 +-
- drivers/net/ethernet/freescale/fec.c   |   35 ++-
- drivers/rtc/rtc-imxdi.c                |    6 +-
- drivers/spi/spi-imx.c                  |   30 +-
- drivers/tty/serial/imx.c               |   38 ++-
- drivers/usb/host/ehci-mxc.c            |   62 ++---
- drivers/video/imxfb.c                  |   50 +++-
- drivers/w1/masters/mxc_w1.c            |    4 +-
- drivers/watchdog/imx2_wdt.c            |    2 +-
- 38 files changed, 3739 insertions(+), 189 deletions(-)
- create mode 100644 arch/arm/mach-imx/clk-busy.c
- create mode 100644 arch/arm/mach-imx/clk-gate2.c
- create mode 100644 arch/arm/mach-imx/clk-imx1.c
- create mode 100644 arch/arm/mach-imx/clk-imx21.c
- create mode 100644 arch/arm/mach-imx/clk-imx25.c
- create mode 100644 arch/arm/mach-imx/clk-imx27.c
- create mode 100644 arch/arm/mach-imx/clk-imx31.c
- create mode 100644 arch/arm/mach-imx/clk-imx35.c
- create mode 100644 arch/arm/mach-imx/clk-imx51-imx53.c
- create mode 100644 arch/arm/mach-imx/clk-imx6q.c
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/Makefile  |    3 +-
+ arch/arm/mach-imx/clk-pfd.c |  138 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk.h     |    3 +
+ 3 files changed, 143 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/mach-imx/clk-pfd.c
- create mode 100644 arch/arm/mach-imx/clk-pllv1.c
- create mode 100644 arch/arm/mach-imx/clk-pllv2.c
- create mode 100644 arch/arm/mach-imx/clk-pllv3.c
- create mode 100644 arch/arm/mach-imx/clk.h
+
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 1b3f2ae..4d6be8d 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -11,7 +11,8 @@ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o pm-i
+ 
+ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clock-mx51-mx53.o ehci-imx5.o pm-imx5.o cpu_op-mx51.o
+ 
+-obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o
++obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
++			    clk-pfd.o
+ 
+ # Support for CMOS sensor interface
+ obj-$(CONFIG_MX1_VIDEO) += mx1-camera-fiq.o mx1-camera-fiq-ksym.o
+diff --git a/arch/arm/mach-imx/clk-pfd.c b/arch/arm/mach-imx/clk-pfd.c
+new file mode 100644
+index 0000000..d7bb6f4
+--- /dev/null
++++ b/arch/arm/mach-imx/clk-pfd.c
+@@ -0,0 +1,138 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include "clk.h"
++
++/**
++ * struct clk_pfd - IMX PFD clock
++ * @clk_hw:	clock source
++ * @reg:	PFD register address
++ * @idx:	the index of PFD encoded in the register
++ *
++ * PFD clock found on i.MX6 series.  Each register for PFD has 4 clk_pfd
++ * data encoded, and member idx is used to specify the one.  And each
++ * register has SET, CLR and TOG registers at offset 0x4 0x8 and 0xc.
++ */
++struct clk_pfd {
++	struct clk_hw	hw;
++	void __iomem	*reg;
++	u8		idx;
++};
++
++#define to_clk_pfd(_hw) container_of(_hw, struct clk_pfd, hw)
++
++#define SET	0x4
++#define CLR	0x8
++#define OTG	0xc
++
++static int clk_pfd_enable(struct clk_hw *hw)
++{
++	struct clk_pfd *pfd = to_clk_pfd(hw);
++
++	writel_relaxed(1 << ((pfd->idx + 1) * 8 - 1), pfd->reg + CLR);
++
++	return 0;
++}
++
++static void clk_pfd_disable(struct clk_hw *hw)
++{
++	struct clk_pfd *pfd = to_clk_pfd(hw);
++
++	writel_relaxed(1 << ((pfd->idx + 1) * 8 - 1), pfd->reg + SET);
++}
++
++static unsigned long clk_pfd_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_pfd *pfd = to_clk_pfd(hw);
++	u64 tmp = parent_rate;
++	u8 frac = (readl_relaxed(pfd->reg) >> (pfd->idx * 8)) & 0x3f;
++
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
++}
++
++static long clk_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
++	u64 tmp = parent_rate;
++	u8 frac;
++
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
++	if (frac < 12)
++		frac = 12;
++	else if (frac > 35)
++		frac = 35;
++	tmp = parent_rate;
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
++}
++
++static int clk_pfd_set_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long parent_rate)
++{
++	struct clk_pfd *pfd = to_clk_pfd(hw);
++	u64 tmp = parent_rate;
++	u8 frac;
++
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
++	if (frac < 12)
++		frac = 12;
++	else if (frac > 35)
++		frac = 35;
++
++	writel_relaxed(0x3f << (pfd->idx * 8), pfd->reg + CLR);
++	writel_relaxed(frac << (pfd->idx * 8), pfd->reg + SET);
++
++	return 0;
++}
++
++static const struct clk_ops clk_pfd_ops = {
++	.enable		= clk_pfd_enable,
++	.disable	= clk_pfd_disable,
++	.recalc_rate	= clk_pfd_recalc_rate,
++	.round_rate	= clk_pfd_round_rate,
++	.set_rate	= clk_pfd_set_rate,
++};
++
++struct clk *imx_clk_pfd(const char *name, const char *parent_name,
++			void __iomem *reg, u8 idx)
++{
++	struct clk_pfd *pfd;
++	struct clk *clk;
++
++	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);
++	if (!pfd)
++		return NULL;
++	pfd->reg = reg;
++	pfd->idx = idx;
++
++	clk = clk_register(NULL, name, &clk_pfd_ops, &pfd->hw,
++			   &parent_name, 1, 0);
++	if (!clk)
++		kfree(pfd);
++
++	return clk;
++}
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index 5f6e435..5297099 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -36,6 +36,9 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+ 			shift, 0, &imx_ccm_lock);
+ }
+ 
++struct clk *imx_clk_pfd(const char *name, const char *parent_name,
++		void __iomem *reg, u8 idx);
++
+ static inline struct clk *imx_clk_fixed(const char *name, int rate)
+ {
+ 	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+-- 
+1.7.10
