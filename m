@@ -1,102 +1,60 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 25 Apr 2012 10:16:06 -0500
-Subject: [PATCH 15/19] ARM: OMAP4430: PM: workaround for DDR corruption
- on second CS
-In-Reply-To: <1335338762.2149.103.camel@sokoban>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-16-git-send-email-t-kristo@ti.com>
- <4F96EF56.5020604@ti.com> <1335338762.2149.103.camel@sokoban>
-Message-ID: <4F981536.2030609@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Apr 2012 09:22:11 -0600
+Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
+ for platforms to use
+In-Reply-To: <20120425114955.GB17631@shlinux2.ap.freescale.net>
+References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+ <4F96F847.508@wwwdotorg.org>
+ <20120425094934.GA17631@shlinux2.ap.freescale.net>
+ <CACRpkdYjVYsM-Qo7NWKx5Mr3rAmp12G_wAtkmNkkqNyX=ZeKUw@mail.gmail.com>
+ <20120425114955.GB17631@shlinux2.ap.freescale.net>
+Message-ID: <4F9816A3.5090907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
-
-On 04/25/2012 02:26 AM, Tero Kristo wrote:
-> On Tue, 2012-04-24 at 13:22 -0500, Jon Hunter wrote:
->> Hi Tero,
+On 04/25/2012 05:49 AM, Dong Aisheng wrote:
+> On Wed, Apr 25, 2012 at 07:19:43PM +0800, Linus Walleij wrote:
+>> On Wed, Apr 25, 2012 at 11:49 AM, Dong Aisheng
+>> <aisheng.dong@freescale.com> wrote:
+>>> On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
 >>
->> On 04/20/2012 04:33 AM, Tero Kristo wrote:
->>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>
->>> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
->>> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
->>> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
->>> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
->>> is not set properly, we apply the required workaround allowing
->>> the restore sequence to work properly.
->>>
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>> ---
->>>  .../include/mach/ctrl_module_wkup_44xx.h           |    2 +
->>>  arch/arm/mach-omap2/pm44xx.c                       |   24 ++++++++++++++++++++
->>>  2 files changed, 26 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>> index a0af9ba..b763a79 100644
->>> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>> @@ -28,6 +28,8 @@
->>>  #define OMAP4_CTRL_MODULE_WKUP_IP_REVISION		0x0000
->>>  #define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO		0x0004
->>>  #define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG		0x0010
->>> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG	0x0114
->>> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG	0x011c
->>>  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0	0x0460
->>>  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1	0x0464
->>>  #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2	0x0468
->>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->>> index 0472921..d4d18d9 100644
->>> --- a/arch/arm/mach-omap2/pm44xx.c
->>> +++ b/arch/arm/mach-omap2/pm44xx.c
->>> @@ -17,6 +17,9 @@
->>>  #include <linux/err.h>
->>>  #include <linux/slab.h>
->>>  #include <asm/system_misc.h>
->>> +#include <linux/io.h>
->>> +
->>> +#include <mach/ctrl_module_wkup_44xx.h>
->>>  
->>>  #include "common.h"
->>>  #include "clockdomain.h"
->>> @@ -215,6 +218,27 @@ static int __init omap4_pm_init(void)
->>>  
->>>  	pr_err("Power Management for TI OMAP4.\n");
->>>  
->>> +	/*
->>> +	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
->>> +	 * Mode Transition When CS1 Is Used On EMIF":
->>> +	 * Overwrite EMIF1/EMIF2
->>> +	 * SECURE_EMIF1_SDRAM_CONFIG2_REG
->>> +	 * SECURE_EMIF2_SDRAM_CONFIG2_REG
->>> +	 */
->>> +	if (cpu_is_omap443x()) {
->>> +		void __iomem *secure_ctrl_mod;
->>> +
->>> +		secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
->>> +		BUG_ON(!secure_ctrl_mod);
->>> +
->>> +		__raw_writel(0x10, secure_ctrl_mod +
->>> +			     OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
->>> +		__raw_writel(0x10, secure_ctrl_mod +
->>> +			     OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
+>>>> The only thing that should be calling pinctrl_request_gpio() is a GPIO
+>>>> driver. It should only be calling it for the GPIOs it manages. I'd
+>>>> expect that if a platform's pinctrl driver was not yet written to
+>>>> support the GPIO functionality, then the GPIO driver would not be
+>>>> calling this function.
+>>>>
+>>> Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
+>>> driver may be shared between several platforms, with pinctrl support
+>>> or not.
 >>
->> According to the erratum description the above registers are used to
->> restore the EMIFx_SDRAM_CONFIG2 registers. So although the value 0x10,
->> maybe the value being used for EMIFx_SDRAM_CONFIG2 registers, shouldn't
->> we read the EMIFx_SDRAM_CONFIG2 registers and store them in the above
->> registers?
+>> I think it's mostly safe to assume that either:
+>>
+> I just saw your reply after i sent out the revised patch...
 > 
-> This might be a good idea, however, this patch might be tagged as TEMP
-> until the EMIF driver is in place, this fix should rather be located
-> there. I'll take a look at this if I can change the implementation a
-> bit.
+>> - pinctrl calls from GPIO drivers gets stubbed out totally due to
+>>   CONFIG_PINCTRL not being selected
+>>
+> Yes, we already have that in include/linux/pinctrl/consumer.h
+> 
+>> or:
+>>
+>> - You need to pass a token through platform data to the
+>>   GPIO driver telling it whether it needs to request pins for
+>>   it's GPIOs or not. Just a bool should work fine?
+>>
+> Yes, this is an alternative way.
+> I'm using a similar way, but pass the data to pinctrl core
+> rather than gpio driver. Then it is be handled together with
+> dummy state in platform code.
+> 
+> Do you think if the current way i used is ok?
+> Or i need to change to your proposed way?
 
-By the way, I did dump the EMIF1_SDRAM_CONFIG2 register on a omap4403
-and it is configured to 0x10. So I think that reading this register and
-saving would be safe.
+I think Linus was suggesting a flag in platform data for each GPIO
+driver rather than a global flag for the entire pinctrl subsystem.
 
-Cheers
-Jon
+That way, if one of the pinctrl drivers did fully support all the GPIO
+functionality and the other didn't, you'd be able to have just one of
+the GPIO drivers not call into pinctrl (or ignore certain errors) yet
+the other GPIO driver could still fully interact with pinctrl as desired.
