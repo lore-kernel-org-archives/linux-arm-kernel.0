@@ -1,46 +1,92 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 25 Apr 2012 10:35:53 +0200
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120425071418.GA2116@lunn.ch>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424201802.GE3628@n2100.arm.linux.org.uk>
- <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
- <20120425052802.GF13489@lunn.ch>
- <20375.40225.227084.644318@ipc1.ka-ro>
- <20120425071418.GA2116@lunn.ch>
-Message-ID: <20375.46953.269684.680915@ipc1.ka-ro>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 25 Apr 2012 10:40:49 +0200
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
+Message-ID: <4F97B891.1020601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Lunn writes:
-> > AFAICT the PCI archs do not have HAVE_CLK enabled. Thus they will have
-> > a dummy clk API in place that provides the driver with a non-error
-> > clk_get() return value.
->  
-> Hi Lothar
-> 
-> Please could you explain this a little bit more. What exactly is a PCI
-> arch?
-> 
-> Most of the Orion SoC have PCIe busses. Does this make them an PCI
-> arch? Because they also have HAVE_CLK. There are more SoCs with PCI.
-> 
-If an arch has HAVE_CLK enabled it must provide valid clocks (be it
-dummy clocks) for all devices it supports.
+Hi Vaibhav,
 
+On 4/25/2012 7:48 AM, Hiremath, Vaibhav wrote:
+> On Wed, Apr 25, 2012 at 06:33:26, Paul Walmsley wrote:
+>> Hello Vaibhav, Afzal, Vaibhav,
+>>
+>> On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
+>>
+>>> AM33XX clock implementation is different than any existing OMAP
+>>> family of devices. Although DPLL module is similar to OMAP4
+>>> device, but the usage is very much different than OMAP4.
+>>> AM33XX has different peripheral set and each module gets
+>>> integrated to the clock framework differently than OMAP
+>>> family of devices.
+>>>
+>>> This patch adds full Clock tree data for AM33XX family
+>>> of devices and also integrates it into existing OMAP framework.
+>>
+>> What do you think about the possibility of removing all of the leaf clocks
+>> that have AM33XX_MODULEMODE_SWCTRL as their .enable_bit, assuming there
+>> are no .fixed_div or .clksel* fields associated with the clocks?
+>>
+>> In theory, I don't think they are needed.  The drivers should be using
+>> runtime PM, and that should enable and disable the module via the hwmod
+>> code, rather than the clock code.
+>>
+>> Of course some clocks would still be needed for the main_clk fields for
+>> the hwmods, but the hwmods should be able to use the leaf clock's parent
+>> clocks for that.
+>>
+>> That would save quite a few lines of data.  And I think Beno?t is planning
+>> to do that for OMAP4+.
+>>
+>> What do you think?
+>>
+>
+> Paul,
+>
+> Yes, theoretically it is possible to do it. But it will also break some of
+> the existing things, like,
+>
+> 1. DebugFS clock interface
+>
+> I believe, with this change, you will not have all the leaf nodes as part of clock tree, so they will not be populated in /debug/clock/
+>
+> 2. Enable and disable of the module is one part, but what about, changing
+>     the rate of the clock (followparent_recalc)?
+>     With the proper and complete clock tree, you can traverse the clock and
+>     driver code doesn't need to know about parent.
+>     Driver can simply call clk_set_rate() on leaf clock, and clock tree will
+>     handle it.
+>
+> If at all we take this path, we have to build the clk node runtime
+> (on-the-fly), AND/OR add new pm_runtime_set_rate() api.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Not at all. You just have to get the fck of that hwmod and use the clock 
+API.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> Are you available on IRC chat anytime? We can discuss on this and align
+> quickly.
+> I am available on linux-omap irc channel (with the name = "hvaibhav")
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+That will not change anything, the point is that MODULEMODE_SWCTRL is 
+uses for module control, not for clock directly, and that's why it is 
+handled by the hwmod.
+
+That will just replace the main_clk from the hwmod with the parent of 
+the current modulemode nodes. Only the enable/disable part will be 
+handled, if that node used to have a div, then the parent will handle that.
+
+Today this module mode clock node is just a duplication of the hwmod 
+node. By removing it, you will reduce the size of the data and have a 
+much mode accurate representation of the reality.
+
+Using the clock tree to handle these nodes was a hack we had to do 
+because the hwmod fmwk was not ready when OMAP4 was introduced and 
+because most drivers were not using pm_runtime.
+
+Regards,
+Benoit
