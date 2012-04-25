@@ -1,42 +1,42 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 17:28:14 +0200
-Subject: [PATCH 24/33] ARM: imx: add common clock support for pfd
+Date: Wed, 25 Apr 2012 17:28:15 +0200
+Subject: [PATCH 25/33] ARM: imx: add common clock support for clk busy
 In-Reply-To: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
 References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1335367703-19929-25-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1335367703-19929-26-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shawn Guo <shawn.guo@linaro.org>
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/Makefile  |    3 +-
- arch/arm/mach-imx/clk-pfd.c |  138 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h     |    3 +
- 3 files changed, 143 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-pfd.c
+ arch/arm/mach-imx/Makefile   |    2 +-
+ arch/arm/mach-imx/clk-busy.c |  173 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk.h      |    8 ++
+ 3 files changed, 182 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/clk-busy.c
 
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 1b3f2ae..4d6be8d 100644
+index 4d6be8d..ae0a779 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -11,7 +11,8 @@ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o pm-i
- 
+@@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o pm-i
  obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clock-mx51-mx53.o ehci-imx5.o pm-imx5.o cpu_op-mx51.o
  
--obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o
-+obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
-+			    clk-pfd.o
+ obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+-			    clk-pfd.o
++			    clk-pfd.o clk-busy.o
  
  # Support for CMOS sensor interface
  obj-$(CONFIG_MX1_VIDEO) += mx1-camera-fiq.o mx1-camera-fiq-ksym.o
-diff --git a/arch/arm/mach-imx/clk-pfd.c b/arch/arm/mach-imx/clk-pfd.c
+diff --git a/arch/arm/mach-imx/clk-busy.c b/arch/arm/mach-imx/clk-busy.c
 new file mode 100644
-index 0000000..d7bb6f4
+index 0000000..5abe1f3
 --- /dev/null
-+++ b/arch/arm/mach-imx/clk-pfd.c
-@@ -0,0 +1,138 @@
++++ b/arch/arm/mach-imx/clk-busy.c
+@@ -0,0 +1,173 @@
 +/*
 + * Copyright 2012 Freescale Semiconductor, Inc.
 + * Copyright 2012 Linaro Ltd.
@@ -53,138 +53,178 @@ index 0000000..d7bb6f4
 +#include <linux/clk-provider.h>
 +#include <linux/io.h>
 +#include <linux/slab.h>
++#include <linux/jiffies.h>
++#include <linux/err.h>
 +#include "clk.h"
 +
-+/**
-+ * struct clk_pfd - IMX PFD clock
-+ * @clk_hw:	clock source
-+ * @reg:	PFD register address
-+ * @idx:	the index of PFD encoded in the register
-+ *
-+ * PFD clock found on i.MX6 series.  Each register for PFD has 4 clk_pfd
-+ * data encoded, and member idx is used to specify the one.  And each
-+ * register has SET, CLR and TOG registers at offset 0x4 0x8 and 0xc.
-+ */
-+struct clk_pfd {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	u8		idx;
-+};
-+
-+#define to_clk_pfd(_hw) container_of(_hw, struct clk_pfd, hw)
-+
-+#define SET	0x4
-+#define CLR	0x8
-+#define OTG	0xc
-+
-+static int clk_pfd_enable(struct clk_hw *hw)
++static int clk_busy_wait(void __iomem *reg, u8 shift)
 +{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
++	unsigned long timeout = jiffies + msecs_to_jiffies(10);
 +
-+	writel_relaxed(1 << ((pfd->idx + 1) * 8 - 1), pfd->reg + CLR);
++	while (readl_relaxed(reg) & (1 << shift))
++		if (time_after(jiffies, timeout))
++			return -ETIMEDOUT;
 +
 +	return 0;
 +}
 +
-+static void clk_pfd_disable(struct clk_hw *hw)
-+{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
++struct clk_busy_divider {
++	struct clk_divider div;
++	const struct clk_ops *div_ops;
++	void __iomem *reg;
++	u8 shift;
++};
 +
-+	writel_relaxed(1 << ((pfd->idx + 1) * 8 - 1), pfd->reg + SET);
++static inline struct clk_busy_divider *to_clk_busy_divider(struct clk_hw *hw)
++{
++	struct clk_divider *div = container_of(hw, struct clk_divider, hw);
++
++	return container_of(div, struct clk_busy_divider, div);
 +}
 +
-+static unsigned long clk_pfd_recalc_rate(struct clk_hw *hw,
-+					 unsigned long parent_rate)
++static unsigned long clk_busy_divider_recalc_rate(struct clk_hw *hw,
++						  unsigned long parent_rate)
 +{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
-+	u64 tmp = parent_rate;
-+	u8 frac = (readl_relaxed(pfd->reg) >> (pfd->idx * 8)) & 0x3f;
++	struct clk_busy_divider *busy = to_clk_busy_divider(hw);
 +
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
++	return busy->div_ops->recalc_rate(&busy->div.hw, parent_rate);
 +}
 +
-+static long clk_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long *prate)
++static long clk_busy_divider_round_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long *prate)
 +{
-+	unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
-+	u64 tmp = parent_rate;
-+	u8 frac;
++	struct clk_busy_divider *busy = to_clk_busy_divider(hw);
 +
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
-+	tmp = parent_rate;
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
++	return busy->div_ops->round_rate(&busy->div.hw, rate, prate);
 +}
 +
-+static int clk_pfd_set_rate(struct clk_hw *hw, unsigned long rate,
++static int clk_busy_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 +		unsigned long parent_rate)
 +{
-+	struct clk_pfd *pfd = to_clk_pfd(hw);
-+	u64 tmp = parent_rate;
-+	u8 frac;
++	struct clk_busy_divider *busy = to_clk_busy_divider(hw);
++	int ret;
 +
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
++	ret = busy->div_ops->set_rate(&busy->div.hw, rate, parent_rate);
++	if (!ret)
++		ret = clk_busy_wait(busy->reg, busy->shift);
 +
-+	writel_relaxed(0x3f << (pfd->idx * 8), pfd->reg + CLR);
-+	writel_relaxed(frac << (pfd->idx * 8), pfd->reg + SET);
-+
-+	return 0;
++	return ret;
 +}
 +
-+static const struct clk_ops clk_pfd_ops = {
-+	.enable		= clk_pfd_enable,
-+	.disable	= clk_pfd_disable,
-+	.recalc_rate	= clk_pfd_recalc_rate,
-+	.round_rate	= clk_pfd_round_rate,
-+	.set_rate	= clk_pfd_set_rate,
++static struct clk_ops clk_busy_divider_ops = {
++	.recalc_rate = clk_busy_divider_recalc_rate,
++	.round_rate = clk_busy_divider_round_rate,
++	.set_rate = clk_busy_divider_set_rate,
 +};
 +
-+struct clk *imx_clk_pfd(const char *name, const char *parent_name,
-+			void __iomem *reg, u8 idx)
++struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
++				 void __iomem *reg, u8 shift, u8 width,
++				 void __iomem *busy_reg, u8 busy_shift)
 +{
-+	struct clk_pfd *pfd;
++	struct clk_busy_divider *busy;
 +	struct clk *clk;
 +
-+	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);
-+	if (!pfd)
++	busy = kzalloc(sizeof(*busy), GFP_KERNEL);
++	if (!busy)
 +		return NULL;
-+	pfd->reg = reg;
-+	pfd->idx = idx;
 +
-+	clk = clk_register(NULL, name, &clk_pfd_ops, &pfd->hw,
-+			   &parent_name, 1, 0);
++	busy->reg = busy_reg;
++	busy->shift = busy_shift;
++
++	busy->div.reg = reg;
++	busy->div.shift = shift;
++	busy->div.width = width;
++	busy->div.lock = &imx_ccm_lock;
++	busy->div_ops = &clk_divider_ops;
++
++	clk = clk_register(NULL, name, &clk_busy_divider_ops, &busy->div.hw,
++			   &parent_name, 1, CLK_SET_RATE_PARENT);
 +	if (!clk)
-+		kfree(pfd);
++		kfree(busy);
++
++	return clk;
++}
++
++struct clk_busy_mux {
++	struct clk_mux mux;
++	const struct clk_ops *mux_ops;
++	void __iomem *reg;
++	u8 shift;
++};
++
++static inline struct clk_busy_mux *to_clk_busy_mux(struct clk_hw *hw)
++{
++	struct clk_mux *mux = container_of(hw, struct clk_mux, hw);
++
++	return container_of(mux, struct clk_busy_mux, mux);
++}
++
++static u8 clk_busy_mux_get_parent(struct clk_hw *hw)
++{
++	struct clk_busy_mux *busy = to_clk_busy_mux(hw);
++
++	return busy->mux_ops->get_parent(&busy->mux.hw);
++}
++
++static int clk_busy_mux_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_busy_mux *busy = to_clk_busy_mux(hw);
++	int ret;
++
++	ret = busy->mux_ops->set_parent(&busy->mux.hw, index);
++	if (!ret)
++		ret = clk_busy_wait(busy->reg, busy->shift);
++
++	return ret;
++}
++
++struct clk_ops clk_busy_mux_ops = {
++	.get_parent = clk_busy_mux_get_parent,
++	.set_parent = clk_busy_mux_set_parent,
++};
++
++struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
++			     u8 width, void __iomem *busy_reg, u8 busy_shift,
++			     const char **parent_names, int num_parents)
++{
++	struct clk_busy_mux *busy;
++	struct clk *clk;
++
++	busy = kzalloc(sizeof(*busy), GFP_KERNEL);
++	if (!busy)
++		return ERR_PTR(-ENOMEM);
++
++	busy->reg = busy_reg;
++	busy->shift = busy_shift;
++
++	busy->mux.reg = reg;
++	busy->mux.shift = shift;
++	busy->mux.width = width;
++	busy->mux.lock = &imx_ccm_lock;
++	busy->mux_ops = &clk_mux_ops;
++
++	clk = clk_register(NULL, name, &clk_busy_mux_ops, &busy->mux.hw,
++			   parent_names, num_parents, 0);
++	if (IS_ERR(clk))
++		kfree(busy);
 +
 +	return clk;
 +}
 diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 5f6e435..5297099 100644
+index 5297099..1bf64fe 100644
 --- a/arch/arm/mach-imx/clk.h
 +++ b/arch/arm/mach-imx/clk.h
-@@ -36,6 +36,9 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 			shift, 0, &imx_ccm_lock);
- }
+@@ -39,6 +39,14 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+ struct clk *imx_clk_pfd(const char *name, const char *parent_name,
+ 		void __iomem *reg, u8 idx);
  
-+struct clk *imx_clk_pfd(const char *name, const char *parent_name,
-+		void __iomem *reg, u8 idx);
++struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
++				 void __iomem *reg, u8 shift, u8 width,
++				 void __iomem *busy_reg, u8 busy_shift);
++
++struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
++			     u8 width, void __iomem *busy_reg, u8 busy_shift,
++			     const char **parent_names, int num_parents);
 +
  static inline struct clk *imx_clk_fixed(const char *name, int rate)
  {
