@@ -1,48 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Apr 2012 11:21:22 -0700
-Subject: Tegra for-next branch status check
-In-Reply-To: <4F95C7C9.30205@wwwdotorg.org>
-References: <4F95C7C9.30205@wwwdotorg.org>
-Message-ID: <CAOesGMgLDwYJBt7sn2Vg-95dZjyUDbyEhgtVeOGGJ2Kbb4Moag@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 25 Apr 2012 11:35:42 -0700
+Subject: [PATCH v5 1/3] USB: Add driver for NXP ISP1301 USB transceiver
+In-Reply-To: <4F97B395.9020501@antcom.de>
+References: <1335002264-22225-1-git-send-email-stigge@antcom.de>
+ <20120424232044.GA2657@kroah.com> <4F97B395.9020501@antcom.de>
+Message-ID: <20120425183542.GA27617@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 25, 2012 at 10:19:33AM +0200, Roland Stigge wrote:
+> Hi Greg,
+> 
+> thanks for reviewing! I integrated all of your suggestions into the
+> patch update, except ...
+> 
+> On 04/25/2012 01:20 AM, Greg KH wrote:
+> > On Sat, Apr 21, 2012 at 11:57:42AM +0200, Roland Stigge wrote:
+> >> This very-lowlevel driver registers the NXP ISP1301 chip via the I2C subsystem.
+> >> The chip is the USB transceiver shared by ohci-nxp, lpc32xx_udc (gadget) and
+> >> isp1301_omap.
+> >>
+> >> Following patches let the respective USB host and gadget drivers use this
+> >> driver, instead of duplicating ISP1301 handling.
+> >>
+> >> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >>
+> >>  include/linux/usb/isp1301.h                       |   84 ++++++++++++++++++++++
+> > 
+> > Why this file?  You have a lot of register stuff in here that should be
+> > in the .c file, right?  Only put what other files need in this .h file,
+> > which shouldn't be much at all from what I can tell.
+> 
+> Right. At first sight, it doesn't look very elegant that the driver
+> exposes the ISP1301 register set to the drivers using it. I discussed
+> this design previously with Arnd on the mailing list and we agreed on
+> the following: ISP1301 is a very low level driver that primarily
+> separates out the I2C client registration of the ISP1301 chip (including
+> instantiation via DT), used by other drivers, but it's still just a kind
+> of helper driver for some OHCI and USB device drivers. Consider the
+> ISP1301 driver as a register set extension of ohci-nxp, lpc32xx-udc and
+> isp1301_omap, which in turn know best what to do with the low level
+> functionality (individual ISP1301 registers and timing, see the
+> different initialization strategies in those drivers). Those drivers
+> previously internally duplicated ISP1301 register definitions which is
+> solved by the new isp1301 driver.
+> 
+> Initially, I actually had register get/set functions defined in
+> isp1301.h but it turned out that those trivial wrappers around standard
+> i2c_smbus_*() better had been removed.
+> 
+> So what do you think?
 
-On Mon, Apr 23, 2012 at 2:21 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> Arnd, Olof,
->
-> Could I please ask you to take a quick look at Tegra's git repo:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
->
-> ... and double-check the construction of all the for-3.5 branches. I've
-> tended to mostly put stuff in topic branches rather than separating
-> things into the perhaps more typical soc/drivers/dt branches. Is this
-> scheme going to work out OK?
->
-> Note a couple dependencies in there:
->
-> for-3.5/gpio-pinmux-dependency is a copy of pinctrl's "base" tag.
->
-> for-3.5/gpio-pinmux depends on for-3.5/gpio-pinmux-dependency
->
-> for-3.5/tegra30-audio and for-3.5/usb-ulpi both depend on
-> for-3.5/gpio-pinmux.
->
-> Thanks for any feedback.
+Ok, that makes more sense, thanks for explaining it.  Perhaps you should
+put that in the patch changelog entry itself, so others don't also have
+that same question?
 
-Looks good. Keeping the changes per topic like that works well,
-especially in cases where the cross-dependencies don't get too heavy
-(and they are not at this time). Even though we will aggregate them to
-fewer branches in arm-soc, getting them sent up as shorter topic
-branches is great.
+thanks,
 
-If you wanted to separate things out a bit more between soc and board
-changes, you could split off some of the top commits from the topic
-branches to a secondary board branch. But given that most of tegra now
-is just two DT boards, there's no real need to keep those few commits
-separated out.
-
-
--Olof
+greg k-h
