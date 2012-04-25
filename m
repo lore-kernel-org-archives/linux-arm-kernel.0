@@ -1,43 +1,23 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 24 Apr 2012 19:03:26 -0600 (MDT)
-Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-In-Reply-To: <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 24 Apr 2012 18:32:20 -0700
+Subject: announcing the clk-next branch
+Message-ID: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vaibhav, Afzal, Vaibhav,
+Hi all,
 
-On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
+The clock patches that I have signed-off on and picked from the list
+are all rebased on top of 3.4-rc4.  They can be found here:
 
-> AM33XX clock implementation is different than any existing OMAP
-> family of devices. Although DPLL module is similar to OMAP4
-> device, but the usage is very much different than OMAP4.
-> AM33XX has different peripheral set and each module gets
-> integrated to the clock framework differently than OMAP
-> family of devices.
-> 
-> This patch adds full Clock tree data for AM33XX family
-> of devices and also integrates it into existing OMAP framework.
+git://git.linaro.org/people/mturquette/linux.git clk-next
 
-What do you think about the possibility of removing all of the leaf clocks
-that have AM33XX_MODULEMODE_SWCTRL as their .enable_bit, assuming there 
-are no .fixed_div or .clksel* fields associated with the clocks?
+If the branch is missing anything that I have ACK'd then please let me know.
 
-In theory, I don't think they are needed.  The drivers should be using 
-runtime PM, and that should enable and disable the module via the hwmod 
-code, rather than the clock code.
+The obvious thing missing are the recent platform ports.  Those folks
+probably want to test on top of this branch first so it seemed
+premature for me to pull them.  After the recent platform ports go in
+then I'll ask for this to head into linux-next.
 
-Of course some clocks would still be needed for the main_clk fields for 
-the hwmods, but the hwmods should be able to use the leaf clock's parent 
-clocks for that.
-
-That would save quite a few lines of data.  And I think Beno?t is planning 
-to do that for OMAP4+.
-
-What do you think?
-
-
-- Paul
+Regards,
+Mike
