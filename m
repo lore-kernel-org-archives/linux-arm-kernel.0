@@ -1,160 +1,51 @@
-From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
-Date: Wed, 25 Apr 2012 10:00:03 +0200
-Subject: [RESEND PATCH 2/2] OMAP3: igep0020: Add support for Micron NAND
- Flash storage memory
-In-Reply-To: <1333564586-3259-2-git-send-email-javier@dowhile0.org>
-References: <1333564586-3259-1-git-send-email-javier@dowhile0.org>
- <1333564586-3259-2-git-send-email-javier@dowhile0.org>
-Message-ID: <CAFqH_52ukhZ93idQoHaA_OwnouffeCkMYfNDhn1mdV8A8FBaBA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Apr 2012 10:05:37 +0200
+Subject: [PATCH 3/8] clk: mxs: add clock support for imx28
+In-Reply-To: <20120425080244.GA1503@S2100-06.ap.freescale.net>
+References: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
+ <1335023840-1394-4-git-send-email-shawn.guo@linaro.org>
+ <20120425071747.GX20478@pengutronix.de>
+ <20120425080244.GA1503@S2100-06.ap.freescale.net>
+Message-ID: <20120425080537.GB3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/4/4 Javier Martinez Canillas <javier@dowhile0.org>:
-> IGEP-based boards can have two different flash memories, a OneNAND or
-> a NAND device. The boot configuration pins (sys_boot) are used to
-> specify which memory is available.
->
-> Also, this patch removes unnecesary code for registering the OneNAND.
->
-> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-> ---
-> ?arch/arm/mach-omap2/board-igep0020.c | ? 75 ++++++++++++++--------------------
-> ?1 files changed, 31 insertions(+), 44 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-> index 930c0d3..4af615a 100644
-> --- a/arch/arm/mach-omap2/board-igep0020.c
-> +++ b/arch/arm/mach-omap2/board-igep0020.c
-> @@ -24,6 +24,8 @@
-> ?#include <linux/i2c/twl.h>
-> ?#include <linux/mmc/host.h>
->
-> +#include <linux/mtd/nand.h>
-> +
-> ?#include <asm/mach-types.h>
-> ?#include <asm/mach/arch.h>
->
-> @@ -39,6 +41,8 @@
-> ?#include "hsmmc.h"
-> ?#include "sdram-numonyx-m65kxxxxam.h"
-> ?#include "common-board-devices.h"
-> +#include "board-flash.h"
-> +#include "control.h"
->
-> ?#define IGEP2_SMSC911X_CS ? ? ? 5
-> ?#define IGEP2_SMSC911X_GPIO ? ? 176
-> @@ -60,6 +64,10 @@
-> ?#define IGEP3_GPIO_LED1_RED ? ?16
-> ?#define IGEP3_GPIO_USBH_NRESET ?183
->
-> +#define IGEP_SYSBOOT_MASK ? ? ? ? ? 0x1f
-> +#define IGEP_SYSBOOT_NAND ? ? ? ? ? 0x0f
-> +#define IGEP_SYSBOOT_ONENAND ? ? ? ?0x10
-> +
-> ?/*
-> ?* IGEP2 Hardware Revision Table
-> ?*
-> @@ -110,8 +118,10 @@ static void __init igep2_get_revision(void)
-> ? ? ? ?gpio_free(IGEP2_GPIO_LED1_RED);
-> ?}
->
-> -#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
-> - ? ? ? defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
-> +#if defined(CONFIG_MTD_ONENAND_OMAP2) || ? ? ? ? ? ? ? \
-> + ? ? ? defined(CONFIG_MTD_ONENAND_OMAP2_MODULE) || ? ? \
-> + ? ? ? defined(CONFIG_MTD_NAND_OMAP2) || ? ? ? ? ? ? ? \
-> + ? ? ? defined(CONFIG_MTD_NAND_OMAP2_MODULE)
->
-> ?#define ONENAND_MAP ? ? ? ? ? ? 0x20000000
->
-> @@ -123,7 +133,7 @@ static void __init igep2_get_revision(void)
-> ?* So MTD regards it as 4KiB page size and 256KiB block size 64*(2*2048)
-> ?*/
->
-> -static struct mtd_partition igep_onenand_partitions[] = {
-> +static struct mtd_partition igep_flash_partitions[] = {
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "X-Loader",
-> ? ? ? ? ? ? ? ?.offset ? ? ? ? = 0,
-> @@ -151,50 +161,27 @@ static struct mtd_partition igep_onenand_partitions[] = {
-> ? ? ? ?},
-> ?};
->
-> -static struct omap_onenand_platform_data igep_onenand_data = {
-> - ? ? ? .parts = igep_onenand_partitions,
-> - ? ? ? .nr_parts = ARRAY_SIZE(igep_onenand_partitions),
-> - ? ? ? .dma_channel ? ?= -1, ? /* disable DMA in OMAP OneNAND driver */
-> -};
-> -
-> -static struct platform_device igep_onenand_device = {
-> - ? ? ? .name ? ? ? ? ? = "omap2-onenand",
-> - ? ? ? .id ? ? ? ? ? ? = -1,
-> - ? ? ? .dev = {
-> - ? ? ? ? ? ? ? .platform_data = &igep_onenand_data,
-> - ? ? ? },
-> -};
-> +static inline u32 igep_get_sysboot_value(void)
-> +{
-> + ? ? ? return omap_ctrl_readl(OMAP343X_CONTROL_STATUS) & IGEP_SYSBOOT_MASK;
-> +}
->
-> ?static void __init igep_flash_init(void)
-> ?{
-> - ? ? ? u8 cs = 0;
-> - ? ? ? u8 onenandcs = GPMC_CS_NUM + 1;
-> -
-> - ? ? ? for (cs = 0; cs < GPMC_CS_NUM; cs++) {
-> - ? ? ? ? ? ? ? u32 ret;
-> - ? ? ? ? ? ? ? ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
-> -
-> - ? ? ? ? ? ? ? /* Check if NAND/oneNAND is configured */
-> - ? ? ? ? ? ? ? if ((ret & 0xC00) == 0x800)
-> - ? ? ? ? ? ? ? ? ? ? ? /* NAND found */
-> - ? ? ? ? ? ? ? ? ? ? ? pr_err("IGEP: Unsupported NAND found\n");
-> - ? ? ? ? ? ? ? else {
-> - ? ? ? ? ? ? ? ? ? ? ? ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
-> - ? ? ? ? ? ? ? ? ? ? ? if ((ret & 0x3F) == (ONENAND_MAP >> 24))
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* ONENAND found */
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? onenandcs = cs;
-> - ? ? ? ? ? ? ? }
-> - ? ? ? }
-> -
-> - ? ? ? if (onenandcs > GPMC_CS_NUM) {
-> - ? ? ? ? ? ? ? pr_err("IGEP: Unable to find configuration in GPMC\n");
-> - ? ? ? ? ? ? ? return;
-> - ? ? ? }
-> -
-> - ? ? ? igep_onenand_data.cs = onenandcs;
-> -
-> - ? ? ? if (platform_device_register(&igep_onenand_device) < 0)
-> - ? ? ? ? ? ? ? pr_err("IGEP: Unable to register OneNAND device\n");
-> + ? ? ? u32 mux;
-> + ? ? ? mux = igep_get_sysboot_value();
-> +
-> + ? ? ? if (mux == IGEP_SYSBOOT_NAND) {
-> + ? ? ? ? ? ? ? pr_info("IGEP: initializing NAND memory device\n");
-> + ? ? ? ? ? ? ? board_nand_init(igep_flash_partitions,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(igep_flash_partitions),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, NAND_BUSWIDTH_16);
-> + ? ? ? } else if (mux == IGEP_SYSBOOT_ONENAND) {
-> + ? ? ? ? ? ? ? pr_info("IGEP: initializing OneNAND memory device\n");
-> + ? ? ? ? ? ? ? board_onenand_init(igep_flash_partitions,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(igep_flash_partitions), 0);
-> + ? ? ? } else
-> + ? ? ? ? ? ? ? pr_err("IGEP: Flash: unsupported sysboot sequence found\n");
-> ?}
->
-> ?#else
-> --
-> 1.7.7.6
->
+On Wed, Apr 25, 2012 at 04:02:45PM +0800, Shawn Guo wrote:
+> On Wed, Apr 25, 2012 at 09:17:47AM +0200, Sascha Hauer wrote:
+> > Hi Shawn,
+> > 
+> > I realized that you have no register lock which means that you rely on
+> > the locking of the clock framework. This may not be sufficient, see the
+> > following example:
+> > 
+> > > +	mxs_clk_div("ssp0_div", "ssp0_sel", SSP0, 0, 9, 29);
+> > > +	clk = mxs_clk_gate("ssp0", "ssp0_div", SSP0, 31);
+> > 
+> > You have both a divider and a gate in the same register here. The gate
+> > implements clk_enable which is protected by a spinlock in the clock
+> > framework. The divider implements clk_set_rate which is protected by a
+> > mutex in the clock framework. This means that during a read-modify-write
+> > operation for a rate change the clk_enable call can come in between.
+> 
+> We have SET and CLR register on mxs clocks, so do not really have to
+> go through read-modify-write sequence.
 
-Seems good to me.
+You have the SET and CLR registers but you don't use them. You could use
+SET/CLR in the gate, but even then:
 
-Tony, as this is a fix ,may be included ?
+- clk_set_rate starts and reads the divider register
+- clk_enable comes in and writes to SET/CLR for the same register
+- clk_set_rate continues and writes to the divider register not knowing
+  that it has been modified in between.
 
-Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
-Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+You could try and clear all divider bits in the divider using the CLR
+register and then set the wanted bits using the SET register, but this
+would mean writing reserved values to the divider in between.
 
-Cheers,
-    Enric
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
