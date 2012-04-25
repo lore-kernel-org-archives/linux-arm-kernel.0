@@ -1,51 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 10:05:37 +0200
-Subject: [PATCH 3/8] clk: mxs: add clock support for imx28
-In-Reply-To: <20120425080244.GA1503@S2100-06.ap.freescale.net>
-References: <1335023840-1394-1-git-send-email-shawn.guo@linaro.org>
- <1335023840-1394-4-git-send-email-shawn.guo@linaro.org>
- <20120425071747.GX20478@pengutronix.de>
- <20120425080244.GA1503@S2100-06.ap.freescale.net>
-Message-ID: <20120425080537.GB3852@pengutronix.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 25 Apr 2012 10:19:33 +0200
+Subject: [PATCH v5 1/3] USB: Add driver for NXP ISP1301 USB transceiver
+In-Reply-To: <20120424232044.GA2657@kroah.com>
+References: <1335002264-22225-1-git-send-email-stigge@antcom.de>
+ <20120424232044.GA2657@kroah.com>
+Message-ID: <4F97B395.9020501@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 04:02:45PM +0800, Shawn Guo wrote:
-> On Wed, Apr 25, 2012 at 09:17:47AM +0200, Sascha Hauer wrote:
-> > Hi Shawn,
-> > 
-> > I realized that you have no register lock which means that you rely on
-> > the locking of the clock framework. This may not be sufficient, see the
-> > following example:
-> > 
-> > > +	mxs_clk_div("ssp0_div", "ssp0_sel", SSP0, 0, 9, 29);
-> > > +	clk = mxs_clk_gate("ssp0", "ssp0_div", SSP0, 31);
-> > 
-> > You have both a divider and a gate in the same register here. The gate
-> > implements clk_enable which is protected by a spinlock in the clock
-> > framework. The divider implements clk_set_rate which is protected by a
-> > mutex in the clock framework. This means that during a read-modify-write
-> > operation for a rate change the clk_enable call can come in between.
+Hi Greg,
+
+thanks for reviewing! I integrated all of your suggestions into the
+patch update, except ...
+
+On 04/25/2012 01:20 AM, Greg KH wrote:
+> On Sat, Apr 21, 2012 at 11:57:42AM +0200, Roland Stigge wrote:
+>> This very-lowlevel driver registers the NXP ISP1301 chip via the I2C subsystem.
+>> The chip is the USB transceiver shared by ohci-nxp, lpc32xx_udc (gadget) and
+>> isp1301_omap.
+>>
+>> Following patches let the respective USB host and gadget drivers use this
+>> driver, instead of duplicating ISP1301 handling.
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>>  include/linux/usb/isp1301.h                       |   84 ++++++++++++++++++++++
 > 
-> We have SET and CLR register on mxs clocks, so do not really have to
-> go through read-modify-write sequence.
+> Why this file?  You have a lot of register stuff in here that should be
+> in the .c file, right?  Only put what other files need in this .h file,
+> which shouldn't be much at all from what I can tell.
 
-You have the SET and CLR registers but you don't use them. You could use
-SET/CLR in the gate, but even then:
+Right. At first sight, it doesn't look very elegant that the driver
+exposes the ISP1301 register set to the drivers using it. I discussed
+this design previously with Arnd on the mailing list and we agreed on
+the following: ISP1301 is a very low level driver that primarily
+separates out the I2C client registration of the ISP1301 chip (including
+instantiation via DT), used by other drivers, but it's still just a kind
+of helper driver for some OHCI and USB device drivers. Consider the
+ISP1301 driver as a register set extension of ohci-nxp, lpc32xx-udc and
+isp1301_omap, which in turn know best what to do with the low level
+functionality (individual ISP1301 registers and timing, see the
+different initialization strategies in those drivers). Those drivers
+previously internally duplicated ISP1301 register definitions which is
+solved by the new isp1301 driver.
 
-- clk_set_rate starts and reads the divider register
-- clk_enable comes in and writes to SET/CLR for the same register
-- clk_set_rate continues and writes to the divider register not knowing
-  that it has been modified in between.
+Initially, I actually had register get/set functions defined in
+isp1301.h but it turned out that those trivial wrappers around standard
+i2c_smbus_*() better had been removed.
 
-You could try and clear all divider bits in the divider using the CLR
-register and then set the wanted bits using the SET register, but this
-would mean writing reserved values to the divider in between.
+So what do you think?
 
-Sascha
+Thanks in advance,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Roland
