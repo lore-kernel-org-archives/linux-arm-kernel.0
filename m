@@ -1,52 +1,146 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 25 Apr 2012 15:19:59 +0800
-Subject: [PATCH v2 0/3] add gpmi-nand dt support for mx6q and mx28
-In-Reply-To: <4F97A351.1090505@de.bosch.com>
-References: <1335323184-11233-1-git-send-email-b32955@freescale.com>
- <4F979C91.9020607@de.bosch.com> <4F979EF2.8050904@freescale.com>
- <4F97A351.1090505@de.bosch.com>
-Message-ID: <4F97A59F.1050602@freescale.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Wed, 25 Apr 2012 12:47:17 +0530
+Subject: [PATCH 1/2 v4] ARM: OMAP2+: omap_hwmod: Add api to enable/disable
+ module level wakeup events
+In-Reply-To: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
+References: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1335338237-4095-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?04?25? 15:10, Dirk Behme ??:
-> On 25.04.2012 08:51, Huang Shijie wrote:
->> ? 2012?04?25? 14:41, Dirk Behme ??:
->>> Hi Huang Shijie,
->>>
->>> On 25.04.2012 05:06, Huang Shijie wrote:
->>>> The mx6q-arm2 and imx28evk have already support the device tree now.
->>>> So i decide to add the gpmi-nand dt support to them.
->>>>
->>>> The mx23 does not support the device tree now. I will add the gpmi 
->>>> dt support
->>>> when it is ready.
->>>>
->>>> Test this patch set on both MX6Q(arm2) and mx28(evk).
->>>>
->>>> v1 --> v2
->>>> [1] merge the gpmi/bch device node into one node.
->>>> [2] add partitions support.
->>>> [3] misc
->>>>
->>>> Huang Shijie (3):
->>>> mtd: gpmi: add device tree support for mx6q and mx28
->>>> ARM: mx28: add gpmi-nand dt support
->>>> ARM: mx6q: add gpmi-nand dt support
->>> For which kernel are these 3 patches? I tried to apply them on top 
->>> of 3.4-rc4 and got a lot of rejects.
->>>
->> They are based on 3.4-rc4. but I also applied some mxs-dma patches.
->>
->> Which one cause the rejects?
->
-> Could you kindly try to apply "mtd: gpmi: add device tree support for 
-> mx6q and mx28" on a clean 3.4-rc4?
->
-I tried just now, it works fine.
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-Huang Shijie
-> Many thanks
->
-> Dirk
->
+On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
+PM_WKEN1_CORE/PM_WKEN_PER regs.
+
+Add api to control the module level wakeup mechanism from info provided from
+hwmod data.
+
+omap_hwmod_enable/disable_wakeup is used from serial.c which should
+configure PM_WKEN register to enable or disable the module level wakeup.
+
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c   |   23 +++++++++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |   16 ++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |    9 +++++++++
+ 3 files changed, 48 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 2c27fdb..25f306b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -382,6 +382,27 @@ static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
+ }
+ 
+ /**
++ * _enable_module_level_wakeup - enable/disable module level wakeup on hwmod.
++ * @oh: struct omap_hwmod *
++ * @set_wake: bool value indicating to set (true) or clear (false) module level
++ *		wakeup enable
++ *
++ * Set or clear the  module level wakeup capability the
++ * hwmod @oh. This function configures th PM_WKEN reg bits if they
++ * are available from hwmod. No return value
++ */
++static void _enable_module_level_wakeup(struct omap_hwmod *oh, bool set_wake)
++{
++	if (oh->prcm.omap2.module_offs && oh->prcm.omap2.prcm_reg_id &&
++			oh->prcm.omap2.idlest_idle_bit)
++		omap2_prm_enable_prcm_module_wakeup(
++				oh->prcm.omap2.module_offs,
++				oh->prcm.omap2.prcm_reg_id,
++				oh->prcm.omap2.idlest_idle_bit,
++				set_wake);
++}
++
++/**
+  * _set_idle_ioring_wakeup - enable/disable IO pad wakeup on hwmod idle for mux
+  * @oh: struct omap_hwmod *
+  * @set_wake: bool value indicating to set (true) or clear (false) wakeup enable
+@@ -2471,6 +2492,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ 		_write_sysconfig(v, oh);
+ 	}
+ 
++	_enable_module_level_wakeup(oh, true);
+ 	_set_idle_ioring_wakeup(oh, true);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+@@ -2504,6 +2526,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ 		_write_sysconfig(v, oh);
+ 	}
+ 
++	_enable_module_level_wakeup(oh, false);
+ 	_set_idle_ioring_wakeup(oh, false);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index 9ce7654..85a753e 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -28,6 +28,10 @@
+ #include "prm-regbits-24xx.h"
+ #include "prm-regbits-34xx.h"
+ 
++static const u8 pm_wken_offs[] = {
++	PM_WKEN1, OMAP24XX_PM_WKEN2
++};
++
+ static const struct omap_prcm_irq omap3_prcm_irqs[] = {
+ 	OMAP_PRCM_IRQ("wkup",	0,	0),
+ 	OMAP_PRCM_IRQ("io",	9,	1),
+@@ -91,6 +95,18 @@ u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+ 	return omap2_prm_rmw_mod_reg_bits(bits, 0x0, module, idx);
+ }
+ 
++void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod, u8 prm_reg_id,
++			u8 prm_reg_shift, bool set_wake)
++{
++	if (prm_reg_id && (prm_reg_id <= ARRAY_SIZE(pm_wken_offs))) {
++		if (set_wake)
++			omap2_prm_set_mod_reg_bits(1 << prm_reg_shift,
++				prcm_mod, pm_wken_offs[prm_reg_id - 1]);
++		else
++			omap2_prm_clear_mod_reg_bits(1 << prm_reg_shift,
++				prcm_mod, pm_wken_offs[prm_reg_id - 1]);
++	}
++}
+ 
+ /**
+  * omap2_prm_is_hardreset_asserted - read the HW reset line state of
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index 70ac2a1..49a185a 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -289,6 +289,13 @@ static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift,
+ 		"not suppose to be used on omap4\n");
+ 	return 0;
+ }
++static inline void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod,
++		u8 prm_reg_id, u8 prm_reg_shift, bool set_wake)
++{
++	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
++		"not suppose to be used on omap4\n");
++	return 0;
++}
+ #else
+ /* Power/reset management domain register get/set */
+ extern u32 omap2_prm_read_mod_reg(s16 module, u16 idx);
+@@ -297,6 +304,8 @@ extern u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module, s16 idx);
+ extern u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx);
+ extern u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx);
+ extern u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask);
++extern void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod, u8 prm_reg_id,
++			u8 prm_reg_shift, bool set_wake);
+ 
+ /* These omap2_ PRM functions apply to both OMAP2 and 3 */
+ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+-- 
+1.7.9
