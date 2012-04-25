@@ -1,136 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Apr 2012 16:44:54 +0200
-Subject: [PATCH] ARM: exynos: Adapt to cpuidle core time keeping and irq
- enable
-In-Reply-To: <1335355912-26063-1-git-send-email-amit.kachhap@linaro.org>
-References: <1335355912-26063-1-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <4F980DE6.1020504@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Apr 2012 09:01:57 -0600
+Subject: Tag on pinctrl
+In-Reply-To: <20120425104559.GA16752@sirena.org.uk>
+References: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
+ <4F96D84E.7080204@wwwdotorg.org> <20120425104559.GA16752@sirena.org.uk>
+Message-ID: <4F9811E5.4040105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2012 02:11 PM, Amit Daniel Kachhap wrote:
-> This patch enables core cpuidle timekeeping and irq enabling and
-> remove those redundant parts from the exynos cpuidle drivers
->
-> CC: Daniel Lezcano<daniel.lezcano@linaro.org>
-> CC: Robert Lee<rob.lee@linaro.org>
-> Signed-off-by: Amit Daniel<amit.kachhap@linaro.org>
-> ---
->   arch/arm/mach-exynos/cpuidle.c |   53 ++++-----------------------------------
->   1 files changed, 6 insertions(+), 47 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index 33ab4e7..26dac28 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -20,6 +20,7 @@
->   #include<asm/smp_scu.h>
->   #include<asm/suspend.h>
->   #include<asm/unified.h>
-> +#include<asm/cpuidle.h>
->   #include<mach/regs-pmu.h>
->   #include<mach/pmu.h>
->
-> @@ -34,22 +35,12 @@
->
->   #define S5P_CHECK_AFTR		0xFCBA0D10
->
-> -static int exynos4_enter_idle(struct cpuidle_device *dev,
-> -			struct cpuidle_driver *drv,
-> -			      int index);
->   static int exynos4_enter_lowpower(struct cpuidle_device *dev,
->   				struct cpuidle_driver *drv,
->   				int index);
->
->   static struct cpuidle_state exynos4_cpuidle_set[] __initdata = {
-> -	[0] = {
-> -		.enter			= exynos4_enter_idle,
-> -		.exit_latency		= 1,
-> -		.target_residency	= 100000,
-> -		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> -		.name			= "C0",
-> -		.desc			= "ARM clock gating(WFI)",
-> -	},
-> +	[0] = ARM_CPUIDLE_WFI_STATE,
->   	[1] = {
->   		.enter			= exynos4_enter_lowpower,
->   		.exit_latency		= 300,
-> @@ -63,8 +54,9 @@ static struct cpuidle_state exynos4_cpuidle_set[] __initdata = {
->   static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
->
->   static struct cpuidle_driver exynos4_idle_driver = {
-> -	.name		= "exynos4_idle",
-> -	.owner		= THIS_MODULE,
-> +	.name			= "exynos4_idle",
-> +	.owner			= THIS_MODULE,
-> +	.en_core_tk_irqen	= 1,
->   };
->
->   /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
-> @@ -103,13 +95,8 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
->   				struct cpuidle_driver *drv,
->   				int index)
->   {
-> -	struct timeval before, after;
-> -	int idle_time;
->   	unsigned long tmp;
->
-> -	local_irq_disable();
-> -	do_gettimeofday(&before);
-> -
->   	exynos4_set_wakeupmask();
->
->   	/* Set value of power down register for aftr mode */
-> @@ -150,34 +137,6 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
->   	/* Clear wakeup state register */
->   	__raw_writel(0x0, S5P_WAKEUP_STAT);
->
-> -	do_gettimeofday(&after);
-> -
-> -	local_irq_enable();
-> -	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> -		    (after.tv_usec - before.tv_usec);
-> -
-> -	dev->last_residency = idle_time;
-> -	return index;
-> -}
-> -
-> -static int exynos4_enter_idle(struct cpuidle_device *dev,
-> -				struct cpuidle_driver *drv,
-> -				int index)
-> -{
-> -	struct timeval before, after;
-> -	int idle_time;
-> -
-> -	local_irq_disable();
-> -	do_gettimeofday(&before);
-> -
-> -	cpu_do_idle();
-> -
-> -	do_gettimeofday(&after);
-> -	local_irq_enable();
-> -	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> -		    (after.tv_usec - before.tv_usec);
-> -
-> -	dev->last_residency = idle_time;
->   	return index;
->   }
->
-> @@ -192,7 +151,7 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
->   		new_index = drv->safe_state_index;
->
->   	if (new_index == 0)
-> -		return exynos4_enter_idle(dev, drv, new_index);
-> +		return arm_cpuidle_simple_enter(dev, drv, new_index);
->   	else
->   		return exynos4_enter_core0_aftr(dev, drv, new_index);
->   }
+On 04/25/2012 04:46 AM, Mark Brown wrote:
+> On Tue, Apr 24, 2012 at 10:43:58AM -0600, Stephen Warren wrote:
+> 
+>> Yes, I have pulled that tag into the Tegra tree as
+>> for-3.5/gpio-pinmux-dependency, and have a Tegra-specific
+>> for-3.5/gpio-pinmux branch that depends on it. Two other Tegra branches
+>> in turn (for-3.5/tegra30-audio, for-3.5/usb-ulpi) depend on
+>> for-3.5/gpio-pinmux.
+> 
+>> Linus, I think this will get into the ARM SoC tree simply by my saying
+>> in my for-3.5/gpio-pinmux pull request that the branch depends on your
+>> tag; I don't /think/ you need to explicitly send a pull request there,
+>> right?
+> 
+> If the gpio-pinmux branch is based on Linus' branch (which it really
+> should be if it's a dependency...) then git will do the right thing
+> here.  If it's not then you need to explicitly get things pulled in but
+> there will also be bisection issues.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+The Tegra branch is indeed based directly on the pinctrl branch.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+However, I was talking more about how Arnd/Olof are managing arm-soc
+than raw git operation; I believe they like to keep an explicit separate
+branch for each dependency in order to track which commits to wait for
+before sending pull requests for the branches they have that are based
+on them, so the dependent commits come in from their original subsystem
+first.
