@@ -1,26 +1,20 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Apr 2012 11:09:31 -0700
-Subject: [GIT PULL] msm fixes for 3.4rc
-In-Reply-To: <20120424175457.GA5013@codeaurora.org>
-References: <20120424175457.GA5013@codeaurora.org>
-Message-ID: <CAOesGMjHigkcY-bEjO7PKc0T-C_6HVMiRydgJjzV+agVLQKU1Q@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Apr 2012 15:15:31 -0300
+Subject: [PATCH 1/4] ARM: imx27-dt: Fix build due to removal of
+ irq_domain_add_simple()
+In-Reply-To: <20120413144413.GR3852@pengutronix.de>
+References: <1334193132-18944-1-git-send-email-festevam@gmail.com>
+ <20120413144413.GR3852@pengutronix.de>
+Message-ID: <CAOMZO5CrpTKbqv28GOy_SikV5w9b4M5O8XmTNVGhX59DDoW5HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 10:54 AM, David Brown <davidb@codeaurora.org> wrote:
-> This fixes a boot problem with the MSM8660 target on device tree
-> caused by the conversion of the ARM GIC driver to proper IRQ domain
-> support.
->
-> The following changes since commit af33eadc73e4a5d35a966c1c7ffe28a8424c9d96:
->
-> ?ARM: msm: Fix section mismatches in proc_comm.c (2012-04-13 10:23:17 -0700)
->
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git msm-fix
+Sascha,
 
-Thanks, pulled.
+On Fri, Apr 13, 2012 at 11:44 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
+> Applied this one as a fix (-rc) and the other ones for -next.
 
--Olof
+I don't see the other patches applied in for-next.
+
+Actually I haven?t found the for-next branch.
