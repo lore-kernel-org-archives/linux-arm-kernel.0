@@ -1,38 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 Apr 2012 13:19:43 +0200
-Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface for
- platforms to use
-In-Reply-To: <20120425094934.GA17631@shlinux2.ap.freescale.net>
-References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
- <4F96F847.508@wwwdotorg.org>
- <20120425094934.GA17631@shlinux2.ap.freescale.net>
-Message-ID: <CACRpkdYjVYsM-Qo7NWKx5Mr3rAmp12G_wAtkmNkkqNyX=ZeKUw@mail.gmail.com>
+Date: Wed, 25 Apr 2012 13:22:23 +0200
+Subject: Tag on pinctrl
+In-Reply-To: <4F96D84E.7080204@wwwdotorg.org>
+References: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
+ <4F96D84E.7080204@wwwdotorg.org>
+Message-ID: <CACRpkdZMsvmQ8AV=7aeAOraZJsYh_uyYPwrDrkYcegWOi7WDNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 11:49 AM, Dong Aisheng
-<aisheng.dong@freescale.com> wrote:
-> On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
+On Tue, Apr 24, 2012 at 6:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
->> The only thing that should be calling pinctrl_request_gpio() is a GPIO
->> driver. It should only be calling it for the GPIOs it manages. I'd
->> expect that if a platform's pinctrl driver was not yet written to
->> support the GPIO functionality, then the GPIO driver would not be
->> calling this function.
->>
-> Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
-> driver may be shared between several platforms, with pinctrl support
-> or not.
+> Linus, I think this will get into the ARM SoC tree simply by my saying
+> in my for-3.5/gpio-pinmux pull request that the branch depends on your
+> tag; I don't /think/ you need to explicitly send a pull request there,
+> right?
 
-I think it's mostly safe to assume that either:
+Yes I hope so, let's try this and see if it works, if it doesn't,
+we'll notice and fix it up someway.
 
-- pinctrl calls from GPIO drivers gets stubbed out totally due to
-  CONFIG_PINCTRL not being selected
+I'll make sure I send a pull request to Torvalds as early as
+possible since the pinctrl tree is pretty independent of any
+other stuff.
 
-or:
-
-- You need to pass a token through platform data to the
-  GPIO driver telling it whether it needs to request pins for
-  it's GPIOs or not. Just a bool should work fine?
-
+Thanks,
 Linus Walleij
