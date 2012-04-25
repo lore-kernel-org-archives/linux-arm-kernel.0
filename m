@@ -1,34 +1,65 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 25 Apr 2012 13:20:50 -0600
-Subject: [PATCH] ARM: disable SUSPEND/ARCH_SUSPEND_POSSIBLE for ARCH_TEGRA
-Message-ID: <1335381650-7666-1-git-send-email-swarren@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 25 Apr 2012 12:21:45 -0700
+Subject: [PATCH] ARM: mm: Fix section mismatches
+Message-ID: <1335381705-24608-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+WARNING: vmlinux.o(.text+0x111b8): Section mismatch in reference
+from the function arm_memory_present() to the function
+.init.text:memory_present()
+The function arm_memory_present() references
+the function __init memory_present().
+This is often because arm_memory_present lacks a __init
+annotation or the annotation of memory_present is wrong.
 
-Tegra doesn't yet support system sleep. Explicitly disable support
-for this feature in Kconfig.
+WARNING: arch/arm/mm/built-in.o(.text+0x1edc): Section mismatch
+in reference from the function alloc_init_pud() to the function
+.init.text:alloc_init_section()
+The function alloc_init_pud() references
+the function __init alloc_init_section().
+This is often because alloc_init_pud lacks a __init
+annotation or the annotation of alloc_init_section is wrong.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
-Russell, I assume this should go into the ARM patch tracker?
+ arch/arm/mm/init.c |    4 ++--
+ arch/arm/mm/mmu.c  |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4f4fead..5bc48d2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2243,7 +2243,7 @@ menu "Power management options"
- source "kernel/power/Kconfig"
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 6e9fde6..c21d06c 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -302,11 +302,11 @@ EXPORT_SYMBOL(pfn_valid);
+ #endif
  
- config ARCH_SUSPEND_POSSIBLE
--	depends on !ARCH_S5PC100
-+	depends on !ARCH_S5PC100 && !ARCH_TEGRA
- 	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
- 		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
- 	def_bool y
+ #ifndef CONFIG_SPARSEMEM
+-static void arm_memory_present(void)
++static void __init arm_memory_present(void)
+ {
+ }
+ #else
+-static void arm_memory_present(void)
++static void __init arm_memory_present(void)
+ {
+ 	struct memblock_region *reg;
+ 
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4c1c6f2..81af404 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -626,8 +626,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+ 	}
+ }
+ 
+-static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+-	unsigned long phys, const struct mem_type *type)
++static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
++	unsigned long end, unsigned long phys, const struct mem_type *type)
+ {
+ 	pud_t *pud = pud_offset(pgd, addr);
+ 	unsigned long next;
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
