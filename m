@@ -1,20 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 25 Apr 2012 15:15:31 -0300
-Subject: [PATCH 1/4] ARM: imx27-dt: Fix build due to removal of
- irq_domain_add_simple()
-In-Reply-To: <20120413144413.GR3852@pengutronix.de>
-References: <1334193132-18944-1-git-send-email-festevam@gmail.com>
- <20120413144413.GR3852@pengutronix.de>
-Message-ID: <CAOMZO5CrpTKbqv28GOy_SikV5w9b4M5O8XmTNVGhX59DDoW5HA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Apr 2012 12:18:12 -0600
+Subject: [PATCH] ARM: tegra: add pll_x freq table entry for 750MHz
+Message-ID: <1335377892-26367-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Fri, Apr 13, 2012 at 11:44 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Some SKUs limit the maximum CPU frequency to 750MHz; see
+tegra2_pllx_clk_init(). The pll_x frequency table needs an entry for this
+frequency, or there will be continual log spam from the cpufreq driver
+attempting to set this rate, yet there being no table entry for it.
 
-> Applied this one as a fix (-rc) and the other ones for -next.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/tegra2_clocks.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-I don't see the other patches applied in for-next.
-
-Actually I haven?t found the for-next branch.
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 0bf0f2d..b59315c 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -1768,6 +1768,12 @@ static struct clk_pll_freq_table tegra_pll_x_freq_table[] = {
+ 	{ 19200000, 760000000,  950,  24, 1, 8},
+ 	{ 26000000, 760000000,  760,  26, 1, 12},
+ 
++	/* 750 MHz */
++	{ 12000000, 750000000,  750,  12, 1, 12},
++	{ 13000000, 750000000,  750,  13, 1, 12},
++	{ 19200000, 750000000,  625,  16, 1, 8},
++	{ 26000000, 750000000,  750,  26, 1, 12},
++
+ 	/* 608 MHz */
+ 	{ 12000000, 608000000,  608,  12, 1, 12},
+ 	{ 13000000, 608000000,  608,  13, 1, 12},
+-- 
+1.7.0.4
