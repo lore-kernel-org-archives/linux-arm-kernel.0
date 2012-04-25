@@ -1,100 +1,128 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Wed, 25 Apr 2012 15:07:03 +0530
-Subject: [PATCH v2] dma: pl330: fix a couple of compilation warnings
-In-Reply-To: <1333927579-16999-1-git-send-email-olof@lixom.net>
-References: <1333919920-25481-1-git-send-email-olof@lixom.net>
- <1333927579-16999-1-git-send-email-olof@lixom.net>
-Message-ID: <1335346623.31825.120.camel@vkoul-udesk3>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 25 Apr 2012 10:20:35 +0000
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <4F97B891.1020601@ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
+ <4F97B891.1020601@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-04-08 at 16:26 -0700, Olof Johansson wrote:
-> Move a couple of tests and do a minor refactor to avoid:
+On Wed, Apr 25, 2012 at 14:10:49, Cousson, Benoit wrote:
+> Hi Vaibhav,
 > 
-> drivers/dma/pl330.c: In function 'pl330_probe':
-> drivers/dma/pl330.c:2929:215: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-> drivers/dma/pl330.c: In function 'pl330_tasklet':
-> drivers/dma/pl330.c:2250:8: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
-> drivers/dma/pl330.c:2228:25: note: 'pch' was declared here
-> drivers/dma/pl330.c:2277:130: warning: 'pch' may be used uninitialized in this function [-Wuninitialized]
-> drivers/dma/pl330.c:2260:25: note: 'pch' was declared here
+> On 4/25/2012 7:48 AM, Hiremath, Vaibhav wrote:
+> > On Wed, Apr 25, 2012 at 06:33:26, Paul Walmsley wrote:
+> >> Hello Vaibhav, Afzal, Vaibhav,
+> >>
+> >> On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
+> >>
+> >>> AM33XX clock implementation is different than any existing OMAP
+> >>> family of devices. Although DPLL module is similar to OMAP4
+> >>> device, but the usage is very much different than OMAP4.
+> >>> AM33XX has different peripheral set and each module gets
+> >>> integrated to the clock framework differently than OMAP
+> >>> family of devices.
+> >>>
+> >>> This patch adds full Clock tree data for AM33XX family
+> >>> of devices and also integrates it into existing OMAP framework.
+> >>
+> >> What do you think about the possibility of removing all of the leaf clocks
+> >> that have AM33XX_MODULEMODE_SWCTRL as their .enable_bit, assuming there
+> >> are no .fixed_div or .clksel* fields associated with the clocks?
+> >>
+> >> In theory, I don't think they are needed.  The drivers should be using
+> >> runtime PM, and that should enable and disable the module via the hwmod
+> >> code, rather than the clock code.
+> >>
+> >> Of course some clocks would still be needed for the main_clk fields for
+> >> the hwmods, but the hwmods should be able to use the leaf clock's parent
+> >> clocks for that.
+> >>
+> >> That would save quite a few lines of data.  And I think Beno?t is planning
+> >> to do that for OMAP4+.
+> >>
+> >> What do you think?
+> >>
+> >
+> > Paul,
+> >
+> > Yes, theoretically it is possible to do it. But it will also break some of
+> > the existing things, like,
+> >
+> > 1. DebugFS clock interface
+> >
+> > I believe, with this change, you will not have all the leaf nodes as part of clock tree, so they will not be populated in /debug/clock/
+> >
+> > 2. Enable and disable of the module is one part, but what about, changing
+> >     the rate of the clock (followparent_recalc)?
+> >     With the proper and complete clock tree, you can traverse the clock and
+> >     driver code doesn't need to know about parent.
+> >     Driver can simply call clk_set_rate() on leaf clock, and clock tree will
+> >     handle it.
+> >
+> > If at all we take this path, we have to build the clk node runtime
+> > (on-the-fly), AND/OR add new pm_runtime_set_rate() api.
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-Applied thanks
-
-> ---
->  drivers/dma/pl330.c |   25 +++++++++++++++----------
->  1 file changed, 15 insertions(+), 10 deletions(-)
+> Not at all. You just have to get the fck of that hwmod and use the clock 
+> API.
 > 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 282caf11..2ee6e23 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2225,12 +2225,9 @@ static inline void free_desc_list(struct list_head *list)
->  {
->  	struct dma_pl330_dmac *pdmac;
->  	struct dma_pl330_desc *desc;
-> -	struct dma_pl330_chan *pch;
-> +	struct dma_pl330_chan *pch = NULL;
->  	unsigned long flags;
->  
-> -	if (list_empty(list))
-> -		return;
-> -
->  	/* Finish off the work list */
->  	list_for_each_entry(desc, list, node) {
->  		dma_async_tx_callback callback;
-> @@ -2247,6 +2244,10 @@ static inline void free_desc_list(struct list_head *list)
->  		desc->pchan = NULL;
->  	}
->  
-> +	/* pch will be unset if list was empty */
-> +	if (!pch)
-> +		return;
-> +
->  	pdmac = pch->dmac;
->  
->  	spin_lock_irqsave(&pdmac->pool_lock, flags);
-> @@ -2257,12 +2258,9 @@ static inline void free_desc_list(struct list_head *list)
->  static inline void handle_cyclic_desc_list(struct list_head *list)
->  {
->  	struct dma_pl330_desc *desc;
-> -	struct dma_pl330_chan *pch;
-> +	struct dma_pl330_chan *pch = NULL;
->  	unsigned long flags;
->  
-> -	if (list_empty(list))
-> -		return;
-> -
->  	list_for_each_entry(desc, list, node) {
->  		dma_async_tx_callback callback;
->  
-> @@ -2274,6 +2272,10 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
->  			callback(desc->txd.callback_param);
->  	}
->  
-> +	/* pch will be unset if list was empty */
-> +	if (!pch)
-> +		return;
-> +
->  	spin_lock_irqsave(&pch->lock, flags);
->  	list_splice_tail_init(list, &pch->work_list);
->  	spin_unlock_irqrestore(&pch->lock, flags);
-> @@ -2926,8 +2928,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	INIT_LIST_HEAD(&pd->channels);
->  
->  	/* Initialize channel parameters */
-> -	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
-> -			(u8)pi->pcfg.num_chan);
-> +	if (pdat)
-> +		num_chan = max_t(int, pdat->nr_valid_peri, pi->pcfg.num_chan);
-> +	else
-> +		num_chan = max_t(int, pi->pcfg.num_peri, pi->pcfg.num_chan);
-> +
->  	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
->  
->  	for (i = 0; i < num_chan; i++) {
+> > Are you available on IRC chat anytime? We can discuss on this and align
+> > quickly.
+> > I am available on linux-omap irc channel (with the name = "hvaibhav")
+> 
+> That will not change anything, the point is that MODULEMODE_SWCTRL is 
+> uses for module control, not for clock directly, and that's why it is 
+> handled by the hwmod.
+> 
+> That will just replace the main_clk from the hwmod with the parent of 
+> the current modulemode nodes. Only the enable/disable part will be 
+> handled, if that node used to have a div, then the parent will handle that.
+> 
+> Today this module mode clock node is just a duplication of the hwmod 
+> node. By removing it, you will reduce the size of the data and have a 
+> much mode accurate representation of the reality.
+> 
+> Using the clock tree to handle these nodes was a hack we had to do 
+> because the hwmod fmwk was not ready when OMAP4 was introduced and 
+> because most drivers were not using pm_runtime.
+> 
 
+Benoit,
 
--- 
-~Vinod
+I completely understand what are trying to explain here, and I completely agree with you on the fact that, MODULEMODE_SWCTRL is for module control and is clock node is just a duplication. 
+
+Module enable and disable is one part, and I am not at all referring to this.
+My point is, more from other piece of code which are dependent on clocktree.
+In order to have proper and complete debugfs representation of all the 
+clocks, somebody has to maintain the information of leaf clocks to parent 
+relation, Isn't it?
+
+For example, take OMAP44xx "dss_dss_clk" clock, OR any clock with "followparent_recalc" field, the question I am raising here is,
+
+How would I know the rate of this clock in driver? Say for example, I want 
+to configure my internal divider based on input rate? 
+OR 
+I want to change the rate of dss_clk itself?
+OR
+Looking at debugfs, would I get the rate of dss_clk? 
+OR
+Will I have dss_clk present in /debug/clock/?
+OR 
+Are we expecting user to know parent of such leaf clocks?
+OR
+Are we planning to export hwmod->main_clk (which is parent clk here) to
+User in debugfs or something?
+
+Thanks,
+Vaibhav
+> Regards,
+> Benoit
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
