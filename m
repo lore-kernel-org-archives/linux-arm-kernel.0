@@ -1,74 +1,88 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 08:25:18 +0200
-Subject: [GIT PULL] i.MX cleanup patches for next
-In-Reply-To: <20120416080053.GQ3852@pengutronix.de>
-References: <20120411084403.GN3852@pengutronix.de>
- <CAOesGMhk9tGokNwy1kdFDB+G08OYEEq9Uf1Qu=K=T8ufick2ag@mail.gmail.com>
- <20120416080053.GQ3852@pengutronix.de>
-Message-ID: <20120425062518.GW20478@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 25 Apr 2012 12:09:32 +0530
+Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
+In-Reply-To: <CAC83Zv+CCLQfZHfqMcbof6JtA-hOK1PfX5Gs0BBVQhBAiWzX_g@mail.gmail.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
+ <13629551.hP3ZV1ajDo@vclass>
+ <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
+ <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
+ <20120424160447.GI3739@atomide.com>
+ <CAC83Zv+CCLQfZHfqMcbof6JtA-hOK1PfX5Gs0BBVQhBAiWzX_g@mail.gmail.com>
+Message-ID: <CAMQu2gzwijaSzXprEwTNTie3zCgFcNPonAexzrO_AWc2a8jOkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Wed, Apr 25, 2012 at 10:04 AM, DebBarma, Tarun Kanti
+<tarun.kanti@ti.com> wrote:
+> On Tue, Apr 24, 2012 at 9:34 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> * DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120424 08:40]:
+>>> Hi Janusz,
+>>>
+>>> On Tue, Apr 24, 2012 at 12:24 AM, DebBarma, Tarun Kanti
+>>> <tarun.kanti@ti.com> wrote:
+>>> > On Sat, Apr 21, 2012 at 7:33 PM, Janusz Krzysztofik
+>>> > <jkrzyszt@tis.icnet.pl> wrote:
+>>> >> On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
+>>> >>> With register offsets now defined for respective OMAP versions we can get rid
+>>> >>> of cpu_class_* checks. This function now has common initialization code for
+>>> >>> all OMAP versions...
+>>> >>>
+>>> >>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>>> >>> Signed-off-by: Charulatha V <charu@ti.com>
+>>> >>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> >>> Acked-by: Tony Lindgren <tony@atomide.com>
+>>> >>
+>>> >> Sorry for being so late with my comment for chanes already present in
+>>> >> mainline, but this patch breaks GPIO on Amstrad Delta at least, and I
+>>> >> have neither enough spare time nor enough experience with non OMAP1
+>>> >> machines to provide a solution myself.
+>>> > Yes, I looked at the omap_gpio_mod_init() and OMAP1 configurations are
+>>> > overwritten.
+>>> > Also looks like there is issue in making distinction between omap15xx
+>>> > and omap16xx.
+>>> > I will post a patch and you can help me testing it in OMAP1 platform.
+>>> > Thanks for pointing this out.
+>> ...
+>>
+>>> Here is the patch, with attachment as well. I have just tested on
+>>> OMAP4 platform.
+>>> Testing on other OMAP2+ platforms is pending. In the meantime can you please
+>>> validate on OMAP1 platform and confirm? Thanks.
+>>> --
+>>> Tarun
+>>>
+>>> From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>>> Date: Tue, 24 Apr 2012 20:34:32 +0530
+>>> Subject: [PATCH] gpio/omap: fix omap1 register overwrite in omap_gpio_mod_init
+>>>
+>>> Initialization of irqenable, irqstatus registers is the common
+>>> operation done in this function for all OMAP platforms, viz.
+>>> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
+>>> was overwriting the correctly programmed OMAP1 value at the
+>>> beginning. As a result, even though it worked on OMAP2+
+>>> platforms it was breaking OMAP1 functionality.
+>>
+>> Sounds like the original patch was never tested on omap1?
+> That's right, only bootup test was done on OMAP1710-SDP.
+>
+>>
+>>> On closer observation it is found that the first _gpio_rmw()
+>>> which is supposedly done to take care of OMAP1 platform is
+>>> generic enough and takes care of OMAP2+ platform as well.
+>>> Therefore remove the latter _gpio_rmw() to irqenable as they
+>>> are redundant.
+>>>
+>>> Also, changing the sequence and logic of initializing the
+>>> irqstatus.
+>>
+>> Please mention also the breaking commit here and get this fix
+>> merged as a regression as soon as it's tested for the current
+>> -rc series.
+> Sure, I will do that!
 
-On Mon, Apr 16, 2012 at 10:00:53AM +0200, Sascha Hauer wrote:
-> 
-> Ok, won't do this in future. I just thought it might be a good idea,
-> because otherwise I end up with the same tag names in the next pull
-> request.
-> 
-> > 
-> > Branch contents otherwise looks OK, so respin and send a fresh pull
-> > request and we'll merge it in.
-> 
-> Here it is:
+Looks like it is regression on 3.4 as well so CC stable when you
+post the patch.
 
-Still something wrong?
-
-Sascha
-
-> 
-> The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
-> 
->   Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-cleanup
-> 
-> for you to fetch changes up to 33076883bc45bfdd5fa5c9bff7f012a460719aba:
-> 
->   ARM: i.MX: efikamx: match machine descriptions with legacy (2012-04-16 09:54:50 +0200)
-> 
-> ----------------------------------------------------------------
-> ARM: i.MX: misc board cleanups
-> 
-> ----------------------------------------------------------------
-> Hector Oron (1):
->       ARM: i.MX: efikamx: match machine descriptions with legacy
-> 
-> Uwe Kleine-K?nig (1):
->       ARM: imx/mx21ads: remove unneeded cast
-> 
->  arch/arm/mach-imx/mach-mx21ads.c      |    3 +--
->  arch/arm/mach-imx/mach-mx51_efikamx.c |    3 +--
->  arch/arm/mach-imx/mach-mx51_efikasb.c |    2 +-
->  3 files changed, 3 insertions(+), 5 deletions(-)
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Santosh
