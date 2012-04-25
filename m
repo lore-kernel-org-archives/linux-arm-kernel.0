@@ -1,48 +1,38 @@
-From: hdoyu@nvidia.com (Hiroshi DOYU)
-Date: Wed, 25 Apr 2012 14:07:39 +0300
-Subject: [PATCHv3 4/4] ARM: dt: tegra: Add device tree support for AHB
-In-Reply-To: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
-References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1335352072-4001-4-git-send-email-hdoyu@nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 Apr 2012 13:19:43 +0200
+Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface for
+ platforms to use
+In-Reply-To: <20120425094934.GA17631@shlinux2.ap.freescale.net>
+References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+ <4F96F847.508@wwwdotorg.org>
+ <20120425094934.GA17631@shlinux2.ap.freescale.net>
+Message-ID: <CACRpkdYjVYsM-Qo7NWKx5Mr3rAmp12G_wAtkmNkkqNyX=ZeKUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add AHB entry for tegra20/30.
+On Wed, Apr 25, 2012 at 11:49 AM, Dong Aisheng
+<aisheng.dong@freescale.com> wrote:
+> On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
 
-Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
----
- arch/arm/boot/dts/tegra20.dtsi |    5 +++++
- arch/arm/boot/dts/tegra30.dtsi |    5 +++++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+>> The only thing that should be calling pinctrl_request_gpio() is a GPIO
+>> driver. It should only be calling it for the GPIOs it manages. I'd
+>> expect that if a platform's pinctrl driver was not yet written to
+>> support the GPIO functionality, then the GPIO driver would not be
+>> calling this function.
+>>
+> Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
+> driver may be shared between several platforms, with pinctrl support
+> or not.
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 52cab08..54e9640 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -212,5 +212,10 @@
- 		reg = < 0x7000f000 0x00000100    /* controller registers */
- 		        0x58000000 0x02000000 >; /* GART aperture */
- 	};
-+
-+	ahb: ahb at 6000c004 {
-+		compatible = "nvidia,tegra30-ahb", "nvidia,tegra20-ahb";
-+		reg = <0x6000c004 0x10c>; /* AHB Arbitration + Gizmo Controller */
-+	};
- };
- 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 15200a9..24120cf 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -224,4 +224,9 @@
- 			nvidia,ahub-cif-ids = <8 8>;
- 		};
- 	};
-+
-+	ahb: ahb at 6000c004 {
-+		compatible = "nvidia,tegra30-ahb", "nvidia,tegra20-ahb";
-+		reg = <0x6000c004 0x14c>; /* AHB Arbitration + Gizmo Controller */
-+	};
- };
--- 
-1.7.5.4
+I think it's mostly safe to assume that either:
+
+- pinctrl calls from GPIO drivers gets stubbed out totally due to
+  CONFIG_PINCTRL not being selected
+
+or:
+
+- You need to pass a token through platform data to the
+  GPIO driver telling it whether it needs to request pins for
+  it's GPIOs or not. Just a bool should work fine?
+
+Linus Walleij
