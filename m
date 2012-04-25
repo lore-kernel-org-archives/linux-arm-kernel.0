@@ -1,40 +1,53 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 25 Apr 2012 13:38:43 +0200
-Subject: [PATCHv4 1/2] drivers: input: keypad: Add device tree support
-In-Reply-To: <20120425105235.GV24211@n2100.arm.linux.org.uk>
-References: <1335346004-18108-1-git-send-email-sourav.poddar@ti.com>
- <20120425105235.GV24211@n2100.arm.linux.org.uk>
-Message-ID: <4F97E243.1040707@antcom.de>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 25 Apr 2012 19:49:56 +0800
+Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
+ for platforms to use
+In-Reply-To: <CACRpkdYjVYsM-Qo7NWKx5Mr3rAmp12G_wAtkmNkkqNyX=ZeKUw@mail.gmail.com>
+References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+ <4F96F847.508@wwwdotorg.org>
+ <20120425094934.GA17631@shlinux2.ap.freescale.net>
+ <CACRpkdYjVYsM-Qo7NWKx5Mr3rAmp12G_wAtkmNkkqNyX=ZeKUw@mail.gmail.com>
+Message-ID: <20120425114955.GB17631@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell and Sourav,
-
-On 04/25/2012 12:52 PM, Russell King - ARM Linux wrote:
-> I think you and Roland Stigge need to put your heads together and come
-> up with a common DT binding for matrix keypad devices, rather than
-> inventing N different platform specific bindings.
+On Wed, Apr 25, 2012 at 07:19:43PM +0800, Linus Walleij wrote:
+> On Wed, Apr 25, 2012 at 11:49 AM, Dong Aisheng
+> <aisheng.dong@freescale.com> wrote:
+> > On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
 > 
->> +Required Board Specific Properties, in addition to those specified by
->> +the shared matrix-keyboard bindings:
->> +- keypad,num-rows: Number of row lines connected to the keypad
->> +  controller.
->> +
->> +- keypad,num-columns: Number of column lines connected to the
->> +  keypad controller.
+> >> The only thing that should be calling pinctrl_request_gpio() is a GPIO
+> >> driver. It should only be calling it for the GPIOs it manages. I'd
+> >> expect that if a platform's pinctrl driver was not yet written to
+> >> support the GPIO functionality, then the GPIO driver would not be
+> >> calling this function.
+> >>
+> > Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
+> > driver may be shared between several platforms, with pinctrl support
+> > or not.
+> 
+> I think it's mostly safe to assume that either:
+> 
+I just saw your reply after i sent out the revised patch...
 
-Right - the LPC32xx key scanner always has a square matrix design (#rows
-== #cols), but I'm fine with re-using properties "keypad,num-rows" and
-"keypad,num-columns" instead of "nxp,matrix-size".
+> - pinctrl calls from GPIO drivers gets stubbed out totally due to
+>   CONFIG_PINCTRL not being selected
+> 
+Yes, we already have that in include/linux/pinctrl/consumer.h
 
-Besides, I still have "nxp,debounce-delay-ms" and "nxp,scan-delay-ms" -
-do I need to change this to some default properties I don't know of (yet)?
+> or:
+> 
+> - You need to pass a token through platform data to the
+>   GPIO driver telling it whether it needs to request pins for
+>   it's GPIOs or not. Just a bool should work fine?
+> 
+Yes, this is an alternative way.
+I'm using a similar way, but pass the data to pinctrl core
+rather than gpio driver. Then it is be handled together with
+dummy state in platform code.
 
-And: I re-used the DT subnodes strategy for the keycodes ("linux,code")
-of the samsung-keypad driver, see
-Documentation/devicetree/bindings/input/samsung-keypad.txt - can I
-continue using it?
+Do you think if the current way i used is ok?
+Or i need to change to your proposed way?
 
-Thanks in advance,
-
-Roland
+Regards
+Dong Aisheng
