@@ -1,122 +1,94 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 25 Apr 2012 14:43:45 +0200
-Subject: [RFC PATCH 00/11 V5] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <20120425124105.GX24211@n2100.arm.linux.org.uk>
-References: <1335099567-21056-1-git-send-email-marex@denx.de>
- <201204251427.59194.marex@denx.de>
- <20120425124105.GX24211@n2100.arm.linux.org.uk>
-Message-ID: <201204251443.46094.marex@denx.de>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 25 Apr 2012 18:24:14 +0530
+Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
+In-Reply-To: <CAMQu2gzwijaSzXprEwTNTie3zCgFcNPonAexzrO_AWc2a8jOkw@mail.gmail.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
+ <13629551.hP3ZV1ajDo@vclass>
+ <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
+ <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
+ <20120424160447.GI3739@atomide.com>
+ <CAC83Zv+CCLQfZHfqMcbof6JtA-hOK1PfX5Gs0BBVQhBAiWzX_g@mail.gmail.com>
+ <CAMQu2gzwijaSzXprEwTNTie3zCgFcNPonAexzrO_AWc2a8jOkw@mail.gmail.com>
+Message-ID: <CAC83ZvKN_Qxw-9RPfpJaL5434j0HgysZ364F+b29rdSCQWhm7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
-
-> On Wed, Apr 25, 2012 at 02:27:58PM +0200, Marek Vasut wrote:
-> > Dear Russell King - ARM Linux,
-> > 
-> > > Do you really need 138 messages (and counting) all threaded together
-> > > across the entire history of this patch set?  Please stop posting new
-> > > copies of your patch set as followups to the previous set.
-> > 
-> > Well, it's usually to the point where the usb patches change, so instead
-> > of posting 8 patches, I post the whole set ot make it consistent.
-> 
-> Sure, no problem with that.
-> 
-> > > Not only does it rob horizontal space for reading the subjects in the
-> > > index, but also it either buries your patches ages back or brings the
-> > > entire 138 messages to the front of mailboxes, depending on your sort
-> > > preferences.  Either way it makes threaded reading of the mailing list
-> > > really difficult.
-> > > 
-> > > Please stop this antisocial behaviour.  Thanks.
-> > 
-> > Can you please suggest better solution? You mean post each new set as a
-> > separate thread ? Or post each patch as an in-reply-to previous one?
-> 
-> Please don't thread the posting of a new version of the patches to
-> the previous posting of the older version.  In other words, the
-> initial summary mail for V5 should not be threaded to the V4 series,
-> and the individual patches for V5 should only be threaded to the
-> initial summary mail for V5.
-> 
-> So, rather than this as one massive thread:
-> ...[PATCH V3 0/N]
->    +-[PATCH V3 1/N]
-> 
->    | `-Replies
-> 
->    +-[PATCH V3 2/N]
-> 
->    | `-Replies
-> 
->    +-[PATCH V3 3/N]
-> 
->    | `-Replies
-> 
->    `-[PATCH V4 0/N]
->      +-[PATCH V4 1/N]
-> 
->      | `-Replies
-> 
->      +-[PATCH V4 2/N]
-> 
->      | `-Replies
-> 
->      +-[PATCH V4 3/N]
-> 
->      | `-Replies
-> 
->      `-[PATCH V5 0/N]
->         +-[PATCH V5 1/N]
-> 
->         | `-Replies
-> 
->         +-[PATCH V5 2/N]
-> 
->         | `-Replies
-> 
->         `-[PATCH V5 3/N]
->           `-Replies
-> 
-> It should be:
-> [PATCH V4 0/N]
-> +-[PATCH V4 1/N]
-> 
-> | `-Replies
-> 
-> +-[PATCH V4 2/N]
-> 
-> | `-Replies
-> 
-> `-[PATCH V4 3/N]
->   `-Replies
-> 
-> <some time later>
-> 
-> [PATCH V5 0/N]
-> +-[PATCH V5 1/N]
-> 
-> | `-Replies
-> 
-> +-[PATCH V5 2/N]
-> 
-> | `-Replies
-> 
-> `-[PATCH V5 3/N]
->   `-Replies
-> 
-> Where the 0/N patches have no parent message.  In other words, these
-> sumamry messages have no references or in-reply-to headers.
-
-I see, roger that!
-
-> If you wish to provide a direct reference back to a previous thread,
-> please do so via URLs into archives, or providing the message id or
-> exact subject of the previous series in the new summary message body.
-> But please don't thread each version to the previous version!
-
-Ack. Thanks for clearing this out, sorry for the mess.
-
-Best regards,
-Marek Vasut
+On Wed, Apr 25, 2012 at 12:09 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> On Wed, Apr 25, 2012 at 10:04 AM, DebBarma, Tarun Kanti
+> <tarun.kanti@ti.com> wrote:
+>> On Tue, Apr 24, 2012 at 9:34 PM, Tony Lindgren <tony@atomide.com> wrote:
+>>> * DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120424 08:40]:
+>>>> Hi Janusz,
+>>>>
+>>>> On Tue, Apr 24, 2012 at 12:24 AM, DebBarma, Tarun Kanti
+>>>> <tarun.kanti@ti.com> wrote:
+>>>> > On Sat, Apr 21, 2012 at 7:33 PM, Janusz Krzysztofik
+>>>> > <jkrzyszt@tis.icnet.pl> wrote:
+>>>> >> On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
+>>>> >>> With register offsets now defined for respective OMAP versions we can get rid
+>>>> >>> of cpu_class_* checks. This function now has common initialization code for
+>>>> >>> all OMAP versions...
+>>>> >>>
+>>>> >>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>>>> >>> Signed-off-by: Charulatha V <charu@ti.com>
+>>>> >>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> >>> Acked-by: Tony Lindgren <tony@atomide.com>
+>>>> >>
+>>>> >> Sorry for being so late with my comment for chanes already present in
+>>>> >> mainline, but this patch breaks GPIO on Amstrad Delta at least, and I
+>>>> >> have neither enough spare time nor enough experience with non OMAP1
+>>>> >> machines to provide a solution myself.
+>>>> > Yes, I looked at the omap_gpio_mod_init() and OMAP1 configurations are
+>>>> > overwritten.
+>>>> > Also looks like there is issue in making distinction between omap15xx
+>>>> > and omap16xx.
+>>>> > I will post a patch and you can help me testing it in OMAP1 platform.
+>>>> > Thanks for pointing this out.
+>>> ...
+>>>
+>>>> Here is the patch, with attachment as well. I have just tested on
+>>>> OMAP4 platform.
+>>>> Testing on other OMAP2+ platforms is pending. In the meantime can you please
+>>>> validate on OMAP1 platform and confirm? Thanks.
+>>>> --
+>>>> Tarun
+>>>>
+>>>> From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>>>> Date: Tue, 24 Apr 2012 20:34:32 +0530
+>>>> Subject: [PATCH] gpio/omap: fix omap1 register overwrite in omap_gpio_mod_init
+>>>>
+>>>> Initialization of irqenable, irqstatus registers is the common
+>>>> operation done in this function for all OMAP platforms, viz.
+>>>> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
+>>>> was overwriting the correctly programmed OMAP1 value at the
+>>>> beginning. As a result, even though it worked on OMAP2+
+>>>> platforms it was breaking OMAP1 functionality.
+>>>
+>>> Sounds like the original patch was never tested on omap1?
+>> That's right, only bootup test was done on OMAP1710-SDP.
+>>
+>>>
+>>>> On closer observation it is found that the first _gpio_rmw()
+>>>> which is supposedly done to take care of OMAP1 platform is
+>>>> generic enough and takes care of OMAP2+ platform as well.
+>>>> Therefore remove the latter _gpio_rmw() to irqenable as they
+>>>> are redundant.
+>>>>
+>>>> Also, changing the sequence and logic of initializing the
+>>>> irqstatus.
+>>>
+>>> Please mention also the breaking commit here and get this fix
+>>> merged as a regression as soon as it's tested for the current
+>>> -rc series.
+>> Sure, I will do that!
+>
+> Looks like it is regression on 3.4 as well so CC stable when you
+> post the patch.
+Ok, I will do that.
+--
+Tarun
+>
+> Regards
+> Santosh
