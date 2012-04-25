@@ -1,52 +1,45 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Apr 2012 07:28:02 +0200
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424201802.GE3628@n2100.arm.linux.org.uk>
- <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
-Message-ID: <20120425052802.GF13489@lunn.ch>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 25 Apr 2012 08:37:47 +0300
+Subject: [PATCH v2 1/3] ARM: tegra: Add AHB driver
+In-Reply-To: <20120424195645.GB3628@n2100.arm.linux.org.uk>
+References: <1335269116-9578-1-git-send-email-hdoyu@nvidia.com>
+ <20120424195645.GB3628@n2100.arm.linux.org.uk>
+Message-ID: <20120425083747.466f5c98330af8964d980b8c@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This is what i was thinking too and thats why floated this version of patch.
-> But as Andrew said, clk API support is enabled for them, but still they
-> don't have a clk for sata. To get this working, there are two solutions:
-> - Create dummy clk for sata for that platform, so clk_get doesn't fail.
-> - Check for error before every call to clk APIs after clk_get().
+On Tue, 24 Apr 2012 21:56:45 +0200
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Tue, Apr 24, 2012 at 03:05:14PM +0300, Hiroshi DOYU wrote:
+> > The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+> > High-performance Bus (AHB) architecture.
+> > 
+> > The AHB Arbiter controls AHB bus master arbitration. This effectively
+> > forms a second level of arbitration for access to the memory
+> > controller through the AHB Slave Memory device. The AHB pre-fetch
+> > logic can be configured to enhance performance for devices doing
+> > sequential access. Each AHB master is assigned to either the high or
+> > low priority bin. Both Tegra20/30 have this AHB bus.
+> > 
+> > Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > Update:
+> > - Use platform_device to get info from dt dynamically.(Felipe/Arnd)
+> > ---
+> >  arch/arm/mach-tegra/Makefile    |    1 +
+> >  arch/arm/mach-tegra/tegra-ahb.c |  285 +++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 286 insertions(+), 0 deletions(-)
 > 
-> Andrew favored the second one. Which means, even on platforms
-> with clk API defined and clk enable required, if there are some issues
-> with lookup table, and clk_get() fails, system may hang when registers
-> are accessed. For this i favored first one.
+> 1. I thought we weren't going to have any more drivers under
+>    arch/arm
 
-I'm not too sure how you are going to achieve 1)
+Can this driver be located under "drivers/misc"? Or is there any better place?
 
-config SATA_MV
-        tristate "Marvell SATA support"
-        help
-          This option enables support for the Marvell Serial ATA family.
-          Currently supports 88SX[56]0[48][01] PCI(-X) chips,
-          as well as the newer [67]042 PCI-X/PCIe and SOC devices.
+> 2. From the way you describe it above, this sounds like it should be some
+>    kind of generic driver, which obtains the necessary settings to be
+>    programmed into registers from (eg) DT.
 
-So this driver can be used with anything which has a PCI(-X) or PCIe
-bus, or Orion SoC and a few PowerPC SoCs.
-
-The SoCs are not too bad, we know which ones they are and we can add
-dummy entries to their device tree. However, how do you want to handle
-the PCI devices? Create the dummy entry somewhere in the middle of the
-PCI core?
-
-Thought not.
-
-A comment to:
-> - Check for error before every call to clk APIs after clk_get().
-
-There are only two calls. clk_prepare_enable() in the probe and
-clk_disable_unprepare() in the remove function.
-
-	Andrew
+Agree.
