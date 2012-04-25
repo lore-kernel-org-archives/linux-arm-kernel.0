@@ -1,49 +1,57 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 25 Apr 2012 02:59:44 +0300
-Subject: [RFC 00/12] OMAP DMA engine conversion
-In-Reply-To: <20120424232928.GB6290@n2100.arm.linux.org.uk>
-References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
- <20120424103858.GC25053@n2100.arm.linux.org.uk>
- <20120424165147.GP3739@atomide.com>
- <CANOLnOOf0znGBSSQp5B3U+1q2OJBXnB_1T0aiuma_rJZDZA08Q@mail.gmail.com>
- <20120424232928.GB6290@n2100.arm.linux.org.uk>
-Message-ID: <CANOLnOM5tkVyLzBvT6i7ziXq1Ld=yzeL5upUdAMUav=wF3HL+A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 24 Apr 2012 17:01:07 -0700
+Subject: [RFC] ARM: SAMSUNG: devs: Use common macro to define resources
+In-Reply-To: <1335258206-5937-1-git-send-email-tushar.behera@linaro.org>
+References: <1335258206-5937-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <4F973EC3.9010901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 2:29 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 25, 2012 at 01:47:21AM +0300, Grazvydas Ignotas wrote:
->> On Tue, Apr 24, 2012 at 7:51 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [120424 03:42]:
->> >> Here's another patch - for the OMAP NAND driver.
->> >>
->> >> One thing this doesn't do is configure up the source/destination bursts,
->> >> which the old code did:
->> >>
->> >> ? ? ? ? ? ? ? ? ? ? ? ? omap_set_dma_dest_burst_mode(info->dma_ch,
->> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_DMA_DATA_BURST_16);
->> >> ? ? ? ? ? ? ? ? ? ? ? ? omap_set_dma_src_burst_mode(info->dma_ch,
->> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_DMA_DATA_BURST_16);
->> >
->> > Grazvydas, care to give this patch a go?
->>
->> Tested-by: Grazvydas Ignotas <notasas@gmail.com>
->> for:
->> - SD card connected over transceiver to MMC2
->> - touchscreen connected over SPI
->> - NAND on GPMC in DMA mode
->> Seems to be working just as they did before, except that I'm not sure
->> SPI was crossing PIO threshold.
->
-> I think my testing on OMAP4430SDP with the SPI based ethernet should've
-> caught anything untoward there.
->
-> For the MMC2, could you say whether this was the hsmmc driver or the
-> older omap1/2 driver please?
+Tushar Behera wrote:
+> CC: Kukjin Kim<kgene.kim@samsung.com>
+> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+> ---
+> I am not sure whether changes like this are accepted as independent patches,
+> as they are not changing the behaviour of the code at all.
+> 
+Yeah, makes sense. will apply in my cleanup branch.
 
-hsmmc running on OMAP3 pandora.
+> I have a patchset doing similar clean up in various Samsung related arch files.
+> If changes like this are acceptable, I will post the complete patchset.
+> 
+OK.
 
+Thanks.
 
--- 
-Gra?vydas
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+>   arch/arm/plat-samsung/devs.c |   12 ++----------
+>   1 files changed, 2 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+> index db32ec5..1013a34 100644
+> --- a/arch/arm/plat-samsung/devs.c
+> +++ b/arch/arm/plat-samsung/devs.c
+> @@ -272,16 +272,8 @@ struct platform_device s5p_device_fimc3 = {
+> 
+>   #ifdef CONFIG_S5P_DEV_G2D
+>   static struct resource s5p_g2d_resource[] = {
+> -	[0] = {
+> -		.start	= S5P_PA_G2D,
+> -		.end	= S5P_PA_G2D + SZ_4K - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start	= IRQ_2D,
+> -		.end	= IRQ_2D,
+> -		.flags	= IORESOURCE_IRQ,
+> -	},
+> +	[0] = DEFINE_RES_MEM(S5P_PA_G2D, SZ_4K),
+> +	[1] = DEFINE_RES_IRQ(IRQ_2D),
+>   };
+> 
+>   struct platform_device s5p_device_g2d = {
