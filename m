@@ -1,113 +1,236 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 17:27:56 +0200
-Subject: [PATCH 06/33] mmc sdhc i.MX: do not depend on grouped clocks
+Date: Wed, 25 Apr 2012 17:28:18 +0200
+Subject: [PATCH 28/33] ARM i.MX21: implement clocks using common clock
+ framework
 In-Reply-To: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
 References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1335367703-19929-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1335367703-19929-29-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the current i.MX clock support groups together unrelated clocks
-to a single clock which is then used by the driver. This can't
-be accomplished with the generic clock framework so we instead
-request the individual clocks in the driver. For i.MX there are
-generally three different clocks:
-
-ipg: bus clock (needed to access registers)
-ahb: dma relevant clock, sometimes referred to as hclk in the datasheet
-per: bit clock, pixel clock
-
-This patch changes the driver to request the individual clocks.
-Currently all clk_get will get the same clock until the SoCs
-are converted to the generic clock framework
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   42 ++++++++++++++++++++++++++----------
- 1 file changed, 31 insertions(+), 11 deletions(-)
+ arch/arm/mach-imx/Kconfig     |    1 +
+ arch/arm/mach-imx/Makefile    |    2 +-
+ arch/arm/mach-imx/clk-imx21.c |  186 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 188 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/clk-imx21.c
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 8abdaf6..ce83d61 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -69,6 +69,9 @@ struct pltfm_imx_data {
- 	u32 scratchpad;
- 	enum imx_esdhc_type devtype;
- 	struct esdhc_platform_data boarddata;
-+	struct clk *clk_ipg;
-+	struct clk *clk_ahb;
-+	struct clk *clk_per;
- };
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index c03920a..d23cebd 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -43,6 +43,7 @@ config SOC_IMX21
+ 	bool
+ 	select MACH_MX21
+ 	select CPU_ARM926T
++	select COMMON_CLK
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MXC_AVIC
  
- static struct platform_device_id imx_esdhc_devtype[] = {
-@@ -437,7 +440,6 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct sdhci_host *host;
- 	struct esdhc_platform_data *boarddata;
--	struct clk *clk;
- 	int err;
- 	struct pltfm_imx_data *imx_data;
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 52b3af4..a2efb79 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -1,5 +1,5 @@
+ obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
+-obj-$(CONFIG_SOC_IMX21) += clock-imx21.o mm-imx21.o
++obj-$(CONFIG_SOC_IMX21) += clk-imx21.o mm-imx21.o
  
-@@ -458,14 +460,29 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	imx_data->devtype = pdev->id_entry->driver_data;
- 	pltfm_host->priv = imx_data;
+ obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
  
--	clk = clk_get(mmc_dev(host->mmc), NULL);
--	if (IS_ERR(clk)) {
--		dev_err(mmc_dev(host->mmc), "clk err\n");
--		err = PTR_ERR(clk);
-+	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(imx_data->clk_ipg)) {
-+		err = PTR_ERR(imx_data->clk_ipg);
- 		goto err_clk_get;
- 	}
--	clk_prepare_enable(clk);
--	pltfm_host->clk = clk;
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
+new file mode 100644
+index 0000000..4e4f384
+--- /dev/null
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -0,0 +1,186 @@
++/*
++ * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
++ * Copyright 2008 Martin Fuzzey, mfuzzey at gmail.com
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
 +
-+	imx_data->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(imx_data->clk_ahb)) {
-+		err = PTR_ERR(imx_data->clk_ahb);
-+		goto err_clk_get;
-+	}
++#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/clkdev.h>
++#include <linux/err.h>
 +
-+	imx_data->clk_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(imx_data->clk_per)) {
-+		err = PTR_ERR(imx_data->clk_per);
-+		goto err_clk_get;
-+	}
++#include <mach/hardware.h>
++#include <mach/common.h>
++#include "clk.h"
 +
-+	pltfm_host->clk = imx_data->clk_per;
++#define IO_ADDR_CCM(off)	(MX21_IO_ADDRESS(MX21_CCM_BASE_ADDR + (off)))
 +
-+	clk_prepare_enable(imx_data->clk_per);
-+	clk_prepare_enable(imx_data->clk_ipg);
-+	clk_prepare_enable(imx_data->clk_ahb);
- 
- 	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
- 
-@@ -558,8 +575,9 @@ no_card_detect_irq:
- 		gpio_free(boarddata->wp_gpio);
- no_card_detect_pin:
- no_board_data:
--	clk_disable_unprepare(pltfm_host->clk);
--	clk_put(pltfm_host->clk);
-+	clk_disable_unprepare(imx_data->clk_per);
-+	clk_disable_unprepare(imx_data->clk_ipg);
-+	clk_disable_unprepare(imx_data->clk_ahb);
- err_clk_get:
- 	kfree(imx_data);
- err_imx_data:
-@@ -585,8 +603,10 @@ static int __devexit sdhci_esdhc_imx_remove(struct platform_device *pdev)
- 		gpio_free(boarddata->cd_gpio);
- 	}
- 
--	clk_disable_unprepare(pltfm_host->clk);
--	clk_put(pltfm_host->clk);
-+	clk_disable_unprepare(imx_data->clk_per);
-+	clk_disable_unprepare(imx_data->clk_ipg);
-+	clk_disable_unprepare(imx_data->clk_ahb);
++/* Register offsets */
++#define CCM_CSCR		IO_ADDR_CCM(0x0)
++#define CCM_MPCTL0		IO_ADDR_CCM(0x4)
++#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
++#define CCM_SPCTL0		IO_ADDR_CCM(0xc)
++#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
++#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
++#define CCM_PCDR0		IO_ADDR_CCM(0x18)
++#define CCM_PCDR1		IO_ADDR_CCM(0x1c)
++#define CCM_PCCR0		IO_ADDR_CCM(0x20)
++#define CCM_PCCR1		IO_ADDR_CCM(0x24)
++#define CCM_CCSR		IO_ADDR_CCM(0x28)
++#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
++#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
++#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
 +
- 	kfree(imx_data);
- 
- 	sdhci_pltfm_free(pdev);
++static const char *mpll_sel_clks[] = { "fpm", "ckih", };
++static const char *spll_sel_clks[] = { "fpm", "ckih", };
++
++enum imx21_clks {
++	ckil, ckih, fpm, mpll_sel, spll_sel, mpll, spll, fclk, hclk, ipg, per1,
++	per2, per3, per4, uart1_ipg_gate, uart2_ipg_gate, uart3_ipg_gate,
++	uart4_ipg_gate, gpt1_ipg_gate, gpt2_ipg_gate, gpt3_ipg_gate,
++	pwm_ipg_gate, sdhc1_ipg_gate, sdhc2_ipg_gate, lcdc_ipg_gate,
++	lcdc_hclk_gate, cspi3_ipg_gate, cspi2_ipg_gate, cspi1_ipg_gate,
++	per4_gate, csi_hclk_gate, usb_div, usb_gate, usb_hclk_gate, ssi1_gate,
++	ssi2_gate, nfc_div, nfc_gate, dma_gate, dma_hclk_gate, brom_gate,
++	emma_gate, emma_hclk_gate, slcdc_gate, slcdc_hclk_gate, wdog_gate,
++	gpio_gate, i2c_gate, kpp_gate, owire_gate, rtc_gate, clk_max
++};
++
++static struct clk *clk[clk_max];
++
++/*
++ * must be called very early to get information about the
++ * available clock rate when the timer framework starts
++ */
++int __init mx21_clocks_init(unsigned long lref, unsigned long href)
++{
++	int i;
++
++	clk[ckil] = imx_clk_fixed("ckil", lref);
++	clk[ckih] = imx_clk_fixed("ckih", href);
++	clk[fpm] = imx_clk_fixed_factor("fpm", "ckil", 512, 1);
++	clk[mpll_sel] = imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks,
++			ARRAY_SIZE(mpll_sel_clks));
++	clk[spll_sel] = imx_clk_mux("spll_sel", CCM_CSCR, 17, 1, spll_sel_clks,
++			ARRAY_SIZE(spll_sel_clks));
++	clk[mpll] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
++	clk[spll] = imx_clk_pllv1("spll", "spll_sel", CCM_SPCTL0);
++	clk[fclk] = imx_clk_divider("fclk", "mpll", CCM_CSCR, 29, 3);
++	clk[hclk] = imx_clk_divider("hclk", "fclk", CCM_CSCR, 10, 4);
++	clk[ipg] = imx_clk_divider("ipg", "hclk", CCM_CSCR, 9, 1);
++	clk[per1] = imx_clk_divider("per1", "mpll", CCM_PCDR1, 0, 6);
++	clk[per2] = imx_clk_divider("per2", "mpll", CCM_PCDR1, 8, 6);
++	clk[per3] = imx_clk_divider("per3", "mpll", CCM_PCDR1, 16, 6);
++	clk[per4] = imx_clk_divider("per4", "mpll", CCM_PCDR1, 24, 6);
++	clk[uart1_ipg_gate] = imx_clk_gate("uart1_ipg_gate", "ipg", CCM_PCCR0, 0);
++	clk[uart2_ipg_gate] = imx_clk_gate("uart2_ipg_gate", "ipg", CCM_PCCR0, 1);
++	clk[uart3_ipg_gate] = imx_clk_gate("uart3_ipg_gate", "ipg", CCM_PCCR0, 2);
++	clk[uart4_ipg_gate] = imx_clk_gate("uart4_ipg_gate", "ipg", CCM_PCCR0, 3);
++	clk[gpt1_ipg_gate] = imx_clk_gate("gpt1_ipg_gate", "ipg", CCM_PCCR1, 25);
++	clk[gpt2_ipg_gate] = imx_clk_gate("gpt2_ipg_gate", "ipg", CCM_PCCR1, 26);
++	clk[gpt3_ipg_gate] = imx_clk_gate("gpt3_ipg_gate", "ipg", CCM_PCCR1, 27);
++	clk[pwm_ipg_gate] = imx_clk_gate("pwm_ipg_gate", "ipg", CCM_PCCR1, 28);
++	clk[sdhc1_ipg_gate] = imx_clk_gate("sdhc1_ipg_gate", "ipg", CCM_PCCR0, 9);
++	clk[sdhc2_ipg_gate] = imx_clk_gate("sdhc2_ipg_gate", "ipg", CCM_PCCR0, 10);
++	clk[lcdc_ipg_gate] = imx_clk_gate("lcdc_ipg_gate", "ipg", CCM_PCCR0, 18);
++	clk[lcdc_hclk_gate] = imx_clk_gate("lcdc_hclk_gate", "hclk", CCM_PCCR0, 26);
++	clk[cspi3_ipg_gate] = imx_clk_gate("cspi3_ipg_gate", "ipg", CCM_PCCR1, 23);
++	clk[cspi2_ipg_gate] = imx_clk_gate("cspi2_ipg_gate", "ipg", CCM_PCCR0, 5);
++	clk[cspi1_ipg_gate] = imx_clk_gate("cspi1_ipg_gate", "ipg", CCM_PCCR0, 4);
++	clk[per4_gate] = imx_clk_gate("per4_gate", "per4", CCM_PCCR0, 22);
++	clk[csi_hclk_gate] = imx_clk_gate("csi_hclk_gate", "hclk", CCM_PCCR0, 31);
++	clk[usb_div] = imx_clk_divider("usb_div", "spll", CCM_CSCR, 26, 3);
++	clk[usb_gate] = imx_clk_gate("usb_gate", "usb_div", CCM_PCCR0, 14);
++	clk[usb_hclk_gate] = imx_clk_gate("usb_hclk_gate", "hclk", CCM_PCCR0, 24);
++	clk[ssi1_gate] = imx_clk_gate("ssi1_gate", "ipg", CCM_PCCR0, 6);
++	clk[ssi2_gate] = imx_clk_gate("ssi2_gate", "ipg", CCM_PCCR0, 7);
++	clk[nfc_div] = imx_clk_divider("nfc_div", "ipg", CCM_PCDR0, 12, 4);
++	clk[nfc_gate] = imx_clk_gate("nfc_gate", "nfc_div", CCM_PCCR0, 19);
++	clk[dma_gate] = imx_clk_gate("dma_gate", "ipg", CCM_PCCR0, 13);
++	clk[dma_hclk_gate] = imx_clk_gate("dma_hclk_gate", "hclk", CCM_PCCR0, 30);
++	clk[brom_gate] = imx_clk_gate("brom_gate", "hclk", CCM_PCCR0, 28);
++	clk[emma_gate] = imx_clk_gate("emma_gate", "ipg", CCM_PCCR0, 15);
++	clk[emma_hclk_gate] = imx_clk_gate("emma_hclk_gate", "hclk", CCM_PCCR0, 27);
++	clk[slcdc_gate] = imx_clk_gate("slcdc_gate", "ipg", CCM_PCCR0, 25);
++	clk[slcdc_hclk_gate] = imx_clk_gate("slcdc_hclk_gate", "hclk", CCM_PCCR0, 21);
++	clk[wdog_gate] = imx_clk_gate("wdog_gate", "ipg", CCM_PCCR1, 24);
++	clk[gpio_gate] = imx_clk_gate("gpio_gate", "ipg", CCM_PCCR0, 11);
++	clk[i2c_gate] = imx_clk_gate("i2c_gate", "ipg", CCM_PCCR0, 12);
++	clk[kpp_gate] = imx_clk_gate("kpp_gate", "ipg", CCM_PCCR1, 30);
++	clk[owire_gate] = imx_clk_gate("owire_gate", "ipg", CCM_PCCR1, 31);
++	clk[rtc_gate] = imx_clk_gate("rtc_gate", "ipg", CCM_PCCR1, 29);
++
++	for (i = 0; i < ARRAY_SIZE(clk); i++)
++		if (IS_ERR(clk[i]))
++			pr_err("i.MX21 clk %d: register failed with %ld\n",
++				i, PTR_ERR(clk[i]));
++
++	clk_register_clkdev(clk[per1], "per1", NULL);
++	clk_register_clkdev(clk[per2], "per2", NULL);
++	clk_register_clkdev(clk[per3], "per3", NULL);
++	clk_register_clkdev(clk[per4], "per4", NULL);
++	clk_register_clkdev(clk[per1], "per", "imx21-uart.0");
++	clk_register_clkdev(clk[uart1_ipg_gate], "ipg", "imx21-uart.0");
++	clk_register_clkdev(clk[per1], "per", "imx21-uart.1");
++	clk_register_clkdev(clk[uart2_ipg_gate], "ipg", "imx21-uart.1");
++	clk_register_clkdev(clk[per1], "per", "imx21-uart.2");
++	clk_register_clkdev(clk[uart3_ipg_gate], "ipg", "imx21-uart.2");
++	clk_register_clkdev(clk[per1], "per", "imx21-uart.3");
++	clk_register_clkdev(clk[uart4_ipg_gate], "ipg", "imx21-uart.3");
++	clk_register_clkdev(clk[gpt1_ipg_gate], "ipg", "imx-gpt.0");
++	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
++	clk_register_clkdev(clk[gpt2_ipg_gate], "ipg", "imx-gpt.1");
++	clk_register_clkdev(clk[per1], "per", "imx-gpt.1");
++	clk_register_clkdev(clk[gpt3_ipg_gate], "ipg", "imx-gpt.2");
++	clk_register_clkdev(clk[per1], "per", "imx-gpt.2");
++	clk_register_clkdev(clk[pwm_ipg_gate], "pwm", "mxc_pwm.0");
++	clk_register_clkdev(clk[per2], "per", "imx21-cspi.0");
++	clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx21-cspi.0");
++	clk_register_clkdev(clk[per2], "per", "imx21-cspi.1");
++	clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx21-cspi.1");
++	clk_register_clkdev(clk[per2], "per", "imx21-cspi.2");
++	clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx21-cspi.2");
++	clk_register_clkdev(clk[per3], "per", "imx-fb.0");
++	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
++	clk_register_clkdev(clk[lcdc_hclk_gate], "ahb", "imx-fb.0");
++	clk_register_clkdev(clk[usb_gate], "per", "imx21-hcd.0");
++	clk_register_clkdev(clk[usb_hclk_gate], "ahb", "imx21-hcd.0");
++	clk_register_clkdev(clk[nfc_gate], NULL, "mxc_nand.0");
++	clk_register_clkdev(clk[dma_hclk_gate], "ahb", "imx-dma");
++	clk_register_clkdev(clk[dma_gate], "ipg", "imx-dma");
++	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
++	clk_register_clkdev(clk[i2c_gate], NULL, "imx-i2c.0");
++	clk_register_clkdev(clk[kpp_gate], NULL, "mxc-keypad");
++	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1.0");
++	clk_register_clkdev(clk[brom_gate], "brom", NULL);
++	clk_register_clkdev(clk[emma_gate], "emma", NULL);
++	clk_register_clkdev(clk[slcdc_gate], "slcdc", NULL);
++	clk_register_clkdev(clk[gpio_gate], "gpio", NULL);
++	clk_register_clkdev(clk[rtc_gate], "rtc", NULL);
++	clk_register_clkdev(clk[csi_hclk_gate], "csi", NULL);
++	clk_register_clkdev(clk[ssi1_gate], "ssi1", NULL);
++	clk_register_clkdev(clk[ssi2_gate], "ssi2", NULL);
++	clk_register_clkdev(clk[sdhc1_ipg_gate], "sdhc1", NULL);
++	clk_register_clkdev(clk[sdhc2_ipg_gate], "sdhc2", NULL);
++
++	mxc_timer_init(NULL, MX21_IO_ADDRESS(MX21_GPT1_BASE_ADDR),
++			MX21_INT_GPT1);
++	return 0;
++}
 -- 
 1.7.10
