@@ -1,57 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Apr 2012 12:15:22 +0000
-Subject: [PATCH v2 1/3] ARM: tegra: Add AHB driver
-In-Reply-To: <20120425074639.GB3423@arwen.pp.htv.fi>
-References: <1335269116-9578-1-git-send-email-hdoyu@nvidia.com>
- <20120425083747.466f5c98330af8964d980b8c@nvidia.com>
- <20120425074639.GB3423@arwen.pp.htv.fi>
-Message-ID: <201204251215.22889.arnd@arndb.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 25 Apr 2012 12:26:44 +0000
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <4F97E243.6000500@ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
+ <4F97B891.1020601@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
+ <4F97E243.6000500@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 April 2012, Felipe Balbi wrote:
->   On Wed, Apr 25, 2012 at 08:37:47AM +0300, Hiroshi Doyu wrote:
-> > On Tue, 24 Apr 2012 21:56:45 +0200
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > 
-> > > On Tue, Apr 24, 2012 at 03:05:14PM +0300, Hiroshi DOYU wrote:
-> > > > The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> > > > High-performance Bus (AHB) architecture.
-> > > > 
-> > > > The AHB Arbiter controls AHB bus master arbitration. This effectively
-> > > > forms a second level of arbitration for access to the memory
-> > > > controller through the AHB Slave Memory device. The AHB pre-fetch
-> > > > logic can be configured to enhance performance for devices doing
-> > > > sequential access. Each AHB master is assigned to either the high or
-> > > > low priority bin. Both Tegra20/30 have this AHB bus.
-> > > > 
-> > > > Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> > > > Cc: Felipe Balbi <balbi@ti.com>
-> > > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > > ---
-> > > > Update:
-> > > > - Use platform_device to get info from dt dynamically.(Felipe/Arnd)
-> > > > ---
-> > > >  arch/arm/mach-tegra/Makefile    |    1 +
-> > > >  arch/arm/mach-tegra/tegra-ahb.c |  285 +++++++++++++++++++++++++++++++++++++++
-> > > >  2 files changed, 286 insertions(+), 0 deletions(-)
-> > > 
-> > > 1. I thought we weren't going to have any more drivers under
-> > >    arch/arm
-> > 
-> > Can this driver be located under "drivers/misc"? Or is there any better place?
+On Wed, Apr 25, 2012 at 17:08:43, Cousson, Benoit wrote:
+> On 4/25/2012 12:20 PM, Hiremath, Vaibhav wrote:
+> > On Wed, Apr 25, 2012 at 14:10:49, Cousson, Benoit wrote:
 > 
-> maybe drivers/platform/arm/ ??
+> ...
+> 
+<snip>
+> 
+> > How would I know the rate of this clock in driver? Say for example, I want
+> > to configure my internal divider based on input rate?
+> > OR
+> > I want to change the rate of dss_clk itself?
+> > OR
+> > Looking at debugfs, would I get the rate of dss_clk?
+> 
+> No because that clock will not exist anymore, but you will have the real 
+> clock rate from the "dss_dss_clk".
+> 
 
-I really wouldn't want to add that directory: It has the risk of letting
-people add random crap there that may or may not be related to ARM (the
-company) and/or ARM (the architecture).
+Thanks Benoit, I think I understand your perspective on Module Vs leaf node 
+and now able to digest as well.
+Probably Last Q, which I think clarify all my doubts,
 
-I think it could go into drivers/amba/ along with the primecell bus driver.
-The two drivers are for two different aspects of the AMBA spec and don't
-actually depend on one another as far as I can tell, but it's at least
-a fitting name, and it doesn't depend on the ARM architecture, which is
-important because the driver could be used on other architectures that
-are connected to an AHB bus.
+Assume we have complete hwmod instance and built a device using 
+omap_device_build() api, and also the driver is completely using runtime pm 
+api's,
+How can driver get the clk handle (required to get the rate)? 
+Is there any api already available for this?
 
-	Arnd
+Thanks,
+Vaibhav
