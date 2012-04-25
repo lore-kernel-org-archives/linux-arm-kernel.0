@@ -1,371 +1,141 @@
 From: hdoyu@nvidia.com (Hiroshi DOYU)
-Date: Wed, 25 Apr 2012 14:07:36 +0300
-Subject: [PATCHv3 1/4] ARM: tegra: Add AHB driver
-Message-ID: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
+Date: Wed, 25 Apr 2012 14:07:38 +0300
+Subject: [PATCHv3 3/4] iommu/tegra: smmu: Refrain from accessing to AHB
+ registers
+In-Reply-To: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
+References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1335352072-4001-3-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-High-performance Bus (AHB) architecture.
-
-The AHB Arbiter controls AHB bus master arbitration. This effectively
-forms a second level of arbitration for access to the memory
-controller through the AHB Slave Memory device. The AHB pre-fetch
-logic can be configured to enhance performance for devices doing
-sequential access. Each AHB master is assigned to either the high or
-low priority bin. Both Tegra20/30 have this AHB bus.
-
-Some of configuration param could be passed from DT too.
-
-Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
-v4:
-Fixed the comments from Felipe/Russell.
-This is now located under drivers/platform/arm.
-v3:
-Use platform_device to get info from dt dynamically.(Felipe/Arnd)
+Use "tegra_ahb_enable_smmu()" to inform AHB that SMMU is
+ready, instead of directly aceessing AHB registers.
 
 Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
 ---
- drivers/platform/Kconfig         |    5 +
- drivers/platform/Makefile        |    1 +
- drivers/platform/arm/Kconfig     |    8 +
- drivers/platform/arm/Makefile    |    5 +
- drivers/platform/arm/tegra-ahb.c |  278 ++++++++++++++++++++++++++++++++++++++
- 5 files changed, 297 insertions(+), 0 deletions(-)
+ drivers/iommu/tegra-smmu.c |   40 ++++++++--------------------------------
+ 1 files changed, 8 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/platform/Kconfig b/drivers/platform/Kconfig
-index 8390dca..8b96a77 100644
---- a/drivers/platform/Kconfig
-+++ b/drivers/platform/Kconfig
-@@ -1,3 +1,8 @@
- if X86
- source "drivers/platform/x86/Kconfig"
- endif
-+
-+if ARM
-+source "drivers/platform/arm/Kconfig"
-+endif
-+
-diff --git a/drivers/platform/Makefile b/drivers/platform/Makefile
-index 782953a..7a2b16f 100644
---- a/drivers/platform/Makefile
-+++ b/drivers/platform/Makefile
-@@ -3,3 +3,4 @@
- #
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index ecd6790..de9fafe 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -36,6 +36,7 @@
  
- obj-$(CONFIG_X86)		+= x86/
-+obj-$(CONFIG_ARM)		+= arm/
-diff --git a/drivers/platform/arm/Kconfig b/drivers/platform/arm/Kconfig
-new file mode 100644
-index 0000000..0af31db
---- /dev/null
-+++ b/drivers/platform/arm/Kconfig
-@@ -0,0 +1,8 @@
-+config TEGRA_AHB
-+	bool "Enable AHB driver for NVIDIA Tegra SoCs"
-+	depends on ARCH_TEGRA
-+	default y
-+	help
-+	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
-+	  which controls AHB bus master arbitration and some
-+	  perfomance parameters(priority, prefech size).
-diff --git a/drivers/platform/arm/Makefile b/drivers/platform/arm/Makefile
-new file mode 100644
-index 0000000..3535f56
---- /dev/null
-+++ b/drivers/platform/arm/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for linux/drivers/platform/arm
-+# ARM Platform-Specific Drivers
-+#
-+obj-$(CONFIG_TEGRA_AHB)		+= tegra-ahb.o
-diff --git a/drivers/platform/arm/tegra-ahb.c b/drivers/platform/arm/tegra-ahb.c
-new file mode 100644
-index 0000000..dcad2ec
---- /dev/null
-+++ b/drivers/platform/arm/tegra-ahb.c
-@@ -0,0 +1,278 @@
-+/*
-+ * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-+ * Copyright (C) 2011 Google, Inc.
-+ *
-+ * Author:
-+ *	Jay Cheng <jacheng@nvidia.com>
-+ *	James Wylder <james.wylder@motorola.com>
-+ *	Benoit Goby <benoit@android.com>
-+ *	Colin Cross <ccross@android.com>
-+ *	Hiroshi DOYU <hdoyu@nvidia.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+#include <mach/iomap.h>
-+
-+#define DRV_NAME "tegra-ahb"
-+
-+#define AHB_ARBITRATION_DISABLE		0x00
-+#define AHB_ARBITRATION_PRIORITY_CTRL	0x04
-+#define   AHB_PRIORITY_WEIGHT(x)	(((x) & 0x7) << 29)
-+#define   PRIORITY_SELECT_USB BIT(6)
-+#define   PRIORITY_SELECT_USB2 BIT(18)
-+#define   PRIORITY_SELECT_USB3 BIT(17)
-+
-+#define AHB_GIZMO_AHB_MEM		0x0c
-+#define   ENB_FAST_REARBITRATE BIT(2)
-+#define   DONT_SPLIT_AHB_WR     BIT(7)
-+
-+#define AHB_GIZMO_APB_DMA		0x10
-+#define AHB_GIZMO_IDE			0x18
-+#define AHB_GIZMO_USB			0x1c
-+#define AHB_GIZMO_AHB_XBAR_BRIDGE	0x20
-+#define AHB_GIZMO_CPU_AHB_BRIDGE	0x24
-+#define AHB_GIZMO_COP_AHB_BRIDGE	0x28
-+#define AHB_GIZMO_XBAR_APB_CTLR		0x2c
-+#define AHB_GIZMO_VCP_AHB_BRIDGE	0x30
-+#define AHB_GIZMO_NAND			0x3c
-+#define AHB_GIZMO_SDMMC4		0x44
-+#define AHB_GIZMO_XIO			0x48
-+#define AHB_GIZMO_BSEV			0x60
-+#define AHB_GIZMO_BSEA			0x70
-+#define AHB_GIZMO_NOR			0x74
-+#define AHB_GIZMO_USB2			0x78
-+#define AHB_GIZMO_USB3			0x7c
-+#define   IMMEDIATE	BIT(18)
-+
-+#define AHB_GIZMO_SDMMC1		0x80
-+#define AHB_GIZMO_SDMMC2		0x84
-+#define AHB_GIZMO_SDMMC3		0x88
-+#define AHB_MEM_PREFETCH_CFG_X		0xd8
-+#define AHB_ARBITRATION_XBAR_CTRL	0xdc
-+#define AHB_MEM_PREFETCH_CFG3		0xe0
-+#define AHB_MEM_PREFETCH_CFG4		0xe4
-+#define AHB_MEM_PREFETCH_CFG1		0xec
-+#define AHB_MEM_PREFETCH_CFG2		0xf0
-+#define   PREFETCH_ENB	BIT(31)
-+#define   MST_ID(x)	(((x) & 0x1f) << 26)
-+#define   AHBDMA_MST_ID	MST_ID(5)
-+#define   USB_MST_ID	MST_ID(6)
-+#define   USB2_MST_ID	MST_ID(18)
-+#define   USB3_MST_ID	MST_ID(17)
-+#define   ADDR_BNDRY(x)	(((x) & 0xf) << 21)
-+#define   INACTIVITY_TIMEOUT(x)	(((x) & 0xffff) << 0)
-+
-+#define AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID	0xf8
-+
-+static u32 tegra_ahb_gizmo[] = {
-+	AHB_ARBITRATION_DISABLE,
-+	AHB_ARBITRATION_PRIORITY_CTRL,
-+	AHB_GIZMO_AHB_MEM,
-+	AHB_GIZMO_APB_DMA,
-+	AHB_GIZMO_IDE,
-+	AHB_GIZMO_USB,
-+	AHB_GIZMO_AHB_XBAR_BRIDGE,
-+	AHB_GIZMO_CPU_AHB_BRIDGE,
-+	AHB_GIZMO_COP_AHB_BRIDGE,
-+	AHB_GIZMO_XBAR_APB_CTLR,
-+	AHB_GIZMO_VCP_AHB_BRIDGE,
-+	AHB_GIZMO_NAND,
-+	AHB_GIZMO_SDMMC4,
-+	AHB_GIZMO_XIO,
-+	AHB_GIZMO_BSEV,
-+	AHB_GIZMO_BSEA,
-+	AHB_GIZMO_NOR,
-+	AHB_GIZMO_USB2,
-+	AHB_GIZMO_USB3,
-+	AHB_GIZMO_SDMMC1,
-+	AHB_GIZMO_SDMMC2,
-+	AHB_GIZMO_SDMMC3,
-+	AHB_MEM_PREFETCH_CFG_X,
-+	AHB_ARBITRATION_XBAR_CTRL,
-+	AHB_MEM_PREFETCH_CFG3,
-+	AHB_MEM_PREFETCH_CFG4,
-+	AHB_MEM_PREFETCH_CFG1,
-+	AHB_MEM_PREFETCH_CFG2,
-+	AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID,
-+};
-+
-+struct tegra_ahb {
+ #include <mach/iomap.h>
+ #include <mach/smmu.h>
++#include <mach/tegra-ahb.h>
+ 
+ /* bitmap of the page sizes currently supported */
+ #define SMMU_IOMMU_PGSIZES	(SZ_4K)
+@@ -111,11 +112,6 @@
+ 
+ #define SMMU_PDE_NEXT_SHIFT		28
+ 
+-/* AHB Arbiter Registers */
+-#define AHB_XBAR_CTRL				0xe0
+-#define AHB_XBAR_CTRL_SMMU_INIT_DONE_DONE	1
+-#define AHB_XBAR_CTRL_SMMU_INIT_DONE_SHIFT	17
+-
+ #define SMMU_NUM_ASIDS				4
+ #define SMMU_TLB_FLUSH_VA_SECTION__MASK		0xffc00000
+ #define SMMU_TLB_FLUSH_VA_SECTION__SHIFT	12 /* right shift */
+@@ -235,7 +231,7 @@ struct smmu_as {
+  * Per SMMU device - IOMMU device
+  */
+ struct smmu_device {
+-	void __iomem	*regs, *regs_ahbarb;
 +	void __iomem	*regs;
-+	void		*ctx;
-+	struct device	*dev;
-+};
-+
-+static inline u32 gizmo_readl(struct tegra_ahb *ahb, u32 offset)
-+{
-+	return readl(ahb->regs + offset);
-+}
-+
-+static inline void gizmo_writel(struct tegra_ahb *ahb, u32 value, u32 offset)
-+{
-+	writel(value, ahb->regs + offset);
-+}
-+
-+static int tegra_ahb_suspend(struct device *dev)
-+{
-+	int i;
-+	struct tegra_ahb *ahb = dev_get_drvdata(dev);
-+	u32 *p = ahb->ctx;
-+
-+	for (i = 0; i < ARRAY_SIZE(tegra_ahb_gizmo); i++)
-+		p[i] = gizmo_readl(ahb, tegra_ahb_gizmo[i]);
-+	return 0;
-+}
-+
-+static int tegra_ahb_resume(struct device *dev)
-+{
-+	int i;
-+	struct tegra_ahb *ahb = dev_get_drvdata(dev);
-+	u32 *p = ahb->ctx;
-+
-+	for (i = 0; i < ARRAY_SIZE(tegra_ahb_gizmo); i++)
-+		gizmo_writel(ahb, p[i], tegra_ahb_gizmo[i]);
-+	return 0;
-+}
-+
-+static UNIVERSAL_DEV_PM_OPS(tegra_ahb_pm,
-+			    tegra_ahb_suspend,
-+			    tegra_ahb_resume, NULL);
-+
-+static void tegra_ahb_gizmo_init(struct tegra_ahb *ahb)
-+{
-+	u32 val;
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_AHB_MEM);
-+	val |= ENB_FAST_REARBITRATE | IMMEDIATE | DONT_SPLIT_AHB_WR;
-+	gizmo_writel(ahb, val, AHB_GIZMO_AHB_MEM);
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_USB);
-+	val |= IMMEDIATE;
-+	gizmo_writel(ahb, val, AHB_GIZMO_USB);
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_USB2);
-+	val |= IMMEDIATE;
-+	gizmo_writel(ahb, val, AHB_GIZMO_USB2);
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_USB3);
-+	val |= IMMEDIATE;
-+	gizmo_writel(ahb, val, AHB_GIZMO_USB3);
-+
-+	val = gizmo_readl(ahb, AHB_ARBITRATION_PRIORITY_CTRL);
-+	val |= PRIORITY_SELECT_USB |
-+		PRIORITY_SELECT_USB2 |
-+		PRIORITY_SELECT_USB3 |
-+		AHB_PRIORITY_WEIGHT(7);
-+	gizmo_writel(ahb, val, AHB_ARBITRATION_PRIORITY_CTRL);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG1);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		AHBDMA_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG1);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG2);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		USB_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG2);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG3);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		USB3_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG3);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG4);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		USB2_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG4);
-+}
-+
-+static int __devinit tegra_ahb_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct tegra_ahb *ahb;
-+	size_t bytes;
-+
-+	bytes = sizeof(*ahb) + sizeof(u32) * ARRAY_SIZE(tegra_ahb_gizmo);
-+	ahb = devm_kzalloc(&pdev->dev, bytes, GFP_KERNEL);
-+	if (!ahb)
-+		return -ENOMEM;
-+	ahb->ctx = ahb + 1;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+	ahb->regs = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!ahb->regs)
-+		return -EBUSY;
-+
-+	ahb->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, ahb);
-+	tegra_ahb_gizmo_init(ahb);
-+	return 0;
-+}
-+
-+static int __devexit tegra_ahb_remove(struct platform_device *pdev)
-+{
-+	platform_set_drvdata(pdev, NULL);
-+	return 0;
-+}
-+
-+static const struct of_device_id tegra_ahb_of_match[] __devinitconst = {
-+	{ .compatible = "nvidia,tegra30-ahb", },
-+	{ .compatible = "nvidia,tegra20-ahb", },
-+	{},
-+};
-+
-+static struct platform_driver tegra_ahb_driver = {
-+	.probe = tegra_ahb_probe,
-+	.remove = __devexit_p(tegra_ahb_remove),
-+	.driver = {
-+		.name = DRV_NAME,
-+		.owner = THIS_MODULE,
-+		.of_match_table = tegra_ahb_of_match,
-+		.pm = &tegra_ahb_pm,
-+	},
-+};
-+
-+static int __init tegra_ahb_init(void)
-+{
-+	return platform_driver_register(&tegra_ahb_driver);
-+}
-+postcore_initcall(tegra_ahb_init);
-+
-+static void __exit tegra_ahb_exit(void)
-+{
-+	platform_driver_unregister(&tegra_ahb_driver);
-+}
-+module_exit(tegra_ahb_exit);
-+
-+MODULE_AUTHOR("Hiroshi DOYU <hdoyu@nvidia.com>");
-+MODULE_DESCRIPTION("Tegra AHB driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:" DRV_NAME);
+ 	unsigned long	iovmm_base;	/* remappable base address */
+ 	unsigned long	page_count;	/* total remappable size */
+ 	spinlock_t	lock;
+@@ -257,7 +253,7 @@ struct smmu_device {
+ static struct smmu_device *smmu_handle; /* unique for a system */
+ 
+ /*
+- *	SMMU/AHB register accessors
++ *	SMMU register accessors
+  */
+ static inline u32 smmu_read(struct smmu_device *smmu, size_t offs)
+ {
+@@ -268,15 +264,6 @@ static inline void smmu_write(struct smmu_device *smmu, u32 val, size_t offs)
+ 	writel(val, smmu->regs + offs);
+ }
+ 
+-static inline u32 ahb_read(struct smmu_device *smmu, size_t offs)
+-{
+-	return readl(smmu->regs_ahbarb + offs);
+-}
+-static inline void ahb_write(struct smmu_device *smmu, u32 val, size_t offs)
+-{
+-	writel(val, smmu->regs_ahbarb + offs);
+-}
+-
+ #define VA_PAGE_TO_PA(va, page)	\
+ 	(page_to_phys(page) + ((unsigned long)(va) & ~PAGE_MASK))
+ 
+@@ -397,11 +384,7 @@ static void smmu_setup_regs(struct smmu_device *smmu)
+ 	smmu_write(smmu, SMMU_PTC_CONFIG_RESET_VAL, SMMU_PTC_CONFIG);
+ 
+ 	smmu_flush_regs(smmu, 1);
+-
+-	val = ahb_read(smmu, AHB_XBAR_CTRL);
+-	val |= AHB_XBAR_CTRL_SMMU_INIT_DONE_DONE <<
+-		AHB_XBAR_CTRL_SMMU_INIT_DONE_SHIFT;
+-	ahb_write(smmu, val, AHB_XBAR_CTRL);
++	tegra_ahb_enable_smmu();
+ }
+ 
+ static void flush_ptc_and_tlb(struct smmu_device *smmu,
+@@ -883,7 +866,7 @@ static int tegra_smmu_resume(struct device *dev)
+ static int tegra_smmu_probe(struct platform_device *pdev)
+ {
+ 	struct smmu_device *smmu;
+-	struct resource *regs, *regs2, *window;
++	struct resource *regs, *window;
+ 	struct device *dev = &pdev->dev;
+ 	int i, err = 0;
+ 
+@@ -893,9 +876,8 @@ static int tegra_smmu_probe(struct platform_device *pdev)
+ 	BUILD_BUG_ON(PAGE_SHIFT != SMMU_PAGE_SHIFT);
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	regs2 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	window = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+-	if (!regs || !regs2 || !window) {
++	window = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!regs || !window) {
+ 		dev_err(dev, "No SMMU resources\n");
+ 		return -ENODEV;
+ 	}
+@@ -911,9 +893,7 @@ static int tegra_smmu_probe(struct platform_device *pdev)
+ 	smmu->iovmm_base = (unsigned long)window->start;
+ 	smmu->page_count = resource_size(window) >> SMMU_PAGE_SHIFT;
+ 	smmu->regs = devm_ioremap(dev, regs->start, resource_size(regs));
+-	smmu->regs_ahbarb = devm_ioremap(dev, regs2->start,
+-					 resource_size(regs2));
+-	if (!smmu->regs || !smmu->regs_ahbarb) {
++	if (!smmu->regs) {
+ 		dev_err(dev, "failed to remap SMMU registers\n");
+ 		err = -ENXIO;
+ 		goto fail;
+@@ -960,8 +940,6 @@ fail:
+ 		__free_page(smmu->avp_vector_page);
+ 	if (smmu->regs)
+ 		devm_iounmap(dev, smmu->regs);
+-	if (smmu->regs_ahbarb)
+-		devm_iounmap(dev, smmu->regs_ahbarb);
+ 	if (smmu && smmu->as) {
+ 		for (i = 0; i < smmu->num_as; i++) {
+ 			if (smmu->as[i].pdir_page) {
+@@ -993,8 +971,6 @@ static int tegra_smmu_remove(struct platform_device *pdev)
+ 		__free_page(smmu->avp_vector_page);
+ 	if (smmu->regs)
+ 		devm_iounmap(dev, smmu->regs);
+-	if (smmu->regs_ahbarb)
+-		devm_iounmap(dev, smmu->regs_ahbarb);
+ 	devm_kfree(dev, smmu);
+ 	smmu_handle = NULL;
+ 	return 0;
 -- 
 1.7.5.4
