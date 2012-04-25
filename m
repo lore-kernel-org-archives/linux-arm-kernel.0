@@ -1,31 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Apr 2012 09:14:18 +0200
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20375.40225.227084.644318@ipc1.ka-ro>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424201802.GE3628@n2100.arm.linux.org.uk>
- <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
- <20120425052802.GF13489@lunn.ch>
- <20375.40225.227084.644318@ipc1.ka-ro>
-Message-ID: <20120425071418.GA2116@lunn.ch>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 25 Apr 2012 09:10:09 +0200
+Subject: [PATCH v2 0/3] add gpmi-nand dt support for mx6q and mx28
+In-Reply-To: <4F979EF2.8050904@freescale.com>
+References: <1335323184-11233-1-git-send-email-b32955@freescale.com>
+ <4F979C91.9020607@de.bosch.com> <4F979EF2.8050904@freescale.com>
+Message-ID: <4F97A351.1090505@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> AFAICT the PCI archs do not have HAVE_CLK enabled. Thus they will have
-> a dummy clk API in place that provides the driver with a non-error
-> clk_get() return value.
- 
-Hi Lothar
+On 25.04.2012 08:51, Huang Shijie wrote:
+> ? 2012?04?25? 14:41, Dirk Behme ??:
+>> Hi Huang Shijie,
+>>
+>> On 25.04.2012 05:06, Huang Shijie wrote:
+>>> The mx6q-arm2 and imx28evk have already support the device tree now.
+>>> So i decide to add the gpmi-nand dt support to them.
+>>>
+>>> The mx23 does not support the device tree now. I will add the gpmi dt 
+>>> support
+>>> when it is ready.
+>>>
+>>> Test this patch set on both MX6Q(arm2) and mx28(evk).
+>>>
+>>> v1 --> v2
+>>> [1] merge the gpmi/bch device node into one node.
+>>> [2] add partitions support.
+>>> [3] misc
+>>>
+>>> Huang Shijie (3):
+>>> mtd: gpmi: add device tree support for mx6q and mx28
+>>> ARM: mx28: add gpmi-nand dt support
+>>> ARM: mx6q: add gpmi-nand dt support
+>> For which kernel are these 3 patches? I tried to apply them on top of 
+>> 3.4-rc4 and got a lot of rejects.
+>>
+> They are based on 3.4-rc4. but I also applied some mxs-dma patches.
+> 
+> Which one cause the rejects?
 
-Please could you explain this a little bit more. What exactly is a PCI
-arch?
+Could you kindly try to apply "mtd: gpmi: add device tree support for 
+mx6q and mx28" on a clean 3.4-rc4?
 
-Most of the Orion SoC have PCIe busses. Does this make them an PCI
-arch? Because they also have HAVE_CLK. There are more SoCs with PCI.
+Many thanks
 
-      Thanks
-	Andrew
+Dirk
