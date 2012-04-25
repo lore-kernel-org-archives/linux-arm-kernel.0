@@ -1,27 +1,22 @@
-From: broonie@sirena.org.uk (Mark Brown)
-Date: Wed, 25 Apr 2012 11:46:00 +0100
-Subject: Tag on pinctrl
-In-Reply-To: <4F96D84E.7080204@wwwdotorg.org>
-References: <CACRpkdYqZrNFxj4kyMqYZk5PAcjF6-TroJ+Xq+3EVBLvo5Zg-Q@mail.gmail.com>
- <4F96D84E.7080204@wwwdotorg.org>
-Message-ID: <20120425104559.GA16752@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 Apr 2012 12:50:45 +0200
+Subject: [PATCH 05/15] ARM: ux500: New DT:ed snowball_platform_devs for
+ one-by-one device enablement
+In-Reply-To: <4F967B01.2050807@linaro.org>
+References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
+ <1334867804-31942-6-git-send-email-lee.jones@linaro.org>
+ <4F967B01.2050807@linaro.org>
+Message-ID: <CACRpkdZoaoGYqgikd4RqhFToPzkEWb7fx8cmOTrrZcxeQOkROQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 10:43:58AM -0600, Stephen Warren wrote:
+On Tue, Apr 24, 2012 at 12:05 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Yes, I have pulled that tag into the Tegra tree as
-> for-3.5/gpio-pinmux-dependency, and have a Tegra-specific
-> for-3.5/gpio-pinmux branch that depends on it. Two other Tegra branches
-> in turn (for-3.5/tegra30-audio, for-3.5/usb-ulpi) depend on
-> for-3.5/gpio-pinmux.
+> Linus, Can you please take 05 and 06 please, as some of the other patches
+> depend on them. Thanks.
 
-> Linus, I think this will get into the ARM SoC tree simply by my saying
-> in my for-3.5/gpio-pinmux pull request that the branch depends on your
-> tag; I don't /think/ you need to explicitly send a pull request there,
-> right?
+I think I've done that now and I'm planning a first pull request to ARM SoC
+to get the base into -next ASAP.
 
-If the gpio-pinmux branch is based on Linus' branch (which it really
-should be if it's a dependency...) then git will do the right thing
-here.  If it's not then you need to explicitly get things pulled in but
-there will also be bisection issues.
+Yours,
+Linus Walleij
