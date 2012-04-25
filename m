@@ -1,42 +1,70 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Apr 2012 11:31:09 +0200
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20375.46953.269684.680915@ipc1.ka-ro>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424201802.GE3628@n2100.arm.linux.org.uk>
- <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
- <20120425052802.GF13489@lunn.ch>
- <20375.40225.227084.644318@ipc1.ka-ro>
- <20120425071418.GA2116@lunn.ch>
- <20375.46953.269684.680915@ipc1.ka-ro>
-Message-ID: <20120425093109.GC2116@lunn.ch>
+From: neilb@suse.de (NeilBrown)
+Date: Wed, 25 Apr 2012 19:39:16 +1000
+Subject: [PATCH 2/3] IRQ: allow check_wakeup_irqs to notice
+ level-triggered interrupts.
+In-Reply-To: <alpine.LFD.2.02.1204251018530.2542@ionos>
+References: <20120425025637.7832.14013.stgit@notabene.brown>
+ <20120425030524.7832.85239.stgit@notabene.brown>
+ <alpine.LFD.2.02.1204251018530.2542@ionos>
+Message-ID: <20120425193916.0db1b4b1@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> If an arch has HAVE_CLK enabled it must provide valid clocks (be it
-> dummy clocks) for all devices it supports.
+On Wed, 25 Apr 2012 10:50:15 +0200 (CEST) Thomas Gleixner
+<tglx@linutronix.de> wrote:
 
-So, lets take the theoretical exaple of a unicore32 PUV3
+> On Wed, 25 Apr 2012, NeilBrown wrote:
+> 
+> > Level triggered interrupts do not cause IRQS_PENDING to be set, so
+> > check_wakeup_irqs ignores them.
+> > They don't need to set IRQS_PENDING as the level stays high which
+> > shows that they must be pending.  However if such an interrupt fired
+> > during late suspend, it will have been masked so the fact that it
+> > is still asserted will not cause the suspend to abort.
+> > 
+> > So if any wakeup interrupt is masked, unmask it when checking wakeup
+> > irqs.  If the interrupt is asserted, suspend will abort.
+> > 
+> > Signed-off-by: NeilBrown <neilb@suse.de>
+> > ---
+> > 
+> >  kernel/irq/pm.c |    6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
+> > index 15e53b1..0d26206 100644
+> > --- a/kernel/irq/pm.c
+> > +++ b/kernel/irq/pm.c
+> > @@ -106,6 +106,12 @@ int check_wakeup_irqs(void)
+> >  		if (irqd_is_wakeup_set(&desc->irq_data)) {
+> >  			if (desc->istate & IRQS_PENDING)
+> >  				return -EBUSY;
+> > +			if (irqd_irq_masked(&desc->irq_data))
+> > +				/* Probably a level interrupt
+> > +				 * which fired recently and was
+> > +				 * masked
+> > +				 */
+> > +				unmask_irq(desc);
+> 
+> Oh no. We don't unmask unconditionally. What about an interrupt which
+> is disabled, has no handler ..... ? That needs more thought.
 
-config ARCH_PUV3
-        def_bool y
-        select CPU_UCV2
-        select GENERIC_CLOCKEVENTS
-        select HAVE_CLK
-        select ARCH_REQUIRE_GPIOLIB
-        select ARCH_HAS_CPUFREQ
+If there is no handler, then irqd_is_wakeup_set() should fail should it not?
 
-Seems like this somewhat unknown, to me at least, architecture, also
-supports PCI. So i plug in an HP Adaptec AIC8120 SATA host bus adapter
-into a spare PCI slot. This uses the Marvell 88SX6041, which the
-SATA_MV driver supports.
+For disabled: would it be OK to check desc->depth?
+Something like:
+     if (desc->depth == 1 && (desc->state & IRQS_SUSPENDED) &&
+         irqd_irq_masked(&desc->irq_data))
+              unmask_irq(desc);
 
-Should i expect that the unicore32 PUV3 has created a dummy clk for
-this case?
+??
 
-Thanks
-	Andrew
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120425/55c249a6/attachment.sig>
