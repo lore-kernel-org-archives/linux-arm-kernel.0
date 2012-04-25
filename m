@@ -1,104 +1,160 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 25 Apr 2012 13:29:22 +0530
-Subject: [PATCH 15/19] ARM: OMAP4430: PM: workaround for DDR corruption on
- second CS
-In-Reply-To: <1335338762.2149.103.camel@sokoban>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-16-git-send-email-t-kristo@ti.com> <4F96EF56.5020604@ti.com>
- <1335338762.2149.103.camel@sokoban>
-Message-ID: <CAMQu2gzn06PWBQxBgRN-su191Zp4d9Ywzg=5NLgAW0on9B0PDQ@mail.gmail.com>
+From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
+Date: Wed, 25 Apr 2012 10:00:03 +0200
+Subject: [RESEND PATCH 2/2] OMAP3: igep0020: Add support for Micron NAND
+ Flash storage memory
+In-Reply-To: <1333564586-3259-2-git-send-email-javier@dowhile0.org>
+References: <1333564586-3259-1-git-send-email-javier@dowhile0.org>
+ <1333564586-3259-2-git-send-email-javier@dowhile0.org>
+Message-ID: <CAFqH_52ukhZ93idQoHaA_OwnouffeCkMYfNDhn1mdV8A8FBaBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 12:56 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> On Tue, 2012-04-24 at 13:22 -0500, Jon Hunter wrote:
->> Hi Tero,
->>
->> On 04/20/2012 04:33 AM, Tero Kristo wrote:
->> > From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> >
->> > Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
->> > Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
->> > The issue occurs when EMIF_SDRAM_CONFIG is restored first before
->> > EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
->> > is not set properly, we apply the required workaround allowing
->> > the restore sequence to work properly.
->> >
->> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
->> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> > ---
->> > ?.../include/mach/ctrl_module_wkup_44xx.h ? ? ? ? ? | ? ?2 +
->> > ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ? ? ? ? ? | ? 24 ++++++++++++++++++++
->> > ?2 files changed, 26 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->> > index a0af9ba..b763a79 100644
->> > --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->> > +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->> > @@ -28,6 +28,8 @@
->> > ?#define OMAP4_CTRL_MODULE_WKUP_IP_REVISION ? ? ? ? 0x0000
->> > ?#define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO ? ? ? ? ? 0x0004
->> > ?#define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG ? ? ? ? ? ? ? ?0x0010
->> > +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG ?0x0114
->> > +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG ?0x011c
->> > ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0 ? ? ? ?0x0460
->> > ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1 ? ? ? ?0x0464
->> > ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2 ? ? ? ?0x0468
->> > diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->> > index 0472921..d4d18d9 100644
->> > --- a/arch/arm/mach-omap2/pm44xx.c
->> > +++ b/arch/arm/mach-omap2/pm44xx.c
->> > @@ -17,6 +17,9 @@
->> > ?#include <linux/err.h>
->> > ?#include <linux/slab.h>
->> > ?#include <asm/system_misc.h>
->> > +#include <linux/io.h>
->> > +
->> > +#include <mach/ctrl_module_wkup_44xx.h>
->> >
->> > ?#include "common.h"
->> > ?#include "clockdomain.h"
->> > @@ -215,6 +218,27 @@ static int __init omap4_pm_init(void)
->> >
->> > ? ? pr_err("Power Management for TI OMAP4.\n");
->> >
->> > + ? /*
->> > + ? ?* Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
->> > + ? ?* Mode Transition When CS1 Is Used On EMIF":
->> > + ? ?* Overwrite EMIF1/EMIF2
->> > + ? ?* SECURE_EMIF1_SDRAM_CONFIG2_REG
->> > + ? ?* SECURE_EMIF2_SDRAM_CONFIG2_REG
->> > + ? ?*/
->> > + ? if (cpu_is_omap443x()) {
->> > + ? ? ? ? ? void __iomem *secure_ctrl_mod;
->> > +
->> > + ? ? ? ? ? secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
->> > + ? ? ? ? ? BUG_ON(!secure_ctrl_mod);
->> > +
->> > + ? ? ? ? ? __raw_writel(0x10, secure_ctrl_mod +
->> > + ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
->> > + ? ? ? ? ? __raw_writel(0x10, secure_ctrl_mod +
->> > + ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
->>
->> According to the erratum description the above registers are used to
->> restore the EMIFx_SDRAM_CONFIG2 registers. So although the value 0x10,
->> maybe the value being used for EMIFx_SDRAM_CONFIG2 registers, shouldn't
->> we read the EMIFx_SDRAM_CONFIG2 registers and store them in the above
->> registers?
+2012/4/4 Javier Martinez Canillas <javier@dowhile0.org>:
+> IGEP-based boards can have two different flash memories, a OneNAND or
+> a NAND device. The boot configuration pins (sys_boot) are used to
+> specify which memory is available.
 >
-> This might be a good idea, however, this patch might be tagged as TEMP
-> until the EMIF driver is in place, this fix should rather be located
-> there. I'll take a look at this if I can change the implementation a
-> bit.
+> Also, this patch removes unnecesary code for registering the OneNAND.
 >
-This patch doesn't have any dependency with EMIF driver since it's more of
-SAR restore BUG. If the dependency is from the regsister macro etc point
-of view, PM code can to the mapping and since it is needed only once
-in the init. EMIF driver is unware of SAR restore phase and that was the
-purpose of the DMA bases SAR restore design.
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> ---
+> ?arch/arm/mach-omap2/board-igep0020.c | ? 75 ++++++++++++++--------------------
+> ?1 files changed, 31 insertions(+), 44 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+> index 930c0d3..4af615a 100644
+> --- a/arch/arm/mach-omap2/board-igep0020.c
+> +++ b/arch/arm/mach-omap2/board-igep0020.c
+> @@ -24,6 +24,8 @@
+> ?#include <linux/i2c/twl.h>
+> ?#include <linux/mmc/host.h>
+>
+> +#include <linux/mtd/nand.h>
+> +
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+>
+> @@ -39,6 +41,8 @@
+> ?#include "hsmmc.h"
+> ?#include "sdram-numonyx-m65kxxxxam.h"
+> ?#include "common-board-devices.h"
+> +#include "board-flash.h"
+> +#include "control.h"
+>
+> ?#define IGEP2_SMSC911X_CS ? ? ? 5
+> ?#define IGEP2_SMSC911X_GPIO ? ? 176
+> @@ -60,6 +64,10 @@
+> ?#define IGEP3_GPIO_LED1_RED ? ?16
+> ?#define IGEP3_GPIO_USBH_NRESET ?183
+>
+> +#define IGEP_SYSBOOT_MASK ? ? ? ? ? 0x1f
+> +#define IGEP_SYSBOOT_NAND ? ? ? ? ? 0x0f
+> +#define IGEP_SYSBOOT_ONENAND ? ? ? ?0x10
+> +
+> ?/*
+> ?* IGEP2 Hardware Revision Table
+> ?*
+> @@ -110,8 +118,10 @@ static void __init igep2_get_revision(void)
+> ? ? ? ?gpio_free(IGEP2_GPIO_LED1_RED);
+> ?}
+>
+> -#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
+> - ? ? ? defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
+> +#if defined(CONFIG_MTD_ONENAND_OMAP2) || ? ? ? ? ? ? ? \
+> + ? ? ? defined(CONFIG_MTD_ONENAND_OMAP2_MODULE) || ? ? \
+> + ? ? ? defined(CONFIG_MTD_NAND_OMAP2) || ? ? ? ? ? ? ? \
+> + ? ? ? defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+>
+> ?#define ONENAND_MAP ? ? ? ? ? ? 0x20000000
+>
+> @@ -123,7 +133,7 @@ static void __init igep2_get_revision(void)
+> ?* So MTD regards it as 4KiB page size and 256KiB block size 64*(2*2048)
+> ?*/
+>
+> -static struct mtd_partition igep_onenand_partitions[] = {
+> +static struct mtd_partition igep_flash_partitions[] = {
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "X-Loader",
+> ? ? ? ? ? ? ? ?.offset ? ? ? ? = 0,
+> @@ -151,50 +161,27 @@ static struct mtd_partition igep_onenand_partitions[] = {
+> ? ? ? ?},
+> ?};
+>
+> -static struct omap_onenand_platform_data igep_onenand_data = {
+> - ? ? ? .parts = igep_onenand_partitions,
+> - ? ? ? .nr_parts = ARRAY_SIZE(igep_onenand_partitions),
+> - ? ? ? .dma_channel ? ?= -1, ? /* disable DMA in OMAP OneNAND driver */
+> -};
+> -
+> -static struct platform_device igep_onenand_device = {
+> - ? ? ? .name ? ? ? ? ? = "omap2-onenand",
+> - ? ? ? .id ? ? ? ? ? ? = -1,
+> - ? ? ? .dev = {
+> - ? ? ? ? ? ? ? .platform_data = &igep_onenand_data,
+> - ? ? ? },
+> -};
+> +static inline u32 igep_get_sysboot_value(void)
+> +{
+> + ? ? ? return omap_ctrl_readl(OMAP343X_CONTROL_STATUS) & IGEP_SYSBOOT_MASK;
+> +}
+>
+> ?static void __init igep_flash_init(void)
+> ?{
+> - ? ? ? u8 cs = 0;
+> - ? ? ? u8 onenandcs = GPMC_CS_NUM + 1;
+> -
+> - ? ? ? for (cs = 0; cs < GPMC_CS_NUM; cs++) {
+> - ? ? ? ? ? ? ? u32 ret;
+> - ? ? ? ? ? ? ? ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
+> -
+> - ? ? ? ? ? ? ? /* Check if NAND/oneNAND is configured */
+> - ? ? ? ? ? ? ? if ((ret & 0xC00) == 0x800)
+> - ? ? ? ? ? ? ? ? ? ? ? /* NAND found */
+> - ? ? ? ? ? ? ? ? ? ? ? pr_err("IGEP: Unsupported NAND found\n");
+> - ? ? ? ? ? ? ? else {
+> - ? ? ? ? ? ? ? ? ? ? ? ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
+> - ? ? ? ? ? ? ? ? ? ? ? if ((ret & 0x3F) == (ONENAND_MAP >> 24))
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* ONENAND found */
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? onenandcs = cs;
+> - ? ? ? ? ? ? ? }
+> - ? ? ? }
+> -
+> - ? ? ? if (onenandcs > GPMC_CS_NUM) {
+> - ? ? ? ? ? ? ? pr_err("IGEP: Unable to find configuration in GPMC\n");
+> - ? ? ? ? ? ? ? return;
+> - ? ? ? }
+> -
+> - ? ? ? igep_onenand_data.cs = onenandcs;
+> -
+> - ? ? ? if (platform_device_register(&igep_onenand_device) < 0)
+> - ? ? ? ? ? ? ? pr_err("IGEP: Unable to register OneNAND device\n");
+> + ? ? ? u32 mux;
+> + ? ? ? mux = igep_get_sysboot_value();
+> +
+> + ? ? ? if (mux == IGEP_SYSBOOT_NAND) {
+> + ? ? ? ? ? ? ? pr_info("IGEP: initializing NAND memory device\n");
+> + ? ? ? ? ? ? ? board_nand_init(igep_flash_partitions,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(igep_flash_partitions),
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, NAND_BUSWIDTH_16);
+> + ? ? ? } else if (mux == IGEP_SYSBOOT_ONENAND) {
+> + ? ? ? ? ? ? ? pr_info("IGEP: initializing OneNAND memory device\n");
+> + ? ? ? ? ? ? ? board_onenand_init(igep_flash_partitions,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(igep_flash_partitions), 0);
+> + ? ? ? } else
+> + ? ? ? ? ? ? ? pr_err("IGEP: Flash: unsupported sysboot sequence found\n");
+> ?}
+>
+> ?#else
+> --
+> 1.7.7.6
+>
 
-Hope this clarifies.
+Seems good to me.
 
-Regards
-Santosh
+Tony, as this is a fix ,may be included ?
+
+Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+
+Cheers,
+    Enric
