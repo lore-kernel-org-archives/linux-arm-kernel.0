@@ -1,186 +1,166 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 17:28:13 +0200
-Subject: [PATCH 23/33] ARM i.MX: Add common clock support for 2bit gate
+Date: Wed, 25 Apr 2012 17:28:17 +0200
+Subject: [PATCH 27/33] ARM i.MX1: implement clocks using common clock framework
 In-Reply-To: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
 References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1335367703-19929-24-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1335367703-19929-28-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gate consists of two bits:
-
-0b00: clk disabled
-0b01: clk enabled in run mode and disabled in sleep mode
-0b11: clk enabled
-
-Currently only disabled and enabled are supported. As it's unlikely
-that we find something like this in another SoC create a i.MX specific
-clk helper for this.
+This also changes the DMA clkdev lookup to use the imx-dma driver name
+and "ahb" as connection ID to request the hclk dma clock.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/mach-imx/Makefile    |    2 +-
- arch/arm/mach-imx/clk-gate2.c |  115 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h       |   12 +++++
- 3 files changed, 128 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-gate2.c
+ arch/arm/mach-imx/Kconfig    |    1 +
+ arch/arm/mach-imx/Makefile   |    2 +-
+ arch/arm/mach-imx/clk-imx1.c |  115 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 117 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/clk-imx1.c
 
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 0b832b1..c03920a 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -34,6 +34,7 @@ config ARCH_MX53
+ config SOC_IMX1
+ 	bool
+ 	select ARCH_MX1
++	select COMMON_CLK
+ 	select CPU_ARM920T
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MXC_AVIC
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 66bc6be..1b3f2ae 100644
+index 173e869..52b3af4 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -11,7 +11,7 @@ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clock-imx35.o ehci-imx35.o pm-i
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_SOC_IMX1) += clock-imx1.o mm-imx1.o
++obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
+ obj-$(CONFIG_SOC_IMX21) += clock-imx21.o mm-imx21.o
  
- obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clock-mx51-mx53.o ehci-imx5.o pm-imx5.o cpu_op-mx51.o
- 
--obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o
-+obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o
- 
- # Support for CMOS sensor interface
- obj-$(CONFIG_MX1_VIDEO) += mx1-camera-fiq.o mx1-camera-fiq-ksym.o
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+ obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
 new file mode 100644
-index 0000000..3e4713c8
+index 0000000..0f0beb5
 --- /dev/null
-+++ b/arch/arm/mach-imx/clk-gate2.c
++++ b/arch/arm/mach-imx/clk-imx1.c
 @@ -0,0 +1,115 @@
 +/*
-+ * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
-+ * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
++ *  Copyright (C) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
-+ * Gated clock implementation
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/string.h>
-+
-+/**
-+ * DOC: basic gatable clock which can gate and ungate it's ouput
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
-+ * Traits of this clock:
-+ * prepare - clk_(un)prepare only ensures parent is (un)prepared
-+ * enable - clk_enable and clk_disable are functional & control gating
-+ * rate - inherits rate from parent.  No clk_set_rate support
-+ * parent - fixed parent.  No clk_set_parent support
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 + */
 +
-+#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/clkdev.h>
++#include <linux/err.h>
 +
-+static int clk_gate2_enable(struct clk_hw *hw)
-+{
-+	struct clk_gate *gate = to_clk_gate(hw);
-+	u32 reg;
-+	unsigned long flags = 0;
++#include <mach/hardware.h>
++#include <mach/common.h>
++#include "clk.h"
 +
-+	if (gate->lock)
-+		spin_lock_irqsave(gate->lock, flags);
++/* CCM register addresses */
++#define IO_ADDR_CCM(off)	(MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR + (off)))
 +
-+	reg = readl(gate->reg);
-+	reg |= 3 << gate->bit_idx;
-+	writel(reg, gate->reg);
++#define CCM_CSCR	IO_ADDR_CCM(0x0)
++#define CCM_MPCTL0	IO_ADDR_CCM(0x4)
++#define CCM_SPCTL0	IO_ADDR_CCM(0xc)
++#define CCM_PCDR	IO_ADDR_CCM(0x20)
 +
-+	if (gate->lock)
-+		spin_unlock_irqrestore(gate->lock, flags);
++/* SCM register addresses */
++#define IO_ADDR_SCM(off)	(MX1_IO_ADDRESS(MX1_SCM_BASE_ADDR + (off)))
 +
-+	return 0;
-+}
++#define SCM_GCCR	IO_ADDR_SCM(0xc)
 +
-+static void clk_gate2_disable(struct clk_hw *hw)
-+{
-+	struct clk_gate *gate = to_clk_gate(hw);
-+	u32 reg;
-+	unsigned long flags = 0;
-+
-+	if (gate->lock)
-+		spin_lock_irqsave(gate->lock, flags);
-+
-+	reg = readl(gate->reg);
-+	reg &= ~(3 << gate->bit_idx);
-+	writel(reg, gate->reg);
-+
-+	if (gate->lock)
-+		spin_unlock_irqrestore(gate->lock, flags);
-+}
-+
-+static int clk_gate2_is_enabled(struct clk_hw *hw)
-+{
-+	u32 reg;
-+	struct clk_gate *gate = to_clk_gate(hw);
-+
-+	reg = readl(gate->reg);
-+
-+	if (((reg >> gate->bit_idx) & 3) == 3)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static struct clk_ops clk_gate2_ops = {
-+	.enable = clk_gate2_enable,
-+	.disable = clk_gate2_disable,
-+	.is_enabled = clk_gate2_is_enabled,
++static const char *prem_sel_clks[] = { "clk32_premult", "clk16m", };
++static const char *clko_sel_clks[] = { "per1", "hclk", "clk48m", "clk16m", "prem",
++				"fclk", };
++enum imx1_clks {
++	dummy, clk32, clk16m_ext, clk16m, clk32_premult, prem, mpll, spll, mcu,
++	fclk, hclk, clk48m, per1, per2, per3, clko, dma_gate, csi_gate,
++	mma_gate, usbd_gate, clk_max
 +};
 +
-+struct clk *clk_register_gate2(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 bit_idx,
-+		u8 clk_gate2_flags, spinlock_t *lock)
++static struct clk *clk[clk_max];
++
++int __init mx1_clocks_init(unsigned long fref)
 +{
-+	struct clk_gate *gate;
-+	struct clk *clk;
++	int i;
 +
-+	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	if (!gate) {
-+		pr_err("%s: could not allocate gated clk\n", __func__);
-+		return ERR_PTR(-ENOMEM);
-+	}
++	clk[dummy] = imx_clk_fixed("dummy", 0);
++	clk[clk32] = imx_clk_fixed("clk32", fref);
++	clk[clk16m_ext] = imx_clk_fixed("clk16m_ext", 16000000);
++	clk[clk16m] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
++	clk[clk32_premult] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
++	clk[prem] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks,
++			ARRAY_SIZE(prem_sel_clks));
++	clk[mpll] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
++	clk[spll] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
++	clk[mcu] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
++	clk[fclk] = imx_clk_divider("fclk", "mpll", CCM_CSCR, 15, 1);
++	clk[hclk] = imx_clk_divider("hclk", "spll", CCM_CSCR, 10, 4);
++	clk[clk48m] = imx_clk_divider("clk48m", "spll", CCM_CSCR, 26, 3);
++	clk[per1] = imx_clk_divider("per1", "spll", CCM_PCDR, 0, 4);
++	clk[per2] = imx_clk_divider("per2", "spll", CCM_PCDR, 4, 4);
++	clk[per3] = imx_clk_divider("per3", "spll", CCM_PCDR, 16, 7);
++	clk[clko] = imx_clk_mux("clko", CCM_CSCR, 29, 3, clko_sel_clks,
++			ARRAY_SIZE(clko_sel_clks));
++	clk[dma_gate] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 4);
++	clk[csi_gate] = imx_clk_gate("csi_gate", "hclk", SCM_GCCR, 2);
++	clk[mma_gate] = imx_clk_gate("mma_gate", "hclk", SCM_GCCR, 1);
++	clk[usbd_gate] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
 +
-+	/* struct clk_gate assignments */
-+	gate->reg = reg;
-+	gate->bit_idx = bit_idx;
-+	gate->flags = clk_gate2_flags;
-+	gate->lock = lock;
++	for (i = 0; i < ARRAY_SIZE(clk); i++)
++		if (IS_ERR(clk[i]))
++			pr_err("imx1 clk %d: register failed with %ld\n",
++				i, PTR_ERR(clk[i]));
 +
-+	clk = clk_register(dev, name,
-+			&clk_gate2_ops, &gate->hw,
-+			(parent_name ? &parent_name : NULL),
-+			(parent_name ? 1 : 0),
-+			flags);
-+	if (IS_ERR(clk))
-+		kfree(clk);
++	clk_register_clkdev(clk[dma_gate], "ahb", "imx-dma");
++	clk_register_clkdev(clk[csi_gate], NULL, "mx1-camera.0");
++	clk_register_clkdev(clk[mma_gate], "mma", NULL);
++	clk_register_clkdev(clk[usbd_gate], NULL, "imx_udc.0");
++	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
++	clk_register_clkdev(clk[hclk], "ipg", "imx-gpt.0");
++	clk_register_clkdev(clk[per1], "per", "imx1-uart.0");
++	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.0");
++	clk_register_clkdev(clk[per1], "per", "imx1-uart.1");
++	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.1");
++	clk_register_clkdev(clk[per1], "per", "imx1-uart.2");
++	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.2");
++	clk_register_clkdev(clk[hclk], NULL, "imx-i2c.0");
++	clk_register_clkdev(clk[per2], "per", "imx1-cspi.0");
++	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.0");
++	clk_register_clkdev(clk[per2], "per", "imx1-cspi.1");
++	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.1");
++	clk_register_clkdev(clk[per2], NULL, "imx-mmc.0");
++	clk_register_clkdev(clk[per2], "per", "imx-fb.0");
++	clk_register_clkdev(clk[dummy], "ipg", "imx-fb.0");
++	clk_register_clkdev(clk[dummy], "ahb", "imx-fb.0");
++	clk_register_clkdev(clk[hclk], "mshc", NULL);
++	clk_register_clkdev(clk[per3], "ssi", NULL);
++	clk_register_clkdev(clk[clk32], NULL, "mxc_rtc.0");
++	clk_register_clkdev(clk[clko], "clko", NULL);
 +
-+	return clk;
++	mxc_timer_init(NULL, MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR),
++			MX1_TIM1_INT);
++
++	return 0;
 +}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 331316d..5f6e435 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -24,6 +24,18 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 		const char *parent_name, void __iomem *base, u32 gate_mask,
- 		u32 div_mask);
- 
-+struct clk *clk_register_gate2(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 bit_idx,
-+		u8 clk_gate_flags, spinlock_t *lock);
-+
-+static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift)
-+{
-+	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+			shift, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_fixed(const char *name, int rate)
- {
- 	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
 -- 
 1.7.10
