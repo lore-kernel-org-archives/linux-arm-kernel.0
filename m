@@ -1,34 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Apr 2012 11:07:01 -0700
-Subject: [GIT PULL] i.MX cleanup patches for next
-In-Reply-To: <20120425062518.GW20478@pengutronix.de>
-References: <20120411084403.GN3852@pengutronix.de>
- <CAOesGMhk9tGokNwy1kdFDB+G08OYEEq9Uf1Qu=K=T8ufick2ag@mail.gmail.com>
- <20120416080053.GQ3852@pengutronix.de>
- <20120425062518.GW20478@pengutronix.de>
-Message-ID: <CAOesGMitB=me-pUS5u3=jCAEuDNg5+bp1b_6gJS1sUW-5CLSeg@mail.gmail.com>
+Date: Wed, 25 Apr 2012 11:09:31 -0700
+Subject: [GIT PULL] msm fixes for 3.4rc
+In-Reply-To: <20120424175457.GA5013@codeaurora.org>
+References: <20120424175457.GA5013@codeaurora.org>
+Message-ID: <CAOesGMjHigkcY-bEjO7PKc0T-C_6HVMiRydgJjzV+agVLQKU1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 11:25 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Olof,
+On Tue, Apr 24, 2012 at 10:54 AM, David Brown <davidb@codeaurora.org> wrote:
+> This fixes a boot problem with the MSM8660 target on device tree
+> caused by the conversion of the ARM GIC driver to proper IRQ domain
+> support.
 >
-> On Mon, Apr 16, 2012 at 10:00:53AM +0200, Sascha Hauer wrote:
->>
->> Ok, won't do this in future. I just thought it might be a good idea,
->> because otherwise I end up with the same tag names in the next pull
->> request.
->>
->> >
->> > Branch contents otherwise looks OK, so respin and send a fresh pull
->> > request and we'll merge it in.
->>
->> Here it is:
+> The following changes since commit af33eadc73e4a5d35a966c1c7ffe28a8424c9d96:
 >
-> Still something wrong?
+> ?ARM: msm: Fix section mismatches in proc_comm.c (2012-04-13 10:23:17 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git msm-fix
 
-Nope, just forgot to revisit. Pulled now. Sorry for the delay.
+Thanks, pulled.
 
-Regards,
 
 -Olof
