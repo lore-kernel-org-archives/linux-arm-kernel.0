@@ -1,77 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 24 Apr 2012 18:22:26 -0600 (MDT)
-Subject: [PATCH-V3 2/3] ARM: OMAP3+: clockdomain33xx: Add clockdomain
- data and respective operations
-In-Reply-To: <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1204241725430.24864@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 24 Apr 2012 17:32:37 -0700
+Subject: [GIT PULL] Samsung fixes-2 for v3.4
+In-Reply-To: <CAOesGMhp48Kh+tJ1534G=ze0CEcVBpaPQxVKs8A31difVw9h9Q@mail.gmail.com>
+References: <4F89A0A5.5030806@samsung.com>
+ <CAOesGMhp48Kh+tJ1534G=ze0CEcVBpaPQxVKs8A31difVw9h9Q@mail.gmail.com>
+Message-ID: <4F974625.1030607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vaibhav, Afzal, Vaibhav,
+Olof Johansson wrote:
+> Hi,
 
-A few questions while reviewing this patch:
+[...]
 
-On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
+(Cc'ed Marek Szyprowsk)
 
-> AM33XX PRCM module consist of, various clockdomains, in all
-> total we have 18 clockdomains available, with following
-> controlling options,
->    - NO Sleep: sleep transition can not be initiated,
->    - SW Sleep: sw forced sleep transition,
->    - SW Wakeup: sw forced wakeup transition,
->    - HW Auto: transitions are based upon hw conditions.
-> 
-> This patch adds all available clockdomain data, respective
-> clockdomain operations for AM33XX family of device, and also
-> integrates it into existing OMAP framework.
-> 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Looking at your current fixes-3 branch, it's unclear at a quick glance
+> why the clk_type patch is a bugfix, and especially why it is a
+> regression fix -- it looks like a cleanup. We're very close to 3.4-rc3
 
-...
+I agree that the removing clk_type member in sdhci platform data should 
+be included in cleanup stuff, it is useless in current mainline though.
 
-> +static struct clockdomain l4ls_am33xx_clkdm = {
-> +	.name		= "l4ls_clkdm",
-> +	.pwrdm		= { .name = "per_pwrdm" },
-> +	.cm_inst	= AM33XX_CM_PER_MOD,
-> +	.clkdm_offs	= AM33XX_CM_PER_L4LS_CLKSTCTRL_OFFSET,
-> +	.clktrctrl_mask	= AM33XX_CLKTRCTRL_MASK,
-> +	.flags		= (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
+Marek, is this ok to you?
 
-It looks to me like we don't need the .clktrctrl_mask field, since 
-according to the clockdomains code, the CLKTRCTRL field is at the same bit 
-shift for each clockdomain.
+> now, so we should only be merging fixes (and ideally only regressions
+> since 3.3).
+>
+> So, if you do need it to go into 3.4 please motivate it when you send
+> the pull request.
+>
 
-Also, since we're not defining any autodeps for the AM335x platform, we 
-shouldn't need the CLKDM_NO_AUTODEPS flag either?  Since no autodeps are 
-defined, the default will be to not set any autodeps.
+Thanks.
 
-Another question is about the CLKTRCTRL bitfields.  According to
-_AM335x ARM Cortex-A8 Microprocessors (MPUs) Technical Reference
-Manual_ Rev. D (SPRUH73D), most of the clockdomains support NO_SLEEP mode 
-(i.e., CLKTRCTRL = 0x0).  That means that technically, we should also set 
-the CLKDM_CAN_DISABLE_AUTO flag.  Unless the documentation is incorrect 
-here?  In another section (Table 8-9 "Clock Transition Mode Settings"), 
-it claims that CLKTRCTRL = 0 is not supported...
-
-Also, a question about the L4_WKUP clockdomain:
-
-> +static struct clockdomain l4_wkup_am33xx_clkdm = {
-> +	.name		= "l4_wkup_clkdm",
-> +	.pwrdm		= { .name = "wkup_pwrdm" },
-> +	.cm_inst	= AM33XX_CM_WKUP_MOD,
-> +	.clkdm_offs	= AM33XX_CM_WKUP_CLKSTCTRL_OFFSET,
-> +	.clktrctrl_mask	= AM33XX_CLKTRCTRL_MASK,
-> +	.flags		= (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
-> +};
-
-Table 8-89 "CM_WKUP_CLKSTCTRL Register Field Descriptions" of SPRUH73D 
-claims that this clockdomain supports hardware-supervised automatic 
-clockdomain transitions.  Again this conflicts with Table 8-9.  Is this a 
-documentation bug, or should we update the patch?
-
-
-- Paul
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
