@@ -1,43 +1,40 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 25 Apr 2012 08:32:14 +0530
-Subject: [PATCH V3 07/12] ata/sata_mv: Remove conditional compilation of
- clk code
-In-Reply-To: <20120424201802.GE3628@n2100.arm.linux.org.uk>
-References: <cover.1335266056.git.viresh.kumar@st.com>
- <abbcf661dc58948794839eb0fba1d5a0950ec848.1335266056.git.viresh.kumar@st.com>
- <20120424120019.GE24089@lunn.ch>
- <CAOh2x==YaPxYxigyE=n2weoKHhu4ktGRHHGdzgs2+d1_Lo-D4Q@mail.gmail.com>
- <20120424201802.GE3628@n2100.arm.linux.org.uk>
-Message-ID: <CAOh2x==Se4ipK_jexOE_=82=S4p41W9Ek0Om6DrUwctSz-Wcyw@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 25 Apr 2012 11:06:21 +0800
+Subject: [PATCH v2 0/3] add gpmi-nand dt support for mx6q and mx28
+Message-ID: <1335323184-11233-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 1:48 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Look, it's very very simple.
+The mx6q-arm2 and imx28evk have already support the device tree now.
+So i decide to add the gpmi-nand dt support to them.
 
-Thanks for explaining.
+The mx23 does not support the device tree now. I will add the gpmi dt support
+when it is ready.
 
-> Finally, if a platform has clk API support enabled, and a driver requests
-> a clock, and clk_get() returns an error, it means the clock was not found.
-> That's a fatal error for the driver, because it means that something is
-> wrong in the lookup tables - moreover, it means that _potentially_ someone
-> screwed up the clk matching and this device has a clock which needs some
-> control, but wasn't found. ?I don't think ignoring that kind of error,
-> even by printing a warning, is a particularly good approach - it seems
-> to me it makes things fragile. ?What if this missing clock causes the
-> bus to your device to ultimately hang?
+Test this patch set on both MX6Q(arm2) and mx28(evk).
 
-This is what i was thinking too and thats why floated this version of patch.
-But as Andrew said, clk API support is enabled for them, but still they
-don't have a clk for sata. To get this working, there are two solutions:
-- Create dummy clk for sata for that platform, so clk_get doesn't fail.
-- Check for error before every call to clk APIs after clk_get().
+v1 --> v2
+	[1] merge the gpmi/bch device node into one node.
+	[2] add partitions support.
+	[3] misc
 
-Andrew favored the second one. Which means, even on platforms
-with clk API defined and clk enable required, if there are some issues
-with lookup table, and clk_get() fails, system may hang when registers
-are accessed. For this i favored first one.
+Huang Shijie (3):
+  mtd: gpmi: add device tree support for mx6q and mx28
+  ARM: mx28: add gpmi-nand dt support
+  ARM: mx6q: add gpmi-nand dt support
 
---
-viresh
+ .../devicetree/bindings/mtd/gpmi-nand.txt          |   34 +++++
+ arch/arm/boot/dts/imx28-evk.dts                    |    4 +
+ arch/arm/boot/dts/imx28.dtsi                       |   18 ++--
+ arch/arm/boot/dts/imx6q-arm2.dts                   |    4 +
+ arch/arm/boot/dts/imx6q.dtsi                       |   12 ++
+ arch/arm/mach-imx/clock-imx6q.c                    |    5 +-
+ arch/arm/mach-mxs/clock-mx28.c                     |    2 +-
+ drivers/mtd/nand/Kconfig                           |    2 +-
+ drivers/mtd/nand/gpmi-nand/bch-regs.h              |   42 +++++--
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c              |   18 ++--
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c             |  131 ++++++++++----------
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |    6 +-
+ include/linux/mtd/gpmi-nand.h                      |    8 +-
+ 13 files changed, 185 insertions(+), 101 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmi-nand.txt
