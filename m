@@ -1,40 +1,45 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 25 Apr 2012 15:40:08 +0000
-Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-In-Reply-To: <alpine.DEB.2.00.1204250934130.29696@utopia.booyaka.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
- <4F97B891.1020601@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
- <4F97E243.6000500@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
- <4F97EF11.4020300@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FDAE7@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204250755020.29696@utopia.booyaka.com>
- <4F9816D1.3000102@ti.com>
- <alpine.DEB.2.00.1204250934130.29696@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FE04C@DBDE01.ent.ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Apr 2012 09:48:33 -0600
+Subject: [PATCHv4 1/2] drivers: input: keypad: Add device tree support
+In-Reply-To: <1335346004-18108-1-git-send-email-sourav.poddar@ti.com>
+References: <1335346004-18108-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <4F981CD1.2050007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 21:06:43, Paul Walmsley wrote:
-> On Wed, 25 Apr 2012, Cousson, Benoit wrote:
-> 
-> > Please take care of changing the hwmod main_clk as well. But maybe 
-> > that's not part of that series.
-> 
-> It's not part of the series yet.
-> 
-> Vaibhav, could you take care of changing the main_clk in your hwmod data 
-> patches, and send those to the list?
-> 
-> 
-Yes, Working on the same now...
+On 04/25/2012 03:26 AM, Sourav Poddar wrote:
+> Update the Documentation with omap4 keypad device tree
+> binding information.
+> Add device tree support for omap4 keypad driver.
 
-Thanks,
-Vaibhav
+> diff --git a/Documentation/devicetree/bindings/input/omap-keypad.txt b/Documentation/devicetree/bindings/input/omap-keypad.txt
 
-> - Paul
-> 
+> +Required Board Specific Properties, in addition to those specified by
+> +the shared matrix-keyboard bindings:
+> +- keypad,num-rows: Number of row lines connected to the keypad
+> +  controller.
+> +
+> +- keypad,num-columns: Number of column lines connected to the
+> +  keypad controller.
+
+I'm not sure if "keypad," is the appropriate prefix here. If the
+properties are specific to this one TI/OMAP binding, "ti," might be a
+better prefix. However, if they're more generally applicable, maybe
+"linux," to match "linux,keymap"?
+
+> +Optional Properties specific to linux:
+> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
+
+It's probably worth considering whether num-rows/columns should be part
+of matrix-keyboard.txt, and whether linux,keypad-no-autorepeat should be
+part of some core keyboard binding. Some of the properties in
+tegra-kbc.txt might be worth generalizing too (debounce/repeat delay,
+ghost filter)?
+
+> +Example:
+> +        keypad at 4ae1c000{
+> +                compatible = "ti,omap4-keypad";
+> +                keypad,num-rows = <2>;
+> +                keypad,num-columns = <8>;
+> +		linux,keypad-no-autorepeat;
+> +	};
