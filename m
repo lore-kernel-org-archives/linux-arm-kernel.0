@@ -1,9 +1,9 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Apr 2012 17:27:54 +0200
-Subject: [PATCH 04/33] net fec: do not depend on grouped clocks
+Date: Wed, 25 Apr 2012 17:27:51 +0200
+Subject: [PATCH 01/33] dmaengine i.MX SDMA: do not depend on grouped clocks
 In-Reply-To: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
 References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1335367703-19929-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1335367703-19929-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,98 +23,119 @@ are converted to the generic clock framework
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/net/ethernet/freescale/fec.c |   35 ++++++++++++++++++++++------------
- 1 file changed, 23 insertions(+), 12 deletions(-)
+ drivers/dma/imx-sdma.c |   40 ++++++++++++++++++++++++++++------------
+ 1 file changed, 28 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index a12b3f5..b249463 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -206,7 +206,8 @@ struct fec_enet_private {
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index d3e38e2..fddccae 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -322,7 +322,8 @@ struct sdma_engine {
+ 	struct sdma_context_data	*context;
+ 	dma_addr_t			context_phys;
+ 	struct dma_device		dma_device;
+-	struct clk			*clk;
++	struct clk			*clk_ipg;
++	struct clk			*clk_ahb;
+ 	struct mutex			channel_0_lock;
+ 	struct sdma_script_start_addrs	*script_addrs;
+ };
+@@ -859,7 +860,8 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
+ 	sdmac->peripheral_type = data->peripheral_type;
+ 	sdmac->event_id0 = data->dma_request;
  
- 	struct net_device *netdev;
+-	clk_enable(sdmac->sdma->clk);
++	clk_enable(sdmac->sdma->clk_ipg);
++	clk_enable(sdmac->sdma->clk_ahb);
  
--	struct clk *clk;
-+	struct clk *clk_ipg;
-+	struct clk *clk_ahb;
- 
- 	/* The saved address of a sent-in-place packet/buffer, for skfree(). */
- 	unsigned char *tx_bounce[TX_RING_SIZE];
-@@ -1064,7 +1065,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
- 	 * Reference Manual has an error on this, and gets fixed on i.MX6Q
- 	 * document.
- 	 */
--	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000);
-+	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk_ahb), 5000000);
- 	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
- 		fep->phy_speed--;
- 	fep->phy_speed <<= 1;
-@@ -1609,12 +1610,20 @@ fec_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	fep->clk = clk_get(&pdev->dev, NULL);
--	if (IS_ERR(fep->clk)) {
--		ret = PTR_ERR(fep->clk);
-+	fep->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(fep->clk_ipg)) {
-+		ret = PTR_ERR(fep->clk_ipg);
- 		goto failed_clk;
- 	}
--	clk_prepare_enable(fep->clk);
-+
-+	fep->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(fep->clk_ahb)) {
-+		ret = PTR_ERR(fep->clk_ahb);
-+		goto failed_clk;
-+	}
-+
-+	clk_prepare_enable(fep->clk_ahb);
-+	clk_prepare_enable(fep->clk_ipg);
- 
- 	ret = fec_enet_init(ndev);
+ 	ret = sdma_request_channel(sdmac);
  	if (ret)
-@@ -1637,8 +1646,8 @@ failed_register:
- 	fec_enet_mii_remove(fep);
- failed_mii_init:
- failed_init:
--	clk_disable_unprepare(fep->clk);
--	clk_put(fep->clk);
-+	clk_disable_unprepare(fep->clk_ahb);
-+	clk_disable_unprepare(fep->clk_ipg);
- failed_clk:
- 	for (i = 0; i < FEC_IRQ_NUM; i++) {
- 		irq = platform_get_irq(pdev, i);
-@@ -1670,8 +1679,8 @@ fec_drv_remove(struct platform_device *pdev)
- 		if (irq > 0)
- 			free_irq(irq, ndev);
- 	}
--	clk_disable_unprepare(fep->clk);
--	clk_put(fep->clk);
-+	clk_disable_unprepare(fep->clk_ahb);
-+	clk_disable_unprepare(fep->clk_ipg);
- 	iounmap(fep->hwp);
- 	free_netdev(ndev);
+@@ -896,7 +898,8 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
  
-@@ -1695,7 +1704,8 @@ fec_suspend(struct device *dev)
- 		fec_stop(ndev);
- 		netif_device_detach(ndev);
+ 	dma_free_coherent(NULL, PAGE_SIZE, sdmac->bd, sdmac->bd_phys);
+ 
+-	clk_disable(sdma->clk);
++	clk_disable(sdma->clk_ipg);
++	clk_disable(sdma->clk_ahb);
+ }
+ 
+ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+@@ -1169,12 +1172,14 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
+ 	addr = (void *)header + header->script_addrs_start;
+ 	ram_code = (void *)header + header->ram_code_start;
+ 
+-	clk_enable(sdma->clk);
++	clk_enable(sdma->clk_ipg);
++	clk_enable(sdma->clk_ahb);
+ 	/* download the RAM image for SDMA */
+ 	sdma_load_script(sdma, ram_code,
+ 			header->ram_code_size,
+ 			addr->ram_code_start_addr);
+-	clk_disable(sdma->clk);
++	clk_disable(sdma->clk_ipg);
++	clk_disable(sdma->clk_ahb);
+ 
+ 	sdma_add_scripts(sdma, addr);
+ 
+@@ -1216,7 +1221,8 @@ static int __init sdma_init(struct sdma_engine *sdma)
+ 		return -ENODEV;
  	}
--	clk_disable_unprepare(fep->clk);
-+	clk_disable_unprepare(fep->clk_ahb);
-+	clk_disable_unprepare(fep->clk_ipg);
+ 
+-	clk_enable(sdma->clk);
++	clk_enable(sdma->clk_ipg);
++	clk_enable(sdma->clk_ahb);
+ 
+ 	/* Be sure SDMA has not started yet */
+ 	writel_relaxed(0, sdma->regs + SDMA_H_C0PTR);
+@@ -1269,12 +1275,14 @@ static int __init sdma_init(struct sdma_engine *sdma)
+ 	/* Initializes channel's priorities */
+ 	sdma_set_channel_priority(&sdma->channel[0], 7);
+ 
+-	clk_disable(sdma->clk);
++	clk_disable(sdma->clk_ipg);
++	clk_disable(sdma->clk_ahb);
  
  	return 0;
- }
-@@ -1706,7 +1716,8 @@ fec_resume(struct device *dev)
- 	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct fec_enet_private *fep = netdev_priv(ndev);
  
--	clk_prepare_enable(fep->clk);
-+	clk_prepare_enable(fep->clk_ahb);
-+	clk_prepare_enable(fep->clk_ipg);
- 	if (netif_running(ndev)) {
- 		fec_restart(ndev, fep->full_duplex);
- 		netif_device_attach(ndev);
+ err_dma_alloc:
+-	clk_disable(sdma->clk);
++	clk_disable(sdma->clk_ipg);
++	clk_disable(sdma->clk_ahb);
+ 	dev_err(sdma->dev, "initialisation failed with %d\n", ret);
+ 	return ret;
+ }
+@@ -1313,12 +1321,21 @@ static int __init sdma_probe(struct platform_device *pdev)
+ 		goto err_request_region;
+ 	}
+ 
+-	sdma->clk = clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(sdma->clk)) {
+-		ret = PTR_ERR(sdma->clk);
++	sdma->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
++	if (IS_ERR(sdma->clk_ipg)) {
++		ret = PTR_ERR(sdma->clk_ipg);
+ 		goto err_clk;
+ 	}
+ 
++	sdma->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
++	if (IS_ERR(sdma->clk_ahb)) {
++		ret = PTR_ERR(sdma->clk_ahb);
++		goto err_clk;
++	}
++
++	clk_prepare(sdma->clk_ipg);
++	clk_prepare(sdma->clk_ahb);
++
+ 	sdma->regs = ioremap(iores->start, resource_size(iores));
+ 	if (!sdma->regs) {
+ 		ret = -ENOMEM;
+@@ -1426,7 +1443,6 @@ err_alloc:
+ err_request_irq:
+ 	iounmap(sdma->regs);
+ err_ioremap:
+-	clk_put(sdma->clk);
+ err_clk:
+ 	release_mem_region(iores->start, resource_size(iores));
+ err_request_region:
 -- 
 1.7.10
