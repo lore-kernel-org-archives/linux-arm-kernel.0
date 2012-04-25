@@ -1,153 +1,279 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 25 Apr 2012 08:40:42 +0000
-Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source
- selection using kernel param
-In-Reply-To: <20120424162016.GK3739@atomide.com>
-References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
- <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
- <20120424162016.GK3739@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FD4DC@DBDE01.ent.ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 25 Apr 2012 10:47:51 +0200
+Subject: [PATCH v6 1/3] USB: Add driver for NXP ISP1301 USB transceiver
+Message-ID: <1335343673-7504-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 21:50:16, Tony Lindgren wrote:
+This very-lowlevel driver registers the NXP ISP1301 chip via the I2C subsystem.
+The chip is the USB transceiver shared by ohci-nxp, lpc32xx_udc (gadget) and
+isp1301_omap.
 
-Thanks Tony for review comments, my response in-lined below -
+Following patches let the respective USB host and gadget drivers use this
+driver, instead of duplicating ISP1301 handling.
 
-> Hi,
-> 
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120424 02:54]:
-> > Current OMAP code supports couple of clocksource options based
-> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
-> > So there can be 3 options -
-> > 
-> > 1. 32KHz sync-timer
-> > 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
-> > 3. 32KHz based gptimer.
-> > 
-> > The optional gptimer based clocksource was added so that it can
-> > give the high precision than sync-timer, so expected usage was 2
-> > and not 3.
-> > Unfortunately option 2, clocksource doesn't meet the requirement of
-> > free-running clock as per clocksource need. It stops in low power states
-> > when sys_clock is cut. That makes gptimer based clocksource option
-> > useless for OMAP2/3/4 devices with sys_clock as a clock input.
-> > Option 3 will still work but it is no better than 32K sync-timer
-> > based clocksource.
-> 
-> For some cases sys clock based timer is still valid if you don't
-> care about PM. In that case deeper idle states need to be disabled,
-> not the timer as discussed earlier. Please update the comments accordingly.
->  
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Ok, I will add below statement, 
+---
 
-"Also, in order to use option 2, deeper idle stated MUST be disabled."
+Applies to v3.4-rc3
 
+Changes since v5:
+* Removed DRV_VERSION
+* Use EXPORT_SYMBOL_GPL()
+* Removed FSF address
 
-> > So ideally we can kill the gptimer based clocksource option but there
-> > are some OMAP based derivative SoCs like AM33XX which doesn't have
-> > 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
-> > clocksource.
-> 
-> Maybe just say: "We must support both sync timer and gptimer based
-> clocksource as some AM33XX hardware does not have the sync timer."
-> 
+Thanks to GregKH for reviewing v5!
 
-Ok, I can change the description accordingly.
+ Documentation/devicetree/bindings/usb/isp1301.txt |   25 ++++++
+ drivers/usb/Kconfig                               |    2 
+ drivers/usb/Makefile                              |    1 
+ drivers/usb/phy/Kconfig                           |   17 ++++
+ drivers/usb/phy/Makefile                          |    7 +
+ drivers/usb/phy/isp1301.c                         |   77 +++++++++++++++++++++
+ include/linux/usb/isp1301.h                       |   80 ++++++++++++++++++++++
+ 7 files changed, 209 insertions(+)
 
-> > Considering above, make sync-timer and gptimer clocksource runtime
-> > selectable so that both OMAP and AMXXXX continue to use the same code.
-> > 
-> > Also, in order to precisely configure/setup sched_clock for given
-> > clocksource, decision has to be made early enough in boot sequence.
-> > 
-> > So, the solution is,
-> > 
-> > Use kernel parameter ("clocksource=") to override
-> 
-> Maybe say: "Use standard kernel parameter ("clocksource=")..."
-> 
-
-Ditto, I will change the description accordingly.
-
-> > --- a/arch/arm/mach-omap1/timer32k.c
-> > +++ b/arch/arm/mach-omap1/timer32k.c
-> > @@ -71,6 +71,7 @@
-> > 
-> >  /* 16xx specific defines */
-> >  #define OMAP1_32K_TIMER_BASE		0xfffb9000
-> > +#define OMAP1_32KSYNC_TIMER_BASE	0xfffbc400
-> >  #define OMAP1_32K_TIMER_CR		0x08
-> >  #define OMAP1_32K_TIMER_TVR		0x00
-> >  #define OMAP1_32K_TIMER_TCR		0x04
-> > @@ -184,7 +185,10 @@ static __init void omap_init_32k_timer(void)
-> >   */
-> >  bool __init omap_32k_timer_init(void)
-> >  {
-> > -	omap_init_clocksource_32k();
-> > +	u32 pbase;
-> > +
-> > +	pbase = cpu_is_omap16xx() ? OMAP1_32KSYNC_TIMER_BASE : NULL;
-> > +	omap_init_clocksource_32k(pbase, SZ_1K);
-> >  	omap_init_32k_timer();
-> > 
-> >  	return true;
-> 
-> Has this patch been tested on omap1?
-> 
-
-I do not have omap1 board with me, so I can not test it. If somebody can 
-provide some help here, that would be really great?
-
-> 
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -510,3 +540,28 @@ static int __init omap2_dm_timer_init(void)
-> >  	return 0;
-> >  }
-> >  arch_initcall(omap2_dm_timer_init);
-> > +
-> > +/**
-> > + * omap2_override_clocksource - clocksource override with user configuration
-> > + *
-> > + * Allows user to override default clocksource, using kernel parameter
-> > + *   clocksource="gp timer"
-> > + *
-> > + * Note that, here we are using same standard kernel parameter "clocksource=",
-> > + * and not introducing any OMAP specific interface.
-> > + */
-> > +static int __init omap2_override_clocksource(char *str)
-> > +{
-> > +	if (!str)
-> > +		return 0;
-> > +	/*
-> > +	 * For OMAP architecture, we only have two options
-> > +	 *    - sync_32k (default)
-> > +	 *    - gp timer
-> > +	 */
-> > +	if (!strcmp(str, "gp timer"))
-> > +		use_gptimer_clksrc = true;
-> > +
-> > +	return 0;
-> > +}
-> > +early_param("clocksource", omap2_override_clocksource);
-> 
-> Should say "For omap2plus architectures" and should say three options.
-> If the sys clock based timer is not currently supported, please mention
-> that in the comments.
-> 
-
-"gp timer" above is nothing but, sys_clock based gptimer option only. May be I should add the source in bracket or something?
-Like,
-	*    - sync_32k (default)
-	*    - gp timer (sys_clock)
-
-Thanks,
-Vaibhav
-
-> Regards,
-> 
-> Tony
-> 
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/usb/isp1301.txt
+@@ -0,0 +1,25 @@
++* NXP ISP1301 USB transceiver
++
++Required properties:
++- compatible: must be "nxp,isp1301"
++- reg: I2C address of the ISP1301 device
++
++Optional properties of devices using ISP1301:
++- transceiver: phandle of isp1301 - this helps the ISP1301 driver to find the
++               ISP1301 instance associated with the respective USB driver
++
++Example:
++
++	isp1301: usb-transceiver at 2c {
++		compatible = "nxp,isp1301";
++		reg = <0x2c>;
++	};
++
++	usbd at 31020000 {
++		compatible = "nxp,lpc3220-udc";
++		reg = <0x31020000 0x300>;
++		interrupt-parent = <&mic>;
++		interrupts = <0x3d 0>, <0x3e 0>, <0x3c 0>, <0x3a 0>;
++		transceiver = <&isp1301>;
++		status = "okay";
++	};
+--- linux-2.6.orig/drivers/usb/Kconfig
++++ linux-2.6/drivers/usb/Kconfig
+@@ -177,6 +177,8 @@ source "drivers/usb/serial/Kconfig"
+ 
+ source "drivers/usb/misc/Kconfig"
+ 
++source "drivers/usb/phy/Kconfig"
++
+ source "drivers/usb/atm/Kconfig"
+ 
+ source "drivers/usb/gadget/Kconfig"
+--- linux-2.6.orig/drivers/usb/Makefile
++++ linux-2.6/drivers/usb/Makefile
+@@ -46,6 +46,7 @@ obj-$(CONFIG_USB_MICROTEK)	+= image/
+ obj-$(CONFIG_USB_SERIAL)	+= serial/
+ 
+ obj-$(CONFIG_USB)		+= misc/
++obj-$(CONFIG_USB)		+= phy/
+ obj-$(CONFIG_EARLY_PRINTK_DBGP)	+= early/
+ 
+ obj-$(CONFIG_USB_ATM)		+= atm/
+--- /dev/null
++++ linux-2.6/drivers/usb/phy/Kconfig
+@@ -0,0 +1,17 @@
++#
++# Physical Layer USB driver configuration
++#
++comment "USB Physical Layer drivers"
++	depends on USB
++
++config USB_ISP1301
++	tristate "NXP ISP1301 USB transceiver support"
++	depends on USB
++	depends on I2C
++	help
++	  Say Y here to add support for the NXP ISP1301 USB transceiver driver.
++	  This chip is typically used as USB transceiver for USB host, gadget
++	  and OTG drivers (to be selected separately).
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called isp1301.
+--- /dev/null
++++ linux-2.6/drivers/usb/phy/Makefile
+@@ -0,0 +1,7 @@
++#
++# Makefile for physical layer USB drivers
++#
++
++ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
++
++obj-$(CONFIG_USB_ISP1301)		+= isp1301.o
+--- /dev/null
++++ linux-2.6/drivers/usb/phy/isp1301.c
+@@ -0,0 +1,77 @@
++/*
++ * NXP ISP1301 USB transceiver driver
++ *
++ * Copyright (C) 2012 Roland Stigge
++ *
++ * Author: Roland Stigge <stigge@antcom.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/i2c.h>
++
++#define DRV_NAME		"isp1301"
++
++#define ISP1301_I2C_ADDR	0x2C
++
++static const unsigned short normal_i2c[] = {
++	ISP1301_I2C_ADDR, ISP1301_I2C_ADDR + 1, I2C_CLIENT_END
++};
++
++static const struct i2c_device_id isp1301_id[] = {
++	{ "isp1301", 0 },
++	{ }
++};
++
++static struct i2c_client *isp1301_i2c_client;
++
++static int isp1301_probe(struct i2c_client *client,
++			 const struct i2c_device_id *i2c_id)
++{
++	isp1301_i2c_client = client;
++	return 0;
++}
++
++static int isp1301_remove(struct i2c_client *client)
++{
++	return 0;
++}
++
++static struct i2c_driver isp1301_driver = {
++	.driver = {
++		.name = DRV_NAME,
++	},
++	.probe = isp1301_probe,
++	.remove = isp1301_remove,
++	.id_table = isp1301_id,
++};
++
++module_i2c_driver(isp1301_driver);
++
++static int match(struct device *dev, void *data)
++{
++	struct device_node *node = (struct device_node *)data;
++	return (dev->of_node == node) &&
++		(dev->driver == &isp1301_driver.driver);
++}
++
++struct i2c_client *isp1301_get_client(struct device_node *node)
++{
++	if (node) { /* reference of ISP1301 I2C node via DT */
++		struct device *dev = bus_find_device(&i2c_bus_type, NULL,
++						     node, match);
++		if (!dev)
++			return NULL;
++		return to_i2c_client(dev);
++	} else { /* non-DT: only one ISP1301 chip supported */
++		return isp1301_i2c_client;
++	}
++}
++EXPORT_SYMBOL_GPL(isp1301_get_client);
++
++MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
++MODULE_DESCRIPTION("NXP ISP1301 USB transceiver driver");
++MODULE_LICENSE("GPL");
+--- /dev/null
++++ linux-2.6/include/linux/usb/isp1301.h
+@@ -0,0 +1,80 @@
++/*
++ * NXP ISP1301 USB transceiver driver
++ *
++ * Copyright (C) 2012 Roland Stigge <stigge@antcom.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __LINUX_USB_ISP1301_H
++#define __LINUX_USB_ISP1301_H
++
++#include <linux/of.h>
++
++/* I2C Register definitions: */
++
++#define ISP1301_I2C_MODE_CONTROL_1	0x04	/* u8 read, set, +1 clear */
++
++#define MC1_SPEED_REG			(1 << 0)
++#define MC1_SUSPEND_REG			(1 << 1)
++#define MC1_DAT_SE0			(1 << 2)
++#define MC1_TRANSPARENT			(1 << 3)
++#define MC1_BDIS_ACON_EN		(1 << 4)
++#define MC1_OE_INT_EN			(1 << 5)
++#define MC1_UART_EN			(1 << 6)
++#define MC1_MASK			0x7f
++
++#define ISP1301_I2C_MODE_CONTROL_2	0x12	/* u8 read, set, +1 clear */
++
++#define MC2_GLOBAL_PWR_DN		(1 << 0)
++#define MC2_SPD_SUSP_CTRL		(1 << 1)
++#define MC2_BI_DI			(1 << 2)
++#define MC2_TRANSP_BDIR0		(1 << 3)
++#define MC2_TRANSP_BDIR1		(1 << 4)
++#define MC2_AUDIO_EN			(1 << 5)
++#define MC2_PSW_EN			(1 << 6)
++#define MC2_EN2V7			(1 << 7)
++
++#define ISP1301_I2C_OTG_CONTROL_1	0x06	/* u8 read, set, +1 clear */
++
++#define OTG1_DP_PULLUP			(1 << 0)
++#define OTG1_DM_PULLUP			(1 << 1)
++#define OTG1_DP_PULLDOWN		(1 << 2)
++#define OTG1_DM_PULLDOWN		(1 << 3)
++#define OTG1_ID_PULLDOWN		(1 << 4)
++#define OTG1_VBUS_DRV			(1 << 5)
++#define OTG1_VBUS_DISCHRG		(1 << 6)
++#define OTG1_VBUS_CHRG			(1 << 7)
++
++#define ISP1301_I2C_OTG_CONTROL_2	0x10	/* u8 readonly */
++
++#define OTG_B_SESS_END			(1 << 6)
++#define OTG_B_SESS_VLD			(1 << 7)
++
++#define ISP1301_I2C_INTERRUPT_SOURCE	0x8
++#define ISP1301_I2C_INTERRUPT_LATCH	0xA
++#define ISP1301_I2C_INTERRUPT_FALLING	0xC
++#define ISP1301_I2C_INTERRUPT_RISING	0xE
++
++#define INT_VBUS_VLD			(1 << 0)
++#define INT_SESS_VLD			(1 << 1)
++#define INT_DP_HI			(1 << 2)
++#define INT_ID_GND			(1 << 3)
++#define INT_DM_HI			(1 << 4)
++#define INT_ID_FLOAT			(1 << 5)
++#define INT_BDIS_ACON			(1 << 6)
++#define INT_CR_INT			(1 << 7)
++
++#define ISP1301_I2C_REG_CLEAR_ADDR	1	/* Register Address Modifier */
++
++struct i2c_client *isp1301_get_client(struct device_node *node);
++
++#endif /* __LINUX_USB_ISP1301_H */
