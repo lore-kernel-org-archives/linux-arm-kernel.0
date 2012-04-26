@@ -1,392 +1,295 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Apr 2012 23:38:36 +0800
-Subject: [PATCH 08/17] ARM: msm: use machine specific hook for late init
+Date: Thu, 26 Apr 2012 23:38:35 +0800
+Subject: [PATCH 07/17] ARM: kirkwood: use machine specific hook for late init
 In-Reply-To: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
 References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335454725-13089-9-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335454725-13089-8-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Nicolas Pitre <nico@fluxnic.net>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-msm/board-halibut.c      |    7 +++++++
- arch/arm/mach-msm/board-mahimahi.c     |    7 +++++++
- arch/arm/mach-msm/board-msm7x27.c      |   10 ++++++++++
- arch/arm/mach-msm/board-msm7x30.c      |    9 +++++++++
- arch/arm/mach-msm/board-msm8960.c      |    8 ++++++++
- arch/arm/mach-msm/board-msm8x60.c      |   11 +++++++++++
- arch/arm/mach-msm/board-qsd8x50.c      |    8 ++++++++
- arch/arm/mach-msm/board-sapphire.c     |    7 +++++++
- arch/arm/mach-msm/board-trout.c        |    7 +++++++
- arch/arm/mach-msm/clock.c              |    4 +---
- arch/arm/mach-msm/include/mach/board.h |    7 +++++++
- arch/arm/mach-msm/smd_debug.c          |    3 +--
- 12 files changed, 83 insertions(+), 5 deletions(-)
+ arch/arm/mach-kirkwood/board-dt.c              |    1 +
+ arch/arm/mach-kirkwood/common.c                |    6 +++++-
+ arch/arm/mach-kirkwood/common.h                |    1 +
+ arch/arm/mach-kirkwood/d2net_v2-setup.c        |    1 +
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c    |    1 +
+ arch/arm/mach-kirkwood/dockstar-setup.c        |    1 +
+ arch/arm/mach-kirkwood/guruplug-setup.c        |    1 +
+ arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c |    1 +
+ arch/arm/mach-kirkwood/netspace_v2-setup.c     |    3 +++
+ arch/arm/mach-kirkwood/netxbig_v2-setup.c      |    2 ++
+ arch/arm/mach-kirkwood/openrd-setup.c          |    3 +++
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c   |    1 +
+ arch/arm/mach-kirkwood/rd88f6281-setup.c       |    1 +
+ arch/arm/mach-kirkwood/sheevaplug-setup.c      |    2 ++
+ arch/arm/mach-kirkwood/t5325-setup.c           |    1 +
+ arch/arm/mach-kirkwood/ts219-setup.c           |    1 +
+ arch/arm/mach-kirkwood/ts41x-setup.c           |    1 +
+ 17 files changed, 27 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-halibut.c b/arch/arm/mach-msm/board-halibut.c
-index 26aac36..f60944c 100644
---- a/arch/arm/mach-msm/board-halibut.c
-+++ b/arch/arm/mach-msm/board-halibut.c
-@@ -94,6 +94,12 @@ static void __init halibut_map_io(void)
- 	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
- }
- 
-+static void __init halibut_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- MACHINE_START(HALIBUT, "Halibut Board (QCT SURF7200A)")
- 	.atag_offset	= 0x100,
- 	.fixup		= halibut_fixup,
-@@ -101,5 +107,6 @@ MACHINE_START(HALIBUT, "Halibut Board (QCT SURF7200A)")
- 	.init_early	= halibut_init_early,
- 	.init_irq	= halibut_init_irq,
- 	.init_machine	= halibut_init,
-+	.init_late	= halibut_init_late,
- 	.timer		= &msm_timer,
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 1c672d9..aaa495c 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -70,6 +70,7 @@ DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
+ 	.init_machine	= kirkwood_dt_init,
++	.init_late	= kirkwood_init_late,
+ 	.restart	= kirkwood_restart,
+ 	.dt_compat	= kirkwood_dt_board_compat,
  MACHINE_END
-diff --git a/arch/arm/mach-msm/board-mahimahi.c b/arch/arm/mach-msm/board-mahimahi.c
-index 5a4882f..6ee7c9a 100644
---- a/arch/arm/mach-msm/board-mahimahi.c
-+++ b/arch/arm/mach-msm/board-mahimahi.c
-@@ -71,6 +71,12 @@ static void __init mahimahi_map_io(void)
- 	msm_clock_init();
- }
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index a02cae8..af88ffe 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -530,7 +530,6 @@ static int __init kirkwood_clock_gate(void)
  
-+static void __init mahimahi_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- extern struct sys_timer msm_timer;
- 
- MACHINE_START(MAHIMAHI, "mahimahi")
-@@ -79,5 +85,6 @@ MACHINE_START(MAHIMAHI, "mahimahi")
- 	.map_io		= mahimahi_map_io,
- 	.init_irq	= msm_init_irq,
- 	.init_machine	= mahimahi_init,
-+	.init_late	= mahimahi_init_late,
- 	.timer		= &msm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-msm7x27.c b/arch/arm/mach-msm/board-msm7x27.c
-index 6d84ee7..8e8ca0f 100644
---- a/arch/arm/mach-msm/board-msm7x27.c
-+++ b/arch/arm/mach-msm/board-msm7x27.c
-@@ -128,11 +128,18 @@ static void __init msm7x2x_map_io(void)
- #endif
- }
- 
-+static void __init msm7x2x_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- MACHINE_START(MSM7X27_SURF, "QCT MSM7x27 SURF")
- 	.atag_offset	= 0x100,
- 	.map_io		= msm7x2x_map_io,
- 	.init_irq	= msm7x2x_init_irq,
- 	.init_machine	= msm7x2x_init,
-+	.init_late	= msm7x2x_init_late,
- 	.timer		= &msm_timer,
- MACHINE_END
- 
-@@ -141,6 +148,7 @@ MACHINE_START(MSM7X27_FFA, "QCT MSM7x27 FFA")
- 	.map_io		= msm7x2x_map_io,
- 	.init_irq	= msm7x2x_init_irq,
- 	.init_machine	= msm7x2x_init,
-+	.init_late	= msm7x2x_init_late,
- 	.timer		= &msm_timer,
- MACHINE_END
- 
-@@ -149,6 +157,7 @@ MACHINE_START(MSM7X25_SURF, "QCT MSM7x25 SURF")
- 	.map_io		= msm7x2x_map_io,
- 	.init_irq	= msm7x2x_init_irq,
- 	.init_machine	= msm7x2x_init,
-+	.init_late	= msm7x2x_init_late,
- 	.timer		= &msm_timer,
- MACHINE_END
- 
-@@ -157,5 +166,6 @@ MACHINE_START(MSM7X25_FFA, "QCT MSM7x25 FFA")
- 	.map_io		= msm7x2x_map_io,
- 	.init_irq	= msm7x2x_init_irq,
- 	.init_machine	= msm7x2x_init,
-+	.init_late	= msm7x2x_init_late,
- 	.timer		= &msm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index db81ed5..a71d8f9 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -120,6 +120,12 @@ static void __init msm7x30_map_io(void)
- 	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
- }
- 
-+static void __init msm7x30_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
- 	.atag_offset = 0x100,
- 	.fixup = msm7x30_fixup,
-@@ -127,6 +133,7 @@ MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
- 	.map_io = msm7x30_map_io,
- 	.init_irq = msm7x30_init_irq,
- 	.init_machine = msm7x30_init,
-+	.init_late = msm7x30_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
- 
-@@ -137,6 +144,7 @@ MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
- 	.map_io = msm7x30_map_io,
- 	.init_irq = msm7x30_init_irq,
- 	.init_machine = msm7x30_init,
-+	.init_late = msm7x30_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
- 
-@@ -147,5 +155,6 @@ MACHINE_START(MSM7X30_FLUID, "QCT MSM7X30 FLUID")
- 	.map_io = msm7x30_map_io,
- 	.init_irq = msm7x30_init_irq,
- 	.init_machine = msm7x30_init,
-+	.init_late = msm7x30_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
-index ed35981..4eb8232 100644
---- a/arch/arm/mach-msm/board-msm8960.c
-+++ b/arch/arm/mach-msm/board-msm8960.c
-@@ -93,6 +93,12 @@ static void __init msm8960_rumi3_init(void)
- 	platform_add_devices(rumi3_devices, ARRAY_SIZE(rumi3_devices));
- }
- 
-+static void __init msm8960_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
- 	.fixup = msm8960_fixup,
- 	.reserve = msm8960_reserve,
-@@ -101,6 +107,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
- 	.timer = &msm_timer,
- 	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8960_sim_init,
-+	.init_late = msm8960_init_late,
- MACHINE_END
- 
- MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
-@@ -111,5 +118,6 @@ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
- 	.timer = &msm_timer,
- 	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8960_rumi3_init,
-+	.init_late = msm8960_init_late,
- MACHINE_END
- 
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index 962e711..1dd6ce7 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -68,6 +68,12 @@ static void __init msm8x60_init(void)
- {
- }
- 
-+static void __init msm8x60_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- #ifdef CONFIG_OF
- static struct of_dev_auxdata msm_auxdata_lookup[] __initdata = {
- 	{}
-@@ -106,6 +112,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
- 	.init_irq = msm8x60_init_irq,
- 	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
-+	.init_late = msm8x60_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
- 
-@@ -116,6 +123,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
- 	.init_irq = msm8x60_init_irq,
- 	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
-+	.init_late = msm8x60_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
- 
-@@ -126,6 +134,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
- 	.init_irq = msm8x60_init_irq,
- 	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
-+	.init_late = msm8x60_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
- 
-@@ -136,6 +145,7 @@ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
- 	.init_irq = msm8x60_init_irq,
- 	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
-+	.init_late = msm8x60_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
- 
-@@ -145,6 +155,7 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.map_io = msm8x60_map_io,
- 	.init_irq = msm8x60_init_irq,
- 	.init_machine = msm8x60_dt_init,
-+	.init_late = msm8x60_init_late,
- 	.timer = &msm_timer,
- 	.dt_compat = msm8x60_fluid_match,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index 7e8909c..45ce374 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -191,11 +191,18 @@ static void __init qsd8x50_init(void)
- 	qsd8x50_init_mmc();
- }
- 
-+static void __init qsd8x50_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
- 	.atag_offset = 0x100,
- 	.map_io = qsd8x50_map_io,
- 	.init_irq = qsd8x50_init_irq,
- 	.init_machine = qsd8x50_init,
-+	.init_late = qsd8x50_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
- 
-@@ -204,5 +211,6 @@ MACHINE_START(QSD8X50A_ST1_5, "QCT QSD8X50A ST1.5")
- 	.map_io = qsd8x50_map_io,
- 	.init_irq = qsd8x50_init_irq,
- 	.init_machine = qsd8x50_init,
-+	.init_late = qsd8x50_init_late,
- 	.timer = &msm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-sapphire.c b/arch/arm/mach-msm/board-sapphire.c
-index 4a8ea0d..9ca39ec 100644
---- a/arch/arm/mach-msm/board-sapphire.c
-+++ b/arch/arm/mach-msm/board-sapphire.c
-@@ -101,6 +101,12 @@ static void __init sapphire_map_io(void)
- 	msm_clock_init();
- }
- 
-+static void __init sapphire_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- MACHINE_START(SAPPHIRE, "sapphire")
- /* Maintainer: Brian Swetland <swetland@google.com> */
- 	.atag_offset    = 0x100,
-@@ -108,5 +114,6 @@ MACHINE_START(SAPPHIRE, "sapphire")
- 	.map_io         = sapphire_map_io,
- 	.init_irq       = sapphire_init_irq,
- 	.init_machine   = sapphire_init,
-+	.init_late      = sapphire_init_late,
- 	.timer          = &msm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
-index d4060a3..c66bd81 100644
---- a/arch/arm/mach-msm/board-trout.c
-+++ b/arch/arm/mach-msm/board-trout.c
-@@ -98,6 +98,12 @@ static void __init trout_map_io(void)
- 	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
- }
- 
-+static void __init trout_init_late(void)
-+{
-+	msm_clock_late_init();
-+	smd_debugfs_init();
-+}
-+
- MACHINE_START(TROUT, "HTC Dream")
- 	.atag_offset	= 0x100,
- 	.fixup		= trout_fixup,
-@@ -105,5 +111,6 @@ MACHINE_START(TROUT, "HTC Dream")
- 	.init_early	= trout_init_early,
- 	.init_irq	= trout_init_irq,
- 	.init_machine	= trout_init,
-+	.init_late	= trout_init_late,
- 	.timer		= &msm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index d9145df..4b06db1 100644
---- a/arch/arm/mach-msm/clock.c
-+++ b/arch/arm/mach-msm/clock.c
-@@ -156,7 +156,7 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
-  * Disable any clocks that belong to us (CLKFLAG_AUTO_OFF) but have
-  * not been explicitly enabled by a clk_enable() call.
-  */
--static int __init clock_late_init(void)
-+int __init msm_clock_late_init(void)
- {
- 	unsigned long flags;
- 	struct clk *clk;
-@@ -180,5 +180,3 @@ static int __init clock_late_init(void)
  	return 0;
  }
+-late_initcall(kirkwood_clock_gate);
  
--late_initcall(clock_late_init);
--
-diff --git a/arch/arm/mach-msm/include/mach/board.h b/arch/arm/mach-msm/include/mach/board.h
-index 2ce8f1f..ae5a67b 100644
---- a/arch/arm/mach-msm/include/mach/board.h
-+++ b/arch/arm/mach-msm/include/mach/board.h
-@@ -42,9 +42,16 @@ void __init msm_map_common_io(void);
- void __init msm_init_irq(void);
- void __init msm_init_gpio(void);
- void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks);
-+int __init msm_clock_late_init(void);
- void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *);
- int __init msm_add_sdcc(unsigned int controller,
- 			struct msm_mmc_platform_data *plat,
- 			unsigned int stat_irq, unsigned long stat_irq_flags);
- 
-+#if defined(CONFIG_MSM_SMD) && defined(CONFIG_DEBUG_FS)
-+int smd_debugfs_init(void);
-+#else
-+static inline int smd_debugfs_init(void) { return 0; }
-+#endif
-+
- #endif
-diff --git a/arch/arm/mach-msm/smd_debug.c b/arch/arm/mach-msm/smd_debug.c
-index c56df9e..8056b3e 100644
---- a/arch/arm/mach-msm/smd_debug.c
-+++ b/arch/arm/mach-msm/smd_debug.c
-@@ -216,7 +216,7 @@ static void debug_create(const char *name, umode_t mode,
- 	debugfs_create_file(name, mode, dent, fill, &debug_ops);
- }
- 
--static int smd_debugfs_init(void)
-+int __init smd_debugfs_init(void)
+ void kirkwood_restart(char mode, const char *cmd)
  {
- 	struct dentry *dent;
- 
-@@ -234,7 +234,6 @@ static int smd_debugfs_init(void)
- 	return 0;
+@@ -547,3 +546,8 @@ void kirkwood_restart(char mode, const char *cmd)
+ 	while (1)
+ 		;
  }
++
++void __init kirkwood_init_late(void)
++{
++	kirkwood_clock_gate();
++}
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index fa8e768..6d8829e 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -50,6 +50,7 @@ void kirkwood_nand_init(struct mtd_partition *parts, int nr_parts, int delay);
+ void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts, int (*dev_ready)(struct mtd_info *));
+ void kirkwood_audio_init(void);
+ void kirkwood_restart(char, const char *);
++void kirkwood_init_late(void);
  
--late_initcall(smd_debugfs_init);
- #endif
- 
- 
+ /* board init functions for boards not fully converted to fdt */
+ #ifdef CONFIG_MACH_DREAMPLUG_DT
+diff --git a/arch/arm/mach-kirkwood/d2net_v2-setup.c b/arch/arm/mach-kirkwood/d2net_v2-setup.c
+index 6e1bac9..94ddb45 100644
+--- a/arch/arm/mach-kirkwood/d2net_v2-setup.c
++++ b/arch/arm/mach-kirkwood/d2net_v2-setup.c
+@@ -226,6 +226,7 @@ MACHINE_START(D2NET_V2, "LaCie d2 Network v2")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+index d933593..1edc314 100644
+--- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
++++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+@@ -102,6 +102,7 @@ MACHINE_START(DB88F6281_BP, "Marvell DB-88F6281-BP Development Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
+index 61d9a55..3ffd50f 100644
+--- a/arch/arm/mach-kirkwood/dockstar-setup.c
++++ b/arch/arm/mach-kirkwood/dockstar-setup.c
+@@ -107,6 +107,7 @@ MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+index bdaed38..b5c0cc2 100644
+--- a/arch/arm/mach-kirkwood/guruplug-setup.c
++++ b/arch/arm/mach-kirkwood/guruplug-setup.c
+@@ -126,6 +126,7 @@ MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+index 85f6169..25943da 100644
+--- a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
++++ b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+@@ -168,6 +168,7 @@ MACHINE_START(MV88F6281GTW_GE, "Marvell 88F6281 GTW GE Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+index e6bba01..06ed9b0 100644
+--- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
++++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+@@ -263,6 +263,7 @@ MACHINE_START(NETSPACE_V2, "LaCie Network Space v2")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+@@ -275,6 +276,7 @@ MACHINE_START(INETSPACE_V2, "LaCie Internet Space v2")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+@@ -287,6 +289,7 @@ MACHINE_START(NETSPACE_MAX_V2, "LaCie Network Space Max v2")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/netxbig_v2-setup.c b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
+index 31ae8de..ec0a1ebd 100644
+--- a/arch/arm/mach-kirkwood/netxbig_v2-setup.c
++++ b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
+@@ -404,6 +404,7 @@ MACHINE_START(NET2BIG_V2, "LaCie 2Big Network v2")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+@@ -416,6 +417,7 @@ MACHINE_START(NET5BIG_V2, "LaCie 5Big Network v2")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index 7e99c3f..8d58f32 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -225,6 +225,7 @@ MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+@@ -238,6 +239,7 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+@@ -251,6 +253,7 @@ MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+index fd2c9c8..c9cc221 100644
+--- a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+@@ -84,6 +84,7 @@ MACHINE_START(RD88F6192_NAS, "Marvell RD-88F6192-NAS Development Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+index ef92207..0863bb0 100644
+--- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+@@ -120,6 +120,7 @@ MACHINE_START(RD88F6281, "Marvell RD-88F6281 Reference Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index 4ea70e5f..51ba9be 100644
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
++++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+@@ -143,6 +143,7 @@ MACHINE_START(SHEEVAPLUG, "Marvell SheevaPlug Reference Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+@@ -155,6 +156,7 @@ MACHINE_START(ESATA_SHEEVAPLUG, "Marvell eSATA SheevaPlug Reference Board")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/t5325-setup.c b/arch/arm/mach-kirkwood/t5325-setup.c
+index f9d2a11..498f83e 100644
+--- a/arch/arm/mach-kirkwood/t5325-setup.c
++++ b/arch/arm/mach-kirkwood/t5325-setup.c
+@@ -212,6 +212,7 @@ MACHINE_START(T5325, "HP t5325 Thin Client")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
+index 73e2b6c..8b217ce 100644
+--- a/arch/arm/mach-kirkwood/ts219-setup.c
++++ b/arch/arm/mach-kirkwood/ts219-setup.c
+@@ -137,6 +137,7 @@ MACHINE_START(TS219, "QNAP TS-119/TS-219")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
+index 5bbca26..cb77ab9 100644
+--- a/arch/arm/mach-kirkwood/ts41x-setup.c
++++ b/arch/arm/mach-kirkwood/ts41x-setup.c
+@@ -181,6 +181,7 @@ MACHINE_START(TS41X, "QNAP TS-41x")
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
++	.init_late	= kirkwood_init_late,
+ 	.timer		= &kirkwood_timer,
+ 	.restart	= kirkwood_restart,
+ MACHINE_END
 -- 
 1.7.5.4
