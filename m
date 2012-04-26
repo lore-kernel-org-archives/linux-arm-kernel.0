@@ -1,19 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Apr 2012 14:01:36 -0600
-Subject: [PATCHv3 4/4] ARM: dt: tegra: Add device tree support for AHB
-In-Reply-To: <1335352072-4001-4-git-send-email-hdoyu@nvidia.com>
-References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
- <1335352072-4001-4-git-send-email-hdoyu@nvidia.com>
-Message-ID: <4F99A9A0.1030304@wwwdotorg.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 Apr 2012 13:08:08 -0700
+Subject: [PATCH 1/3] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC
+ interrupts.
+In-Reply-To: <20120425030524.7832.52047.stgit@notabene.brown> (NeilBrown's
+ message of "Wed, 25 Apr 2012 13:05:24 +1000")
+References: <20120425025637.7832.14013.stgit@notabene.brown>
+ <20120425030524.7832.52047.stgit@notabene.brown>
+Message-ID: <87sjfq9ryv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
-> Add AHB entry for tegra20/30.
+NeilBrown <neilb@suse.de> writes:
 
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> All interrupts can wake-from-sleep (I think) so it should be
+> permissible to call enable_irq_wake().  Setting this flag allows that.
+>
+> It is needed because without this, an interrupt which is delivered
+> during late suspend will get ignored but will not cause suspend to
+> abort.
+> If enable_irq_wake() is called and succeeds, check_wakuep_irqs()
+> will abort the suspend if the interrupt has fired.
+>
+> Signed-off-by: NeilBrown <neilb@suse.de>
 
-> +	ahb: ahb at 6000c004 {
-> +		compatible = "nvidia,tegra30-ahb", "nvidia,tegra20-ahb";
+Acked-by: Kevin Hilman <khilman@ti.com>
 
-This should only be tegra20-ahb in the Tegra20 file.
+Tony, should I queue this one in my OMAP PM features for v3.5 branch?
+or do you want to take it?
+
+Kevin
