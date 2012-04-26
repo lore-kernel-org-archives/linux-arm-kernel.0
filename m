@@ -1,37 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Apr 2012 09:36:11 +0200
-Subject: imx sgtl5000:BUG: scheduling while atomic:
- speaker-test/1225/0x00000003
-In-Reply-To: <20376.63821.15844.738438@ipc1.ka-ro>
-References: <20120426023319.GC28063@b20223-02.ap.freescale.net>
- <20120426051212.GF28063@b20223-02.ap.freescale.net>
- <20376.59099.336772.398425@ipc1.ka-ro>
- <20120426064430.GG28063@b20223-02.ap.freescale.net>
- <20376.63821.15844.738438@ipc1.ka-ro>
-Message-ID: <20120426073611.GA17184@pengutronix.de>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Thu, 26 Apr 2012 15:48:54 +0800
+Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
+ for platforms to use
+In-Reply-To: <4F9816A3.5090907@wwwdotorg.org>
+References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
+ <4F96F847.508@wwwdotorg.org>
+ <20120425094934.GA17631@shlinux2.ap.freescale.net>
+ <CACRpkdYjVYsM-Qo7NWKx5Mr3rAmp12G_wAtkmNkkqNyX=ZeKUw@mail.gmail.com>
+ <20120425114955.GB17631@shlinux2.ap.freescale.net>
+ <4F9816A3.5090907@wwwdotorg.org>
+Message-ID: <20120426074853.GA26070@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 09:29:17AM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Wed, Apr 25, 2012 at 11:22:11PM +0800, Stephen Warren wrote:
+> On 04/25/2012 05:49 AM, Dong Aisheng wrote:
+> > On Wed, Apr 25, 2012 at 07:19:43PM +0800, Linus Walleij wrote:
+> >> On Wed, Apr 25, 2012 at 11:49 AM, Dong Aisheng
+> >> <aisheng.dong@freescale.com> wrote:
+> >>> On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
+> >>
+> >>>> The only thing that should be calling pinctrl_request_gpio() is a GPIO
+> >>>> driver. It should only be calling it for the GPIOs it manages. I'd
+> >>>> expect that if a platform's pinctrl driver was not yet written to
+> >>>> support the GPIO functionality, then the GPIO driver would not be
+> >>>> calling this function.
+> >>>>
+> >>> Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
+> >>> driver may be shared between several platforms, with pinctrl support
+> >>> or not.
+> >>
+> >> I think it's mostly safe to assume that either:
+> >>
+> > I just saw your reply after i sent out the revised patch...
+> > 
+> >> - pinctrl calls from GPIO drivers gets stubbed out totally due to
+> >>   CONFIG_PINCTRL not being selected
+> >>
+> > Yes, we already have that in include/linux/pinctrl/consumer.h
+> > 
+> >> or:
+> >>
+> >> - You need to pass a token through platform data to the
+> >>   GPIO driver telling it whether it needs to request pins for
+> >>   it's GPIOs or not. Just a bool should work fine?
+> >>
+> > Yes, this is an alternative way.
+> > I'm using a similar way, but pass the data to pinctrl core
+> > rather than gpio driver. Then it is be handled together with
+> > dummy state in platform code.
+> > 
+> > Do you think if the current way i used is ok?
+> > Or i need to change to your proposed way?
 > 
-> > > -	init_completion(&sdmac->done);
-> > > +	unsigned long timeout = 500;
-> > I'm not sure. Did you test 500us is enough for loading firmware?
-> >
-> Channel 0 is not used for actual data transfer but for some internal
-> housekeeping. Thus the timeout is independent from the time required
-> for the actual data transfer.
-> I haven't seen any timeout even with the timeout set to 100us.
-> Usually it takes 3 to 4 us to complete.
+> I think Linus was suggesting a flag in platform data for each GPIO
+> driver rather than a global flag for the entire pinctrl subsystem.
+> 
+> That way, if one of the pinctrl drivers did fully support all the GPIO
+> functionality and the other didn't, you'd be able to have just one of
+> the GPIO drivers not call into pinctrl (or ignore certain errors) yet
+> the other GPIO driver could still fully interact with pinctrl as desired.
+> 
+Yes, it's true.
+I will drop the dummy gpio support in pinctrl subsystem and let gpio
+driver to decide whether it wants to use pinctrl gpio mux function.
 
-It *is* used to load the firmware. Have you tested your patch with
-actually loading a firmware?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Dong Aisheng
