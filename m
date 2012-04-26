@@ -1,212 +1,153 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Apr 2012 23:38:44 +0800
-Subject: [PATCH 16/17] ARM: tegra: use machine specific hook for late init
+Date: Thu, 26 Apr 2012 23:38:45 +0800
+Subject: [PATCH 17/17] ARM: ux500: use machine specific hook for late init
 In-Reply-To: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
 References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335454725-13089-17-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335454725-13089-18-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Colin Cross <ccross@android.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-tegra/board-dt-tegra20.c |    1 +
- arch/arm/mach-tegra/board-dt-tegra30.c |    1 +
- arch/arm/mach-tegra/board-harmony.c    |    1 +
- arch/arm/mach-tegra/board-paz00.c      |    1 +
- arch/arm/mach-tegra/board-seaboard.c   |    3 +++
- arch/arm/mach-tegra/board-trimslice.c  |    1 +
- arch/arm/mach-tegra/board.h            |   16 ++++++++++++++++
- arch/arm/mach-tegra/clock.c            |    3 +--
- arch/arm/mach-tegra/common.c           |    7 +++++++
- arch/arm/mach-tegra/pinmux.c           |    3 +--
- arch/arm/mach-tegra/powergate.c        |    4 +---
- 11 files changed, 34 insertions(+), 7 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c       |    4 ++++
+ arch/arm/mach-ux500/board-u5500.c        |    1 +
+ arch/arm/mach-ux500/clock.c              |    6 ++----
+ arch/arm/mach-ux500/clock.h              |   12 ++++++++++++
+ arch/arm/mach-ux500/cpu.c                |    6 ++++++
+ arch/arm/mach-ux500/include/mach/setup.h |    1 +
+ 6 files changed, 26 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 0952494..0f0da6c 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -142,6 +142,7 @@ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 77d03c1..348ebd9 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -722,6 +722,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+ 	.timer		= &ux500_timer,
  	.handle_irq	= gic_handle_irq,
- 	.timer		= &tegra_timer,
- 	.init_machine	= tegra_dt_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
- 	.dt_compat	= tegra20_dt_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
-index 5f7c03e..09d21b2 100644
---- a/arch/arm/mach-tegra/board-dt-tegra30.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra30.c
-@@ -80,6 +80,7 @@ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
- 	.handle_irq	= gic_handle_irq,
- 	.timer		= &tegra_timer,
- 	.init_machine	= tegra30_dt_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
- 	.dt_compat	= tegra30_dt_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index c00aadb..987115a 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -191,5 +191,6 @@ MACHINE_START(HARMONY, "harmony")
- 	.handle_irq	= gic_handle_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_harmony_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-index 330afdf..2e8a4c6 100644
---- a/arch/arm/mach-tegra/board-paz00.c
-+++ b/arch/arm/mach-tegra/board-paz00.c
-@@ -221,5 +221,6 @@ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
- 	.handle_irq	= gic_handle_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_paz00_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
-index d669847..273eaaa 100644
---- a/arch/arm/mach-tegra/board-seaboard.c
-+++ b/arch/arm/mach-tegra/board-seaboard.c
-@@ -289,6 +289,7 @@ MACHINE_START(SEABOARD, "seaboard")
- 	.handle_irq	= gic_handle_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_seaboard_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
+ 	.init_machine	= mop500_init_machine,
++	.init_late	= ux500_init_late,
  MACHINE_END
  
-@@ -300,6 +301,7 @@ MACHINE_START(KAEN, "kaen")
+ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+@@ -731,6 +732,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+ 	.timer		= &ux500_timer,
  	.handle_irq	= gic_handle_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_kaen_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
+ 	.init_machine	= hrefv60_init_machine,
++	.init_late	= ux500_init_late,
  MACHINE_END
  
-@@ -311,5 +313,6 @@ MACHINE_START(WARIO, "wario")
+ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+@@ -741,6 +743,7 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+ 	.timer		= &ux500_timer,
  	.handle_irq	= gic_handle_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_wario_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
+ 	.init_machine	= snowball_init_machine,
++	.init_late	= ux500_init_late,
  MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
-index cd52820..0a2a0e5 100644
---- a/arch/arm/mach-tegra/board-trimslice.c
-+++ b/arch/arm/mach-tegra/board-trimslice.c
-@@ -180,5 +180,6 @@ MACHINE_START(TRIMSLICE, "trimslice")
- 	.handle_irq	= gic_handle_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_trimslice_init,
-+	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index 75d1543..80086c6 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -32,5 +32,21 @@ void __init tegra_init_irq(void);
- void __init tegra_dt_init_irq(void);
- int __init tegra_pcie_init(bool init_port0, bool init_port1);
  
-+void tegra_init_late(void);
-+
-+#ifdef CONFIG_DEBUG_FS
-+int tegra_clk_debugfs_init(void);
-+int tegra_pinmux_debuginit(void);
-+#else
-+static inline int tegra_clk_debugfs_init(void) { return 0; }
-+static inline int tegra_pinmux_debuginit(void) { return 0; }
-+#endif
-+
-+#if defined(CONFIG_ARCH_TEGRA_2x_SOC) && defined(CONFIG_DEBUG_FS)
-+int __init tegra_powergate_debugfs_init(void);
-+#else
-+static inline int tegra_powergate_debugfs_init(void) { return 0; }
-+#endif
-+
- extern struct sys_timer tegra_timer;
+ #ifdef CONFIG_MACH_UX500_DT
+@@ -830,6 +833,7 @@ DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
+ 	.timer		= &ux500_timer,
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= u8500_init_machine,
++	.init_late	= ux500_init_late,
+ 	.dt_compat      = u8500_dt_board_compat,
+ MACHINE_END
  #endif
-diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index 8dad8d1..58f981c 100644
---- a/arch/arm/mach-tegra/clock.c
-+++ b/arch/arm/mach-tegra/clock.c
-@@ -642,7 +642,7 @@ static int clk_debugfs_register(struct clk *c)
+diff --git a/arch/arm/mach-ux500/board-u5500.c b/arch/arm/mach-ux500/board-u5500.c
+index 0ff4be7..c7f5c82 100644
+--- a/arch/arm/mach-ux500/board-u5500.c
++++ b/arch/arm/mach-ux500/board-u5500.c
+@@ -159,4 +159,5 @@ MACHINE_START(U5500, "ST-Ericsson U5500 Platform")
+ 	.timer		= &ux500_timer,
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= u5500_init_machine,
++	.init_late	= ux500_init_late,
+ MACHINE_END
+diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
+index ec35f0a..ce00f5e 100644
+--- a/arch/arm/mach-ux500/clock.c
++++ b/arch/arm/mach-ux500/clock.c
+@@ -633,7 +633,7 @@ static int clk_debugfs_register(struct clk *c)
  	return 0;
  }
  
 -static int __init clk_debugfs_init(void)
-+int __init tegra_clk_debugfs_init(void)
++int __init clk_debugfs_init(void)
  {
  	struct clk *c;
  	struct dentry *d;
-@@ -669,5 +669,4 @@ err_out:
+@@ -655,7 +655,6 @@ err_out:
  	return err;
  }
  
 -late_initcall(clk_debugfs_init);
- #endif
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 22df10f..d5301b6 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -132,3 +132,10 @@ void __init tegra30_init_early(void)
- 	tegra_powergate_init();
+ #endif /* defined(CONFIG_DEBUG_FS) */
+ 
+ unsigned long clk_smp_twd_rate = 500000000;
+@@ -694,12 +693,11 @@ static struct notifier_block clk_twd_cpufreq_nb = {
+ 	.notifier_call = clk_twd_cpufreq_transition,
+ };
+ 
+-static int clk_init_smp_twd_cpufreq(void)
++int clk_init_smp_twd_cpufreq(void)
+ {
+ 	return cpufreq_register_notifier(&clk_twd_cpufreq_nb,
+ 				  CPUFREQ_TRANSITION_NOTIFIER);
  }
+-late_initcall(clk_init_smp_twd_cpufreq);
+ 
  #endif
+ 
+diff --git a/arch/arm/mach-ux500/clock.h b/arch/arm/mach-ux500/clock.h
+index d776ada..65d27a1 100644
+--- a/arch/arm/mach-ux500/clock.h
++++ b/arch/arm/mach-ux500/clock.h
+@@ -150,3 +150,15 @@ struct clk clk_##_name = {						\
+ 
+ int __init clk_db8500_ed_fixup(void);
+ int __init clk_init(void);
 +
-+void __init tegra_init_late(void)
++#ifdef CONFIG_DEBUG_FS
++int clk_debugfs_init(void);
++#else
++static inline int clk_debugfs_init(void) { return 0; }
++#endif
++
++#ifdef CONFIG_CPU_FREQ
++int clk_init_smp_twd_cpufreq(void);
++#else
++static inline int clk_init_smp_twd_cpufreq(void) { return 0; }
++#endif
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index d11f389..9856c57 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -67,6 +67,12 @@ void __init ux500_init_irq(void)
+ 	clk_init();
+ }
+ 
++void __init ux500_init_late(void)
 +{
-+	tegra_clk_debugfs_init();
-+	tegra_pinmux_debuginit();
-+	tegra_powergate_debugfs_init();
++	clk_debugfs_init();
++	clk_init_smp_twd_cpufreq();
 +}
-diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-index ac35d2b..4cecf38 100644
---- a/arch/arm/mach-tegra/pinmux.c
-+++ b/arch/arm/mach-tegra/pinmux.c
-@@ -975,7 +975,7 @@ static const struct file_operations debug_drive_fops = {
- 	.release	= single_release,
- };
- 
--static int __init tegra_pinmux_debuginit(void)
-+int __init tegra_pinmux_debuginit(void)
++
+ static const char * __init ux500_get_machine(void)
  {
- 	(void) debugfs_create_file("tegra_pinmux", S_IRUGO,
- 					NULL, NULL, &debug_fops);
-@@ -983,5 +983,4 @@ static int __init tegra_pinmux_debuginit(void)
- 					NULL, NULL, &debug_drive_fops);
- 	return 0;
- }
--late_initcall(tegra_pinmux_debuginit);
- #endif
-diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
-index c238699..f5b12fb 100644
---- a/arch/arm/mach-tegra/powergate.c
-+++ b/arch/arm/mach-tegra/powergate.c
-@@ -234,7 +234,7 @@ static const struct file_operations powergate_fops = {
- 	.release	= single_release,
- };
+ 	return kasprintf(GFP_KERNEL, "DB%4x", dbx500_partnumber());
+diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/include/mach/setup.h
+index 3dc00ff..7b5d865 100644
+--- a/arch/arm/mach-ux500/include/mach/setup.h
++++ b/arch/arm/mach-ux500/include/mach/setup.h
+@@ -22,6 +22,7 @@ extern struct device * __init u5500_init_devices(void);
+ extern struct device * __init u8500_init_devices(void);
  
--static int __init powergate_debugfs_init(void)
-+int __init tegra_powergate_debugfs_init(void)
- {
- 	struct dentry *d;
- 	int err = -ENOMEM;
-@@ -247,6 +247,4 @@ static int __init powergate_debugfs_init(void)
- 	return err;
- }
+ extern void __init ux500_init_irq(void);
++extern void __init ux500_init_late(void);
  
--late_initcall(powergate_debugfs_init);
--
- #endif
+ extern void __init u5500_sdi_init(struct device *parent);
+ 
 -- 
 1.7.5.4
