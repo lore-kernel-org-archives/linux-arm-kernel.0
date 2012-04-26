@@ -1,32 +1,25 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 26 Apr 2012 17:27:51 -0500
-Subject: [PATCH 04/17] ARM: ep93xx: use machine specific hook for late init
-In-Reply-To: <20120426221222.GI24211@n2100.arm.linux.org.uk>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-5-git-send-email-shawn.guo@linaro.org>
- <4F99B9EB.6060806@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F002069887EDC4@AUSP01VMBX24.collaborationhost.net>
- <20120426221222.GI24211@n2100.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F002069887EDDE@AUSP01VMBX24.collaborationhost.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 26 Apr 2012 16:38:07 -0600 (MDT)
+Subject: [PATCH-V5 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <alpine.DEB.2.00.1204261330010.10308@utopia.booyaka.com>
+References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
+ <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FF819@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204261330010.10308@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1204261636340.10308@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 26, 2012 3:12 PM, Russell King wrote:
-> On Thu, Apr 26, 2012 at 04:49:27PM -0500, H Hartley Sweeten wrote:
->> Wouldn't every mach-* supported by a unified kernel have to at least
->> be the same ARM variant (i.e. they share a common compiler setup)?
->> The ep93xx is an arm920t. Are there any other mach-* types that use
->> that?
->
-> ... which would be compatible with any kernel which includes ARMv4
-> through to ARMv5t CPUs.  I've built for many many many years Integrator
-> support with every CPU between ARM720T to ARM926T.
+On Thu, 26 Apr 2012, Paul Walmsley wrote:
 
-Thanks for the clarification!
+> Okay, thanks for testing.  Please do update this patch to use 
+> omap_hwmod_enable(), etc.; see for example omap_dm_timer_init_one().
 
-Ryan,
-Based on that I would assume that Shawn's patch is also relevant to ep93xx
-to help with the unified kernel.
+And, just to be explicit, the ioremap(), clk_get(), and clk_enable() 
+should no longer be needed for OMAP2+, once you add the 
+omap_hwmod_enable().
 
-Regards,
-Hartley
+
+- Paul
