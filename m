@@ -1,63 +1,64 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Thu, 26 Apr 2012 12:03:23 +0530
-Subject: [PATCHv4 1/2] drivers: input: keypad: Add device tree support
-In-Reply-To: <4F981CD1.2050007@wwwdotorg.org>
-References: <1335346004-18108-1-git-send-email-sourav.poddar@ti.com>
- <4F981CD1.2050007@wwwdotorg.org>
-Message-ID: <CAKdam56ONhS_drgfHCeY6aKWp3nT0PtDEO5SMCKxG+dGVPS66A@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 26 Apr 2012 00:36:00 -0600 (MDT)
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FE7EA@DBDE01.ent.ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204252335190.30642@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FE7EA@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1204260025140.30642@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Thu, 26 Apr 2012, Hiremath, Vaibhav wrote:
 
-On Wed, Apr 25, 2012 at 9:18 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/25/2012 03:26 AM, Sourav Poddar wrote:
->> Update the Documentation with omap4 keypad device tree
->> binding information.
->> Add device tree support for omap4 keypad driver.
->
->> diff --git a/Documentation/devicetree/bindings/input/omap-keypad.txt b/Documentation/devicetree/bindings/input/omap-keypad.txt
->
->> +Required Board Specific Properties, in addition to those specified by
->> +the shared matrix-keyboard bindings:
->> +- keypad,num-rows: Number of row lines connected to the keypad
->> + ?controller.
->> +
->> +- keypad,num-columns: Number of column lines connected to the
->> + ?keypad controller.
->
-> I'm not sure if "keypad," is the appropriate prefix here. If the
-> properties are specific to this one TI/OMAP binding, "ti," might be a
-> better prefix. However, if they're more generally applicable, maybe
-> "linux," to match "linux,keymap"?
->
-Yes, the idea was to make this binding more generic. Hence no "ti/omap"
-prefix were used.
-'linux' prefix denotes bindings specific to linux, keymap has
-keycodes which is linux specific. Hence, linux,keymap looks
-appropriate. But num rows/ cols are keyboard specific, so I am not
-sure if linux prefix goes well here ??
->> +Optional Properties specific to linux:
->> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
->
-> It's probably worth considering whether num-rows/columns should be part
-> of matrix-keyboard.txt, and whether linux,keypad-no-autorepeat should be
-> part of some core keyboard binding. Some of the properties in
-> tegra-kbc.txt might be worth generalizing too (debounce/repeat delay,
-> ghost filter)?
->
-Yes, I also think that its a good idea to make some of the above
-binding more generic. Though, I think "linux,keypad-no-autorepeat"
-will still be a custom binding, since its totally on the platform
-whether to use
-autorepeat feature or not?
->> +Example:
->> + ? ? ? ?keypad at 4ae1c000{
+> Unfortunately, this is fractional divider, assuming input clock of 24MHz.
+> 
+> 24MHz / 732.4219 = 32KHz (Normal OPP100)
+> 24MHz / 366.2109 = 32KHz (OPP50)
 
->> + ? ? ? ? ? ? ? ?compatible = "ti,omap4-keypad";
->> + ? ? ? ? ? ? ? ?keypad,num-rows = <2>;
->> + ? ? ? ? ? ? ? ?keypad,num-columns = <8>;
->> + ? ? ? ? ? ? linux,keypad-no-autorepeat;
->> + ? ? };
+Yes, I already saw that in the TRM.  The question is, how is the 
+fractional divider implemented in the hardware?  Is it implemented as an 
+M,N counter?  It's rather unlikely to be dividing by 732.4219 directly -- 
+in fact that value isn't even accurate.
 
-~Sourav
+> As per the Spec, we have some known HW/Si issues to run whole system at 
+> OPP50, that's where if you refer to the TRM Table 8-22. Per PLL Typical 
+> Frequencies (MHz), it only talks about OPP100, which is 732.4219 divider.
+> 
+> So, technically, if both OPP's (OPP100 and OPP50) works fine, then yes, we 
+> should handle it. But given the fact that, OPP50 is not fully functional due 
+> to HW/Si issues, from CORE and PER perspective we will always stay at OPP100.
+
+I see.
+
+> To summarize, I had to make it fixed-frequency due to,
+> 
+>  - Fractional divisor value.
+
+This could be implemented as an M,N counter, unless the hardware is doing 
+something more unusual.
+
+> > - This clock is feeding downstream clocks, but it's using the MODULEMODE 
+> > control interface, as if it were a standalone IP block.  Do you know why 
+> > it's using the MODULEMODE control method rather than some optional clock 
+> > control bits, like OMAP4 does?
+> 
+> Yes, this clock is feeding to timers, gpio debounce clocks, etc...
+> Honestly, I do not know the answer to why part of it.
+> (May be another integration/design issue)
+
+Could you please check with the AM335x PRCM designers about this to find 
+out what that MODULEMODE bit is actually doing (i.e., is it actually 
+enabling the clock, and if so, why did they not use the OPTFCLKEN bits) ?  
+The AM335x TRM has almost no documentation on what those MODULEMODE bits 
+are doing in this case.
+
+We're trying to remove all of these MODULEMODE clocks from the clock 
+framework, and also remove the accompanying clockdomain control sequence 
+from the clock code.  But now it's looking like it may be impossible due 
+to this "clock," which means we'll need to keep that code around, which is 
+unfortunate.
+
+
+- Paul
