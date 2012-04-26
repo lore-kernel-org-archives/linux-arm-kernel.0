@@ -1,83 +1,33 @@
-From: russ.dill@gmail.com (Russ Dill)
-Date: Thu, 26 Apr 2012 00:45:18 -0700
-Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FE807@DBDE01.ent.ti.com>
-References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
- <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
- <CA+Bv8XYemH3zW48id_ZAvC2gU_uZMFei6dMO1GUog_YTvFBV2Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83E9FE722@DBDE01.ent.ti.com>
- <CA+Bv8XaWkBr7ZDTjmjDg_K+JhEfWdYEt=eKQ5Gj8NMbw4K=Jmg@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83E9FE807@DBDE01.ent.ti.com>
-Message-ID: <CA+Bv8XYDNKWByVEMWniYruH6bcDtOihne5ecoXWJs6fYq418bQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Apr 2012 08:47:46 +0100
+Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
+ clkdevs for given struct clk *
+In-Reply-To: <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
+Message-ID: <20120426074746.GD24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 11:23 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> On Thu, Apr 26, 2012 at 11:26:09, Russ Dill wrote:
->> On Wed, Apr 25, 2012 at 10:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
->> > On Thu, Apr 26, 2012 at 10:06:40, Russ Dill wrote:
->> >> On Tue, Apr 24, 2012 at 2:45 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
->> >> > Current OMAP code supports couple of clocksource options based
->> >> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
->> >> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
->> >> > So there can be 3 options -
->> >> >
->> >> > 1. 32KHz sync-timer
->> >> > 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
->> >> > 3. 32KHz based gptimer.
->> >> >
->> >> > The optional gptimer based clocksource was added so that it can
->> >> > give the high precision than sync-timer, so expected usage was 2
->> >> > and not 3.
->> >> > Unfortunately option 2, clocksource doesn't meet the requirement of
->> >> > free-running clock as per clocksource need. It stops in low power states
->> >> > when sys_clock is cut. That makes gptimer based clocksource option
->> >> > useless for OMAP2/3/4 devices with sys_clock as a clock input.
->> >> > Option 3 will still work but it is no better than 32K sync-timer
->> >> > based clocksource.
->> >> >
->> >> > So ideally we can kill the gptimer based clocksource option but there
->> >> > are some OMAP based derivative SoCs like AM33XX which doesn't have
->> >> > 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
->> >> > clocksource.
->> >> > Considering above, make sync-timer and gptimer clocksource runtime
->> >> > selectable so that both OMAP and AMXXXX continue to use the same code.
->> >> >
->> >> > Also, in order to precisely configure/setup sched_clock for given
->> >> > clocksource, decision has to be made early enough in boot sequence.
->> >> >
->> >> > So, the solution is,
->> >> >
->> >> > Use kernel parameter ("clocksource=") to override
->> >> > default 32k_sync-timer, in addition to this, we also use hwmod database
->> >> > lookup mechanism, through which at run-time we can identify availability
->> >> > of 32k-sync timer on the device, else fall back to gptimer.
->> >> >
->> >> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> >> > Signed-off-by: Felipe Balbi <balbi@ti.com>
->> >> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> >> > Cc: Kevin Hilman <khilman@ti.com>
->> >> > Cc: Benoit Cousson <b-cousson@ti.com>
->> >> > Cc: Tony Lindgren <tony@atomide.com>
->> >> > Cc: Paul Walmsley <paul@pwsan.com>
->> >> > Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->> >> > Cc: Ming Lei <tom.leiming@gmail.com>
->> >>
->> >> This fails to boot on my Mistral am37x-evm with omap2plus_defconfig
->> >>
->> >
->> > Thanks Russ, for validating it.
->> >
->> > But I do not see any relation between your boot process stuck and this patch.
->> > What is the observation without these patches?
->>
->> With no patches applied it boots, with 1/3 applied it boots, with 2/3
->> applied it boots, with 3/3 applied it gets hung. I also tested on my
->> beagleboard b4, that booted fine.
->>
->
-> You mean to say, on Beagleboard it boots up fine. And same fails on EVM?
+On Tue, Apr 24, 2012 at 12:20:29PM +0530, Viresh Kumar wrote:
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> With common clock framework, clks are allocated at runtime. Some of them require
+> clkdevs to be allocated and added in global clkdev list.
+> 
+> This patch introduces helper routines to:
+> 
+>  - allocate and add single clkdev for a single clk structure.
+>  - add multiple clkdevs for a single clk structure.
 
+This still causes additional warnings.  Having managed to get the build
+for various platforms down to zero warnings, we now have:
 
-yes
+drivers/clk/clkdev.c: In function 'clkdev_alloc':
+drivers/clk/clkdev.c:209: warning: 'ap' may be used uninitialized in this function
+drivers/clk/clkdev.c: In function 'clk_register_clkdev':
+drivers/clk/clkdev.c:251: warning: 'ap' may be used uninitialized in this function
+
+for everything building clkdev.c
+
+I'll be dropping the patch.  Please fix.
