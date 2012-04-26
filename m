@@ -1,49 +1,73 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 26 Apr 2012 16:22:59 +0200
-Subject: i.MX6: 3.4-rc4: WARNING at arch/arm/kernel/smp_twd.c ?
-Message-ID: <4F995A43.1050006@de.bosch.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 26 Apr 2012 22:40:24 +0800
+Subject: [PATCH v4 1/4] dt: add of_get_child_count helper function
+Message-ID: <1335451227-27709-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Booting a 3.4-rc4 on a i.MX6 SabreLite board, the kernel boot messages 
-contain
+Currently most code to get child count in kernel are almost same,
+add a helper to implement this function for dt to use.
 
-...
-sched_clock: 32 bits at 66MHz, resolution 15ns, wraps every 65075ms
-------------[ cut here ]------------
-WARNING: at arch/arm/kernel/smp_twd.c:349 
-twd_local_timer_of_register+0x54/0x98()
-twd_local_timer_of_register failed (-19)
-Modules linked in:
-Backtrace:
-[<80012128>] (dump_backtrace+0x0/0x10c) from [<803fef58>] 
-(dump_stack+0x18/0x1c)
-  r7:8055ff60 r6:8051cc08 r5:804ad180 r4:0000015d
-[<803fef40>] (dump_stack+0x0/0x1c) from [<80021600>] 
-(warn_slowpath_common+0x54/0x6c)
-[<800215ac>] (warn_slowpath_common+0x0/0x6c) from [<800216bc>] 
-(warn_slowpath_fmt+0x38/0x40)
-  r9:412fc09a r8:8057afc0 r7:805aa5c0 r6:00000000 r5:8054fa8c
-r4:00000000
-[<80021684>] (warn_slowpath_fmt+0x0/0x40) from [<8051cc08>] 
-(twd_local_timer_of_register+0x54/0x98)
-  r3:ffffffed r2:804ad19c
-[<8051cbb4>] (twd_local_timer_of_register+0x0/0x98) from [<805286a0>] 
-(imx6q_timer_init+0x14/0x18)
-  r5:8054fa8c r4:8fffffff
-[<8052868c>] (imx6q_timer_init+0x0/0x18) from [<8051c80c>] 
-(time_init+0x28/0x38)
-[<8051c7e4>] (time_init+0x0/0x38) from [<80518890>] 
-(start_kernel+0x19c/0x31c)
-[<805186f4>] (start_kernel+0x0/0x31c) from [<10008044>] (0x10008044)
-  r8:1000406a r7:8057efe4 r6:8054fa5c r5:8057b048 r4:10c53c7d
----[ end trace 1b75b31a2719ed1c ]---
-Console: colour dummy device 80x30
-...
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Any idea or hint?
+---
+Rob missed this patch for 3.4 kernel.
+Based on Rob's suggestion, we can get it go in with pinctrl driver.
+Since Rob once had applied it, i added Rob's ack.
+See:
+https://lkml.org/lkml/2012/4/14/239
 
-Best regards
+changes v3->v4:
+ * addressed Grant's suggestion to use for_each_child_of_node.
 
-Dirk
+changes v2->v3:
+ Addressed some people's comments:
+ * do not use assignment as expression
+ * return 0 for non-dt case
+
+Changes v1->v2:
+ * change the name from of_get_child_number to of_get_child_count
+---
+ include/linux/of.h |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index e3f942d..1c14976 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -193,6 +193,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
+ 	for (child = of_get_next_child(parent, NULL); child != NULL; \
+ 	     child = of_get_next_child(parent, child))
+ 
++static inline int of_get_child_count(const struct device_node *np)
++{
++	struct device_node *child = NULL;
++	int num = 0;
++
++	for_each_child_of_node(np, child)
++		num++;
++
++	return num;
++}
++
+ extern struct device_node *of_find_node_with_property(
+ 	struct device_node *from, const char *prop_name);
+ #define for_each_node_with_property(dn, prop_name) \
+@@ -300,6 +311,11 @@ static inline bool of_have_populated_dt(void)
+ #define for_each_child_of_node(parent, child) \
+ 	while (0)
+ 
++static inline int of_get_child_count(const struct device_node *np)
++{
++	return 0;
++}
++
+ static inline int of_device_is_compatible(const struct device_node *device,
+ 					  const char *name)
+ {
+-- 
+1.7.0.4
