@@ -1,234 +1,405 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 26 Apr 2012 23:10:38 +0530
-Subject: [PATCH V3 07/10] ARM: OMAP2+: SmartReflex: Use per-OPP data structure
-In-Reply-To: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1335462041-4949-8-git-send-email-j-keerthy@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 26 Apr 2012 10:41:24 -0700
+Subject: [PATCH 08/17] ARM: msm: use machine specific hook for late init
+In-Reply-To: <1335454725-13089-9-git-send-email-shawn.guo@linaro.org>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-9-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120426174124.GA22248@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+This should be ok.  I'll forward it on to Saravana Kannan and Stephen
+Boyd, since it will affect the clock changes they are working on, but
+It's not too difficult to adapt.
 
-The SmartReflex driver incorrectly treats some per-OPP data as data
-common to all OPPs (e.g., ERRMINLIMIT).  Move this data into a per-OPP
-data structure.
+David
 
-Furthermore, in order to make the SmartReflex implementation ready for
-the move to drivers/, remove the dependency from the SR driver code
-to the voltage layer by querying the data tables only from the SR device
-init code.
+On Thu, Apr 26, 2012 at 11:38:36PM +0800, Shawn Guo wrote:
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-msm/board-halibut.c      |    7 +++++++
+>  arch/arm/mach-msm/board-mahimahi.c     |    7 +++++++
+>  arch/arm/mach-msm/board-msm7x27.c      |   10 ++++++++++
+>  arch/arm/mach-msm/board-msm7x30.c      |    9 +++++++++
+>  arch/arm/mach-msm/board-msm8960.c      |    8 ++++++++
+>  arch/arm/mach-msm/board-msm8x60.c      |   11 +++++++++++
+>  arch/arm/mach-msm/board-qsd8x50.c      |    8 ++++++++
+>  arch/arm/mach-msm/board-sapphire.c     |    7 +++++++
+>  arch/arm/mach-msm/board-trout.c        |    7 +++++++
+>  arch/arm/mach-msm/clock.c              |    4 +---
+>  arch/arm/mach-msm/include/mach/board.h |    7 +++++++
+>  arch/arm/mach-msm/smd_debug.c          |    3 +--
+>  12 files changed, 83 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-msm/board-halibut.c b/arch/arm/mach-msm/board-halibut.c
+> index 26aac36..f60944c 100644
+> --- a/arch/arm/mach-msm/board-halibut.c
+> +++ b/arch/arm/mach-msm/board-halibut.c
+> @@ -94,6 +94,12 @@ static void __init halibut_map_io(void)
+>  	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
+>  }
+>  
+> +static void __init halibut_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  MACHINE_START(HALIBUT, "Halibut Board (QCT SURF7200A)")
+>  	.atag_offset	= 0x100,
+>  	.fixup		= halibut_fixup,
+> @@ -101,5 +107,6 @@ MACHINE_START(HALIBUT, "Halibut Board (QCT SURF7200A)")
+>  	.init_early	= halibut_init_early,
+>  	.init_irq	= halibut_init_irq,
+>  	.init_machine	= halibut_init,
+> +	.init_late	= halibut_init_late,
+>  	.timer		= &msm_timer,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/board-mahimahi.c b/arch/arm/mach-msm/board-mahimahi.c
+> index 5a4882f..6ee7c9a 100644
+> --- a/arch/arm/mach-msm/board-mahimahi.c
+> +++ b/arch/arm/mach-msm/board-mahimahi.c
+> @@ -71,6 +71,12 @@ static void __init mahimahi_map_io(void)
+>  	msm_clock_init();
+>  }
+>  
+> +static void __init mahimahi_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  extern struct sys_timer msm_timer;
+>  
+>  MACHINE_START(MAHIMAHI, "mahimahi")
+> @@ -79,5 +85,6 @@ MACHINE_START(MAHIMAHI, "mahimahi")
+>  	.map_io		= mahimahi_map_io,
+>  	.init_irq	= msm_init_irq,
+>  	.init_machine	= mahimahi_init,
+> +	.init_late	= mahimahi_init_late,
+>  	.timer		= &msm_timer,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/board-msm7x27.c b/arch/arm/mach-msm/board-msm7x27.c
+> index 6d84ee7..8e8ca0f 100644
+> --- a/arch/arm/mach-msm/board-msm7x27.c
+> +++ b/arch/arm/mach-msm/board-msm7x27.c
+> @@ -128,11 +128,18 @@ static void __init msm7x2x_map_io(void)
+>  #endif
+>  }
+>  
+> +static void __init msm7x2x_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  MACHINE_START(MSM7X27_SURF, "QCT MSM7x27 SURF")
+>  	.atag_offset	= 0x100,
+>  	.map_io		= msm7x2x_map_io,
+>  	.init_irq	= msm7x2x_init_irq,
+>  	.init_machine	= msm7x2x_init,
+> +	.init_late	= msm7x2x_init_late,
+>  	.timer		= &msm_timer,
+>  MACHINE_END
+>  
+> @@ -141,6 +148,7 @@ MACHINE_START(MSM7X27_FFA, "QCT MSM7x27 FFA")
+>  	.map_io		= msm7x2x_map_io,
+>  	.init_irq	= msm7x2x_init_irq,
+>  	.init_machine	= msm7x2x_init,
+> +	.init_late	= msm7x2x_init_late,
+>  	.timer		= &msm_timer,
+>  MACHINE_END
+>  
+> @@ -149,6 +157,7 @@ MACHINE_START(MSM7X25_SURF, "QCT MSM7x25 SURF")
+>  	.map_io		= msm7x2x_map_io,
+>  	.init_irq	= msm7x2x_init_irq,
+>  	.init_machine	= msm7x2x_init,
+> +	.init_late	= msm7x2x_init_late,
+>  	.timer		= &msm_timer,
+>  MACHINE_END
+>  
+> @@ -157,5 +166,6 @@ MACHINE_START(MSM7X25_FFA, "QCT MSM7x25 FFA")
+>  	.map_io		= msm7x2x_map_io,
+>  	.init_irq	= msm7x2x_init_irq,
+>  	.init_machine	= msm7x2x_init,
+> +	.init_late	= msm7x2x_init_late,
+>  	.timer		= &msm_timer,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+> index db81ed5..a71d8f9 100644
+> --- a/arch/arm/mach-msm/board-msm7x30.c
+> +++ b/arch/arm/mach-msm/board-msm7x30.c
+> @@ -120,6 +120,12 @@ static void __init msm7x30_map_io(void)
+>  	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
+>  }
+>  
+> +static void __init msm7x30_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
+>  	.atag_offset = 0x100,
+>  	.fixup = msm7x30_fixup,
+> @@ -127,6 +133,7 @@ MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
+>  	.map_io = msm7x30_map_io,
+>  	.init_irq = msm7x30_init_irq,
+>  	.init_machine = msm7x30_init,
+> +	.init_late = msm7x30_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+>  
+> @@ -137,6 +144,7 @@ MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
+>  	.map_io = msm7x30_map_io,
+>  	.init_irq = msm7x30_init_irq,
+>  	.init_machine = msm7x30_init,
+> +	.init_late = msm7x30_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+>  
+> @@ -147,5 +155,6 @@ MACHINE_START(MSM7X30_FLUID, "QCT MSM7X30 FLUID")
+>  	.map_io = msm7x30_map_io,
+>  	.init_irq = msm7x30_init_irq,
+>  	.init_machine = msm7x30_init,
+> +	.init_late = msm7x30_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+> index ed35981..4eb8232 100644
+> --- a/arch/arm/mach-msm/board-msm8960.c
+> +++ b/arch/arm/mach-msm/board-msm8960.c
+> @@ -93,6 +93,12 @@ static void __init msm8960_rumi3_init(void)
+>  	platform_add_devices(rumi3_devices, ARRAY_SIZE(rumi3_devices));
+>  }
+>  
+> +static void __init msm8960_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
+>  	.fixup = msm8960_fixup,
+>  	.reserve = msm8960_reserve,
+> @@ -101,6 +107,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
+>  	.timer = &msm_timer,
+>  	.handle_irq = gic_handle_irq,
+>  	.init_machine = msm8960_sim_init,
+> +	.init_late = msm8960_init_late,
+>  MACHINE_END
+>  
+>  MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
+> @@ -111,5 +118,6 @@ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
+>  	.timer = &msm_timer,
+>  	.handle_irq = gic_handle_irq,
+>  	.init_machine = msm8960_rumi3_init,
+> +	.init_late = msm8960_init_late,
+>  MACHINE_END
+>  
+> diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+> index 962e711..1dd6ce7 100644
+> --- a/arch/arm/mach-msm/board-msm8x60.c
+> +++ b/arch/arm/mach-msm/board-msm8x60.c
+> @@ -68,6 +68,12 @@ static void __init msm8x60_init(void)
+>  {
+>  }
+>  
+> +static void __init msm8x60_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  #ifdef CONFIG_OF
+>  static struct of_dev_auxdata msm_auxdata_lookup[] __initdata = {
+>  	{}
+> @@ -106,6 +112,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+>  	.init_irq = msm8x60_init_irq,
+>  	.handle_irq = gic_handle_irq,
+>  	.init_machine = msm8x60_init,
+> +	.init_late = msm8x60_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+>  
+> @@ -116,6 +123,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+>  	.init_irq = msm8x60_init_irq,
+>  	.handle_irq = gic_handle_irq,
+>  	.init_machine = msm8x60_init,
+> +	.init_late = msm8x60_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+>  
+> @@ -126,6 +134,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
+>  	.init_irq = msm8x60_init_irq,
+>  	.handle_irq = gic_handle_irq,
+>  	.init_machine = msm8x60_init,
+> +	.init_late = msm8x60_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+>  
+> @@ -136,6 +145,7 @@ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
+>  	.init_irq = msm8x60_init_irq,
+>  	.handle_irq = gic_handle_irq,
+>  	.init_machine = msm8x60_init,
+> +	.init_late = msm8x60_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+>  
+> @@ -145,6 +155,7 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+>  	.map_io = msm8x60_map_io,
+>  	.init_irq = msm8x60_init_irq,
+>  	.init_machine = msm8x60_dt_init,
+> +	.init_late = msm8x60_init_late,
+>  	.timer = &msm_timer,
+>  	.dt_compat = msm8x60_fluid_match,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+> index 7e8909c..45ce374 100644
+> --- a/arch/arm/mach-msm/board-qsd8x50.c
+> +++ b/arch/arm/mach-msm/board-qsd8x50.c
+> @@ -191,11 +191,18 @@ static void __init qsd8x50_init(void)
+>  	qsd8x50_init_mmc();
+>  }
+>  
+> +static void __init qsd8x50_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
+>  	.atag_offset = 0x100,
+>  	.map_io = qsd8x50_map_io,
+>  	.init_irq = qsd8x50_init_irq,
+>  	.init_machine = qsd8x50_init,
+> +	.init_late = qsd8x50_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+>  
+> @@ -204,5 +211,6 @@ MACHINE_START(QSD8X50A_ST1_5, "QCT QSD8X50A ST1.5")
+>  	.map_io = qsd8x50_map_io,
+>  	.init_irq = qsd8x50_init_irq,
+>  	.init_machine = qsd8x50_init,
+> +	.init_late = qsd8x50_init_late,
+>  	.timer = &msm_timer,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/board-sapphire.c b/arch/arm/mach-msm/board-sapphire.c
+> index 4a8ea0d..9ca39ec 100644
+> --- a/arch/arm/mach-msm/board-sapphire.c
+> +++ b/arch/arm/mach-msm/board-sapphire.c
+> @@ -101,6 +101,12 @@ static void __init sapphire_map_io(void)
+>  	msm_clock_init();
+>  }
+>  
+> +static void __init sapphire_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  MACHINE_START(SAPPHIRE, "sapphire")
+>  /* Maintainer: Brian Swetland <swetland@google.com> */
+>  	.atag_offset    = 0x100,
+> @@ -108,5 +114,6 @@ MACHINE_START(SAPPHIRE, "sapphire")
+>  	.map_io         = sapphire_map_io,
+>  	.init_irq       = sapphire_init_irq,
+>  	.init_machine   = sapphire_init,
+> +	.init_late      = sapphire_init_late,
+>  	.timer          = &msm_timer,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+> index d4060a3..c66bd81 100644
+> --- a/arch/arm/mach-msm/board-trout.c
+> +++ b/arch/arm/mach-msm/board-trout.c
+> @@ -98,6 +98,12 @@ static void __init trout_map_io(void)
+>  	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
+>  }
+>  
+> +static void __init trout_init_late(void)
+> +{
+> +	msm_clock_late_init();
+> +	smd_debugfs_init();
+> +}
+> +
+>  MACHINE_START(TROUT, "HTC Dream")
+>  	.atag_offset	= 0x100,
+>  	.fixup		= trout_fixup,
+> @@ -105,5 +111,6 @@ MACHINE_START(TROUT, "HTC Dream")
+>  	.init_early	= trout_init_early,
+>  	.init_irq	= trout_init_irq,
+>  	.init_machine	= trout_init,
+> +	.init_late	= trout_init_late,
+>  	.timer		= &msm_timer,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+> index d9145df..4b06db1 100644
+> --- a/arch/arm/mach-msm/clock.c
+> +++ b/arch/arm/mach-msm/clock.c
+> @@ -156,7 +156,7 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
+>   * Disable any clocks that belong to us (CLKFLAG_AUTO_OFF) but have
+>   * not been explicitly enabled by a clk_enable() call.
+>   */
+> -static int __init clock_late_init(void)
+> +int __init msm_clock_late_init(void)
+>  {
+>  	unsigned long flags;
+>  	struct clk *clk;
+> @@ -180,5 +180,3 @@ static int __init clock_late_init(void)
+>  	return 0;
+>  }
+>  
+> -late_initcall(clock_late_init);
+> -
+> diff --git a/arch/arm/mach-msm/include/mach/board.h b/arch/arm/mach-msm/include/mach/board.h
+> index 2ce8f1f..ae5a67b 100644
+> --- a/arch/arm/mach-msm/include/mach/board.h
+> +++ b/arch/arm/mach-msm/include/mach/board.h
+> @@ -42,9 +42,16 @@ void __init msm_map_common_io(void);
+>  void __init msm_init_irq(void);
+>  void __init msm_init_gpio(void);
+>  void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks);
+> +int __init msm_clock_late_init(void);
+>  void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *);
+>  int __init msm_add_sdcc(unsigned int controller,
+>  			struct msm_mmc_platform_data *plat,
+>  			unsigned int stat_irq, unsigned long stat_irq_flags);
+>  
+> +#if defined(CONFIG_MSM_SMD) && defined(CONFIG_DEBUG_FS)
+> +int smd_debugfs_init(void);
+> +#else
+> +static inline int smd_debugfs_init(void) { return 0; }
+> +#endif
+> +
+>  #endif
+> diff --git a/arch/arm/mach-msm/smd_debug.c b/arch/arm/mach-msm/smd_debug.c
+> index c56df9e..8056b3e 100644
+> --- a/arch/arm/mach-msm/smd_debug.c
+> +++ b/arch/arm/mach-msm/smd_debug.c
+> @@ -216,7 +216,7 @@ static void debug_create(const char *name, umode_t mode,
+>  	debugfs_create_file(name, mode, dent, fill, &debug_ops);
+>  }
+>  
+> -static int smd_debugfs_init(void)
+> +int __init smd_debugfs_init(void)
+>  {
+>  	struct dentry *dent;
+>  
+> @@ -234,7 +234,6 @@ static int smd_debugfs_init(void)
+>  	return 0;
+>  }
+>  
+> -late_initcall(smd_debugfs_init);
+>  #endif
+>  
+>  
+> -- 
+> 1.7.5.4
+> 
 
-Based on Paul's original code for the SmartReflex driver conversion.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Thara Gopinath <thara@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/smartreflex.c |   38 +++++++++++++++++-------------------
- arch/arm/mach-omap2/sr_device.c   |   36 +++++++++++++++++++++++++++++-----
- include/linux/power/smartreflex.h |    8 +++++-
- 3 files changed, 54 insertions(+), 28 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index acef08d..20075de 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -347,22 +347,23 @@ static void sr_v2_disable(struct omap_sr *sr)
- 	sr_write_reg(sr, IRQSTATUS, IRQSTATUS_MCUDISABLEACKINT);
- }
- 
--static u32 sr_retrieve_nvalue(struct omap_sr *sr, u32 efuse_offs)
-+static struct omap_sr_nvalue_table *sr_retrieve_nvalue_row(
-+				struct omap_sr *sr, u32 efuse_offs)
- {
- 	int i;
- 
- 	if (!sr->nvalue_table) {
- 		dev_warn(&sr->pdev->dev, "%s: Missing ntarget value table\n",
- 			__func__);
--		return 0;
-+		return NULL;
- 	}
- 
- 	for (i = 0; i < sr->nvalue_count; i++) {
- 		if (sr->nvalue_table[i].efuse_offs == efuse_offs)
--			return sr->nvalue_table[i].nvalue;
-+			return &sr->nvalue_table[i];
- 	}
- 
--	return 0;
-+	return NULL;
- }
- 
- /* Public Functions */
-@@ -586,7 +587,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- {
- 	struct omap_volt_data *volt_data;
- 	struct omap_sr *sr = _sr_lookup(voltdm);
--	u32 nvalue_reciprocal;
-+	struct omap_sr_nvalue_table *nvalue_row;
- 	int ret;
- 
- 	if (IS_ERR(sr)) {
-@@ -602,16 +603,16 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- 		return PTR_ERR(volt_data);
- 	}
- 
--	nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data->sr_efuse_offs);
-+	nvalue_row = sr_retrieve_nvalue_row(sr, volt_data->sr_efuse_offs);
- 
--	if (!nvalue_reciprocal) {
--		dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %ld\n",
--			__func__, volt);
-+	if (!nvalue_row) {
-+		dev_warn(&sr->pdev->dev, "%s: failure getting SR data for this voltage %ld\n",
-+			 __func__, volt);
- 		return -ENODATA;
- 	}
- 
- 	/* errminlimit is opp dependent and hence linked to voltage */
--	sr->err_minlimit = volt_data->sr_errminlimit;
-+	sr->err_minlimit = nvalue_row->errminlimit;
- 
- 	pm_runtime_get_sync(&sr->pdev->dev);
- 
-@@ -624,7 +625,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- 	if (ret)
- 		return ret;
- 
--	sr_write_reg(sr, NVALUERECIPROCAL, nvalue_reciprocal);
-+	sr_write_reg(sr, NVALUERECIPROCAL, nvalue_row->nvalue);
- 
- 	/* SRCONFIG - enable SR */
- 	sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, SRCONFIG_SRENABLE);
-@@ -872,7 +873,6 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	struct omap_sr_data *pdata = pdev->dev.platform_data;
- 	struct resource *mem, *irq;
- 	struct dentry *nvalue_dir;
--	struct omap_volt_data *volt_data;
- 	int i, ret = 0;
- 
- 	sr_info = kzalloc(sizeof(struct omap_sr), GFP_KERNEL);
-@@ -990,12 +990,10 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		goto err_debugfs;
- 	}
- 
--	omap_voltage_get_volttable(sr_info->voltdm, &volt_data);
--	if (!volt_data) {
--		dev_warn(&pdev->dev, "%s: %s: No Voltage table for the"
--			" corresponding vdd. Cannot create debugfs"
--			"entries for n-values\n",
--			__func__, sr_info->name);
-+	if (sr_info->nvalue_count == 0 || !sr_info->nvalue_table) {
-+		dev_warn(&pdev->dev, "%s: %s: No Voltage table for the corresponding vdd. Cannot create debugfs entries for n-values\n",
-+			 __func__, sr_info->name);
-+
- 		ret = -ENODATA;
- 		goto err_debugfs;
- 	}
-@@ -1003,8 +1001,8 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	for (i = 0; i < sr_info->nvalue_count; i++) {
- 		char name[NVALUE_NAME_LEN + 1];
- 
--		snprintf(name, sizeof(name), "volt_%d",
--			 volt_data[i].volt_nominal);
-+		snprintf(name, sizeof(name), "volt_%lu",
-+				sr_info->nvalue_table[i].volt_nominal);
- 		(void) debugfs_create_x32(name, S_IRUGO | S_IWUSR, nvalue_dir,
- 				&(sr_info->nvalue_table[i].nvalue));
- 	}
-diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
-index e081174..e107e39 100644
---- a/arch/arm/mach-omap2/sr_device.c
-+++ b/arch/arm/mach-omap2/sr_device.c
-@@ -36,7 +36,10 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
- 				struct omap_sr_data *sr_data)
- {
- 	struct omap_sr_nvalue_table *nvalue_table;
--	int i, count = 0;
-+	int i, j, count = 0;
-+
-+	sr_data->nvalue_count = 0;
-+	sr_data->nvalue_table = NULL;
- 
- 	while (volt_data[count].volt_nominal)
- 		count++;
-@@ -44,8 +47,14 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
- 	nvalue_table = kzalloc(sizeof(struct omap_sr_nvalue_table)*count,
- 			GFP_KERNEL);
- 
--	for (i = 0; i < count; i++) {
-+	if (!nvalue_table) {
-+		pr_err("OMAP: SmartReflex: cannot allocate memory for n-value table\n");
-+		return;
-+	}
-+
-+	for (i = 0, j = 0; i < count; i++) {
- 		u32 v;
-+
- 		/*
- 		 * In OMAP4 the efuse registers are 24 bit aligned.
- 		 * A __raw_readl will fail for non-32 bit aligned address
-@@ -58,15 +67,30 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
- 				omap_ctrl_readb(offset + 1) << 8 |
- 				omap_ctrl_readb(offset + 2) << 16;
- 		} else {
--			 v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
-+			v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
- 		}
- 
--		nvalue_table[i].efuse_offs = volt_data[i].sr_efuse_offs;
--		nvalue_table[i].nvalue = v;
-+		/*
-+		 * Many OMAP SoCs don't have the eFuse values set.
-+		 * For example, pretty much all OMAP3xxx before
-+		 * ES3.something.
-+		 *
-+		 * XXX There needs to be some way for board files or
-+		 * userspace to add these in.
-+		 */
-+		if (v == 0)
-+			continue;
-+
-+		nvalue_table[j].nvalue = v;
-+		nvalue_table[j].efuse_offs = volt_data[i].sr_efuse_offs;
-+		nvalue_table[j].errminlimit = volt_data[i].sr_errminlimit;
-+		nvalue_table[j].volt_nominal = volt_data[i].volt_nominal;
-+
-+		j++;
- 	}
- 
- 	sr_data->nvalue_table = nvalue_table;
--	sr_data->nvalue_count = count;
-+	sr_data->nvalue_count = j;
- }
- 
- static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
-diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
-index 78b795e..222f901 100644
---- a/include/linux/power/smartreflex.h
-+++ b/include/linux/power/smartreflex.h
-@@ -243,12 +243,16 @@ struct omap_sr_class_data {
- /**
-  * struct omap_sr_nvalue_table	- Smartreflex n-target value info
-  *
-- * @efuse_offs:	The offset of the efuse where n-target values are stored.
-- * @nvalue:	The n-target value.
-+ * @efuse_offs:	  The offset of the efuse where n-target values are stored.
-+ * @nvalue:	  The n-target value.
-+ * @errminlimit:  The value of the ERRMINLIMIT bitfield for this n-target
-+ * @volt_nominal: microvolts DC that the VDD is initially programmed to
-  */
- struct omap_sr_nvalue_table {
- 	u32 efuse_offs;
- 	u32 nvalue;
-+	u32 errminlimit;
-+	unsigned long volt_nominal;
- };
- 
- /**
 -- 
-1.7.5.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
