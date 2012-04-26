@@ -1,114 +1,56 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 26 Apr 2012 05:48:33 +0000
-Subject: [PATCH-V3 2/3] ARM: OMAP3+: clockdomain33xx: Add clockdomain
- data and respective operations
-In-Reply-To: <alpine.DEB.2.00.1204252118170.30642@utopia.booyaka.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241725430.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD30E@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204252118170.30642@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FE75B@DBDE01.ent.ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 26 Apr 2012 08:49:44 +0300
+Subject: [PATCH v2 1/3] ARM: tegra: Add AHB driver
+In-Reply-To: <4F981F6C.2050807@wwwdotorg.org>
+References: <1335269116-9578-1-git-send-email-hdoyu@nvidia.com>
+ <20120425083747.466f5c98330af8964d980b8c@nvidia.com>
+ <20120425074639.GB3423@arwen.pp.htv.fi>
+ <201204251215.22889.arnd@arndb.de> <4F981F6C.2050807@wwwdotorg.org>
+Message-ID: <20120426084944.21e7aa1c3944c906742967a2@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 08:49:28, Paul Walmsley wrote:
-> On Wed, 25 Apr 2012, Hiremath, Vaibhav wrote:
-> 
-> > On Wed, Apr 25, 2012 at 05:52:26, Paul Walmsley wrote:
-> > > A few questions while reviewing this patch:
-> > > 
-> > > On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
-> > > 
-> > > > AM33XX PRCM module consist of, various clockdomains, in all
-> > > > total we have 18 clockdomains available, with following
-> > > > controlling options,
-> > > >    - NO Sleep: sleep transition can not be initiated,
-> > > >    - SW Sleep: sw forced sleep transition,
-> > > >    - SW Wakeup: sw forced wakeup transition,
-> > > >    - HW Auto: transitions are based upon hw conditions.
-> > > > 
-> > > > This patch adds all available clockdomain data, respective
-> > > > clockdomain operations for AM33XX family of device, and also
-> > > > integrates it into existing OMAP framework.
-> > > > 
-> > > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > > > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> > > > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > > 
-> > > ...
-> > > 
-> > > > +static struct clockdomain l4ls_am33xx_clkdm = {
-> > > > +	.name		= "l4ls_clkdm",
-> > > > +	.pwrdm		= { .name = "per_pwrdm" },
-> > > > +	.cm_inst	= AM33XX_CM_PER_MOD,
-> > > > +	.clkdm_offs	= AM33XX_CM_PER_L4LS_CLKSTCTRL_OFFSET,
-> > > > +	.clktrctrl_mask	= AM33XX_CLKTRCTRL_MASK,
-> > > > +	.flags		= (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
-> > > 
-> > > It looks to me like we don't need the .clktrctrl_mask field, since 
-> > > according to the clockdomains code, the CLKTRCTRL field is at the same bit 
-> > > shift for each clockdomain.
-> > > 
+On Wed, 25 Apr 2012 17:59:40 +0200
+Stephen Warren <swarren@wwwdotorg.org> wrote:
+
+> On 04/25/2012 06:15 AM, Arnd Bergmann wrote:
+> > On Wednesday 25 April 2012, Felipe Balbi wrote:
+> ...
+> >>> Can this driver be located under "drivers/misc"? Or is there any better place?
+> >>
+> >> maybe drivers/platform/arm/ ??
 > > 
-> > Yeah, we actually don't need it, probably I added for completeness.
-> > I will remove it in next version.
-> 
-> I've removed them here.
-> 
-
-Thanks.
-
-> > > Also, since we're not defining any autodeps for the AM335x platform, we 
-> > > shouldn't need the CLKDM_NO_AUTODEPS flag either?  Since no autodeps are 
-> > > defined, the default will be to not set any autodeps.
-> > > 
+> > I really wouldn't want to add that directory: It has the risk of letting
+> > people add random crap there that may or may not be related to ARM (the
+> > company) and/or ARM (the architecture).
 > > 
-> > This is required to avoid few "pr_debug", if you don't provide it.
-> > For example, without this flag set, you will get,
-> > 
-> > pr_debug("clockdomain: hardware cannot set/clear sleep "
-> > 		"dependency affecting %s from %s\n", clkdm1->name,
-> >              clkdm2->name);
-> > 
-> > Refer to the file omap_hwmod.c, function, _enable(), the call sequence is,
-> > 
-> > _enable() => _add_initiator_dep() => clkdm_add_sleepdep() =>leads to warning
+> > I think it could go into drivers/amba/ along with the primecell bus driver.
+> > The two drivers are for two different aspects of the AMBA spec and don't
+> > actually depend on one another as far as I can tell, but it's at least
+> > a fitting name, and it doesn't depend on the ARM architecture, which is
+> > important because the driver could be used on other architectures that
+> > are connected to an AHB bus.
 > 
-> Seems like the better thing to do is to just avoid calling
-> _{add,del}_initiator_dep() on the AM335x.
-> 
+> Hiroshi, is this driver for something (registers/features) that AMBA
+> actually specifies? AHB might be part of AMBA (I'm not familiar enough
+> to know), but I don't think this aspect of Tegra's AHB bus is part of
+> any core AHB/AMBA specification, rather than being some Tegra-specific
+> control over the bus (given that the registers and bits correspond to
+> Tegra-specific devices on the bus).
 
-Don't you think, if flag is doing all the job, why to pollute code with
-cpu_is_am33xx() checks.
+Agree.
 
+Taking a look at AHB spec, this tegra-ahb part is a bit beyond that
+spec from S/W POV. If there's other similiar AHB drivers from othere
+SoC, we may be able to generalize them, but at the moment, it's hard
+to imagine how much/little part is common for similar AHB drivers,
+like registers/bit definitions. Most of the part may depends on
+SoC/Tegra.
 
-> > > Another question is about the CLKTRCTRL bitfields.  According to
-> > > _AM335x ARM Cortex-A8 Microprocessors (MPUs) Technical Reference
-> > > Manual_ Rev. D (SPRUH73D), most of the clockdomains support NO_SLEEP mode 
-> > > (i.e., CLKTRCTRL = 0x0).  That means that technically, we should also set 
-> > > the CLKDM_CAN_DISABLE_AUTO flag.  Unless the documentation is incorrect 
-> > > here?  In another section (Table 8-9 "Clock Transition Mode Settings"), 
-> > > it claims that CLKTRCTRL = 0 is not supported...
-> > > 
-> > 
-> > It is not supported, and should be considered as documentation issue.
-> 
-> Okay so I guess the description for this patch (quoted above) is wrong 
-> then also?
-> 
+> I'm not really convinced that low-level platform-specific drivers like
+> this shouldn't be in the arch/arm/mach-* directories.
 
-Yeah, I realized it, after your comment; its copy thing...Will correct in 
-next version.
-
-Paul,
-
-I am thinking of separating clocktree patch (PATCH-V3 3/3) from this series, 
-so that clockdomain stuff can get in independently, and clocktree anyway 
-will follow them (it may take some time in review cycle).
-
-Thanks,
-Vaibhav
-> 
-> - Paul
-> 
+So I think that keeping this kind of drivers under
+"arch/arm/mach-*" or "drivers/amba" as 'tegra'-ahb.c name. If similier
+drivers comes, then, what about thinking the generalization again?
+Either way would be ok for me.
