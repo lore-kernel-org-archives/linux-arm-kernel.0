@@ -1,959 +1,494 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 26 Apr 2012 22:40:25 +0800
-Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
+Date: Thu, 26 Apr 2012 22:40:27 +0800
+Subject: [PATCH v3 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl subsystem
 In-Reply-To: <1335451227-27709-1-git-send-email-b29396@freescale.com>
 References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
-Message-ID: <1335451227-27709-2-git-send-email-b29396@freescale.com>
+Message-ID: <1335451227-27709-4-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-The driver has mux and config support while the gpio is still
-not supported.
-For select input setting, the driver will handle it internally
-and do not need user to take care of it.
-
-The pinctrl-imx core driver will parse the dts file and dynamically
-create the pinmux functions and groups.
-
-Each IMX SoC pinctrl driver should register pins with a pin register map
-including mux register and config register and select input map to core
-for proper operations.
+This driver is shared between many platforms. Currently only imx6q has
+pinctrl support, to avoid breaking other platforms that do not have pinctrl
+support to run this driver, enable pinctrl dummy state for them before
+they also convert to pinctrl subsystem.
 
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-
 ---
-ChangeLog: v2->v3:
-* add missed SION bit set from device tree
-  Thanks for Richard Zhao's reminder.
-ChangeLog: v1->v2:
-* Change the binding a bit.
-  For fsl,pins property, change it from pin name strings to pin function id
-  which represents a pin working on a specific function. Then we can remove
-  fsl,mux property since the pin function id already contains the mux setting.
-  Also remove other pin config property in the first patch.
-  Because in the future, we will switch to use dtc macro, then using a lot of
-  propertys to represent the each pin config like pull, speed and etc seems
-  needless.
-  Then each pin entry in dts file becomes a pair of PIN_FUNC_ID and CONFIG:
-  fsl,pins = <PIN_FUNC_ID CONFIG ..>
-  See binding doc for details.
-* Sascha raised a question that pins in the same group may have different
-  pad setting for example I2C_CLK needs pull up while I2C_DAT not.
-  The v1 driver can aslo handle this issue but needs split the different
-  pad setting pins into different groups which loses a bit flexibility.
-  Also suggested by Richard Zhao and Jason Liu, we may still want the iomux
-  v3 simililar using way that allows each pin has the abiblity to configure
-  its pad which seems reasonable because from HW point of view, FSL IMX are
-  indeed pin based SoC which should be able to set per pin.
-  So the main changes in this v2 patch are change to support per pin config.
-  Then the using of iomux is almost the same as the existing iomux v3 for
-  non dt imx platforms. See binding doc for example.
+This patch depends on:
+pinctrl: add pinctrl_provide_dummies interface for platforms to use
+http://www.spinics.net/lists/arm-kernel/msg171538.html
 
-  After introduce the new way, there're mainly two known issues:
-  1) Since many pins in the same group may have the same pad config setting,
-     thus there may be some data redundance, however, since it's one word
-     and it's purely describe hw i would think it's not a big issue.
-  2) Need a magic number to indicate no pad config need. In current iomux v3,
-     It's 1<<16 which is not used by IMX5, i used 1<<31 for both MX5 and MX6.
-     However, it's definitely possibile that in the future, the bit 31 may also
-     be used, that means we may need change the binding doc or just handle it in
-     driver for different SoCs.
-  3) Due to core limitation, the current pinconf_group_set/get only support
-     get/set the same config(a u32 value)for all the pins in the same group,
-     so i removed the imx_group_set/get functions support, instead, using
-     imx_pin_get/set.
-     About this limitation, we may need some futher discussion on if we may
-     need to enhance it to be more flexible to support configure different
-     pins in the same group.
-* Refactor probe handling based on Stephen's suggestion.
-* Enhanced the binding doc and split it into two part, pinctrl-imx common part
-  and pinctrl-soc driver part.
-* Change functions name from imx_pmx_* to imx_pinctrl_*.
-* Other fixes based on Sascha, Stephen, Linus, Shawn's comments.
+ChangeLog v2->v3:
+ * patch name updated.
+   v1 name is ARM: imx6q: switch to use pinctrl driver
+ * using pinctrl dummy state to avoid breaking other platforms to use this
+   driver.
+
+ChangeLog v1->v2:
+ * using updated binding
 ---
- .../bindings/pinctrl/fsl,imx-pinctrl.txt           |   93 +++
- drivers/pinctrl/Kconfig                            |    5 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinctrl-imx.c                      |  627 ++++++++++++++++++++
- drivers/pinctrl/pinctrl-imx.h                      |  106 ++++
- 5 files changed, 832 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
- create mode 100644 drivers/pinctrl/pinctrl-imx.c
- create mode 100644 drivers/pinctrl/pinctrl-imx.h
+ arch/arm/boot/dts/imx6q-arm2.dts               |    4 +++
+ arch/arm/boot/dts/imx6q.dtsi                   |   32 ++++++++++++++++++++++++
+ arch/arm/mach-imx/Kconfig                      |    2 +
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |    2 +
+ arch/arm/mach-imx/mach-cpuimx51.c              |    2 +
+ arch/arm/mach-imx/mach-cpuimx51sd.c            |    2 +
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    2 +
+ arch/arm/mach-imx/mach-mx25_3ds.c              |    2 +
+ arch/arm/mach-imx/mach-mx35_3ds.c              |    2 +
+ arch/arm/mach-imx/mach-mx51_3ds.c              |    2 +
+ arch/arm/mach-imx/mach-mx51_babbage.c          |    2 +
+ arch/arm/mach-imx/mach-mx51_efikamx.c          |    2 +
+ arch/arm/mach-imx/mach-mx51_efikasb.c          |    2 +
+ arch/arm/mach-imx/mach-mx53_ard.c              |    2 +
+ arch/arm/mach-imx/mach-mx53_evk.c              |    2 +
+ arch/arm/mach-imx/mach-mx53_loco.c             |    2 +
+ arch/arm/mach-imx/mach-mx53_smd.c              |    2 +
+ arch/arm/mach-imx/mach-pcm043.c                |    2 +
+ arch/arm/mach-imx/mach-vpr200.c                |    2 +
+ drivers/mmc/host/sdhci-esdhc-imx.c             |    9 ++++++
+ 20 files changed, 79 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-new file mode 100644
-index 0000000..e00c7fc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-@@ -0,0 +1,93 @@
-+* Freescale IOMUX Controller (IOMUXC) for i.MX
-+
-+The IOMUX Controller (IOMUXC), together with the IOMUX, enables the IC
-+to share one PAD to several functional blocks. The sharing is done by
-+multiplexing the PAD input/output signals. For each PAD there are up to
-+8 muxing options (called ALT modes). Since different modules require
-+different PAD settings (like pull up, keeper, etc) the IOMUXC controls
-+also the PAD settings parameters.
-+
-+Please refer to pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices, including the meaning of the
-+phrase "pin configuration node".
-+
-+Freescale IMX pin configuration node is a node of a group of pins which can be
-+used for a specific device or function. This node represents both mux and config
-+of the pins in that group. The 'mux' selects the function mode(also named mux
-+mode) this pin can work on and the 'config' configures various pad settings
-+such as pull-up, open drain, drive strength, etc.
-+
-+Required properties for iomux controller:
-+- compatible: "fsl,<soc>-iomuxc"
-+  Please refer to each fsl,<soc>-pinctrl.txt binding doc for supported SoCs.
-+
-+Required properties for pin configuration node:
-+- fsl,pins: two integers array, represents a group of pins mux and config
-+  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
-+  pin working on a specific function, CONFIG is the pad setting value like
-+  pull-up on this pin. Please refer to fsl,<soc>-pinctrl.txt for the valid
-+  pins and functions of each SoC.
-+
-+Bits used for CONFIG:
-+NO_PAD_CTL(1 << 31): indicate this pin does not need config.
-+
-+SION(1 << 30): Software Input On Field.
-+Force the selected mux mode input path no matter of MUX_MODE functionality.
-+By default the input path is determined by functionality of the selected
-+mux mode (regular).
-+
-+Other bits are used for PAD setting.
-+
-+NOTE:
-+Some requirements for using fsl,imx-pinctrl binding:
-+1. We have pin function node defined under iomux controller node to represent
-+   what pinmux functions this SoC supports.
-+2. The pin configuration node intends to work on a specific function should
-+   to be defined under that specific function node.
-+   The function node's name should represent well about what function
-+   this group of pins in this pin configuration node are working on.
-+3. The driver can use the function node's name and pin configuration node's
-+   name describe the pin function and group hierarchy.
-+   For example, Linux IMX pinctrl driver takes the function node's name
-+   as the function name and pin configuration node's name as group name to
-+   create the map table.
-+4. Each pin configuration node should have a phandle, devices can set pins
-+   configurations by referring to the phandle of that pin configuration node.
-+
-+Examples:
-+usdhc@0219c000 { /* uSDHC4 */
-+	fsl,card-wired;
-+	vmmc-supply = <&reg_3p3v>;
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4_1>;
-+};
-+
-+iomuxc at 020e0000 {
-+	compatible = "fsl,imx6q-iomuxc";
-+	reg = <0x020e0000 0x4000>;
-+
-+	/* shared pinctrl settings */
-+	usdhc4 {
-+		pinctrl_usdhc4_1: usdhc4grp-1 {
-+			fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
-+				    1392 0x17059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
-+				    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
-+				    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
-+				    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
-+				    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
-+				    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
-+				    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
-+				    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
-+				    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
-+		};
-+	};
-+	....
-+};
-+Refer to the IOMUXC controller chapter in imx6q datasheet,
-+0x17059 means enable hysteresis, 47KOhm Pull Up, 50Mhz speed,
-+80Ohm driver strength and Fast Slew Rate.
-+User should refer to each SoC spec to set the correct value.
-+
-+TODO: when dtc macro support is available, we can change above raw data
-+to dt macro which can get better readability in dts file.
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index f73a5ea..aad2882 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -26,6 +26,11 @@ config DEBUG_PINCTRL
- 	help
- 	  Say Y here to add some extra checks and diagnostics to PINCTRL calls.
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index ce1c823..34dd9cd 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -37,12 +37,16 @@
+ 				cd-gpios = <&gpio6 11 0>;
+ 				wp-gpios = <&gpio6 14 0>;
+ 				vmmc-supply = <&reg_3p3v>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usdhc3_1>;
+ 				status = "okay";
+ 			};
  
-+config PINCTRL_IMX
-+	bool
-+	select PINMUX
-+	select PINCONF
+ 			usdhc at 0219c000 { /* uSDHC4 */
+ 				fsl,card-wired;
+ 				vmmc-supply = <&reg_3p3v>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usdhc4_1>;
+ 				status = "okay";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 4905f51..a89f294 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -386,7 +386,39 @@
+ 			};
+ 
+ 			iomuxc at 020e0000 {
++				compatible = "fsl,imx6q-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
 +
- config PINCTRL_PXA3xx
- 	bool
- 	select PINMUX
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 8e3c95a..a01a97c 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -9,6 +9,7 @@ ifeq ($(CONFIG_OF),y)
- obj-$(CONFIG_PINCTRL)		+= devicetree.o
- endif
- obj-$(CONFIG_GENERIC_PINCONF)	+= pinconf-generic.o
-+obj-$(CONFIG_PINCTRL_IMX)	+= pinctrl-imx.o
- obj-$(CONFIG_PINCTRL_PXA3xx)	+= pinctrl-pxa3xx.o
- obj-$(CONFIG_PINCTRL_MMP2)	+= pinctrl-mmp2.o
- obj-$(CONFIG_PINCTRL_PXA168)	+= pinctrl-pxa168.o
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-new file mode 100644
-index 0000000..8faf613
---- /dev/null
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -0,0 +1,627 @@
-+/*
-+ * Core driver for the imx pin controller
-+ *
-+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2012 Linaro Ltd.
-+ *
-+ * Author: Dong Aisheng <dong.aisheng@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
++				/* shared pinctrl settings */
++				usdhc3 {
++					pinctrl_usdhc3_1: usdhc3grp-1 {
++						fsl,pins = <1273 0x17059	/* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
++							    1281 0x10059	/* MX6Q_PAD_SD3_CLK__USDHC3_CLK	*/
++							    1289 0x17059	/* MX6Q_PAD_SD3_DAT0__USDHC3_DAT0 */
++							    1297 0x17059	/* MX6Q_PAD_SD3_DAT1__USDHC3_DAT1 */
++							    1305 0x17059	/* MX6Q_PAD_SD3_DAT2__USDHC3_DAT2 */
++							    1312 0x17059	/* MX6Q_PAD_SD3_DAT3__USDHC3_DAT3 */
++							    1265 0x17059	/* MX6Q_PAD_SD3_DAT4__USDHC3_DAT4 */
++							    1257 0x17059	/* MX6Q_PAD_SD3_DAT5__USDHC3_DAT5 */
++							    1249 0x17059	/* MX6Q_PAD_SD3_DAT6__USDHC3_DAT6 */
++							    1241 0x17059>;	/* MX6Q_PAD_SD3_DAT7__USDHC3_DAT7 */
++					};
++				};
 +
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
++				usdhc4 {
++					pinctrl_usdhc4_1: usdhc4grp-1 {
++						fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
++							    1392 0x10059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
++							    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
++							    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
++							    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
++							    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
++							    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
++							    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
++							    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
++							    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
++					};
++				};
+ 			};
+ 
+ 			dcic at 020e4000 { /* DCIC1 */
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 7561eca..e0fc67c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -842,6 +842,8 @@ config SOC_IMX6Q
+ 	select HAVE_IMX_MMDC
+ 	select HAVE_IMX_SRC
+ 	select HAVE_SMP
++	select PINCTRL
++	select PINCTRL_IMX6Q
+ 	select USE_OF
+ 
+ 	help
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+index fd8bf8a..12bbb62 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+@@ -25,6 +25,7 @@
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
+ #include <linux/leds.h>
 +#include <linux/pinctrl/machine.h>
-+#include <linux/pinctrl/pinconf.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
-+#include <linux/slab.h>
-+
-+#include "core.h"
-+#include "pinctrl-imx.h"
-+
-+#define IMX_PMX_DUMP(info, p, m, c, n)		\
-+{						\
-+	int i, j;				\
-+	printk("Format: Pin Mux Config\n");	\
-+	for (i = 0; i < n; i++) {		\
-+		j = p[i];			\
-+		printk("%s %d 0x%lx\n",		\
-+			info->pins[j].name,	\
-+			m[i], c[i]);		\
-+	}					\
-+}
-+
-+/* The bits in CONFIG cell defined in binding doc*/
-+#define IMX_NO_PAD_CTL	0x80000000	/* no pin config need */
-+#define IMX_PAD_SION 0x40000000		/* set SION */
-+
-+/**
-+ * @dev: a pointer back to containing device
-+ * @base: the offset to the controller in virtual memory
-+ */
-+struct imx_pinctrl {
-+	struct device *dev;
-+	struct pinctrl_dev *pctl;
-+	void __iomem *base;
-+	const struct imx_pinctrl_soc_info *info;
-+};
-+
-+static const struct imx_pin_reg *imx_find_pin_reg(
-+				const struct imx_pinctrl_soc_info *info,
-+				unsigned pin, bool is_mux, unsigned mux)
-+{
-+	const struct imx_pin_reg *pin_reg = NULL;
-+	int i;
-+
-+	for (i = 0; i < info->npin_regs; i++) {
-+		pin_reg = &info->pin_regs[i];
-+		if (pin_reg->pid != pin)
-+			continue;
-+		if (!is_mux)
-+			break;
-+		else if (pin_reg->mux_mode == (mux & IMX_MUX_MASK))
-+			break;
+ #include <linux/platform_device.h>
+ #include <linux/input.h>
+ #include <video/platform_lcd.h>
+@@ -251,6 +252,7 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
+ 			ARRAY_SIZE(eukrea_mbimxsd_pads)))
+ 		printk(KERN_ERR "error setting mbimxsd pads !\n");
+ 
++	pinctrl_provide_dummies();
+ 	imx35_add_imx_uart1(&uart_pdata);
+ 	imx35_add_ipu_core(&mx3_ipu_data);
+ 	imx35_add_mx3_sdc_fb(&mx3fb_pdata);
+diff --git a/arch/arm/mach-imx/mach-cpuimx51.c b/arch/arm/mach-imx/mach-cpuimx51.c
+index 944025d..2c67d7f 100644
+--- a/arch/arm/mach-imx/mach-cpuimx51.c
++++ b/arch/arm/mach-imx/mach-cpuimx51.c
+@@ -22,6 +22,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/interrupt.h>
++#include <linux/pinctrl/machine.h>
+ 
+ #include <mach/eukrea-baseboards.h>
+ #include <mach/common.h>
+@@ -243,6 +244,7 @@ static void __init eukrea_cpuimx51_init(void)
+ 	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51_pads,
+ 					ARRAY_SIZE(eukrea_cpuimx51_pads));
+ 
++	pinctrl_provide_dummies();
+ 	imx51_add_imx_uart(0, &uart_pdata);
+ 	imx51_add_mxc_nand(&eukrea_cpuimx51_nand_board_info);
+ 
+diff --git a/arch/arm/mach-imx/mach-cpuimx51sd.c b/arch/arm/mach-imx/mach-cpuimx51sd.c
+index 9fbe923..5d5a872 100644
+--- a/arch/arm/mach-imx/mach-cpuimx51sd.c
++++ b/arch/arm/mach-imx/mach-cpuimx51sd.c
+@@ -25,6 +25,7 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/spi/spi.h>
+ #include <linux/can/platform/mcp251x.h>
++#include <linux/pinctrl/machine.h>
+ 
+ #include <mach/eukrea-baseboards.h>
+ #include <mach/common.h>
+@@ -265,6 +266,7 @@ static void __init eukrea_cpuimx51sd_init(void)
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx51sd_pads,
+ 					ARRAY_SIZE(eukrea_cpuimx51sd_pads));
++	pinctrl_provide_dummies();
+ 
+ #if defined(CONFIG_CPU_FREQ_IMX)
+ 	get_cpu_op = mx51_get_cpu_op;
+diff --git a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+index 76a97a5..b90b795 100644
+--- a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
++++ b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+@@ -23,6 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+@@ -131,6 +132,7 @@ static void __init eukrea_cpuimx25_init(void)
+ 			ARRAY_SIZE(eukrea_cpuimx25_pads)))
+ 		printk(KERN_ERR "error setting cpuimx25 pads !\n");
+ 
++	pinctrl_provide_dummies();
+ 	imx25_add_imx_uart0(&uart_pdata);
+ 	imx25_add_mxc_nand(&eukrea_cpuimx25_nand_board_info);
+ 	imx25_add_imxdi_rtc(NULL);
+diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
+index f267342..347467c 100644
+--- a/arch/arm/mach-imx/mach-mx25_3ds.c
++++ b/arch/arm/mach-imx/mach-mx25_3ds.c
+@@ -29,6 +29,7 @@
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/usb/otg.h>
+ 
+ #include <mach/hardware.h>
+@@ -233,6 +234,7 @@ static void __init mx25pdk_init(void)
+ 	mxc_iomux_v3_setup_multiple_pads(mx25pdk_pads,
+ 			ARRAY_SIZE(mx25pdk_pads));
+ 
++	pinctrl_provide_dummies();
+ 	imx25_add_imx_uart0(&uart_pdata);
+ 	imx25_add_fsl_usb2_udc(&otg_device_pdata);
+ 	imx25_add_mxc_ehci_hs(&usbh2_pdata);
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index 6ae51c6..b8cfc6a 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -31,6 +31,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/memory.h>
+ #include <linux/gpio.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/usb/otg.h>
+ 
+ #include <linux/mtd/physmap.h>
+@@ -380,6 +381,7 @@ static void __init mx35_3ds_init(void)
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
+ 
++	pinctrl_provide_dummies();
+ 	imx35_add_fec(NULL);
+ 	imx35_add_imx2_wdt(NULL);
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+diff --git a/arch/arm/mach-imx/mach-mx51_3ds.c b/arch/arm/mach-imx/mach-mx51_3ds.c
+index 83eab41..9a8a6f2 100644
+--- a/arch/arm/mach-imx/mach-mx51_3ds.c
++++ b/arch/arm/mach-imx/mach-mx51_3ds.c
+@@ -14,6 +14,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/spi/spi.h>
+ #include <linux/gpio.h>
++#include <linux/pinctrl/machine.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -139,6 +140,7 @@ static void __init mx51_3ds_init(void)
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
+ 					ARRAY_SIZE(mx51_3ds_pads));
++	pinctrl_provide_dummies();
+ 
+ 	imx51_add_imx_uart(0, &uart_pdata);
+ 	imx51_add_imx_uart(1, &uart_pdata);
+diff --git a/arch/arm/mach-imx/mach-mx51_babbage.c b/arch/arm/mach-imx/mach-mx51_babbage.c
+index e4b822e..9adc94b 100644
+--- a/arch/arm/mach-imx/mach-mx51_babbage.c
++++ b/arch/arm/mach-imx/mach-mx51_babbage.c
+@@ -17,6 +17,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/input.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
+ 
+@@ -353,6 +354,7 @@ void __init imx51_babbage_common_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
+ 					 ARRAY_SIZE(mx51babbage_pads));
++	pinctrl_provide_dummies();
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-imx/mach-mx51_efikamx.c b/arch/arm/mach-imx/mach-mx51_efikamx.c
+index 586e9f8..8486569 100644
+--- a/arch/arm/mach-imx/mach-mx51_efikamx.c
++++ b/arch/arm/mach-imx/mach-mx51_efikamx.c
+@@ -22,6 +22,7 @@
+ #include <linux/input.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/mc13892.h>
+@@ -237,6 +238,7 @@ static void __init mx51_efikamx_init(void)
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(mx51efikamx_pads,
+ 					ARRAY_SIZE(mx51efikamx_pads));
++	pinctrl_provide_dummies();
+ 	efika_board_common_init();
+ 
+ 	mx51_efikamx_board_id();
+diff --git a/arch/arm/mach-imx/mach-mx51_efikasb.c b/arch/arm/mach-imx/mach-mx51_efikasb.c
+index 24aded9..dfd9952 100644
+--- a/arch/arm/mach-imx/mach-mx51_efikasb.c
++++ b/arch/arm/mach-imx/mach-mx51_efikasb.c
+@@ -22,6 +22,7 @@
+ #include <linux/input.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/mc13892.h>
+@@ -260,6 +261,7 @@ static void __init efikasb_board_init(void)
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(mx51efikasb_pads,
+ 					ARRAY_SIZE(mx51efikasb_pads));
++	pinctrl_provide_dummies();
+ 	efika_board_common_init();
+ 
+ 	mx51_efikasb_board_id();
+diff --git a/arch/arm/mach-imx/mach-mx53_ard.c b/arch/arm/mach-imx/mach-mx53_ard.c
+index 0564198..d251da4 100644
+--- a/arch/arm/mach-imx/mach-mx53_ard.c
++++ b/arch/arm/mach-imx/mach-mx53_ard.c
+@@ -22,6 +22,7 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/smsc911x.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
+@@ -226,6 +227,7 @@ void __init imx53_ard_common_init(void)
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_ard_pads,
+ 					 ARRAY_SIZE(mx53_ard_pads));
+ 	weim_cs_config();
++	pinctrl_provide_dummies();
+ }
+ 
+ static struct platform_device *devices[] __initdata = {
+diff --git a/arch/arm/mach-imx/mach-mx53_evk.c b/arch/arm/mach-imx/mach-mx53_evk.c
+index 5a72188..9ca7010 100644
+--- a/arch/arm/mach-imx/mach-mx53_evk.c
++++ b/arch/arm/mach-imx/mach-mx53_evk.c
+@@ -23,6 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
+ #include <mach/common.h>
+@@ -134,6 +135,7 @@ void __init imx53_evk_common_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
+ 					 ARRAY_SIZE(mx53_evk_pads));
++	pinctrl_provide_dummies();
+ }
+ 
+ static void __init mx53_evk_board_init(void)
+diff --git a/arch/arm/mach-imx/mach-mx53_loco.c b/arch/arm/mach-imx/mach-mx53_loco.c
+index 37f67ca..4c11cc1 100644
+--- a/arch/arm/mach-imx/mach-mx53_loco.c
++++ b/arch/arm/mach-imx/mach-mx53_loco.c
+@@ -23,6 +23,7 @@
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
+ #include <linux/i2c.h>
++#include <linux/pinctrl/machine.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+@@ -266,6 +267,7 @@ void __init imx53_qsb_common_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+ 					 ARRAY_SIZE(mx53_loco_pads));
++	pinctrl_provide_dummies();
+ }
+ 
+ static struct i2c_board_info mx53loco_i2c_devices[] = {
+diff --git a/arch/arm/mach-imx/mach-mx53_smd.c b/arch/arm/mach-imx/mach-mx53_smd.c
+index 8e972c5..d621022 100644
+--- a/arch/arm/mach-imx/mach-mx53_smd.c
++++ b/arch/arm/mach-imx/mach-mx53_smd.c
+@@ -22,6 +22,7 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
++#include <linux/pinctrl/machine.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+@@ -128,6 +129,7 @@ void __init imx53_smd_common_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_smd_pads,
+ 					 ARRAY_SIZE(mx53_smd_pads));
++	pinctrl_provide_dummies();
+ }
+ 
+ static void __init mx53_smd_board_init(void)
+diff --git a/arch/arm/mach-imx/mach-pcm043.c b/arch/arm/mach-imx/mach-pcm043.c
+index 237474f..c0ec1b8 100644
+--- a/arch/arm/mach-imx/mach-pcm043.c
++++ b/arch/arm/mach-imx/mach-pcm043.c
+@@ -25,6 +25,7 @@
+ #include <linux/delay.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/at24.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+ 
+@@ -361,6 +362,7 @@ static void __init pcm043_init(void)
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(pcm043_pads, ARRAY_SIZE(pcm043_pads));
+ 
++	pinctrl_provide_dummies();
+ 	imx35_add_fec(NULL);
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	imx35_add_imx2_wdt(NULL);
+diff --git a/arch/arm/mach-imx/mach-vpr200.c b/arch/arm/mach-imx/mach-vpr200.c
+index 033257e..cf9afcb 100644
+--- a/arch/arm/mach-imx/mach-vpr200.c
++++ b/arch/arm/mach-imx/mach-vpr200.c
+@@ -23,6 +23,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/memory.h>
+ #include <linux/gpio.h>
++#include <linux/pinctrl/machine.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -271,6 +272,7 @@ static void __init vpr200_board_init(void)
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(vpr200_pads, ARRAY_SIZE(vpr200_pads));
+ 
++	pinctrl_provide_dummies();
+ 	imx35_add_fec(NULL);
+ 	imx35_add_imx2_wdt(NULL);
+ 	imx_add_gpio_keys(&vpr200_gpio_keys_data);
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 6193a0d..039bc19 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -24,6 +24,7 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
+ #include <mach/esdhc.h>
+ #include "sdhci-pltfm.h"
+ #include "sdhci-esdhc.h"
+@@ -68,6 +69,7 @@ struct pltfm_imx_data {
+ 	int flags;
+ 	u32 scratchpad;
+ 	enum imx_esdhc_type devtype;
++	struct pinctrl *pinctrl;
+ 	struct esdhc_platform_data boarddata;
+ };
+ 
+@@ -467,6 +469,12 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 	clk_prepare_enable(clk);
+ 	pltfm_host->clk = clk;
+ 
++	imx_data->pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(imx_data->pinctrl)) {
++		err = PTR_ERR(imx_data->pinctrl);
++		goto pin_err;
 +	}
 +
-+	if (!pin_reg) {
-+		dev_err(info->dev, "Pin(%s): unable to find pin reg map\n",
-+			info->pins[pin].name);
-+		return NULL;
-+	}
-+
-+	return pin_reg;
-+}
-+
-+static const inline struct imx_pin_group *imx_pinctrl_find_group_by_name(
-+				const struct imx_pinctrl_soc_info *info,
-+				const char *name)
-+{
-+	const struct imx_pin_group *grp = NULL;
-+	int i;
-+
-+	for (i = 0; i < info->ngroups; i++) {
-+		if (!strcmp(info->groups[i].name, name)) {
-+			grp = &info->groups[i];
-+			break;
-+		}
-+	}
-+
-+	return grp;
-+}
-+
-+static int imx_get_groups_count(struct pinctrl_dev *pctldev)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+
-+	return info->ngroups;
-+}
-+
-+static const char *imx_get_group_name(struct pinctrl_dev *pctldev,
-+				       unsigned selector)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+
-+	return info->groups[selector].name;
-+}
-+
-+static int imx_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
-+			       const unsigned **pins,
-+			       unsigned *npins)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+
-+	if (selector >= info->ngroups)
-+		return -EINVAL;
-+
-+	*pins = info->groups[selector].pins;
-+	*npins = info->groups[selector].npins;
-+
-+	return 0;
-+}
-+
-+static void imx_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
-+		   unsigned offset)
-+{
-+	seq_printf(s, "%s", dev_name(pctldev->dev));
-+}
-+
-+static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
-+			struct device_node *np,
-+			struct pinctrl_map **map, unsigned *num_maps)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_group *grp;
-+	struct pinctrl_map *new_map;
-+	struct device_node *parent;
-+	int map_num = 1;
-+	int i;
-+
-+	/*
-+	 * first find the group of this node and check if we need create
-+	 * config maps for pins
-+	 */
-+	grp = imx_pinctrl_find_group_by_name(info, np->name);
-+	if (!grp) {
-+		dev_err(info->dev, "unable to find group for node %s\n",
-+			np->name);
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < grp->npins; i++) {
-+		if (!(grp->configs[i] & IMX_NO_PAD_CTL))
-+			map_num++;
-+	}
-+
-+	new_map = kmalloc(sizeof(struct pinctrl_map) * map_num, GFP_KERNEL);
-+	if (!new_map)
-+		return -ENOMEM;
-+
-+	*map = new_map;
-+	*num_maps = map_num;
-+
-+	/* create mux map */
-+	parent = of_get_parent(np);
-+	if (!parent)
-+		return -EINVAL;
-+	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
-+	new_map[0].data.mux.function = parent->name;
-+	new_map[0].data.mux.group = np->name;
-+	of_node_put(parent);
-+
-+	/* create config map */
-+	new_map++;
-+	for (i = 0; i < grp->npins; i++) {
-+		if (!(grp->configs[i] & IMX_NO_PAD_CTL)) {
-+			new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
-+			new_map[i].data.configs.group_or_pin =
-+					pin_get_name(pctldev, grp->pins[i]);
-+			new_map[i].data.configs.configs = &grp->configs[i];
-+			new_map[i].data.configs.num_configs = 1;
-+		}
-+	}
-+
-+	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
-+		new_map->data.mux.function, new_map->data.mux.group, map_num);
-+
-+	return 0;
-+}
-+
-+static void imx_dt_free_map(struct pinctrl_dev *pctldev,
-+				struct pinctrl_map *map, unsigned num_maps)
-+{
-+	int i;
-+
-+	for (i = 0; i < num_maps; i++)
-+		kfree(map);
-+}
-+
-+static struct pinctrl_ops imx_pctrl_ops = {
-+	.get_groups_count = imx_get_groups_count,
-+	.get_group_name = imx_get_group_name,
-+	.get_group_pins = imx_get_group_pins,
-+	.pin_dbg_show = imx_pin_dbg_show,
-+	.dt_node_to_map = imx_dt_node_to_map,
-+	.dt_free_map = imx_dt_free_map,
-+
-+};
-+
-+static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
-+			   unsigned group)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	const unsigned *pins, *mux;
-+	unsigned int npins, pin_id;
-+	int i;
-+
-+	/*
-+	 * Configure the mux mode for each pin in the group for a specific
-+	 * function.
-+	 */
-+	pins = info->groups[group].pins;
-+	npins = info->groups[group].npins;
-+	mux = info->groups[group].mux_mode;
-+
-+	WARN_ON(!pins || !npins || !mux);
-+
-+	dev_dbg(ipctl->dev, "enable function %s group %s\n",
-+		info->functions[selector].name, info->groups[group].name);
-+
-+	for (i = 0; i < npins; i++) {
-+		pin_id = pins[i];
-+
-+		pin_reg = imx_find_pin_reg(info, pin_id, 1, mux[i]);
-+		if (!pin_reg)
-+			return -EINVAL;
-+
-+		if (!pin_reg->mux_reg) {
-+			dev_err(ipctl->dev, "Pin(%s) does not support mux function\n",
-+				info->pins[pin_id].name);
-+			return -EINVAL;
-+		}
-+
-+		writel(mux[i], ipctl->base + pin_reg->mux_reg);
-+		dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
-+			pin_reg->mux_reg, mux[i]);
-+
-+		/* some pins also need select input setting, set it if found */
-+		if (pin_reg->input_reg) {
-+			writel(pin_reg->input_val, ipctl->base + pin_reg->input_reg);
-+			dev_dbg(ipctl->dev,
-+				"==>select_input: offset 0x%x val 0x%x\n",
-+				pin_reg->input_reg, pin_reg->input_val);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void imx_pmx_disable(struct pinctrl_dev *pctldev, unsigned func_selector,
-+			    unsigned group_selector)
-+{
-+	/* nothing to do here */
-+}
-+
-+static int imx_pmx_get_funcs_count(struct pinctrl_dev *pctldev)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+
-+	return info->nfunctions;
-+}
-+
-+static const char *imx_pmx_get_func_name(struct pinctrl_dev *pctldev,
-+					  unsigned selector)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+
-+	return info->functions[selector].name;
-+}
-+
-+static int imx_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
-+			       const char * const **groups,
-+			       unsigned * const num_groups)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+
-+	*groups = info->functions[selector].groups;
-+	*num_groups = info->functions[selector].num_groups;
-+
-+	return 0;
-+}
-+
-+static struct pinmux_ops imx_pmx_ops = {
-+	.get_functions_count = imx_pmx_get_funcs_count,
-+	.get_function_name = imx_pmx_get_func_name,
-+	.get_function_groups = imx_pmx_get_groups,
-+	.enable = imx_pmx_enable,
-+	.disable = imx_pmx_disable,
-+};
-+
-+static int imx_pinconf_get(struct pinctrl_dev *pctldev,
-+			     unsigned pin_id, unsigned long *config)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+
-+	pin_reg = imx_find_pin_reg(info, pin_id, 0, 0);
-+	if (!pin_reg)
-+		return -EINVAL;
-+
-+	if (!pin_reg->conf_reg) {
-+		dev_err(info->dev, "Pin(%s) does not support config function\n",
-+			info->pins[pin_id].name);
-+		return -EINVAL;
-+	}
-+
-+	*config = readl(ipctl->base + pin_reg->conf_reg);
-+
-+	return 0;
-+}
-+
-+static int imx_pinconf_set(struct pinctrl_dev *pctldev,
-+			     unsigned pin_id, unsigned long config)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+
-+	pin_reg = imx_find_pin_reg(info, pin_id, 0, 0);
-+	if (!pin_reg)
-+		return -EINVAL;
-+
-+	if (!pin_reg->conf_reg) {
-+		dev_err(info->dev, "Pin(%s) does not support config function\n",
-+			info->pins[pin_id].name);
-+		return -EINVAL;
-+	}
-+
-+	dev_dbg(ipctl->dev, "pinconf set pin %s\n",
-+		info->pins[pin_id].name);
-+
-+	writel(config, ipctl->base + pin_reg->conf_reg);
-+	dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%lx\n",
-+		pin_reg->conf_reg, config);
-+
-+	return 0;
-+}
-+
-+static void imx_pinconf_dbg_show(struct pinctrl_dev *pctldev,
-+				   struct seq_file *s, unsigned pin_id)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	unsigned long config;
-+
-+	pin_reg = imx_find_pin_reg(info, pin_id, 0, 0);
-+	if (!pin_reg || !pin_reg->conf_reg) {
-+		seq_printf(s, "N/A");
-+		return;
-+	}
-+
-+	config = readl(ipctl->base + pin_reg->conf_reg);
-+	seq_printf(s, "0x%lx", config);
-+}
-+
-+static void imx_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
-+					 struct seq_file *s, unsigned group)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	struct imx_pin_group *grp;
-+	unsigned long config;
-+	const char *name;
-+	int i, ret;
-+
-+	if (group > info->ngroups)
-+		return;
-+
-+	seq_printf(s, "\n");
-+	grp = &info->groups[group];
-+	for (i = 0; i < grp->npins; i++) {
-+		name = pin_get_name(pctldev, grp->pins[i]);
-+		ret = imx_pinconf_get(pctldev, grp->pins[i], &config);
-+		if (ret)
-+			return;
-+		seq_printf(s, "%s: 0x%lx", name, config);
-+	}
-+}
-+
-+struct pinconf_ops imx_pinconf_ops = {
-+	.pin_config_get = imx_pinconf_get,
-+	.pin_config_set = imx_pinconf_set,
-+	.pin_config_dbg_show = imx_pinconf_dbg_show,
-+	.pin_config_group_dbg_show = imx_pinconf_group_dbg_show,
-+};
-+
-+static struct pinctrl_desc imx_pinctrl_desc = {
-+	.pctlops = &imx_pctrl_ops,
-+	.pmxops = &imx_pmx_ops,
-+	.confops = &imx_pinconf_ops,
-+	.owner = THIS_MODULE,
-+};
-+
-+/* decode pin id and mux from pin function id got from device tree*/
-+static int imx_pinctrl_get_pin_id_and_mux(const struct imx_pinctrl_soc_info *info,
-+				unsigned int pin_func_id, unsigned int *pin_id,
-+				unsigned int *mux)
-+{
-+	if (pin_func_id > info->npin_regs)
-+		return -EINVAL;
-+
-+	*pin_id = info->pin_regs[pin_func_id].pid;
-+	*mux = info->pin_regs[pin_func_id].mux_mode;
-+
-+	return 0;
-+}
-+
-+static int __devinit imx_pinctrl_parse_groups(struct device_node *np,
-+				struct imx_pin_group *grp,
-+				struct imx_pinctrl_soc_info *info,
-+				u32 index)
-+{
-+	unsigned int pin_func_id;
-+	int ret, size;
-+	const const __be32 *list;
-+	int i, j;
-+	u32 config;
-+
-+	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
-+
-+	/* Initialise group */
-+	grp->name = np->name;
-+
-+	/*
-+	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
-+	 * do sanity check and calculate pins number
-+	 */
-+	list = of_get_property(np, "fsl,pins", &size);
-+	/* we do not check return since it's safe node passed down */
-+	size /= sizeof(*list);
-+	if (!size || size % 2) {
-+		dev_err(info->dev, "wrong pins number or pins and configs should be pairs\n");
-+		return -EINVAL;
-+	}
-+
-+	grp->npins = size / 2;
-+	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
-+				GFP_KERNEL);
-+	grp->mux_mode = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
-+				GFP_KERNEL);
-+	grp->configs = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned long),
-+				GFP_KERNEL);
-+	for (i = 0, j = 0; i < size; i += 2, j++) {
-+		pin_func_id = be32_to_cpu(*list++);
-+		ret = imx_pinctrl_get_pin_id_and_mux(info, pin_func_id,
-+					&grp->pins[j], &grp->mux_mode[j]);
-+		if (ret) {
-+			dev_err(info->dev, "get invalid pin function id\n");
-+			return -EINVAL;
-+		}
-+		/* SION bit is in mux register */
-+		config = be32_to_cpu(*list++);
-+		if (config & IMX_PAD_SION)
-+			grp->mux_mode[j] |= IOMUXC_CONFIG_SION;
-+		grp->configs[j] = config & ~IMX_PAD_SION;
-+	}
-+
-+#ifdef DEBUG
-+	IMX_PMX_DUMP(info, grp->pins, grp->mux_mode, grp->configs, grp->npins);
-+#endif
-+	return 0;
-+}
-+
-+static int __devinit imx_pinctrl_parse_functions(struct device_node *np,
-+			struct imx_pinctrl_soc_info *info, u32 index)
-+{
-+	struct device_node *child;
-+	struct imx_pmx_func *func;
-+	struct imx_pin_group *grp;
-+	int ret;
-+	static u32 grp_index;
-+	u32 i = 0;
-+
-+	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
-+
-+	func = &info->functions[index];
-+
-+	/* Initialise function */
-+	func->name = np->name;
-+	func->num_groups = of_get_child_count(np);
-+	if (func->num_groups <= 0) {
-+		dev_err(info->dev, "no groups defined\n");
-+		return -EINVAL;
-+	}
-+	func->groups = devm_kzalloc(info->dev,
-+			func->num_groups * sizeof(char *), GFP_KERNEL);
-+
-+	for_each_child_of_node(np, child) {
-+		func->groups[i] = child->name;
-+		grp = &info->groups[grp_index++];
-+		ret = imx_pinctrl_parse_groups(child, grp, info, i++);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __devinit imx_pinctrl_probe_dt(struct platform_device *pdev,
-+				struct imx_pinctrl_soc_info *info)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *child;
-+	int ret;
-+	u32 nfuncs = 0;
-+	u32 i = 0;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	nfuncs = of_get_child_count(np);
-+	if (nfuncs <= 0) {
-+		dev_err(&pdev->dev, "no functions defined\n");
-+		return -EINVAL;
-+	}
-+
-+	info->nfunctions = nfuncs;
-+	info->functions = devm_kzalloc(&pdev->dev, nfuncs * sizeof(struct imx_pmx_func),
-+					GFP_KERNEL);
-+	if (!info->functions)
-+		return -ENOMEM;
-+
-+	info->ngroups = 0;
-+	for_each_child_of_node(np, child)
-+		info->ngroups += of_get_child_count(child);
-+	info->groups = devm_kzalloc(&pdev->dev, info->ngroups * sizeof(struct imx_pin_group),
-+					GFP_KERNEL);
-+	if (!info->groups)
-+		return -ENOMEM;
-+
-+	for_each_child_of_node(np, child) {
-+		ret = imx_pinctrl_parse_functions(child, info, i++);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to parse function\n");
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+int __devinit imx_pinctrl_probe(struct platform_device *pdev,
-+				struct imx_pinctrl_soc_info *info)
-+{
-+	struct imx_pinctrl *ipctl;
-+	struct resource *res;
-+	int ret;
-+
-+	if (!info || !info->pins || !info->npins
-+		  || !info->pin_regs || !info->npin_regs) {
-+		dev_err(&pdev->dev, "wrong pinctrl info\n");
-+		return -EINVAL;
-+	}
-+	info->dev = &pdev->dev;
-+
-+	/* Create state holders etc for this driver */
-+	ipctl = devm_kzalloc(&pdev->dev, sizeof(*ipctl), GFP_KERNEL);
-+	if (!ipctl)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENOENT;
-+
-+	ipctl->base = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!ipctl->base)
-+		return -EBUSY;
-+
-+	imx_pinctrl_desc.name = dev_name(&pdev->dev);
-+	imx_pinctrl_desc.pins = info->pins;
-+	imx_pinctrl_desc.npins = info->npins;
-+
-+	ret = imx_pinctrl_probe_dt(pdev, info);
-+	if (ret) {
-+		dev_err(&pdev->dev, "fail to probe dt properties\n");
-+		return ret;
-+	}
-+
-+	ipctl->info = info;
-+	ipctl->dev = info->dev;
-+	platform_set_drvdata(pdev, ipctl);
-+	ipctl->pctl = pinctrl_register(&imx_pinctrl_desc, &pdev->dev, ipctl);
-+	if (!ipctl->pctl) {
-+		dev_err(&pdev->dev, "could not register IMX pinctrl driver\n");
-+		return -EINVAL;
-+	}
-+
-+	dev_info(&pdev->dev, "initialized IMX pinctrl driver\n");
-+
-+	return 0;
-+}
-+
-+int __devexit imx_pinctrl_remove(struct platform_device *pdev)
-+{
-+	struct imx_pinctrl *ipctl = platform_get_drvdata(pdev);
-+
-+	pinctrl_unregister(ipctl->pctl);
-+
-+	return 0;
-+}
-diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
-new file mode 100644
-index 0000000..c8ce541
---- /dev/null
-+++ b/drivers/pinctrl/pinctrl-imx.h
-@@ -0,0 +1,106 @@
-+/*
-+ * IMX pinmux core definitions
-+ *
-+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2012 Linaro Ltd.
-+ *
-+ * Author: Dong Aisheng <dong.aisheng@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __DRIVERS_PINCTRL_IMX_H
-+#define __DRIVERS_PINCTRL_IMX_H
-+
-+struct platform_device;
-+
-+/**
-+ * struct imx_pin_group - describes an IMX pin group
-+ * @name: the name of this specific pin group
-+ * @pins: an array of discrete physical pins used in this group, taken
-+ *	from the driver-local pin enumeration space
-+ * @npins: the number of pins in this group array, i.e. the number of
-+ *	elements in .pins so we can iterate over that array
-+ * @mux_mode: the mux mode for each pin in this group. The size of this
-+ *	array is the same as pins.
-+ * @configs: the config for each pin in this group. The size of this
-+ *	array is the same as pins.
-+ */
-+struct imx_pin_group {
-+	const char *name;
-+	unsigned int *pins;
-+	unsigned npins;
-+	unsigned int *mux_mode;
-+	unsigned long *configs;
-+};
-+
-+/**
-+ * struct imx_pmx_func - describes IMX pinmux functions
-+ * @name: the name of this specific function
-+ * @groups: corresponding pin groups
-+ * @num_groups: the number of groups
-+ */
-+struct imx_pmx_func {
-+	const char *name;
-+	const char **groups;
-+	unsigned num_groups;
-+};
-+
-+/**
-+ * struct imx_pin_reg - describe a pin reg map
-+ * The last 3 members are used for select input setting
-+ * @pid: pin id
-+ * @mux_reg: mux register offset
-+ * @conf_reg: config register offset
-+ * @mux_mode: mux mode
-+ * @input_reg: select input register offset for this mux if any
-+ *  0 if no select input setting needed.
-+ * @input_val: the value set to select input register
-+ */
-+struct imx_pin_reg {
-+	unsigned int pid;
-+	unsigned int mux_reg;
-+	unsigned int conf_reg;
-+	unsigned int mux_mode;
-+	unsigned int input_reg;
-+	unsigned int input_val;
-+};
-+
-+struct imx_pinctrl_soc_info {
-+	struct device *dev;
-+	const struct pinctrl_pin_desc *pins;
-+	unsigned int npins;
-+	const struct imx_pin_reg *pin_regs;
-+	unsigned int npin_regs;
-+	struct imx_pin_group *groups;
-+	unsigned int ngroups;
-+	struct imx_pmx_func *functions;
-+	unsigned int nfunctions;
-+};
-+
-+#define NO_MUX		0x0
-+#define NO_PAD		0x0
-+
-+#define IMX_PIN_REG(id, conf, mux, mode, input, val)	\
-+	{						\
-+		.pid = id,				\
-+		.conf_reg = conf,			\
-+		.mux_reg = mux,				\
-+		.mux_mode  = mode,			\
-+		.input_reg = input,			\
-+		.input_val = val,			\
-+	}
-+
-+#define IMX_PINCTRL_PIN(pin) PINCTRL_PIN(pin, #pin)
-+
-+#define PAD_CTL_MASK(len)	((1 << len) - 1)
-+#define IMX_MUX_MASK	0x7
-+#define IOMUXC_CONFIG_SION	(0x1 << 4)
-+
-+int imx_pinctrl_probe(struct platform_device *pdev,
-+			struct imx_pinctrl_soc_info *info);
-+int imx_pinctrl_remove(struct platform_device *pdev);
-+#endif /* __DRIVERS_PINCTRL_IMX_H */
+ 	if (!is_imx25_esdhc(imx_data))
+ 		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+ 
+@@ -559,6 +567,7 @@ no_card_detect_irq:
+ 		gpio_free(boarddata->wp_gpio);
+ no_card_detect_pin:
+ no_board_data:
++pin_err:
+ 	clk_disable_unprepare(pltfm_host->clk);
+ 	clk_put(pltfm_host->clk);
+ err_clk_get:
 -- 
 1.7.0.4
