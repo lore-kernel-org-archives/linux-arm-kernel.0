@@ -1,25 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 26 Apr 2012 16:38:07 -0600 (MDT)
-Subject: [PATCH-V5 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <alpine.DEB.2.00.1204261330010.10308@utopia.booyaka.com>
-References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
- <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FF819@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204261330010.10308@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1204261636340.10308@utopia.booyaka.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 27 Apr 2012 08:41:11 +1000
+Subject: [PATCH 04/17] ARM: ep93xx: use machine specific hook for late init
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F002069887EDC4@AUSP01VMBX24.collaborationhost.net>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-5-git-send-email-shawn.guo@linaro.org>
+ <4F99B9EB.6060806@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F002069887EDC4@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4F99CF07.5020006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Apr 2012, Paul Walmsley wrote:
+On 27/04/12 07:49, H Hartley Sweeten wrote:
 
-> Okay, thanks for testing.  Please do update this patch to use 
-> omap_hwmod_enable(), etc.; see for example omap_dm_timer_init_one().
+> On Thursday, April 26, 2012 2:11 PM, Ryan Mallon wrote:
+>> On 27/04/12 01:38, Shawn Guo wrote:
+>>
+>>> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+>>> Cc: Ryan Mallon <rmallon@gmail.com>
+>>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>>
+>>
+>> Why do we want this? It increases the size of the code and changes
+>> a static function to a non-static one that now requires ifdefery
+>> to handle the !CONFIG_CRUNCH case. I don't see the value in this
+>> patch?
+> 
+> Ryan,
+> 
+> See Shawn's "[PATCH 00/17] arch/arm/mach-* late_initcall cleanup".
+> 
+> I haven't looked closely at this yet. I think there may be some platforms
+> where the late_initcall's might cause a problem when making an ARM
+> unified kernel.
 
-And, just to be explicit, the ioremap(), clk_get(), and clk_enable() 
-should no longer be needed for OMAP2+, once you add the 
-omap_hwmod_enable().
 
+Hmm, I see. It's a bit annoying that it makes the code less clean, but I
+can't really see any other nice way of doing it :-/.
 
-- Paul
+~Ryan
