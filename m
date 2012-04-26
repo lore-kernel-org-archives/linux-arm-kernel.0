@@ -1,64 +1,111 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 26 Apr 2012 13:12:12 +0800
-Subject: imx sgtl5000:BUG: scheduling while atomic:
- speaker-test/1225/0x00000003
-In-Reply-To: <20120426023319.GC28063@b20223-02.ap.freescale.net>
-References: <20120426023319.GC28063@b20223-02.ap.freescale.net>
-Message-ID: <20120426051212.GF28063@b20223-02.ap.freescale.net>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Thu, 26 Apr 2012 10:43:57 +0530
+Subject: [PATCH v9 11/25] gpio/omap: cleanup omap_gpio_mod_init function
+In-Reply-To: <20120425134508.GE25053@n2100.arm.linux.org.uk>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <1328203851-20435-12-git-send-email-tarun.kanti@ti.com>
+ <13629551.hP3ZV1ajDo@vclass>
+ <CAC83ZvK630=6B-k2TfV3XBg8w7ZosLVDNE4ezjDYnn=hcXA48Q@mail.gmail.com>
+ <CAC83ZvJDDvCu8NKTOYh75USA3fvSAKEGaXXi9PtCM955K_keSA@mail.gmail.com>
+ <20120424160447.GI3739@atomide.com>
+ <CAC83Zv+CCLQfZHfqMcbof6JtA-hOK1PfX5Gs0BBVQhBAiWzX_g@mail.gmail.com>
+ <CAMQu2gzwijaSzXprEwTNTie3zCgFcNPonAexzrO_AWc2a8jOkw@mail.gmail.com>
+ <CAC83ZvKN_Qxw-9RPfpJaL5434j0HgysZ364F+b29rdSCQWhm7A@mail.gmail.com>
+ <20120425134508.GE25053@n2100.arm.linux.org.uk>
+Message-ID: <CAC83ZvL54bot+yQoRPPX3_9O5wfdpdBCNb4-Chw7sPyVFDBGSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 10:33:21AM +0800, Richard Zhao wrote:
-> [   13.901890] eth0: no IPv6 routers present
-> [   70.295079] BUG: scheduling while atomic: speaker-test/1225/0x00000003
-> [   70.304293] Modules linked in:
-> [   70.310389] [<c0015a68>] (unwind_backtrace+0x0/0xec) from [<c0585810>] (dump_stack+0x20/0x24)
-> [   70.310421] [<c0585810>] (dump_stack+0x20/0x24) from [<c0585f6c>] (__schedule_bug+0x54/0x60)
-> [   70.310452] [<c0585f6c>] (__schedule_bug+0x54/0x60) from [<c058db64>] (__schedule+0x84/0x748)
-> [   70.310476] [<c058db64>] (__schedule+0x84/0x748) from [<c058e310>] (schedule+0x8c/0x90)
-> [   70.310500] [<c058e310>] (schedule+0x8c/0x90) from [<c058c504>] (schedule_timeout+0x2fc/0x35c)
-> [   70.310541] [<c058c504>] (schedule_timeout+0x2fc/0x35c) from [<c058d970>] (wait_for_common+0xd8/0x16c)
-> [   70.310567] [<c058d970>] (wait_for_common+0xd8/0x16c) from [<c058da44>] (wait_for_completion_timeout+0x1c/0x20)
-> [   70.310604] [<c058da44>] (wait_for_completion_timeout+0x1c/0x20) from [<c03352bc>] (sdma_run_channel+0x70/0x8c)
-> [   70.310634] [<c03352bc>] (sdma_run_channel+0x70/0x8c) from [<c0335614>] (sdma_load_context+0x188/0x19c)
-> [   70.310661] [<c0335614>] (sdma_load_context+0x188/0x19c) from [<c0335688>] (sdma_prep_dma_cyclic+0x60/0x1a8)
-> [   70.310694] [<c0335688>] (sdma_prep_dma_cyclic+0x60/0x1a8) from [<c04760f4>] (snd_dmaengine_pcm_trigger+0xa0/0x134)
-> [   70.310729] [<c04760f4>] (snd_dmaengine_pcm_trigger+0xa0/0x134) from [<c0483e68>] (soc_pcm_trigger+0x74/0xb0)
-> [   70.310770] [<c0483e68>] (soc_pcm_trigger+0x74/0xb0) from [<c046e670>] (snd_pcm_do_start+0x34/0x40)
-> [   70.310797] [<c046e670>] (snd_pcm_do_start+0x34/0x40) from [<c046e288>] (snd_pcm_action_single+0x48/0x74)
-> [   70.310823] [<c046e288>] (snd_pcm_action_single+0x48/0x74) from [<c046e334>] (snd_pcm_action+0x80/0x8c)
-> [   70.310850] [<c046e334>] (snd_pcm_action+0x80/0x8c) from [<c04707f0>] (snd_pcm_start+0x24/0x2c)
-> [   70.310877] [<c04707f0>] (snd_pcm_start+0x24/0x2c) from [<c0474058>] (snd_pcm_lib_write1+0x2a8/0x340)
-> [   70.310900] [<c0474058>] (snd_pcm_lib_write1+0x2a8/0x340) from [<c04741d0>] (snd_pcm_lib_write+0x70/0x7c)
-> [   70.311007] [<c04741d0>] (snd_pcm_lib_write+0x70/0x7c) from [<c04703f8>] (snd_pcm_playback_ioctl1+0x114/0x428)
-> [   70.311038] [<c04703f8>] (snd_pcm_playback_ioctl1+0x114/0x428) from [<c0470744>] (snd_pcm_playback_ioctl+0x38/0x44)
-> [   70.311077] [<c0470744>] (snd_pcm_playback_ioctl+0x38/0x44) from [<c0107234>] (do_vfs_ioctl+0x4f4/0x568)
-> [   70.311105] [<c0107234>] (do_vfs_ioctl+0x4f4/0x568) from [<c0107308>] (sys_ioctl+0x60/0x84)
-> [   70.311138] [<c0107308>] (sys_ioctl+0x60/0x84) from [<c000df40>] (ret_fast_syscall+0x0/0x30)
-> [   80.301928] ALSA sound/core/pcm_lib.c:1853 playback write error (DMA or IRQ trouble?)
-> 
-> 
-> kernel: 3.4rc3 with ASoC/for-next and some my patches.
+On Wed, Apr 25, 2012 at 7:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Apr 25, 2012 at 06:24:14PM +0530, DebBarma, Tarun Kanti wrote:
+>> On Wed, Apr 25, 2012 at 12:09 PM, Shilimkar, Santosh
+>> <santosh.shilimkar@ti.com> wrote:
+>> > On Wed, Apr 25, 2012 at 10:04 AM, DebBarma, Tarun Kanti
+>> > <tarun.kanti@ti.com> wrote:
+>> >> On Tue, Apr 24, 2012 at 9:34 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> >>> * DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120424 08:40]:
+>> >>>> Hi Janusz,
+>> >>>>
+>> >>>> On Tue, Apr 24, 2012 at 12:24 AM, DebBarma, Tarun Kanti
+>> >>>> <tarun.kanti@ti.com> wrote:
+>> >>>> > On Sat, Apr 21, 2012 at 7:33 PM, Janusz Krzysztofik
+>> >>>> > <jkrzyszt@tis.icnet.pl> wrote:
+>> >>>> >> On Thursday 02 of February 2012 23:00:37 Tarun Kanti DebBarma wrote:
+>> >>>> >>> With register offsets now defined for respective OMAP versions we can get rid
+>> >>>> >>> of cpu_class_* checks. This function now has common initialization code for
+>> >>>> >>> all OMAP versions...
+>> >>>> >>>
+>> >>>> >>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> >>>> >>> Signed-off-by: Charulatha V <charu@ti.com>
+>> >>>> >>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> >>>> >>> Acked-by: Tony Lindgren <tony@atomide.com>
+>> >>>> >>
+>> >>>> >> Sorry for being so late with my comment for chanes already present in
+>> >>>> >> mainline, but this patch breaks GPIO on Amstrad Delta at least, and I
+>> >>>> >> have neither enough spare time nor enough experience with non OMAP1
+>> >>>> >> machines to provide a solution myself.
+>> >>>> > Yes, I looked at the omap_gpio_mod_init() and OMAP1 configurations are
+>> >>>> > overwritten.
+>> >>>> > Also looks like there is issue in making distinction between omap15xx
+>> >>>> > and omap16xx.
+>> >>>> > I will post a patch and you can help me testing it in OMAP1 platform.
+>> >>>> > Thanks for pointing this out.
+>> >>> ...
+>> >>>
+>> >>>> Here is the patch, with attachment as well. I have just tested on
+>> >>>> OMAP4 platform.
+>> >>>> Testing on other OMAP2+ platforms is pending. In the meantime can you please
+>> >>>> validate on OMAP1 platform and confirm? Thanks.
+>> >>>> --
+>> >>>> Tarun
+>> >>>>
+>> >>>> From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> >>>> Date: Tue, 24 Apr 2012 20:34:32 +0530
+>> >>>> Subject: [PATCH] gpio/omap: fix omap1 register overwrite in omap_gpio_mod_init
+>> >>>>
+>> >>>> Initialization of irqenable, irqstatus registers is the common
+>> >>>> operation done in this function for all OMAP platforms, viz.
+>> >>>> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
+>> >>>> was overwriting the correctly programmed OMAP1 value at the
+>> >>>> beginning. As a result, even though it worked on OMAP2+
+>> >>>> platforms it was breaking OMAP1 functionality.
+>> >>>
+>> >>> Sounds like the original patch was never tested on omap1?
+>> >> That's right, only bootup test was done on OMAP1710-SDP.
+>> >>
+>> >>>
+>> >>>> On closer observation it is found that the first _gpio_rmw()
+>> >>>> which is supposedly done to take care of OMAP1 platform is
+>> >>>> generic enough and takes care of OMAP2+ platform as well.
+>> >>>> Therefore remove the latter _gpio_rmw() to irqenable as they
+>> >>>> are redundant.
+>> >>>>
+>> >>>> Also, changing the sequence and logic of initializing the
+>> >>>> irqstatus.
+>> >>>
+>> >>> Please mention also the breaking commit here and get this fix
+>> >>> merged as a regression as soon as it's tested for the current
+>> >>> -rc series.
+>> >> Sure, I will do that!
+>> >
+>> > Looks like it is regression on 3.4 as well so CC stable when you
+>> > post the patch.
+>> Ok, I will do that.
+>
+> Correction.
+>
+> Don't email your patch in any way to the stable folk _before_ it has been
+> taken into Linus' tree. ?However, you _may_ add in the patch attributations
+> a Cc: <stable@vger.kernel.org> tag if you want the stable folk to
+> automatically pick up your patch when it _does_ end up in Linus' tree.
+> But... make sure that git send-email or whatever doesn't automatically
+> add that to the recipients for the emailed patch.
+>
+> If you send the stable people a patch before its in mainline, you'll get
+> a whinge telling you to read Documentation/stable_kernel_rules.txt
 
-I found the cause.
-snd_dmaengine_pcm_trigger --> dmaengine_pcm_prepare_and_submit
---> dmaengine_prep_dma_cyclic
-
-The trigger function is in atomic context, but dmaengine_prep_dma_cyclic
-tried to sleep.
-
->From dma engine design, can device_prep_dma_cyclic sleep?
-If yes, we may need to move it out of trigger functions.
-
-Thanks
-Richard
-> 
-> Thanks
-> Richard
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Alright, I will add Cc: <stable@vger.kernel.org> tag in the patch.
+Thanks.
+--
+Tarun
