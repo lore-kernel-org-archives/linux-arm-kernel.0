@@ -1,57 +1,74 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 26 Apr 2012 02:36:37 -0700 (PDT)
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <20120426084201.GF17184@pengutronix.de>
-References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
- <4F98EB10.2000505@codeaurora.org>
- <20120426084201.GF17184@pengutronix.de>
-Message-ID: <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 26 Apr 2012 17:37:59 +0800
+Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
+ framework
+In-Reply-To: <20120426074205.GA2234@S2101-09.ap.freescale.net>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
+ <20120426024837.GD28063@b20223-02.ap.freescale.net>
+ <20120426064150.GE3852@pengutronix.de>
+ <20120426074205.GA2234@S2101-09.ap.freescale.net>
+Message-ID: <20120426093758.GM28063@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 26, 2012 at 03:42:08PM +0800, Shawn Guo wrote:
+> On Thu, Apr 26, 2012 at 08:41:50AM +0200, Sascha Hauer wrote:
+> > > clk_set_rate(&pll4_audio, FREQ_650M);
+> > > clk_set_rate(&pll5_video, FREQ_650M);
+> > > clk_set_parent(&ipu1_di0_clk, &ipu1_di0_pre_clk);
+> > > clk_set_parent(&ipu1_di0_pre_clk, &pll5_video);
+> > > clk_set_parent(&gpu3d_shader_clk, &pll2_pfd_594m);
+> > > clk_set_rate(&gpu3d_shader_clk, FREQ_594M);
+> > > clk_set_parent(&gpu3d_core_clk, &mmdc_ch0_axi_clk);
+> > > clk_set_rate(&gpu3d_core_clk, FREQ_528M);
+> > > clk_set_parent(&asrc_serial_clk, &pll3_usb_otg);
+> > > clk_set_rate(&asrc_serial_clk, 1500000);
+> > > clk_set_rate(&enfc_clk, 11000000);
+> > > 
+> 
+> I copied these from Freescale internal BSP when I was creating the file,
+> but did not really think about if we need them or not, so I took the
+> chance to clean them up.  From my testing, I haven't observed any
+> problem with in-tree imx6 drivers.
+I hope we keep the clk tree topology similar with fsl internal kernel
+as much as possible. fsl kernel has more drivers and more consideration
+of the whole tree.
+> 
+> Basically, I do not to mess up the soc clock init with too much driver
+> specific stuff there.
+It's not driver specific. IMHO, driver is not encouraged to change rate
+or reparent. The clk tree is considered as a whole.
 
-On Thu, April 26, 2012 1:42 am, Sascha Hauer wrote:
-> On Wed, Apr 25, 2012 at 11:28:32PM -0700, Saravana Kannan wrote:
->>
->> >diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
->> >index 6e58f11..8e97491 100644
->> >--- a/drivers/clk/clk-mux.c
->> >+++ b/drivers/clk/clk-mux.c
->> >@@ -95,6 +95,7 @@ struct clk *clk_register_mux(struct device *dev,
->> const char *name,
->> >  {
->>
->> I would really like to remove these functions. At least until we add
->> device tree support where each clock is listed in device tree.
->>
->> At present, these functions seem to be abused more than actually
->> being used appropriately.
->
-> I think this goes in my direction. Still exactly this abuse how you call
-> it makes me relatively independent of for example the changes you
-> introduce with your patch. Had I static initializers I would now have
-> to start a rebase orgy.
-
-In the other email you say you have to change. Here you say, you don't
-have to change. Hopefully, you didn't have to change much -- I was aiming
-for that. If there was agreement about removing these functions, I was
-planning on helping move the current users after this patch merged.
-
-I think in the long run this will result in less changes for you and more
-readable code. If clk_register() adds another optional param, you can't
-get around that without having to write more wrapper functions or changing
-any existing ones you might have. But with this struct, the common clock
-code can be written in a way so that the a value of 0 for the new param
-defaults to the behavior that was there before the param was added.
-
-Something to think about: With these wrapper calls, one would do a lot of
-kalloc and copying of small items when one knows at compile time what the
-clocks are going to be.
-
-Anyway, I understand that some people see value in this. That's why I'm
-bringing it up for discussion instead of just doing it in my patch.
-
--Saravana
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks
+Richard
+>  Unless we are back to the corner, individual
+> driver should set up its clock properly with clk API.
+> 
+> > > /*
+> > >  * Before pinctrl API is available, we have to rely on the pad
+> > >  * configuration set up by bootloader.  For usdhc example here,
+> > >  * u-boot sets up the pads for 49.5 MHz case, and we have to lower
+> > >  * the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
+> > >  *
+> > >  * FIXME: This is should be removed after pinctrl API is available.
+> > >  * At that time, usdhc driver can call pinctrl API to change pad
+> > >  * configuration dynamically per different usdhc clock settings.
+> > >  */
+> > > clk_set_rate(&usdhc1_clk, 49500000);
+> > > clk_set_rate(&usdhc2_clk, 49500000);
+> > > clk_set_rate(&usdhc3_clk, 49500000);
+> > > clk_set_rate(&usdhc4_clk, 49500000);
+> > 
+> > Can't say anything to these, probably Shawn has simply lost them while
+> > porting.
+> > 
+> I dropped it on purpose.  This quick hack made by me is actually broken.
+> Whenever bootloader changes the pad setting, we have problem here.  So
+> before pinctrl support is available bootloader should be responsible
+> for setting pad and clock in the correct pair.
+> 
+> -- 
+> Regards,
+> Shawn
+> 
