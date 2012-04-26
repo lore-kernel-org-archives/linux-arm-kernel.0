@@ -1,43 +1,89 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 26 Apr 2012 23:04:02 +0530
-Subject: [PATCH] arm: davinci: pdctl next bit position incorrect
-In-Reply-To: <4F917C12.8080306@mvista.com>
-References: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
- <4F8F22D1.8080309@ti.com> <4F8FECD6.6050105@mvista.com>
- <4F9042CA.7050305@ti.com> <4F917C12.8080306@mvista.com>
-Message-ID: <4F99870A.6080201@ti.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 26 Apr 2012 23:10:31 +0530
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+Message-ID: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+From: J Keerthy <j-keerthy@ti.com>
 
-On 4/20/2012 8:39 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 04/19/2012 08:52 PM, Sekhar Nori wrote:
-> 
->>>>> The PDCTL NEXT bit is incorrectly set to bit 1 instead of bit 0. This
->>>>> patch fixes this issue
-> 
->>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> 
->>>> Applying this for v3.5.
-> 
->>>     But why not to 3.4? It concerns turning on DSP domain on DM644x.
-> 
->> Yes, but I think as you noted sometime before, no one is really
->> depending on kernel to turn on DSP domain on DM644x.
-> 
->    Looks like you're right (though I don't remember noting it :-).
-> 
->> Its probably being
->> done from U-Boot or ROM code. This is not a v3.4 regression either.
-> 
->    U-Boot does it only when DSPLINK support is not desired.
+AVS(Adaptive Voltage Scaling) is a power management technique which
+controls the operating voltage of a device in order to optimize (i.e. reduce)
+its power consumption. The voltage is adapted depending on static factors
+(chip manufacturing process) and dynamic factors (temperature
+depending performance).
+The TI AVS solution is named Smartreflex. 
 
-Okay. Since DSPLink existed long before this code to turn on domain was
-introduced by Murali, it must be having its own private code to do this.
-So, looks like this should not really be a regression for anyone.
+To that end, create the AVS driver in drivers/power/avs and
+move the OMAP SmartReflex code to the new directory. The
+class driver is still retained in the mach-omap2 directory.
 
-Thanks,
-Sekhar
+In preparation to the move of the OMAP code the following changes have been
+made:
+- fill in platform data from the device initialization code and pass
+ it to the driver,
+- create CONFIG_AVS* config options accordingly.
+
+The platform integration data for SmartReflex is passed from hwmod
+and the voltage layer to the driver using pdata.
+
+Tested on OMAP4430 SDP using omap2plus_defconfig with the
+CONFIG_POWER_AVS* options set. Voltage correction seen
+on oscilloscope on all three VDDs.
+Based on master branch of the l-o git tree, commit
+6bd61e8de0511dd9831eb9d89eea0b4603a10e9e.
+
+Tree: git://gitorious.org/~keerthy05/omap-pm/keerthy-sr.git for_smartreflex_ip_driver_move 
+
+V3: rework after the comments on MLs
+ . Retain Efuse offsets check to identify a particular OPP.
+ . Introduce a common header file accessible both by arch/arm/mach-omap2/
+   and drivers/.
+ . Retain the class driver in mach-omap2/ and move IP driver to drivers/power/
+   avs since class driver needs voltage layer support.
+
+History:
+v2: rework after the comments on MLs
+ . Keep the OMAP Kconfig options in the arch dir (Rafael),
+ . Move the shared header file from plat-omap to
+   include/linux/power/ (Tony)
+
+v1: initial revision
+
+J Keerthy (1):
+  ARM: OMAP2+: Voltage: Move the omap_volt_data structure to plat
+
+Jean Pihet (9):
+  ARM: OMAP2+: SmartReflex: move the smartreflex header to include/linux/power
+  ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
+  ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of
+    voltage domains.
+  ARM: OMAP3: hwmod: rename the smartreflex entries
+  ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
+  ARM: OMAP2+: SmartReflex: Use per-OPP data structure
+  ARM: OMAP2+: SmartReflex: Create per-opp debugfs node for errminlimit
+  ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
+  ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
+ arch/arm/mach-omap2/Makefile                       |    5 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   12 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    3 +-
+ arch/arm/mach-omap2/pm.h                           |    2 +-
+ arch/arm/mach-omap2/smartreflex-class3.c           |   29 ++--
+ arch/arm/mach-omap2/sr_device.c                    |   39 ++++-
+ arch/arm/mach-omap2/voltage.h                      |   21 +---
+ arch/arm/plat-omap/Kconfig                         |   31 ++--
+ arch/arm/plat-omap/include/plat/voltage.h          |   21 +++-
+ drivers/power/Kconfig                              |    2 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/avs/Kconfig                          |   12 ++
+ drivers/power/avs/Makefile                         |    1 +
+ .../mach-omap2 => drivers/power/avs}/smartreflex.c |  161 ++++++++------------
+ .../linux/power}/smartreflex.h                     |   74 ++++++++--
+ 15 files changed, 235 insertions(+), 179 deletions(-)
+ create mode 100644 drivers/power/avs/Kconfig
+ create mode 100644 drivers/power/avs/Makefile
+ rename {arch/arm/mach-omap2 => drivers/power/avs}/smartreflex.c (90%)
+ rename {arch/arm/mach-omap2 => include/linux/power}/smartreflex.h (79%)
+
+-- 
+1.7.5.4
