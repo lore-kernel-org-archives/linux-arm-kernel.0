@@ -1,24 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Apr 2012 10:24:11 -0600
-Subject: [PATCH v4 1/4] dt: add of_get_child_count helper function
-In-Reply-To: <1335451227-27709-1-git-send-email-b29396@freescale.com>
-References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
-Message-ID: <4F9976AB.1020502@wwwdotorg.org>
+From: wcohen@redhat.com (William Cohen)
+Date: Thu, 26 Apr 2012 11:29:17 -0400
+Subject: [PATCH 1/3] Add the Performance Monitoring Unit to the Trimslice
+ device tree
+Message-ID: <1335454157-4881-1-git-send-email-wcohen@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 08:40 AM, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Currently most code to get child count in kernel are almost same,
-> add a helper to implement this function for dt to use.
+The tegra processor has a performance monitoring unit. However, this
+was not listed on the board-trimslice.c devices. This patch adds
+it to the list of devices and allows one to use hardware performance
+monitoring events on the trimslice machine.
 
-> diff --git a/include/linux/of.h b/include/linux/of.h
+Signed-off-by: William Cohen <wcohen@redhat.com>
+---
+ arch/arm/mach-tegra/board-trimslice.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-> +static inline int of_get_child_count(const struct device_node *np)
-> +{
-> +	struct device_node *child = NULL;
-
-You don't actually need to initialize child here. It doesn't really
-matter here, but in a more complex function, it might hide a
-used-before-initialized error.
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index cd52820..0484903 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -82,6 +82,7 @@ static struct platform_device trimslice_audio_device = {
+ 
+ static struct platform_device *trimslice_devices[] __initdata = {
+ 	&debug_uart,
++	&tegra_pmu_device,
+ 	&tegra_sdhci_device1,
+ 	&tegra_sdhci_device4,
+ 	&tegra_i2s_device1,
+-- 
+1.7.10
