@@ -1,69 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Apr 2012 16:25:02 +0200
-Subject: [PATCH v2] Convert i.MX architecture to generic clock framework
-In-Reply-To: <4F995657.4080505@de.bosch.com>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <4F995657.4080505@de.bosch.com>
-Message-ID: <20120426142502.GM17184@pengutronix.de>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 26 Apr 2012 16:22:59 +0200
+Subject: i.MX6: 3.4-rc4: WARNING at arch/arm/kernel/smp_twd.c ?
+Message-ID: <4F995A43.1050006@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 04:06:15PM +0200, Dirk Behme wrote:
-> On 25.04.2012 17:27, Sascha Hauer wrote:
-> >Hi All,
-> >
-> >Here is another round of patches to convert i.MX to the generic clock
-> >framework. It is based on Mikes recently published for-next branch plus:
-> >
-> >[PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
-> >[PATCH V3 2/8] clk: add a fixed factor clock
-> >clkdev: Implement managed clk_get()
-> >
-> >The branch is tested on all SoCs I have available, but regressions are more
-> >than likely, so please give it a test.
-> >
-> >I didn't move the clock support to drivers/clk now as the clock control
-> >module is shared with several other SoC specific stuff and I need a global
-> >spinlock. Accessing this somewhere from drivers/ seems odd. Depending on
-> >how things work out we can move it to drivers/ later.
-> >
-> >The remaining cleanups like removing the old clock support posted in the
-> >last series are not included here, I will respin them once it's clear that
-> >a series goes in
-> >
-> >For your convenience a complete series including dependencies (so not
-> >meant for upstream) can be pulled here:
-> >
-> >git://git.pengutronix.de/git/imx/linux-2.6.git work/v3.4-rc4-imx-clk
-> 
-> Booting this on top of a 3.4-rc4 on a i.MX6 SabreLite gives me
-> 
-> ..
-> Linux video capture interface: v2.00
-> Switching to clocksource mxc_timer1
-> Clockevents: could not switch to one-shot mode:
-> Clockevents: could not switch to one-shot mode:
-> Clockevents: could not switch to one-shot mode: dummy_timer is not
-> functional.
->  dummy_timer is not functional.
-> Clockevents: could not switch to one-shot mode:
-> Could not switch to high resolution mode on CPU 0
->  dummy_timer is not functional.
-> Could not switch to high resolution mode on CPU 2
-> Could not switch to high resolution mode on CPU 1
->  dummy_timer is not functional.
-> Could not switch to high resolution mode on CPU 3
-> NET: Registered protocol family 2
-> ...
-> 
-> I'm no expert of this, so just in case this is interesting for somebody.
 
-Just rechecked, I can't reproduce this here on a arm2 board
+Booting a 3.4-rc4 on a i.MX6 SabreLite board, the kernel boot messages 
+contain
 
-Sascha
+...
+sched_clock: 32 bits at 66MHz, resolution 15ns, wraps every 65075ms
+------------[ cut here ]------------
+WARNING: at arch/arm/kernel/smp_twd.c:349 
+twd_local_timer_of_register+0x54/0x98()
+twd_local_timer_of_register failed (-19)
+Modules linked in:
+Backtrace:
+[<80012128>] (dump_backtrace+0x0/0x10c) from [<803fef58>] 
+(dump_stack+0x18/0x1c)
+  r7:8055ff60 r6:8051cc08 r5:804ad180 r4:0000015d
+[<803fef40>] (dump_stack+0x0/0x1c) from [<80021600>] 
+(warn_slowpath_common+0x54/0x6c)
+[<800215ac>] (warn_slowpath_common+0x0/0x6c) from [<800216bc>] 
+(warn_slowpath_fmt+0x38/0x40)
+  r9:412fc09a r8:8057afc0 r7:805aa5c0 r6:00000000 r5:8054fa8c
+r4:00000000
+[<80021684>] (warn_slowpath_fmt+0x0/0x40) from [<8051cc08>] 
+(twd_local_timer_of_register+0x54/0x98)
+  r3:ffffffed r2:804ad19c
+[<8051cbb4>] (twd_local_timer_of_register+0x0/0x98) from [<805286a0>] 
+(imx6q_timer_init+0x14/0x18)
+  r5:8054fa8c r4:8fffffff
+[<8052868c>] (imx6q_timer_init+0x0/0x18) from [<8051c80c>] 
+(time_init+0x28/0x38)
+[<8051c7e4>] (time_init+0x0/0x38) from [<80518890>] 
+(start_kernel+0x19c/0x31c)
+[<805186f4>] (start_kernel+0x0/0x31c) from [<10008044>] (0x10008044)
+  r8:1000406a r7:8057efe4 r6:8054fa5c r5:8057b048 r4:10c53c7d
+---[ end trace 1b75b31a2719ed1c ]---
+Console: colour dummy device 80x30
+...
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Any idea or hint?
+
+Best regards
+
+Dirk
