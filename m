@@ -1,25 +1,20 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 26 Apr 2012 12:31:34 +0200
-Subject: [GIT PULL] net/at91: at91_ether fixes for 3.4-rc
-In-Reply-To: <20120426.061212.570213998793556907.davem@davemloft.net>
-References: <4F991210.8060409@atmel.com>
- <20120426.052006.1832921763623188173.davem@davemloft.net>
- <4F991E6D.4020303@atmel.com>
- <20120426.061212.570213998793556907.davem@davemloft.net>
-Message-ID: <4F992406.8020306@atmel.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 26 Apr 2012 18:37:10 +0800
+Subject: [PATCH 0/2] add DMA support to uart
+Message-ID: <1335436632-29499-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 12:12 PM, David Miller :
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Date: Thu, 26 Apr 2012 12:07:41 +0200
-> 
->> So, should I repost both of them as patch series?
-> 
-> Yes, with a leading "[PATCH 0/N] " posting as I asked.
+Add DMA support to UART driver.
 
-Ok, done!
+Tested this patch on imx6q(arm2) board with a new SDMA firmware.
 
-Thanks, bye,
--- 
-Nicolas Ferre
+
+Huang Shijie (2):
+  serial/imx: add DMA support
+  ARM: MX6q: enable DMA support for UART2
+
+ .../bindings/tty/serial/fsl-imx-uart.txt           |    7 +
+ arch/arm/boot/dts/imx6q-arm2.dts                   |    8 +
+ drivers/tty/serial/imx.c                           |  386 +++++++++++++++++++-
+ 3 files changed, 397 insertions(+), 4 deletions(-)
