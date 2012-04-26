@@ -1,67 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Apr 2012 12:57:28 -0600
-Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
- device tree
-In-Reply-To: <4F9993C3.8050008@redhat.com>
-References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
- <20120305103245.GC31189@mudshark.cambridge.arm.com>
- <4F9597B4.5020208@redhat.com> <4F9966CB.6090504@redhat.com>
- <20120426152246.GI10272@mudshark.cambridge.arm.com>
- <4F9970AD.6090501@wwwdotorg.org> <4F9993C3.8050008@redhat.com>
-Message-ID: <4F999A98.6080800@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Apr 2012 12:05:25 -0700
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
+ <20120418231837.GT21106@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
+ <20120426184312.GY3739@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
+Message-ID: <20120426190524.GZ3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 12:28 PM, William Cohen wrote:
-> On 04/26/2012 11:58 AM, Stephen Warren wrote:
->> On 04/26/2012 09:22 AM, Will Deacon wrote:
->>> On Thu, Apr 26, 2012 at 04:16:27PM +0100, William Cohen wrote:
->>>> On 04/23/2012 01:56 PM, William Cohen wrote:
->>>>> Has this patch been pulled into the git tree?  -Will (Cohen)
->>>>
->>>>
->>>> This patch pretty much duplicates what is already done for in board-seaboard.c:
->>>>
->>>> http://lxr.linux.no/#linux+v3.3.3/arch/arm/mach-tegra/board-seaboard.c#L147
->>>>
->>>> I have tested the patch out with oprofile, papi, and perf. Things seem to function properly with the patch on a trimslice.
->>>
->>> Right, that sounds good to me. This should go via the tegra/arm-soc tree.
->>> For some reason, I can't find the original patch in the list archives so
->>> perhaps you could repost it to linux-arm-kernel and CC Olof and Arnd?
->>
->> Is there actually any reason to proceed with this patch? When booting
->> Tegra using device tree (i.e. CONFIG_OF rather than the way the phrase
->> is used in the email subject), the ARM PMU is enabled on all boards. So,
->> I'd recommend switching to DT rather than continuing to patch up the
->> board files, which will hopefully be removed in the nearish future.
->>
->> (BTW, best to cc linux-tegra at vger.kernel.org too)
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120426 11:52]:
 > 
-> Hi Stephen,
-> 
-> The fedora 17 arm kernels are not yet using the DT. That is the motivations to get this fix into the upstream kernel so that people could use performance monitoring hardware.
+> Yes, they were accepted and were also available under linux-omap/soc2 branch 
+> for quite some time.
 
-Are people using the mainline kernel for Fedora on Tegra then?
+Hmm sorry if I've dropped them accidentally. I tend to drop the branches
+after each merge window and purge my linux-omap mailbox too.
 
-> Has the pmu support been verified to work on Nvidia Tegra when using the DT?  In the past I was not successful in getting the trimslice to boot up using device tree. Are there some clear instructions somewhere on how to do this?  
+Regards,
 
-I believe I validated the PMU functionality when booting using DT when I
-created the patch to add it to the device tree files.
-
-Booting with DT is very simple. You can do either:
-
-a) Grab arch/arm/boot/tegra-trimslice.dtb from the kernel build tree,
-load it into memory from U-Boot just like the kernel and initrd, and
-pass the address as the third parameter to "bootm". This is the
-preferred option.
-
-b) Enable CONFIG_ARM_APPENDED_DTB, then concatenate zImage and
-tegra-trimslice.dtb into a single file, and use that as the kernel
-image. this is probably marginally easier to get working the first time
-around, since the only difference is you package a slightly different
-kernel file onto the boot media.
-
-Either way, I'd recommend passing root=UUID=xxx to the kernel instead of
-an explicit block device name, since it's possible the naming is
-different between booting with board files and device tree.
+Tony
