@@ -1,69 +1,62 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 26 Apr 2012 15:48:54 +0800
-Subject: [PATCH v2 1/2] pinctrl: add pinctrl_provide_dummies interface
- for platforms to use
-In-Reply-To: <4F9816A3.5090907@wwwdotorg.org>
-References: <1335260023-15859-1-git-send-email-b29396@freescale.com>
- <4F96F847.508@wwwdotorg.org>
- <20120425094934.GA17631@shlinux2.ap.freescale.net>
- <CACRpkdYjVYsM-Qo7NWKx5Mr3rAmp12G_wAtkmNkkqNyX=ZeKUw@mail.gmail.com>
- <20120425114955.GB17631@shlinux2.ap.freescale.net>
- <4F9816A3.5090907@wwwdotorg.org>
-Message-ID: <20120426074853.GA26070@shlinux2.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Apr 2012 15:42:08 +0800
+Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
+ framework
+In-Reply-To: <20120426064150.GE3852@pengutronix.de>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
+ <20120426024837.GD28063@b20223-02.ap.freescale.net>
+ <20120426064150.GE3852@pengutronix.de>
+Message-ID: <20120426074205.GA2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 11:22:11PM +0800, Stephen Warren wrote:
-> On 04/25/2012 05:49 AM, Dong Aisheng wrote:
-> > On Wed, Apr 25, 2012 at 07:19:43PM +0800, Linus Walleij wrote:
-> >> On Wed, Apr 25, 2012 at 11:49 AM, Dong Aisheng
-> >> <aisheng.dong@freescale.com> wrote:
-> >>> On Wed, Apr 25, 2012 at 03:00:23AM +0800, Stephen Warren wrote:
-> >>
-> >>>> The only thing that should be calling pinctrl_request_gpio() is a GPIO
-> >>>> driver. It should only be calling it for the GPIOs it manages. I'd
-> >>>> expect that if a platform's pinctrl driver was not yet written to
-> >>>> support the GPIO functionality, then the GPIO driver would not be
-> >>>> calling this function.
-> >>>>
-> >>> Hmm, pinctrl gpio is in the same situation as pinctrl state that gpio
-> >>> driver may be shared between several platforms, with pinctrl support
-> >>> or not.
-> >>
-> >> I think it's mostly safe to assume that either:
-> >>
-> > I just saw your reply after i sent out the revised patch...
+On Thu, Apr 26, 2012 at 08:41:50AM +0200, Sascha Hauer wrote:
+> > clk_set_rate(&pll4_audio, FREQ_650M);
+> > clk_set_rate(&pll5_video, FREQ_650M);
+> > clk_set_parent(&ipu1_di0_clk, &ipu1_di0_pre_clk);
+> > clk_set_parent(&ipu1_di0_pre_clk, &pll5_video);
+> > clk_set_parent(&gpu3d_shader_clk, &pll2_pfd_594m);
+> > clk_set_rate(&gpu3d_shader_clk, FREQ_594M);
+> > clk_set_parent(&gpu3d_core_clk, &mmdc_ch0_axi_clk);
+> > clk_set_rate(&gpu3d_core_clk, FREQ_528M);
+> > clk_set_parent(&asrc_serial_clk, &pll3_usb_otg);
+> > clk_set_rate(&asrc_serial_clk, 1500000);
+> > clk_set_rate(&enfc_clk, 11000000);
 > > 
-> >> - pinctrl calls from GPIO drivers gets stubbed out totally due to
-> >>   CONFIG_PINCTRL not being selected
-> >>
-> > Yes, we already have that in include/linux/pinctrl/consumer.h
-> > 
-> >> or:
-> >>
-> >> - You need to pass a token through platform data to the
-> >>   GPIO driver telling it whether it needs to request pins for
-> >>   it's GPIOs or not. Just a bool should work fine?
-> >>
-> > Yes, this is an alternative way.
-> > I'm using a similar way, but pass the data to pinctrl core
-> > rather than gpio driver. Then it is be handled together with
-> > dummy state in platform code.
-> > 
-> > Do you think if the current way i used is ok?
-> > Or i need to change to your proposed way?
-> 
-> I think Linus was suggesting a flag in platform data for each GPIO
-> driver rather than a global flag for the entire pinctrl subsystem.
-> 
-> That way, if one of the pinctrl drivers did fully support all the GPIO
-> functionality and the other didn't, you'd be able to have just one of
-> the GPIO drivers not call into pinctrl (or ignore certain errors) yet
-> the other GPIO driver could still fully interact with pinctrl as desired.
-> 
-Yes, it's true.
-I will drop the dummy gpio support in pinctrl subsystem and let gpio
-driver to decide whether it wants to use pinctrl gpio mux function.
 
-Regards
-Dong Aisheng
+I copied these from Freescale internal BSP when I was creating the file,
+but did not really think about if we need them or not, so I took the
+chance to clean them up.  From my testing, I haven't observed any
+problem with in-tree imx6 drivers.
+
+Basically, I do not to mess up the soc clock init with too much driver
+specific stuff there.  Unless we are back to the corner, individual
+driver should set up its clock properly with clk API.
+
+> > /*
+> >  * Before pinctrl API is available, we have to rely on the pad
+> >  * configuration set up by bootloader.  For usdhc example here,
+> >  * u-boot sets up the pads for 49.5 MHz case, and we have to lower
+> >  * the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
+> >  *
+> >  * FIXME: This is should be removed after pinctrl API is available.
+> >  * At that time, usdhc driver can call pinctrl API to change pad
+> >  * configuration dynamically per different usdhc clock settings.
+> >  */
+> > clk_set_rate(&usdhc1_clk, 49500000);
+> > clk_set_rate(&usdhc2_clk, 49500000);
+> > clk_set_rate(&usdhc3_clk, 49500000);
+> > clk_set_rate(&usdhc4_clk, 49500000);
+> 
+> Can't say anything to these, probably Shawn has simply lost them while
+> porting.
+> 
+I dropped it on purpose.  This quick hack made by me is actually broken.
+Whenever bootloader changes the pad setting, we have problem here.  So
+before pinctrl support is available bootloader should be responsible
+for setting pad and clock in the correct pair.
+
+-- 
+Regards,
+Shawn
