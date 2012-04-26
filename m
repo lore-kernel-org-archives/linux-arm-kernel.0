@@ -1,61 +1,63 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 26 Apr 2012 12:23:20 +0200
-Subject: [patch v2 3/3] kirkwood: Add iconnect support
-In-Reply-To: <201204252345.07721.linux@baker-net.org.uk> (Adam Baker's message
- of "Wed, 25 Apr 2012 23:45:07 +0100")
-References: <20120418211638.691400727@rtp-net.org>
- <20120418213147.502692381@rtp-net.org>
- <201204252345.07721.linux@baker-net.org.uk>
-Message-ID: <87zk9yx04n.fsf@lebrac.rtp-net.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Apr 2012 11:28:15 +0100
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case
+ that l2x0 is enabled before init
+In-Reply-To: <4F991ED6.8060109@marvell.com>
+References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
+ <20120424082810.GA9367@arm.com> <4F98D659.4030709@marvell.com>
+ <20120426083554.GB18136@arm.com> <4F99148B.4020900@marvell.com>
+ <20120426094400.GD18136@arm.com> <4F991ED6.8060109@marvell.com>
+Message-ID: <20120426102815.GE18136@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adam Baker <linux@baker-net.org.uk> writes:
+On Thu, Apr 26, 2012 at 11:09:26AM +0100, Yilu Mao wrote:
+> On 04/26/2012 05:44 PM, Catalin Marinas wrote:
+> > On Thu, Apr 26, 2012 at 10:25:31AM +0100, Yilu Mao wrote:
+> >> On 04/26/2012 04:35 PM, Catalin Marinas wrote:
+> >>> On Thu, Apr 26, 2012 at 06:00:09AM +0100, Yilu Mao wrote:
+> >>>> On 04/24/2012 04:28 PM, Catalin Marinas wrote:
+> >>>>> On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
+> >>>>>> +	l2x0_saved_regs.aux_ctrl = aux;
+> >>>>>> +
+> >>>>>>     	aux&= aux_mask;
+> >>>>>>     	aux |= aux_val;
+> >>>>>
+> >>>>> I think that's the wrong place to save it, it should be after the
+> >>>>> masking was done.
+> >>>>>
+> >>>>> Anyway, if we cannot write this register in l2x0_init() because the L2
+> >>>>> was enabled, do we expect the L2 to be disabled during resume?
+> >>>>>
+> >>>> Sorry, I don't think so.
+> >>>> This is the right place to save it because we must make sure the saved
+> >>>> aux_ctrl is the same as what it is set.
+> >>>> If we save it after masking was done, the saved value will be different
+> >>>> because we can't actually change the real setting.
+> >>>
+> >>> And since we can't actually change the real setting on the resume path,
+> >>> why do we need to save it anyway. Is your L2 cache disabled on the
+> >>> resume path but not on the cold boot one?
+> >>
+> >> We can't change L2 aux ctrl setting when do init because it has been
+> >> enabled.
+> >
+> > This is normally for the case where the kernel running in non-secure
+> > mode is not allowed to write the L2 aux ctrl register. Does this
+> > permission change with core idle?
+> >
+> Yes, your understanding of previous mail is right. The L2 is enabled on 
+> code boot and it is disabled on the resume in our case.
 
-Hi,
+But the kernel either runs in secure mode or the non-secure access to
+this register is allowed.
 
-> On Wednesday 18 April 2012, Arnaud Patard wrote:
->> Add support for Iomega Iconnect system.
->> 
->> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->> 
->
-> Arnaud,
->
-> I have so far been unable to get a kernel to boot with your patches. I just 
-> get
->  
-> Uncompressing Linux... done, booting the kernel.
+> So if we don't have such patch, when core idle exit, L2 cache aux ctrl 
+> register will be set to 0x0 because l2x0_saved_regs.aux_ctrl is not 
+> initialized.
 
-hm. sounds weird. Are you sure that you have the DTB appended to your
-kernel image ?
+You could still make sure that the mask passed doesn't affect the
+original setting and save it after masking.
 
->
-> then nothing even with earlyprintk in the cmd line.
->
-> I applied the patches to a recent clone of Linus' tree as they depend on other 
-> device tree work that isn't in the latest stable kernel - I haven't yet 
-> verified if that tree boots as if it were a RD88F6281 with your changes 
-> disabled so that is probably my next step.
-
-With device-tree, you don't have to worry with your machine number.
-
->
-> I've also hit the issue of the stock U-Boot not supporting DTB so am running 
-> with
-> CONFIG_ARM_APPENDED_DTB=y
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
-> Have you been using the latter option or are you just using the settings in 
-> your dtb file? I'm assuming that you are running with an initrd, so far I've 
-
-It depends on what your boot media is. For instance if you boot your
-kernel and the rootfs on usb and necessary modules built-in you can boot
-directly with things like root=/dev/sdaX rootwait.
-
-> been trying to run without one hence I was hoping to be able to set the rootfs 
-> location on the kernel command line.
-
-either you use ARM_ATAG_DTB_COMPAT and set the command line on from
-uboot or you don't set it and set the command line from the dts file.
-
-Arnaud
+-- 
+Catalin
