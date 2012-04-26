@@ -1,11 +1,11 @@
 From: ylmao@marvell.com (Yilu Mao)
-Date: Thu, 26 Apr 2012 13:00:09 +0800
+Date: Thu, 26 Apr 2012 13:09:29 +0800
 Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that
  l2x0 is enabled before init
 In-Reply-To: <20120424082810.GA9367@arm.com>
 References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
  <20120424082810.GA9367@arm.com>
-Message-ID: <4F98D659.4030709@marvell.com>
+Message-ID: <4F98D889.40207@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
