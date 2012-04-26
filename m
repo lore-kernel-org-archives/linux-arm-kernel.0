@@ -1,57 +1,92 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 26 Apr 2012 13:42:01 +0200
-Subject: possible MXS-i2c bug
-In-Reply-To: <201204261326.29388.marex@denx.de>
-References: <201204261326.29388.marex@denx.de>
-Message-ID: <20120426114201.GC3548@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Apr 2012 14:00:43 +0200
+Subject: [PATCH 1/2] serial/imx: add DMA support
+In-Reply-To: <1335436632-29499-2-git-send-email-b32955@freescale.com>
+References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
+ <1335436632-29499-2-git-send-email-b32955@freescale.com>
+Message-ID: <20120426120043.GH17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Thu, Apr 26, 2012 at 06:37:11PM +0800, Huang Shijie wrote:
+> Add the DMA support for uart RX and TX.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  .../bindings/tty/serial/fsl-imx-uart.txt           |    7 +
+>  drivers/tty/serial/imx.c                           |  386 +++++++++++++++++++-
+>  2 files changed, 389 insertions(+), 4 deletions(-)
+> 
+> +	enum dma_status status;
+> +	unsigned long flags;
+> +	int ret;
+> +
+> +	status = chan->device->device_tx_status(chan, (dma_cookie_t)NULL, NULL);
+> +	if (DMA_IN_PROGRESS == status)
+> +		return;
+> +
+> +	spin_lock_irqsave(&sport->port.lock, flags);
+> +	sport->tx_bytes = uart_circ_chars_pending(xmit);
+> +	if (sport->tx_bytes > 0) {
 
-you forgot the most important list, linux-i2c ;)
+Instead of putting nearly the whole body of this function inside a 'if'
+you should return here.
 
-> I recently tried mxs-i2c (on 3.4-rc4) with at24 eeprom, didn't work as expected.
+> +		if (xmit->tail > xmit->head) {
+> +			sport->dma_tx_nents = 2;
+> +			sg_init_table(sgl, 2);
+> +			sg_set_buf(sgl, xmit->buf + xmit->tail,
+> +					UART_XMIT_SIZE - xmit->tail);
+> +			sg_set_buf(&sgl[1], xmit->buf, xmit->head);
+> +		} else {
+> +			sport->dma_tx_nents = 1;
+> +			sg_init_one(sgl, xmit->buf + xmit->tail,
+> +					sport->tx_bytes);
+> +		}
+> +		spin_unlock_irqrestore(&sport->port.lock, flags);
+> +
+> +		ret = dma_map_sg(sport->port.dev, sgl,
+> +				sport->dma_tx_nents, DMA_TO_DEVICE);
+> +		if (ret == 0) {
+> +			pr_err("DMA mapping error for TX.\n");
 
-Yes, we had the same this week/last week.
+Use dev_* functions. Whoever reads the above in the logs won't have a
+clue that it comes from the serial driver.
 
-> Apparently, there might be some timing issue, when I put printk() into the at24 
-> driver eeprom write function, it "fixed" itself. Though, replacing the i2c 
-> driver with i2c gpio also fixed the issue, so I suspect the i2c driver has some 
-> flaw in it.
 
-Try removing the printk and use the module paramter "io_limit=24" for
-at24. Does this help? (Or bs<=24 with dd)
+> +			return;
+> +		}
+> +		desc = dmaengine_prep_slave_sg(chan, sgl,
+> +				sport->dma_tx_nents, DMA_MEM_TO_DEV, 0);
+> +		if (!desc) {
+> +			pr_err("We cannot prepare for the TX slave dma!\n");
+> +			return;
+> +		}
+> +		desc->callback = dma_tx_callback;
+> +		desc->callback_param = sport;
+> +
+> +		/* fire it */
+> +		dmaengine_submit(desc);
+> +		dma_async_issue_pending(chan);
+> +		return;
+> +	}
+> +	spin_unlock_irqrestore(&sport->port.lock, flags);
+> +	return;
+> +}
+> +
 
-> If noone has any fixes already, I'll debug this tonight or so.
+> +/* see the "i.MX61 SDMA Scripts User Manual.doc" for the parameters */
 
-The write FIFO overflows, since it only can carry 8 words. There is
-currently no check for that. One solution would be to check the FIFO
-status and fill them as needed. This will probably require additional
-locking, so I think the proper solution would be to use DMA for
-transfers bigger than the write FIFO size (we would get MX23 support
-then, too). Sadly, we don't have DMA support yet and I don't have time
-to implement it.
+I can't see how the manual helps here.
 
-I am thinking if such transfers which would fail anyway, should
-currently be rejected or if the driver should depend on BROKEN or both.
+Please test this patch at least on one more SoC. There should be nothing
+i.MX6 specific in here, the fact that the i.MX6 is mentioned several
+times in the comments make me suspicious.
 
-I am still undecided, though.
-
-Please also check the patch I sent yesterday, there is also another one
-coming after I get confirmation from a customer.
-
-Regards,
-
-   Wolfram
+Sascha
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120426/e69a67b6/attachment.sig>
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
