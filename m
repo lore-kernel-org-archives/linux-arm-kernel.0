@@ -1,61 +1,70 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 26 Apr 2012 08:37:16 +0300
-Subject: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-In-Reply-To: <4F981D96.3000401@wwwdotorg.org>
-References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
- <1335352072-4001-2-git-send-email-hdoyu@nvidia.com>
- <20120425112950.GC3564@arwen.pp.htv.fi>
- <4F981D96.3000401@wwwdotorg.org>
-Message-ID: <20120426083716.69efa6f5b58200e265b2e867@nvidia.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 26 Apr 2012 05:42:38 +0000
+Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source
+ selection using kernel param
+In-Reply-To: <CA+Bv8XYemH3zW48id_ZAvC2gU_uZMFei6dMO1GUog_YTvFBV2Q@mail.gmail.com>
+References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
+ <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
+ <CA+Bv8XYemH3zW48id_ZAvC2gU_uZMFei6dMO1GUog_YTvFBV2Q@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9FE722@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Apr 2012 17:51:50 +0200
-Stephen Warren <swarren@wwwdotorg.org> wrote:
-
-> On 04/25/2012 05:29 AM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Wed, Apr 25, 2012 at 02:07:37PM +0300, Hiroshi DOYU wrote:
-> >> Add extern func, "tegra_ahb_enable_smmu()" to inform AHB that SMMU is
-> >> ready.
+On Thu, Apr 26, 2012 at 10:06:40, Russ Dill wrote:
+> On Tue, Apr 24, 2012 at 2:45 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+> > Current OMAP code supports couple of clocksource options based
+> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+> > So there can be 3 options -
+> >
+> > 1. 32KHz sync-timer
+> > 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+> > 3. 32KHz based gptimer.
+> >
+> > The optional gptimer based clocksource was added so that it can
+> > give the high precision than sync-timer, so expected usage was 2
+> > and not 3.
+> > Unfortunately option 2, clocksource doesn't meet the requirement of
+> > free-running clock as per clocksource need. It stops in low power states
+> > when sys_clock is cut. That makes gptimer based clocksource option
+> > useless for OMAP2/3/4 devices with sys_clock as a clock input.
+> > Option 3 will still work but it is no better than 32K sync-timer
+> > based clocksource.
+> >
+> > So ideally we can kill the gptimer based clocksource option but there
+> > are some OMAP based derivative SoCs like AM33XX which doesn't have
+> > 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
+> > clocksource.
+> > Considering above, make sync-timer and gptimer clocksource runtime
+> > selectable so that both OMAP and AMXXXX continue to use the same code.
+> >
+> > Also, in order to precisely configure/setup sched_clock for given
+> > clocksource, decision has to be made early enough in boot sequence.
+> >
+> > So, the solution is,
+> >
+> > Use kernel parameter ("clocksource=") to override
+> > default 32k_sync-timer, in addition to this, we also use hwmod database
+> > lookup mechanism, through which at run-time we can identify availability
+> > of 32k-sync timer on the device, else fall back to gptimer.
+> >
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> > Cc: Ming Lei <tom.leiming@gmail.com>
 > 
-> >> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> >> +static int __tegra_ahb_enable_smmu(struct device *dev, void *data)
-> >> +{
-> >> +	u32 val;
-> >> +	struct tegra_ahb *ahb = dev_get_drvdata(dev);
-> >> +
-> >> +	val = gizmo_readl(ahb, AHB_ARBITRATION_XBAR_CTRL);
-> >> +	val |= AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE;
-> >> +	gizmo_writel(ahb, val, AHB_ARBITRATION_XBAR_CTRL);
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +int tegra_ahb_enable_smmu(void)
-> >> +{
-> >> +	return driver_for_each_device(&tegra_ahb_driver.driver, NULL, NULL,
-> >> +				      __tegra_ahb_enable_smmu);
-> >> +}
-> >> +EXPORT_SYMBOL(tegra_ahb_enable_smmu);
-> >> +#endif
-> > 
-> > this is still not correct. If you will always call this whenever you run
-> > on tegra 3, why do you even expose this function ?
+> This fails to boot on my Mistral am37x-evm with omap2plus_defconfig
 > 
-> I think the issue is that this function should only be called after the
-> SMMU driver has initialized the SMMU, and it's ready to be activated.
 
-Right. "tegra_ahb_enable_smmu()" is not supposed to be called at
-tegra_ahb_probe(), but it is always expected to be called after SMMU
-is initialized/gets ready.
+Thanks Russ, for validating it.
 
-The sequence is:
- 1, AHB is probed.
- ...<any other operations>...
- 2, SMMU is probed.
- ...<any other operations>...
- 3, SMMU is ready, then,
- 4, SMMU lets AHB know that SMMU is ready to be used by AHB clients.
+But I do not see any relation between your boot process stuck and this patch.
+What is the observation without these patches?
 
-The above step 4 is "tegra_ahb_enable_smmu()".
+Thanks,
+Vaibhav
