@@ -1,42 +1,106 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Thu, 26 Apr 2012 10:55:01 +0300
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <CAAQ0ZWT2arwk275y3E+=nECNh1sSe8+w44jVL7xL3xOy3QqJNA@mail.gmail.com>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20120104135204.GA14741@S2100-06.ap.freescale.net>
- <20120104211800.GF11810@n2100.arm.linux.org.uk>
- <20120105113106.GR11810@n2100.arm.linux.org.uk>
- <20120330131320.GH3254@S2101-09.ap.freescale.net>
- <20120330131509.GE22981@n2100.arm.linux.org.uk>
- <20120330132040.GF22981@n2100.arm.linux.org.uk>
- <4F98FC74.3050302@bluegiga.com>
- <CAAQ0ZWT2arwk275y3E+=nECNh1sSe8+w44jVL7xL3xOy3QqJNA@mail.gmail.com>
-Message-ID: <4F98FF55.7060500@bluegiga.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Apr 2012 15:58:52 +0800
+Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
+ framework
+In-Reply-To: <20120426065701.GH28063@b20223-02.ap.freescale.net>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
+ <20120426024837.GD28063@b20223-02.ap.freescale.net>
+ <20120426064150.GE3852@pengutronix.de>
+ <20120426065701.GH28063@b20223-02.ap.freescale.net>
+Message-ID: <20120426075850.GB2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 10:48 AM, Shawn Guo wrote:
-> On 26 April 2012 15:42, Lauri Hintsala<lauri.hintsala@bluegiga.com>  wrote:
->> Hi Russel,
->>
->> I don't see any mach-types updates for linux-next. Do you have any chance to
->> update mach-types now? We have been waiting apx4devkit support since
->> December.
->>
-> Or you may want to contribute the mxs sub-architecture DT support?
-> Then we do not even need to bother Russell to update the mach-types ;)
->   I anyway would hope we can kill all those board files with DT support
-> in the next 1~2 cycles.
+On Thu, Apr 26, 2012 at 02:57:02PM +0800, Richard Zhao wrote:
+> On Thu, Apr 26, 2012 at 08:41:50AM +0200, Sascha Hauer wrote:
+> > On Thu, Apr 26, 2012 at 10:48:38AM +0800, Richard Zhao wrote:
+> > > The below code is removed from mx6q_clocks_init implicitly.
+> > > Why? If it's reasonable, it needs to be on a separate patch too.
+> > > 
+> > > /* only keep necessary clocks on */
+> > > writel_relaxed(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,  CCGR0);
+> > > writel_relaxed(0x3 << CG8  | 0x3 << CG9  | 0x3 << CG10, CCGR2);
+> > > writel_relaxed(0x3 << CG10 | 0x3 << CG12,               CCGR3);
+> > > writel_relaxed(0x3 << CG4  | 0x3 << CG6  | 0x3 << CG7,  CCGR4);
+> > > writel_relaxed(0x3 << CG0,                              CCGR5);
+> > > writel_relaxed(0,                                       CCGR6);
+> > > writel_relaxed(0,                                       CCGR7);
+> > 
+> > The clock framework will turn them off automatically.
+> > For the first time the hardware state will be consistent with the
+> > software state. Hurray!
+> > 
+> > > 
+> > > clk_enable(&uart_clk);
+> > 
+> > This is not needed anymore. For the early debug case we depend on the
+> > uart being enabled by the bootloader anyway, so it's safe to assume that
+> > the clock is turned on also. Otherwise the uart driver turns on this
+> > clock when needed.
+> > 
+> > > clk_enable(&mmdc_ch0_axi_clk);
+> > 
+> > This reminds me on something. This clock is turned on in the loop around
+> > clks_init_on. Since we now have pointers to each clock we don't need the
+> > clk_get_sys() anymore but can use the pointers directly. Will fix this
+> > one.
+> > 
+> > > 
+> > > clk_set_rate(&pll4_audio, FREQ_650M);
+> > > clk_set_rate(&pll5_video, FREQ_650M);
+> > > clk_set_parent(&ipu1_di0_clk, &ipu1_di0_pre_clk);
+> > > clk_set_parent(&ipu1_di0_pre_clk, &pll5_video);
+> > > clk_set_parent(&gpu3d_shader_clk, &pll2_pfd_594m);
+> > > clk_set_rate(&gpu3d_shader_clk, FREQ_594M);
+> > > clk_set_parent(&gpu3d_core_clk, &mmdc_ch0_axi_clk);
+> > > clk_set_rate(&gpu3d_core_clk, FREQ_528M);
+> > > clk_set_parent(&asrc_serial_clk, &pll3_usb_otg);
+> > > clk_set_rate(&asrc_serial_clk, 1500000);
+> > > clk_set_rate(&enfc_clk, 11000000);
+> > > 
+> > > /*
+> > >  * Before pinctrl API is available, we have to rely on the pad
+> > >  * configuration set up by bootloader.  For usdhc example here,
+> > >  * u-boot sets up the pads for 49.5 MHz case, and we have to lower
+> > >  * the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
+> > >  *
+> > >  * FIXME: This is should be removed after pinctrl API is available.
+> > >  * At that time, usdhc driver can call pinctrl API to change pad
+> > >  * configuration dynamically per different usdhc clock settings.
+> > >  */
+> > > clk_set_rate(&usdhc1_clk, 49500000);
+> > > clk_set_rate(&usdhc2_clk, 49500000);
+> > > clk_set_rate(&usdhc3_clk, 49500000);
+> > > clk_set_rate(&usdhc4_clk, 49500000);
+> > 
+> > Can't say anything to these, probably Shawn has simply lost them while
+> > porting.
+> > 
+> > > 
+> > > clk_set_parent(&cko1_clk, &ahb_clk);
+> > 
+> > Why this? The cko pin has different usecases on each board, mostly I
+> > think for debugging. We shouldn't touch it here.
+> clko1's used by audio codec on many boards.
 
-Hi Shawn,
+How many?  Even it's truly so many, it's still board specific lookup,
+which I do not want to have in soc specific clock driver.
 
-You are right, we have work with DT. But before that it would be nice to 
-have buildable board in mainline.
+> Do you/Shawn think I can add board specific code here with
+> of_machine_is_compatible?
 
-BR,
-Lauri
+No, I do not think so.
+
+> I need to add audio codec clkdev. Other places
+> can not get clk pointers.
+> 
+As what I have been told you, I would rather you have a generic lookup
+for cko in clk-imx6q.c, and then you can get the clk pointer at wherever
+you should add board specific lookup for the clk.  That generic lookup
+could be used by whatever boards for whatever purpose without messing
+up clk-imx6q.c.
+
+-- 
+Regards,
+Shawn
