@@ -1,52 +1,96 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Thu, 26 Apr 2012 13:43:10 -0700
-Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <87aa1ybaxf.fsf@ti.com>
-References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
- <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
- <87aa1ybaxf.fsf@ti.com>
-Message-ID: <CA+Bv8XYG2heeWKMt-gdWkPD3_1kkcZspP_XgvCAdwynXzTA3AQ@mail.gmail.com>
+From: neilb@suse.de (NeilBrown)
+Date: Fri, 27 Apr 2012 06:50:40 +1000
+Subject: [PATCH 1/3] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC
+ interrupts.
+In-Reply-To: <878vhi9qj8.fsf@ti.com>
+References: <20120425025637.7832.14013.stgit@notabene.brown>
+ <20120425030524.7832.52047.stgit@notabene.brown>
+ <878vhi9qj8.fsf@ti.com>
+Message-ID: <20120427065040.3ba0fce2@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 11:33 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
->
->> Current OMAP code supports couple of clocksource options based
->> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
->> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
->
-> [...]
->
->> +
->> + ? ? sync32k_ick = clk_get(NULL, "omap_32ksync_ick");
->> + ? ? if (!IS_ERR(sync32k_ick))
->> + ? ? ? ? ? ? clk_enable(sync32k_ick);
->> +
->> + ? ? sync32k_cnt_reg = base + OMAP2_32KSYNCNT_CR_OFF;
->> +
->> + ? ? /*
->> + ? ? ?* 120000 rough estimate from the calculations in
->> + ? ? ?* __clocksource_updatefreq_scale.
->> + ? ? ?*/
->> + ? ? clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
->> + ? ? ? ? ? ? ? ? ? ? 32768, NSEC_PER_SEC, 120000);
->> +
->> + ? ? ret = clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? clocksource_mmio_readl_up);
->
-> After discussing this a bit with Vaibhav offline, we found that 'base'
-> here should be sync32k_cnt_reg.
->
-> Can you guys that were seeing the hang confirm that that fixes the
-> issue?
->
-> If so, please reply with your Tested-by.
+On Thu, 26 Apr 2012 13:39:07 -0700 Kevin Hilman <khilman@ti.com> wrote:
 
-Tested-by: Russ Dill <Russ.Dill@ti.com>
+> NeilBrown <neilb@suse.de> writes:
+> 
+> > All interrupts can wake-from-sleep (I think) so it should be
+> > permissible to call enable_irq_wake().  Setting this flag allows that.
+> >
+> > It is needed because without this, an interrupt which is delivered
+> > during late suspend will get ignored but will not cause suspend to
+> > abort.
+> > If enable_irq_wake() is called and succeeds, check_wakuep_irqs()
+> > will abort the suspend if the interrupt has fired.
+> >
+> > Signed-off-by: NeilBrown <neilb@suse.de>
+> 
+> The name of this flag and the effect of setting it are somewhat
+> confusing (e.g. why does skipping set_wake suddenly make wakeups work.)
+> So I tried to make it clearer with a reworking of the changelog (below.)
+> 
+> If I understood this correctly, and if you're OK with the updated
+> changelog, I'll queue this up for v3.5.
+> 
 
-All three patches in series boot tested on:
-Beagleboard xM
-Beagleboard B4
-Mistral AM37X-EVM
+I'm very OK with your updated changelog - thanks.  Filling in various bits
+that I didn't know and clarifies the rest :-)
+
+Thanks,
+NeilBrown
+
+
+
+> Thanks,
+> 
+> Kevin
+> 
+> >From 644742ddae59731bc10aacde94645d7c49ca5ecd Mon Sep 17 00:00:00 2001
+> From: NeilBrown <neilb@suse.de>
+> Date: Wed, 25 Apr 2012 13:05:24 +1000
+> Subject: [PATCH] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC interrupts.
+> 
+> Without an ->irq_set_wake() method in an irq_chip, calls to
+> enable_irq_wake() will fail.  This also causes these interrupts to not
+> be able to abort suspend (via check_wakeup_irqs() in late suspend.)
+> 
+> Currently, we don't implement ->irq_set_wake() for INTC interrupts
+> because they default to be wakeup enabled by setting the GRPSEL bits
+> in PM init.  Even though there is no ->irq_set_wake(), we want
+> enable_irq_wake() to succeed so these interrupts can abort suspend
+> when necessary.
+> 
+> To fix, set IRQCHIP_SKIP_SET_WAKE flag for all the INTC
+> interrupts which avoids trying to check irq_chip->irq_set_wake()
+> and failing when it doesn't exist.
+> 
+> Longer term, we need to implement ->irq_set_wake() for the INTC
+> which can manage the appropriate GRPSEL bits.
+> 
+> Signed-off-by: NeilBrown <neilb@suse.de>
+> [khilman at ti.com: rework changelog]
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/irq.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+> index 65f0d257..b0790a9 100644
+> --- a/arch/arm/mach-omap2/irq.c
+> +++ b/arch/arm/mach-omap2/irq.c
+> @@ -148,6 +148,7 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+>  	ct->chip.irq_ack = omap_mask_ack_irq;
+>  	ct->chip.irq_mask = irq_gc_mask_disable_reg;
+>  	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
+> +	ct->chip.flags |= IRQCHIP_SKIP_SET_WAKE;
+>  
+>  	ct->regs.ack = INTC_CONTROL;
+>  	ct->regs.enable = INTC_MIR_CLEAR0;
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120427/0dd8042d/attachment.sig>
