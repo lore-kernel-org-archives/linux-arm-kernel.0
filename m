@@ -1,63 +1,79 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Apr 2012 14:32:56 -0600
-Subject: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-In-Reply-To: <20120426202610.GA30690@arwen.pp.htv.fi>
-References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
- <1335352072-4001-2-git-send-email-hdoyu@nvidia.com>
- <4F99A821.2040406@wwwdotorg.org> <20120426202610.GA30690@arwen.pp.htv.fi>
-Message-ID: <4F99B0F8.4040308@wwwdotorg.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 Apr 2012 13:39:07 -0700
+Subject: [PATCH 1/3] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC
+ interrupts.
+In-Reply-To: <20120425030524.7832.52047.stgit@notabene.brown> (NeilBrown's
+ message of "Wed, 25 Apr 2012 13:05:24 +1000")
+References: <20120425025637.7832.14013.stgit@notabene.brown>
+ <20120425030524.7832.52047.stgit@notabene.brown>
+Message-ID: <878vhi9qj8.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 02:26 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Apr 26, 2012 at 01:55:13PM -0600, Stephen Warren wrote:
->> On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
->>> Add extern func, "tegra_ahb_enable_smmu()" to inform AHB that SMMU is
->>> ready.
->>
->>> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
->>> +static int __tegra_ahb_enable_smmu(struct device *dev, void *data)
->> ...
->>> +int tegra_ahb_enable_smmu(void)
->>> +{
->>> +	return driver_for_each_device(&tegra_ahb_driver.driver, NULL, NULL,
->>> +				      __tegra_ahb_enable_smmu);
->>> +}
->>> +EXPORT_SYMBOL(tegra_ahb_enable_smmu);
->>> +#endif
->>
->> That looks like a neat solution to avoid having a global device object.
-> 
-> except that it won't work always. If you happen to have two AHB bridges,
-> each using a separate smmu but only one smmu is ready, this will set
-> SMMU_INIT_DONE on both bridges.
+NeilBrown <neilb@suse.de> writes:
 
-There is only 1.
+> All interrupts can wake-from-sleep (I think) so it should be
+> permissible to call enable_irq_wake().  Setting this flag allows that.
+>
+> It is needed because without this, an interrupt which is delivered
+> during late suspend will get ignored but will not cause suspend to
+> abort.
+> If enable_irq_wake() is called and succeeds, check_wakuep_irqs()
+> will abort the suspend if the interrupt has fired.
+>
+> Signed-off-by: NeilBrown <neilb@suse.de>
 
->> However, if that driver_for_each_device finds no devices, the function
->> still succeeds. That doesn't seem right, and doesn't allow e.g. the SMMU
->> to defer its probe until the AHB driver has completed.
->>
->> Perhaps add a local int variable to tegra_ahb_enable_smmu(), pass the
->> address to __tegra_ahb_enable_smmu, and have it increment the int. Then,
->> after calling driver_for_each_device,:
->>
->> if (!ahb_device_count)
->>     return -EPROBE_DEFER
->> if (WARN_ON(ahb_device_count != 1))
->>     return -EINVAL;
->> return 0;
-> 
-> that would look, well, weird. Why don't you just different initcall
-> leves for this ? Maybe smmu goes into postcore_initcall() and tegra_ahb
-> goes into postcore_initcall_sync() ?? then you know that SMMU will be
-> ready by the time you call tegra_ahb probe. Well, unless smmu's probe
-> fail, but then again, IIUC it won't work anyway...
+The name of this flag and the effect of setting it are somewhat
+confusing (e.g. why does skipping set_wake suddenly make wakeups work.)
+So I tried to make it clearer with a reworking of the changelog (below.)
 
-Uggh. I'd rather all these devices just got instantiated from device
-tree and relied on deferred probe to manage any ordering, rather than
-playing complex games with multiple initcall levels (and in the end
-probably having to invent more and more initcall levels to correctly
-represent all the dependencies).
+If I understood this correctly, and if you're OK with the updated
+changelog, I'll queue this up for v3.5.
+
+Thanks,
+
+Kevin
+
+>From 644742ddae59731bc10aacde94645d7c49ca5ecd Mon Sep 17 00:00:00 2001
+From: NeilBrown <neilb@suse.de>
+Date: Wed, 25 Apr 2012 13:05:24 +1000
+Subject: [PATCH] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC interrupts.
+
+Without an ->irq_set_wake() method in an irq_chip, calls to
+enable_irq_wake() will fail.  This also causes these interrupts to not
+be able to abort suspend (via check_wakeup_irqs() in late suspend.)
+
+Currently, we don't implement ->irq_set_wake() for INTC interrupts
+because they default to be wakeup enabled by setting the GRPSEL bits
+in PM init.  Even though there is no ->irq_set_wake(), we want
+enable_irq_wake() to succeed so these interrupts can abort suspend
+when necessary.
+
+To fix, set IRQCHIP_SKIP_SET_WAKE flag for all the INTC
+interrupts which avoids trying to check irq_chip->irq_set_wake()
+and failing when it doesn't exist.
+
+Longer term, we need to implement ->irq_set_wake() for the INTC
+which can manage the appropriate GRPSEL bits.
+
+Signed-off-by: NeilBrown <neilb@suse.de>
+[khilman at ti.com: rework changelog]
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/irq.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 65f0d257..b0790a9 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -148,6 +148,7 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+ 	ct->chip.irq_ack = omap_mask_ack_irq;
+ 	ct->chip.irq_mask = irq_gc_mask_disable_reg;
+ 	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
++	ct->chip.flags |= IRQCHIP_SKIP_SET_WAKE;
+ 
+ 	ct->regs.ack = INTC_CONTROL;
+ 	ct->regs.enable = INTC_MIR_CLEAR0;
+-- 
+1.7.9.2
