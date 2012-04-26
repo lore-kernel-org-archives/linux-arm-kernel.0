@@ -1,59 +1,36 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 26 Apr 2012 17:29:06 +0200
-Subject: [PATCH 02/17] ARM: at91: use machine specific hook for late init
-In-Reply-To: <1335454725-13089-3-git-send-email-shawn.guo@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 26 Apr 2012 09:51:49 -0600
+Subject: [PATCH 16/17] ARM: tegra: use machine specific hook for late init
+In-Reply-To: <1335454725-13089-17-git-send-email-shawn.guo@linaro.org>
 References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120426152906.GP9142@game.jcrosoft.org>
+ <1335454725-13089-17-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F996F15.5010908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:38 Thu 26 Apr     , Shawn Guo wrote:
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-at91/board-1arm.c         |    1 +
->  arch/arm/mach-at91/board-afeb-9260v1.c  |    1 +
->  arch/arm/mach-at91/board-cam60.c        |    1 +
->  arch/arm/mach-at91/board-carmeva.c      |    1 +
->  arch/arm/mach-at91/board-cpu9krea.c     |    1 +
->  arch/arm/mach-at91/board-cpuat91.c      |    1 +
->  arch/arm/mach-at91/board-csb337.c       |    1 +
->  arch/arm/mach-at91/board-csb637.c       |    1 +
->  arch/arm/mach-at91/board-dt.c           |    1 +
->  arch/arm/mach-at91/board-eb01.c         |    1 +
->  arch/arm/mach-at91/board-eb9200.c       |    1 +
->  arch/arm/mach-at91/board-ecbat91.c      |    1 +
->  arch/arm/mach-at91/board-eco920.c       |    1 +
->  arch/arm/mach-at91/board-flexibity.c    |    1 +
->  arch/arm/mach-at91/board-foxg20.c       |    1 +
->  arch/arm/mach-at91/board-gsia18s.c      |    1 +
->  arch/arm/mach-at91/board-kafa.c         |    1 +
->  arch/arm/mach-at91/board-kb9202.c       |    1 +
->  arch/arm/mach-at91/board-neocore926.c   |    1 +
->  arch/arm/mach-at91/board-pcontrol-g20.c |    1 +
->  arch/arm/mach-at91/board-picotux200.c   |    1 +
->  arch/arm/mach-at91/board-qil-a9260.c    |    1 +
->  arch/arm/mach-at91/board-rm9200dk.c     |    1 +
->  arch/arm/mach-at91/board-rm9200ek.c     |    1 +
->  arch/arm/mach-at91/board-rsi-ews.c      |    1 +
->  arch/arm/mach-at91/board-sam9-l9260.c   |    1 +
->  arch/arm/mach-at91/board-sam9260ek.c    |    1 +
->  arch/arm/mach-at91/board-sam9261ek.c    |    1 +
->  arch/arm/mach-at91/board-sam9263ek.c    |    1 +
->  arch/arm/mach-at91/board-sam9g20ek.c    |    1 +
->  arch/arm/mach-at91/board-sam9m10g45ek.c |    1 +
->  arch/arm/mach-at91/board-sam9rlek.c     |    1 +
->  arch/arm/mach-at91/board-snapper9260.c  |    1 +
->  arch/arm/mach-at91/board-stamp9g20.c    |    1 +
->  arch/arm/mach-at91/board-usb-a926x.c    |    1 +
->  arch/arm/mach-at91/board-yl-9200.c      |    1 +
->  arch/arm/mach-at91/clock.c              |    3 +--
->  arch/arm/mach-at91/generic.h            |    5 +++++
->  arch/arm/mach-at91/setup.c              |    5 +++++
-I like it but I think it's more time to put soc init that machine init
+On 04/26/2012 09:38 AM, Shawn Guo wrote:
 
-Best Regards,
-J.
+BTW, it'd be useful to CC everyone on the cover letter for context.
+
+I think this mostly looks fine, except for one issue below:
+
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+
+> +void __init tegra_init_late(void)
+> +{
+> +	tegra_clk_debugfs_init();
+> +	tegra_pinmux_debuginit();
+
+That function has been removed ...
+
+> +	tegra_powergate_debugfs_init();
+> +}
+
+> diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
+
+... because this whole file will be deleted in 3.5; see
+git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+gpio-pinmux
+
+I'm not sure if you want to remove that part of this patch to make it
+merge more easily?
