@@ -1,41 +1,80 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 26 Apr 2012 16:49:27 -0500
-Subject: [PATCH 04/17] ARM: ep93xx: use machine specific hook for late init
-In-Reply-To: <4F99B9EB.6060806@gmail.com>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-5-git-send-email-shawn.guo@linaro.org>
- <4F99B9EB.6060806@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F002069887EDC4@AUSP01VMBX24.collaborationhost.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Apr 2012 22:52:58 +0100
+Subject: [PATCH] ARM:mfd: fix ezx-pcap build failure
+In-Reply-To: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
+References: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
+Message-ID: <20120426215258.GG24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 26, 2012 2:11 PM, Ryan Mallon wrote:
-> On 27/04/12 01:38, Shawn Guo wrote:
->
->> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
->> Cc: Ryan Mallon <rmallon@gmail.com>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->
->
-> Why do we want this? It increases the size of the code and changes
-> a static function to a non-static one that now requires ifdefery
-> to handle the !CONFIG_CRUNCH case. I don't see the value in this
-> patch?
+On Wed, Apr 25, 2012 at 11:02:43AM -0400, Mark Asselstine wrote:
+> Attempting to build the ezx_defconfig we get a build failure:
+> 
+> drivers/mfd/ezx-pcap.c: In function 'pcap_isr_work':
+> drivers/mfd/ezx-pcap.c:205: error: implicit declaration of function 'irq_to_gpio'
+> 
+> Looking at this failure we can find that commit 4929f5a8a99f
+> [ARM:pxa: rename gpio_to_irq and irq_to_gpio] renamed irq_to_gpio()
+> to pxa_irq_to_gpio() but this change was not made in the ezx-pcap
+> driver.
 
-Ryan,
+That's because drivers shouldn't have knowledge about the SoC they're
+running on.  This driver is not restricted to only being built for PXA,
+and so with your change, this will cause a link error should this be
+built on non-PXA.
 
-See Shawn's "[PATCH 00/17] arch/arm/mach-* late_initcall cleanup".
+However, there's a big problem with code using irq_to_gpio() or any
+variant of that in this manner:
 
-I haven't looked closely at this yet. I think there may be some platforms
-where the late_initcall's might cause a problem when making an ARM
-unified kernel.
+        } while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
 
-Actually I have a question about the ARM unified kernel.
+What is the effect when the supplied IRQ does not have a mapping to a
+GPIO - or it _does_ by way of a badly coded irq_to_gpio() function
+but that GPIO is not the correct one.
 
-Wouldn't every mach-* supported by a unified kernel have to at least
-be the same ARM variant (i.e. they share a common compiler setup)?
-The ep93xx is an arm920t. Are there any other mach-* types that use
-that?
+There is no prevention against endlessly looping, so it could cause a
+system lockup.
 
-Regards,
-Hartley
+The real answer is to fix SPI et.al. so that its possible to pass the
+_GPIO_ number into this driver (that's what the driver wants for its
+interrupt line after all).  To fix that, SPI folk need to get involved
+(added Grant as a first step.)
+
+In the meantime, I'd suggest making this depend on !ARM || BROKEN until
+it's probably fixed.
+
+> 
+> Signed-off-by: Mark Asselstine <mark.asselstine@windriver.com>
+> ---
+>  drivers/mfd/ezx-pcap.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
+> index 43a76c4..c49c52a 100644
+> --- a/drivers/mfd/ezx-pcap.c
+> +++ b/drivers/mfd/ezx-pcap.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/spi/spi.h>
+>  #include <linux/gpio.h>
+>  #include <linux/slab.h>
+> +#include <linux/gpio-pxa.h>
+>  
+>  #define PCAP_ADC_MAXQ		8
+>  struct pcap_adc_request {
+> @@ -202,7 +203,7 @@ static void pcap_isr_work(struct work_struct *work)
+>  		}
+>  		local_irq_enable();
+>  		ezx_pcap_write(pcap, PCAP_REG_MSR, pcap->msr);
+> -	} while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
+> +	} while (gpio_get_value(pxa_irq_to_gpio(pcap->spi->irq)));
+>  }
+>  
+>  static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
