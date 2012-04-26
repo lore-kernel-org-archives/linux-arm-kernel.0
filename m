@@ -1,49 +1,94 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Apr 2012 10:11:31 +0200
-Subject: imx sgtl5000:BUG: scheduling while atomic:
- speaker-test/1225/0x00000003
-In-Reply-To: <20377.289.954415.840587@ipc1.ka-ro>
-References: <20120426023319.GC28063@b20223-02.ap.freescale.net>
- <20120426051212.GF28063@b20223-02.ap.freescale.net>
- <20376.59099.336772.398425@ipc1.ka-ro>
- <20120426064430.GG28063@b20223-02.ap.freescale.net>
- <20376.63821.15844.738438@ipc1.ka-ro>
- <20120426073611.GA17184@pengutronix.de>
- <20377.289.954415.840587@ipc1.ka-ro>
-Message-ID: <20120426081131.GZ20478@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 26 Apr 2012 02:11:56 -0600 (MDT)
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FEB50@DBDE01.ent.ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204252335190.30642@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FE7EA@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204260025140.30642@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FEB50@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1204260140530.30642@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 10:02:41AM +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Sascha Hauer writes:
-> > On Thu, Apr 26, 2012 at 09:29:17AM +0200, Lothar Wa?mann wrote:
-> > > Hi,
+On Thu, 26 Apr 2012, Hiremath, Vaibhav wrote:
+
+> On Thu, Apr 26, 2012 at 12:06:00, Paul Walmsley wrote:
+> > On Thu, 26 Apr 2012, Hiremath, Vaibhav wrote:
+> > 
+> > > Unfortunately, this is fractional divider, assuming input clock of 24MHz.
 > > > 
-> > > > > -	init_completion(&sdmac->done);
-> > > > > +	unsigned long timeout = 500;
-> > > > I'm not sure. Did you test 500us is enough for loading firmware?
-> > > >
-> > > Channel 0 is not used for actual data transfer but for some internal
-> > > housekeeping. Thus the timeout is independent from the time required
-> > > for the actual data transfer.
-> > > I haven't seen any timeout even with the timeout set to 100us.
-> > > Usually it takes 3 to 4 us to complete.
+> > > 24MHz / 732.4219 = 32KHz (Normal OPP100)
+> > > 24MHz / 366.2109 = 32KHz (OPP50)
 > > 
-> > It *is* used to load the firmware. Have you tested your patch with
-> > actually loading a firmware?
+> > Yes, I already saw that in the TRM.  The question is, how is the 
+> > fractional divider implemented in the hardware?  Is it implemented as an 
+> > M,N counter?  It's rather unlikely to be dividing by 732.4219 directly -- 
+> > in fact that value isn't even accurate.
+> 
+> Not sure how it is implemented in HW, in any case we do not have control 
+> over it. The control is only provided using,
+> 	- MODULEMODE (module enable/disable)
+> 	- CONTROL_CLK32K_DIVRATIO_CTRL (divisor selection)
+
+Right, but the goal is to make the clock tree rate computation independent 
+of the assumptions of the OPP settings.
+
+So placing a fixed clock rate -- one that supposedly does not depend on a 
+parent rate -- in the middle of a clock tree is something we wish to 
+avoid, if possible.  It is a hack.  Especially considering that the 
+clock's input rate does appear to depend on its parent's rate.
+
+So, could you please double-check to find out if the appropriate 
+abstraction is as an M,N counter?  If the public forum is an issue, then 
+if you prefer, you can E-mail me privately with the results.
+
+> > > > - This clock is feeding downstream clocks, but it's using the MODULEMODE 
+> > > > control interface, as if it were a standalone IP block.  Do you know why 
+> > > > it's using the MODULEMODE control method rather than some optional clock 
+> > > > control bits, like OMAP4 does?
+> > > 
+> > > Yes, this clock is feeding to timers, gpio debounce clocks, etc...
+> > > Honestly, I do not know the answer to why part of it.
+> > > (May be another integration/design issue)
 > > 
-> I'm using it around 100 times a day (with a 100us timeout)...
+> > Could you please check with the AM335x PRCM designers about this to find 
+> > out what that MODULEMODE bit is actually doing (i.e., is it actually 
+> > enabling the clock, and if so, why did they not use the OPTFCLKEN bits) ?  
+> > The AM335x TRM has almost no documentation on what those MODULEMODE bits 
+> > are doing in this case.
+> 
+> I can check, I am certain that, the answer would be to consider this as a 
+> separate independent module.
 
-That should be enough ;)
+Yes, please check with the hardware team.  The questions would be:
 
-I am fine with the patch.
+- What does changing the CLKDIV32K_CLKCTRL.MODULEMODE bits do?
 
-Sascha
+- Is it necessary for the MODULEMODE bits to be set to 2 (ENABLE) to 
+generate a clock to the clock nodes downstream of CLKDIV32K, or does the 
+MODULEMODE just affect some other register access by the MPU?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+- Will setting the CLKDIV32K_CLKCTRL.MODULEMODE bits to 0 disable the 
+clock from being provided to downstream nodes of the CLKDIV32K, or does it 
+simply affect register access?
+
+- Is it necessary to follow the clockdomain enable sequence before 
+enabling the CLKDIV32K MODULEMODE?
+
+- What clockdomain does the CLKDIV32K module belong to?
+
+> And same as other modules, control is provided to the SW.
+
+The problem is that CLKDIV32K does not appear to be a distinct, leaf IP 
+block from a clocking perspective, unlike the other uses of the 
+*_CLKCTRL.MODULEMODE bits in the AM335x and OMAP4 clock trees.  So 
+something is very unusual here.
+
+If one of our core framework assumptions for OMAP4+ devices is incorrect, 
+it would be useful for us to know as soon as possible, to avoid churn and 
+broken code.
+
+
+- Paul
