@@ -1,96 +1,187 @@
-From: neilb@suse.de (NeilBrown)
-Date: Fri, 27 Apr 2012 06:50:40 +1000
-Subject: [PATCH 1/3] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC
- interrupts.
-In-Reply-To: <878vhi9qj8.fsf@ti.com>
-References: <20120425025637.7832.14013.stgit@notabene.brown>
- <20120425030524.7832.52047.stgit@notabene.brown>
- <878vhi9qj8.fsf@ti.com>
-Message-ID: <20120427065040.3ba0fce2@notabene.brown>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 27 Apr 2012 07:11:07 +1000
+Subject: [PATCH 04/17] ARM: ep93xx: use machine specific hook for late init
+In-Reply-To: <1335454725-13089-5-git-send-email-shawn.guo@linaro.org>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F99B9EB.6060806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Apr 2012 13:39:07 -0700 Kevin Hilman <khilman@ti.com> wrote:
+On 27/04/12 01:38, Shawn Guo wrote:
 
-> NeilBrown <neilb@suse.de> writes:
-> 
-> > All interrupts can wake-from-sleep (I think) so it should be
-> > permissible to call enable_irq_wake().  Setting this flag allows that.
-> >
-> > It is needed because without this, an interrupt which is delivered
-> > during late suspend will get ignored but will not cause suspend to
-> > abort.
-> > If enable_irq_wake() is called and succeeds, check_wakuep_irqs()
-> > will abort the suspend if the interrupt has fired.
-> >
-> > Signed-off-by: NeilBrown <neilb@suse.de>
-> 
-> The name of this flag and the effect of setting it are somewhat
-> confusing (e.g. why does skipping set_wake suddenly make wakeups work.)
-> So I tried to make it clearer with a reworking of the changelog (below.)
-> 
-> If I understood this correctly, and if you're OK with the updated
-> changelog, I'll queue this up for v3.5.
-> 
-
-I'm very OK with your updated changelog - thanks.  Filling in various bits
-that I didn't know and clarifies the rest :-)
-
-Thanks,
-NeilBrown
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
 
+Why do we want this? It increases the size of the code and changes
+a static function to a non-static one that now requires ifdefery
+to handle the !CONFIG_CRUNCH case. I don't see the value in this
+patch?
 
-> Thanks,
-> 
-> Kevin
-> 
-> >From 644742ddae59731bc10aacde94645d7c49ca5ecd Mon Sep 17 00:00:00 2001
-> From: NeilBrown <neilb@suse.de>
-> Date: Wed, 25 Apr 2012 13:05:24 +1000
-> Subject: [PATCH] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC interrupts.
-> 
-> Without an ->irq_set_wake() method in an irq_chip, calls to
-> enable_irq_wake() will fail.  This also causes these interrupts to not
-> be able to abort suspend (via check_wakeup_irqs() in late suspend.)
-> 
-> Currently, we don't implement ->irq_set_wake() for INTC interrupts
-> because they default to be wakeup enabled by setting the GRPSEL bits
-> in PM init.  Even though there is no ->irq_set_wake(), we want
-> enable_irq_wake() to succeed so these interrupts can abort suspend
-> when necessary.
-> 
-> To fix, set IRQCHIP_SKIP_SET_WAKE flag for all the INTC
-> interrupts which avoids trying to check irq_chip->irq_set_wake()
-> and failing when it doesn't exist.
-> 
-> Longer term, we need to implement ->irq_set_wake() for the INTC
-> which can manage the appropriate GRPSEL bits.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.de>
-> [khilman at ti.com: rework changelog]
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+~Ryan
+
 > ---
->  arch/arm/mach-omap2/irq.c |    1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/mach-ep93xx/adssphere.c             |    1 +
+>  arch/arm/mach-ep93xx/core.c                  |    5 +++++
+>  arch/arm/mach-ep93xx/crunch.c                |    4 +---
+>  arch/arm/mach-ep93xx/gesbc9312.c             |    1 +
+>  arch/arm/mach-ep93xx/include/mach/platform.h |    7 +++++++
+>  arch/arm/mach-ep93xx/micro9.c                |    4 ++++
+>  arch/arm/mach-ep93xx/simone.c                |    1 +
+>  arch/arm/mach-ep93xx/snappercl15.c           |    1 +
+>  arch/arm/mach-ep93xx/ts72xx.c                |    1 +
+>  arch/arm/mach-ep93xx/vision_ep9307.c         |    1 +
+>  10 files changed, 23 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-> index 65f0d257..b0790a9 100644
-> --- a/arch/arm/mach-omap2/irq.c
-> +++ b/arch/arm/mach-omap2/irq.c
-> @@ -148,6 +148,7 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
->  	ct->chip.irq_ack = omap_mask_ack_irq;
->  	ct->chip.irq_mask = irq_gc_mask_disable_reg;
->  	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
-> +	ct->chip.flags |= IRQCHIP_SKIP_SET_WAKE;
+> diff --git a/arch/arm/mach-ep93xx/adssphere.c b/arch/arm/mach-ep93xx/adssphere.c
+> index 2d45947..a472777 100644
+> --- a/arch/arm/mach-ep93xx/adssphere.c
+> +++ b/arch/arm/mach-ep93xx/adssphere.c
+> @@ -41,5 +41,6 @@ MACHINE_START(ADSSPHERE, "ADS Sphere board")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= adssphere_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 8d25895..365a90b 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -904,3 +904,8 @@ void ep93xx_restart(char mode, const char *cmd)
+>  	while (1)
+>  		;
+>  }
+> +
+> +void __init ep93xx_init_late(void)
+> +{
+> +	crunch_init();
+> +}
+> diff --git a/arch/arm/mach-ep93xx/crunch.c b/arch/arm/mach-ep93xx/crunch.c
+> index 74753e2..a4a2ab9 100644
+> --- a/arch/arm/mach-ep93xx/crunch.c
+> +++ b/arch/arm/mach-ep93xx/crunch.c
+> @@ -79,12 +79,10 @@ static struct notifier_block crunch_notifier_block = {
+>  	.notifier_call	= crunch_do,
+>  };
 >  
->  	ct->regs.ack = INTC_CONTROL;
->  	ct->regs.enable = INTC_MIR_CLEAR0;
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120427/0dd8042d/attachment.sig>
+> -static int __init crunch_init(void)
+> +int __init crunch_init(void)
+>  {
+>  	thread_register_notifier(&crunch_notifier_block);
+>  	elf_hwcap |= HWCAP_CRUNCH;
+>  
+>  	return 0;
+>  }
+> -
+> -late_initcall(crunch_init);
+> diff --git a/arch/arm/mach-ep93xx/gesbc9312.c b/arch/arm/mach-ep93xx/gesbc9312.c
+> index fcdffbe..437c341 100644
+> --- a/arch/arm/mach-ep93xx/gesbc9312.c
+> +++ b/arch/arm/mach-ep93xx/gesbc9312.c
+> @@ -41,5 +41,6 @@ MACHINE_START(GESBC9312, "Glomation GESBC-9312-sx")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= gesbc9312_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+> index 602bd87..1ecb040 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+> @@ -53,5 +53,12 @@ void ep93xx_init_devices(void);
+>  extern struct sys_timer ep93xx_timer;
+>  
+>  void ep93xx_restart(char, const char *);
+> +void ep93xx_init_late(void);
+> +
+> +#ifdef CONFIG_CRUNCH
+> +int crunch_init(void);
+> +#else
+> +static inline int crunch_init(void) { return 0; }
+> +#endif
+>  
+>  #endif
+> diff --git a/arch/arm/mach-ep93xx/micro9.c b/arch/arm/mach-ep93xx/micro9.c
+> index dc431c5..3d7cdab 100644
+> --- a/arch/arm/mach-ep93xx/micro9.c
+> +++ b/arch/arm/mach-ep93xx/micro9.c
+> @@ -85,6 +85,7 @@ MACHINE_START(MICRO9, "Contec Micro9-High")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= micro9_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+>  #endif
+> @@ -98,6 +99,7 @@ MACHINE_START(MICRO9M, "Contec Micro9-Mid")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= micro9_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+>  #endif
+> @@ -111,6 +113,7 @@ MACHINE_START(MICRO9L, "Contec Micro9-Lite")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= micro9_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+>  #endif
+> @@ -124,6 +127,7 @@ MACHINE_START(MICRO9S, "Contec Micro9-Slim")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= micro9_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+>  #endif
+> diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+> index f40c298..33dc079 100644
+> --- a/arch/arm/mach-ep93xx/simone.c
+> +++ b/arch/arm/mach-ep93xx/simone.c
+> @@ -86,5 +86,6 @@ MACHINE_START(SIM_ONE, "Simplemachines Sim.One Board")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= simone_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
+> index 0c00852..eb28237 100644
+> --- a/arch/arm/mach-ep93xx/snappercl15.c
+> +++ b/arch/arm/mach-ep93xx/snappercl15.c
+> @@ -183,5 +183,6 @@ MACHINE_START(SNAPPER_CL15, "Bluewater Systems Snapper CL15")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer 		= &ep93xx_timer,
+>  	.init_machine	= snappercl15_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+> index 5ea7909..d4ef339 100644
+> --- a/arch/arm/mach-ep93xx/ts72xx.c
+> +++ b/arch/arm/mach-ep93xx/ts72xx.c
+> @@ -252,5 +252,6 @@ MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= ts72xx_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+> index ba156eb..2905a49 100644
+> --- a/arch/arm/mach-ep93xx/vision_ep9307.c
+> +++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+> @@ -367,5 +367,6 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
+>  	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= vision_init_machine,
+> +	.init_late	= ep93xx_init_late,
+>  	.restart	= ep93xx_restart,
+>  MACHINE_END
