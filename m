@@ -1,91 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Apr 2012 21:19:28 -0600 (MDT)
-Subject: [PATCH-V3 2/3] ARM: OMAP3+: clockdomain33xx: Add clockdomain
- data and respective operations
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FD30E@DBDE01.ent.ti.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241725430.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD30E@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1204252118170.30642@utopia.booyaka.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 26 Apr 2012 08:52:49 +0530
+Subject: [PATCH 16/33] ARM: S3C24XX: mach-osiris: Use common macro to
+ define resources
+In-Reply-To: <4F982C12.1020103@mvista.com>
+References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
+ <1335327163-11794-17-git-send-email-tushar.behera@linaro.org>
+ <4F982C12.1020103@mvista.com>
+Message-ID: <4F98BF89.9070303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Apr 2012, Hiremath, Vaibhav wrote:
-
-> On Wed, Apr 25, 2012 at 05:52:26, Paul Walmsley wrote:
-> > A few questions while reviewing this patch:
-> > 
-> > On Tue, 3 Apr 2012, Vaibhav Hiremath wrote:
-> > 
-> > > AM33XX PRCM module consist of, various clockdomains, in all
-> > > total we have 18 clockdomains available, with following
-> > > controlling options,
-> > >    - NO Sleep: sleep transition can not be initiated,
-> > >    - SW Sleep: sw forced sleep transition,
-> > >    - SW Wakeup: sw forced wakeup transition,
-> > >    - HW Auto: transitions are based upon hw conditions.
-> > > 
-> > > This patch adds all available clockdomain data, respective
-> > > clockdomain operations for AM33XX family of device, and also
-> > > integrates it into existing OMAP framework.
-> > > 
-> > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> > > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > 
-> > ...
-> > 
-> > > +static struct clockdomain l4ls_am33xx_clkdm = {
-> > > +	.name		= "l4ls_clkdm",
-> > > +	.pwrdm		= { .name = "per_pwrdm" },
-> > > +	.cm_inst	= AM33XX_CM_PER_MOD,
-> > > +	.clkdm_offs	= AM33XX_CM_PER_L4LS_CLKSTCTRL_OFFSET,
-> > > +	.clktrctrl_mask	= AM33XX_CLKTRCTRL_MASK,
-> > > +	.flags		= (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
-> > 
-> > It looks to me like we don't need the .clktrctrl_mask field, since 
-> > according to the clockdomains code, the CLKTRCTRL field is at the same bit 
-> > shift for each clockdomain.
-> > 
+On 04/25/2012 10:23 PM, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Yeah, we actually don't need it, probably I added for completeness.
-> I will remove it in next version.
-
-I've removed them here.
-
-> > Also, since we're not defining any autodeps for the AM335x platform, we 
-> > shouldn't need the CLKDM_NO_AUTODEPS flag either?  Since no autodeps are 
-> > defined, the default will be to not set any autodeps.
-> > 
+> On 04/25/2012 08:12 AM, Tushar Behera wrote:
 > 
-> This is required to avoid few "pr_debug", if you don't provide it.
-> For example, without this flag set, you will get,
+>> CC: Ben Dooks<ben-linux@fluff.org>
+>> CC: Kukjin Kim<kgene.kim@samsung.com>
+>> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+>> ---
+>>   arch/arm/mach-s3c24xx/mach-osiris.c |   12 ++----------
+>>   1 files changed, 2 insertions(+), 10 deletions(-)
 > 
-> pr_debug("clockdomain: hardware cannot set/clear sleep "
-> 		"dependency affecting %s from %s\n", clkdm1->name,
->              clkdm2->name);
+>> diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c
+>> b/arch/arm/mach-s3c24xx/mach-osiris.c
+>> index c5daeb6..95d0772 100644
+>> --- a/arch/arm/mach-s3c24xx/mach-osiris.c
+>> +++ b/arch/arm/mach-s3c24xx/mach-osiris.c
+>> @@ -244,16 +244,8 @@ static struct s3c2410_platform_nand __initdata
+>> osiris_nand_info = {
+>>   /* PCMCIA control and configuration */
+>>
+>>   static struct resource osiris_pcmcia_resource[] = {
+>> -    [0] = {
+>> -        .start    = 0x0f000000,
+>> -        .end    = 0x0f100000,
+>> -        .flags    = IORESOURCE_MEM,
+>> -    },
+>> -    [1] = {
+>> -        .start    = 0x0c000000,
+>> -        .end    = 0x0c100000,
+>> -        .flags    = IORESOURCE_MEM,
+>> -    }
+>> +    [0] = DEFINE_RES_MEM(0x0f000000, SZ_1M),
+>> +    [1] = DEFINE_RES_MEM(0x0c000000, SZ_1M),
 > 
-> Refer to the file omap_hwmod.c, function, _enable(), the call sequence is,
+>    You seem to be fixing the mistake in the original code where - 1 was
+> missing in the '.end' initializers...
 > 
-> _enable() => _add_initiator_dep() => clkdm_add_sleepdep() =>leads to warning
+I am not sure if the original author intended to have it SZ_1M byte wide
+or (SZ_1M+1) byte wide. Since the later case seemed highly unlikely, I
+went ahead with SZ_1M.
 
-Seems like the better thing to do is to just avoid calling
-_{add,del}_initiator_dep() on the AM335x.
+Although, I should have mentioned this in the commit log. :(
 
-> > Another question is about the CLKTRCTRL bitfields.  According to
-> > _AM335x ARM Cortex-A8 Microprocessors (MPUs) Technical Reference
-> > Manual_ Rev. D (SPRUH73D), most of the clockdomains support NO_SLEEP mode 
-> > (i.e., CLKTRCTRL = 0x0).  That means that technically, we should also set 
-> > the CLKDM_CAN_DISABLE_AUTO flag.  Unless the documentation is incorrect 
-> > here?  In another section (Table 8-9 "Clock Transition Mode Settings"), 
-> > it claims that CLKTRCTRL = 0 is not supported...
-> > 
-> 
-> It is not supported, and should be considered as documentation issue.
-
-Okay so I guess the description for this patch (quoted above) is wrong 
-then also?
+> WBR, Sergei
 
 
-- Paul
+-- 
+Tushar Behera
