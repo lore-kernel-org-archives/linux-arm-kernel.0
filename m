@@ -1,37 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Apr 2012 22:59:03 +0100
-Subject: [PATCHv3 1/4] ARM: tegra: Add AHB driver
-In-Reply-To: <4F99A740.3080407@wwwdotorg.org>
-References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
- <4F99A740.3080407@wwwdotorg.org>
-Message-ID: <20120426215903.GH24211@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 26 Apr 2012 23:04:38 +0100
+Subject: [PATCH] ARM:mfd: fix ezx-pcap build failure
+In-Reply-To: <20120426215258.GG24211@n2100.arm.linux.org.uk>
+References: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
+ <20120426215258.GG24211@n2100.arm.linux.org.uk>
+Message-ID: <20120426220437.GC9415@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 01:51:28PM -0600, Stephen Warren wrote:
-> On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
-> > The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> > High-performance Bus (AHB) architecture.
-> > 
-> > The AHB Arbiter controls AHB bus master arbitration. This effectively
-> > forms a second level of arbitration for access to the memory
-> > controller through the AHB Slave Memory device. The AHB pre-fetch
-> > logic can be configured to enhance performance for devices doing
-> > sequential access. Each AHB master is assigned to either the high or
-> > low priority bin. Both Tegra20/30 have this AHB bus.
-> > 
-> > Some of configuration param could be passed from DT too.
-> 
-> I think this code looks reasonable. I'd like to see an ack from Russell,
-> Arnd, and Olof on the final location of the files though.
+On Thu, Apr 26, 2012 at 10:52:58PM +0100, Russell King - ARM Linux wrote:
 
-Well, the big question which needs answering is whether this AHB software
-interface is something specific to Tegra or whether it really is something
-generic.  There's been some hints in the previous thread that it's
-specific to Tegra, so it may not after all make sense for it to be a
-generic driver.
+> The real answer is to fix SPI et.al. so that its possible to pass the
+> _GPIO_ number into this driver (that's what the driver wants for its
+> interrupt line after all).  To fix that, SPI folk need to get involved
+> (added Grant as a first step.)
 
-However, we _have_ decided "no more drivers under arch/arm".  So I really
-don't want to see "struct xxx_driver" appearing in any code under that
-subdirectory or one of its decendents.  I don't have much more to say
-about location than that.
+Or, in the short term, add platform data to pass in a GPIO and ignore
+any IRQ that might get passed in.
