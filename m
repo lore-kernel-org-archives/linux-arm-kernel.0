@@ -1,41 +1,58 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 26 Apr 2012 10:33:21 +0800
-Subject: imx sgtl5000:BUG: scheduling while atomic:
- speaker-test/1225/0x00000003
-Message-ID: <20120426023319.GC28063@b20223-02.ap.freescale.net>
+Date: Thu, 26 Apr 2012 10:48:38 +0800
+Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
+ framework
+In-Reply-To: <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120426024837.GD28063@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[   13.901890] eth0: no IPv6 routers present
-[   70.295079] BUG: scheduling while atomic: speaker-test/1225/0x00000003
-[   70.304293] Modules linked in:
-[   70.310389] [<c0015a68>] (unwind_backtrace+0x0/0xec) from [<c0585810>] (dump_stack+0x20/0x24)
-[   70.310421] [<c0585810>] (dump_stack+0x20/0x24) from [<c0585f6c>] (__schedule_bug+0x54/0x60)
-[   70.310452] [<c0585f6c>] (__schedule_bug+0x54/0x60) from [<c058db64>] (__schedule+0x84/0x748)
-[   70.310476] [<c058db64>] (__schedule+0x84/0x748) from [<c058e310>] (schedule+0x8c/0x90)
-[   70.310500] [<c058e310>] (schedule+0x8c/0x90) from [<c058c504>] (schedule_timeout+0x2fc/0x35c)
-[   70.310541] [<c058c504>] (schedule_timeout+0x2fc/0x35c) from [<c058d970>] (wait_for_common+0xd8/0x16c)
-[   70.310567] [<c058d970>] (wait_for_common+0xd8/0x16c) from [<c058da44>] (wait_for_completion_timeout+0x1c/0x20)
-[   70.310604] [<c058da44>] (wait_for_completion_timeout+0x1c/0x20) from [<c03352bc>] (sdma_run_channel+0x70/0x8c)
-[   70.310634] [<c03352bc>] (sdma_run_channel+0x70/0x8c) from [<c0335614>] (sdma_load_context+0x188/0x19c)
-[   70.310661] [<c0335614>] (sdma_load_context+0x188/0x19c) from [<c0335688>] (sdma_prep_dma_cyclic+0x60/0x1a8)
-[   70.310694] [<c0335688>] (sdma_prep_dma_cyclic+0x60/0x1a8) from [<c04760f4>] (snd_dmaengine_pcm_trigger+0xa0/0x134)
-[   70.310729] [<c04760f4>] (snd_dmaengine_pcm_trigger+0xa0/0x134) from [<c0483e68>] (soc_pcm_trigger+0x74/0xb0)
-[   70.310770] [<c0483e68>] (soc_pcm_trigger+0x74/0xb0) from [<c046e670>] (snd_pcm_do_start+0x34/0x40)
-[   70.310797] [<c046e670>] (snd_pcm_do_start+0x34/0x40) from [<c046e288>] (snd_pcm_action_single+0x48/0x74)
-[   70.310823] [<c046e288>] (snd_pcm_action_single+0x48/0x74) from [<c046e334>] (snd_pcm_action+0x80/0x8c)
-[   70.310850] [<c046e334>] (snd_pcm_action+0x80/0x8c) from [<c04707f0>] (snd_pcm_start+0x24/0x2c)
-[   70.310877] [<c04707f0>] (snd_pcm_start+0x24/0x2c) from [<c0474058>] (snd_pcm_lib_write1+0x2a8/0x340)
-[   70.310900] [<c0474058>] (snd_pcm_lib_write1+0x2a8/0x340) from [<c04741d0>] (snd_pcm_lib_write+0x70/0x7c)
-[   70.311007] [<c04741d0>] (snd_pcm_lib_write+0x70/0x7c) from [<c04703f8>] (snd_pcm_playback_ioctl1+0x114/0x428)
-[   70.311038] [<c04703f8>] (snd_pcm_playback_ioctl1+0x114/0x428) from [<c0470744>] (snd_pcm_playback_ioctl+0x38/0x44)
-[   70.311077] [<c0470744>] (snd_pcm_playback_ioctl+0x38/0x44) from [<c0107234>] (do_vfs_ioctl+0x4f4/0x568)
-[   70.311105] [<c0107234>] (do_vfs_ioctl+0x4f4/0x568) from [<c0107308>] (sys_ioctl+0x60/0x84)
-[   70.311138] [<c0107308>] (sys_ioctl+0x60/0x84) from [<c000df40>] (ret_fast_syscall+0x0/0x30)
-[   80.301928] ALSA sound/core/pcm_lib.c:1853 playback write error (DMA or IRQ trouble?)
+The below code is removed from mx6q_clocks_init implicitly.
+Why? If it's reasonable, it needs to be on a separate patch too.
 
+/* only keep necessary clocks on */
+writel_relaxed(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,  CCGR0);
+writel_relaxed(0x3 << CG8  | 0x3 << CG9  | 0x3 << CG10, CCGR2);
+writel_relaxed(0x3 << CG10 | 0x3 << CG12,               CCGR3);
+writel_relaxed(0x3 << CG4  | 0x3 << CG6  | 0x3 << CG7,  CCGR4);
+writel_relaxed(0x3 << CG0,                              CCGR5);
+writel_relaxed(0,                                       CCGR6);
+writel_relaxed(0,                                       CCGR7);
 
-kernel: 3.4rc3 with ASoC/for-next and some my patches.
+clk_enable(&uart_clk);
+clk_enable(&mmdc_ch0_axi_clk);
+
+clk_set_rate(&pll4_audio, FREQ_650M);
+clk_set_rate(&pll5_video, FREQ_650M);
+clk_set_parent(&ipu1_di0_clk, &ipu1_di0_pre_clk);
+clk_set_parent(&ipu1_di0_pre_clk, &pll5_video);
+clk_set_parent(&gpu3d_shader_clk, &pll2_pfd_594m);
+clk_set_rate(&gpu3d_shader_clk, FREQ_594M);
+clk_set_parent(&gpu3d_core_clk, &mmdc_ch0_axi_clk);
+clk_set_rate(&gpu3d_core_clk, FREQ_528M);
+clk_set_parent(&asrc_serial_clk, &pll3_usb_otg);
+clk_set_rate(&asrc_serial_clk, 1500000);
+clk_set_rate(&enfc_clk, 11000000);
+
+/*
+ * Before pinctrl API is available, we have to rely on the pad
+ * configuration set up by bootloader.  For usdhc example here,
+ * u-boot sets up the pads for 49.5 MHz case, and we have to lower
+ * the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
+ *
+ * FIXME: This is should be removed after pinctrl API is available.
+ * At that time, usdhc driver can call pinctrl API to change pad
+ * configuration dynamically per different usdhc clock settings.
+ */
+clk_set_rate(&usdhc1_clk, 49500000);
+clk_set_rate(&usdhc2_clk, 49500000);
+clk_set_rate(&usdhc3_clk, 49500000);
+clk_set_rate(&usdhc4_clk, 49500000);
+
+clk_set_parent(&cko1_clk, &ahb_clk);
+
 
 Thanks
 Richard
