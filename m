@@ -1,47 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Apr 2012 10:44:00 +0100
-Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case
- that l2x0 is enabled before init
-In-Reply-To: <4F99148B.4020900@marvell.com>
-References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
- <20120424082810.GA9367@arm.com> <4F98D659.4030709@marvell.com>
- <20120426083554.GB18136@arm.com> <4F99148B.4020900@marvell.com>
-Message-ID: <20120426094400.GD18136@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 26 Apr 2012 10:49:02 +0100
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <20120426083924.GE17184@pengutronix.de>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+ <20120426083924.GE17184@pengutronix.de>
+Message-ID: <20120426094901.GE3207@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 10:25:31AM +0100, Yilu Mao wrote:
-> On 04/26/2012 04:35 PM, Catalin Marinas wrote:
-> > On Thu, Apr 26, 2012 at 06:00:09AM +0100, Yilu Mao wrote:
-> >> On 04/24/2012 04:28 PM, Catalin Marinas wrote:
-> >>> On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
-> >>>> +	l2x0_saved_regs.aux_ctrl = aux;
-> >>>> +
-> >>>>    	aux&= aux_mask;
-> >>>>    	aux |= aux_val;
-> >>>
-> >>> I think that's the wrong place to save it, it should be after the
-> >>> masking was done.
-> >>>
-> >>> Anyway, if we cannot write this register in l2x0_init() because the L2
-> >>> was enabled, do we expect the L2 to be disabled during resume?
-> >>>
-> >> Sorry, I don't think so.
-> >> This is the right place to save it because we must make sure the saved
-> >> aux_ctrl is the same as what it is set.
-> >> If we save it after masking was done, the saved value will be different
-> >> because we can't actually change the real setting.
-> >
-> > And since we can't actually change the real setting on the resume path,
-> > why do we need to save it anyway. Is your L2 cache disabled on the
-> > resume path but not on the cold boot one?
->
-> We can't change L2 aux ctrl setting when do init because it has been 
-> enabled.
+On Thu, Apr 26, 2012 at 10:39:24AM +0200, Sascha Hauer wrote:
 
-This is normally for the case where the kernel running in non-secure
-mode is not allowed to write the L2 aux ctrl register. Does this
-permission change with core idle?
+> Can we please stop messing with the function prototypes? So you prefer
+> passing a struct to clk_register which is fine and yes, it may have
+> advantages. But do we really need to change the prototype? Why can't we
+> just add a new function?
 
--- 
-Catalin
+> I am generally open to do these changes, but we have come to the point
+> where people actually want to *use* the clock framework instead of
+> rebasing their stuff onto the latest patches.
+
+Or at least wait until we've got somewhere with applying drivers so that
+whoever is changing the APIs is responsible for updating at least the
+in-tree drivers.  This would minimise the pain for people who've been
+sitting waiting to get their stuff in which seems helpful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120426/17d8c96e/attachment.sig>
