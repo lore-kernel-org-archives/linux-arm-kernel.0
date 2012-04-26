@@ -1,37 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Apr 2012 09:35:54 +0100
-Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case
- that l2x0 is enabled before init
-In-Reply-To: <4F98D659.4030709@marvell.com>
-References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
- <20120424082810.GA9367@arm.com> <4F98D659.4030709@marvell.com>
-Message-ID: <20120426083554.GB18136@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Apr 2012 10:39:24 +0200
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <20120426083924.GE17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 06:00:09AM +0100, Yilu Mao wrote:
-> On 04/24/2012 04:28 PM, Catalin Marinas wrote:
-> > On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
-> >> +	l2x0_saved_regs.aux_ctrl = aux;
-> >> +
-> >>   	aux&= aux_mask;
-> >>   	aux |= aux_val;
-> >
-> > I think that's the wrong place to save it, it should be after the
-> > masking was done.
-> >
-> > Anyway, if we cannot write this register in l2x0_init() because the L2
-> > was enabled, do we expect the L2 to be disabled during resume?
-> >
-> Sorry, I don't think so.
-> This is the right place to save it because we must make sure the saved 
-> aux_ctrl is the same as what it is set.
-> If we save it after masking was done, the saved value will be different 
-> because we can't actually change the real setting.
+On Wed, Apr 25, 2012 at 10:58:56PM -0700, Saravana Kannan wrote:
+> Create a struct clk_init_data to hold all data that needs to be passed from
+> the platfrom specific driver to the common clock framework during clock
+> registration. Add a pointer to this struct inside clk_hw.
+> 
+> This has several advantages:
+> * Completely hides struct clk from many clock platform drivers and static
+>   clock initialization code that don't care for static initialization of
+>   the struct clks.
+> * For platforms that want to do complete static initialization, it removed
+>   the need to directly mess with the struct clk's fields while still
+>   allowing to statically allocate struct clk. This keeps the code more
+>   future proof even if they include clk-private.h.
+> * Simplifies the generic clk_register() function and allows adding optional
+>   fields in the future without modifying the function signature.
+> * Simplifies the static initialization of clocks on all platforms by
+>   removing the need for forward delcarations or convoluted macros.
 
-And since we can't actually change the real setting on the resume path,
-why do we need to save it anyway. Is your L2 cache disabled on the
-resume path but not on the cold boot one?
+Can we please stop messing with the function prototypes? So you prefer
+passing a struct to clk_register which is fine and yes, it may have
+advantages. But do we really need to change the prototype? Why can't we
+just add a new function?
+
+I am generally open to do these changes, but we have come to the point
+where people actually want to *use* the clock framework instead of
+rebasing their stuff onto the latest patches.
+
+Sascha
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
