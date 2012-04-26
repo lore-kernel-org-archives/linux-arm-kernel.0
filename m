@@ -1,43 +1,43 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 26 Apr 2012 16:40:19 +0000
-Subject: [PATCH-V5 3/3] ARM: OMAP: Make OMAP clocksource source
- selection using kernel param
-In-Reply-To: <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
-References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
- <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FF819@DBDE01.ent.ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 26 Apr 2012 23:04:02 +0530
+Subject: [PATCH] arm: davinci: pdctl next bit position incorrect
+In-Reply-To: <4F917C12.8080306@mvista.com>
+References: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
+ <4F8F22D1.8080309@ti.com> <4F8FECD6.6050105@mvista.com>
+ <4F9042CA.7050305@ti.com> <4F917C12.8080306@mvista.com>
+Message-ID: <4F99870A.6080201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 20:40:34, Paul Walmsley wrote:
-> Hi
-> 
-> a question
-> 
-> On Wed, 25 Apr 2012, Vaibhav Hiremath wrote:
-> 
-<snip>
-> > +
-> > +	sync32k_ick = clk_get(NULL, "omap_32ksync_ick");
-> > +	if (!IS_ERR(sync32k_ick))
-> > +		clk_enable(sync32k_ick);
-> 
-> You've added hwmod data for this IP block, which is good.  This will 
-> presumably cause the IP block to be idled on boot.  But you haven't 
-> converted this code to use either the hwmod enable code -- just using 
-> clk_get() isn't enough.  (Better would be to use a driver and the PM 
-> runtime functions, of course, but maybe this runs too early?)
-> 
-> If the 32k sync timer is in OCP force-idle, then that might produce the 
-> hangs you're seeing.
-> 
+Hi Sergei,
 
-I tried disabling all idle related flags in hwmod entry but no change in 
-observation, kernel still hangs.
+On 4/20/2012 8:39 PM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 04/19/2012 08:52 PM, Sekhar Nori wrote:
+> 
+>>>>> The PDCTL NEXT bit is incorrectly set to bit 1 instead of bit 0. This
+>>>>> patch fixes this issue
+> 
+>>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+> 
+>>>> Applying this for v3.5.
+> 
+>>>     But why not to 3.4? It concerns turning on DSP domain on DM644x.
+> 
+>> Yes, but I think as you noted sometime before, no one is really
+>> depending on kernel to turn on DSP domain on DM644x.
+> 
+>    Looks like you're right (though I don't remember noting it :-).
+> 
+>> Its probably being
+>> done from U-Boot or ROM code. This is not a v3.4 regression either.
+> 
+>    U-Boot does it only when DSPLINK support is not desired.
 
-I even conformed the register content by connecting debugger, and it is set 
-to No-idle state.
+Okay. Since DSPLink existed long before this code to turn on domain was
+introduced by Murali, it must be having its own private code to do this.
+So, looks like this should not really be a regression for anyone.
 
 Thanks,
-Vaibhav
+Sekhar
