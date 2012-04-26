@@ -1,58 +1,37 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Thu, 26 Apr 2012 16:35:40 +0900
-Subject: [PATCH 0/4] memcpy optimized with strd/ldrd
-In-Reply-To: <alpine.LFD.2.02.1204031047430.24151@xanadu.home>
-References: <03e101cd0e07$eec39f10$cc4add30$@com>
- <030501cd0e6a$03642770$0a2c7650$%kim@samsung.com>
- <alpine.LFD.2.02.1203300914510.24151@xanadu.home>
- <008f01cd1170$cbee3dd0$63cab970$%kim@samsung.com>
- <alpine.LFD.2.02.1204031047430.24151@xanadu.home>
-Message-ID: <016a01cd237f$2e2ecc10$8a8c6430$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Apr 2012 09:36:11 +0200
+Subject: imx sgtl5000:BUG: scheduling while atomic:
+ speaker-test/1225/0x00000003
+In-Reply-To: <20376.63821.15844.738438@ipc1.ka-ro>
+References: <20120426023319.GC28063@b20223-02.ap.freescale.net>
+ <20120426051212.GF28063@b20223-02.ap.freescale.net>
+ <20376.59099.336772.398425@ipc1.ka-ro>
+ <20120426064430.GG28063@b20223-02.ap.freescale.net>
+ <20376.63821.15844.738438@ipc1.ka-ro>
+Message-ID: <20120426073611.GA17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> Sent: Tuesday, April 03, 2012 11:49 PM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 0/4] memcpy optimized with strd/ldrd
->
-> On Tue, 3 Apr 2012, Boojin Kim wrote:
->
-> > Nicolas Pitre wrote:
+On Thu, Apr 26, 2012 at 09:29:17AM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> > > -	init_completion(&sdmac->done);
+> > > +	unsigned long timeout = 500;
+> > I'm not sure. Did you test 500us is enough for loading firmware?
 > >
-> > > > >
-> > > > > Here's my version.  Lightly tested.
-> > > > > I have no A15 hardware to run any performance comparison though.
-> > > > >
-> > > > I'm reviewing and testing your patch. But, My other work disturbs to reviewing it.
-> > > > I will give you feedback soon within this week.
-> > > > Wait a little more.
-> > > > And, Thanks for your patches. :)
-> > >
-> > > FYI, it occurred to me that some corner cases might not be quite right
-> > > with regards to alignment for the STRD instruction.  It seems that the
-> > > hardware on which I tested it (Marvell Dove CPU) apparently copes with
-> > > misaligned SDRD's when they're still 32-bit aligned.  So I need to run
-> > > this code through a real validation harness on different hardware.
-> >
-> > It's sad, but the performance result wasn't better after adapting your patch.
-> > I think something on 1~3 patch brings performance degreasing.
->
-> If you could identify which patch is responsible that would be helpful.
-Sorry for late response. I'm so busy these days. Y_Y
-I checked your patches. And, the 1st patch makes performance drop.
-Transmit time for 4KB memcpy is 489ns. After applying 1st patch, the transmit time is 578ns.
-Performance also drops on memcpy of other small size about 10%.
-I wish this is helpful for you.
-Thanks,
->
-> Thanks.
->
->
-> Nicolas
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Channel 0 is not used for actual data transfer but for some internal
+> housekeeping. Thus the timeout is independent from the time required
+> for the actual data transfer.
+> I haven't seen any timeout even with the timeout set to 100us.
+> Usually it takes 3 to 4 us to complete.
+
+It *is* used to load the firmware. Have you tested your patch with
+actually loading a firmware?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
