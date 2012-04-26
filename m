@@ -1,58 +1,179 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 26 Apr 2012 12:47:34 -0700
-Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <87aa1ybaxf.fsf@ti.com>
-References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
- <1335260749-25877-4-git-send-email-hvaibhav@ti.com> <87aa1ybaxf.fsf@ti.com>
-Message-ID: <4F99A656.9030800@ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 26 Apr 2012 21:51:00 +0200
+Subject: [PATCH RESEND v7] gpio: Device tree support for LPC32xx
+Message-ID: <1335469860-3337-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 11:33 AM, Kevin Hilman wrote:
-> Vaibhav Hiremath<hvaibhav@ti.com>  writes:
->
->> Current OMAP code supports couple of clocksource options based
->> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
->> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
->
-> [...]
->
->> +
->> +	sync32k_ick = clk_get(NULL, "omap_32ksync_ick");
->> +	if (!IS_ERR(sync32k_ick))
->> +		clk_enable(sync32k_ick);
->> +
->> +	sync32k_cnt_reg = base + OMAP2_32KSYNCNT_CR_OFF;
->> +
->> +	/*
->> +	 * 120000 rough estimate from the calculations in
->> +	 * __clocksource_updatefreq_scale.
->> +	 */
->> +	clocks_calc_mult_shift(&persistent_mult,&persistent_shift,
->> +			32768, NSEC_PER_SEC, 120000);
->> +
->> +	ret = clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
->> +				clocksource_mmio_readl_up);
->
-> After discussing this a bit with Vaibhav offline, we found that 'base'
-> here should be sync32k_cnt_reg.
+This patch adds device tree support for gpio-lpc32xx.c
 
-Sorry, this was confusing.  To be more specific, s/base/sync32k_cnt_reg/ 
-in the clocksource_mmio_init line
-above.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Kevin
+---
 
-> Can you guys that were seeing the hang confirm that that fixes the
-> issue?
->
-> If so, please reply with your Tested-by.
->
-> Thanks,
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Applies to v3.4-rc4
+
+Changes since last version:
+* Split up lpc32xx_gpio_probe() for readability
+
+Thanks to Jean-Christophe PLAGNIOL-VILLARD for reviewing!
+ 
+ Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   65 ++++++++++++++++
+ arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +-
+ drivers/gpio/gpio-lpc32xx.c                             |   56 +++++++++++++
+ 3 files changed, 127 insertions(+), 3 deletions(-)
+
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+@@ -0,0 +1,65 @@
++NXP LPC32xx SoC GPIO controller
++
++Required properties:
++- compatible: must be "nxp,lpc3220-gpio"
++- reg: Physical base address and length of the controller's registers.
++- #address-cells: Always 1, for indexing of the subnodes (GPIO groups of the
++  SoC)
++- #size-cells: Always 0
++
++Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
++- gpio-controller: Marks the device node as a GPIO controller.
++- #gpio-cells: Should be two. The first cell is the pin number and the
++  second cell is used to specify optional parameters:
++  - bit 0 specifies polarity (0 for normal, 1 for inverted)
++- reg: Index of the GPIO group
++
++Optional properties of sub-nodes which describe the GPIO groups of LPC32xx:
++- status: Set to "disabled" if you don't use the respective GPIO group
++  of the LPC32xx SoC
++
++Example:
++
++	gpio: gpio at 40028000 {
++		compatible = "nxp,lpc3220-gpio";
++		reg = <0x40028000 0x1000>;
++		/* create a private address space for enumeration */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		gpio_p0: gpio-bank at 0 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <0>;
++		};
++
++		gpio_p1: gpio-bank at 1 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <1>;
++		};
++
++		gpio_p2: gpio-bank at 2 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <2>;
++		};
++
++		gpio_p3: gpio-bank at 3 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <3>;
++		};
++
++		gpi_p3: gpio-bank at 4 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <4>;
++		};
++
++		gpo_p3: gpio-bank at 5 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <5>;
++		};
++	};
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
++++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
+@@ -1 +1,8 @@
+-/* empty */
++#ifndef __MACH_GPIO_H
++#define __MACH_GPIO_H
++
++#include "gpio-lpc32xx.h"
++
++#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
++
++#endif /* __MACH_GPIO_H */
+--- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
++++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+@@ -21,6 +21,9 @@
+ #include <linux/io.h>
+ #include <linux/errno.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+@@ -454,10 +457,59 @@ static struct lpc32xx_gpio_chip lpc32xx_
+ 	},
+ };
+ 
++/* Empty now, can be removed later when mach-lpc32xx is finally switched over
++ * to DT support
++ */
+ void __init lpc32xx_gpio_init(void)
+ {
++}
++
++static void __devinit lpc32xx_gpiochip_add_dt(struct device_node *node)
++{
++	if (of_device_is_available(node)) {
++		u32 index;
++		struct gpio_chip *chip;
++
++		if (of_property_read_u32(node, "reg", &index) < 0)
++			return;
++		if (index >= ARRAY_SIZE(lpc32xx_gpiochip))
++			return;
++		chip = &lpc32xx_gpiochip[index].chip;
++		chip->of_node = of_node_get(node);
++		gpiochip_add(chip);
++	}
++}
++
++static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
++{
++	struct device_node *node;
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
+-		gpiochip_add(&lpc32xx_gpiochip[i].chip);
++	if (pdev->dev.of_node) {
++		for_each_child_of_node(pdev->dev.of_node, node)
++			lpc32xx_gpiochip_add_dt(node);
++	} else {
++		for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
++			gpiochip_add(&lpc32xx_gpiochip[i].chip);
++	}
++
++	return 0;
+ }
++
++#ifdef CONFIG_OF
++static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
++	{ .compatible = "nxp,lpc3220-gpio", },
++	{ },
++};
++#endif
++
++static struct platform_driver lpc32xx_gpio_driver = {
++	.driver		= {
++		.name	= "lpc32xx-gpio",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(lpc32xx_gpio_of_match),
++	},
++	.probe		= lpc32xx_gpio_probe,
++};
++
++module_platform_driver(lpc32xx_gpio_driver);
