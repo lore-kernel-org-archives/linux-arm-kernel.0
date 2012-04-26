@@ -1,48 +1,45 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 26 Apr 2012 11:16:55 +0100
-Subject: [PATCH 1/8] ARM: PCI: remove unused sys->hw
+Date: Thu, 26 Apr 2012 11:17:16 +0100
+Subject: [PATCH 2/8] ARM: PCI: footbridge: provide a 'no swizzle' function
+ for CATS
 In-Reply-To: <20120426101626.GE24211@n2100.arm.linux.org.uk>
 References: <20120426101626.GE24211@n2100.arm.linux.org.uk>
-Message-ID: <E1SNLkt-00080g-R0@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1SNLlE-00080m-0Q@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms mark their hw_pci structure as __initdata, which means
-it will be discarded after init time.  Storing pointers to __initdata
-in long lived data structures is a potential source of problems, and
-in this case, sys->hw is unused apart from its initialization.
-
-So, lets remove this member and its initializer.
+CATS sets its swizzle function to zero, which at the moment means
+that no swizzling is required.  Make this explicit for CATS.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/mach/pci.h |    1 -
- arch/arm/kernel/bios32.c        |    1 -
- 2 files changed, 0 insertions(+), 2 deletions(-)
+ arch/arm/mach-footbridge/cats-pci.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index d943b7d..0fc8548 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -45,7 +45,6 @@ struct pci_sys_data {
- 	u8		(*swizzle)(struct pci_dev *, u8 *);
- 					/* IRQ mapping				*/
- 	int		(*map_irq)(const struct pci_dev *, u8, u8);
--	struct hw_pci	*hw;
- 	void		*private_data;	/* platform controller private data	*/
- };
+diff --git a/arch/arm/mach-footbridge/cats-pci.c b/arch/arm/mach-footbridge/cats-pci.c
+index 32321f6..dc13c87 100644
+--- a/arch/arm/mach-footbridge/cats-pci.c
++++ b/arch/arm/mach-footbridge/cats-pci.c
+@@ -16,6 +16,11 @@
+ /* cats host-specific stuff */
+ static int irqmap_cats[] __initdata = { IRQ_PCI, IRQ_IN0, IRQ_IN1, IRQ_IN3 };
  
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index ede5f77..e17dd25 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -424,7 +424,6 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
- #ifdef CONFIG_PCI_DOMAINS
- 		sys->domain  = hw->domain;
- #endif
--		sys->hw      = hw;
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
++static u8 cats_no_swizzle(struct pci_dev *dev, u8 *pin)
++{
++	return 0;
++}
++
+ static int __init cats_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ {
+ 	if (dev->irq >= 255)
+@@ -39,7 +44,7 @@ static int __init cats_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+  * cards being used (ie, pci-pci bridge based cards)?
+  */
+ static struct hw_pci cats_pci __initdata = {
+-	.swizzle		= NULL,
++	.swizzle		= cats_no_swizzle,
+ 	.map_irq		= cats_map_irq,
+ 	.nr_controllers		= 1,
+ 	.setup			= dc21285_setup,
 -- 
 1.7.4.4
