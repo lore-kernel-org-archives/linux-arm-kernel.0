@@ -1,51 +1,89 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Apr 2012 11:52:51 -0600
-Subject: [PATCH 4/4] ARM: tegra: update defconfig
-In-Reply-To: <1335462771-21791-1-git-send-email-swarren@wwwdotorg.org>
-References: <1335462771-21791-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1335462771-21791-4-git-send-email-swarren@wwwdotorg.org>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 26 Apr 2012 23:35:35 +0530
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+Message-ID: <1335463535-5454-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+From: J Keerthy <j-keerthy@ti.com>
 
-Enable support for sensors on Seaboard:
-* INPUT_MPU3050
-* BATTERY_SBS
+AVS(Adaptive Voltage Scaling) is a power management technique which
+controls the operating voltage of a device in order to optimize (i.e. reduce)
+its power consumption. The voltage is adapted depending on static factors
+(chip manufacturing process) and dynamic factors (temperature
+depending performance).
+The TI AVS solution is named Smartreflex. 
 
-and options they depend on:
-* INPUT_MISC=y
-* POWER_SUPPLY=y
+To that end, create the AVS driver in drivers/power/avs and
+move the OMAP SmartReflex code to the new directory. The
+class driver is still retained in the mach-omap2 directory.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-(This will be squashed into the existing defconfig update patch in Tegra's
-for-next branch)
----
- arch/arm/configs/tegra_defconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+In preparation to the move of the OMAP code the following changes have been
+made:
+- fill in platform data from the device initialization code and pass
+ it to the driver,
+- create CONFIG_AVS* config options accordingly.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 99c3e66..310fe81 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -92,6 +92,8 @@ CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_WLAN is not set
- CONFIG_INPUT_EVDEV=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_MPU3050=y
- # CONFIG_VT is not set
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
-@@ -104,6 +106,8 @@ CONFIG_I2C=y
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
- CONFIG_SPI_TEGRA=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_BATTERY_SBS=y
- CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_REGULATOR=y
+The platform integration data for SmartReflex is passed from hwmod
+and the voltage layer to the driver using pdata.
+
+Tested on OMAP4430 SDP using omap2plus_defconfig with the
+CONFIG_POWER_AVS* options set. Voltage correction seen
+on oscilloscope on all three VDDs.
+Based on master branch of the l-o git tree, commit
+6bd61e8de0511dd9831eb9d89eea0b4603a10e9e.
+
+Tree: git://gitorious.org/~keerthy05/omap-pm/keerthy-sr.git for_smartreflex_ip_driver_move 
+
+V3: rework after the comments on MLs
+ . Retain Efuse offsets check to identify a particular OPP.
+ . Introduce a common header file accessible both by arch/arm/mach-omap2/
+   and drivers/.
+ . Retain the class driver in mach-omap2/ and move IP driver to drivers/power/
+   avs since class driver needs voltage layer support.
+
+History:
+v2: rework after the comments on MLs
+ . Keep the OMAP Kconfig options in the arch dir (Rafael),
+ . Move the shared header file from plat-omap to
+   include/linux/power/ (Tony)
+
+v1: initial revision
+
+J Keerthy (1):
+  ARM: OMAP2+: Voltage: Move the omap_volt_data structure to plat
+
+Jean Pihet (9):
+  ARM: OMAP2+: SmartReflex: move the smartreflex header to include/linux/power
+  ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
+  ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of
+    voltage domains.
+  ARM: OMAP3: hwmod: rename the smartreflex entries
+  ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
+  ARM: OMAP2+: SmartReflex: Use per-OPP data structure
+  ARM: OMAP2+: SmartReflex: Create per-opp debugfs node for errminlimit
+  ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
+  ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
+ arch/arm/mach-omap2/Makefile                       |    5 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   12 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    3 +-
+ arch/arm/mach-omap2/pm.h                           |    2 +-
+ arch/arm/mach-omap2/smartreflex-class3.c           |   29 ++--
+ arch/arm/mach-omap2/sr_device.c                    |   39 ++++-
+ arch/arm/mach-omap2/voltage.h                      |   21 +---
+ arch/arm/plat-omap/Kconfig                         |   31 ++--
+ arch/arm/plat-omap/include/plat/voltage.h          |   21 +++-
+ drivers/power/Kconfig                              |    2 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/avs/Kconfig                          |   12 ++
+ drivers/power/avs/Makefile                         |    1 +
+ .../mach-omap2 => drivers/power/avs}/smartreflex.c |  161 ++++++++------------
+ .../linux/power}/smartreflex.h                     |   74 ++++++++--
+ 15 files changed, 235 insertions(+), 179 deletions(-)
+ create mode 100644 drivers/power/avs/Kconfig
+ create mode 100644 drivers/power/avs/Makefile
+ rename {arch/arm/mach-omap2 => drivers/power/avs}/smartreflex.c (90%)
+ rename {arch/arm/mach-omap2 => include/linux/power}/smartreflex.h (79%)
+
 -- 
-1.7.0.4
+1.7.5.4
