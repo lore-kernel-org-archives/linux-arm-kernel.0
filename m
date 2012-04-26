@@ -1,43 +1,89 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Apr 2012 10:39:24 +0200
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
-References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <20120426083924.GE17184@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 26 Apr 2012 02:40:46 -0600 (MDT)
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FDD1D@DBDE01.ent.ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
+ <4F97B891.1020601@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
+ <4F97E243.6000500@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
+ <4F97EF11.4020300@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FDAE7@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204250755020.29696@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FDD1D@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1204260226060.10308@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 10:58:56PM -0700, Saravana Kannan wrote:
-> Create a struct clk_init_data to hold all data that needs to be passed from
-> the platfrom specific driver to the common clock framework during clock
-> registration. Add a pointer to this struct inside clk_hw.
+On Wed, 25 Apr 2012, Hiremath, Vaibhav wrote:
+
+> On Wed, Apr 25, 2012 at 19:25:29, Paul Walmsley wrote:
+> > On Wed, 25 Apr 2012, Hiremath, Vaibhav wrote:
+> > 
+> > > Thanks for describing it for me. I will change AM33XX clock tree for this
+> > > And submit the next version soon.
+> > 
+> > Well I can just remove those leaf clock entries from my copy here, if 
+> > you're okay with that ?
+> > 
 > 
-> This has several advantages:
-> * Completely hides struct clk from many clock platform drivers and static
->   clock initialization code that don't care for static initialization of
->   the struct clks.
-> * For platforms that want to do complete static initialization, it removed
->   the need to directly mess with the struct clk's fields while still
->   allowing to statically allocate struct clk. This keeps the code more
->   future proof even if they include clk-private.h.
-> * Simplifies the generic clk_register() function and allows adding optional
->   fields in the future without modifying the function signature.
-> * Simplifies the static initialization of clocks on all platforms by
->   removing the need for forward delcarations or convoluted macros.
+> Great...
+> 
+> More that OK :)
 
-Can we please stop messing with the function prototypes? So you prefer
-passing a struct to clk_register which is fine and yes, it may have
-advantages. But do we really need to change the prototype? Why can't we
-just add a new function?
+I have taken a first pass at this.  The updated patch is below.  It has 
+been compile-tested only.  Could you please review this and try testing 
+it?  It is also in the branch 'am33xx_support_3.5' of 
+git://git.pwsan.com/linux-2.6.
 
-I am generally open to do these changes, but we have come to the point
-where people actually want to *use* the clock framework instead of
-rebasing their stuff onto the latest patches.
+Here are a few notes:
 
-Sascha
+- Leaf nodes with MODULEMODE clock enable bits were removed, where there 
+were no obvious driver dependencies.  Removing these may not be the 
+correct thing to do, considering strange clocks like the CLKDIV32K.  It 
+may be that the underlying clockdomain control for this device is very 
+different than the OMAP4, and if so, we need to find this out sooner 
+rather than later.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+- Clock nodes with no direct hardware control have been dropped.  This has 
+the unfortunate consequence of making the clock tree slightly harder to 
+follow, but, in combination with the MODULEMODE clock removals, reduces 
+the diffstat burden by about 1000 lines.
+
+- Many clksel clocks were missing .init, .set_rate, and .round_rate 
+function pointers; these have been added where it appeared to be 
+appropriate.  Also, many clksel clocks had incorrect .recalc function 
+pointers that did not take the clksel fields into consideration; these 
+have been fixed.
+
+- Several common struct clksel_rate blocks were shared with the OMAP4 
+clock tree.
+
+- The non-inlineable function am33xx_init_timer_parent() was moved from
+clock33xx.h to clock33xx.c.
+
+- Some multi-line comment formatting and mach-omap2/control.h formatting 
+was cleaned up.
+
+- AM33XX_CONTROL_STATUS_SYSBOOT1_MASK/SHIFT macros were added to remove 
+a magic number from the clock tree.
+
+- The "clk_sel" nomenclature in the original patch was changed to "clksel" 
+to conform with the use in OMAP2/3/4 clock trees.
+
+- The timer mux clock nodes have been split from the timer MODULEMODE 
+nodes.
+
+Still to be done:
+
+* Some clocks seem to be missing clockdomain names.  These probably should 
+be added.
+
+* The clkdiv32k clock needs to be revised, depending on feedback from the 
+hardware team.
+
+
+- Paul
