@@ -1,46 +1,34 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 26 Apr 2012 22:10:51 +0200
-Subject: [PATCH RESEND v5] iio: lpc32xx-adc: Remove driver conflict due to
- device tree
-Message-ID: <1335471051-3648-1-git-send-email-stigge@antcom.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Apr 2012 13:25:40 -0700
+Subject: [PATCH 1/3] ARM: omap2+: set IRQCHIP_SKIP_SET_WAKE for INTC
+ interrupts.
+In-Reply-To: <87sjfq9ryv.fsf@ti.com>
+References: <20120425025637.7832.14013.stgit@notabene.brown>
+ <20120425030524.7832.52047.stgit@notabene.brown>
+ <87sjfq9ryv.fsf@ti.com>
+Message-ID: <20120426202539.GA3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, the touchscreen and ADC drivers of the LPC32xx SoC had a Kconfig
-conflict declared because they use the same hardware. Upon the introduction of
-device tree support in both drivers, the conflict must be removed to enable
-the same kernel to support different hardware (configured via the device tree).
+* Kevin Hilman <khilman@ti.com> [120426 13:11]:
+> NeilBrown <neilb@suse.de> writes:
+> 
+> > All interrupts can wake-from-sleep (I think) so it should be
+> > permissible to call enable_irq_wake().  Setting this flag allows that.
+> >
+> > It is needed because without this, an interrupt which is delivered
+> > during late suspend will get ignored but will not cause suspend to
+> > abort.
+> > If enable_irq_wake() is called and succeeds, check_wakuep_irqs()
+> > will abort the suspend if the interrupt has fired.
+> >
+> > Signed-off-by: NeilBrown <neilb@suse.de>
+> 
+> Acked-by: Kevin Hilman <khilman@ti.com>
+> 
+> Tony, should I queue this one in my OMAP PM features for v3.5 branch?
+> or do you want to take it?
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+You can take it since is's PM related.
 
----
-
-Applies to v3.4-rc4
-
-I separated this patch out from the series of LPC32xx conversion since most of
-the other patches are already integrated into the respective subsystem's -next
-branches.
-
- drivers/staging/iio/adc/Kconfig |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
---- linux-2.6.orig/drivers/staging/iio/adc/Kconfig
-+++ linux-2.6/drivers/staging/iio/adc/Kconfig
-@@ -195,11 +195,13 @@ config MAX1363_RING_BUFFER
- 
- config LPC32XX_ADC
- 	tristate "NXP LPC32XX ADC"
--	depends on ARCH_LPC32XX && !TOUCHSCREEN_LPC32XX
-+	depends on ARCH_LPC32XX
- 	help
- 	  Say yes here to build support for the integrated ADC inside the
- 	  LPC32XX SoC. Note that this feature uses the same hardware as the
--	  touchscreen driver, so you can only select one of the two drivers
--	  (lpc32xx_adc or lpc32xx_ts). Provides direct access via sysfs.
-+	  touchscreen driver, so you should either select only one of the two
-+	  drivers (lpc32xx_adc or lpc32xx_ts) or, in the OpenFirmware case,
-+	  activate only one via device tree selection.  Provides direct access
-+	  via sysfs.
- 
- endmenu
+Tony
