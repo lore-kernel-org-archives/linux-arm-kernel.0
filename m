@@ -1,27 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Apr 2012 12:05:25 -0700
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <20120418231837.GT21106@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
- <20120426184312.GY3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
-Message-ID: <20120426190524.GZ3739@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 26 Apr 2012 20:11:59 +0100
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20120426191159.GA9415@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120426 11:52]:
+On Thu, Apr 26, 2012 at 11:10:31PM +0530, Keerthy wrote:
+> From: J Keerthy <j-keerthy@ti.com>
 > 
-> Yes, they were accepted and were also available under linux-omap/soc2 branch 
-> for quite some time.
+> AVS(Adaptive Voltage Scaling) is a power management technique which
+> controls the operating voltage of a device in order to optimize (i.e. reduce)
+> its power consumption. The voltage is adapted depending on static factors
+> (chip manufacturing process) and dynamic factors (temperature
+> depending performance).
+> The TI AVS solution is named Smartreflex. 
 
-Hmm sorry if I've dropped them accidentally. I tend to drop the branches
-after each merge window and purge my linux-omap mailbox too.
-
-Regards,
-
-Tony
+What's the relationship between this and existing things like devfreq
+and cpufreq?  It'd be better if the changelogs made this clear and
+provided an overview of how all these different subsystems are intended
+to fit together.
