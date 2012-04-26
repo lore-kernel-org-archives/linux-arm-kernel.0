@@ -1,48 +1,57 @@
-From: ylmao@marvell.com (Yilu Mao)
-Date: Thu, 26 Apr 2012 17:25:31 +0800
-Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that
- l2x0 is enabled before init
-In-Reply-To: <20120426083554.GB18136@arm.com>
-References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
- <20120424082810.GA9367@arm.com> <4F98D659.4030709@marvell.com>
- <20120426083554.GB18136@arm.com>
-Message-ID: <4F99148B.4020900@marvell.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 26 Apr 2012 02:36:37 -0700 (PDT)
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <20120426084201.GF17184@pengutronix.de>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+ <4F98EB10.2000505@codeaurora.org>
+ <20120426084201.GF17184@pengutronix.de>
+Message-ID: <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 04:35 PM, Catalin Marinas wrote:
-> On Thu, Apr 26, 2012 at 06:00:09AM +0100, Yilu Mao wrote:
->> On 04/24/2012 04:28 PM, Catalin Marinas wrote:
->>> On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
->>>> +	l2x0_saved_regs.aux_ctrl = aux;
->>>> +
->>>>    	aux&= aux_mask;
->>>>    	aux |= aux_val;
->>>
->>> I think that's the wrong place to save it, it should be after the
->>> masking was done.
->>>
->>> Anyway, if we cannot write this register in l2x0_init() because the L2
->>> was enabled, do we expect the L2 to be disabled during resume?
->>>
->> Sorry, I don't think so.
->> This is the right place to save it because we must make sure the saved
->> aux_ctrl is the same as what it is set.
->> If we save it after masking was done, the saved value will be different
->> because we can't actually change the real setting.
->
-> And since we can't actually change the real setting on the resume path,
-> why do we need to save it anyway. Is your L2 cache disabled on the
-> resume path but not on the cold boot one?
->
-We can't change L2 aux ctrl setting when do init because it has been 
-enabled. But we have the requirement to handle core idle. For CA9 core 
-idle, L2 controller may be reset. So we need to restore the L2 
-controller registers base on l2x0_saved_regs. This is why we need to 
-keep the value in l2x0_saved_regs to be the same as real setting.
 
+On Thu, April 26, 2012 1:42 am, Sascha Hauer wrote:
+> On Wed, Apr 25, 2012 at 11:28:32PM -0700, Saravana Kannan wrote:
+>>
+>> >diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+>> >index 6e58f11..8e97491 100644
+>> >--- a/drivers/clk/clk-mux.c
+>> >+++ b/drivers/clk/clk-mux.c
+>> >@@ -95,6 +95,7 @@ struct clk *clk_register_mux(struct device *dev,
+>> const char *name,
+>> >  {
+>>
+>> I would really like to remove these functions. At least until we add
+>> device tree support where each clock is listed in device tree.
+>>
+>> At present, these functions seem to be abused more than actually
+>> being used appropriately.
+>
+> I think this goes in my direction. Still exactly this abuse how you call
+> it makes me relatively independent of for example the changes you
+> introduce with your patch. Had I static initializers I would now have
+> to start a rebase orgy.
+
+In the other email you say you have to change. Here you say, you don't
+have to change. Hopefully, you didn't have to change much -- I was aiming
+for that. If there was agreement about removing these functions, I was
+planning on helping move the current users after this patch merged.
+
+I think in the long run this will result in less changes for you and more
+readable code. If clk_register() adds another optional param, you can't
+get around that without having to write more wrapper functions or changing
+any existing ones you might have. But with this struct, the common clock
+code can be written in a way so that the a value of 0 for the new param
+defaults to the behavior that was there before the param was added.
+
+Something to think about: With these wrapper calls, one would do a lot of
+kalloc and copying of small items when one knows at compile time what the
+clocks are going to be.
+
+Anyway, I understand that some people see value in this. That's why I'm
+bringing it up for discussion instead of just doing it in my patch.
+
+-Saravana
 -- 
-Thanks.
-
-Best Wishes,
-Yilu Mao
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
