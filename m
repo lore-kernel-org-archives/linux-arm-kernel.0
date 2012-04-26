@@ -1,86 +1,61 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 26 Apr 2012 13:46:43 +0000
-Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source
- selection using kernel param
-In-Reply-To: <CA+Bv8XYDNKWByVEMWniYruH6bcDtOihne5ecoXWJs6fYq418bQ@mail.gmail.com>
-References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
- <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
- <CA+Bv8XYemH3zW48id_ZAvC2gU_uZMFei6dMO1GUog_YTvFBV2Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83E9FE722@DBDE01.ent.ti.com>
- <CA+Bv8XaWkBr7ZDTjmjDg_K+JhEfWdYEt=eKQ5Gj8NMbw4K=Jmg@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83E9FE807@DBDE01.ent.ti.com>
- <CA+Bv8XYDNKWByVEMWniYruH6bcDtOihne5ecoXWJs6fYq418bQ@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FF456@DBDE01.ent.ti.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 26 Apr 2012 16:06:15 +0200
+Subject: [PATCH v2] Convert i.MX architecture to generic clock framework
+In-Reply-To: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4F995657.4080505@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 13:15:18, Russ Dill wrote:
-> On Wed, Apr 25, 2012 at 11:23 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> > On Thu, Apr 26, 2012 at 11:26:09, Russ Dill wrote:
-> >> On Wed, Apr 25, 2012 at 10:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
-> >> > On Thu, Apr 26, 2012 at 10:06:40, Russ Dill wrote:
-> >> >> On Tue, Apr 24, 2012 at 2:45 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
-> >> >> > Current OMAP code supports couple of clocksource options based
-> >> >> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-> >> >> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
-> >> >> > So there can be 3 options -
-> >> >> >
-> >> >> > 1. 32KHz sync-timer
-> >> >> > 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
-> >> >> > 3. 32KHz based gptimer.
-> >> >> >
-<Snip>
-> >
-> > You mean to say, on Beagleboard it boots up fine. And same fails on EVM?
+On 25.04.2012 17:27, Sascha Hauer wrote:
+> Hi All,
 > 
+> Here is another round of patches to convert i.MX to the generic clock
+> framework. It is based on Mikes recently published for-next branch plus:
 > 
-> yes
+> [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
+> [PATCH V3 2/8] clk: add a fixed factor clock
+> clkdev: Implement managed clk_get()
 > 
+> The branch is tested on all SoCs I have available, but regressions are more
+> than likely, so please give it a test.
+> 
+> I didn't move the clock support to drivers/clk now as the clock control
+> module is shared with several other SoC specific stuff and I need a global
+> spinlock. Accessing this somewhere from drivers/ seems odd. Depending on
+> how things work out we can move it to drivers/ later.
+> 
+> The remaining cleanups like removing the old clock support posted in the
+> last series are not included here, I will respin them once it's clear that
+> a series goes in
+> 
+> For your convenience a complete series including dependencies (so not
+> meant for upstream) can be pulled here:
+> 
+> git://git.pengutronix.de/git/imx/linux-2.6.git work/v3.4-rc4-imx-clk
 
-I am able to reproduce this issue, and it seems the issue is really weird 
-and I am completely clueless here.
+Booting this on top of a 3.4-rc4 on a i.MX6 SabreLite gives me
 
-With below patch/change it always works, 100% success. The moment I add 0x10 
-offset to the ioremaped virtual base address, gone...95% of the time it 
-fails.
-I have observed that, the execution always stays at wfi (default_idle) 
-thread. Really strange behavior...and I am clueless now.
+..
+Linux video capture interface: v2.00
+Switching to clocksource mxc_timer1
+Clockevents: could not switch to one-shot mode:
+Clockevents: could not switch to one-shot mode:
+Clockevents: could not switch to one-shot mode: dummy_timer is not 
+functional.
+  dummy_timer is not functional.
+Clockevents: could not switch to one-shot mode:
+Could not switch to high resolution mode on CPU 0
+  dummy_timer is not functional.
+Could not switch to high resolution mode on CPU 2
+Could not switch to high resolution mode on CPU 1
+  dummy_timer is not functional.
+Could not switch to high resolution mode on CPU 3
+NET: Registered protocol family 2
+...
 
- - The 32k sync timer address space is part of iotable.
- - The ioremap() internally masks the addr to page aligned addr and gets pfn,
-   At the end, offset is being added. So I don't really understand how is it
-   different than adding offset before and after ioremap().
+I'm no expert of this, so just in case this is interesting for somebody.
 
+Best regards
 
-Also, this issue is nothing to do with my patch, it also happens with the 
-original code.
-Just add 0x10 offset after ioremap(), and booooooom.... (95% of the time)
-
-
-----------Patch which works (on top of this patch-series)----------
-
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index 3e3cdab..b0ef8ce 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -90,6 +90,7 @@ int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
-         * For this to work we must have a static mapping in io.c
-         * for this area
-         */
-+       pbase = pbase + OMAP2_32KSYNCNT_CR_OFF;
-        base = ioremap(pbase, size);
-        if (!base) {
-                pr_err("32k_counter: failed to map base addr\n");
-@@ -100,7 +101,7 @@ int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
-        if (!IS_ERR(sync32k_ick))
-                clk_enable(sync32k_ick);
-
--       sync32k_cnt_reg = base + OMAP2_32KSYNCNT_CR_OFF;
-+       sync32k_cnt_reg = base;
-
-        /*
-         * 120000 rough estimate from the calculations in
-
-
-Thanks,
-Vaibhav
+Dirk
