@@ -1,67 +1,220 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 26 Apr 2012 02:57:20 -0600 (MDT)
-Subject: [PATCH-V3 2/3] ARM: OMAP3+: clockdomain33xx: Add clockdomain
- data and respective operations
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FE75B@DBDE01.ent.ti.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241725430.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD30E@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204252118170.30642@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FE75B@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1204260252240.10308@utopia.booyaka.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 26 Apr 2012 17:13:02 +0800
+Subject: imx sgtl5000:BUG: scheduling while atomic:
+ speaker-test/1225/0x00000003
+In-Reply-To: <20120426081614.GI28063@b20223-02.ap.freescale.net>
+References: <20120426023319.GC28063@b20223-02.ap.freescale.net>
+ <20120426051212.GF28063@b20223-02.ap.freescale.net>
+ <20376.59099.336772.398425@ipc1.ka-ro>
+ <20120426064430.GG28063@b20223-02.ap.freescale.net>
+ <20376.63821.15844.738438@ipc1.ka-ro>
+ <20120426081614.GI28063@b20223-02.ap.freescale.net>
+Message-ID: <20120426091301.GJ28063@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Apr 2012, Hiremath, Vaibhav wrote:
-
-> On Thu, Apr 26, 2012 at 08:49:28, Paul Walmsley wrote:
-
-(attribution lost)
-
-> > > > Also, since we're not defining any autodeps for the AM335x platform, we 
-> > > > shouldn't need the CLKDM_NO_AUTODEPS flag either?  Since no autodeps are 
-> > > > defined, the default will be to not set any autodeps.
-> > > > 
-> > > 
-> > > This is required to avoid few "pr_debug", if you don't provide it.
-> > > For example, without this flag set, you will get,
-> > > 
-> > > pr_debug("clockdomain: hardware cannot set/clear sleep "
-> > > 		"dependency affecting %s from %s\n", clkdm1->name,
-> > >              clkdm2->name);
-> > > 
-> > > Refer to the file omap_hwmod.c, function, _enable(), the call sequence is,
-> > > 
-> > > _enable() => _add_initiator_dep() => clkdm_add_sleepdep() =>leads to warning
+On Thu, Apr 26, 2012 at 04:16:15PM +0800, Richard Zhao wrote:
+> On Thu, Apr 26, 2012 at 09:29:17AM +0200, Lothar Wa?mann wrote:
+> > Hi,
 > > 
-> > Seems like the better thing to do is to just avoid calling
-> > _{add,del}_initiator_dep() on the AM335x.
+> > Richard Zhao writes:
+> > > On Thu, Apr 26, 2012 at 08:10:35AM +0200, Lothar Wa?mann wrote:
+> > > > Hi,
+> > > > 
+> > > > [added CC: Sascha Hauer as the SDMA driver author]
+> > > > 
+> > > > Richard Zhao writes:
+> > > > > On Thu, Apr 26, 2012 at 10:33:21AM +0800, Richard Zhao wrote:
+> > > > > > [   13.901890] eth0: no IPv6 routers present
+> > > > > > [   70.295079] BUG: scheduling while atomic: speaker-test/1225/0x00000003
+> > > > > > [   70.304293] Modules linked in:
+> > > > > > [   70.310389] [<c0015a68>] (unwind_backtrace+0x0/0xec) from [<c0585810>] (dump_stack+0x20/0x24)
+> > > > > > [   70.310421] [<c0585810>] (dump_stack+0x20/0x24) from [<c0585f6c>] (__schedule_bug+0x54/0x60)
+> > > > > > [   70.310452] [<c0585f6c>] (__schedule_bug+0x54/0x60) from [<c058db64>] (__schedule+0x84/0x748)
+> > > > > > [   70.310476] [<c058db64>] (__schedule+0x84/0x748) from [<c058e310>] (schedule+0x8c/0x90)
+> > > > > > [   70.310500] [<c058e310>] (schedule+0x8c/0x90) from [<c058c504>] (schedule_timeout+0x2fc/0x35c)
+> > > > > > [   70.310541] [<c058c504>] (schedule_timeout+0x2fc/0x35c) from [<c058d970>] (wait_for_common+0xd8/0x16c)
+> > > > > > [   70.310567] [<c058d970>] (wait_for_common+0xd8/0x16c) from [<c058da44>] (wait_for_completion_timeout+0x1c/0x20)
+> > > > > > [   70.310604] [<c058da44>] (wait_for_completion_timeout+0x1c/0x20) from [<c03352bc>] (sdma_run_channel+0x70/0x8c)
+> > > > > > [   70.310634] [<c03352bc>] (sdma_run_channel+0x70/0x8c) from [<c0335614>] (sdma_load_context+0x188/0x19c)
+> > > > > > [   70.310661] [<c0335614>] (sdma_load_context+0x188/0x19c) from [<c0335688>] (sdma_prep_dma_cyclic+0x60/0x1a8)
+> > > > > > [   70.310694] [<c0335688>] (sdma_prep_dma_cyclic+0x60/0x1a8) from [<c04760f4>] (snd_dmaengine_pcm_trigger+0xa0/0x134)
+> > > > > > [   70.310729] [<c04760f4>] (snd_dmaengine_pcm_trigger+0xa0/0x134) from [<c0483e68>] (soc_pcm_trigger+0x74/0xb0)
+> > > > > > [   70.310770] [<c0483e68>] (soc_pcm_trigger+0x74/0xb0) from [<c046e670>] (snd_pcm_do_start+0x34/0x40)
+> > > > > > [   70.310797] [<c046e670>] (snd_pcm_do_start+0x34/0x40) from [<c046e288>] (snd_pcm_action_single+0x48/0x74)
+> > > > > > [   70.310823] [<c046e288>] (snd_pcm_action_single+0x48/0x74) from [<c046e334>] (snd_pcm_action+0x80/0x8c)
+> > > > > > [   70.310850] [<c046e334>] (snd_pcm_action+0x80/0x8c) from [<c04707f0>] (snd_pcm_start+0x24/0x2c)
+> > > > > > [   70.310877] [<c04707f0>] (snd_pcm_start+0x24/0x2c) from [<c0474058>] (snd_pcm_lib_write1+0x2a8/0x340)
+> > > > > > [   70.310900] [<c0474058>] (snd_pcm_lib_write1+0x2a8/0x340) from [<c04741d0>] (snd_pcm_lib_write+0x70/0x7c)
+> > > > > > [   70.311007] [<c04741d0>] (snd_pcm_lib_write+0x70/0x7c) from [<c04703f8>] (snd_pcm_playback_ioctl1+0x114/0x428)
+> > > > > > [   70.311038] [<c04703f8>] (snd_pcm_playback_ioctl1+0x114/0x428) from [<c0470744>] (snd_pcm_playback_ioctl+0x38/0x44)
+> > > > > > [   70.311077] [<c0470744>] (snd_pcm_playback_ioctl+0x38/0x44) from [<c0107234>] (do_vfs_ioctl+0x4f4/0x568)
+> > > > > > [   70.311105] [<c0107234>] (do_vfs_ioctl+0x4f4/0x568) from [<c0107308>] (sys_ioctl+0x60/0x84)
+> > > > > > [   70.311138] [<c0107308>] (sys_ioctl+0x60/0x84) from [<c000df40>] (ret_fast_syscall+0x0/0x30)
+> > > > > > [   80.301928] ALSA sound/core/pcm_lib.c:1853 playback write error (DMA or IRQ trouble?)
+> > > > > > 
+> > > > > > 
+> > > > > > kernel: 3.4rc3 with ASoC/for-next and some my patches.
+> > > > > 
+> > > > > I found the cause.
+> > > > > snd_dmaengine_pcm_trigger --> dmaengine_pcm_prepare_and_submit
+> > > > > --> dmaengine_prep_dma_cyclic
+> > > > > 
+> > > > > The trigger function is in atomic context, but dmaengine_prep_dma_cyclic
+> > > > > tried to sleep.
+> > > > > 
+> > > > > From dma engine design, can device_prep_dma_cyclic sleep?
+> > > > > If yes, we may need to move it out of trigger functions.
+> > > > > 
+> > > > The root cause is that sdma_run_channel does a
+> > > > wait_for_completion_timeout() to wait for the special channel 0 to
+> > > > complete which is complete overkill from my point of view.
+> > > > channel 0 is used internally in the DMA engine and should always
+> > > > complete within a few microseconds. Thus a busy loop with a timeout
+> > > > would be fine here.
+> > > > 
+> > > > Furthermore a mutex is used to serialize access to channel data
+> > > > structures which also forbids the affected function to be used in
+> > > > interrupt context.
+> > > Only when dma engine declare dev_prep_xxx can not sleep, we need your patch.
+> > > > 
+> > > > The following patch would fix that:
+> > > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > > > index d3e38e2..fcab768 100644
+> > > > --- a/drivers/dma/imx-sdma.c
+> > > > +++ b/drivers/dma/imx-sdma.c
+> > > > @@ -24,7 +24,7 @@
+> > > >  #include <linux/mm.h>
+> > > >  #include <linux/interrupt.h>
+> > > >  #include <linux/clk.h>
+> > > > -#include <linux/wait.h>
+> > > > +#include <linux/delay.h>
+> > > >  #include <linux/sched.h>
+> > > >  #include <linux/semaphore.h>
+> > > >  #include <linux/spinlock.h>
+> > > > @@ -323,7 +323,7 @@ struct sdma_engine {
+> > > >  	dma_addr_t			context_phys;
+> > > >  	struct dma_device		dma_device;
+> > > >  	struct clk			*clk;
+> > > > -	struct mutex			channel_0_lock;
+> > > > +	spinlock_t			channel_0_lock;
+> > > >  	struct sdma_script_start_addrs	*script_addrs;
+> > > >  };
+> > > >  
+> > > > @@ -408,12 +408,21 @@ static int sdma_run_channel(struct sdma_channel *sdmac)
+> > > Since you're polling, change function name specific to channel 0?
+> 
+> Will you take the comment?
+> 
+> > > >  	struct sdma_engine *sdma = sdmac->sdma;
+> > > >  	int channel = sdmac->channel;
+> > > >  	int ret;
+> > > > -
+> > > > -	init_completion(&sdmac->done);
+> > > > +	unsigned long timeout = 500;
+> > > I'm not sure. Did you test 500us is enough for loading firmware?
+> > >
+> > Channel 0 is not used for actual data transfer but for some internal
+> > housekeeping. Thus the timeout is independent from the time required
+> > for the actual data transfer.
+> > I haven't seen any timeout even with the timeout set to 100us.
+> > Usually it takes 3 to 4 us to complete.
+I tested on imx6q. I uses 2us to load firmware.
+
+> > 
+> > > >  	sdma_enable_channel(sdma, channel);
+> > > >  
+> > > You didn't disable the irq. mxc_sdma_handle_channel may be called.
+> > >
+> > The calls to sdma_run_channel() are framed with
+> > spinlock_irq_save()/spin_unlock_irqrestore().
+It's different on SMP. You don't have spinlock at irq handler. It's
+possible they check the SDMA_H_INTR together. I think you need spinlock
+in irq handler.
+
+Richard
+> > 
+> > > > -	ret = wait_for_completion_timeout(&sdmac->done, HZ);
+> > > > +	while (!(ret = readl_relaxed(sdma->regs + SDMA_H_INTR) & 1)) {
+> > > > +		if (timeout-- <= 0)
+> > > > +			break;
+> > > > +		udelay(1);
+> > > > +	}
+> > > > +	if (ret) {
+> > > > +		/* Clear the interrupt status */
+> > > > +		writel_relaxed(ret, sdma->regs + SDMA_H_INTR);
+> > > > +	} else {
+> > > > +		dev_err(sdma->dev, "Timeout waiting for CH0 ready\n");
+> > > > +	}
+> > > >  
+> > > >  	return ret ? 0 : -ETIMEDOUT;
+> > > >  }
+> > > > @@ -425,17 +434,17 @@ static int sdma_load_script(struct sdma_engine *sdma, void *buf, int size,
+> > > >  	void *buf_virt;
+> > > >  	dma_addr_t buf_phys;
+> > > >  	int ret;
+> > > > -
+> > > > -	mutex_lock(&sdma->channel_0_lock);
+> > > > +	unsigned long flags;
+> > > >  
+> > > >  	buf_virt = dma_alloc_coherent(NULL,
+> > > >  			size,
+> > > >  			&buf_phys, GFP_KERNEL);
+> > > >  	if (!buf_virt) {
+> > > > -		ret = -ENOMEM;
+> > > > -		goto err_out;
+> > > > +		return -ENOMEM;
+> > > >  	}
+> > > >  
+> > > > +	spin_lock_irqsave(&sdma->channel_0_lock, flags);
+> > > > +
+> > > >  	bd0->mode.command = C0_SETPM;
+> > > >  	bd0->mode.status = BD_DONE | BD_INTR | BD_WRAP | BD_EXTD;
+> > > >  	bd0->mode.count = size / 2;
+> > > > @@ -446,10 +455,9 @@ static int sdma_load_script(struct sdma_engine *sdma, void *buf, int size,
+> > > >  
+> > > >  	ret = sdma_run_channel(&sdma->channel[0]);
+> > > >  
+> > > > -	dma_free_coherent(NULL, size, buf_virt, buf_phys);
+> > > > +	spin_unlock_irqrestore(&sdma->channel_0_lock, flags);
+> > > >  
+> > > > -err_out:
+> > > > -	mutex_unlock(&sdma->channel_0_lock);
+> > > > +	dma_free_coherent(NULL, size, buf_virt, buf_phys);
+> > > >  
+> > > >  	return ret;
+> > > >  }
+> > > > @@ -539,7 +547,7 @@ static void mxc_sdma_handle_channel(struct sdma_channel *sdmac)
+> > > >  	complete(&sdmac->done);
+> > > >  
+> > > >  	/* not interested in channel 0 interrupts */
+> > > > -	if (sdmac->channel == 0)
+> > > > +	if (WARN_ON(sdmac->channel == 0))
+> > > >  		return;
+> > > Move it before complete?
+> > > 
+> > Shouldn't matter since it should never be reached anyway.
+> You've decided to add the warning, why not add it in a better place?
+> 
+> Richard
+> > 
+> > 
+> > Lothar Wa?mann
+> > -- 
+> > ___________________________________________________________
+> > 
+> > Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> > Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> > Gesch?ftsf?hrer: Matthias Kaussen
+> > Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> > 
+> > www.karo-electronics.de | info at karo-electronics.de
+> > ___________________________________________________________
 > > 
 > 
-> Don't you think, if flag is doing all the job, why to pollute code with
-> cpu_is_am33xx() checks.
-
-That's not what that flag was intended to do.  It was originally intended 
-for OMAP3xxx, to allow autodeps to be disabled for some clockdomains, 
-while leaving them enabled for others.
-
-If autodeps are completely unneeded, as they are for AM335x, for slower 
-cores like the Cortex-A8, it seems best to avoid executing any 
-superfluous code.
-
-> Yeah, I realized it, after your comment; its copy thing...Will correct in 
-> next version.
-
-I've dropped those lines from the description in the local copy here.
-
-> I am thinking of separating clocktree patch (PATCH-V3 3/3) from this series, 
-> so that clockdomain stuff can get in independently, and clocktree anyway 
-> will follow them (it may take some time in review cycle).
-
-Yes, I was thinking of doing this too.  The only aspect that gave me pause 
-is that the clockdomain changes are not 100% separate from the clock tree.  
-So we may have to update the clockdomain data as the clock tree changes.
-
-
-- Paul
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
