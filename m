@@ -1,295 +1,288 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Apr 2012 23:38:35 +0800
-Subject: [PATCH 07/17] ARM: kirkwood: use machine specific hook for late init
+Date: Thu, 26 Apr 2012 23:38:37 +0800
+Subject: [PATCH 09/17] ARM: omap1: use machine specific hook for late init
 In-Reply-To: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
 References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335454725-13089-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335454725-13089-10-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-kirkwood/board-dt.c              |    1 +
- arch/arm/mach-kirkwood/common.c                |    6 +++++-
- arch/arm/mach-kirkwood/common.h                |    1 +
- arch/arm/mach-kirkwood/d2net_v2-setup.c        |    1 +
- arch/arm/mach-kirkwood/db88f6281-bp-setup.c    |    1 +
- arch/arm/mach-kirkwood/dockstar-setup.c        |    1 +
- arch/arm/mach-kirkwood/guruplug-setup.c        |    1 +
- arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c |    1 +
- arch/arm/mach-kirkwood/netspace_v2-setup.c     |    3 +++
- arch/arm/mach-kirkwood/netxbig_v2-setup.c      |    2 ++
- arch/arm/mach-kirkwood/openrd-setup.c          |    3 +++
- arch/arm/mach-kirkwood/rd88f6192-nas-setup.c   |    1 +
- arch/arm/mach-kirkwood/rd88f6281-setup.c       |    1 +
- arch/arm/mach-kirkwood/sheevaplug-setup.c      |    2 ++
- arch/arm/mach-kirkwood/t5325-setup.c           |    1 +
- arch/arm/mach-kirkwood/ts219-setup.c           |    1 +
- arch/arm/mach-kirkwood/ts41x-setup.c           |    1 +
- 17 files changed, 27 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap1/board-ams-delta.c |    8 +++++++-
+ arch/arm/mach-omap1/board-fsample.c   |    1 +
+ arch/arm/mach-omap1/board-generic.c   |    1 +
+ arch/arm/mach-omap1/board-h2.c        |    1 +
+ arch/arm/mach-omap1/board-h3.c        |    1 +
+ arch/arm/mach-omap1/board-htcherald.c |    1 +
+ arch/arm/mach-omap1/board-innovator.c |    1 +
+ arch/arm/mach-omap1/board-nokia770.c  |    1 +
+ arch/arm/mach-omap1/board-osk.c       |    1 +
+ arch/arm/mach-omap1/board-palmte.c    |    1 +
+ arch/arm/mach-omap1/board-palmtt.c    |    1 +
+ arch/arm/mach-omap1/board-palmz71.c   |    1 +
+ arch/arm/mach-omap1/board-perseus2.c  |    1 +
+ arch/arm/mach-omap1/board-sx1.c       |    1 +
+ arch/arm/mach-omap1/board-voiceblue.c |    1 +
+ arch/arm/mach-omap1/common.h          |   10 ++++++++++
+ arch/arm/mach-omap1/io.c              |    5 +++++
+ arch/arm/mach-omap1/serial.c          |    3 +--
+ 18 files changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 1c672d9..aaa495c 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -70,6 +70,7 @@ DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
- 	.init_irq	= kirkwood_init_irq,
- 	.timer		= &kirkwood_timer,
- 	.init_machine	= kirkwood_dt_init,
-+	.init_late	= kirkwood_init_late,
- 	.restart	= kirkwood_restart,
- 	.dt_compat	= kirkwood_dt_board_compat,
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index c1b681e..f2f8a58 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -595,7 +595,12 @@ gpio_free:
+ 	gpio_free(AMS_DELTA_GPIO_PIN_MODEM_IRQ);
+ 	return err;
+ }
+-late_initcall(late_init);
++
++static void __init ams_delta_init_late(void)
++{
++	omap1_init_late();
++	late_init();
++}
+ 
+ static void __init ams_delta_map_io(void)
+ {
+@@ -611,6 +616,7 @@ MACHINE_START(AMS_DELTA, "Amstrad E3 (Delta)")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= ams_delta_init,
++	.init_late	= ams_delta_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index a02cae8..af88ffe 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -530,7 +530,6 @@ static int __init kirkwood_clock_gate(void)
+diff --git a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
+index 80bd43c..a77ee57 100644
+--- a/arch/arm/mach-omap1/board-fsample.c
++++ b/arch/arm/mach-omap1/board-fsample.c
+@@ -383,6 +383,7 @@ MACHINE_START(OMAP_FSAMPLE, "OMAP730 F-Sample")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_fsample_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-generic.c b/arch/arm/mach-omap1/board-generic.c
+index 9a5fe58..e75e2d5 100644
+--- a/arch/arm/mach-omap1/board-generic.c
++++ b/arch/arm/mach-omap1/board-generic.c
+@@ -88,6 +88,7 @@ MACHINE_START(OMAP_GENERIC, "Generic OMAP1510/1610/1710")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_generic_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+index 553a2e5..04cf994 100644
+--- a/arch/arm/mach-omap1/board-h2.c
++++ b/arch/arm/mach-omap1/board-h2.c
+@@ -446,6 +446,7 @@ MACHINE_START(OMAP_H2, "TI-H2")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= h2_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
+index 4c19f4c..a11ef0a 100644
+--- a/arch/arm/mach-omap1/board-h3.c
++++ b/arch/arm/mach-omap1/board-h3.c
+@@ -439,6 +439,7 @@ MACHINE_START(OMAP_H3, "TI OMAP1710 H3 board")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= h3_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
+index 60c06ee..118a9d4 100644
+--- a/arch/arm/mach-omap1/board-htcherald.c
++++ b/arch/arm/mach-omap1/board-htcherald.c
+@@ -605,6 +605,7 @@ MACHINE_START(HERALD, "HTC Herald")
+ 	.reserve	= omap_reserve,
+ 	.init_irq       = omap1_init_irq,
+ 	.init_machine   = htcherald_init,
++	.init_late	= omap1_init_late,
+ 	.timer          = &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-innovator.c b/arch/arm/mach-omap1/board-innovator.c
+index 67d7fd5..7970223 100644
+--- a/arch/arm/mach-omap1/board-innovator.c
++++ b/arch/arm/mach-omap1/board-innovator.c
+@@ -457,6 +457,7 @@ MACHINE_START(OMAP_INNOVATOR, "TI-Innovator")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= innovator_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
+index d21dcc2..7212ae9 100644
+--- a/arch/arm/mach-omap1/board-nokia770.c
++++ b/arch/arm/mach-omap1/board-nokia770.c
+@@ -255,6 +255,7 @@ MACHINE_START(NOKIA770, "Nokia 770")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_nokia770_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+index a5f85dd..da8d872 100644
+--- a/arch/arm/mach-omap1/board-osk.c
++++ b/arch/arm/mach-omap1/board-osk.c
+@@ -574,6 +574,7 @@ MACHINE_START(OMAP_OSK, "TI-OSK")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= osk_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
+index a60e6c2..949b62a 100644
+--- a/arch/arm/mach-omap1/board-palmte.c
++++ b/arch/arm/mach-omap1/board-palmte.c
+@@ -267,6 +267,7 @@ MACHINE_START(OMAP_PALMTE, "OMAP310 based Palm Tungsten E")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_palmte_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-palmtt.c b/arch/arm/mach-omap1/board-palmtt.c
+index 8d85487..7f1e1cf 100644
+--- a/arch/arm/mach-omap1/board-palmtt.c
++++ b/arch/arm/mach-omap1/board-palmtt.c
+@@ -313,6 +313,7 @@ MACHINE_START(OMAP_PALMTT, "OMAP1510 based Palm Tungsten|T")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_palmtt_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
+index a2c5abc..0711685 100644
+--- a/arch/arm/mach-omap1/board-palmz71.c
++++ b/arch/arm/mach-omap1/board-palmz71.c
+@@ -330,6 +330,7 @@ MACHINE_START(OMAP_PALMZ71, "OMAP310 based Palm Zire71")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_palmz71_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
+index 76d4ee0..512989b 100644
+--- a/arch/arm/mach-omap1/board-perseus2.c
++++ b/arch/arm/mach-omap1/board-perseus2.c
+@@ -345,6 +345,7 @@ MACHINE_START(OMAP_PERSEUS2, "OMAP730 Perseus2")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_perseus2_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-sx1.c b/arch/arm/mach-omap1/board-sx1.c
+index f34cb74..3b7b82b 100644
+--- a/arch/arm/mach-omap1/board-sx1.c
++++ b/arch/arm/mach-omap1/board-sx1.c
+@@ -407,6 +407,7 @@ MACHINE_START(SX1, "OMAP310 based Siemens SX1")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= omap_sx1_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= omap1_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
+index 37232d0..afd67f0 100644
+--- a/arch/arm/mach-omap1/board-voiceblue.c
++++ b/arch/arm/mach-omap1/board-voiceblue.c
+@@ -294,6 +294,7 @@ MACHINE_START(VOICEBLUE, "VoiceBlue OMAP5910")
+ 	.reserve	= omap_reserve,
+ 	.init_irq	= omap1_init_irq,
+ 	.init_machine	= voiceblue_init,
++	.init_late	= omap1_init_late,
+ 	.timer		= &omap1_timer,
+ 	.restart	= voiceblue_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
+index af658ad..0b77e6d 100644
+--- a/arch/arm/mach-omap1/common.h
++++ b/arch/arm/mach-omap1/common.h
+@@ -52,8 +52,18 @@ static inline void omap16xx_map_io(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_OMAP_SERIAL_WAKE
++int omap_serial_wakeup_init(void);
++#else
++static inline int omap_serial_wakeup_init(void)
++{
++	return 0;
++}
++#endif
++
+ void omap1_init_early(void);
+ void omap1_init_irq(void);
++void omap1_init_late(void);
+ void omap1_restart(char, const char *);
+ 
+ extern struct sys_timer omap1_timer;
+diff --git a/arch/arm/mach-omap1/io.c b/arch/arm/mach-omap1/io.c
+index d969a72..cf811f2 100644
+--- a/arch/arm/mach-omap1/io.c
++++ b/arch/arm/mach-omap1/io.c
+@@ -138,6 +138,11 @@ void __init omap1_init_early(void)
+ 	omap_init_consistent_dma_size();
+ }
+ 
++void __init omap1_init_late(void)
++{
++	omap_serial_wakeup_init();
++}
++
+ /*
+  * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+  */
+diff --git a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
+index 93ae8f2..6809c9e 100644
+--- a/arch/arm/mach-omap1/serial.c
++++ b/arch/arm/mach-omap1/serial.c
+@@ -237,7 +237,7 @@ static void __init omap_serial_set_port_wakeup(int gpio_nr)
+ 	enable_irq_wake(gpio_to_irq(gpio_nr));
+ }
+ 
+-static int __init omap_serial_wakeup_init(void)
++int __init omap_serial_wakeup_init(void)
+ {
+ 	if (!cpu_is_omap16xx())
+ 		return 0;
+@@ -251,7 +251,6 @@ static int __init omap_serial_wakeup_init(void)
  
  	return 0;
  }
--late_initcall(kirkwood_clock_gate);
+-late_initcall(omap_serial_wakeup_init);
  
- void kirkwood_restart(char mode, const char *cmd)
- {
-@@ -547,3 +546,8 @@ void kirkwood_restart(char mode, const char *cmd)
- 	while (1)
- 		;
- }
-+
-+void __init kirkwood_init_late(void)
-+{
-+	kirkwood_clock_gate();
-+}
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index fa8e768..6d8829e 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -50,6 +50,7 @@ void kirkwood_nand_init(struct mtd_partition *parts, int nr_parts, int delay);
- void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts, int (*dev_ready)(struct mtd_info *));
- void kirkwood_audio_init(void);
- void kirkwood_restart(char, const char *);
-+void kirkwood_init_late(void);
+ #endif	/* CONFIG_OMAP_SERIAL_WAKE */
  
- /* board init functions for boards not fully converted to fdt */
- #ifdef CONFIG_MACH_DREAMPLUG_DT
-diff --git a/arch/arm/mach-kirkwood/d2net_v2-setup.c b/arch/arm/mach-kirkwood/d2net_v2-setup.c
-index 6e1bac9..94ddb45 100644
---- a/arch/arm/mach-kirkwood/d2net_v2-setup.c
-+++ b/arch/arm/mach-kirkwood/d2net_v2-setup.c
-@@ -226,6 +226,7 @@ MACHINE_START(D2NET_V2, "LaCie d2 Network v2")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-index d933593..1edc314 100644
---- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-+++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-@@ -102,6 +102,7 @@ MACHINE_START(DB88F6281_BP, "Marvell DB-88F6281-BP Development Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
-index 61d9a55..3ffd50f 100644
---- a/arch/arm/mach-kirkwood/dockstar-setup.c
-+++ b/arch/arm/mach-kirkwood/dockstar-setup.c
-@@ -107,6 +107,7 @@ MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
-index bdaed38..b5c0cc2 100644
---- a/arch/arm/mach-kirkwood/guruplug-setup.c
-+++ b/arch/arm/mach-kirkwood/guruplug-setup.c
-@@ -126,6 +126,7 @@ MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
-index 85f6169..25943da 100644
---- a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
-+++ b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
-@@ -168,6 +168,7 @@ MACHINE_START(MV88F6281GTW_GE, "Marvell 88F6281 GTW GE Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-index e6bba01..06ed9b0 100644
---- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
-+++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-@@ -263,6 +263,7 @@ MACHINE_START(NETSPACE_V2, "LaCie Network Space v2")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-@@ -275,6 +276,7 @@ MACHINE_START(INETSPACE_V2, "LaCie Internet Space v2")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-@@ -287,6 +289,7 @@ MACHINE_START(NETSPACE_MAX_V2, "LaCie Network Space Max v2")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/netxbig_v2-setup.c b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
-index 31ae8de..ec0a1ebd 100644
---- a/arch/arm/mach-kirkwood/netxbig_v2-setup.c
-+++ b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
-@@ -404,6 +404,7 @@ MACHINE_START(NET2BIG_V2, "LaCie 2Big Network v2")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-@@ -416,6 +417,7 @@ MACHINE_START(NET5BIG_V2, "LaCie 5Big Network v2")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index 7e99c3f..8d58f32 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -225,6 +225,7 @@ MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-@@ -238,6 +239,7 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-@@ -251,6 +253,7 @@ MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
-index fd2c9c8..c9cc221 100644
---- a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
-+++ b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
-@@ -84,6 +84,7 @@ MACHINE_START(RD88F6192_NAS, "Marvell RD-88F6192-NAS Development Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
-index ef92207..0863bb0 100644
---- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
-+++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
-@@ -120,6 +120,7 @@ MACHINE_START(RD88F6281, "Marvell RD-88F6281 Reference Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-index 4ea70e5f..51ba9be 100644
---- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
-+++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-@@ -143,6 +143,7 @@ MACHINE_START(SHEEVAPLUG, "Marvell SheevaPlug Reference Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-@@ -155,6 +156,7 @@ MACHINE_START(ESATA_SHEEVAPLUG, "Marvell eSATA SheevaPlug Reference Board")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/t5325-setup.c b/arch/arm/mach-kirkwood/t5325-setup.c
-index f9d2a11..498f83e 100644
---- a/arch/arm/mach-kirkwood/t5325-setup.c
-+++ b/arch/arm/mach-kirkwood/t5325-setup.c
-@@ -212,6 +212,7 @@ MACHINE_START(T5325, "HP t5325 Thin Client")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
-index 73e2b6c..8b217ce 100644
---- a/arch/arm/mach-kirkwood/ts219-setup.c
-+++ b/arch/arm/mach-kirkwood/ts219-setup.c
-@@ -137,6 +137,7 @@ MACHINE_START(TS219, "QNAP TS-119/TS-219")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
-index 5bbca26..cb77ab9 100644
---- a/arch/arm/mach-kirkwood/ts41x-setup.c
-+++ b/arch/arm/mach-kirkwood/ts41x-setup.c
-@@ -181,6 +181,7 @@ MACHINE_START(TS41X, "QNAP TS-41x")
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
- 	.init_irq	= kirkwood_init_irq,
-+	.init_late	= kirkwood_init_late,
- 	.timer		= &kirkwood_timer,
- 	.restart	= kirkwood_restart,
- MACHINE_END
 -- 
 1.7.5.4
