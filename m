@@ -1,33 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Apr 2012 08:47:46 +0100
-Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
- clkdevs for given struct clk *
-In-Reply-To: <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
-Message-ID: <20120426074746.GD24211@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 Apr 2012 15:48:23 +0800
+Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
+ Development Kit
+In-Reply-To: <4F98FC74.3050302@bluegiga.com>
+References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20111219071350.GH4962@S2100-06.ap.freescale.net>
+ <4EEEE40C.3000200@bluegiga.com>
+ <20111219091916.GJ4962@S2100-06.ap.freescale.net>
+ <20111219091322.GD14542@n2100.arm.linux.org.uk>
+ <20120104135204.GA14741@S2100-06.ap.freescale.net>
+ <20120104211800.GF11810@n2100.arm.linux.org.uk>
+ <20120105113106.GR11810@n2100.arm.linux.org.uk>
+ <20120330131320.GH3254@S2101-09.ap.freescale.net>
+ <20120330131509.GE22981@n2100.arm.linux.org.uk>
+ <20120330132040.GF22981@n2100.arm.linux.org.uk>
+ <4F98FC74.3050302@bluegiga.com>
+Message-ID: <CAAQ0ZWT2arwk275y3E+=nECNh1sSe8+w44jVL7xL3xOy3QqJNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 12:20:29PM +0530, Viresh Kumar wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> With common clock framework, clks are allocated at runtime. Some of them require
-> clkdevs to be allocated and added in global clkdev list.
-> 
-> This patch introduces helper routines to:
-> 
->  - allocate and add single clkdev for a single clk structure.
->  - add multiple clkdevs for a single clk structure.
+On 26 April 2012 15:42, Lauri Hintsala <lauri.hintsala@bluegiga.com> wrote:
+> Hi Russel,
+>
+> I don't see any mach-types updates for linux-next. Do you have any chance to
+> update mach-types now? We have been waiting apx4devkit support since
+> December.
+>
+Or you may want to contribute the mxs sub-architecture DT support?
+Then we do not even need to bother Russell to update the mach-types ;)
+ I anyway would hope we can kill all those board files with DT support
+in the next 1~2 cycles.
 
-This still causes additional warnings.  Having managed to get the build
-for various platforms down to zero warnings, we now have:
-
-drivers/clk/clkdev.c: In function 'clkdev_alloc':
-drivers/clk/clkdev.c:209: warning: 'ap' may be used uninitialized in this function
-drivers/clk/clkdev.c: In function 'clk_register_clkdev':
-drivers/clk/clkdev.c:251: warning: 'ap' may be used uninitialized in this function
-
-for everything building clkdev.c
-
-I'll be dropping the patch.  Please fix.
+Regards,
+Shawn
