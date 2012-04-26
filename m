@@ -1,87 +1,83 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Thu, 26 Apr 2012 10:42:44 +0300
-Subject: [PATCH v3] ARM: mxs: Add initial support for Bluegiga APX4
- Development Kit
-In-Reply-To: <20120330132040.GF22981@n2100.arm.linux.org.uk>
-References: <1323766966-30502-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20111219071350.GH4962@S2100-06.ap.freescale.net>
- <4EEEE40C.3000200@bluegiga.com>
- <20111219091916.GJ4962@S2100-06.ap.freescale.net>
- <20111219091322.GD14542@n2100.arm.linux.org.uk>
- <20120104135204.GA14741@S2100-06.ap.freescale.net>
- <20120104211800.GF11810@n2100.arm.linux.org.uk>
- <20120105113106.GR11810@n2100.arm.linux.org.uk>
- <20120330131320.GH3254@S2101-09.ap.freescale.net>
- <20120330131509.GE22981@n2100.arm.linux.org.uk>
- <20120330132040.GF22981@n2100.arm.linux.org.uk>
-Message-ID: <4F98FC74.3050302@bluegiga.com>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Thu, 26 Apr 2012 00:45:18 -0700
+Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FE807@DBDE01.ent.ti.com>
+References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
+ <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
+ <CA+Bv8XYemH3zW48id_ZAvC2gU_uZMFei6dMO1GUog_YTvFBV2Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83E9FE722@DBDE01.ent.ti.com>
+ <CA+Bv8XaWkBr7ZDTjmjDg_K+JhEfWdYEt=eKQ5Gj8NMbw4K=Jmg@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83E9FE807@DBDE01.ent.ti.com>
+Message-ID: <CA+Bv8XYDNKWByVEMWniYruH6bcDtOihne5ecoXWJs6fYq418bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2012 04:20 PM, Russell King - ARM Linux wrote:
-> On Fri, Mar 30, 2012 at 02:15:10PM +0100, Russell King - ARM Linux wrote:
->> On Fri, Mar 30, 2012 at 09:13:24PM +0800, Shawn Guo wrote:
->>> On Thu, Jan 05, 2012 at 11:31:06AM +0000, Russell King - ARM Linux wrote:
->>>> On Wed, Jan 04, 2012 at 09:18:00PM +0000, Russell King - ARM Linux wrote:
->>>>> On Wed, Jan 04, 2012 at 09:52:05PM +0800, Shawn Guo wrote:
->>>>>> On Mon, Dec 19, 2011 at 09:13:22AM +0000, Russell King - ARM Linux wrote:
->>>>>>> No.  It will be automatically removed from any update as long as it does
->>>>>>> not conform to the requirements - that is, in this case, the strings
->>>>>>> being out of sync indentified in the message to which you replied to.
->>>>>>>
->>>>>>> Someone needs to tell me what the correct entry is supposed to look like.
->>>>>>>
->>>>>> Hi Russell,
->>>>>>
->>>>>> Any chance to have APX4DEVKIT included in your patch 'ARM: Update
->>>>>> mach-types' for 3.3?
->>>>>
->>>>> As it appears when I run the update script, the answer is yes.  I'll
->>>>> update the commit in the next couple of days (I want to reduce the
->>>>> number of times I re-merge the tree now that I've a git-rerere immune
->>>>> conflict to deal with.)
->>>>
->>>> I'll change that - as 3.2 was released last night.  I'm not going to
->>>> update mach-types now as that would be suicide - updating it will
->>>> mean a bunch of entries will be deleted, and we don't know whether that
->>>> will cause build failures.
->>>>
->>>> So... not this side of the merge window.
->>>
->>> Hi Russell,
->>>
->>> I thought you will send a mach-types update during v3.4 merge window,
->>> so I merged APX4DEVKIT board file and it's now on mainline (not enabled
->>> in mxs_defconfig though).  But I have not seen mach-types update yet
->>> while the merge window is almost done.  Do you still plan to send an
->>> update or plan to stop updating mach-types?
+On Wed, Apr 25, 2012 at 11:23 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> On Thu, Apr 26, 2012 at 11:26:09, Russ Dill wrote:
+>> On Wed, Apr 25, 2012 at 10:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+>> > On Thu, Apr 26, 2012 at 10:06:40, Russ Dill wrote:
+>> >> On Tue, Apr 24, 2012 at 2:45 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+>> >> > Current OMAP code supports couple of clocksource options based
+>> >> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+>> >> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+>> >> > So there can be 3 options -
+>> >> >
+>> >> > 1. 32KHz sync-timer
+>> >> > 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+>> >> > 3. 32KHz based gptimer.
+>> >> >
+>> >> > The optional gptimer based clocksource was added so that it can
+>> >> > give the high precision than sync-timer, so expected usage was 2
+>> >> > and not 3.
+>> >> > Unfortunately option 2, clocksource doesn't meet the requirement of
+>> >> > free-running clock as per clocksource need. It stops in low power states
+>> >> > when sys_clock is cut. That makes gptimer based clocksource option
+>> >> > useless for OMAP2/3/4 devices with sys_clock as a clock input.
+>> >> > Option 3 will still work but it is no better than 32K sync-timer
+>> >> > based clocksource.
+>> >> >
+>> >> > So ideally we can kill the gptimer based clocksource option but there
+>> >> > are some OMAP based derivative SoCs like AM33XX which doesn't have
+>> >> > 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
+>> >> > clocksource.
+>> >> > Considering above, make sync-timer and gptimer clocksource runtime
+>> >> > selectable so that both OMAP and AMXXXX continue to use the same code.
+>> >> >
+>> >> > Also, in order to precisely configure/setup sched_clock for given
+>> >> > clocksource, decision has to be made early enough in boot sequence.
+>> >> >
+>> >> > So, the solution is,
+>> >> >
+>> >> > Use kernel parameter ("clocksource=") to override
+>> >> > default 32k_sync-timer, in addition to this, we also use hwmod database
+>> >> > lookup mechanism, through which at run-time we can identify availability
+>> >> > of 32k-sync timer on the device, else fall back to gptimer.
+>> >> >
+>> >> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> >> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> >> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> >> > Cc: Kevin Hilman <khilman@ti.com>
+>> >> > Cc: Benoit Cousson <b-cousson@ti.com>
+>> >> > Cc: Tony Lindgren <tony@atomide.com>
+>> >> > Cc: Paul Walmsley <paul@pwsan.com>
+>> >> > Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> >> > Cc: Ming Lei <tom.leiming@gmail.com>
+>> >>
+>> >> This fails to boot on my Mistral am37x-evm with omap2plus_defconfig
+>> >>
+>> >
+>> > Thanks Russ, for validating it.
+>> >
+>> > But I do not see any relation between your boot process stuck and this patch.
+>> > What is the observation without these patches?
 >>
->> Well, it seems I've been missing having that branch in linux-next for
->> almost the entire previous cycle.  It would be utterly irresponsible
->> to now commit that into mainline because of the -now- huge number of
->> platform IDs that it deletes.
+>> With no patches applied it boots, with 1/3 applied it boots, with 2/3
+>> applied it boots, with 3/3 applied it gets hung. I also tested on my
+>> beagleboard b4, that booted fine.
 >>
->> I assume, therefore, that you don't keep an eye on what's in linux-next.
 >
-> You've actually asked around the same time in the cycle as you asked last
-> time, and I gave more or less the same reply back then.  Nothing's really
-> changed.  There is no way in hell that I'm committing any kind of
-> mach-types update _during_ a merge window.
->
-> The only time that I'd consider doing that is _outside_ of a merge window
-> in preparation for the _next_ merge window, and having it sit in linux-next
-> for a decent amount of time so that people can see it coming, and deal with
-> the implications of that update.  I'd say a minimum of a month in linux-next
-> is required to avoid problems with people on vacations and the like.
+> You mean to say, on Beagleboard it boots up fine. And same fails on EVM?
 
 
-Hi Russel,
-
-I don't see any mach-types updates for linux-next. Do you have any 
-chance to update mach-types now? We have been waiting apx4devkit support 
-since December.
-
-Thank you in advance.
-
-Best regards,
-Lauri Hintsala
+yes
