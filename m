@@ -1,187 +1,147 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 26 Apr 2012 16:44:46 +0200
-Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
-In-Reply-To: <1335451227-27709-2-git-send-email-b29396@freescale.com>
-References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
- <1335451227-27709-2-git-send-email-b29396@freescale.com>
-Message-ID: <20120426144446.GN9142@game.jcrosoft.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 26 Apr 2012 09:10:34 -0600 (MDT)
+Subject: [PATCH-V5 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
+References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
+ <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:40 Thu 26 Apr     , Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> The driver has mux and config support while the gpio is still
-> not supported.
-> For select input setting, the driver will handle it internally
-> and do not need user to take care of it.
-> 
-> The pinctrl-imx core driver will parse the dts file and dynamically
-> create the pinmux functions and groups.
-> 
-> Each IMX SoC pinctrl driver should register pins with a pin register map
-> including mux register and config register and select input map to core
-> for proper operations.
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> ---
-> ChangeLog: v2->v3:
-> * add missed SION bit set from device tree
->   Thanks for Richard Zhao's reminder.
-> ChangeLog: v1->v2:
-> * Change the binding a bit.
->   For fsl,pins property, change it from pin name strings to pin function id
->   which represents a pin working on a specific function. Then we can remove
->   fsl,mux property since the pin function id already contains the mux setting.
->   Also remove other pin config property in the first patch.
->   Because in the future, we will switch to use dtc macro, then using a lot of
->   propertys to represent the each pin config like pull, speed and etc seems
->   needless.
->   Then each pin entry in dts file becomes a pair of PIN_FUNC_ID and CONFIG:
->   fsl,pins = <PIN_FUNC_ID CONFIG ..>
->   See binding doc for details.
-> * Sascha raised a question that pins in the same group may have different
->   pad setting for example I2C_CLK needs pull up while I2C_DAT not.
->   The v1 driver can aslo handle this issue but needs split the different
->   pad setting pins into different groups which loses a bit flexibility.
->   Also suggested by Richard Zhao and Jason Liu, we may still want the iomux
->   v3 simililar using way that allows each pin has the abiblity to configure
->   its pad which seems reasonable because from HW point of view, FSL IMX are
->   indeed pin based SoC which should be able to set per pin.
->   So the main changes in this v2 patch are change to support per pin config.
->   Then the using of iomux is almost the same as the existing iomux v3 for
->   non dt imx platforms. See binding doc for example.
-> 
->   After introduce the new way, there're mainly two known issues:
->   1) Since many pins in the same group may have the same pad config setting,
->      thus there may be some data redundance, however, since it's one word
->      and it's purely describe hw i would think it's not a big issue.
->   2) Need a magic number to indicate no pad config need. In current iomux v3,
->      It's 1<<16 which is not used by IMX5, i used 1<<31 for both MX5 and MX6.
->      However, it's definitely possibile that in the future, the bit 31 may also
->      be used, that means we may need change the binding doc or just handle it in
->      driver for different SoCs.
->   3) Due to core limitation, the current pinconf_group_set/get only support
->      get/set the same config(a u32 value)for all the pins in the same group,
->      so i removed the imx_group_set/get functions support, instead, using
->      imx_pin_get/set.
->      About this limitation, we may need some futher discussion on if we may
->      need to enhance it to be more flexible to support configure different
->      pins in the same group.
-> * Refactor probe handling based on Stephen's suggestion.
-> * Enhanced the binding doc and split it into two part, pinctrl-imx common part
->   and pinctrl-soc driver part.
-> * Change functions name from imx_pmx_* to imx_pinctrl_*.
-> * Other fixes based on Sascha, Stephen, Linus, Shawn's comments.
-> ---
->  .../bindings/pinctrl/fsl,imx-pinctrl.txt           |   93 +++
->  drivers/pinctrl/Kconfig                            |    5 +
->  drivers/pinctrl/Makefile                           |    1 +
->  drivers/pinctrl/pinctrl-imx.c                      |  627 ++++++++++++++++++++
->  drivers/pinctrl/pinctrl-imx.h                      |  106 ++++
->  5 files changed, 832 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
->  create mode 100644 drivers/pinctrl/pinctrl-imx.c
->  create mode 100644 drivers/pinctrl/pinctrl-imx.h
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-> new file mode 100644
-> index 0000000..e00c7fc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-> @@ -0,0 +1,93 @@
-> +* Freescale IOMUX Controller (IOMUXC) for i.MX
-> +
-> +The IOMUX Controller (IOMUXC), together with the IOMUX, enables the IC
-> +to share one PAD to several functional blocks. The sharing is done by
-> +multiplexing the PAD input/output signals. For each PAD there are up to
-> +8 muxing options (called ALT modes). Since different modules require
-> +different PAD settings (like pull up, keeper, etc) the IOMUXC controls
-> +also the PAD settings parameters.
-> +
-> +Please refer to pinctrl-bindings.txt in this directory for details of the
-> +common pinctrl bindings used by client devices, including the meaning of the
-> +phrase "pin configuration node".
-> +
-> +Freescale IMX pin configuration node is a node of a group of pins which can be
-> +used for a specific device or function. This node represents both mux and config
-> +of the pins in that group. The 'mux' selects the function mode(also named mux
-> +mode) this pin can work on and the 'config' configures various pad settings
-> +such as pull-up, open drain, drive strength, etc.
-> +
-> +Required properties for iomux controller:
-> +- compatible: "fsl,<soc>-iomuxc"
-> +  Please refer to each fsl,<soc>-pinctrl.txt binding doc for supported SoCs.
-> +
-> +Required properties for pin configuration node:
-> +- fsl,pins: two integers array, represents a group of pins mux and config
-> +  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
-> +  pin working on a specific function, CONFIG is the pad setting value like
-> +  pull-up on this pin. Please refer to fsl,<soc>-pinctrl.txt for the valid
-> +  pins and functions of each SoC.
-> +
-> +Bits used for CONFIG:
-> +NO_PAD_CTL(1 << 31): indicate this pin does not need config.
-> +
-> +SION(1 << 30): Software Input On Field.
-> +Force the selected mux mode input path no matter of MUX_MODE functionality.
-> +By default the input path is determined by functionality of the selected
-> +mux mode (regular).
-> +
-> +Other bits are used for PAD setting.
-> +
-> +NOTE:
-> +Some requirements for using fsl,imx-pinctrl binding:
-> +1. We have pin function node defined under iomux controller node to represent
-> +   what pinmux functions this SoC supports.
-> +2. The pin configuration node intends to work on a specific function should
-> +   to be defined under that specific function node.
-> +   The function node's name should represent well about what function
-> +   this group of pins in this pin configuration node are working on.
-> +3. The driver can use the function node's name and pin configuration node's
-> +   name describe the pin function and group hierarchy.
-> +   For example, Linux IMX pinctrl driver takes the function node's name
-> +   as the function name and pin configuration node's name as group name to
-> +   create the map table.
-> +4. Each pin configuration node should have a phandle, devices can set pins
-> +   configurations by referring to the phandle of that pin configuration node.
-> +
-> +Examples:
-> +usdhc at 0219c000 { /* uSDHC4 */
-> +	fsl,card-wired;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc4_1>;
-> +};
-> +
-> +iomuxc at 020e0000 {
-> +	compatible = "fsl,imx6q-iomuxc";
-> +	reg = <0x020e0000 0x4000>;
-> +
-> +	/* shared pinctrl settings */
-> +	usdhc4 {
-> +		pinctrl_usdhc4_1: usdhc4grp-1 {
-> +			fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
-> +				    1392 0x17059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
-> +				    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
-> +				    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
-> +				    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
-> +				    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
-> +				    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
-> +				    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
-> +				    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
-> +				    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
-honestly I don't like this it's obscure need to decode manually
+Hi
 
-I propose to use phandle
+a question
 
-as example on uart you will want or not the rst/cts so you will have quite a
-lot of bindings
+On Wed, 25 Apr 2012, Vaibhav Hiremath wrote:
 
-so you can describe the pin configuration (function) and refer it by phandle
-in the group
+> Current OMAP code supports couple of clocksource options based
+> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+> So there can be 3 options -
+> 
+> 1. 32KHz sync-timer
+> 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+> 3. 32KHz based gptimer.
+> 
+> The optional gptimer based clocksource was added so that it can
+> give the high precision than sync-timer, so expected usage was 2
+> and not 3.
+> Unfortunately option 2, clocksource doesn't meet the requirement of
+> free-running clock as per clocksource need. It stops in low power states
+> when sys_clock is cut. That makes gptimer based clocksource option
+> useless for OMAP2/3/4 devices with sys_clock as a clock input.
+> So, in order to use option 2, deeper idle state MUST be disabled.
+> 
+> Option 3 will still work but it is no better than 32K sync-timer
+> based clocksource.
+> 
+> We must support both sync timer and gptimer based clocksource as
+> some OMAP based derivative SoCs like AM33XX does not have the
+> sync timer.
+> 
+> Considering above, make sync-timer and gptimer clocksource runtime
+> selectable so that both OMAP and AMXXXX continue to use the same code.
+> 
+> Also, in order to precisely configure/setup sched_clock for given
+> clocksource, decision has to be made early enough in boot sequence.
+> 
+> So, the solution is,
+> 
+> Use standard kernel parameter ("clocksource=") to override
+> default 32k_sync-timer, in addition to this, we also use hwmod database
+> lookup mechanism, through which at run-time we can identify availability
+> of 32k-sync timer on the device, else fall back to gptimer.
 
-Best Regards,
-J.
+...
+
+> -int __init omap_init_clocksource_32k(void)
+> +/**
+> + * omap_init_clocksource_32k - setup and register counter 32k as a
+> + * kernel clocksource
+> + * @pbase: base addr of counter_32k module
+> + * @size: size of counter_32k to map
+> + *
+> + * Returns 0 upon success or negative error code upon failure.
+> + *
+> + */
+> +int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
+>  {
+> -	static char err[] __initdata = KERN_ERR
+> -			"%s: can't register clocksource!\n";
+> -
+> -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+> -		u32 pbase;
+> -		unsigned long size = SZ_4K;
+> -		void __iomem *base;
+> -		struct clk *sync_32k_ick;
+> -
+> -		if (cpu_is_omap16xx()) {
+> -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
+> -			size = SZ_1K;
+> -		} else if (cpu_is_omap2420())
+> -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
+> -		else if (cpu_is_omap2430())
+> -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
+> -		else if (cpu_is_omap34xx())
+> -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+> -		else if (cpu_is_omap44xx())
+> -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+> -		else
+> -			return -ENODEV;
+> -
+> -		/* For this to work we must have a static mapping in io.c for this area */
+> -		base = ioremap(pbase, size);
+> -		if (!base)
+> -			return -ENODEV;
+> -
+> -		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+> -		if (!IS_ERR(sync_32k_ick))
+> -			clk_enable(sync_32k_ick);
+> -
+> -		timer_32k_base = base;
+> -
+> -		/*
+> -		 * 120000 rough estimate from the calculations in
+> -		 * __clocksource_updatefreq_scale.
+> -		 */
+> -		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+> -				32768, NSEC_PER_SEC, 120000);
+> -
+> -		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+> -					  clocksource_mmio_readl_up))
+> -			printk(err, "32k_counter");
+> -
+> -		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
+> +	int ret;
+> +	void __iomem *base;
+> +	struct clk *sync32k_ick;
+> +
+> +	if (!pbase || !size)
+> +		return -ENODEV;
+> +	/*
+> +	 * For this to work we must have a static mapping in io.c
+> +	 * for this area
+> +	 */
+> +	base = ioremap(pbase, size);
+> +	if (!base) {
+> +		pr_err("32k_counter: failed to map base addr\n");
+> +		return -ENODEV;
+>  	}
+> -	return 0;
+> +
+> +	sync32k_ick = clk_get(NULL, "omap_32ksync_ick");
+> +	if (!IS_ERR(sync32k_ick))
+> +		clk_enable(sync32k_ick);
+
+You've added hwmod data for this IP block, which is good.  This will 
+presumably cause the IP block to be idled on boot.  But you haven't 
+converted this code to use either the hwmod enable code -- just using 
+clk_get() isn't enough.  (Better would be to use a driver and the PM 
+runtime functions, of course, but maybe this runs too early?)
+
+If the 32k sync timer is in OCP force-idle, then that might produce the 
+hangs you're seeing.
+
+
+- Paul
