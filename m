@@ -1,46 +1,48 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Thu, 26 Apr 2012 14:28:19 -0400
-Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
- device tree
-In-Reply-To: <4F9970AD.6090501@wwwdotorg.org>
-References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
- <20120305103245.GC31189@mudshark.cambridge.arm.com>
- <4F9597B4.5020208@redhat.com> <4F9966CB.6090504@redhat.com>
- <20120426152246.GI10272@mudshark.cambridge.arm.com>
- <4F9970AD.6090501@wwwdotorg.org>
-Message-ID: <4F9993C3.8050008@redhat.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 Apr 2012 11:33:16 -0700
+Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <1335260749-25877-4-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Tue, 24 Apr 2012 15:15:49 +0530")
+References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
+ <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
+Message-ID: <87aa1ybaxf.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 11:58 AM, Stephen Warren wrote:
-> On 04/26/2012 09:22 AM, Will Deacon wrote:
->> On Thu, Apr 26, 2012 at 04:16:27PM +0100, William Cohen wrote:
->>> On 04/23/2012 01:56 PM, William Cohen wrote:
->>>> Has this patch been pulled into the git tree?  -Will (Cohen)
->>>
->>>
->>> This patch pretty much duplicates what is already done for in board-seaboard.c:
->>>
->>> http://lxr.linux.no/#linux+v3.3.3/arch/arm/mach-tegra/board-seaboard.c#L147
->>>
->>> I have tested the patch out with oprofile, papi, and perf. Things seem to function properly with the patch on a trimslice.
->>
->> Right, that sounds good to me. This should go via the tegra/arm-soc tree.
->> For some reason, I can't find the original patch in the list archives so
->> perhaps you could repost it to linux-arm-kernel and CC Olof and Arnd?
-> 
-> Is there actually any reason to proceed with this patch? When booting
-> Tegra using device tree (i.e. CONFIG_OF rather than the way the phrase
-> is used in the email subject), the ARM PMU is enabled on all boards. So,
-> I'd recommend switching to DT rather than continuing to patch up the
-> board files, which will hopefully be removed in the nearish future.
-> 
-> (BTW, best to cc linux-tegra at vger.kernel.org too)
+Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
-Hi Stephen,
+> Current OMAP code supports couple of clocksource options based
+> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
 
-The fedora 17 arm kernels are not yet using the DT. That is the motivations to get this fix into the upstream kernel so that people could use performance monitoring hardware.
+[...]
 
-Has the pmu support been verified to work on Nvidia Tegra when using the DT?  In the past I was not successful in getting the trimslice to boot up using device tree. Are there some clear instructions somewhere on how to do this?  
+> +
+> +	sync32k_ick = clk_get(NULL, "omap_32ksync_ick");
+> +	if (!IS_ERR(sync32k_ick))
+> +		clk_enable(sync32k_ick);
+> +
+> +	sync32k_cnt_reg = base + OMAP2_32KSYNCNT_CR_OFF;
+> +
+> +	/*
+> +	 * 120000 rough estimate from the calculations in
+> +	 * __clocksource_updatefreq_scale.
+> +	 */
+> +	clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+> +			32768, NSEC_PER_SEC, 120000);
+> +
+> +	ret = clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+> +				clocksource_mmio_readl_up);
 
--Will
+After discussing this a bit with Vaibhav offline, we found that 'base'
+here should be sync32k_cnt_reg.
+
+Can you guys that were seeing the hang confirm that that fixes the
+issue?
+
+If so, please reply with your Tested-by.  
+
+Thanks,
+
+Kevin
