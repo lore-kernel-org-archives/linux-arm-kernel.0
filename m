@@ -1,39 +1,52 @@
-From: ylmao@marvell.com (Yilu Mao)
-Date: Thu, 26 Apr 2012 13:08:57 +0800
-Subject: [PATCH v3] ARM: cache-l2x0.c: save aux ctrl for resume in case that
- l2x0 is enabled before init
-Message-ID: <1335416937-24724-1-git-send-email-ylmao@marvell.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 26 Apr 2012 05:18:15 +0000
+Subject: [PATCH v3 0/9] Convert OMAP GPMC to driver
+In-Reply-To: <20120425164424.GT3739@atomide.com>
+References: <cover.1333638917.git.afzal@ti.com>
+ <20120425164424.GT3739@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9700FE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
-register will not be saved in l2x0_saved_regs. Therefore we can not use
-l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
-by saving aux ctrl in l2x0_saved_regs just after it's being read from
-the register.
+Hi Tony,
 
-Signed-off-by: Yilu Mao <ylmao@marvell.com>
----
- arch/arm/mm/cache-l2x0.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+On Wed, Apr 25, 2012 at 22:14:25, Tony Lindgren wrote:
+> > Once driver is acceptable, platform code for other peripherals
+> > connected via GPMC would be adapted to make use of GPMC driver. And
+> > then the board modifications. But before that HWMOD entry has to be
+> > populated for respective SoC(s ?).
+>  
+> No, we can't do it this way, it breaks things. We need to first
+> convert everything to use the new GPMC driver, then move it. 
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a53fd2a..f273c7e 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -320,6 +320,13 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
- 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- 
-+	/*
-+	 * In case l2x controller is enabled, the aux ctrl register
-+	 * can't be set. So the original value should be stored in
-+	 * the l2x0_saved_regs for restoring when resume.
-+	 */
-+	l2x0_saved_regs.aux_ctrl = aux;
-+
- 	aux &= aux_mask;
- 	aux |= aux_val;
- 
--- 
-1.7.5.4
+Sorry, my statements were not clear, I meant once driver is
+acceptable & still living in mach-omap2, platform code dealing
+with peripherals on gpmc would be adapted to make use of gpmc
+driver. Moving driver to new location is only planned as a
+separate commit after, before mentioned changes. Hope with this
+clarification we are on same track. 
+
+>  
+> > Now DESTINATION FOR THIS DRIVER has to be decided. Original plan was
+> > to consider GPMC as MFD. The peripheral(s) connected to GPMC being
+> > considered childs of MFD.
+> 
+> Let's not put it into MFD. This is a bus driver. But that
+> decision can wait as we cleary have quite a few things to convert
+> first under arch/arm/mach-omap2.
+>  
+> > Various options that could be seen so far on where this driver can go,
+> > 1. mfd
+> > 2. misc
+> > 3. drivers/platform/arm/ (create an new one?)
+> > 4. memory (create a new one ?)
+> 
+> It's a parallel bus driver, not memory not misc, not MFD.
+
+Greg suggested to send gpmc driver to new memory folder.
+
+In the next version, gpmc driver would still be in mach-omap2,
+moving to new location can be done later.
+
+Regards
+Afzal
