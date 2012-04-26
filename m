@@ -1,56 +1,73 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 26 Apr 2012 08:49:44 +0300
-Subject: [PATCH v2 1/3] ARM: tegra: Add AHB driver
-In-Reply-To: <4F981F6C.2050807@wwwdotorg.org>
-References: <1335269116-9578-1-git-send-email-hdoyu@nvidia.com>
- <20120425083747.466f5c98330af8964d980b8c@nvidia.com>
- <20120425074639.GB3423@arwen.pp.htv.fi>
- <201204251215.22889.arnd@arndb.de> <4F981F6C.2050807@wwwdotorg.org>
-Message-ID: <20120426084944.21e7aa1c3944c906742967a2@nvidia.com>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Wed, 25 Apr 2012 22:56:09 -0700
+Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FE722@DBDE01.ent.ti.com>
+References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
+ <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
+ <CA+Bv8XYemH3zW48id_ZAvC2gU_uZMFei6dMO1GUog_YTvFBV2Q@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83E9FE722@DBDE01.ent.ti.com>
+Message-ID: <CA+Bv8XaWkBr7ZDTjmjDg_K+JhEfWdYEt=eKQ5Gj8NMbw4K=Jmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Apr 2012 17:59:40 +0200
-Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Wed, Apr 25, 2012 at 10:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> On Thu, Apr 26, 2012 at 10:06:40, Russ Dill wrote:
+>> On Tue, Apr 24, 2012 at 2:45 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+>> > Current OMAP code supports couple of clocksource options based
+>> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+>> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+>> > So there can be 3 options -
+>> >
+>> > 1. 32KHz sync-timer
+>> > 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+>> > 3. 32KHz based gptimer.
+>> >
+>> > The optional gptimer based clocksource was added so that it can
+>> > give the high precision than sync-timer, so expected usage was 2
+>> > and not 3.
+>> > Unfortunately option 2, clocksource doesn't meet the requirement of
+>> > free-running clock as per clocksource need. It stops in low power states
+>> > when sys_clock is cut. That makes gptimer based clocksource option
+>> > useless for OMAP2/3/4 devices with sys_clock as a clock input.
+>> > Option 3 will still work but it is no better than 32K sync-timer
+>> > based clocksource.
+>> >
+>> > So ideally we can kill the gptimer based clocksource option but there
+>> > are some OMAP based derivative SoCs like AM33XX which doesn't have
+>> > 32K sync-timer hardware IP and need to fallback on 32KHz based gptimer
+>> > clocksource.
+>> > Considering above, make sync-timer and gptimer clocksource runtime
+>> > selectable so that both OMAP and AMXXXX continue to use the same code.
+>> >
+>> > Also, in order to precisely configure/setup sched_clock for given
+>> > clocksource, decision has to be made early enough in boot sequence.
+>> >
+>> > So, the solution is,
+>> >
+>> > Use kernel parameter ("clocksource=") to override
+>> > default 32k_sync-timer, in addition to this, we also use hwmod database
+>> > lookup mechanism, through which at run-time we can identify availability
+>> > of 32k-sync timer on the device, else fall back to gptimer.
+>> >
+>> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> > Cc: Kevin Hilman <khilman@ti.com>
+>> > Cc: Benoit Cousson <b-cousson@ti.com>
+>> > Cc: Tony Lindgren <tony@atomide.com>
+>> > Cc: Paul Walmsley <paul@pwsan.com>
+>> > Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> > Cc: Ming Lei <tom.leiming@gmail.com>
+>>
+>> This fails to boot on my Mistral am37x-evm with omap2plus_defconfig
+>>
+>
+> Thanks Russ, for validating it.
+>
+> But I do not see any relation between your boot process stuck and this patch.
+> What is the observation without these patches?
 
-> On 04/25/2012 06:15 AM, Arnd Bergmann wrote:
-> > On Wednesday 25 April 2012, Felipe Balbi wrote:
-> ...
-> >>> Can this driver be located under "drivers/misc"? Or is there any better place?
-> >>
-> >> maybe drivers/platform/arm/ ??
-> > 
-> > I really wouldn't want to add that directory: It has the risk of letting
-> > people add random crap there that may or may not be related to ARM (the
-> > company) and/or ARM (the architecture).
-> > 
-> > I think it could go into drivers/amba/ along with the primecell bus driver.
-> > The two drivers are for two different aspects of the AMBA spec and don't
-> > actually depend on one another as far as I can tell, but it's at least
-> > a fitting name, and it doesn't depend on the ARM architecture, which is
-> > important because the driver could be used on other architectures that
-> > are connected to an AHB bus.
-> 
-> Hiroshi, is this driver for something (registers/features) that AMBA
-> actually specifies? AHB might be part of AMBA (I'm not familiar enough
-> to know), but I don't think this aspect of Tegra's AHB bus is part of
-> any core AHB/AMBA specification, rather than being some Tegra-specific
-> control over the bus (given that the registers and bits correspond to
-> Tegra-specific devices on the bus).
-
-Agree.
-
-Taking a look at AHB spec, this tegra-ahb part is a bit beyond that
-spec from S/W POV. If there's other similiar AHB drivers from othere
-SoC, we may be able to generalize them, but at the moment, it's hard
-to imagine how much/little part is common for similar AHB drivers,
-like registers/bit definitions. Most of the part may depends on
-SoC/Tegra.
-
-> I'm not really convinced that low-level platform-specific drivers like
-> this shouldn't be in the arch/arm/mach-* directories.
-
-So I think that keeping this kind of drivers under
-"arch/arm/mach-*" or "drivers/amba" as 'tegra'-ahb.c name. If similier
-drivers comes, then, what about thinking the generalization again?
-Either way would be ok for me.
+With no patches applied it boots, with 1/3 applied it boots, with 2/3
+applied it boots, with 3/3 applied it gets hung. I also tested on my
+beagleboard b4, that booted fine.
