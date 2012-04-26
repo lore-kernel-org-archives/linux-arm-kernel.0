@@ -1,23 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 26 Apr 2012 20:11:59 +0100
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20120426191159.GA9415@sirena.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 26 Apr 2012 13:25:48 -0600 (MDT)
+Subject: [PATCH-V5 1/3] ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC
+ timer to prcm-common header
+In-Reply-To: <1335362340-14960-2-git-send-email-hvaibhav@ti.com>
+References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
+ <1335362340-14960-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.00.1204261325380.10308@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 11:10:31PM +0530, Keerthy wrote:
-> From: J Keerthy <j-keerthy@ti.com>
-> 
-> AVS(Adaptive Voltage Scaling) is a power management technique which
-> controls the operating voltage of a device in order to optimize (i.e. reduce)
-> its power consumption. The voltage is adapted depending on static factors
-> (chip manufacturing process) and dynamic factors (temperature
-> depending performance).
-> The TI AVS solution is named Smartreflex. 
+On Wed, 25 Apr 2012, Vaibhav Hiremath wrote:
 
-What's the relationship between this and existing things like devfreq
-and cpufreq?  It'd be better if the changelogs made this clear and
-provided an overview of how all these different subsystems are intended
-to fit together.
+> Add missing idle_st bit for 32k-sync timer into the prcm-common
+> header file, required for hwmod data.
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> ---
+> NOTE: This patch is same as first version, without any code changes.
+
+Thanks, queued for 3.5.
+
+
+- Paul
