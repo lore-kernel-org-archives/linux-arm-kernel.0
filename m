@@ -1,50 +1,44 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 26 Apr 2012 11:17:36 +0100
-Subject: [PATCH 3/8] ARM: PCI: integrator: use common PCI swizzle
+Date: Thu, 26 Apr 2012 11:17:56 +0100
+Subject: [PATCH 4/8] ARM: PCI: versatile: fix PCI interrupt setup
 In-Reply-To: <20120426101626.GE24211@n2100.arm.linux.org.uk>
 References: <20120426101626.GE24211@n2100.arm.linux.org.uk>
-Message-ID: <E1SNLlY-00080t-3w@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1SNLls-00080x-7W@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Integrator swizzle function is almost the same as the standard PCI
-swizzle, except for an initial check for pin = 0.  Make the integrator
-swizzle function a wrapper around the standard PCI swizzle function so
-we preseve this behaviour while using common code.
+This is at odds with the documentation in the file; it says pin 1 on
+slots 24,25,26,27 map to IRQs 27,28,29,30, but the function will always
+be entered with slot=0 due to the lack of swizzle function.  Fix this
+function to behave as the comments say, and use the standard PCI
+swizzle.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-integrator/pci.c |   17 +++--------------
- 1 files changed, 3 insertions(+), 14 deletions(-)
+ arch/arm/mach-versatile/pci.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/pci.c b/arch/arm/mach-integrator/pci.c
-index f1ca9c1..5715c63 100644
---- a/arch/arm/mach-integrator/pci.c
-+++ b/arch/arm/mach-integrator/pci.c
-@@ -70,21 +70,10 @@
-  */
- static u8 __init integrator_swizzle(struct pci_dev *dev, u8 *pinp)
- {
--	int pin = *pinp;
-+	if (*pinp == 0)
-+		*pinp = 1;
+diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
+index d2268be..24dd4b1 100644
+--- a/arch/arm/mach-versatile/pci.c
++++ b/arch/arm/mach-versatile/pci.c
+@@ -339,15 +339,13 @@ static int __init versatile_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ 	 *  26     1     29
+ 	 *  27     1     30
+ 	 */
+-	irq = 27 + ((slot + pin - 1) & 3);
+-
+-	printk("PCI map irq: slot %d, pin %d, devslot %d, irq: %d\n",slot,pin,devslot,irq);
++	irq = 27 + ((slot - 24 + pin - 1) & 3);
  
--	if (pin == 0)
--		pin = 1;
--
--	while (dev->bus->self) {
--		pin = pci_swizzle_interrupt_pin(dev, pin);
--		/*
--		 * move up the chain of bridges, swizzling as we go.
--		 */
--		dev = dev->bus->self;
--	}
--	*pinp = pin;
--
--	return PCI_SLOT(dev->devfn);
-+	return pci_std_swizzle(dev, pinp);
+ 	return irq;
  }
  
- static int irq_tab[4] __initdata = {
+ static struct hw_pci versatile_pci __initdata = {
+-	.swizzle		= NULL,
++	.swizzle		= pci_std_swizzle,
+ 	.map_irq		= versatile_map_irq,
+ 	.nr_controllers		= 1,
+ 	.setup			= pci_versatile_setup,
 -- 
 1.7.4.4
