@@ -1,81 +1,36 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 26 Apr 2012 10:58:15 -0500
-Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83E9FF456@DBDE01.ent.ti.com>
-References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
- <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
- <CA+Bv8XYemH3zW48id_ZAvC2gU_uZMFei6dMO1GUog_YTvFBV2Q@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83E9FE722@DBDE01.ent.ti.com>
- <CA+Bv8XaWkBr7ZDTjmjDg_K+JhEfWdYEt=eKQ5Gj8NMbw4K=Jmg@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83E9FE807@DBDE01.ent.ti.com>
- <CA+Bv8XYDNKWByVEMWniYruH6bcDtOihne5ecoXWJs6fYq418bQ@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83E9FF456@DBDE01.ent.ti.com>
-Message-ID: <4F997097.7010009@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 26 Apr 2012 09:58:37 -0600
+Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
+ device tree
+In-Reply-To: <20120426152246.GI10272@mudshark.cambridge.arm.com>
+References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
+ <20120305103245.GC31189@mudshark.cambridge.arm.com>
+ <4F9597B4.5020208@redhat.com> <4F9966CB.6090504@redhat.com>
+ <20120426152246.GI10272@mudshark.cambridge.arm.com>
+Message-ID: <4F9970AD.6090501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav, Russ,
-
-On 04/26/2012 08:46 AM, Hiremath, Vaibhav wrote:
-> On Thu, Apr 26, 2012 at 13:15:18, Russ Dill wrote:
->> On Wed, Apr 25, 2012 at 11:23 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
->>> On Thu, Apr 26, 2012 at 11:26:09, Russ Dill wrote:
->>>> On Wed, Apr 25, 2012 at 10:42 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
->>>>> On Thu, Apr 26, 2012 at 10:06:40, Russ Dill wrote:
->>>>>> On Tue, Apr 24, 2012 at 2:45 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
->>>>>>> Current OMAP code supports couple of clocksource options based
->>>>>>> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
->>>>>>> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
->>>>>>> So there can be 3 options -
->>>>>>>
->>>>>>> 1. 32KHz sync-timer
->>>>>>> 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
->>>>>>> 3. 32KHz based gptimer.
->>>>>>>
-> <Snip>
->>>
->>> You mean to say, on Beagleboard it boots up fine. And same fails on EVM?
+On 04/26/2012 09:22 AM, Will Deacon wrote:
+> On Thu, Apr 26, 2012 at 04:16:27PM +0100, William Cohen wrote:
+>> On 04/23/2012 01:56 PM, William Cohen wrote:
+>>> Has this patch been pulled into the git tree?  -Will (Cohen)
 >>
 >>
->> yes
+>> This patch pretty much duplicates what is already done for in board-seaboard.c:
 >>
+>> http://lxr.linux.no/#linux+v3.3.3/arch/arm/mach-tegra/board-seaboard.c#L147
+>>
+>> I have tested the patch out with oprofile, papi, and perf. Things seem to function properly with the patch on a trimslice.
 > 
-> I am able to reproduce this issue, and it seems the issue is really weird 
-> and I am completely clueless here.
-> 
-> With below patch/change it always works, 100% success. The moment I add 0x10 
-> offset to the ioremaped virtual base address, gone...95% of the time it 
-> fails.
-> I have observed that, the execution always stays at wfi (default_idle) 
-> thread. Really strange behavior...and I am clueless now.
-> 
->  - The 32k sync timer address space is part of iotable.
->  - The ioremap() internally masks the addr to page aligned addr and gets pfn,
->    At the end, offset is being added. So I don't really understand how is it
->    different than adding offset before and after ioremap().
-> 
-> 
-> Also, this issue is nothing to do with my patch, it also happens with the 
-> original code.
-> Just add 0x10 offset after ioremap(), and booooooom.... (95% of the time)
-> 
-> 
-> ----------Patch which works (on top of this patch-series)----------
-> 
-> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-> index 3e3cdab..b0ef8ce 100644
-> --- a/arch/arm/plat-omap/counter_32k.c
-> +++ b/arch/arm/plat-omap/counter_32k.c
-> @@ -90,6 +90,7 @@ int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
->          * For this to work we must have a static mapping in io.c
->          * for this area
->          */
-> +       pbase = pbase + OMAP2_32KSYNCNT_CR_OFF;
->         base = ioremap(pbase, size);
+> Right, that sounds good to me. This should go via the tegra/arm-soc tree.
+> For some reason, I can't find the original patch in the list archives so
+> perhaps you could repost it to linux-arm-kernel and CC Olof and Arnd?
 
-What is size set to in the failing case on the am37xx device? Any chance
-we are not mapping enough space?
+Is there actually any reason to proceed with this patch? When booting
+Tegra using device tree (i.e. CONFIG_OF rather than the way the phrase
+is used in the email subject), the ARM PMU is enabled on all boards. So,
+I'd recommend switching to DT rather than continuing to patch up the
+board files, which will hopefully be removed in the nearish future.
 
-Cheers
-Jon
+(BTW, best to cc linux-tegra at vger.kernel.org too)
