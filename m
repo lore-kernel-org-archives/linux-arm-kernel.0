@@ -1,29 +1,69 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Thu, 26 Apr 2012 16:21:26 +0200
-Subject: [PATCH 31/33] ARM i.MX5: implement clocks using common clock
- framework
-In-Reply-To: <20120426130222.GI17184@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Apr 2012 16:25:02 +0200
+Subject: [PATCH v2] Convert i.MX architecture to generic clock framework
+In-Reply-To: <4F995657.4080505@de.bosch.com>
 References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <201204261448.00925.heiko@sntech.de> <20120426130222.GI17184@pengutronix.de>
-Message-ID: <201204261621.27142.heiko@sntech.de>
+ <4F995657.4080505@de.bosch.com>
+Message-ID: <20120426142502.GM17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 26. April 2012, 15:02:22 schrieb Sascha Hauer:
-> On Thu, Apr 26, 2012 at 02:48:00PM +0200, Heiko St?bner wrote:
-> > Hi Sascha,
-> > 
-> > more out of curiosity, why is the i.MX50 always excluded. Is it so vastly
-> > different to the MX51 and MX53?
+On Thu, Apr 26, 2012 at 04:06:15PM +0200, Dirk Behme wrote:
+> On 25.04.2012 17:27, Sascha Hauer wrote:
+> >Hi All,
+> >
+> >Here is another round of patches to convert i.MX to the generic clock
+> >framework. It is based on Mikes recently published for-next branch plus:
+> >
+> >[PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add clkdevs for given struct clk *
+> >[PATCH V3 2/8] clk: add a fixed factor clock
+> >clkdev: Implement managed clk_get()
+> >
+> >The branch is tested on all SoCs I have available, but regressions are more
+> >than likely, so please give it a test.
+> >
+> >I didn't move the clock support to drivers/clk now as the clock control
+> >module is shared with several other SoC specific stuff and I need a global
+> >spinlock. Accessing this somewhere from drivers/ seems odd. Depending on
+> >how things work out we can move it to drivers/ later.
+> >
+> >The remaining cleanups like removing the old clock support posted in the
+> >last series are not included here, I will respin them once it's clear that
+> >a series goes in
+> >
+> >For your convenience a complete series including dependencies (so not
+> >meant for upstream) can be pulled here:
+> >
+> >git://git.pengutronix.de/git/imx/linux-2.6.git work/v3.4-rc4-imx-clk
 > 
-> I don't think that it's so different. I think the reason is that the
-> i.MX50 is not widely used outside of some special applications. At least
-> we have no customers using it.
+> Booting this on top of a 3.4-rc4 on a i.MX6 SabreLite gives me
+> 
+> ..
+> Linux video capture interface: v2.00
+> Switching to clocksource mxc_timer1
+> Clockevents: could not switch to one-shot mode:
+> Clockevents: could not switch to one-shot mode:
+> Clockevents: could not switch to one-shot mode: dummy_timer is not
+> functional.
+>  dummy_timer is not functional.
+> Clockevents: could not switch to one-shot mode:
+> Could not switch to high resolution mode on CPU 0
+>  dummy_timer is not functional.
+> Could not switch to high resolution mode on CPU 2
+> Could not switch to high resolution mode on CPU 1
+>  dummy_timer is not functional.
+> Could not switch to high resolution mode on CPU 3
+> NET: Registered protocol family 2
+> ...
+> 
+> I'm no expert of this, so just in case this is interesting for somebody.
 
-yeah, I started working on one of those "special applications" :-) .Currently 
-based on the freescale tree, where the mx50 seems to have its own clock file. 
+Just rechecked, I can't reproduce this here on a arm2 board
 
-So, it seems I'll take a look myself to see what is missing/different.
+Sascha
 
-
-Heiko
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
