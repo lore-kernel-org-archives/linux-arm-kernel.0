@@ -1,147 +1,60 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 26 Apr 2012 09:10:34 -0600 (MDT)
-Subject: [PATCH-V5 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
-References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
- <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Thu, 26 Apr 2012 11:16:27 -0400
+Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
+ device tree
+In-Reply-To: <4F9597B4.5020208@redhat.com>
+References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
+ <20120305103245.GC31189@mudshark.cambridge.arm.com>
+ <4F9597B4.5020208@redhat.com>
+Message-ID: <4F9966CB.6090504@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-a question
-
-On Wed, 25 Apr 2012, Vaibhav Hiremath wrote:
-
-> Current OMAP code supports couple of clocksource options based
-> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
-> So there can be 3 options -
+On 04/23/2012 01:56 PM, William Cohen wrote:
+> On 03/05/2012 05:32 AM, Will Deacon wrote:
+>> On Sat, Mar 03, 2012 at 02:06:53AM +0000, William Cohen wrote:
+>>> The tegra processor has a performance monitoring unit. However, this
+>>> was not listed on the board-trimslice.c devices. This patch adds
+>>> it to the list of devices and allows one to use hardware performance
+>>> monitoring events on the trimslice machine.
+>>>
+>>> Signed-off-by: William Cohen <wcohen@redhat.com>
+>>> ---
+>>>  arch/arm/mach-tegra/board-trimslice.c |    1 +
+>>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+>>> index cd52820..0484903 100644
+>>> --- a/arch/arm/mach-tegra/board-trimslice.c
+>>> +++ b/arch/arm/mach-tegra/board-trimslice.c
+>>> @@ -82,6 +82,7 @@ static struct platform_device trimslice_audio_device = {
+>>>  
+>>>  static struct platform_device *trimslice_devices[] __initdata = {
+>>>  	&debug_uart,
+>>> +	&tegra_pmu_device,
+>>>  	&tegra_sdhci_device1,
+>>>  	&tegra_sdhci_device4,
+>>>  	&tegra_i2s_device1,
+>>> -- 
+>>> 1.7.5.2
+>>
+>> Olof - would you be able to pick this up please? I've not been able to test
+>> it, but since the device is already defined I'm assuming the IRQ numbers are
+>> correct.
+>>
+>> Cheers,
+>>
+>> Will
 > 
-> 1. 32KHz sync-timer
-> 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
-> 3. 32KHz based gptimer.
+> Hi Will and Olof,
 > 
-> The optional gptimer based clocksource was added so that it can
-> give the high precision than sync-timer, so expected usage was 2
-> and not 3.
-> Unfortunately option 2, clocksource doesn't meet the requirement of
-> free-running clock as per clocksource need. It stops in low power states
-> when sys_clock is cut. That makes gptimer based clocksource option
-> useless for OMAP2/3/4 devices with sys_clock as a clock input.
-> So, in order to use option 2, deeper idle state MUST be disabled.
-> 
-> Option 3 will still work but it is no better than 32K sync-timer
-> based clocksource.
-> 
-> We must support both sync timer and gptimer based clocksource as
-> some OMAP based derivative SoCs like AM33XX does not have the
-> sync timer.
-> 
-> Considering above, make sync-timer and gptimer clocksource runtime
-> selectable so that both OMAP and AMXXXX continue to use the same code.
-> 
-> Also, in order to precisely configure/setup sched_clock for given
-> clocksource, decision has to be made early enough in boot sequence.
-> 
-> So, the solution is,
-> 
-> Use standard kernel parameter ("clocksource=") to override
-> default 32k_sync-timer, in addition to this, we also use hwmod database
-> lookup mechanism, through which at run-time we can identify availability
-> of 32k-sync timer on the device, else fall back to gptimer.
-
-...
-
-> -int __init omap_init_clocksource_32k(void)
-> +/**
-> + * omap_init_clocksource_32k - setup and register counter 32k as a
-> + * kernel clocksource
-> + * @pbase: base addr of counter_32k module
-> + * @size: size of counter_32k to map
-> + *
-> + * Returns 0 upon success or negative error code upon failure.
-> + *
-> + */
-> +int __init omap_init_clocksource_32k(u32 pbase, unsigned long size)
->  {
-> -	static char err[] __initdata = KERN_ERR
-> -			"%s: can't register clocksource!\n";
-> -
-> -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-> -		u32 pbase;
-> -		unsigned long size = SZ_4K;
-> -		void __iomem *base;
-> -		struct clk *sync_32k_ick;
-> -
-> -		if (cpu_is_omap16xx()) {
-> -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
-> -			size = SZ_1K;
-> -		} else if (cpu_is_omap2420())
-> -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
-> -		else if (cpu_is_omap2430())
-> -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
-> -		else if (cpu_is_omap34xx())
-> -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
-> -		else if (cpu_is_omap44xx())
-> -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
-> -		else
-> -			return -ENODEV;
-> -
-> -		/* For this to work we must have a static mapping in io.c for this area */
-> -		base = ioremap(pbase, size);
-> -		if (!base)
-> -			return -ENODEV;
-> -
-> -		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
-> -		if (!IS_ERR(sync_32k_ick))
-> -			clk_enable(sync_32k_ick);
-> -
-> -		timer_32k_base = base;
-> -
-> -		/*
-> -		 * 120000 rough estimate from the calculations in
-> -		 * __clocksource_updatefreq_scale.
-> -		 */
-> -		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
-> -				32768, NSEC_PER_SEC, 120000);
-> -
-> -		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
-> -					  clocksource_mmio_readl_up))
-> -			printk(err, "32k_counter");
-> -
-> -		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
-> +	int ret;
-> +	void __iomem *base;
-> +	struct clk *sync32k_ick;
-> +
-> +	if (!pbase || !size)
-> +		return -ENODEV;
-> +	/*
-> +	 * For this to work we must have a static mapping in io.c
-> +	 * for this area
-> +	 */
-> +	base = ioremap(pbase, size);
-> +	if (!base) {
-> +		pr_err("32k_counter: failed to map base addr\n");
-> +		return -ENODEV;
->  	}
-> -	return 0;
-> +
-> +	sync32k_ick = clk_get(NULL, "omap_32ksync_ick");
-> +	if (!IS_ERR(sync32k_ick))
-> +		clk_enable(sync32k_ick);
-
-You've added hwmod data for this IP block, which is good.  This will 
-presumably cause the IP block to be idled on boot.  But you haven't 
-converted this code to use either the hwmod enable code -- just using 
-clk_get() isn't enough.  (Better would be to use a driver and the PM 
-runtime functions, of course, but maybe this runs too early?)
-
-If the 32k sync timer is in OCP force-idle, then that might produce the 
-hangs you're seeing.
+> Has this patch been pulled into the git tree?  -Will (Cohen)
 
 
-- Paul
+This patch pretty much duplicates what is already done for in board-seaboard.c:
+
+http://lxr.linux.no/#linux+v3.3.3/arch/arm/mach-tegra/board-seaboard.c#L147
+
+I have tested the patch out with oprofile, papi, and perf. Things seem to function properly with the patch on a trimslice.
+
+-Will
