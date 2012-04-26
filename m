@@ -1,38 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Apr 2012 19:07:19 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120404111524.GF32505@mudshark.cambridge.arm.com>
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
-Message-ID: <20120426180719.GC20186@mudshark.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 26 Apr 2012 23:51:16 +0530
+Subject: [PATCH] ARM: davinci/da850-evm: fix section mismatch
+In-Reply-To: <1333139360-6791-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1333139360-6791-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <4F99921C.9030008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2012 at 12:15:24PM +0100, Will Deacon wrote:
-> On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
-> > 
-> > Part of the problem is that the clockdomain data for the emu_sys 
-> > clockdomain is wrong.  Here's something to try to fix it.  It might just 
-> > be enough to get it to work.
-> 
-> Hmm, doesn't seem to work but I do see the following in dmesg when I try to
-> use perf:
-> 
->  powerdomain: waited too long for powerdomain emu_pwrdm to complete transition
-> 
-> which is new with your patch.
+Hi Uwe,
 
-Sorry to nag, but does anybody have a clue where to go from here? I can
-start digging in the OMAP PM code, but it's all new territory for me.
+On 3/31/2012 1:59 AM, Uwe Kleine-K?nig wrote:
+> This fixes:
+> 	WARNING: arch/arm/mach-davinci/built-in.o(.text+0x2d84): Section mismatch in reference from the function da850_evm_ui_expander_setup() to the (unknown reference) .init.data:(unknown)
+> 	The function da850_evm_ui_expander_setup() references
+> 	the (unknown reference) __initdata (unknown).
+> 	This is often because da850_evm_ui_expander_setup lacks a __initdata
+> 	annotation or the annotation of (unknown) is wrong.
+> 
+> Note this is a real issue because if the tca6416 driver only binds when
+> the init sections are already discarded da850_evm_ui_expander_setup is
+> called when da850_evm_devices might already be overwritten.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Cheers,
+Thanks for the patch. I am queuing this for v3.5 since the tca6416
+driver is set to Y by default when DA850 EVM is selected. So I suspect
+users will mostly remain unaffected by the bug.
 
-Will
+Thanks,
+Sekhar
