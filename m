@@ -1,64 +1,118 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Apr 2012 10:04:41 +0200
-Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
- framework
-In-Reply-To: <20120426071413.GH3852@pengutronix.de>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
- <20120426024837.GD28063@b20223-02.ap.freescale.net>
- <20120426064150.GE3852@pengutronix.de>
- <20120426065701.GH28063@b20223-02.ap.freescale.net>
- <20120426071413.GH3852@pengutronix.de>
-Message-ID: <20120426080441.GY20478@pengutronix.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 26 Apr 2012 16:15:50 +0800
+Subject: [PATCH v4 1/1] pinctrl: add pinctrl_provide_dummies interface for
+ platforms to use
+Message-ID: <1335428150-12629-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 09:14:13AM +0200, Sascha Hauer wrote:
-> On Thu, Apr 26, 2012 at 02:57:02PM +0800, Richard Zhao wrote:
-> > On Thu, Apr 26, 2012 at 08:41:50AM +0200, Sascha Hauer wrote:
-> > > On Thu, Apr 26, 2012 at 10:48:38AM +0800, Richard Zhao wrote:
-> > > > The below code is removed from mx6q_clocks_init implicitly.
-> > > > Why? If it's reasonable, it needs to be on a separate patch too.
-> > > > 
-> > > > clk_set_rate(&usdhc1_clk, 49500000);
-> > > > clk_set_rate(&usdhc2_clk, 49500000);
-> > > > clk_set_rate(&usdhc3_clk, 49500000);
-> > > > clk_set_rate(&usdhc4_clk, 49500000);
-> > > 
-> > > Can't say anything to these, probably Shawn has simply lost them while
-> > > porting.
-> > > 
-> > > > 
-> > > > clk_set_parent(&cko1_clk, &ahb_clk);
-> > > 
-> > > Why this? The cko pin has different usecases on each board, mostly I
-> > > think for debugging. We shouldn't touch it here.
-> > clko1's used by audio codec on many boards.
-> > Do you/Shawn think I can add board specific code here with
-> > of_machine_is_compatible? I need to add audio codec clkdev. Other places
-> > can not get clk pointers.
-> 
-> Agreed that we need something to adjust/reparent this clock, but adding
-> board specific code to this file is not the right thing to do.
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-BTW I generally wonder how a board (or SoC code) can reparent clocks if
-needed. At the moment we need
+Add a interface pinctrl_provide_dummies for platform to indicate
+whether it needs use pinctrl dummy state.
 
-	clk_get_sys(mux);
-	clk_get_sys(new_parent);
-	clk_set_parent(mux, new_parent);
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ChangLog v3->v4:
+* remove dummy gpio support in pinctrl subsystem.
+  Let gpio driver decide whether it wants to use pinctrl gpio mux
+  function.
+ChangLog v2->v3:
+* Also changed the missed pinctrl gpio APIs in v1.
+ChangeLog v1->v2:
+* Based on sascha's suggestion, drop using kconfig since it will hide
+  pinctrl errors on all other boards.
+  See: https://lkml.org/lkml/2012/4/18/282
+  It seemed both Linus and Stephen agreed with this way, so i'm ok
+  with it too.
+* add dummy gpio support.
+  pinctrl gpio in the same situation as state.
+* patch name changed.
+  Original is pinctrl: handle dummy state in core.
+* split removing old dt dummy interface into a separate patch
+---
+ drivers/pinctrl/core.c          |   29 +++++++++++++++++++++++++++--
+ include/linux/pinctrl/machine.h |    5 ++++-
+ 2 files changed, 31 insertions(+), 3 deletions(-)
 
-The above needs error checking and we need a clkdev for all clocks we want
-to reparent + a clkdev for all possible parents.
-
-All this together makes reparenting in practice quite cumbersome. I have
-the hope that future additions to the clock framework will make this
-easier.
-
-Sascha
-
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index ea2412a..d302fdb 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -43,6 +43,8 @@ struct pinctrl_maps {
+ 	unsigned num_maps;
+ };
+ 
++static bool pinctrl_dummy_state;
++
+ /* Mutex taken by all entry points */
+ DEFINE_MUTEX(pinctrl_mutex);
+ 
+@@ -61,6 +63,19 @@ static LIST_HEAD(pinctrl_maps);
+ 			_i_ < _maps_node_->num_maps; \
+ 			i++, _map_ = &_maps_node_->maps[_i_])
+ 
++/**
++ * pinctrl_provide_dummies() - indicate if pinctrl provides dummy state support
++ *
++ * Usually this function is called by platforms without pinctrl driver support
++ * but run with some shared drivers using pinctrl APIs.
++ * After calling this function, the pinctrl core will return successfully
++ * with creating a dummy state for the driver to keep going smoothly.
++ */
++void pinctrl_provide_dummies(void)
++{
++	pinctrl_dummy_state = true;
++}
++
+ const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev)
+ {
+ 	/* We're not allowed to register devices without name */
+@@ -720,8 +735,18 @@ static struct pinctrl_state *pinctrl_lookup_state_locked(struct pinctrl *p,
+ 	struct pinctrl_state *state;
+ 
+ 	state = find_state(p, name);
+-	if (!state)
+-		return ERR_PTR(-ENODEV);
++	if (!state) {
++		if (pinctrl_dummy_state) {
++			/* create dummy state */
++			dev_dbg(p->dev, "using pinctrl dummy state (%s)\n",
++				name);
++			state = create_state(p, name);
++			if (IS_ERR(state))
++				return state;
++		} else {
++			return ERR_PTR(-ENODEV);
++		}
++	}
+ 
+ 	return state;
+ }
+diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
+index e4d1de7..ec61e11 100644
+--- a/include/linux/pinctrl/machine.h
++++ b/include/linux/pinctrl/machine.h
+@@ -154,7 +154,7 @@ struct pinctrl_map {
+ 
+ extern int pinctrl_register_mappings(struct pinctrl_map const *map,
+ 				unsigned num_maps);
+-
++extern void pinctrl_provide_dummies(void);
+ #else
+ 
+ static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
+@@ -163,5 +163,8 @@ static inline int pinctrl_register_mappings(struct pinctrl_map const *map,
+ 	return 0;
+ }
+ 
++static inline void pinctrl_provide_dummies(void)
++{
++}
+ #endif /* !CONFIG_PINMUX */
+ #endif
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.4
