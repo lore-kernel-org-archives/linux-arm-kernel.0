@@ -1,74 +1,47 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 26 Apr 2012 17:37:59 +0800
-Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
- framework
-In-Reply-To: <20120426074205.GA2234@S2101-09.ap.freescale.net>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
- <20120426024837.GD28063@b20223-02.ap.freescale.net>
- <20120426064150.GE3852@pengutronix.de>
- <20120426074205.GA2234@S2101-09.ap.freescale.net>
-Message-ID: <20120426093758.GM28063@b20223-02.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Apr 2012 10:44:00 +0100
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case
+ that l2x0 is enabled before init
+In-Reply-To: <4F99148B.4020900@marvell.com>
+References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
+ <20120424082810.GA9367@arm.com> <4F98D659.4030709@marvell.com>
+ <20120426083554.GB18136@arm.com> <4F99148B.4020900@marvell.com>
+Message-ID: <20120426094400.GD18136@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 03:42:08PM +0800, Shawn Guo wrote:
-> On Thu, Apr 26, 2012 at 08:41:50AM +0200, Sascha Hauer wrote:
-> > > clk_set_rate(&pll4_audio, FREQ_650M);
-> > > clk_set_rate(&pll5_video, FREQ_650M);
-> > > clk_set_parent(&ipu1_di0_clk, &ipu1_di0_pre_clk);
-> > > clk_set_parent(&ipu1_di0_pre_clk, &pll5_video);
-> > > clk_set_parent(&gpu3d_shader_clk, &pll2_pfd_594m);
-> > > clk_set_rate(&gpu3d_shader_clk, FREQ_594M);
-> > > clk_set_parent(&gpu3d_core_clk, &mmdc_ch0_axi_clk);
-> > > clk_set_rate(&gpu3d_core_clk, FREQ_528M);
-> > > clk_set_parent(&asrc_serial_clk, &pll3_usb_otg);
-> > > clk_set_rate(&asrc_serial_clk, 1500000);
-> > > clk_set_rate(&enfc_clk, 11000000);
-> > > 
-> 
-> I copied these from Freescale internal BSP when I was creating the file,
-> but did not really think about if we need them or not, so I took the
-> chance to clean them up.  From my testing, I haven't observed any
-> problem with in-tree imx6 drivers.
-I hope we keep the clk tree topology similar with fsl internal kernel
-as much as possible. fsl kernel has more drivers and more consideration
-of the whole tree.
-> 
-> Basically, I do not to mess up the soc clock init with too much driver
-> specific stuff there.
-It's not driver specific. IMHO, driver is not encouraged to change rate
-or reparent. The clk tree is considered as a whole.
+On Thu, Apr 26, 2012 at 10:25:31AM +0100, Yilu Mao wrote:
+> On 04/26/2012 04:35 PM, Catalin Marinas wrote:
+> > On Thu, Apr 26, 2012 at 06:00:09AM +0100, Yilu Mao wrote:
+> >> On 04/24/2012 04:28 PM, Catalin Marinas wrote:
+> >>> On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
+> >>>> +	l2x0_saved_regs.aux_ctrl = aux;
+> >>>> +
+> >>>>    	aux&= aux_mask;
+> >>>>    	aux |= aux_val;
+> >>>
+> >>> I think that's the wrong place to save it, it should be after the
+> >>> masking was done.
+> >>>
+> >>> Anyway, if we cannot write this register in l2x0_init() because the L2
+> >>> was enabled, do we expect the L2 to be disabled during resume?
+> >>>
+> >> Sorry, I don't think so.
+> >> This is the right place to save it because we must make sure the saved
+> >> aux_ctrl is the same as what it is set.
+> >> If we save it after masking was done, the saved value will be different
+> >> because we can't actually change the real setting.
+> >
+> > And since we can't actually change the real setting on the resume path,
+> > why do we need to save it anyway. Is your L2 cache disabled on the
+> > resume path but not on the cold boot one?
+>
+> We can't change L2 aux ctrl setting when do init because it has been 
+> enabled.
 
-Thanks
-Richard
->  Unless we are back to the corner, individual
-> driver should set up its clock properly with clk API.
-> 
-> > > /*
-> > >  * Before pinctrl API is available, we have to rely on the pad
-> > >  * configuration set up by bootloader.  For usdhc example here,
-> > >  * u-boot sets up the pads for 49.5 MHz case, and we have to lower
-> > >  * the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
-> > >  *
-> > >  * FIXME: This is should be removed after pinctrl API is available.
-> > >  * At that time, usdhc driver can call pinctrl API to change pad
-> > >  * configuration dynamically per different usdhc clock settings.
-> > >  */
-> > > clk_set_rate(&usdhc1_clk, 49500000);
-> > > clk_set_rate(&usdhc2_clk, 49500000);
-> > > clk_set_rate(&usdhc3_clk, 49500000);
-> > > clk_set_rate(&usdhc4_clk, 49500000);
-> > 
-> > Can't say anything to these, probably Shawn has simply lost them while
-> > porting.
-> > 
-> I dropped it on purpose.  This quick hack made by me is actually broken.
-> Whenever bootloader changes the pad setting, we have problem here.  So
-> before pinctrl support is available bootloader should be responsible
-> for setting pad and clock in the correct pair.
-> 
-> -- 
-> Regards,
-> Shawn
-> 
+This is normally for the case where the kernel running in non-secure
+mode is not allowed to write the L2 aux ctrl register. Does this
+permission change with core idle?
+
+-- 
+Catalin
