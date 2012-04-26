@@ -1,31 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 26 Apr 2012 23:51:16 +0530
-Subject: [PATCH] ARM: davinci/da850-evm: fix section mismatch
-In-Reply-To: <1333139360-6791-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1333139360-6791-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4F99921C.9030008@ti.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Thu, 26 Apr 2012 14:28:19 -0400
+Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
+ device tree
+In-Reply-To: <4F9970AD.6090501@wwwdotorg.org>
+References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
+ <20120305103245.GC31189@mudshark.cambridge.arm.com>
+ <4F9597B4.5020208@redhat.com> <4F9966CB.6090504@redhat.com>
+ <20120426152246.GI10272@mudshark.cambridge.arm.com>
+ <4F9970AD.6090501@wwwdotorg.org>
+Message-ID: <4F9993C3.8050008@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-On 3/31/2012 1:59 AM, Uwe Kleine-K?nig wrote:
-> This fixes:
-> 	WARNING: arch/arm/mach-davinci/built-in.o(.text+0x2d84): Section mismatch in reference from the function da850_evm_ui_expander_setup() to the (unknown reference) .init.data:(unknown)
-> 	The function da850_evm_ui_expander_setup() references
-> 	the (unknown reference) __initdata (unknown).
-> 	This is often because da850_evm_ui_expander_setup lacks a __initdata
-> 	annotation or the annotation of (unknown) is wrong.
+On 04/26/2012 11:58 AM, Stephen Warren wrote:
+> On 04/26/2012 09:22 AM, Will Deacon wrote:
+>> On Thu, Apr 26, 2012 at 04:16:27PM +0100, William Cohen wrote:
+>>> On 04/23/2012 01:56 PM, William Cohen wrote:
+>>>> Has this patch been pulled into the git tree?  -Will (Cohen)
+>>>
+>>>
+>>> This patch pretty much duplicates what is already done for in board-seaboard.c:
+>>>
+>>> http://lxr.linux.no/#linux+v3.3.3/arch/arm/mach-tegra/board-seaboard.c#L147
+>>>
+>>> I have tested the patch out with oprofile, papi, and perf. Things seem to function properly with the patch on a trimslice.
+>>
+>> Right, that sounds good to me. This should go via the tegra/arm-soc tree.
+>> For some reason, I can't find the original patch in the list archives so
+>> perhaps you could repost it to linux-arm-kernel and CC Olof and Arnd?
 > 
-> Note this is a real issue because if the tca6416 driver only binds when
-> the init sections are already discarded da850_evm_ui_expander_setup is
-> called when da850_evm_devices might already be overwritten.
+> Is there actually any reason to proceed with this patch? When booting
+> Tegra using device tree (i.e. CONFIG_OF rather than the way the phrase
+> is used in the email subject), the ARM PMU is enabled on all boards. So,
+> I'd recommend switching to DT rather than continuing to patch up the
+> board files, which will hopefully be removed in the nearish future.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> (BTW, best to cc linux-tegra at vger.kernel.org too)
 
-Thanks for the patch. I am queuing this for v3.5 since the tca6416
-driver is set to Y by default when DA850 EVM is selected. So I suspect
-users will mostly remain unaffected by the bug.
+Hi Stephen,
 
-Thanks,
-Sekhar
+The fedora 17 arm kernels are not yet using the DT. That is the motivations to get this fix into the upstream kernel so that people could use performance monitoring hardware.
+
+Has the pmu support been verified to work on Nvidia Tegra when using the DT?  In the past I was not successful in getting the trimslice to boot up using device tree. Are there some clear instructions somewhere on how to do this?  
+
+-Will
