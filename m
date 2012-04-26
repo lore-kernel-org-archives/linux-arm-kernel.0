@@ -1,109 +1,79 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 26 Apr 2012 11:49:43 +0530
-Subject: [PATCH 15/19] ARM: OMAP4430: PM: workaround for DDR corruption on
- second CS
-In-Reply-To: <4F981536.2030609@ti.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-16-git-send-email-t-kristo@ti.com> <4F96EF56.5020604@ti.com>
- <1335338762.2149.103.camel@sokoban> <4F981536.2030609@ti.com>
-Message-ID: <CAMQu2gwEuKGtcrP4x-JU3NH906QKvScRwO7vDtrghErKaaF0HA@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 26 Apr 2012 06:21:21 +0000
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <alpine.DEB.2.00.1204252335190.30642@utopia.booyaka.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204252335190.30642@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9FE7EA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 8:46 PM, Jon Hunter <jon-hunter@ti.com> wrote:
-> Hi Tero,
->
-> On 04/25/2012 02:26 AM, Tero Kristo wrote:
->> On Tue, 2012-04-24 at 13:22 -0500, Jon Hunter wrote:
->>> Hi Tero,
->>>
->>> On 04/20/2012 04:33 AM, Tero Kristo wrote:
->>>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>
->>>> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
->>>> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
->>>> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
->>>> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
->>>> is not set properly, we apply the required workaround allowing
->>>> the restore sequence to work properly.
->>>>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
->>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>> ---
->>>> ?.../include/mach/ctrl_module_wkup_44xx.h ? ? ? ? ? | ? ?2 +
->>>> ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ? ? ? ? ? | ? 24 ++++++++++++++++++++
->>>> ?2 files changed, 26 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>>> index a0af9ba..b763a79 100644
->>>> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>>> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>>> @@ -28,6 +28,8 @@
->>>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_REVISION ? ? ? ? 0x0000
->>>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO ? ? ? ? ? 0x0004
->>>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG ? ? ? ? ? ? ? ?0x0010
->>>> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG ?0x0114
->>>> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG ?0x011c
->>>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0 ? ? ? ?0x0460
->>>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1 ? ? ? ?0x0464
->>>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2 ? ? ? ?0x0468
->>>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->>>> index 0472921..d4d18d9 100644
->>>> --- a/arch/arm/mach-omap2/pm44xx.c
->>>> +++ b/arch/arm/mach-omap2/pm44xx.c
->>>> @@ -17,6 +17,9 @@
->>>> ?#include <linux/err.h>
->>>> ?#include <linux/slab.h>
->>>> ?#include <asm/system_misc.h>
->>>> +#include <linux/io.h>
->>>> +
->>>> +#include <mach/ctrl_module_wkup_44xx.h>
->>>>
->>>> ?#include "common.h"
->>>> ?#include "clockdomain.h"
->>>> @@ -215,6 +218,27 @@ static int __init omap4_pm_init(void)
->>>>
->>>> ? ? pr_err("Power Management for TI OMAP4.\n");
->>>>
->>>> + ? /*
->>>> + ? ?* Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
->>>> + ? ?* Mode Transition When CS1 Is Used On EMIF":
->>>> + ? ?* Overwrite EMIF1/EMIF2
->>>> + ? ?* SECURE_EMIF1_SDRAM_CONFIG2_REG
->>>> + ? ?* SECURE_EMIF2_SDRAM_CONFIG2_REG
->>>> + ? ?*/
->>>> + ? if (cpu_is_omap443x()) {
->>>> + ? ? ? ? ? void __iomem *secure_ctrl_mod;
->>>> +
->>>> + ? ? ? ? ? secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
->>>> + ? ? ? ? ? BUG_ON(!secure_ctrl_mod);
->>>> +
->>>> + ? ? ? ? ? __raw_writel(0x10, secure_ctrl_mod +
->>>> + ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
->>>> + ? ? ? ? ? __raw_writel(0x10, secure_ctrl_mod +
->>>> + ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
->>>
->>> According to the erratum description the above registers are used to
->>> restore the EMIFx_SDRAM_CONFIG2 registers. So although the value 0x10,
->>> maybe the value being used for EMIFx_SDRAM_CONFIG2 registers, shouldn't
->>> we read the EMIFx_SDRAM_CONFIG2 registers and store them in the above
->>> registers?
->>
->> This might be a good idea, however, this patch might be tagged as TEMP
->> until the EMIF driver is in place, this fix should rather be located
->> there. I'll take a look at this if I can change the implementation a
->> bit.
->
-> By the way, I did dump the EMIF1_SDRAM_CONFIG2 register on a omap4403
-> and it is configured to 0x10. So I think that reading this register and
-> saving would be safe.
->
-That's right. The reason it is harcoded is, it will be 0x10 or 0x0. Writing 0x10
-even of we use 1 chip select doesn't create any issue as such.
+On Thu, Apr 26, 2012 at 11:15:21, Paul Walmsley wrote:
+> Hi,
+> 
+> > +/*
+> > + * clkdiv32 is generated from fixed division of 732.4219
+> > + */
+> > +static struct clk clkdiv32k_ick = {
+> > +	.name		= "clkdiv32k_ick",
+> > +	.clkdm_name	= "clk_24mhz_clkdm",
+> > +	.rate		= 32768,
+> > +	.parent		= &clk_24mhz,
+> > +	.enable_reg	= AM33XX_CM_PER_CLKDIV32K_CLKCTRL,
+> > +	.enable_bit	= AM33XX_MODULEMODE_SWCTRL,
+> > +	.ops		= &clkops_omap2_dflt,
+> > +};
+> 
+> While working on this file, this clock seemed quite perplexing.  Perhaps 
+> you might be able to answer some questions about it.
+> 
+> - The fractional fixed division seems a little bogus.  Is this actually an 
+> M,N counter?  A few moments with PARI revealed a likely M,N of 64,46875.  
+> Could you please confirm that this is the case for this clock?
+> 
+> - This clock structure makes this clock appear to be a fixed-frequency 
+> clock.  But according to SPRUH73D Figure 8-10 "Peripheral PLL Structure", 
+> the divider feeding this clock can be switched between an M,N of 64,46875 
+> and 32,46875 depending on the value of CONTROL_CLK32K_DIVRATIO_CTRL.  So 
+> shouldn't we implement that?
+> 
 
-But go ahead and read the register and store it. That way it will
-appear bit cleaner.
+Unfortunately, this is fractional divider, assuming input clock of 24MHz.
 
-Regards
-Santosh
+24MHz / 732.4219 = 32KHz (Normal OPP100)
+24MHz / 366.2109 = 32KHz (OPP50)
+
+The register control CONTROL_CLK32K_DIVRATIO_CTRL is provided to choose 
+between these two dividers.
+
+As per the Spec, we have some known HW/Si issues to run whole system at 
+OPP50, that's where if you refer to the TRM Table 8-22. Per PLL Typical 
+Frequencies (MHz), it only talks about OPP100, which is 732.4219 divider.
+
+So, technically, if both OPP's (OPP100 and OPP50) works fine, then yes, we 
+should handle it. But given the fact that, OPP50 is not fully functional due 
+to HW/Si issues, from CORE and PER perspective we will always stay at OPP100.
+
+To summarize, I had to make it fixed-frequency due to,
+
+ - Fractional divisor value.
+ - We will always stay at OPP100 in any case, making this divisor constant 
+   always.
+
+> - This clock is feeding downstream clocks, but it's using the MODULEMODE 
+> control interface, as if it were a standalone IP block.  Do you know why 
+> it's using the MODULEMODE control method rather than some optional clock 
+> control bits, like OMAP4 does?
+> 
+
+Yes, this clock is feeding to timers, gpio debounce clocks, etc...
+Honestly, I do not know the answer to why part of it.
+(May be another integration/design issue)
+
+Thanks,
+Vaibhav
+
+> 
+> - Paul
+> 
