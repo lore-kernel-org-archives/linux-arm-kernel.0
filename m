@@ -1,32 +1,27 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Thu, 26 Apr 2012 11:29:17 -0400
-Subject: [PATCH 1/3] Add the Performance Monitoring Unit to the Trimslice
- device tree
-Message-ID: <1335454157-4881-1-git-send-email-wcohen@redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 26 Apr 2012 10:32:49 -0600
+Subject: [PATCH v3 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl
+ subsystem
+In-Reply-To: <1335451227-27709-4-git-send-email-b29396@freescale.com>
+References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
+ <1335451227-27709-4-git-send-email-b29396@freescale.com>
+Message-ID: <4F9978B1.3050203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tegra processor has a performance monitoring unit. However, this
-was not listed on the board-trimslice.c devices. This patch adds
-it to the list of devices and allows one to use hardware performance
-monitoring events on the trimslice machine.
+On 04/26/2012 08:40 AM, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> This driver is shared between many platforms. Currently only imx6q has
+> pinctrl support, to avoid breaking other platforms that do not have pinctrl
+> support to run this driver, enable pinctrl dummy state for them before
+> they also convert to pinctrl subsystem.
 
-Signed-off-by: William Cohen <wcohen@redhat.com>
----
- arch/arm/mach-tegra/board-trimslice.c |    1 +
- 1 file changed, 1 insertion(+)
+The series,
 
-diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
-index cd52820..0484903 100644
---- a/arch/arm/mach-tegra/board-trimslice.c
-+++ b/arch/arm/mach-tegra/board-trimslice.c
-@@ -82,6 +82,7 @@ static struct platform_device trimslice_audio_device = {
- 
- static struct platform_device *trimslice_devices[] __initdata = {
- 	&debug_uart,
-+	&tegra_pmu_device,
- 	&tegra_sdhci_device1,
- 	&tegra_sdhci_device4,
- 	&tegra_i2s_device1,
--- 
-1.7.10
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+(My ack isn't meant to override or influence any discussions between
+Freescale maintainers re: the binding, but more that the binding seems
+to be /a/ reasonable solution, and is specified well enough that I
+understand what's going on there)
