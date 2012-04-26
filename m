@@ -1,98 +1,98 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 26 Apr 2012 23:10:36 +0530
-Subject: [PATCH V3 05/10] ARM: OMAP2+: SmartReflex: introduce a busy loop
- condition test macro
+Date: Thu, 26 Apr 2012 23:10:37 +0530
+Subject: [PATCH V3 06/10] ARM: OMAP2+: Voltage: Move the omap_volt_data
+ structure to plat
 In-Reply-To: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
 References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
+Message-ID: <1335462041-4949-7-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+From: J Keerthy <j-keerthy@ti.com>
 
-Now that omap_test_timeout is only accessible from mach-omap2/,
-introduce a similar function for SR.
+Move the omap_volt_data structure from mach-omap2/ directory
+to arch/arm/plat-omap/include/plat/ so that it is accessible
+from both mach-omap2 and drivers directories.
 
-This change makes the SmartReflex implementation ready for the move
-to drivers/.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
 Signed-off-by: J Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |   12 ++++++------
- include/linux/power/smartreflex.h |   23 ++++++++++++++++++++++-
- 2 files changed, 28 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/voltage.h             |   21 ++-------------------
+ arch/arm/plat-omap/include/plat/voltage.h |   21 ++++++++++++++++++++-
+ 2 files changed, 22 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index d859277..acef08d 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -289,9 +289,9 @@ static void sr_v1_disable(struct omap_sr *sr)
- 	 * Wait for SR to be disabled.
- 	 * wait until ERRCONFIG.MCUDISACKINTST = 1. Typical latency is 1us.
- 	 */
--	omap_test_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
--			ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
--			timeout);
-+	sr_test_cond_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
-+			     ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
-+			     timeout);
+diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+index 16a1b09..34ef504 100644
+--- a/arch/arm/mach-omap2/voltage.h
++++ b/arch/arm/mach-omap2/voltage.h
+@@ -16,6 +16,8 @@
  
- 	if (timeout >= SR_DISABLE_TIMEOUT)
- 		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-@@ -334,9 +334,9 @@ static void sr_v2_disable(struct omap_sr *sr)
- 	 * Wait for SR to be disabled.
- 	 * wait until IRQSTATUS.MCUDISACKINTST = 1. Typical latency is 1us.
- 	 */
--	omap_test_timeout((sr_read_reg(sr, IRQSTATUS) &
--			IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
--			timeout);
-+	sr_test_cond_timeout((sr_read_reg(sr, IRQSTATUS) &
-+			     IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
-+			     timeout);
+ #include <linux/err.h>
  
- 	if (timeout >= SR_DISABLE_TIMEOUT)
- 		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
-index 884eaee..78b795e 100644
---- a/include/linux/power/smartreflex.h
-+++ b/include/linux/power/smartreflex.h
-@@ -22,7 +22,7 @@
++#include <plat/voltage.h>
++
+ #include "vc.h"
+ #include "vp.h"
  
- #include <linux/types.h>
- #include <linux/platform_device.h>
--
-+#include <linux/delay.h>
- #include <plat/voltage.h>
- 
- /*
-@@ -168,6 +168,27 @@ struct omap_sr {
+@@ -91,25 +93,6 @@ struct voltagedomain {
  };
  
  /**
-+ * test_cond_timeout - busy-loop, testing a condition
-+ * @cond: condition to test until it evaluates to true
-+ * @timeout: maximum number of microseconds in the timeout
-+ * @index: loop index (integer)
-+ *
-+ * Loop waiting for @cond to become true or until at least @timeout
-+ * microseconds have passed.  To use, define some integer @index in the
-+ * calling code.  After running, if @index == @timeout, then the loop has
-+ * timed out.
-+ *
-+ * Copied from omap_test_timeout */
-+#define sr_test_cond_timeout(cond, timeout, index)		\
-+({								\
-+	for (index = 0; index < timeout; index++) {		\
-+		if (cond)					\
-+			break;					\
-+		udelay(1);					\
-+	}							\
-+})
-+
+- * struct omap_volt_data - Omap voltage specific data.
+- * @voltage_nominal:	The possible voltage value in uV
+- * @sr_efuse_offs:	The offset of the efuse register(from system
+- *			control module base address) from where to read
+- *			the n-target value for the smartreflex module.
+- * @sr_errminlimit:	Error min limit value for smartreflex. This value
+- *			differs at differnet opp and thus is linked
+- *			with voltage.
+- * @vp_errorgain:	Error gain value for the voltage processor. This
+- *			field also differs according to the voltage/opp.
+- */
+-struct omap_volt_data {
+-	u32	volt_nominal;
+-	u32	sr_efuse_offs;
+-	u8	sr_errminlimit;
+-	u8	vp_errgain;
+-};
+-
+-/**
+  * struct omap_voltdm_pmic - PMIC specific data required by voltage driver.
+  * @slew_rate:	PMIC slew rate (in uv/us)
+  * @step_size:	PMIC voltage step size (in uv)
+diff --git a/arch/arm/plat-omap/include/plat/voltage.h b/arch/arm/plat-omap/include/plat/voltage.h
+index 0a6a482..5be4d5d 100644
+--- a/arch/arm/plat-omap/include/plat/voltage.h
++++ b/arch/arm/plat-omap/include/plat/voltage.h
+@@ -11,10 +11,29 @@
+ #ifndef __ARCH_ARM_OMAP_VOLTAGE_H
+ #define __ARCH_ARM_OMAP_VOLTAGE_H
+ 
 +/**
-  * struct omap_sr_pmic_data - Strucutre to be populated by pmic code to pass
-  *				pmic specific info to smartreflex driver
-  *
++ * struct omap_volt_data - Omap voltage specific data.
++ * @voltage_nominal:	The possible voltage value in uV
++ * @sr_efuse_offs:	The offset of the efuse register(from system
++ *			control module base address) from where to read
++ *			the n-target value for the smartreflex module.
++ * @sr_errminlimit:	Error min limit value for smartreflex. This value
++ *			differs at differnet opp and thus is linked
++ *			with voltage.
++ * @vp_errorgain:	Error gain value for the voltage processor. This
++ *			field also differs according to the voltage/opp.
++ */
++struct omap_volt_data {
++	u32	volt_nominal;
++	u32	sr_efuse_offs;
++	u8	sr_errminlimit;
++	u8	vp_errgain;
++};
+ struct voltagedomain;
+ 
+ struct voltagedomain *voltdm_lookup(const char *name);
+ int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
+ unsigned long voltdm_get_voltage(struct voltagedomain *voltdm);
+-
++struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
++		unsigned long volt);
+ #endif
 -- 
 1.7.5.4
