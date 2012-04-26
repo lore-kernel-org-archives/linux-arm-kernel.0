@@ -1,88 +1,84 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Apr 2012 08:41:50 +0200
-Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
- framework
-In-Reply-To: <20120426024837.GD28063@b20223-02.ap.freescale.net>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
- <20120426024837.GD28063@b20223-02.ap.freescale.net>
-Message-ID: <20120426064150.GE3852@pengutronix.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 26 Apr 2012 06:43:25 +0000
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <alpine.DEB.2.00.1204260025140.30642@utopia.booyaka.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204252335190.30642@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FE7EA@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204260025140.30642@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83E9FEB50@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 10:48:38AM +0800, Richard Zhao wrote:
-> The below code is removed from mx6q_clocks_init implicitly.
-> Why? If it's reasonable, it needs to be on a separate patch too.
+On Thu, Apr 26, 2012 at 12:06:00, Paul Walmsley wrote:
+> On Thu, 26 Apr 2012, Hiremath, Vaibhav wrote:
 > 
-> /* only keep necessary clocks on */
-> writel_relaxed(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,  CCGR0);
-> writel_relaxed(0x3 << CG8  | 0x3 << CG9  | 0x3 << CG10, CCGR2);
-> writel_relaxed(0x3 << CG10 | 0x3 << CG12,               CCGR3);
-> writel_relaxed(0x3 << CG4  | 0x3 << CG6  | 0x3 << CG7,  CCGR4);
-> writel_relaxed(0x3 << CG0,                              CCGR5);
-> writel_relaxed(0,                                       CCGR6);
-> writel_relaxed(0,                                       CCGR7);
-
-The clock framework will turn them off automatically.
-For the first time the hardware state will be consistent with the
-software state. Hurray!
-
+> > Unfortunately, this is fractional divider, assuming input clock of 24MHz.
+> > 
+> > 24MHz / 732.4219 = 32KHz (Normal OPP100)
+> > 24MHz / 366.2109 = 32KHz (OPP50)
 > 
-> clk_enable(&uart_clk);
-
-This is not needed anymore. For the early debug case we depend on the
-uart being enabled by the bootloader anyway, so it's safe to assume that
-the clock is turned on also. Otherwise the uart driver turns on this
-clock when needed.
-
-> clk_enable(&mmdc_ch0_axi_clk);
-
-This reminds me on something. This clock is turned on in the loop around
-clks_init_on. Since we now have pointers to each clock we don't need the
-clk_get_sys() anymore but can use the pointers directly. Will fix this
-one.
-
+> Yes, I already saw that in the TRM.  The question is, how is the 
+> fractional divider implemented in the hardware?  Is it implemented as an 
+> M,N counter?  It's rather unlikely to be dividing by 732.4219 directly -- 
+> in fact that value isn't even accurate.
 > 
-> clk_set_rate(&pll4_audio, FREQ_650M);
-> clk_set_rate(&pll5_video, FREQ_650M);
-> clk_set_parent(&ipu1_di0_clk, &ipu1_di0_pre_clk);
-> clk_set_parent(&ipu1_di0_pre_clk, &pll5_video);
-> clk_set_parent(&gpu3d_shader_clk, &pll2_pfd_594m);
-> clk_set_rate(&gpu3d_shader_clk, FREQ_594M);
-> clk_set_parent(&gpu3d_core_clk, &mmdc_ch0_axi_clk);
-> clk_set_rate(&gpu3d_core_clk, FREQ_528M);
-> clk_set_parent(&asrc_serial_clk, &pll3_usb_otg);
-> clk_set_rate(&asrc_serial_clk, 1500000);
-> clk_set_rate(&enfc_clk, 11000000);
+
+Not sure how it is implemented in HW, in any case we do not have control 
+over it. The control is only provided using,
+	- MODULEMODE (module enable/disable)
+	- CONTROL_CLK32K_DIVRATIO_CTRL (divisor selection)
+
+
+> > As per the Spec, we have some known HW/Si issues to run whole system at 
+> > OPP50, that's where if you refer to the TRM Table 8-22. Per PLL Typical 
+> > Frequencies (MHz), it only talks about OPP100, which is 732.4219 divider.
+> > 
+> > So, technically, if both OPP's (OPP100 and OPP50) works fine, then yes, we 
+> > should handle it. But given the fact that, OPP50 is not fully functional due 
+> > to HW/Si issues, from CORE and PER perspective we will always stay at OPP100.
 > 
-> /*
->  * Before pinctrl API is available, we have to rely on the pad
->  * configuration set up by bootloader.  For usdhc example here,
->  * u-boot sets up the pads for 49.5 MHz case, and we have to lower
->  * the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
->  *
->  * FIXME: This is should be removed after pinctrl API is available.
->  * At that time, usdhc driver can call pinctrl API to change pad
->  * configuration dynamically per different usdhc clock settings.
->  */
-> clk_set_rate(&usdhc1_clk, 49500000);
-> clk_set_rate(&usdhc2_clk, 49500000);
-> clk_set_rate(&usdhc3_clk, 49500000);
-> clk_set_rate(&usdhc4_clk, 49500000);
-
-Can't say anything to these, probably Shawn has simply lost them while
-porting.
-
+> I see.
 > 
-> clk_set_parent(&cko1_clk, &ahb_clk);
+> > To summarize, I had to make it fixed-frequency due to,
+> > 
+> >  - Fractional divisor value.
+> 
+> This could be implemented as an M,N counter, unless the hardware is doing 
+> something more unusual.
+> 
+> > > - This clock is feeding downstream clocks, but it's using the MODULEMODE 
+> > > control interface, as if it were a standalone IP block.  Do you know why 
+> > > it's using the MODULEMODE control method rather than some optional clock 
+> > > control bits, like OMAP4 does?
+> > 
+> > Yes, this clock is feeding to timers, gpio debounce clocks, etc...
+> > Honestly, I do not know the answer to why part of it.
+> > (May be another integration/design issue)
+> 
+> Could you please check with the AM335x PRCM designers about this to find 
+> out what that MODULEMODE bit is actually doing (i.e., is it actually 
+> enabling the clock, and if so, why did they not use the OPTFCLKEN bits) ?  
+> The AM335x TRM has almost no documentation on what those MODULEMODE bits 
+> are doing in this case.
+> 
 
-Why this? The cko pin has different usecases on each board, mostly I
-think for debugging. We shouldn't touch it here.
+I can check, I am certain that, the answer would be to consider this as a 
+separate independent module. And same as other modules, control is provided 
+to the SW.
 
-Sascha
+> We're trying to remove all of these MODULEMODE clocks from the clock 
+> framework, and also remove the accompanying clockdomain control sequence 
+> from the clock code.  But now it's looking like it may be impossible due 
+> to this "clock," which means we'll need to keep that code around, which is 
+> unfortunate.
+> 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think we have to live with it.
+
+Thanks,
+Vaibhav
+> 
+> - Paul
+> 
