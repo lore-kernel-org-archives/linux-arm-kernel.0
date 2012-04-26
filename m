@@ -1,66 +1,37 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 26 Apr 2012 13:53:12 +0530
-Subject: [PATCH 1/2] Input: matrix-keymap - uninline and prepare for device
- tree support
-In-Reply-To: <20120426081750.GA2684@core.coreip.homeip.net>
-References: <20120426081750.GA2684@core.coreip.homeip.net>
-Message-ID: <4F9905F0.6030402@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Apr 2012 09:35:54 +0100
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case
+ that l2x0 is enabled before init
+In-Reply-To: <4F98D659.4030709@marvell.com>
+References: <1335235280-25148-1-git-send-email-ylmao@marvell.com>
+ <20120424082810.GA9367@arm.com> <4F98D659.4030709@marvell.com>
+Message-ID: <20120426083554.GB18136@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/26/2012 1:47 PM, Dmitry Torokhov wrote:
-> diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
-> index 3b6b528..7c8f2bc 100644
-> --- a/drivers/input/keyboard/spear-keyboard.c
-> +++ b/drivers/input/keyboard/spear-keyboard.c
-> @@ -49,7 +49,9 @@
->  #define KEY_VALUE      0x00FFFFFF
->  #define ROW_MASK       0xF0
->  #define COLUMN_MASK    0x0F
-> -#define ROW_SHIFT      4
-> +#define NUM_ROWS       16
-> +#define NUM_COLS       16
-> +
->  #define KEY_MATRIX_SHIFT       6
-> 
->  struct spear_kbd {
-> @@ -60,7 +62,7 @@ struct spear_kbd {
->         unsigned int irq;
->         unsigned int mode;
->         unsigned short last_key;
-> -       unsigned short keycodes[256];
-> +       unsigned short keycodes[NUM_ROWS * NUM_COLS];
->  };
-> 
->  static irqreturn_t spear_kbd_interrupt(int irq, void *dev_id)
-> @@ -212,18 +214,17 @@ static int __devinit spear_kbd_probe(struct platform_device *pdev)
->         input_dev->open = spear_kbd_open;
->         input_dev->close = spear_kbd_close;
-> 
-> -       __set_bit(EV_KEY, input_dev->evbit);
-> +       error = matrix_keypad_build_keymap(keymap, NULL, NUM_ROWS, NUM_COLS,
-> +                                          kbd->keycodes, input_dev);
-> +       if (error) {
-> +               dev_err(&pdev->dev, "Failed to build keymap\n");
-> +               goto errr_put_clk;
-> +       }
-> +
->         if (pdata->rep)
->                 __set_bit(EV_REP, input_dev->evbit);
->         input_set_capability(input_dev, EV_MSC, MSC_SCAN);
-> 
-> -       input_dev->keycode = kbd->keycodes;
-> -       input_dev->keycodesize = sizeof(kbd->keycodes[0]);
-> -       input_dev->keycodemax = ARRAY_SIZE(kbd->keycodes);
-> -
-> -       matrix_keypad_build_keymap(keymap, ROW_SHIFT,
-> -                       input_dev->keycode, input_dev->keybit);
-> -
->         input_set_drvdata(input_dev, kbd);
-> 
->         error = request_irq(irq, spear_kbd_interrupt, 0, "keyboard", kbd);
+On Thu, Apr 26, 2012 at 06:00:09AM +0100, Yilu Mao wrote:
+> On 04/24/2012 04:28 PM, Catalin Marinas wrote:
+> > On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
+> >> +	l2x0_saved_regs.aux_ctrl = aux;
+> >> +
+> >>   	aux&= aux_mask;
+> >>   	aux |= aux_val;
+> >
+> > I think that's the wrong place to save it, it should be after the
+> > masking was done.
+> >
+> > Anyway, if we cannot write this register in l2x0_init() because the L2
+> > was enabled, do we expect the L2 to be disabled during resume?
+> >
+> Sorry, I don't think so.
+> This is the right place to save it because we must make sure the saved 
+> aux_ctrl is the same as what it is set.
+> If we save it after masking was done, the saved value will be different 
+> because we can't actually change the real setting.
 
-Have you rebased these patches over my patchset for SPEAr and Tegra?
+And since we can't actually change the real setting on the resume path,
+why do we need to save it anyway. Is your L2 cache disabled on the
+resume path but not on the cold boot one?
 
 -- 
-viresh
+Catalin
