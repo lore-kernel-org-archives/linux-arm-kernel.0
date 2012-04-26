@@ -1,26 +1,29 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 26 Apr 2012 11:04:33 +0800
-Subject: imx sgtl5000:BUG: scheduling while atomic:
- speaker-test/1225/0x00000003
-In-Reply-To: <CAOMZO5BeGRgxPeyxYNDD+OcZWCMekf5LpouLCLuwco=f7WRahg@mail.gmail.com>
-References: <20120426023319.GC28063@b20223-02.ap.freescale.net>
- <CAOMZO5BeGRgxPeyxYNDD+OcZWCMekf5LpouLCLuwco=f7WRahg@mail.gmail.com>
-Message-ID: <20120426030432.GE28063@b20223-02.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 25 Apr 2012 21:31:58 -0700
+Subject: [GIT PULL] U300 fixes for the 3.4 series
+In-Reply-To: <CACRpkdYnV3em1v8VJ9ukoVN6+-6vRa69pf5d7p8JJ1W=8tbCCA@mail.gmail.com>
+References: <CACRpkdYnV3em1v8VJ9ukoVN6+-6vRa69pf5d7p8JJ1W=8tbCCA@mail.gmail.com>
+Message-ID: <CAOesGMgZRXTPbT1MDqO8Ft3JvKByv4Jomsja6LwAVq37gxHqYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 12:00:27AM -0300, Fabio Estevam wrote:
-> On Wed, Apr 25, 2012 at 11:33 PM, Richard Zhao
-> <richard.zhao@freescale.com> wrote:
-> 
-> > kernel: 3.4rc3 with ASoC/for-next and some my patches.
-> 
-> Which board is this? Does it work on a mx51babbage?
-I'm adding imx6q_sabrelite audio support. But the dump don't
-have a clue that's board specific, so I put it here to see
-whether anyone else ever saw the similar.
+On Mon, Apr 23, 2012 at 12:27 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> Hi ARM SoC maintainers,
+>
+> these are some two accumulated fixes for the U300 platform to be included
+> in the -rc series for 3.4.
+>
+> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+>
+> ?Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> u300-fixes-for-arm-soc
 
-I didn't try mx5.
+Thanks, pulled.
 
-Thanks
-Richard
+
+-Olof
