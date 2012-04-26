@@ -1,88 +1,52 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 26 Apr 2012 23:38:48 +0300
-Subject: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-In-Reply-To: <4F99B0F8.4040308@wwwdotorg.org>
-References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
- <1335352072-4001-2-git-send-email-hdoyu@nvidia.com>
- <4F99A821.2040406@wwwdotorg.org>
- <20120426202610.GA30690@arwen.pp.htv.fi>
- <4F99B0F8.4040308@wwwdotorg.org>
-Message-ID: <20120426203847.GC30690@arwen.pp.htv.fi>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Thu, 26 Apr 2012 13:43:10 -0700
+Subject: [PATCH-V4 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <87aa1ybaxf.fsf@ti.com>
+References: <1335260749-25877-1-git-send-email-hvaibhav@ti.com>
+ <1335260749-25877-4-git-send-email-hvaibhav@ti.com>
+ <87aa1ybaxf.fsf@ti.com>
+Message-ID: <CA+Bv8XYG2heeWKMt-gdWkPD3_1kkcZspP_XgvCAdwynXzTA3AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 26, 2012 at 11:33 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+>
+>> Current OMAP code supports couple of clocksource options based
+>> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+>> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+>
+> [...]
+>
+>> +
+>> + ? ? sync32k_ick = clk_get(NULL, "omap_32ksync_ick");
+>> + ? ? if (!IS_ERR(sync32k_ick))
+>> + ? ? ? ? ? ? clk_enable(sync32k_ick);
+>> +
+>> + ? ? sync32k_cnt_reg = base + OMAP2_32KSYNCNT_CR_OFF;
+>> +
+>> + ? ? /*
+>> + ? ? ?* 120000 rough estimate from the calculations in
+>> + ? ? ?* __clocksource_updatefreq_scale.
+>> + ? ? ?*/
+>> + ? ? clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+>> + ? ? ? ? ? ? ? ? ? ? 32768, NSEC_PER_SEC, 120000);
+>> +
+>> + ? ? ret = clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? clocksource_mmio_readl_up);
+>
+> After discussing this a bit with Vaibhav offline, we found that 'base'
+> here should be sync32k_cnt_reg.
+>
+> Can you guys that were seeing the hang confirm that that fixes the
+> issue?
+>
+> If so, please reply with your Tested-by.
 
-On Thu, Apr 26, 2012 at 02:32:56PM -0600, Stephen Warren wrote:
-> On 04/26/2012 02:26 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Thu, Apr 26, 2012 at 01:55:13PM -0600, Stephen Warren wrote:
-> >> On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
-> >>> Add extern func, "tegra_ahb_enable_smmu()" to inform AHB that SMMU is
-> >>> ready.
-> >>
-> >>> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> >>> +static int __tegra_ahb_enable_smmu(struct device *dev, void *data)
-> >> ...
-> >>> +int tegra_ahb_enable_smmu(void)
-> >>> +{
-> >>> +	return driver_for_each_device(&tegra_ahb_driver.driver, NULL, NULL,
-> >>> +				      __tegra_ahb_enable_smmu);
-> >>> +}
-> >>> +EXPORT_SYMBOL(tegra_ahb_enable_smmu);
-> >>> +#endif
-> >>
-> >> That looks like a neat solution to avoid having a global device object.
-> > 
-> > except that it won't work always. If you happen to have two AHB bridges,
-> > each using a separate smmu but only one smmu is ready, this will set
-> > SMMU_INIT_DONE on both bridges.
-> 
-> There is only 1.
+Tested-by: Russ Dill <Russ.Dill@ti.com>
 
-that's why there's a "if you happen to have" statement. If you stick to
-this "there is only 1" argument, why do you even make this into a
-platform driver ? Just stick the entire code hidden on the
-machine_init() code. Drivers a supposed to be able to instantiated
-multiple times and always work, this method won't work if tegra99999
-ends up with two AHB bridges/SMMUs
-
-> >> However, if that driver_for_each_device finds no devices, the function
-> >> still succeeds. That doesn't seem right, and doesn't allow e.g. the SMMU
-> >> to defer its probe until the AHB driver has completed.
-> >>
-> >> Perhaps add a local int variable to tegra_ahb_enable_smmu(), pass the
-> >> address to __tegra_ahb_enable_smmu, and have it increment the int. Then,
-> >> after calling driver_for_each_device,:
-> >>
-> >> if (!ahb_device_count)
-> >>     return -EPROBE_DEFER
-> >> if (WARN_ON(ahb_device_count != 1))
-> >>     return -EINVAL;
-> >> return 0;
-> > 
-> > that would look, well, weird. Why don't you just different initcall
-> > leves for this ? Maybe smmu goes into postcore_initcall() and tegra_ahb
-> > goes into postcore_initcall_sync() ?? then you know that SMMU will be
-> > ready by the time you call tegra_ahb probe. Well, unless smmu's probe
-> > fail, but then again, IIUC it won't work anyway...
-> 
-> Uggh. I'd rather all these devices just got instantiated from device
-> tree and relied on deferred probe to manage any ordering, rather than
-> playing complex games with multiple initcall levels (and in the end
-> probably having to invent more and more initcall levels to correctly
-> represent all the dependencies).
-
-then do that... it'll be better than current trickery with
-driver_for_each_device() and my initcall trickery ;-)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120426/1483cb4a/attachment.sig>
+All three patches in series boot tested on:
+Beagleboard xM
+Beagleboard B4
+Mistral AM37X-EVM
