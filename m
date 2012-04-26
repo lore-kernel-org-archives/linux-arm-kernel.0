@@ -1,51 +1,49 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 26 Apr 2012 06:59:58 +0000
-Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-In-Reply-To: <alpine.DEB.2.00.1204260017540.30642@utopia.booyaka.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204260017540.30642@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83E9FEBA6@DBDE01.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Apr 2012 09:14:13 +0200
+Subject: [PATCH 33/33] ARM: i.MX6: implement clocks using common clock
+ framework
+In-Reply-To: <20120426065701.GH28063@b20223-02.ap.freescale.net>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-34-git-send-email-s.hauer@pengutronix.de>
+ <20120426024837.GD28063@b20223-02.ap.freescale.net>
+ <20120426064150.GE3852@pengutronix.de>
+ <20120426065701.GH28063@b20223-02.ap.freescale.net>
+Message-ID: <20120426071413.GH3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 11:54:51, Paul Walmsley wrote:
-> 
-> Hi Vaibhav, Afzal, Vaibhav,
-> 
-> while working on clock33xx_data.c, it became clear that we would not be 
-> able to remove the MODULEMODE leaf clocks for several IP blocks that share 
-> driver code with other DaVinci chips.  This is because:
-> 
-> 1. the drivers for these IP blocks only use the clock framework, rather 
-> than runtime PM;
-> 
-> and 
-> 
-> 2. the clk_get() calls in those drivers do not specify a con_id 
-> parameter, which could cause problems with the clkdev clk_find()'s fuzzy 
-> matching algorithm.
-> 
-> So perhaps your group can work on converting the drivers to use runtime 
-> PM?  Discussing this with Kevin, it sounds like DaVinci doesn't have 
-> runtime PM hooks implemented, but you can probably use OMAP1 as an example 
-> of how to do it.
-> 
-> And then if clk_get() is still needed in the drivers, a specific con_id 
-> should be supplied, such as "fck", which can also be supplied by the OMAP 
-> codebase.
-> 
-> 
+On Thu, Apr 26, 2012 at 02:57:02PM +0800, Richard Zhao wrote:
+> On Thu, Apr 26, 2012 at 08:41:50AM +0200, Sascha Hauer wrote:
+> > On Thu, Apr 26, 2012 at 10:48:38AM +0800, Richard Zhao wrote:
+> > > The below code is removed from mx6q_clocks_init implicitly.
+> > > Why? If it's reasonable, it needs to be on a separate patch too.
+> > > 
+> > > clk_set_rate(&usdhc1_clk, 49500000);
+> > > clk_set_rate(&usdhc2_clk, 49500000);
+> > > clk_set_rate(&usdhc3_clk, 49500000);
+> > > clk_set_rate(&usdhc4_clk, 49500000);
+> > 
+> > Can't say anything to these, probably Shawn has simply lost them while
+> > porting.
+> > 
+> > > 
+> > > clk_set_parent(&cko1_clk, &ahb_clk);
+> > 
+> > Why this? The cko pin has different usecases on each board, mostly I
+> > think for debugging. We shouldn't touch it here.
+> clko1's used by audio codec on many boards.
+> Do you/Shawn think I can add board specific code here with
+> of_machine_is_compatible? I need to add audio codec clkdev. Other places
+> can not get clk pointers.
 
-Honestly, I don't want to block AM33xx stuff getting into mainline due to 
-missing feature in Davinci.
+Agreed that we need something to adjust/reparent this clock, but adding
+board specific code to this file is not the right thing to do.
 
-Also, since AM33xx is not fully supported in the mainline (from peripheral 
-perspective), it really should not break anything as of now.
+Sascha
 
-I am expecting, AM33xx core patches will get in by v3.5 and then while 
-adding peripheral support we will take Davinci migration activity, and can
-make sure that nothing breaks (for all Davinci, OMAP and AM33xx).
 
-Thanks,
-Vaibhav
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
