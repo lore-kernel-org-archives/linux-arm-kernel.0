@@ -1,98 +1,144 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 27 Apr 2012 16:29:31 +0800
-Subject: [PATCH v3 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl
- subsystem
-In-Reply-To: <20120427073504.GS17184@pengutronix.de>
-References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
- <1335451227-27709-4-git-send-email-b29396@freescale.com>
- <20120427073504.GS17184@pengutronix.de>
-Message-ID: <20120427082930.GC826@shlinux2.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Apr 2012 09:22:45 +0100
+Subject: [PATCH 1/2] serial/imx: add DMA support
+In-Reply-To: <4F9A4417.7080107@freescale.com>
+References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
+ <1335436632-29499-2-git-send-email-b32955@freescale.com>
+ <20120426111116.GF24211@n2100.arm.linux.org.uk>
+ <4F9A4417.7080107@freescale.com>
+Message-ID: <20120427082245.GJ24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 03:35:04PM +0800, Sascha Hauer wrote:
-> On Thu, Apr 26, 2012 at 10:40:27PM +0800, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > This driver is shared between many platforms. Currently only imx6q has
-> > pinctrl support, to avoid breaking other platforms that do not have pinctrl
-> > support to run this driver, enable pinctrl dummy state for them before
-> > they also convert to pinctrl subsystem.
-> > 
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > ---
-> > This patch depends on:
-> > pinctrl: add pinctrl_provide_dummies interface for platforms to use
-> > http://www.spinics.net/lists/arm-kernel/msg171538.html
-> > 
-> > ChangeLog v2->v3:
-> >  * patch name updated.
-> >    v1 name is ARM: imx6q: switch to use pinctrl driver
-> >  * using pinctrl dummy state to avoid breaking other platforms to use this
-> >    driver.
-> > 
-> > ChangeLog v1->v2:
-> >  * using updated binding
-> > ---
-> >  arch/arm/boot/dts/imx6q-arm2.dts               |    4 +++
-> >  arch/arm/boot/dts/imx6q.dtsi                   |   32 ++++++++++++++++++++++++
-> >  arch/arm/mach-imx/Kconfig                      |    2 +
-> >  arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |    2 +
-> >  arch/arm/mach-imx/mach-cpuimx51.c              |    2 +
-> >  arch/arm/mach-imx/mach-cpuimx51sd.c            |    2 +
-> >  arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    2 +
-> >  arch/arm/mach-imx/mach-mx25_3ds.c              |    2 +
-> >  arch/arm/mach-imx/mach-mx35_3ds.c              |    2 +
-> >  arch/arm/mach-imx/mach-mx51_3ds.c              |    2 +
-> >  arch/arm/mach-imx/mach-mx51_babbage.c          |    2 +
-> >  arch/arm/mach-imx/mach-mx51_efikamx.c          |    2 +
-> >  arch/arm/mach-imx/mach-mx51_efikasb.c          |    2 +
-> >  arch/arm/mach-imx/mach-mx53_ard.c              |    2 +
-> >  arch/arm/mach-imx/mach-mx53_evk.c              |    2 +
-> >  arch/arm/mach-imx/mach-mx53_loco.c             |    2 +
-> >  arch/arm/mach-imx/mach-mx53_smd.c              |    2 +
-> >  arch/arm/mach-imx/mach-pcm043.c                |    2 +
-> >  arch/arm/mach-imx/mach-vpr200.c                |    2 +
-> 
-> Here you are patching only the boards which happen to use the esdhc
-> controller, so we need to patch other boards when another driver gains
+On Fri, Apr 27, 2012 at 03:00:39PM +0800, Huang Shijie wrote:
+> ? 2012?04?26? 19:11, Russell King - ARM Linux ??:
+>> On Thu, Apr 26, 2012 at 06:37:11PM +0800, Huang Shijie wrote:
+>>> Add the DMA support for uart RX and TX.
+>>>
+>>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>>> ---
+>> Apart from the comments below,
+>>
+>> 1. How do you deal with transmitting the high-priority XON/XOFF
+>>     characters (port->x_char) which occur with s/w flow control and
+>>     the tty buffers fill up?
+>> 2. How do you deal with flow control in general?  IOW, what happens
+>>     when the remote end deasserts your CTS with h/w flow control enabled.
+>>     How does your end deal with sending RTS according to flow control
+>>     conditions?
+>>
+>> i
+> The UART uses the DMA for RX/TX with the hardware flow control (RTS/CTS)  
+> enabled all the time.
 
-Yes, theoretically, if a board does not have drivers running with pinctrl,
-it may not need change.
+Your answer is too vague.  Please try again.
 
-There're so many boards under arch/arm/mach-imx/*:
-b29396 at shlinux2:~/upstream/linux-pinctrl$ ls arch/arm/mach-imx/mach-
-mach-apf9328.c             mach-imx27_visstrim_m10.c  mach-mx31lilly.c           mach-mx51_efikamx.o        mach-pcm037_eet.c
-mach-armadillo5x0.c        mach-imx6q.c               mach-mx31lilly.o           mach-mx51_efikasb.c        mach-pcm037_eet.o
-mach-armadillo5x0.o        mach-imx6q.o               mach-mx31lite.c            mach-mx51_efikasb.o        mach-pcm037.o
-mach-bug.c                 mach-kzm_arm11_01.c        mach-mx31lite.o            mach-mx53_ard.c            mach-pcm038.c
-mach-bug.o                 mach-kzm_arm11_01.o        mach-mx31moboard.c         mach-mx53_ard.o            mach-pcm043.c
-mach-cpuimx27.c            mach-mx1ads.c              mach-mx31moboard.o         mach-mx53_evk.c            mach-pcm043.o
-mach-cpuimx35.c            mach-mx21ads.c             mach-mx35_3ds.c            mach-mx53_evk.o            mach-qong.c
-mach-cpuimx51.c            mach-mx25_3ds.c            mach-mx35_3ds.o            mach-mx53_loco.c           mach-qong.o
-mach-cpuimx51.o            mach-mx27_3ds.c            mach-mx50_rdp.c            mach-mx53_loco.o           mach-scb9328.c
-mach-cpuimx51sd.c          mach-mx27ads.c             mach-mx51_3ds.c            mach-mx53_smd.c            mach-vpr200.c
-mach-cpuimx51sd.o          mach-mx31_3ds.c            mach-mx51_3ds.o            mach-mx53_smd.o            mach-vpr200.o
-mach-eukrea_cpuimx25.c     mach-mx31_3ds.o            mach-mx51_babbage.c        mach-mxt_td60.c
-mach-imx27ipcam.c          mach-mx31ads.c             mach-mx51_babbage.o        mach-pca100.c
-mach-imx27lite.c           mach-mx31ads.o             mach-mx51_efikamx.c        mach-pcm037.c
+> If we use the software flow control(XON/XOFF), we should not enable the DMA.
+> I think i should add more comments about this issue.
+>
+> For example:
+> The MX6Q arm2 has two uarts, one with the DMA disabled is used for debug,
+> the other one with the DMA/RTS.CTS enabled can be used for the Bluetooth.
+>>>   .../bindings/tty/serial/fsl-imx-uart.txt           |    7 +
+>>>   drivers/tty/serial/imx.c                           |  386 +++++++++++++++++++-
+>>>   2 files changed, 389 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+>>> index a9c0406..f27489d 100644
+>>> --- a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+>>> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+>>> @@ -8,6 +8,10 @@ Required properties:
+>>>   Optional properties:
+>>>   - fsl,uart-has-rtscts : Indicate the uart has rts and cts
+>>>   - fsl,irda-mode : Indicate the uart supports irda mode
+>>> +- fsl,enable-dma : Indicate the uart supports DMA
+>>> +- fsl,uart-dma-events : contains the DMA events for RX and TX,
+>>> +	          The first is the RX event, while the other is TX.
+>>> +- fsl,enable-dte: Indicate the uart works in DTE mode
+>>>
+>>>   Example:
+>>>
+>>> @@ -16,4 +20,7 @@ uart at 73fbc000 {
+>>>   	reg =<0x73fbc000 0x4000>;
+>>>   	interrupts =<31>;
+>>>   	fsl,uart-has-rtscts;
+>>> +	fsl,enable-dma;
+>>> +	fsl,uart-dma-events =<xx xx>;
+>>> +	fsl,enable-dte;
+>>>   };
+>>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>>> index e7fecee..65ba24d 100644
+>>> --- a/drivers/tty/serial/imx.c
+>>> +++ b/drivers/tty/serial/imx.c
+>>> @@ -47,9 +47,11 @@
+>>>   #include<linux/slab.h>
+>>>   #include<linux/of.h>
+>>>   #include<linux/of_device.h>
+>>> +#include<linux/dma-mapping.h>
+>>>
+>>>   #include<asm/io.h>
+>>>   #include<asm/irq.h>
+>>> +#include<mach/dma.h>
+>>>   #include<mach/imx-uart.h>
+>>>
+>>>   /* Register definitions */
+>>> @@ -82,6 +84,7 @@
+>>>   #define  UCR1_ADBR       (1<<14) /* Auto detect baud rate */
+>>>   #define  UCR1_TRDYEN     (1<<13) /* Transmitter ready interrupt enable */
+>>>   #define  UCR1_IDEN       (1<<12) /* Idle condition interrupt */
+>>> +#define  UCR1_ICD_REG(x) (((x)&  3)<<  10) /* idle condition detect */
+>>>   #define  UCR1_RRDYEN     (1<<9)	 /* Recv ready interrupt enable */
+>>>   #define  UCR1_RDMAEN     (1<<8)	 /* Recv ready DMA enable */
+>>>   #define  UCR1_IREN       (1<<7)	 /* Infrared interface enable */
+>>> @@ -125,6 +128,7 @@
+>>>   #define  UCR4_ENIRI 	 (1<<8)  /* Serial infrared interrupt enable */
+>>>   #define  UCR4_WKEN  	 (1<<7)  /* Wake interrupt enable */
+>>>   #define  UCR4_REF16 	 (1<<6)  /* Ref freq 16 MHz */
+>>> +#define  UCR4_IDDMAEN    (1<<6)  /* DMA IDLE Condition Detected */
+>>>   #define  UCR4_IRSC  	 (1<<5)  /* IR special case */
+>>>   #define  UCR4_TCEN  	 (1<<3)  /* Transmit complete interrupt enable */
+>>>   #define  UCR4_BKEN  	 (1<<2)  /* Break condition interrupt enable */
+>>> @@ -134,6 +138,7 @@
+>>>   #define  UFCR_RFDIV      (7<<7)  /* Reference freq divider mask */
+>>>   #define  UFCR_RFDIV_REG(x)	(((x)<  7 ? 6 - (x) : 6)<<  7)
+>>>   #define  UFCR_TXTL_SHF   10      /* Transmitter trigger level shift */
+>>> +#define  UFCR_DCEDTE	 (1<<6)
+>>>   #define  USR1_PARITYERR  (1<<15) /* Parity error interrupt flag */
+>>>   #define  USR1_RTSS  	 (1<<14) /* RTS pin status */
+>>>   #define  USR1_TRDY  	 (1<<13) /* Transmitter ready interrupt/dma flag */
+>>> @@ -200,12 +205,27 @@ struct imx_port {
+>>>   	unsigned int		old_status;
+>>>   	int			txirq,rxirq,rtsirq;
+>>>   	unsigned int		have_rtscts:1;
+>>> +	unsigned int		enable_dte:1;
+>>> +	unsigned int		enable_dma:1;
+>>>   	unsigned int		use_irda:1;
+>>>   	unsigned int		irda_inv_rx:1;
+>>>   	unsigned int		irda_inv_tx:1;
+>>>   	unsigned short		trcv_delay; /* transceiver delay */
+>>>   	struct clk		*clk;
+>>>   	struct imx_uart_data	*devdata;
+>>> +
+>>> +	/* DMA fields */
+>>> +	unsigned int		dma_req_rx;
+>>> +	unsigned int		dma_req_tx;
+>>> +	struct imx_dma_data	dma_data;
+>>> +	struct dma_chan		*dma_chan_rx, *dma_chan_tx;
+>>> +	struct scatterlist	rx_sgl, tx_sgl[2];
+>>> +	void			*rx_buf;
+>>> +	unsigned int		rx_bytes, tx_bytes;
+>>> +	struct work_struct	tsk_dma_rx, tsk_dma_tx;
+>> Why do you need a work struct to deal with DMA?
+>>
+> The uart uses the SDMA (drivers/dma/imx-sdma.c). And the SDMA may  
+> schedule out in :
+> sdma_prep_slave_sg() --> sdma_load_contex() -->sdma_run_channel() .
 
-Some of them i'm not familiar and i don't know whether they may use pinctrl
-so i just patched the affected ones.
+It should not.  prep_slave_sg() must be callable from atomic contexts.
 
-One lazy method may be just patch all board files without pinctrl support
-and it will not cause any error.
+> This callback is called from IRQ context, with all the IRQ disabled. see:
+> sdma_int_handler() -->mxc_sdma_handle_channel() -->  
+> mxc_sdma_handle_channel_normal()
+> --> .callback().
 
-What's your suggestion?
-
-> pinctrl. Let's add the provide_dummies call to the SoCs instead which
-> do not have pinctrl yet.
-> 
-You meant add provide_dummies call in imx*_soc_init call?
-We could do it but there might be a case that some boards are converted
-to use pinctrl while others still not but they're based on the same soc.
-For examples, 4 mx53 boards and we may not be able to convert them all at
-the same time.
-
-Regards
-Dong Aisheng
+That's a bug in your dmaengine driver.
