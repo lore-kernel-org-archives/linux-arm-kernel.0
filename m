@@ -1,30 +1,58 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 27 Apr 2012 17:06:53 +0800
-Subject: [GIT PULL][for 3.5] pull request from arch-pxa keyboard
-Message-ID: <CAN1soZz+nbDrfsoNLAV0WfBz7rV+hRR_NP8QrWKONROANNLBbg@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 27 Apr 2012 17:10:56 +0800
+Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
+In-Reply-To: <20120427080412.GW17184@pengutronix.de>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
+ <20120427080412.GW17184@pengutronix.de>
+Message-ID: <20120427091055.GP28063@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+On Fri, Apr 27, 2012 at 10:04:12AM +0200, Sascha Hauer wrote:
+> On Fri, Apr 27, 2012 at 03:03:03PM +0800, Richard Zhao wrote:
+> > It's used by audio drivers.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/clk-imx6q.c |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index f40a35d..9a03dcc 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -418,6 +418,7 @@ int __init mx6q_clocks_init(void)
+> >  	clk_register_clkdev(clk[sdma], NULL, "20ec000.sdma");
+> >  	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
+> >  	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
+> > +	clk_register_clkdev(clk[ssi1], NULL, "2028000.ssi");
+> 
+> The ssi clock needs a general cleanup on all i.MX just like I cleaned up
+> the other units. The SSI unit has at least a register clock and a baud
+> clock. What the driver requests and enables is the register clock.
+> 
+> The baud clock is currently unused and is needed only for master mode
+> (which is not implemented in the ssi driver)
+Are you sure for that? If I don't enable clk[ssi1], the ssi will not
+work.
 
-Please help to pull keyboard branch from arch-pxa git tree.
+> 
+> So where we want to come to is:
+> 
+> 	clk_register_clkdev(clk[ipg], "ipg", "2028000.ssi");
+ssi don't have ipg gate. We can let it always on for imx6q.
 
-The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
-
-  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git keyboard
-
-Chao Xie (4):
-      Input: pxa27x_keypad keep clock on as wakeup source
-      Input: pxa27x_keypad bug fix for direct_key_mask
-      Input: pxa27x_keypad direct key may be low active
-      Input: pxa27x_keypad add choice to set direct_key_mask
-
- arch/arm/plat-pxa/include/plat/pxa27x_keypad.h |    4 ++
- drivers/input/keyboard/pxa27x_keypad.c         |   52 +++++++++++++++++------
- 2 files changed, 42 insertions(+), 14 deletions(-)
-
-Regards
-Haojian
+Thanks
+Richard
+> 	clk_register_clkdev(clk[ssi1], "baud", "2028000.ssi");
+> 
+> Sascha
+> 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
