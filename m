@@ -1,100 +1,84 @@
-From: mark.asselstine@windriver.com (Mark Asselstine)
-Date: Fri, 27 Apr 2012 11:28:28 -0400
-Subject: [PATCH] ARM:mfd: fix ezx-pcap build failure
-In-Reply-To: <20120426215258.GG24211@n2100.arm.linux.org.uk>
-References: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
- <20120426215258.GG24211@n2100.arm.linux.org.uk>
-Message-ID: <2732324.Os5djSkuuZ@yow-masselst-d1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Apr 2012 16:30:31 +0100
+Subject: [PATCH 1/2] serial/imx: add DMA support
+In-Reply-To: <CAMiH66FoEYEqudAOx7Y8GpgjfT-gX2qOi0BjG0-X8xH8u24kSw@mail.gmail.com>
+References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
+ <1335436632-29499-2-git-send-email-b32955@freescale.com>
+ <20120426111116.GF24211@n2100.arm.linux.org.uk>
+ <4F9A4417.7080107@freescale.com>
+ <20120427082245.GJ24211@n2100.arm.linux.org.uk>
+ <4F9A6AEE.30005@freescale.com>
+ <20120427095003.GK24211@n2100.arm.linux.org.uk>
+ <CAMiH66FoEYEqudAOx7Y8GpgjfT-gX2qOi0BjG0-X8xH8u24kSw@mail.gmail.com>
+Message-ID: <20120427153031.GA27792@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On April 26, 2012 22:52:58 Russell King - ARM Linux wrote:
-> On Wed, Apr 25, 2012 at 11:02:43AM -0400, Mark Asselstine wrote:
-> > Attempting to build the ezx_defconfig we get a build failure:
-> > 
-> > drivers/mfd/ezx-pcap.c: In function 'pcap_isr_work':
-> > drivers/mfd/ezx-pcap.c:205: error: implicit declaration of function
-> > 'irq_to_gpio'
-> > 
-> > Looking at this failure we can find that commit 4929f5a8a99f
-> > [ARM:pxa: rename gpio_to_irq and irq_to_gpio] renamed irq_to_gpio()
-> > to pxa_irq_to_gpio() but this change was not made in the ezx-pcap
-> > driver.
+On Fri, Apr 27, 2012 at 11:18:15AM -0400, Huang Shijie wrote:
+> On Fri, Apr 27, 2012 at 5:50 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Apr 27, 2012 at 05:46:22PM +0800, Huang Shijie wrote:
+> >>>>> 1. How do you deal with transmitting the high-priority XON/XOFF
+> >>>>> ? ? ?characters (port->x_char) which occur with s/w flow control and
+> >>>>> ? ? ?the tty buffers fill up?
+> >>>>> 2. How do you deal with flow control in general? ?IOW, what happens
+> >>>>> ? ? ?when the remote end deasserts your CTS with h/w flow control enabled.
+> >> If the remote end deasserts my CTS, it means the remote will not send
+> >> any data.
+> >>
+> >> My DMA for RX will expire in the following steps:
+> >> [1] the UART only waits for 32 bytes time long
+> >> [2] the UART triggers an IDLE Condition Detect DMA.
+> >> [3] the dma_rx_callback() will release the DMA for Rx.
+> >
+> > Err, hang on. ?I think you're totally confused about hardware flow
+> > control. ?Certainly you're not using the correct terms for what you're
+> > describing.
+> >
+> > The CTS input normally controls the transmitter. ?In many hardware
+> > assisted hardware flow control setups, the deassertion of CTS merely
+> > prevents the transmitter starting a new character.
+> >
+> > This shouldn't have any effect on the receiver of the same UART at all.
+> >
+> >>>>> ? ? ?How does your end deal with sending RTS according to flow control
+> >>>>> ? ? ?conditions?
+> >>>>>
+> >> If a CTS is received after we sent out a RTS, it will follow the steps:
+> >> ?imx_int() --> imx_rtsint() --> uart_handle_cts_change() -->start_tx()
+> >>
+> >> The start_tx() will create an TX DMA operation, and send out the data.
+> >
+> > The generation of RTS (connected to the remote ends CTS signal) is
+> > supposed to control whether the remote end sends you characters. ?RTS
+> http://en.wikipedia.org/wiki/Flow_control#Hardware_flow_control
 > 
-> That's because drivers shouldn't have knowledge about the SoC they're
-> running on.  This driver is not restricted to only being built for PXA,
-> and so with your change, this will cause a link error should this be
-> built on non-PXA.
+> >From the wiki, the generation of RTS (assert by the  "master end") is
+> used to send data
+> from the master to slave(the remote), not control the remote end sends
+> me characters.
 
-Agreed. I haven't dissected the rest of the file to see if there are other 
-platform bits leaking in but the filename also wraps the platform name.
+Well, there's a lot of confusion over RTS.  Most implementations of it
+are as per this paragraph on the above page:
 
-> 
-> However, there's a big problem with code using irq_to_gpio() or any
-> variant of that in this manner:
-> 
->         } while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
-> 
-> What is the effect when the supplied IRQ does not have a mapping to a
-> GPIO - or it _does_ by way of a badly coded irq_to_gpio() function
-> but that GPIO is not the correct one.
-> 
-> There is no prevention against endlessly looping, so it could cause a
-> system lockup.
+ A non-standard symmetric alternative, commonly called "RTS/CTS handshaking,"
+ was developed by various equipment manufacturers. In this scheme, CTS is no
+ longer a response to RTS; instead, CTS indicates permission from the DCE
+ for the DTE to send data to the DCE, and RTS indicates permission from
+ the DTE for the DCE to send data to the DTE. RTS and CTS are controlled
+ by the DTE and DCE respectively, each independent of the other. This was
+ eventually codified in version RS-232-E (actually TIA-232-E by that time)
+ by defining a new signal, "RTR (Ready to Receive)," which is CCITT V.24
+ circuit 133. TIA-232-E and the corresponding international standards were
+ updated to show that circuit 133, when implemented, shares the same pin
+ as RTS (Request to Send), and that when 133 is in use, RTS is assumed by
+ the DCE to be ON at all times
 
-Unfortunately the commit [b1148fd4 mfd: fix pcap irq bottom handler
-] which modified things to loop as long as the interrupt is asserted didn't 
-supply much information regarding the behavior they were trying to achieve/fix 
-nor what would be the consequence of bailing earlier.
+This is what is actually used by all NULL modem cables, serial consoles,
+and many modems can be (sensibly) configured to support it.  Many
+modems can be configured via AT commands to respond as per the above
+paragraph too.
 
-> 
-> The real answer is to fix SPI et.al. so that its possible to pass the
-> _GPIO_ number into this driver (that's what the driver wants for its
-> interrupt line after all).  To fix that, SPI folk need to get involved
-> (added Grant as a first step.)
-> 
-> In the meantime, I'd suggest making this depend on !ARM || BROKEN until
-> it's probably fixed.
-
-I will look at having the gpio num passed to the driver one way or another and 
-will take any suggestions from Grant but without access to this hardware I am 
-inclined to do as you suggest and work around things with this patch and a 
-modified Kconfig , possibly making this driver depend on CONFIG_PXA_EZX.
-
-Thanks,
-Mark
-
-> 
-> > Signed-off-by: Mark Asselstine <mark.asselstine@windriver.com>
-> > ---
-> > 
-> >  drivers/mfd/ezx-pcap.c |    3 ++-
-> >  1 files changed, 2 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
-> > index 43a76c4..c49c52a 100644
-> > --- a/drivers/mfd/ezx-pcap.c
-> > +++ b/drivers/mfd/ezx-pcap.c
-> > @@ -19,6 +19,7 @@
-> > 
-> >  #include <linux/spi/spi.h>
-> >  #include <linux/gpio.h>
-> >  #include <linux/slab.h>
-> > 
-> > +#include <linux/gpio-pxa.h>
-> > 
-> >  #define PCAP_ADC_MAXQ		8
-> >  struct pcap_adc_request {
-> > 
-> > @@ -202,7 +203,7 @@ static void pcap_isr_work(struct work_struct *work)
-> > 
-> >  		}
-> >  		local_irq_enable();
-> >  		ezx_pcap_write(pcap, PCAP_REG_MSR, pcap->msr);
-> > 
-> > -	} while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
-> > +	} while (gpio_get_value(pxa_irq_to_gpio(pcap->spi->irq)));
-> > 
-> >  }
-> >  
-> >  static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
+And this is the hardware flow control scheme implemented by the Linux
+Kernel for CRTSCTS, plus the hardware assisted hardware flow control
+provided by industry standard UARTs such as the 1675x and later UARTs.
