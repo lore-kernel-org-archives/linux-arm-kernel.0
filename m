@@ -1,131 +1,186 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 27 Apr 2012 08:55:12 +0200
-Subject: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-In-Reply-To: <20120427.094826.1181797260264746303.hdoyu@nvidia.com>
-References: <4F99B0F8.4040308@wwwdotorg.org><20120426203847.GC30690@arwen.pp.htv.fi><20120427.094826.1181797260264746303.hdoyu@nvidia.com>
-Message-ID: <20120427.095512.2246787149498272095.hdoyu@nvidia.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 27 Apr 2012 15:00:39 +0800
+Subject: [PATCH 1/2] serial/imx: add DMA support
+In-Reply-To: <20120426111116.GF24211@n2100.arm.linux.org.uk>
+References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
+ <1335436632-29499-2-git-send-email-b32955@freescale.com>
+ <20120426111116.GF24211@n2100.arm.linux.org.uk>
+Message-ID: <4F9A4417.7080107@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hiroshi DOYU <hdoyu@nvidia.com>
-Subject: Re: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-Date: Fri, 27 Apr 2012 09:48:26 +0300 (EEST)
-Message-ID: <20120427.094826.1181797260264746303.hdoyu@nvidia.com>
+? 2012?04?26? 19:11, Russell King - ARM Linux ??:
+> On Thu, Apr 26, 2012 at 06:37:11PM +0800, Huang Shijie wrote:
+>> Add the DMA support for uart RX and TX.
+>>
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> ---
+> Apart from the comments below,
+>
+> 1. How do you deal with transmitting the high-priority XON/XOFF
+>     characters (port->x_char) which occur with s/w flow control and
+>     the tty buffers fill up?
+> 2. How do you deal with flow control in general?  IOW, what happens
+>     when the remote end deasserts your CTS with h/w flow control enabled.
+>     How does your end deal with sending RTS according to flow control
+>     conditions?
+>
+> i
+The UART uses the DMA for RX/TX with the hardware flow control (RTS/CTS) 
+enabled all the time.
+If we use the software flow control(XON/XOFF), we should not enable the DMA.
+I think i should add more comments about this issue.
 
-> From: Felipe Balbi <balbi@ti.com>
-> Subject: Re: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-> Date: Thu, 26 Apr 2012 22:38:48 +0200
-> Message-ID: <20120426203847.GC30690@arwen.pp.htv.fi>
-> 
-> > * PGP Signed by an unknown key
-> > 
-> > Hi,
-> > 
-> > On Thu, Apr 26, 2012 at 02:32:56PM -0600, Stephen Warren wrote:
-> > > On 04/26/2012 02:26 PM, Felipe Balbi wrote:
-> > > > Hi,
-> > > > 
-> > > > On Thu, Apr 26, 2012 at 01:55:13PM -0600, Stephen Warren wrote:
-> > > >> On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
-> > > >>> Add extern func, "tegra_ahb_enable_smmu()" to inform AHB that SMMU is
-> > > >>> ready.
-> > > >>
-> > > >>> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> > > >>> +static int __tegra_ahb_enable_smmu(struct device *dev, void *data)
-> > > >> ...
-> > > >>> +int tegra_ahb_enable_smmu(void)
-> > > >>> +{
-> > > >>> +	return driver_for_each_device(&tegra_ahb_driver.driver, NULL, NULL,
-> > > >>> +				      __tegra_ahb_enable_smmu);
-> > > >>> +}
-> > > >>> +EXPORT_SYMBOL(tegra_ahb_enable_smmu);
-> > > >>> +#endif
-> > > >>
-> > > >> That looks like a neat solution to avoid having a global device object.
-> > > > 
-> > > > except that it won't work always. If you happen to have two AHB bridges,
-> > > > each using a separate smmu but only one smmu is ready, this will set
-> > > > SMMU_INIT_DONE on both bridges.
-> > > 
-> > > There is only 1.
-> > 
-> > that's why there's a "if you happen to have" statement. If you stick to
-> > this "there is only 1" argument, why do you even make this into a
-> > platform driver ? Just stick the entire code hidden on the
-> > machine_init() code. Drivers a supposed to be able to instantiated
-> > multiple times and always work, this method won't work if tegra99999
-> > ends up with two AHB bridges/SMMUs
-> > 
-> > > >> However, if that driver_for_each_device finds no devices, the function
-> > > >> still succeeds. That doesn't seem right, and doesn't allow e.g. the SMMU
-> > > >> to defer its probe until the AHB driver has completed.
-> > > >>
-> > > >> Perhaps add a local int variable to tegra_ahb_enable_smmu(), pass the
-> > > >> address to __tegra_ahb_enable_smmu, and have it increment the int. Then,
-> > > >> after calling driver_for_each_device,:
-> > > >>
-> > > >> if (!ahb_device_count)
-> > > >>     return -EPROBE_DEFER
-> > > >> if (WARN_ON(ahb_device_count != 1))
-> > > >>     return -EINVAL;
-> > > >> return 0;
-> > > > 
-> > > > that would look, well, weird. Why don't you just different initcall
-> > > > leves for this ? Maybe smmu goes into postcore_initcall() and tegra_ahb
-> > > > goes into postcore_initcall_sync() ?? then you know that SMMU will be
-> > > > ready by the time you call tegra_ahb probe. Well, unless smmu's probe
-> > > > fail, but then again, IIUC it won't work anyway...
-> > > 
-> > > Uggh. I'd rather all these devices just got instantiated from device
-> > > tree and relied on deferred probe to manage any ordering, rather than
-> > > playing complex games with multiple initcall levels (and in the end
-> > > probably having to invent more and more initcall levels to correctly
-> > > represent all the dependencies).
-> > 
-> > then do that... it'll be better than current trickery with
-> > driver_for_each_device() and my initcall trickery ;-)
-> 
-> Then, what about something like the following?
-> 
->  static int tegra_ahb_match_by_smmu(struct device *dev, void *data)
->  {
->  	struct tegra_ahb *ahb = dev_get_drvdata(dev);
->  	struct device_node *dn = data;
->  
->  	return (ahb->dev->of_node == dn) ? 1 : 0
->  }
->  
->  int tegra_ahb_enable_smmu(struct device_node *ahb)
->  {
->  	struct device *dev;
->  	u32 val;
->  
->  	dev = driver_find_device(&tegra_ahb_driver.driver, NULL, ahb,
->  				 tegra_ahb_match_by_smmu);
->  	if (!dev)
->  		return -ENODEV;
+For example:
+The MX6Q arm2 has two uarts, one with the DMA disabled is used for debug,
+the other one with the DMA/RTS.CTS enabled can be used for the Bluetooth.
+>>   .../bindings/tty/serial/fsl-imx-uart.txt           |    7 +
+>>   drivers/tty/serial/imx.c                           |  386 +++++++++++++++++++-
+>>   2 files changed, 389 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+>> index a9c0406..f27489d 100644
+>> --- a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+>> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+>> @@ -8,6 +8,10 @@ Required properties:
+>>   Optional properties:
+>>   - fsl,uart-has-rtscts : Indicate the uart has rts and cts
+>>   - fsl,irda-mode : Indicate the uart supports irda mode
+>> +- fsl,enable-dma : Indicate the uart supports DMA
+>> +- fsl,uart-dma-events : contains the DMA events for RX and TX,
+>> +	          The first is the RX event, while the other is TX.
+>> +- fsl,enable-dte: Indicate the uart works in DTE mode
+>>
+>>   Example:
+>>
+>> @@ -16,4 +20,7 @@ uart at 73fbc000 {
+>>   	reg =<0x73fbc000 0x4000>;
+>>   	interrupts =<31>;
+>>   	fsl,uart-has-rtscts;
+>> +	fsl,enable-dma;
+>> +	fsl,uart-dma-events =<xx xx>;
+>> +	fsl,enable-dte;
+>>   };
+>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>> index e7fecee..65ba24d 100644
+>> --- a/drivers/tty/serial/imx.c
+>> +++ b/drivers/tty/serial/imx.c
+>> @@ -47,9 +47,11 @@
+>>   #include<linux/slab.h>
+>>   #include<linux/of.h>
+>>   #include<linux/of_device.h>
+>> +#include<linux/dma-mapping.h>
+>>
+>>   #include<asm/io.h>
+>>   #include<asm/irq.h>
+>> +#include<mach/dma.h>
+>>   #include<mach/imx-uart.h>
+>>
+>>   /* Register definitions */
+>> @@ -82,6 +84,7 @@
+>>   #define  UCR1_ADBR       (1<<14) /* Auto detect baud rate */
+>>   #define  UCR1_TRDYEN     (1<<13) /* Transmitter ready interrupt enable */
+>>   #define  UCR1_IDEN       (1<<12) /* Idle condition interrupt */
+>> +#define  UCR1_ICD_REG(x) (((x)&  3)<<  10) /* idle condition detect */
+>>   #define  UCR1_RRDYEN     (1<<9)	 /* Recv ready interrupt enable */
+>>   #define  UCR1_RDMAEN     (1<<8)	 /* Recv ready DMA enable */
+>>   #define  UCR1_IREN       (1<<7)	 /* Infrared interface enable */
+>> @@ -125,6 +128,7 @@
+>>   #define  UCR4_ENIRI 	 (1<<8)  /* Serial infrared interrupt enable */
+>>   #define  UCR4_WKEN  	 (1<<7)  /* Wake interrupt enable */
+>>   #define  UCR4_REF16 	 (1<<6)  /* Ref freq 16 MHz */
+>> +#define  UCR4_IDDMAEN    (1<<6)  /* DMA IDLE Condition Detected */
+>>   #define  UCR4_IRSC  	 (1<<5)  /* IR special case */
+>>   #define  UCR4_TCEN  	 (1<<3)  /* Transmit complete interrupt enable */
+>>   #define  UCR4_BKEN  	 (1<<2)  /* Break condition interrupt enable */
+>> @@ -134,6 +138,7 @@
+>>   #define  UFCR_RFDIV      (7<<7)  /* Reference freq divider mask */
+>>   #define  UFCR_RFDIV_REG(x)	(((x)<  7 ? 6 - (x) : 6)<<  7)
+>>   #define  UFCR_TXTL_SHF   10      /* Transmitter trigger level shift */
+>> +#define  UFCR_DCEDTE	 (1<<6)
+>>   #define  USR1_PARITYERR  (1<<15) /* Parity error interrupt flag */
+>>   #define  USR1_RTSS  	 (1<<14) /* RTS pin status */
+>>   #define  USR1_TRDY  	 (1<<13) /* Transmitter ready interrupt/dma flag */
+>> @@ -200,12 +205,27 @@ struct imx_port {
+>>   	unsigned int		old_status;
+>>   	int			txirq,rxirq,rtsirq;
+>>   	unsigned int		have_rtscts:1;
+>> +	unsigned int		enable_dte:1;
+>> +	unsigned int		enable_dma:1;
+>>   	unsigned int		use_irda:1;
+>>   	unsigned int		irda_inv_rx:1;
+>>   	unsigned int		irda_inv_tx:1;
+>>   	unsigned short		trcv_delay; /* transceiver delay */
+>>   	struct clk		*clk;
+>>   	struct imx_uart_data	*devdata;
+>> +
+>> +	/* DMA fields */
+>> +	unsigned int		dma_req_rx;
+>> +	unsigned int		dma_req_tx;
+>> +	struct imx_dma_data	dma_data;
+>> +	struct dma_chan		*dma_chan_rx, *dma_chan_tx;
+>> +	struct scatterlist	rx_sgl, tx_sgl[2];
+>> +	void			*rx_buf;
+>> +	unsigned int		rx_bytes, tx_bytes;
+>> +	struct work_struct	tsk_dma_rx, tsk_dma_tx;
+> Why do you need a work struct to deal with DMA?
+>
+The uart uses the SDMA (drivers/dma/imx-sdma.c). And the SDMA may 
+schedule out in :
+sdma_prep_slave_sg() --> sdma_load_contex() -->sdma_run_channel() .
 
-+		return -EPROBE_DEFER
+So i have to add a work struct to prepare and triger the DMA operations.
+>> +	unsigned int		dma_tx_nents;
+>> +	bool			dma_is_rxing;
+>> +	wait_queue_head_t	dma_wait;
+>>   };
+>>
+>>   struct imx_port_ucrs {
+>> @@ -394,6 +414,13 @@ static void imx_stop_rx(struct uart_port *port)
+>>   	struct imx_port *sport = (struct imx_port *)port;
+>>   	unsigned long temp;
+>>
+>> +	/*
+>> +	 * We are maybe in the SMP now, so if the DMA RX thread is running,
+>> +	 * we have to wait for it to finish.
+>> +	 */
+>> +	if (sport->enable_dma&&  sport->dma_is_rxing)
+>> +		return;
+>> +
+>>   	temp = readl(sport->port.membase + UCR2);
+>>   	writel(temp&~ UCR2_RXEN, sport->port.membase + UCR2);
+>>   }
+>> @@ -429,6 +456,80 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
+>>   		imx_stop_tx(&sport->port);
+>>   }
+>>
+>> +static void dma_tx_callback(void *data)
+>> +{
+>> +	struct imx_port *sport = data;
+>> +	struct scatterlist *sgl =&sport->tx_sgl[0];
+> 	struct scatterlist *sgl = sport->tx_sgl;
+>
+> is equivalent, and less typing.
+>
+>> +	struct circ_buf *xmit =&sport->port.state->xmit;
+>> +
+>> +	dma_unmap_sg(sport->port.dev, sgl, sport->dma_tx_nents, DMA_TO_DEVICE);
+>> +
+>> +	/* update the stat */
+>> +	spin_lock(&sport->port.lock);
+>> +	xmit->tail = (xmit->tail + sport->tx_bytes)&  (UART_XMIT_SIZE - 1);
+>> +	sport->port.icount.tx += sport->tx_bytes;
+>> +	spin_unlock(&sport->port.lock);
+> Callbacks are called from tasklet context, and will have IRQs enabled.
+> As the port lock is taken from IRQ context, this is waiting for a deadlock
+> to happen.  Have you run this with lockdep enabled?
+>
+This callback is called from IRQ context, with all the IRQ disabled. see:
+sdma_int_handler() -->mxc_sdma_handle_channel() --> 
+mxc_sdma_handle_channel_normal()
+--> .callback().
 
-Maybe this is better(?).
+So spin_lock() is enough.
 
->  
->  	val = gizmo_readl(ahb, AHB_ARBITRATION_XBAR_CTRL);
->  	val |= AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE;
->  	gizmo_writel(ahb, val, AHB_ARBITRATION_XBAR_CTRL);
->  	return 0;
->  }
->  EXPORT_SYMBOL(tegra_ahb_enable_smmu);
-> 
-> 	Modified arch/arm/boot/dts/tegra30.dtsi
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> index 655bc47..28f9138 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -242,5 +242,6 @@
->  	smmu {
->  		compatible = "nvidia,tegra30-smmu";
->  		mc = <&mc>;
-> +		ahb = <&ahb>;
->  	};
->  };
+Best Regards
+Huang Shijie
