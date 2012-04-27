@@ -1,51 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Apr 2012 13:55:57 +0100
-Subject: [PATCH v4 5/7] ARM: architected timers: add support for UP timer
-In-Reply-To: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
-References: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1335531359-32128-6-git-send-email-marc.zyngier@arm.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 27 Apr 2012 18:31:13 +0530
+Subject: [PATCH 01/11] dma: imx-sdma: make channel0 operations atomic
+In-Reply-To: <20120427113335.GM24211@n2100.arm.linux.org.uk>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-2-git-send-email-richard.zhao@freescale.com>
+ <1335514900.31825.132.camel@vkoul-udesk3>
+ <20120427084109.GO28063@b20223-02.ap.freescale.net>
+ <1335522130.31825.135.camel@vkoul-udesk3>
+ <20120427112655.GS28063@b20223-02.ap.freescale.net>
+ <20120427113335.GM24211@n2100.arm.linux.org.uk>
+Message-ID: <4F9A9899.2060306@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_LOCAL_TIMERS is not defined, let the architected timer
-driver register a single clock_event_device that is used as a
-global timer.
+On Friday 27 April 2012 05:03 PM, Russell King - ARM Linux wrote:
+> On Fri, Apr 27, 2012 at 07:26:56PM +0800, Richard Zhao wrote:
+>> Sure, I mean, can you doc in include/linux/dmaengine.h that
+>> dmaengine_prep_xxx may sleep?
+> Incorrect.  They may _not_ sleep.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/arch_timer.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 1a34eee..154f0a1 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -246,6 +246,8 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
- 	.stop	= arch_timer_stop,
- };
- 
-+static struct clock_event_device arch_timer_global_evt;
-+
- static int __init arch_timer_common_register(void)
- {
- 	int err;
-@@ -280,6 +282,17 @@ static int __init arch_timer_common_register(void)
- 	}
- 
- 	err = local_timer_register(&arch_timer_ops);
-+	if (err) {
-+		/*
-+		 * We couldn't register as a local timer (could be
-+		 * because we're on a UP platform, or because some
-+		 * other local timer is already present...). Try as a
-+		 * global timer instead.
-+		 */
-+		arch_timer_global_evt.cpumask = cpumask_of(0);
-+		err = arch_timer_setup(&arch_timer_global_evt);
-+	}
-+
- 	if (err)
- 		goto out_free_irq;
- 
--- 
-1.7.7.1
+But I have seen that we are using the kzalloc in the dmaengine_prep_xxx 
+and kzalloc is sleeping call.
