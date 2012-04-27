@@ -1,65 +1,50 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 Apr 2012 13:06:20 -0600
-Subject: [PATCH 3/9] ARM: mmp: support DT in irq
-In-Reply-To: <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
-References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
- <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <20120427190620.D3C313E0B4D@localhost>
+Date: Fri, 27 Apr 2012 13:07:59 -0600
+Subject: [PATCH 0/8] gpio/omap: remaining cleanups and fix
+In-Reply-To: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
+References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20120427190759.C6DC43E0B4D@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Apr 2012 16:39:11 +0800, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> Append new interrupt driver that could support both pxa168 and mmp2
-> silicon. And this driver supports device tree.
+On Fri, 27 Apr 2012 19:43:30 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
+> Here are the remaining cleanup patches. There are broadly
+> two categories of cleanups.
 > 
-> Since CONFIG_SPARSE_IRQ is enabled in arch-mmp, irq driver should
-> handle reserved NR_IRQS_LEGACY in irq domain.
+> Cat-1: Those missed while introducing new feature like SPARSE_IRQ
+>        handling and DT support; use edge/level handlers from
+>        generic IRQ framework.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> ---
->  arch/arm/mach-mmp/Makefile                   |    2 +-
->  arch/arm/mach-mmp/include/mach/entry-macro.S |    9 +
->  arch/arm/mach-mmp/irq.c                      |  287 ++++++++++++++++++++++++++
+> Cat-2: Removal of redundant fields from struct gpio_bank{} as a
+>        result of they being already covered by members within
+>        context field of struct gpio_bank{}.
+> 
+> Reference: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+> Commit: 66f75a5d028beaf67c931435fdc3e7823125730c (Linux 3.4-rc4)
+> 
+> Series is available for reference here:
+> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev.git for_3.5/gpio_more_cleanup_fixes
+> 
+> Test info:
+> OMAP2+ platforms: OMAP2430SDP, OMAP3430SDP, OMAP4430SDP
+> OMAP1: Bootup test on OMAP1710SDP.
+> 
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Cousson, Benoit <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Tarun Kanti DebBarma (8):
+>   gpio/omap: remove virtual_irq_start variable
+>   gpio/omap: remove saved_fallingdetect, saved_risingdetect
+>   gpio/omap: remove suspend_wakeup field from struct gpio_bank
+>   gpio/omap: remove saved_wakeup field from struct gpio_bank
+>   gpio/omap: remove retrigger variable in gpio_irq_handler
+>   gpio/omap: remove suspend/resume callbacks
+>   gpio/omap: remove cpu_is_omapxxxx() checks from *_runtime_resume()
+>   gpio/omap: fix missing check in *_runtime_suspend()
 
-It shouldn't be necessary to create an entirely new irq controller
-driver that duplicates the functionality of irq-mmp2.c and
-irq-pxa168.c.  Instead, the existing drivers should be refactored to
-work with both DT and non-DT user.
-
-> diff --git a/arch/arm/mach-mmp/include/mach/entry-macro.S b/arch/arm/mach-mmp/include/mach/entry-macro.S
-> index 9cff9e7..6b9d925 100644
-> --- a/arch/arm/mach-mmp/include/mach/entry-macro.S
-> +++ b/arch/arm/mach-mmp/include/mach/entry-macro.S
-> @@ -6,13 +6,19 @@
->   * published by the Free Software Foundation.
->   */
->  
-> +#include <asm/irq.h>
->  #include <mach/regs-icu.h>
->  
->  	.macro	get_irqnr_preamble, base, tmp
->  	mrc	p15, 0, \tmp, c0, c0, 0		@ CPUID
->  	and	\tmp, \tmp, #0xff00
->  	cmp	\tmp, #0x5800
-> +#ifdef CONFIG_OF
-> +	ldr	\base, =mmp_icu_base
-> +	ldr	\base, [\base, #0]
-> +#else
->  	ldr	\base, =ICU_VIRT_BASE
-> +#endif
->  	addne	\base, \base, #0x10c		@ PJ1 AP INT SEL register
->  	addeq	\base, \base, #0x104		@ PJ4 IRQ SEL register
->  	.endm
-> @@ -20,5 +26,8 @@
->  	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
->  	ldr	\tmp, [\base, #0]
->  	and	\irqnr, \tmp, #0x3f
-> +#ifdef CONFIG_OF
-> +	add	\irqnr, \irqnr, #NR_IRQS_LEGACY
-> +#endif
-
-What do these do?  Does turning on CONFIG_OF break booting with atags?
-If so then this will need to be reworked.  CONFIG_OF must not disable
-non-devicetree usage.
+The changes look fine to me.  Which branch should this series be
+merged through?  It can either go via arm-soc or my gpio/next branch.
 
 g.
