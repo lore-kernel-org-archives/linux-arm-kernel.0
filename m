@@ -1,29 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 27 Apr 2012 11:05:08 +0200
-Subject: [PATCH 06/17] ARM: imx: use machine specific hook for late init
-In-Reply-To: <1335454725-13089-7-git-send-email-shawn.guo@linaro.org>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120427090508.GD17184@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 27 Apr 2012 17:06:53 +0800
+Subject: [GIT PULL][for 3.5] pull request from arch-pxa keyboard
+Message-ID: <CAN1soZz+nbDrfsoNLAV0WfBz7rV+hRR_NP8QrWKONROANNLBbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 11:38:34PM +0800, Shawn Guo wrote:
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> -static int __init eet_init_devices(void)
-> +int __init pcm037_eet_init_devices(void)
->  {
-> -	if (!machine_is_pcm037() || pcm037_variant() != PCM037_EET)
-> -		return 0;
+Hi Olof & Arnd,
 
-The pcm037_variant() != PCM037_EET gets lost here.
+Please help to pull keyboard branch from arch-pxa git tree.
 
-Otherwise looks good.
+The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
 
-Sascha
+  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git keyboard
+
+Chao Xie (4):
+      Input: pxa27x_keypad keep clock on as wakeup source
+      Input: pxa27x_keypad bug fix for direct_key_mask
+      Input: pxa27x_keypad direct key may be low active
+      Input: pxa27x_keypad add choice to set direct_key_mask
+
+ arch/arm/plat-pxa/include/plat/pxa27x_keypad.h |    4 ++
+ drivers/input/keyboard/pxa27x_keypad.c         |   52 +++++++++++++++++------
+ 2 files changed, 42 insertions(+), 14 deletions(-)
+
+Regards
+Haojian
