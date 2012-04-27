@@ -1,45 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 27 Apr 2012 11:50:35 -0600
-Subject: [PATCH 2/2] ARM: add EM3027 RTC to tegra_defconfig
-In-Reply-To: <1335549035-22286-1-git-send-email-swarren@wwwdotorg.org>
-References: <1335549035-22286-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1335549035-22286-2-git-send-email-swarren@wwwdotorg.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 27 Apr 2012 10:50:49 -0700
+Subject: [PATCH V3 0/8] SPEAr: Move to common clock framework
+In-Reply-To: <4F9A23AB.5080704@st.com>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <4F9A23AB.5080704@st.com>
+Message-ID: <CAJOA=zM2W5hp5tYv8Dsf1MD5bFzWcQMZqExfg3C_z1qvOid8VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Thu, Apr 26, 2012 at 9:42 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> On 4/24/2012 12:20 PM, Viresh KUMAR wrote:
+>> Mike,
+>>
+>> You can apply all these patches as they don't have any dependency left (leaving
+>> the ones included here) and will now apply cleanly over linux-next.
+>
+> Mike,
+>
+> These patches give compilation errors over your clk-next branch.
+> This happened due to following patch.
+>
+> commit 1c0035d710dd3bfa86d58f851b8737c7f11a9bbc
+> Author: Shawn Guo <shawn.guo@linaro.org>
+> Date: ? Thu Apr 12 20:50:18 2012 +0800
+>
+> ? ?clk: pass parent_rate into .set_rate
+>
+> ? ?For most of .set_rate implementation, parent_rate will be used, so just
+> ? ?like passing parent_rate into .recalc_rate, let's pass parent_rate into
+> ? ?.set_rate too.
+>
+> ? ?It also updates the kernel doc for .set_rate ops.
+>
+> ? ?Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ? ?Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>
+> I will send fixups as reply on individual patches, and then send you pull request
+> with these changes squashed to parent commits.
 
-The IIO option seems to have been moved recently too.
+Ok great.  A public branch for me to pull from would be great.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This will be squashed into the existing defconfig commit
----
- arch/arm/configs/tegra_defconfig |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Thanks,
+Mike
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 310fe81..7a90abb 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -138,9 +138,9 @@ CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_EM3027=y
- CONFIG_RTC_DRV_TEGRA=y
- CONFIG_STAGING=y
--CONFIG_IIO=y
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_ISL29028=y
- CONFIG_SENSORS_AK8975=y
-@@ -149,6 +149,7 @@ CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
-+CONFIG_IIO=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
--- 
-1.7.0.4
+> --
+> viresh
