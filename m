@@ -1,90 +1,49 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Fri, 27 Apr 2012 19:43:34 +0530
-Subject: [PATCH 4/8] gpio/omap: remove saved_wakeup field from struct gpio_bank
-In-Reply-To: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
-References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1335536018-16004-5-git-send-email-tarun.kanti@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 27 Apr 2012 16:23:51 +0200
+Subject: [PATCH] i2c: mxs: disable QUEUE when sending is done
+Message-ID: <1335536631-28202-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no more need to have saved_wakeup because bank->context.wake_en
-already holds that value. So getting rid of read/write operation associated
-with this field.
+Since the last fixes to this driver ensure now the queue termination is
+done correctly, we can finally disable the queue after a transfer
+without problems. The gain is that it will only be reenabled after the
+next transfer is fully set up. Before, the queue was running all the
+time and if the setup of the next message was interrupted by another
+thread, an incomplete buffer could have been sent, padded with zeroes.
 
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Cousson, Benoit <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- drivers/gpio/gpio-omap.c |   12 +++---------
- 1 files changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 7b00256..cb9f6d9 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -57,7 +57,6 @@ struct gpio_bank {
- 	u16 irq;
- 	int irq_base;
- 	struct irq_domain *domain;
--	u32 saved_wakeup;
- 	u32 non_wakeup_gpios;
- 	u32 enabled_non_wakeup_gpios;
- 	struct gpio_regs context;
-@@ -786,7 +785,6 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
- 	unsigned long		flags;
+In case you are testing this patch, please donate Tested-by tags. Regular I2C
+usage should do, a bit of stress testing (putting I2C bus and system under
+load) would be great.
+
+ drivers/i2c/busses/i2c-mxs.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index 4c37347..76b8af4 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -253,6 +253,9 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
  
- 	spin_lock_irqsave(&bank->lock, flags);
--	bank->saved_wakeup = __raw_readl(mask_reg);
- 	__raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
- 	spin_unlock_irqrestore(&bank->lock, flags);
+ 	if (i2c->cmd_err == -ENXIO)
+ 		mxs_i2c_reset(i2c);
++	else
++		writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
++				i2c->regs + MXS_I2C_QUEUECTRL_CLR);
  
-@@ -802,7 +800,7 @@ static int omap_mpuio_resume_noirq(struct device *dev)
- 	unsigned long		flags;
+ 	dev_dbg(i2c->dev, "Done with err=%d\n", i2c->cmd_err);
  
- 	spin_lock_irqsave(&bank->lock, flags);
--	__raw_writel(bank->saved_wakeup, mask_reg);
-+	__raw_writel(bank->context.wake_en, mask_reg);
- 	spin_unlock_irqrestore(&bank->lock, flags);
+@@ -383,8 +386,6 @@ static int __devexit mxs_i2c_remove(struct platform_device *pdev)
+ 	if (ret)
+ 		return -EBUSY;
  
- 	return 0;
-@@ -1158,7 +1156,6 @@ static int omap_gpio_suspend(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct gpio_bank *bank = platform_get_drvdata(pdev);
- 	void __iomem *base = bank->base;
--	void __iomem *wakeup_enable;
- 	unsigned long flags;
+-	writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
+-			i2c->regs + MXS_I2C_QUEUECTRL_CLR);
+ 	writel(MXS_I2C_CTRL0_SFTRST, i2c->regs + MXS_I2C_CTRL0_SET);
  
- 	if (!bank->mod_usage || !bank->loses_context)
-@@ -1167,10 +1164,7 @@ static int omap_gpio_suspend(struct device *dev)
- 	if (!bank->regs->wkup_en || !bank->context.wake_en)
- 		return 0;
- 
--	wakeup_enable = bank->base + bank->regs->wkup_en;
--
- 	spin_lock_irqsave(&bank->lock, flags);
--	bank->saved_wakeup = __raw_readl(wakeup_enable);
- 	_gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
- 	_gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
- 	spin_unlock_irqrestore(&bank->lock, flags);
-@@ -1188,12 +1182,12 @@ static int omap_gpio_resume(struct device *dev)
- 	if (!bank->mod_usage || !bank->loses_context)
- 		return 0;
- 
--	if (!bank->regs->wkup_en || !bank->saved_wakeup)
-+	if (!bank->regs->wkup_en || !bank->context.wake_en)
- 		return 0;
- 
- 	spin_lock_irqsave(&bank->lock, flags);
- 	_gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
--	_gpio_rmw(base, bank->regs->wkup_en, bank->saved_wakeup, 1);
-+	_gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
- 	return 0;
+ 	platform_set_drvdata(pdev, NULL);
 -- 
-1.7.0.4
+1.7.10
