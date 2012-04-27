@@ -1,169 +1,64 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 27 Apr 2012 17:46:22 +0800
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Apr 2012 10:50:03 +0100
 Subject: [PATCH 1/2] serial/imx: add DMA support
-In-Reply-To: <20120427082245.GJ24211@n2100.arm.linux.org.uk>
+In-Reply-To: <4F9A6AEE.30005@freescale.com>
 References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
  <1335436632-29499-2-git-send-email-b32955@freescale.com>
  <20120426111116.GF24211@n2100.arm.linux.org.uk>
  <4F9A4417.7080107@freescale.com>
  <20120427082245.GJ24211@n2100.arm.linux.org.uk>
-Message-ID: <4F9A6AEE.30005@freescale.com>
+ <4F9A6AEE.30005@freescale.com>
+Message-ID: <20120427095003.GK24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?04?27? 16:22, Russell King - ARM Linux ??:
-> On Fri, Apr 27, 2012 at 03:00:39PM +0800, Huang Shijie wrote:
->> ? 2012?04?26? 19:11, Russell King - ARM Linux ??:
->>> On Thu, Apr 26, 2012 at 06:37:11PM +0800, Huang Shijie wrote:
->>>> Add the DMA support for uart RX and TX.
->>>>
->>>> Signed-off-by: Huang Shijie<b32955@freescale.com>
->>>> ---
->>> Apart from the comments below,
->>>
->>> 1. How do you deal with transmitting the high-priority XON/XOFF
->>>      characters (port->x_char) which occur with s/w flow control and
->>>      the tty buffers fill up?
->>> 2. How do you deal with flow control in general?  IOW, what happens
->>>      when the remote end deasserts your CTS with h/w flow control enabled.
-If the remote end deasserts my CTS, it means the remote will not send 
-any data.
-
-My DMA for RX will expire in the following steps:
-[1] the UART only waits for 32 bytes time long
-[2] the UART triggers an IDLE Condition Detect DMA.
-[3] the dma_rx_callback() will release the DMA for Rx.
-
->>>      How does your end deal with sending RTS according to flow control
->>>      conditions?
->>>
-If a CTS is received after we sent out a RTS, it will follow the steps:
-  imx_int() --> imx_rtsint() --> uart_handle_cts_change() -->start_tx()
-
-The start_tx() will create an TX DMA operation, and send out the data.
-
-
-
->>> i
->> The UART uses the DMA for RX/TX with the hardware flow control (RTS/CTS)
->> enabled all the time.
-> Your answer is too vague.  Please try again.
+On Fri, Apr 27, 2012 at 05:46:22PM +0800, Huang Shijie wrote:
+>>>> 1. How do you deal with transmitting the high-priority XON/XOFF
+>>>>      characters (port->x_char) which occur with s/w flow control and
+>>>>      the tty buffers fill up?
+>>>> 2. How do you deal with flow control in general?  IOW, what happens
+>>>>      when the remote end deasserts your CTS with h/w flow control enabled.
+> If the remote end deasserts my CTS, it means the remote will not send  
+> any data.
 >
->> If we use the software flow control(XON/XOFF), we should not enable the DMA.
->> I think i should add more comments about this issue.
+> My DMA for RX will expire in the following steps:
+> [1] the UART only waits for 32 bytes time long
+> [2] the UART triggers an IDLE Condition Detect DMA.
+> [3] the dma_rx_callback() will release the DMA for Rx.
+
+Err, hang on.  I think you're totally confused about hardware flow
+control.  Certainly you're not using the correct terms for what you're
+describing.
+
+The CTS input normally controls the transmitter.  In many hardware
+assisted hardware flow control setups, the deassertion of CTS merely
+prevents the transmitter starting a new character.
+
+This shouldn't have any effect on the receiver of the same UART at all.
+
+>>>>      How does your end deal with sending RTS according to flow control
+>>>>      conditions?
+>>>>
+> If a CTS is received after we sent out a RTS, it will follow the steps:
+>  imx_int() --> imx_rtsint() --> uart_handle_cts_change() -->start_tx()
+>
+> The start_tx() will create an TX DMA operation, and send out the data.
+
+The generation of RTS (connected to the remote ends CTS signal) is
+supposed to control whether the remote end sends you characters.  RTS
+gets deasserted either by software control when you're running out of
+space to store the received characters, or (in the case of hardware
+assisted hardware flow control) your receivers FIFO fills above a
+certain watermark.
+
+>> It should not.  prep_slave_sg() must be callable from atomic contexts.
 >>
->> For example:
->> The MX6Q arm2 has two uarts, one with the DMA disabled is used for debug,
->> the other one with the DMA/RTS.CTS enabled can be used for the Bluetooth.
->>>>    .../bindings/tty/serial/fsl-imx-uart.txt           |    7 +
->>>>    drivers/tty/serial/imx.c                           |  386 +++++++++++++++++++-
->>>>    2 files changed, 389 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
->>>> index a9c0406..f27489d 100644
->>>> --- a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
->>>> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
->>>> @@ -8,6 +8,10 @@ Required properties:
->>>>    Optional properties:
->>>>    - fsl,uart-has-rtscts : Indicate the uart has rts and cts
->>>>    - fsl,irda-mode : Indicate the uart supports irda mode
->>>> +- fsl,enable-dma : Indicate the uart supports DMA
->>>> +- fsl,uart-dma-events : contains the DMA events for RX and TX,
->>>> +	          The first is the RX event, while the other is TX.
->>>> +- fsl,enable-dte: Indicate the uart works in DTE mode
->>>>
->>>>    Example:
->>>>
->>>> @@ -16,4 +20,7 @@ uart at 73fbc000 {
->>>>    	reg =<0x73fbc000 0x4000>;
->>>>    	interrupts =<31>;
->>>>    	fsl,uart-has-rtscts;
->>>> +	fsl,enable-dma;
->>>> +	fsl,uart-dma-events =<xx xx>;
->>>> +	fsl,enable-dte;
->>>>    };
->>>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
->>>> index e7fecee..65ba24d 100644
->>>> --- a/drivers/tty/serial/imx.c
->>>> +++ b/drivers/tty/serial/imx.c
->>>> @@ -47,9 +47,11 @@
->>>>    #include<linux/slab.h>
->>>>    #include<linux/of.h>
->>>>    #include<linux/of_device.h>
->>>> +#include<linux/dma-mapping.h>
->>>>
->>>>    #include<asm/io.h>
->>>>    #include<asm/irq.h>
->>>> +#include<mach/dma.h>
->>>>    #include<mach/imx-uart.h>
->>>>
->>>>    /* Register definitions */
->>>> @@ -82,6 +84,7 @@
->>>>    #define  UCR1_ADBR       (1<<14) /* Auto detect baud rate */
->>>>    #define  UCR1_TRDYEN     (1<<13) /* Transmitter ready interrupt enable */
->>>>    #define  UCR1_IDEN       (1<<12) /* Idle condition interrupt */
->>>> +#define  UCR1_ICD_REG(x) (((x)&   3)<<   10) /* idle condition detect */
->>>>    #define  UCR1_RRDYEN     (1<<9)	 /* Recv ready interrupt enable */
->>>>    #define  UCR1_RDMAEN     (1<<8)	 /* Recv ready DMA enable */
->>>>    #define  UCR1_IREN       (1<<7)	 /* Infrared interface enable */
->>>> @@ -125,6 +128,7 @@
->>>>    #define  UCR4_ENIRI 	 (1<<8)  /* Serial infrared interrupt enable */
->>>>    #define  UCR4_WKEN  	 (1<<7)  /* Wake interrupt enable */
->>>>    #define  UCR4_REF16 	 (1<<6)  /* Ref freq 16 MHz */
->>>> +#define  UCR4_IDDMAEN    (1<<6)  /* DMA IDLE Condition Detected */
->>>>    #define  UCR4_IRSC  	 (1<<5)  /* IR special case */
->>>>    #define  UCR4_TCEN  	 (1<<3)  /* Transmit complete interrupt enable */
->>>>    #define  UCR4_BKEN  	 (1<<2)  /* Break condition interrupt enable */
->>>> @@ -134,6 +138,7 @@
->>>>    #define  UFCR_RFDIV      (7<<7)  /* Reference freq divider mask */
->>>>    #define  UFCR_RFDIV_REG(x)	(((x)<   7 ? 6 - (x) : 6)<<   7)
->>>>    #define  UFCR_TXTL_SHF   10      /* Transmitter trigger level shift */
->>>> +#define  UFCR_DCEDTE	 (1<<6)
->>>>    #define  USR1_PARITYERR  (1<<15) /* Parity error interrupt flag */
->>>>    #define  USR1_RTSS  	 (1<<14) /* RTS pin status */
->>>>    #define  USR1_TRDY  	 (1<<13) /* Transmitter ready interrupt/dma flag */
->>>> @@ -200,12 +205,27 @@ struct imx_port {
->>>>    	unsigned int		old_status;
->>>>    	int			txirq,rxirq,rtsirq;
->>>>    	unsigned int		have_rtscts:1;
->>>> +	unsigned int		enable_dte:1;
->>>> +	unsigned int		enable_dma:1;
->>>>    	unsigned int		use_irda:1;
->>>>    	unsigned int		irda_inv_rx:1;
->>>>    	unsigned int		irda_inv_tx:1;
->>>>    	unsigned short		trcv_delay; /* transceiver delay */
->>>>    	struct clk		*clk;
->>>>    	struct imx_uart_data	*devdata;
->>>> +
->>>> +	/* DMA fields */
->>>> +	unsigned int		dma_req_rx;
->>>> +	unsigned int		dma_req_tx;
->>>> +	struct imx_dma_data	dma_data;
->>>> +	struct dma_chan		*dma_chan_rx, *dma_chan_tx;
->>>> +	struct scatterlist	rx_sgl, tx_sgl[2];
->>>> +	void			*rx_buf;
->>>> +	unsigned int		rx_bytes, tx_bytes;
->>>> +	struct work_struct	tsk_dma_rx, tsk_dma_tx;
->>> Why do you need a work struct to deal with DMA?
->>>
->> The uart uses the SDMA (drivers/dma/imx-sdma.c). And the SDMA may
->> schedule out in :
->> sdma_prep_slave_sg() -->  sdma_load_contex() -->sdma_run_channel() .
-> It should not.  prep_slave_sg() must be callable from atomic contexts.
+> the Documentation/dmaengine.txt does not explicitly force all the  dma  
+> engine driver
+> to do so.
 >
-the Documentation/dmaengine.txt does not explicitly force all the  dma 
-engine driver
-to do so.
+> Add more comments for it in Documentation/dmaengine.txt?
 
-Add more comments for it in Documentation/dmaengine.txt?
->> This callback is called from IRQ context, with all the IRQ disabled. see:
->> sdma_int_handler() -->mxc_sdma_handle_channel() -->
->> mxc_sdma_handle_channel_normal()
->> -->  .callback().
-> That's a bug in your dmaengine driver.
->
-OK, it's really a bug in the sdma driver.
-thanks.
-
-Best Regards
-Huang Shijie
+Nevertheless, it is common practice for drivers to call prep_slave_sg()
+from atomic contexts.  It sounds like your DMA driver is being fixed
+anyway, so these tasklets can be killed.
