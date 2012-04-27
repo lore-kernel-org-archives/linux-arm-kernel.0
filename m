@@ -1,81 +1,30 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Apr 2012 15:03:04 +0800
-Subject: [PATCH 10/11] ARM: imx6q_sabrelite: clkdev_add cko1 for sgtl5000
+Date: Fri, 27 Apr 2012 15:03:03 +0800
+Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
 In-Reply-To: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
 References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1335510185-7906-11-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It's used by audio drivers.
+
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6q.c  |    3 +++
- arch/arm/mach-imx/mach-imx6q.c |   28 ++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 0 deletions(-)
+ arch/arm/mach-imx/clk-imx6q.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 9a03dcc..4ea0de0 100644
+index f40a35d..9a03dcc 100644
 --- a/arch/arm/mach-imx/clk-imx6q.c
 +++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -419,6 +419,9 @@ int __init mx6q_clocks_init(void)
+@@ -418,6 +418,7 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[sdma], NULL, "20ec000.sdma");
  	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
  	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
- 	clk_register_clkdev(clk[ssi1], NULL, "2028000.ssi");
-+	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
-+	clk_register_clkdev(clk[ahb], "ahb", NULL);
-+	clk_register_clkdev(clk[cko1], "cko1", NULL);
++	clk_register_clkdev(clk[ssi1], NULL, "2028000.ssi");
  
  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++) {
  		c = clk_get_sys(clks_init_on[i], NULL);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index d25c5d8..e9b2522 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -10,6 +10,8 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <linux/clkdev.h>
-+#include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/io.h>
-@@ -75,10 +77,36 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- 	return 0;
- }
- 
-+static void __init imx6q_cko1_setup(void)
-+{
-+	struct clk *cko1_sel, *ahb, *cko1;
-+	unsigned long rate;
-+
-+	cko1_sel = clk_get_sys(NULL, "cko1_sel");
-+	ahb = clk_get_sys(NULL, "ahb");
-+	cko1 = clk_get_sys(NULL, "cko1");
-+	if (IS_ERR(cko1_sel) || IS_ERR(ahb) || IS_ERR(cko1)) {
-+		printk(KERN_ERR "cko1 setup failed!\n");
-+		goto put_clk;
-+	}
-+	clk_set_parent(cko1_sel, ahb);
-+	rate = clk_round_rate(cko1, 16000000);
-+	clk_set_rate(cko1, rate);
-+	clk_register_clkdev(cko1, NULL, "0-000a");
-+put_clk:
-+	if (!IS_ERR(cko1_sel))
-+		clk_put(cko1_sel);
-+	if (!IS_ERR(ahb))
-+		clk_put(ahb);
-+	if (!IS_ERR(cko1))
-+		clk_put(cko1);
-+}
-+
- static void __init imx6q_sabrelite_init(void)
- {
- 	phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
- 				ksz9021rn_phy_fixup);
-+	imx6q_cko1_setup();
- }
- 
- static void __init imx6q_init_machine(void)
 -- 
 1.7.5.4
