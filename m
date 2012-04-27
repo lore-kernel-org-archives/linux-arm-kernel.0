@@ -1,34 +1,56 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 Apr 2012 14:46:28 -0600
-Subject: [PATCH 2/2] ARM: VIC: use the domain mapping function to assign
- handlers
-In-Reply-To: <CACRpkdYai+eFybnTM7Mh6o7pwt+vwebzHsudwaoCwtn-VPcxxw@mail.gmail.com>
-References: <1334763054-19340-1-git-send-email-linus.walleij@stericsson.com>
- <20120427190020.EDB813E0B4D@localhost>
- <CACRpkdYai+eFybnTM7Mh6o7pwt+vwebzHsudwaoCwtn-VPcxxw@mail.gmail.com>
-Message-ID: <CACxGe6vBbcsT+MVR9dZLTnAdQdX4WDkPJH5-5+DpOuZZmYQyaw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 27 Apr 2012 14:01:17 -0700
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <20120427175657.GP18260@opensource.wolfsonmicro.com> (Mark
+ Brown's message of "Fri, 27 Apr 2012 18:56:58 +0100")
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>
+Message-ID: <87397o3n4y.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Apr 27, 2012 at 9:00 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->
->>> +static struct irq_domain_ops vic_irqdomain_ops = {
->>> + ? ? .map = vic_irqdomain_map,
->>> + ? ? .xlate = irq_domain_xlate_onetwocell,
->>> +};
->>
->> It looks like this patch also needs to update the
->> irq_domain_add_legacy() call to use this ops structure instead of
->> irq_domain_simple_ops.
->
-> I goofed up when I split the patch, that change is in 1/2, which is thus
-> not bisectable :-/
->
-> But the end result is working and looking as it should.
->
-> Do you want me to re-split, or can we live with this?
+Hi Mark,
 
-No need to be sloppy.  Re-split please.
+Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
-g.
+> On Fri, Apr 27, 2012 at 11:09:10AM +0530, J, KEERTHY wrote:
+>
+>> Devfreq and cpufreq are related to dynamic frequency/voltage switching between
+>> pre defined Operating Performance Points or the OPPs. Every OPP being
+>> a voltage/frequency pair. Smartreflex is a different
+>> power management technique.
+>
+> But presumably these things should integrate somehow - for example,
+> should devfreq and cpufreq be providing inputs into what AVS is doing,
+> and if so how?
+
+The way it is currently designed, cpufreq/devfreq/regulator layers don't
+need to know about AVS.
+
+The higher-level layers only know about the "nominal" voltage.  AVS
+hardware does automatic, adaptive, micro-adjustments around that nominal
+voltage, and these micro-adjustments are managed by the AVS hardware
+sending commands to the PMIC.  (specifically, on OMAP, the AVS sensors
+provide inputs to the voltage processor (VP) which provide inputs to the
+voltage controller (VC) which sends commands to the PMIC[1].)
+
+The driver proposed here is primarily for initializing the various
+parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
+adjustments are done in hardware by VC/VP.
+
+The only thing the higher-level layers might potentially need to do to
+enable/disable AVS around transitions (e.g. when changing OPP, AVS is
+disabled before changing OPP and only re-enabled when the new nominal
+voltage has been acheived.)
+
+On OMAP, we handle this inside the OMAP-specific voltage layer which is
+called by the regulator framework, so even the regulators do not need
+any knowledge of AVS.
+
+Kevin
+
+[1] Figure 3-76 in OMAP4430 ES2.1 Public TRM vAD provides a 
+    detailed diagram:
+    http://www.ti.com/pdfs/wtbu/OMAP4430_ES2.x_PUBLIC_TRM_vAD.zip
