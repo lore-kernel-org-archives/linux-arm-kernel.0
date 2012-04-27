@@ -1,30 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 27 Apr 2012 11:51:56 -0300
-Subject: [PATCH] i2c: mxs: disable QUEUE when sending is done
-In-Reply-To: <1335536631-28202-1-git-send-email-w.sang@pengutronix.de>
-References: <1335536631-28202-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <CAOMZO5A1_Z7T5md61OJWmXbx2qCjFEByjyGvjhxqhfxzwfLEVQ@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 27 Apr 2012 16:59:36 +0200
+Subject: possible MXS-i2c bug
+In-Reply-To: <201204270110.21377.marex@denx.de>
+References: <201204261326.29388.marex@denx.de>
+ <20120426114201.GC3548@pengutronix.de>
+ <201204270110.21377.marex@denx.de>
+Message-ID: <20120427145936.GD16504@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi,
 
-On Fri, Apr 27, 2012 at 11:23 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> I've been thinking about the DMA approach. The problem I found out is that we 
+> need to transfer all messages we're given at time in one DMA chain ... at least 
+> that's how I understand it from the FSL manual (see Fig. 27-10 in the mx28 
+> manual).
 
-> ? ? ? ?if (i2c->cmd_err == -ENXIO)
-> ? ? ? ? ? ? ? ?mxs_i2c_reset(i2c);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i2c->regs + MXS_I2C_QUEUECTRL_CLR);
+I can't follow you:  mxs_i2c_xfer() gets a list of messages, yet they
+are iterated over in mxs_i2c_xfer_msg(). A single I2C message is
+unscattered and can't be bigger than 64KB, so that should be doable?
 
-When setting the QUEUE_RUN, do we really want to clear all the other
-bits of QUEUECTRL_CLR register?
+Am I missing something by already being in weekend-mode? :)
 
-I am wondering if we should only set QUEUE_RUN bit here.
-
-My mx28evk does not come with i2c eeprom. I hope I will solder one
-soon so I can test it.
-
-Thanks,
-
-Fabio Estevam
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120427/115b71e8/attachment.sig>
