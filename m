@@ -1,32 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Apr 2012 20:53:40 +0100
-Subject: [PATCH] ARM: ux500: Fix build error caused by recent variable
- name change
-In-Reply-To: <CACRpkdaRdn+q2ODUir6dE8btB8+RTkCYsN0W-Zsj7mkRDNrHQw@mail.gmail.com>
-References: <1335541015-10155-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdaRdn+q2ODUir6dE8btB8+RTkCYsN0W-Zsj7mkRDNrHQw@mail.gmail.com>
-Message-ID: <4F9AF944.5090309@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 27 Apr 2012 13:05:34 -0700
+Subject: [PATCH 0/6] ARM: OMAP: hwmod: remove runtime cpu_is checking
+Message-ID: <1335557140-10854-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/12 18:48, Linus Walleij wrote:
-> On Fri, Apr 27, 2012 at 5:36 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> error: ?u8500_soc_node? undeclared (first use in this function)
->>
->> Was recently changed to 'u8500_local_bus_nodes'.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->
-> IIRC I already fixed this up when applying the patch renaming the node.
->
-> Can you check the ux500-core branch on my linux-stericsson tree?
+This series attempts to remove all the runtime cpu_is* checking in
+omap_hwmod.c in favor of using function pointers initialized at init
+time.
 
-Just did.
+This series was motivated by the addition of support for the AM335x
+series which was done by adding several more cpu_is* checks, and
+provided the proverbial straw that broke the camel's back.  
 
-Seemingly the patch was complete after all (I could have sworn that I 
-tested it). I have no idea how I lost it from my own tree though.
+In addition to the cleanup, this provides a much cleaner way of adding
+additional SoC support since it no longer requires adding additional
+runtime cpu_is* checks.
 
-Scrap this then.
+Boot tested on OMAP3530/Overo and OMAP4430/Panda.
 
-/Lee
+Kevin Hilman (6):
+  ARM: OMAP4: hwmod: rename _enable_module to _omap4_enable_module()
+  ARM: OMAP2+: hwmod: use init-time function ptrs for enable/disable
+    module
+  ARM: OMAP4: hwmod: drop extra cpu_is check from
+    _wait_target_disable()
+  ARM: OMAP2+: hwmod: use init-time function pointer for
+    wait_target_ready
+  ARM: OMAP2+: hwmod: use init-time function pointer for hardreset
+  ARM: OMAP2+: hwmod: use init-time function pointer for _init_clkdm
+
+ arch/arm/mach-omap2/omap_hwmod.c             |  192 +++++++++++++++-----------
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   11 ++
+ 2 files changed, 126 insertions(+), 77 deletions(-)
+
+-- 
+1.7.9.2
