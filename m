@@ -1,37 +1,38 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 27 Apr 2012 08:53:56 +0000
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <20120426190524.GZ3739@atomide.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <20120418231837.GT21106@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
- <20120426184312.GY3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
- <20120426190524.GZ3739@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA008E5@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 16:54:05 +0800
+Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
+In-Reply-To: <1335451227-27709-2-git-send-email-b29396@freescale.com>
+References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
+ <1335451227-27709-2-git-send-email-b29396@freescale.com>
+Message-ID: <20120427085402.GV2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 00:35:25, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120426 11:52]:
-> > 
-> > Yes, they were accepted and were also available under linux-omap/soc2 branch 
-> > for quite some time.
-> 
-> Hmm sorry if I've dropped them accidentally. I tend to drop the branches
-> after each merge window and purge my linux-omap mailbox too.
-> 
+On Thu, Apr 26, 2012 at 10:40:25PM +0800, Dong Aisheng wrote:
+> +/**
+> + * struct imx_pin_reg - describe a pin reg map
+> + * The last 3 members are used for select input setting
+> + * @pid: pin id
+> + * @mux_reg: mux register offset
+> + * @conf_reg: config register offset
+> + * @mux_mode: mux mode
+> + * @input_reg: select input register offset for this mux if any
+> + *  0 if no select input setting needed.
+> + * @input_val: the value set to select input register
+> + */
+> +struct imx_pin_reg {
+> +	unsigned int pid;
+> +	unsigned int mux_reg;
+> +	unsigned int conf_reg;
+> +	unsigned int mux_mode;
+> +	unsigned int input_reg;
+> +	unsigned int input_val;
+> +};
 
-I can understand, I will submit another version for this.
+Since the array of this struct is big, I would suggest define the type
+of the members as size-efficient as possible, for example, u16 is enough
+for pid, and reg offset, while u8 is enough for mux_mode?
 
-I will be waiting for your comment and conformation on, which family AM33xx 
-device should fall in? Please refer to the mail-chain -
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67275.html
-
-
-Thanks,
-Vaibhav
+-- 
+Regards,
+Shawn
