@@ -1,64 +1,37 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 27 Apr 2012 10:16:17 +0530
-Subject: [PATCH V3 6/8] SPEAr: clk: Add General Purpose Timer Synthesizer
- clock
-In-Reply-To: <91fe5296600bd8ca55f9b7e0a1fd32e1a072f817.1335249846.git.viresh.kumar@st.com>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <91fe5296600bd8ca55f9b7e0a1fd32e1a072f817.1335249846.git.viresh.kumar@st.com>
-Message-ID: <4F9A2499.6090705@st.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 13:05:51 +0800
+Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add SPI NOR support
+In-Reply-To: <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
+References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
+ <20120427034401.GE2234@S2101-09.ap.freescale.net>
+ <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
+Message-ID: <20120427050549.GG2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2012 12:20 PM, Viresh KUMAR wrote:
-> All SPEAr SoC's contain GPT Synthesizers. Their Fout is derived from
-> following equations:
+On Fri, Apr 27, 2012 at 12:51:01AM -0300, Fabio Estevam wrote:
+> On Fri, Apr 27, 2012 at 12:44 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > 
-> Fout= Fin/((2 ^ (N+1)) * (M+1))
+> > I applied both patches and see the following modprobe error message
+> > with my testing. ?Any relevance, or I missed something?
+> >
+> > spi_imx 2008000.ecspi: master is unqueued, this is deprecated
 > 
-> This patch adds in support for this type of clock.
+> This happens in imx-spi driver and I have reported it in the spi-devel list:
+> http://www.mail-archive.com/spi-devel-general at lists.sourceforge.net/msg08019.html
+> 
+I'm fine with that, since it's an info printed by spi core to draw
+people's attention on purpose.
 
-    fixup! SPEAr: clk: Add General Purpose Timer Synthesizer clock
----
- drivers/clk/spear/clk-gpt-synth.c |   11 +++++++----
- 1 files changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/spear/clk-gpt-synth.c b/drivers/clk/spear/clk-gpt-synth.c
-index 514539c..f3b252a 100644
---- a/drivers/clk/spear/clk-gpt-synth.c
-+++ b/drivers/clk/spear/clk-gpt-synth.c
-@@ -46,10 +46,11 @@ static long clk_gpt_round_rate(struct clk_hw *hw, unsigned long drate,
-                unsigned long *prate)
- {
-        struct clk_gpt *gpt = to_clk_gpt(hw);
-+       unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
-        int unused;
- 
--       return clk_round_rate_index(hw, drate, gpt_calc_rate, gpt->rtbl_cnt,
--                       &unused);
-+       return clk_round_rate_index(hw, drate, parent_rate, gpt_calc_rate,
-+                       gpt->rtbl_cnt, &unused);
- }
- 
- static unsigned long clk_gpt_recalc_rate(struct clk_hw *hw,
-@@ -77,14 +78,16 @@ static unsigned long clk_gpt_recalc_rate(struct clk_hw *hw,
- }
- 
- /* Configures new clock rate of gpt */
--static int clk_gpt_set_rate(struct clk_hw *hw, unsigned long drate)
-+static int clk_gpt_set_rate(struct clk_hw *hw, unsigned long drate,
-+                               unsigned long prate)
- {
-        struct clk_gpt *gpt = to_clk_gpt(hw);
-        struct gpt_rate_tbl *rtbl = gpt->rtbl;
-        unsigned long flags = 0, val;
-        int i;
- 
--       clk_round_rate_index(hw, drate, gpt_calc_rate, gpt->rtbl_cnt, &i);
-+       clk_round_rate_index(hw, drate, prate, gpt_calc_rate, gpt->rtbl_cnt,
-+                       &i);
- 
-        if (gpt->lock)
-                spin_lock_irqsave(gpt->lock, flags);
+> > modprobe: FATAL: Could not load /lib/modules/3.4.0-rc4+/modules.dep: No such fil
+> 
+> I have only tested it as built-in.
+> 
+The problem is we do not have this error message before applying these
+two patches, while we are seeing the message with your patches applied.
+What I am saying is your changes on defconfig should not introduce any
+message like that.
 
 -- 
-viresh
+Regards,
+Shawn
