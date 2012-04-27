@@ -1,48 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 27 Apr 2012 10:04:12 +0200
-Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
-In-Reply-To: <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120427080412.GW17184@pengutronix.de>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Fri, 27 Apr 2012 10:04:32 +0200
+Subject: [PATCH v10 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <D99582E5322435468A77E74BB0039E7B1D22784E8B@SRV02.hamburg.garz-fricke.de>
+References: <D99582E5322435468A77E74BB0039E7B1D22784CF0@SRV02.hamburg.garz-fricke.de>
+ <alpine.DEB.2.00.1204261035060.16439@gatekeeper.vosshq.de>
+ <D99582E5322435468A77E74BB0039E7B1D22784E8B@SRV02.hamburg.garz-fricke.de>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D0905E0994A@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 03:03:03PM +0800, Richard Zhao wrote:
-> It's used by audio drivers.
+Hi Carsten,
+
+Carsten Behling wrote on 2012-04-27:
+>>  	INIT_COMPLETION(dev->cmd_complete);
+>> +	dev->transfer_status = 0;
+>>  	if (dev->msg->flags & I2C_M_RD) {
+>>  		unsigned start_flags = AT91_TWI_START;
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx6q.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> this patch will not work, because you reset 'dev->transfer_status'
+> before it is evaluated on errors (AT91_TWI_NACK, AT91_TWI_OVRE). 
+
+it should, because transfer_status is updated by the ISR between
+wait_for_completion_interruptible_timeout() and the error evaluation.
+Please try it out.
+
+> > P.S. Are you using a RM9200? Seems that this SOC has some problems...
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index f40a35d..9a03dcc 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -418,6 +418,7 @@ int __init mx6q_clocks_init(void)
->  	clk_register_clkdev(clk[sdma], NULL, "20ec000.sdma");
->  	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
->  	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
-> +	clk_register_clkdev(clk[ssi1], NULL, "2028000.ssi");
+> Yes, our ECO920 uses the RM9200, but we support it with an very old kernel
+> (2.6.21). I remember there were many problems with I2C.
 
-The ssi clock needs a general cleanup on all i.MX just like I cleaned up
-the other units. The SSI unit has at least a register clock and a baud
-clock. What the driver requests and enables is the register clock.
+Ok, but good to hear the driver basically works with the RM9200.
 
-The baud clock is currently unused and is needed only for master mode
-(which is not implemented in the ssi driver)
-
-So where we want to come to is:
-
-	clk_register_clkdev(clk[ipg], "ipg", "2028000.ssi");
-	clk_register_clkdev(clk[ssi1], "baud", "2028000.ssi");
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Niko
