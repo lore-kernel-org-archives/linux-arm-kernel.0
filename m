@@ -1,37 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 13:05:51 +0800
-Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add SPI NOR support
-In-Reply-To: <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
-References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
- <20120427034401.GE2234@S2101-09.ap.freescale.net>
- <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
-Message-ID: <20120427050549.GG2234@S2101-09.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 27 Apr 2012 13:06:04 +0800
+Subject: [PATCH] arch/arm: mioa701 add camera output enable gpio
+In-Reply-To: <1335129840-25387-1-git-send-email-robert.jarzmik@free.fr>
+References: <1335129840-25387-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <CAN1soZyOZPTR=4Q14yq8ngZ=mwG8R7rO=NSxqnDk1HZMz9uWNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 12:51:01AM -0300, Fabio Estevam wrote:
-> On Fri, Apr 27, 2012 at 12:44 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > I applied both patches and see the following modprobe error message
-> > with my testing. ?Any relevance, or I missed something?
-> >
-> > spi_imx 2008000.ecspi: master is unqueued, this is deprecated
-> 
-> This happens in imx-spi driver and I have reported it in the spi-devel list:
-> http://www.mail-archive.com/spi-devel-general at lists.sourceforge.net/msg08019.html
-> 
-I'm fine with that, since it's an info printed by spi core to draw
-people's attention on purpose.
+On Mon, Apr 23, 2012 at 5:24 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> The Micron MT9M111 camera chip needs its output enable to be
+> activated in order to work. The bootloader is not required to
+> activate it, so do it in machine code.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> ?arch/arm/mach-pxa/include/mach/mioa701.h | ? ?3 +++
+> ?arch/arm/mach-pxa/mioa701.c ? ? ? ? ? ? ?| ? ?2 ++
+> ?2 files changed, 5 insertions(+), 0 deletions(-)
+>
+Applied
 
-> > modprobe: FATAL: Could not load /lib/modules/3.4.0-rc4+/modules.dep: No such fil
-> 
-> I have only tested it as built-in.
-> 
-The problem is we do not have this error message before applying these
-two patches, while we are seeing the message with your patches applied.
-What I am saying is your changes on defconfig should not introduce any
-message like that.
-
--- 
-Regards,
-Shawn
+Regards
+Haojian
