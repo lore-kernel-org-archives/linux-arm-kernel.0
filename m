@@ -1,61 +1,37 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 Apr 2012 16:05:49 -0600
-Subject: [PATCH 0/8] gpio/omap: remaining cleanups and fix
-In-Reply-To: <87ipgkzvlk.fsf@ti.com>
-References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
- <20120427190759.C6DC43E0B4D@localhost> <87ipgkzvlk.fsf@ti.com>
-Message-ID: <CACxGe6tq8t97w_e+YiNvZZG4fh7_3t5sFYR5GY791DGQo=TrNQ@mail.gmail.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 27 Apr 2012 15:08:13 -0700
+Subject: [PATCH/RFT 0/8] ARM: OMAP: remove IP checks from SoC family
+ detection
+In-Reply-To: <1335482993-14035-1-git-send-email-khilman@ti.com>
+References: <1335482993-14035-1-git-send-email-khilman@ti.com>
+Message-ID: <20120427220813.GE19196@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 3:57 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
->
->> On Fri, 27 Apr 2012 19:43:30 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
->>> Here are the remaining cleanup patches. There are broadly
->>> two categories of cleanups.
->>>
->>> Cat-1: Those missed while introducing new feature like SPARSE_IRQ
->>> ? ? ? ?handling and DT support; use edge/level handlers from
->>> ? ? ? ?generic IRQ framework.
->>>
->>> Cat-2: Removal of redundant fields from struct gpio_bank{} as a
->>> ? ? ? ?result of they being already covered by members within
->>> ? ? ? ?context field of struct gpio_bank{}.
->>>
->>> Reference: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
->>> Commit: 66f75a5d028beaf67c931435fdc3e7823125730c (Linux 3.4-rc4)
->>>
->>> Series is available for reference here:
->>> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev.git for_3.5/gpio_more_cleanup_fixes
->>>
->>> Test info:
->>> OMAP2+ platforms: OMAP2430SDP, OMAP3430SDP, OMAP4430SDP
->>> OMAP1: Bootup test on OMAP1710SDP.
->>>
->>> Cc: Kevin Hilman <khilman@ti.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Cc: Cousson, Benoit <b-cousson@ti.com>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> Tarun Kanti DebBarma (8):
->>> ? gpio/omap: remove virtual_irq_start variable
->>> ? gpio/omap: remove saved_fallingdetect, saved_risingdetect
->>> ? gpio/omap: remove suspend_wakeup field from struct gpio_bank
->>> ? gpio/omap: remove saved_wakeup field from struct gpio_bank
->>> ? gpio/omap: remove retrigger variable in gpio_irq_handler
->>> ? gpio/omap: remove suspend/resume callbacks
->>> ? gpio/omap: remove cpu_is_omapxxxx() checks from *_runtime_resume()
->>> ? gpio/omap: fix missing check in *_runtime_suspend()
->>
->> The changes look fine to me. ?Which branch should this series be
->> merged through? ?It can either go via arm-soc or my gpio/next branch.
->
-> This needs a little more review/testing on OMAP.
->
-> Expect a pull request from me when it's ready and you can take it
-> through gpio/nex.
+On Thu, Apr 26, 2012 at 04:29:45PM -0700, Kevin Hilman wrote:
 
-Okay.
+Hi Kevin.
 
-g.
+> This is a rebased version of this series which is ready for broader
+> testing.  I'd especially appreciate testing from those of you with
+> AM35x platforms.
+> 
+> Currently, our SoC detection is based on SoC family detection
+> (using die ID) and the presence of specific IP blocks (or feature.)
+> 
+> This series begins the separation of the SoC family detection and
+> specific IP detection by completely removing IP detection from the SoC
+> family detection (cpu_is_*.)
+> 
+> Applies on top of v3.4-rc4, boot tested on AM3517 EVM.
+
+Your series applied and booted without issue until the point that
+pm_idle is called.  At that point it hung because its doing a wfi
+and not getting an interrupt to wake up back up.  That's expected
+behaviour so your patches are good (IMHO) but I need to finish and
+submit a new version of my patches to fix that issue.
+
+I tested using an nfs-mounted and mmc-mounted rootfs (and
+CONFIG_TI_DAVINCI_EMAC=y).
+
+Mark
