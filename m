@@ -1,33 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 27 Apr 2012 13:46:16 -0600
-Subject: [PATCH] ARM: dt: tegra trimslice: enable SDHCI1 controller
-Message-ID: <1335555976-15130-1-git-send-email-swarren@wwwdotorg.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 27 Apr 2012 20:53:40 +0100
+Subject: [PATCH] ARM: ux500: Fix build error caused by recent variable
+ name change
+In-Reply-To: <CACRpkdaRdn+q2ODUir6dE8btB8+RTkCYsN0W-Zsj7mkRDNrHQw@mail.gmail.com>
+References: <1335541015-10155-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaRdn+q2ODUir6dE8btB8+RTkCYsN0W-Zsj7mkRDNrHQw@mail.gmail.com>
+Message-ID: <4F9AF944.5090309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 27/04/12 18:48, Linus Walleij wrote:
+> On Fri, Apr 27, 2012 at 5:36 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+>
+>> error: ?u8500_soc_node? undeclared (first use in this function)
+>>
+>> Was recently changed to 'u8500_local_bus_nodes'.
+>>
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+>
+> IIRC I already fixed this up when applying the patch renaming the node.
+>
+> Can you check the ux500-core branch on my linux-stericsson tree?
 
-This is the micro-SD card slot.
+Just did.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra-trimslice.dts |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+Seemingly the patch was complete after all (I could have sworn that I 
+tested it). I have no idea how I lost it from my own tree though.
 
-diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra-trimslice.dts
-index 0c1a54c..ead9365 100644
---- a/arch/arm/boot/dts/tegra-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra-trimslice.dts
-@@ -296,10 +296,6 @@
- 		status = "disable";
- 	};
- 
--	sdhci at c8000000 {
--		status = "disable";
--	};
--
- 	sdhci at c8000200 {
- 		status = "disable";
- 	};
--- 
-1.7.0.4
+Scrap this then.
+
+/Lee
