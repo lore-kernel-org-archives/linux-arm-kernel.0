@@ -1,186 +1,72 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 27 Apr 2012 16:39:10 +0800
-Subject: [PATCH 2/9] ARM: mmp: distinguish mmp and mmp2 in Kconfig
-In-Reply-To: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1335515957-1798-3-git-send-email-haojian.zhuang@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Apr 2012 10:38:51 +0200
+Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add SPI NOR support
+In-Reply-To: <20120427073546.GR2234@S2101-09.ap.freescale.net>
+References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
+ <20120427034401.GE2234@S2101-09.ap.freescale.net>
+ <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
+ <20120427050549.GG2234@S2101-09.ap.freescale.net>
+ <20120427062732.GM20039@pengutronix.de>
+ <20120427073546.GR2234@S2101-09.ap.freescale.net>
+Message-ID: <20120427083851.GZ17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Append four CONFIG_* MACRO to distinguish boards in arch-mmp.
+On Fri, Apr 27, 2012 at 03:35:48PM +0800, Shawn Guo wrote:
+> On Fri, Apr 27, 2012 at 08:27:32AM +0200, Uwe Kleine-K?nig wrote:
+> > This seems to me to be a userspace problem? My guess is applying the
+> > patch changed the kernel version (appends '+') and you didn't run make
+> > modules_install and/or depmod?!
+> > 
+> Hmm, what the modules are we missing here?  That's actually my question.
+> Fabio, Uwe, Sascha, you do not see this error message with your testing?
 
-CONFIG_MMP_LEGACY and CONFIG_MMP2_LEGACY are used to support boards
-without device tree.
+Every imx spi user (in fact most spi users no matter which driver)
+will see this message.
 
-CONFIG_MMP_DT and CONFIG_MMP2_DT are used to support boards with
-device tree.
+See:
 
-At the same time, only one of these four macro could be selected.
-It's used to miss compiling all boards file together.
+commit ffbbdd21329f3e15eeca6df2d4bc11c04d9d91c0
+Author: Linus Walleij <linus.walleij@linaro.org>
+Date:   Wed Feb 22 10:05:38 2012 +0100
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- arch/arm/configs/mmp2_defconfig   |    1 +
- arch/arm/configs/pxa168_defconfig |    1 +
- arch/arm/configs/pxa910_defconfig |    1 +
- arch/arm/mach-mmp/Kconfig         |   37 ++++++++++++++++++++++++++++++++++---
- 4 files changed, 37 insertions(+), 3 deletions(-)
+    spi: create a message queueing infrastructure
+    
+    This rips the message queue in the PL022 driver out and pushes
+    it into (optional) common infrastructure. Drivers that want to
+    use the message pumping thread will need to define the new
+    per-messags transfer methods and leave the deprecated transfer()
+    method as NULL.
+    
+    Most of the design is described in the documentation changes that
+    are included in this patch.
+    
+    Since there is a queue that need to be stopped when the system
+    is suspending/resuming, two new calls are implemented for the
+    device drivers to call in their suspend()/resume() functions:
+    spi_master_suspend() and spi_master_resume().
+    
+    ChangeLog v1->v2:
+    - Remove Kconfig entry and do not make the queue support optional
+      at all, instead be more agressive and have it as part of the
+      compulsory infrastructure.
+    - If the .transfer() method is implemented, delete print a small
+      deprecation notice and do not start the transfer pump.
+    - Fix a bitrotted comment.
+    ChangeLog v2->v3:
+    - Fix up a problematic sequence courtesy of Chris Blair.
+    - Stop rather than destroy the queue on suspend() courtesy of
+      Chris Blair.
+    
+    Signed-off-by: Chris Blair <chris.blair@stericsson.com>
+    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+    Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+    Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+    Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 
-diff --git a/arch/arm/configs/mmp2_defconfig b/arch/arm/configs/mmp2_defconfig
-index 5a58452..8c309d1 100644
---- a/arch/arm/configs/mmp2_defconfig
-+++ b/arch/arm/configs/mmp2_defconfig
-@@ -8,6 +8,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_MMP=y
-+CONFIG_MMP2_LEGACY=y
- CONFIG_MACH_BROWNSTONE=y
- CONFIG_MACH_FLINT=y
- CONFIG_MACH_MARVELL_JASPER=y
-diff --git a/arch/arm/configs/pxa168_defconfig b/arch/arm/configs/pxa168_defconfig
-index 74d7e01..2abaa9f 100644
---- a/arch/arm/configs/pxa168_defconfig
-+++ b/arch/arm/configs/pxa168_defconfig
-@@ -8,6 +8,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_MMP=y
-+CONFIG_MMP_LEGACY=y
- CONFIG_MACH_ASPENITE=y
- CONFIG_MACH_ZYLONITE2=y
- CONFIG_MACH_AVENGERS_LITE=y
-diff --git a/arch/arm/configs/pxa910_defconfig b/arch/arm/configs/pxa910_defconfig
-index 1cd381e..1e95263 100644
---- a/arch/arm/configs/pxa910_defconfig
-+++ b/arch/arm/configs/pxa910_defconfig
-@@ -9,6 +9,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_MMP=y
-+CONFIG_MMP_LEGACY=y
- CONFIG_MACH_TAVOREVB=y
- CONFIG_MACH_TTC_DKB=y
- CONFIG_NO_HZ=y
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index 5a90b9a..5d49913 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -2,6 +2,9 @@ if ARCH_MMP
- 
- menu "Marvell PXA168/910/MMP2 Implmentations"
- 
-+choice
-+	prompt "Support Machines for MMP series"
-+
- config MACH_MMP_DT
- 	bool "Support MMP2 platforms from device tree"
- 	select CPU_PXA168
-@@ -12,8 +15,30 @@ config MACH_MMP_DT
- 	  the device tree. Needn't select any other machine while
- 	  MACH_MMP_DT is enabled.
- 
-+config MACH_MMP2_DT
-+	bool "Support MMP2 platforms from device tree"
-+	select CPU_MMP2
-+	select USE_OF
-+	help
-+	  Include support for Marvell MMP2 based platforms using
-+	  the device tree.
-+
-+config MMP_LEGACY
-+	bool "Support MMP platform without device tree"
-+	help
-+	  Include support for Marvell MMP based platforms in legacy
-+	  mode without device tree.
-+
-+config MMP2_LEGACY
-+	bool "Support MMP2 platform without device tree"
-+	help
-+	  Include support for Marvell MMP2 based platforms in legacy
-+	  mode without device tree.
-+endchoice
-+
- config MACH_ASPENITE
- 	bool "Marvell's PXA168 Aspenite Development Board"
-+	depends on MMP_LEGACY
- 	select CPU_PXA168
- 	help
- 	  Say 'Y' here if you want to support the Marvell PXA168-based
-@@ -21,6 +46,7 @@ config MACH_ASPENITE
- 
- config MACH_ZYLONITE2
- 	bool "Marvell's PXA168 Zylonite2 Development Board"
-+	depends on MMP_LEGACY
- 	select CPU_PXA168
- 	help
- 	  Say 'Y' here if you want to support the Marvell PXA168-based
-@@ -28,6 +54,7 @@ config MACH_ZYLONITE2
- 
- config MACH_AVENGERS_LITE
- 	bool "Marvell's PXA168 Avengers Lite Development Board"
-+	depends on MMP_LEGACY
- 	select CPU_PXA168
- 	help
- 	  Say 'Y' here if you want to support the Marvell PXA168-based
-@@ -35,6 +62,7 @@ config MACH_AVENGERS_LITE
- 
- config MACH_TAVOREVB
- 	bool "Marvell's PXA910 TavorEVB Development Board"
-+	depends on MMP_LEGACY
- 	select CPU_PXA910
- 	help
- 	  Say 'Y' here if you want to support the Marvell PXA910-based
-@@ -42,6 +70,7 @@ config MACH_TAVOREVB
- 
- config MACH_TTC_DKB
- 	bool "Marvell's PXA910 TavorEVB Development Board"
-+	depends on MMP_LEGACY
- 	select CPU_PXA910
- 	help
- 	  Say 'Y' here if you want to support the Marvell PXA910-based
-@@ -49,7 +78,7 @@ config MACH_TTC_DKB
- 
- config MACH_BROWNSTONE
- 	bool "Marvell's Brownstone Development Platform"
--	depends on !CPU_MOHAWK
-+	depends on MMP2_LEGACY && !CPU_MOHAWK
- 	select CPU_MMP2
- 	help
- 	  Say 'Y' here if you want to support the Marvell MMP2-based
-@@ -60,7 +89,7 @@ config MACH_BROWNSTONE
- 
- config MACH_FLINT
- 	bool "Marvell's Flint Development Platform"
--	depends on !CPU_MOHAWK
-+	depends on MMP2_LEGACY && !CPU_MOHAWK
- 	select CPU_MMP2
- 	help
- 	  Say 'Y' here if you want to support the Marvell MMP2-based
-@@ -71,7 +100,7 @@ config MACH_FLINT
- 
- config MACH_MARVELL_JASPER
- 	bool "Marvell's Jasper Development Platform"
--	depends on !CPU_MOHAWK
-+	depends on MMP2_LEGACY && !CPU_MOHAWK
- 	select CPU_MMP2
- 	help
- 	  Say 'Y' here if you want to support the Marvell MMP2-base
-@@ -82,6 +111,7 @@ config MACH_MARVELL_JASPER
- 
- config MACH_TETON_BGA
- 	bool "Marvell's PXA168 Teton BGA Development Board"
-+	depends on MMP_LEGACY
- 	select CPU_PXA168
- 	help
- 	  Say 'Y' here if you want to support the Marvell PXA168-based
-@@ -89,6 +119,7 @@ config MACH_TETON_BGA
- 
- config MACH_GPLUGD
- 	bool "Marvell's PXA168 GuruPlug Display (gplugD) Board"
-+	depends on MMP_LEGACY
- 	select CPU_PXA168
- 	help
- 	  Say 'Y' here if you want to support the Marvell PXA168-based
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
