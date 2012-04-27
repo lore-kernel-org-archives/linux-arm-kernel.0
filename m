@@ -1,48 +1,101 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 27 Apr 2012 08:40:15 +0300
-Subject: [PATCHv3 1/4] ARM: tegra: Add AHB driver
-In-Reply-To: <20120426215903.GH24211@n2100.arm.linux.org.uk>
-References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
- <4F99A740.3080407@wwwdotorg.org>
- <20120426215903.GH24211@n2100.arm.linux.org.uk>
-Message-ID: <20120427084015.cb7c8e00c7d9a4cd01faa5ae@nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 13:48:44 +0800
+Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
+In-Reply-To: <20120426151536.GO9142@game.jcrosoft.org>
+References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
+ <1335451227-27709-2-git-send-email-b29396@freescale.com>
+ <20120426144446.GN9142@game.jcrosoft.org>
+ <20120426151536.GO9142@game.jcrosoft.org>
+Message-ID: <20120427054842.GJ2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Apr 2012 23:59:03 +0200
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Thu, Apr 26, 2012 at 01:51:28PM -0600, Stephen Warren wrote:
-> > On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
-> > > The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> > > High-performance Bus (AHB) architecture.
-> > > 
-> > > The AHB Arbiter controls AHB bus master arbitration. This effectively
-> > > forms a second level of arbitration for access to the memory
-> > > controller through the AHB Slave Memory device. The AHB pre-fetch
-> > > logic can be configured to enhance performance for devices doing
-> > > sequential access. Each AHB master is assigned to either the high or
-> > > low priority bin. Both Tegra20/30 have this AHB bus.
-> > > 
-> > > Some of configuration param could be passed from DT too.
-> > 
-> > I think this code looks reasonable. I'd like to see an ack from Russell,
-> > Arnd, and Olof on the final location of the files though.
+On Thu, Apr 26, 2012 at 05:15:36PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> We have on Imx mxc at91 and other SoC controler hich you configure per pin
 > 
-> Well, the big question which needs answering is whether this AHB software
-> interface is something specific to Tegra or whether it really is something
-> generic.  There's been some hints in the previous thread that it's
-> specific to Tegra, so it may not after all make sense for it to be a
-> generic driver.
+> which means one pin have multiple function and the same function is on
+> multiple pins
 > 
-> However, we _have_ decided "no more drivers under arch/arm".  So I really
-> don't want to see "struct xxx_driver" appearing in any code under that
-> subdirectory or one of its decendents.  I don't have much more to say
-> about location than that.
+> so the groups are just a list of possible pins
+> 
+> Instead of re-inventing bindings we do need to come with a common binding whre
+> it's possible
+> 
+> So instead I proppose (send in the v2) to use common way to describe the group
+> 
+Let's see how many nodes we will have in device tree.  For imx6q
+example, there are 332 pins and each pin has up to 8 function selects.
+We will end up with having 332 x 8 = 2656 sub nodes under node
+"functions".  Device tree simply cannot afford such a bloating.
 
-What about having this driver under "drivers/amba"?
+Regards,
+Shawn
 
-If other similiar drivers are coming up, it's easy to find rather than
-having this arch/arm/mach-*. There may be some possibility of
-generalization later, then. Also it meets the requirement of no
-"struct xxxx_driver" under arch/arm. Arnd?
+> 1) we describe one function per pin
+> 
+> 	functions {
+> 		rxd_pb12 {
+> 			atmel,pin-id = <44>;
+> 			atmel,mux = <0>;
+> 		};
+> 
+> 		txd_pb13 {
+> 			atmel,pin-id = <45>;
+> 			atmel,pull = <2>;
+> 			atmel,mux = <0>;
+> 		};
+> 
+> 		txd0_pb19 {
+> 			atmel,pin-id = <51>;
+> 			atmel,pull = <2>;
+> 			atmel,mux = <0>;
+> 		};
+> 
+> 		rxd0_pb18 {
+> 			atmel,pin-id = <50>;
+> 			atmel,mux = <0>;
+> 		};
+> 
+> 		rts0_pb17 {
+> 			atmel,pin-id = <49>;
+> 			atmel,mux = <1>;
+> 		};
+> 
+> 		cts0_pb15 {
+> 			atmel,pin-id = <47>;
+> 			atmel,mux = <1>;
+> 		};
+> 	};
+> 
+> 
+> advantage if you need to set a pull-up or any pin parameter different on your board
+> you can overwrite it without re-creating a group
+> 
+> This is controller specific
+> 
+> and then we have the common bindings to describe the group
+> by using phandle of the functions to describe the group
+> 
+> 	groups {
+> 		dbgu {
+> 			pinctrl,functions = < &rxd_pb12
+> 					      &txd_pb13 >;
+> 		};
+> 
+> 		uart0_rxd_txd {
+> 			pinctrl,functions = < &rxd0_pb18
+> 					      &txd0_pb19 >;
+> 		};
+> 
+> 		uart0_rts_cts {
+> 			pinctrl,functions = < &rxd0_pb18
+> 					      &txd0_pb19
+> 					      &rts0_pb17
+> 					      &cts0_pb15 >;
+> 		};
+> 	};
+> 
+> this will be handle by a generic code in c
+> 
+> Best Regards,
+> J.
