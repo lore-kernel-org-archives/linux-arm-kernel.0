@@ -1,34 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 27 Apr 2012 08:32:03 +0200
-Subject: [PATCH 22/33] ARM: imx: add common clock support for pllv3
-In-Reply-To: <20120427062120.GL2234@S2101-09.ap.freescale.net>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 27 Apr 2012 08:32:10 +0200
+Subject: [PATCH v2] Convert i.MX architecture to generic clock framework
+In-Reply-To: <20120427022851.GC2234@S2101-09.ap.freescale.net>
 References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <1335367703-19929-23-git-send-email-s.hauer@pengutronix.de>
- <20120427062120.GL2234@S2101-09.ap.freescale.net>
-Message-ID: <20120427063203.GN17184@pengutronix.de>
+ <4F995657.4080505@de.bosch.com>
+ <20120427022851.GC2234@S2101-09.ap.freescale.net>
+Message-ID: <4F9A3D6A.5040506@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 02:21:22PM +0800, Shawn Guo wrote:
-> On Wed, Apr 25, 2012 at 05:28:12PM +0200, Sascha Hauer wrote:
-> > +static long clk_pllv3_round_rate(struct clk_hw *hw, unsigned long rate,
-> > +				 unsigned long *prate)
-> > +{
-> > +	unsigned long parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
+On 27.04.2012 04:28, Shawn Guo wrote:
+> On Thu, Apr 26, 2012 at 04:06:15PM +0200, Dirk Behme wrote:
+>>> git://git.pengutronix.de/git/imx/linux-2.6.git work/v3.4-rc4-imx-clk
+>> Booting this on top of a 3.4-rc4 on a i.MX6 SabreLite gives me
+>>
+> What do you mean "on top of a 3.4-rc4"?  Sascha's branch is built up
+> on v3.4-rc4.
 > 
-> With patch 81536e0 (clk: always pass parent_rate into .round_rate) in
-> there, *prate is just the parent_rate.  That said, we do not need to
-> call __clk_get_rate and __clk_get_parent anywhere in this file.
+>> ..
+>> Linux video capture interface: v2.00
+>> Switching to clocksource mxc_timer1
+>> Clockevents: could not switch to one-shot mode:
+>> Clockevents: could not switch to one-shot mode:
+>> Clockevents: could not switch to one-shot mode: dummy_timer is not
+>> functional.
+>>  dummy_timer is not functional.
+>> Clockevents: could not switch to one-shot mode:
+>> Could not switch to high resolution mode on CPU 0
+>>  dummy_timer is not functional.
+>> Could not switch to high resolution mode on CPU 2
+>> Could not switch to high resolution mode on CPU 1
+>>  dummy_timer is not functional.
+>> Could not switch to high resolution mode on CPU 3
+>> NET: Registered protocol family 2
+>> ...
+>>
+>> I'm no expert of this, so just in case this is interesting for somebody.
+>>
+> I just booted my sabrelite board using Sascha's branch and can not
+> reproduce it.
 
-The set_rate prototype has changed, round_rate not, so I missed this.
-Will fix.
+Sacha, Shawn, many thanks for your help! I can't reproduce it today 
+morning, too :( I will recheck again.
 
-Thanks
- Sascha
+Many thanks again and best regards
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Dirk
