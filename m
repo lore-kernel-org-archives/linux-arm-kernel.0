@@ -1,69 +1,59 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Apr 2012 14:21:59 -0700
-Subject: [PATCH] arm: omap3: am35x: Don't mark missing features as present
-In-Reply-To: <1334861927-1741-1-git-send-email-mgreer@animalcreek.com> (Mark
- A. Greer's message of "Thu, 19 Apr 2012 11:58:47 -0700")
-References: <1334861927-1741-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <871un827m0.fsf@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Apr 2012 15:24:12 -0600
+Subject: Tegra board file deprecation schedule
+Message-ID: <4F9B0E7C.1060408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Mark A. Greer" <mgreer@animalcreek.com> writes:
+Eventually, Tegra support will become device tree only in the mainline
+kernel; arch/arm/mach-tegra/board* will be deleted.
 
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
->
-> The Chip Identification register on the am35x family of SoCs
-> has bits 12, 7:5, and 3:2 marked as reserved and are read as
-> zeroes.  Unfortunately, on other omap SoCs, a 0 bit means a
-> feature is "Full Use" so the OMAP3_CHECK_FEATURE() macro
-> called by omap3_check_features() will incorrectly interpret
-> those zeroes to mean that a feature is present even though it
-> isn't.  To fix that, the feature bits that are incorrectly
-> set (namely, OMAP3_HAS_IVA and OMAP3_HAS_ISP) need to be
-> cleared after all of the calls to OMAP3_CHECK_FEATURE() in
-> omap3_check_features() are made.
->
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->  arch/arm/mach-omap2/id.c |   11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 0e79b7b..9736049 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -248,6 +248,17 @@ void __init omap3xxx_check_features(void)
->  	omap_features |= OMAP3_HAS_SDRC;
->  
->  	/*
-> +	 * am35x fixups:
-> +	 * - The am35x Chip ID register has bits 12, 7:5, and 3:2 marked as
-> +	 *   reserved and therefore return 0 when read.  Unfortunately,
-> +	 *   OMAP3_CHECK_FEATURE() will interpret some of those zeroes to
-> +	 *   mean that a feature is present even though it isn't so clear
-> +	 *   the incorrectly set feature bits.
-> +	 */
-> +	if (cpu_is_omap3505() || cpu_is_omap3517())
-> +		omap_features &= ~(OMAP3_HAS_IVA | OMAP3_HAS_ISP);
+I propose the following policy towards this goal: I'd like to maintain
+the board files until the relevant device tree file has the same level
+of functionality. Once that is achieved, and a Linus kernel is release
+with full support for the board via device tree, the board files can be
+deleted from the next kernel release.
 
-I just sent a series that removes these cpu_is macros:
+Does anyone have any issues with this?
 
-   http://marc.info/?l=linux-omap&m=133548306205953&w=2
+The device tree conversion status is:
 
-It looks like I can just replace the above with 'if (cpu_is_am35xx()', correct?
+Cardhu/Ventana:
 
-Since you have various AM35x devices, could you could give my series a
-spin and make this change?  If it works, and acked-by/tested-by on my
-series would be appreciated as well.
+None; already device tree only
 
-Thanks,
+Seaboard:
 
-Kevin
+Kaen and Wario board variants are not explicitly supported via device
+tree. However, the differences are almost entirely minor (at least as
+far as the current features supported in board-seaboard*), so anyone
+wishing to use those board variants could easily create their own device
+tree files. I plan to ignore Kaen/Wario and delete board-seaboard* in
+3.6 unless someone objects.
 
+Harmony:
 
+Missing support for TPS6586x regulator, and PCI-Express controller.
+Thierry is working on this. I hope this support will be ready to be
+merged for 3.6, and hence board-harmony* can be deleted in 3.7.
 
+TrimSlice:
 
-> +	/*
->  	 * TODO: Get additional info (where applicable)
->  	 *       e.g. Size of L2 cache.
->  	 */
+Missing RTC and Micro-SD slot support. I've sent patches for this, which
+will be merged today.
+
+Missing audio support. I sent patches for this today. I hope they'll be
+merged for 3.5.
+
+Missing PCI-Express support; status above.
+
+I hope board-trimslice* can be deleted in 3.7.
+
+Paz00/Toshiba AC100:
+
+Missing rfkill button support. Defining a good binding for this might
+prove challenging. Marc Dietrich started work on this a while back. I
+pinged him to see if he intends to continue this work.
+
+This is probably the long-pole for completely removing board files,
+unless we ignore the rfkill feature and delete the board files anyway.
