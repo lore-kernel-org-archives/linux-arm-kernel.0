@@ -1,26 +1,34 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Apr 2012 13:44:02 -0700
-Subject: [PATCH-V4 4/4] ARM: OMAP3+: am33xx: Add powerdomain & PRM support
-In-Reply-To: <87bome579d.fsf@ti.com> (Kevin Hilman's message of "Thu, 26 Apr
- 2012 17:49:02 -0700")
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <1333123435-27186-5-git-send-email-hvaibhav@ti.com>
- <87bome579d.fsf@ti.com>
-Message-ID: <87lilg52i5.fsf@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 27 Apr 2012 14:46:28 -0600
+Subject: [PATCH 2/2] ARM: VIC: use the domain mapping function to assign
+ handlers
+In-Reply-To: <CACRpkdYai+eFybnTM7Mh6o7pwt+vwebzHsudwaoCwtn-VPcxxw@mail.gmail.com>
+References: <1334763054-19340-1-git-send-email-linus.walleij@stericsson.com>
+ <20120427190020.EDB813E0B4D@localhost>
+ <CACRpkdYai+eFybnTM7Mh6o7pwt+vwebzHsudwaoCwtn-VPcxxw@mail.gmail.com>
+Message-ID: <CACxGe6vBbcsT+MVR9dZLTnAdQdX4WDkPJH5-5+DpOuZZmYQyaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+On Fri, Apr 27, 2012 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Apr 27, 2012 at 9:00 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>
+>>> +static struct irq_domain_ops vic_irqdomain_ops = {
+>>> + ? ? .map = vic_irqdomain_map,
+>>> + ? ? .xlate = irq_domain_xlate_onetwocell,
+>>> +};
+>>
+>> It looks like this patch also needs to update the
+>> irq_domain_add_legacy() call to use this ops structure instead of
+>> irq_domain_simple_ops.
+>
+> I goofed up when I split the patch, that change is in 1/2, which is thus
+> not bisectable :-/
+>
+> But the end result is working and looking as it should.
+>
+> Do you want me to re-split, or can we live with this?
 
-[...]
+No need to be sloppy.  Re-split please.
 
-> I also don't like all the cpu_is* checking currently in omap_hwmod.c
-> (which is here before you added this) and have an idea on how to clean
-> it up, I should have a patch by tomorrow for this.  That should help
-> adding am33xx support here without needing all the cpu_is* checking.
-
-Series just posted: 
-
-   http://marc.info/?l=linux-omap&m=133555727831379&w=2
-
-Kevin
+g.
