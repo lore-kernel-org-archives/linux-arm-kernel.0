@@ -1,32 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Apr 2012 22:34:09 +0200
-Subject: [PATCH 05/12] mmc: omap_hsmmc: add DMA engine support
-In-Reply-To: <20120427190332.GG28062@n2100.arm.linux.org.uk>
-References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
- <E1SMLlv-0002WI-8a@rmk-PC.arm.linux.org.uk>
- <CACRpkdZPEnPTpp+vwJed4ZkXLNjEVUz==YVvwg_bhuUOyD3Fxg@mail.gmail.com>
- <20120427190332.GG28062@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdY926ZWoxhm9hKfhWCF5bSmm36GVsVGJZVYswxh1YJxuQ@mail.gmail.com>
+Date: Fri, 27 Apr 2012 22:38:08 +0200
+Subject: [PATCH 2/8] dmaengine: amba-pl08x: ensure physical channels are
+ properly held
+In-Reply-To: <20120418101938.GM25053@n2100.arm.linux.org.uk>
+References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
+ <E1SKRqh-0004b8-RH@rmk-PC.arm.linux.org.uk>
+ <20120418101938.GM25053@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdY8rJYQhUwtW1mtmnY8WB7T7mowefqOmiJdCZ1iS5E89A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 9:03 PM, Russell King - ARM Linux
+On Wed, Apr 18, 2012 at 12:19 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 27, 2012 at 09:00:22PM +0200, Linus Walleij wrote:
 
->> Are these development artifacts?
->
-> Read the commit message. ;)
->
-> They're there (and removed by the next patch) so that the driver can
-> be easily switched between DMA engine and the private DMA API. ?Simply
-> change the relevant #if to zero at build time.
+> Oops, this patch wasn't supposed to be part of this set...
 
-Yeah I saw now when reading through the series...
+...however it gives me the impression that you have a patch set cooking
+to also switch PL08x over to the virtual channel mechanism which is
+really appetizing to see :-)
 
-The whole thing looks very good, since I'm not that into OMAP stuff
-I'm trying now to glance over the dmaengine semantics part that
-I understand a bit atleast.
-
-Thanks,
+Yours,
 Linus Walleij
