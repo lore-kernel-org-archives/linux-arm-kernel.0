@@ -1,24 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Apr 2012 19:48:43 +0200
-Subject: [PATCH] ARM: ux500: Fix build error caused by recent variable
- name change
-In-Reply-To: <1335541015-10155-1-git-send-email-lee.jones@linaro.org>
-References: <1335541015-10155-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaRdn+q2ODUir6dE8btB8+RTkCYsN0W-Zsj7mkRDNrHQw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Apr 2012 11:50:34 -0600
+Subject: [PATCH 1/2] ARM: dt: tegra trimslice: add RTC I2C device
+Message-ID: <1335549035-22286-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 5:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
+From: Stephen Warren <swarren@nvidia.com>
 
-> error: ?u8500_soc_node? undeclared (first use in this function)
->
-> Was recently changed to 'u8500_local_bus_nodes'.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+According to the device's datasheet, it can support an interrupt too.
+However, the existing board file doesn't specify an interrupt, and I
+don't have the schematics, so I can't add an interrupts property. The
+current Linux driver doesn't support anyway.
 
-IIRC I already fixed this up when applying the patch renaming the node.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-trimslice.dts |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Can you check the ux500-core branch on my linux-stericsson tree?
-
-Thanks,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra-trimslice.dts
+index e4fcf9a..23ffa9e 100644
+--- a/arch/arm/boot/dts/tegra-trimslice.dts
++++ b/arch/arm/boot/dts/tegra-trimslice.dts
+@@ -250,6 +250,11 @@
+ 
+ 	i2c at 7000c500 {
+ 		clock-frequency = <400000>;
++
++		rtc at 56 {
++			compatible = "emmicro,em3027";
++			reg = <0x56>;
++		};
+ 	};
+ 
+ 	i2c at 7000d000 {
+-- 
+1.7.0.4
