@@ -1,39 +1,41 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 27 Apr 2012 09:16:22 +0200
-Subject: [PATCH 19/33] ARM i.MX: prepare for common clock framework
-In-Reply-To: <20120427064007.GM2234@S2101-09.ap.freescale.net>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <1335367703-19929-20-git-send-email-s.hauer@pengutronix.de>
- <20120427064007.GM2234@S2101-09.ap.freescale.net>
-Message-ID: <20120427071622.GP17184@pengutronix.de>
+Date: Fri, 27 Apr 2012 09:19:55 +0200
+Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add SPI NOR support
+In-Reply-To: <20120427050549.GG2234@S2101-09.ap.freescale.net>
+References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
+ <20120427034401.GE2234@S2101-09.ap.freescale.net>
+ <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
+ <20120427050549.GG2234@S2101-09.ap.freescale.net>
+Message-ID: <20120427071955.GQ17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 02:40:09PM +0800, Shawn Guo wrote:
-> On Wed, Apr 25, 2012 at 05:28:09PM +0200, Sascha Hauer wrote:
-> > - Add necessary #ifdefs for CONFIG_COMMON_CLOCK
-> > - Add a global spinlock to protect the CCM registers
+On Fri, Apr 27, 2012 at 01:05:51PM +0800, Shawn Guo wrote:
+> On Fri, Apr 27, 2012 at 12:51:01AM -0300, Fabio Estevam wrote:
+> > On Fri, Apr 27, 2012 at 12:44 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> > +
-> > +static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
-> > +		u8 shift, u8 width, const char **parents, int num_parents)
-> > +{
-> > +	return clk_register_mux(NULL, name, parents, num_parents, 0, reg, shift,
+> > > I applied both patches and see the following modprobe error message
+> > > with my testing. ?Any relevance, or I missed something?
+> > >
+> > > spi_imx 2008000.ecspi: master is unqueued, this is deprecated
+> > 
+> > This happens in imx-spi driver and I have reported it in the spi-devel list:
+> > http://www.mail-archive.com/spi-devel-general at lists.sourceforge.net/msg08019.html
+> > 
+> I'm fine with that, since it's an info printed by spi core to draw
+> people's attention on purpose.
 > 
-> I think the fourth parameter should be CLK_SET_RATE_PARENT too, as mux
-> could also likely be in a clk_set_rate propagation path, saying it has
-> a parent clk who has .round_rate and .set_rate operations.
+> > > modprobe: FATAL: Could not load /lib/modules/3.4.0-rc4+/modules.dep: No such fil
+> > 
+> > I have only tested it as built-in.
+> > 
+> The problem is we do not have this error message before applying these
+> two patches, while we are seeing the message with your patches applied.
+> What I am saying is your changes on defconfig should not introduce any
+> message like that.
 
-Nope, we can't do this. When we do this every clock_set_rate on a leaf
-node will propagate up to the ipg, ahb, main_clk, plls and whatever is
-up there.
-
-I made the assumption that we can safely propagate up to the next mux
-but not further. It may turn out that this is to simple and needs
-adjustments, but generally adding a CLK_SET_RATE_PARENT to a mux won't
-work.
+This is an orthogonal issue. It should be fixed in the SPI driver, but
+it shouldn't be a reason to to not turn on SPI support.
 
 Sascha
 
