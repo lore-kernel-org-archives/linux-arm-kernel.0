@@ -1,64 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Apr 2012 10:50:03 +0100
-Subject: [PATCH 1/2] serial/imx: add DMA support
-In-Reply-To: <4F9A6AEE.30005@freescale.com>
-References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
- <1335436632-29499-2-git-send-email-b32955@freescale.com>
- <20120426111116.GF24211@n2100.arm.linux.org.uk>
- <4F9A4417.7080107@freescale.com>
- <20120427082245.GJ24211@n2100.arm.linux.org.uk>
- <4F9A6AEE.30005@freescale.com>
-Message-ID: <20120427095003.GK24211@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 27 Apr 2012 11:29:49 +0200
+Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
+In-Reply-To: <20120427081120.GT2234@S2101-09.ap.freescale.net>
+References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
+ <1335451227-27709-2-git-send-email-b29396@freescale.com>
+ <20120426144446.GN9142@game.jcrosoft.org>
+ <20120426151536.GO9142@game.jcrosoft.org>
+ <20120427054842.GJ2234@S2101-09.ap.freescale.net>
+ <20120427062816.GQ9142@game.jcrosoft.org>
+ <20120427072503.GP2234@S2101-09.ap.freescale.net>
+ <20120427071104.GS9142@game.jcrosoft.org>
+ <20120427081120.GT2234@S2101-09.ap.freescale.net>
+Message-ID: <20120427092949.GT9142@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 05:46:22PM +0800, Huang Shijie wrote:
->>>> 1. How do you deal with transmitting the high-priority XON/XOFF
->>>>      characters (port->x_char) which occur with s/w flow control and
->>>>      the tty buffers fill up?
->>>> 2. How do you deal with flow control in general?  IOW, what happens
->>>>      when the remote end deasserts your CTS with h/w flow control enabled.
-> If the remote end deasserts my CTS, it means the remote will not send  
-> any data.
->
-> My DMA for RX will expire in the following steps:
-> [1] the UART only waits for 32 bytes time long
-> [2] the UART triggers an IDLE Condition Detect DMA.
-> [3] the dma_rx_callback() will release the DMA for Rx.
+On 16:11 Fri 27 Apr     , Shawn Guo wrote:
+> On Fri, Apr 27, 2012 at 09:11:04AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > except duplicate bindings instead having common one make no sense either
+> > 
+> > so imx, at91 and ST (STB SoC and other does have the same type of pin IP
+> > 
+> > to not come with a common bindig means we are doint the same crap as before
+> > 
+> > with switch to DT
+> > 
+> It can be every different in hardware details from one pin based
+> controller to another.  mxs pinctrl is another pin based IP, and Dong
+> tried to approach a binding working good for both imx and mxs, but in
+> the end we agree imx binding does not work so good for mxs, and vice
+> versa.  And that's why pinctrl core binding design leaves out the
+> platform specific binding.
+agreed on the pin level configuration but not for the group management
+there all the same
+of simple group of pins
 
-Err, hang on.  I think you're totally confused about hardware flow
-control.  Certainly you're not using the correct terms for what you're
-describing.
+for this we must have a common way to describe it and handle it in c
 
-The CTS input normally controls the transmitter.  In many hardware
-assisted hardware flow control setups, the deassertion of CTS merely
-prevents the transmitter starting a new character.
-
-This shouldn't have any effect on the receiver of the same UART at all.
-
->>>>      How does your end deal with sending RTS according to flow control
->>>>      conditions?
->>>>
-> If a CTS is received after we sent out a RTS, it will follow the steps:
->  imx_int() --> imx_rtsint() --> uart_handle_cts_change() -->start_tx()
->
-> The start_tx() will create an TX DMA operation, and send out the data.
-
-The generation of RTS (connected to the remote ends CTS signal) is
-supposed to control whether the remote end sends you characters.  RTS
-gets deasserted either by software control when you're running out of
-space to store the received characters, or (in the case of hardware
-assisted hardware flow control) your receivers FIFO fills above a
-certain watermark.
-
->> It should not.  prep_slave_sg() must be callable from atomic contexts.
->>
-> the Documentation/dmaengine.txt does not explicitly force all the  dma  
-> engine driver
-> to do so.
->
-> Add more comments for it in Documentation/dmaengine.txt?
-
-Nevertheless, it is common practice for drivers to call prep_slave_sg()
-from atomic contexts.  It sounds like your DMA driver is being fixed
-anyway, so these tasklets can be killed.
+Best Regards,
+J.
