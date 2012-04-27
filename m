@@ -1,121 +1,73 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 27 Apr 2012 08:48:26 +0200
-Subject: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-In-Reply-To: <20120426203847.GC30690@arwen.pp.htv.fi>
-References: <20120426202610.GA30690@arwen.pp.htv.fi><4F99B0F8.4040308@wwwdotorg.org><20120426203847.GC30690@arwen.pp.htv.fi>
-Message-ID: <20120427.094826.1181797260264746303.hdoyu@nvidia.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 27 Apr 2012 08:31:09 +0200
+Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
+In-Reply-To: <20120427034825.GA826@shlinux2.ap.freescale.net>
+References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
+ <1335451227-27709-2-git-send-email-b29396@freescale.com>
+ <20120426144446.GN9142@game.jcrosoft.org>
+ <20120427034825.GA826@shlinux2.ap.freescale.net>
+Message-ID: <20120427063109.GR9142@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
-Subject: Re: [PATCHv3 2/4] ARM: tegra: Add SMMU enabler in AHB
-Date: Thu, 26 Apr 2012 22:38:48 +0200
-Message-ID: <20120426203847.GC30690@arwen.pp.htv.fi>
-
-> * PGP Signed by an unknown key
-> 
-> Hi,
-> 
-> On Thu, Apr 26, 2012 at 02:32:56PM -0600, Stephen Warren wrote:
-> > On 04/26/2012 02:26 PM, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Thu, Apr 26, 2012 at 01:55:13PM -0600, Stephen Warren wrote:
-> > >> On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
-> > >>> Add extern func, "tegra_ahb_enable_smmu()" to inform AHB that SMMU is
-> > >>> ready.
-> > >>
-> > >>> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> > >>> +static int __tegra_ahb_enable_smmu(struct device *dev, void *data)
-> > >> ...
-> > >>> +int tegra_ahb_enable_smmu(void)
-> > >>> +{
-> > >>> +	return driver_for_each_device(&tegra_ahb_driver.driver, NULL, NULL,
-> > >>> +				      __tegra_ahb_enable_smmu);
-> > >>> +}
-> > >>> +EXPORT_SYMBOL(tegra_ahb_enable_smmu);
-> > >>> +#endif
-> > >>
-> > >> That looks like a neat solution to avoid having a global device object.
-> > > 
-> > > except that it won't work always. If you happen to have two AHB bridges,
-> > > each using a separate smmu but only one smmu is ready, this will set
-> > > SMMU_INIT_DONE on both bridges.
+> > > +   this group of pins in this pin configuration node are working on.
+> > > +3. The driver can use the function node's name and pin configuration node's
+> > > +   name describe the pin function and group hierarchy.
+> > > +   For example, Linux IMX pinctrl driver takes the function node's name
+> > > +   as the function name and pin configuration node's name as group name to
+> > > +   create the map table.
+> > > +4. Each pin configuration node should have a phandle, devices can set pins
+> > > +   configurations by referring to the phandle of that pin configuration node.
+> > > +
+> > > +Examples:
+> > > +usdhc at 0219c000 { /* uSDHC4 */
+> > > +	fsl,card-wired;
+> > > +	vmmc-supply = <&reg_3p3v>;
+> > > +	status = "okay";
+> > > +	pinctrl-names = "default";
+> > > +	pinctrl-0 = <&pinctrl_usdhc4_1>;
+> > > +};
+> > > +
+> > > +iomuxc at 020e0000 {
+> > > +	compatible = "fsl,imx6q-iomuxc";
+> > > +	reg = <0x020e0000 0x4000>;
+> > > +
+> > > +	/* shared pinctrl settings */
+> > > +	usdhc4 {
+> > > +		pinctrl_usdhc4_1: usdhc4grp-1 {
+> > > +			fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
+> > > +				    1392 0x17059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
+> > > +				    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
+> > > +				    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
+> > > +				    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
+> > > +				    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
+> > > +				    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
+> > > +				    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
+> > > +				    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
+> > > +				    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
+> > honestly I don't like this it's obscure need to decode manually
 > > 
-> > There is only 1.
-> 
-> that's why there's a "if you happen to have" statement. If you stick to
-> this "there is only 1" argument, why do you even make this into a
-> platform driver ? Just stick the entire code hidden on the
-> machine_init() code. Drivers a supposed to be able to instantiated
-> multiple times and always work, this method won't work if tegra99999
-> ends up with two AHB bridges/SMMUs
-> 
-> > >> However, if that driver_for_each_device finds no devices, the function
-> > >> still succeeds. That doesn't seem right, and doesn't allow e.g. the SMMU
-> > >> to defer its probe until the AHB driver has completed.
-> > >>
-> > >> Perhaps add a local int variable to tegra_ahb_enable_smmu(), pass the
-> > >> address to __tegra_ahb_enable_smmu, and have it increment the int. Then,
-> > >> after calling driver_for_each_device,:
-> > >>
-> > >> if (!ahb_device_count)
-> > >>     return -EPROBE_DEFER
-> > >> if (WARN_ON(ahb_device_count != 1))
-> > >>     return -EINVAL;
-> > >> return 0;
-> > > 
-> > > that would look, well, weird. Why don't you just different initcall
-> > > leves for this ? Maybe smmu goes into postcore_initcall() and tegra_ahb
-> > > goes into postcore_initcall_sync() ?? then you know that SMMU will be
-> > > ready by the time you call tegra_ahb probe. Well, unless smmu's probe
-> > > fail, but then again, IIUC it won't work anyway...
+> > I propose to use phandle
 > > 
-> > Uggh. I'd rather all these devices just got instantiated from device
-> > tree and relied on deferred probe to manage any ordering, rather than
-> > playing complex games with multiple initcall levels (and in the end
-> > probably having to invent more and more initcall levels to correctly
-> > represent all the dependencies).
+> > as example on uart you will want or not the rst/cts so you will have quite a
+> > lot of bindings
+> > 
+> > so you can describe the pin configuration (function) and refer it by phandle
+> > in the group
+> > 
+> Hmm, i can't say you're wrong.
+> What you suggested may be suitable for your SoCs, before i know more about your SoC
+> details, i may not comment too much.
 > 
-> then do that... it'll be better than current trickery with
-> driver_for_each_device() and my initcall trickery ;-)
+> The binding i used here basically follows the exist iomux v3 convention which we're
+> using for non dt platforms, i think most people working on fsl platform may would
+> want a similar using as before since iomux v3 is very easy to use for imx soc.
+> You can refer to: iomux-mx51.h.
+> 
+> After dt macro support is available(which is still in progress), we may
+> convert the raw data above to raw data then user do not need to decode
+> the setting anymore.
+this is not an excuse to duplicate bindings
 
-Then, what about something like the following?
-
- static int tegra_ahb_match_by_smmu(struct device *dev, void *data)
- {
- 	struct tegra_ahb *ahb = dev_get_drvdata(dev);
- 	struct device_node *dn = data;
- 
- 	return (ahb->dev->of_node == dn) ? 1 : 0
- }
- 
- int tegra_ahb_enable_smmu(struct device_node *ahb)
- {
- 	struct device *dev;
- 	u32 val;
- 
- 	dev = driver_find_device(&tegra_ahb_driver.driver, NULL, ahb,
- 				 tegra_ahb_match_by_smmu);
- 	if (!dev)
- 		return -ENODEV;
- 
- 	val = gizmo_readl(ahb, AHB_ARBITRATION_XBAR_CTRL);
- 	val |= AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE;
- 	gizmo_writel(ahb, val, AHB_ARBITRATION_XBAR_CTRL);
- 	return 0;
- }
- EXPORT_SYMBOL(tegra_ahb_enable_smmu);
-
-	Modified arch/arm/boot/dts/tegra30.dtsi
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 655bc47..28f9138 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -242,5 +242,6 @@
- 	smmu {
- 		compatible = "nvidia,tegra30-smmu";
- 		mc = <&mc>;
-+		ahb = <&ahb>;
- 	};
- };
+Best Regards,
+J.
