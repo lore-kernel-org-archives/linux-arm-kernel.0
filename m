@@ -1,71 +1,21 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Fri, 27 Apr 2012 11:18:15 -0400
-Subject: [PATCH 1/2] serial/imx: add DMA support
-In-Reply-To: <20120427095003.GK24211@n2100.arm.linux.org.uk>
-References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
- <1335436632-29499-2-git-send-email-b32955@freescale.com>
- <20120426111116.GF24211@n2100.arm.linux.org.uk>
- <4F9A4417.7080107@freescale.com>
- <20120427082245.GJ24211@n2100.arm.linux.org.uk>
- <4F9A6AEE.30005@freescale.com>
- <20120427095003.GK24211@n2100.arm.linux.org.uk>
-Message-ID: <CAMiH66FoEYEqudAOx7Y8GpgjfT-gX2qOi0BjG0-X8xH8u24kSw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Apr 2012 09:25:56 -0600
+Subject: [PATCH v5 1/1] dt: add of_get_child_count helper function
+In-Reply-To: <1335497780-1164-1-git-send-email-b29396@freescale.com>
+References: <20120427032831.GE26070@shlinux2.ap.freescale.net>
+ <1335497780-1164-1-git-send-email-b29396@freescale.com>
+Message-ID: <4F9ABA84.3070506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 5:50 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Apr 27, 2012 at 05:46:22PM +0800, Huang Shijie wrote:
->>>>> 1. How do you deal with transmitting the high-priority XON/XOFF
->>>>> ? ? ?characters (port->x_char) which occur with s/w flow control and
->>>>> ? ? ?the tty buffers fill up?
->>>>> 2. How do you deal with flow control in general? ?IOW, what happens
->>>>> ? ? ?when the remote end deasserts your CTS with h/w flow control enabled.
->> If the remote end deasserts my CTS, it means the remote will not send
->> any data.
->>
->> My DMA for RX will expire in the following steps:
->> [1] the UART only waits for 32 bytes time long
->> [2] the UART triggers an IDLE Condition Detect DMA.
->> [3] the dma_rx_callback() will release the DMA for Rx.
->
-> Err, hang on. ?I think you're totally confused about hardware flow
-> control. ?Certainly you're not using the correct terms for what you're
-> describing.
->
-> The CTS input normally controls the transmitter. ?In many hardware
-> assisted hardware flow control setups, the deassertion of CTS merely
-> prevents the transmitter starting a new character.
->
-> This shouldn't have any effect on the receiver of the same UART at all.
->
->>>>> ? ? ?How does your end deal with sending RTS according to flow control
->>>>> ? ? ?conditions?
->>>>>
->> If a CTS is received after we sent out a RTS, it will follow the steps:
->> ?imx_int() --> imx_rtsint() --> uart_handle_cts_change() -->start_tx()
->>
->> The start_tx() will create an TX DMA operation, and send out the data.
->
-> The generation of RTS (connected to the remote ends CTS signal) is
-> supposed to control whether the remote end sends you characters. ?RTS
-http://en.wikipedia.org/wiki/Flow_control#Hardware_flow_control
+On 04/26/2012 09:36 PM, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Currently most code to get child count in kernel are almost same,
+> add a helper to implement this function for dt to use.
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
->From the wiki, the generation of RTS (assert by the  "master end") is
-used to send data
-from the master to slave(the remote), not control the remote end sends
-me characters.
-
-
-
-Best Regards
-Huang Shijie
-
-
-
-> gets deasserted either by software control when you're running out of
-> space to store the received characters, or (in the case of hardware
-> assisted hardware flow control) your receivers FIFO fills above a
-> certain watermark.
->
->>>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
