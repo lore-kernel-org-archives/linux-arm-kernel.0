@@ -1,124 +1,65 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 26 Apr 2012 16:59:11 -0700
-Subject: [PATCH 1/9] cpu: Introduce clear_tasks_mm_cpumask() helper
-In-Reply-To: <20120423070736.GA30752@lizard>
-References: <20120423070641.GA27702@lizard>
-	<20120423070736.GA30752@lizard>
-Message-ID: <20120426165911.00cebd31.akpm@linux-foundation.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 Apr 2012 17:49:02 -0700
+Subject: [PATCH-V4 4/4] ARM: OMAP3+: am33xx: Add powerdomain & PRM support
+In-Reply-To: <1333123435-27186-5-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Fri, 30 Mar 2012 21:33:55 +0530")
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <1333123435-27186-5-git-send-email-hvaibhav@ti.com>
+Message-ID: <87bome579d.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Apr 2012 00:07:36 -0700
-Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
+Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
-> Many architectures clear tasks' mm_cpumask like this:
-> 
-> 	read_lock(&tasklist_lock);
-> 	for_each_process(p) {
-> 		if (p->mm)
-> 			cpumask_clear_cpu(cpu, mm_cpumask(p->mm));
-> 	}
-> 	read_unlock(&tasklist_lock);
-> 
-> Depending on the context, the code above may have several problems,
-> such as:
-> 
-> 1. Working with task->mm w/o getting mm or grabing the task lock is
->    dangerous as ->mm might disappear (exit_mm() assigns NULL under
->    task_lock(), so tasklist lock is not enough).
-> 
-> 2. Checking for process->mm is not enough because process' main
->    thread may exit or detach its mm via use_mm(), but other threads
->    may still have a valid mm.
-> 
-> This patch implements a small helper function that does things
-> correctly, i.e.:
-> 
-> 1. We take the task's lock while whe handle its mm (we can't use
->    get_task_mm()/mmput() pair as mmput() might sleep);
-> 
-> 2. To catch exited main thread case, we use find_lock_task_mm(),
->    which walks up all threads and returns an appropriate task
->    (with task lock held).
-> 
-> Also, Per Peter Zijlstra's idea, now we don't grab tasklist_lock in
-> the new helper, instead we take the rcu read lock. We can do this
-> because the function is called after the cpu is taken down and marked
-> offline, so no new tasks will get this cpu set in their mm mask.
-> 
+> As far as PRM/CM/PRCM modules are concerned, AM33XX device is
+> different than OMAP3 and OMAP4 architectures; so we need to
+> handle it separately.
+> This patch adds support for, Powerdomain, Powerdomain data,
+> PRM api's required for AM33XX device.
+>
+> And also, hooks up AM33XX powerdomain to existing OMAP framework.
 
-Seems reasonable.
+[...]
 
-> --- a/include/linux/cpu.h
-> +++ b/include/linux/cpu.h
-> @@ -179,6 +179,7 @@ extern void put_online_cpus(void);
->  #define hotcpu_notifier(fn, pri)	cpu_notifier(fn, pri)
->  #define register_hotcpu_notifier(nb)	register_cpu_notifier(nb)
->  #define unregister_hotcpu_notifier(nb)	unregister_cpu_notifier(nb)
-> +void clear_tasks_mm_cpumask(int cpu);
->  int cpu_down(unsigned int cpu);
->  
->  #ifdef CONFIG_ARCH_CPU_PROBE_RELEASE
-> diff --git a/kernel/cpu.c b/kernel/cpu.c
-> index 2060c6e..ecdf499 100644
-> --- a/kernel/cpu.c
-> +++ b/kernel/cpu.c
-> @@ -10,6 +10,8 @@
->  #include <linux/sched.h>
->  #include <linux/unistd.h>
->  #include <linux/cpu.h>
-> +#include <linux/oom.h>
-> +#include <linux/rcupdate.h>
->  #include <linux/export.h>
->  #include <linux/kthread.h>
->  #include <linux/stop_machine.h>
-> @@ -171,6 +173,30 @@ void __ref unregister_cpu_notifier(struct notifier_block *nb)
->  }
->  EXPORT_SYMBOL(unregister_cpu_notifier);
->  
-> +void clear_tasks_mm_cpumask(int cpu)
-
-The operation of this function was presumably obvious to you at the
-time you wrote it, but that isn't true of other people at later times.
-
-Please document it?
-
-
-> +{
-> +	struct task_struct *p;
-> +
+> @@ -1288,7 +1289,15 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+>  	if (IS_ERR_VALUE(ret))
+>  		return ret;
+>
+> -	if (cpu_is_omap24xx() || cpu_is_omap34xx())
 > +	/*
-> +	 * This function is called after the cpu is taken down and marked
-> +	 * offline,
-
-hm, well.  Who said that this function will only ever be called
-after that CPU was taken down?  There is nothing in the function name
-nor in the (absent) documentation which enforces this precondition.
-
-If someone tries to use this function for a different purpose, or
-copies-and-modifies it for a different purpose, we just shot them in
-the foot.
-
-They'd be pretty dumb to do that without reading the local comment,
-but still...
-
-> 	 so its not like new tasks will ever get this cpu set in
-> +	 * their mm mask. -- Peter Zijlstra
-> +	 * Thus, we may use rcu_read_lock() here, instead of grabbing
-> +	 * full-fledged tasklist_lock.
+> +	 * cpu_is_omap34xx() is true for am33xx device as well, so
+> +	 * fist check for cpu_is_am33xx().
 > +	 */
-> +	rcu_read_lock();
-> +	for_each_process(p) {
-> +		struct task_struct *t;
-> +
-> +		t = find_lock_task_mm(p);
-> +		if (!t)
-> +			continue;
-> +		cpumask_clear_cpu(cpu, mm_cpumask(t->mm));
-> +		task_unlock(t);
-> +	}
-> +	rcu_read_unlock();
-> +}
+> +	if (cpu_is_am33xx())
+> +		return am33xx_prm_assert_hardreset(ohri.rst_shift,
+> +				oh->clkdm->pwrdm.ptr->prcm_offs,
+> +				oh->prcm.omap4.rstctrl_offs);
 
-It is good that this code exists under CONFIG_HOTPLUG_CPU.  Did you
-check that everything works correctly with CONFIG_HOTPLUG_CPU=n?
+This still troubles me.  I *really* don't like that we have a dependence
+on cpu_is* call ordering.  This is very fragile and error prone.
+
+I also don't like all the cpu_is* checking currently in omap_hwmod.c
+(which is here before you added this) and have an idea on how to clean
+it up, I should have a patch by tomorrow for this.  That should help
+adding am33xx support here without needing all the cpu_is* checking.
+
+That being said, I just did a simple experiment[1] to see why
+cpu_is_omap34xx() needs to be true for AM33xx in the first place.  Based
+on my quick experiment, it does not appear to be needed.  I think our
+lives will be much simpler if cpu_is_omap34xx() is not true for the
+AM335x family. 
+
+Can you have a look at my test branch[1] and see what you think?  I
+changed the omap_revision for AM335x so that cpu_is_omap34xx() is no
+longer true on this platform.  Then, I only needed to fixup the SRAM
+init, and it boots just fine on my BeagleBone.
+
+I really think we need to go this route, because having
+cpu_is_omap34xx() true on AM335x is causing more headaches than it is
+solving problems.  This will require you to rework a little bit these
+clock/power/voltage domain patches, but I belive it will greatly
+simplify the maintainability of the end result.
+
+Kevin
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tmp/am335x-cpu-is-hacking
