@@ -1,95 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Apr 2012 13:55:59 +0100
-Subject: [PATCH v4 7/7] ARM: architected timers: remove support for non DT
- platforms
-In-Reply-To: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
-References: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1335531359-32128-8-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 27 Apr 2012 13:55:52 +0100
+Subject: [GIT PULL][PATCH v4 0/7] A7/A15 architected timer support
+Message-ID: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All mainline platforms using the ARM architected timers are DT
-only. As such, remove the ad-hoc support that is not longer needed
-anymore.
+Russell,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/arch_timer.h |   14 +-------------
- arch/arm/kernel/arch_timer.c      |   19 ++-----------------
- 2 files changed, 3 insertions(+), 30 deletions(-)
+The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 935897f..ed2e95d 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -1,22 +1,10 @@
- #ifndef __ASMARM_ARCH_TIMER_H
- #define __ASMARM_ARCH_TIMER_H
- 
--#include <linux/ioport.h>
--
--struct arch_timer {
--	struct resource	res[2];
--};
--
- #ifdef CONFIG_ARM_ARCH_TIMER
--int arch_timer_register(struct arch_timer *);
--int arch_timer_sched_clock_init(void);
- int arch_timer_of_register(void);
-+int arch_timer_sched_clock_init(void);
- #else
--static inline int arch_timer_register(struct arch_timer *at)
--{
--	return -ENXIO;
--}
--
- static inline int arch_timer_of_register(void)
- {
- 	return -ENXIO;
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 154f0a1..dd58035 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -248,7 +248,7 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
- 
- static struct clock_event_device arch_timer_global_evt;
- 
--static int __init arch_timer_common_register(void)
-+static int __init arch_timer_register(void)
- {
- 	int err;
- 
-@@ -309,20 +309,6 @@ out_free:
- 	return err;
- }
- 
--int __init arch_timer_register(struct arch_timer *at)
--{
--	if (at->res[0].start <= 0 || !(at->res[0].flags & IORESOURCE_IRQ))
--		return -EINVAL;
--
--	arch_timer_ppi = at->res[0].start;
--
--	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ))
--		arch_timer_ppi2 = at->res[1].start;
--
--	return arch_timer_common_register();
--}
--
--#ifdef CONFIG_OF
- static const struct of_device_id arch_timer_of_match[] __initconst = {
- 	{ .compatible	= "arm,armv7-timer",	},
- 	{},
-@@ -348,9 +334,8 @@ int __init arch_timer_of_register(void)
- 	pr_info("arch_timer: found %s irqs %d %d\n",
- 		np->name, arch_timer_ppi, arch_timer_ppi2);
- 
--	return arch_timer_common_register();
-+	return arch_timer_register();
- }
--#endif
- 
- int __init arch_timer_sched_clock_init(void)
- {
+  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git timers-v3.4-rc4
+
+This patch series adds support for the architected timers found in
+Cortex-A7 and Cortex-A15. It adds local timer support, sched_clock,
+global timer and DT support.
+
+Tested on Cortex A15.
+
+* From v3:
+- Remove dependency on CONFIG_TICK_ONESHOT
+- Tidy up error checking in the VE code
+- Remove ad-hoc probing, making the driver DT only
+
+* From v2:
+- Allow the generic code to report that local timers cannot be used.
+- Plug local timers into the VExpress DT code.
+
+* From the initial revision:
+- Fixed global timer registration when an SMP kernel is running on UP
+  with LOCAL_TIMERS enabled.
+
+Marc Zyngier (7):
+  ARM: local timers: reserve local_timer_register() to SMP
+  ARM: local timers: Add A15 architected timer support
+  ARM: architected timers: Add A15 specific sched_clock implementation
+  ARM: architected timers: add DT support
+  ARM: architected timers: add support for UP timer
+  ARM: vexpress: plug local timers into the DT code
+  ARM: architected timers: remove support for non DT platforms
+
+ .../devicetree/bindings/arm/arch_timer.txt         |   27 ++
+ arch/arm/Kconfig                                   |    6 +
+ arch/arm/include/asm/arch_timer.h                  |   19 +
+ arch/arm/kernel/Makefile                           |    1 +
+ arch/arm/kernel/arch_timer.c                       |  350 ++++++++++++++++++++
+ arch/arm/kernel/smp.c                              |    3 +
+ arch/arm/mach-vexpress/v2m.c                       |    8 +-
+ 7 files changed, 413 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
+ create mode 100644 arch/arm/include/asm/arch_timer.h
+ create mode 100644 arch/arm/kernel/arch_timer.c
+
 -- 
 1.7.7.1
