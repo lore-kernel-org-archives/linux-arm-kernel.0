@@ -1,33 +1,29 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 27 Apr 2012 17:04:53 +0800
-Subject: [PATCH V3 1/4] Input: pxa27x_keypad keep clock on as wakeup source
-In-Reply-To: <CAN1soZyBPE3YExELmu5yHeMTWQf9Zs07v26F6Qz3ocKO+cXGFw@mail.gmail.com>
-References: <1333246084-14110-1-git-send-email-chao.xie@marvell.com>
- <CAN1soZyBPE3YExELmu5yHeMTWQf9Zs07v26F6Qz3ocKO+cXGFw@mail.gmail.com>
-Message-ID: <CAN1soZxTfp9p-JoTmXRDFYLKt0mmgcSwc5F9Tk8b+E0fQRW6AQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Apr 2012 11:05:08 +0200
+Subject: [PATCH 06/17] ARM: imx: use machine specific hook for late init
+In-Reply-To: <1335454725-13089-7-git-send-email-shawn.guo@linaro.org>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120427090508.GD17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 2, 2012 at 5:37 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> On Sun, Apr 1, 2012 at 10:08 AM, Chao Xie <chao.xie@marvell.com> wrote:
->> When the keypad is used as wake up source, the clock can not
->> be disabled. Or it can not detect key pressing.
->> If the keypad is used as wake up source, when resume back,
->> do not enable the clock and configure it again because the
->> register content is retained.
->>
->> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->> ---
->
-> Hi Dmitry,
->
-> I just found that you're not looped in this mail thread. Could I merge
-> them into arch-pxa tree?
->
-> Best Regards
-> Haojian
+On Thu, Apr 26, 2012 at 11:38:34PM +0800, Shawn Guo wrote:
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> -static int __init eet_init_devices(void)
+> +int __init pcm037_eet_init_devices(void)
+>  {
+> -	if (!machine_is_pcm037() || pcm037_variant() != PCM037_EET)
+> -		return 0;
 
-Applied
+The pcm037_variant() != PCM037_EET gets lost here.
 
-Regards
-Haojian
+Otherwise looks good.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
