@@ -1,27 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Apr 2012 22:41:28 +0100
-Subject: [PATCH 2/8] dmaengine: amba-pl08x: ensure physical channels
- are properly held
-In-Reply-To: <CACRpkdY8rJYQhUwtW1mtmnY8WB7T7mowefqOmiJdCZ1iS5E89A@mail.gmail.com>
-References: <20120418100954.GK25053@n2100.arm.linux.org.uk>
- <E1SKRqh-0004b8-RH@rmk-PC.arm.linux.org.uk>
- <20120418101938.GM25053@n2100.arm.linux.org.uk>
- <CACRpkdY8rJYQhUwtW1mtmnY8WB7T7mowefqOmiJdCZ1iS5E89A@mail.gmail.com>
-Message-ID: <20120427214128.GH28062@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Apr 2012 15:44:59 -0600
+Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
+ device tree
+In-Reply-To: <4F99AB93.9040201@redhat.com>
+References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
+ <20120305103245.GC31189@mudshark.cambridge.arm.com>
+ <4F9597B4.5020208@redhat.com> <4F9966CB.6090504@redhat.com>
+ <20120426152246.GI10272@mudshark.cambridge.arm.com>
+ <4F9970AD.6090501@wwwdotorg.org> <4F9993C3.8050008@redhat.com>
+ <4F999A98.6080800@wwwdotorg.org> <4F99AB93.9040201@redhat.com>
+Message-ID: <4F9B135B.6080101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 10:38:08PM +0200, Linus Walleij wrote:
-> On Wed, Apr 18, 2012 at 12:19 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+On 04/26/2012 02:09 PM, William Cohen wrote:
+> On 04/26/2012 02:57 PM, Stephen Warren wrote:
+>> On 04/26/2012 12:28 PM, William Cohen wrote:
+>>> On 04/26/2012 11:58 AM, Stephen Warren wrote:
+>>>> On 04/26/2012 09:22 AM, Will Deacon wrote:
+>>>>> On Thu, Apr 26, 2012 at 04:16:27PM +0100, William Cohen wrote:
+>>>>>> On 04/23/2012 01:56 PM, William Cohen wrote:
+>>>>>>> Has this patch been pulled into the git tree?  -Will (Cohen)
+>>>>>>
+>>>>>>
+>>>>>> This patch pretty much duplicates what is already done for in board-seaboard.c:
+>>>>>>
+>>>>>> http://lxr.linux.no/#linux+v3.3.3/arch/arm/mach-tegra/board-seaboard.c#L147
+>>>>>>
+>>>>>> I have tested the patch out with oprofile, papi, and perf. Things seem to function properly with the patch on a trimslice.
+>>>>>
+>>>>> Right, that sounds good to me. This should go via the tegra/arm-soc tree.
+>>>>> For some reason, I can't find the original patch in the list archives so
+>>>>> perhaps you could repost it to linux-arm-kernel and CC Olof and Arnd?
+>>>>
+>>>> Is there actually any reason to proceed with this patch? When booting
+>>>> Tegra using device tree (i.e. CONFIG_OF rather than the way the phrase
+>>>> is used in the email subject), the ARM PMU is enabled on all boards. So,
+>>>> I'd recommend switching to DT rather than continuing to patch up the
+>>>> board files, which will hopefully be removed in the nearish future.
+>>>>
+>>>> (BTW, best to cc linux-tegra at vger.kernel.org too)
+>>>
+>>> Hi Stephen,
+>>>
+>>> The fedora 17 arm kernels are not yet using the DT. That is the motivations to get this fix into the upstream kernel so that people could use performance monitoring hardware.
+>>
+>> Are people using the mainline kernel for Fedora on Tegra then?
 > 
-> > Oops, this patch wasn't supposed to be part of this set...
+> Hi Stephen,
 > 
-> ...however it gives me the impression that you have a patch set cooking
-> to also switch PL08x over to the virtual channel mechanism which is
-> really appetizing to see :-)
+> The Fedora 17 Arm kernel is currently based on 3.3.2 with patches.  Right now the Fedora arm kernels enable device tree support, but do not use the device trees.
+> 
+> board-trimslice.c is eventually going to be pruned away. However, in the meantime it would be nice if the arm kernel performance monitoring support worked on trimslice regardless whether one was using device trees or not.  
+> 
+> In the past I unsuccesfully tried method b below.  There may be issues with the particular version of uboot on trimslice, but I am not sure.
 
-Actually, that doesn't exist yet.
+FYI, I just did some work on TrimSlice. Method (a) won't work because
+the U-Boot they ship doesn't have DT support. However, method (b) worked
+fine, and the U-Boot version shouldn't affect it at all (and I have a
+very old U-Boot, since I have one of the early developer boards anyway).
 
-This was a patch I'd had floating around, but I don't think its needed
-in any way - I mis-analysed the code and created the patch...
+> 
+> -Will
+> 
+>>> Has the pmu support been verified to work on Nvidia Tegra when using the DT?  In the past I was not successful in getting the trimslice to boot up using device tree. Are there some clear instructions somewhere on how to do this?  
+>>
+>> I believe I validated the PMU functionality when booting using DT when I
+>> created the patch to add it to the device tree files.
+>>
+>> Booting with DT is very simple. You can do either:
+>>
+>> a) Grab arch/arm/boot/tegra-trimslice.dtb from the kernel build tree,
+>> load it into memory from U-Boot just like the kernel and initrd, and
+>> pass the address as the third parameter to "bootm". This is the
+>> preferred option.
+>>
+>> b) Enable CONFIG_ARM_APPENDED_DTB, then concatenate zImage and
+>> tegra-trimslice.dtb into a single file, and use that as the kernel
+>> image. this is probably marginally easier to get working the first time
+>> around, since the only difference is you package a slightly different
+>> kernel file onto the boot media.
+>>
+>> Either way, I'd recommend passing root=UUID=xxx to the kernel instead of
+>> an explicit block device name, since it's possible the naming is
+>> different between booting with board files and device tree.
+> 
