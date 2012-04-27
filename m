@@ -1,17 +1,21 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 27 Apr 2012 17:54:04 +0530
-Subject: [PATCH v5 2/7] memory: emif: add register definitions for EMIF
+Date: Fri, 27 Apr 2012 17:54:08 +0530
+Subject: [PATCH v5 6/7] memory: emif: add one-time settings
 In-Reply-To: <1335529449-28046-1-git-send-email-santosh.shilimkar@ti.com>
 References: <y>
  <1335529449-28046-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1335529449-28046-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1335529449-28046-7-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Aneesh V <aneesh@ti.com>
 
-Add register offsets and bit field definitions
-for EMIF module in TI SoCs
+Add settings that are not dependent on frequency
+or any other transient parameters. This includes
+- power managment control init
+- impedence calibration control
+- frequency independent phy configuration registers
+- initialization of temperature polling
 
 Signed-off-by: Aneesh V <aneesh@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
@@ -21,469 +25,188 @@ Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
 Cc: Greg KH <greg@kroah.com>
 ---
- drivers/memory/emif.h |  454 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 454 insertions(+), 0 deletions(-)
- create mode 100644 drivers/memory/emif.h
+ drivers/memory/emif.c |  148 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 148 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/memory/emif.h b/drivers/memory/emif.h
-new file mode 100644
-index 0000000..44b97df
---- /dev/null
-+++ b/drivers/memory/emif.h
-@@ -0,0 +1,454 @@
-+/*
-+ * Defines for the EMIF driver
-+ *
-+ * Copyright (C) 2012 Texas Instruments, Inc.
-+ *
-+ * Benoit Cousson (b-cousson at ti.com)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
+diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
+index a8dcf35..3dfffbb 100644
+--- a/drivers/memory/emif.c
++++ b/drivers/memory/emif.c
+@@ -78,6 +78,24 @@ static void set_ddr_clk_period(u32 freq)
+ }
+ 
+ /*
++ * Get bus width used by EMIF. Note that this may be different from the
++ * bus width of the DDR devices used. For instance two 16-bit DDR devices
++ * may be connected to a given CS of EMIF. In this case bus width as far
++ * as EMIF is concerned is 32, where as the DDR bus width is 16 bits.
 + */
-+#ifndef __EMIF_H
-+#define __EMIF_H
++static u32 get_emif_bus_width(struct emif_data *emif)
++{
++	u32		width;
++	void __iomem	*base = emif->base;
 +
-+/* Registers offset */
-+#define EMIF_MODULE_ID_AND_REVISION			0x0000
-+#define EMIF_STATUS					0x0004
-+#define EMIF_SDRAM_CONFIG				0x0008
-+#define EMIF_SDRAM_CONFIG_2				0x000c
-+#define EMIF_SDRAM_REFRESH_CONTROL			0x0010
-+#define EMIF_SDRAM_REFRESH_CTRL_SHDW			0x0014
-+#define EMIF_SDRAM_TIMING_1				0x0018
-+#define EMIF_SDRAM_TIMING_1_SHDW			0x001c
-+#define EMIF_SDRAM_TIMING_2				0x0020
-+#define EMIF_SDRAM_TIMING_2_SHDW			0x0024
-+#define EMIF_SDRAM_TIMING_3				0x0028
-+#define EMIF_SDRAM_TIMING_3_SHDW			0x002c
-+#define EMIF_LPDDR2_NVM_TIMING				0x0030
-+#define EMIF_LPDDR2_NVM_TIMING_SHDW			0x0034
-+#define EMIF_POWER_MANAGEMENT_CONTROL			0x0038
-+#define EMIF_POWER_MANAGEMENT_CTRL_SHDW			0x003c
-+#define EMIF_LPDDR2_MODE_REG_DATA			0x0040
-+#define EMIF_LPDDR2_MODE_REG_CONFIG			0x0050
-+#define EMIF_OCP_CONFIG					0x0054
-+#define EMIF_OCP_CONFIG_VALUE_1				0x0058
-+#define EMIF_OCP_CONFIG_VALUE_2				0x005c
-+#define EMIF_IODFT_TEST_LOGIC_GLOBAL_CONTROL		0x0060
-+#define EMIF_IODFT_TEST_LOGIC_CTRL_MISR_RESULT		0x0064
-+#define EMIF_IODFT_TEST_LOGIC_ADDRESS_MISR_RESULT	0x0068
-+#define EMIF_IODFT_TEST_LOGIC_DATA_MISR_RESULT_1	0x006c
-+#define EMIF_IODFT_TEST_LOGIC_DATA_MISR_RESULT_2	0x0070
-+#define EMIF_IODFT_TEST_LOGIC_DATA_MISR_RESULT_3	0x0074
-+#define EMIF_PERFORMANCE_COUNTER_1			0x0080
-+#define EMIF_PERFORMANCE_COUNTER_2			0x0084
-+#define EMIF_PERFORMANCE_COUNTER_CONFIG			0x0088
-+#define EMIF_PERFORMANCE_COUNTER_MASTER_REGION_SELECT	0x008c
-+#define EMIF_PERFORMANCE_COUNTER_TIME			0x0090
-+#define EMIF_MISC_REG					0x0094
-+#define EMIF_DLL_CALIB_CTRL				0x0098
-+#define EMIF_DLL_CALIB_CTRL_SHDW			0x009c
-+#define EMIF_END_OF_INTERRUPT				0x00a0
-+#define EMIF_SYSTEM_OCP_INTERRUPT_RAW_STATUS		0x00a4
-+#define EMIF_LL_OCP_INTERRUPT_RAW_STATUS		0x00a8
-+#define EMIF_SYSTEM_OCP_INTERRUPT_STATUS		0x00ac
-+#define EMIF_LL_OCP_INTERRUPT_STATUS			0x00b0
-+#define EMIF_SYSTEM_OCP_INTERRUPT_ENABLE_SET		0x00b4
-+#define EMIF_LL_OCP_INTERRUPT_ENABLE_SET		0x00b8
-+#define EMIF_SYSTEM_OCP_INTERRUPT_ENABLE_CLEAR		0x00bc
-+#define EMIF_LL_OCP_INTERRUPT_ENABLE_CLEAR		0x00c0
-+#define EMIF_SDRAM_OUTPUT_IMPEDANCE_CALIBRATION_CONFIG	0x00c8
-+#define EMIF_TEMPERATURE_ALERT_CONFIG			0x00cc
-+#define EMIF_OCP_ERROR_LOG				0x00d0
-+#define EMIF_READ_WRITE_LEVELING_RAMP_WINDOW		0x00d4
-+#define EMIF_READ_WRITE_LEVELING_RAMP_CONTROL		0x00d8
-+#define EMIF_READ_WRITE_LEVELING_CONTROL		0x00dc
-+#define EMIF_DDR_PHY_CTRL_1				0x00e4
-+#define EMIF_DDR_PHY_CTRL_1_SHDW			0x00e8
-+#define EMIF_DDR_PHY_CTRL_2				0x00ec
-+#define EMIF_PRIORITY_TO_CLASS_OF_SERVICE_MAPPING	0x0100
-+#define EMIF_CONNECTION_ID_TO_CLASS_OF_SERVICE_1_MAPPING 0x0104
-+#define EMIF_CONNECTION_ID_TO_CLASS_OF_SERVICE_2_MAPPING 0x0108
-+#define EMIF_READ_WRITE_EXECUTION_THRESHOLD		0x0120
-+#define EMIF_COS_CONFIG					0x0124
-+#define EMIF_PHY_STATUS_1				0x0140
-+#define EMIF_PHY_STATUS_2				0x0144
-+#define EMIF_PHY_STATUS_3				0x0148
-+#define EMIF_PHY_STATUS_4				0x014c
-+#define EMIF_PHY_STATUS_5				0x0150
-+#define EMIF_PHY_STATUS_6				0x0154
-+#define EMIF_PHY_STATUS_7				0x0158
-+#define EMIF_PHY_STATUS_8				0x015c
-+#define EMIF_PHY_STATUS_9				0x0160
-+#define EMIF_PHY_STATUS_10				0x0164
-+#define EMIF_PHY_STATUS_11				0x0168
-+#define EMIF_PHY_STATUS_12				0x016c
-+#define EMIF_PHY_STATUS_13				0x0170
-+#define EMIF_PHY_STATUS_14				0x0174
-+#define EMIF_PHY_STATUS_15				0x0178
-+#define EMIF_PHY_STATUS_16				0x017c
-+#define EMIF_PHY_STATUS_17				0x0180
-+#define EMIF_PHY_STATUS_18				0x0184
-+#define EMIF_PHY_STATUS_19				0x0188
-+#define EMIF_PHY_STATUS_20				0x018c
-+#define EMIF_PHY_STATUS_21				0x0190
-+#define EMIF_EXT_PHY_CTRL_1				0x0200
-+#define EMIF_EXT_PHY_CTRL_1_SHDW			0x0204
-+#define EMIF_EXT_PHY_CTRL_2				0x0208
-+#define EMIF_EXT_PHY_CTRL_2_SHDW			0x020c
-+#define EMIF_EXT_PHY_CTRL_3				0x0210
-+#define EMIF_EXT_PHY_CTRL_3_SHDW			0x0214
-+#define EMIF_EXT_PHY_CTRL_4				0x0218
-+#define EMIF_EXT_PHY_CTRL_4_SHDW			0x021c
-+#define EMIF_EXT_PHY_CTRL_5				0x0220
-+#define EMIF_EXT_PHY_CTRL_5_SHDW			0x0224
-+#define EMIF_EXT_PHY_CTRL_6				0x0228
-+#define EMIF_EXT_PHY_CTRL_6_SHDW			0x022c
-+#define EMIF_EXT_PHY_CTRL_7				0x0230
-+#define EMIF_EXT_PHY_CTRL_7_SHDW			0x0234
-+#define EMIF_EXT_PHY_CTRL_8				0x0238
-+#define EMIF_EXT_PHY_CTRL_8_SHDW			0x023c
-+#define EMIF_EXT_PHY_CTRL_9				0x0240
-+#define EMIF_EXT_PHY_CTRL_9_SHDW			0x0244
-+#define EMIF_EXT_PHY_CTRL_10				0x0248
-+#define EMIF_EXT_PHY_CTRL_10_SHDW			0x024c
-+#define EMIF_EXT_PHY_CTRL_11				0x0250
-+#define EMIF_EXT_PHY_CTRL_11_SHDW			0x0254
-+#define EMIF_EXT_PHY_CTRL_12				0x0258
-+#define EMIF_EXT_PHY_CTRL_12_SHDW			0x025c
-+#define EMIF_EXT_PHY_CTRL_13				0x0260
-+#define EMIF_EXT_PHY_CTRL_13_SHDW			0x0264
-+#define EMIF_EXT_PHY_CTRL_14				0x0268
-+#define EMIF_EXT_PHY_CTRL_14_SHDW			0x026c
-+#define EMIF_EXT_PHY_CTRL_15				0x0270
-+#define EMIF_EXT_PHY_CTRL_15_SHDW			0x0274
-+#define EMIF_EXT_PHY_CTRL_16				0x0278
-+#define EMIF_EXT_PHY_CTRL_16_SHDW			0x027c
-+#define EMIF_EXT_PHY_CTRL_17				0x0280
-+#define EMIF_EXT_PHY_CTRL_17_SHDW			0x0284
-+#define EMIF_EXT_PHY_CTRL_18				0x0288
-+#define EMIF_EXT_PHY_CTRL_18_SHDW			0x028c
-+#define EMIF_EXT_PHY_CTRL_19				0x0290
-+#define EMIF_EXT_PHY_CTRL_19_SHDW			0x0294
-+#define EMIF_EXT_PHY_CTRL_20				0x0298
-+#define EMIF_EXT_PHY_CTRL_20_SHDW			0x029c
-+#define EMIF_EXT_PHY_CTRL_21				0x02a0
-+#define EMIF_EXT_PHY_CTRL_21_SHDW			0x02a4
-+#define EMIF_EXT_PHY_CTRL_22				0x02a8
-+#define EMIF_EXT_PHY_CTRL_22_SHDW			0x02ac
-+#define EMIF_EXT_PHY_CTRL_23				0x02b0
-+#define EMIF_EXT_PHY_CTRL_23_SHDW			0x02b4
-+#define EMIF_EXT_PHY_CTRL_24				0x02b8
-+#define EMIF_EXT_PHY_CTRL_24_SHDW			0x02bc
-+#define EMIF_EXT_PHY_CTRL_25				0x02c0
-+#define EMIF_EXT_PHY_CTRL_25_SHDW			0x02c4
-+#define EMIF_EXT_PHY_CTRL_26				0x02c8
-+#define EMIF_EXT_PHY_CTRL_26_SHDW			0x02cc
-+#define EMIF_EXT_PHY_CTRL_27				0x02d0
-+#define EMIF_EXT_PHY_CTRL_27_SHDW			0x02d4
-+#define EMIF_EXT_PHY_CTRL_28				0x02d8
-+#define EMIF_EXT_PHY_CTRL_28_SHDW			0x02dc
-+#define EMIF_EXT_PHY_CTRL_29				0x02e0
-+#define EMIF_EXT_PHY_CTRL_29_SHDW			0x02e4
-+#define EMIF_EXT_PHY_CTRL_30				0x02e8
-+#define EMIF_EXT_PHY_CTRL_30_SHDW			0x02ec
++	width = (readl(base + EMIF_SDRAM_CONFIG) & NARROW_MODE_MASK)
++			>> NARROW_MODE_SHIFT;
++	width = width == 0 ? 32 : 16;
 +
-+/* Registers shifts and masks */
++	return width;
++}
 +
-+/* EMIF_MODULE_ID_AND_REVISION */
-+#define SCHEME_SHIFT					30
-+#define SCHEME_MASK					(0x3 << 30)
-+#define MODULE_ID_SHIFT					16
-+#define MODULE_ID_MASK					(0xfff << 16)
-+#define RTL_VERSION_SHIFT				11
-+#define RTL_VERSION_MASK				(0x1f << 11)
-+#define MAJOR_REVISION_SHIFT				8
-+#define MAJOR_REVISION_MASK				(0x7 << 8)
-+#define MINOR_REVISION_SHIFT				0
-+#define MINOR_REVISION_MASK				(0x3f << 0)
++/*
+  * Get the CL from SDRAM_CONFIG register
+  */
+ static u32 get_cl(struct emif_data *emif)
+@@ -372,6 +390,70 @@ static u32 get_sdram_tim_3_shdw(const struct lpddr2_timings *timings,
+ 	return tim3;
+ }
+ 
++static u32 get_zq_config_reg(const struct lpddr2_addressing *addressing,
++		bool cs1_used, bool cal_resistors_per_cs)
++{
++	u32 zq = 0, val = 0;
 +
-+/* STATUS */
-+#define BE_SHIFT					31
-+#define BE_MASK						(1 << 31)
-+#define DUAL_CLK_MODE_SHIFT				30
-+#define DUAL_CLK_MODE_MASK				(1 << 30)
-+#define FAST_INIT_SHIFT					29
-+#define FAST_INIT_MASK					(1 << 29)
-+#define RDLVLGATETO_SHIFT				6
-+#define RDLVLGATETO_MASK				(1 << 6)
-+#define RDLVLTO_SHIFT					5
-+#define RDLVLTO_MASK					(1 << 5)
-+#define WRLVLTO_SHIFT					4
-+#define WRLVLTO_MASK					(1 << 4)
-+#define PHY_DLL_READY_SHIFT				2
-+#define PHY_DLL_READY_MASK				(1 << 2)
++	val = EMIF_ZQCS_INTERVAL_US * 1000 / addressing->tREFI_ns;
++	zq |= val << ZQ_REFINTERVAL_SHIFT;
 +
-+/* SDRAM_CONFIG */
-+#define SDRAM_TYPE_SHIFT				29
-+#define SDRAM_TYPE_MASK					(0x7 << 29)
-+#define IBANK_POS_SHIFT					27
-+#define IBANK_POS_MASK					(0x3 << 27)
-+#define DDR_TERM_SHIFT					24
-+#define DDR_TERM_MASK					(0x7 << 24)
-+#define DDR2_DDQS_SHIFT					23
-+#define DDR2_DDQS_MASK					(1 << 23)
-+#define DYN_ODT_SHIFT					21
-+#define DYN_ODT_MASK					(0x3 << 21)
-+#define DDR_DISABLE_DLL_SHIFT				20
-+#define DDR_DISABLE_DLL_MASK				(1 << 20)
-+#define SDRAM_DRIVE_SHIFT				18
-+#define SDRAM_DRIVE_MASK				(0x3 << 18)
-+#define CWL_SHIFT					16
-+#define CWL_MASK					(0x3 << 16)
-+#define NARROW_MODE_SHIFT				14
-+#define NARROW_MODE_MASK				(0x3 << 14)
-+#define CL_SHIFT					10
-+#define CL_MASK						(0xf << 10)
-+#define ROWSIZE_SHIFT					7
-+#define ROWSIZE_MASK					(0x7 << 7)
-+#define IBANK_SHIFT					4
-+#define IBANK_MASK					(0x7 << 4)
-+#define EBANK_SHIFT					3
-+#define EBANK_MASK					(1 << 3)
-+#define PAGESIZE_SHIFT					0
-+#define PAGESIZE_MASK					(0x7 << 0)
++	val = DIV_ROUND_UP(T_ZQCL_DEFAULT_NS, T_ZQCS_DEFAULT_NS) - 1;
++	zq |= val << ZQ_ZQCL_MULT_SHIFT;
 +
-+/* SDRAM_CONFIG_2 */
-+#define CS1NVMEN_SHIFT					30
-+#define CS1NVMEN_MASK					(1 << 30)
-+#define EBANK_POS_SHIFT					27
-+#define EBANK_POS_MASK					(1 << 27)
-+#define RDBNUM_SHIFT					4
-+#define RDBNUM_MASK					(0x3 << 4)
-+#define RDBSIZE_SHIFT					0
-+#define RDBSIZE_MASK					(0x7 << 0)
++	val = DIV_ROUND_UP(T_ZQINIT_DEFAULT_NS, T_ZQCL_DEFAULT_NS) - 1;
++	zq |= val << ZQ_ZQINIT_MULT_SHIFT;
 +
-+/* SDRAM_REFRESH_CONTROL */
-+#define INITREF_DIS_SHIFT				31
-+#define INITREF_DIS_MASK				(1 << 31)
-+#define SRT_SHIFT					29
-+#define SRT_MASK					(1 << 29)
-+#define ASR_SHIFT					28
-+#define ASR_MASK					(1 << 28)
-+#define PASR_SHIFT					24
-+#define PASR_MASK					(0x7 << 24)
-+#define REFRESH_RATE_SHIFT				0
-+#define REFRESH_RATE_MASK				(0xffff << 0)
++	zq |= ZQ_SFEXITEN_ENABLE << ZQ_SFEXITEN_SHIFT;
 +
-+/* SDRAM_TIMING_1 */
-+#define T_RTW_SHIFT					29
-+#define T_RTW_MASK					(0x7 << 29)
-+#define T_RP_SHIFT					25
-+#define T_RP_MASK					(0xf << 25)
-+#define T_RCD_SHIFT					21
-+#define T_RCD_MASK					(0xf << 21)
-+#define T_WR_SHIFT					17
-+#define T_WR_MASK					(0xf << 17)
-+#define T_RAS_SHIFT					12
-+#define T_RAS_MASK					(0x1f << 12)
-+#define T_RC_SHIFT					6
-+#define T_RC_MASK					(0x3f << 6)
-+#define T_RRD_SHIFT					3
-+#define T_RRD_MASK					(0x7 << 3)
-+#define T_WTR_SHIFT					0
-+#define T_WTR_MASK					(0x7 << 0)
++	if (cal_resistors_per_cs)
++		zq |= ZQ_DUALCALEN_ENABLE << ZQ_DUALCALEN_SHIFT;
++	else
++		zq |= ZQ_DUALCALEN_DISABLE << ZQ_DUALCALEN_SHIFT;
 +
-+/* SDRAM_TIMING_2 */
-+#define T_XP_SHIFT					28
-+#define T_XP_MASK					(0x7 << 28)
-+#define T_ODT_SHIFT					25
-+#define T_ODT_MASK					(0x7 << 25)
-+#define T_XSNR_SHIFT					16
-+#define T_XSNR_MASK					(0x1ff << 16)
-+#define T_XSRD_SHIFT					6
-+#define T_XSRD_MASK					(0x3ff << 6)
-+#define T_RTP_SHIFT					3
-+#define T_RTP_MASK					(0x7 << 3)
-+#define T_CKE_SHIFT					0
-+#define T_CKE_MASK					(0x7 << 0)
++	zq |= ZQ_CS0EN_MASK; /* CS0 is used for sure */
 +
-+/* SDRAM_TIMING_3 */
-+#define T_PDLL_UL_SHIFT					28
-+#define T_PDLL_UL_MASK					(0xf << 28)
-+#define T_CSTA_SHIFT					24
-+#define T_CSTA_MASK					(0xf << 24)
-+#define T_CKESR_SHIFT					21
-+#define T_CKESR_MASK					(0x7 << 21)
-+#define ZQ_ZQCS_SHIFT					15
-+#define ZQ_ZQCS_MASK					(0x3f << 15)
-+#define T_TDQSCKMAX_SHIFT				13
-+#define T_TDQSCKMAX_MASK				(0x3 << 13)
-+#define T_RFC_SHIFT					4
-+#define T_RFC_MASK					(0x1ff << 4)
-+#define T_RAS_MAX_SHIFT					0
-+#define T_RAS_MAX_MASK					(0xf << 0)
++	val = cs1_used ? 1 : 0;
++	zq |= val << ZQ_CS1EN_SHIFT;
 +
-+/* POWER_MANAGEMENT_CONTROL */
-+#define PD_TIM_SHIFT					12
-+#define PD_TIM_MASK					(0xf << 12)
-+#define DPD_EN_SHIFT					11
-+#define DPD_EN_MASK					(1 << 11)
-+#define LP_MODE_SHIFT					8
-+#define LP_MODE_MASK					(0x7 << 8)
-+#define SR_TIM_SHIFT					4
-+#define SR_TIM_MASK					(0xf << 4)
-+#define CS_TIM_SHIFT					0
-+#define CS_TIM_MASK					(0xf << 0)
++	return zq;
++}
 +
-+/* LPDDR2_MODE_REG_DATA */
-+#define VALUE_0_SHIFT					0
-+#define VALUE_0_MASK					(0x7f << 0)
++static u32 get_temp_alert_config(const struct lpddr2_addressing *addressing,
++		const struct emif_custom_configs *custom_configs, bool cs1_used,
++		u32 sdram_io_width, u32 emif_bus_width)
++{
++	u32 alert = 0, interval, devcnt;
 +
-+/* LPDDR2_MODE_REG_CONFIG */
-+#define CS_SHIFT					31
-+#define CS_MASK						(1 << 31)
-+#define REFRESH_EN_SHIFT				30
-+#define REFRESH_EN_MASK					(1 << 30)
-+#define ADDRESS_SHIFT					0
-+#define ADDRESS_MASK					(0xff << 0)
++	if (custom_configs && (custom_configs->mask &
++				EMIF_CUSTOM_CONFIG_TEMP_ALERT_POLL_INTERVAL))
++		interval = custom_configs->temp_alert_poll_interval_ms;
++	else
++		interval = TEMP_ALERT_POLL_INTERVAL_DEFAULT_MS;
 +
-+/* OCP_CONFIG */
-+#define SYS_THRESH_MAX_SHIFT				24
-+#define SYS_THRESH_MAX_MASK				(0xf << 24)
-+#define MPU_THRESH_MAX_SHIFT				20
-+#define MPU_THRESH_MAX_MASK				(0xf << 20)
-+#define LL_THRESH_MAX_SHIFT				16
-+#define LL_THRESH_MAX_MASK				(0xf << 16)
++	interval *= 1000000;			/* Convert to ns */
++	interval /= addressing->tREFI_ns;	/* Convert to refresh cycles */
++	alert |= (interval << TA_REFINTERVAL_SHIFT);
 +
-+/* PERFORMANCE_COUNTER_1 */
-+#define COUNTER1_SHIFT					0
-+#define COUNTER1_MASK					(0xffffffff << 0)
++	/*
++	 * sdram_io_width is in 'log2(x) - 1' form. Convert emif_bus_width
++	 * also to this form and subtract to get TA_DEVCNT, which is
++	 * in log2(x) form.
++	 */
++	emif_bus_width = __fls(emif_bus_width) - 1;
++	devcnt = emif_bus_width - sdram_io_width;
++	alert |= devcnt << TA_DEVCNT_SHIFT;
 +
-+/* PERFORMANCE_COUNTER_2 */
-+#define COUNTER2_SHIFT					0
-+#define COUNTER2_MASK					(0xffffffff << 0)
++	/* DEVWDT is in 'log2(x) - 3' form */
++	alert |= (sdram_io_width - 2) << TA_DEVWDT_SHIFT;
 +
-+/* PERFORMANCE_COUNTER_CONFIG */
-+#define CNTR2_MCONNID_EN_SHIFT				31
-+#define CNTR2_MCONNID_EN_MASK				(1 << 31)
-+#define CNTR2_REGION_EN_SHIFT				30
-+#define CNTR2_REGION_EN_MASK				(1 << 30)
-+#define CNTR2_CFG_SHIFT					16
-+#define CNTR2_CFG_MASK					(0xf << 16)
-+#define CNTR1_MCONNID_EN_SHIFT				15
-+#define CNTR1_MCONNID_EN_MASK				(1 << 15)
-+#define CNTR1_REGION_EN_SHIFT				14
-+#define CNTR1_REGION_EN_MASK				(1 << 14)
-+#define CNTR1_CFG_SHIFT					0
-+#define CNTR1_CFG_MASK					(0xf << 0)
++	alert |= 1 << TA_SFEXITEN_SHIFT;
++	alert |= 1 << TA_CS0EN_SHIFT;
++	alert |= (cs1_used ? 1 : 0) << TA_CS1EN_SHIFT;
 +
-+/* PERFORMANCE_COUNTER_MASTER_REGION_SELECT */
-+#define MCONNID2_SHIFT					24
-+#define MCONNID2_MASK					(0xff << 24)
-+#define REGION_SEL2_SHIFT				16
-+#define REGION_SEL2_MASK				(0x3 << 16)
-+#define MCONNID1_SHIFT					8
-+#define MCONNID1_MASK					(0xff << 8)
-+#define REGION_SEL1_SHIFT				0
-+#define REGION_SEL1_MASK				(0x3 << 0)
++	return alert;
++}
 +
-+/* PERFORMANCE_COUNTER_TIME */
-+#define TOTAL_TIME_SHIFT				0
-+#define TOTAL_TIME_MASK					(0xffffffff << 0)
+ static u32 get_read_idle_ctrl_shdw(u8 volt_ramp)
+ {
+ 	u32 idle = 0, val = 0;
+@@ -815,6 +897,71 @@ static int __init_or_module setup_interrupts(struct emif_data *emif, u32 irq)
+ 
+ }
+ 
++static void __init_or_module emif_onetime_settings(struct emif_data *emif)
++{
++	u32				pwr_mgmt_ctrl, zq, temp_alert_cfg;
++	void __iomem			*base = emif->base;
++	const struct lpddr2_addressing	*addressing;
++	const struct ddr_device_info	*device_info;
 +
-+/* DLL_CALIB_CTRL */
-+#define ACK_WAIT_SHIFT					16
-+#define ACK_WAIT_MASK					(0xf << 16)
-+#define DLL_CALIB_INTERVAL_SHIFT			0
-+#define DLL_CALIB_INTERVAL_MASK				(0x1ff << 0)
++	device_info = emif->plat_data->device_info;
++	addressing = get_addressing_table(device_info);
 +
-+/* END_OF_INTERRUPT */
-+#define EOI_SHIFT					0
-+#define EOI_MASK					(1 << 0)
++	/*
++	 * Init power management settings
++	 * We don't know the frequency yet. Use a high frequency
++	 * value for a conservative timeout setting
++	 */
++	pwr_mgmt_ctrl = get_pwr_mgmt_ctrl(1000000000, emif,
++			emif->plat_data->ip_rev);
++	emif->lpmode = (pwr_mgmt_ctrl & LP_MODE_MASK) >> LP_MODE_SHIFT;
++	writel(pwr_mgmt_ctrl, base + EMIF_POWER_MANAGEMENT_CONTROL);
 +
-+/* SYSTEM_OCP_INTERRUPT_RAW_STATUS */
-+#define DNV_SYS_SHIFT					2
-+#define DNV_SYS_MASK					(1 << 2)
-+#define TA_SYS_SHIFT					1
-+#define TA_SYS_MASK					(1 << 1)
-+#define ERR_SYS_SHIFT					0
-+#define ERR_SYS_MASK					(1 << 0)
++	/* Init ZQ calibration settings */
++	zq = get_zq_config_reg(addressing, device_info->cs1_used,
++		device_info->cal_resistors_per_cs);
++	writel(zq, base + EMIF_SDRAM_OUTPUT_IMPEDANCE_CALIBRATION_CONFIG);
 +
-+/* LOW_LATENCY_OCP_INTERRUPT_RAW_STATUS */
-+#define DNV_LL_SHIFT					2
-+#define DNV_LL_MASK					(1 << 2)
-+#define TA_LL_SHIFT					1
-+#define TA_LL_MASK					(1 << 1)
-+#define ERR_LL_SHIFT					0
-+#define ERR_LL_MASK					(1 << 0)
++	/* Check temperature level temperature level*/
++	get_temperature_level(emif);
++	if (emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
++		dev_emerg(emif->dev, "SDRAM temperature exceeds operating limit.. Needs shut down!!!\n");
 +
-+/* SYSTEM_OCP_INTERRUPT_ENABLE_SET */
-+#define EN_DNV_SYS_SHIFT				2
-+#define EN_DNV_SYS_MASK					(1 << 2)
-+#define EN_TA_SYS_SHIFT					1
-+#define EN_TA_SYS_MASK					(1 << 1)
-+#define EN_ERR_SYS_SHIFT					0
-+#define EN_ERR_SYS_MASK					(1 << 0)
++	/* Init temperature polling */
++	temp_alert_cfg = get_temp_alert_config(addressing,
++		emif->plat_data->custom_configs, device_info->cs1_used,
++		device_info->io_width, get_emif_bus_width(emif));
++	writel(temp_alert_cfg, base + EMIF_TEMPERATURE_ALERT_CONFIG);
 +
-+/* LOW_LATENCY_OCP_INTERRUPT_ENABLE_SET */
-+#define EN_DNV_LL_SHIFT					2
-+#define EN_DNV_LL_MASK					(1 << 2)
-+#define EN_TA_LL_SHIFT					1
-+#define EN_TA_LL_MASK					(1 << 1)
-+#define EN_ERR_LL_SHIFT					0
-+#define EN_ERR_LL_MASK					(1 << 0)
++	/*
++	 * Program external PHY control registers that are not frequency
++	 * dependent
++	 */
++	if (emif->plat_data->phy_type != EMIF_PHY_TYPE_INTELLIPHY)
++		return;
++	writel(EMIF_EXT_PHY_CTRL_1_VAL, base + EMIF_EXT_PHY_CTRL_1_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_5_VAL, base + EMIF_EXT_PHY_CTRL_5_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_6_VAL, base + EMIF_EXT_PHY_CTRL_6_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_7_VAL, base + EMIF_EXT_PHY_CTRL_7_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_8_VAL, base + EMIF_EXT_PHY_CTRL_8_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_9_VAL, base + EMIF_EXT_PHY_CTRL_9_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_10_VAL, base + EMIF_EXT_PHY_CTRL_10_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_11_VAL, base + EMIF_EXT_PHY_CTRL_11_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_12_VAL, base + EMIF_EXT_PHY_CTRL_12_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_13_VAL, base + EMIF_EXT_PHY_CTRL_13_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_14_VAL, base + EMIF_EXT_PHY_CTRL_14_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_15_VAL, base + EMIF_EXT_PHY_CTRL_15_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_16_VAL, base + EMIF_EXT_PHY_CTRL_16_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_17_VAL, base + EMIF_EXT_PHY_CTRL_17_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_18_VAL, base + EMIF_EXT_PHY_CTRL_18_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_19_VAL, base + EMIF_EXT_PHY_CTRL_19_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_20_VAL, base + EMIF_EXT_PHY_CTRL_20_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_21_VAL, base + EMIF_EXT_PHY_CTRL_21_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_22_VAL, base + EMIF_EXT_PHY_CTRL_22_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_23_VAL, base + EMIF_EXT_PHY_CTRL_23_SHDW);
++	writel(EMIF_EXT_PHY_CTRL_24_VAL, base + EMIF_EXT_PHY_CTRL_24_SHDW);
++}
 +
-+/* SDRAM_OUTPUT_IMPEDANCE_CALIBRATION_CONFIG */
-+#define ZQ_CS1EN_SHIFT					31
-+#define ZQ_CS1EN_MASK					(1 << 31)
-+#define ZQ_CS0EN_SHIFT					30
-+#define ZQ_CS0EN_MASK					(1 << 30)
-+#define ZQ_DUALCALEN_SHIFT				29
-+#define ZQ_DUALCALEN_MASK				(1 << 29)
-+#define ZQ_SFEXITEN_SHIFT				28
-+#define ZQ_SFEXITEN_MASK				(1 << 28)
-+#define ZQ_ZQINIT_MULT_SHIFT				18
-+#define ZQ_ZQINIT_MULT_MASK				(0x3 << 18)
-+#define ZQ_ZQCL_MULT_SHIFT				16
-+#define ZQ_ZQCL_MULT_MASK				(0x3 << 16)
-+#define ZQ_REFINTERVAL_SHIFT				0
-+#define ZQ_REFINTERVAL_MASK				(0xffff << 0)
-+
-+/* TEMPERATURE_ALERT_CONFIG */
-+#define TA_CS1EN_SHIFT					31
-+#define TA_CS1EN_MASK					(1 << 31)
-+#define TA_CS0EN_SHIFT					30
-+#define TA_CS0EN_MASK					(1 << 30)
-+#define TA_SFEXITEN_SHIFT				28
-+#define TA_SFEXITEN_MASK				(1 << 28)
-+#define TA_DEVWDT_SHIFT					26
-+#define TA_DEVWDT_MASK					(0x3 << 26)
-+#define TA_DEVCNT_SHIFT					24
-+#define TA_DEVCNT_MASK					(0x3 << 24)
-+#define TA_REFINTERVAL_SHIFT				0
-+#define TA_REFINTERVAL_MASK				(0x3fffff << 0)
-+
-+/* OCP_ERROR_LOG */
-+#define MADDRSPACE_SHIFT				14
-+#define MADDRSPACE_MASK					(0x3 << 14)
-+#define MBURSTSEQ_SHIFT					11
-+#define MBURSTSEQ_MASK					(0x7 << 11)
-+#define MCMD_SHIFT					8
-+#define MCMD_MASK					(0x7 << 8)
-+#define MCONNID_SHIFT					0
-+#define MCONNID_MASK					(0xff << 0)
-+
-+/* DDR_PHY_CTRL_1 - EMIF4D */
-+#define DLL_SLAVE_DLY_CTRL_SHIFT_4D			4
-+#define DLL_SLAVE_DLY_CTRL_MASK_4D			(0xFF << 4)
-+#define READ_LATENCY_SHIFT_4D				0
-+#define READ_LATENCY_MASK_4D				(0xf << 0)
-+
-+/* DDR_PHY_CTRL_1 - EMIF4D5 */
-+#define DLL_HALF_DELAY_SHIFT_4D5			21
-+#define DLL_HALF_DELAY_MASK_4D5				(1 << 21)
-+#define READ_LATENCY_SHIFT_4D5				0
-+#define READ_LATENCY_MASK_4D5				(0x1f << 0)
-+
-+/* DDR_PHY_CTRL_1_SHDW */
-+#define DDR_PHY_CTRL_1_SHDW_SHIFT			5
-+#define DDR_PHY_CTRL_1_SHDW_MASK			(0x7ffffff << 5)
-+#define READ_LATENCY_SHDW_SHIFT				0
-+#define READ_LATENCY_SHDW_MASK				(0x1f << 0)
-+
-+#endif
+ static void get_default_timings(struct emif_data *emif)
+ {
+ 	struct emif_platform_data *pd = emif->plat_data;
+@@ -1027,6 +1174,7 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
+ 
++	emif_onetime_settings(emif);
+ 	disable_and_clear_all_interrupts(emif);
+ 	setup_interrupts(emif, irq);
+ 
 -- 
 1.7.5.4
