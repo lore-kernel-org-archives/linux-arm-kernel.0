@@ -1,58 +1,94 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Apr 2012 17:10:56 +0800
-Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
-In-Reply-To: <20120427080412.GW17184@pengutronix.de>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
- <20120427080412.GW17184@pengutronix.de>
-Message-ID: <20120427091055.GP28063@b20223-02.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 27 Apr 2012 09:14:59 +0000
+Subject: [PATCH-V3 2/3] ARM: OMAP3+: clockdomain33xx: Add clockdomain
+ data and respective operations
+In-Reply-To: <alpine.DEB.2.00.1204261252430.10308@utopia.booyaka.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241725430.24864@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD30E@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204252118170.30642@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FE75B@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204260252240.10308@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FF79B@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204261252430.10308@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA0094D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 10:04:12AM +0200, Sascha Hauer wrote:
-> On Fri, Apr 27, 2012 at 03:03:03PM +0800, Richard Zhao wrote:
-> > It's used by audio drivers.
+On Fri, Apr 27, 2012 at 00:26:47, Paul Walmsley wrote:
+> On Thu, 26 Apr 2012, Hiremath, Vaibhav wrote:
+> 
+> > On Thu, Apr 26, 2012 at 14:27:20, Paul Walmsley wrote:
+> 
+> (attribution lost)
+> 
+> > > > I am thinking of separating clocktree patch (PATCH-V3 3/3) from this series, 
+> > > > so that clockdomain stuff can get in independently, and clocktree anyway 
+> > > > will follow them (it may take some time in review cycle).
+> > > 
+> > > Yes, I was thinking of doing this too.  The only aspect that gave me pause 
+> > > is that the clockdomain changes are not 100% separate from the clock tree.  
+> > > So we may have to update the clockdomain data as the clock tree changes.
 > > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/clk-imx6q.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> > index f40a35d..9a03dcc 100644
-> > --- a/arch/arm/mach-imx/clk-imx6q.c
-> > +++ b/arch/arm/mach-imx/clk-imx6q.c
-> > @@ -418,6 +418,7 @@ int __init mx6q_clocks_init(void)
-> >  	clk_register_clkdev(clk[sdma], NULL, "20ec000.sdma");
-> >  	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
-> >  	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
-> > +	clk_register_clkdev(clk[ssi1], NULL, "2028000.ssi");
+> > Why do you say that, clockdomain changes are not 100% separate from 
+> > clocktree? It is completely independent...
 > 
-> The ssi clock needs a general cleanup on all i.MX just like I cleaned up
-> the other units. The SSI unit has at least a register clock and a baud
-> clock. What the driver requests and enables is the register clock.
+> Clock enables and disables call clkdm_clk_{enable,disable}() which 
+> undertakes the clockdomain enable sequence on the first clock enabled 
+> inside the clockdomain, and the clockdomain disable sequence on the last 
+> clock inside the clockdomain.  The clockdomain is associated with the 
+> clock via the struct clk .clkdm and .clkdm_name fields.
 > 
-> The baud clock is currently unused and is needed only for master mode
-> (which is not implemented in the ssi driver)
-Are you sure for that? If I don't enable clk[ssi1], the ssi will not
-work.
 
-> 
-> So where we want to come to is:
-> 
-> 	clk_register_clkdev(clk[ipg], "ipg", "2028000.ssi");
-ssi don't have ipg gate. We can let it always on for imx6q.
+Paul,
 
-Thanks
-Richard
-> 	clk_register_clkdev(clk[ssi1], "baud", "2028000.ssi");
+"struct clk" will come into picture when we define clocktree 
+(clock33xx_data.c file), isn't it?
+
+>From clockdomain perspective, it is still independent and definite set of 
+clock domains as per device with respective api's required to control it.
+Which clock falls down to which domain, is defined in clocktree 
+(clock33xx_data.c file), isn't it?
+
+
+> So yes, they are interconnected; particularly if the clkdiv32k MODULEMODE 
+> "clock" is really needed.
 > 
-> Sascha
 > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
+
+Coming back to example of div32k clock, assuming this as a module with MODULEMODE,
+
+static struct clk clkdiv32k_ick = {
+	.name           = "clkdiv32k_ick",
+	.clkdm_name     = "clk_24mhz_clkdm",
+	.rate           = 32768,
+	.parent         = &clk_24mhz,
+	.enable_reg     = AM33XX_CM_PER_CLKDIV32K_CLKCTRL,
+	.enable_bit     = AM33XX_MODULEMODE_SWCTRL,
+	.ops            = &clkops_omap2_dflt,
+};
+
+And we have separate domain for div32k clock.
+
+static struct clockdomain clk_24mhz_am33xx_clkdm = {
+	.name           = "clk_24mhz_clkdm",
+	.pwrdm          = { .name = "per_pwrdm" },
+	.cm_inst        = AM33XX_CM_PER_MOD,
+	.prcm_partition = AM33XX_PRM_PARTITION,
+	.clkdm_offs     = AM33XX_CM_PER_CLK_24MHZ_CLKSTCTRL_OFFSET,
+	.clktrctrl_mask = AM33XX_CLKTRCTRL_MASK,
+	.flags          = (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
+};
+
+
+In any case, I believe we have to define this domain in 
+clockdomain_data, right?
+
+
+
+Just FYI, I am about to initiate a mail-chain with design team, on your 
+questions on div32k. Hopefully I will have some input by Monday.
+
+Thanks,
+Vaibhav
