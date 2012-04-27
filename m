@@ -1,43 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 27 Apr 2012 14:50:48 +0200
-Subject: gpio irqs broken on imx27 with dt
-Message-ID: <20120427125048.GN20039@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 20:54:52 +0800
+Subject: [PATCH 16/17] ARM: tegra: use machine specific hook for late init
+In-Reply-To: <4F996F15.5010908@wwwdotorg.org>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-17-git-send-email-shawn.guo@linaro.org>
+ <4F996F15.5010908@wwwdotorg.org>
+Message-ID: <20120427125450.GZ2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Apr 26, 2012 at 09:51:49AM -0600, Stephen Warren wrote:
+> On 04/26/2012 09:38 AM, Shawn Guo wrote:
+> 
+> BTW, it'd be useful to CC everyone on the cover letter for context.
+> 
+Yes, thanks for the reminding.  Will do in the future.
 
-I experience problems on using gpio irqs on an imx27 based machine
-booting with dt.
+> I think this mostly looks fine, except for one issue below:
+> 
+> > diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+> 
+> > +void __init tegra_init_late(void)
+> > +{
+> > +	tegra_clk_debugfs_init();
+> > +	tegra_pinmux_debuginit();
+> 
+> That function has been removed ...
+> 
+> > +	tegra_powergate_debugfs_init();
+> > +}
+> 
+> > diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
+> 
+> ... because this whole file will be deleted in 3.5; see
+> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+> gpio-pinmux
+> 
+> I'm not sure if you want to remove that part of this patch to make it
+> merge more easily?
 
-I think one problem is:
-
-        if (mxc_gpio_hwtype == IMX21_GPIO) {
-                /* setup one handler for all GPIO interrupts */
-                if (pdev->id == 0)
-                        irq_set_chained_handler(port->irq,
-                                                mx2_gpio_irq_handler);
-	} ...
-
-because the inner if doesn't trigger as dt-created gpio devices have all
-pdev->id == -1.
-
-I havn't looked deeper into it yet, but I think another problem is that
-gpios don't start at 0 and so the usual
-
-	#define OTG_PHY_CS_GPIO (GPIO_PORTB + 23)
-
-doesn't work either (which might be expected, but doesn't necessarily
-needs to fail?!). (You could argue I shouldn't hardcode gpio numbers any
-more, but as not all device drivers are oftree aware yet I need to get
-of the ground somehow.)
-
-I'm leaving for the weekend now, so just wanted you to inform that there
-is a problem. Shawn, maybe you have an idea?
-
-Best regards
-Uwe
+Sure.  Will remove that part from the patch.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Shawn
