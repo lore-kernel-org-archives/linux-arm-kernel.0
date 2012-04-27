@@ -1,34 +1,24 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Apr 2012 21:19:19 +0800
-Subject: [PATCH 01/11] dma: imx-sdma: make channel0 operations atomic
-In-Reply-To: <20120427131010.GN24211@n2100.arm.linux.org.uk>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-2-git-send-email-richard.zhao@freescale.com>
- <1335514900.31825.132.camel@vkoul-udesk3>
- <20120427084109.GO28063@b20223-02.ap.freescale.net>
- <1335522130.31825.135.camel@vkoul-udesk3>
- <20120427112655.GS28063@b20223-02.ap.freescale.net>
- <20120427113335.GM24211@n2100.arm.linux.org.uk>
- <4F9A9899.2060306@nvidia.com>
- <20120427131010.GN24211@n2100.arm.linux.org.uk>
-Message-ID: <20120427131918.GT28063@b20223-02.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 21:23:12 +0800
+Subject: [PATCH 04/17] ARM: ep93xx: use machine specific hook for late init
+In-Reply-To: <4F99CF07.5020006@gmail.com>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-5-git-send-email-shawn.guo@linaro.org>
+ <4F99B9EB.6060806@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F002069887EDC4@AUSP01VMBX24.collaborationhost.net>
+ <4F99CF07.5020006@gmail.com>
+Message-ID: <20120427132310.GC2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 02:10:10PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 27, 2012 at 06:31:13PM +0530, Laxman Dewangan wrote:
-> > On Friday 27 April 2012 05:03 PM, Russell King - ARM Linux wrote:
-> >> On Fri, Apr 27, 2012 at 07:26:56PM +0800, Richard Zhao wrote:
-> >>> Sure, I mean, can you doc in include/linux/dmaengine.h that
-> >>> dmaengine_prep_xxx may sleep?
-> >> Incorrect.  They may _not_ sleep.
-Vinod, do you agree? Any way, better doc it.
+On Fri, Apr 27, 2012 at 08:41:11AM +1000, Ryan Mallon wrote:
+> Hmm, I see. It's a bit annoying that it makes the code less clean, but I
+> can't really see any other nice way of doing it :-/.
+> 
+I guess you will feel the gain if you have more stuff later that need
+to get done in late_initcall time, especially when these stuff are soc
+specific or even board specific.
 
-Thanks
-Richard
-> >
-> > But I have seen that we are using the kzalloc in the dmaengine_prep_xxx  
-> > and kzalloc is sleeping call.
-> 
-> Not with GFP_ATOMIC it isn't.
-> 
+-- 
+Regards,
+Shawn
