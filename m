@@ -1,49 +1,33 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 27 Apr 2012 17:58:13 +0530
-Subject: [PATCH] clk: constify parent name arrays in macros
-Message-ID: <1335529693-14280-1-git-send-email-rnayak@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 20:33:35 +0800
+Subject: [PATCH 07/17] ARM: kirkwood: use machine specific hook for late
+ init
+In-Reply-To: <20120426193644.GA17250@lunn.ch>
+References: <20120426193644.GA17250@lunn.ch>
+Message-ID: <20120427123333.GW2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-parent name array is now expected to be const char *, make
-the relevent changes in the clk macros which define
-default clock types.
+On Thu, Apr 26, 2012 at 09:36:44PM +0200, Andrew Lunn wrote:
+> Hi Shawn
+> 
+> You can probably drop this patch. The move to common clock framework
+> removes late_initcall(kirkwood_clock_gate). The common clock framework
+> late init call is used instead to turn off all clocks which are no
+> longer in use.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- include/linux/clk-private.h |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+Ok, will drop the patch.
 
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index eeae7a3..6ebec83 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -70,7 +70,7 @@ struct clk {
- #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
- 				_fixed_rate_flags)		\
- 	static struct clk _name;				\
--	static char *_name##_parent_names[] = {};		\
-+	static const char *_name##_parent_names[] = {};		\
- 	static struct clk_fixed_rate _name##_hw = {		\
- 		.hw = {						\
- 			.clk = &_name,				\
-@@ -85,7 +85,7 @@ struct clk {
- 				_flags, _reg, _bit_idx,		\
- 				_gate_flags, _lock)		\
- 	static struct clk _name;				\
--	static char *_name##_parent_names[] = {			\
-+	static const char *_name##_parent_names[] = {		\
- 		_parent_name,					\
- 	};							\
- 	static struct clk *_name##_parents[] = {		\
-@@ -107,7 +107,7 @@ struct clk {
- 				_flags, _reg, _shift, _width,	\
- 				_divider_flags, _lock)		\
- 	static struct clk _name;				\
--	static char *_name##_parent_names[] = {			\
-+	static const char *_name##_parent_names[] = {		\
- 		_parent_name,					\
- 	};							\
- 	static struct clk *_name##_parents[] = {		\
--- 
-1.7.1
+Regards,
+Shawn
+
+> 
+> Take a look at:
+> 
+> https://lunn at github.com/lunn/orion-clk.git branch v3.4-rc4-clk-orion
+> 
+> I also have a version rebased on Mike clk-next tree, but i'm waiting
+> for the discussion about what clk-next should be based on, before
+> you again rebasing and posting my patches.
+> 
+> 	Andrew
