@@ -1,33 +1,21 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 20:33:35 +0800
-Subject: [PATCH 07/17] ARM: kirkwood: use machine specific hook for late
- init
-In-Reply-To: <20120426193644.GA17250@lunn.ch>
-References: <20120426193644.GA17250@lunn.ch>
-Message-ID: <20120427123333.GW2234@S2101-09.ap.freescale.net>
+Date: Fri, 27 Apr 2012 20:36:52 +0800
+Subject: [PATCH 08/17] ARM: msm: use machine specific hook for late init
+In-Reply-To: <20120426174124.GA22248@codeaurora.org>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-9-git-send-email-shawn.guo@linaro.org>
+ <20120426174124.GA22248@codeaurora.org>
+Message-ID: <20120427123649.GX2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 09:36:44PM +0200, Andrew Lunn wrote:
-> Hi Shawn
+On Thu, Apr 26, 2012 at 10:41:24AM -0700, David Brown wrote:
+> This should be ok.  I'll forward it on to Saravana Kannan and Stephen
+> Boyd, since it will affect the clock changes they are working on, but
+> It's not too difficult to adapt.
 > 
-> You can probably drop this patch. The move to common clock framework
-> removes late_initcall(kirkwood_clock_gate). The common clock framework
-> late init call is used instead to turn off all clocks which are no
-> longer in use.
-
-Ok, will drop the patch.
+I will drop the change on clock code, since common clk migration will
+kill that late_initcall anyway, so that we can save the conflict.
 
 Regards,
 Shawn
-
-> 
-> Take a look at:
-> 
-> https://lunn at github.com/lunn/orion-clk.git branch v3.4-rc4-clk-orion
-> 
-> I also have a version rebased on Mike clk-next tree, but i'm waiting
-> for the discussion about what clk-next should be based on, before
-> you again rebasing and posting my patches.
-> 
-> 	Andrew
