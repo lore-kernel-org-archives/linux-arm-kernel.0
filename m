@@ -1,51 +1,38 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 27 Apr 2012 11:02:05 +0800
-Subject: [PATCH] arm/sa1100: fix sa1100-rtc memory resource
-In-Reply-To: <1334384779-532-1-git-send-email-mad_soft@inbox.ru>
-References: <1334384779-532-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <CAN1soZwQ9BBp+=mZZm6tL+r2j5-wX-mFkeBPCOuqCGkibZ0R1g@mail.gmail.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Fri, 27 Apr 2012 11:13:32 +0800
+Subject: [PATCH 1/2] pinctrl: support gpio request deferred probing
+In-Reply-To: <4F9A01B6.2050502@wwwdotorg.org>
+References: <1335353894-22096-1-git-send-email-b29396@freescale.com>
+ <CACRpkdadLsqpb=X+BmomyRywf=SrgGpbW2B=Myo3zTn_xMHJ2g@mail.gmail.com>
+ <4F9A01B6.2050502@wwwdotorg.org>
+Message-ID: <20120427031331.GD26070@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 14, 2012 at 2:26 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> DEFINE_RES_MEM() takes the size of resource as a second argument,
-> not the end address. Passing end address leads to following error
-> in runtime during device registration:
-> sa1100-rtc: failed to claim resource 0
->
-> Fix it.
->
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> ---
-> ?arch/arm/mach-sa1100/generic.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> For reference: bug was introduced by commit 3888c09074
-> ("rtc: sa1100: declare irq in resource")
->
-> diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-> index 7c524b4..16be4c5 100644
-> --- a/arch/arm/mach-sa1100/generic.c
-> +++ b/arch/arm/mach-sa1100/generic.c
-> @@ -306,7 +306,7 @@ void sa11x0_register_irda(struct irda_platform_data *irda)
-> ?}
->
-> ?static struct resource sa1100_rtc_resources[] = {
-> - ? ? ? DEFINE_RES_MEM(0x90010000, 0x9001003f),
-> + ? ? ? DEFINE_RES_MEM(0x90010000, 0x40),
-> ? ? ? ?DEFINE_RES_IRQ_NAMED(IRQ_RTC1Hz, "rtc 1Hz"),
-> ? ? ? ?DEFINE_RES_IRQ_NAMED(IRQ_RTCAlrm, "rtc alarm"),
-> ?};
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+Hi Stephen,
 
-Applied
+On Fri, Apr 27, 2012 at 10:17:26AM +0800, Stephen Warren wrote:
+> On 04/26/2012 03:36 PM, Linus Walleij wrote:
+> > On Wed, Apr 25, 2012 at 1:38 PM, Dong Aisheng <b29396@freescale.com> wrote:
+> > 
+> >> From: Dong Aisheng <dong.aisheng@linaro.org>
+> >>
+> >> As pinctrl handles, it may be possible the pinctrl gpio ranges
+> >> are still not got registered when user call pinctrl_gpio_request.
+> >> Thus, add defer support for it too.
+> >>
+> >> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Since nobody is saying anything and it looks reasonable,
+> > I just applied this.
+> 
+> I didn't look at this, because V4 was sent without this patch, so I
+> assumed it'd been dropped by Dong. Was I wrong?
+> 
+I thought this patch had no relationship with dummy state v4 patch and
+it had no changes, so i did not resend it out with the v4 patch again.
+It did not mean drop. Sorry for causing confusing.
+Anyway thanks for your attention.
 
 Regards
-Haojian
+Dong Aisheng
