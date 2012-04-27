@@ -1,41 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 27 Apr 2012 11:29:49 +0200
-Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
-In-Reply-To: <20120427081120.GT2234@S2101-09.ap.freescale.net>
-References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
- <1335451227-27709-2-git-send-email-b29396@freescale.com>
- <20120426144446.GN9142@game.jcrosoft.org>
- <20120426151536.GO9142@game.jcrosoft.org>
- <20120427054842.GJ2234@S2101-09.ap.freescale.net>
- <20120427062816.GQ9142@game.jcrosoft.org>
- <20120427072503.GP2234@S2101-09.ap.freescale.net>
- <20120427071104.GS9142@game.jcrosoft.org>
- <20120427081120.GT2234@S2101-09.ap.freescale.net>
-Message-ID: <20120427092949.GT9142@game.jcrosoft.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 27 Apr 2012 10:03:28 +0000
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <alpine.DEB.2.00.1204260246170.10308@utopia.booyaka.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204260246170.10308@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA00AC6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:11 Fri 27 Apr     , Shawn Guo wrote:
-> On Fri, Apr 27, 2012 at 09:11:04AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > except duplicate bindings instead having common one make no sense either
-> > 
-> > so imx, at91 and ST (STB SoC and other does have the same type of pin IP
-> > 
-> > to not come with a common bindig means we are doint the same crap as before
-> > 
-> > with switch to DT
-> > 
-> It can be every different in hardware details from one pin based
-> controller to another.  mxs pinctrl is another pin based IP, and Dong
-> tried to approach a binding working good for both imx and mxs, but in
-> the end we agree imx binding does not work so good for mxs, and vice
-> versa.  And that's why pinctrl core binding design leaves out the
-> platform specific binding.
-agreed on the pin level configuration but not for the group management
-there all the same
-of simple group of pins
+On Thu, Apr 26, 2012 at 14:19:28, Paul Walmsley wrote:
+> Hello Vaibhav,
+> 
+> looking at Table 1-1 "Device Features" of SPRUH73D, it seems that some 
+> AM33xx family chips come with some features disabled, such as the 
+> PRU-ICSS, the SGX, Ethernet, or USB.  How will this affect the clock tree?  
+> For example, is it correct for us to include the PRU-ICSS clock control on 
+> a clock tree that is booted on an AM3352 or an AM3354?
+> 
+> 
 
-for this we must have a common way to describe it and handle it in c
+I thought of this, but if you look at the existing way of handling such Si version based clock registration is supported by "cpu_clkflg", like CK_3XXX, 
+CK_AM35XX, etc...
 
-Best Regards,
-J.
+During my baseport patch submission, Tony had removed CK_AM33XX flag while 
+merging them. I believe, we are trying to get rid of these flags, and that's 
+where Tony had removed them form my baseport patch.
+I was not sure on how to handle this, so I decided to continue with full 
+chip support (AM3358 and AM3359).
+
+
+Thanks,
+Vaibhav
