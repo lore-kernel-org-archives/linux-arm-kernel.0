@@ -1,60 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 27 Apr 2012 08:45:19 +0200
-Subject: [PATCH v3 3/4] pinctrl: pinctrl-imx: add imx6q pinctrl driver
-In-Reply-To: <1335451227-27709-3-git-send-email-b29396@freescale.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 27 Apr 2012 08:28:16 +0200
+Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
+In-Reply-To: <20120427054842.GJ2234@S2101-09.ap.freescale.net>
 References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
- <1335451227-27709-3-git-send-email-b29396@freescale.com>
-Message-ID: <20120427064519.GO17184@pengutronix.de>
+ <1335451227-27709-2-git-send-email-b29396@freescale.com>
+ <20120426144446.GN9142@game.jcrosoft.org>
+ <20120426151536.GO9142@game.jcrosoft.org>
+ <20120427054842.GJ2234@S2101-09.ap.freescale.net>
+Message-ID: <20120427062816.GQ9142@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 10:40:26PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> ---
-> ChangeLog v1-v2:
-> * add binding doc for pinctrl-imx6q
-> * refactor the probe
-> ---
->  .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         | 1605 ++++++++++++++
->  drivers/pinctrl/Kconfig                            |    8 +
->  drivers/pinctrl/Makefile                           |    1 +
->  drivers/pinctrl/pinctrl-imx6q.c                    | 2331 ++++++++++++++++++++
->  4 files changed, 3945 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
->  create mode 100644 drivers/pinctrl/pinctrl-imx6q.c
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-> new file mode 100644
-> index 0000000..13d474f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
-> @@ -0,0 +1,1605 @@
-> +* Freescale IMX6Q IOMUX Controller
-> +
-> +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
-> +and usage.
-> +
-> +Required properties:
-> +- compatible: "fsl,imx6q-iomuxc"
-> +- fsl,pins: two integers array, represents a group of pins mux and config
-> +  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
-> +  pin working on a specific function, CONFIG is the pad setting value like
-> +  pull-up for this pin. Please refer to imx6q datasheet for the valid pad
-> +  config settings.
+On 13:48 Fri 27 Apr     , Shawn Guo wrote:
+> On Thu, Apr 26, 2012 at 05:15:36PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > We have on Imx mxc at91 and other SoC controler hich you configure per pin
+> > 
+> > which means one pin have multiple function and the same function is on
+> > multiple pins
+> > 
+> > so the groups are just a list of possible pins
+> > 
+> > Instead of re-inventing bindings we do need to come with a common binding whre
+> > it's possible
+> > 
+> > So instead I proppose (send in the v2) to use common way to describe the group
+> > 
+> Let's see how many nodes we will have in device tree.  For imx6q
+> example, there are 332 pins and each pin has up to 8 function selects.
+> We will end up with having 332 x 8 = 2656 sub nodes under node
+> "functions".  Device tree simply cannot afford such a bloating.
+device tree can offord it
 
-Wouldn't it make sense to document the CONFIG bits here? Something like
+except you are going to have hundereds of duplicated pinctrl configuration
+as different board will have different mux which is impossbile to maintain
+either
 
-Pull keeper enabled (pke)	(1 << 7)
-...
+and I do not expect we add all the configuration possible but just the common
+one
 
-Not all bits are available on all pins, refer to the datasheet...
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best Regards,
+J.
