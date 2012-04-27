@@ -1,56 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 13:59:03 +0800
-Subject: Question: Common clock framework, (Mux + Divider)
-In-Reply-To: <CAF1ZMEeE-vJ7chGggPbaS4L2QghDJSegw4zg+LHGhYT1-CMD9g@mail.gmail.com>
-References: <CAF1ZMEeE-vJ7chGggPbaS4L2QghDJSegw4zg+LHGhYT1-CMD9g@mail.gmail.com>
-Message-ID: <20120427055901.GK2234@S2101-09.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 27 Apr 2012 14:09:53 +0800
+Subject: [PATCH 1/2] serial/imx: add DMA support
+In-Reply-To: <20120426120043.GH17184@pengutronix.de>
+References: <1335436632-29499-1-git-send-email-b32955@freescale.com>
+ <1335436632-29499-2-git-send-email-b32955@freescale.com>
+ <20120426120043.GH17184@pengutronix.de>
+Message-ID: <4F9A3831.1020203@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 07:10:35PM +0800, Dennis.Yxun wrote:
-> HI Shawn:
-> 
->   I've looked at the code which you implement the common clock framework
-> for mxs
-> and I notice that you extend the fixed clock with clk-fixed-factor (support
-> multi and divider)
+Hi,
+>> +/* see the "i.MX61 SDMA Scripts User Manual.doc" for the parameters */
+> I can't see how the manual helps here.
+sorry, the comment is in the wrong place. it should placed at 
+configuring the `slave_config`.
+> Please test this patch at least on one more SoC. There should be nothing
+> i.MX6 specific in here, the fact that the i.MX6 is mentioned several
+> times in the comments make me suspicious.
+There are bugs in the UART DMA code in the firmware before the imx6q.  
+So we can not test the UART DMA except the imx6q arm2 board.
 
-I assume you are talking about drivers/clk/mxs/clk-frac.c.  It's not
-an extension of clk-fixed-factor but a mxs specific implementation on
-its own.
+thanks
 
-> However I think the actually case may more complicated than this, say clock
-> could be
-> div1 = (bit[1] == 1) ? 4 : 8;
-> mul1 = (bit[4:3] << 2)
-> mul2 = bit[12:8]
-> b = (a * mul1 * mul2) / (div2 -1)
->   Here difference is actually the algorithm, but should we provide specific
-> implementation, say create struct clk_foo?
-> or can we extend the framework, to just call our own customize algorithm?
-> 
-I'm not ready to say this should be implemented as a generic clock, and
-that's why I chose to create mxs specific clk-frac.
-
->   then how about the clk framework handle mux plus divider case (see the
-> dagram)
-> can we also extend as drivers/clk/clk-mux-divider.c? so others could get
-> benefits.
-> 
->  a ----\
->  b -----\ ------ d   ,    d = ( a  or b or c ) /divider
->  c-----/
-> 
-> or could we handle this with following, crate virtual clock like a', b',c'
-> a -- a' --\
-> b -- b' --\ ---d
-> c -- c' --/
-> a -- > a' , b --> b' , c --> c' could be handled with clk-divider
-> a', b',c' -> d could be handled with clk-mux
-> 
-That's should be the case, and it's the whole point we have those basic
-clks in framework.
-
--- 
-Regards,
-Shawn
+Huang Shijie
