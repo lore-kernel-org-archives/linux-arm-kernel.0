@@ -1,52 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Apr 2012 13:55:58 +0100
-Subject: [PATCH v4 6/7] ARM: vexpress: plug local timers into the DT code
+Date: Fri, 27 Apr 2012 13:55:57 +0100
+Subject: [PATCH v4 5/7] ARM: architected timers: add support for UP timer
 In-Reply-To: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
 References: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1335531359-32128-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1335531359-32128-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/mach-vexpress/v2m.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+If CONFIG_LOCAL_TIMERS is not defined, let the architected timer
+driver register a single clock_event_device that is used as a
+global timer.
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 47cdcca..04dd092 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -19,8 +19,10 @@
- #include <linux/clkdev.h>
- #include <linux/mtd/physmap.h>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/arch_timer.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index 1a34eee..154f0a1 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -246,6 +246,8 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
+ 	.stop	= arch_timer_stop,
+ };
  
-+#include <asm/arch_timer.h>
- #include <asm/mach-types.h>
- #include <asm/sizes.h>
-+#include <asm/smp_twd.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-@@ -616,7 +618,6 @@ void __init v2m_dt_init_early(void)
++static struct clock_event_device arch_timer_global_evt;
++
+ static int __init arch_timer_common_register(void)
+ {
+ 	int err;
+@@ -280,6 +282,17 @@ static int __init arch_timer_common_register(void)
  	}
  
- 	clkdev_add_table(v2m_dt_lookups, ARRAY_SIZE(v2m_dt_lookups));
--	versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
- }
- 
- static  struct of_device_id vexpress_irq_match[] __initdata = {
-@@ -643,6 +644,11 @@ static void __init v2m_dt_timer_init(void)
- 		return;
- 	node = of_find_node_by_path(path);
- 	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
-+	if (arch_timer_of_register() != 0)
-+		twd_local_timer_of_register();
+ 	err = local_timer_register(&arch_timer_ops);
++	if (err) {
++		/*
++		 * We couldn't register as a local timer (could be
++		 * because we're on a UP platform, or because some
++		 * other local timer is already present...). Try as a
++		 * global timer instead.
++		 */
++		arch_timer_global_evt.cpumask = cpumask_of(0);
++		err = arch_timer_setup(&arch_timer_global_evt);
++	}
 +
-+	if (arch_timer_sched_clock_init() != 0)
-+		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
- }
+ 	if (err)
+ 		goto out_free_irq;
  
- static struct sys_timer v2m_dt_timer = {
 -- 
 1.7.7.1
