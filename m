@@ -1,51 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 15:55:41 +0800
-Subject: [PATCH 19/33] ARM i.MX: prepare for common clock framework
-In-Reply-To: <20120427071622.GP17184@pengutronix.de>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <1335367703-19929-20-git-send-email-s.hauer@pengutronix.de>
- <20120427064007.GM2234@S2101-09.ap.freescale.net>
- <20120427071622.GP17184@pengutronix.de>
-Message-ID: <20120427075539.GS2234@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Apr 2012 09:55:44 +0200
+Subject: [PATCH 01/11] dma: imx-sdma: make channel0 operations atomic
+In-Reply-To: <1335510185-7906-2-git-send-email-richard.zhao@freescale.com>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120427075544.GV17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 09:16:22AM +0200, Sascha Hauer wrote:
-> On Fri, Apr 27, 2012 at 02:40:09PM +0800, Shawn Guo wrote:
-> > On Wed, Apr 25, 2012 at 05:28:09PM +0200, Sascha Hauer wrote:
-> > > - Add necessary #ifdefs for CONFIG_COMMON_CLOCK
-> > > - Add a global spinlock to protect the CCM registers
-> > > 
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > ---
-> > > +
-> > > +static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
-> > > +		u8 shift, u8 width, const char **parents, int num_parents)
-> > > +{
-> > > +	return clk_register_mux(NULL, name, parents, num_parents, 0, reg, shift,
-> > 
-> > I think the fourth parameter should be CLK_SET_RATE_PARENT too, as mux
-> > could also likely be in a clk_set_rate propagation path, saying it has
-> > a parent clk who has .round_rate and .set_rate operations.
+On Fri, Apr 27, 2012 at 03:02:55PM +0800, Richard Zhao wrote:
+> device_prep_dma_cyclic may be call in audio trigger function which is
+> atomic context, so we make it atomic too.
 > 
-> Nope, we can't do this. When we do this every clock_set_rate on a leaf
-> node will propagate up to the ipg, ahb, main_clk, plls and whatever is
-> up there.
-
-PLL does not have CLK_SET_RATE_PARENT set, right?
-
-What's the problem with that propagation?  Isn't it designed so?  Now
-on imx6q, 792MHz is a set point for cpu frequency, we have to propagate
-up to pll's set_rate to get that frequency.  There is a mux in the
-middle of the propagation path.  If we do not set CLK_SET_RATE_PARENT
-for mux, how can we get this frequency?
-
-Regards,
-Shawn
-
+>  - change channel0 lock to spinlock.
+>  - Use polling to wait for channel0 finish running.
 > 
-> I made the assumption that we can safely propagate up to the next mux
-> but not further. It may turn out that this is to simple and needs
-> adjustments, but generally adding a CLK_SET_RATE_PARENT to a mux won't
-> work.
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  drivers/dma/imx-sdma.c |   57 +++++++++++++++++++++++++++--------------------
+>  1 files changed, 33 insertions(+), 24 deletions(-)
 > 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index fddccae..fc49ffa 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -24,7 +24,7 @@
+>  #include <linux/mm.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/clk.h>
+> -#include <linux/wait.h>
+> +#include <linux/delay.h>
+>  #include <linux/sched.h>
+>  #include <linux/semaphore.h>
+>  #include <linux/spinlock.h>
+> @@ -324,7 +324,7 @@ struct sdma_engine {
+>  	struct dma_device		dma_device;
+>  	struct clk			*clk_ipg;
+>  	struct clk			*clk_ahb;
+> -	struct mutex			channel_0_lock;
+> +	spinlock_t		channel_0_lock;
+>  	struct sdma_script_start_addrs	*script_addrs;
+>  };
+>  
+> @@ -402,19 +402,31 @@ static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
+>  }
+>  
+>  /*
+> - * sdma_run_channel - run a channel and wait till it's done
+> + * sdma_run_channel0 - run a channel and wait till it's done
+>   */
+> -static int sdma_run_channel(struct sdma_channel *sdmac)
+> +static int sdma_run_channel0(struct sdma_channel *sdmac)
+
+Renaming this to sdma_run_channel0 is fine, but then the argument should
+be changed to struct sdma_engine. It makes no sense to say in the
+function name that this function is channel 0 only and at the same time
+allow to pass in an arbitrary other channel.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
