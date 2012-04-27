@@ -1,46 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 27 Apr 2012 10:31:42 +0200
-Subject: [PATCH v3 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl
- subsystem
-In-Reply-To: <20120427082930.GC826@shlinux2.ap.freescale.net>
-References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
- <1335451227-27709-4-git-send-email-b29396@freescale.com>
- <20120427073504.GS17184@pengutronix.de>
- <20120427082930.GC826@shlinux2.ap.freescale.net>
-Message-ID: <20120427083142.GY17184@pengutronix.de>
+From: carsten.behling@garz-fricke.com (Carsten Behling)
+Date: Fri, 27 Apr 2012 10:36:47 +0200
+Subject: AW: [PATCH v10 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D0905E0994A@wm021.weinmann.com>
+References: <D99582E5322435468A77E74BB0039E7B1D22784CF0@SRV02.hamburg.garz-fricke.de>
+ <alpine.DEB.2.00.1204261035060.16439@gatekeeper.vosshq.de>
+ <D99582E5322435468A77E74BB0039E7B1D22784E8B@SRV02.hamburg.garz-fricke.de>
+ <EF2E73589CA71846A15D0B2CDF79505D0905E0994A@wm021.weinmann.com>
+Message-ID: <D99582E5322435468A77E74BB0039E7B1D2293684D@SRV02.hamburg.garz-fricke.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 04:29:31PM +0800, Dong Aisheng wrote:
-> mach-imx27ipcam.c          mach-mx31ads.c             mach-mx51_babbage.o        mach-pca100.c
-> mach-imx27lite.c           mach-mx31ads.o             mach-mx51_efikamx.c        mach-pcm037.c
-> 
-> Some of them i'm not familiar and i don't know whether they may use pinctrl
-> so i just patched the affected ones.
-> 
-> One lazy method may be just patch all board files without pinctrl support
-> and it will not cause any error.
-> 
-> What's your suggestion?
-> 
-> > pinctrl. Let's add the provide_dummies call to the SoCs instead which
-> > do not have pinctrl yet.
-> > 
-> You meant add provide_dummies call in imx*_soc_init call?
-> We could do it but there might be a case that some boards are converted
-> to use pinctrl while others still not but they're based on the same soc.
-> For examples, 4 mx53 boards and we may not be able to convert them all at
-> the same time.
+Hi Niko,
 
-My point is that none of the mx5 boards have pinctrl since there is no
-SoC driver for it.
-For DT based boards pinctrl should be mandatory once the SoC has pinctrl
-support. All non DT boards probably won't get pinctrl anyway.
+you a right. Driver works with that patch.
 
-Sascha
+Mit freundlichen Gr??en / Best regards
+Carsten Behling
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Development Engineer
+Garz & Fricke GmbH
+Tempowerkring 2, 21079 Hamburg - Germany
+Amtsgericht Hamburg HRB 60514
+Gesch?ftsf?hrer: Manfred Garz, Matthias Fricke
+Phone: +49 (0) 40 791 899 - 56
+Fax:    +49 40 / 791 899 - 39
+www.garz-fricke.com 
+
+ 
+
+
+-----Urspr?ngliche Nachricht-----
+Von: Voss, Nikolaus [mailto:N.Voss at weinmann.de] 
+Gesendet: Freitag, 27. April 2012 10:05
+An: Carsten Behling
+Cc: Marc-Oliver Westerburg; 'devel at ayanes.com'; 'Wolfram Sang'; 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org'; 'linux-i2c at vger.kernel.org'; 'Hubert Feurstein'
+Betreff: RE: [PATCH v10 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+
+Hi Carsten,
+
+Carsten Behling wrote on 2012-04-27:
+>>  	INIT_COMPLETION(dev->cmd_complete);
+>> +	dev->transfer_status = 0;
+>>  	if (dev->msg->flags & I2C_M_RD) {
+>>  		unsigned start_flags = AT91_TWI_START;
+> 
+> this patch will not work, because you reset 'dev->transfer_status'
+> before it is evaluated on errors (AT91_TWI_NACK, AT91_TWI_OVRE). 
+
+it should, because transfer_status is updated by the ISR between
+wait_for_completion_interruptible_timeout() and the error evaluation.
+Please try it out.
+
+> > P.S. Are you using a RM9200? Seems that this SOC has some problems...
+> 
+> Yes, our ECO920 uses the RM9200, but we support it with an very old kernel
+> (2.6.21). I remember there were many problems with I2C.
+
+Ok, but good to hear the driver basically works with the RM9200.
+
+Niko
