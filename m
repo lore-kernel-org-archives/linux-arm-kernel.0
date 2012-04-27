@@ -1,49 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Apr 2012 20:03:32 +0100
-Subject: [PATCH 05/12] mmc: omap_hsmmc: add DMA engine support
-In-Reply-To: <CACRpkdZPEnPTpp+vwJed4ZkXLNjEVUz==YVvwg_bhuUOyD3Fxg@mail.gmail.com>
-References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
- <E1SMLlv-0002WI-8a@rmk-PC.arm.linux.org.uk>
- <CACRpkdZPEnPTpp+vwJed4ZkXLNjEVUz==YVvwg_bhuUOyD3Fxg@mail.gmail.com>
-Message-ID: <20120427190332.GG28062@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 27 Apr 2012 13:06:20 -0600
+Subject: [PATCH 3/9] ARM: mmp: support DT in irq
+In-Reply-To: <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
+References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
+ <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20120427190620.D3C313E0B4D@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 09:00:22PM +0200, Linus Walleij wrote:
-> On Mon, Apr 23, 2012 at 6:05 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
+On Fri, 27 Apr 2012 16:39:11 +0800, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> Append new interrupt driver that could support both pxa168 and mmp2
+> silicon. And this driver supports device tree.
 > 
-> > Add DMA engine support to the OMAP HSMMC driver. ?This supplements the
-> > private DMA API implementation contained within this driver, and the
-> > driver can be switched at build time between using DMA engine and the
-> > private DMA API.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Since CONFIG_SPARSE_IRQ is enabled in arch-mmp, irq driver should
+> handle reserved NR_IRQS_LEGACY in irq domain.
 > 
-> Great,
-> 
-> > +#if 1
-> > + ? ? ? ? ? ? ? sig = host->dma_line_rx;
-> > + ? ? ? ? ? ? ? host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> > + ? ? ? ? ? ? ? if (!host->rx_chan) {
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_warn(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", sig);
-> > + ? ? ? ? ? ? ? }
-> > +#endif
-> > +#if 1
-> > + ? ? ? ? ? ? ? sig = host->dma_line_tx;
-> > + ? ? ? ? ? ? ? host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> > + ? ? ? ? ? ? ? if (!host->tx_chan) {
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_warn(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", sig);
-> > + ? ? ? ? ? ? ? }
-> > +#endif
-> 
-> Are these development artifacts?
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  arch/arm/mach-mmp/Makefile                   |    2 +-
+>  arch/arm/mach-mmp/include/mach/entry-macro.S |    9 +
+>  arch/arm/mach-mmp/irq.c                      |  287 ++++++++++++++++++++++++++
 
-Read the commit message. ;)
+It shouldn't be necessary to create an entirely new irq controller
+driver that duplicates the functionality of irq-mmp2.c and
+irq-pxa168.c.  Instead, the existing drivers should be refactored to
+work with both DT and non-DT user.
 
-They're there (and removed by the next patch) so that the driver can
-be easily switched between DMA engine and the private DMA API.  Simply
-change the relevant #if to zero at build time.
+> diff --git a/arch/arm/mach-mmp/include/mach/entry-macro.S b/arch/arm/mach-mmp/include/mach/entry-macro.S
+> index 9cff9e7..6b9d925 100644
+> --- a/arch/arm/mach-mmp/include/mach/entry-macro.S
+> +++ b/arch/arm/mach-mmp/include/mach/entry-macro.S
+> @@ -6,13 +6,19 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <asm/irq.h>
+>  #include <mach/regs-icu.h>
+>  
+>  	.macro	get_irqnr_preamble, base, tmp
+>  	mrc	p15, 0, \tmp, c0, c0, 0		@ CPUID
+>  	and	\tmp, \tmp, #0xff00
+>  	cmp	\tmp, #0x5800
+> +#ifdef CONFIG_OF
+> +	ldr	\base, =mmp_icu_base
+> +	ldr	\base, [\base, #0]
+> +#else
+>  	ldr	\base, =ICU_VIRT_BASE
+> +#endif
+>  	addne	\base, \base, #0x10c		@ PJ1 AP INT SEL register
+>  	addeq	\base, \base, #0x104		@ PJ4 IRQ SEL register
+>  	.endm
+> @@ -20,5 +26,8 @@
+>  	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+>  	ldr	\tmp, [\base, #0]
+>  	and	\irqnr, \tmp, #0x3f
+> +#ifdef CONFIG_OF
+> +	add	\irqnr, \irqnr, #NR_IRQS_LEGACY
+> +#endif
 
-I don't think it warrants config symbols or trying to do it via module
-params as its just a stepping stone through the process.
+What do these do?  Does turning on CONFIG_OF break booting with atags?
+If so then this will need to be reworked.  CONFIG_OF must not disable
+non-devicetree usage.
+
+g.
