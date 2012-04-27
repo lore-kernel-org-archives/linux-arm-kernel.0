@@ -1,30 +1,30 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 27 Apr 2012 05:31:07 +0000
-Subject: [PATCH-V5 3/3] ARM: OMAP: Make OMAP clocksource source
- selection using kernel param
-In-Reply-To: <alpine.DEB.2.00.1204261636340.10308@utopia.booyaka.com>
-References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
- <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FF819@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204261330010.10308@utopia.booyaka.com>
- <alpine.DEB.2.00.1204261636340.10308@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA000B5@DBDE01.ent.ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 27 Apr 2012 13:33:39 +0800
+Subject: [PATCH 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
+In-Reply-To: <1334085678.6046.6.camel@flow>
+References: <1333644241.54055.YahooMailClassic@web29001.mail.ird.yahoo.com>
+ <1334085678.6046.6.camel@flow>
+Message-ID: <CAN1soZxpLfOmCv_mcRG0QL5LVsP7OZuMiEuOFG7qyGQQkMoYNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 04:08:07, Paul Walmsley wrote:
-> On Thu, 26 Apr 2012, Paul Walmsley wrote:
-> 
-> > Okay, thanks for testing.  Please do update this patch to use 
-> > omap_hwmod_enable(), etc.; see for example omap_dm_timer_init_one().
-> 
-> And, just to be explicit, the ioremap(), clk_get(), and clk_enable() 
-> should no longer be needed for OMAP2+, once you add the 
-> omap_hwmod_enable().
-> 
+On Wed, Apr 11, 2012 at 3:21 AM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+> Am Donnerstag, den 05.04.2012, 17:44 +0100 schrieb Paul Parsons:
+>> This patch is part of a set which adds PCMCIA/CF support for the hx4700.
+>> This patch modifies asic3_gpio_config[] as follows:
+>> 1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
+>> 2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
+>>
+>> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+>> Cc: Philipp Zabel <philipp.zabel@gmail.com>
+>
+> Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+>
+> regards
+> Philipp
+>
 
-What about OMAP1 architecture? Will it work? 
+Please re-send patch. I failed to apply it.
 
-Thanks,
-Vaibhav
+Thanks
+Haojian
