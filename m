@@ -1,87 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 27 Apr 2012 15:44:59 -0600
-Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
- device tree
-In-Reply-To: <4F99AB93.9040201@redhat.com>
-References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
- <20120305103245.GC31189@mudshark.cambridge.arm.com>
- <4F9597B4.5020208@redhat.com> <4F9966CB.6090504@redhat.com>
- <20120426152246.GI10272@mudshark.cambridge.arm.com>
- <4F9970AD.6090501@wwwdotorg.org> <4F9993C3.8050008@redhat.com>
- <4F999A98.6080800@wwwdotorg.org> <4F99AB93.9040201@redhat.com>
-Message-ID: <4F9B135B.6080101@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Apr 2012 23:50:45 +0200
+Subject: gpio irqs broken on imx27 with dt
+In-Reply-To: <20120427125048.GN20039@pengutronix.de>
+References: <20120427125048.GN20039@pengutronix.de>
+Message-ID: <20120427215045.GC20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2012 02:09 PM, William Cohen wrote:
-> On 04/26/2012 02:57 PM, Stephen Warren wrote:
->> On 04/26/2012 12:28 PM, William Cohen wrote:
->>> On 04/26/2012 11:58 AM, Stephen Warren wrote:
->>>> On 04/26/2012 09:22 AM, Will Deacon wrote:
->>>>> On Thu, Apr 26, 2012 at 04:16:27PM +0100, William Cohen wrote:
->>>>>> On 04/23/2012 01:56 PM, William Cohen wrote:
->>>>>>> Has this patch been pulled into the git tree?  -Will (Cohen)
->>>>>>
->>>>>>
->>>>>> This patch pretty much duplicates what is already done for in board-seaboard.c:
->>>>>>
->>>>>> http://lxr.linux.no/#linux+v3.3.3/arch/arm/mach-tegra/board-seaboard.c#L147
->>>>>>
->>>>>> I have tested the patch out with oprofile, papi, and perf. Things seem to function properly with the patch on a trimslice.
->>>>>
->>>>> Right, that sounds good to me. This should go via the tegra/arm-soc tree.
->>>>> For some reason, I can't find the original patch in the list archives so
->>>>> perhaps you could repost it to linux-arm-kernel and CC Olof and Arnd?
->>>>
->>>> Is there actually any reason to proceed with this patch? When booting
->>>> Tegra using device tree (i.e. CONFIG_OF rather than the way the phrase
->>>> is used in the email subject), the ARM PMU is enabled on all boards. So,
->>>> I'd recommend switching to DT rather than continuing to patch up the
->>>> board files, which will hopefully be removed in the nearish future.
->>>>
->>>> (BTW, best to cc linux-tegra at vger.kernel.org too)
->>>
->>> Hi Stephen,
->>>
->>> The fedora 17 arm kernels are not yet using the DT. That is the motivations to get this fix into the upstream kernel so that people could use performance monitoring hardware.
->>
->> Are people using the mainline kernel for Fedora on Tegra then?
+On Fri, Apr 27, 2012 at 02:50:48PM +0200, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Hi Stephen,
+> I experience problems on using gpio irqs on an imx27 based machine
+> booting with dt.
 > 
-> The Fedora 17 Arm kernel is currently based on 3.3.2 with patches.  Right now the Fedora arm kernels enable device tree support, but do not use the device trees.
+> I think one problem is:
 > 
-> board-trimslice.c is eventually going to be pruned away. However, in the meantime it would be nice if the arm kernel performance monitoring support worked on trimslice regardless whether one was using device trees or not.  
+>         if (mxc_gpio_hwtype == IMX21_GPIO) {
+>                 /* setup one handler for all GPIO interrupts */
+>                 if (pdev->id == 0)
+>                         irq_set_chained_handler(port->irq,
+>                                                 mx2_gpio_irq_handler);
+> 	} ...
 > 
-> In the past I unsuccesfully tried method b below.  There may be issues with the particular version of uboot on trimslice, but I am not sure.
+> because the inner if doesn't trigger as dt-created gpio devices have all
+> pdev->id == -1.
 
-FYI, I just did some work on TrimSlice. Method (a) won't work because
-the U-Boot they ship doesn't have DT support. However, method (b) worked
-fine, and the U-Boot version shouldn't affect it at all (and I have a
-very old U-Boot, since I have one of the early developer boards anyway).
+How about
 
-> 
-> -Will
-> 
->>> Has the pmu support been verified to work on Nvidia Tegra when using the DT?  In the past I was not successful in getting the trimslice to boot up using device tree. Are there some clear instructions somewhere on how to do this?  
->>
->> I believe I validated the PMU functionality when booting using DT when I
->> created the patch to add it to the device tree files.
->>
->> Booting with DT is very simple. You can do either:
->>
->> a) Grab arch/arm/boot/tegra-trimslice.dtb from the kernel build tree,
->> load it into memory from U-Boot just like the kernel and initrd, and
->> pass the address as the third parameter to "bootm". This is the
->> preferred option.
->>
->> b) Enable CONFIG_ARM_APPENDED_DTB, then concatenate zImage and
->> tegra-trimslice.dtb into a single file, and use that as the kernel
->> image. this is probably marginally easier to get working the first time
->> around, since the only difference is you package a slightly different
->> kernel file onto the boot media.
->>
->> Either way, I'd recommend passing root=UUID=xxx to the kernel instead of
->> an explicit block device name, since it's possible the naming is
->> different between booting with board files and device tree.
-> 
+	static int once = 0;
+
+	if (mxc_gpio_hwtype == IMX21_GPIO) {
+		/* setup one handler for all GPIO interrupts */
+		if (!once) {
+			irq_set_chained_handler(port->irq,
+						mx2_gpio_irq_handler);
+			once = 1;
+		}
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
