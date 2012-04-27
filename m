@@ -1,38 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 27 Apr 2012 01:05:02 -0300
-Subject: [PATCH v2 2/2] ARM: imx_v6_v7_defconfig: Add SPI NOR support
-In-Reply-To: <1335310537-11219-1-git-send-email-festevam@gmail.com>
-References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
-Message-ID: <1335499502-2896-1-git-send-email-festevam@gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 27 Apr 2012 09:40:55 +0530
+Subject: announcing the clk-next branch
+In-Reply-To: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
+References: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
+Message-ID: <4F9A1C4F.6020304@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPI NOR support in defconfig.
+On 4/25/2012 7:02 AM, Turquette, Mike wrote:
+> If the branch is missing anything that I have ACK'd then please let me know.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Author: Viresh Kumar <viresh.kumar@st.com>
+Date:   Wed Apr 11 11:34:35 2012 +0530
+
+    clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is set and clk is enabled
+    
+    This is well documented but isn't implemented. clk_set_rate() must check if
+    flags have CLK_SET_RATE_GATE bit set and is enabled too.
+    
+    Untested patch.
+    
+    Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
-Changes since v1:
-- Drop CONFIG_M25PXX_USE_FAST_READ
+ drivers/clk/clk.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
- arch/arm/configs/imx_v6_v7_defconfig |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 865d0dd..2bcce5a 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -898,6 +898,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+        if (rate == clk->rate)
+                goto out;
+ 
++       if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
++               ret = -EBUSY;
++               goto out;
++       }
++
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index ff562c9..b1d3675 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -64,6 +64,12 @@ CONFIG_IPV6=y
- # CONFIG_WIRELESS is not set
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_OF_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_DATAFLASH=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SST25L=y
- # CONFIG_STANDALONE is not set
- CONFIG_CONNECTOR=y
- CONFIG_BLK_DEV_LOOP=y
+
 -- 
-1.7.1
+viresh
