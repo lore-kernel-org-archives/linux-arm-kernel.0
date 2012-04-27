@@ -1,60 +1,213 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Apr 2012 13:05:35 -0700
-Subject: [PATCH 1/6] ARM: OMAP4: hwmod: rename _enable_module to
- _omap4_enable_module()
+Date: Fri, 27 Apr 2012 13:05:39 -0700
+Subject: [PATCH 5/6] ARM: OMAP2+: hwmod: use init-time function pointer for
+ hardreset
 In-Reply-To: <1335557140-10854-1-git-send-email-khilman@ti.com>
 References: <1335557140-10854-1-git-send-email-khilman@ti.com>
-Message-ID: <1335557140-10854-2-git-send-email-khilman@ti.com>
+Message-ID: <1335557140-10854-6-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-_enable_module is specific to OMAP4-class SoCs, so rename it to
-be consistend with the corresponding _omap4_disable_module.
+Rather than using cpu_is* checking at runtime, initialize SoC specific
+function pointers for the various hard reset functions at init time.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |  111 +++++++++++++++++---------
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++
+ 2 files changed, 78 insertions(+), 39 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index bf86f7e..939032a 100644
+index 6dd454d..6b08f19 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -771,13 +771,13 @@ static void _disable_optional_clocks(struct omap_hwmod *oh)
+@@ -1424,6 +1424,59 @@ static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name,
+ 	return -ENOENT;
+ }
+ 
++static int omap2_assert_hardreset(struct omap_hwmod *oh,
++				  struct omap_hwmod_rst_info *ohri)
++{
++	return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
++					  ohri->rst_shift);
++}
++
++static int omap2_deassert_hardreset(struct omap_hwmod *oh,
++				    struct omap_hwmod_rst_info *ohri)
++{
++	return omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
++					    ohri->rst_shift,
++					    ohri->st_shift);
++}
++
++static int omap2_is_hardreset_asserted(struct omap_hwmod *oh,
++				       struct omap_hwmod_rst_info *ohri)
++{
++	return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
++					       ohri->st_shift);
++}
++
++static int omap4_assert_hardreset(struct omap_hwmod *oh,
++				  struct omap_hwmod_rst_info *ohri)
++
++{
++	return omap4_prminst_assert_hardreset(ohri->rst_shift,
++				oh->clkdm->pwrdm.ptr->prcm_partition,
++				oh->clkdm->pwrdm.ptr->prcm_offs,
++				oh->prcm.omap4.rstctrl_offs);
++}
++
++static int omap4_deassert_hardreset(struct omap_hwmod *oh,
++				    struct omap_hwmod_rst_info *ohri)
++{
++	if (ohri->st_shift)
++		pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
++		       oh->name, ohri->name);
++	return omap4_prminst_deassert_hardreset(ohri->rst_shift,
++				oh->clkdm->pwrdm.ptr->prcm_partition,
++				oh->clkdm->pwrdm.ptr->prcm_offs,
++				oh->prcm.omap4.rstctrl_offs);
++}
++
++static int omap4_is_hardreset_asserted(struct omap_hwmod *oh,
++				       struct omap_hwmod_rst_info *ohri)
++{
++	return omap4_prminst_is_hardreset_asserted(ohri->rst_shift,
++				oh->clkdm->pwrdm.ptr->prcm_partition,
++				oh->clkdm->pwrdm.ptr->prcm_offs,
++				oh->prcm.omap4.rstctrl_offs);
++}
++
+ /**
+  * _assert_hardreset - assert the HW reset line of submodules
+  * contained in the hwmod module.
+@@ -1437,7 +1490,7 @@ static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name,
+ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+ 	struct omap_hwmod_rst_info ohri;
+-	u8 ret;
++	u8 ret = -EINVAL;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+@@ -1446,16 +1499,10 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+ 
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
+-						  ohri.rst_shift);
+-	else if (cpu_is_omap44xx())
+-		return omap4_prminst_assert_hardreset(ohri.rst_shift,
+-				  oh->clkdm->pwrdm.ptr->prcm_partition,
+-				  oh->clkdm->pwrdm.ptr->prcm_offs,
+-				  oh->prcm.omap4.rstctrl_offs);
+-	else
+-		return -EINVAL;
++	if (oh->assert_hardreset)
++		ret = oh->assert_hardreset(oh, &ohri);
++
++	return ret;
  }
  
  /**
-- * _enable_module - enable CLKCTRL modulemode on OMAP4
-+ * _omap4_enable_module - enable CLKCTRL modulemode on OMAP4
-  * @oh: struct omap_hwmod *
-  *
-  * Enables the PRCM module mode related to the hwmod @oh.
-  * No return value.
-  */
--static void _enable_module(struct omap_hwmod *oh)
-+static void _omap4_enable_module(struct omap_hwmod *oh)
+@@ -1471,7 +1518,7 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
  {
- 	/* The module mode does not exist prior OMAP4 */
- 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-@@ -786,8 +786,8 @@ static void _enable_module(struct omap_hwmod *oh)
- 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
- 		return;
+ 	struct omap_hwmod_rst_info ohri;
+-	int ret;
++	int ret = -EINVAL;
  
--	pr_debug("omap_hwmod: %s: _enable_module: %d\n",
--		 oh->name, oh->prcm.omap4.modulemode);
-+	pr_debug("omap_hwmod: %s: %s: %d\n",
-+		 oh->name, __func__, oh->prcm.omap4.modulemode);
+ 	if (!oh)
+ 		return -EINVAL;
+@@ -1480,21 +1527,8 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
  
- 	omap4_cminst_module_enable(oh->prcm.omap4.modulemode,
- 				   oh->clkdm->prcm_partition,
-@@ -1814,7 +1814,7 @@ static int _enable(struct omap_hwmod *oh)
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		ret = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
+-						   ohri.rst_shift,
+-						   ohri.st_shift);
+-	} else if (cpu_is_omap44xx()) {
+-		if (ohri.st_shift)
+-			pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
+-			       oh->name, name);
+-		ret = omap4_prminst_deassert_hardreset(ohri.rst_shift,
+-				  oh->clkdm->pwrdm.ptr->prcm_partition,
+-				  oh->clkdm->pwrdm.ptr->prcm_offs,
+-				  oh->prcm.omap4.rstctrl_offs);
+-	} else {
+-		return -EINVAL;
+-	}
++	if (oh->deassert_hardreset)
++		ret = oh->deassert_hardreset(oh, &ohri);
+ 
+ 	if (ret == -EBUSY)
+ 		pr_warning("omap_hwmod: %s: failed to hardreset\n", oh->name);
+@@ -1513,7 +1547,7 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+ 	struct omap_hwmod_rst_info ohri;
+-	u8 ret;
++	u8 ret = -EINVAL;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+@@ -1522,17 +1556,10 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+ 
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
+-						       ohri.st_shift);
+-	} else if (cpu_is_omap44xx()) {
+-		return omap4_prminst_is_hardreset_asserted(ohri.rst_shift,
+-				  oh->clkdm->pwrdm.ptr->prcm_partition,
+-				  oh->clkdm->pwrdm.ptr->prcm_offs,
+-				  oh->prcm.omap4.rstctrl_offs);
+-	} else {
+-		return -EINVAL;
+-	}
++	if (oh->is_hardreset_asserted)
++		ret = oh->is_hardreset_asserted(oh, &ohri);
++
++	return ret;
+ }
+ 
+ /**
+@@ -2063,10 +2090,16 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+ 
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		oh->wait_module_ready = omap2_wait_module_ready;
++		oh->assert_hardreset = omap2_assert_hardreset;
++		oh->deassert_hardreset = omap2_deassert_hardreset;
++		oh->is_hardreset_asserted = omap2_is_hardreset_asserted;
+ 	} else if (cpu_is_omap44xx()) {
+ 		oh->enable_module = _omap4_enable_module;
+ 		oh->disable_module = _omap4_disable_module;
+ 		oh->wait_module_ready = omap4_wait_module_ready;
++		oh->assert_hardreset = omap4_assert_hardreset;
++		oh->deassert_hardreset = omap4_deassert_hardreset;
++		oh->is_hardreset_asserted = omap4_is_hardreset_asserted;
  	}
  
- 	_enable_clocks(oh);
--	_enable_module(oh);
-+	_omap4_enable_module(oh);
+ 	oh->_state = _HWMOD_STATE_INITIALIZED;
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 329ede5..4f512b6 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -568,6 +568,12 @@ struct omap_hwmod {
+ 	void (*enable_module)(struct omap_hwmod *oh);
+ 	int (*disable_module)(struct omap_hwmod *oh);
+ 	int (*wait_module_ready)(struct omap_hwmod *oh);
++	int (*assert_hardreset)(struct omap_hwmod *oh,
++				struct omap_hwmod_rst_info *ohri);
++	int (*deassert_hardreset)(struct omap_hwmod *oh,
++				  struct omap_hwmod_rst_info *ohri);
++	int (*is_hardreset_asserted)(struct omap_hwmod *oh,
++				     struct omap_hwmod_rst_info *ohri);
+ };
  
- 	r = _wait_target_ready(oh);
- 	if (!r) {
+ struct omap_hwmod *omap_hwmod_lookup(const char *name);
 -- 
 1.7.9.2
