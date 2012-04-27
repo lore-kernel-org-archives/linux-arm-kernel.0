@@ -1,45 +1,39 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Apr 2012 21:25:39 +0800
-Subject: [PATCH 01/11] dma: imx-sdma: make channel0 operations atomic
-In-Reply-To: <20378.25703.527491.719116@ipc1.ka-ro>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-2-git-send-email-richard.zhao@freescale.com>
- <20378.25703.527491.719116@ipc1.ka-ro>
-Message-ID: <20120427132538.GU28063@b20223-02.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 22:07:49 +0800
+Subject: [PATCH 02/17] ARM: at91: use machine specific hook for late init
+In-Reply-To: <20120426152906.GP9142@game.jcrosoft.org>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-3-git-send-email-shawn.guo@linaro.org>
+ <20120426152906.GP9142@game.jcrosoft.org>
+Message-ID: <20120427140746.GD2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 11:18:31AM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Thu, Apr 26, 2012 at 05:29:06PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> I like it but I think it's more time to put soc init that machine init
 > 
-> Richard Zhao writes:
-> > device_prep_dma_cyclic may be call in audio trigger function which is
-> > atomic context, so we make it atomic too.
-> > 
-> >  - change channel0 lock to spinlock.
-> >  - Use polling to wait for channel0 finish running.
-> > 
-> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> >
-> Actually I didn't sign off the patch that I posted, because I wanted
-> to wait for more comments first.
-I send it out with slight modifications because the series highly
-depend on it. Will you take it over or let me put it in next version?
-Both are ok to me.
+Yes, just like other hooks in struct machine_desc, when there is no
+machine specific but only soc specific setup need to get done, the hook
+is pretty much like a soc specific one.  But when you get some machine
+specific setup besides soc one, you will be happy to have it.  Taking
+board "Carmeva" as exmaple, it will be something like the following.
 
-Thanks
-Richard
-> 
-> 
-> Lothar Wa?mann
-> -- 
-> ___________________________________________________________
-> 
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-> 
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
-> 
+static void __init carmeva_init_late(void)
+{
+	at91_init_late();
+	carmeva_specific_late_init();
+}
+
+MACHINE_START(CARMEVA, "Carmeva")
+        /* Maintainer: Conitec Datasystems */
+        .timer          = &at91rm9200_timer,
+        .map_io         = at91_map_io,
+        .init_early     = carmeva_init_early,
+        .init_irq       = at91_init_irq_default,
+        .init_machine   = carmeva_board_init,
+        .init_late      = carmeva_init_late,
+MACHINE_END
+
+-- 
+Regards,
+Shawn
