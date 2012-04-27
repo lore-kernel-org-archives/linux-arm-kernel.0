@@ -1,36 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 27 Apr 2012 18:16:59 -0300
-Subject: gpio irqs broken on imx27 with dt
-In-Reply-To: <20120427125048.GN20039@pengutronix.de>
-References: <20120427125048.GN20039@pengutronix.de>
-Message-ID: <CAOMZO5D5s6sApB6EDUgPDb50gReBpGV8HP8KdMeHomsY0tsrqQ@mail.gmail.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 27 Apr 2012 14:14:40 -0700
+Subject: [PATCH v2] arm: omap3: am35x: Fix clockdomain dependencies
+In-Reply-To: <alpine.DEB.2.00.1204261656160.10308@utopia.booyaka.com>
+References: <1334866606-8291-1-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204261656160.10308@utopia.booyaka.com>
+Message-ID: <20120427211440.GB19196@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
+On Thu, Apr 26, 2012 at 04:56:39PM -0600, Paul Walmsley wrote:
+> On Thu, 19 Apr 2012, Mark A. Greer wrote:
+> 
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> > 
+> > The am35x family of SoCs do not have an IVA so
+> > a parallel set of clockdomain dependencies are
+> > required that are simililar to OMAP3 but without
+> > any IVA dependencies.
+> > 
+> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> 
+> Thanks, queued for 3.5.
 
-2012/4/27 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
->
-> I experience problems on using gpio irqs on an imx27 based machine
-> booting with dt.
+Thanks Paul.
 
-Currently there is no pinctrl driver for mx27.
+FYI, I have a version rebased on top of Kevin's recent patch series
+that renames OMAP3517 to AM35XX (among other things),
+     "ARM: OMAP: remove IP checks from SoC family detection".
 
-What you can do as a temporary workaround is to do the same as mx51 or mx53:
+Would you like that one instead?
 
-config MACH_IMX51_DT
-	bool "Support i.MX51 platforms from device tree"
-	select SOC_IMX51
-	select MACH_MX51_BABBAGE
-	select USE_OF
-	help
-	  Include support for Freescale i.MX51 based platforms
-	  using the device tree for discovery
-
-MACH_IMX51_DT currently selects MACH_MX51_BABBAGE so that the IOMUX
-infrastructure can be used.
-
-Regards,
-
-Fabio Estevam
+Mark
+--
