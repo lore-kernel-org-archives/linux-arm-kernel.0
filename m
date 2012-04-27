@@ -1,93 +1,95 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Apr 2012 13:55:55 +0100
-Subject: [PATCH v4 3/7] ARM: architected timers: Add A15 specific sched_clock
- implementation
+Date: Fri, 27 Apr 2012 13:55:59 +0100
+Subject: [PATCH v4 7/7] ARM: architected timers: remove support for non DT
+ platforms
 In-Reply-To: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
 References: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1335531359-32128-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1335531359-32128-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide an A15 sched_clock implementation using the virtual counter,
-which is thought to be more useful than the physical one in a
-virtualised environment, as it can offset the time spent in another
-VM or the hypervisor.
+All mainline platforms using the ARM architected timers are DT
+only. As such, remove the ad-hoc support that is not longer needed
+anymore.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/arch_timer.h |    6 ++++++
- arch/arm/kernel/arch_timer.c      |   25 +++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/arch_timer.h |   14 +-------------
+ arch/arm/kernel/arch_timer.c      |   19 ++-----------------
+ 2 files changed, 3 insertions(+), 30 deletions(-)
 
 diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 827305d..dc008c6 100644
+index 935897f..ed2e95d 100644
 --- a/arch/arm/include/asm/arch_timer.h
 +++ b/arch/arm/include/asm/arch_timer.h
-@@ -9,11 +9,17 @@ struct arch_timer {
+@@ -1,22 +1,10 @@
+ #ifndef __ASMARM_ARCH_TIMER_H
+ #define __ASMARM_ARCH_TIMER_H
  
+-#include <linux/ioport.h>
+-
+-struct arch_timer {
+-	struct resource	res[2];
+-};
+-
  #ifdef CONFIG_ARM_ARCH_TIMER
- int arch_timer_register(struct arch_timer *);
+-int arch_timer_register(struct arch_timer *);
+-int arch_timer_sched_clock_init(void);
+ int arch_timer_of_register(void);
 +int arch_timer_sched_clock_init(void);
  #else
- static inline int arch_timer_register(struct arch_timer *at)
+-static inline int arch_timer_register(struct arch_timer *at)
+-{
+-	return -ENXIO;
+-}
+-
+ static inline int arch_timer_of_register(void)
  {
  	return -ENXIO;
- }
-+
-+static inline int arch_timer_sched_clock_init(void)
-+{
-+	return -ENXIO;
-+}
- #endif
- 
- #endif
 diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index bb9a8b4..dd90704 100644
+index 154f0a1..dd58035 100644
 --- a/arch/arm/kernel/arch_timer.c
 +++ b/arch/arm/kernel/arch_timer.c
-@@ -23,6 +23,7 @@
- #include <asm/localtimer.h>
- #include <asm/arch_timer.h>
- #include <asm/system_info.h>
-+#include <asm/sched_clock.h>
+@@ -248,7 +248,7 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
  
- static unsigned long arch_timer_rate;
- static int arch_timer_ppi;
-@@ -204,6 +205,18 @@ static inline cycle_t arch_counter_get_cntvct(void)
- 	return ((cycle_t) cvalh << 32) | cvall;
- }
+ static struct clock_event_device arch_timer_global_evt;
  
-+static u32 notrace arch_counter_get_cntvct32(void)
-+{
-+	cycle_t cntvct = arch_counter_get_cntvct();
-+
-+	/*
-+	 * The sched_clock infrastructure only knows about counters
-+	 * with@most 32bits. Forget about the upper 24 bits for the
-+	 * time being...
-+	 */
-+	return (u32)(cntvct & (u32)~0);
-+}
-+
- static cycle_t arch_counter_read(struct clocksource *cs)
+-static int __init arch_timer_common_register(void)
++static int __init arch_timer_register(void)
  {
- 	return arch_counter_get_cntpct();
-@@ -286,3 +299,15 @@ out_free:
+ 	int err;
  
+@@ -309,20 +309,6 @@ out_free:
  	return err;
  }
-+
-+int __init arch_timer_sched_clock_init(void)
-+{
-+	int err;
-+
-+	err = arch_timer_available();
-+	if (err)
-+		return err;
-+
-+	setup_sched_clock(arch_counter_get_cntvct32, 32, arch_timer_rate);
-+	return 0;
-+}
+ 
+-int __init arch_timer_register(struct arch_timer *at)
+-{
+-	if (at->res[0].start <= 0 || !(at->res[0].flags & IORESOURCE_IRQ))
+-		return -EINVAL;
+-
+-	arch_timer_ppi = at->res[0].start;
+-
+-	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ))
+-		arch_timer_ppi2 = at->res[1].start;
+-
+-	return arch_timer_common_register();
+-}
+-
+-#ifdef CONFIG_OF
+ static const struct of_device_id arch_timer_of_match[] __initconst = {
+ 	{ .compatible	= "arm,armv7-timer",	},
+ 	{},
+@@ -348,9 +334,8 @@ int __init arch_timer_of_register(void)
+ 	pr_info("arch_timer: found %s irqs %d %d\n",
+ 		np->name, arch_timer_ppi, arch_timer_ppi2);
+ 
+-	return arch_timer_common_register();
++	return arch_timer_register();
+ }
+-#endif
+ 
+ int __init arch_timer_sched_clock_init(void)
+ {
 -- 
 1.7.7.1
