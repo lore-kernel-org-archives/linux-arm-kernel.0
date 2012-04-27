@@ -1,46 +1,174 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 20:54:52 +0800
-Subject: [PATCH 16/17] ARM: tegra: use machine specific hook for late init
-In-Reply-To: <4F996F15.5010908@wwwdotorg.org>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-17-git-send-email-shawn.guo@linaro.org>
- <4F996F15.5010908@wwwdotorg.org>
-Message-ID: <20120427125450.GZ2234@S2101-09.ap.freescale.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Apr 2012 13:55:56 +0100
+Subject: [PATCH v4 4/7] ARM: architected timers: add DT support
+In-Reply-To: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
+References: <1335531359-32128-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1335531359-32128-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 09:51:49AM -0600, Stephen Warren wrote:
-> On 04/26/2012 09:38 AM, Shawn Guo wrote:
-> 
-> BTW, it'd be useful to CC everyone on the cover letter for context.
-> 
-Yes, thanks for the reminding.  Will do in the future.
+Add runtime DT support and documentation for the Cortex A7/A15
+architected timers.
 
-> I think this mostly looks fine, except for one issue below:
-> 
-> > diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-> 
-> > +void __init tegra_init_late(void)
-> > +{
-> > +	tegra_clk_debugfs_init();
-> > +	tegra_pinmux_debuginit();
-> 
-> That function has been removed ...
-> 
-> > +	tegra_powergate_debugfs_init();
-> > +}
-> 
-> > diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-> 
-> ... because this whole file will be deleted in 3.5; see
-> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
-> gpio-pinmux
-> 
-> I'm not sure if you want to remove that part of this patch to make it
-> merge more easily?
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ .../devicetree/bindings/arm/arch_timer.txt         |   27 ++++++++++
+ arch/arm/include/asm/arch_timer.h                  |    6 ++
+ arch/arm/kernel/arch_timer.c                       |   53 +++++++++++++++++---
+ 3 files changed, 79 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
 
-Sure.  Will remove that part from the patch.
-
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+new file mode 100644
+index 0000000..52478c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -0,0 +1,27 @@
++* ARM architected timer
++
++ARM Cortex-A7 and Cortex-A15 have a per-core architected timer, which
++provides per-cpu timers.
++
++The timer is attached to a GIC to deliver its per-processor interrupts.
++
++** Timer node properties:
++
++- compatible : Should at least contain "arm,armv7-timer".
++
++- interrupts : Interrupt list for secure, non-secure, virtual and
++  hypervisor timers, in that order.
++
++- clock-frequency : The frequency of the main counter, in Hz. Optional.
++
++Example:
++
++	timer {
++		compatible = "arm,cortex-a15-timer",
++			     "arm,armv7-timer";
++		interrupts = <1 13 0xf08>,
++			     <1 14 0xf08>,
++			     <1 11 0xf08>,
++			     <1 10 0xf08>;
++		clock-frequency = <100000000>;
++	};
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index dc008c6..935897f 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -10,12 +10,18 @@ struct arch_timer {
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ int arch_timer_register(struct arch_timer *);
+ int arch_timer_sched_clock_init(void);
++int arch_timer_of_register(void);
+ #else
+ static inline int arch_timer_register(struct arch_timer *at)
+ {
+ 	return -ENXIO;
+ }
+ 
++static inline int arch_timer_of_register(void)
++{
++	return -ENXIO;
++}
++
+ static inline int arch_timer_sched_clock_init(void)
+ {
+ 	return -ENXIO;
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index dd90704..1a34eee 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -17,6 +17,7 @@
+ #include <linux/jiffies.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
++#include <linux/of_irq.h>
+ #include <linux/io.h>
+ 
+ #include <asm/cputype.h>
+@@ -245,13 +246,10 @@ static struct local_timer_ops arch_timer_ops __cpuinitdata = {
+ 	.stop	= arch_timer_stop,
+ };
+ 
+-int __init arch_timer_register(struct arch_timer *at)
++static int __init arch_timer_common_register(void)
+ {
+ 	int err;
+ 
+-	if (at->res[0].start <= 0 || !(at->res[0].flags & IORESOURCE_IRQ))
+-		return -EINVAL;
+-
+ 	err = arch_timer_available();
+ 	if (err)
+ 		return err;
+@@ -262,7 +260,6 @@ int __init arch_timer_register(struct arch_timer *at)
+ 
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+ 
+-	arch_timer_ppi = at->res[0].start;
+ 	err = request_percpu_irq(arch_timer_ppi, arch_timer_handler,
+ 				 "arch_timer", arch_timer_evt);
+ 	if (err) {
+@@ -271,8 +268,7 @@ int __init arch_timer_register(struct arch_timer *at)
+ 		goto out_free;
+ 	}
+ 
+-	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ)) {
+-		arch_timer_ppi2 = at->res[1].start;
++	if (arch_timer_ppi2) {
+ 		err = request_percpu_irq(arch_timer_ppi2, arch_timer_handler,
+ 					 "arch_timer", arch_timer_evt);
+ 		if (err) {
+@@ -300,6 +296,49 @@ out_free:
+ 	return err;
+ }
+ 
++int __init arch_timer_register(struct arch_timer *at)
++{
++	if (at->res[0].start <= 0 || !(at->res[0].flags & IORESOURCE_IRQ))
++		return -EINVAL;
++
++	arch_timer_ppi = at->res[0].start;
++
++	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ))
++		arch_timer_ppi2 = at->res[1].start;
++
++	return arch_timer_common_register();
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id arch_timer_of_match[] __initconst = {
++	{ .compatible	= "arm,armv7-timer",	},
++	{},
++};
++
++int __init arch_timer_of_register(void)
++{
++	struct device_node *np;
++	u32 freq;
++
++	np = of_find_matching_node(NULL, arch_timer_of_match);
++	if (!np) {
++		pr_err("arch_timer: can't find DT node\n");
++		return -ENODEV;
++	}
++
++	/* Try to determine the frequency from the device tree or CNTFRQ */
++	if (!of_property_read_u32(np, "clock-frequency", &freq))
++		arch_timer_rate = freq;
++
++	arch_timer_ppi = irq_of_parse_and_map(np, 0);
++	arch_timer_ppi2 = irq_of_parse_and_map(np, 1);
++	pr_info("arch_timer: found %s irqs %d %d\n",
++		np->name, arch_timer_ppi, arch_timer_ppi2);
++
++	return arch_timer_common_register();
++}
++#endif
++
+ int __init arch_timer_sched_clock_init(void)
+ {
+ 	int err;
 -- 
-Regards,
-Shawn
+1.7.7.1
