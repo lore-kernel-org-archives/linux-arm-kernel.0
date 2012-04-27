@@ -1,50 +1,115 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 Apr 2012 13:07:59 -0600
-Subject: [PATCH 0/8] gpio/omap: remaining cleanups and fix
-In-Reply-To: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
-References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <20120427190759.C6DC43E0B4D@localhost>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Apr 2012 13:34:19 -0600
+Subject: [PATCH] ASoC: tegra: add device tree support for TrimSlice
+Message-ID: <1335555259-9263-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Apr 2012 19:43:30 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
-> Here are the remaining cleanup patches. There are broadly
-> two categories of cleanups.
-> 
-> Cat-1: Those missed while introducing new feature like SPARSE_IRQ
->        handling and DT support; use edge/level handlers from
->        generic IRQ framework.
-> 
-> Cat-2: Removal of redundant fields from struct gpio_bank{} as a
->        result of they being already covered by members within
->        context field of struct gpio_bank{}.
-> 
-> Reference: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
-> Commit: 66f75a5d028beaf67c931435fdc3e7823125730c (Linux 3.4-rc4)
-> 
-> Series is available for reference here:
-> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev.git for_3.5/gpio_more_cleanup_fixes
-> 
-> Test info:
-> OMAP2+ platforms: OMAP2430SDP, OMAP3430SDP, OMAP4430SDP
-> OMAP1: Bootup test on OMAP1710SDP.
-> 
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Cousson, Benoit <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Tarun Kanti DebBarma (8):
->   gpio/omap: remove virtual_irq_start variable
->   gpio/omap: remove saved_fallingdetect, saved_risingdetect
->   gpio/omap: remove suspend_wakeup field from struct gpio_bank
->   gpio/omap: remove saved_wakeup field from struct gpio_bank
->   gpio/omap: remove retrigger variable in gpio_irq_handler
->   gpio/omap: remove suspend/resume callbacks
->   gpio/omap: remove cpu_is_omapxxxx() checks from *_runtime_resume()
->   gpio/omap: fix missing check in *_runtime_suspend()
+From: Stephen Warren <swarren@nvidia.com>
 
-The changes look fine to me.  Which branch should this series be
-merged through?  It can either go via arm-soc or my gpio/next branch.
+This binding doesn't include the nvidia,model or nvidia,audio-routing
+properties the other Tegra audio DT bindings have, because this binding
+is targetted at a single machine, rather than for any machine using the
+tlv320aic23 codec.
 
-g.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Ideally, the binding would be more generic, but that would require
+representing the board's jacks in the binding, and there's no way to do
+that yet. That problem actually affects the other two Tegra audio
+bindings too:-(
+
+The next step would be to define a binding for the board jacks, and
+unify the 3 Tegra bindings/machin-drivers into e.g. tegra_of_simple.
+However, I can't promise when that will happen right now.
+---
+ .../bindings/sound/tegra-audio-trimslice.txt       |   14 ++++++++
+ sound/soc/tegra/trimslice.c                        |   34 ++++++++++++++++++++
+ 2 files changed, 48 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/tegra-audio-trimslice.txt
+
+diff --git a/Documentation/devicetree/bindings/sound/tegra-audio-trimslice.txt b/Documentation/devicetree/bindings/sound/tegra-audio-trimslice.txt
+new file mode 100644
+index 0000000..04b14cf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/tegra-audio-trimslice.txt
+@@ -0,0 +1,14 @@
++NVIDIA Tegra audio complex for TrimSlice
++
++Required properties:
++- compatible : "nvidia,tegra-audio-trimslice"
++- nvidia,i2s-controller : The phandle of the Tegra I2S1 controller
++- nvidia,audio-codec : The phandle of the WM8903 audio codec
++
++Example:
++
++sound {
++	compatible = "nvidia,tegra-audio-trimslice";
++	nvidia,i2s-controller = <&tegra_i2s1>;
++	nvidia,audio-codec = <&codec>;
++};
+diff --git a/sound/soc/tegra/trimslice.c b/sound/soc/tegra/trimslice.c
+index 0fd115e..4a8d5b6 100644
+--- a/sound/soc/tegra/trimslice.c
++++ b/sound/soc/tegra/trimslice.c
+@@ -27,6 +27,7 @@
+ #include <asm/mach-types.h>
+ 
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+@@ -149,6 +150,32 @@ static __devinit int tegra_snd_trimslice_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
+ 
++	if (pdev->dev.of_node) {
++		trimslice_tlv320aic23_dai.codec_name = NULL;
++		trimslice_tlv320aic23_dai.codec_of_node = of_parse_phandle(
++				pdev->dev.of_node, "nvidia,audio-codec", 0);
++		if (!trimslice_tlv320aic23_dai.codec_of_node) {
++			dev_err(&pdev->dev,
++				"Property 'nvidia,audio-codec' missing or invalid\n");
++			ret = -EINVAL;
++			goto err;
++		}
++
++		trimslice_tlv320aic23_dai.cpu_dai_name = NULL;
++		trimslice_tlv320aic23_dai.cpu_dai_of_node = of_parse_phandle(
++				pdev->dev.of_node, "nvidia,i2s-controller", 0);
++		if (!trimslice_tlv320aic23_dai.cpu_dai_of_node) {
++			dev_err(&pdev->dev,
++				"Property 'nvidia,i2s-controller' missing or invalid\n");
++			ret = -EINVAL;
++			goto err;
++		}
++
++		trimslice_tlv320aic23_dai.platform_name = NULL;
++		trimslice_tlv320aic23_dai.platform_of_node =
++				trimslice_tlv320aic23_dai.cpu_dai_of_node;
++	}
++
+ 	ret = tegra_asoc_utils_init(&trimslice->util_data, &pdev->dev);
+ 	if (ret)
+ 		goto err;
+@@ -184,10 +211,17 @@ static int __devexit tegra_snd_trimslice_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id trimslice_of_match[] __devinitconst = {
++	{ .compatible = "nvidia,tegra-audio-trimslice", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, trimslice_of_match);
++
+ static struct platform_driver tegra_snd_trimslice_driver = {
+ 	.driver = {
+ 		.name = DRV_NAME,
+ 		.owner = THIS_MODULE,
++		.of_match_table = trimslice_of_match,
+ 	},
+ 	.probe = tegra_snd_trimslice_probe,
+ 	.remove = __devexit_p(tegra_snd_trimslice_remove),
+-- 
+1.7.0.4
