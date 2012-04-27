@@ -1,63 +1,59 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 27 Apr 2012 10:54:42 -0700
-Subject: announcing the clk-next branch
-In-Reply-To: <20120427070925.GO2234@S2101-09.ap.freescale.net>
-References: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
- <4F9A395A.3030306@st.com> <20120427070925.GO2234@S2101-09.ap.freescale.net>
-Message-ID: <CAJOA=zPdo8d7YMWDhdyNPkKQB_Ae_NiKPhEKxX2JYz=bpXXavQ@mail.gmail.com>
+Date: Fri, 27 Apr 2012 10:55:50 -0700
+Subject: [PATCH] clk: constify parent name arrays in macros
+In-Reply-To: <1335529693-14280-1-git-send-email-rnayak@ti.com>
+References: <1335529693-14280-1-git-send-email-rnayak@ti.com>
+Message-ID: <CAJOA=zNzkOvzdFSuSzC015ELZWE+Jtj=H5P9fbQSHW3HZdsZow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 12:09 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Fri, Apr 27, 2012 at 11:44:50AM +0530, Viresh Kumar wrote:
->> Hi Mike and others,
->>
->> I am finding difficulty in creating branch to be pulled in by Mike for clock
->> stuff. Somebody please help.
->>
->> SPEAr patches have dependency on few patchsets that are pulled in linux-next
->> already.
->> - SPEAr DT support
->> - SPEAr Pinctrl support
->> - Mike clk fixes
->> - Misc Pinctrl patches
->>
-> I'm basically running into the same situation. ?I have a bunch of mxs DT
-> patches touching the existing clock code, while I'm converting the clock
-> to framework and put the code into drivers/clk. ?I originally thought
-> that the new mxs clock should go through Mike's tree since they are
-> sitting in drivers/clk. ?But with a second thought, I feel it might be
-> easier to still have them go through arm-soc tree.
+On Fri, Apr 27, 2012 at 5:28 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> parent name array is now expected to be const char *, make
+> the relevent changes in the clk macros which define
+> default clock types.
 >
-> We can ask Arnd, Olof to pull clkdev from Russell, clk core from Mike,
-> and pinctrl from Linus into arm-soc as dependencies, take all the
-> platform clock/pinctrl porting into arm-soc, and sort out the conflicts
-> in arm-soc tree. ?Otherwise, I'm a little worried about that we will
-> probably upset Torvalds with leaving so many conflicts to him.
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-Arnd & Olof,
+Good catch Rajendra.  I'll pull it into clk-next.
 
-Are you guys OK with this?  I'm OK with you pulling clk-next as a
-dependency if it reduces merge confusion.
-
-Would I be allowed to rebase clk-next, or must it be stable?  If I
-cannot rebase it then I need a bit of time to remove the conflicting
-clkdev patches that Russell mentioned are already merged through him.
-
-Thanks,
+Regards,
 Mike
 
-> So in short, I will send my mxs clock series to Arnd and Olof.
+> ---
+> ?include/linux/clk-private.h | ? ?6 +++---
+> ?1 files changed, 3 insertions(+), 3 deletions(-)
 >
-> Regards,
-> Shawn
+> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+> index eeae7a3..6ebec83 100644
+> --- a/include/linux/clk-private.h
+> +++ b/include/linux/clk-private.h
+> @@ -70,7 +70,7 @@ struct clk {
+> ?#define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate, ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_fixed_rate_flags) ? ? ? ? ? ? ?\
+> ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> - ? ? ? static char *_name##_parent_names[] = {}; ? ? ? ? ? ? ? \
+> + ? ? ? static const char *_name##_parent_names[] = {}; ? ? ? ? \
+> ? ? ? ?static struct clk_fixed_rate _name##_hw = { ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?.hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ?.clk = &_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> @@ -85,7 +85,7 @@ struct clk {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _bit_idx, ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_gate_flags, _lock) ? ? ? ? ? ? \
+> ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> - ? ? ? static char *_name##_parent_names[] = { ? ? ? ? ? ? ? ? \
+> + ? ? ? static const char *_name##_parent_names[] = { ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?_parent_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ?}; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?static struct clk *_name##_parents[] = { ? ? ? ? ? ? ? ?\
+> @@ -107,7 +107,7 @@ struct clk {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _shift, _width, ? \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_divider_flags, _lock) ? ? ? ? ?\
+> ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> - ? ? ? static char *_name##_parent_names[] = { ? ? ? ? ? ? ? ? \
+> + ? ? ? static const char *_name##_parent_names[] = { ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?_parent_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ?}; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?static struct clk *_name##_parents[] = { ? ? ? ? ? ? ? ?\
+> --
+> 1.7.1
 >
->> Now, how should i create branch for SPEAr clk stuff over these dependencies?
->> I tried to create a merge of first 3, but couldn't get a linux-next/master
->> sha of a branch for Last dependency.
->>
->> Should i cherrypick that one?
->>
->> At last, i believe this branch, that i would create, must be in a compilable
->> state? So, i can't just send a pull request for my clock patches rebased over
->> Mike's branch directly?
