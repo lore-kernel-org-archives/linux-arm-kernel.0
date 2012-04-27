@@ -1,50 +1,24 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 27 Apr 2012 09:30:48 +0200
-Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
-In-Reply-To: <20120426144446.GN9142@game.jcrosoft.org>
-References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
- <1335451227-27709-2-git-send-email-b29396@freescale.com>
- <20120426144446.GN9142@game.jcrosoft.org>
-Message-ID: <20120427073048.GR17184@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 15:31:05 +0800
+Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add SPI NOR support
+In-Reply-To: <20120427071955.GQ17184@pengutronix.de>
+References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
+ <20120427034401.GE2234@S2101-09.ap.freescale.net>
+ <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
+ <20120427050549.GG2234@S2101-09.ap.freescale.net>
+ <20120427071955.GQ17184@pengutronix.de>
+Message-ID: <20120427073103.GQ2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 04:44:46PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > +			fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
-> > +				    1392 0x17059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
-> > +				    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
-> > +				    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
-> > +				    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
-> > +				    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
-> > +				    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
-> > +				    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
-> > +				    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
-> > +				    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
-> honestly I don't like this it's obscure need to decode manually
+On Fri, Apr 27, 2012 at 09:19:55AM +0200, Sascha Hauer wrote:
+> This is an orthogonal issue. It should be fixed in the SPI driver, but
+> it shouldn't be a reason to to not turn on SPI support.
 > 
-> I propose to use phandle
-> 
-> as example on uart you will want or not the rst/cts so you will have quite a
-> lot of bindings
-> 
-> so you can describe the pin configuration (function) and refer it by phandle
-> in the group
-
-I don't exactly know where are you aiming at. I think that you want a
-collection of pin groups somewhere and want to refer to it in the device
-nodes. No, please don't. There's no way to come up with a common group
-needed for example for the IPU (image processing unit). What pins you
-want to use here depends on the number of data lines you have on your
-panel and what type of panel you have. You can always use the remaining
-pins for somethin else. SPI is another example. The SPI unit has some
-dedicated chip select lines. The exact number of used chip selects is
-board specific.
-
-Sascha
-
+I'm asking for explanation to the error message, and I did not say we
+should block turning on SPI support.  Of course not, if this is an
+orthogonal issue.  But again, what's the issue exactly?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Shawn
