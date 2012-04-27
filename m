@@ -1,87 +1,60 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Apr 2012 15:03:02 +0800
-Subject: [PATCH 08/11] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1335510185-7906-9-git-send-email-richard.zhao@freescale.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Fri, 27 Apr 2012 15:16:55 +0800
+Subject: [PATCH v3 3/4] pinctrl: pinctrl-imx: add imx6q pinctrl driver
+In-Reply-To: <20120427064519.GO17184@pengutronix.de>
+References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
+ <1335451227-27709-3-git-send-email-b29396@freescale.com>
+ <20120427064519.GO17184@pengutronix.de>
+Message-ID: <20120427071654.GB826@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |    3 +++
- arch/arm/boot/dts/imx6q.dtsi          |   10 ++++++++++
- sound/soc/fsl/imx-audmux.c            |    8 ++++++++
- 3 files changed, 21 insertions(+), 0 deletions(-)
+On Fri, Apr 27, 2012 at 02:45:19PM +0800, Sascha Hauer wrote:
+> On Thu, Apr 26, 2012 at 10:40:26PM +0800, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > ---
+> > ChangeLog v1-v2:
+> > * add binding doc for pinctrl-imx6q
+> > * refactor the probe
+> > ---
+> >  .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         | 1605 ++++++++++++++
+> >  drivers/pinctrl/Kconfig                            |    8 +
+> >  drivers/pinctrl/Makefile                           |    1 +
+> >  drivers/pinctrl/pinctrl-imx6q.c                    | 2331 ++++++++++++++++++++
+> >  4 files changed, 3945 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+> >  create mode 100644 drivers/pinctrl/pinctrl-imx6q.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+> > new file mode 100644
+> > index 0000000..13d474f
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+> > @@ -0,0 +1,1605 @@
+> > +* Freescale IMX6Q IOMUX Controller
+> > +
+> > +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
+> > +and usage.
+> > +
+> > +Required properties:
+> > +- compatible: "fsl,imx6q-iomuxc"
+> > +- fsl,pins: two integers array, represents a group of pins mux and config
+> > +  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
+> > +  pin working on a specific function, CONFIG is the pad setting value like
+> > +  pull-up for this pin. Please refer to imx6q datasheet for the valid pad
+> > +  config settings.
+> 
+> Wouldn't it make sense to document the CONFIG bits here? Something like
+> 
+> Pull keeper enabled (pke)	(1 << 7)
+> ...
+> 
+Yes, it makes sense for me to add it.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 02f93bc..cdae2dd 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -54,7 +54,10 @@
- 
- 			audmux at 021d8000 {
- 				status = "okay";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_audmux_1>;
- 			};
-+
- 			uart2: uart at 021e8000 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 7bf402e..3c3004d 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -402,6 +402,16 @@
- 				reg = <0x020e0000 0x4000>;
- 
- 				/* shared pinctrl settings */
-+				audmux {
-+					pinctrl_audmux_1: audmux-1 {
-+						fsl,pins =	"MX6Q_PAD_SD2_DAT0",
-+								"MX6Q_PAD_SD2_DAT3",
-+								"MX6Q_PAD_SD2_DAT2",
-+								"MX6Q_PAD_SD2_DAT1";
-+						fsl,mux = <3 3 3 3>;
-+					};
-+				};
-+
- 				i2c1 {
- 					pinctrl_i2c1_1: i2c1grp-1 {
- 						fsl,pins =	"MX6Q_PAD_EIM_D21",
-diff --git a/sound/soc/fsl/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
-index f237003..6c7dfc0 100644
---- a/sound/soc/fsl/imx-audmux.c
-+++ b/sound/soc/fsl/imx-audmux.c
-@@ -26,6 +26,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include "imx-audmux.h"
- 
-@@ -249,6 +250,7 @@ EXPORT_SYMBOL_GPL(imx_audmux_v2_configure_port);
- static int __devinit imx_audmux_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-+	struct pinctrl *pct;
- 	const struct of_device_id *of_id =
- 			of_match_device(imx_audmux_dt_ids, &pdev->dev);
- 
-@@ -257,6 +259,12 @@ static int __devinit imx_audmux_probe(struct platform_device *pdev)
- 	if (!audmux_base)
- 		return -EADDRNOTAVAIL;
- 
-+	pct = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pct)) {
-+		dev_err(&pdev->dev, "setup pinctrl failed!");
-+		return PTR_ERR(pct);
-+	}
-+
- 	audmux_clk = clk_get(&pdev->dev, "audmux");
- 	if (IS_ERR(audmux_clk)) {
- 		dev_dbg(&pdev->dev, "cannot get clock: %ld\n",
--- 
-1.7.5.4
+> Not all bits are available on all pins, refer to the datasheet...
+> 
+
+Regards
+Dong Aisheng
