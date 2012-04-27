@@ -1,39 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 22:07:49 +0800
-Subject: [PATCH 02/17] ARM: at91: use machine specific hook for late init
-In-Reply-To: <20120426152906.GP9142@game.jcrosoft.org>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-3-git-send-email-shawn.guo@linaro.org>
- <20120426152906.GP9142@game.jcrosoft.org>
-Message-ID: <20120427140746.GD2234@S2101-09.ap.freescale.net>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Fri, 27 Apr 2012 19:43:30 +0530
+Subject: [PATCH 0/8] gpio/omap: remaining cleanups and fix
+Message-ID: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 05:29:06PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> I like it but I think it's more time to put soc init that machine init
-> 
-Yes, just like other hooks in struct machine_desc, when there is no
-machine specific but only soc specific setup need to get done, the hook
-is pretty much like a soc specific one.  But when you get some machine
-specific setup besides soc one, you will be happy to have it.  Taking
-board "Carmeva" as exmaple, it will be something like the following.
+Here are the remaining cleanup patches. There are broadly
+two categories of cleanups.
 
-static void __init carmeva_init_late(void)
-{
-	at91_init_late();
-	carmeva_specific_late_init();
-}
+Cat-1: Those missed while introducing new feature like SPARSE_IRQ
+       handling and DT support; use edge/level handlers from
+       generic IRQ framework.
 
-MACHINE_START(CARMEVA, "Carmeva")
-        /* Maintainer: Conitec Datasystems */
-        .timer          = &at91rm9200_timer,
-        .map_io         = at91_map_io,
-        .init_early     = carmeva_init_early,
-        .init_irq       = at91_init_irq_default,
-        .init_machine   = carmeva_board_init,
-        .init_late      = carmeva_init_late,
-MACHINE_END
+Cat-2: Removal of redundant fields from struct gpio_bank{} as a
+       result of they being already covered by members within
+       context field of struct gpio_bank{}.
 
--- 
-Regards,
-Shawn
+Reference: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+Commit: 66f75a5d028beaf67c931435fdc3e7823125730c (Linux 3.4-rc4)
+
+Series is available for reference here:
+git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev.git for_3.5/gpio_more_cleanup_fixes
+
+Test info:
+OMAP2+ platforms: OMAP2430SDP, OMAP3430SDP, OMAP4430SDP
+OMAP1: Bootup test on OMAP1710SDP.
+
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Cousson, Benoit <b-cousson@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Tarun Kanti DebBarma (8):
+  gpio/omap: remove virtual_irq_start variable
+  gpio/omap: remove saved_fallingdetect, saved_risingdetect
+  gpio/omap: remove suspend_wakeup field from struct gpio_bank
+  gpio/omap: remove saved_wakeup field from struct gpio_bank
+  gpio/omap: remove retrigger variable in gpio_irq_handler
+  gpio/omap: remove suspend/resume callbacks
+  gpio/omap: remove cpu_is_omapxxxx() checks from *_runtime_resume()
+  gpio/omap: fix missing check in *_runtime_suspend()
+
+ arch/arm/mach-omap1/gpio15xx.c         |    2 -
+ arch/arm/mach-omap1/gpio16xx.c         |    5 --
+ arch/arm/mach-omap1/gpio7xx.c          |    7 --
+ arch/arm/mach-omap2/gpio.c             |    3 +-
+ arch/arm/plat-omap/include/plat/gpio.h |    3 +-
+ drivers/gpio/gpio-omap.c               |  103 +++++++-------------------------
+ 6 files changed, 27 insertions(+), 96 deletions(-)
