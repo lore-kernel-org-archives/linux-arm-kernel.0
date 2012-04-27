@@ -1,15 +1,15 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Fri, 27 Apr 2012 19:43:32 +0530
-Subject: [PATCH 2/8] gpio/omap: remove saved_fallingdetect, saved_risingdetect
+Date: Fri, 27 Apr 2012 19:43:35 +0530
+Subject: [PATCH 5/8] gpio/omap: remove retrigger variable in gpio_irq_handler
 In-Reply-To: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
 References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1335536018-16004-3-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1335536018-16004-6-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we already have context.fallingdetect and context.risingdetect
-there is no more need to have these additional fields. Also, getting
-rid of extra reads associated with them.
+commit 672e302e3c (ARM: OMAP: use edge/level handlers from generic IRQ
+framework) removed retrigger support in favor of using generic IRQ
+framework.  This patch cleans up some unused remnants of that removal.
 
 Cc: Kevin Hilman <khilman@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -20,66 +20,29 @@ Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   19 ++++++++-----------
- 1 files changed, 8 insertions(+), 11 deletions(-)
+ drivers/gpio/gpio-omap.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 1adc2ec..1751f89 100644
+index cb9f6d9..7533564 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -63,8 +63,6 @@ struct gpio_bank {
- 	u32 enabled_non_wakeup_gpios;
- 	struct gpio_regs context;
- 	u32 saved_datain;
--	u32 saved_fallingdetect;
--	u32 saved_risingdetect;
- 	u32 level_mask;
- 	u32 toggle_mask;
- 	spinlock_t lock;
-@@ -1247,11 +1245,9 @@ static int omap_gpio_runtime_suspend(struct device *dev)
- 	 */
- 	bank->saved_datain = __raw_readl(bank->base +
- 						bank->regs->datain);
--	l1 = __raw_readl(bank->base + bank->regs->fallingdetect);
--	l2 = __raw_readl(bank->base + bank->regs->risingdetect);
-+	l1 = bank->context.fallingdetect;
-+	l2 = bank->context.risingdetect;
+@@ -636,7 +636,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	u32 isr;
+ 	unsigned int gpio_irq, gpio_index;
+ 	struct gpio_bank *bank;
+-	u32 retrigger = 0;
+ 	int unmasked = 0;
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
  
--	bank->saved_fallingdetect = l1;
--	bank->saved_risingdetect = l2;
- 	l1 &= ~bank->enabled_non_wakeup_gpios;
- 	l2 &= ~bank->enabled_non_wakeup_gpios;
- 
-@@ -1310,9 +1306,9 @@ static int omap_gpio_runtime_resume(struct device *dev)
+@@ -673,8 +672,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 			chained_irq_exit(chip, desc);
  		}
- 	}
  
--	__raw_writel(bank->saved_fallingdetect,
-+	__raw_writel(bank->context.fallingdetect,
- 			bank->base + bank->regs->fallingdetect);
--	__raw_writel(bank->saved_risingdetect,
-+	__raw_writel(bank->context.risingdetect,
- 			bank->base + bank->regs->risingdetect);
- 	l = __raw_readl(bank->base + bank->regs->datain);
- 
-@@ -1329,14 +1325,15 @@ static int omap_gpio_runtime_resume(struct device *dev)
- 	 * No need to generate IRQs for the rising edge for gpio IRQs
- 	 * configured with falling edge only; and vice versa.
- 	 */
--	gen0 = l & bank->saved_fallingdetect;
-+	gen0 = l & bank->context.fallingdetect;
- 	gen0 &= bank->saved_datain;
- 
--	gen1 = l & bank->saved_risingdetect;
-+	gen1 = l & bank->context.risingdetect;
- 	gen1 &= ~(bank->saved_datain);
- 
- 	/* FIXME: Consider GPIO IRQs with level detections properly! */
--	gen = l & (~(bank->saved_fallingdetect) & ~(bank->saved_risingdetect));
-+	gen = l & (~(bank->context.fallingdetect) &
-+					 ~(bank->context.risingdetect));
- 	/* Consider all GPIO IRQs needed to be updated */
- 	gen |= gen0 | gen1;
+-		isr |= retrigger;
+-		retrigger = 0;
+ 		if (!isr)
+ 			break;
  
 -- 
 1.7.0.4
