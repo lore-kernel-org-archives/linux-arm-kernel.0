@@ -1,87 +1,73 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 27 Apr 2012 06:37:09 +0000
-Subject: [PATCH-V4 4/4] ARM: OMAP3+: am33xx: Add powerdomain & PRM support
-In-Reply-To: <87bome579d.fsf@ti.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <1333123435-27186-5-git-send-email-hvaibhav@ti.com> <87bome579d.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA00381@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 14:40:09 +0800
+Subject: [PATCH 19/33] ARM i.MX: prepare for common clock framework
+In-Reply-To: <1335367703-19929-20-git-send-email-s.hauer@pengutronix.de>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-20-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120427064007.GM2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 06:19:02, Hilman, Kevin wrote:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+On Wed, Apr 25, 2012 at 05:28:09PM +0200, Sascha Hauer wrote:
+> - Add necessary #ifdefs for CONFIG_COMMON_CLOCK
+> - Add a global spinlock to protect the CCM registers
 > 
-> > As far as PRM/CM/PRCM modules are concerned, AM33XX device is
-> > different than OMAP3 and OMAP4 architectures; so we need to
-> > handle it separately.
-> > This patch adds support for, Powerdomain, Powerdomain data,
-> > PRM api's required for AM33XX device.
-> >
-> > And also, hooks up AM33XX powerdomain to existing OMAP framework.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/clk.h                |   44 ++++++++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/clock.c              |   11 ++++++++
+>  arch/arm/plat-mxc/include/mach/clock.h |    4 +++
+>  3 files changed, 59 insertions(+)
+>  create mode 100644 arch/arm/mach-imx/clk.h
 > 
-> [...]
-> 
-> > @@ -1288,7 +1289,15 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
-> >  	if (IS_ERR_VALUE(ret))
-> >  		return ret;
-> >
-> > -	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-> > +	/*
-> > +	 * cpu_is_omap34xx() is true for am33xx device as well, so
-> > +	 * fist check for cpu_is_am33xx().
-> > +	 */
-> > +	if (cpu_is_am33xx())
-> > +		return am33xx_prm_assert_hardreset(ohri.rst_shift,
-> > +				oh->clkdm->pwrdm.ptr->prcm_offs,
-> > +				oh->prcm.omap4.rstctrl_offs);
-> 
-> This still troubles me.  I *really* don't like that we have a dependence
-> on cpu_is* call ordering.  This is very fragile and error prone.
-> 
-> I also don't like all the cpu_is* checking currently in omap_hwmod.c
-> (which is here before you added this) and have an idea on how to clean
-> it up, I should have a patch by tomorrow for this.  That should help
-> adding am33xx support here without needing all the cpu_is* checking.
-> 
-> That being said, I just did a simple experiment[1] to see why
-> cpu_is_omap34xx() needs to be true for AM33xx in the first place.  Based
-> on my quick experiment, it does not appear to be needed.  I think our
-> lives will be much simpler if cpu_is_omap34xx() is not true for the
-> AM335x family. 
-> 
-> Can you have a look at my test branch[1] and see what you think?  I
-> changed the omap_revision for AM335x so that cpu_is_omap34xx() is no
-> longer true on this platform.  Then, I only needed to fixup the SRAM
-> init, and it boots just fine on my BeagleBone.
-> 
-> I really think we need to go this route, because having
-> cpu_is_omap34xx() true on AM335x is causing more headaches than it is
-> solving problems.  This will require you to rework a little bit these
-> clock/power/voltage domain patches, but I belive it will greatly
-> simplify the maintainability of the end result.
-> 
+> diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+> new file mode 100644
+> index 0000000..00f2590
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/clk.h
+> @@ -0,0 +1,44 @@
+> +#ifndef __MACH_IMX_CLK_H
+> +#define __MACH_IMX_CLK_H
+> +
+> +#include <linux/spinlock.h>
+> +#include <linux/clk-provider.h>
+> +#include <mach/clock.h>
+> +
+> +struct clk *imx_clk_pllv1(const char *name, char *parent,
+> +		void __iomem *base);
+> +
+> +static inline struct clk *imx_clk_fixed(const char *name, int rate)
+> +{
+> +	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+> +}
+> +
+> +static inline struct clk *imx_clk_divider(const char *name, const char *parent,
+> +		void __iomem *reg, u8 shift, u8 width)
+> +{
+> +	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
+> +			reg, shift, width, 0, &imx_ccm_lock);
+> +}
+> +
+> +static inline struct clk *imx_clk_gate(const char *name, const char *parent,
+> +		void __iomem *reg, u8 shift)
+> +{
+> +	return clk_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
+> +			shift, 0, &imx_ccm_lock);
+> +}
+> +
+> +static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
+> +		u8 shift, u8 width, const char **parents, int num_parents)
+> +{
+> +	return clk_register_mux(NULL, name, parents, num_parents, 0, reg, shift,
 
-Let me spend some time, and explore your changes; I think getting system to boot should not be only criteria here.
-But honestly, I fully agree with you that, we are creating more issue, 
-adding more cpu_is_xxx() checks, with cpu_is_34xx() true for AM33xx. 
+I think the fourth parameter should be CLK_SET_RATE_PARENT too, as mux
+could also likely be in a clk_set_rate propagation path, saying it has
+a parent clk who has .round_rate and .set_rate operations.
 
-As I have done in the past initially, I recommend and vote for,
+> +			width, 0, &imx_ccm_lock);
+> +}
+> +
 
- 1. Creating separate family cpu_is_am33xx() for AM33xx device.
-OR
- 2. Bring it to omap44xx family, since prcm block is closer to omap4
-    and not with omap3. Also, 
-
-
-Tony,
-I will let tony make a decision on this. By the time, Tony makes his 
-decision, I will spend time to explore your (Kevin's below) branch.
-
-Thanks,
-Vaibhav
-
-> Kevin
-> 
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tmp/am335x-cpu-is-hacking
-> 
-> 
+-- 
+Regards,
+Shawn
