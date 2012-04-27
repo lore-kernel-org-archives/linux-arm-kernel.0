@@ -1,51 +1,59 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 Apr 2012 10:09:13 -0600
-Subject: [PATCH] ARM:mfd: fix ezx-pcap build failure
-In-Reply-To: <20120426215258.GG24211@n2100.arm.linux.org.uk>
-References: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
- <20120426215258.GG24211@n2100.arm.linux.org.uk>
-Message-ID: <20120427160913.87CE93E1290@localhost>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 27 Apr 2012 18:37:56 +0200
+Subject: possible MXS-i2c bug
+In-Reply-To: <201204271753.39516.marex@denx.de>
+References: <201204261326.29388.marex@denx.de>
+ <201204271708.53467.marex@denx.de>
+ <20120427154119.GF16504@pengutronix.de>
+ <201204271753.39516.marex@denx.de>
+Message-ID: <20120427163756.GH16504@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Apr 2012 22:52:58 +0100, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 25, 2012 at 11:02:43AM -0400, Mark Asselstine wrote:
-> > Attempting to build the ezx_defconfig we get a build failure:
+
+> But then you don't have the DMA chain linked. Which I wonder if the controller 
+> has any problem with or not. I tried yesterday, got wrotes working perfectly, 
+> but still had issues with reads, which is exactly what needs to be chained.
+
+Yes, the read needs chaining of two "DMA command blocks". That should be
+the only chain needed, because of how the driver handles reads. It is
+still one I2C message, though.
+
+> I'll poke further eventually.
+
+I really hope it works out! That would be great.
+
+> > Regarding Figure 27-10, the first I2C write command could be sent
+> > seperately (probably even via PIOQUEUE).
+> 
+> I wonder if we want to combine pioqueue and DMA, that might create quite some 
+> franken-driver.
+
+Might be true, yet I hope it won't. Most I2C transfers tend to be very
+small, so PIOQEUE would have some advantage here (less overhead).
+
+> > The only thing to be chained is the I2C read command and the actual
+> > reading of the data.
 > > 
-> > drivers/mfd/ezx-pcap.c: In function 'pcap_isr_work':
-> > drivers/mfd/ezx-pcap.c:205: error: implicit declaration of function 'irq_to_gpio'
-> > 
-> > Looking at this failure we can find that commit 4929f5a8a99f
-> > [ARM:pxa: rename gpio_to_irq and irq_to_gpio] renamed irq_to_gpio()
-> > to pxa_irq_to_gpio() but this change was not made in the ezx-pcap
-> > driver.
+> > Just checked, the FSL driver does it basically this way, too.
 > 
-> That's because drivers shouldn't have knowledge about the SoC they're
-> running on.  This driver is not restricted to only being built for PXA,
-> and so with your change, this will cause a link error should this be
-> built on non-PXA.
-> 
-> However, there's a big problem with code using irq_to_gpio() or any
-> variant of that in this manner:
-> 
->         } while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
-> 
-> What is the effect when the supplied IRQ does not have a mapping to a
-> GPIO - or it _does_ by way of a badly coded irq_to_gpio() function
-> but that GPIO is not the correct one.
+> Which doesn't mean FSL driver does it correctly, but it probably
+> worked for them and there was some bug in my DMA tinkering.
 
-... like if multiple gpios map to the same IRQ.
+It's only a proof-of-concept. We both know that :) (If it works, that
+is, AFAICT that one will fail for transfers bigger than PAGE_SIZE, too).
 
-> There is no prevention against endlessly looping, so it could cause a
-> system lockup.
-> 
-> The real answer is to fix SPI et.al. so that its possible to pass the
-> _GPIO_ number into this driver (that's what the driver wants for its
-> interrupt line after all).  To fix that, SPI folk need to get involved
-> (added Grant as a first step.)
+Thanks,
 
-This doesn't look like a core SPI problem to me.  This specific driver
-needs a gpio connection to work and therefore it should be passed in
-via either the DT binding or platform_data as Mark suggests.
+   Wolfram
 
-g.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120427/10286e8f/attachment.sig>
