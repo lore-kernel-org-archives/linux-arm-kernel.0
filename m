@@ -1,50 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 15:09:27 +0800
-Subject: announcing the clk-next branch
-In-Reply-To: <4F9A395A.3030306@st.com>
-References: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
- <4F9A395A.3030306@st.com>
-Message-ID: <20120427070925.GO2234@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Apr 2012 09:16:22 +0200
+Subject: [PATCH 19/33] ARM i.MX: prepare for common clock framework
+In-Reply-To: <20120427064007.GM2234@S2101-09.ap.freescale.net>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-20-git-send-email-s.hauer@pengutronix.de>
+ <20120427064007.GM2234@S2101-09.ap.freescale.net>
+Message-ID: <20120427071622.GP17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 11:44:50AM +0530, Viresh Kumar wrote:
-> Hi Mike and others,
+On Fri, Apr 27, 2012 at 02:40:09PM +0800, Shawn Guo wrote:
+> On Wed, Apr 25, 2012 at 05:28:09PM +0200, Sascha Hauer wrote:
+> > - Add necessary #ifdefs for CONFIG_COMMON_CLOCK
+> > - Add a global spinlock to protect the CCM registers
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> > +
+> > +static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
+> > +		u8 shift, u8 width, const char **parents, int num_parents)
+> > +{
+> > +	return clk_register_mux(NULL, name, parents, num_parents, 0, reg, shift,
 > 
-> I am finding difficulty in creating branch to be pulled in by Mike for clock
-> stuff. Somebody please help.
-> 
-> SPEAr patches have dependency on few patchsets that are pulled in linux-next
-> already.
-> - SPEAr DT support
-> - SPEAr Pinctrl support
-> - Mike clk fixes
-> - Misc Pinctrl patches
-> 
-I'm basically running into the same situation.  I have a bunch of mxs DT
-patches touching the existing clock code, while I'm converting the clock
-to framework and put the code into drivers/clk.  I originally thought
-that the new mxs clock should go through Mike's tree since they are
-sitting in drivers/clk.  But with a second thought, I feel it might be
-easier to still have them go through arm-soc tree.
+> I think the fourth parameter should be CLK_SET_RATE_PARENT too, as mux
+> could also likely be in a clk_set_rate propagation path, saying it has
+> a parent clk who has .round_rate and .set_rate operations.
 
-We can ask Arnd, Olof to pull clkdev from Russell, clk core from Mike,
-and pinctrl from Linus into arm-soc as dependencies, take all the
-platform clock/pinctrl porting into arm-soc, and sort out the conflicts
-in arm-soc tree.  Otherwise, I'm a little worried about that we will
-probably upset Torvalds with leaving so many conflicts to him.
+Nope, we can't do this. When we do this every clock_set_rate on a leaf
+node will propagate up to the ipg, ahb, main_clk, plls and whatever is
+up there.
 
-So in short, I will send my mxs clock series to Arnd and Olof.
+I made the assumption that we can safely propagate up to the next mux
+but not further. It may turn out that this is to simple and needs
+adjustments, but generally adding a CLK_SET_RATE_PARENT to a mux won't
+work.
 
-Regards,
-Shawn
+Sascha
 
-> Now, how should i create branch for SPEAr clk stuff over these dependencies?
-> I tried to create a merge of first 3, but couldn't get a linux-next/master
-> sha of a branch for Last dependency.
-> 
-> Should i cherrypick that one?
-> 
-> At last, i believe this branch, that i would create, must be in a compilable
-> state? So, i can't just send a pull request for my clock patches rebased over
-> Mike's branch directly?
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
