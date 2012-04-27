@@ -1,61 +1,20 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Apr 2012 14:57:27 -0700
-Subject: [PATCH 0/8] gpio/omap: remaining cleanups and fix
-In-Reply-To: <20120427190759.C6DC43E0B4D@localhost> (Grant Likely's message of
- "Fri, 27 Apr 2012 13:07:59 -0600")
-References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
- <20120427190759.C6DC43E0B4D@localhost>
-Message-ID: <87ipgkzvlk.fsf@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 27 Apr 2012 19:00:38 -0300
+Subject: Tegra board file deprecation schedule
+In-Reply-To: <4F9B1568.9070704@wwwdotorg.org>
+References: <4F9B0E7C.1060408@wwwdotorg.org>
+ <CAOesGMh3NY4cQERSQY-p0QsMtcCXyhkdGSGnnrckcz8-DPjbBw@mail.gmail.com>
+ <4F9B1568.9070704@wwwdotorg.org>
+Message-ID: <CAOMZO5Cnd9knDUuc4aZrPrtk5YKUwpr-oJhUnu=z94=9CfY1ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@secretlab.ca> writes:
+On Fri, Apr 27, 2012 at 6:53 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-> On Fri, 27 Apr 2012 19:43:30 +0530, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
->> Here are the remaining cleanup patches. There are broadly
->> two categories of cleanups.
->> 
->> Cat-1: Those missed while introducing new feature like SPARSE_IRQ
->>        handling and DT support; use edge/level handlers from
->>        generic IRQ framework.
->> 
->> Cat-2: Removal of redundant fields from struct gpio_bank{} as a
->>        result of they being already covered by members within
->>        context field of struct gpio_bank{}.
->> 
->> Reference: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
->> Commit: 66f75a5d028beaf67c931435fdc3e7823125730c (Linux 3.4-rc4)
->> 
->> Series is available for reference here:
->> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev.git for_3.5/gpio_more_cleanup_fixes
->> 
->> Test info:
->> OMAP2+ platforms: OMAP2430SDP, OMAP3430SDP, OMAP4430SDP
->> OMAP1: Bootup test on OMAP1710SDP.
->> 
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Cousson, Benoit <b-cousson@ti.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Tarun Kanti DebBarma (8):
->>   gpio/omap: remove virtual_irq_start variable
->>   gpio/omap: remove saved_fallingdetect, saved_risingdetect
->>   gpio/omap: remove suspend_wakeup field from struct gpio_bank
->>   gpio/omap: remove saved_wakeup field from struct gpio_bank
->>   gpio/omap: remove retrigger variable in gpio_irq_handler
->>   gpio/omap: remove suspend/resume callbacks
->>   gpio/omap: remove cpu_is_omapxxxx() checks from *_runtime_resume()
->>   gpio/omap: fix missing check in *_runtime_suspend()
->
-> The changes look fine to me.  Which branch should this series be
-> merged through?  It can either go via arm-soc or my gpio/next branch.
+> The only one sticking point might be that the Harmony regulator
+> initialization needs to wait for the regulator driver to be probed, but
+> happen before the PCIe driver is registers. Perhaps we could hook up
+> some temporary bus notifiers to handle that. But since PCIe will likely
+> be fixed in 3.6, we could probably just wait for that on Harmony.
 
-This needs a little more review/testing on OMAP.
-
-Expect a pull request from me when it's ready and you can take it
-through gpio/nex.
-
-Thanks,
-
-Kevin
+Does EPROBE_DEFER help in this case?
