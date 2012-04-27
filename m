@@ -1,55 +1,66 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 27 Apr 2012 09:11:04 +0200
-Subject: [PATCH v3 2/4] pinctrl: pinctrl-imx: add imx pinctrl core driver
-In-Reply-To: <20120427072503.GP2234@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Apr 2012 09:35:04 +0200
+Subject: [PATCH v3 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl
+ subsystem
+In-Reply-To: <1335451227-27709-4-git-send-email-b29396@freescale.com>
 References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
- <1335451227-27709-2-git-send-email-b29396@freescale.com>
- <20120426144446.GN9142@game.jcrosoft.org>
- <20120426151536.GO9142@game.jcrosoft.org>
- <20120427054842.GJ2234@S2101-09.ap.freescale.net>
- <20120427062816.GQ9142@game.jcrosoft.org>
- <20120427072503.GP2234@S2101-09.ap.freescale.net>
-Message-ID: <20120427071104.GS9142@game.jcrosoft.org>
+ <1335451227-27709-4-git-send-email-b29396@freescale.com>
+Message-ID: <20120427073504.GS17184@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:25 Fri 27 Apr     , Shawn Guo wrote:
-> On Fri, Apr 27, 2012 at 08:28:16AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 13:48 Fri 27 Apr     , Shawn Guo wrote:
-> > > On Thu, Apr 26, 2012 at 05:15:36PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > We have on Imx mxc at91 and other SoC controler hich you configure per pin
-> > > > 
-> > > > which means one pin have multiple function and the same function is on
-> > > > multiple pins
-> > > > 
-> > > > so the groups are just a list of possible pins
-> > > > 
-> > > > Instead of re-inventing bindings we do need to come with a common binding whre
-> > > > it's possible
-> > > > 
-> > > > So instead I proppose (send in the v2) to use common way to describe the group
-> > > > 
-> > > Let's see how many nodes we will have in device tree.  For imx6q
-> > > example, there are 332 pins and each pin has up to 8 function selects.
-> > > We will end up with having 332 x 8 = 2656 sub nodes under node
-> > > "functions".  Device tree simply cannot afford such a bloating.
-> > device tree can offord it
-> > 
-> No.  Device tree maintainers has told that.  Looking into the clock DT
-> binding discussion, you will find that Grant does not like to have
-> even 100~200 nodes to represent an entire clock tree in the DT.
+On Thu, Apr 26, 2012 at 10:40:27PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> With your proposal (actually this has been proposed long time before),
-> to represent the pins for a 24bit display, it easily consumes 28 nodes
-> on mach-mxs, while my binding only needs one node.  So in short, the
-> proposal has been discussed and it's not a sensible one.
-except duplicate bindings instead having common one make no sense either
+> This driver is shared between many platforms. Currently only imx6q has
+> pinctrl support, to avoid breaking other platforms that do not have pinctrl
+> support to run this driver, enable pinctrl dummy state for them before
+> they also convert to pinctrl subsystem.
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+> This patch depends on:
+> pinctrl: add pinctrl_provide_dummies interface for platforms to use
+> http://www.spinics.net/lists/arm-kernel/msg171538.html
+> 
+> ChangeLog v2->v3:
+>  * patch name updated.
+>    v1 name is ARM: imx6q: switch to use pinctrl driver
+>  * using pinctrl dummy state to avoid breaking other platforms to use this
+>    driver.
+> 
+> ChangeLog v1->v2:
+>  * using updated binding
+> ---
+>  arch/arm/boot/dts/imx6q-arm2.dts               |    4 +++
+>  arch/arm/boot/dts/imx6q.dtsi                   |   32 ++++++++++++++++++++++++
+>  arch/arm/mach-imx/Kconfig                      |    2 +
+>  arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |    2 +
+>  arch/arm/mach-imx/mach-cpuimx51.c              |    2 +
+>  arch/arm/mach-imx/mach-cpuimx51sd.c            |    2 +
+>  arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    2 +
+>  arch/arm/mach-imx/mach-mx25_3ds.c              |    2 +
+>  arch/arm/mach-imx/mach-mx35_3ds.c              |    2 +
+>  arch/arm/mach-imx/mach-mx51_3ds.c              |    2 +
+>  arch/arm/mach-imx/mach-mx51_babbage.c          |    2 +
+>  arch/arm/mach-imx/mach-mx51_efikamx.c          |    2 +
+>  arch/arm/mach-imx/mach-mx51_efikasb.c          |    2 +
+>  arch/arm/mach-imx/mach-mx53_ard.c              |    2 +
+>  arch/arm/mach-imx/mach-mx53_evk.c              |    2 +
+>  arch/arm/mach-imx/mach-mx53_loco.c             |    2 +
+>  arch/arm/mach-imx/mach-mx53_smd.c              |    2 +
+>  arch/arm/mach-imx/mach-pcm043.c                |    2 +
+>  arch/arm/mach-imx/mach-vpr200.c                |    2 +
 
-so imx, at91 and ST (STB SoC and other does have the same type of pin IP
+Here you are patching only the boards which happen to use the esdhc
+controller, so we need to patch other boards when another driver gains
+pinctrl. Let's add the provide_dummies call to the SoCs instead which
+do not have pinctrl yet.
 
-to not come with a common bindig means we are doint the same crap as before
+Sascha
 
-with switch to DT
-
-Best Regards,
-J.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
