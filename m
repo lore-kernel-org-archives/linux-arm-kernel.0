@@ -1,30 +1,22 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 27 Apr 2012 13:33:39 +0800
-Subject: [PATCH 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
-In-Reply-To: <1334085678.6046.6.camel@flow>
-References: <1333644241.54055.YahooMailClassic@web29001.mail.ird.yahoo.com>
- <1334085678.6046.6.camel@flow>
-Message-ID: <CAN1soZxpLfOmCv_mcRG0QL5LVsP7OZuMiEuOFG7qyGQQkMoYNA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Apr 2012 13:35:30 +0800
+Subject: [PATCH v3 3/4] pinctrl: pinctrl-imx: add imx6q pinctrl driver
+In-Reply-To: <1335451227-27709-3-git-send-email-b29396@freescale.com>
+References: <1335451227-27709-1-git-send-email-b29396@freescale.com>
+ <1335451227-27709-3-git-send-email-b29396@freescale.com>
+Message-ID: <20120427053528.GI2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2012 at 3:21 AM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> Am Donnerstag, den 05.04.2012, 17:44 +0100 schrieb Paul Parsons:
->> This patch is part of a set which adds PCMCIA/CF support for the hx4700.
->> This patch modifies asic3_gpio_config[] as follows:
->> 1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
->> 2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
->>
->> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
->> Cc: Philipp Zabel <philipp.zabel@gmail.com>
->
-> Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
->
-> regards
-> Philipp
->
+On Thu, Apr 26, 2012 at 10:40:26PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Please re-send patch. I failed to apply it.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks
-Haojian
+> ---
+> ChangeLog v1-v2:
+> * add binding doc for pinctrl-imx6q
+> * refactor the probe
+> ---
