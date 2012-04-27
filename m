@@ -1,32 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Apr 2012 16:36:55 +0100
-Subject: [PATCH] ARM: ux500: Fix build error caused by recent variable name
- change
-Message-ID: <1335541015-10155-1-git-send-email-lee.jones@linaro.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 27 Apr 2012 17:41:19 +0200
+Subject: possible MXS-i2c bug
+In-Reply-To: <201204271708.53467.marex@denx.de>
+References: <201204261326.29388.marex@denx.de>
+ <201204270110.21377.marex@denx.de>
+ <20120427145936.GD16504@pengutronix.de>
+ <201204271708.53467.marex@denx.de>
+Message-ID: <20120427154119.GF16504@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-error: ?u8500_soc_node? undeclared (first use in this function)
 
-Was recently changed to 'u8500_local_bus_nodes'.
+> You can get a large list of i2c messages. In the current implementation, yes, 
+> they're iterated in mxs_i2c_xfer_msg. Correct.
+> 
+> If you want to do DMA transfer do/from the i2c controller, you have to take all 
+> these messages and create the chain of DMA transfers according to these 
+> messages, correct?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This is what I wonder. I'd think one could work on a per message basis.
+Regarding Figure 27-10, the first I2C write command could be sent
+seperately (probably even via PIOQUEUE). The only thing to be chained is
+the I2C read command and the actual reading of the data.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 39b4a98..bc8a0d7 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -761,7 +761,7 @@ static void __init u8500_init_machine(void)
- 		snowball_platform_devs[i]->dev.parent = parent;
- 
- 	/* automatically probe child nodes of db8500 device */
--	of_platform_populate(NULL, u8500_soc_node, u8500_auxdata_lookup, parent);
-+	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
- 
- 	if (of_machine_is_compatible("st-ericsson,mop500")) {
- 		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
+Just checked, the FSL driver does it basically this way, too.
+
 -- 
-1.7.9.1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120427/db3b5ffd/attachment.sig>
