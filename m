@@ -1,21 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Apr 2012 20:36:52 +0800
-Subject: [PATCH 08/17] ARM: msm: use machine specific hook for late init
-In-Reply-To: <20120426174124.GA22248@codeaurora.org>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-9-git-send-email-shawn.guo@linaro.org>
- <20120426174124.GA22248@codeaurora.org>
-Message-ID: <20120427123649.GX2234@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Apr 2012 14:37:12 +0200
+Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add SPI NOR support
+In-Reply-To: <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
+References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
+ <20120427034401.GE2234@S2101-09.ap.freescale.net>
+ <CAOMZO5DLwrKJQjZD3RWptd4TjUHq=4HLopnzZbFRFvB60pm8XA@mail.gmail.com>
+Message-ID: <CACRpkdaWZcGXDz3gn7X88+Bbu-u6snpuxbR6f=MmhDSP9KmfpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 10:41:24AM -0700, David Brown wrote:
-> This should be ok.  I'll forward it on to Saravana Kannan and Stephen
-> Boyd, since it will affect the clock changes they are working on, but
-> It's not too difficult to adapt.
-> 
-I will drop the change on clock code, since common clk migration will
-kill that late_initcall anyway, so that we can save the conflict.
+On Fri, Apr 27, 2012 at 5:51 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Fri, Apr 27, 2012 at 12:44 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>
+>> I applied both patches and see the following modprobe error message
+>> with my testing. ?Any relevance, or I missed something?
+>>
+>> spi_imx 2008000.ecspi: master is unqueued, this is deprecated
+>
+> This happens in imx-spi driver and I have reported it in the spi-devel list:
+> http://www.mail-archive.com/spi-devel-general at lists.sourceforge.net/msg08019.html
 
-Regards,
-Shawn
+Sorry for missing to reply on your mail on how to fix it, will do that now!
+
+Yours,
+Linus Walleij
