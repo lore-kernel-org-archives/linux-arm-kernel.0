@@ -1,49 +1,65 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 27 Apr 2012 16:23:51 +0200
-Subject: [PATCH] i2c: mxs: disable QUEUE when sending is done
-Message-ID: <1335536631-28202-1-git-send-email-w.sang@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 27 Apr 2012 07:27:30 -0700
+Subject: [GIT PULL] 3rd Samsung fixes for v3.4
+Message-ID: <4F9AACD2.80308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the last fixes to this driver ensure now the queue termination is
-done correctly, we can finally disable the queue after a transfer
-without problems. The gain is that it will only be reenabled after the
-next transfer is fully set up. Before, the queue was running all the
-time and if the setup of the next message was interrupted by another
-thread, an incomplete buffer could have been sent, padded with zeroes.
+Hi Arnd, Olof
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
+Here this pull request includes fix for some remained build error and 
+warning for samsung stuff and change the device name for exynos4 sdhci 
+according to change of regarding driver and fix gic initializer for 
+exynos5 dt.
 
-In case you are testing this patch, please donate Tested-by tags. Regular I2C
-usage should do, a bit of stress testing (putting I2C bus and system under
-load) would be great.
+Please pull from:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+v3.4-samsung-fixes-3
 
- drivers/i2c/busses/i2c-mxs.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+If any problems, please let me know.
 
-diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 4c37347..76b8af4 100644
---- a/drivers/i2c/busses/i2c-mxs.c
-+++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -253,6 +253,9 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
- 
- 	if (i2c->cmd_err == -ENXIO)
- 		mxs_i2c_reset(i2c);
-+	else
-+		writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
-+				i2c->regs + MXS_I2C_QUEUECTRL_CLR);
- 
- 	dev_dbg(i2c->dev, "Done with err=%d\n", i2c->cmd_err);
- 
-@@ -383,8 +386,6 @@ static int __devexit mxs_i2c_remove(struct platform_device *pdev)
- 	if (ret)
- 		return -EBUSY;
- 
--	writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
--			i2c->regs + MXS_I2C_QUEUECTRL_CLR);
- 	writel(MXS_I2C_CTRL0_SFTRST, i2c->regs + MXS_I2C_CTRL0_SET);
- 
- 	platform_set_drvdata(pdev, NULL);
--- 
-1.7.10
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+
+   Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+v3.4-samsung-fixes-3
+
+Arnd Bergmann (1):
+       ARM: mini2440_defconfig: Fix build error
+
+Kukjin Kim (2):
+       ARM: S3C24XX: Fix build warning for S3C2410_PM
+       ARM: EXYNOS: Fix resource on dev-dwmci.c
+
+Marek Szyprowski (1):
+       ARM: SAMSUNG: add missing MMC_CAP2_BROKEN_VOLTAGE capability
+
+Thomas Abraham (2):
+       ARM: EXYNOS: use 'exynos4-sdhci' as device name for sdhci controllers
+       ARM: EXYNOS: Fix incorrect initialization of GIC
+
+Tushar Behera (1):
+       ARM: EXYNOS: Fix compilation error when CONFIG_OF is not defined
+
+  arch/arm/configs/mini2440_defconfig        |    2 ++
+  arch/arm/mach-exynos/clock-exynos4.c       |   24 ++++++++++++------------
+  arch/arm/mach-exynos/clock-exynos5.c       |   24 ++++++++++++------------
+  arch/arm/mach-exynos/common.c              |   14 +++++++++++++-
+  arch/arm/mach-exynos/dev-dwmci.c           |   13 +++----------
+  arch/arm/mach-exynos/mach-nuri.c           |    1 +
+  arch/arm/mach-exynos/mach-universal_c210.c |    1 +
+  arch/arm/mach-s3c24xx/Kconfig              |    8 ++++----
+  arch/arm/mach-s5pv210/mach-goni.c          |    2 ++
+  arch/arm/plat-samsung/include/plat/sdhci.h |   28 
+++++++++++++++++++++++++++++
+  10 files changed, 78 insertions(+), 39 deletions(-)
