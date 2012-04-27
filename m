@@ -1,94 +1,99 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 27 Apr 2012 09:14:59 +0000
-Subject: [PATCH-V3 2/3] ARM: OMAP3+: clockdomain33xx: Add clockdomain
- data and respective operations
-In-Reply-To: <alpine.DEB.2.00.1204261252430.10308@utopia.booyaka.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241725430.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD30E@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204252118170.30642@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FE75B@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204260252240.10308@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FF79B@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204261252430.10308@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA0094D@DBDE01.ent.ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 27 Apr 2012 17:15:08 +0800
+Subject: [PATCH 04/11] i2c: imx: add pinctrl support
+In-Reply-To: <20120427084056.GD826@shlinux2.ap.freescale.net>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-5-git-send-email-richard.zhao@freescale.com>
+ <20120427084056.GD826@shlinux2.ap.freescale.net>
+Message-ID: <20120427091507.GQ28063@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 00:26:47, Paul Walmsley wrote:
-> On Thu, 26 Apr 2012, Hiremath, Vaibhav wrote:
-> 
-> > On Thu, Apr 26, 2012 at 14:27:20, Paul Walmsley wrote:
-> 
-> (attribution lost)
-> 
-> > > > I am thinking of separating clocktree patch (PATCH-V3 3/3) from this series, 
-> > > > so that clockdomain stuff can get in independently, and clocktree anyway 
-> > > > will follow them (it may take some time in review cycle).
-> > > 
-> > > Yes, I was thinking of doing this too.  The only aspect that gave me pause 
-> > > is that the clockdomain changes are not 100% separate from the clock tree.  
-> > > So we may have to update the clockdomain data as the clock tree changes.
+On Fri, Apr 27, 2012 at 04:40:57PM +0800, Dong Aisheng wrote:
+> On Fri, Apr 27, 2012 at 03:02:58PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6q-sabrelite.dts |    2 ++
+> >  arch/arm/boot/dts/imx6q.dtsi          |   16 ++++++++++++++++
+> >  drivers/i2c/busses/i2c-imx.c          |    9 +++++++++
+> >  3 files changed, 27 insertions(+), 0 deletions(-)
 > > 
-> > Why do you say that, clockdomain changes are not 100% separate from 
-> > clocktree? It is completely independent...
+> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > index 4663a4e..4e13293 100644
+> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > @@ -50,6 +50,8 @@
+> >  			i2c at 021a0000 { /* I2C1 */
+> >  				status = "okay";
+> >  				clock-frequency = <100000>;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_i2c1_1>;
+> >  
+> >  				codec: sgtl5000 at 0a {
+> >  					compatible = "fsl,sgtl5000";
+> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> > index 2ba32e7..fe8c80d 100644
+> > --- a/arch/arm/boot/dts/imx6q.dtsi
+> > +++ b/arch/arm/boot/dts/imx6q.dtsi
+> > @@ -390,6 +390,22 @@
+> >  				reg = <0x020e0000 0x4000>;
+> >  
+> >  				/* shared pinctrl settings */
+> > +				i2c1 {
+> > +					pinctrl_i2c1_1: i2c1grp-1 {
+> > +						fsl,pins =	"MX6Q_PAD_EIM_D21",
+> > +								"MX6Q_PAD_EIM_D28";
+> > +						fsl,hysteresis = <1>;
+> > +						fsl,mux = <0x16 0x11>;
+> > +						fsl,pull = <2>;
+> > +						fsl,pue = <1>;
+> > +						fsl,pke = <1>;
+> > +						fsl,open-drain = <1>;
+> > +						fsl,speed = <2>;
+> > +						fsl,drive-strength = <6>;
+> > +						fsl,slew-rate = <1>;
+> > +					};
+> The pinctrl binding is changed a bit since v1.
+> You may need to change here according to v2 or latter.
+Yes, I'll try your v3 with SION.
 > 
-> Clock enables and disables call clkdm_clk_{enable,disable}() which 
-> undertakes the clockdomain enable sequence on the first clock enabled 
-> inside the clockdomain, and the clockdomain disable sequence on the last 
-> clock inside the clockdomain.  The clockdomain is associated with the 
-> clock via the struct clk .clkdm and .clkdm_name fields.
+> > +				};
+> > +
+> >  				uart4 {
+> >  					pinctrl_uart4_1: uart4grp-1 {
+> >  						fsl,pins =	"MX6Q_PAD_KEY_COL0",
+> > diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> > index dfb84b7..7a52067 100644
+> > --- a/drivers/i2c/busses/i2c-imx.c
+> > +++ b/drivers/i2c/busses/i2c-imx.c
+> > @@ -48,6 +48,7 @@
+> >  #include <linux/platform_device.h>
+> >  #include <linux/clk.h>
+> >  #include <linux/slab.h>
+> > +#include <linux/pinctrl/consumer.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/of_i2c.h>
+> > @@ -470,6 +471,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+> >  	struct imx_i2c_struct *i2c_imx;
+> >  	struct resource *res;
+> >  	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
+> > +	struct pinctrl *pct;
+> >  	void __iomem *base;
+> >  	resource_size_t res_size;
+> >  	int irq, bitrate;
+> > @@ -520,6 +522,13 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+> >  	i2c_imx->base			= base;
+> >  	i2c_imx->res			= res;
+> >  
+> > +	pct = devm_pinctrl_get_select_default(&pdev->dev);
+> You may want to check this change will break other platforms also using this driver.
+> Refer to:
+> http://www.spinics.net/lists/arm-kernel/msg171538.html
+I didn't expect it can go in right now. It surely depends on your dummy pinctrl.
+
+Thanks
+Richard
 > 
-
-Paul,
-
-"struct clk" will come into picture when we define clocktree 
-(clock33xx_data.c file), isn't it?
-
->From clockdomain perspective, it is still independent and definite set of 
-clock domains as per device with respective api's required to control it.
-Which clock falls down to which domain, is defined in clocktree 
-(clock33xx_data.c file), isn't it?
-
-
-> So yes, they are interconnected; particularly if the clkdiv32k MODULEMODE 
-> "clock" is really needed.
-> 
-> 
-
-Coming back to example of div32k clock, assuming this as a module with MODULEMODE,
-
-static struct clk clkdiv32k_ick = {
-	.name           = "clkdiv32k_ick",
-	.clkdm_name     = "clk_24mhz_clkdm",
-	.rate           = 32768,
-	.parent         = &clk_24mhz,
-	.enable_reg     = AM33XX_CM_PER_CLKDIV32K_CLKCTRL,
-	.enable_bit     = AM33XX_MODULEMODE_SWCTRL,
-	.ops            = &clkops_omap2_dflt,
-};
-
-And we have separate domain for div32k clock.
-
-static struct clockdomain clk_24mhz_am33xx_clkdm = {
-	.name           = "clk_24mhz_clkdm",
-	.pwrdm          = { .name = "per_pwrdm" },
-	.cm_inst        = AM33XX_CM_PER_MOD,
-	.prcm_partition = AM33XX_PRM_PARTITION,
-	.clkdm_offs     = AM33XX_CM_PER_CLK_24MHZ_CLKSTCTRL_OFFSET,
-	.clktrctrl_mask = AM33XX_CLKTRCTRL_MASK,
-	.flags          = (CLKDM_CAN_SWSUP | CLKDM_NO_AUTODEPS),
-};
-
-
-In any case, I believe we have to define this domain in 
-clockdomain_data, right?
-
-
-
-Just FYI, I am about to initiate a mail-chain with design team, on your 
-questions on div32k. Hopefully I will have some input by Monday.
-
-Thanks,
-Vaibhav
+> Regards
+> Dong Aisheng
