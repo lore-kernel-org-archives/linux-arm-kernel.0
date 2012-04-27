@@ -1,126 +1,92 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Apr 2012 15:02:57 +0800
-Subject: [PATCH 03/11] ASoC: fsl: add sgtl5000 clock support for imx-sgtl5000
+Date: Fri, 27 Apr 2012 15:02:58 +0800
+Subject: [PATCH 04/11] i2c: imx: add pinctrl support
 In-Reply-To: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
 References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1335510185-7906-4-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1335510185-7906-5-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Zhao <richard.zhao@linaro.org>
-
-It tries to clk_get the clock. And if it failed, it assumes the clock
-by default enabled.
-
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- sound/soc/fsl/imx-sgtl5000.c |   40 ++++++++++++++++++++++++++++++++--------
- 1 files changed, 32 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    2 ++
+ arch/arm/boot/dts/imx6q.dtsi          |   16 ++++++++++++++++
+ drivers/i2c/busses/i2c-imx.c          |    9 +++++++++
+ 3 files changed, 27 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
-index 73b935e..3a729ca 100644
---- a/sound/soc/fsl/imx-sgtl5000.c
-+++ b/sound/soc/fsl/imx-sgtl5000.c
-@@ -13,6 +13,8 @@
- #include <linux/module.h>
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 4663a4e..4e13293 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -50,6 +50,8 @@
+ 			i2c at 021a0000 { /* I2C1 */
+ 				status = "okay";
+ 				clock-frequency = <100000>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c1_1>;
+ 
+ 				codec: sgtl5000 at 0a {
+ 					compatible = "fsl,sgtl5000";
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 2ba32e7..fe8c80d 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -390,6 +390,22 @@
+ 				reg = <0x020e0000 0x4000>;
+ 
+ 				/* shared pinctrl settings */
++				i2c1 {
++					pinctrl_i2c1_1: i2c1grp-1 {
++						fsl,pins =	"MX6Q_PAD_EIM_D21",
++								"MX6Q_PAD_EIM_D28";
++						fsl,hysteresis = <1>;
++						fsl,mux = <0x16 0x11>;
++						fsl,pull = <2>;
++						fsl,pue = <1>;
++						fsl,pke = <1>;
++						fsl,open-drain = <1>;
++						fsl,speed = <2>;
++						fsl,drive-strength = <6>;
++						fsl,slew-rate = <1>;
++					};
++				};
++
+ 				uart4 {
+ 					pinctrl_uart4_1: uart4grp-1 {
+ 						fsl,pins =	"MX6Q_PAD_KEY_COL0",
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index dfb84b7..7a52067 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -48,6 +48,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+ #include <linux/slab.h>
++#include <linux/pinctrl/consumer.h>
  #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/of_i2c.h>
-+#include <linux/clk.h>
- #include <sound/soc.h>
+ #include <linux/of_device.h>
+ #include <linux/of_i2c.h>
+@@ -470,6 +471,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+ 	struct imx_i2c_struct *i2c_imx;
+ 	struct resource *res;
+ 	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
++	struct pinctrl *pct;
+ 	void __iomem *base;
+ 	resource_size_t res_size;
+ 	int irq, bitrate;
+@@ -520,6 +522,13 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+ 	i2c_imx->base			= base;
+ 	i2c_imx->res			= res;
  
- #include "../codecs/sgtl5000.h"
-@@ -25,6 +27,7 @@ struct imx_sgtl5000_data {
- 	struct snd_soc_card card;
- 	char codec_dai_name[DAI_NAME_SIZE];
- 	char platform_name[DAI_NAME_SIZE];
-+	struct clk *codec_clk;
- 	unsigned int clk_frequency;
- };
- 
-@@ -58,6 +61,7 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *ssi_np, *codec_np;
- 	struct platform_device *ssi_pdev;
-+	struct i2c_client *codec_dev;
- 	struct imx_sgtl5000_data *data;
- 	int int_port, ext_port;
- 	int ret;
-@@ -113,6 +117,11 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
- 		ret = -EINVAL;
- 		goto fail;
- 	}
-+	codec_dev = of_find_i2c_device_by_node(codec_np);
-+	if (!codec_dev) {
-+		dev_err(&pdev->dev, "failed to find codec platform device\n");
-+		return -EINVAL;
++	pct = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pct)) {
++		dev_err(&pdev->dev, "can't get/select pinctrl\n");
++		ret = PTR_ERR(pct);
++		goto fail3;
 +	}
- 
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data) {
-@@ -120,11 +129,20 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
- 		goto fail;
- 	}
- 
--	ret = of_property_read_u32(codec_np, "clock-frequency",
--				   &data->clk_frequency);
--	if (ret) {
--		dev_err(&pdev->dev, "clock-frequency missing or invalid\n");
--		goto fail;
-+	data->codec_clk = clk_get(&codec_dev->dev, NULL);
-+	if (IS_ERR(data->codec_clk)) {
-+		/* assuming clock enabled by default */
-+		data->codec_clk = NULL;
-+		ret = of_property_read_u32(codec_np, "clock-frequency",
-+					&data->clk_frequency);
-+		if (ret) {
-+			dev_err(&codec_dev->dev,
-+				"clock-frequency missing or invalid\n");
-+			goto fail;
-+		}
-+	} else {
-+		data->clk_frequency = clk_get_rate(data->codec_clk);
-+		clk_prepare_enable(data->codec_clk);
- 	}
- 
- 	data->dai.name = "HiFi";
-@@ -140,10 +158,10 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
- 	data->card.dev = &pdev->dev;
- 	ret = snd_soc_of_parse_card_name(&data->card, "model");
- 	if (ret)
--		goto fail;
-+		goto clk_fail;
- 	ret = snd_soc_of_parse_audio_routing(&data->card, "audio-routing");
- 	if (ret)
--		goto fail;
-+		goto clk_fail;
- 	data->card.num_links = 1;
- 	data->card.dai_link = &data->dai;
- 	data->card.dapm_widgets = imx_sgtl5000_dapm_widgets;
-@@ -152,10 +170,12 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
- 	ret = snd_soc_register_card(&data->card);
- 	if (ret) {
- 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
--		goto fail;
-+		goto clk_fail;
- 	}
- 
- 	platform_set_drvdata(pdev, data);
-+clk_fail:
-+	clk_put(data->codec_clk);
- fail:
- 	if (ssi_np)
- 		of_node_put(ssi_np);
-@@ -169,6 +189,10 @@ static int __devexit imx_sgtl5000_remove(struct platform_device *pdev)
- {
- 	struct imx_sgtl5000_data *data = platform_get_drvdata(pdev);
- 
-+	if (data->codec_clk) {
-+		clk_disable_unprepare(data->codec_clk);
-+		clk_put(data->codec_clk);
-+	}
- 	snd_soc_unregister_card(&data->card);
- 
- 	return 0;
++
+ 	/* Get I2C clock */
+ 	i2c_imx->clk = clk_get(&pdev->dev, "i2c_clk");
+ 	if (IS_ERR(i2c_imx->clk)) {
 -- 
 1.7.5.4
