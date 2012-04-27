@@ -1,28 +1,28 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 27 Apr 2012 18:56:58 +0100
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <20120426191159.GA9415@sirena.org.uk>
- <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
-Message-ID: <20120427175657.GP18260@opensource.wolfsonmicro.com>
+Date: Fri, 27 Apr 2012 19:02:35 +0100
+Subject: [PATCH] ARM:mfd: fix ezx-pcap build failure
+In-Reply-To: <2732324.Os5djSkuuZ@yow-masselst-d1>
+References: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
+ <20120426215258.GG24211@n2100.arm.linux.org.uk>
+ <2732324.Os5djSkuuZ@yow-masselst-d1>
+Message-ID: <20120427180235.GA19778@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 11:09:10AM +0530, J, KEERTHY wrote:
+On Fri, Apr 27, 2012 at 11:28:28AM -0400, Mark Asselstine wrote:
+> On April 26, 2012 22:52:58 Russell King - ARM Linux wrote:
 
-> Devfreq and cpufreq are related to dynamic frequency/voltage switching between
-> pre defined Operating Performance Points or the OPPs. Every OPP being
-> a voltage/frequency pair. Smartreflex is a different
-> power management technique.
+> > What is the effect when the supplied IRQ does not have a mapping to a
+> > GPIO - or it _does_ by way of a badly coded irq_to_gpio() function
+> > but that GPIO is not the correct one.
 
-But presumably these things should integrate somehow - for example,
-should devfreq and cpufreq be providing inputs into what AVS is doing,
-and if so how?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120427/0bce95d8/attachment.sig>
+> > There is no prevention against endlessly looping, so it could cause a
+> > system lockup.
+
+> Unfortunately the commit [b1148fd4 mfd: fix pcap irq bottom handler
+> ] which modified things to loop as long as the interrupt is asserted didn't 
+> supply much information regarding the behavior they were trying to achieve/fix 
+> nor what would be the consequence of bailing earlier.
+
+The usual reason for this pattern is to simulate level triggered IRQs on
+an edge triggered interrupt controller.
