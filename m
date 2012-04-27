@@ -1,25 +1,36 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Apr 2012 14:15:12 -0700
-Subject: [PATCH] arm: omap3: Only access IVA if one exists
-In-Reply-To: <1334859465-14352-1-git-send-email-mgreer@animalcreek.com> (Mark
- A. Greer's message of "Thu, 19 Apr 2012 11:17:45 -0700")
-References: <1334859465-14352-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <87bomc27xb.fsf@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 27 Apr 2012 18:16:59 -0300
+Subject: gpio irqs broken on imx27 with dt
+In-Reply-To: <20120427125048.GN20039@pengutronix.de>
+References: <20120427125048.GN20039@pengutronix.de>
+Message-ID: <CAOMZO5D5s6sApB6EDUgPDb50gReBpGV8HP8KdMeHomsY0tsrqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Mark A. Greer" <mgreer@animalcreek.com> writes:
+Uwe,
 
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+2012/4/27 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
 >
-> prcm_setup_regs() blindly accesses IVA bits
-> in the PRM and calls omap3_iva_idle() which
-> does more IVA related register accesses.
-> Only do this if the IVA hardware actually
-> exists.
->
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> I experience problems on using gpio irqs on an imx27 based machine
+> booting with dt.
 
-Thanks, queuing for v3.5 (branch: for_3.5/cleanup/pm)
+Currently there is no pinctrl driver for mx27.
 
-Kevin
+What you can do as a temporary workaround is to do the same as mx51 or mx53:
+
+config MACH_IMX51_DT
+	bool "Support i.MX51 platforms from device tree"
+	select SOC_IMX51
+	select MACH_MX51_BABBAGE
+	select USE_OF
+	help
+	  Include support for Freescale i.MX51 based platforms
+	  using the device tree for discovery
+
+MACH_IMX51_DT currently selects MACH_MX51_BABBAGE so that the IOMUX
+infrastructure can be used.
+
+Regards,
+
+Fabio Estevam
