@@ -1,30 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Apr 2012 08:41:30 +0000
-Subject: [PATCH 04/17] ARM: ep93xx: use machine specific hook for late init
-In-Reply-To: <4F99CF07.5020006@gmail.com>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <ADE657CA350FB648AAC2C43247A983F002069887EDC4@AUSP01VMBX24.collaborationhost.net>
- <4F99CF07.5020006@gmail.com>
-Message-ID: <201204270841.30621.arnd@arndb.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 27 Apr 2012 20:26:15 +0800
+Subject: [PATCH v5 1/4] dt: add of_get_child_count helper function
+Message-ID: <1335529578-14507-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 April 2012, Ryan Mallon wrote:
-> > 
-> > See Shawn's "[PATCH 00/17] arch/arm/mach-* late_initcall cleanup".
-> > 
-> > I haven't looked closely at this yet. I think there may be some platforms
-> > where the late_initcall's might cause a problem when making an ARM
-> > unified kernel.
-> 
-> 
-> Hmm, I see. It's a bit annoying that it makes the code less clean, but I
-> can't really see any other nice way of doing it :-/.
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Well, we could treat crunch as a special case and not call it through
-the init_late callback but instead add a check in crunch_init() detect
-the presence of crunch hardware. We don't have to replace every
-late_initcall with the new method, although it only makes sense to
-apply the series if we do most of them.
+Currently most code to get child count in kernel are almost same,
+add a helper to implement this function for dt to use.
 
-	Arnd
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+
+---
+Rob missed this patch for 3.4 kernel.
+Based on Rob's suggestion, we can get it go in with pinctrl driver.
+Since Rob once had applied it, i added Rob's ack.
+See:
+https://lkml.org/lkml/2012/4/14/239
+
+changes v4->v5:
+ * do not initialize child node pointer based on Stephen's suggestion.
+
+changes v3->v4:
+ * addressed Grant's suggestion to use for_each_child_of_node.
+
+changes v2->v3:
+ Addressed some people's comments:
+ * do not use assignment as expression
+ * return 0 for non-dt case
+
+Changes v1->v2:
+ * change the name from of_get_child_number to of_get_child_count
+---
+ include/linux/of.h |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index e3f942d..2ec1083 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -193,6 +193,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
+ 	for (child = of_get_next_child(parent, NULL); child != NULL; \
+ 	     child = of_get_next_child(parent, child))
+ 
++static inline int of_get_child_count(const struct device_node *np)
++{
++	struct device_node *child;
++	int num = 0;
++
++	for_each_child_of_node(np, child)
++		num++;
++
++	return num;
++}
++
+ extern struct device_node *of_find_node_with_property(
+ 	struct device_node *from, const char *prop_name);
+ #define for_each_node_with_property(dn, prop_name) \
+@@ -300,6 +311,11 @@ static inline bool of_have_populated_dt(void)
+ #define for_each_child_of_node(parent, child) \
+ 	while (0)
+ 
++static inline int of_get_child_count(const struct device_node *np)
++{
++	return 0;
++}
++
+ static inline int of_device_is_compatible(const struct device_node *device,
+ 					  const char *name)
+ {
+-- 
+1.7.0.4
