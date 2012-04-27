@@ -1,34 +1,53 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 27 Apr 2012 10:03:28 +0000
-Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-In-Reply-To: <alpine.DEB.2.00.1204260246170.10308@utopia.booyaka.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204260246170.10308@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA00AC6@DBDE01.ent.ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 27 Apr 2012 14:12:53 +0400
+Subject: [PATCH] arm: davinci: pdctl next bit position incorrect
+In-Reply-To: <4F99870A.6080201@ti.com>
+References: <1334745664-19275-1-git-send-email-m-karicheri2@ti.com>
+ <4F8F22D1.8080309@ti.com> <4F8FECD6.6050105@mvista.com>
+ <4F9042CA.7050305@ti.com> <4F917C12.8080306@mvista.com>
+ <4F99870A.6080201@ti.com>
+Message-ID: <4F9A7125.6050802@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 14:19:28, Paul Walmsley wrote:
-> Hello Vaibhav,
-> 
-> looking at Table 1-1 "Device Features" of SPRUH73D, it seems that some 
-> AM33xx family chips come with some features disabled, such as the 
-> PRU-ICSS, the SGX, Ethernet, or USB.  How will this affect the clock tree?  
-> For example, is it correct for us to include the PRU-ICSS clock control on 
-> a clock tree that is booted on an AM3352 or an AM3354?
-> 
-> 
+Hello.
 
-I thought of this, but if you look at the existing way of handling such Si version based clock registration is supported by "cpu_clkflg", like CK_3XXX, 
-CK_AM35XX, etc...
+On 26-04-2012 21:34, Sekhar Nori wrote:
 
-During my baseport patch submission, Tony had removed CK_AM33XX flag while 
-merging them. I believe, we are trying to get rid of these flags, and that's 
-where Tony had removed them form my baseport patch.
-I was not sure on how to handle this, so I decided to continue with full 
-chip support (AM3358 and AM3359).
+>> On 04/19/2012 08:52 PM, Sekhar Nori wrote:
 
+>>>>>> The PDCTL NEXT bit is incorrectly set to bit 1 instead of bit 0. This
+>>>>>> patch fixes this issue
 
-Thanks,
-Vaibhav
+>>>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+
+>>>>> Applying this for v3.5.
+
+>>>>      But why not to 3.4? It concerns turning on DSP domain on DM644x.
+
+>>> Yes, but I think as you noted sometime before, no one is really
+>>> depending on kernel to turn on DSP domain on DM644x.
+
+>>     Looks like you're right (though I don't remember noting it :-).
+
+>>> Its probably being
+>>> done from U-Boot or ROM code. This is not a v3.4 regression either.
+
+>>     U-Boot does it only when DSPLINK support is not desired.
+
+> Okay. Since DSPLink existed long before this code to turn on domain was
+> introduced by Murali,
+
+    The code to turn on DSP domain wasn't introduced by Murali, it was there 
+originally. Ah, you probably mean that the code was checking PDSTAT0, not 
+PDSTAT1 before doing the DSP domain switch?
+
+> it must be having its own private code to do this.
+> So, looks like this should not really be a regression for anyone.
+
+    It seems you're right.
+
+> Thanks,
+> Sekhar
+
+WBR, Sergei
