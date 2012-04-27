@@ -1,48 +1,87 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 27 Apr 2012 08:32:10 +0200
-Subject: [PATCH v2] Convert i.MX architecture to generic clock framework
-In-Reply-To: <20120427022851.GC2234@S2101-09.ap.freescale.net>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <4F995657.4080505@de.bosch.com>
- <20120427022851.GC2234@S2101-09.ap.freescale.net>
-Message-ID: <4F9A3D6A.5040506@de.bosch.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 27 Apr 2012 06:37:09 +0000
+Subject: [PATCH-V4 4/4] ARM: OMAP3+: am33xx: Add powerdomain & PRM support
+In-Reply-To: <87bome579d.fsf@ti.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <1333123435-27186-5-git-send-email-hvaibhav@ti.com> <87bome579d.fsf@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA00381@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.04.2012 04:28, Shawn Guo wrote:
-> On Thu, Apr 26, 2012 at 04:06:15PM +0200, Dirk Behme wrote:
->>> git://git.pengutronix.de/git/imx/linux-2.6.git work/v3.4-rc4-imx-clk
->> Booting this on top of a 3.4-rc4 on a i.MX6 SabreLite gives me
->>
-> What do you mean "on top of a 3.4-rc4"?  Sascha's branch is built up
-> on v3.4-rc4.
+On Fri, Apr 27, 2012 at 06:19:02, Hilman, Kevin wrote:
+> Vaibhav Hiremath <hvaibhav@ti.com> writes:
 > 
->> ..
->> Linux video capture interface: v2.00
->> Switching to clocksource mxc_timer1
->> Clockevents: could not switch to one-shot mode:
->> Clockevents: could not switch to one-shot mode:
->> Clockevents: could not switch to one-shot mode: dummy_timer is not
->> functional.
->>  dummy_timer is not functional.
->> Clockevents: could not switch to one-shot mode:
->> Could not switch to high resolution mode on CPU 0
->>  dummy_timer is not functional.
->> Could not switch to high resolution mode on CPU 2
->> Could not switch to high resolution mode on CPU 1
->>  dummy_timer is not functional.
->> Could not switch to high resolution mode on CPU 3
->> NET: Registered protocol family 2
->> ...
->>
->> I'm no expert of this, so just in case this is interesting for somebody.
->>
-> I just booted my sabrelite board using Sascha's branch and can not
-> reproduce it.
+> > As far as PRM/CM/PRCM modules are concerned, AM33XX device is
+> > different than OMAP3 and OMAP4 architectures; so we need to
+> > handle it separately.
+> > This patch adds support for, Powerdomain, Powerdomain data,
+> > PRM api's required for AM33XX device.
+> >
+> > And also, hooks up AM33XX powerdomain to existing OMAP framework.
+> 
+> [...]
+> 
+> > @@ -1288,7 +1289,15 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+> >  	if (IS_ERR_VALUE(ret))
+> >  		return ret;
+> >
+> > -	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> > +	/*
+> > +	 * cpu_is_omap34xx() is true for am33xx device as well, so
+> > +	 * fist check for cpu_is_am33xx().
+> > +	 */
+> > +	if (cpu_is_am33xx())
+> > +		return am33xx_prm_assert_hardreset(ohri.rst_shift,
+> > +				oh->clkdm->pwrdm.ptr->prcm_offs,
+> > +				oh->prcm.omap4.rstctrl_offs);
+> 
+> This still troubles me.  I *really* don't like that we have a dependence
+> on cpu_is* call ordering.  This is very fragile and error prone.
+> 
+> I also don't like all the cpu_is* checking currently in omap_hwmod.c
+> (which is here before you added this) and have an idea on how to clean
+> it up, I should have a patch by tomorrow for this.  That should help
+> adding am33xx support here without needing all the cpu_is* checking.
+> 
+> That being said, I just did a simple experiment[1] to see why
+> cpu_is_omap34xx() needs to be true for AM33xx in the first place.  Based
+> on my quick experiment, it does not appear to be needed.  I think our
+> lives will be much simpler if cpu_is_omap34xx() is not true for the
+> AM335x family. 
+> 
+> Can you have a look at my test branch[1] and see what you think?  I
+> changed the omap_revision for AM335x so that cpu_is_omap34xx() is no
+> longer true on this platform.  Then, I only needed to fixup the SRAM
+> init, and it boots just fine on my BeagleBone.
+> 
+> I really think we need to go this route, because having
+> cpu_is_omap34xx() true on AM335x is causing more headaches than it is
+> solving problems.  This will require you to rework a little bit these
+> clock/power/voltage domain patches, but I belive it will greatly
+> simplify the maintainability of the end result.
+> 
 
-Sacha, Shawn, many thanks for your help! I can't reproduce it today 
-morning, too :( I will recheck again.
+Let me spend some time, and explore your changes; I think getting system to boot should not be only criteria here.
+But honestly, I fully agree with you that, we are creating more issue, 
+adding more cpu_is_xxx() checks, with cpu_is_34xx() true for AM33xx. 
 
-Many thanks again and best regards
+As I have done in the past initially, I recommend and vote for,
 
-Dirk
+ 1. Creating separate family cpu_is_am33xx() for AM33xx device.
+OR
+ 2. Bring it to omap44xx family, since prcm block is closer to omap4
+    and not with omap3. Also, 
+
+
+Tony,
+I will let tony make a decision on this. By the time, Tony makes his 
+decision, I will spend time to explore your (Kevin's below) branch.
+
+Thanks,
+Vaibhav
+
+> Kevin
+> 
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tmp/am335x-cpu-is-hacking
+> 
+> 
