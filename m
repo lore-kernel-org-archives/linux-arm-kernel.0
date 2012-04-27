@@ -1,42 +1,79 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 27 Apr 2012 15:02:59 +0800
-Subject: [PATCH 05/11] ARM: imx6q: move imx6q_sabrelite specific code to a
- dedicated function
+Date: Fri, 27 Apr 2012 15:03:00 +0800
+Subject: [PATCH 06/11] ARM: dts: imx6q-sabrelite: add ssi device
 In-Reply-To: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
 References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1335510185-7906-6-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1335510185-7906-7-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It'll be easier to add other board specific code.
+From: Richard Zhao <richard.zhao@linaro.org>
 
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/mach-imx/mach-imx6q.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    9 +++++++++
+ arch/arm/boot/dts/imx6q.dtsi          |   18 +++++++++++++++---
+ 2 files changed, 24 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index da6c1d9..d25c5d8 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -75,11 +75,16 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 4e13293..7bd8855 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -22,6 +22,15 @@
+ 	};
  
-+static void __init imx6q_sabrelite_init(void)
-+{
-+	phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
-+				ksz9021rn_phy_fixup);
-+}
+ 	soc {
++		aips-bus at 02000000 { /* AIPS1 */
++			spba-bus at 02000000 {
++				ssi1: ssi at 02028000 {
++					fsl,mode = "i2s-slave";
++					status = "okay";
++				};
++			};
++		};
 +
- static void __init imx6q_init_machine(void)
- {
- 	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
--		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
--					   ksz9021rn_phy_fixup);
-+		imx6q_sabrelite_init();
+ 		aips-bus at 02100000 { /* AIPS2 */
+ 			enet at 02188000 {
+ 				phy-mode = "rgmii";
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index fe8c80d..da42fc0 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -177,19 +177,31 @@
+ 					interrupts = <0 51 0x04>;
+ 				};
  
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-				ssi at 02028000 { /* SSI1 */
++				ssi1: ssi at 02028000 {
++					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 0x04>;
++					fsl,fifo-depth = <15>;
++					fsl,ssi-dma-events = <38 37>;
++					status = "disabled";
+ 				};
  
+-				ssi at 0202c000 { /* SSI2 */
++				ssi2: ssi at 0202c000 {
++					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 0x04>;
++					fsl,fifo-depth = <15>;
++					fsl,ssi-dma-events = <42 41>;
++					status = "disabled";
+ 				};
+ 
+-				ssi at 02030000 { /* SSI3 */
++				ssi3: ssi at 02030000 {
++					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 0x04>;
++					fsl,fifo-depth = <15>;
++					fsl,ssi-dma-events = <46 45>;
++					status = "disabled";
+ 				};
+ 
+ 				asrc at 02034000 {
 -- 
 1.7.5.4
