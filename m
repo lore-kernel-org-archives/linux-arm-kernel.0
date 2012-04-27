@@ -1,49 +1,48 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Fri, 27 Apr 2012 11:09:10 +0530
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <20120426191159.GA9415@sirena.org.uk>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <20120426191159.GA9415@sirena.org.uk>
-Message-ID: <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 27 Apr 2012 08:40:15 +0300
+Subject: [PATCHv3 1/4] ARM: tegra: Add AHB driver
+In-Reply-To: <20120426215903.GH24211@n2100.arm.linux.org.uk>
+References: <1335352072-4001-1-git-send-email-hdoyu@nvidia.com>
+ <4F99A740.3080407@wwwdotorg.org>
+ <20120426215903.GH24211@n2100.arm.linux.org.uk>
+Message-ID: <20120427084015.cb7c8e00c7d9a4cd01faa5ae@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+On Thu, 26 Apr 2012 23:59:03 +0200
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-On Fri, Apr 27, 2012 at 12:41 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Apr 26, 2012 at 11:10:31PM +0530, Keerthy wrote:
->> From: J Keerthy <j-keerthy@ti.com>
->>
->> AVS(Adaptive Voltage Scaling) is a power management technique which
->> controls the operating voltage of a device in order to optimize (i.e. reduce)
->> its power consumption. The voltage is adapted depending on static factors
->> (chip manufacturing process) and dynamic factors (temperature
->> depending performance).
->> The TI AVS solution is named Smartreflex.
->
-> What's the relationship between this and existing things like devfreq
-> and cpufreq? ?It'd be better if the changelogs made this clear and
-> provided an overview of how all these different subsystems are intended
-> to fit together.
+> On Thu, Apr 26, 2012 at 01:51:28PM -0600, Stephen Warren wrote:
+> > On 04/25/2012 05:07 AM, Hiroshi DOYU wrote:
+> > > The AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+> > > High-performance Bus (AHB) architecture.
+> > > 
+> > > The AHB Arbiter controls AHB bus master arbitration. This effectively
+> > > forms a second level of arbitration for access to the memory
+> > > controller through the AHB Slave Memory device. The AHB pre-fetch
+> > > logic can be configured to enhance performance for devices doing
+> > > sequential access. Each AHB master is assigned to either the high or
+> > > low priority bin. Both Tegra20/30 have this AHB bus.
+> > > 
+> > > Some of configuration param could be passed from DT too.
+> > 
+> > I think this code looks reasonable. I'd like to see an ack from Russell,
+> > Arnd, and Olof on the final location of the files though.
+> 
+> Well, the big question which needs answering is whether this AHB software
+> interface is something specific to Tegra or whether it really is something
+> generic.  There's been some hints in the previous thread that it's
+> specific to Tegra, so it may not after all make sense for it to be a
+> generic driver.
+> 
+> However, we _have_ decided "no more drivers under arch/arm".  So I really
+> don't want to see "struct xxx_driver" appearing in any code under that
+> subdirectory or one of its decendents.  I don't have much more to say
+> about location than that.
 
-Devfreq and cpufreq are related to dynamic frequency/voltage switching between
-pre defined Operating Performance Points or the OPPs. Every OPP being
-a voltage/frequency pair. Smartreflex is a different
-power management technique.
+What about having this driver under "drivers/amba"?
 
-SmartReflex is a technology that uses adaptive
-power supply to achieve the goal of reducing active power consumption.
-With SmartReflex, the power supply voltage can be adapted to the silicon
-performance either statically (for example, adapted to the manufacturing process
-of a given device), or dynamically (for example, adapted to the temperature
-induced current performance of the device).
-
-So for every OPP(voltage/frequency pair) depending on the silicon process and
-temperature the Smartreflex tries to get the voltage to an optimal
-value at which
-the corresponding frequency can be sustained.
-
--- 
-Regards and Thanks,
-Keerthy
+If other similiar drivers are coming up, it's easy to find rather than
+having this arch/arm/mach-*. There may be some possibility of
+generalization later, then. Also it meets the requirement of no
+"struct xxxx_driver" under arch/arm. Arnd?
