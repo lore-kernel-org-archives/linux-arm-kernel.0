@@ -1,73 +1,23 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Sat, 28 Apr 2012 11:28:43 +0800
-Subject: [RESEND PATCH 2/2] cpufreq: OMAP: remove loops_per_jiffy recalculate
- for smp
-In-Reply-To: <1335583723-18915-1-git-send-email-richard.zhao@freescale.com>
-References: <1335583723-18915-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1335583723-18915-2-git-send-email-richard.zhao@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 28 Apr 2012 12:52:57 +0800
+Subject: announcing the clk-next branch
+In-Reply-To: <CAJOA=zPdo8d7YMWDhdyNPkKQB_Ae_NiKPhEKxX2JYz=bpXXavQ@mail.gmail.com>
+References: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
+ <4F9A395A.3030306@st.com>
+ <20120427070925.GO2234@S2101-09.ap.freescale.net>
+ <CAJOA=zPdo8d7YMWDhdyNPkKQB_Ae_NiKPhEKxX2JYz=bpXXavQ@mail.gmail.com>
+Message-ID: <20120428045255.GB9924@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm registered cpufreq transition notifier to recalculate it.
+On Fri, Apr 27, 2012 at 10:54:42AM -0700, Turquette, Mike wrote:
+> Would I be allowed to rebase clk-next, or must it be stable?  If I
+> cannot rebase it then I need a bit of time to remove the conflicting
+> clkdev patches that Russell mentioned are already merged through him.
+> 
+Any branch that appears on arm-soc tree as a dependency should be
+stable, I think.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/cpufreq/omap-cpufreq.c |   35 -----------------------------------
- 1 files changed, 0 insertions(+), 35 deletions(-)
-
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 17fa04d..83a78ad 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -40,16 +40,6 @@
- /* OPP tolerance in percentage */
- #define	OPP_TOLERANCE	4
- 
--#ifdef CONFIG_SMP
--struct lpj_info {
--	unsigned long	ref;
--	unsigned int	freq;
--};
--
--static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
--static struct lpj_info global_lpj_ref;
--#endif
--
- static struct cpufreq_frequency_table *freq_table;
- static atomic_t freq_table_users = ATOMIC_INIT(0);
- static struct clk *mpu_clk;
-@@ -161,31 +151,6 @@ static int omap_target(struct cpufreq_policy *policy,
- 	}
- 
- 	freqs.new = omap_getspeed(policy->cpu);
--#ifdef CONFIG_SMP
--	/*
--	 * Note that loops_per_jiffy is not updated on SMP systems in
--	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
--	 * on frequency transition. We need to update all dependent CPUs.
--	 */
--	for_each_cpu(i, policy->cpus) {
--		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
--		if (!lpj->freq) {
--			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
--			lpj->freq = freqs.old;
--		}
--
--		per_cpu(cpu_data, i).loops_per_jiffy =
--			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
--	}
--
--	/* And don't forget to adjust the global one */
--	if (!global_lpj_ref.freq) {
--		global_lpj_ref.ref = loops_per_jiffy;
--		global_lpj_ref.freq = freqs.old;
--	}
--	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
--					freqs.new);
--#endif
- 
- done:
- 	/* notifiers */
 -- 
-1.7.5.4
+Regards,
+Shawn
