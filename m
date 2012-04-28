@@ -1,45 +1,60 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 29 Apr 2012 00:02:38 +0800
-Subject: [PATCH v2 5/8] ARM: mxs: change the lookup name for fec phy clock
+Date: Sun, 29 Apr 2012 00:02:39 +0800
+Subject: [PATCH v2 6/8] ARM: mxs: switch to common clk framework
 In-Reply-To: <1335628961-1340-1-git-send-email-shawn.guo@linaro.org>
 References: <1335628961-1340-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335628961-1340-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335628961-1340-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the fec phy clock lookup name to be more accurate.
+It switches mxs clock support to common clk framework based drivers.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-mxs/clock-mx28.c   |    2 +-
- arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig           |    1 +
+ arch/arm/mach-mxs/Makefile |    5 +----
+ drivers/clk/Makefile       |    2 ++
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index cea29c9..5a832ad 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -624,7 +624,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxs-auart.3", NULL, uart_clk)
- 	_REGISTER_CLOCK("mxs-auart.4", NULL, uart_clk)
- 	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
--	_REGISTER_CLOCK("pll2", NULL, pll2_clk)
-+	_REGISTER_CLOCK("enet_out", NULL, pll2_clk)
- 	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
- 	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
- 	_REGISTER_CLOCK("mxs-mmc.0", NULL, ssp0_clk)
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index e386c14..9596940 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -226,7 +226,7 @@ static void __init mx28evk_fec_reset(void)
- 	struct clk *clk;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index cf006d4..60bdec7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -468,6 +468,7 @@ config ARCH_MXS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
++	select COMMON_CLK
+ 	select HAVE_CLK_PREPARE
+ 	help
+ 	  Support for Freescale MXS-based family of processors
+diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+index 908bf9a..6ce21a2 100644
+--- a/arch/arm/mach-mxs/Makefile
++++ b/arch/arm/mach-mxs/Makefile
+@@ -1,12 +1,9 @@
+ # Common support
+-obj-y := clock.o devices.o icoll.o iomux.o system.o timer.o mm.o
++obj-y := devices.o icoll.o iomux.o system.o timer.o mm.o
  
- 	/* Enable fec phy clock */
--	clk = clk_get_sys("pll2", NULL);
-+	clk = clk_get_sys("enet_out", NULL);
- 	if (!IS_ERR(clk))
- 		clk_prepare_enable(clk);
+ obj-$(CONFIG_MXS_OCOTP) += ocotp.o
+ obj-$(CONFIG_PM) += pm.o
  
+-obj-$(CONFIG_SOC_IMX23) += clock-mx23.o
+-obj-$(CONFIG_SOC_IMX28) += clock-mx28.o
+-
+ obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
+ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+ obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 24aa714..4a5bdbc 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -2,3 +2,5 @@
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+ 				   clk-mux.o clk-divider.o clk-fixed-factor.o
++
++obj-$(CONFIG_ARCH_MXS)		+= mxs/
 -- 
 1.7.5.4
