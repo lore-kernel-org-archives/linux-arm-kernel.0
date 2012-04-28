@@ -1,32 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Apr 2012 17:37:16 +0100
-Subject: [PATCH 07/12] mmc: omap: add DMA engine support
-In-Reply-To: <20120424001330.GD3739@atomide.com>
-References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
- <E1SMLmZ-0002WS-Rd@rmk-PC.arm.linux.org.uk>
- <20120424001330.GD3739@atomide.com>
-Message-ID: <20120428163716.GI28062@n2100.arm.linux.org.uk>
+Date: Sat, 28 Apr 2012 18:36:04 +0100
+Subject: [PATCH RESEND] ARM: pxa: hx4700: Initialize DS1WM clock_rate
+In-Reply-To: <1335610789.79238.YahooMailClassic@web29018.mail.ird.yahoo.com>
+References: <1335610789.79238.YahooMailClassic@web29018.mail.ird.yahoo.com>
+Message-ID: <20120428173604.GC27792@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 05:13:30PM -0700, Tony Lindgren wrote:
-> * Russell King <rmk+kernel@arm.linux.org.uk> [120423 09:11]:
-> > Add DMA engine support to the OMAP driver.  This supplements the
-> > private DMA API implementation contained within this driver, and the
-> > driver can be switched at build time between using DMA engine and the
-> > private DMA API.
-> 
-> Below is what's needed to use DMA request lines from platform data.
-> Note also the release_mem_region change that we'll now need for
-> this one also (but not as a fix).
-> 
-> I've posted a cleanup patch series to mostly remove plat-omap/devices.c
-> that takes care of passing the DMA request lines in platform data.
-> That series should get merged before the driver changes for this
-> driver to keep DMA working.
+I don't know who's intending to take this, but I'd have thought Haojian
+would have...
 
-Okay, how do we want to handle this patch?  I don't think there's any
-urgency for this patch at the present time, so I'm quite happy for this
-to be delayed after the next merge window after we have the pre-requisits
-for it in place.  (And trying to get it in earlier is only going to give
-us git tree dependencies to deal with.)
+On Sat, Apr 28, 2012 at 11:59:49AM +0100, Paul Parsons wrote:
+> The asic3 driver now sets the DS1WM clock_rate from the newly added
+> asic3_platform_data clock_rate field.
+> 
+> This patch initializes the asic3_platform_data clock_rate field on the
+> hx4700 platform.
+> 
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> Cc: Philipp Zabel <philipp.zabel@gmail.com>
+> ---
+>  arch/arm/mach-pxa/hx4700.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+> index 00a00a9..6bd692d 100644
+> --- a/arch/arm/mach-pxa/hx4700.c
+> +++ b/arch/arm/mach-pxa/hx4700.c
+> @@ -295,6 +295,7 @@ static struct asic3_platform_data asic3_platform_data = {
+>  	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
+>  	.irq_base        = IRQ_BOARD_START,
+>  	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
+> +	.clock_rate      = 4000000,
+>  	.leds            = asic3_leds,
+>  };
+>  
+> -- 
+> 1.7.3.4
+> 
