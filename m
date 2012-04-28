@@ -1,57 +1,170 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 28 Apr 2012 12:02:21 +0100 (BST)
-Subject: [PATCH RESEND 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
-Message-ID: <1335610941.35099.YahooMailClassic@web29005.mail.ird.yahoo.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Apr 2012 12:06:35 +0100
+Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
+ clkdevs for given struct clk *
+In-Reply-To: <20120428110108.GD20478@pengutronix.de>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
+ <20120426074746.GD24211@n2100.arm.linux.org.uk> <4F992369.2020308@st.com>
+ <20120428095222.GP24211@n2100.arm.linux.org.uk>
+ <20120428110108.GD20478@pengutronix.de>
+Message-ID: <20120428110635.GQ24211@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is part of a set which adds PCMCIA/CF support for the hx4700.
-This patch modifies asic3_gpio_config[] as follows:
-1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
-2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
+On Sat, Apr 28, 2012 at 01:01:08PM +0200, Sascha Hauer wrote:
+> On Sat, Apr 28, 2012 at 10:52:22AM +0100, Russell King - ARM Linux wrote:
+> > +
+> > +/**
+> > + * clk_register_clkdev - register one clock lookup for a struct clk
+> > + * @clk: struct clk to associate with all clk_lookups
+> > + * @con_id: connection ID string on device
+> > + * @dev_id: format string describing device name
+> > + *
+> > + * con_id or dev_id may be NULL as a wildcard, just as in the rest of
+> > + * clkdev.
+> > + *
+> > + * To make things easier for mass registration, we detect the NULL clk
+> > + * from a previous clk_register() call, and generate an error code for
+> > + * that.  This is to permit this function to be called immediately after
+> > + * clk_register().
+> > + */
+> > +int clk_register_clkdev(struct clk *clk, const char *con_id,
+> > +	const char *dev_fmt, ...)
+> > +{
+> > +	struct clk_lookup *cl;
+> > +	va_list ap;
+> > +
+> > +	if (!clk)
+> > +		return -ENOMEM;
+> 
+> clk_register was recently changed to return ERR_PTR in Mikes branch.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-Cc: Philipp Zabel <philipp.zabel@gmail.com>
----
+That's something I was thinking about suggesting, so that the rules for
+passing in 'struct clk' are the same as that for clk_get(), which makes
+everything nicely symetrical.
 
-V6:
-Rebased from linux-3.3-rc6 to linux-3.4-rc1.
-
- arch/arm/mach-pxa/hx4700.c |    2 +-
- include/linux/mfd/asic3.h  |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 75ce812..de01277 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -231,7 +231,6 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC0_LED0,		/* red */
- 	ASIC3_GPIOC1_LED1,		/* green */
- 	ASIC3_GPIOC2_LED2,		/* blue */
--	ASIC3_GPIOC4_CF_nCD,
- 	ASIC3_GPIOC5_nCIOW,
- 	ASIC3_GPIOC6_nCIOR,
- 	ASIC3_GPIOC7_nPCE_1,
-@@ -245,6 +244,7 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC15_nPIOR,
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 6db161f..2000c6b 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -116,8 +116,9 @@ struct clk_lookup_alloc {
+ 	char	con_id[MAX_CON_ID];
+ };
  
- 	/* GPIOD: input GPIOs, CF */
-+	ASIC3_GPIOD4_CF_nCD,
- 	ASIC3_GPIOD11_nCIOIS16,
- 	ASIC3_GPIOD12_nCWAIT,
- 	ASIC3_GPIOD15_nPIOW,
-diff --git a/include/linux/mfd/asic3.h b/include/linux/mfd/asic3.h
-index ed793b7..ef6faa5 100644
---- a/include/linux/mfd/asic3.h
-+++ b/include/linux/mfd/asic3.h
-@@ -138,6 +138,7 @@ struct asic3_platform_data {
- #define ASIC3_GPIOC13_nPWAIT		ASIC3_CONFIG_GPIO(45, 1, 1, 0)
- #define ASIC3_GPIOC14_nPIOIS16		ASIC3_CONFIG_GPIO(46, 1, 1, 0)
- #define ASIC3_GPIOC15_nPIOR		ASIC3_CONFIG_GPIO(47, 1, 0, 0)
-+#define ASIC3_GPIOD4_CF_nCD		ASIC3_CONFIG_GPIO(52, 1, 0, 0)
- #define ASIC3_GPIOD11_nCIOIS16		ASIC3_CONFIG_GPIO(59, 1, 0, 0)
- #define ASIC3_GPIOD12_nCWAIT		ASIC3_CONFIG_GPIO(60, 1, 0, 0)
- #define ASIC3_GPIOD15_nPIOW		ASIC3_CONFIG_GPIO(63, 1, 0, 0)
--- 
-1.7.3.4
+-struct clk_lookup * __init_refok
+-clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
++static struct clk_lookup * __init_refok
++vclkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt,
++	va_list ap)
+ {
+ 	struct clk_lookup_alloc *cla;
+ 
+@@ -132,16 +133,25 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+ 	}
+ 
+ 	if (dev_fmt) {
+-		va_list ap;
+-
+-		va_start(ap, dev_fmt);
+ 		vscnprintf(cla->dev_id, sizeof(cla->dev_id), dev_fmt, ap);
+ 		cla->cl.dev_id = cla->dev_id;
+-		va_end(ap);
+ 	}
+ 
+ 	return &cla->cl;
+ }
++
++struct clk_lookup * __init_refok
++clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
++{
++	struct clk_lookup *cl;
++	va_list ap;
++
++	va_start(ap, dev_fmt);
++	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
++	va_end(ap);
++
++	return cl;
++}
+ EXPORT_SYMBOL(clkdev_alloc);
+ 
+ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
+@@ -173,3 +183,65 @@ void clkdev_drop(struct clk_lookup *cl)
+ 	kfree(cl);
+ }
+ EXPORT_SYMBOL(clkdev_drop);
++
++/**
++ * clk_register_clkdev - register one clock lookup for a struct clk
++ * @clk: struct clk to associate with all clk_lookups
++ * @con_id: connection ID string on device
++ * @dev_id: format string describing device name
++ *
++ * con_id or dev_id may be NULL as a wildcard, just as in the rest of
++ * clkdev.
++ *
++ * To make things easier for mass registration, we detect error clks
++ * from a previous clk_register() call, and return the error code for
++ * those.  This is to permit this function to be called immediately after
++ * clk_register().
++ */
++int clk_register_clkdev(struct clk *clk, const char *con_id,
++	const char *dev_fmt, ...)
++{
++	struct clk_lookup *cl;
++	va_list ap;
++
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	va_start(ap, dev_fmt);
++	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
++	va_end(ap);
++
++	if (!cl)
++		return -ENOMEM;
++
++	clkdev_add(cl);
++
++	return 0;
++}
++
++/**
++ * clk_register_clkdevs - register a set of clk_lookup for a struct clk
++ * @clk: struct clk to associate with all clk_lookups
++ * @cl: array of clk_lookup structures with con_id and dev_id pre-initialized
++ * @num: number of clk_lookup structures to register
++ *
++ * To make things easier for mass registration, we detect error clks
++ * from a previous clk_register() call, and return the error code for
++ * those.  This is to permit this function to be called immediately after
++ * clk_register().
++ */
++int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
++{
++	unsigned i;
++
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	for (i = 0; i < num; i++) {
++		cl->clk = clk;
++		clkdev_add(cl);
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL(clk_register_clkdevs);
+diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+index d9a4fd0..a6a6f60 100644
+--- a/include/linux/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -40,4 +40,7 @@ void clkdev_drop(struct clk_lookup *cl);
+ void clkdev_add_table(struct clk_lookup *, size_t);
+ int clk_add_alias(const char *, const char *, char *, struct device *);
+ 
++int clk_register_clkdev(struct clk *, const char *, const char *, ...);
++int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
++
+ #endif
