@@ -1,55 +1,111 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 28 Apr 2012 07:30:01 +0200
-Subject: [PATCH 02/17] ARM: at91: use machine specific hook for late init
-In-Reply-To: <20120428023008.GA9924@S2101-09.ap.freescale.net>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-3-git-send-email-shawn.guo@linaro.org>
- <20120426152906.GP9142@game.jcrosoft.org>
- <20120427140746.GD2234@S2101-09.ap.freescale.net>
- <20120427142601.GU9142@game.jcrosoft.org>
- <20120428023008.GA9924@S2101-09.ap.freescale.net>
-Message-ID: <20120428053001.GY9142@game.jcrosoft.org>
+From: ylmao@marvell.com (Yilu Mao)
+Date: Sat, 28 Apr 2012 14:24:28 +0800
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that
+ l2x0 is enabled before init
+In-Reply-To: <4F992B80.6040207@marvell.com>
+References: <20120424082810.GA9367@arm.com> <4F98D659.4030709@marvell.com>
+ <20120426083554.GB18136@arm.com> <4F99148B.4020900@marvell.com>
+ <20120426094400.GD18136@arm.com> <4F991ED6.8060109@marvell.com>
+ <20120426102815.GE18136@arm.com> <4F9924FB.7070308@marvell.com>
+ <20120426103840.GA6294@arm.com> <4F9927F2.5060408@marvell.com>
+ <20120426105651.GB6294@arm.com> <4F992B80.6040207@marvell.com>
+Message-ID: <4F9B8D1C.6090400@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:30 Sat 28 Apr     , Shawn Guo wrote:
-> On Fri, Apr 27, 2012 at 04:26:01PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > we discuss with Arnd we came back with 2 ideas one is to use a machine
-> > specific initcall or compatible specifc initcall
-> 
-> Do you mean an initcall with machine/compatible detection inside?  The
-> whole point of the hooks in struct machine_desc  is to save the
-> machine/compatible detection.  You already use .init_machine as
-> an arch_initcall time hook, and what .init_late provides you is just
-> a late_initcall time hook.  If you want to detect machine/compatible
-> in your late_initcall rather than using this hook, you should not
-> use .init_machine for the same reason.
-on DT we just do this
+On 04/26/2012 07:03 PM, Lu Mao wrote:
+> On 04/26/2012 06:56 PM, Catalin Marinas wrote:
+>> On Thu, Apr 26, 2012 at 11:48:18AM +0100, Yilu Mao wrote:
+>>> On 04/26/2012 06:38 PM, Catalin Marinas wrote:
+>>>> On Thu, Apr 26, 2012 at 11:35:39AM +0100, Yilu Mao wrote:
+>>>>> On 04/26/2012 06:28 PM, Catalin Marinas wrote:
+>>>>>> On Thu, Apr 26, 2012 at 11:09:26AM +0100, Yilu Mao wrote:
+>>>>>>> On 04/26/2012 05:44 PM, Catalin Marinas wrote:
+>>>>>>>> On Thu, Apr 26, 2012 at 10:25:31AM +0100, Yilu Mao wrote:
+>>>>>>>>> On 04/26/2012 04:35 PM, Catalin Marinas wrote:
+>>>>>>>>>> On Thu, Apr 26, 2012 at 06:00:09AM +0100, Yilu Mao wrote:
+>>>>>>>>>>> On 04/24/2012 04:28 PM, Catalin Marinas wrote:
+>>>>>>>>>>>> On Tue, Apr 24, 2012 at 03:41:20AM +0100, Yilu Mao wrote:
+>>>>>>>>>>>>> +	l2x0_saved_regs.aux_ctrl = aux;
+>>>>>>>>>>>>> +
+>>>>>>>>>>>>>         	aux&= aux_mask;
+>>>>>>>>>>>>>         	aux |= aux_val;
+>>>>>>>>>>>>
+>>>>>>>>>>>> I think that's the wrong place to save it, it should be after the
+>>>>>>>>>>>> masking was done.
+>>>>>>>>>>>>
+>>>>>>>>>>>> Anyway, if we cannot write this register in l2x0_init() because the L2
+>>>>>>>>>>>> was enabled, do we expect the L2 to be disabled during resume?
+>>>>>>>>>>>>
+>>>>>>>>>>> Sorry, I don't think so.
+>>>>>>>>>>> This is the right place to save it because we must make sure the saved
+>>>>>>>>>>> aux_ctrl is the same as what it is set.
+>>>>>>>>>>> If we save it after masking was done, the saved value will be different
+>>>>>>>>>>> because we can't actually change the real setting.
+>>>>>>>>>>
+>>>>>>>>>> And since we can't actually change the real setting on the resume path,
+>>>>>>>>>> why do we need to save it anyway. Is your L2 cache disabled on the
+>>>>>>>>>> resume path but not on the cold boot one?
+>>>>>>>>>
+>>>>>>>>> We can't change L2 aux ctrl setting when do init because it has been
+>>>>>>>>> enabled.
+>>>>>>>>
+>>>>>>>> This is normally for the case where the kernel running in non-secure
+>>>>>>>> mode is not allowed to write the L2 aux ctrl register. Does this
+>>>>>>>> permission change with core idle?
+>>>>>>>>
+>>>>>>> Yes, your understanding of previous mail is right. The L2 is enabled on
+>>>>>>> code boot and it is disabled on the resume in our case.
+>>>>>>
+>>>>>> But the kernel either runs in secure mode or the non-secure access to
+>>>>>> this register is allowed.
+>>>>>>
+>>>>>>> So if we don't have such patch, when core idle exit, L2 cache aux ctrl
+>>>>>>> register will be set to 0x0 because l2x0_saved_regs.aux_ctrl is not
+>>>>>>> initialized.
+>>>>>>
+>>>>>> You could still make sure that the mask passed doesn't affect the
+>>>>>> original setting and save it after masking.
+>>>>>>
+>>>>> Do you mean the code is like this:
+>>>>> aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+>>>>> aux&= aux_mask;
+>>>>> l2x0_saved_regs.aux_ctrl = aux;
+>>>>>
+>>>>> Then the saved value is not the same as real setting. So the restored
+>>>>> value after core idle will not the same as before... This is not what we
+>>>>> expected.
+>>>>
+>>>> My point was that on your platform you pass an aux_mask that is meant to
+>>>> change the already set aux_ctlr value. Why do you pass such mask to be
+>>>> anything other than ~0UL in this case?
+>>>>
+>>> Sorry I still can't catch your point...
+>>> In our platform, we actually use ~0UL as aux mask.
+>>>
+>>> Anyway, the two arguments, aux_value and aux_mask, are both for changing
+>>> the original value set before kernel bootup. If L2 cache is enabled in
+>>> cold boot, both two arguments are useless because we can't set the
+>>> register. So we must make sure we can restore the original value after
+>>> core idle.
+>>
+>> So if your platform passes aux_mask = ~0UL and aux_val = 0, there is no
+>> change to the read aux_ctlr value.
+>>
+>> If for whatever reason (same binary running in different configuration)
+>> you need to pass the aux_mask and aux_val different from the above, then
+>> your argument makes sense. But I just want to be clear.
+>>
+> Actually, our arguments are aux_value = 0x30000000 and aux_mask = ~0UL.
+> I think it is also ok with my patch.
+> What do you think?
+>
+Hi Catalin,
 
-so the hook start to make not too much sense
-at machine level
+Do you agree with this patch to be merged?
 
-as this is for nearly all of them purely soc
+-- 
+Thanks.
 
-> 
-> > or the second one is to
-> > resurect Marc patch series to introduce soc_desc
-> > 
-> This is the approach I can agree on, but isn't the patch moving one
-> step close to that, turning the late_initcall into a function which
-> can be hooked into soc specific call?
-no you touch too much file and make code expertoed where this no need of this
-
-> 
-> > and on at91 Ill not touch it as the old style board can NOT be compiled with
-> > other soc (only one at91 soc at a time).
-> > 
-> > And I'll not fix it as we move to the DT which I fix to be able to be compiled
-> > in the multiarch kernel.
-> > 
-> It's something on your plate.  Just tell me to drop the patch from
-> the series, if you do not want it in.
-no I want it clean an ALL arch and do not duplicated code 
-
-Best Regards,
-J.
+Best Wishes,
+Yilu Mao
