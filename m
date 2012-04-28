@@ -1,92 +1,110 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 29 Apr 2012 00:02:41 +0800
-Subject: [PATCH v2 8/8] ARM: mxs: remove now unused timer_clk argument from
- mxs_timer_init
-In-Reply-To: <1335628961-1340-1-git-send-email-shawn.guo@linaro.org>
-References: <1335628961-1340-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335628961-1340-9-git-send-email-shawn.guo@linaro.org>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Sat, 28 Apr 2012 18:09:32 +0200
+Subject: Tegra board file deprecation schedule
+In-Reply-To: <CAOesGMh3NY4cQERSQY-p0QsMtcCXyhkdGSGnnrckcz8-DPjbBw@mail.gmail.com>
+References: <4F9B0E7C.1060408@wwwdotorg.org>
+ <CAOesGMh3NY4cQERSQY-p0QsMtcCXyhkdGSGnnrckcz8-DPjbBw@mail.gmail.com>
+Message-ID: <6014194.Op4vnW6Cge@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With old mxs clock support removed, the timer_clk argument of
-mxs_timer_init is unused now, so remove it.
+Hi,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/include/mach/common.h |    4 +---
- arch/arm/mach-mxs/timer.c               |   14 +++++++-------
- drivers/clk/mxs/clk-imx23.c             |    2 +-
- drivers/clk/mxs/clk-imx28.c             |    2 +-
- 4 files changed, 10 insertions(+), 12 deletions(-)
+On Friday 27 April 2012 14:39:35 Olof Johansson wrote:
+> On Fri, Apr 27, 2012 at 2:24 PM, Stephen Warren <swarren@wwwdotorg.org> 
+wrote:
+> > Eventually, Tegra support will become device tree only in the mainline
+> > kernel; arch/arm/mach-tegra/board* will be deleted.
+> > 
+> > I propose the following policy towards this goal: I'd like to maintain
+> > the board files until the relevant device tree file has the same level
+> > of functionality. Once that is achieved, and a Linus kernel is release
+> > with full support for the board via device tree, the board files can be
+> > deleted from the next kernel release.
+> > 
+> > Does anyone have any issues with this?
+> 
+> Sounds great, but I think you can be more aggressive than this; no
+> need to keep the non-DT board alive for the final release.
+> 
+> > The device tree conversion status is:
+> > 
+> > Cardhu/Ventana:
+> > 
+> > None; already device tree only
+> > 
+> > Seaboard:
+> > 
+> > Kaen and Wario board variants are not explicitly supported via device
+> > tree. However, the differences are almost entirely minor (at least as
+> > far as the current features supported in board-seaboard*), so anyone
+> > wishing to use those board variants could easily create their own device
+> > tree files. I plan to ignore Kaen/Wario and delete board-seaboard* in
+> > 3.6 unless someone objects.
+> 
+> Wario is no longer an active platform and can be completely removed;
+> I'll post patches for this.
+> 
+> Kaen is somewhat active, but I can send a device tree for it;
+> definitely ok to sunset before it's in since we can carry it locally
+> in our downstream kernel tree if needed.
+> 
+> > Harmony:
+> > 
+> > Missing support for TPS6586x regulator, and PCI-Express controller.
+> > Thierry is working on this. I hope this support will be ready to be
+> > merged for 3.6, and hence board-harmony* can be deleted in 3.7.
+> > 
+> > TrimSlice:
+> > 
+> > Missing RTC and Micro-SD slot support. I've sent patches for this, which
+> > will be merged today.
+> > 
+> > Missing audio support. I sent patches for this today. I hope they'll be
+> > merged for 3.5.
+> > 
+> > Missing PCI-Express support; status above.
+> > 
+> > I hope board-trimslice* can be deleted in 3.7.
+> > 
+> > Paz00/Toshiba AC100:
+> > 
+> > Missing rfkill button support. Defining a good binding for this might
+> > prove challenging. Marc Dietrich started work on this a while back. I
+> > pinged him to see if he intends to continue this work.
 
-diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-index e1237ab..9bdc953 100644
---- a/arch/arm/mach-mxs/include/mach/common.h
-+++ b/arch/arm/mach-mxs/include/mach/common.h
-@@ -11,11 +11,9 @@
- #ifndef __MACH_MXS_COMMON_H__
- #define __MACH_MXS_COMMON_H__
- 
--struct clk;
--
- extern const u32 *mxs_get_ocotp(void);
- extern int mxs_reset_block(void __iomem *);
--extern void mxs_timer_init(struct clk *, int);
-+extern void mxs_timer_init(int);
- extern void mxs_restart(char, const char *);
- extern int mxs_saif_clkmux_select(unsigned int clkmux);
- 
-diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-index 575e8fd..02d36de 100644
---- a/arch/arm/mach-mxs/timer.c
-+++ b/arch/arm/mach-mxs/timer.c
-@@ -244,14 +244,14 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
- 	return 0;
- }
- 
--void __init mxs_timer_init(struct clk *timer_clk, int irq)
-+void __init mxs_timer_init(int irq)
- {
--	if (!timer_clk) {
--		timer_clk = clk_get_sys("timrot", NULL);
--		if (IS_ERR(timer_clk)) {
--			pr_err("%s: failed to get clk\n", __func__);
--			return;
--		}
-+	struct clk *timer_clk;
-+
-+	timer_clk = clk_get_sys("timrot", NULL);
-+	if (IS_ERR(timer_clk)) {
-+		pr_err("%s: failed to get clk\n", __func__);
-+		return;
- 	}
- 
- 	clk_prepare_enable(timer_clk);
-diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-index 2ec76ff..dcae112 100644
---- a/drivers/clk/mxs/clk-imx23.c
-+++ b/drivers/clk/mxs/clk-imx23.c
-@@ -198,7 +198,7 @@ int __init mx23_clocks_init(void)
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
- 
--	mxs_timer_init(NULL, MX23_INT_TIMER0);
-+	mxs_timer_init(MX23_INT_TIMER0);
- 
- 	return 0;
- }
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index 7617894..2ae0d3d 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -322,7 +322,7 @@ int __init mx28_clocks_init(void)
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
- 
--	mxs_timer_init(NULL, MX28_INT_TIMER0);
-+	mxs_timer_init(MX28_INT_TIMER0);
- 
- 	return 0;
- }
--- 
-1.7.5.4
+I got no response after my last suggestion to add it below the corresponding 
+usb controller [1]. It wasn't a clever idea anyway I think. So the best 
+solution would be as Olof suggested to add it as a platform_device. See my 
+original patch [2]. If this is ok, I can send a rebased version, and hope that 
+the DT people accept it.
+
+Some other things regarding board removal also came into my mind. First, is 
+the sdhci order problem solved? Maybe I missed it, but it would be nice if we 
+could give the internal emmc a device number of zero and the external reader a 
+device number one. Currently it is oposite around and AFAIK device tree 
+guaranties no special order unless you enforce it somehow.
+
+Another (maybe a bit off-topic) thing that puzzels me is the how to assign the 
+clock to the nvec. The device needs the clock (tegra-i2c.2) but there is no 
+sane way to get it. I was thinking to add an device name alias (nvec = tegra-
+i2c.2) to the board file so I can use clk_get(&pdev->dev, NULL) instead of 
+clk_get_sys which seems to be unwanted. Is it possible to add a "clock" 
+property to it?
+
+Otherwise I'm fine with board file removal.
+
+Marc
+
+[1] http://permalink.gmane.org/gmane.linux.ports.tegra/3456
+[2] http://permalink.gmane.org/gmane.linux.ports.tegra/3415
+
+
+> > 
+> > This is probably the long-pole for completely removing board files,
+> > unless we ignore the rfkill feature and delete the board files anyway.
+> 
+> if this is the only thing holding it up sunsetting all non-DT boards
+> on tegra then I suggest just adding a one-time runtime test that adds
+> a platform device on that device tree platform. As long as there
+> aren't more of them creeping in over time that should be OK.
