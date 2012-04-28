@@ -1,48 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 28 Apr 2012 13:01:08 +0200
-Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
- clkdevs for given struct clk *
-In-Reply-To: <20120428095222.GP24211@n2100.arm.linux.org.uk>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
- <20120426074746.GD24211@n2100.arm.linux.org.uk>
- <4F992369.2020308@st.com>
- <20120428095222.GP24211@n2100.arm.linux.org.uk>
-Message-ID: <20120428110108.GD20478@pengutronix.de>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 28 Apr 2012 12:02:21 +0100 (BST)
+Subject: [PATCH RESEND 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
+Message-ID: <1335610941.35099.YahooMailClassic@web29005.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2012 at 10:52:22AM +0100, Russell King - ARM Linux wrote:
-> +
-> +/**
-> + * clk_register_clkdev - register one clock lookup for a struct clk
-> + * @clk: struct clk to associate with all clk_lookups
-> + * @con_id: connection ID string on device
-> + * @dev_id: format string describing device name
-> + *
-> + * con_id or dev_id may be NULL as a wildcard, just as in the rest of
-> + * clkdev.
-> + *
-> + * To make things easier for mass registration, we detect the NULL clk
-> + * from a previous clk_register() call, and generate an error code for
-> + * that.  This is to permit this function to be called immediately after
-> + * clk_register().
-> + */
-> +int clk_register_clkdev(struct clk *clk, const char *con_id,
-> +	const char *dev_fmt, ...)
-> +{
-> +	struct clk_lookup *cl;
-> +	va_list ap;
-> +
-> +	if (!clk)
-> +		return -ENOMEM;
+This patch is part of a set which adds PCMCIA/CF support for the hx4700.
+This patch modifies asic3_gpio_config[] as follows:
+1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
+2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
 
-clk_register was recently changed to return ERR_PTR in Mikes branch.
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Cc: Philipp Zabel <philipp.zabel@gmail.com>
+---
 
-Sascha
+V6:
+Rebased from linux-3.3-rc6 to linux-3.4-rc1.
 
+ arch/arm/mach-pxa/hx4700.c |    2 +-
+ include/linux/mfd/asic3.h  |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index 75ce812..de01277 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -231,7 +231,6 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOC0_LED0,		/* red */
+ 	ASIC3_GPIOC1_LED1,		/* green */
+ 	ASIC3_GPIOC2_LED2,		/* blue */
+-	ASIC3_GPIOC4_CF_nCD,
+ 	ASIC3_GPIOC5_nCIOW,
+ 	ASIC3_GPIOC6_nCIOR,
+ 	ASIC3_GPIOC7_nPCE_1,
+@@ -245,6 +244,7 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOC15_nPIOR,
+ 
+ 	/* GPIOD: input GPIOs, CF */
++	ASIC3_GPIOD4_CF_nCD,
+ 	ASIC3_GPIOD11_nCIOIS16,
+ 	ASIC3_GPIOD12_nCWAIT,
+ 	ASIC3_GPIOD15_nPIOW,
+diff --git a/include/linux/mfd/asic3.h b/include/linux/mfd/asic3.h
+index ed793b7..ef6faa5 100644
+--- a/include/linux/mfd/asic3.h
++++ b/include/linux/mfd/asic3.h
+@@ -138,6 +138,7 @@ struct asic3_platform_data {
+ #define ASIC3_GPIOC13_nPWAIT		ASIC3_CONFIG_GPIO(45, 1, 1, 0)
+ #define ASIC3_GPIOC14_nPIOIS16		ASIC3_CONFIG_GPIO(46, 1, 1, 0)
+ #define ASIC3_GPIOC15_nPIOR		ASIC3_CONFIG_GPIO(47, 1, 0, 0)
++#define ASIC3_GPIOD4_CF_nCD		ASIC3_CONFIG_GPIO(52, 1, 0, 0)
+ #define ASIC3_GPIOD11_nCIOIS16		ASIC3_CONFIG_GPIO(59, 1, 0, 0)
+ #define ASIC3_GPIOD12_nCWAIT		ASIC3_CONFIG_GPIO(60, 1, 0, 0)
+ #define ASIC3_GPIOD15_nPIOW		ASIC3_CONFIG_GPIO(63, 1, 0, 0)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.3.4
