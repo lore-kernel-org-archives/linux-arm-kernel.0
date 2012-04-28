@@ -1,46 +1,41 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sat, 28 Apr 2012 09:31:55 -0400
-Subject: [PATCH v2 0/3] add gpmi-nand dt support for mx6q and mx28
-In-Reply-To: <1335614459.1937.13.camel@koala>
-References: <1335323184-11233-1-git-send-email-b32955@freescale.com>
- <1335614459.1937.13.camel@koala>
-Message-ID: <CAMiH66GgMFVp4+4+6PVp-+CPqdFykO1BeE_2EHC2YmWYZ917yQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 28 Apr 2012 15:33:35 +0200
+Subject: [PATCH] i2c: mxs: disable QUEUE when sending is done
+In-Reply-To: <20120428102601.GO20039@pengutronix.de>
+References: <1335536631-28202-1-git-send-email-w.sang@pengutronix.de>
+ <CAOMZO5A1_Z7T5md61OJWmXbx2qCjFEByjyGvjhxqhfxzwfLEVQ@mail.gmail.com>
+ <20120428102601.GO20039@pengutronix.de>
+Message-ID: <201204281533.35277.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem:
+Dear Uwe Kleine-K?nig,
 
-On Sat, Apr 28, 2012 at 8:00 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Wed, 2012-04-25 at 11:06 +0800, Huang Shijie wrote:
->> The mx6q-arm2 and imx28evk have already support the device tree now.
->> So i decide to add the gpmi-nand dt support to them.
->>
->> The mx23 does not support the device tree now. I will add the gpmi dt support
->> when it is ready.
->
-> I cannot apply these patches to l2-mtd.git:
-Could you only apply the gpmi-nand patch? The other two patches are
-for DT, and should be appled in Shawn's tree.
+> On Fri, Apr 27, 2012 at 11:51:56AM -0300, Fabio Estevam wrote:
+> > Hi Wolfram,
+> > 
+> > On Fri, Apr 27, 2012 at 11:23 AM, Wolfram Sang <w.sang@pengutronix.de> 
+wrote:
+> > >        if (i2c->cmd_err == -ENXIO)
+> > >                mxs_i2c_reset(i2c);
+> > > +       else
+> > > +               writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
+> > > +                               i2c->regs + MXS_I2C_QUEUECTRL_CLR);
+> > 
+> > When setting the QUEUE_RUN, do we really want to clear all the other
+> > bits of QUEUECTRL_CLR register?
+> > 
+> > I am wondering if we should only set QUEUE_RUN bit here.
+> 
+> I didn't check the manual, but I guess writing to MXS_I2C_QUEUECTRL_CLR
+> just clears the QUEUE_RUN bit and nothing else?!
 
-Best Regards
-Huang Shijie
+I think the RUN bit will be cleared by the controller anyway, so this patch is 
+pointless.
 
+> 
+> Best regards
+> Uwe
 
-
-
-
-
->
-> Applying: ARM: mx28: add gpmi-nand dt support
-> error: arch/arm/boot/dts/imx28-evk.dts: does not exist in index
-> error: arch/arm/boot/dts/imx28.dtsi: does not exist in index
->
-> --
-> Best Regards,
-> Artem Bityutskiy
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Best regards,
+Marek Vasut
