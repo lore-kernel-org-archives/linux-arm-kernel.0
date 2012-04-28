@@ -1,64 +1,664 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 29 Apr 2012 00:02:33 +0800
-Subject: [PATCH v2 0/8] common clk support for mxs
-Message-ID: <1335628961-1340-1-git-send-email-shawn.guo@linaro.org>
+Date: Sun, 29 Apr 2012 00:02:34 +0800
+Subject: [PATCH v2 1/8] clk: mxs: add mxs specific clocks
+In-Reply-To: <1335628961-1340-1-git-send-email-shawn.guo@linaro.org>
+References: <1335628961-1340-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335628961-1340-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
- * Follow imx way to save clk pointer returned by registration in an
-   array and ease the error checking and references to these clk
-   pointers later.
- * Add global locking to protect register access.
+Add mxs specific clocks, pll, reference clock (PFD), integer divider
+and fractional divider.
 
-Shawn Guo (8):
-  clk: mxs: add mxs specific clocks
-  clk: mxs: add clock support for imx23
-  clk: mxs: add clock support for imx28
-  ARM: mxs: request clock for timer
-  ARM: mxs: change the lookup name for fec phy clock
-  ARM: mxs: switch to common clk framework
-  ARM: mxs: remove old clock support
-  ARM: mxs: remove now unused timer_clk argument from mxs_timer_init
-
- arch/arm/Kconfig                        |    1 +
- arch/arm/mach-mxs/Makefile              |    5 +-
- arch/arm/mach-mxs/clock-mx23.c          |  536 ---------------------
- arch/arm/mach-mxs/clock-mx28.c          |  803 -------------------------------
- arch/arm/mach-mxs/clock.c               |  211 --------
- arch/arm/mach-mxs/include/mach/clock.h  |   62 ---
- arch/arm/mach-mxs/include/mach/common.h |    6 +-
- arch/arm/mach-mxs/mach-mx28evk.c        |    2 +-
- arch/arm/mach-mxs/regs-clkctrl-mx23.h   |  331 -------------
- arch/arm/mach-mxs/regs-clkctrl-mx28.h   |  486 -------------------
- arch/arm/mach-mxs/system.c              |   16 -
- arch/arm/mach-mxs/timer.c               |   11 +-
- drivers/clk/Makefile                    |    2 +
- drivers/clk/mxs/Makefile                |    8 +
- drivers/clk/mxs/clk-div.c               |  103 ++++
- drivers/clk/mxs/clk-frac.c              |  132 +++++
- drivers/clk/mxs/clk-imx23.c             |  204 ++++++++
- drivers/clk/mxs/clk-imx28.c             |  328 +++++++++++++
- drivers/clk/mxs/clk-pll.c               |  109 +++++
- drivers/clk/mxs/clk-ref.c               |  147 ++++++
- drivers/clk/mxs/clk.c                   |   28 ++
- drivers/clk/mxs/clk.h                   |   66 +++
- 22 files changed, 1141 insertions(+), 2456 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/clock-mx23.c
- delete mode 100644 arch/arm/mach-mxs/clock-mx28.c
- delete mode 100644 arch/arm/mach-mxs/clock.c
- delete mode 100644 arch/arm/mach-mxs/include/mach/clock.h
- delete mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx23.h
- delete mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx28.h
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/clk/mxs/Makefile   |    5 ++
+ drivers/clk/mxs/clk-div.c  |  103 +++++++++++++++++++++++++++++++
+ drivers/clk/mxs/clk-frac.c |  132 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/mxs/clk-pll.c  |  109 ++++++++++++++++++++++++++++++++
+ drivers/clk/mxs/clk-ref.c  |  147 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/mxs/clk.c      |   28 ++++++++
+ drivers/clk/mxs/clk.h      |   66 ++++++++++++++++++++
+ 7 files changed, 590 insertions(+), 0 deletions(-)
  create mode 100644 drivers/clk/mxs/Makefile
  create mode 100644 drivers/clk/mxs/clk-div.c
  create mode 100644 drivers/clk/mxs/clk-frac.c
- create mode 100644 drivers/clk/mxs/clk-imx23.c
- create mode 100644 drivers/clk/mxs/clk-imx28.c
  create mode 100644 drivers/clk/mxs/clk-pll.c
  create mode 100644 drivers/clk/mxs/clk-ref.c
  create mode 100644 drivers/clk/mxs/clk.c
  create mode 100644 drivers/clk/mxs/clk.h
 
+diff --git a/drivers/clk/mxs/Makefile b/drivers/clk/mxs/Makefile
+new file mode 100644
+index 0000000..d9472a8
+--- /dev/null
++++ b/drivers/clk/mxs/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for mxs specific clk
++#
++
++obj-y += clk.o clk-pll.o clk-ref.o clk-div.o clk-frac.o
+diff --git a/drivers/clk/mxs/clk-div.c b/drivers/clk/mxs/clk-div.c
+new file mode 100644
+index 0000000..f412c73
+--- /dev/null
++++ b/drivers/clk/mxs/clk-div.c
+@@ -0,0 +1,103 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/slab.h>
++#include "clk.h"
++
++/**
++ * struct clk_div - mxs integer divider clock
++ * @divider: the parent class
++ * @ops: pointer to clk_ops of parent class
++ * @reg: register address
++ * @busy: busy bit shift
++ *
++ * The mxs divider clock is a subclass of basic clk_divider with an
++ * addtional busy bit.
++ */
++struct clk_div {
++	struct clk_divider divider;
++	const struct clk_ops *ops;
++	void __iomem *reg;
++	u8 busy;
++};
++
++static inline struct clk_div *to_clk_div(struct clk_hw *hw)
++{
++	struct clk_divider *divider = container_of(hw, struct clk_divider, hw);
++
++	return container_of(divider, struct clk_div, divider);
++}
++
++static unsigned long clk_div_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_div *div = to_clk_div(hw);
++
++	return div->ops->recalc_rate(&div->divider.hw, parent_rate);
++}
++
++static long clk_div_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	struct clk_div *div = to_clk_div(hw);
++
++	return div->ops->round_rate(&div->divider.hw, rate, prate);
++}
++
++static int clk_div_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_div *div = to_clk_div(hw);
++	int ret;
++
++	ret = div->ops->set_rate(&div->divider.hw, rate, parent_rate);
++	if (!ret)
++		ret = mxs_clk_wait(div->reg, div->busy);
++
++	return ret;
++}
++
++static struct clk_ops clk_div_ops = {
++	.recalc_rate = clk_div_recalc_rate,
++	.round_rate = clk_div_round_rate,
++	.set_rate = clk_div_set_rate,
++};
++
++struct clk *mxs_clk_div(const char *name, const char *parent_name,
++			void __iomem *reg, u8 shift, u8 width, u8 busy)
++{
++	struct clk_div *div;
++	struct clk *clk;
++
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return ERR_PTR(-ENOMEM);
++
++	div->reg = reg;
++	div->busy = busy;
++
++	div->divider.reg = reg;
++	div->divider.shift = shift;
++	div->divider.width = width;
++	div->divider.flags = CLK_DIVIDER_ONE_BASED;
++	div->divider.lock = &mxs_lock;
++	div->ops = &clk_divider_ops;
++
++	clk = clk_register(NULL, name, &clk_div_ops, &div->divider.hw,
++			   &parent_name, 1, CLK_SET_RATE_PARENT);
++	if (!clk)
++		kfree(div);
++
++	return clk;
++}
+diff --git a/drivers/clk/mxs/clk-frac.c b/drivers/clk/mxs/clk-frac.c
+new file mode 100644
+index 0000000..1a127e8
+--- /dev/null
++++ b/drivers/clk/mxs/clk-frac.c
+@@ -0,0 +1,132 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include "clk.h"
++
++/**
++ * struct clk_frac - mxs fractional divider clock
++ * @hw: clk_hw for the fractional divider clock
++ * @reg: register address
++ * @shift: the divider bit shift
++ * @width: the divider bit width
++ * @busy: busy bit shift
++ *
++ * The clock is an adjustable fractional divider with a busy bit to wait
++ * when the divider is adjusted.
++ */
++struct clk_frac {
++	struct clk_hw hw;
++	void __iomem *reg;
++	u8 shift;
++	u8 width;
++	u8 busy;
++};
++
++#define to_clk_frac(_hw) container_of(_hw, struct clk_frac, hw)
++
++static unsigned long clk_frac_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
++{
++	struct clk_frac *frac = to_clk_frac(hw);
++	u32 div;
++
++	div = readl_relaxed(frac->reg) >> frac->shift;
++	div &= (1 << frac->width) - 1;
++
++	return (parent_rate >> frac->width) * div;
++}
++
++static long clk_frac_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
++{
++	struct clk_frac *frac = to_clk_frac(hw);
++	unsigned long parent_rate = *prate;
++	u32 div;
++	u64 tmp;
++
++	if (rate > parent_rate)
++		return -EINVAL;
++
++	tmp = rate;
++	tmp <<= frac->width;
++	do_div(tmp, parent_rate);
++	div = tmp;
++
++	if (!div)
++		return -EINVAL;
++
++	return (parent_rate >> frac->width) * div;
++}
++
++static int clk_frac_set_rate(struct clk_hw *hw, unsigned long rate,
++			     unsigned long parent_rate)
++{
++	struct clk_frac *frac = to_clk_frac(hw);
++	unsigned long flags;
++	u32 div, val;
++	u64 tmp;
++
++	if (rate > parent_rate)
++		return -EINVAL;
++
++	tmp = rate;
++	tmp <<= frac->width;
++	do_div(tmp, parent_rate);
++	div = tmp;
++
++	if (!div)
++		return -EINVAL;
++
++	spin_lock_irqsave(&mxs_lock, flags);
++
++	val = readl_relaxed(frac->reg);
++	val &= ~(((1 << frac->width) - 1) << frac->shift);
++	val |= div << frac->shift;
++	writel_relaxed(val, frac->reg);
++
++	spin_unlock_irqrestore(&mxs_lock, flags);
++
++	return mxs_clk_wait(frac->reg, frac->busy);
++}
++
++static struct clk_ops clk_frac_ops = {
++	.recalc_rate = clk_frac_recalc_rate,
++	.round_rate = clk_frac_round_rate,
++	.set_rate = clk_frac_set_rate,
++};
++
++struct clk *mxs_clk_frac(const char *name, const char *parent_name,
++			 void __iomem *reg, u8 shift, u8 width, u8 busy)
++{
++	struct clk_frac *frac;
++	struct clk *clk;
++
++	frac = kzalloc(sizeof(*frac), GFP_KERNEL);
++	if (!frac)
++		return ERR_PTR(-ENOMEM);
++
++	frac->reg = reg;
++	frac->shift = shift;
++	frac->width = width;
++	frac->busy = busy;
++
++	clk = clk_register(NULL, name, &clk_frac_ops, &frac->hw,
++			   &parent_name, 1, CLK_SET_RATE_PARENT);
++	if (!clk)
++		kfree(frac);
++
++	return clk;
++}
+diff --git a/drivers/clk/mxs/clk-pll.c b/drivers/clk/mxs/clk-pll.c
+new file mode 100644
+index 0000000..f3ba9cd
+--- /dev/null
++++ b/drivers/clk/mxs/clk-pll.c
+@@ -0,0 +1,109 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include "clk.h"
++
++/**
++ * struct clk_pll - mxs pll clock
++ * @hw: clk_hw for the pll
++ * @base: base address of the pll
++ * @power: the shift of power bit
++ * @rate: the clock rate of the pll
++ *
++ * The mxs pll is a fixed rate clock with power and gate control,
++ * and the shift of gate bit is always 31.
++ */
++struct clk_pll {
++	struct clk_hw hw;
++	void __iomem *base;
++	u8 power;
++	unsigned long rate;
++};
++
++#define to_clk_pll(_hw) container_of(_hw, struct clk_pll, hw)
++
++static int clk_pll_prepare(struct clk_hw *hw)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++
++	writel_relaxed(1 << pll->power, pll->base + SET);
++
++	udelay(10);
++
++	return 0;
++}
++
++static void clk_pll_unprepare(struct clk_hw *hw)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++
++	writel_relaxed(1 << pll->power, pll->base + CLR);
++}
++
++static int clk_pll_enable(struct clk_hw *hw)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++
++	writel_relaxed(1 << 31, pll->base + CLR);
++
++	return 0;
++}
++
++static void clk_pll_disable(struct clk_hw *hw)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++
++	writel_relaxed(1 << 31, pll->base + SET);
++}
++
++static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++
++	return pll->rate;
++}
++
++static const struct clk_ops clk_pll_ops = {
++	.prepare = clk_pll_prepare,
++	.unprepare = clk_pll_unprepare,
++	.enable = clk_pll_enable,
++	.disable = clk_pll_disable,
++	.recalc_rate = clk_pll_recalc_rate,
++};
++
++struct clk *mxs_clk_pll(const char *name, const char *parent_name,
++			void __iomem *base, u8 power, unsigned long rate)
++{
++	struct clk_pll *pll;
++	struct clk *clk;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	pll->base = base;
++	pll->rate = rate;
++	pll->power = power;
++
++	clk = clk_register(NULL, name, &clk_pll_ops, &pll->hw,
++			   &parent_name, 1, 0);
++	if (!clk)
++		kfree(pll);
++
++	return clk;
++}
+diff --git a/drivers/clk/mxs/clk-ref.c b/drivers/clk/mxs/clk-ref.c
+new file mode 100644
+index 0000000..e63c354
+--- /dev/null
++++ b/drivers/clk/mxs/clk-ref.c
+@@ -0,0 +1,147 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include "clk.h"
++
++/**
++ * struct clk_ref - mxs reference clock
++ * @hw: clk_hw for the reference clock
++ * @reg: register address
++ * @idx: the index of the reference clock within the same register
++ *
++ * The mxs reference clock sources from pll.  Every 4 reference clocks share
++ * one register space, and @idx is used to identify them.  Each reference
++ * clock has a gate control and a fractional * divider.  The rate is calculated
++ * as pll rate  * (18 / FRAC), where FRAC = 18 ~ 35.
++ */
++struct clk_ref {
++	struct clk_hw hw;
++	void __iomem *reg;
++	u8 idx;
++};
++
++#define to_clk_ref(_hw) container_of(_hw, struct clk_ref, hw)
++
++static int clk_ref_enable(struct clk_hw *hw)
++{
++	struct clk_ref *ref = to_clk_ref(hw);
++
++	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + CLR);
++
++	return 0;
++}
++
++static void clk_ref_disable(struct clk_hw *hw)
++{
++	struct clk_ref *ref = to_clk_ref(hw);
++
++	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + SET);
++}
++
++static unsigned long clk_ref_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_ref *ref = to_clk_ref(hw);
++	u64 tmp = parent_rate;
++	u8 frac = (readl_relaxed(ref->reg) >> (ref->idx * 8)) & 0x3f;
++
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
++}
++
++static long clk_ref_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	unsigned long parent_rate = *prate;
++	u64 tmp = parent_rate;
++	u8 frac;
++
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
++
++	if (frac < 18)
++		frac = 18;
++	else if (frac > 35)
++		frac = 35;
++
++	tmp = parent_rate;
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
++}
++
++static int clk_ref_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_ref *ref = to_clk_ref(hw);
++	unsigned long flags;
++	u64 tmp = parent_rate;
++	u32 val;
++	u8 frac, shift = ref->idx * 8;
++
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
++
++	if (frac < 18)
++		frac = 18;
++	else if (frac > 35)
++		frac = 35;
++
++	spin_lock_irqsave(&mxs_lock, flags);
++
++	val = readl_relaxed(ref->reg);
++	val &= ~(0x3f << shift);
++	val |= frac << shift;
++	writel_relaxed(val, ref->reg);
++
++	spin_unlock_irqrestore(&mxs_lock, flags);
++
++	return 0;
++}
++
++static const struct clk_ops clk_ref_ops = {
++	.enable		= clk_ref_enable,
++	.disable	= clk_ref_disable,
++	.recalc_rate	= clk_ref_recalc_rate,
++	.round_rate	= clk_ref_round_rate,
++	.set_rate	= clk_ref_set_rate,
++};
++
++struct clk *mxs_clk_ref(const char *name, const char *parent_name,
++			void __iomem *reg, u8 idx)
++{
++	struct clk_ref *ref;
++	struct clk *clk;
++
++	ref = kzalloc(sizeof(*ref), GFP_KERNEL);
++	if (!ref)
++		return ERR_PTR(-ENOMEM);
++
++	ref->reg = reg;
++	ref->idx = idx;
++
++	clk = clk_register(NULL, name, &clk_ref_ops, &ref->hw,
++			   &parent_name, 1, 0);
++	if (!clk)
++		kfree(ref);
++
++	return clk;
++}
+diff --git a/drivers/clk/mxs/clk.c b/drivers/clk/mxs/clk.c
+new file mode 100644
+index 0000000..b24d560
+--- /dev/null
++++ b/drivers/clk/mxs/clk.c
+@@ -0,0 +1,28 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/jiffies.h>
++#include <linux/spinlock.h>
++
++DEFINE_SPINLOCK(mxs_lock);
++
++int mxs_clk_wait(void __iomem *reg, u8 shift)
++{
++	unsigned long timeout = jiffies + msecs_to_jiffies(10);
++
++	while (readl_relaxed(reg) & (1 << shift))
++		if (time_after(jiffies, timeout))
++			return -ETIMEDOUT;
++
++	return 0;
++}
+diff --git a/drivers/clk/mxs/clk.h b/drivers/clk/mxs/clk.h
+new file mode 100644
+index 0000000..81421e2
+--- /dev/null
++++ b/drivers/clk/mxs/clk.h
+@@ -0,0 +1,66 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later@the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#ifndef __MXS_CLK_H
++#define __MXS_CLK_H
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/spinlock.h>
++
++#define SET	0x4
++#define CLR	0x8
++
++extern spinlock_t mxs_lock;
++
++int mxs_clk_wait(void __iomem *reg, u8 shift);
++
++struct clk *mxs_clk_pll(const char *name, const char *parent_name,
++			void __iomem *base, u8 power, unsigned long rate);
++
++struct clk *mxs_clk_ref(const char *name, const char *parent_name,
++			void __iomem *reg, u8 idx);
++
++struct clk *mxs_clk_div(const char *name, const char *parent_name,
++			void __iomem *reg, u8 shift, u8 width, u8 busy);
++
++struct clk *mxs_clk_frac(const char *name, const char *parent_name,
++			 void __iomem *reg, u8 shift, u8 width, u8 busy);
++
++static inline struct clk *mxs_clk_fixed(const char *name, int rate)
++{
++	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++}
++
++static inline struct clk *mxs_clk_gate(const char *name,
++			const char *parent_name, void __iomem *reg, u8 shift)
++{
++	return clk_register_gate(NULL, name, parent_name, CLK_SET_RATE_PARENT,
++				 reg, shift, CLK_GATE_SET_TO_DISABLE,
++				 &mxs_lock);
++}
++
++static inline struct clk *mxs_clk_mux(const char *name, void __iomem *reg,
++		u8 shift, u8 width, const char **parent_names, int num_parents)
++{
++	return clk_register_mux(NULL, name, parent_names, num_parents,
++				CLK_SET_RATE_PARENT, reg, shift, width,
++				0, &mxs_lock);
++}
++
++static inline struct clk *mxs_clk_fixed_factor(const char *name,
++		const char *parent_name, unsigned int mult, unsigned int div)
++{
++	return clk_register_fixed_factor(NULL, name, parent_name,
++					 CLK_SET_RATE_PARENT, mult, div);
++}
++
++#endif /* __MXS_CLK_H */
 -- 
 1.7.5.4
