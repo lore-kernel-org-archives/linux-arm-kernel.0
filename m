@@ -1,44 +1,48 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 28 Apr 2012 12:01:02 +0100 (BST)
-Subject: [PATCH RESEND] ARM: pxa: hx4700: Enable ASIC3 GPIO as a wakeup source
-Message-ID: <1335610862.47644.YahooMailClassic@web29017.mail.ird.yahoo.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 28 Apr 2012 13:01:08 +0200
+Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
+ clkdevs for given struct clk *
+In-Reply-To: <20120428095222.GP24211@n2100.arm.linux.org.uk>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
+ <20120426074746.GD24211@n2100.arm.linux.org.uk>
+ <4F992369.2020308@st.com>
+ <20120428095222.GP24211@n2100.arm.linux.org.uk>
+Message-ID: <20120428110108.GD20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the ASIC3 GPIO (12) as a wakeup source:
-1. Set the WAKEUP_ON_EDGE_RISE MFP config bits for GPIO12 in
-hx4700_pin_config[].
-2. Call gpio_set_wake() for GPIO12.
+On Sat, Apr 28, 2012 at 10:52:22AM +0100, Russell King - ARM Linux wrote:
+> +
+> +/**
+> + * clk_register_clkdev - register one clock lookup for a struct clk
+> + * @clk: struct clk to associate with all clk_lookups
+> + * @con_id: connection ID string on device
+> + * @dev_id: format string describing device name
+> + *
+> + * con_id or dev_id may be NULL as a wildcard, just as in the rest of
+> + * clkdev.
+> + *
+> + * To make things easier for mass registration, we detect the NULL clk
+> + * from a previous clk_register() call, and generate an error code for
+> + * that.  This is to permit this function to be called immediately after
+> + * clk_register().
+> + */
+> +int clk_register_clkdev(struct clk *clk, const char *con_id,
+> +	const char *dev_fmt, ...)
+> +{
+> +	struct clk_lookup *cl;
+> +	va_list ap;
+> +
+> +	if (!clk)
+> +		return -ENOMEM;
 
-With GPIO12 thus enabled, the mfd/asic3 driver can enable its own GPIOs
-as wakeup sources by implementing a irq_set_wake() handler.
+clk_register was recently changed to return ERR_PTR in Mikes branch.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-Cc: Philipp Zabel <philipp.zabel@gmail.com>
----
- arch/arm/mach-pxa/hx4700.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Sascha
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index de01277..00a00a9 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -129,7 +129,7 @@ static unsigned long hx4700_pin_config[] __initdata = {
- 	GPIO88_GPIO,
- 
- 	/* HX4700 specific input GPIOs */
--	GPIO12_GPIO,	/* ASIC3_IRQ */
-+	GPIO12_GPIO | WAKEUP_ON_EDGE_RISE,	/* ASIC3_IRQ */
- 	GPIO13_GPIO,	/* W3220_IRQ */
- 	GPIO14_GPIO,	/* nWLAN_IRQ */
- 
-@@ -863,6 +863,7 @@ static void __init hx4700_init(void)
- 	int ret;
- 
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
-+	gpio_set_wake(GPIO12_HX4700_ASIC3_IRQ, 1);
- 	ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
- 	if (ret)
- 		pr_err ("hx4700: Failed to request GPIOs.\n");
 -- 
-1.7.3.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
