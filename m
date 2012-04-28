@@ -1,43 +1,36 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 Apr 2012 15:25:38 -0700
-Subject: [PATCH/RFT 0/8] ARM: OMAP: remove IP checks from SoC family
- detection
-In-Reply-To: <20120427220813.GE19196@animalcreek.com> (Mark A. Greer's message
- of "Fri, 27 Apr 2012 15:08:13 -0700")
-References: <1335482993-14035-1-git-send-email-khilman@ti.com>
- <20120427220813.GE19196@animalcreek.com>
-Message-ID: <87aa1wyfq5.fsf@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 27 Apr 2012 18:04:53 -0600 (MDT)
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA00AC6@DBDE01.ent.ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204260246170.10308@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA00AC6@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1204271804010.10308@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Mark A. Greer" <mgreer@animalcreek.com> writes:
+On Fri, 27 Apr 2012, Hiremath, Vaibhav wrote:
 
-> On Thu, Apr 26, 2012 at 04:29:45PM -0700, Kevin Hilman wrote:
->
-> Hi Kevin.
->
->> This is a rebased version of this series which is ready for broader
->> testing.  I'd especially appreciate testing from those of you with
->> AM35x platforms.
->> 
->> Currently, our SoC detection is based on SoC family detection
->> (using die ID) and the presence of specific IP blocks (or feature.)
->> 
->> This series begins the separation of the SoC family detection and
->> specific IP detection by completely removing IP detection from the SoC
->> family detection (cpu_is_*.)
->> 
->> Applies on top of v3.4-rc4, boot tested on AM3517 EVM.
->
-> Your series applied and booted without issue until the point that
-> pm_idle is called.  At that point it hung because its doing a wfi
-> and not getting an interrupt to wake up back up.  That's expected
-> behaviour so your patches are good (IMHO) but I need to finish and
-> submit a new version of my patches to fix that issue.
+> On Thu, Apr 26, 2012 at 14:19:28, Paul Walmsley wrote:
+> > looking at Table 1-1 "Device Features" of SPRUH73D, it seems that some 
+> > AM33xx family chips come with some features disabled, such as the 
+> > PRU-ICSS, the SGX, Ethernet, or USB.  How will this affect the clock tree?  
+> > For example, is it correct for us to include the PRU-ICSS clock control on 
+> > a clock tree that is booted on an AM3352 or an AM3354?
+> 
+> I thought of this, but if you look at the existing way of handling such 
+> Si version based clock registration is supported by "cpu_clkflg", like 
+> CK_3XXX, CK_AM35XX, etc...
+> 
+> During my baseport patch submission, Tony had removed CK_AM33XX flag while 
+> merging them. I believe, we are trying to get rid of these flags, and that's 
+> where Tony had removed them form my baseport patch.
+> I was not sure on how to handle this, so I decided to continue with full 
+> chip support (AM3358 and AM3359).
 
-For the benefit of others wanting to test this:
+Okay, no problem.  Sounds like we should start with full support and then 
+remove clocks later if they cause problems on the lower-end devices.
 
-You have to use 'nohlt' on the cmdline on AM35x in order to avoid WFI
-and the wakeup problems that are still being worked on.
 
-Kevin
+- Paul
