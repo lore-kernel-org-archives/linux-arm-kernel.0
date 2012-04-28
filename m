@@ -1,24 +1,44 @@
 From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sat, 28 Apr 2012 15:00:59 +0300
-Subject: [PATCH v2 0/3] add gpmi-nand dt support for mx6q and mx28
-In-Reply-To: <1335323184-11233-1-git-send-email-b32955@freescale.com>
-References: <1335323184-11233-1-git-send-email-b32955@freescale.com>
-Message-ID: <1335614459.1937.13.camel@koala>
+Date: Sat, 28 Apr 2012 15:20:54 +0300
+Subject: [PATCH 00/10] allow mxc_nand to be probed via device tree
+In-Reply-To: <20120423092240.GA18013@pengutronix.de>
+References: <20120423092240.GA18013@pengutronix.de>
+Message-ID: <1335615654.1937.20.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-04-25 at 11:06 +0800, Huang Shijie wrote:
-> The mx6q-arm2 and imx28evk have already support the device tree now.
-> So i decide to add the gpmi-nand dt support to them.
+On Mon, 2012-04-23 at 11:22 +0200, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> The mx23 does not support the device tree now. I will add the gpmi dt support
-> when it is ready.
+> this series aims to be able to probe mxc_nand devices via device tree.
+> Most of its patches reorganize the driver to only use cpu_is_mxYZ for
+> the case that the device is not probed via device tree.
+> 
+> I split this conversion in several patches to allow easier review. IMHO
+> it makes sense to keep this splitting for an eventual bisection.
+> 
+> This is tested on an i.MX27 based machine and works fine including
+> passing of partition data.
 
-I cannot apply these patches to l2-mtd.git:
+Applied all 11 patches from your git tree to l2-mtd.git. Note, you have
+one checkpatch.pl warning:
 
-Applying: ARM: mx28: add gpmi-nand dt support
-error: arch/arm/boot/dts/imx28-evk.dts: does not exist in index
-error: arch/arm/boot/dts/imx28.dtsi: does not exist in index
+WARNING:STATIC_CONST_CHAR_ARRAY: static const char * array should probably be static const char * const
+#69: FILE: drivers/mtd/nand/mxc_nand.c:274:
++static const char *part_probes[] = { "RedBoot", "cmdlinepart", "ofpart", NULL };
+
+Also there are still several sparse warnings, e.g.
+
++drivers/mtd/nand/mxc_nand.c:1249:26: warning: incorrect type in initializer (different modifiers) [sparse]
++drivers/mtd/nand/mxc_nand.c:1249:26:    expected void *data [sparse]
++drivers/mtd/nand/mxc_nand.c:1249:26:    got struct mxc_nand_devtype_data static const [toplevel] *<noident> [sparse]
+
+And you added few gcc warnings, e.g.:
+
++drivers/mtd/nand/mxc_nand.c:1252:3: warning: initialization discards 'const' qualifier from pointer target type [enabled by default]
+
+Would you take a look and _possibly_ (if makes sense, I did not verify)
+send incremental fixes?
 
 -- 
 Best Regards,
@@ -29,4 +49,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120428/6f581371/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120428/4f7f8a3e/attachment.sig>
