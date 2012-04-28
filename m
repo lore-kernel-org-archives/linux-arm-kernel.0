@@ -1,61 +1,34 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Sat, 28 Apr 2012 18:15:42 +0800
-Subject: [PATCH] dma: imx-sdma: keep the callbacks invoked in the tasklet
-Message-ID: <1335608142-22580-1-git-send-email-b32955@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 28 Apr 2012 12:26:01 +0200
+Subject: [PATCH] i2c: mxs: disable QUEUE when sending is done
+In-Reply-To: <CAOMZO5A1_Z7T5md61OJWmXbx2qCjFEByjyGvjhxqhfxzwfLEVQ@mail.gmail.com>
+References: <1335536631-28202-1-git-send-email-w.sang@pengutronix.de>
+ <CAOMZO5A1_Z7T5md61OJWmXbx2qCjFEByjyGvjhxqhfxzwfLEVQ@mail.gmail.com>
+Message-ID: <20120428102601.GO20039@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code keeps the callbacks invoked from interrupt context, this
-does not conform to the Documentation/dmaengine.txt.
+On Fri, Apr 27, 2012 at 11:51:56AM -0300, Fabio Estevam wrote:
+> Hi Wolfram,
+> 
+> On Fri, Apr 27, 2012 at 11:23 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> 
+> > ? ? ? ?if (i2c->cmd_err == -ENXIO)
+> > ? ? ? ? ? ? ? ?mxs_i2c_reset(i2c);
+> > + ? ? ? else
+> > + ? ? ? ? ? ? ? writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i2c->regs + MXS_I2C_QUEUECTRL_CLR);
+> 
+> When setting the QUEUE_RUN, do we really want to clear all the other
+> bits of QUEUECTRL_CLR register?
+> 
+> I am wondering if we should only set QUEUE_RUN bit here.
+I didn't check the manual, but I guess writing to MXS_I2C_QUEUECTRL_CLR
+just clears the QUEUE_RUN bit and nothing else?!
 
-So add tasklet support to fix this issue.
+Best regards
+Uwe
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/dma/imx-sdma.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index a894482..c492079 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -271,6 +271,7 @@ struct sdma_channel {
- 	enum dma_status			status;
- 	unsigned int			chn_count;
- 	unsigned int			chn_real_count;
-+	struct tasklet_struct		tasklet;
- };
- 
- #define IMX_DMA_SG_LOOP		BIT(0)
-@@ -534,8 +535,10 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
- 		sdmac->desc.callback(sdmac->desc.callback_param);
- }
- 
--static void mxc_sdma_handle_channel(struct sdma_channel *sdmac)
-+static void sdma_tasklet(unsigned long data)
- {
-+	struct sdma_channel *sdmac = (struct sdma_channel *) data;
-+
- 	complete(&sdmac->done);
- 
- 	/* not interested in channel 0 interrupts */
-@@ -560,7 +563,7 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
- 		int channel = fls(stat) - 1;
- 		struct sdma_channel *sdmac = &sdma->channel[channel];
- 
--		mxc_sdma_handle_channel(sdmac);
-+		tasklet_schedule(&sdmac->tasklet);
- 
- 		__clear_bit(channel, &stat);
- 	}
-@@ -1361,6 +1364,8 @@ static int __init sdma_probe(struct platform_device *pdev)
- 		dma_cookie_init(&sdmac->chan);
- 		sdmac->channel = i;
- 
-+		tasklet_init(&sdmac->tasklet, sdma_tasklet,
-+			     (unsigned long) sdmac);
- 		/*
- 		 * Add the channel to the DMAC list. Do not add channel 0 though
- 		 * because we need it internally in the SDMA driver. This also means
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
