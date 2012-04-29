@@ -1,65 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 29 Apr 2012 11:27:01 +0200
-Subject: [PATCH 00/10] allow mxc_nand to be probed via device tree
-In-Reply-To: <1335615654.1937.20.camel@koala>
-References: <20120423092240.GA18013@pengutronix.de>
- <1335615654.1937.20.camel@koala>
-Message-ID: <20120429092701.GS20039@pengutronix.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Sun, 29 Apr 2012 10:11:51 +0000
+Subject: [PATCH 1/6] ARM: OMAP4: hwmod: rename _enable_module to
+ _omap4_enable_module()
+In-Reply-To: <1335557140-10854-2-git-send-email-khilman@ti.com>
+References: <1335557140-10854-1-git-send-email-khilman@ti.com>
+ <1335557140-10854-2-git-send-email-khilman@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA024EC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Artem,
-
-On Sat, Apr 28, 2012 at 03:20:54PM +0300, Artem Bityutskiy wrote:
-> On Mon, 2012-04-23 at 11:22 +0200, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > this series aims to be able to probe mxc_nand devices via device tree.
-> > Most of its patches reorganize the driver to only use cpu_is_mxYZ for
-> > the case that the device is not probed via device tree.
-> > 
-> > I split this conversion in several patches to allow easier review. IMHO
-> > it makes sense to keep this splitting for an eventual bisection.
-> > 
-> > This is tested on an i.MX27 based machine and works fine including
-> > passing of partition data.
+On Sat, Apr 28, 2012 at 01:35:35, Hilman, Kevin wrote:
+> _enable_module is specific to OMAP4-class SoCs, so rename it to
+> be consistend with the corresponding _omap4_disable_module.
 > 
-> Applied all 11 patches from your git tree to l2-mtd.git. Note, you have
-> one checkpatch.pl warning:
+
+If we assume AM33xx device under omap4 class, then above statement makes 
+sense, else its not really true.
+
+Just wanted to remind on the fact that, we still have not concluded on 
+am33xx device, whether to have separate class or OMAP3 class or OAMP4 class?
+
+Also, I and sure that, most of the new family of devices coming 
+in will use OMAP4 look-a-like PRCM block.
+
+Also, minor spelling mistake above,
+s/consistend/consistent
+
+
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c |   10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
-> WARNING:STATIC_CONST_CHAR_ARRAY: static const char * array should probably be static const char * const
-> #69: FILE: drivers/mtd/nand/mxc_nand.c:274:
-> +static const char *part_probes[] = { "RedBoot", "cmdlinepart", "ofpart", NULL };
-I noticed that, too. This is not new though and as
-mtd_device_parse_register takes a const char **types applying
-checkpatch's advice would yield another warning. But probably fixing
-both would work. I wouldn't address this as part of this series.
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index bf86f7e..939032a 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -771,13 +771,13 @@ static void _disable_optional_clocks(struct omap_hwmod *oh)
+>  }
+>  
+>  /**
+> - * _enable_module - enable CLKCTRL modulemode on OMAP4
+> + * _omap4_enable_module - enable CLKCTRL modulemode on OMAP4
+>   * @oh: struct omap_hwmod *
+>   *
+>   * Enables the PRCM module mode related to the hwmod @oh.
+>   * No return value.
+>   */
+> -static void _enable_module(struct omap_hwmod *oh)
+> +static void _omap4_enable_module(struct omap_hwmod *oh)
 
-> Also there are still several sparse warnings, e.g.
+In that case, does it make sense to move this function to cminst44xx.c file. 
+And same applies to _disable_module() as well. 
+
+Thanks,
+Vaibhav
+>  {
+>  	/* The module mode does not exist prior OMAP4 */
+>  	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> @@ -786,8 +786,8 @@ static void _enable_module(struct omap_hwmod *oh)
+>  	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
+>  		return;
+>  
+> -	pr_debug("omap_hwmod: %s: _enable_module: %d\n",
+> -		 oh->name, oh->prcm.omap4.modulemode);
+> +	pr_debug("omap_hwmod: %s: %s: %d\n",
+> +		 oh->name, __func__, oh->prcm.omap4.modulemode);
+>  
+>  	omap4_cminst_module_enable(oh->prcm.omap4.modulemode,
+>  				   oh->clkdm->prcm_partition,
+> @@ -1814,7 +1814,7 @@ static int _enable(struct omap_hwmod *oh)
+>  	}
+>  
+>  	_enable_clocks(oh);
+> -	_enable_module(oh);
+> +	_omap4_enable_module(oh);
+>  
+>  	r = _wait_target_ready(oh);
+>  	if (!r) {
+> -- 
+> 1.7.9.2
 > 
-> +drivers/mtd/nand/mxc_nand.c:1249:26: warning: incorrect type in initializer (different modifiers) [sparse]
-> +drivers/mtd/nand/mxc_nand.c:1249:26:    expected void *data [sparse]
-> +drivers/mtd/nand/mxc_nand.c:1249:26:    got struct mxc_nand_devtype_data static const [toplevel] *<noident> [sparse]
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> And you added few gcc warnings, e.g.:
-> 
-> +drivers/mtd/nand/mxc_nand.c:1252:3: warning: initialization discards 'const' qualifier from pointer target type [enabled by default]
-This is the same problem, i.e. casting away several consts. Hmm, and for
-me neither gcc nor sparse provide that warning but I wonder why. At some
-point I saw this warning, so I sent a patch:
-
-http://mid.gmane.org/1335171381-24869-1-git-send-email-u.kleine-koenig at pengutronix.de
-
-(I developed my series on top of that and rebased on linus/master for
-posting.) Sparse only tells me:
-
-	include/asm-generic/bitops/ffs.h:19:23: warning: right shift by bigger than source value
-
-(using gcc 4.3.2 and sparse (from Debian) 0.4.3+20110419-1)
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
