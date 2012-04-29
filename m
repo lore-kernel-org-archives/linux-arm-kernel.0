@@ -1,27 +1,26 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 28 Apr 2012 21:49:12 -0400 (EDT)
-Subject: [PATCH 1/2] AT91: Remove fixed mapping for AT91RM9200 ethernet
-In-Reply-To: <3ad9b1273c4f30d42dcc3bdf6d03470111246f14.1335435759.git.nicolas.ferre@atmel.com>
-References: <3ad9b1273c4f30d42dcc3bdf6d03470111246f14.1335435759.git.nicolas.ferre@atmel.com>
-Message-ID: <20120428.214912.1328835829329133918.davem@davemloft.net>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Sun, 29 Apr 2012 02:38:23 -0400
+Subject: Fixing audit on ARM
+Message-ID: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Thu, 26 Apr 2012 12:30:42 +0200
+Hi Folks,
 
-> From: Andrew Victor <avictor.za@gmail.com>
-> 
-> The AT91RM9200 Ethernet controller still has a fixed IO mapping.
-> So:
-> * Remove the fixed IO mapping and AT91_VA_BASE_EMAC definition.
-> * Pass the physical base-address via platform-resources to the driver.
-> * Convert at91_ether.c driver to perform an ioremap().
-> * Ethernet PHY detection needs to be performed during the driver
-> initialization process, it can no longer be done first.
-> 
-> Signed-off-by: Andrew Victor <linux@maxim.org.za>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I've been playing around with getting ARM kernels built in more standard
+Fedora configurations (as have a number of other members of the Fedora
+ARM community). This has turned up a bunch of problems so far, which
+is both good and bad. The upside is that we can all work together to
+make sure some of these non-embedded features get more testing :)
 
-Applied to net-next.
+Anyway. I'm sending a trivial fix that prevents systemd going into a
+forkbomb OOM tailspin on all recent Fedora ARM kernels (unless we
+turn off audit). Note that the fact that this has been corrupting
+userspace up to this point suggests strongly to me that we should
+be also considering turning off audit on ARM systems until it is
+known that there are not other issues. But I can run my test
+system successfully, so I submit this fix for review anyway.
+
+Thanks,
+
+Jon.
