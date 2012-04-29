@@ -1,39 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sun, 29 Apr 2012 13:16:38 -0600
+Date: Sun, 29 Apr 2012 13:21:23 -0600
 Subject: Tegra board file deprecation schedule
-In-Reply-To: <1388911.4olGsS8Z0g@ax5200p>
-References: <4F9B0E7C.1060408@wwwdotorg.org> <6014194.Op4vnW6Cge@ax5200p>
- <20120428213456.GD27792@n2100.arm.linux.org.uk> <1388911.4olGsS8Z0g@ax5200p>
-Message-ID: <4F9D9396.9070009@wwwdotorg.org>
+In-Reply-To: <6014194.Op4vnW6Cge@ax5200p>
+References: <4F9B0E7C.1060408@wwwdotorg.org>
+ <CAOesGMh3NY4cQERSQY-p0QsMtcCXyhkdGSGnnrckcz8-DPjbBw@mail.gmail.com>
+ <6014194.Op4vnW6Cge@ax5200p>
+Message-ID: <4F9D94B3.4070903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2012 12:11 PM, Marc Dietrich wrote:
-> On Saturday 28 April 2012 22:34:56 Russell King - ARM Linux wrote:
->> On Sat, Apr 28, 2012 at 06:09:32PM +0200, Marc Dietrich wrote:
->>> Another (maybe a bit off-topic) thing that puzzels me is the how to assign
->>> the clock to the nvec.
->>
->> What's the nvec?
-> 
-> it is the embedded controller used on many first gen tegra2 boards 
-> (drivers/staging/nvec). Do you remember commit 55dc6ee7 ?
-> 
->>> The device needs the clock (tegra-i2c.2) but there is no sane way to get
->>> it. I was thinking to add an device name alias (nvec = tegra-i2c.2) to
->>> the board file so I can use clk_get(&pdev->dev, NULL) instead of
->>> clk_get_sys which seems to be unwanted.
->>
->> clk_get() is preferred in drivers which have struct device's to get them.
->> And if you know the device name, then I see no problem with the aliasing
->> approach.
-> 
-> I'm just looking for a way to use clk_get if two devices, tegra-i2c and nvec 
-> (or tegra-i2c-slave in the future) share the same clock. 
+On 04/28/2012 10:09 AM, Marc Dietrich wrote:
+...
+> Some other things regarding board removal also came into my mind. First, is 
+> the sdhci order problem solved? Maybe I missed it, but it would be nice if we 
+> could give the internal emmc a device number of zero and the external reader a 
+> device number one. Currently it is oposite around and AFAIK device tree 
+> guaranties no special order unless you enforce it somehow.
 
-Oh, you mean the I2C controller clock.
+I think we shouldn't consider there to be an SDHCI order problem.
+Relying on block devices to appear with a specific name is probably
+something we shouldn't do. The fact it happened with SDHCI is pretty
+unique; it doesn't for USB-attached devices, removable SDHCI devices, etc.
 
-The correct approach here is to remove all the I2C logic from the NVEC
-driver and add I2C slave support to the real I2C driver. Then, NVEC
-becomes just a protocol driver for the slave transactions. Then, there
-is no clock to deal with.
+Instead, you can use partition or filesystem UUIDs to name devices. I
+boot with root=PARTUUID=xxxx these days, and hence never have to adjust
+my command-line depending on the SDHCI probe ordering differences, and
+it's work just fine for USB or other storage too.
