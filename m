@@ -1,53 +1,35 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sun, 29 Apr 2012 13:32:50 +0200
-Subject: [PATCH] gpio/omap: fix incorrect initialization of
- omap_gpio_mod_init
-In-Reply-To: <1335515951-6907-1-git-send-email-tarun.kanti@ti.com>
-References: <1335515951-6907-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <5062087.MRndu11OX4@vclass>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Sun, 29 Apr 2012 14:40:42 +0100
+Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
+Message-ID: <1335706842-11725-1-git-send-email-ijc@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 of April 2012 14:09:11 Tarun Kanti DebBarma wrote:
-> Breaking commit: ab985f0f7c2c0ef90b7c832f0c04f470dda0593d
-> 
-> Initialization of irqenable, irqstatus registers is the common
-> operation done in this function for all OMAP platforms, viz.
-> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
-> was overwriting the correctly programmed OMAP1 value at the
-> beginning. As a result, even though it worked on OMAP2+
-> platforms it was breaking OMAP1 functionality. On close
-> observation it is found that the first _gpio_rmw() which is
-> supposedly done to take care of OMAP1 platform is generic enough
-> and takes care of OMAP2+ platform as well. Therefore remove the
-> latter _gpio_rmw() to irqenable as they are redundant now.
-> 
-> Writing to ctrl and debounce_en registers for OMAP2+ platforms
-> are modified to match the original(pre-cleanup) code where the
-> registers are initialized with 0. In the cleanup series since
-> we are using _gpio_rmw(reg, 0, 1), instead of __raw_writel(),
-> we are just reading and writing the same values to ctrl and
-> debounce_en. This is not an issue for debounce_en register
-> because it has 0x0 as the default value. But in the case of
-> ctrl register the default value is 0x2 (GATINGRATIO = 0x1)
-> so that we end up writing 0x2 instead of intended 0 value.
-> Therefore correcting it to _gpio_rmw(reg, l, 0), where
-> l = 0xffffffff so that registers are initialized to 0.
-> 
-> Also, changing the sequence and logic of initializing the irqstatus.
+Fixes the following build error when CONFIG_KEXEC is enabled:
+  CC      arch/arm/mach-kirkwood/board-dt.o
+arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
+arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
+arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
 
-Hi,
-Sorry for not responding in 2 days, as I promissed. The reason is that 
-there are still more issues with GPIO on my Amstrad Delta, for example 
-those introduced with commit 384ebe1c2849160d040df3e68634ec506f13d9ff, 
-and I'm still trying to understand and fix them. Than, it's hard for me 
-to provide you with my Tested-by: before I'm confident those other issues 
-are not related.
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+[v4, rebase onto recent Linus for repost]
+[v3, speak actual English in the commit message, thanks Sergei Shtylyov]
+[v2, using linux/kexec.h not asm/kexec.h]
+---
+ arch/arm/mach-kirkwood/board-dt.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Anyway, and with respect to Kevin's comments, reverting the irqstatus 
-vs. irqenable initialization order doesn't seem to break anything for 
-me, and changes to debounce_en and ctrl register handling seem not 
-relevant to my test machine.
-
-Thanks,
-Janusz
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 1c672d9..f7fe1b9 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -14,6 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/kexec.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <mach/bridge-regs.h>
+-- 
+1.7.10
