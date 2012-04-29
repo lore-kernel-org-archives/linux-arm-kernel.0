@@ -1,41 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sun, 29 Apr 2012 13:25:05 -0600
-Subject: Tegra board file deprecation schedule
-In-Reply-To: <1335648381.13148.4.camel@antimon>
-References: <4F9B0E7C.1060408@wwwdotorg.org> <1335648381.13148.4.camel@antimon>
-Message-ID: <4F9D9591.60407@wwwdotorg.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 29 Apr 2012 21:28:01 +0200
+Subject: [PATCH v3 2/2] ARM: LPC32xx: Make platform use key driver
+In-Reply-To: <1335727681-17656-1-git-send-email-stigge@antcom.de>
+References: <1335727681-17656-1-git-send-email-stigge@antcom.de>
+Message-ID: <1335727681-17656-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2012 03:26 PM, Lucas Stach wrote:
-> Am Freitag, den 27.04.2012, 15:24 -0600 schrieb Stephen Warren:
->> Eventually, Tegra support will become device tree only in the mainline
->> kernel; arch/arm/mach-tegra/board* will be deleted.
->>
->> I propose the following policy towards this goal: I'd like to maintain
->> the board files until the relevant device tree file has the same level
->> of functionality. Once that is achieved, and a Linus kernel is release
->> with full support for the board via device tree, the board files can be
->> deleted from the next kernel release.
->>
->> Does anyone have any issues with this?
-> 
-> Do we have any way to describe the clocks in the device tree?
+This patch connects the lpc32xx-key driver to the LPC32xx platform (via
+lpc32xx.dtsi), and more specifically to the reference board via its dts file.
+The clock.c file needs to be changed to match the automatic device name to its
+clock.
 
-Not at present, although supporting that will probably be part of
-Tegra's support of the common clock API and DT bindings.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-> I'm
-> planning to add support for the Toradex Colibri T20 processor module,
-> which uses a 13MHz external OSC, so the generic clock init in the
-> current dt code definitely won't work for this board.
+---
+Applies to v3.4-rc4 + LPC32xx DT patches
 
-I'm not actually sure that's true. I believe we measure the OSC
-frequency during boot, and all the clock driver PLL tables have (or
-should have) entries for the various supported crystal frequencies. I
-wouldn't be too surprised if it all just worked, or could easily be
-fixed to.
+Please pick this patch for the arm-soc subsystem.
 
-(I wouldn't consider this to be related to board file deprecation, since
-there are currently no board files to be deprecated that rely on such a
-feature anyway)
+Changes since v2:
+* DT: Use "keypad,num-rows", "keypad,num-columns" and "linux,keymap" properties
+
+ arch/arm/boot/dts/lpc32xx.dtsi |    2 ++
+ arch/arm/boot/dts/phy3250.dts  |    9 +++++++++
+ arch/arm/mach-lpc32xx/clock.c  |    2 +-
+ 3 files changed, 12 insertions(+), 1 deletion(-)
+
+--- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
++++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -285,6 +285,8 @@
+ 			key at 40050000 {
+ 				compatible = "nxp,lpc3220-key";
+ 				reg = <0x40050000 0x1000>;
++				interrupts = <54 0>;
++				status = "disable";
+ 			};
+ 
+ 		};
+--- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
++++ linux-2.6/arch/arm/boot/dts/phy3250.dts
+@@ -124,6 +124,15 @@
+ 			tsc at 40048000 {
+ 				status = "okay";
+ 			};
++
++			key at 40050000 {
++				status = "okay";
++				keypad,num-rows = <1>;
++				keypad,num-columns = <1>;
++				nxp,debounce-delay-ms = <3>;
++				nxp,scan-delay-ms = <34>;
++				linux,keymap = <0x00000002>;
++			};
+ 		};
+ 	};
+ 
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
++++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
+@@ -1131,7 +1131,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_INIT("31020300.i2c", NULL, &clk_i2c2),
+ 	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
+ 	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
+-	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
++	CLKDEV_INIT("40050000.key", NULL, &clk_kscan),
+ 	CLKDEV_INIT("lpc32xx-nand.0", "nand_ck", &clk_nand),
+ 	CLKDEV_INIT("200b0000.flash", "nand_ck_mlc", &clk_nand_mlc),
+ 	CLKDEV_INIT("40048000.adc", NULL, &clk_adc),
