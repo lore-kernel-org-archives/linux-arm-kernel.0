@@ -1,21 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 Apr 2012 19:56:19 +0100
-Subject: Tegra board file deprecation schedule
-In-Reply-To: <1388911.4olGsS8Z0g@ax5200p>
-References: <4F9B0E7C.1060408@wwwdotorg.org> <6014194.Op4vnW6Cge@ax5200p>
- <20120428213456.GD27792@n2100.arm.linux.org.uk> <1388911.4olGsS8Z0g@ax5200p>
-Message-ID: <20120429185619.GA32152@n2100.arm.linux.org.uk>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Sun, 29 Apr 2012 20:59:15 +0200
+Subject: [PATCH 1/3] pwm-core: fix compilation when OF is not selected
+In-Reply-To: <20120429170431.GA29827@avionic-0098.adnet.avionic-design.de>
+References: <1335713330-6488-1-git-send-email-eric@eukrea.com>
+ <20120429170431.GA29827@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20120429205915.63eace41@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 29, 2012 at 08:11:56PM +0200, Marc Dietrich wrote:
-> On Saturday 28 April 2012 22:34:56 Russell King - ARM Linux wrote:
-> > clk_get() is preferred in drivers which have struct device's to get them.
-> > And if you know the device name, then I see no problem with the aliasing
-> > approach.
-> 
-> I'm just looking for a way to use clk_get if two devices, tegra-i2c and nvec 
-> (or tegra-i2c-slave in the future) share the same clock. 
+Le Sun, 29 Apr 2012 19:04:31 +0200,
+Thierry Reding <thierry.reding@avionic-design.de> a ?crit :
 
-Easy if you know the device names for each.  You just have two clk_lookup
-entries which point at the exact same struct clk, one for each device.
+> * Eric B?nard wrote:
+> > else we get the following error :
+> > drivers/pwm/core.c: In function 'pwm_get':
+> > drivers/pwm/core.c:538:3: error: implicit declaration of function 'of_pwm_request' [-Werror=implicit-function-declaration]
+> > 
+> > Signed-off-by: Eric B?nard <eric@eukrea.com>
+> 
+> This is solved a little differently in the latest patches. That no longer has
+> the of_pwm_request() function protected by #ifdef CONFIG_OF, but rather calls
+> it in a IS_ENABLED(CONFIG_OF)-protected block so that it will still receive
+> compile coverage in !OF configurations but at the same time will be removed
+> by the compiler's dead code elimination.
+> 
+OK this still doesn't work (using linux-2.6 at :
+f7b006931751f029620ad2f8310ac7a1484fbdb4 ) leads to :
+ CC      drivers/pwm/core.o drivers/pwm/core.c: In function
+ 'of_pwm_request': drivers/pwm/core.c:447:3: error: implicit
+ declaration of function
+ 'of_property_match_string' [-Werror=implicit-function-declaration]
+ drivers/pwm/core.c:452:2: error: implicit declaration of function
+ 'of_parse_phandle_with_args' [-Werror=implicit-function-declaration]
+
+in include/linux/of.h the declaration of these function is inside
+a #ifdef CONFIG_OF / #endif so I don't see how this can compile.
+
+Eric
