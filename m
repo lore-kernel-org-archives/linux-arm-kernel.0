@@ -1,54 +1,67 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Sun, 29 Apr 2012 10:29:03 +0000
-Subject: [PATCH 0/6] ARM: OMAP: hwmod: remove runtime cpu_is checking
-In-Reply-To: <1335557140-10854-1-git-send-email-khilman@ti.com>
-References: <1335557140-10854-1-git-send-email-khilman@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA02502@DBDE01.ent.ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 29 Apr 2012 14:10:20 +0300
+Subject: [PATCH 00/10] allow mxc_nand to be probed via device tree
+In-Reply-To: <20120429092701.GS20039@pengutronix.de>
+References: <20120423092240.GA18013@pengutronix.de>
+ <1335615654.1937.20.camel@koala> <20120429092701.GS20039@pengutronix.de>
+Message-ID: <1335697820.1942.2.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2012 at 01:35:34, Hilman, Kevin wrote:
-> This series attempts to remove all the runtime cpu_is* checking in
-> omap_hwmod.c in favor of using function pointers initialized at init
-> time.
+On Sun, 2012-04-29 at 11:27 +0200, Uwe Kleine-K?nig wrote:
+> Hello Artem,
 > 
-> This series was motivated by the addition of support for the AM335x
-> series which was done by adding several more cpu_is* checks, and
-> provided the proverbial straw that broke the camel's back.  
+> On Sat, Apr 28, 2012 at 03:20:54PM +0300, Artem Bityutskiy wrote:
+> > On Mon, 2012-04-23 at 11:22 +0200, Uwe Kleine-K?nig wrote:
+> > > Hello,
+> > > 
+> > > this series aims to be able to probe mxc_nand devices via device tree.
+> > > Most of its patches reorganize the driver to only use cpu_is_mxYZ for
+> > > the case that the device is not probed via device tree.
+> > > 
+> > > I split this conversion in several patches to allow easier review. IMHO
+> > > it makes sense to keep this splitting for an eventual bisection.
+> > > 
+> > > This is tested on an i.MX27 based machine and works fine including
+> > > passing of partition data.
+> > 
+> > Applied all 11 patches from your git tree to l2-mtd.git. Note, you have
+> > one checkpatch.pl warning:
+> > 
+> > WARNING:STATIC_CONST_CHAR_ARRAY: static const char * array should probably be static const char * const
+> > #69: FILE: drivers/mtd/nand/mxc_nand.c:274:
+> > +static const char *part_probes[] = { "RedBoot", "cmdlinepart", "ofpart", NULL };
+> I noticed that, too. This is not new though and as
+> mtd_device_parse_register takes a const char **types applying
+> checkpatch's advice would yield another warning. But probably fixing
+> both would work. I wouldn't address this as part of this series.
 > 
-> In addition to the cleanup, this provides a much cleaner way of adding
-> additional SoC support since it no longer requires adding additional
-> runtime cpu_is* checks.
-> 
-> Boot tested on OMAP3530/Overo and OMAP4430/Panda.
-> 
+> > Also there are still several sparse warnings, e.g.
+> > 
+> > +drivers/mtd/nand/mxc_nand.c:1249:26: warning: incorrect type in initializer (different modifiers) [sparse]
+> > +drivers/mtd/nand/mxc_nand.c:1249:26:    expected void *data [sparse]
+> > +drivers/mtd/nand/mxc_nand.c:1249:26:    got struct mxc_nand_devtype_data static const [toplevel] *<noident> [sparse]
+> > 
+> > And you added few gcc warnings, e.g.:
+> > 
+> > +drivers/mtd/nand/mxc_nand.c:1252:3: warning: initialization discards 'const' qualifier from pointer target type [enabled by default]
+> This is the same problem, i.e. casting away several consts. Hmm, and for
+> me neither gcc nor sparse provide that warning but I wonder why. At some
+> point I saw this warning, so I sent a patch:
 
-Also, tested on AM37xEVM. And also, will integrated for AM33xx development, so that I won't get into cpu_is_xxx check at all.
+Try to compile with gcc 4.6 - you can download it from here:
+ftp://ftp.kernel.org/pub/tools/crosstool/files/bin/
 
+I do not know whether it produces good binaries or not, but for
+compile-testing it is much better than ancient gcc 4.3.
 
-Thanks,
-Vaibhav
-
-> Kevin Hilman (6):
->   ARM: OMAP4: hwmod: rename _enable_module to _omap4_enable_module()
->   ARM: OMAP2+: hwmod: use init-time function ptrs for enable/disable
->     module
->   ARM: OMAP4: hwmod: drop extra cpu_is check from
->     _wait_target_disable()
->   ARM: OMAP2+: hwmod: use init-time function pointer for
->     wait_target_ready
->   ARM: OMAP2+: hwmod: use init-time function pointer for hardreset
->   ARM: OMAP2+: hwmod: use init-time function pointer for _init_clkdm
-> 
->  arch/arm/mach-omap2/omap_hwmod.c             |  192 +++++++++++++++-----------
->  arch/arm/plat-omap/include/plat/omap_hwmod.h |   11 ++
->  2 files changed, 126 insertions(+), 77 deletions(-)
-> 
-> -- 
-> 1.7.9.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120429/8c14338f/attachment.sig>
