@@ -1,71 +1,30 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sun, 29 Apr 2012 19:14:18 +0200
-Subject: [PATCH 3/3] pwm-core: fix registration of several pwm
-In-Reply-To: <1335713330-6488-3-git-send-email-eric@eukrea.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Sun, 29 Apr 2012 19:32:24 +0200
+Subject: [PATCH 1/3] pwm-core: fix compilation when OF is not selected
+In-Reply-To: <20120429170431.GA29827@avionic-0098.adnet.avionic-design.de>
 References: <1335713330-6488-1-git-send-email-eric@eukrea.com>
- <1335713330-6488-3-git-send-email-eric@eukrea.com>
-Message-ID: <20120429171418.GC29827@avionic-0098.adnet.avionic-design.de>
+ <20120429170431.GA29827@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20120429193224.2cdc75e7@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eric B?nard wrote:
-> * after a pwm is allocated using alloc_pwms, ret contains the number
-> of the pwm and is returned by pwmchip_add so the calling driver
-> (pwm-imx in my case) fails with the following log :
-> mxc_pwm: probe of mxc_pwm.1 failed with error 1
-> mxc_pwm: probe of mxc_pwm.2 failed with error 2
-> mxc_pwm: probe of mxc_pwm.3 failed with error 3
+Le Sun, 29 Apr 2012 19:04:31 +0200,
+Thierry Reding <thierry.reding@avionic-design.de> a ?crit :
+
+> * Eric B?nard wrote:
+> > else we get the following error :
+> > drivers/pwm/core.c: In function 'pwm_get':
+> > drivers/pwm/core.c:538:3: error: implicit declaration of function 'of_pwm_request' [-Werror=implicit-function-declaration]
+> > 
+> > Signed-off-by: Eric B?nard <eric@eukrea.com>
 > 
-> * this patch fix error handling in pwmchip_add
+> This is solved a little differently in the latest patches. That no longer has
+> the of_pwm_request() function protected by #ifdef CONFIG_OF, but rather calls
+> it in a IS_ENABLED(CONFIG_OF)-protected block so that it will still receive
+> compile coverage in !OF configurations but at the same time will be removed
+> by the compiler's dead code elimination. 
 > 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  drivers/pwm/core.c |    7 +++++--
->  1 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index a7be0bc..d3438e4 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -216,8 +216,10 @@ int pwmchip_add(struct pwm_chip *chip)
->  		goto out;
->  
->  	chip->pwms = kzalloc(chip->npwm * sizeof(*pwm), GFP_KERNEL);
-> -	if (!chip->pwms)
-> -		return -ENOMEM;
-> +	if (!chip->pwms) {
-> +		ret = -ENOMEM;
-> +		goto out;
-> +	}
+OK, this was based on de8eba0b1e53ee0d2e3270c12d6482971e2beb4b in your
+tree dated the 27th march. I now see you updated it on friday.
 
-Good catch!
-
->  
->  	chip->base = ret;
->  
-> @@ -239,6 +241,7 @@ int pwmchip_add(struct pwm_chip *chip)
->  	if (IS_ENABLED(CONFIG_OF))
->  		of_pwmchip_add(chip);
->  
-> +	ret = 0;
->  out:
->  	mutex_unlock(&pwm_lock);
->  	return ret;
-
-pwmchip_add() is meant to return a negative error-code on failure, so a
-positive return values would still indicate success, therefore any callers
-should check explicitly for (ret < 0) instead of just (ret). However in this
-case it might be safer to make the return value explicitly 0 in case of
-success.
-
-I'd like to fold this into the existing series as well, if that's okay with
-you.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120429/9288c84e/attachment.sig>
+Eric 
