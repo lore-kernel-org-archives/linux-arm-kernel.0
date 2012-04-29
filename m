@@ -1,67 +1,53 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sun, 29 Apr 2012 14:10:20 +0300
-Subject: [PATCH 00/10] allow mxc_nand to be probed via device tree
-In-Reply-To: <20120429092701.GS20039@pengutronix.de>
-References: <20120423092240.GA18013@pengutronix.de>
- <1335615654.1937.20.camel@koala> <20120429092701.GS20039@pengutronix.de>
-Message-ID: <1335697820.1942.2.camel@koala>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sun, 29 Apr 2012 13:32:50 +0200
+Subject: [PATCH] gpio/omap: fix incorrect initialization of
+ omap_gpio_mod_init
+In-Reply-To: <1335515951-6907-1-git-send-email-tarun.kanti@ti.com>
+References: <1335515951-6907-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <5062087.MRndu11OX4@vclass>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-04-29 at 11:27 +0200, Uwe Kleine-K?nig wrote:
-> Hello Artem,
+On Friday 27 of April 2012 14:09:11 Tarun Kanti DebBarma wrote:
+> Breaking commit: ab985f0f7c2c0ef90b7c832f0c04f470dda0593d
 > 
-> On Sat, Apr 28, 2012 at 03:20:54PM +0300, Artem Bityutskiy wrote:
-> > On Mon, 2012-04-23 at 11:22 +0200, Uwe Kleine-K?nig wrote:
-> > > Hello,
-> > > 
-> > > this series aims to be able to probe mxc_nand devices via device tree.
-> > > Most of its patches reorganize the driver to only use cpu_is_mxYZ for
-> > > the case that the device is not probed via device tree.
-> > > 
-> > > I split this conversion in several patches to allow easier review. IMHO
-> > > it makes sense to keep this splitting for an eventual bisection.
-> > > 
-> > > This is tested on an i.MX27 based machine and works fine including
-> > > passing of partition data.
-> > 
-> > Applied all 11 patches from your git tree to l2-mtd.git. Note, you have
-> > one checkpatch.pl warning:
-> > 
-> > WARNING:STATIC_CONST_CHAR_ARRAY: static const char * array should probably be static const char * const
-> > #69: FILE: drivers/mtd/nand/mxc_nand.c:274:
-> > +static const char *part_probes[] = { "RedBoot", "cmdlinepart", "ofpart", NULL };
-> I noticed that, too. This is not new though and as
-> mtd_device_parse_register takes a const char **types applying
-> checkpatch's advice would yield another warning. But probably fixing
-> both would work. I wouldn't address this as part of this series.
+> Initialization of irqenable, irqstatus registers is the common
+> operation done in this function for all OMAP platforms, viz.
+> OMAP1, OMAP2+. The latter _gpio_rmw()'s to irqenable register
+> was overwriting the correctly programmed OMAP1 value at the
+> beginning. As a result, even though it worked on OMAP2+
+> platforms it was breaking OMAP1 functionality. On close
+> observation it is found that the first _gpio_rmw() which is
+> supposedly done to take care of OMAP1 platform is generic enough
+> and takes care of OMAP2+ platform as well. Therefore remove the
+> latter _gpio_rmw() to irqenable as they are redundant now.
 > 
-> > Also there are still several sparse warnings, e.g.
-> > 
-> > +drivers/mtd/nand/mxc_nand.c:1249:26: warning: incorrect type in initializer (different modifiers) [sparse]
-> > +drivers/mtd/nand/mxc_nand.c:1249:26:    expected void *data [sparse]
-> > +drivers/mtd/nand/mxc_nand.c:1249:26:    got struct mxc_nand_devtype_data static const [toplevel] *<noident> [sparse]
-> > 
-> > And you added few gcc warnings, e.g.:
-> > 
-> > +drivers/mtd/nand/mxc_nand.c:1252:3: warning: initialization discards 'const' qualifier from pointer target type [enabled by default]
-> This is the same problem, i.e. casting away several consts. Hmm, and for
-> me neither gcc nor sparse provide that warning but I wonder why. At some
-> point I saw this warning, so I sent a patch:
+> Writing to ctrl and debounce_en registers for OMAP2+ platforms
+> are modified to match the original(pre-cleanup) code where the
+> registers are initialized with 0. In the cleanup series since
+> we are using _gpio_rmw(reg, 0, 1), instead of __raw_writel(),
+> we are just reading and writing the same values to ctrl and
+> debounce_en. This is not an issue for debounce_en register
+> because it has 0x0 as the default value. But in the case of
+> ctrl register the default value is 0x2 (GATINGRATIO = 0x1)
+> so that we end up writing 0x2 instead of intended 0 value.
+> Therefore correcting it to _gpio_rmw(reg, l, 0), where
+> l = 0xffffffff so that registers are initialized to 0.
+> 
+> Also, changing the sequence and logic of initializing the irqstatus.
 
-Try to compile with gcc 4.6 - you can download it from here:
-ftp://ftp.kernel.org/pub/tools/crosstool/files/bin/
+Hi,
+Sorry for not responding in 2 days, as I promissed. The reason is that 
+there are still more issues with GPIO on my Amstrad Delta, for example 
+those introduced with commit 384ebe1c2849160d040df3e68634ec506f13d9ff, 
+and I'm still trying to understand and fix them. Than, it's hard for me 
+to provide you with my Tested-by: before I'm confident those other issues 
+are not related.
 
-I do not know whether it produces good binaries or not, but for
-compile-testing it is much better than ancient gcc 4.3.
+Anyway, and with respect to Kevin's comments, reverting the irqstatus 
+vs. irqenable initialization order doesn't seem to break anything for 
+me, and changes to debounce_en and ctrl register handling seem not 
+relevant to my test machine.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120429/8c14338f/attachment.sig>
+Thanks,
+Janusz
