@@ -1,49 +1,74 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 29 Apr 2012 16:47:01 +0200
-Subject: [PATCH v8 0/5] USB: LPC32xx device tree related OHCI and UDC patch
- series
-Message-ID: <1335710826-6684-1-git-send-email-stigge@antcom.de>
+Date: Sun, 29 Apr 2012 16:47:03 +0200
+Subject: [PATCH v8 2/5] ohci-nxp: Device tree support
+In-Reply-To: <1335710826-6684-1-git-send-email-stigge@antcom.de>
+References: <1335710826-6684-1-git-send-email-stigge@antcom.de>
+Message-ID: <1335710826-6684-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series collects the pending LPC32xx patches in one series and forward
-ports it onto
+This patch adds device tree support to ohci-nxp.c
 
-git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-next
-
-There are no other changes since last post.
-
-Roland Stigge (5):
-  ohci-nxp: Driver cleanup
-  ohci-nxp: Device tree support
-  USB: Add driver for NXP ISP1301 USB transceiver
-  USB: gadget driver for LPC32xx
-  USB: ohci-nxp: Use isp1301 driver
-
- Documentation/devicetree/bindings/usb/isp1301.txt  |   25 +
- .../devicetree/bindings/usb/lpc32xx-udc.txt        |   28 +
- Documentation/devicetree/bindings/usb/ohci-nxp.txt |   24 +
- drivers/usb/Kconfig                                |    2 +
- drivers/usb/Makefile                               |    1 +
- drivers/usb/gadget/Kconfig                         |   11 +
- drivers/usb/gadget/Makefile                        |    1 +
- drivers/usb/gadget/gadget_chips.h                  |    3 +
- drivers/usb/gadget/lpc32xx_udc.c                   | 3538 ++++++++++++++++++++
- drivers/usb/host/Kconfig                           |    1 +
- drivers/usb/host/ohci-nxp.c                        |  165 +-
- drivers/usb/phy/Kconfig                            |   17 +
- drivers/usb/phy/Makefile                           |    7 +
- drivers/usb/phy/isp1301.c                          |   77 +
- include/linux/usb/isp1301.h                        |   80 +
- 15 files changed, 3861 insertions(+), 119 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/isp1301.txt
- create mode 100644 Documentation/devicetree/bindings/usb/lpc32xx-udc.txt
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+---
+ Documentation/devicetree/bindings/usb/ohci-nxp.txt |   16 ++++++++++++++++
+ drivers/usb/host/ohci-nxp.c                        |   10 ++++++++++
+ 2 files changed, 26 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/usb/ohci-nxp.txt
- create mode 100644 drivers/usb/gadget/lpc32xx_udc.c
- create mode 100644 drivers/usb/phy/Kconfig
- create mode 100644 drivers/usb/phy/Makefile
- create mode 100644 drivers/usb/phy/isp1301.c
- create mode 100644 include/linux/usb/isp1301.h
 
+diff --git a/Documentation/devicetree/bindings/usb/ohci-nxp.txt b/Documentation/devicetree/bindings/usb/ohci-nxp.txt
+new file mode 100644
+index 0000000..b5c3631
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ohci-nxp.txt
+@@ -0,0 +1,16 @@
++* OHCI controller, NXP ohci-nxp variant
++
++Required properties:
++- compatible: must be "nxp,ohci-nxp"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: The OHCI interrupt
++
++Example (LPC32xx):
++
++	ohci at 31020000 {
++		compatible = "nxp,ohci-nxp";
++		reg = <0x31020000 0x300>;
++		interrupt-parent = <&mic>;
++		interrupts = <0x3b 0>;
++	};
+diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
+index 63261f7..bf542e7 100644
+--- a/drivers/usb/host/ohci-nxp.c
++++ b/drivers/usb/host/ohci-nxp.c
+@@ -22,6 +22,7 @@
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
++#include <linux/of.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -525,10 +526,19 @@ static int usb_hcd_nxp_remove(struct platform_device *pdev)
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:usb-ohci");
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id usb_hcd_nxp_match[] = {
++	{ .compatible = "nxp,ohci-nxp" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, usb_hcd_nxp_match);
++#endif
++
+ static struct platform_driver usb_hcd_nxp_driver = {
+ 	.driver = {
+ 		.name = "usb-ohci",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(usb_hcd_nxp_match),
+ 	},
+ 	.probe = usb_hcd_nxp_probe,
+ 	.remove = usb_hcd_nxp_remove,
 -- 
 1.7.9
