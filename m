@@ -1,76 +1,16 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 30 Apr 2012 00:34:08 +0200
-Subject: [RFC PATCH 00/11 V6] MXS: Add i.MX28 USB Host driver
-Message-ID: <1335738860-26623-1-git-send-email-marex@denx.de>
+Date: Mon, 30 Apr 2012 00:34:14 +0200
+Subject: [PATCH 06/11] MXS: Add small registration glue for ci13xxx_udc
+In-Reply-To: <1335738860-26623-1-git-send-email-marex@denx.de>
+References: <1335738860-26623-1-git-send-email-marex@denx.de>
+Message-ID: <1335738860-26623-7-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
-generic USB PHY infrastructure. Also added is glue code for CI13xxx driver, to
-allow device mode. This patchset still does NOT support OTG mode, the
-device/host mode is selected via platform data.
+This patch adds small registration glue for the ci13xxx_udc that is compatible
+with the imx-otg driver.
 
-V2: Introduce stub imx-usb driver that then registers the PHY and EHCI drivers.
-V3: Add the HCD on demand based on the PHY's state (only add HCD if it's host).
-    Currently, only the HOST mode is supported.
-V4: * Introduce ci13xxx gadget glue
-    * Reorder patches in a more sensible order
-    * Introduce platform data, containing VBUS GPIO and port mode (device/gadget)
-    * Rename imx-usb to imx-otg
-    * Drop mx28evk usb host patch
-    * Use more devm_ function
-    * Rework the mxs-phy to register the same interrupt as ehci-mxs (and
-      effectivelly kill bogus otg_set_vbus() call from ehci-mxs ; use standard
-      ehci irq handling in ehci-mxs)
-V5: * Finally move OTG IRQ handling into imx-otg
-    * Move imx_otg_set_{host,peripheral}() into imx-otg
-    * Move imx_otg_work() into imx-otg driver (now it all makes sense, yay!)
-V6: Do PHY-specific job inside the PHY driver
-
-Marek Vasut (11):
-  MXS: Make clk_disable return integer
-  MXS: Add USB EHCI and USB PHY clock handling
-  MXS: Fixup i.MX233 USB base address name
-  MXS: Add data shared between imx-otg and EHCI driver
-  MXS: Modify the ci13xxx_udc to avoid adding UDC
-  MXS: Add small registration glue for ci13xxx_udc
-  MXS: Add separate MXS EHCI HCD driver
-  MXS: Add imx-otg driver
-  MXS: Add USB PHY driver
-  MXS: Add platform registration hooks for USB EHCI
-  MXS: Enable USB on M28EVK
-
- arch/arm/mach-mxs/Kconfig                       |    2 +
- arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
- arch/arm/mach-mxs/devices-mx28.h                |    5 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-usb.c        |   89 +++++
- arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
- arch/arm/mach-mxs/include/mach/devices-common.h |   13 +
- arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
- arch/arm/mach-mxs/mach-m28evk.c                 |   21 ++
- drivers/usb/gadget/Kconfig                      |   17 +
- drivers/usb/gadget/Makefile                     |    1 +
- drivers/usb/gadget/ci13xxx_mxs.c                |   67 ++++
- drivers/usb/gadget/ci13xxx_udc.c                |   12 +-
- drivers/usb/gadget/ci13xxx_udc.h                |    1 +
- drivers/usb/host/Kconfig                        |    7 +
- drivers/usb/host/ehci-hcd.c                     |    5 +
- drivers/usb/host/ehci-mxs.c                     |  178 +++++++++
- drivers/usb/otg/Kconfig                         |   16 +
- drivers/usb/otg/Makefile                        |    2 +
- drivers/usb/otg/imx-otg.c                       |  437 +++++++++++++++++++++++
- drivers/usb/otg/mxs-phy.c                       |  293 +++++++++++++++
- include/linux/usb/mxs-usb.h                     |   94 +++++
- 23 files changed, 1289 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
- create mode 100644 drivers/usb/gadget/ci13xxx_mxs.c
- create mode 100644 drivers/usb/host/ehci-mxs.c
- create mode 100644 drivers/usb/otg/imx-otg.c
- create mode 100644 drivers/usb/otg/mxs-phy.c
- create mode 100644 include/linux/usb/mxs-usb.h
-
+Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
 Cc: Detlev Zundel <dzu@denx.de>
 Cc: Fabio Estevam <festevam@gmail.com>
@@ -83,6 +23,125 @@ Cc: Shi Make-B15407 <B15407@freescale.com>
 Cc: Stefano Babic <sbabic@denx.de>
 Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Wolfgang Denk <wd@denx.de>
+---
+ drivers/usb/gadget/Kconfig       |   17 ++++++++++
+ drivers/usb/gadget/Makefile      |    1 +
+ drivers/usb/gadget/ci13xxx_mxs.c |   67 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 85 insertions(+)
+ create mode 100644 drivers/usb/gadget/ci13xxx_mxs.c
 
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 2633f75..1fa6b0d 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -494,6 +494,23 @@ config USB_CI13XXX_MSM
+ 	  dynamically linked module called "ci13xxx_msm" and force all
+ 	  gadget drivers to also be dynamically linked.
+ 
++config USB_CI13XXX_MXS
++	tristate "MIPS USB CI13xxx for i.MX23/28"
++	depends on ARCH_MXS
++	select USB_GADGET_DUALSPEED
++	select USB_IMX_COMPOSITE
++	help
++	  i.MX SoC has chipidea USB controller.  This driver uses
++	  ci13xxx_udc core.
++	  This driver depends on OTG driver for PHY initialization,
++	  clock management, powering up VBUS, and power management.
++	  This driver is not supported on boards like trout which
++	  has an external PHY.
++
++	  Say "y" to link the driver statically, or "m" to build a
++	  dynamically linked module called "ci13xxx_mxs" and force all
++	  gadget drivers to also be dynamically linked.
++
+ #
+ # LAST -- dummy/emulated controller
+ #
+diff --git a/drivers/usb/gadget/Makefile b/drivers/usb/gadget/Makefile
+index b7f6eef..1f159a9 100644
+--- a/drivers/usb/gadget/Makefile
++++ b/drivers/usb/gadget/Makefile
+@@ -30,6 +30,7 @@ obj-$(CONFIG_USB_EG20T)		+= pch_udc.o
+ obj-$(CONFIG_USB_MV_UDC)	+= mv_udc.o
+ mv_udc-y			:= mv_udc_core.o
+ obj-$(CONFIG_USB_CI13XXX_MSM)	+= ci13xxx_msm.o
++obj-$(CONFIG_USB_CI13XXX_MXS)	+= ci13xxx_mxs.o
+ obj-$(CONFIG_USB_FUSB300)	+= fusb300_udc.o
+ 
+ #
+diff --git a/drivers/usb/gadget/ci13xxx_mxs.c b/drivers/usb/gadget/ci13xxx_mxs.c
+new file mode 100644
+index 0000000..2d99336
+--- /dev/null
++++ b/drivers/usb/gadget/ci13xxx_mxs.c
+@@ -0,0 +1,67 @@
++/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/usb/ulpi.h>
++#include <linux/usb/mxs-usb.h>
++
++#include "ci13xxx_udc.c"
++
++#define MSM_USB_BASE	(udc->regs)
++
++static irqreturn_t mxs_udc_irq(int irq, void *data)
++{
++	return udc_irq();
++}
++
++static struct ci13xxx_udc_driver ci13xxx_mxs_udc_driver = {
++	.name			= "ci13xxx-mxs",
++	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
++				  CI13XXX_DISABLE_STREAMING |
++				  CI13XXX_DONT_REGISTER_GADGET,
++};
++
++static int ci13xxx_mxs_probe(struct platform_device *pdev)
++{
++	struct imx_otg *data = pdev->dev.platform_data;
++	int ret;
++
++	ret = devm_request_irq(&pdev->dev, data->irq, mxs_udc_irq,
++				IRQF_SHARED, pdev->name, pdev);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Failed to request IRQ!\n");
++		return ret;
++	}
++
++	ret = udc_probe(&ci13xxx_mxs_udc_driver, &pdev->dev, data->mem);
++	if (ret < 0)
++		dev_err(&pdev->dev, "Failed to probe CI13xxx-mxs!\n");
++
++	pm_runtime_no_callbacks(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++
++	return ret;
++}
++
++static struct platform_driver ci13xxx_mxs_driver = {
++	.probe		= ci13xxx_mxs_probe,
++	.driver		= {
++		.name	= "ci13xxx-mxs",
++	},
++};
++
++static int __init ci13xxx_mxs_init(void)
++{
++	return platform_driver_register(&ci13xxx_mxs_driver);
++}
++
++module_init(ci13xxx_mxs_init);
++
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:ci13xxx-mxs");
 -- 
 1.7.10
