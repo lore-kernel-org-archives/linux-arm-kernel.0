@@ -1,25 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Apr 2012 22:34:56 +0100
-Subject: Tegra board file deprecation schedule
-In-Reply-To: <6014194.Op4vnW6Cge@ax5200p>
-References: <4F9B0E7C.1060408@wwwdotorg.org>
- <CAOesGMh3NY4cQERSQY-p0QsMtcCXyhkdGSGnnrckcz8-DPjbBw@mail.gmail.com>
- <6014194.Op4vnW6Cge@ax5200p>
-Message-ID: <20120428213456.GD27792@n2100.arm.linux.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 28 Apr 2012 21:49:28 -0400 (EDT)
+Subject: [PATCH 2/2] net/at91_ether: use gpio_to_irq for phy IRQ line
+In-Reply-To: <cfc991548b5b73c8038f41877da1cd0104945cf5.1335435759.git.nicolas.ferre@atmel.com>
+References: <3ad9b1273c4f30d42dcc3bdf6d03470111246f14.1335435759.git.nicolas.ferre@atmel.com>
+ <cfc991548b5b73c8038f41877da1cd0104945cf5.1335435759.git.nicolas.ferre@atmel.com>
+Message-ID: <20120428.214928.225764794994822879.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2012 at 06:09:32PM +0200, Marc Dietrich wrote:
-> Another (maybe a bit off-topic) thing that puzzels me is the how to assign
-> the clock to the nvec.
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date: Thu, 26 Apr 2012 12:30:43 +0200
 
-What's the nvec?
+> Use the gpio_to_irq() function to retrieve the phy IRQ line
+> from the GPIO pin specification.
+> This fix is needed now that we have moved to irqdomains on AT91.
+> 
+> Reported-by: Jamie Iles <jamie@jamieiles.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> The device needs the clock (tegra-i2c.2) but there is no sane way to get
-> it. I was thinking to add an device name alias (nvec = tegra-i2c.2) to
-> the board file so I can use clk_get(&pdev->dev, NULL) instead of 
-> clk_get_sys which seems to be unwanted.
-
-clk_get() is preferred in drivers which have struct device's to get them.
-And if you know the device name, then I see no problem with the aliasing
-approach.
+Applied to net-next.
