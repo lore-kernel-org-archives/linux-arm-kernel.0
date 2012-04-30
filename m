@@ -1,35 +1,33 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 30 Apr 2012 12:14:11 -0700
-Subject: [PATCH 01/20] ARM: EXYNOS: Add watchdog timer clock instance
+Date: Mon, 30 Apr 2012 12:14:13 -0700
+Subject: [PATCH 03/20] ARM: EXYNOS: fix ctrlbit for exynos5_clk_pdma1
 In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
 References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1335813270-13083-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1335813270-13083-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog timer clock instance for EXYNOS5 watchdog controller.
+From: Kukjin Kim <kgene.kim@samsung.com>
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+It should be (1 << 2) for ctrlbit of exynos5_clk_pdma1.
+
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/clock-exynos5.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos/clock-exynos5.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index 5cd7a8b..3dc3c50 100644
+index 3dc3c50..846741e 100644
 --- a/arch/arm/mach-exynos/clock-exynos5.c
 +++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -454,6 +454,11 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.enable		= exynos5_clk_ip_peris_ctrl,
- 		.ctrlbit	= (1 << 20),
- 	}, {
-+		.name		= "watchdog",
-+		.parent		= &exynos5_clk_aclk_66.clk,
-+		.enable		= exynos5_clk_ip_peris_ctrl,
-+		.ctrlbit	= (1 << 19),
-+	}, {
- 		.name		= "hsmmc",
- 		.devname	= "exynos4-sdhci.0",
- 		.parent		= &exynos5_clk_aclk_200.clk,
+@@ -683,7 +683,7 @@ static struct clk exynos5_clk_pdma1 = {
+ 	.name		= "dma",
+ 	.devname	= "dma-pl330.1",
+ 	.enable		= exynos5_clk_ip_fsys_ctrl,
+-	.ctrlbit	= (1 << 1),
++	.ctrlbit	= (1 << 2),
+ };
+ 
+ static struct clk exynos5_clk_mdma1 = {
 -- 
 1.7.5.4
