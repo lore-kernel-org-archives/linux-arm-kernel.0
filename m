@@ -1,27 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 22:17:35 +0000
-Subject: [PATCH] maintainership update for the Marvell Orion family of SOCs
-In-Reply-To: <87mx5sanuf.fsf@lebrac.rtp-net.org>
-References: <alpine.LFD.2.02.1204301330111.21030@xanadu.home>
- <201204302124.28892.arnd@arndb.de> <87mx5sanuf.fsf@lebrac.rtp-net.org>
-Message-ID: <201204302217.35958.arnd@arndb.de>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 30 Apr 2012 15:18:59 -0700
+Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
+ wake-ups work
+In-Reply-To: <878vhcriav.fsf@ti.com>
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+ <20120424205105.GA26749@animalcreek.com>
+ <20120424232506.GA8850@animalcreek.com> <87haw4282b.fsf@ti.com>
+ <20120430213433.GA19256@animalcreek.com> <878vhcriav.fsf@ti.com>
+Message-ID: <20120430221859.GC19256@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 April 2012, Arnaud Patard wrote:
-> > the plat-orion directory and leave the other directories for the classic
-> > probing, eventually to be removed when the new stuff can handle all the
-> > machines that someone cares about.
+On Mon, Apr 30, 2012 at 03:00:56PM -0700, Kevin Hilman wrote:
+> "Mark A. Greer" <mgreer@animalcreek.com> writes:
 > 
-> I'm not sure we'll be able to remove any machine without being sure it's
-> working and it can take quite some time. orion/kirkwood/... are used on
-> NAS boxes so I guess people are not necessary updating their kernel on a
-> regular basis.
+> > On Fri, Apr 27, 2012 at 02:12:12PM -0700, Kevin Hilman wrote:
+> >> "Mark A. Greer" <mgreer@animalcreek.com> writes:
+> >> 
+> >> > On Tue, Apr 24, 2012 at 01:51:05PM -0700, Mark A. Greer wrote:
+> >
+> >> > Just thinking out loud...
+> >> >
+> >> > We could chose whether pm_idle & cpuidle issue a wfi based on
+> >> > whether there is a davinci-emac present.  The issue with that is
+> >> > that someday there may be another SoC that has a davinci-emac that
+> >> > can wake up the system.  I know cpu_is_xxx() is frowned upon but
+> >> > this does seem like a proper usage of it--the deciding factor
+> >> > really is whether its an am35x or not (and CONFIG_TI_DAVINCI_EMAC
+> >> > is enabled).
+> >> 
+> >> The presence of the davinci_emac is probably overkill, avoiding WFI
+> >> should really only be done when the davinci_emac is *active*.
+> >> e.g. using an am35x with an EMAC *present*, but not in use because
+> >> there's an MMC rootfs for example.
+> >> 
+> >> If there's a good way to detect an in-use davinci_emac, then
+> >> disable_hlt() can be used to avoid WFI.  When the davinci_emac is not in
+> >> use (e.g. module unloaded etc.) then enable_hlt() can be used to
+> >> (re)allow WFI.
+> >
+> > This can work for pm_idle but what should be done for cpu_idle
+> > (as in, omap3_enter_idle[_bm])?  We should have some sort of
+> > solution for that so users can safely enable CONFIG_CPU_IDLE
+> > and not have the am3517 fall apart.
+> 
+> disable_hlt() will prevent either the default idle *or* CPUidle from
+> being called.
+> 
+> It will simply call cpu_relax() instead of calling any idle
+> function. (c.f. cpu_idle() in arch/arm/kernel/process.c)
 
-Well, there is no reason to rush this at all, it could live in parallel
-for a couple of years. But at one point we can decide that if nobody has
-bothered to write the .dts file for one board and tested it that nobody
-cares about that board any more and it can just get removed and possibly
-added back in dts form when someone does complain.
+Yep, you're right.  Sorry.
 
-	Arnd
+Mark
