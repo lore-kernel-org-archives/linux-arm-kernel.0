@@ -1,45 +1,103 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Apr 2012 09:25:46 +0100
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <20120425185747.GC24211@n2100.arm.linux.org.uk>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
-Message-ID: <4F9E4C8A.8010807@linaro.org>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Mon, 30 Apr 2012 14:02:02 +0530
+Subject: [PATCH 1/1] [RESEND] ARM: OMAP3+: dpll: Configure autoidle mode only
+ if it's supported
+Message-ID: <1335774722-6728-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/12 19:57, Russell King - ARM Linux wrote:
-> On Mon, Apr 16, 2012 at 10:26:08AM +0100, Lee Jones wrote:
->> +	/* Must have platform data or Device Tree. */
->> +	if (!plat&&  !np) {
->> +		dev_err(&dev->dev, "No plat data or DT found\n");
->> +		return -EINVAL;
->>   	}
->>
->> +	if (np)
->> +		mmci_dt_populate_generic_pdata(np, plat);
->
-> Please tell me what happens if plat is NULL, but we're running on a DT
-> enabled platform.  Something tells me that you might just want to fix
-> that case _before_ I apply your patch.
+The current DPLL code enables and disables autoidle features
+without checking whether the autoidle register is available.
+Fix this by putting a check for the existence of the autoidle
+register in the DPLL data.
 
+With such a check in place, for DPLLs which do not support this
+feature, simply skipping the autoidle_reg entry in the DPLL data
+is sufficient.
 
-Sorry for the response delay, I've been incredibly busy with other DT 
-enablement.
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+This change is needed for AM33xx, which does not support
+autoidle mode for the DPLLs.
 
-You're right, I need to allocate memory for platform_data in 
-mmci_dt_populate_generic_pdata. This must have worked by chance when I 
-tested it. I will draft up another patch and send it to you as soon as I 
-can free up some time.
+ arch/arm/mach-omap2/dpll3xxx.c |   23 ++++++++++++++++++-----
+ 1 files changed, 18 insertions(+), 5 deletions(-)
 
-Kind regards,
-Lee
-
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index fc56745..f0f10be 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -142,7 +142,8 @@ static int _omap3_noncore_dpll_lock(struct clk *clk)
+ 
+ 	ai = omap3_dpll_autoidle_read(clk);
+ 
+-	omap3_dpll_deny_idle(clk);
++	if (ai)
++		omap3_dpll_deny_idle(clk);
+ 
+ 	_omap3_dpll_write_clken(clk, DPLL_LOCKED);
+ 
+@@ -186,8 +187,6 @@ static int _omap3_noncore_dpll_bypass(struct clk *clk)
+ 
+ 	if (ai)
+ 		omap3_dpll_allow_idle(clk);
+-	else
+-		omap3_dpll_deny_idle(clk);
+ 
+ 	return r;
+ }
+@@ -216,8 +215,6 @@ static int _omap3_noncore_dpll_stop(struct clk *clk)
+ 
+ 	if (ai)
+ 		omap3_dpll_allow_idle(clk);
+-	else
+-		omap3_dpll_deny_idle(clk);
+ 
+ 	return 0;
+ }
+@@ -519,6 +516,9 @@ u32 omap3_dpll_autoidle_read(struct clk *clk)
+ 
+ 	dd = clk->dpll_data;
+ 
++	if (!dd->autoidle_reg)
++		return -EINVAL;
++
+ 	v = __raw_readl(dd->autoidle_reg);
+ 	v &= dd->autoidle_mask;
+ 	v >>= __ffs(dd->autoidle_mask);
+@@ -545,6 +545,12 @@ void omap3_dpll_allow_idle(struct clk *clk)
+ 
+ 	dd = clk->dpll_data;
+ 
++	if (!dd->autoidle_reg) {
++		pr_debug("clock: DPLL %s: autoidle not supported\n",
++			clk->name);
++		return;
++	}
++
+ 	/*
+ 	 * REVISIT: CORE DPLL can optionally enter low-power bypass
+ 	 * by writing 0x5 instead of 0x1.  Add some mechanism to
+@@ -554,6 +560,7 @@ void omap3_dpll_allow_idle(struct clk *clk)
+ 	v &= ~dd->autoidle_mask;
+ 	v |= DPLL_AUTOIDLE_LOW_POWER_STOP << __ffs(dd->autoidle_mask);
+ 	__raw_writel(v, dd->autoidle_reg);
++
+ }
+ 
+ /**
+@@ -572,6 +579,12 @@ void omap3_dpll_deny_idle(struct clk *clk)
+ 
+ 	dd = clk->dpll_data;
+ 
++	if (!dd->autoidle_reg) {
++		pr_debug("clock: DPLL %s: autoidle not supported\n",
++			clk->name);
++		return;
++	}
++
+ 	v = __raw_readl(dd->autoidle_reg);
+ 	v &= ~dd->autoidle_mask;
+ 	v |= DPLL_AUTOIDLE_DISABLE << __ffs(dd->autoidle_mask);
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.0.4
