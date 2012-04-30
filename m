@@ -1,113 +1,184 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 30 Apr 2012 12:14:29 -0700
-Subject: [PATCH 19/20] ARM: Exynos5: Add combiner,
- wakeup interrupt controller and ethernet nodes
+Date: Mon, 30 Apr 2012 12:14:28 -0700
+Subject: [PATCH 18/20] ARM: dts: Update device tree source files for EXYNOS5250
 In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
 References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1335813270-13083-20-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1335813270-13083-19-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And interrupt combiner, external interrupt wakeup interrupt controller
-and smsc9215 lan controller nodes.
+Updated EXYNOS5 device tree source files to reflect changes in rev1
+of EXYNOS5 SoC. This includes new additions to the EXYNOS5 dtsi and
+SMDK5250 dts files and few minor fixes.
 
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   11 ++++++
- arch/arm/boot/dts/exynos5250.dtsi         |   55 +++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   52 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi         |   44 +++++++-----------------
+ 2 files changed, 65 insertions(+), 31 deletions(-)
 
 diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index bcc4b89..dbc4bdb 100644
+index 399d17b..bcc4b89 100644
 --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
 +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -24,6 +24,17 @@
+@@ -23,4 +23,56 @@
+ 	chosen {
  		bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
  	};
- 
-+	lan9215 at 0x05000000 {
-+		compatible = "smsc,lan9215", "smsc,lan9115";
-+		reg = <0x05000000 0x20000>;
-+		interrupts = <5 0>;
-+		interrupt-parent = <&wakeup_eint>;
-+		phy-mode = "mii";
-+		smsc,irq-push-pull;
-+		smsc,force-internal-phy;
-+		local-mac-address = [00 80 00 23 45 67];
++
++	i2c at 12C60000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <20000>;
++		gpios = <&gpb3 0 2 3 0>,
++			<&gpb3 1 2 3 0>;
++
++		eeprom at 50 {
++			compatible = "samsung,s524ad0xd1";
++			reg = <0x50>;
++		};
 +	};
 +
- 	i2c at 12C60000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
++	i2c at 12C70000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <20000>;
++		gpios = <&gpb3 2 2 3 0>,
++			<&gpb3 3 2 3 0>;
++
++		eeprom at 51 {
++			compatible = "samsung,s524ad0xd1";
++			reg = <0x51>;
++		};
++	};
++
++	i2c at 12C80000 {
++		status = "disabled";
++	};
++
++	i2c at 12C90000 {
++		status = "disabled";
++	};
++
++	i2c at 12CA0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CB0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CC0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CD0000 {
++		status = "disabled";
++	};
+ };
 diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 76b7dba..af124917 100644
+index dfc4335..76b7dba 100644
 --- a/arch/arm/boot/dts/exynos5250.dtsi
 +++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -26,10 +26,65 @@
- 	gic:interrupt-controller at 10481000 {
+@@ -23,11 +23,11 @@
+ 	compatible = "samsung,exynos5250";
+ 	interrupt-parent = <&gic>;
+ 
+-	gic:interrupt-controller at 10490000 {
++	gic:interrupt-controller at 10481000 {
  		compatible = "arm,cortex-a9-gic";
  		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		#size-cells = <0>;
  		interrupt-controller;
- 		reg = <0x10481000 0x1000>, <0x10482000 0x2000>;
+-		reg = <0x10490000 0x1000>, <0x10480000 0x100>;
++		reg = <0x10481000 0x1000>, <0x10482000 0x2000>;
  	};
  
-+	combiner:interrupt-controller at 10440000 {
-+		compatible = "samsung,exynos4210-combiner";
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		samsung,combiner-nr = <32>;
-+		reg = <0x10440000 0x1000>;
-+		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-+			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-+			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-+			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-+			     <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
-+			     <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
-+			     <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
-+			     <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
-+	};
-+
-+	wakeup_eint: interrupt-controller at 11400000 {
-+		compatible = "samsung,exynos5210-wakeup-eint";
-+		reg = <0x11400000 0x1000>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		interrupt-parent = <&wakeup_map>;
-+		interrupts = <0x0 0>, <0x1 0>, <0x2 0>, <0x3 0>,
-+			     <0x4 0>, <0x5 0>, <0x6 0>, <0x7 0>,
-+			     <0x8 0>, <0x9 0>, <0xa 0>, <0xb 0>,
-+			     <0xc 0>, <0xd 0>, <0xe 0>, <0xf 0>,
-+			     <0x10 0>;
-+
-+                wakeup_map: interrupt-map {
-+			compatible = "samsung,exynos5210-wakeup-eint-map";
-+                        #interrupt-cells = <2>;
-+                        #address-cells = <0>;
-+                        #size-cells = <0>;
-+                        interrupt-map = <0x0 0 &combiner 23 0>,
-+                                        <0x1 0 &combiner 24 0>,
-+                                        <0x2 0 &combiner 25 0>,
-+                                        <0x3 0 &combiner 25 1>,
-+                                        <0x4 0 &combiner 26 0>,
-+                                        <0x5 0 &combiner 26 1>,
-+                                        <0x6 0 &combiner 27 0>,
-+                                        <0x7 0 &combiner 27 1>,
-+                                        <0x8 0 &combiner 28 0>,
-+                                        <0x9 0 &combiner 28 1>,
-+                                        <0xa 0 &combiner 29 0>,
-+                                        <0xb 0 &combiner 29 1>,
-+                                        <0xc 0 &combiner 30 0>,
-+                                        <0xd 0 &combiner 30 1>,
-+                                        <0xe 0 &combiner 31 0>,
-+                                        <0xf 0 &combiner 31 1>,
-+                                        <0x10 0 &gic 0 32 0>;
-+                };
-+        };
-+
  	watchdog {
- 		compatible = "samsung,s3c2410-wdt";
- 		reg = <0x101D0000 0x100>;
+@@ -42,30 +42,6 @@
+ 		interrupts = <0 43 0>, <0 44 0>;
+ 	};
+ 
+-	sdhci at 12200000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12200000 0x100>;
+-		interrupts = <0 75 0>;
+-	};
+-
+-	sdhci at 12210000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12210000 0x100>;
+-		interrupts = <0 76 0>;
+-	};
+-
+-	sdhci at 12220000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12220000 0x100>;
+-		interrupts = <0 77 0>;
+-	};
+-
+-	sdhci at 12230000 {
+-		compatible = "samsung,exynos4210-sdhci";
+-		reg = <0x12230000 0x100>;
+-		interrupts = <0 78 0>;
+-	};
+-
+ 	serial at 12C00000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x12C00000 0x100>;
+@@ -157,13 +133,13 @@
+ 			interrupts = <0 35 0>;
+ 		};
+ 
+-		mdma0: pdma at 10800000 {
++		mdma0: mdma at 10800000 {
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x10800000 0x1000>;
+ 			interrupts = <0 33 0>;
+ 		};
+ 
+-		mdma1: pdma at 11C10000 {
++		mdma1: mdma at 11C10000 {
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x11C10000 0x1000>;
+ 			interrupts = <0 124 0>;
+@@ -242,6 +218,12 @@
+ 			#gpio-cells = <4>;
+ 		};
+ 
++		gpc4: gpio-controller at 114002E0 {
++			compatible = "samsung,exynos4-gpio";
++			reg = <0x114002E0 0x20>;
++			#gpio-cells = <4>;
++		};
++
+ 		gpd0: gpio-controller at 11400160 {
+ 			compatible = "samsung,exynos4-gpio";
+ 			reg = <0x11400160 0x20>;
+@@ -388,19 +370,19 @@
+ 
+ 		gpv2: gpio-controller at 10D10040 {
+ 			compatible = "samsung,exynos4-gpio";
+-			reg = <0x10D10040 0x20>;
++			reg = <0x10D10060 0x20>;
+ 			#gpio-cells = <4>;
+ 		};
+ 
+ 		gpv3: gpio-controller at 10D10060 {
+ 			compatible = "samsung,exynos4-gpio";
+-			reg = <0x10D10060 0x20>;
++			reg = <0x10D10080 0x20>;
+ 			#gpio-cells = <4>;
+ 		};
+ 
+ 		gpv4: gpio-controller at 10D10080 {
+ 			compatible = "samsung,exynos4-gpio";
+-			reg = <0x10D10080 0x20>;
++			reg = <0x10D100C0 0x20>;
+ 			#gpio-cells = <4>;
+ 		};
+ 
 -- 
 1.7.5.4
