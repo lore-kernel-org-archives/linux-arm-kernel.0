@@ -1,103 +1,55 @@
-From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Mon, 30 Apr 2012 14:02:02 +0530
-Subject: [PATCH 1/1] [RESEND] ARM: OMAP3+: dpll: Configure autoidle mode only
- if it's supported
-Message-ID: <1335774722-6728-1-git-send-email-vaibhav.bedia@ti.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 30 Apr 2012 10:58:10 +0200
+Subject: Tegra board file deprecation schedule
+In-Reply-To: <4F9D9396.9070009@wwwdotorg.org>
+References: <4F9B0E7C.1060408@wwwdotorg.org> <1388911.4olGsS8Z0g@ax5200p>
+ <4F9D9396.9070009@wwwdotorg.org>
+Message-ID: <2573129.rORKuOVVxu@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current DPLL code enables and disables autoidle features
-without checking whether the autoidle register is available.
-Fix this by putting a check for the existence of the autoidle
-register in the DPLL data.
+Am Sonntag, 29. April 2012, 13:16:38 schrieb Stephen Warren:
+> On 04/29/2012 12:11 PM, Marc Dietrich wrote:
+> > On Saturday 28 April 2012 22:34:56 Russell King - ARM Linux wrote:
+> >> On Sat, Apr 28, 2012 at 06:09:32PM +0200, Marc Dietrich wrote:
+> >>> Another (maybe a bit off-topic) thing that puzzels me is the how to
+> >>> assign
+> >>> the clock to the nvec.
+> >> 
+> >> What's the nvec?
+> > 
+> > it is the embedded controller used on many first gen tegra2 boards
+> > (drivers/staging/nvec). Do you remember commit 55dc6ee7 ?
+> > 
+> >>> The device needs the clock (tegra-i2c.2) but there is no sane way to get
+> >>> it. I was thinking to add an device name alias (nvec = tegra-i2c.2) to
+> >>> the board file so I can use clk_get(&pdev->dev, NULL) instead of
+> >>> clk_get_sys which seems to be unwanted.
+> >> 
+> >> clk_get() is preferred in drivers which have struct device's to get them.
+> >> And if you know the device name, then I see no problem with the aliasing
+> >> approach.
+> > 
+> > I'm just looking for a way to use clk_get if two devices, tegra-i2c and
+> > nvec (or tegra-i2c-slave in the future) share the same clock.
+> 
+> Oh, you mean the I2C controller clock.
+> 
+> The correct approach here is to remove all the I2C logic from the NVEC
+> driver and add I2C slave support to the real I2C driver. Then, NVEC
+> becomes just a protocol driver for the slave transactions. Then, there
+> is no clock to deal with.
 
-With such a check in place, for DPLLs which do not support this
-feature, simply skipping the autoidle_reg entry in the DPLL data
-is sufficient.
+you are absolutely right, but there is no i2c slave controller driver in 
+mainline yet and I don't want to submit the one nvidia already wrote [1]. 
+Maybe you can ask around if someone is willing to do this.
 
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
----
-This change is needed for AM33xx, which does not support
-autoidle mode for the DPLLs.
+Anyway, removal of the board files will not make it worser than it is already 
+so this is not a show stopper.
 
- arch/arm/mach-omap2/dpll3xxx.c |   23 ++++++++++++++++++-----
- 1 files changed, 18 insertions(+), 5 deletions(-)
+Marc
 
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index fc56745..f0f10be 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -142,7 +142,8 @@ static int _omap3_noncore_dpll_lock(struct clk *clk)
- 
- 	ai = omap3_dpll_autoidle_read(clk);
- 
--	omap3_dpll_deny_idle(clk);
-+	if (ai)
-+		omap3_dpll_deny_idle(clk);
- 
- 	_omap3_dpll_write_clken(clk, DPLL_LOCKED);
- 
-@@ -186,8 +187,6 @@ static int _omap3_noncore_dpll_bypass(struct clk *clk)
- 
- 	if (ai)
- 		omap3_dpll_allow_idle(clk);
--	else
--		omap3_dpll_deny_idle(clk);
- 
- 	return r;
- }
-@@ -216,8 +215,6 @@ static int _omap3_noncore_dpll_stop(struct clk *clk)
- 
- 	if (ai)
- 		omap3_dpll_allow_idle(clk);
--	else
--		omap3_dpll_deny_idle(clk);
- 
- 	return 0;
- }
-@@ -519,6 +516,9 @@ u32 omap3_dpll_autoidle_read(struct clk *clk)
- 
- 	dd = clk->dpll_data;
- 
-+	if (!dd->autoidle_reg)
-+		return -EINVAL;
-+
- 	v = __raw_readl(dd->autoidle_reg);
- 	v &= dd->autoidle_mask;
- 	v >>= __ffs(dd->autoidle_mask);
-@@ -545,6 +545,12 @@ void omap3_dpll_allow_idle(struct clk *clk)
- 
- 	dd = clk->dpll_data;
- 
-+	if (!dd->autoidle_reg) {
-+		pr_debug("clock: DPLL %s: autoidle not supported\n",
-+			clk->name);
-+		return;
-+	}
-+
- 	/*
- 	 * REVISIT: CORE DPLL can optionally enter low-power bypass
- 	 * by writing 0x5 instead of 0x1.  Add some mechanism to
-@@ -554,6 +560,7 @@ void omap3_dpll_allow_idle(struct clk *clk)
- 	v &= ~dd->autoidle_mask;
- 	v |= DPLL_AUTOIDLE_LOW_POWER_STOP << __ffs(dd->autoidle_mask);
- 	__raw_writel(v, dd->autoidle_reg);
-+
- }
- 
- /**
-@@ -572,6 +579,12 @@ void omap3_dpll_deny_idle(struct clk *clk)
- 
- 	dd = clk->dpll_data;
- 
-+	if (!dd->autoidle_reg) {
-+		pr_debug("clock: DPLL %s: autoidle not supported\n",
-+			clk->name);
-+		return;
-+	}
-+
- 	v = __raw_readl(dd->autoidle_reg);
- 	v &= ~dd->autoidle_mask;
- 	v |= DPLL_AUTOIDLE_DISABLE << __ffs(dd->autoidle_mask);
--- 
-1.7.0.4
+
+[1] http://nv-
+tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=blob;f=drivers/i2c/busses/i2c-
+slave-tegra.c;hb=linux-tegra-nv-3.1
