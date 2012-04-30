@@ -1,112 +1,24 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 30 Apr 2012 16:15:20 -0700
-Subject: [PATCH v7 0/6] PM QoS: implement the OMAP low level constraints
- management code
-In-Reply-To: <1334756720-29166-1-git-send-email-j-pihet@ti.com> (jean pihet's
- message of "Wed, 18 Apr 2012 15:45:14 +0200")
-References: <1334756720-29166-1-git-send-email-j-pihet@ti.com>
-Message-ID: <877gwwlsl3.fsf@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 30 Apr 2012 17:20:46 -0600
+Subject: [PATCH] ARM: disable SUSPEND/ARCH_SUSPEND_POSSIBLE for ARCH_TEGRA
+In-Reply-To: <1335381650-7666-1-git-send-email-swarren@wwwdotorg.org>
+References: <1335381650-7666-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <4F9F1E4E.4020604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+On 04/25/2012 01:20 PM, Stephen Warren wrote:
+> Tegra doesn't yet support system sleep. Explicitly disable support
+> for this feature in Kconfig.
 
-jean.pihet at newoldbits.com writes:
+Russell, Arnd, Olof, should this go through the ARM patch tracker, or
+should I just take it through the Tegra tree? Thanks.
 
-> From: Jean Pihet <j-pihet@ti.com>
->
-> . Implement the devices wake-up latency constraints using the global
->   device PM QoS notification handler which applies the constraints to the
->   underlying layer,
-> . Implement the low level code which controls the power domains next
->   functional power states [3], through the hwmod and pwrdm layers,
-> . Add cpuidle and power domains wake-up latency figures for OMAP3, cf. 
->   comments in the code and [1] for the details on where the numbers
->   are magically coming from,
-> . Implement the relation between the cpuidle and per-device PM QoS frameworks
->   in the OMAP3 specific idle callbacks.
->   The chosen C-state shall satisfy the following conditions:
->    . the 'valid' field is enabled,
->    . it satisfies the enable_off_mode flag,
->    . the next state for MPU and CORE power domains is not lower than the
->      state programmed by the per-device PM QoS.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
 
-I've just been through this series and it looks good to me.  
-
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-
-> ToDo:
-> 1. support OMAP4 chipset when the low power modes will be supported
-
-Have you been able to do this with Tero's latest CORE RET and device off
-series?
-
-Kevin
-
-> 2. validate the constraints framework on OMAP4 HW (done on OMAP3)
-> 3. Re-visit the OMAP power domains states initialization procedure. Currently
->    the power states that have been changed from the constraints API which were
->    applied before the initialization of the power domains are lost
-> 4. Further clean-up the OMAP PM layer, use the generic frameworks instead (OPP,
->    PM QoS for throughput constraints ...)
->
->
-> Based on the pm-qos branch of the linux-omap git tree (3.4.0-rc2) [2] with
-> the functional power states changes applied [3].
->
-> Tested cpuidle and suspend on OMAP3 Beagleboard (ES2.x) with constraints
-> on MPU, CORE, PER in RETention and OFF modes.
->
-> [1] http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-> [3] http://marc.info/?l=linux-omap&m=133475291911194&w=2
->
->
-> History:
->
-> v7:
-> . rebased on top of the functional power state changes [3]
->
-> v6:
-> . minor change in the commits description after Kevin's review
-> . added Kevin's Reviewed-by
->
-> v5:
-> . rebased on latest linux-omap [2]
-> . rework after Kevin's comments on the MLs
->
-> v4:
-> . split up the patches which remove the omap_pm_ code from the patch set.
->   Those patches are to be submitted later, on top of this patch set.
-> . latency numbers: provide the measurements setup and conditions in the code
->   comments, added the link to the details on wiki [1].
-> . improved kerneldoc
-> . split big functions into smaller ones, in order to improve the readability
->
-> v3: reworked the error return path and improved the kerneldoc
->
-> v2: reworked the OMAP specific cpuidle code to demote the initial C-state to
->      a valid C-state which fulfills the per-device constraints
->
-> v1: initial version
->
->
-> Jean Pihet (6):
->   ARM: OMAP2+: PM QoS: control the power domains next state from the
->     constraints
->   ARM: OMAP2+: PM QoS: manage the per-device latency constraints in
->     hwmod
->   ARM: OMAP: omap_device: register to the per-device PM QoS framework
->   ARM: OMAP3: cpuidle: next C-state decision depends on the PM QoS MPU
->     and CORE constraints
->   ARM: OMAP3: update cpuidle latency and threshold figures
->   ARM: OMAP3: powerdomain data: add wake-up latency figures
->
->  arch/arm/mach-omap2/cpuidle34xx.c           |  109 ++++++++------
->  arch/arm/mach-omap2/omap_hwmod.c            |   22 +--
->  arch/arm/mach-omap2/pm.h                    |   17 ++-
->  arch/arm/mach-omap2/powerdomain.c           |  216 +++++++++++++++++++++++++++
->  arch/arm/mach-omap2/powerdomain.h           |   17 ++
->  arch/arm/mach-omap2/powerdomains3xxx_data.c |   83 ++++++++++
->  arch/arm/plat-omap/omap_device.c            |   81 ++++++++++-
->  7 files changed, 481 insertions(+), 64 deletions(-)
+>  config ARCH_SUSPEND_POSSIBLE
+> -	depends on !ARCH_S5PC100
+> +	depends on !ARCH_S5PC100 && !ARCH_TEGRA
+>  	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
+>  		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
+>  	def_bool y
