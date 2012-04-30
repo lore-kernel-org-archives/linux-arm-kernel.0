@@ -1,47 +1,41 @@
-From: mark.asselstine@windriver.com (Mark Asselstine)
-Date: Mon, 30 Apr 2012 13:26:22 -0400
-Subject: [PATCH] ARM:mfd: fix ezx-pcap build failure
-In-Reply-To: <20120427180235.GA19778@sirena.org.uk>
-References: <1335366163-12920-1-git-send-email-mark.asselstine@windriver.com>
- <2732324.Os5djSkuuZ@yow-masselst-d1> <20120427180235.GA19778@sirena.org.uk>
-Message-ID: <2435660.8EsSVMd2ha@yow-masselst-d1>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 30 Apr 2012 19:26:09 +0200
+Subject: [PATCH 3.4-rc4] ARM: OMAP1: Amstrad Delta: Fix wrong IRQ base in FIQ
+ handler
+Message-ID: <1335806769-23711-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On April 27, 2012 19:02:35 Mark Brown wrote:
-> On Fri, Apr 27, 2012 at 11:28:28AM -0400, Mark Asselstine wrote:
-> > On April 26, 2012 22:52:58 Russell King - ARM Linux wrote:
-> > > What is the effect when the supplied IRQ does not have a mapping to
-> > > a
-> > > GPIO - or it _does_ by way of a badly coded irq_to_gpio() function
-> > > but that GPIO is not the correct one.
-> > > 
-> > > There is no prevention against endlessly looping, so it could cause
-> > > a
-> > > system lockup.
-> > 
-> > Unfortunately the commit [b1148fd4 mfd: fix pcap irq bottom handler
-> > ] which modified things to loop as long as the interrupt is asserted
-> > didn't supply much information regarding the behavior they were trying
-> > to achieve/fix nor what would be the consequence of bailing earlier.
-> 
-> The usual reason for this pattern is to simulate level triggered IRQs on
-> an edge triggered interrupt controller.
+Commit 384ebe1c2849160d040df3e68634ec506f13d9ff, "gpio/omap: Add DT
+support to GPIO driver", introduced dynamic IRQ numbering of OMAP GPIO
+interrupts, breaking all IH_GPIO_BASE based IRQ number calculations.
+This issue was corrected in the OMAP GPIO driver and the related header
+file with commit 25db711df3258d125dc1209800317e5c0ef3c870, "gpio/omap:
+Fix IRQ handling for SPARSE_IRQ".
 
-Makes sense. OK. I want to help here with a complete fix but it has been a 
-while since I have waded into SPI and ARM initialization so here are some 
-stumbling blocks for me.
+However, the Amstrad Delta FIQ handler, which replaces the gpio-omap
+driver in serving GPIO interrupts on this board, still uses that
+outdated method. Fix it.
 
-If I first fix the build issue by adding 'int gpio_num' to the 
-pcap_platform_data and made use of pdata->gpio_num in place of irq_to_gpio() 
-in pcap_isr_work().  Now to set gpio_num.
+Created and tested against linux-3.4-rc4.
 
-In the board .c file I would assume the goal would be to create the necessary 
-structs to set gpio_num for "ezx-pcap" and pass them to 
-spi_register_board_info(). Right? But should I expect to already see some of 
-this infrastructure in place already? Doesn't the "ezx-pcap" device already 
-have to be defined somewhere, to have irq_base set for example? Or is this 
-coming from firmware?
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+ arch/arm/mach-omap1/ams-delta-fiq.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks,
-Mark A.
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
+index fcce7ff..cfd98b1 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq.c
++++ b/arch/arm/mach-omap1/ams-delta-fiq.c
+@@ -48,7 +48,7 @@ static irqreturn_t deferred_fiq(int irq, void *dev_id)
+ 	struct irq_chip *irq_chip = NULL;
+ 	int gpio, irq_num, fiq_count;
+ 
+-	irq_desc = irq_to_desc(IH_GPIO_BASE);
++	irq_desc = irq_to_desc(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK));
+ 	if (irq_desc)
+ 		irq_chip = irq_desc->irq_data.chip;
+ 
+-- 
+1.7.3.4
