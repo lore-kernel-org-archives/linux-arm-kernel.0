@@ -1,21 +1,52 @@
-From: davej@redhat.com (Dave Jones)
-Date: Mon, 30 Apr 2012 10:06:45 -0400
-Subject: CPUFREQ maintainence.
-Message-ID: <20120430140645.GB12583@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Apr 2012 14:19:26 +0000
+Subject: [PATCH 1/2] cs89x0_platform : Use ioread16/iowrite16 instead of
+ inw/outw
+In-Reply-To: <1335779839-30420-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1335779839-30420-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <201204301419.27119.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This last few releases I've been more of a hindrance than help to getting
-some of the patches merged upstream, so due to my lack of time, I'm considering
-removing myself as maintainer, and having patches routed as such instead...
+On Monday 30 April 2012, Jaccon Bastiaansen wrote:
+> The use of the inw/outw functions by the cs89x0 platform driver
+> results in NULL pointer references.
+> 
+> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> ---
+>  drivers/net/ethernet/cirrus/cs89x0.c |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
 
-ARM -> Russell/relevant ARM subtree maintainers
-x86 driver patches -> x86 at vger.kernel.org
-(All the other archs currently supported already go through the arch trees mips/sparc etc)
+It's actually broken on most platforms already, and the #ifdef is
+about to go away since IXP2xxx is getting removed in v3.5.
 
-The core doesn't see a huge amount of change these days, I figure patches for
-that can just go to lkml & Linus/Andrew like any other subsystem.
+> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
+> index b9406cb..95737e9 100644
+> --- a/drivers/net/ethernet/cirrus/cs89x0.c
+> +++ b/drivers/net/ethernet/cirrus/cs89x0.c
+> @@ -369,6 +369,18 @@ writeword(unsigned long base_addr, int portno, u16 value)
+>  {
+>         __raw_writel(value, base_addr + (portno << 1));
+>  }
+> +#elif defined(CONFIG_CS89x0_PLATFORM)
+> +static u16
+> +readword(unsigned long base_addr, int portno)
+> +{
+> +       return ioread16(base_addr + portno);
+> +}
+> +
+> +static void
+> +writeword(unsigned long base_addr, int portno, u16 value)
+> +{
+> +       iowrite16(value, base_addr + portno);
+> +}
+>  #else
+>  static u16
+>  readword(unsigned long base_addr, int portno)
 
-comments?
+I think the best solution would be to always using ioread32/iowrite32
+in the #else path, and change the ISA code to do an ioport_map
+for the base address, passing around the virtual address as an __iomem
+pointer.
 
-	Dave
+	Arnd
