@@ -1,24 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 30 Apr 2012 17:20:46 -0600
-Subject: [PATCH] ARM: disable SUSPEND/ARCH_SUSPEND_POSSIBLE for ARCH_TEGRA
-In-Reply-To: <1335381650-7666-1-git-send-email-swarren@wwwdotorg.org>
-References: <1335381650-7666-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <4F9F1E4E.4020604@wwwdotorg.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 30 Apr 2012 16:30:01 -0700
+Subject: [PATCH 0/3] ARM: OMAP3: clock: cleanup AM35xx clock flags
+Message-ID: <1335828604-18795-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2012 01:20 PM, Stephen Warren wrote:
-> Tegra doesn't yet support system sleep. Explicitly disable support
-> for this feature in Kconfig.
+Remove all AM35xx specifics from the clock tree and tree and treat all
+AM35xx devices the same.
 
-Russell, Arnd, Olof, should this go through the ARM patch tracker, or
-should I just take it through the Tegra tree? Thanks.
+Kevin Hilman (2):
+  ARM: OMAP3: clock data: replace 3503/3517 flag with AM35x flag for
+    UART4
+  ARM: OMAP3: clock data: treat all AM35x devices the same
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+Paul Walmsley (1):
+  ARM: OMAP: clock: convert AM3517/3505 detection/flags to AM35xx
 
->  config ARCH_SUSPEND_POSSIBLE
-> -	depends on !ARCH_S5PC100
-> +	depends on !ARCH_S5PC100 && !ARCH_TEGRA
->  	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
->  		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
->  	def_bool y
+ arch/arm/mach-omap2/clock3xxx_data.c          |   36 +++++++++----------------
+ arch/arm/plat-omap/include/plat/clkdev_omap.h |    4 +--
+ 2 files changed, 13 insertions(+), 27 deletions(-)
+
+-- 
+1.7.9.2
