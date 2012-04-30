@@ -1,44 +1,48 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 30 Apr 2012 21:46:41 +0530
-Subject: announcing the clk-next branch
-In-Reply-To: <201204301441.39191.arnd.bergmann@linaro.org>
-References: <CAJOA=zOGSh3et4nxE=JdojL4uDjgt8o+oiOU4pmbM=oU2U6prA@mail.gmail.com>
- <4F98C780.8020309@st.com>
- <201204301441.39191.arnd.bergmann@linaro.org>
-Message-ID: <CAOh2x==aTftkv-2agaU873sp5LZhBjLmwYuW9QJm3Rvt+fZ3gw@mail.gmail.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 30 Apr 2012 09:25:10 -0700
+Subject: [PATCH/RFT 0/8] ARM: OMAP: remove IP checks from SoC family
+ detection
+In-Reply-To: <87aa1wyfq5.fsf@ti.com>
+References: <1335482993-14035-1-git-send-email-khilman@ti.com>
+ <20120427220813.GE19196@animalcreek.com> <87aa1wyfq5.fsf@ti.com>
+Message-ID: <20120430162510.GA18669@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2012 at 8:11 PM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
-> Sorry for the late reply on my side. I'm not sure if I understand your
-> question correctly. Generally the rule is to not apply the same patch to
-> two separate branches because that can result in merge conflicts and/or an
-> unclean history.
+On Fri, Apr 27, 2012 at 03:25:38PM -0700, Kevin Hilman wrote:
+> "Mark A. Greer" <mgreer@animalcreek.com> writes:
+> 
+> > On Thu, Apr 26, 2012 at 04:29:45PM -0700, Kevin Hilman wrote:
+> >
+> > Hi Kevin.
+> >
+> >> This is a rebased version of this series which is ready for broader
+> >> testing.  I'd especially appreciate testing from those of you with
+> >> AM35x platforms.
+> >> 
+> >> Currently, our SoC detection is based on SoC family detection
+> >> (using die ID) and the presence of specific IP blocks (or feature.)
+> >> 
+> >> This series begins the separation of the SoC family detection and
+> >> specific IP detection by completely removing IP detection from the SoC
+> >> family detection (cpu_is_*.)
+> >> 
+> >> Applies on top of v3.4-rc4, boot tested on AM3517 EVM.
+> >
+> > Your series applied and booted without issue until the point that
+> > pm_idle is called.  At that point it hung because its doing a wfi
+> > and not getting an interrupt to wake up back up.  That's expected
+> > behaviour so your patches are good (IMHO) but I need to finish and
+> > submit a new version of my patches to fix that issue.
+> 
+> For the benefit of others wanting to test this:
+> 
+> You have to use 'nohlt' on the cmdline on AM35x in order to avoid WFI
+> and the wakeup problems that are still being worked on.
 
-No Probs.
+Oops, yes.  I meant to add that and say that my am3517evm boots fine
+with your patches and 'nohlt' on the cmdline.  I'm using omap2plus_defconfig
+with CONFIG_TI_DAVINCI_EMAC enabled.
 
-> The way to deal with dependencies in a case like this is to apply the patches
-> on one branch in the right order and ask different people to include parts of
-> that branch in their trees without rebasing.
->
-> For instance, you can take Mike's branch as a base (as long as he promises
-> to never rebase that branch), add some patches on top and ask him to pull that
-> commit with your additional clk patches. Then you add other patches for arm-soc
-> on top of that and ask me to pull that branch, including the clk commits that
-> originally came from Mike.
->
-> I can then pull the branch into one of the arm-soc branches that gets sent to
-> Linus after the clk tree was merged into v3.5-rc1.
->
-> It also works the other way round: You can base on top of patches that are
-> already in arm-soc, add more stuff that should go into arm-soc on top, and
-> add clk patches for Mike on top of that, which means that in the end, the
-> arm-soc tree has to go to Linus before the clk tree does.
->
-> The tricky part here is to avoid circular dependencies.
-
-Can you please check my new PULL requests sent few minutes back.
-I hope, i haven't done anything wrong this time. :)
-
+Mark
 --
-viresh
