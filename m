@@ -1,30 +1,45 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 30 Apr 2012 23:02:22 +0200
-Subject: [PATCH 1/2] I2C: Set I2C timing registers for mxs-i2c
-In-Reply-To: <201204302247.17242.marex@denx.de>
-References: <1335738969-27445-1-git-send-email-marex@denx.de>
- <201204302209.12482.marex@denx.de>
- <20120430202742.GC28226@pengutronix.de>
- <201204302247.17242.marex@denx.de>
-Message-ID: <20120430210222.GF28226@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 30 Apr 2012 16:16:27 -0500
+Subject: [PATCH V3 0/2] of: Add generic device tree DMA helpers
+Message-ID: <1335820587-28679-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Indeed. Default to 100kHz might be a good idea too, in case user entered some 
-> weird value. Eventually, it'd be nice if we could calculate the timing values 
-> for all possible frequencies, but I didn't got to deriving such formula ... 
-> dunno if it's worth it either, doubt so.
+From: Jon Hunter <jon-hunter@ti.com>
 
-Would be awesome to have it; but we can leave it for later when it is
-actually needed.
+This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
+to add some basic helpers to retrieve a DMA controller device_node and the
+DMA request/channel information.
+
+[1] http://article.gmane.org/gmane.linux.drivers.devicetree/12022
+[2] http://article.gmane.org/gmane.linux.ports.arm.omap/73622
+
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+
+Jon Hunter (2):
+  of: Add generic device tree DMA helpers
+  of: selftest/dma: Add selftest for new DT DMA
+
+ Documentation/devicetree/bindings/dma/dma.txt |   47 ++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts        |    2 +
+ arch/arm/boot/dts/omap4-panda.dts             |    2 +
+ arch/arm/boot/dts/testcases/tests-dma.dtsi    |   32 ++++
+ arch/arm/boot/dts/testcases/tests.dtsi        |    1 +
+ drivers/of/Makefile                           |    2 +-
+ drivers/of/dma.c                              |  203 +++++++++++++++++++++++++
+ drivers/of/selftest.c                         |  118 ++++++++++++++
+ include/linux/of_dma.h                        |   35 +++++
+ 9 files changed, 441 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/dma.txt
+ create mode 100644 arch/arm/boot/dts/testcases/tests-dma.dtsi
+ create mode 100644 drivers/of/dma.c
+ create mode 100644 include/linux/of_dma.h
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120430/904f919e/attachment.sig>
+1.7.5.4
