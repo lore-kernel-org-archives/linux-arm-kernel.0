@@ -1,185 +1,113 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 30 Apr 2012 12:14:27 -0700
-Subject: [PATCH 17/20] ARM: Exynos: Add device tree support for gpio wakeup
- interrupt controller
+Date: Mon, 30 Apr 2012 12:14:29 -0700
+Subject: [PATCH 19/20] ARM: Exynos5: Add combiner,
+ wakeup interrupt controller and ethernet nodes
 In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
 References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1335813270-13083-18-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1335813270-13083-20-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree support for gpio wakeup source interrupt controller
-for Exynos platforms.
+And interrupt combiner, external interrupt wakeup interrupt controller
+and smsc9215 lan controller nodes.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/common.c |   92 +++++++++++++++++++++++++++++++++++------
- 1 files changed, 79 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   11 ++++++
+ arch/arm/boot/dts/exynos5250.dtsi         |   55 +++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 544f8b5..074508f 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -64,7 +64,8 @@ static void exynos4_init_clocks(int xtal);
- static void exynos5_init_clocks(int xtal);
- static void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- static int exynos_init(void);
--static int exynos_init_irq_eint(void);
-+static int exynos_init_irq_eint(struct device_node *np,
-+				struct device_node *parent);
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index bcc4b89..dbc4bdb 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -24,6 +24,17 @@
+ 		bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
+ 	};
  
- static struct cpu_table cpu_ids[] __initdata = {
- 	{
-@@ -589,6 +590,8 @@ static const struct of_device_id exynos4_dt_irq_match[] = {
- 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
- 	{ .compatible = "samsung,exynos4210-combiner",
- 			.data = combiner_of_init, },
-+	{ .compatible = "samsung,exynos5210-wakeup-eint-map",
-+			.data = exynos_init_irq_eint, },
- 	{},
- };
- #endif
-@@ -606,8 +609,10 @@ void __init exynos4_init_irq(void)
- 		of_irq_init(exynos4_dt_irq_match);
- #endif
- 
--	if (!of_have_populated_dt())
-+	if (!of_have_populated_dt()) {
- 		combiner_init(S5P_VA_COMBINER_BASE, NULL);
-+		exynos_init_irq_eint(NULL, NULL);
-+	}
- 
- 	/*
- 	 * The parameters of s5p_init_irq() are for VIC init.
-@@ -615,7 +620,6 @@ void __init exynos4_init_irq(void)
- 	 * uses GIC instead of VIC.
- 	 */
- 	s5p_init_irq(NULL, 0);
--	exynos_init_irq_eint();
- }
- 
- void __init exynos5_init_irq(void)
-@@ -629,7 +633,6 @@ void __init exynos5_init_irq(void)
- 	 * uses GIC instead of VIC.
- 	 */
- 	s5p_init_irq(NULL, 0);
--	exynos_init_irq_eint();
- }
- 
- struct bus_type exynos_subsys = {
-@@ -1002,17 +1005,72 @@ static int exynos_eint_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static int exynos_eint_irq_domain_xlate(struct irq_domain *d,
-+		struct device_node *controller, const u32 *intspec,
-+		unsigned int intsize, unsigned long *out_hwirq,
-+		unsigned int *out_type)
-+{
-+	if (d->of_node != controller)
-+		return -EINVAL;
-+	if (intsize < 2)
-+		return -EINVAL;
-+	*out_hwirq = intspec[0];
-+
-+	switch (intspec[1]) {
-+	case S5P_IRQ_TYPE_LEVEL_LOW:
-+		*out_type = IRQ_TYPE_LEVEL_LOW;
-+		break;
-+	case S5P_IRQ_TYPE_LEVEL_HIGH:
-+		*out_type = IRQ_TYPE_LEVEL_HIGH;
-+		break;
-+	case S5P_IRQ_TYPE_EDGE_FALLING:
-+		*out_type = IRQ_TYPE_EDGE_FALLING;
-+		break;
-+	case S5P_IRQ_TYPE_EDGE_RISING:
-+		*out_type = IRQ_TYPE_EDGE_RISING;
-+		break;
-+	case S5P_IRQ_TYPE_EDGE_BOTH:
-+		*out_type = IRQ_TYPE_EDGE_BOTH;
-+		break;
++	lan9215 at 0x05000000 {
++		compatible = "smsc,lan9215", "smsc,lan9115";
++		reg = <0x05000000 0x20000>;
++		interrupts = <5 0>;
++		interrupt-parent = <&wakeup_eint>;
++		phy-mode = "mii";
++		smsc,irq-push-pull;
++		smsc,force-internal-phy;
++		local-mac-address = [00 80 00 23 45 67];
 +	};
 +
-+	return 0;
-+}
-+#else
-+static int exynos_eint_irq_domain_xlate(struct irq_domain *d,
-+		struct device_node *controller, const u32 *intspec,
-+		unsigned int intsize, unsigned long *out_hwirq,
-+		unsigned int *out_type)
-+{
-+	return -EINVAL;
-+}
-+#endif
+ 	i2c at 12C60000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 76b7dba..af124917 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -26,10 +26,65 @@
+ 	gic:interrupt-controller at 10481000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		#size-cells = <0>;
+ 		interrupt-controller;
+ 		reg = <0x10481000 0x1000>, <0x10482000 0x2000>;
+ 	};
+ 
++	combiner:interrupt-controller at 10440000 {
++		compatible = "samsung,exynos4210-combiner";
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		samsung,combiner-nr = <32>;
++		reg = <0x10440000 0x1000>;
++		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
++			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
++			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
++			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
++			     <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
++			     <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
++			     <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
++			     <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
++	};
 +
- static struct irq_domain_ops exynos_eint_irq_domain_ops = {
-+	.xlate = exynos_eint_irq_domain_xlate,
- 	.map = exynos_eint_irq_domain_map,
- };
- 
--static int __init exynos_init_irq_eint(void)
-+static int __init exynos_init_irq_eint(struct device_node *eint_np,
-+					struct device_node *parent)
- {
--	int irq, *src_int, irq_base;
-+	int irq, *src_int, irq_base, irq_eint;
- 	unsigned int paddr;
-+	static unsigned int retry = 0;
-+	static struct device_node *np;
- 
--	paddr = soc_is_exynos5250() ? EXYNOS5_PA_GPIO1 : EXYNOS4_PA_GPIO2;
--	exynos_eint_base = ioremap(paddr, SZ_4K);
-+	if (retry)
-+		goto retry_init;
++	wakeup_eint: interrupt-controller at 11400000 {
++		compatible = "samsung,exynos5210-wakeup-eint";
++		reg = <0x11400000 0x1000>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&wakeup_map>;
++		interrupts = <0x0 0>, <0x1 0>, <0x2 0>, <0x3 0>,
++			     <0x4 0>, <0x5 0>, <0x6 0>, <0x7 0>,
++			     <0x8 0>, <0x9 0>, <0xa 0>, <0xb 0>,
++			     <0xc 0>, <0xd 0>, <0xe 0>, <0xf 0>,
++			     <0x10 0>;
 +
-+	if (!eint_np) {
-+		paddr = soc_is_exynos5250() ? EXYNOS5_PA_GPIO1 :
-+						EXYNOS4_PA_GPIO2;
-+		exynos_eint_base = ioremap(paddr, SZ_4K);
-+	} else {
-+		np = of_get_parent(eint_np);
-+		exynos_eint_base = of_iomap(np, 0);
-+	}
- 	if (!exynos_eint_base) {
- 		pr_err("unable to ioremap for EINT base address\n");
- 		return -ENXIO;
-@@ -1025,21 +1083,29 @@ static int __init exynos_init_irq_eint(void)
- 				"linux irq base\n", __func__, irq_base);
- 	}
- 
--	irq_domain = irq_domain_add_legacy(NULL, EXYNOS_EINT_NR, irq_base, 0,
-+	irq_domain = irq_domain_add_legacy(np, EXYNOS_EINT_NR, irq_base, 0,
- 					 &exynos_eint_irq_domain_ops, NULL);
- 	if (WARN_ON(!irq_domain)) {
- 		pr_warning("%s: irq domain init failed\n", __func__);
- 		return 0;
- 	}
- 
--	irq_set_chained_handler(EXYNOS_IRQ_EINT16_31, exynos_irq_demux_eint16_31);
-+	irq_eint = eint_np ? irq_of_parse_and_map(np, 16) : EXYNOS_IRQ_EINT16_31;
-+	irq_set_chained_handler(irq_eint, exynos_irq_demux_eint16_31);
- 
--	for (irq = 0 ; irq <= 15; irq++) {
-+retry_init:
-+	for (irq = 0; irq <= 15; irq++) {
- 		eint0_15_data[irq] = irq;
- 		src_int = soc_is_exynos5250() ? exynos5_eint0_15_src_int :
- 						exynos4_eint0_15_src_int;
--		irq_set_handler_data(src_int[irq], &eint0_15_data[irq]);
--		irq_set_chained_handler(src_int[irq], exynos_irq_eint0_15);
-+		irq_eint = eint_np ? irq_of_parse_and_map(np, irq) : src_int[irq];
-+		if (!irq_eint) {
-+			of_node_put(np);
-+			retry = 1;
-+			return -EAGAIN;
-+		}
-+		irq_set_handler_data(irq_eint, &eint0_15_data[irq]);
-+		irq_set_chained_handler(irq_eint, exynos_irq_eint0_15);
- 	}
- 
- 	return 0;
++                wakeup_map: interrupt-map {
++			compatible = "samsung,exynos5210-wakeup-eint-map";
++                        #interrupt-cells = <2>;
++                        #address-cells = <0>;
++                        #size-cells = <0>;
++                        interrupt-map = <0x0 0 &combiner 23 0>,
++                                        <0x1 0 &combiner 24 0>,
++                                        <0x2 0 &combiner 25 0>,
++                                        <0x3 0 &combiner 25 1>,
++                                        <0x4 0 &combiner 26 0>,
++                                        <0x5 0 &combiner 26 1>,
++                                        <0x6 0 &combiner 27 0>,
++                                        <0x7 0 &combiner 27 1>,
++                                        <0x8 0 &combiner 28 0>,
++                                        <0x9 0 &combiner 28 1>,
++                                        <0xa 0 &combiner 29 0>,
++                                        <0xb 0 &combiner 29 1>,
++                                        <0xc 0 &combiner 30 0>,
++                                        <0xd 0 &combiner 30 1>,
++                                        <0xe 0 &combiner 31 0>,
++                                        <0xf 0 &combiner 31 1>,
++                                        <0x10 0 &gic 0 32 0>;
++                };
++        };
++
+ 	watchdog {
+ 		compatible = "samsung,s3c2410-wdt";
+ 		reg = <0x101D0000 0x100>;
 -- 
 1.7.5.4
