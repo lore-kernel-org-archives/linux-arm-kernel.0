@@ -1,151 +1,40 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Mon, 30 Apr 2012 11:43:18 -0500
-Subject: [PATCH] ARM: exynos: Adapt to cpuidle core time keeping and irq
- enable
-In-Reply-To: <4F980DE6.1020504@linaro.org>
-References: <1335355912-26063-1-git-send-email-amit.kachhap@linaro.org>
- <4F980DE6.1020504@linaro.org>
-Message-ID: <CAMXH7KG_=oupDTe7vcbDdp6wb=gHc3s8Z4EwxVeJBPGDNC8FSQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Apr 2012 08:59:38 -0700
+Subject: [PATCH 07/12] mmc: omap: add DMA engine support
+In-Reply-To: <20120428163716.GI28062@n2100.arm.linux.org.uk>
+References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
+ <E1SMLmZ-0002WS-Rd@rmk-PC.arm.linux.org.uk>
+ <20120424001330.GD3739@atomide.com>
+ <20120428163716.GI28062@n2100.arm.linux.org.uk>
+Message-ID: <20120430155937.GB3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 9:44 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 04/25/2012 02:11 PM, Amit Daniel Kachhap wrote:
->>
->> This patch enables core cpuidle timekeeping and irq enabling and
->> remove those redundant parts from the exynos cpuidle drivers
->>
->> CC: Daniel Lezcano<daniel.lezcano@linaro.org>
->> CC: Robert Lee<rob.lee@linaro.org>
->> Signed-off-by: Amit Daniel<amit.kachhap@linaro.org>
->> ---
->> ?arch/arm/mach-exynos/cpuidle.c | ? 53
->> ++++-----------------------------------
->> ?1 files changed, 6 insertions(+), 47 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/cpuidle.c
->> b/arch/arm/mach-exynos/cpuidle.c
->> index 33ab4e7..26dac28 100644
->> --- a/arch/arm/mach-exynos/cpuidle.c
->> +++ b/arch/arm/mach-exynos/cpuidle.c
->> @@ -20,6 +20,7 @@
->> ?#include<asm/smp_scu.h>
->> ?#include<asm/suspend.h>
->> ?#include<asm/unified.h>
->> +#include<asm/cpuidle.h>
->> ?#include<mach/regs-pmu.h>
->> ?#include<mach/pmu.h>
->>
->> @@ -34,22 +35,12 @@
->>
->> ?#define S5P_CHECK_AFTR ? ? ? ? ? ? ? ?0xFCBA0D10
->>
->> -static int exynos4_enter_idle(struct cpuidle_device *dev,
->> - ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
->> ?static int exynos4_enter_lowpower(struct cpuidle_device *dev,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index);
->>
->> ?static struct cpuidle_state exynos4_cpuidle_set[] __initdata = {
->> - ? ? ? [0] = {
->> - ? ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= exynos4_enter_idle,
->> - ? ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 1,
->> - ? ? ? ? ? ? ? .target_residency ? ? ? = 100000,
->> - ? ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
->> - ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "C0",
->> - ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "ARM clock gating(WFI)",
->> - ? ? ? },
->> + ? ? ? [0] = ARM_CPUIDLE_WFI_STATE,
->> ? ? ? ?[1] = {
->> ? ? ? ? ? ? ? ?.enter ? ? ? ? ? ? ? ? ?= exynos4_enter_lowpower,
->> ? ? ? ? ? ? ? ?.exit_latency ? ? ? ? ? = 300,
->> @@ -63,8 +54,9 @@ static struct cpuidle_state exynos4_cpuidle_set[]
->> __initdata = {
->> ?static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
->>
->> ?static struct cpuidle_driver exynos4_idle_driver = {
->> - ? ? ? .name ? ? ? ? ? = "exynos4_idle",
->> - ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
->> + ? ? ? .name ? ? ? ? ? ? ? ? ? = "exynos4_idle",
->> + ? ? ? .owner ? ? ? ? ? ? ? ? ?= THIS_MODULE,
->> + ? ? ? .en_core_tk_irqen ? ? ? = 1,
->> ?};
->>
->> ?/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
->> @@ -103,13 +95,8 @@ static int exynos4_enter_core0_aftr(struct
->> cpuidle_device *dev,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index)
->> ?{
->> - ? ? ? struct timeval before, after;
->> - ? ? ? int idle_time;
->> ? ? ? ?unsigned long tmp;
->>
->> - ? ? ? local_irq_disable();
->> - ? ? ? do_gettimeofday(&before);
->> -
->> ? ? ? ?exynos4_set_wakeupmask();
->>
->> ? ? ? ?/* Set value of power down register for aftr mode */
->> @@ -150,34 +137,6 @@ static int exynos4_enter_core0_aftr(struct
->> cpuidle_device *dev,
->> ? ? ? ?/* Clear wakeup state register */
->> ? ? ? ?__raw_writel(0x0, S5P_WAKEUP_STAT);
->>
->> - ? ? ? do_gettimeofday(&after);
->> -
->> - ? ? ? local_irq_enable();
->> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
->> - ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
->> -
->> - ? ? ? dev->last_residency = idle_time;
->> - ? ? ? return index;
->> -}
->> -
->> -static int exynos4_enter_idle(struct cpuidle_device *dev,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
->> -{
->> - ? ? ? struct timeval before, after;
->> - ? ? ? int idle_time;
->> -
->> - ? ? ? local_irq_disable();
->> - ? ? ? do_gettimeofday(&before);
->> -
->> - ? ? ? cpu_do_idle();
->> -
->> - ? ? ? do_gettimeofday(&after);
->> - ? ? ? local_irq_enable();
->> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
->> - ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
->> -
->> - ? ? ? dev->last_residency = idle_time;
->> ? ? ? ?return index;
->> ?}
->>
->> @@ -192,7 +151,7 @@ static int exynos4_enter_lowpower(struct
->> cpuidle_device *dev,
->> ? ? ? ? ? ? ? ?new_index = drv->safe_state_index;
->>
->> ? ? ? ?if (new_index == 0)
->> - ? ? ? ? ? ? ? return exynos4_enter_idle(dev, drv, new_index);
->> + ? ? ? ? ? ? ? return arm_cpuidle_simple_enter(dev, drv, new_index);
->> ? ? ? ?else
->> ? ? ? ? ? ? ? ?return exynos4_enter_core0_aftr(dev, drv, new_index);
->> ?}
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120428 09:40]:
+> On Mon, Apr 23, 2012 at 05:13:30PM -0700, Tony Lindgren wrote:
+> > * Russell King <rmk+kernel@arm.linux.org.uk> [120423 09:11]:
+> > > Add DMA engine support to the OMAP driver.  This supplements the
+> > > private DMA API implementation contained within this driver, and the
+> > > driver can be switched at build time between using DMA engine and the
+> > > private DMA API.
+> > 
+> > Below is what's needed to use DMA request lines from platform data.
+> > Note also the release_mem_region change that we'll now need for
+> > this one also (but not as a fix).
+> > 
+> > I've posted a cleanup patch series to mostly remove plat-omap/devices.c
+> > that takes care of passing the DMA request lines in platform data.
+> > That series should get merged before the driver changes for this
+> > driver to keep DMA working.
+> 
+> Okay, how do we want to handle this patch?  I don't think there's any
+> urgency for this patch at the present time, so I'm quite happy for this
+> to be delayed after the next merge window after we have the pre-requisits
+> for it in place.  (And trying to get it in earlier is only going to give
+> us git tree dependencies to deal with.)
 
-Acked-by: Robert Lee <rob.lee@linaro.org>
+Sounds good to me.
 
->
->
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->
-> --
-> ?<http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro: ?<http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+Regards,
+
+Tony
