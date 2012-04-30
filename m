@@ -1,19 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 21:27:06 +0000
-Subject: [PATCH] MAINTAINER: add some drivers upstreamed in CSR SIRFPRIMA2
-In-Reply-To: <1335756203-3285-1-git-send-email-21cnbao@gmail.com>
-References: <1335756203-3285-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <201204302127.06190.arnd@arndb.de>
+Date: Mon, 30 Apr 2012 21:30:44 +0000
+Subject: [PATCH] ARM: SPEAr3xx: Correct keyboard data passed from DT
+In-Reply-To: <1f044de2d6d026b27222690777660e45b98c4b0f.1335246229.git.viresh.kumar@st.com>
+References: <1f044de2d6d026b27222690777660e45b98c4b0f.1335246229.git.viresh.kumar@st.com>
+Message-ID: <201204302130.44183.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 April 2012, 21cnbao at gmail.com wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+On Tuesday 24 April 2012, Viresh Kumar wrote:
+> keyboard data passed via DT is in wrong format. Fix it.
 > 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  arch/arm/boot/dts/spear300-evb.dts |  162 ++++++++++++++++++------------------
+>  1 files changed, 81 insertions(+), 81 deletions(-)
 
-Applied to the next/maintainer branch of the arm-soc tree.
-
-Thanks,
+Applied to spear/dt and next/dt.
 
 	Arnd
