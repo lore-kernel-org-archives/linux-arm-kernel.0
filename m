@@ -1,30 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 17:46:44 +0000
-Subject: [GIT PULL] ARM: SPEAr13xx support for 3.5
-In-Reply-To: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
-References: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
-Message-ID: <201204301746.45004.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 30 Apr 2012 13:48:28 -0400
+Subject: [PATCH] maintainership update for the Marvell Orion family of SOCs
+In-Reply-To: <alpine.LFD.2.02.1204301330111.21030@xanadu.home>
+References: <alpine.LFD.2.02.1204301330111.21030@xanadu.home>
+Message-ID: <20120430174828.GZ15711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 April 2012, viresh kumar wrote:
-> Hi Arnd/Olof,
+On Mon, Apr 30, 2012 at 01:44:48PM -0400, Nicolas Pitre wrote:
+> While Lennert and I have moved our focus to other things, some people
+> picked up the slack on those platforms.  Let's empower them with a more 
+> official status.
 > 
-> This is pull request for SPEAr13xx support updates. It had dependency
-> on for-v3.5-spear-clk, spear/dt and spear/pinctrl for applying patches, and
-> so i created a merge of v3.4-rc5 with spear/dt and pinctrl branches and applied
-> for-v3.5-spear-clk patches, before this patchset.
+> Signed-off-by: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
 > 
-> Also, it has compilation dependencies with:
-> - Mike's clk-next branch
-> - Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ...
-
-Ok, I missed the compilation dependencies you mentioned here.  So the branch
-you sent me doesn't actually build by itself, which is not good.
-
-I have now merged both as staging branches, which means it will be in linux-next
-from now on but can still get rebased in order to work out the dependencies.
-We can work out something from here once I understand where the dependencies
-are.
-
-	Arnd
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index bb76fc42fc..348b881f74 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -908,11 +908,12 @@ ARM/MAGICIAN MACHINE SUPPORT
+>  M:	Philipp Zabel <philipp.zabel@gmail.com>
+>  S:	Maintained
+>  
+> -ARM/Marvell Loki/Kirkwood/MV78xx0/Orion SOC support
+> -M:	Lennert Buytenhek <kernel@wantstofly.org>
+> -M:	Nicolas Pitre <nico@fluxnic.net>
+> +ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
+> +M:	Jason Cooper <jason@lakedaemon.net>
+> +M:	Andrew Lunn <andrew@lunn.ch>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -S:	Odd Fixes
+> +S:	Maintained
+> +F:	arch/arm/mach-dove/
+>  F:	arch/arm/mach-kirkwood/
+>  F:	arch/arm/mach-mv78xx0/
+>  F:	arch/arm/mach-orion5x/
