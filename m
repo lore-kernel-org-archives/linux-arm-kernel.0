@@ -1,62 +1,63 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 30 Apr 2012 11:38:09 +0800
-Subject: [Linaro-mm-sig] [PATCHv24 00/16] Contiguous Memory Allocator
-In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAGsJ_4yAwh32u3tdWFA3BC76NpMws5RT_JnxnzNdHx6eoHHxMw@mail.gmail.com>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Mon, 30 Apr 2012 09:55:26 +0530
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <87397o3n4y.fsf@ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>
+ <87397o3n4y.fsf@ti.com>
+Message-ID: <CAJ6a13ZFj47nps1teNHyE3FyzZOUBx9HDOL-3_CNC+_vdbs6ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/4/3 Marek Szyprowski <m.szyprowski@samsung.com>:
-> Hi,
+On Sat, Apr 28, 2012 at 2:31 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Mark,
 >
-> This is (yet another) update of CMA patches. I've rebased them onto
-> recent v3.4-rc1 kernel tree and integrated some minor bugfixes. The
-> first issue has been pointed by Sandeep Patil - alloc_contig_range
-> reclaimed two times too many pages, second issue (possible mismatch
-> between pageblock size and MAX_ORDER pages) has been recently spotted
-> by Michal Nazarewicz.
+> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 >
-> These patches are also available on my git repository:
-> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc1-cma-v24
+>> On Fri, Apr 27, 2012 at 11:09:10AM +0530, J, KEERTHY wrote:
+>>
+>>> Devfreq and cpufreq are related to dynamic frequency/voltage switching between
+>>> pre defined Operating Performance Points or the OPPs. Every OPP being
+>>> a voltage/frequency pair. Smartreflex is a different
+>>> power management technique.
+>>
+>> But presumably these things should integrate somehow - for example,
+>> should devfreq and cpufreq be providing inputs into what AVS is doing,
+>> and if so how?
 >
-> Best regards
-> Marek Szyprowski
-> Samsung Poland R&D Center
+> The way it is currently designed, cpufreq/devfreq/regulator layers don't
+> need to know about AVS.
 >
+> The higher-level layers only know about the "nominal" voltage. ?AVS
+> hardware does automatic, adaptive, micro-adjustments around that nominal
+> voltage, and these micro-adjustments are managed by the AVS hardware
+> sending commands to the PMIC. ?(specifically, on OMAP, the AVS sensors
+> provide inputs to the voltage processor (VP) which provide inputs to the
+> voltage controller (VC) which sends commands to the PMIC[1].)
 >
+> The driver proposed here is primarily for initializing the various
+> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
+> adjustments are done in hardware by VC/VP.
 >
-> Patches in this patchset:
+> The only thing the higher-level layers might potentially need to do to
+> enable/disable AVS around transitions (e.g. when changing OPP, AVS is
+> disabled before changing OPP and only re-enabled when the new nominal
+> voltage has been acheived.)
+>
+> On OMAP, we handle this inside the OMAP-specific voltage layer which is
+> called by the regulator framework, so even the regulators do not need
+> any knowledge of AVS.
+>
+> Kevin
+>
+> [1] Figure 3-76 in OMAP4430 ES2.1 Public TRM vAD provides a
+> ? ?detailed diagram:
+> ? ?http://www.ti.com/pdfs/wtbu/OMAP4430_ES2.x_PUBLIC_TRM_vAD.zip
 
-Marek,
+Thanks for the detailed answer Kevin.
 
-how about the patch "mm: cma: add a simple kernel module as the helper
-to test CMA", did you forget merging this?
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/088412.html
-
->
-> Marek Szyprowski (6):
->  mm: extract reclaim code from __alloc_pages_direct_reclaim()
->  mm: trigger page reclaim in alloc_contig_range() to stabilise
->    watermarks
->  drivers: add Contiguous Memory Allocator
->  X86: integrate CMA with DMA-mapping subsystem
->  ARM: integrate CMA with DMA-mapping subsystem
->  ARM: Samsung: use CMA for 2 memory banks for s5p-mfc device
->
-> Mel Gorman (1):
->  mm: Serialize access to min_free_kbytes
->
-> Michal Nazarewicz (9):
->  mm: page_alloc: remove trailing whitespace
->  mm: compaction: introduce isolate_migratepages_range()
->  mm: compaction: introduce map_pages()
->  mm: compaction: introduce isolate_freepages_range()
->  mm: compaction: export some of the functions
->  mm: page_alloc: introduce alloc_contig_range()
->  mm: page_alloc: change fallbacks array handling
->  mm: mmzone: MIGRATE_CMA migration type added
->  mm: page_isolation: MIGRATE_CMA isolation functions added
->
-
--barry
+-- 
+Regards and Thanks,
+Keerthy
