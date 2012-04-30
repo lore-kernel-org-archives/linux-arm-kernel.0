@@ -1,47 +1,33 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Mon, 30 Apr 2012 11:35:43 +0200
-Subject: [PATCH/RFT 6/8] ARM: OMAP: remove unused cpu_is_omap3505()
-In-Reply-To: <CAORVsuVYXooj5CPzZZhOL8asmoX5X1bB=D-7pyf4McgKOATmyg@mail.gmail.com>
-References: <1335482993-14035-1-git-send-email-khilman@ti.com>
- <1335482993-14035-7-git-send-email-khilman@ti.com>
- <CAORVsuVYXooj5CPzZZhOL8asmoX5X1bB=D-7pyf4McgKOATmyg@mail.gmail.com>
-Message-ID: <2D046CE0-37F1-4C35-B7B1-1B75203DE147@dominion.thruhere.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 30 Apr 2012 11:49:13 +0200
+Subject: [PATCH] hwrng: Kconfig: modify default state for atmel-rng driver
+In-Reply-To: <20120427173504.GK18260@opensource.wolfsonmicro.com>
+References: <20120427173504.GK18260@opensource.wolfsonmicro.com>
+Message-ID: <1335779353-9515-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In order to prevent building the Atmel hw_random driver for each and every
+configuration, add a "default" Kconfig state in relation with
+CONFIG_ARCH_AT91.
 
-Op 30 apr. 2012, om 11:07 heeft Jean Pihet het volgende geschreven:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/char/hw_random/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Kevin,
-> 
-> On Fri, Apr 27, 2012 at 1:29 AM, Kevin Hilman <khilman@ti.com> wrote:
->> The 3505 check is now unused and can be removed.
->> 
->> There are no longer any cpu_is_* checks that depend on specific IP
->> detection.
->> 
->> Acked-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> Tested-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->>  arch/arm/plat-omap/include/plat/cpu.h |    8 +-------
->>  1 file changed, 1 insertion(+), 7 deletions(-)
->> 
->> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
->> index 41f3e5a..b34bf6c 100644
->> --- a/arch/arm/plat-omap/include/plat/cpu.h
->> +++ b/arch/arm/plat-omap/include/plat/cpu.h
->> @@ -250,8 +250,7 @@ IS_AM_SUBCLASS(335x, 0x335)
->>  * cpu_is_omap2423():  True for OMAP2423
->>  * cpu_is_omap2430():  True for OMAP2430
->>  * cpu_is_omap3430():  True for OMAP3430
->> - * cpu_is_omap3505():  True for OMAP3505
->> - * cpu_is_omap3517():  True for OMAP3517
->> + * cpu_is_omap3517():  True for AM35x: OMAP3517, OMAP3505
-> Is cpu_is_omap35xx() a better name for it?
-
-No, since 3530 is the same as 3430 :(
-
-regards,
-
-Koen
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index b2402eb..d98998f 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -63,7 +63,7 @@ config HW_RANDOM_AMD
+ config HW_RANDOM_ATMEL
+ 	tristate "Atmel Random Number Generator support"
+ 	depends on HW_RANDOM && HAVE_CLK
+-	default HW_RANDOM
++	default (HW_RANDOM && ARCH_AT91)
+ 	---help---
+ 	  This driver provides kernel-side support for the Random Number
+ 	  Generator hardware found on Atmel AT91 devices.
+-- 
+1.7.10
