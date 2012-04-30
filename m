@@ -1,58 +1,43 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Mon, 30 Apr 2012 22:48:30 +0200
-Subject: [PATCH] maintainership update for the Marvell Orion family of SOCs
-In-Reply-To: <alpine.LFD.2.02.1204301330111.21030@xanadu.home> (Nicolas
- Pitre's message of "Mon, 30 Apr 2012 13:44:48 -0400 (EDT)")
-References: <alpine.LFD.2.02.1204301330111.21030@xanadu.home>
-Message-ID: <87wr4x9c9t.fsf@lebrac.rtp-net.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 30 Apr 2012 23:01:08 +0200
+Subject: [PATCH 2/2] I2C: Implement DMA support into mxs-i2c
+In-Reply-To: <201204302245.57958.marex@denx.de>
+References: <1335738969-27445-1-git-send-email-marex@denx.de>
+ <201204302207.39112.marex@denx.de>
+ <20120430203016.GD28226@pengutronix.de>
+ <201204302245.57958.marex@denx.de>
+Message-ID: <20120430210108.GE28226@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Nicolas Pitre <nico@fluxnic.net> writes:
-> While Lennert and I have moved our focus to other things, some people
-> picked up the slack on those platforms.  Let's empower them with a more 
-> official status.
->
-> Signed-off-by: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index bb76fc42fc..348b881f74 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -908,11 +908,12 @@ ARM/MAGICIAN MACHINE SUPPORT
->  M:	Philipp Zabel <philipp.zabel@gmail.com>
->  S:	Maintained
->  
-> -ARM/Marvell Loki/Kirkwood/MV78xx0/Orion SOC support
-> -M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -M:	Nicolas Pitre <nico@fluxnic.net>
-> +ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
-> +M:	Jason Cooper <jason@lakedaemon.net>
-> +M:	Andrew Lunn <andrew@lunn.ch>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -S:	Odd Fixes
-> +S:	Maintained
-> +F:	arch/arm/mach-dove/
->  F:	arch/arm/mach-kirkwood/
->  F:	arch/arm/mach-mv78xx0/
->  F:	arch/arm/mach-orion5x/
+> > > It complains that data might be undefined, do you want it in a separate
+> > > patch then ?
+> > 
+> > Yes, but only if you can prove that the compiler is right.
+> 
+> It's not right, because that variable is always initialized, but this at least 
+> squashes the compile warning.
 
-Sorry to hijack a little bit this thread, but I got a few days ago a
-88ap510/dove device so I was wondering if the work currently done on
-kirkwood would allow us the same kernel binary at least on dove and
-kirkwood ? [1] If so, when it'll be possible, will it be considered to
-move the corresponding board setup from
-arch/arm/mach-{dove,kirkwood,...} into a new directory, like what was
-done on recently on imx ?
+The compiler needs to be fixed, not the kernel.
 
-Thanks,
-Arnaud
+> > Yes, send V2 with DMA by default, and I will give a try on the
+> > mode-switching later, too.
+> 
+> I'd prefer to have PIOQ by default, to avoid breaking some of the boards. Or can 
+> you test on all of them?
 
-[1] I'm only talking of kirkwood and dove because it's only what I can
-test. Of course, if it can be a single kernel binary for
-dove/kirkwood/mv78xx0/orion5x, it'll be even better.
+? What kind of breakage do you expect? I think it is okay if we pull it
+in during the merge window; we can fix issues then till the relase (and
+maybe mode switching works, after all).
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120430/2d34f440/attachment.sig>
