@@ -1,62 +1,36 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 30 Apr 2012 15:25:53 -0700
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120426180719.GC20186@mudshark.cambridge.arm.com> (Will
- Deacon's message of "Thu, 26 Apr 2012 19:07:19 +0100")
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com>
-Message-ID: <871un4q2ku.fsf@ti.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 30 Apr 2012 15:46:49 -0700
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+ <4F98EB10.2000505@codeaurora.org> <20120426084201.GF17184@pengutronix.de>
+ <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
+ <20120426095135.GG17184@pengutronix.de> <4F9EE84C.90106@codeaurora.org>
+ <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
+Message-ID: <4F9F1659.1010804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-Will Deacon <will.deacon@arm.com> writes:
-
-> On Wed, Apr 04, 2012 at 12:15:24PM +0100, Will Deacon wrote:
->> On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
->> > 
->> > Part of the problem is that the clockdomain data for the emu_sys 
->> > clockdomain is wrong.  Here's something to try to fix it.  It might just 
->> > be enough to get it to work.
->> 
->> Hmm, doesn't seem to work but I do see the following in dmesg when I try to
->> use perf:
->> 
->>  powerdomain: waited too long for powerdomain emu_pwrdm to complete transition
->> 
->> which is new with your patch.
+On 04/30/2012 03:19 PM, Turquette, Mike wrote:
+> On Mon, Apr 30, 2012 at 12:30 PM, Saravana Kannan
+> <skannan@codeaurora.org>  wrote:
+>> Mike, Shawn, Paul, Rob,
+>>
+>> Comments? Can we pull this in?
 >
-> Sorry to nag, but does anybody have a clue where to go from here? I can
-> start digging in the OMAP PM code, but it's all new territory for me.
+> Saravana,
+>
+> I will test this a bit more thoroughly tomorrow and get back to you.
+>
+> Thanks,
+> Mike
 
-Unfortunately, digging in the code isn't going to help much.  
+Thanks Mike!
 
-We've been trying to get our heads around some undocumented reset
-behavior for the various debug IPs in OMAP.
+I'm still hoping a Ack/Nack for the general idea from the others.
 
-After a little digging and clarification from HW designers, it appears
-that if we allow the EMU clockdomain to idle, a full reset of the debug
-IPs is done.  That means there are two solutions to this problem:
+-Saravana
 
-1) don't ever alow EMU clockdomain to idle.
-2) modify CTI driver to re-init for every use.
-
-Obviously (1) is the easiet, and hacks for that have already been
-posted, but that has pretty significant impacts on power savings.  (2)
-is the right solution to merge upstream, but needs writing. 
-
-For (2), using runtime PM methods in the driver would be the simplest
-here since the ->runtime_resume method will be called every time the
-device is about to be used.
-
-Kevin
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
