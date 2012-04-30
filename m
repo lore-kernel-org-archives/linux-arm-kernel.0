@@ -1,187 +1,127 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 30 Apr 2012 12:14:17 -0700
-Subject: [PATCH 07/20] ARM: EXYNOS: Add pre-divider and fout mux clocks for
- bpll and mpll
+Date: Mon, 30 Apr 2012 12:14:18 -0700
+Subject: [PATCH 08/20] ARM: EXYNOS: update irqs for EXYNOS5250 evt1
 In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
 References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1335813270-13083-8-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1335813270-13083-9-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kisoo Yu <ksoo.yu@samsung.com>
+From: Kukjin Kim <kgene.kim@samsung.com>
 
-The fout clock of BPLL and MPLL have a selectable source in rev1 of
-EXYNOS5. The clock options are a fixed divided by 2 clock and the
-output of the PLL itself. Add support for these new clock instances.
-
-Signed-off-by: Kisoo Yu <ksoo.yu@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-[kgene.kim at samsung.com: temporary apply this because I
-don't want to add pll stuff in each clock not commonly]
-Temporary-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/clock-exynos5.c           |   73 +++++++++++++++++++++++-
- arch/arm/mach-exynos/include/mach/regs-clock.h |    2 +
- arch/arm/plat-s5p/clock.c                      |   11 ----
- 3 files changed, 74 insertions(+), 12 deletions(-)
+ arch/arm/mach-exynos/include/mach/irqs.h |   34 ++++++++++++++++++-----------
+ 1 files changed, 21 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index 846741e..7c0f810 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -145,6 +145,39 @@ static struct clksrc_clk exynos5_clk_sclk_apll = {
- 	.reg_div = { .reg = EXYNOS5_CLKDIV_CPU0, .shift = 24, .size = 3 },
- };
- 
-+static struct clk clk_fout_bpll_div2 = {
-+	.name	= "fout_bpll_div2",
-+};
-+
-+static struct clk *exynos5_clkset_mout_bpll_fout_list[] = {
-+	[0] = &clk_fout_bpll_div2,
-+	[1] = &clk_fout_bpll,
-+};
-+
-+static struct clksrc_sources exynos5_clkset_mout_bpll_fout = {
-+	.sources	= exynos5_clkset_mout_bpll_fout_list,
-+	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_bpll_fout_list),
-+};
-+
-+static struct clksrc_clk exynos5_clk_mout_bpll_fout = {
-+	.clk	= {
-+		.name		= "mout_bpll_fout",
-+	},
-+	.sources = &exynos5_clkset_mout_bpll_fout,
-+	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 0, .size = 1 },
-+};
-+
-+/* Possible clock sources for BPLL Mux */
-+static struct clk *clk_src_bpll_list[] = {
-+	[0] = &clk_fin_bpll,
-+	[1] = &exynos5_clk_mout_bpll_fout.clk,
-+};
-+
-+struct clksrc_sources clk_src_bpll = {
-+	.sources	= clk_src_bpll_list,
-+	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
-+};
-+
- static struct clksrc_clk exynos5_clk_mout_bpll = {
- 	.clk	= {
- 		.name		= "mout_bpll",
-@@ -187,11 +220,43 @@ static struct clksrc_clk exynos5_clk_mout_epll = {
- 	.reg_src = { .reg = EXYNOS5_CLKSRC_TOP2, .shift = 12, .size = 1 },
- };
- 
-+static struct clk clk_fout_mpll_div2 = {
-+	.name	= "fout_mpll_div2",
-+};
-+
-+static struct clk *exynos5_clkset_mout_mpll_fout_list[] = {
-+	[0] = &clk_fout_mpll_div2,
-+	[1] = &clk_fout_mpll,
-+};
-+
-+static struct clksrc_sources exynos5_clkset_mout_mpll_fout = {
-+	.sources	= exynos5_clkset_mout_mpll_fout_list,
-+	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_mpll_fout_list),
-+};
-+
-+static struct clksrc_clk exynos5_clk_mout_mpll_fout = {
-+	.clk	= {
-+		.name		= "mout_mpll_fout",
-+	},
-+	.sources = &exynos5_clkset_mout_mpll_fout,
-+	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 4, .size = 1 },
-+};
-+
-+static struct clk *exynos5_clk_src_mpll_list[] = {
-+	[0] = &clk_fin_mpll,
-+	[1] = &exynos5_clk_mout_mpll_fout.clk,
-+};
-+
-+struct clksrc_sources exynos5_clk_src_mpll = {
-+	.sources	= exynos5_clk_src_mpll_list,
-+	.nr_sources	= ARRAY_SIZE(exynos5_clk_src_mpll_list),
-+};
-+
- struct clksrc_clk exynos5_clk_mout_mpll = {
- 	.clk = {
- 		.name		= "mout_mpll",
- 	},
--	.sources = &clk_src_mpll,
-+	.sources = &exynos5_clk_src_mpll,
- 	.reg_src = { .reg = EXYNOS5_CLKSRC_CORE1, .shift = 8, .size = 1 },
- };
- 
-@@ -946,10 +1011,12 @@ static struct clksrc_clk *exynos5_sysclks[] = {
- 	&exynos5_clk_mout_apll,
- 	&exynos5_clk_sclk_apll,
- 	&exynos5_clk_mout_bpll,
-+	&exynos5_clk_mout_bpll_fout,
- 	&exynos5_clk_mout_bpll_user,
- 	&exynos5_clk_mout_cpll,
- 	&exynos5_clk_mout_epll,
- 	&exynos5_clk_mout_mpll,
-+	&exynos5_clk_mout_mpll_fout,
- 	&exynos5_clk_mout_mpll_user,
- 	&exynos5_clk_vpllsrc,
- 	&exynos5_clk_sclk_vpll,
-@@ -1013,6 +1080,8 @@ static struct clk *exynos5_clks[] __initdata = {
- 	&exynos5_clk_sclk_hdmi27m,
- 	&exynos5_clk_sclk_hdmiphy,
- 	&clk_fout_bpll,
-+	&clk_fout_bpll_div2,
-+	&clk_fout_mpll_div2,
- 	&clk_fout_cpll,
- 	&exynos5_clk_armclk,
- };
-@@ -1178,8 +1247,10 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
- 
- 	clk_fout_apll.ops = &exynos5_fout_apll_ops;
- 	clk_fout_bpll.rate = bpll;
-+	clk_fout_bpll_div2.rate = bpll >> 1;
- 	clk_fout_cpll.rate = cpll;
- 	clk_fout_mpll.rate = mpll;
-+	clk_fout_mpll_div2.rate = mpll >> 1;
- 	clk_fout_epll.rate = epll;
- 	clk_fout_vpll.rate = vpll;
- 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
-index d9578a5..130034d 100644
---- a/arch/arm/mach-exynos/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
-@@ -313,6 +313,8 @@
- #define EXYNOS5_CLKGATE_IP_PERIS		EXYNOS_CLKREG(0x10960)
- #define EXYNOS5_CLKGATE_BLOCK			EXYNOS_CLKREG(0x10980)
- 
-+#define EXYNOS5_PLL_DIV2_SEL			EXYNOS_CLKREG(0x20A24)
-+
- #define EXYNOS5_BPLL_CON0			EXYNOS_CLKREG(0x20110)
- #define EXYNOS5_CLKSRC_CDREX			EXYNOS_CLKREG(0x20200)
- #define EXYNOS5_CLKDIV_CDREX			EXYNOS_CLKREG(0x20500)
-diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-index f68a9bb..bea0907 100644
---- a/arch/arm/plat-s5p/clock.c
-+++ b/arch/arm/plat-s5p/clock.c
-@@ -115,17 +115,6 @@ struct clksrc_sources clk_src_apll = {
- 	.nr_sources	= ARRAY_SIZE(clk_src_apll_list),
- };
- 
--/* Possible clock sources for BPLL Mux */
--static struct clk *clk_src_bpll_list[] = {
--	[0] = &clk_fin_bpll,
--	[1] = &clk_fout_bpll,
--};
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index ece5624..46d4734 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -297,6 +297,7 @@
+ #define EXYNOS5_IRQ_MIPICSI1		IRQ_SPI(80)
+ #define EXYNOS5_IRQ_EFNFCON_DMA_ABORT	IRQ_SPI(81)
+ #define EXYNOS5_IRQ_MIPIDSI0		IRQ_SPI(82)
++#define EXYNOS5_IRQ_WDT_IOP		IRQ_SPI(83)
+ #define EXYNOS5_IRQ_ROTATOR		IRQ_SPI(84)
+ #define EXYNOS5_IRQ_GSC0		IRQ_SPI(85)
+ #define EXYNOS5_IRQ_GSC1		IRQ_SPI(86)
+@@ -305,8 +306,8 @@
+ #define EXYNOS5_IRQ_JPEG		IRQ_SPI(89)
+ #define EXYNOS5_IRQ_EFNFCON_DMA		IRQ_SPI(90)
+ #define EXYNOS5_IRQ_2D			IRQ_SPI(91)
+-#define EXYNOS5_IRQ_SFMC0		IRQ_SPI(92)
+-#define EXYNOS5_IRQ_SFMC1		IRQ_SPI(93)
++#define EXYNOS5_IRQ_EFNFCON_0		IRQ_SPI(92)
++#define EXYNOS5_IRQ_EFNFCON_1		IRQ_SPI(93)
+ #define EXYNOS5_IRQ_MIXER		IRQ_SPI(94)
+ #define EXYNOS5_IRQ_HDMI		IRQ_SPI(95)
+ #define EXYNOS5_IRQ_MFC			IRQ_SPI(96)
+@@ -320,7 +321,7 @@
+ #define EXYNOS5_IRQ_PCM2		IRQ_SPI(104)
+ #define EXYNOS5_IRQ_SPDIF		IRQ_SPI(105)
+ #define EXYNOS5_IRQ_ADC0		IRQ_SPI(106)
 -
--struct clksrc_sources clk_src_bpll = {
--	.sources	= clk_src_bpll_list,
--	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
--};
--
- /* Possible clock sources for CPLL Mux */
- static struct clk *clk_src_cpll_list[] = {
- 	[0] = &clk_fin_cpll,
++#define EXYNOS5_IRQ_ADC1		IRQ_SPI(107)
+ #define EXYNOS5_IRQ_SATA_PHY		IRQ_SPI(108)
+ #define EXYNOS5_IRQ_SATA_PMEMREQ	IRQ_SPI(109)
+ #define EXYNOS5_IRQ_CAM_C		IRQ_SPI(110)
+@@ -329,7 +330,6 @@
+ #define EXYNOS5_IRQ_DP1_INTP1		IRQ_SPI(113)
+ #define EXYNOS5_IRQ_CEC			IRQ_SPI(114)
+ #define EXYNOS5_IRQ_SATA		IRQ_SPI(115)
+-#define EXYNOS5_IRQ_NFCON		IRQ_SPI(116)
+ 
+ #define EXYNOS5_IRQ_MCT_L0		IRQ_SPI(120)
+ #define EXYNOS5_IRQ_MCT_L1		IRQ_SPI(121)
+@@ -340,7 +340,6 @@
+ #define EXYNOS5_IRQ_RP_TIMER		IRQ_SPI(127)
+ 
+ #define EXYNOS5_IRQ_PMU			COMBINER_IRQ(1, 2)
+-#define EXYNOS5_IRQ_PMU_CPU1		COMBINER_IRQ(1, 6)
+ 
+ #define EXYNOS5_IRQ_SYSMMU_GSC0_0	COMBINER_IRQ(2, 0)
+ #define EXYNOS5_IRQ_SYSMMU_GSC0_1	COMBINER_IRQ(2, 1)
+@@ -351,6 +350,8 @@
+ #define EXYNOS5_IRQ_SYSMMU_GSC3_0	COMBINER_IRQ(2, 6)
+ #define EXYNOS5_IRQ_SYSMMU_GSC3_1	COMBINER_IRQ(2, 7)
+ 
++#define EXYNOS5_IRQ_SYSMMU_LITE2_0	COMBINER_IRQ(3, 0)
++#define EXYNOS5_IRQ_SYSMMU_LITE2_1	COMBINER_IRQ(3, 1)
+ #define EXYNOS5_IRQ_SYSMMU_FIMD1_0	COMBINER_IRQ(3, 2)
+ #define EXYNOS5_IRQ_SYSMMU_FIMD1_1	COMBINER_IRQ(3, 3)
+ #define EXYNOS5_IRQ_SYSMMU_LITE0_0	COMBINER_IRQ(3, 4)
+@@ -374,8 +375,8 @@
+ 
+ #define EXYNOS5_IRQ_SYSMMU_ARM_0	COMBINER_IRQ(6, 0)
+ #define EXYNOS5_IRQ_SYSMMU_ARM_1	COMBINER_IRQ(6, 1)
+-#define EXYNOS5_IRQ_SYSMMU_MFC_L_0	COMBINER_IRQ(6, 2)
+-#define EXYNOS5_IRQ_SYSMMU_MFC_L_1	COMBINER_IRQ(6, 3)
++#define EXYNOS5_IRQ_SYSMMU_MFC_R_0	COMBINER_IRQ(6, 2)
++#define EXYNOS5_IRQ_SYSMMU_MFC_R_1	COMBINER_IRQ(6, 3)
+ #define EXYNOS5_IRQ_SYSMMU_RTIC_0	COMBINER_IRQ(6, 4)
+ #define EXYNOS5_IRQ_SYSMMU_RTIC_1	COMBINER_IRQ(6, 5)
+ #define EXYNOS5_IRQ_SYSMMU_SSS_0	COMBINER_IRQ(6, 6)
+@@ -387,11 +388,9 @@
+ #define EXYNOS5_IRQ_SYSMMU_MDMA1_1	COMBINER_IRQ(7, 3)
+ #define EXYNOS5_IRQ_SYSMMU_TV_0		COMBINER_IRQ(7, 4)
+ #define EXYNOS5_IRQ_SYSMMU_TV_1		COMBINER_IRQ(7, 5)
+-#define EXYNOS5_IRQ_SYSMMU_GPSX_0	COMBINER_IRQ(7, 6)
+-#define EXYNOS5_IRQ_SYSMMU_GPSX_1	COMBINER_IRQ(7, 7)
+ 
+-#define EXYNOS5_IRQ_SYSMMU_MFC_R_0	COMBINER_IRQ(8, 5)
+-#define EXYNOS5_IRQ_SYSMMU_MFC_R_1	COMBINER_IRQ(8, 6)
++#define EXYNOS5_IRQ_SYSMMU_MFC_L_0	COMBINER_IRQ(8, 5)
++#define EXYNOS5_IRQ_SYSMMU_MFC_L_1	COMBINER_IRQ(8, 6)
+ 
+ #define EXYNOS5_IRQ_SYSMMU_DIS1_0	COMBINER_IRQ(9, 4)
+ #define EXYNOS5_IRQ_SYSMMU_DIS1_1	COMBINER_IRQ(9, 5)
+@@ -407,15 +406,24 @@
+ #define EXYNOS5_IRQ_SYSMMU_DRC_0	COMBINER_IRQ(11, 6)
+ #define EXYNOS5_IRQ_SYSMMU_DRC_1	COMBINER_IRQ(11, 7)
+ 
++#define EXYNOS5_IRQ_MDMA1_ABORT		COMBINER_IRQ(13, 1)
++
++#define EXYNOS5_IRQ_MDMA0_ABORT		COMBINER_IRQ(15, 3)
++
+ #define EXYNOS5_IRQ_FIMD1_FIFO		COMBINER_IRQ(18, 4)
+ #define EXYNOS5_IRQ_FIMD1_VSYNC		COMBINER_IRQ(18, 5)
+ #define EXYNOS5_IRQ_FIMD1_SYSTEM	COMBINER_IRQ(18, 6)
+ 
++#define EXYNOS5_IRQ_ARMIOP_GIC		COMBINER_IRQ(19, 0)
++#define EXYNOS5_IRQ_ARMISP_GIC		COMBINER_IRQ(19, 1)
++#define EXYNOS5_IRQ_IOP_GIC		COMBINER_IRQ(19, 3)
++#define EXYNOS5_IRQ_ISP_GIC		COMBINER_IRQ(19, 4)
++
++#define EXYNOS5_IRQ_PMU_CPU1		COMBINER_IRQ(22, 4)
++
+ #define EXYNOS5_IRQ_EINT0		COMBINER_IRQ(23, 0)
+ #define EXYNOS5_IRQ_MCT_G0		COMBINER_IRQ(23, 3)
+ #define EXYNOS5_IRQ_MCT_G1		COMBINER_IRQ(23, 4)
+-#define EXYNOS5_IRQ_MCT_G2		COMBINER_IRQ(23, 5)
+-#define EXYNOS5_IRQ_MCT_G3		COMBINER_IRQ(23, 6)
+ 
+ #define EXYNOS5_IRQ_EINT1		COMBINER_IRQ(24, 0)
+ #define EXYNOS5_IRQ_SYSMMU_LITE1_0	COMBINER_IRQ(24, 1)
 -- 
 1.7.5.4
