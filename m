@@ -1,21 +1,31 @@
-From: korkiat.s@pacc.go.th (zwhm)
-Date: Mon, 30 Apr 2012 13:31:50 +0800
-Subject: =?gb2312?B?0K2199SxuaS52M+10tS8sLfAt7bAzbav1fnS6UM=?=
-Message-ID: <9F5D1C02-2F7B-4285-A4C6-B326619F5FF6@pacc.go.th>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 30 Apr 2012 07:58:25 +0200
+Subject: [PATCH 1/2] I2C: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1335738969-27445-1-git-send-email-marex@denx.de>
+References: <1335738969-27445-1-git-send-email-marex@denx.de>
+Message-ID: <20120430055825.GA7926@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-50201213
+On Mon, Apr 30, 2012 at 12:36:08AM +0200, Marek Vasut wrote:
+> This sets the bus to run at 400kHz, prior to this,
+> the bus frequency was undefined.
 
+Not exactly. The default values let it run at 100kHz. Since not all
+slaves support 400kHz, I have to NACK this one. Making it configurable
+is the way to go here.
 
-??????????????????????13:31:50
+Thanks,
 
+   Wolfram
 
-AXJRRP
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: Mdnyxv7598.xls
-Type: application/x-msexcel
-Size: 40448 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120430/0742e7cc/attachment-0001.bin>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120430/ce7d39c1/attachment.sig>
