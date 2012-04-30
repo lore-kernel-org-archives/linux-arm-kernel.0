@@ -1,116 +1,103 @@
 From: ccross@android.com (Colin Cross)
-Date: Mon, 30 Apr 2012 13:09:06 -0700
-Subject: [PATCHv3 0/5] coupled cpuidle state support
-Message-ID: <1335816551-27756-1-git-send-email-ccross@android.com>
+Date: Mon, 30 Apr 2012 13:09:07 -0700
+Subject: [PATCHv3 1/5] cpuidle: refactor out cpuidle_enter_state
+In-Reply-To: <1335816551-27756-1-git-send-email-ccross@android.com>
+References: <1335816551-27756-1-git-send-email-ccross@android.com>
+Message-ID: <1335816551-27756-2-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
-cpus cannot be independently powered down, either due to
-sequencing restrictions (on Tegra 2, cpu 0 must be the last to
-power down), or due to HW bugs (on OMAP4460, a cpu powering up
-will corrupt the gic state unless the other cpu runs a work
-around).  Each cpu has a power state that it can enter without
-coordinating with the other cpu (usually Wait For Interrupt, or
-WFI), and one or more "coupled" power states that affect blocks
-shared between the cpus (L2 cache, interrupt controller, and
-sometimes the whole SoC).  Entering a coupled power state must
-be tightly controlled on both cpus.
+Split the code to enter a state and update the stats into a helper
+function, cpuidle_enter_state, and export it.  This function will
+be called by the coupled state code to handle entering the safe
+state and the final coupled state.
 
-The easiest solution to implementing coupled cpu power states is
-to hotplug all but one cpu whenever possible, usually using a
-cpufreq governor that looks at cpu load to determine when to
-enable the secondary cpus.  This causes problems, as hotplug is an
-expensive operation, so the number of hotplug transitions must be
-minimized, leading to very slow response to loads, often on the
-order of seconds.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ drivers/cpuidle/cpuidle.c |   42 +++++++++++++++++++++++++++++-------------
+ drivers/cpuidle/cpuidle.h |    2 ++
+ 2 files changed, 31 insertions(+), 13 deletions(-)
 
-This patch series implements an alternative solution, where each
-cpu will wait in the WFI state until all cpus are ready to enter
-a coupled state, at which point the coupled state function will
-be called on all cpus at approximately the same time.
-
-Once all cpus are ready to enter idle, they are woken by an smp
-cross call.  At this point, there is a chance that one of the
-cpus will find work to do, and choose not to enter suspend.  A
-final pass is needed to guarantee that all cpus will call the
-power state enter function at the same time.  During this pass,
-each cpu will increment the ready counter, and continue once the
-ready counter matches the number of online coupled cpus.  If any
-cpu exits idle, the other cpus will decrement their counter and
-retry.
-
-To use coupled cpuidle states, a cpuidle driver must:
-
-   Set struct cpuidle_device.coupled_cpus to the mask of all
-   coupled cpus, usually the same as cpu_possible_mask if all cpus
-   are part of the same cluster.  The coupled_cpus mask must be
-   set in the struct cpuidle_device for each cpu.
-
-   Set struct cpuidle_device.safe_state to a state that is not a
-   coupled state.  This is usually WFI.
-
-   Set CPUIDLE_FLAG_COUPLED in struct cpuidle_state.flags for each
-   state that affects multiple cpus.
-
-   Provide a struct cpuidle_state.enter function for each state
-   that affects multiple cpus.  This function is guaranteed to be
-   called on all cpus at approximately the same time.  The driver
-   should ensure that the cpus all abort together if any cpu tries
-   to abort once the function is called.
-
-This series has been tested by implementing a test cpuidle state
-that uses the parallel barrier helper function to verify that
-all cpus call the function at the same time.
-
-This patch set has a few disadvantages over the hotplug governor,
-but I think they are all fairly minor:
-   * Worst-case interrupt latency can be increased.  If one cpu
-     receives an interrupt while the other is spinning in the
-     ready_count loop, the second cpu will be stuck with
-     interrupts off until the first cpu finished processing
-     its interrupt and exits idle.  This will increase the worst
-     case interrupt latency by the worst-case interrupt processing
-     time, but should be very rare.
-   * Interrupts are processed while still inside pm_idle.
-     Normally, interrupts are only processed at the very end of
-     pm_idle, just before it returns to the idle loop.  Coupled
-     states requires processing interrupts inside
-     cpuidle_enter_state_coupled in order to distinguish between
-     the smp_cross_call from another cpu that is now idle and an
-     interrupt that should cause idle to exit.
-     I don't see a way to fix this without either being able to
-     read the next pending irq from the interrupt chip, or
-     querying the irq core for which interrupts were processed.
-   * Since interrupts are processed inside cpuidle, the next
-     timer event could change.  The new timer event will be
-     handled correctly, but the idle state decision made by
-     the governor will be out of date, and will not be revisited.
-     The governor select function could be called again every time,
-     but this could lead to a lot of work being done by an idle
-     cpu if the other cpu was mostly busy.
-
-v2:
-   * removed the coupled lock, replacing it with atomic counters
-   * added a check for outstanding pokes before beginning the
-     final transition to avoid extra wakeups
-   * made the cpuidle_coupled struct completely private
-   * fixed kerneldoc comment formatting
-   * added a patch with a helper function for resynchronizing
-     cpus after aborting idle
-   * added a patch (not for merging) to add trace events for
-     verification and performance testing
-
-v3:
-   * rebased on v3.4-rc4 by Santosh
-   * fixed decrement in cpuidle_coupled_cpu_set_alive
-   * updated tracing patch to remove unnecessary debugging so
-     it can be merged
-   * made tracing _rcuidle
-
-This series has been tested and reviewed by Santosh and Kevin
-for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
-and Exynos5 patches are in progress.  I think this is ready to
-go in.  Lean, are you maintaining a cpuidle tree for linux-next?
-If not, I can publish a tree for linux-next, or this could go in
-through Arnd's tree.
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index 2f0083a..3e3e3e4 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -103,6 +103,34 @@ int cpuidle_play_dead(void)
+ }
+ 
+ /**
++ * cpuidle_enter_state - enter the state and update stats
++ * @dev: cpuidle device for this cpu
++ * @drv: cpuidle driver for this cpu
++ * @next_state: index into drv->states of the state to enter
++ */
++int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
++		int next_state)
++{
++	int entered_state;
++
++	entered_state = cpuidle_enter_ops(dev, drv, next_state);
++
++	if (entered_state >= 0) {
++		/* Update cpuidle counters */
++		/* This can be moved to within driver enter routine
++		 * but that results in multiple copies of same code.
++		 */
++		dev->states_usage[entered_state].time +=
++				(unsigned long long)dev->last_residency;
++		dev->states_usage[entered_state].usage++;
++	} else {
++		dev->last_residency = 0;
++	}
++
++	return entered_state;
++}
++
++/**
+  * cpuidle_idle_call - the main idle loop
+  *
+  * NOTE: no locks or semaphores should be used here
+@@ -143,23 +171,11 @@ int cpuidle_idle_call(void)
+ 	trace_power_start_rcuidle(POWER_CSTATE, next_state, dev->cpu);
+ 	trace_cpu_idle_rcuidle(next_state, dev->cpu);
+ 
+-	entered_state = cpuidle_enter_ops(dev, drv, next_state);
++	entered_state = cpuidle_enter_state(dev, drv, next_state);
+ 
+ 	trace_power_end_rcuidle(dev->cpu);
+ 	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, dev->cpu);
+ 
+-	if (entered_state >= 0) {
+-		/* Update cpuidle counters */
+-		/* This can be moved to within driver enter routine
+-		 * but that results in multiple copies of same code.
+-		 */
+-		dev->states_usage[entered_state].time +=
+-				(unsigned long long)dev->last_residency;
+-		dev->states_usage[entered_state].usage++;
+-	} else {
+-		dev->last_residency = 0;
+-	}
+-
+ 	/* give the governor an opportunity to reflect on the outcome */
+ 	if (cpuidle_curr_governor->reflect)
+ 		cpuidle_curr_governor->reflect(dev, entered_state);
+diff --git a/drivers/cpuidle/cpuidle.h b/drivers/cpuidle/cpuidle.h
+index 7db1866..d8a3ccc 100644
+--- a/drivers/cpuidle/cpuidle.h
++++ b/drivers/cpuidle/cpuidle.h
+@@ -14,6 +14,8 @@
+ extern struct mutex cpuidle_lock;
+ extern spinlock_t cpuidle_driver_lock;
+ extern int cpuidle_disabled(void);
++extern int cpuidle_enter_state(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int next_state);
+ 
+ /* idle loop */
+ extern void cpuidle_install_idle_handler(void);
+-- 
+1.7.7.3
