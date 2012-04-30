@@ -1,28 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 22:15:06 +0000
-Subject: [PULL] ARM: at91: at91sam9n12 DT support
-In-Reply-To: <20120427172617.GX9142@game.jcrosoft.org>
-References: <20120427172617.GX9142@game.jcrosoft.org>
-Message-ID: <201204302215.07063.arnd@arndb.de>
+Date: Mon, 30 Apr 2012 22:17:35 +0000
+Subject: [PATCH] maintainership update for the Marvell Orion family of SOCs
+In-Reply-To: <87mx5sanuf.fsf@lebrac.rtp-net.org>
+References: <alpine.LFD.2.02.1204301330111.21030@xanadu.home>
+ <201204302124.28892.arnd@arndb.de> <87mx5sanuf.fsf@lebrac.rtp-net.org>
+Message-ID: <201204302217.35958.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 April 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Hi,
+On Monday 30 April 2012, Arnaud Patard wrote:
+> > the plat-orion directory and leave the other directories for the classic
+> > probing, eventually to be removed when the new stuff can handle all the
+> > machines that someone cares about.
 > 
-> please pull
-> based on the at91-for-next-dt pull
-> 
-> The following changes since commit 26690863e2c1fa4fee5f6137b219f4b8a1a02287:
-> 
->   Ethernut 5 board support (2012-04-27 23:23:22 +0800)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-for-next-soc
+> I'm not sure we'll be able to remove any machine without being sure it's
+> working and it can take quite some time. orion/kirkwood/... are used on
+> NAS boxes so I guess people are not necessary updating their kernel on a
+> regular basis.
 
-
-Pulled into the next/newsoc branch, and pulled the previous one into
-the next/dt branch, thanks a lot!
+Well, there is no reason to rush this at all, it could live in parallel
+for a couple of years. But at one point we can decide that if nobody has
+bothered to write the .dts file for one board and tested it that nobody
+cares about that board any more and it can just get removed and possibly
+added back in dts form when someone does complain.
 
 	Arnd
