@@ -1,46 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Apr 2012 14:18:57 +0200
-Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
-In-Reply-To: <20120430020143.GA1857@richard-laptop>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
- <20120427080412.GW17184@pengutronix.de>
- <20120427091055.GP28063@b20223-02.ap.freescale.net>
- <20120427092529.GA20478@pengutronix.de>
- <20120430020143.GA1857@richard-laptop>
-Message-ID: <20120430121857.GL4141@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 30 Apr 2012 14:05:42 +0200
+Subject: [PATCH 1/2] I2C: Set I2C timing registers for mxs-i2c
+In-Reply-To: <20120430055825.GA7926@pengutronix.de>
+References: <1335738969-27445-1-git-send-email-marex@denx.de>
+ <20120430055825.GA7926@pengutronix.de>
+Message-ID: <201204301405.42621.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2012 at 10:01:46AM +0800, Richard Zhao wrote:
-> > > > 
-> > > > 	clk_register_clkdev(clk[ipg], "ipg", "2028000.ssi");
-> > > ssi don't have ipg gate. We can let it always on for imx6q.
-> > 
-> > Can you please ask your IC guys for clarification?
-> > 
-> > For example on i.MX5 we have a ssi ipg clock and a ssi serial clock.
-> > Both can be gated with two individual gate bits.
-> > 
-> > The i.MX6 datasheet (and also several other i.MX datasheets) is quite
-> > nebulous. The i.MX6 has only one gate bit for each SSI unit, but
-> > it's not clear if this bit actually gates both the ipg and serial
-> > clock or only one of them.
-> You're right. ipg and serial clocks share the same gate. How do we
-> handle it? I think it's not the only one and won't be last one.
+Dear Wolfram Sang,
 
-We don't have support for a single gate gating two clocks right now and
-I don't know how this fits into the clock framework.
-We could pretend that only the ipg clock is gateable because this is
-needed anyway when the SSI unit is used.
+> On Mon, Apr 30, 2012 at 12:36:08AM +0200, Marek Vasut wrote:
+> > This sets the bus to run at 400kHz, prior to this,
+> > the bus frequency was undefined.
+> 
+> Not exactly. The default values let it run at 100kHz.
 
-It seems we need a proper solution for this later.
+Have you tried dumping the default values and comparing it with the values for 
+100kHz in the manual?
 
-Sascha
+> Since not all
+> slaves support 400kHz, I have to NACK this one. Making it configurable
+> is the way to go here.
 
+All right, that's a good point.
+> 
+> Thanks,
+> 
+>    Wolfram
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
+Marek Vasut
