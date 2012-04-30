@@ -1,46 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 21:41:08 +0000
-Subject: [GIT PULL] ux500-core for ARM SoC
-In-Reply-To: <1335369056-5331-1-git-send-email-linus.walleij@linaro.org>
-References: <1335369056-5331-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201204302141.08186.arnd@arndb.de>
+Date: Mon, 30 Apr 2012 21:47:19 +0000
+Subject: [GIT PULL] ux500 device tree patches
+In-Reply-To: <1335369540-5607-1-git-send-email-linus.walleij@linaro.org>
+References: <1335369540-5607-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201204302147.19715.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 25 April 2012, Linus Walleij wrote:
-> Daniel Lezcano (1):
->       ARM: ux500: add the cpuidle driver for WFI and ARM retention
+> this pull request contains some device tree work by Lee Jones.
+> I have tried to keep these patches in the arch/arm/boot/dts/*
+> space to get some sanity in the branch proliferation.
 > 
-> Lee Jones (4):
->       ARM: ux500: Do not attempt to register non-existent i2c devices on Snowball
->       ARM: ux500: Fork cpu-db8500 platform_devs for sequential DT enablement
->       ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
->       ARM: ux500: Enable PRCMU Timer 4 (clocksource) for Device Tree
+> There is still one patch that touches arch/arm/mach-ux500 too
+> though (but it should merge fine with the other ux500 stuff).
 > 
-> Linus Walleij (4):
->       ARM: ux500: core U9540 support
->       ARM: ux500: delete U5500 support
->       mfd/db5500-prcmu: delete DB5500 PRCMU support
->       mfd/ab5500: delete AB5500 support
+> The changes to the device tree are of course dependent on some
+> core changes and some patching in the GPIO/pin driver, but as
+> the device tree files are believed to be a different world
+> (and should one day live in their own git) I split this off
+> anyway. I don't think people bisect the device trees per se
+> and the board code in conjunction anyway.
 > 
-> Michel Jaouen (1):
->       ARM: ux500: ioremap differences for DB9540
+> If you think differently tell me and I'll happily stack
+> all three pull requests on top of each other and send one
+> big shebang with everything instead :-)
+> 
+> So: please pull this in.
 > 
 
-Hi Linus,
-
-Sorry for the delay in my reply. I was going to pull this but noticed
-that you have an unfortunate mix of stuff in this branch, and you've done
-this better in the past.
-
-Please separate this into more logical branches, e.g.
-
-1. delete u5500
-2. add u9540 support
-3. device tree patches (why not in the other branch?)
-
-I have applied it to a staging branch for now, which means it gets
-coverage in linux-next but I won't send it in the merge window without
-further action.
+Pulled, thanks!
 
 	Arnd
