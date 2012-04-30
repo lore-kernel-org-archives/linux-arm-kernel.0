@@ -1,64 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Apr 2012 14:34:38 +0100
-Subject: [PATCH v4] ARM: cache-l2x0.c: save aux ctrl for resume in case
- l2x0 is enabled before init
-In-Reply-To: <1335791786-32377-1-git-send-email-ylmao@marvell.com>
-References: <1335791786-32377-1-git-send-email-ylmao@marvell.com>
-Message-ID: <CAHkRjk51pATYdhKhmBb9sWywN+0BgeQLpW9bMfTkRgf_09wydg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Apr 2012 08:46:40 +0000
+Subject: [PATCH 02/17] ARM: at91: use machine specific hook for late init
+In-Reply-To: <20120428065348.GC9924@S2101-09.ap.freescale.net>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <20120428053001.GY9142@game.jcrosoft.org>
+ <20120428065348.GC9924@S2101-09.ap.freescale.net>
+Message-ID: <201204300846.41118.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 April 2012 14:16, Yilu Mao <ylmao@marvell.com> wrote:
-> If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
-> register will not be saved in l2x0_saved_regs. Therefore we can not use
-> l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
-> by saving aux ctrl in l2x0_saved_regs just after it's being read from
-> the register.
-> And in case some bits of aux ctrl register are reserved, re-read and
-> save it properly after set it if l2x0 is disabled before init.
->
-> Change-Id: I54f3002274ffe9cdc667dba81e36e08f2e121467
-> Signed-off-by: Yilu Mao <ylmao@marvell.com>
-> ---
-> ?arch/arm/mm/cache-l2x0.c | ? ?9 +++++++++
-> ?1 files changed, 9 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index a53fd2a..9893e58 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -320,6 +320,13 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
-> ? ? ? ?cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
-> ? ? ? ?aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
->
-> + ? ? ? /*
-> + ? ? ? ?* In case l2x controller is enabled, the aux ctrl register
-> + ? ? ? ?* can't be set. So the original value should be stored in
-> + ? ? ? ?* the l2x0_saved_regs for restoring when resume.
-> + ? ? ? ?*/
-> + ? ? ? l2x0_saved_regs.aux_ctrl = aux;
+On Saturday 28 April 2012, Shawn Guo wrote:
+> On Sat, Apr 28, 2012 at 07:30:01AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 10:30 Sat 28 Apr     , Shawn Guo wrote:
+> > > On Fri, Apr 27, 2012 at 04:26:01PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > we discuss with Arnd we came back with 2 ideas one is to use a machine
+> > > > specific initcall or compatible specifc initcall
+> > > 
+> > > Do you mean an initcall with machine/compatible detection inside?  The
+> > > whole point of the hooks in struct machine_desc  is to save the
+> > > machine/compatible detection.  You already use .init_machine as
+> > > an arch_initcall time hook, and what .init_late provides you is just
+> > > a late_initcall time hook.  If you want to detect machine/compatible
+> > > in your late_initcall rather than using this hook, you should not
+> > > use .init_machine for the same reason.
+> > on DT we just do this
+> > 
+> I'm talking about non-DT case.  Sadly, there are still so many non-DT
+> board files in arch/arm/mach-at91.
 
-Why not move this
+It depends on whether we want to allow non-DT board files for multiplatform
+kernels. We clearly can allow them, but I think we can spare some trouble
+and also make the configuration simpler if we just disallow it, and
+make only those platforms that are converted to both allow multiplat
+and DT boot as sub-options under the top-level multiplatform kernel
+option. If we do that, we can keep a lot of initcalls in the platform
+code and just add an "if (!of_have_populated_dt())" in them or a check
+for the respective device.
 
-> +
-> ? ? ? ?aux &= aux_mask;
-> ? ? ? ?aux |= aux_val;
->
-> @@ -364,6 +371,8 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
-> ? ? ? ? ? ? ? ?/* l2x0 controller is disabled */
-> ? ? ? ? ? ? ? ?writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
->
-> + ? ? ? ? ? ? ? /* Re-read it in case some bits are reserved. */
-> + ? ? ? ? ? ? ? aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+> > so the hook start to make not too much sense
+> > at machine level
+> > 
+> > as this is for nearly all of them purely soc
+> > 
+> This reminds me an argument against soc_desc stuff.  With DT adopted,
+> the struct machine_desc (hooks inside it) becomes purely soc specific,
+> so why do we need soc_desc then?
 
-and this
+Ah, good point. I was wondering what happened to that discussion.
 
-> ? ? ? ? ? ? ? ?l2x0_saved_regs.aux_ctrl = aux;
->
-> ? ? ? ? ? ? ? ?l2x0_inv_all();
+On a related note, I have looked up what kinds of initcalls are in
+the platform code:
 
-somewhere after the if block and we only read the aux once. The
-comment may no longer make sense though.
+$ git grep -h ^[a-z_]*_initcall arch/arm/ | cut -f 1 -d \( | sort | uniq -c | sort -n      1 subsys_initcall_sync
+      2 postcore_initcall_sync
+      5 console_initcall
+      7 fs_initcall
+      9 early_initcall
+     14 __initcall
+     34 device_initcall
+     35 postcore_initcall
+     43 core_initcall
+     49 late_initcall
+     87 subsys_initcall
+    128 arch_initcall
 
--- 
-Catalin
+I think that if we do the late_initcall mechanism that you proposed,
+we will probaly need the same for subsyste_initcall, and although
+we already have mach_desc->init_machine() at the arch_initcall
+level, it seems that there are a lot of other users that don't
+use it (for good or for not so good reasons, I have not checked)
+and that would definitely benefit from the method that Jean-Christophe
+posted. I think we will end up wanting both in any case.
+
+	Arnd
