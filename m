@@ -1,37 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Apr 2012 09:05:29 -0700
-Subject: [PATCH 0/6] ARM: OMAP: hwmod: remove runtime cpu_is checking
-In-Reply-To: <4F9E8CA7.8050700@ti.com>
-References: <1335557140-10854-1-git-send-email-khilman@ti.com>
- <4F9E8CA7.8050700@ti.com>
-Message-ID: <20120430160527.GC3739@atomide.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Mon, 30 Apr 2012 21:38:43 +0530
+Subject: [GIT PULL] ARM: spear-soc clock updates for 3.5
+Message-ID: <CAOh2x=n11TXfKp3HkEPFTeFi2qO7tKmedSL7zPeU842-+tu47w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [120430 06:03]:
-> On Saturday 28 April 2012 01:35 AM, Kevin Hilman wrote:
-> > This series attempts to remove all the runtime cpu_is* checking in
-> > omap_hwmod.c in favor of using function pointers initialized at init
-> > time.
-> > 
-> > This series was motivated by the addition of support for the AM335x
-> > series which was done by adding several more cpu_is* checks, and
-> > provided the proverbial straw that broke the camel's back.  
-> > 
-> > In addition to the cleanup, this provides a much cleaner way of adding
-> > additional SoC support since it no longer requires adding additional
-> > runtime cpu_is* checks.
-> > 
-> > Boot tested on OMAP3530/Overo and OMAP4430/Panda.
-> > 
-> I was looking at some of these while trying to OMAP5
-> support. Indeed the cpu_is_* is becoming increasingly
-> no maintanable and ugly. Thanks for the series.
+Hi Arnd/Olof,
 
-Also we need to start considering what happens if non-omap code
-calls cpu_is_omapxxx for common zImage kernels.. So it's best to
-make sure they only happen in omap specific calls during init time.
+This is pull request for SPEAr common clk framework updates. It had dependency
+on spear/dt and spear/pinctrl for applying patches, and so i created a merge
+of v3.4-rc5 with those branches.
 
-Regards,
+Also, it has compilation dependencies with:
+- Mike's clk-next branch
+- Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ...
 
-Tony
+I have added Reviewed-by from Mike on these patches.
+
+The following changes since commit 507f3bb673bf25ff0345986c72609debacdcee60:
+
+  Merge branch 'spear/dt'; branch 'spear/pinctrl' into v3.4-rc5
+(2012-04-30 13:30:19 +0530)
+
+are available in the git repository at:
+
+
+  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear-clk
+
+for you to fetch changes up to 9e1a2a12e55a9d8da21810cab91b91eb8f27be35:
+
+  SPEAr: Switch to common clock framework (2012-04-30 13:36:13 +0530)
+
+----------------------------------------------------------------
+Sascha Hauer (1):
+      clk: add a fixed factor clock
+
+Viresh Kumar (6):
+      SPEAr: clk: Add VCO-PLL Synthesizer clock
+      SPEAr: clk: Add Auxiliary Synthesizer clock
+      SPEAr: clk: Add Fractional Synthesizer clock
+      SPEAr: clk: Add General Purpose Timer Synthesizer clock
+      SPEAr: Call clk_prepare() before calling clk_enable
+      SPEAr: Switch to common clock framework
+
+ MAINTAINERS                                     |    4 +-
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/mach-spear3xx/Makefile                 |    2 +-
+ arch/arm/mach-spear3xx/clock.c                  |  892 --------------------
+ arch/arm/mach-spear3xx/include/mach/generic.h   |    4 +-
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h |    2 +
+ arch/arm/mach-spear3xx/include/mach/spear.h     |   13 +
+ arch/arm/mach-spear3xx/spear300.c               |    1 -
+ arch/arm/mach-spear3xx/spear310.c               |    1 -
+ arch/arm/mach-spear3xx/spear320.c               |   12 +-
+ arch/arm/mach-spear3xx/spear3xx.c               |    2 +
+ arch/arm/mach-spear6xx/Makefile                 |    2 +-
+ arch/arm/mach-spear6xx/clock.c                  |  789 ------------------
+ arch/arm/mach-spear6xx/include/mach/misc_regs.h |    2 +
+ arch/arm/mach-spear6xx/spear6xx.c               |    5 +-
+ arch/arm/plat-spear/Makefile                    |    2 +-
+ arch/arm/plat-spear/clock.c                     | 1005 -----------------------
+ arch/arm/plat-spear/include/plat/clock.h        |  249 ------
+ arch/arm/plat-spear/time.c                      |    8 +-
+ drivers/clk/Makefile                            |    5 +-
+ drivers/clk/clk-fixed-factor.c                  |   95 +++
+ drivers/clk/spear/Makefile                      |    8 +
+ drivers/clk/spear/clk-aux-synth.c               |  192 +++++
+ drivers/clk/spear/clk-frac-synth.c              |  159 ++++
+ drivers/clk/spear/clk-gpt-synth.c               |  148 ++++
+ drivers/clk/spear/clk-vco-pll.c                 |  350 ++++++++
+ drivers/clk/spear/clk.c                         |   36 +
+ drivers/clk/spear/clk.h                         |  134 +++
+ drivers/clk/spear/spear3xx_clock.c              |  612 ++++++++++++++
+ drivers/clk/spear/spear6xx_clock.c              |  342 ++++++++
+ include/linux/clk-private.h                     |   20 +
+ include/linux/clk-provider.h                    |   23 +
+ 32 files changed, 2164 insertions(+), 2956 deletions(-)
+ delete mode 100644 arch/arm/mach-spear3xx/clock.c
+ delete mode 100644 arch/arm/mach-spear6xx/clock.c
+ delete mode 100644 arch/arm/plat-spear/clock.c
+ delete mode 100644 arch/arm/plat-spear/include/plat/clock.h
+ create mode 100644 drivers/clk/clk-fixed-factor.c
+ create mode 100644 drivers/clk/spear/Makefile
+ create mode 100644 drivers/clk/spear/clk-aux-synth.c
+ create mode 100644 drivers/clk/spear/clk-frac-synth.c
+ create mode 100644 drivers/clk/spear/clk-gpt-synth.c
+ create mode 100644 drivers/clk/spear/clk-vco-pll.c
+ create mode 100644 drivers/clk/spear/clk.c
+ create mode 100644 drivers/clk/spear/clk.h
+ create mode 100644 drivers/clk/spear/spear3xx_clock.c
+ create mode 100644 drivers/clk/spear/spear6xx_clock.c
+
+-- 
+viresh
