@@ -1,38 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 30 Apr 2012 13:41:23 -0700
-Subject: [PATCH-V4 1/4] ARM: OMAP3+: am33xx: Add voltage domain data
-In-Reply-To: <alpine.DEB.2.00.1204271838090.10308@utopia.booyaka.com> (Paul
- Walmsley's message of "Fri, 27 Apr 2012 18:39:07 -0600 (MDT)")
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <1333123435-27186-2-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204271838090.10308@utopia.booyaka.com>
-Message-ID: <87r4v5t0jw.fsf@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 30 Apr 2012 22:45:57 +0200
+Subject: [PATCH 2/2] I2C: Implement DMA support into mxs-i2c
+In-Reply-To: <20120430203016.GD28226@pengutronix.de>
+References: <1335738969-27445-1-git-send-email-marex@denx.de>
+ <201204302207.39112.marex@denx.de> <20120430203016.GD28226@pengutronix.de>
+Message-ID: <201204302245.57958.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+Dear Wolfram Sang,
 
-> Hi Vaibhav, Kevin,
->
-> On Fri, 30 Mar 2012, Vaibhav Hiremath wrote:
->
->> Currently dummy voltage domain data is being created
->> in order to succeed boot process, nothing has been done
->> w.r.t actual hardware (voltage control).
->> 
->> Also, hook up the AM33XX voltage domain to OMAP framework.
->> 
->> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->
-> Looks okay to me.  Kevin, you want to ack this one and I will queue it?  
-> Either that, or if you want to take it, I will ack it.
+> > > What has the compiler version to do with the relevance? :) This has
+> > > nothing to do with adding DMA support. Plus, nobody so far could tell
+> > > me what path gcc is seeing there.
+> > 
+> > It complains that data might be undefined, do you want it in a separate
+> > patch then ?
+> 
+> Yes, but only if you can prove that the compiler is right.
 
-You can take it with the others.
+It's not right, because that variable is always initialized, but this at least 
+squashes the compile warning.
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+> > I still havent figured out how to flip between pioqueue mode and dma mode
+> > without the controller getting confused, so I prefer to postpone it into
+> > subsequent patch. Eventually, I agree it'd be cool to be able to do this
+> > switching.
+> 
+> Yes, send V2 with DMA by default, and I will give a try on the
+> mode-switching later, too.
+
+I'd prefer to have PIOQ by default, to avoid breaking some of the boards. Or can 
+you test on all of them?
+
+> 
+> Thanks,
+> 
+>    Wolfram
+
+Best regards,
+Marek Vasut
