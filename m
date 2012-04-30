@@ -1,23 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Apr 2012 13:11:26 +0100
-Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case
- that l2x0 is enabled before init
-In-Reply-To: <4F9B8D1C.6090400@marvell.com>
-References: <4F99148B.4020900@marvell.com> <20120426094400.GD18136@arm.com>
- <4F991ED6.8060109@marvell.com> <20120426102815.GE18136@arm.com>
- <4F9924FB.7070308@marvell.com> <20120426103840.GA6294@arm.com>
- <4F9927F2.5060408@marvell.com> <20120426105651.GB6294@arm.com>
- <4F992B80.6040207@marvell.com> <4F9B8D1C.6090400@marvell.com>
-Message-ID: <20120430121125.GN10632@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Apr 2012 14:18:57 +0200
+Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
+In-Reply-To: <20120430020143.GA1857@richard-laptop>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
+ <20120427080412.GW17184@pengutronix.de>
+ <20120427091055.GP28063@b20223-02.ap.freescale.net>
+ <20120427092529.GA20478@pengutronix.de>
+ <20120430020143.GA1857@richard-laptop>
+Message-ID: <20120430121857.GL4141@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2012 at 07:24:28AM +0100, Yilu Mao wrote:
-> Do you agree with this patch to be merged?
+On Mon, Apr 30, 2012 at 10:01:46AM +0800, Richard Zhao wrote:
+> > > > 
+> > > > 	clk_register_clkdev(clk[ipg], "ipg", "2028000.ssi");
+> > > ssi don't have ipg gate. We can let it always on for imx6q.
+> > 
+> > Can you please ask your IC guys for clarification?
+> > 
+> > For example on i.MX5 we have a ssi ipg clock and a ssi serial clock.
+> > Both can be gated with two individual gate bits.
+> > 
+> > The i.MX6 datasheet (and also several other i.MX datasheets) is quite
+> > nebulous. The i.MX6 has only one gate bit for each SSI unit, but
+> > it's not clear if this bit actually gates both the ipg and serial
+> > clock or only one of them.
+> You're right. ipg and serial clocks share the same gate. How do we
+> handle it? I think it's not the only one and won't be last one.
 
-I would rather re-read the aux_ctrl register again after it was set (if
-L2 is disabled) and store this value. It makes sense if some of the bits
-are reserved, at least we have the real value.
+We don't have support for a single gate gating two clocks right now and
+I don't know how this fits into the clock framework.
+We could pretend that only the ipg clock is gateable because this is
+needed anyway when the SSI unit is used.
+
+It seems we need a proper solution for this later.
+
+Sascha
+
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
