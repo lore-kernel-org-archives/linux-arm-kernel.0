@@ -1,64 +1,83 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Sun, 29 Apr 2012 21:57:08 -0400
-Subject: [PATCH] ARM: Fix restoration of IP scratch register when auditing
- syscalls [v2]
-Message-ID: <1335751028-15466-1-git-send-email-jcm@jonmasters.org>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Mon, 30 Apr 2012 10:01:46 +0800
+Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
+In-Reply-To: <20120427092529.GA20478@pengutronix.de>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
+ <20120427080412.GW17184@pengutronix.de>
+ <20120427091055.GP28063@b20223-02.ap.freescale.net>
+ <20120427092529.GA20478@pengutronix.de>
+Message-ID: <20120430020143.GA1857@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audit subsystem builds upon ptrace to record system calls. This is done
-in a couple of places (on return from fork into a new task, on exit from
-the SWI vector), using calls to syscall_trace. The latter function abuses
-the userspace intra-procedure scratch register (regs->ARM_ip, aka r12),
-and intends to restore it prior to return to userspace. Unfortunately,
-there are cases where we will return to userspace without restoring.
+On Fri, Apr 27, 2012 at 11:25:29AM +0200, Sascha Hauer wrote:
+> On Fri, Apr 27, 2012 at 05:10:56PM +0800, Richard Zhao wrote:
+> > On Fri, Apr 27, 2012 at 10:04:12AM +0200, Sascha Hauer wrote:
+> > > On Fri, Apr 27, 2012 at 03:03:03PM +0800, Richard Zhao wrote:
+> > > > It's used by audio drivers.
+> > > > 
+> > > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > > > ---
+> > > >  arch/arm/mach-imx/clk-imx6q.c |    1 +
+> > > >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > > > index f40a35d..9a03dcc 100644
+> > > > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > > > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > > > @@ -418,6 +418,7 @@ int __init mx6q_clocks_init(void)
+> > > >  	clk_register_clkdev(clk[sdma], NULL, "20ec000.sdma");
+> > > >  	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
+> > > >  	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
+> > > > +	clk_register_clkdev(clk[ssi1], NULL, "2028000.ssi");
+> > > 
+> > > The ssi clock needs a general cleanup on all i.MX just like I cleaned up
+> > > the other units. The SSI unit has at least a register clock and a baud
+> > > clock. What the driver requests and enables is the register clock.
+> > > 
+> > > The baud clock is currently unused and is needed only for master mode
+> > > (which is not implemented in the ssi driver)
+> > Are you sure for that? If I don't enable clk[ssi1], the ssi will not
+> > work.
+> > 
+> > > 
+> > > So where we want to come to is:
+> > > 
+> > > 	clk_register_clkdev(clk[ipg], "ipg", "2028000.ssi");
+> > ssi don't have ipg gate. We can let it always on for imx6q.
+> 
+> Can you please ask your IC guys for clarification?
+> 
+> For example on i.MX5 we have a ssi ipg clock and a ssi serial clock.
+> Both can be gated with two individual gate bits.
+> 
+> The i.MX6 datasheet (and also several other i.MX datasheets) is quite
+> nebulous. The i.MX6 has only one gate bit for each SSI unit, but
+> it's not clear if this bit actually gates both the ipg and serial
+> clock or only one of them.
+You're right. ipg and serial clocks share the same gate. How do we
+handle it? I think it's not the only one and won't be last one.
+> 
+> My general idea is that each unit in the SoC has different input clocks.
+> In the driver we need to clk_get() the input clocks. If a given SoC has
+> no software control over some of the devices input clocks, then we need
+> to provide a dummy for this, because other SoCs have control over the
+> clock.
+Great.
 
-If we are in fact not ptracing but are merely auditing calls, we will
-happily trash the content of ip but will exit to userspace without
-restoring the value. It just so happens that GLIBC uses ip as a
-storage for the TLS thread pointer info, and bad things result.
-
-The fix is simply to have an additional out when not ptracing. This
-second version merges the two existing if statements following useful
-Google+ feedback from Ralph, but keeps the out jump as a reminder to
-those who will otherwise fail to restore the IP in future patches.
-
-Signed-off-by: Jon Masters <jcm@jonmasters.org>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Cc: Eric Paris <eparis@redhat.com>
-Cc: Ralph Corderoy <ralph@inputplus.co.uk>
-Cc: stable at vger.kernel.org
----
- arch/arm/kernel/ptrace.c |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index ede6443..e8388d7 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -928,10 +928,10 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 		audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
- 				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
- 
--	if (!test_thread_flag(TIF_SYSCALL_TRACE))
--		return scno;
--	if (!(current->ptrace & PT_PTRACED))
--		return scno;
-+	/* If e.g. doing audit (not also ptrace) restore user IP and return */
-+	if (!test_thread_flag(TIF_SYSCALL_TRACE) ||
-+	    !(current->ptrace & PT_PTRACED))
-+		goto out_no_ptrace;
- 
- 	current_thread_info()->syscall = scno;
- 
-@@ -951,4 +951,8 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 	regs->ARM_ip = ip;
- 
- 	return current_thread_info()->syscall;
-+
-+out_no_ptrace:
-+	regs->ARM_ip = ip;
-+	return scno;
- }
--- 
-1.7.7.4
+Thanks
+Richard
+> 
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
