@@ -1,45 +1,121 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 30 Apr 2012 16:16:27 -0500
-Subject: [PATCH V3 0/2] of: Add generic device tree DMA helpers
-Message-ID: <1335820587-28679-1-git-send-email-jon-hunter@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 30 Apr 2012 14:18:05 -0700
+Subject: [PATCHv3 0/5] coupled cpuidle state support
+In-Reply-To: <1335816551-27756-1-git-send-email-ccross@android.com>
+References: <1335816551-27756-1-git-send-email-ccross@android.com>
+Message-ID: <CAMbhsRS+CAXoJvwdNN+iYLQUJR1BYkJD0kBLORyFwtHv7sCcuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Hunter <jon-hunter@ti.com>
+On Mon, Apr 30, 2012 at 1:09 PM, Colin Cross <ccross@android.com> wrote:
+> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+> cpus cannot be independently powered down, either due to
+> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+> power down), or due to HW bugs (on OMAP4460, a cpu powering up
+> will corrupt the gic state unless the other cpu runs a work
+> around). ?Each cpu has a power state that it can enter without
+> coordinating with the other cpu (usually Wait For Interrupt, or
+> WFI), and one or more "coupled" power states that affect blocks
+> shared between the cpus (L2 cache, interrupt controller, and
+> sometimes the whole SoC). ?Entering a coupled power state must
+> be tightly controlled on both cpus.
+>
+> The easiest solution to implementing coupled cpu power states is
+> to hotplug all but one cpu whenever possible, usually using a
+> cpufreq governor that looks at cpu load to determine when to
+> enable the secondary cpus. ?This causes problems, as hotplug is an
+> expensive operation, so the number of hotplug transitions must be
+> minimized, leading to very slow response to loads, often on the
+> order of seconds.
+>
+> This patch series implements an alternative solution, where each
+> cpu will wait in the WFI state until all cpus are ready to enter
+> a coupled state, at which point the coupled state function will
+> be called on all cpus at approximately the same time.
+>
+> Once all cpus are ready to enter idle, they are woken by an smp
+> cross call. ?At this point, there is a chance that one of the
+> cpus will find work to do, and choose not to enter suspend. ?A
+> final pass is needed to guarantee that all cpus will call the
+> power state enter function at the same time. ?During this pass,
+> each cpu will increment the ready counter, and continue once the
+> ready counter matches the number of online coupled cpus. ?If any
+> cpu exits idle, the other cpus will decrement their counter and
+> retry.
+>
+> To use coupled cpuidle states, a cpuidle driver must:
+>
+> ? Set struct cpuidle_device.coupled_cpus to the mask of all
+> ? coupled cpus, usually the same as cpu_possible_mask if all cpus
+> ? are part of the same cluster. ?The coupled_cpus mask must be
+> ? set in the struct cpuidle_device for each cpu.
+>
+> ? Set struct cpuidle_device.safe_state to a state that is not a
+> ? coupled state. ?This is usually WFI.
+>
+> ? Set CPUIDLE_FLAG_COUPLED in struct cpuidle_state.flags for each
+> ? state that affects multiple cpus.
+>
+> ? Provide a struct cpuidle_state.enter function for each state
+> ? that affects multiple cpus. ?This function is guaranteed to be
+> ? called on all cpus at approximately the same time. ?The driver
+> ? should ensure that the cpus all abort together if any cpu tries
+> ? to abort once the function is called.
+>
+> This series has been tested by implementing a test cpuidle state
+> that uses the parallel barrier helper function to verify that
+> all cpus call the function at the same time.
+>
+> This patch set has a few disadvantages over the hotplug governor,
+> but I think they are all fairly minor:
+> ? * Worst-case interrupt latency can be increased. ?If one cpu
+> ? ? receives an interrupt while the other is spinning in the
+> ? ? ready_count loop, the second cpu will be stuck with
+> ? ? interrupts off until the first cpu finished processing
+> ? ? its interrupt and exits idle. ?This will increase the worst
+> ? ? case interrupt latency by the worst-case interrupt processing
+> ? ? time, but should be very rare.
+> ? * Interrupts are processed while still inside pm_idle.
+> ? ? Normally, interrupts are only processed at the very end of
+> ? ? pm_idle, just before it returns to the idle loop. ?Coupled
+> ? ? states requires processing interrupts inside
+> ? ? cpuidle_enter_state_coupled in order to distinguish between
+> ? ? the smp_cross_call from another cpu that is now idle and an
+> ? ? interrupt that should cause idle to exit.
+> ? ? I don't see a way to fix this without either being able to
+> ? ? read the next pending irq from the interrupt chip, or
+> ? ? querying the irq core for which interrupts were processed.
+> ? * Since interrupts are processed inside cpuidle, the next
+> ? ? timer event could change. ?The new timer event will be
+> ? ? handled correctly, but the idle state decision made by
+> ? ? the governor will be out of date, and will not be revisited.
+> ? ? The governor select function could be called again every time,
+> ? ? but this could lead to a lot of work being done by an idle
+> ? ? cpu if the other cpu was mostly busy.
+>
+> v2:
+> ? * removed the coupled lock, replacing it with atomic counters
+> ? * added a check for outstanding pokes before beginning the
+> ? ? final transition to avoid extra wakeups
+> ? * made the cpuidle_coupled struct completely private
+> ? * fixed kerneldoc comment formatting
+> ? * added a patch with a helper function for resynchronizing
+> ? ? cpus after aborting idle
+> ? * added a patch (not for merging) to add trace events for
+> ? ? verification and performance testing
+>
+> v3:
+> ? * rebased on v3.4-rc4 by Santosh
+> ? * fixed decrement in cpuidle_coupled_cpu_set_alive
+> ? * updated tracing patch to remove unnecessary debugging so
+> ? ? it can be merged
+> ? * made tracing _rcuidle
+>
+> This series has been tested and reviewed by Santosh and Kevin
+> for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
+> and Exynos5 patches are in progress. ?I think this is ready to
+> go in. ?Lean, are you maintaining a cpuidle tree for linux-next?
+Sorry, *Len.
 
-This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
-to add some basic helpers to retrieve a DMA controller device_node and the
-DMA request/channel information.
-
-[1] http://article.gmane.org/gmane.linux.drivers.devicetree/12022
-[2] http://article.gmane.org/gmane.linux.ports.arm.omap/73622
-
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-
-Jon Hunter (2):
-  of: Add generic device tree DMA helpers
-  of: selftest/dma: Add selftest for new DT DMA
-
- Documentation/devicetree/bindings/dma/dma.txt |   47 ++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts        |    2 +
- arch/arm/boot/dts/omap4-panda.dts             |    2 +
- arch/arm/boot/dts/testcases/tests-dma.dtsi    |   32 ++++
- arch/arm/boot/dts/testcases/tests.dtsi        |    1 +
- drivers/of/Makefile                           |    2 +-
- drivers/of/dma.c                              |  203 +++++++++++++++++++++++++
- drivers/of/selftest.c                         |  118 ++++++++++++++
- include/linux/of_dma.h                        |   35 +++++
- 9 files changed, 441 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/dma.txt
- create mode 100644 arch/arm/boot/dts/testcases/tests-dma.dtsi
- create mode 100644 drivers/of/dma.c
- create mode 100644 include/linux/of_dma.h
-
--- 
-1.7.5.4
+> If not, I can publish a tree for linux-next, or this could go in
+> through Arnd's tree.
