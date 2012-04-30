@@ -1,127 +1,103 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 30 Apr 2012 12:14:18 -0700
-Subject: [PATCH 08/20] ARM: EXYNOS: update irqs for EXYNOS5250 evt1
+Date: Mon, 30 Apr 2012 12:14:19 -0700
+Subject: [PATCH 09/20] ARM: Exynos: Remove a new bus_type instance for Exynos5
 In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
 References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1335813270-13083-9-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1335813270-13083-10-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kukjin Kim <kgene.kim@samsung.com>
+A seperate bus_type instance is not required for Exynos5. The existing bus_type
+instance used with Exynos4 is sufficient for both Exynos4 and Exynos5. This
+also solves issue of uninitialized usage of exynos4_subsys in Exynos4 power
+management code that is reused for Exynos5 also. In addition to that, the
+existing exynos4_subsys bus_type is renamed to exynos_subsys to indicate that
+it is reused on both Exynos4 and Exynos5 platforms.
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/include/mach/irqs.h |   34 ++++++++++++++++++-----------
- 1 files changed, 21 insertions(+), 13 deletions(-)
+ arch/arm/mach-exynos/common.c            |   27 ++++++---------------------
+ arch/arm/mach-exynos/pm.c                |    2 +-
+ arch/arm/plat-samsung/include/plat/cpu.h |    2 +-
+ 3 files changed, 8 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-index ece5624..46d4734 100644
---- a/arch/arm/mach-exynos/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos/include/mach/irqs.h
-@@ -297,6 +297,7 @@
- #define EXYNOS5_IRQ_MIPICSI1		IRQ_SPI(80)
- #define EXYNOS5_IRQ_EFNFCON_DMA_ABORT	IRQ_SPI(81)
- #define EXYNOS5_IRQ_MIPIDSI0		IRQ_SPI(82)
-+#define EXYNOS5_IRQ_WDT_IOP		IRQ_SPI(83)
- #define EXYNOS5_IRQ_ROTATOR		IRQ_SPI(84)
- #define EXYNOS5_IRQ_GSC0		IRQ_SPI(85)
- #define EXYNOS5_IRQ_GSC1		IRQ_SPI(86)
-@@ -305,8 +306,8 @@
- #define EXYNOS5_IRQ_JPEG		IRQ_SPI(89)
- #define EXYNOS5_IRQ_EFNFCON_DMA		IRQ_SPI(90)
- #define EXYNOS5_IRQ_2D			IRQ_SPI(91)
--#define EXYNOS5_IRQ_SFMC0		IRQ_SPI(92)
--#define EXYNOS5_IRQ_SFMC1		IRQ_SPI(93)
-+#define EXYNOS5_IRQ_EFNFCON_0		IRQ_SPI(92)
-+#define EXYNOS5_IRQ_EFNFCON_1		IRQ_SPI(93)
- #define EXYNOS5_IRQ_MIXER		IRQ_SPI(94)
- #define EXYNOS5_IRQ_HDMI		IRQ_SPI(95)
- #define EXYNOS5_IRQ_MFC			IRQ_SPI(96)
-@@ -320,7 +321,7 @@
- #define EXYNOS5_IRQ_PCM2		IRQ_SPI(104)
- #define EXYNOS5_IRQ_SPDIF		IRQ_SPI(105)
- #define EXYNOS5_IRQ_ADC0		IRQ_SPI(106)
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index eff4446..3302a8d 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -565,30 +565,18 @@ void __init exynos5_init_irq(void)
+ 	s5p_init_irq(NULL, 0);
+ }
+ 
+-struct bus_type exynos4_subsys = {
+-	.name		= "exynos4-core",
+-	.dev_name	= "exynos4-core",
+-};
 -
-+#define EXYNOS5_IRQ_ADC1		IRQ_SPI(107)
- #define EXYNOS5_IRQ_SATA_PHY		IRQ_SPI(108)
- #define EXYNOS5_IRQ_SATA_PMEMREQ	IRQ_SPI(109)
- #define EXYNOS5_IRQ_CAM_C		IRQ_SPI(110)
-@@ -329,7 +330,6 @@
- #define EXYNOS5_IRQ_DP1_INTP1		IRQ_SPI(113)
- #define EXYNOS5_IRQ_CEC			IRQ_SPI(114)
- #define EXYNOS5_IRQ_SATA		IRQ_SPI(115)
--#define EXYNOS5_IRQ_NFCON		IRQ_SPI(116)
+-struct bus_type exynos5_subsys = {
+-	.name		= "exynos5-core",
+-	.dev_name	= "exynos5-core",
++struct bus_type exynos_subsys = {
++	.name		= "exynos-core",
++	.dev_name	= "exynos-core",
+ };
  
- #define EXYNOS5_IRQ_MCT_L0		IRQ_SPI(120)
- #define EXYNOS5_IRQ_MCT_L1		IRQ_SPI(121)
-@@ -340,7 +340,6 @@
- #define EXYNOS5_IRQ_RP_TIMER		IRQ_SPI(127)
+ static struct device exynos4_dev = {
+-	.bus	= &exynos4_subsys,
+-};
+-
+-static struct device exynos5_dev = {
+-	.bus	= &exynos5_subsys,
++	.bus	= &exynos_subsys,
+ };
  
- #define EXYNOS5_IRQ_PMU			COMBINER_IRQ(1, 2)
--#define EXYNOS5_IRQ_PMU_CPU1		COMBINER_IRQ(1, 6)
+ static int __init exynos_core_init(void)
+ {
+-	if (soc_is_exynos5250())
+-		return subsys_system_register(&exynos5_subsys, NULL);
+-	else
+-		return subsys_system_register(&exynos4_subsys, NULL);
++	return subsys_system_register(&exynos_subsys, NULL);
+ }
+ core_initcall(exynos_core_init);
  
- #define EXYNOS5_IRQ_SYSMMU_GSC0_0	COMBINER_IRQ(2, 0)
- #define EXYNOS5_IRQ_SYSMMU_GSC0_1	COMBINER_IRQ(2, 1)
-@@ -351,6 +350,8 @@
- #define EXYNOS5_IRQ_SYSMMU_GSC3_0	COMBINER_IRQ(2, 6)
- #define EXYNOS5_IRQ_SYSMMU_GSC3_1	COMBINER_IRQ(2, 7)
+@@ -675,10 +663,7 @@ static int __init exynos_init(void)
+ {
+ 	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
  
-+#define EXYNOS5_IRQ_SYSMMU_LITE2_0	COMBINER_IRQ(3, 0)
-+#define EXYNOS5_IRQ_SYSMMU_LITE2_1	COMBINER_IRQ(3, 1)
- #define EXYNOS5_IRQ_SYSMMU_FIMD1_0	COMBINER_IRQ(3, 2)
- #define EXYNOS5_IRQ_SYSMMU_FIMD1_1	COMBINER_IRQ(3, 3)
- #define EXYNOS5_IRQ_SYSMMU_LITE0_0	COMBINER_IRQ(3, 4)
-@@ -374,8 +375,8 @@
+-	if (soc_is_exynos5250())
+-		return device_register(&exynos5_dev);
+-	else
+-		return device_register(&exynos4_dev);
++	return device_register(&exynos4_dev);
+ }
  
- #define EXYNOS5_IRQ_SYSMMU_ARM_0	COMBINER_IRQ(6, 0)
- #define EXYNOS5_IRQ_SYSMMU_ARM_1	COMBINER_IRQ(6, 1)
--#define EXYNOS5_IRQ_SYSMMU_MFC_L_0	COMBINER_IRQ(6, 2)
--#define EXYNOS5_IRQ_SYSMMU_MFC_L_1	COMBINER_IRQ(6, 3)
-+#define EXYNOS5_IRQ_SYSMMU_MFC_R_0	COMBINER_IRQ(6, 2)
-+#define EXYNOS5_IRQ_SYSMMU_MFC_R_1	COMBINER_IRQ(6, 3)
- #define EXYNOS5_IRQ_SYSMMU_RTIC_0	COMBINER_IRQ(6, 4)
- #define EXYNOS5_IRQ_SYSMMU_RTIC_1	COMBINER_IRQ(6, 5)
- #define EXYNOS5_IRQ_SYSMMU_SSS_0	COMBINER_IRQ(6, 6)
-@@ -387,11 +388,9 @@
- #define EXYNOS5_IRQ_SYSMMU_MDMA1_1	COMBINER_IRQ(7, 3)
- #define EXYNOS5_IRQ_SYSMMU_TV_0		COMBINER_IRQ(7, 4)
- #define EXYNOS5_IRQ_SYSMMU_TV_1		COMBINER_IRQ(7, 5)
--#define EXYNOS5_IRQ_SYSMMU_GPSX_0	COMBINER_IRQ(7, 6)
--#define EXYNOS5_IRQ_SYSMMU_GPSX_1	COMBINER_IRQ(7, 7)
+ /* uart registration process */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 428cfeb..7164aa9 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -275,7 +275,7 @@ static void exynos4_restore_pll(void)
  
--#define EXYNOS5_IRQ_SYSMMU_MFC_R_0	COMBINER_IRQ(8, 5)
--#define EXYNOS5_IRQ_SYSMMU_MFC_R_1	COMBINER_IRQ(8, 6)
-+#define EXYNOS5_IRQ_SYSMMU_MFC_L_0	COMBINER_IRQ(8, 5)
-+#define EXYNOS5_IRQ_SYSMMU_MFC_L_1	COMBINER_IRQ(8, 6)
+ static struct subsys_interface exynos4_pm_interface = {
+ 	.name		= "exynos4_pm",
+-	.subsys		= &exynos4_subsys,
++	.subsys		= &exynos_subsys,
+ 	.add_dev	= exynos4_pm_add,
+ };
  
- #define EXYNOS5_IRQ_SYSMMU_DIS1_0	COMBINER_IRQ(9, 4)
- #define EXYNOS5_IRQ_SYSMMU_DIS1_1	COMBINER_IRQ(9, 5)
-@@ -407,15 +406,24 @@
- #define EXYNOS5_IRQ_SYSMMU_DRC_0	COMBINER_IRQ(11, 6)
- #define EXYNOS5_IRQ_SYSMMU_DRC_1	COMBINER_IRQ(11, 7)
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 787ceac..0721293 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -202,7 +202,7 @@ extern struct bus_type s3c2443_subsys;
+ extern struct bus_type s3c6410_subsys;
+ extern struct bus_type s5p64x0_subsys;
+ extern struct bus_type s5pv210_subsys;
+-extern struct bus_type exynos4_subsys;
++extern struct bus_type exynos_subsys;
  
-+#define EXYNOS5_IRQ_MDMA1_ABORT		COMBINER_IRQ(13, 1)
-+
-+#define EXYNOS5_IRQ_MDMA0_ABORT		COMBINER_IRQ(15, 3)
-+
- #define EXYNOS5_IRQ_FIMD1_FIFO		COMBINER_IRQ(18, 4)
- #define EXYNOS5_IRQ_FIMD1_VSYNC		COMBINER_IRQ(18, 5)
- #define EXYNOS5_IRQ_FIMD1_SYSTEM	COMBINER_IRQ(18, 6)
+ extern void (*s5pc1xx_idle)(void);
  
-+#define EXYNOS5_IRQ_ARMIOP_GIC		COMBINER_IRQ(19, 0)
-+#define EXYNOS5_IRQ_ARMISP_GIC		COMBINER_IRQ(19, 1)
-+#define EXYNOS5_IRQ_IOP_GIC		COMBINER_IRQ(19, 3)
-+#define EXYNOS5_IRQ_ISP_GIC		COMBINER_IRQ(19, 4)
-+
-+#define EXYNOS5_IRQ_PMU_CPU1		COMBINER_IRQ(22, 4)
-+
- #define EXYNOS5_IRQ_EINT0		COMBINER_IRQ(23, 0)
- #define EXYNOS5_IRQ_MCT_G0		COMBINER_IRQ(23, 3)
- #define EXYNOS5_IRQ_MCT_G1		COMBINER_IRQ(23, 4)
--#define EXYNOS5_IRQ_MCT_G2		COMBINER_IRQ(23, 5)
--#define EXYNOS5_IRQ_MCT_G3		COMBINER_IRQ(23, 6)
- 
- #define EXYNOS5_IRQ_EINT1		COMBINER_IRQ(24, 0)
- #define EXYNOS5_IRQ_SYSMMU_LITE1_0	COMBINER_IRQ(24, 1)
 -- 
 1.7.5.4
