@@ -1,31 +1,186 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Mon, 30 Apr 2012 18:51:56 +0200
-Subject: Tegra board file deprecation schedule
-In-Reply-To: <4F9EB68A.3080309@wwwdotorg.org>
-References: <4F9B0E7C.1060408@wwwdotorg.org> <2573129.rORKuOVVxu@fb07-iapwap2>
- <4F9EB68A.3080309@wwwdotorg.org>
-Message-ID: <6157937.A8jHT3QHt6@ax5200p>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Mon, 30 Apr 2012 18:52:04 +0200
+Subject: [RESEND PATCH 2/2] OMAP3: igep0020: Add support for Micron NAND
+ Flash storage memory
+In-Reply-To: <CAFqH_52ukhZ93idQoHaA_OwnouffeCkMYfNDhn1mdV8A8FBaBA@mail.gmail.com>
+References: <1333564586-3259-1-git-send-email-javier@dowhile0.org>
+ <1333564586-3259-2-git-send-email-javier@dowhile0.org>
+ <CAFqH_52ukhZ93idQoHaA_OwnouffeCkMYfNDhn1mdV8A8FBaBA@mail.gmail.com>
+Message-ID: <CAAwP0s3WZRtAk87SWLgeEFaPCeSZzagrdHAXO66a-7ixs+QxAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 April 2012 09:58:02 Stephen Warren wrote:
-> On 04/30/2012 02:58 AM, Marc Dietrich wrote:
-> > Am Sonntag, 29. April 2012, 13:16:38 schrieb Stephen Warren:
-> ...
-> 
-> >> The correct approach here is to remove all the I2C logic from the NVEC
-> >> driver and add I2C slave support to the real I2C driver. Then, NVEC
-> >> becomes just a protocol driver for the slave transactions. Then, there
-> >> is no clock to deal with.
-> > 
-> > you are absolutely right, but there is no i2c slave controller driver in
-> > mainline yet and I don't want to submit the one nvidia already wrote [1].
-> > Maybe you can ask around if someone is willing to do this.
-> 
-> Someone has been assigned to work on this, but other priorities are in
-> the way. Unfortunately, I don't have any realistic ETA I can give right now.
+On Wed, Apr 25, 2012 at 10:00 AM, Enric Balletb? i Serra
+<eballetbo@gmail.com> wrote:
+> 2012/4/4 Javier Martinez Canillas <javier@dowhile0.org>:
+>> IGEP-based boards can have two different flash memories, a OneNAND or
+>> a NAND device. The boot configuration pins (sys_boot) are used to
+>> specify which memory is available.
+>>
+>> Also, this patch removes unnecesary code for registering the OneNAND.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+>> ---
+>> ?arch/arm/mach-omap2/board-igep0020.c | ? 75 ++++++++++++++--------------------
+>> ?1 files changed, 31 insertions(+), 44 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+>> index 930c0d3..4af615a 100644
+>> --- a/arch/arm/mach-omap2/board-igep0020.c
+>> +++ b/arch/arm/mach-omap2/board-igep0020.c
+>> @@ -24,6 +24,8 @@
+>> ?#include <linux/i2c/twl.h>
+>> ?#include <linux/mmc/host.h>
+>>
+>> +#include <linux/mtd/nand.h>
+>> +
+>> ?#include <asm/mach-types.h>
+>> ?#include <asm/mach/arch.h>
+>>
+>> @@ -39,6 +41,8 @@
+>> ?#include "hsmmc.h"
+>> ?#include "sdram-numonyx-m65kxxxxam.h"
+>> ?#include "common-board-devices.h"
+>> +#include "board-flash.h"
+>> +#include "control.h"
+>>
+>> ?#define IGEP2_SMSC911X_CS ? ? ? 5
+>> ?#define IGEP2_SMSC911X_GPIO ? ? 176
+>> @@ -60,6 +64,10 @@
+>> ?#define IGEP3_GPIO_LED1_RED ? ?16
+>> ?#define IGEP3_GPIO_USBH_NRESET ?183
+>>
+>> +#define IGEP_SYSBOOT_MASK ? ? ? ? ? 0x1f
+>> +#define IGEP_SYSBOOT_NAND ? ? ? ? ? 0x0f
+>> +#define IGEP_SYSBOOT_ONENAND ? ? ? ?0x10
+>> +
+>> ?/*
+>> ?* IGEP2 Hardware Revision Table
+>> ?*
+>> @@ -110,8 +118,10 @@ static void __init igep2_get_revision(void)
+>> ? ? ? ?gpio_free(IGEP2_GPIO_LED1_RED);
+>> ?}
+>>
+>> -#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
+>> - ? ? ? defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
+>> +#if defined(CONFIG_MTD_ONENAND_OMAP2) || ? ? ? ? ? ? ? \
+>> + ? ? ? defined(CONFIG_MTD_ONENAND_OMAP2_MODULE) || ? ? \
+>> + ? ? ? defined(CONFIG_MTD_NAND_OMAP2) || ? ? ? ? ? ? ? \
+>> + ? ? ? defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+>>
+>> ?#define ONENAND_MAP ? ? ? ? ? ? 0x20000000
+>>
+>> @@ -123,7 +133,7 @@ static void __init igep2_get_revision(void)
+>> ?* So MTD regards it as 4KiB page size and 256KiB block size 64*(2*2048)
+>> ?*/
+>>
+>> -static struct mtd_partition igep_onenand_partitions[] = {
+>> +static struct mtd_partition igep_flash_partitions[] = {
+>> ? ? ? ?{
+>> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "X-Loader",
+>> ? ? ? ? ? ? ? ?.offset ? ? ? ? = 0,
+>> @@ -151,50 +161,27 @@ static struct mtd_partition igep_onenand_partitions[] = {
+>> ? ? ? ?},
+>> ?};
+>>
+>> -static struct omap_onenand_platform_data igep_onenand_data = {
+>> - ? ? ? .parts = igep_onenand_partitions,
+>> - ? ? ? .nr_parts = ARRAY_SIZE(igep_onenand_partitions),
+>> - ? ? ? .dma_channel ? ?= -1, ? /* disable DMA in OMAP OneNAND driver */
+>> -};
+>> -
+>> -static struct platform_device igep_onenand_device = {
+>> - ? ? ? .name ? ? ? ? ? = "omap2-onenand",
+>> - ? ? ? .id ? ? ? ? ? ? = -1,
+>> - ? ? ? .dev = {
+>> - ? ? ? ? ? ? ? .platform_data = &igep_onenand_data,
+>> - ? ? ? },
+>> -};
+>> +static inline u32 igep_get_sysboot_value(void)
+>> +{
+>> + ? ? ? return omap_ctrl_readl(OMAP343X_CONTROL_STATUS) & IGEP_SYSBOOT_MASK;
+>> +}
+>>
+>> ?static void __init igep_flash_init(void)
+>> ?{
+>> - ? ? ? u8 cs = 0;
+>> - ? ? ? u8 onenandcs = GPMC_CS_NUM + 1;
+>> -
+>> - ? ? ? for (cs = 0; cs < GPMC_CS_NUM; cs++) {
+>> - ? ? ? ? ? ? ? u32 ret;
+>> - ? ? ? ? ? ? ? ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
+>> -
+>> - ? ? ? ? ? ? ? /* Check if NAND/oneNAND is configured */
+>> - ? ? ? ? ? ? ? if ((ret & 0xC00) == 0x800)
+>> - ? ? ? ? ? ? ? ? ? ? ? /* NAND found */
+>> - ? ? ? ? ? ? ? ? ? ? ? pr_err("IGEP: Unsupported NAND found\n");
+>> - ? ? ? ? ? ? ? else {
+>> - ? ? ? ? ? ? ? ? ? ? ? ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
+>> - ? ? ? ? ? ? ? ? ? ? ? if ((ret & 0x3F) == (ONENAND_MAP >> 24))
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* ONENAND found */
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? onenandcs = cs;
+>> - ? ? ? ? ? ? ? }
+>> - ? ? ? }
+>> -
+>> - ? ? ? if (onenandcs > GPMC_CS_NUM) {
+>> - ? ? ? ? ? ? ? pr_err("IGEP: Unable to find configuration in GPMC\n");
+>> - ? ? ? ? ? ? ? return;
+>> - ? ? ? }
+>> -
+>> - ? ? ? igep_onenand_data.cs = onenandcs;
+>> -
+>> - ? ? ? if (platform_device_register(&igep_onenand_device) < 0)
+>> - ? ? ? ? ? ? ? pr_err("IGEP: Unable to register OneNAND device\n");
+>> + ? ? ? u32 mux;
+>> + ? ? ? mux = igep_get_sysboot_value();
+>> +
+>> + ? ? ? if (mux == IGEP_SYSBOOT_NAND) {
+>> + ? ? ? ? ? ? ? pr_info("IGEP: initializing NAND memory device\n");
+>> + ? ? ? ? ? ? ? board_nand_init(igep_flash_partitions,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(igep_flash_partitions),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, NAND_BUSWIDTH_16);
+>> + ? ? ? } else if (mux == IGEP_SYSBOOT_ONENAND) {
+>> + ? ? ? ? ? ? ? pr_info("IGEP: initializing OneNAND memory device\n");
+>> + ? ? ? ? ? ? ? board_onenand_init(igep_flash_partitions,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(igep_flash_partitions), 0);
+>> + ? ? ? } else
+>> + ? ? ? ? ? ? ? pr_err("IGEP: Flash: unsupported sysboot sequence found\n");
+>> ?}
+>>
+>> ?#else
+>> --
+>> 1.7.7.6
+>>
+>
+> Seems good to me.
+>
+> Tony, as this is a fix ,may be included ?
+>
+> Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+> Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+>
+> Cheers,
+> ? ?Enric
+> --
 
-oh, that's nice. The nvec driver is also far from perfect, so we have some 
-more time to cleanup the rest.
+Tony,
 
-Marc
+Can you please merge this patch and:
+
+[RESEND PATCH 1/2] ARM: OMAP2+: nand: Make board_onenand_init()
+visible to board code
+
+I've sent this two patches several times and no one is against them. I
+also had positive feedback such as Enric's acked-by
+
+These two patches are a fix and needed to boot newer versions of the
+IGEPv2 board. Without the patches the board doesn't even boot.
+
+Please tell me if you need me to resend the patches.
+
+Best regards,
+
+-- 
+Javier Mart?nez Canillas
+(+34) 682 39 81 69
+Barcelona, Spain
