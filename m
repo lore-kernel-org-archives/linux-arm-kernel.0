@@ -1,41 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 30 Apr 2012 22:47:17 +0200
-Subject: [PATCH 1/2] I2C: Set I2C timing registers for mxs-i2c
-In-Reply-To: <20120430202742.GC28226@pengutronix.de>
-References: <1335738969-27445-1-git-send-email-marex@denx.de>
- <201204302209.12482.marex@denx.de> <20120430202742.GC28226@pengutronix.de>
-Message-ID: <201204302247.17242.marex@denx.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 30 Apr 2012 13:48:39 -0700
+Subject: [PATCH/RFT 0/8] ARM: OMAP: remove IP checks from SoC family
+ detection
+In-Reply-To: <20120430162510.GA18669@animalcreek.com> (Mark A. Greer's message
+ of "Mon, 30 Apr 2012 09:25:10 -0700")
+References: <1335482993-14035-1-git-send-email-khilman@ti.com>
+ <20120427220813.GE19196@animalcreek.com> <87aa1wyfq5.fsf@ti.com>
+ <20120430162510.GA18669@animalcreek.com>
+Message-ID: <87d36pt07s.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+"Mark A. Greer" <mgreer@animalcreek.com> writes:
 
-> > > > > > This sets the bus to run at 400kHz, prior to this,
-> > > > > > the bus frequency was undefined.
-> > > > > 
-> > > > > Not exactly. The default values let it run at 100kHz.
-> > > > 
-> > > > Have you tried dumping the default values and comparing it with the
-> > > > values for 100kHz in the manual?
-> > > 
-> > > Yes, sure. Doesn't it work for you? I just rechecked and the values are
-> > > okay. That being said, if you make it configurable for 400kHz, it would
-> > > in deed be better to rewrite the values for 100kHz, too.
-> > 
-> > They were different for me ... did you configure the i2c bus in your
-> > bootloader possibly? Those values might have been written there since
-> > then ... I didn't run i2c in u-boot before booting linux.
-> 
-> Nope, no I2C involved in the bootloader at all. Do you get the correct
-> values after soft-resetting the device?
-> 
-> It doesn't really matter, though. Just reinit them to the proper values
-> depending on the user setting.
+> On Fri, Apr 27, 2012 at 03:25:38PM -0700, Kevin Hilman wrote:
+>> "Mark A. Greer" <mgreer@animalcreek.com> writes:
+>> 
+>> > On Thu, Apr 26, 2012 at 04:29:45PM -0700, Kevin Hilman wrote:
+>> >
+>> > Hi Kevin.
+>> >
+>> >> This is a rebased version of this series which is ready for broader
+>> >> testing.  I'd especially appreciate testing from those of you with
+>> >> AM35x platforms.
+>> >> 
+>> >> Currently, our SoC detection is based on SoC family detection
+>> >> (using die ID) and the presence of specific IP blocks (or feature.)
+>> >> 
+>> >> This series begins the separation of the SoC family detection and
+>> >> specific IP detection by completely removing IP detection from the SoC
+>> >> family detection (cpu_is_*.)
+>> >> 
+>> >> Applies on top of v3.4-rc4, boot tested on AM3517 EVM.
+>> >
+>> > Your series applied and booted without issue until the point that
+>> > pm_idle is called.  At that point it hung because its doing a wfi
+>> > and not getting an interrupt to wake up back up.  That's expected
+>> > behaviour so your patches are good (IMHO) but I need to finish and
+>> > submit a new version of my patches to fix that issue.
+>> 
+>> For the benefit of others wanting to test this:
+>> 
+>> You have to use 'nohlt' on the cmdline on AM35x in order to avoid WFI
+>> and the wakeup problems that are still being worked on.
+>
+> Oops, yes.  I meant to add that and say that my am3517evm boots fine
+> with your patches and 'nohlt' on the cmdline.  I'm using omap2plus_defconfig
+> with CONFIG_TI_DAVINCI_EMAC enabled.
 
-Indeed. Default to 100kHz might be a good idea too, in case user entered some 
-weird value. Eventually, it'd be nice if we could calculate the timing values 
-for all possible frequencies, but I didn't got to deriving such formula ... 
-dunno if it's worth it either, doubt so.
+Thanks for testing,  will add a Tested-by from you.
 
-Best regards,
-Marek Vasut
+Kevin
