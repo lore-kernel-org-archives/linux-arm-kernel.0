@@ -1,34 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 21:47:19 +0000
-Subject: [GIT PULL] ux500 device tree patches
-In-Reply-To: <1335369540-5607-1-git-send-email-linus.walleij@linaro.org>
-References: <1335369540-5607-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201204302147.19715.arnd@arndb.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 30 Apr 2012 23:54:41 +0200
+Subject: [PATCHv3 0/5] coupled cpuidle state support
+In-Reply-To: <CAMbhsRRReyiv2LgUNgp6XiW07V8Eb0gd4fb7W6nBjMZ1FpmOBQ@mail.gmail.com>
+References: <1335816551-27756-1-git-send-email-ccross@android.com>
+ <201204302325.09505.rjw@sisk.pl>
+ <CAMbhsRRReyiv2LgUNgp6XiW07V8Eb0gd4fb7W6nBjMZ1FpmOBQ@mail.gmail.com>
+Message-ID: <201204302354.41969.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 April 2012, Linus Walleij wrote:
-> this pull request contains some device tree work by Lee Jones.
-> I have tried to keep these patches in the arch/arm/boot/dts/*
-> space to get some sanity in the branch proliferation.
+On Monday, April 30, 2012, Colin Cross wrote:
+> On Mon, Apr 30, 2012 at 2:25 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > Hi,
+> >
+> > I have a comment, which isn't about the series itself, but something
+> > thay may be worth thinking about.
+> >
+> > On Monday, April 30, 2012, Colin Cross wrote:
+> >> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+> >> cpus cannot be independently powered down, either due to
+> >> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+> >> power down), or due to HW bugs (on OMAP4460, a cpu powering up
+> >> will corrupt the gic state unless the other cpu runs a work
+> >> around).  Each cpu has a power state that it can enter without
+> >> coordinating with the other cpu (usually Wait For Interrupt, or
+> >> WFI), and one or more "coupled" power states that affect blocks
+> >> shared between the cpus (L2 cache, interrupt controller, and
+> >> sometimes the whole SoC).  Entering a coupled power state must
+> >> be tightly controlled on both cpus.
+> >
+> > That seems to be a special case of a more general situation where
+> > a number of CPU cores belong into a single power domain, possibly along
+> > some I/O devices.
+> >
+> > We'll need to handle the general case at one point anyway, so I wonder if
+> > the approach shown here may get us in the way?
 > 
-> There is still one patch that touches arch/arm/mach-ux500 too
-> though (but it should merge fine with the other ux500 stuff).
-> 
-> The changes to the device tree are of course dependent on some
-> core changes and some patching in the GPIO/pin driver, but as
-> the device tree files are believed to be a different world
-> (and should one day live in their own git) I split this off
-> anyway. I don't think people bisect the device trees per se
-> and the board code in conjunction anyway.
-> 
-> If you think differently tell me and I'll happily stack
-> all three pull requests on top of each other and send one
-> big shebang with everything instead :-)
-> 
-> So: please pull this in.
-> 
+> I can't parse what you're saying here.
 
-Pulled, thanks!
+The general case is a CPU core in one PM domain with a number of I/O
+devices and a number of other CPU cores.  If we forget about the I/O
+devices, we get a situation your patchset is addressing, so the
+question is how difficult it is going to be to extend it to cover the
+I/O devices as well.
 
-	Arnd
+> >> The easiest solution to implementing coupled cpu power states is
+> >> to hotplug all but one cpu whenever possible, usually using a
+> >> cpufreq governor that looks at cpu load to determine when to
+> >> enable the secondary cpus.  This causes problems, as hotplug is an
+> >> expensive operation, so the number of hotplug transitions must be
+> >> minimized, leading to very slow response to loads, often on the
+> >> order of seconds.
+> >
+> > This isn't a solution at all, rather a workaround and a poor one for that
+> > matter.
+> 
+> Yes, which is what started me on this series.
+> 
+> >> This patch series implements an alternative solution, where each
+> >> cpu will wait in the WFI state until all cpus are ready to enter
+> >> a coupled state, at which point the coupled state function will
+> >> be called on all cpus at approximately the same time.
+> >>
+> >> Once all cpus are ready to enter idle, they are woken by an smp
+> >> cross call.
+> >
+> > Is it really necessary to wake up all of the CPUs in WFI before
+> > going to deeper idle?  We should be able to figure out when they
+> > are going to be needed next time without waking them up and we should
+> > know the latency to wake up from the deeper multi-CPU "C-state",
+> > so it should be possible to decide whether or not to go to deeper
+> > idle without the SMP cross call.  Is there anything I'm missing here?
+> 
+> The decision to go to the lower state has already been made when the
+> cross call occurs.  On the platforms I have worked directly with so
+> far (Tegra2 and OMAP4460), the secondary cpu needs to execute code
+> before the primary cpu turns off the power.  For example, on OMAP4460,
+> the secondary cpu needs to go from WFI (clock gated) to OFF (power
+> gated), because OFF is not supported as an individual cpu state due to
+> a ROM code bug.  To do that transition, it needs to come out of WFI,
+> set up it's power domain registers, save a bunch of state, and
+> transition to OFF.
+> 
+> On Tegra3, the deepest individual cpu state for cpus 1-3 is OFF, the
+> same state the cpu would go into as the first step of a transition to
+> a deeper power state (cpus 0-3 OFF).  It would be more optimal in that
+> case to bypass the SMP cross call, and leave the cpu in OFF, but that
+> would require some way of disabling all wakeups for the secondary cpus
+> and then verifying that they didn't start waking up just before the
+> wakeups were disabled.  I have just started considering this
+> optimization, but I don't see anything in the existing code that would
+> prevent adding it later.
+
+OK
+
+> A simple measurement using the tracing may show that it is
+> unnecessary.  If the wakeup time for CPU1 to go from OFF to active is
+> small there might be no need to optimize out the extra wakeup.
+
+I see.
+
+So, in the end, it may always be more straightforward to put individual
+CPU cores into single-core idle states until the "we can all go to
+deeper idle" condition is satisfied and then wake them all up and let
+each of them do the transition individually, right?
+
+Rafael
