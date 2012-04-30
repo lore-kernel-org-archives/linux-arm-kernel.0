@@ -1,57 +1,35 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 30 Apr 2012 15:18:59 -0700
-Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
- wake-ups work
-In-Reply-To: <878vhcriav.fsf@ti.com>
-References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
- <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
- <20120424205105.GA26749@animalcreek.com>
- <20120424232506.GA8850@animalcreek.com> <87haw4282b.fsf@ti.com>
- <20120430213433.GA19256@animalcreek.com> <878vhcriav.fsf@ti.com>
-Message-ID: <20120430221859.GC19256@animalcreek.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 30 Apr 2012 15:19:35 -0700
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <4F9EE84C.90106@codeaurora.org>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+ <4F98EB10.2000505@codeaurora.org> <20120426084201.GF17184@pengutronix.de>
+ <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
+ <20120426095135.GG17184@pengutronix.de> <4F9EE84C.90106@codeaurora.org>
+Message-ID: <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2012 at 03:00:56PM -0700, Kevin Hilman wrote:
-> "Mark A. Greer" <mgreer@animalcreek.com> writes:
-> 
-> > On Fri, Apr 27, 2012 at 02:12:12PM -0700, Kevin Hilman wrote:
-> >> "Mark A. Greer" <mgreer@animalcreek.com> writes:
-> >> 
-> >> > On Tue, Apr 24, 2012 at 01:51:05PM -0700, Mark A. Greer wrote:
-> >
-> >> > Just thinking out loud...
-> >> >
-> >> > We could chose whether pm_idle & cpuidle issue a wfi based on
-> >> > whether there is a davinci-emac present.  The issue with that is
-> >> > that someday there may be another SoC that has a davinci-emac that
-> >> > can wake up the system.  I know cpu_is_xxx() is frowned upon but
-> >> > this does seem like a proper usage of it--the deciding factor
-> >> > really is whether its an am35x or not (and CONFIG_TI_DAVINCI_EMAC
-> >> > is enabled).
-> >> 
-> >> The presence of the davinci_emac is probably overkill, avoiding WFI
-> >> should really only be done when the davinci_emac is *active*.
-> >> e.g. using an am35x with an EMAC *present*, but not in use because
-> >> there's an MMC rootfs for example.
-> >> 
-> >> If there's a good way to detect an in-use davinci_emac, then
-> >> disable_hlt() can be used to avoid WFI.  When the davinci_emac is not in
-> >> use (e.g. module unloaded etc.) then enable_hlt() can be used to
-> >> (re)allow WFI.
-> >
-> > This can work for pm_idle but what should be done for cpu_idle
-> > (as in, omap3_enter_idle[_bm])?  We should have some sort of
-> > solution for that so users can safely enable CONFIG_CPU_IDLE
-> > and not have the am3517 fall apart.
-> 
-> disable_hlt() will prevent either the default idle *or* CPUidle from
-> being called.
-> 
-> It will simply call cpu_relax() instead of calling any idle
-> function. (c.f. cpu_idle() in arch/arm/kernel/process.c)
+On Mon, Apr 30, 2012 at 12:30 PM, Saravana Kannan
+<skannan@codeaurora.org> wrote:
+> Mike, Shawn, Paul, Rob,
+>
+> Comments? Can we pull this in?
 
-Yep, you're right.  Sorry.
+Saravana,
 
-Mark
+I will test this a bit more thoroughly tomorrow and get back to you.
+
+Thanks,
+Mike
+
+> -Saravana
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
