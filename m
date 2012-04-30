@@ -1,41 +1,30 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 30 Apr 2012 19:26:09 +0200
-Subject: [PATCH 3.4-rc4] ARM: OMAP1: Amstrad Delta: Fix wrong IRQ base in FIQ
- handler
-Message-ID: <1335806769-23711-1-git-send-email-jkrzyszt@tis.icnet.pl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Apr 2012 17:46:44 +0000
+Subject: [GIT PULL] ARM: SPEAr13xx support for 3.5
+In-Reply-To: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
+References: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
+Message-ID: <201204301746.45004.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 384ebe1c2849160d040df3e68634ec506f13d9ff, "gpio/omap: Add DT
-support to GPIO driver", introduced dynamic IRQ numbering of OMAP GPIO
-interrupts, breaking all IH_GPIO_BASE based IRQ number calculations.
-This issue was corrected in the OMAP GPIO driver and the related header
-file with commit 25db711df3258d125dc1209800317e5c0ef3c870, "gpio/omap:
-Fix IRQ handling for SPARSE_IRQ".
+On Monday 30 April 2012, viresh kumar wrote:
+> Hi Arnd/Olof,
+> 
+> This is pull request for SPEAr13xx support updates. It had dependency
+> on for-v3.5-spear-clk, spear/dt and spear/pinctrl for applying patches, and
+> so i created a merge of v3.4-rc5 with spear/dt and pinctrl branches and applied
+> for-v3.5-spear-clk patches, before this patchset.
+> 
+> Also, it has compilation dependencies with:
+> - Mike's clk-next branch
+> - Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ...
 
-However, the Amstrad Delta FIQ handler, which replaces the gpio-omap
-driver in serving GPIO interrupts on this board, still uses that
-outdated method. Fix it.
+Ok, I missed the compilation dependencies you mentioned here.  So the branch
+you sent me doesn't actually build by itself, which is not good.
 
-Created and tested against linux-3.4-rc4.
+I have now merged both as staging branches, which means it will be in linux-next
+from now on but can still get rebased in order to work out the dependencies.
+We can work out something from here once I understand where the dependencies
+are.
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
- arch/arm/mach-omap1/ams-delta-fiq.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
-index fcce7ff..cfd98b1 100644
---- a/arch/arm/mach-omap1/ams-delta-fiq.c
-+++ b/arch/arm/mach-omap1/ams-delta-fiq.c
-@@ -48,7 +48,7 @@ static irqreturn_t deferred_fiq(int irq, void *dev_id)
- 	struct irq_chip *irq_chip = NULL;
- 	int gpio, irq_num, fiq_count;
- 
--	irq_desc = irq_to_desc(IH_GPIO_BASE);
-+	irq_desc = irq_to_desc(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK));
- 	if (irq_desc)
- 		irq_chip = irq_desc->irq_data.chip;
- 
--- 
-1.7.3.4
+	Arnd
