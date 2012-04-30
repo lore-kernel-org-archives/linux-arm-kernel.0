@@ -1,105 +1,187 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 30 Apr 2012 12:14:16 -0700
-Subject: [PATCH 06/20] ARM: EXYNOS: add GPC4 bank instance
+Date: Mon, 30 Apr 2012 12:14:17 -0700
+Subject: [PATCH 07/20] ARM: EXYNOS: Add pre-divider and fout mux clocks for
+ bpll and mpll
 In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
 References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1335813270-13083-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1335813270-13083-8-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sangsu Park <sangsu4u.park@samsung.com>
+From: Kisoo Yu <ksoo.yu@samsung.com>
 
-Add GPC4 bank instance which is included in rev1 of EXYNOS5.
+The fout clock of BPLL and MPLL have a selectable source in rev1 of
+EXYNOS5. The clock options are a fixed divided by 2 clock and the
+output of the PLL itself. Add support for these new clock instances.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+Signed-off-by: Kisoo Yu <ksoo.yu@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-[kgene.kim at samsung.com: re-worked on top of v3.4-rc3]
+[kgene.kim at samsung.com: temporary apply this because I
+don't want to add pll stuff in each clock not commonly]
+Temporary-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/gpio.h |    9 ++++++---
- arch/arm/mach-exynos/include/mach/irqs.h |    2 +-
- drivers/gpio/gpio-samsung.c              |   11 ++++++++++-
- 3 files changed, 17 insertions(+), 5 deletions(-)
+ arch/arm/mach-exynos/clock-exynos5.c           |   73 +++++++++++++++++++++++-
+ arch/arm/mach-exynos/include/mach/regs-clock.h |    2 +
+ arch/arm/plat-s5p/clock.c                      |   11 ----
+ 3 files changed, 74 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-index d7498af..eb24f1e 100644
---- a/arch/arm/mach-exynos/include/mach/gpio.h
-+++ b/arch/arm/mach-exynos/include/mach/gpio.h
-@@ -153,10 +153,11 @@ enum exynos4_gpio_number {
- #define EXYNOS5_GPIO_B2_NR	(4)
- #define EXYNOS5_GPIO_B3_NR	(4)
- #define EXYNOS5_GPIO_C0_NR	(7)
--#define EXYNOS5_GPIO_C1_NR	(7)
-+#define EXYNOS5_GPIO_C1_NR	(4)
- #define EXYNOS5_GPIO_C2_NR	(7)
- #define EXYNOS5_GPIO_C3_NR	(7)
--#define EXYNOS5_GPIO_D0_NR	(8)
-+#define EXYNOS5_GPIO_C4_NR	(7)
-+#define EXYNOS5_GPIO_D0_NR	(4)
- #define EXYNOS5_GPIO_D1_NR	(8)
- #define EXYNOS5_GPIO_Y0_NR	(6)
- #define EXYNOS5_GPIO_Y1_NR	(4)
-@@ -199,7 +200,8 @@ enum exynos5_gpio_number {
- 	EXYNOS5_GPIO_C1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C0),
- 	EXYNOS5_GPIO_C2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C1),
- 	EXYNOS5_GPIO_C3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C2),
--	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
-+	EXYNOS5_GPIO_C4_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
-+	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C4),
- 	EXYNOS5_GPIO_D1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D0),
- 	EXYNOS5_GPIO_Y0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D1),
- 	EXYNOS5_GPIO_Y1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y0),
-@@ -242,6 +244,7 @@ enum exynos5_gpio_number {
- #define EXYNOS5_GPC1(_nr)	(EXYNOS5_GPIO_C1_START + (_nr))
- #define EXYNOS5_GPC2(_nr)	(EXYNOS5_GPIO_C2_START + (_nr))
- #define EXYNOS5_GPC3(_nr)	(EXYNOS5_GPIO_C3_START + (_nr))
-+#define EXYNOS5_GPC4(_nr)	(EXYNOS5_GPIO_C4_START + (_nr))
- #define EXYNOS5_GPD0(_nr)	(EXYNOS5_GPIO_D0_START + (_nr))
- #define EXYNOS5_GPD1(_nr)	(EXYNOS5_GPIO_D1_START + (_nr))
- #define EXYNOS5_GPY0(_nr)	(EXYNOS5_GPIO_Y0_START + (_nr))
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-index ef52f61..ece5624 100644
---- a/arch/arm/mach-exynos/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos/include/mach/irqs.h
-@@ -446,7 +446,7 @@
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index 846741e..7c0f810 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -145,6 +145,39 @@ static struct clksrc_clk exynos5_clk_sclk_apll = {
+ 	.reg_div = { .reg = EXYNOS5_CLKDIV_CPU0, .shift = 24, .size = 3 },
+ };
  
- #define EXYNOS5_MAX_COMBINER_NR		32
- 
--#define EXYNOS5_IRQ_GPIO1_NR_GROUPS	13
-+#define EXYNOS5_IRQ_GPIO1_NR_GROUPS	14
- #define EXYNOS5_IRQ_GPIO2_NR_GROUPS	9
- #define EXYNOS5_IRQ_GPIO3_NR_GROUPS	5
- #define EXYNOS5_IRQ_GPIO4_NR_GROUPS	1
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index 19d6fc0..0a2087b 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -2452,6 +2452,12 @@ static struct samsung_gpio_chip exynos5_gpios_1[] = {
- 		},
- 	}, {
- 		.chip	= {
-+			.base	= EXYNOS5_GPC4(0),
-+			.ngpio	= EXYNOS5_GPIO_C4_NR,
-+			.label	= "GPC4",
-+		},
-+	}, {
-+		.chip	= {
- 			.base	= EXYNOS5_GPD0(0),
- 			.ngpio	= EXYNOS5_GPIO_D0_NR,
- 			.label	= "GPD0",
-@@ -2874,8 +2880,11 @@ static __init int samsung_gpiolib_init(void)
- 			goto err_ioremap1;
- 		}
- 
-+		/* need to set base address for gpc4 */
-+		exynos5_gpios_1[11].base = gpio_base1 + 0x2E0;
++static struct clk clk_fout_bpll_div2 = {
++	.name	= "fout_bpll_div2",
++};
 +
- 		/* need to set base address for gpx */
--		chip = &exynos5_gpios_1[20];
-+		chip = &exynos5_gpios_1[21];
- 		gpx_base = gpio_base1 + 0xC00;
- 		for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
- 			chip->base = gpx_base;
++static struct clk *exynos5_clkset_mout_bpll_fout_list[] = {
++	[0] = &clk_fout_bpll_div2,
++	[1] = &clk_fout_bpll,
++};
++
++static struct clksrc_sources exynos5_clkset_mout_bpll_fout = {
++	.sources	= exynos5_clkset_mout_bpll_fout_list,
++	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_bpll_fout_list),
++};
++
++static struct clksrc_clk exynos5_clk_mout_bpll_fout = {
++	.clk	= {
++		.name		= "mout_bpll_fout",
++	},
++	.sources = &exynos5_clkset_mout_bpll_fout,
++	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 0, .size = 1 },
++};
++
++/* Possible clock sources for BPLL Mux */
++static struct clk *clk_src_bpll_list[] = {
++	[0] = &clk_fin_bpll,
++	[1] = &exynos5_clk_mout_bpll_fout.clk,
++};
++
++struct clksrc_sources clk_src_bpll = {
++	.sources	= clk_src_bpll_list,
++	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
++};
++
+ static struct clksrc_clk exynos5_clk_mout_bpll = {
+ 	.clk	= {
+ 		.name		= "mout_bpll",
+@@ -187,11 +220,43 @@ static struct clksrc_clk exynos5_clk_mout_epll = {
+ 	.reg_src = { .reg = EXYNOS5_CLKSRC_TOP2, .shift = 12, .size = 1 },
+ };
+ 
++static struct clk clk_fout_mpll_div2 = {
++	.name	= "fout_mpll_div2",
++};
++
++static struct clk *exynos5_clkset_mout_mpll_fout_list[] = {
++	[0] = &clk_fout_mpll_div2,
++	[1] = &clk_fout_mpll,
++};
++
++static struct clksrc_sources exynos5_clkset_mout_mpll_fout = {
++	.sources	= exynos5_clkset_mout_mpll_fout_list,
++	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_mpll_fout_list),
++};
++
++static struct clksrc_clk exynos5_clk_mout_mpll_fout = {
++	.clk	= {
++		.name		= "mout_mpll_fout",
++	},
++	.sources = &exynos5_clkset_mout_mpll_fout,
++	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 4, .size = 1 },
++};
++
++static struct clk *exynos5_clk_src_mpll_list[] = {
++	[0] = &clk_fin_mpll,
++	[1] = &exynos5_clk_mout_mpll_fout.clk,
++};
++
++struct clksrc_sources exynos5_clk_src_mpll = {
++	.sources	= exynos5_clk_src_mpll_list,
++	.nr_sources	= ARRAY_SIZE(exynos5_clk_src_mpll_list),
++};
++
+ struct clksrc_clk exynos5_clk_mout_mpll = {
+ 	.clk = {
+ 		.name		= "mout_mpll",
+ 	},
+-	.sources = &clk_src_mpll,
++	.sources = &exynos5_clk_src_mpll,
+ 	.reg_src = { .reg = EXYNOS5_CLKSRC_CORE1, .shift = 8, .size = 1 },
+ };
+ 
+@@ -946,10 +1011,12 @@ static struct clksrc_clk *exynos5_sysclks[] = {
+ 	&exynos5_clk_mout_apll,
+ 	&exynos5_clk_sclk_apll,
+ 	&exynos5_clk_mout_bpll,
++	&exynos5_clk_mout_bpll_fout,
+ 	&exynos5_clk_mout_bpll_user,
+ 	&exynos5_clk_mout_cpll,
+ 	&exynos5_clk_mout_epll,
+ 	&exynos5_clk_mout_mpll,
++	&exynos5_clk_mout_mpll_fout,
+ 	&exynos5_clk_mout_mpll_user,
+ 	&exynos5_clk_vpllsrc,
+ 	&exynos5_clk_sclk_vpll,
+@@ -1013,6 +1080,8 @@ static struct clk *exynos5_clks[] __initdata = {
+ 	&exynos5_clk_sclk_hdmi27m,
+ 	&exynos5_clk_sclk_hdmiphy,
+ 	&clk_fout_bpll,
++	&clk_fout_bpll_div2,
++	&clk_fout_mpll_div2,
+ 	&clk_fout_cpll,
+ 	&exynos5_clk_armclk,
+ };
+@@ -1178,8 +1247,10 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
+ 
+ 	clk_fout_apll.ops = &exynos5_fout_apll_ops;
+ 	clk_fout_bpll.rate = bpll;
++	clk_fout_bpll_div2.rate = bpll >> 1;
+ 	clk_fout_cpll.rate = cpll;
+ 	clk_fout_mpll.rate = mpll;
++	clk_fout_mpll_div2.rate = mpll >> 1;
+ 	clk_fout_epll.rate = epll;
+ 	clk_fout_vpll.rate = vpll;
+ 
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
+index d9578a5..130034d 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+@@ -313,6 +313,8 @@
+ #define EXYNOS5_CLKGATE_IP_PERIS		EXYNOS_CLKREG(0x10960)
+ #define EXYNOS5_CLKGATE_BLOCK			EXYNOS_CLKREG(0x10980)
+ 
++#define EXYNOS5_PLL_DIV2_SEL			EXYNOS_CLKREG(0x20A24)
++
+ #define EXYNOS5_BPLL_CON0			EXYNOS_CLKREG(0x20110)
+ #define EXYNOS5_CLKSRC_CDREX			EXYNOS_CLKREG(0x20200)
+ #define EXYNOS5_CLKDIV_CDREX			EXYNOS_CLKREG(0x20500)
+diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
+index f68a9bb..bea0907 100644
+--- a/arch/arm/plat-s5p/clock.c
++++ b/arch/arm/plat-s5p/clock.c
+@@ -115,17 +115,6 @@ struct clksrc_sources clk_src_apll = {
+ 	.nr_sources	= ARRAY_SIZE(clk_src_apll_list),
+ };
+ 
+-/* Possible clock sources for BPLL Mux */
+-static struct clk *clk_src_bpll_list[] = {
+-	[0] = &clk_fin_bpll,
+-	[1] = &clk_fout_bpll,
+-};
+-
+-struct clksrc_sources clk_src_bpll = {
+-	.sources	= clk_src_bpll_list,
+-	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
+-};
+-
+ /* Possible clock sources for CPLL Mux */
+ static struct clk *clk_src_cpll_list[] = {
+ 	[0] = &clk_fin_cpll,
 -- 
 1.7.5.4
