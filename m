@@ -1,34 +1,23 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 31 May 2012 14:04:29 -0700
-Subject: [GIT PULL] at91: platform data for atmel-mci (for 3.5)
-In-Reply-To: <4FC722B7.10409@atmel.com>
-References: <4FBE4FE7.3010005@atmel.com>
-	<4FC722B7.10409@atmel.com>
-Message-ID: <CAOesGMhq8uzei+Dn8=1iYrTiAOtuByjm58j9zgFyORVG5VZuNQ@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 01 May 2012 08:48:09 +1000
+Subject: Request for inclusion of ep93xx tree in linux-next
+Message-ID: <4F9F16A9.9090108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Stephen,
 
+Can you please add the following branches:
 
-On Thu, May 31, 2012 at 12:50 AM, Nicolas Ferre <nicolas.ferre@atmel.com>wrote:
+  ep93xx-cleanup
+  ep93xx-fixes
 
-> On 05/24/2012 05:12 PM, Nicolas Ferre :
-> > Hi Arnd, hi Olof,
->
-> Ping?
->
-> (or maybe you will have a look at this after the merge window...)
->
+from the ep93xx git tree:
 
-So, I looked at this branch yesterday but I wasn't entirely happy with the
-number of ifdefs it adds.
+  git://github.com/RyanMallon/linux-ep93xx.git
 
-If the idea is to deprecate the old driver, wouldn't it make more sense to
-just cut everyone over instead of having both sets of setup in the kernel?
+To linux-next. Both branches are stable and based on v3.4-rc2. Testing
+for the tree is covered by the arm ep93xx_defconfig.
 
-
--Olof
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120531/f867477f/attachment-0001.html>
+Thanks,
+~Ryan
