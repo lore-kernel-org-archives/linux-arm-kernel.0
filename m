@@ -1,247 +1,61 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 30 Apr 2012 16:20:08 -0500
-Subject: [PATCH V3 2/2] of: selftest/dma: Add selftest for new DT DMA
-Message-ID: <1335820808-28806-1-git-send-email-jon-hunter@ti.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 30 Apr 2012 23:25:09 +0200
+Subject: [PATCHv3 0/5] coupled cpuidle state support
+In-Reply-To: <1335816551-27756-1-git-send-email-ccross@android.com>
+References: <1335816551-27756-1-git-send-email-ccross@android.com>
+Message-ID: <201204302325.09505.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Hunter <jon-hunter@ti.com>
+Hi,
 
-These selftests are covering the new DT DMA helpers for both legacy controllers
-(not supporting DMA Engine) and controllers supporting DMA Engine. They will
-test both error and normal cases.
+I have a comment, which isn't about the series itself, but something
+thay may be worth thinking about.
 
-A dummy DMA engine filter function is also provided to show how this is used
-when registering a new DMA controller if the driver uses DMA engine.
+On Monday, April 30, 2012, Colin Cross wrote:
+> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+> cpus cannot be independently powered down, either due to
+> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+> power down), or due to HW bugs (on OMAP4460, a cpu powering up
+> will corrupt the gic state unless the other cpu runs a work
+> around).  Each cpu has a power state that it can enter without
+> coordinating with the other cpu (usually Wait For Interrupt, or
+> WFI), and one or more "coupled" power states that affect blocks
+> shared between the cpus (L2 cache, interrupt controller, and
+> sometimes the whole SoC).  Entering a coupled power state must
+> be tightly controlled on both cpus.
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/boot/dts/at91sam9m10g45ek.dts     |    2 +
- arch/arm/boot/dts/omap4-panda.dts          |    2 +
- arch/arm/boot/dts/testcases/tests-dma.dtsi |   32 ++++++++
- arch/arm/boot/dts/testcases/tests.dtsi     |    1 +
- drivers/of/selftest.c                      |  118 ++++++++++++++++++++++++++++
- 5 files changed, 155 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/testcases/tests-dma.dtsi
+That seems to be a special case of a more general situation where
+a number of CPU cores belong into a single power domain, possibly along
+some I/O devices.
 
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index a3633bd..4b3c942 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -154,3 +154,5 @@
- 		};
- 	};
- };
-+
-+/include/ "testcases/tests.dtsi"
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index ea6f5bb..a79d637 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -74,3 +74,5 @@
- 	ti,non-removable;
- 	ti,bus-width = <4>;
- };
-+
-+/include/ "testcases/tests.dtsi"
-diff --git a/arch/arm/boot/dts/testcases/tests-dma.dtsi b/arch/arm/boot/dts/testcases/tests-dma.dtsi
-new file mode 100644
-index 0000000..a75d155
---- /dev/null
-+++ b/arch/arm/boot/dts/testcases/tests-dma.dtsi
-@@ -0,0 +1,32 @@
-+
-+/ {
-+	testcase-data {
-+		dma-tests {
-+			testdmac0: test-dma-controller0 {
-+				#dma-cells = <2>;
-+			};
-+
-+			testdmac1: test-dma-controller1 {
-+				#dma-cells = <2>;
-+			};
-+
-+			/* wrong number of cells */
-+			testdmac2: test-dma-controller2 {
-+				#dma-cells = <1>;
-+			};
-+
-+			dma-slave-a {
-+				dma = <&testdmac0 42 1>;
-+			};
-+
-+			/* wrong number of values */
-+			dma-slave-b {
-+				dma = <&testdmac1 24>;
-+			};
-+
-+			dma-slave-c {
-+				dma = <&testdmac1 24 2>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/testcases/tests.dtsi b/arch/arm/boot/dts/testcases/tests.dtsi
-index a7c5067..e3afb2b 100644
---- a/arch/arm/boot/dts/testcases/tests.dtsi
-+++ b/arch/arm/boot/dts/testcases/tests.dtsi
-@@ -1 +1,2 @@
- /include/ "tests-phandle.dtsi"
-+/include/ "tests-dma.dtsi"
-diff --git a/drivers/of/selftest.c b/drivers/of/selftest.c
-index f24ffd7..65789691 100644
---- a/drivers/of/selftest.c
-+++ b/drivers/of/selftest.c
-@@ -9,10 +9,12 @@
- #include <linux/errno.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_dma.h>
- #include <linux/list.h>
- #include <linux/mutex.h>
- #include <linux/slab.h>
- #include <linux/device.h>
-+#include <linux/dmaengine.h>
- 
- static bool selftest_passed = true;
- #define selftest(result, fmt, ...) { \
-@@ -148,6 +150,121 @@ static void __init of_selftest_property_match_string(void)
- 	selftest(rc == -EILSEQ, "unterminated string; rc=%i", rc);
- }
- 
-+
-+static bool selftest_dma_filter_fn(struct dma_chan *chan, void *param)
-+{
-+	return true;
-+}
-+
-+static void __init of_selftest_dma(void)
-+{
-+	struct device_node *dma_controller_np;
-+	struct device_node *dma_slave_np;
-+	struct of_dma_channel_info info;
-+	dma_cap_mask_t mask;
-+	int rc;
-+
-+	pr_info("start\n");
-+	dma_controller_np = of_find_node_by_path(
-+		"/testcase-data/dma-tests/test-dma-controller0");
-+	dma_slave_np = of_find_node_by_path(
-+		"/testcase-data/dma-tests/dma-slave-a");
-+	if (!dma_controller_np || !dma_slave_np) {
-+		pr_err("No testcase data in device tree\n");
-+		return;
-+	}
-+
-+	/* wrong usage: DMA controller not registered yet! */
-+	rc = of_get_dma_channel_info(dma_slave_np, DMA_MEM_TO_DEV, &info);
-+	selftest(rc == -ENODEV,
-+		"selftest DMA slave request expected:-ENODEV got:%i\n", rc);
-+
-+	/* test legacy DMA controller registration with no filter function */
-+	rc = of_dma_controller_register(dma_controller_np, NULL, NULL);
-+	selftest(rc == 0, "selftest DMA controller not found: got:%i\n", rc);
-+
-+	/* wrong usage and error code tests */
-+	rc = of_get_dma_channel_info(dma_slave_np, DMA_MEM_TO_MEM, &info);
-+	selftest(rc == -EINVAL,
-+		"selftest DMA slave request expected:-EINVAL got:%i\n", rc);
-+
-+	rc = of_get_dma_channel_info(dma_slave_np, DMA_MEM_TO_DEV, NULL);
-+	selftest(rc == -EINVAL,
-+		"selftest DMA slave request expected:-EINVAL got:%i\n", rc);
-+
-+	/* proper use of the API */
-+	rc = of_get_dma_channel_info(dma_slave_np, DMA_MEM_TO_DEV, &info);
-+	selftest(rc == 0, "selftest DMA slave request error: got:%i\n", rc);
-+	selftest(info.dma_channel == 42,
-+		"selftest DMA slave request line expected:42 got:%i\n",
-+		info.dma_channel);
-+
-+	of_dma_controller_free(dma_controller_np);
-+
-+	/* wrong usage: DMA controller not registered anymore! */
-+	rc = of_get_dma_channel_info(dma_slave_np, DMA_MEM_TO_DEV, &info);
-+	selftest(rc == -ENODEV,
-+		"selftest DMA slave request expected:-ENODEV got:%i\n", rc);
-+
-+	/* use with a two values DMA request specification */
-+	dma_controller_np = of_find_node_by_path(
-+		"/testcase-data/dma-tests/test-dma-controller1");
-+	dma_slave_np = of_find_node_by_path(
-+		"/testcase-data/dma-tests/dma-slave-b");
-+	if (!dma_controller_np || !dma_slave_np) {
-+		pr_err("No testcase data in device tree\n");
-+		return;
-+	}
-+
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
-+
-+	/* DMA controller registration using DMA Engine filter function */
-+	rc = of_dma_controller_register(dma_controller_np, &mask,
-+		selftest_dma_filter_fn);
-+	selftest(rc == 0, "selftest DMA controller not found: got:%i\n", rc);
-+
-+	/* wrong number of cells */
-+	rc = of_get_dma_channel_info(dma_slave_np, DMA_MEM_TO_MEM, &info);
-+	selftest(rc == -EINVAL,
-+		"selftest DMA slave request expected:-EINVAL got:%i\n", rc);
-+
-+	dma_slave_np = of_find_node_by_path(
-+		"/testcase-data/dma-tests/dma-slave-c");
-+	if (!dma_slave_np) {
-+		pr_err("No dma-slave-c data in device tree\n");
-+		return;
-+	}
-+
-+	/* proper use of the API */
-+	rc = of_get_dma_channel_info(dma_slave_np, DMA_DEV_TO_MEM, &info);
-+	selftest(rc == 0, "selftest DMA slave request error: got:%i\n", rc);
-+	selftest(info.dma_channel == 24,
-+		"selftest DMA slave request line expected:24 got:%i\n",
-+		info.dma_channel);
-+	selftest(info.dma_filter_func == selftest_dma_filter_fn,
-+		"selftest DMA slave filter function expected:0x%x got:0x%x\n",
-+		(u32)selftest_dma_filter_fn, (u32)info.dma_filter_func);
-+
-+	of_dma_controller_free(dma_controller_np);
-+
-+	/* use with a two values DMA request specification */
-+	dma_controller_np = of_find_node_by_path(
-+		"/testcase-data/dma-tests/test-dma-controller2");
-+	if (!dma_controller_np) {
-+		pr_err("No testcase data in device tree\n");
-+		return;
-+	}
-+
-+	/* wrong number of cells */
-+	rc = of_dma_controller_register(dma_controller_np, NULL,
-+		selftest_dma_filter_fn);
-+	selftest(rc == -EINVAL, "selftest DMA controller not found: got:%i\n",
-+		rc);
-+
-+	pr_info("end - %s\n", selftest_passed ? "PASS" : "FAIL");
-+}
-+
- static int __init of_selftest(void)
- {
- 	struct device_node *np;
-@@ -162,6 +279,7 @@ static int __init of_selftest(void)
- 	pr_info("start of selftest - you will see error messages\n");
- 	of_selftest_parse_phandle_with_args();
- 	of_selftest_property_match_string();
-+	of_selftest_dma();
- 	pr_info("end of selftest - %s\n", selftest_passed ? "PASS" : "FAIL");
- 	return 0;
- }
--- 
-1.7.5.4
+We'll need to handle the general case at one point anyway, so I wonder if
+the approach shown here may get us in the way?
+
+> The easiest solution to implementing coupled cpu power states is
+> to hotplug all but one cpu whenever possible, usually using a
+> cpufreq governor that looks at cpu load to determine when to
+> enable the secondary cpus.  This causes problems, as hotplug is an
+> expensive operation, so the number of hotplug transitions must be
+> minimized, leading to very slow response to loads, often on the
+> order of seconds.
+
+This isn't a solution at all, rather a workaround and a poor one for that
+matter.
+
+> This patch series implements an alternative solution, where each
+> cpu will wait in the WFI state until all cpus are ready to enter
+> a coupled state, at which point the coupled state function will
+> be called on all cpus at approximately the same time.
+> 
+> Once all cpus are ready to enter idle, they are woken by an smp
+> cross call.
+
+Is it really necessary to wake up all of the CPUs in WFI before
+going to deeper idle?  We should be able to figure out when they
+are going to be needed next time without waking them up and we should
+know the latency to wake up from the deeper multi-CPU "C-state",
+so it should be possible to decide whether or not to go to deeper
+idle without the SMP cross call.  Is there anything I'm missing here?
+
+Rafael
