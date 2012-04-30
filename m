@@ -1,38 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 21:57:05 +0000
-Subject: [GIT PULL] ux500 GPIO and pins for ARM SoC
-In-Reply-To: <1335369929-5856-1-git-send-email-linus.walleij@linaro.org>
-References: <1335369929-5856-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201204302157.05288.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 30 Apr 2012 15:00:56 -0700
+Subject: [PATCH 03/12] arm: omap3: Only sleep in cpuidle driver if I/O
+ wake-ups work
+In-Reply-To: <20120430213433.GA19256@animalcreek.com> (Mark A. Greer's message
+ of "Mon, 30 Apr 2012 14:34:33 -0700")
+References: <1334171147-7517-1-git-send-email-mgreer@animalcreek.com>
+ <1334171147-7517-4-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1204111532280.29473@utopia.booyaka.com>
+ <20120424205105.GA26749@animalcreek.com>
+ <20120424232506.GA8850@animalcreek.com> <87haw4282b.fsf@ti.com>
+ <20120430213433.GA19256@animalcreek.com>
+Message-ID: <878vhcriav.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 April 2012, Linus Walleij wrote:
-> 
-> Hi ARM SoC maintainers,
-> 
-> This is a pull request for the GPIO and pin control stuff
-> accumulated in the ST-Ericsson tree. Here we have:
-> 
-> - Improvements and fixes and a custom pin config API from
->   Rabin Vincent
-> 
-> - Device Tree bindings from Lee Jones
-> 
-> - Some accumulated patches by yours truly.
-> 
-> - A MSP platform data init patch from Ola Lilja that is merged
->   here due to dependency on pin config work. It is to be
->   used with work being worked on in parallel in the ALSA
->   SoC subsystem.
-> 
-> If you wonder about the custom pin config implementation this
-> is to be used as a transition base as I am rewriting the
-> driver to use pinctrl. Expect a final pull request on top
-> of this one that will move the ux500 over to pinctrl.
-> 
-> Please pull this in...
+"Mark A. Greer" <mgreer@animalcreek.com> writes:
 
-Pulled into next/pinctrl branch, thanks!
+> On Fri, Apr 27, 2012 at 02:12:12PM -0700, Kevin Hilman wrote:
+>> "Mark A. Greer" <mgreer@animalcreek.com> writes:
+>> 
+>> > On Tue, Apr 24, 2012 at 01:51:05PM -0700, Mark A. Greer wrote:
+>
+>> > Just thinking out loud...
+>> >
+>> > We could chose whether pm_idle & cpuidle issue a wfi based on
+>> > whether there is a davinci-emac present.  The issue with that is
+>> > that someday there may be another SoC that has a davinci-emac that
+>> > can wake up the system.  I know cpu_is_xxx() is frowned upon but
+>> > this does seem like a proper usage of it--the deciding factor
+>> > really is whether its an am35x or not (and CONFIG_TI_DAVINCI_EMAC
+>> > is enabled).
+>> 
+>> The presence of the davinci_emac is probably overkill, avoiding WFI
+>> should really only be done when the davinci_emac is *active*.
+>> e.g. using an am35x with an EMAC *present*, but not in use because
+>> there's an MMC rootfs for example.
+>> 
+>> If there's a good way to detect an in-use davinci_emac, then
+>> disable_hlt() can be used to avoid WFI.  When the davinci_emac is not in
+>> use (e.g. module unloaded etc.) then enable_hlt() can be used to
+>> (re)allow WFI.
+>
+> This can work for pm_idle but what should be done for cpu_idle
+> (as in, omap3_enter_idle[_bm])?  We should have some sort of
+> solution for that so users can safely enable CONFIG_CPU_IDLE
+> and not have the am3517 fall apart.
 
-	Arnd
+disable_hlt() will prevent either the default idle *or* CPUidle from
+being called.
+
+It will simply call cpu_relax() instead of calling any idle
+function. (c.f. cpu_idle() in arch/arm/kernel/process.c)
+
+Kevin
