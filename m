@@ -1,95 +1,133 @@
 From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 30 Apr 2012 21:38:43 +0530
-Subject: [GIT PULL] ARM: spear-soc clock updates for 3.5
-Message-ID: <CAOh2x=n11TXfKp3HkEPFTeFi2qO7tKmedSL7zPeU842-+tu47w@mail.gmail.com>
+Date: Mon, 30 Apr 2012 21:40:32 +0530
+Subject: [GIT PULL] ARM: SPEAr13xx support for 3.5
+Message-ID: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd/Olof,
 
-This is pull request for SPEAr common clk framework updates. It had dependency
-on spear/dt and spear/pinctrl for applying patches, and so i created a merge
-of v3.4-rc5 with those branches.
+This is pull request for SPEAr13xx support updates. It had dependency
+on for-v3.5-spear-clk, spear/dt and spear/pinctrl for applying patches, and
+so i created a merge of v3.4-rc5 with spear/dt and pinctrl branches and applied
+for-v3.5-spear-clk patches, before this patchset.
 
 Also, it has compilation dependencies with:
 - Mike's clk-next branch
 - Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ...
 
-I have added Reviewed-by from Mike on these patches.
+I have added Reviewed & Acked -by from Mike and Linus on few patches.
 
-The following changes since commit 507f3bb673bf25ff0345986c72609debacdcee60:
-
-  Merge branch 'spear/dt'; branch 'spear/pinctrl' into v3.4-rc5
-(2012-04-30 13:30:19 +0530)
-
-are available in the git repository at:
-
-
-  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear-clk
-
-for you to fetch changes up to 9e1a2a12e55a9d8da21810cab91b91eb8f27be35:
+The following changes since commit 9e1a2a12e55a9d8da21810cab91b91eb8f27be35:
 
   SPEAr: Switch to common clock framework (2012-04-30 13:36:13 +0530)
 
+are available in the git repository at:
+
+  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear13xx
+
+for you to fetch changes up to bfaa722b194835e80921d62a97fc0da82e6a8cc4:
+
+  SPEAr: Update MAINTAINERS and Documentation (2012-04-30 13:44:39 +0530)
+
 ----------------------------------------------------------------
-Sascha Hauer (1):
-      clk: add a fixed factor clock
+Viresh Kumar (10):
+      SPEAr: Add DT bindings for SPEAr's timer
+      SPEAr13xx: Add header files
+      SPEAr13xx: Add source files
+      SPEAr13xx: Add common clock framework support
+      pinctrl: SPEAr: Create macro for declaring GPIO PINS
+      pinctrl: Add SPEAr13xx pinctrl drivers
+      SPEAr13xx: Add dts and dtsi files
+      SPEAr13xx: Add compilation support
+      SPEAr13xx: Add defconfig
+      SPEAr: Update MAINTAINERS and Documentation
 
-Viresh Kumar (6):
-      SPEAr: clk: Add VCO-PLL Synthesizer clock
-      SPEAr: clk: Add Auxiliary Synthesizer clock
-      SPEAr: clk: Add Fractional Synthesizer clock
-      SPEAr: clk: Add General Purpose Timer Synthesizer clock
-      SPEAr: Call clk_prepare() before calling clk_enable
-      SPEAr: Switch to common clock framework
-
- MAINTAINERS                                     |    4 +-
- arch/arm/Kconfig                                |    1 +
- arch/arm/mach-spear3xx/Makefile                 |    2 +-
- arch/arm/mach-spear3xx/clock.c                  |  892 --------------------
- arch/arm/mach-spear3xx/include/mach/generic.h   |    4 +-
- arch/arm/mach-spear3xx/include/mach/misc_regs.h |    2 +
- arch/arm/mach-spear3xx/include/mach/spear.h     |   13 +
- arch/arm/mach-spear3xx/spear300.c               |    1 -
- arch/arm/mach-spear3xx/spear310.c               |    1 -
- arch/arm/mach-spear3xx/spear320.c               |   12 +-
- arch/arm/mach-spear3xx/spear3xx.c               |    2 +
- arch/arm/mach-spear6xx/Makefile                 |    2 +-
- arch/arm/mach-spear6xx/clock.c                  |  789 ------------------
- arch/arm/mach-spear6xx/include/mach/misc_regs.h |    2 +
- arch/arm/mach-spear6xx/spear6xx.c               |    5 +-
- arch/arm/plat-spear/Makefile                    |    2 +-
- arch/arm/plat-spear/clock.c                     | 1005 -----------------------
- arch/arm/plat-spear/include/plat/clock.h        |  249 ------
- arch/arm/plat-spear/time.c                      |    8 +-
- drivers/clk/Makefile                            |    5 +-
- drivers/clk/clk-fixed-factor.c                  |   95 +++
- drivers/clk/spear/Makefile                      |    8 +
- drivers/clk/spear/clk-aux-synth.c               |  192 +++++
- drivers/clk/spear/clk-frac-synth.c              |  159 ++++
- drivers/clk/spear/clk-gpt-synth.c               |  148 ++++
- drivers/clk/spear/clk-vco-pll.c                 |  350 ++++++++
- drivers/clk/spear/clk.c                         |   36 +
- drivers/clk/spear/clk.h                         |  134 +++
- drivers/clk/spear/spear3xx_clock.c              |  612 ++++++++++++++
- drivers/clk/spear/spear6xx_clock.c              |  342 ++++++++
- include/linux/clk-private.h                     |   20 +
- include/linux/clk-provider.h                    |   23 +
- 32 files changed, 2164 insertions(+), 2956 deletions(-)
- delete mode 100644 arch/arm/mach-spear3xx/clock.c
- delete mode 100644 arch/arm/mach-spear6xx/clock.c
- delete mode 100644 arch/arm/plat-spear/clock.c
- delete mode 100644 arch/arm/plat-spear/include/plat/clock.h
- create mode 100644 drivers/clk/clk-fixed-factor.c
- create mode 100644 drivers/clk/spear/Makefile
- create mode 100644 drivers/clk/spear/clk-aux-synth.c
- create mode 100644 drivers/clk/spear/clk-frac-synth.c
- create mode 100644 drivers/clk/spear/clk-gpt-synth.c
- create mode 100644 drivers/clk/spear/clk-vco-pll.c
- create mode 100644 drivers/clk/spear/clk.c
- create mode 100644 drivers/clk/spear/clk.h
- create mode 100644 drivers/clk/spear/spear3xx_clock.c
- create mode 100644 drivers/clk/spear/spear6xx_clock.c
+ Documentation/arm/SPEAr/overview.txt               |   32 +-
+ .../devicetree/bindings/arm/spear-timer.txt        |   18 +
+ Documentation/devicetree/bindings/arm/spear.txt    |   14 +-
+ .../devicetree/bindings/pinctrl/pinctrl_spear.txt  |   47 +
+ MAINTAINERS                                        |   13 +
+ arch/arm/Makefile                                  |    2 +
+ arch/arm/boot/dts/spear1310-evb.dts                |  267 +++
+ arch/arm/boot/dts/spear1310.dtsi                   |  184 ++
+ arch/arm/boot/dts/spear1340-evb.dts                |  283 +++
+ arch/arm/boot/dts/spear1340.dtsi                   |   56 +
+ arch/arm/boot/dts/spear13xx.dtsi                   |  262 +++
+ arch/arm/boot/dts/spear3xx.dtsi                    |    6 +
+ arch/arm/boot/dts/spear600.dtsi                    |    6 +
+ arch/arm/configs/spear13xx_defconfig               |   91 +
+ arch/arm/mach-spear13xx/Kconfig                    |   20 +
+ arch/arm/mach-spear13xx/Makefile                   |   10 +
+ arch/arm/mach-spear13xx/Makefile.boot              |    6 +
+ arch/arm/mach-spear13xx/headsmp.S                  |   47 +
+ arch/arm/mach-spear13xx/hotplug.c                  |  119 ++
+ arch/arm/mach-spear13xx/include/mach/debug-macro.S |   14 +
+ arch/arm/mach-spear13xx/include/mach/dma.h         |  128 ++
+ arch/arm/mach-spear13xx/include/mach/generic.h     |   49 +
+ arch/arm/mach-spear13xx/include/mach/gpio.h        |   19 +
+ arch/arm/mach-spear13xx/include/mach/hardware.h    |    1 +
+ arch/arm/mach-spear13xx/include/mach/irqs.h        |   20 +
+ arch/arm/mach-spear13xx/include/mach/spear.h       |   62 +
+ arch/arm/mach-spear13xx/include/mach/timex.h       |   19 +
+ arch/arm/mach-spear13xx/include/mach/uncompress.h  |   19 +
+ arch/arm/mach-spear13xx/platsmp.c                  |  127 ++
+ arch/arm/mach-spear13xx/spear1310.c                |   88 +
+ arch/arm/mach-spear13xx/spear1340.c                |  192 ++
+ arch/arm/mach-spear13xx/spear13xx.c                |  197 ++
+ arch/arm/mach-spear3xx/include/mach/generic.h      |    2 +-
+ arch/arm/mach-spear3xx/include/mach/irqs.h         |    1 -
+ arch/arm/mach-spear3xx/include/mach/spear.h        |    1 -
+ arch/arm/mach-spear3xx/spear3xx.c                  |    2 +-
+ arch/arm/mach-spear6xx/include/mach/generic.h      |    2 +-
+ arch/arm/mach-spear6xx/include/mach/irqs.h         |    3 -
+ arch/arm/mach-spear6xx/include/mach/spear.h        |    1 -
+ arch/arm/mach-spear6xx/spear6xx.c                  |    2 +-
+ arch/arm/plat-spear/Kconfig                        |   12 +
+ arch/arm/plat-spear/Makefile                       |    5 +-
+ arch/arm/plat-spear/restart.c                      |    5 +
+ arch/arm/plat-spear/time.c                         |   31 +-
+ drivers/clk/spear/Makefile                         |    2 +
+ drivers/clk/spear/spear1310_clock.c                | 1106 ++++++++++
+ drivers/clk/spear/spear1340_clock.c                |  964 +++++++++
+ drivers/pinctrl/spear/Kconfig                      |   10 +
+ drivers/pinctrl/spear/Makefile                     |    2 +
+ drivers/pinctrl/spear/pinctrl-spear.h              |  251 +++
+ drivers/pinctrl/spear/pinctrl-spear1310.c          | 2198 ++++++++++++++++++++
+ drivers/pinctrl/spear/pinctrl-spear1340.c          | 1989 ++++++++++++++++++
+ drivers/pinctrl/spear/pinctrl-spear3xx.c           |  103 +-
+ 53 files changed, 8965 insertions(+), 145 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spear-timer.txt
+ create mode 100644 arch/arm/boot/dts/spear1310-evb.dts
+ create mode 100644 arch/arm/boot/dts/spear1310.dtsi
+ create mode 100644 arch/arm/boot/dts/spear1340-evb.dts
+ create mode 100644 arch/arm/boot/dts/spear1340.dtsi
+ create mode 100644 arch/arm/boot/dts/spear13xx.dtsi
+ create mode 100644 arch/arm/configs/spear13xx_defconfig
+ create mode 100644 arch/arm/mach-spear13xx/Kconfig
+ create mode 100644 arch/arm/mach-spear13xx/Makefile
+ create mode 100644 arch/arm/mach-spear13xx/Makefile.boot
+ create mode 100644 arch/arm/mach-spear13xx/headsmp.S
+ create mode 100644 arch/arm/mach-spear13xx/hotplug.c
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/dma.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/generic.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1310_misc_regs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1340_misc_regs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/timex.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-spear13xx/platsmp.c
+ create mode 100644 arch/arm/mach-spear13xx/spear1310.c
+ create mode 100644 arch/arm/mach-spear13xx/spear1340.c
+ create mode 100644 arch/arm/mach-spear13xx/spear13xx.c
+ create mode 100644 drivers/clk/spear/spear1310_clock.c
+ create mode 100644 drivers/clk/spear/spear1340_clock.c
+ create mode 100644 drivers/pinctrl/spear/pinctrl-spear1310.c
+ create mode 100644 drivers/pinctrl/spear/pinctrl-spear1340.c
 
 -- 
 viresh
