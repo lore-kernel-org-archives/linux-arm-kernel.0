@@ -1,71 +1,79 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 30 Apr 2012 12:14:20 -0700
-Subject: [PATCH 10/20] of/irq: fix interrupt parent lookup procedure
+Date: Mon, 30 Apr 2012 12:14:21 -0700
+Subject: [PATCH 11/20] of/irq: add retry support for interrupt controller tree
+ initialization
 In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
 References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1335813270-13083-11-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1335813270-13083-12-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interrupt parent lookup fails for a node that is a interrupt-controller
-but does not have an explict interrupt-parent property and instead inherits
-this property from the root node.
+Allow a interrupt-controller initializtion call to report -EAGAIN to notify
+that its initializtion has not been completed since one or more of its
+interrupt-parent has not yet been initialized.
 
-Consider the nodes listed below.
-
-    / {
-        interrupt-parent = <&intc_level1>;
-
-        intc_level1: interrupt-controller at xxx {
-                interrupt-controller;
-                #interrupt-cells = <3>;
-                <rest of the properties here>;
-        };
-
-        intc_level2: interrupt-controller at yyy {
-                interrupt-controller;
-                #interrupt-cells = <2>;
-                <rest of the properties here>;
-        };
-    };
-
-The interrupt parent lookup for interrupt-controller at yyy fails. It inherits
-the interrupt-parent property from the root node and the root node ('/')
-specifies a 'interrupt-parent' property which represents the default interrupt
-root controller. But, the property '#interrupt-cells' might not be specified
-in the root node.
-
-In case a interrupt controller node does not include a 'interrupt-parent'
-property but inherits that property from the root node, the check for
-'interrupt-cells' property in the root node fails. Fix this removing the
-check for 'interrupt-cells' property.
-
+Suggested-by: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- drivers/of/irq.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ drivers/of/irq.c |   25 +++++++++++++++++++++----
+ 1 files changed, 21 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 9cf0060..a520363 100644
+index a520363..bbe6039 100644
 --- a/drivers/of/irq.c
 +++ b/drivers/of/irq.c
-@@ -66,14 +66,16 @@ struct device_node *of_irq_find_parent(struct device_node *child)
- 		if (parp == NULL)
- 			p = of_get_parent(child);
- 		else {
-+			of_node_put(child);
- 			if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
- 				p = of_node_get(of_irq_dflt_pic);
- 			else
- 				p = of_find_node_by_phandle(be32_to_cpup(parp));
-+			return p;
- 		}
- 		of_node_put(child);
- 		child = p;
--	} while (p && of_get_property(p, "#interrupt-cells", NULL) == NULL);
-+	} while (p);
+@@ -418,8 +418,6 @@ void __init of_irq_init(const struct of_device_id *matches)
+ 	INIT_LIST_HEAD(&intc_parent_list);
  
- 	return p;
- }
+ 	for_each_matching_node(np, matches) {
+-		if (!of_find_property(np, "interrupt-controller", NULL))
+-			continue;
+ 		/*
+ 		 * Here, we allocate and populate an intc_desc with the node
+ 		 * pointer, interrupt-parent device_node etc.
+@@ -454,7 +452,6 @@ void __init of_irq_init(const struct of_device_id *matches)
+ 			if (desc->interrupt_parent != parent)
+ 				continue;
+ 
+-			list_del(&desc->list);
+ 			match = of_match_node(matches, desc->dev);
+ 			if (WARN(!match->data,
+ 			    "of_irq_init: no init function for %s\n",
+@@ -468,6 +465,15 @@ void __init of_irq_init(const struct of_device_id *matches)
+ 				 desc->dev, desc->interrupt_parent);
+ 			irq_init_cb = match->data;
+ 			ret = irq_init_cb(desc->dev, desc->interrupt_parent);
++			if (ret == -EAGAIN)
++				/* 
++				 * Interrupt controller's initialization did not
++				 * complete and should be retried. So let its
++				 * intc_desc be on intc_desc_list.
++				 */
++				continue;
++			list_del(&desc->list);
++
+ 			if (ret) {
+ 				kfree(desc);
+ 				continue;
+@@ -484,7 +490,18 @@ void __init of_irq_init(const struct of_device_id *matches)
+ 		desc = list_first_entry(&intc_parent_list, typeof(*desc), list);
+ 		if (list_empty(&intc_parent_list) || !desc) {
+ 			pr_err("of_irq_init: children remain, but no parents\n");
+-			break;
++			/*
++			 * If a search with NULL as parent did not result in any
++			 * new parent being found, then the scan for matching
++			 * interrupt controller nodes is considered as complete.
++			 * Otherwise, if there are pending elements on the
++			 * intc_desc_list, then retry this process again with
++			 * NULL as parent.
++			 */
++			if (!parent)
++				break;
++			parent = NULL;
++			continue;
+ 		}
+ 		list_del(&desc->list);
+ 		parent = desc->dev;
 -- 
 1.7.5.4
