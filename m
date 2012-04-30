@@ -1,51 +1,31 @@
 From: ylmao@marvell.com (Yilu Mao)
-Date: Mon, 30 Apr 2012 21:16:26 +0800
-Subject: [PATCH v4] ARM: cache-l2x0.c: save aux ctrl for resume in case l2x0
- is enabled before init
-Message-ID: <1335791786-32377-1-git-send-email-ylmao@marvell.com>
+Date: Mon, 30 Apr 2012 21:22:49 +0800
+Subject: [PATCH] ARM: cache-l2x0.c: save aux ctrl for resume in case that
+ l2x0 is enabled before init
+In-Reply-To: <20120430121125.GN10632@arm.com>
+References: <4F99148B.4020900@marvell.com> <20120426094400.GD18136@arm.com>
+ <4F991ED6.8060109@marvell.com> <20120426102815.GE18136@arm.com>
+ <4F9924FB.7070308@marvell.com> <20120426103840.GA6294@arm.com>
+ <4F9927F2.5060408@marvell.com> <20120426105651.GB6294@arm.com>
+ <4F992B80.6040207@marvell.com> <4F9B8D1C.6090400@marvell.com>
+ <20120430121125.GN10632@arm.com>
+Message-ID: <4F9E9229.4020904@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
-register will not be saved in l2x0_saved_regs. Therefore we can not use
-l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
-by saving aux ctrl in l2x0_saved_regs just after it's being read from
-the register.
-And in case some bits of aux ctrl register are reserved, re-read and
-save it properly after set it if l2x0 is disabled before init.
+On 04/30/2012 08:11 PM, Catalin Marinas wrote:
+> On Sat, Apr 28, 2012 at 07:24:28AM +0100, Yilu Mao wrote:
+>> Do you agree with this patch to be merged?
+>
+> I would rather re-read the aux_ctrl register again after it was set (if
+> L2 is disabled) and store this value. It makes sense if some of the bits
+> are reserved, at least we have the real value.
+>
+Ok, I have provided a V4 patch including this.
+Please help to review.
 
-Change-Id: I54f3002274ffe9cdc667dba81e36e08f2e121467
-Signed-off-by: Yilu Mao <ylmao@marvell.com>
----
- arch/arm/mm/cache-l2x0.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a53fd2a..9893e58 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -320,6 +320,13 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
- 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- 
-+	/*
-+	 * In case l2x controller is enabled, the aux ctrl register
-+	 * can't be set. So the original value should be stored in
-+	 * the l2x0_saved_regs for restoring when resume.
-+	 */
-+	l2x0_saved_regs.aux_ctrl = aux;
-+
- 	aux &= aux_mask;
- 	aux |= aux_val;
- 
-@@ -364,6 +371,8 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 		/* l2x0 controller is disabled */
- 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
- 
-+		/* Re-read it in case some bits are reserved. */
-+		aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- 		l2x0_saved_regs.aux_ctrl = aux;
- 
- 		l2x0_inv_all();
 -- 
-1.7.5.4
+Thanks.
+
+Best Wishes,
+Yilu Mao
