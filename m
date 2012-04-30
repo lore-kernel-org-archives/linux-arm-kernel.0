@@ -1,52 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Apr 2012 14:19:26 +0000
-Subject: [PATCH 1/2] cs89x0_platform : Use ioread16/iowrite16 instead of
- inw/outw
-In-Reply-To: <1335779839-30420-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <1335779839-30420-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <201204301419.27119.arnd@arndb.de>
+Date: Mon, 30 Apr 2012 14:21:45 +0000
+Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
+In-Reply-To: <1335706842-11725-1-git-send-email-ijc@hellion.org.uk>
+References: <1335706842-11725-1-git-send-email-ijc@hellion.org.uk>
+Message-ID: <201204301421.45446.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 April 2012, Jaccon Bastiaansen wrote:
-> The use of the inw/outw functions by the cs89x0 platform driver
-> results in NULL pointer references.
+On Sunday 29 April 2012, Ian Campbell wrote:
 > 
-> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
-> ---
->  drivers/net/ethernet/cirrus/cs89x0.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
+> Fixes the following build error when CONFIG_KEXEC is enabled:
+>   CC      arch/arm/mach-kirkwood/board-dt.o
+> arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
+> arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
+> arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
+> 
+> Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+> [v4, rebase onto recent Linus for repost]
+> [v3, speak actual English in the commit message, thanks Sergei Shtylyov]
+> [v2, using linux/kexec.h not asm/kexec.h]
 
-It's actually broken on most platforms already, and the #ifdef is
-about to go away since IXP2xxx is getting removed in v3.5.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-> index b9406cb..95737e9 100644
-> --- a/drivers/net/ethernet/cirrus/cs89x0.c
-> +++ b/drivers/net/ethernet/cirrus/cs89x0.c
-> @@ -369,6 +369,18 @@ writeword(unsigned long base_addr, int portno, u16 value)
->  {
->         __raw_writel(value, base_addr + (portno << 1));
->  }
-> +#elif defined(CONFIG_CS89x0_PLATFORM)
-> +static u16
-> +readword(unsigned long base_addr, int portno)
-> +{
-> +       return ioread16(base_addr + portno);
-> +}
-> +
-> +static void
-> +writeword(unsigned long base_addr, int portno, u16 value)
-> +{
-> +       iowrite16(value, base_addr + portno);
-> +}
->  #else
->  static u16
->  readword(unsigned long base_addr, int portno)
-
-I think the best solution would be to always using ioread32/iowrite32
-in the #else path, and change the ISA code to do an ioport_map
-for the base address, passing around the virtual address as an __iomem
-pointer.
+Jason, can you apply this patch on your tree?
 
 	Arnd
