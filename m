@@ -1,30 +1,51 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 30 Apr 2012 22:09:12 +0200
-Subject: [PATCH 1/2] I2C: Set I2C timing registers for mxs-i2c
-In-Reply-To: <20120430194313.GA28226@pengutronix.de>
-References: <1335738969-27445-1-git-send-email-marex@denx.de>
- <201204301405.42621.marex@denx.de> <20120430194313.GA28226@pengutronix.de>
-Message-ID: <201204302209.12482.marex@denx.de>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 30 Apr 2012 13:09:08 -0700
+Subject: [PATCHv3 2/5] cpuidle: fix error handling in __cpuidle_register_device
+In-Reply-To: <1335816551-27756-1-git-send-email-ccross@android.com>
+References: <1335816551-27756-1-git-send-email-ccross@android.com>
+Message-ID: <1335816551-27756-3-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+Fix the error handling in __cpuidle_register_device to include
+the missing list_del.  Move it to a label, which will simplify
+the error handling when coupled states are added.
 
-> > > > This sets the bus to run at 400kHz, prior to this,
-> > > > the bus frequency was undefined.
-> > > 
-> > > Not exactly. The default values let it run at 100kHz.
-> > 
-> > Have you tried dumping the default values and comparing it with the
-> > values for 100kHz in the manual?
-> 
-> Yes, sure. Doesn't it work for you? I just rechecked and the values are
-> okay. That being said, if you make it configurable for 400kHz, it would
-> in deed be better to rewrite the values for 100kHz, too.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ drivers/cpuidle/cpuidle.c |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
 
-They were different for me ... did you configure the i2c bus in your bootloader 
-possibly? Those values might have been written there since then ... I didn't run 
-i2c in u-boot before booting linux.
-
-Best regards,
-Marek Vasut
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index 3e3e3e4..4540672 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -403,13 +403,18 @@ static int __cpuidle_register_device(struct cpuidle_device *dev)
+ 
+ 	per_cpu(cpuidle_devices, dev->cpu) = dev;
+ 	list_add(&dev->device_list, &cpuidle_detected_devices);
+-	if ((ret = cpuidle_add_sysfs(cpu_dev))) {
+-		module_put(cpuidle_driver->owner);
+-		return ret;
+-	}
++	ret = cpuidle_add_sysfs(cpu_dev);
++	if (ret)
++		goto err_sysfs;
+ 
+ 	dev->registered = 1;
+ 	return 0;
++
++err_sysfs:
++	list_del(&dev->device_list);
++	per_cpu(cpuidle_devices, dev->cpu) = NULL;
++	module_put(cpuidle_driver->owner);
++	return ret;
+ }
+ 
+ /**
+-- 
+1.7.7.3
