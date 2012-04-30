@@ -1,144 +1,45 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 30 Apr 2012 14:10:14 +0200
-Subject: [PATCH 2/2] I2C: Implement DMA support into mxs-i2c
-In-Reply-To: <20120430060554.GB7926@pengutronix.de>
-References: <1335738969-27445-1-git-send-email-marex@denx.de>
- <1335738969-27445-2-git-send-email-marex@denx.de>
- <20120430060554.GB7926@pengutronix.de>
-Message-ID: <201204301410.14393.marex@denx.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 30 Apr 2012 18:29:19 +0530
+Subject: [PATCH 0/6] ARM: OMAP: hwmod: remove runtime cpu_is checking
+In-Reply-To: <1335557140-10854-1-git-send-email-khilman@ti.com>
+References: <1335557140-10854-1-git-send-email-khilman@ti.com>
+Message-ID: <4F9E8CA7.8050700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+On Saturday 28 April 2012 01:35 AM, Kevin Hilman wrote:
+> This series attempts to remove all the runtime cpu_is* checking in
+> omap_hwmod.c in favor of using function pointers initialized at init
+> time.
+> 
+> This series was motivated by the addition of support for the AM335x
+> series which was done by adding several more cpu_is* checks, and
+> provided the proverbial straw that broke the camel's back.  
+> 
+> In addition to the cleanup, this provides a much cleaner way of adding
+> additional SoC support since it no longer requires adding additional
+> runtime cpu_is* checks.
+> 
+> Boot tested on OMAP3530/Overo and OMAP4430/Panda.
+> 
+I was looking at some of these while trying to OMAP5
+support. Indeed the cpu_is_* is becoming increasingly
+no maintanable and ugly. Thanks for the series.
 
-> On Mon, Apr 30, 2012 at 12:36:09AM +0200, Marek Vasut wrote:
-> > This patch implements DMA support into mxs-i2c. DMA transfers are now
-> > enabled by default, though it is possible for example for debugging
-> > purposes, to disable them via i2c->dma_mode.
-> > 
-> > Cc: Linux I2C <linux-i2c@vger.kernel.org>
-> > Cc: Detlev Zundel <dzu@denx.de>
-> > Cc: Fabio Estevam <festevam@gmail.com>
-> > Cc: Stefano Babic <sbabic@denx.de>
-> > Cc: Wolfgang Denk <wd@denx.de>
-> > Cc: Wolfram Sang <w.sang@pengutronix.de>
-> 
-> Looks promising, will give it a shot this week! Thanks.
-> Very quick review.
-> 
-> > ---
-> > 
-> >  arch/arm/mach-mxs/devices/platform-mxs-i2c.c    |    5 +
-> >  arch/arm/mach-mxs/include/mach/devices-common.h |    1 +
-> >  drivers/i2c/busses/i2c-mxs.c                    |  261
-> >  +++++++++++++++++++++-- 3 files changed, 245 insertions(+), 22
-> >  deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/devices/platform-mxs-i2c.c
-> > b/arch/arm/mach-mxs/devices/platform-mxs-i2c.c index 79222ec..a94f308
-> > 100644
-> > --- a/arch/arm/mach-mxs/devices/platform-mxs-i2c.c
-> > +++ b/arch/arm/mach-mxs/devices/platform-mxs-i2c.c
-> > @@ -14,6 +14,7 @@
-> > 
-> >  	{								\
-> >  	
-> >  		.id = _id,						\
-> >  		.iobase = soc ## _I2C ## _id ## _BASE_ADDR,		\
-> > 
-> > +		.dma	= soc ## _DMA_I2C ## _id,			\
-> > 
-> >  		.errirq = soc ## _INT_I2C ## _id ## _ERROR,		\
-> >  		.dmairq = soc ## _INT_I2C ## _id ## _DMA,		\
-> >  	
-> >  	}
-> > 
-> > @@ -37,6 +38,10 @@ struct platform_device *__init mxs_add_mxs_i2c(
-> > 
-> >  			.end = data->iobase + SZ_8K - 1,
-> >  			.flags = IORESOURCE_MEM,
-> >  		
-> >  		}, {
-> > 
-> > +			.start	= data->dma,
-> > +			.end	= data->dma,
-> > +			.flags	= IORESOURCE_DMA,
-> > +		}, {
-> > 
-> >  			.start = data->errirq,
-> >  			.end = data->errirq,
-> >  			.flags = IORESOURCE_IRQ,
-> > 
-> > diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h
-> > b/arch/arm/mach-mxs/include/mach/devices-common.h index f2e3839..791d99c
-> > 100644
-> > --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> > +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> > @@ -80,6 +80,7 @@ mxs_add_gpmi_nand(const struct gpmi_nand_platform_data
-> > *pdata,
-> > 
-> >  struct mxs_mxs_i2c_data {
-> >  
-> >  	int id;
-> >  	resource_size_t iobase;
-> > 
-> > +	resource_size_t dma;
-> > 
-> >  	resource_size_t errirq;
-> >  	resource_size_t dmairq;
-> >  
-> >  };
-> 
-> You need to either split this and send via alkml or I need an ACK from
-> Shawn if it shall go in via I2C. You don't have Shawn on CC, please use
-> scripts/get_maintainer.pl on your patchesr; you have been missing
-> people/lists at least for the third time now.
-> 
-> >  static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int
-> >  len) {
-> > 
-> > -	u32 data;
-> > +	u32 data = 0;
-> 
-> Unrelated, useless change.
+Have reviewed the series & tested it on OMAP4430 SDP.
+Firstly I tried applying the branch against mainline
+only to realise that it does depend on Paul's
+earlier series. So used directly your branch
+"for_3.5/cleanup/hwmod-cpu-is" to test it out.
 
-Have you tried compiling the code with gcc 4.7?
+Only one comment on function names considering
+OMAP4/5 compatibility.
+Should omap4_*() defined in this series should be
+called omap4plus_*() or similar considering they can
+be directly used on OMAP5 devices too.
 
-> 
-> >  	int i;
-> > 
-> > +
-> > +	/*
-> > +	 * The MXS I2C DMA mode is prefered and enabled by default.
-> > +	 * The PIO mode is still supported, but should be used only
-> > +	 * for debuging purposes etc.
-> > +	 */
-> 
-> For exactness, should be "PIOQUEUE" instead of PIO. There is a PIO mode,
-> but we don't use it.
+Otherwise FWIW,
+Reviewed-tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Ok, it indeed should.
-
-> 
-> > +	i2c->dma_mode = 1;
-> 
-> Have you measured the overhead of DMA? I'd still think that
-> 
-> 	if (MX23 || msg->len > 24)
-> 		do_dma
-> 	else
-> 		do_pioqueue
-> 
-> might be worth considered.
-
-It might, but in the 2.6.35.3 I have from FSL, it only does:
-
-WARN_ONCE(len > 24, "choose DMA mode if xfer len > 24 bytes\n");
-
-Also, I tried switching PIOQUEUE/DMA, but didn't get it working. We might as 
-well make this dma/pioqueue mode configurable as well as speed via platform data 
-until someone comes up with a patch that can mix pioqueue and dma?
-> 
-> Regards,
-> 
->    Wolfram
+Regards
+santosh
