@@ -1,9 +1,10 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 1 May 2012 17:53:00 +0530
-Subject: [PATCH v4 30/39] ARM: OMAP2+: board omap3logic: gpmc driver adaptation
+Date: Tue, 1 May 2012 17:53:06 +0530
+Subject: [PATCH v4 31/39] ARM: OMAP2+: board omap3pandora: gpmc driver
+ adaptation
 In-Reply-To: <cover.1335874494.git.afzal@ti.com>
 References: <cover.1335874494.git.afzal@ti.com>
-Message-ID: <e040c11706547d01fb2744246d83c0cba30003ef.1335874494.git.afzal@ti.com>
+Message-ID: <84e89d05d2218d8c788a4bc92a81f7a45d66a8ab.1335874494.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,16 +13,16 @@ code to provide gpmc driver with required information.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3logic.c |   13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/board-omap3pandora.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-index 9b3c141..9867fc8 100644
---- a/arch/arm/mach-omap2/board-omap3logic.c
-+++ b/arch/arm/mach-omap2/board-omap3logic.c
-@@ -55,6 +55,12 @@
- #define OMAP3_TORPEDO_MMC_GPIO_CD		127
- #define OMAP3_TORPEDO_SMSC911X_GPIO_IRQ		129
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 33d995d..25b2de6 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -57,6 +57,12 @@
+ #define PANDORA_WIFI_NRESET_GPIO	23
+ #define OMAP3_PANDORA_TS_GPIO		94
  
 +static struct gpmc_device_pdata *gpmc_device_data[1];
 +
@@ -29,29 +30,20 @@ index 9b3c141..9867fc8 100644
 +	.device_pdata = gpmc_device_data,
 +};
 +
- static struct regulator_consumer_supply omap3logic_vmmc1_supply[] = {
- 	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
- };
-@@ -180,7 +186,11 @@ static inline void __init board_smsc911x_init(void)
- 		return;
- 	}
- 
--	gpmc_smsc911x_init(&board_smsc911x_data);
-+	*gpmc_device_data = gpmc_smsc911x_init(&board_smsc911x_data);
-+	if (*gpmc_device_data)
-+		gpmc_data.num_device++;
-+	else
-+		pr_err("error: unable to initilaize gpmc smsc911x\n");
- }
- 
- #ifdef CONFIG_OMAP_MUX
-@@ -204,6 +214,7 @@ static void __init omap3logic_init(void)
- 	omap_sdrc_init(NULL, NULL);
- 	board_mmc_init();
- 	board_smsc911x_init();
+ static struct mtd_partition omap3pandora_nand_partitions[] = {
+ 	{
+ 		.name           = "xloader",
+@@ -607,8 +613,9 @@ static void __init omap3pandora_init(void)
+ 	omap_ads7846_init(1, OMAP3_PANDORA_TS_GPIO, 0, NULL);
+ 	usbhs_init(&usbhs_bdata);
+ 	usb_musb_init(NULL);
+-	gpmc_nand_init(&pandora_nand_data);
+-
++	*gpmc_device_data = gpmc_nand_init(&pandora_nand_data);
++	gpmc_data.num_device++;
 +	omap_init_gpmc(&gpmc_data);
- 
  	/* Ensure SDRC pins are mux'd for self-refresh */
  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
 -- 
 1.7.10
