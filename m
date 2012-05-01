@@ -1,84 +1,51 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Tue, 1 May 2012 12:51:55 -0700
-Subject: [PATCH] ARM: BCMRING: fix IO mem static mapping
-Message-ID: <4FA03EDB.9060008@broadcom.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 1 May 2012 21:56:03 +0200
+Subject: [PATCH 1/1] ARM: kirkwood: Add support for RaidSonic
+In-Reply-To: <alpine.DEB.2.00.1205011902150.23719@marmot.wormnet.eu>
+References: <20120501172042.GA13233@lunn.ch>
+ <alpine.DEB.2.00.1205011902150.23719@marmot.wormnet.eu>
+Message-ID: <20120501195603.GW25584@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix bcmring IO mem static mapping.
+On Tue, May 01, 2012 at 07:34:29PM +0100, Jamie Lentin wrote:
+> On Tue, 1 May 2012, Andrew Lunn wrote:
+> 
+> >Hi Simon
+> >
+> >The patch looks good.
+> >
+> >+static void ib62x0_power_off(void)
+> >+{
+> >+       gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
+> >+}
+> >
+> >Seeing this set of a train of thought. I have a feature creep
+> >request. Nice to have, i.e. not required to acceptance. This patterns
+> >of using a GPIO line to turn the hardware off is seen quite a few
+> >times. e.g.
+> >
+> >mach-kirkwood/netspace_v2-setup.c
+> >mach-orion5x/mv2120-setup.c
+> >mach-kirkwood/d2net_v2-setup.c
+> >mach-kirkwood/netspace_v2-setup.c
+> >
+> >and a few more.
+> >
+> >How about writing a gpio-poweroff platform driver? It would take a
+> >platform_data structure which lists which GPIO line to use, and if it
+> >should be active high/low. The probe function would take control of
+> >the GPIO line, set it to inactive state, and output. It would also
+> >register a function for pm_power_off(). When that function is called,
+> >it toggles the GPIO to turn the power off.
+> >
+> >Then wrap all this up in a DT binding.
+> 
+> I've been thinking about this too, would make a lot of sense. Most
+> of the gpio-poweroff driver would be easy, although registering the
+> power_off function wasn't immediately obvious.
 
-This causes bcmring booting issue since v3.2
+pm_power_off is a global variable. You should be able to assign it
+from anywhere.
 
-Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
----
-  arch/arm/mach-bcmring/mm.c |   27 +++++++++++----------------
-  1 file changed, 11 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-bcmring/mm.c b/arch/arm/mach-bcmring/mm.c
-index 1adec78..b46ea07 100644
---- a/arch/arm/mach-bcmring/mm.c
-+++ b/arch/arm/mach-bcmring/mm.c
-@@ -31,24 +31,19 @@
-      .type = MT_MEMORY }
-
-  static struct map_desc bcmring_io_desc[] __initdata = {
--    IO_DESC(MM_IO_BASE_NAND, SZ_64K),    /* phys:0x28000000-0x28000FFF  
-virt:0xE8000000-0xE8000FFF  size:0x00010000 */
--    IO_DESC(MM_IO_BASE_UMI, SZ_64K),    /* phys:0x2C000000-0x2C000FFF  
-virt:0xEC000000-0xEC000FFF  size:0x00010000 */
--
-      IO_DESC(MM_IO_BASE_BROM, SZ_64K),    /* 
-phys:0x30000000-0x3000FFFF  virt:0xF3000000-0xF300FFFF  size:0x00010000 */
--    MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),    /* phys:0x31000000-0x31FFFFFF  
-virt:0xF3100000-0xF31FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_DMA0, SZ_1M),    /* phys:0x32000000-0x32FFFFFF  
-virt:0xF3200000-0xF32FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_DMA1, SZ_1M),    /* phys:0x33000000-0x33FFFFFF  
-virt:0xF3300000-0xF33FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_ESW, SZ_1M),    /* phys:0x34000000-0x34FFFFFF  
-virt:0xF3400000-0xF34FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_CLCD, SZ_1M),    /* phys:0x35000000-0x35FFFFFF  
-virt:0xF3500000-0xF35FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_APM, SZ_1M),    /* phys:0x36000000-0x36FFFFFF  
-virt:0xF3600000-0xF36FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_SPUM, SZ_1M),    /* phys:0x37000000-0x37FFFFFF  
-virt:0xF3700000-0xF37FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),    /* 
-phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),    /* 
-phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x01000000 */
--
-+    MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),    /* phys:0x31000000-0x31FFFFFF  
-virt:0xF3100000-0xF31FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_DMA0, SZ_1M),    /* phys:0x32000000-0x32FFFFFF  
-virt:0xF3200000-0xF32FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_DMA1, SZ_1M),    /* phys:0x33000000-0x33FFFFFF  
-virt:0xF3300000-0xF33FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_ESW, SZ_1M),            /* 
-phys:0x34000000-0x34FFFFFF  virt:0xF3400000-0xF34FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_CLCD, SZ_1M),    /* phys:0x35000000-0x35FFFFFF  
-virt:0xF3500000-0xF35FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_APM, SZ_1M),            /* 
-phys:0x36000000-0x36FFFFFF  virt:0xF3600000-0xF36FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_SPUM, SZ_1M),    /* phys:0x37000000-0x37FFFFFF  
-virt:0xF3700000-0xF37FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),    /* 
-phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),    /* 
-phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x00100000 */
-      IO_DESC(MM_IO_BASE_VRAM, SZ_64K),    /* 
-phys:0x40000000-0x4000FFFF  virt:0xF4000000-0xF400FFFF  size:0x00010000 */
--    IO_DESC(MM_IO_BASE_CHIPC, SZ_16M),    /* 
-phys:0x80000000-0x80FFFFFF  virt:0xF8000000-0xF8FFFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD,
--        SZ_16M),    /* phys:0x0F000000-0x0FFFFFFF  
-virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
-+    IO_DESC(MM_IO_BASE_CHIPC, SZ_8M),    /* phys:0x80000000-0x807FFFFF  
-virt:0xF8000000-0xF87FFFFF  size:0x00800000 */
-+    IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD, SZ_16M), /* 
-phys:0x0F000000-0x0FFFFFFF virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
-  };
-
-  void __init bcmring_map_io(void)
--- 
-1.7.9.5
+     Andrew
