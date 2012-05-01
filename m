@@ -1,57 +1,100 @@
 From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Tue,  1 May 2012 15:07:38 +0200
-Subject: [PATCH 0/5] ARM: OMAP2+: PM: implement a caching mechanism on the
- power domains state registers
-Message-ID: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
+Date: Tue,  1 May 2012 15:07:40 +0200
+Subject: [PATCH 2/5] ARM: OMAP2+: PM: use the power domains registers cache
+ for the power states
+In-Reply-To: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
+References: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
+Message-ID: <1335877663-32649-3-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean Pihet <j-pihet@ti.com>
 
-The OMAP3 PRCM registers accesses are known to be slow, with a PRCM register
-read taking up to 12-14us depending on the OPP.
+Use the caching API for the previous, current and next power domains states.
 
-This patch adds a caching mechanism on the power domains state registers.
-When the cache is cold or has been invalidated a register access is
-performed, otherwise the register value is retrieved from the registers
-cache.
-The API is made of read and write functions for fields in the cache, as well
-as an invalidate and helper functions to invalidate parts of the cache
-contents (i.e. previous, current power states and all fields in the cache).
-The power domain code is converted to use the API to read and write the
-previous, current and next states for the power domains states, logical
-and memory states.
-The PM debug code also uses the caching API instead of the internal
-pwrdm->state variable.
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+---
+ arch/arm/mach-omap2/powerdomain.c |   32 ++++++++++++++++++++++++++------
+ 1 files changed, 26 insertions(+), 6 deletions(-)
 
-Using the caching mechanism optimizes the performance of the system in the
-transitions to and from the low power states.
-
-Tested on Beagleboard using cpuidle in RET and OFF modes.
-
-Based on the linux-omap git tree (3.4.0-rc2) [1] with the changes for the
-functional power states [2] and the per-device PM QoS support for OMAP [3].
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-[2] http://marc.info/?l=linux-omap&m=133475291911194&w=2
-[3] http://marc.info/?l=linux-omap&m=133475685213067&w=2
-
-
-Jean Pihet (5):
-  ARM: OMAP2+: PM: implement a caching mechanism on the power domains
-    state registers
-  ARM: OMAP2+: PM: use the power domains registers cache for the power
-    states
-  ARM: OMAP2+: PM: use the power domains registers cache for the logic
-    and mem states
-  ARM: OMAP2+: PM: use the power domains registers cache invalidate API
-  ARM: OMAP2+: PM debug: use the power domains registers caching API
-
- arch/arm/mach-omap2/pm-debug.c    |   16 ++-
- arch/arm/mach-omap2/pm34xx.c      |    6 +
- arch/arm/mach-omap2/powerdomain.c |  272 ++++++++++++++++++++++++++++++++-----
- arch/arm/mach-omap2/powerdomain.h |   45 ++++++-
- 4 files changed, 297 insertions(+), 42 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 18e1ffc..2058e27 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -854,6 +854,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 					  smp_processor_id());
+ 		/* Program the pwrdm desired target state */
+ 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
++		if (!ret)
++			pwrdm_cache_write(pwrdm, PWRDM_CACHE_NEXT_PWRST, pwrst);
+ 	}
+ 
+ 	return ret;
+@@ -869,13 +871,19 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+  */
+ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
+ {
+-	int ret = -EINVAL;
++	int pwrst, ret = -EINVAL;
+ 
+ 	if (!pwrdm)
+ 		return -EINVAL;
+ 
+-	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst)
++	if (!pwrdm_cache_read(pwrdm, PWRDM_CACHE_NEXT_PWRST, &pwrst))
++		return pwrst;
++
++	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst) {
+ 		ret = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
++		if (ret >= 0)
++			pwrdm_cache_write(pwrdm, PWRDM_CACHE_NEXT_PWRST, ret);
++	}
+ 
+ 	return ret;
+ }
+@@ -906,13 +914,19 @@ int pwrdm_read_next_func_pwrst(struct powerdomain *pwrdm)
+  */
+ int pwrdm_read_pwrst(struct powerdomain *pwrdm)
+ {
+-	int ret = -EINVAL;
++	int pwrst, ret = -EINVAL;
+ 
+ 	if (!pwrdm)
+ 		return -EINVAL;
+ 
+-	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
++	if (!pwrdm_cache_read(pwrdm, PWRDM_CACHE_PWRST, &pwrst))
++		return pwrst;
++
++	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst) {
+ 		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
++		if (ret >= 0)
++			pwrdm_cache_write(pwrdm, PWRDM_CACHE_PWRST, ret);
++	}
+ 
+ 	return ret;
+ }
+@@ -943,13 +957,19 @@ int pwrdm_read_func_pwrst(struct powerdomain *pwrdm)
+  */
+ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
+ {
+-	int ret = -EINVAL;
++	int pwrst, ret = -EINVAL;
+ 
+ 	if (!pwrdm)
+ 		return -EINVAL;
+ 
+-	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_pwrst)
++	if (!pwrdm_cache_read(pwrdm, PWRDM_CACHE_PREV_PWRST, &pwrst))
++		return pwrst;
++
++	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_pwrst) {
+ 		ret = arch_pwrdm->pwrdm_read_prev_pwrst(pwrdm);
++		if (ret >= 0)
++			pwrdm_cache_write(pwrdm, PWRDM_CACHE_PREV_PWRST, ret);
++	}
+ 
+ 	return ret;
+ }
 -- 
 1.7.7.6
