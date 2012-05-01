@@ -1,21 +1,26 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 1 May 2012 13:37:11 -0400
-Subject: [PATCH v8 0/5] USB: LPC32xx device tree related OHCI and UDC
- patch series
-In-Reply-To: <1335710826-6684-1-git-send-email-stigge@antcom.de>
-References: <1335710826-6684-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120501173711.GA11231@kroah.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Tue,  1 May 2012 12:47:38 -0500
+Subject: [PATCH 0/2] OMAP: mailbox initial device tree support
+Message-ID: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 29, 2012 at 04:47:01PM +0200, Roland Stigge wrote:
-> This series collects the pending LPC32xx patches in one series and forward
-> ports it onto
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-next
-> 
-> There are no other changes since last post.
+To allow mailbox driver to function with device tree.
 
-All applied, thanks for your persistance.
+Tested in OMAP4 and OMAP3. OMAP2 untested.
 
-greg k-h
+Omar Ramirez Luna (2):
+  OMAP: mailbox: add device tree support
+  arm/dts: OMAP2+: Add mailbox nodes
+
+ .../devicetree/bindings/arm/omap/mailbox.txt       |    9 +++++++++
+ arch/arm/boot/dts/omap2.dtsi                       |    5 +++++
+ arch/arm/boot/dts/omap3.dtsi                       |    5 +++++
+ arch/arm/boot/dts/omap4.dtsi                       |    5 +++++
+ arch/arm/mach-omap2/devices.c                      |    3 +++
+ arch/arm/mach-omap2/mailbox.c                      |   12 ++++++++++++
+ 6 files changed, 39 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/mailbox.txt
+
+-- 
+1.7.4.1
