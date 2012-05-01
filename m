@@ -1,158 +1,172 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 1 May 2012 20:31:51 +0800
-Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
- clkdevs for given struct clk *
-In-Reply-To: <20120428110635.GQ24211@n2100.arm.linux.org.uk>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
- <20120426074746.GD24211@n2100.arm.linux.org.uk>
- <4F992369.2020308@st.com>
- <20120428095222.GP24211@n2100.arm.linux.org.uk>
- <20120428110108.GD20478@pengutronix.de>
- <20120428110635.GQ24211@n2100.arm.linux.org.uk>
-Message-ID: <20120501123149.GE2194@S2101-09.ap.freescale.net>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Tue, 1 May 2012 17:49:03 +0530
+Subject: [PATCH v4 00/39] OMAP GPMC driver conversion
+Message-ID: <cover.1335874494.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2012 at 12:06:35PM +0100, Russell King - ARM Linux wrote:
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 6db161f..2000c6b 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -116,8 +116,9 @@ struct clk_lookup_alloc {
->  	char	con_id[MAX_CON_ID];
->  };
->  
-> -struct clk_lookup * __init_refok
-> -clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
-> +static struct clk_lookup * __init_refok
-> +vclkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt,
-> +	va_list ap)
->  {
->  	struct clk_lookup_alloc *cla;
->  
-> @@ -132,16 +133,25 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
->  	}
->  
->  	if (dev_fmt) {
-> -		va_list ap;
-> -
-> -		va_start(ap, dev_fmt);
->  		vscnprintf(cla->dev_id, sizeof(cla->dev_id), dev_fmt, ap);
->  		cla->cl.dev_id = cla->dev_id;
-> -		va_end(ap);
->  	}
->  
->  	return &cla->cl;
->  }
-> +
-> +struct clk_lookup * __init_refok
-> +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
-> +{
-> +	struct clk_lookup *cl;
-> +	va_list ap;
-> +
-> +	va_start(ap, dev_fmt);
-> +	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
-> +	va_end(ap);
-> +
-> +	return cl;
-> +}
->  EXPORT_SYMBOL(clkdev_alloc);
->  
->  int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
-> @@ -173,3 +183,65 @@ void clkdev_drop(struct clk_lookup *cl)
->  	kfree(cl);
->  }
->  EXPORT_SYMBOL(clkdev_drop);
-> +
-> +/**
-> + * clk_register_clkdev - register one clock lookup for a struct clk
-> + * @clk: struct clk to associate with all clk_lookups
-> + * @con_id: connection ID string on device
-> + * @dev_id: format string describing device name
-> + *
-> + * con_id or dev_id may be NULL as a wildcard, just as in the rest of
-> + * clkdev.
-> + *
-> + * To make things easier for mass registration, we detect error clks
-> + * from a previous clk_register() call, and return the error code for
-> + * those.  This is to permit this function to be called immediately after
-> + * clk_register().
-> + */
-> +int clk_register_clkdev(struct clk *clk, const char *con_id,
-> +	const char *dev_fmt, ...)
-> +{
-> +	struct clk_lookup *cl;
-> +	va_list ap;
-> +
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	va_start(ap, dev_fmt);
-> +	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
-> +	va_end(ap);
-> +
-> +	if (!cl)
-> +		return -ENOMEM;
-> +
-> +	clkdev_add(cl);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * clk_register_clkdevs - register a set of clk_lookup for a struct clk
-> + * @clk: struct clk to associate with all clk_lookups
-> + * @cl: array of clk_lookup structures with con_id and dev_id pre-initialized
-> + * @num: number of clk_lookup structures to register
-> + *
-> + * To make things easier for mass registration, we detect error clks
-> + * from a previous clk_register() call, and return the error code for
-> + * those.  This is to permit this function to be called immediately after
-> + * clk_register().
-> + */
-> +int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
-> +{
-> +	unsigned i;
-> +
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	for (i = 0; i < num; i++) {
+Hi,
 
-With above line changed to:
+GPMC driver conversion patch series. Some peripherals has GPMC helper
+functions, these has been modified to cater to the needs of GPMC
+driver. All the boards using GPMC has been adapted to use the new
+GPMC driver.
 
-	for (i = 0; i < num; i++, cl++) {
+GPMC HWMOD entry for OMAP2/3 has been added. On OMAP3, kernel does
+spit "omap_hwmod: gpmc: cannot be enabled for reset (3)", but
+peripherals connected via GPMC are working. Really shaky about OMAP2
+GPMC HWMOD entry. Would be helpful if someone can help me in resolving
+warning on OMAP3 & verify whether OMAP2 entry is proper. The series
+adapts to HWMOD.
 
+Drivers, NAND & OneNAND of OMAP has been modified to make use of GPMC
+changes & cleaned up the now unnecessary exported symbol usages.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+This series has been made on top of,
+5e136da Linux-omap rebuilt: Updated to -rc5,
+A patch by Javier Martinez Canillas <javier@dowhile0.org>,
+OMAP3: igep0020: Add support for Micron NAND Flash storage memory,
+has also been incorporated into the series as this was necessary for
+igep0020 board.
 
-Regards,
-Shawn
+This has been tested on omap3 evm (SMSC911x) & beagle board (NAND)
 
-> +		cl->clk = clk;
-> +		clkdev_add(cl);
-> +	}
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(clk_register_clkdevs);
-> diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-> index d9a4fd0..a6a6f60 100644
-> --- a/include/linux/clkdev.h
-> +++ b/include/linux/clkdev.h
-> @@ -40,4 +40,7 @@ void clkdev_drop(struct clk_lookup *cl);
->  void clkdev_add_table(struct clk_lookup *, size_t);
->  int clk_add_alias(const char *, const char *, char *, struct device *);
->  
-> +int clk_register_clkdev(struct clk *, const char *, const char *, ...);
-> +int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
-> +
->  #endif
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I would need help to get these changes tested on other boards using
+GPMC. Expected problematic boards are those having OMAP2xxx SoCs,
+apollon board. In the case of apollon, in addition to it being
+OMAP2xxx, it was modified to use gpmc_smc91x_init instead of directly
+writing to configuration registers.
+
+Additional features that currently boards in mainline does not make
+use of like, waitpin interrupt handling, changes to leverage revision
+6 IP differences has not been incorporated.
+
+GPMC driver now provides NAND driver with GPMC-NAND registers so that
+OMAP NAND driver can handle those by itself instead of using exported
+symbols.
+
+Acquiring CS for NAND has also been incorporated, it has been made as
+a separate patch as it is felt that this should probably go away,
+explained in the relevant patch.
+
+GPMC (General Purpose Memory Controller) in brief:
+GPMC is an unified memory controller dedicated to interfacing external
+memory devices like
+ Asynchronous SRAM like memories and application specific integrated circuit devices.
+ Asynchronous, synchronous, and page mode burst NOR flash devices NAND flash
+ Pseudo-SRAM devices
+
+GPMC details can be referred in AM335X Technical Reference Manual
+@ http://www.ti.com/lit/pdf/spruh73
+
+v4: Handle wait pin (except for interrupts), enhance configuration
+    & timing interface of GPMC to take care of all boards. Dynamic
+    allocation of interrupt instead of static. Convert remaining
+    peripherals to work with GPMC driver. Handle acquiring NAND CS#,
+    adapt to HWMOD, update HWMOD OMAP2/3 entries, other minor
+    commenst on v3.
+v3: Single device structure passed from platform for peripherals using
+    multiple CS instead of using multiple device structure having a few
+    redundant data, handle interrupts, GPMC NAND handling by GPMC NAND
+    driver instead of GPMC driver
+v2: Avoid code movement that kept similar code together (for easy review)
+
+TODO: Cleanup
+
+Regards
+Afzal
+
+Afzal Mohammed (38):
+  ARM: OMAP2+: gpmc: driver conversion
+  ARM: OMAP2+: gpmc: Adapt to HWMOD
+  ARM: OMAP2+: gpmc: register details for nand driver
+  ARM: OMAP2+: gpmc: Acquire NAND CS value
+  ARM: OMAP2+: nand: create platform data structure
+  ARM: OMAP2+: onenand: return value in init function
+  ARM: OMAP2+: gpmc-nand: Adapt to use gpmc driver
+  ARM: OMAP2+: gpmc-onenand: Adapt to use gpmc driver
+  ARM: OMAP2+: flash: Adapt to gpmc driver
+  ARM: OMAP2+: gpmc-smsc911x: Adapt to use gpmc driver
+  ARM: OMAP2+: gpmc-smc91x: Adapt to use gpmc driver
+  ARM: OMAP2+: gpmc-tusb6010: Adapt to gpmc driver
+  ARM: OMAP3: hwmod data: add gpmc
+  ARM: OMAP2xxx: hwmod data: add gpmc
+  mtd: nand: omap2: obtain memory from resource
+  mtd: nand: omap2: use gpmc provided irqs
+  mtd: nand: omap2: handle nand on gpmc
+  mtd: onenand: omap: obtain memory from resource
+  ARM: OMAP2+: board omap3evm: gpmc driver adaptation
+  ARM: OMAP2+: board omap3beagle: gpmc driver adaptation
+  ARM: OMAP2+: board apollon: gpmc driver adaptation
+  ARM: OMAP2+: board h4: gpmc driver adaptation
+  ARM: OMAP2+: board 3630sdp: gpmc driver adaptation
+  ARM: OMAP2+: board 3430sdp: gpmc driver adaptation
+  ARM: OMAP2+: board 2430sdp: gpmc driver adaptation
+  ARM: OMAP2+: board cm-t3517: gpmc driver adaptation
+  ARM: OMAP2+: board cm-t35: gpmc driver adaptation
+  ARM: OMAP2+: board ldp: gpmc driver adaptation
+  ARM: OMAP2+: board n8x0: gpmc driver adaptation
+  ARM: OMAP2+: board omap3logic: gpmc driver adaptation
+  ARM: OMAP2+: board omap3pandora: gpmc driver adaptation
+  ARM: OMAP2+: board omap3stalker: gpmc driver adaptation
+  ARM: OMAP2+: board omap4pcm049: gpmc driver adaptation
+  ARM: OMAP2+: board overo: gpmc driver adaptation
+  ARM: OMAP2+: board rm680: gpmc driver adaptation
+  ARM: OMAP2+: board rx51: gpmc driver adaptation
+  ARM: OMAP2+: board zoom-debugboard: gpmc driver adaptation
+  ARM: OMAP2+: board igep0020: gpmc driver adaptation
+
+Javier Martinez Canillas (1):
+  OMAP3: igep0020: Add support for Micron NAND Flash storage memory
+
+ arch/arm/mach-omap2/board-2430sdp.c                |   44 +-
+ arch/arm/mach-omap2/board-3430sdp.c                |   18 +-
+ arch/arm/mach-omap2/board-3630sdp.c                |   23 +-
+ arch/arm/mach-omap2/board-apollon.c                |  152 +--
+ arch/arm/mach-omap2/board-cm-t35.c                 |   21 +-
+ arch/arm/mach-omap2/board-cm-t3517.c               |   10 +-
+ arch/arm/mach-omap2/board-devkit8000.c             |    6 +-
+ arch/arm/mach-omap2/board-flash.c                  |  160 ++--
+ arch/arm/mach-omap2/board-flash.h                  |   36 +-
+ arch/arm/mach-omap2/board-h4.c                     |  130 +--
+ arch/arm/mach-omap2/board-igep0020.c               |   99 +-
+ arch/arm/mach-omap2/board-ldp.c                    |   26 +-
+ arch/arm/mach-omap2/board-n8x0.c                   |   18 +-
+ arch/arm/mach-omap2/board-omap3beagle.c            |   22 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |   14 +-
+ arch/arm/mach-omap2/board-omap3logic.c             |   13 +-
+ arch/arm/mach-omap2/board-omap3pandora.c           |   11 +-
+ arch/arm/mach-omap2/board-omap3stalker.c           |   13 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c         |    6 +-
+ arch/arm/mach-omap2/board-omap4pcm049.c            |   13 +-
+ arch/arm/mach-omap2/board-overo.c                  |   32 +-
+ arch/arm/mach-omap2/board-rm680.c                  |   10 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c       |   17 +-
+ arch/arm/mach-omap2/board-zoom-debugboard.c        |   47 +-
+ arch/arm/mach-omap2/board-zoom.c                   |    5 +-
+ arch/arm/mach-omap2/common-board-devices.c         |   46 -
+ arch/arm/mach-omap2/common-board-devices.h         |    1 -
+ arch/arm/mach-omap2/gpmc-nand.c                    |   84 +-
+ arch/arm/mach-omap2/gpmc-onenand.c                 |  111 +--
+ arch/arm/mach-omap2/gpmc-smc91x.c                  |   87 +-
+ arch/arm/mach-omap2/gpmc-smsc911x.c                |   59 +-
+ arch/arm/mach-omap2/gpmc.c                         |  980 +++++++++++++++++---
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   18 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   18 +
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   41 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   52 ++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |    1 +
+ arch/arm/mach-omap2/prcm-common.h                  |    2 +
+ arch/arm/mach-omap2/usb-tusb6010.c                 |  177 ++--
+ arch/arm/plat-omap/include/plat/gpmc-smc91x.h      |   10 +-
+ arch/arm/plat-omap/include/plat/gpmc-smsc911x.h    |    9 +-
+ arch/arm/plat-omap/include/plat/gpmc.h             |  110 ++-
+ arch/arm/plat-omap/include/plat/nand.h             |   10 +-
+ arch/arm/plat-omap/include/plat/onenand.h          |    7 +-
+ drivers/mtd/nand/omap2.c                           |  296 ++++--
+ drivers/mtd/onenand/omap2.c                        |   29 +-
+ include/linux/usb/musb.h                           |    4 +-
+ 47 files changed, 2110 insertions(+), 988 deletions(-)
+
+-- 
+1.7.10
