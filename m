@@ -1,100 +1,254 @@
 From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Tue,  1 May 2012 15:07:40 +0200
-Subject: [PATCH 2/5] ARM: OMAP2+: PM: use the power domains registers cache
- for the power states
+Date: Tue,  1 May 2012 15:07:39 +0200
+Subject: [PATCH 1/5] ARM: OMAP2+: PM: implement a caching mechanism on the
+ power domains state registers
 In-Reply-To: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
 References: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1335877663-32649-3-git-send-email-j-pihet@ti.com>
+Message-ID: <1335877663-32649-2-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean Pihet <j-pihet@ti.com>
 
-Use the caching API for the previous, current and next power domains states.
+The OMAP3 PRCM registers accesses are known to be slow. A PRCM read
+can take up to 12-14us depending on the OPP.
+
+This patch adds a caching mechanism on the power domains state registers.
+When the cache is cold or has been invalidated a register access is
+performed, otherwise the register value is retrieved from the registers
+cache.
+The API is made of read and write functions for fields in the cache, as well
+as an invalidate function and helper functions to invalidate parts of the
+cache contents (i.e. previous, current power states and all fields in the
+cache).
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   32 ++++++++++++++++++++++++++------
- 1 files changed, 26 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |  128 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h |   45 ++++++++++++-
+ 2 files changed, 171 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 18e1ffc..2058e27 100644
+index 100c422..18e1ffc 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -854,6 +854,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 					  smp_processor_id());
- 		/* Program the pwrdm desired target state */
- 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
-+		if (!ret)
-+			pwrdm_cache_write(pwrdm, PWRDM_CACHE_NEXT_PWRST, pwrst);
- 	}
- 
- 	return ret;
-@@ -869,13 +871,19 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-  */
- int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
- {
--	int ret = -EINVAL;
-+	int pwrst, ret = -EINVAL;
- 
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst)
-+	if (!pwrdm_cache_read(pwrdm, PWRDM_CACHE_NEXT_PWRST, &pwrst))
-+		return pwrst;
-+
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst) {
- 		ret = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
-+		if (ret >= 0)
-+			pwrdm_cache_write(pwrdm, PWRDM_CACHE_NEXT_PWRST, ret);
-+	}
- 
- 	return ret;
+@@ -697,6 +697,134 @@ out:
  }
-@@ -906,13 +914,19 @@ int pwrdm_read_next_func_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_pwrst(struct powerdomain *pwrdm)
- {
--	int ret = -EINVAL;
-+	int pwrst, ret = -EINVAL;
  
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
-+	if (!pwrdm_cache_read(pwrdm, PWRDM_CACHE_PWRST, &pwrst))
-+		return pwrst;
+ /**
++ * pwrdm_cache_read - read from the registers cache
++ * @pwrdm: struct powerdomain *
++ * @index: index of the data to be read from the cache
++ * @value: data value to be returned
++ *
++ * Returns 0 if the data is read from the cache.
++ * Returns -ENODATA if the data is not present, -EINVAL if the data is
++ * to be read past the end of the cache.
++ */
++static int pwrdm_cache_read(struct powerdomain *pwrdm, int index, int *value)
++{
++	if (index >= PWRDM_CACHE_SIZE)
++		return -EINVAL;
 +
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst) {
- 		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
-+		if (ret >= 0)
-+			pwrdm_cache_write(pwrdm, PWRDM_CACHE_PWRST, ret);
-+	}
- 
- 	return ret;
- }
-@@ -943,13 +957,19 @@ int pwrdm_read_func_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- {
--	int ret = -EINVAL;
-+	int pwrst, ret = -EINVAL;
- 
- 	if (!pwrdm)
- 		return -EINVAL;
- 
--	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_pwrst)
-+	if (!pwrdm_cache_read(pwrdm, PWRDM_CACHE_PREV_PWRST, &pwrst))
-+		return pwrst;
++	if (!(pwrdm->cache_state & (1 << index)))
++		return -ENODATA;
 +
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_pwrst) {
- 		ret = arch_pwrdm->pwrdm_read_prev_pwrst(pwrdm);
-+		if (ret >= 0)
-+			pwrdm_cache_write(pwrdm, PWRDM_CACHE_PREV_PWRST, ret);
++	*value = pwrdm->cache[index];
++	return 0;
++}
++
++/**
++ * pwrdm_cache_write - store data to the registers cache
++ * @pwrdm: struct powerdomain *
++ * @index: index of the data to write to the cache
++ * @value: data value to be stored
++ *
++ * Stores the data in the cache and maintains the internal cache state.
++ *
++ * Returns -EINVAL if the data is to be written past the end of the cache,
++ * 0 otherwise.
++ */
++static int pwrdm_cache_write(struct powerdomain *pwrdm, int index, int value)
++{
++	if (index >= PWRDM_CACHE_SIZE)
++		return -EINVAL;
++
++	pwrdm->cache[index] = value;
++	pwrdm->cache_state |= (1 << index);
++
++	return 0;
++}
++
++/**
++ * pwrdm_invalidate_regs_cache_fields - invalidate fields in the
++ * power domain registers cache
++ * @pwrdm: struct powerdomain *
++ * @mask: cache fields to invalidate, made by OR'ing the
++ * PWRDM_CACHE_* values
++ *
++ * If pwrdm is NULL, invalidate the fields for all power domains,
++ * otherwise invalidate them for the given pwrdm only.
++ *
++ * Invalidates some of the power domain cache fields, thus imposing
++ * an effective re-read from the HW register@the next access.
++ */
++void pwrdm_invalidate_regs_cache_fields(struct powerdomain *pwrdm, int mask)
++{
++	struct powerdomain *temp_pwrdm;
++
++	if (pwrdm) {
++		pwrdm->cache_state &= ~mask;
++	} else {
++		list_for_each_entry(temp_pwrdm, &pwrdm_list, node)
++			temp_pwrdm->cache_state &= ~mask;
 +	}
++}
++
++/**
++ * pwrdm_invalidate_regs_cache_fields_prev - invalidate the previous states
++ * in the power domain registers cache
++ * @pwrdm: struct powerdomain *
++ *
++ * If pwrdm is NULL, invalidate the previous states for all power domains,
++ * otherwise invalidate them for the given pwrdm only.
++ *
++ * Invalidates only the previous states of the power domain cache fields,
++ * thus imposing an effective re-read from the HW register at the next access.
++ */
++void pwrdm_invalidate_regs_cache_fields_prev(struct powerdomain *pwrdm)
++{
++	int i;
++
++	pwrdm_invalidate_regs_cache_fields(pwrdm,
++				PWRDM_CACHE_PREV_PWRST |
++				PWRDM_CACHE_PREV_LOGIC_PWRST);
++	for (i = 0; i < PWRDM_MAX_MEM_BANKS; i++)
++		pwrdm_invalidate_regs_cache_fields(pwrdm,
++				PWRDM_CACHE_PREV_MEM_PWRST + i);
++}
++
++/**
++ * pwrdm_invalidate_regs_cache_fields_current - invalidate the current
++ * states in the power domains' registers cache
++ *
++ * If pwrdm is NULL, invalidate the current states for all power domains,
++ * otherwise invalidate them for the given pwrdm only.
++ *
++ * Invalidates only the current states of the power domains cache fields,
++ * thus imposing an effective re-read from the HW register at the next access.
++ */
++void pwrdm_invalidate_regs_cache_fields_current(struct powerdomain *pwrdm)
++{
++	int i;
++
++	pwrdm_invalidate_regs_cache_fields(pwrdm, PWRDM_CACHE_PWRST |
++					   PWRDM_CACHE_LOGIC_RETST);
++	for (i = 0; i < PWRDM_MAX_MEM_BANKS; i++) {
++		pwrdm_invalidate_regs_cache_fields(pwrdm,
++					PWRDM_CACHE_MEM_PWRST + i);
++		pwrdm_invalidate_regs_cache_fields(pwrdm,
++					PWRDM_CACHE_MEM_ONST + i);
++	}
++}
++
++/**
++ * pwrdm_invalidate_regs_cache_all - invalidate all fields in the registers
++ * cache for all power domains
++ *
++ * Invalidates all of the power domain cache fields of all power domains,
++ * thus imposing an effective re-read from the HW register at the next access
++ */
++void pwrdm_invalidate_regs_cache_all(void)
++{
++	pwrdm_invalidate_regs_cache_fields(NULL, PWRDM_CACHE_ALL);
++}
++
++/**
+  * pwrdm_set_next_pwrst - set next powerdomain power state
+  * @pwrdm: struct powerdomain * to set
+  * @pwrst: one of the PWRDM_POWER_* macros
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 63028c0..e5d621c 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -93,6 +93,37 @@
+ /* XXX A completely arbitrary number. What is reasonable here? */
+ #define PWRDM_TRANSITION_BAILOUT 100000
  
- 	return ret;
- }
++/* Power domains state cache fields */
++enum cache_fields {
++	/* current power state */
++	PWRDM_CACHE_PWRST,
++	/* prev power state */
++	PWRDM_CACHE_PREV_PWRST,
++	/* next power state */
++	PWRDM_CACHE_NEXT_PWRST,
++	/* current logic RET state */
++	PWRDM_CACHE_LOGIC_RETST,
++	/* prev logic power state */
++	PWRDM_CACHE_PREV_LOGIC_PWRST,
++	/* next logic RET state */
++	PWRDM_CACHE_NEXT_LOGIC_RETST,
++	/* current mem bank pwrst, up to PWRDM_MAX_MEM_BANKS banks */
++	PWRDM_CACHE_MEM_PWRST,
++	/* previous mem bank pwrst, up to PWRDM_MAX_MEM_BANKS banks */
++	PWRDM_CACHE_PREV_MEM_PWRST	= PWRDM_CACHE_MEM_PWRST +
++					  PWRDM_MAX_MEM_BANKS,
++	/* next mem bank RET state, up to PWRDM_MAX_MEM_BANKS banks */
++	PWRDM_CACHE_NEXT_MEM_RETST	= PWRDM_CACHE_PREV_MEM_PWRST +
++					  PWRDM_MAX_MEM_BANKS,
++	/* mem ON state, up to PWRDM_MAX_MEM_BANKS banks */
++	PWRDM_CACHE_MEM_ONST		= PWRDM_CACHE_NEXT_MEM_RETST +
++					  PWRDM_MAX_MEM_BANKS,
++	/* keep this item@the end of the list */
++	PWRDM_CACHE_SIZE		= PWRDM_CACHE_MEM_ONST +
++					  PWRDM_MAX_MEM_BANKS
++};
++#define PWRDM_CACHE_ALL		-1
++
+ struct clockdomain;
+ struct powerdomain;
+ 
+@@ -104,14 +135,17 @@ struct powerdomain;
+  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
+  * @pwrsts: Possible powerdomain power states
+  * @pwrsts_logic_ret: Possible logic power states when pwrdm in RETENTION
+- * @flags: Powerdomain flags
++ * @flags: Powerdomain capability flags
+  * @banks: Number of software-controllable memory banks in this powerdomain
+  * @pwrsts_mem_ret: Possible memory bank pwrstates when pwrdm in RETENTION
+  * @pwrsts_mem_on: Possible memory bank pwrstates when pwrdm in ON
+  * @pwrdm_clkdms: Clockdomains in this powerdomain
+  * @node: list_head linking all powerdomains
+  * @voltdm_node: list_head linking all powerdomains in a voltagedomain
+- * @state:
++ * @state: last power state of the pwrdm, used to detect state transitions
++ * @cache: Power domain registers cache contents
++ * @cache_state: State of the power domains cache. Each bit indicates if
++ * the corresponding data field is available from the cache
+  * @state_counter:
+  * @timer:
+  * @state_timer:
+@@ -137,6 +171,8 @@ struct powerdomain {
+ 	struct list_head voltdm_node;
+ 	struct mutex lock;
+ 	int state;
++	int cache[PWRDM_CACHE_SIZE];
++	long cache_state;
+ 	unsigned state_counter[PWRDM_MAX_FUNC_PWRSTS];
+ 	unsigned ret_logic_off_counter;
+ 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
+@@ -233,6 +269,11 @@ int pwrdm_read_prev_func_pwrst(struct powerdomain *pwrdm);
+ int pwrdm_read_func_pwrst(struct powerdomain *pwrdm);
+ int pwrdm_read_next_func_pwrst(struct powerdomain *pwrdm);
+ 
++void pwrdm_invalidate_regs_cache_fields(struct powerdomain *pwrdm, int mask);
++void pwrdm_invalidate_regs_cache_fields_prev(struct powerdomain *pwrdm);
++void pwrdm_invalidate_regs_cache_fields_current(struct powerdomain *pwrdm);
++void pwrdm_invalidate_regs_cache_all(void);
++
+ int omap2_pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+ int omap2_pwrdm_func_to_logic_pwrst(struct powerdomain *pwrdm, u8 func_pwrst);
+ int omap2_pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst, u8 logic);
 -- 
 1.7.7.6
