@@ -1,25 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 May 2012 01:19:36 +0200
-Subject: [PATCH v2] pinctrl: add pinctrl-mxs support
-In-Reply-To: <1335589250-25065-1-git-send-email-shawn.guo@linaro.org>
-References: <1335589250-25065-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdakZkqfPC-OShh3xLXaLaxwJmOBNMYvSa_85_fU1P9sdQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 2 May 2012 07:39:41 +0800
+Subject: [PATCH 10/11] ARM: imx6q_sabrelite: clkdev_add cko1 for sgtl5000
+In-Reply-To: <20120501124706.GF2194@S2101-09.ap.freescale.net>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-11-git-send-email-richard.zhao@freescale.com>
+ <20120501124706.GF2194@S2101-09.ap.freescale.net>
+Message-ID: <20120501233939.GO2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2012 at 7:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, May 01, 2012 at 08:47:10PM +0800, Shawn Guo wrote:
+> > +	clk_register_clkdev(cko1, NULL, "0-000a");
+> 
+> This dev_id looks a little strange to me.  I understand that's the
+> consequence of having sgtl5000 clock managed in ASoC machine driver
+> imx-sgtl5000.
+> 
+Just realised it's not the case.  But shouldn't the name look like
+"sgtl5000.0-000a"?
 
-> Add pinctrl support for Freescale MXS SoCs, i.MX23 and i.MX28.
-> The driver supports device tree probe only.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> Changes since v1:
-> * Improve binding document
-> * Add missing MODULE_DEVICE_TABLE for imx23_pinctrl_of_match and
-> ?imx28_pinctrl_of_match
-
-Thanks Shawn, applied with Stepgen's ACK.
-
-Yours,
-Linus Walleij
+-- 
+Regards,
+Shawn
