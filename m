@@ -1,75 +1,74 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 1 May 2012 17:50:05 +0530
-Subject: [PATCH v4 04/39] ARM: OMAP2+: gpmc: Acquire NAND CS value
+Date: Tue, 1 May 2012 17:50:20 +0530
+Subject: [PATCH v4 06/39] ARM: OMAP2+: onenand: return value in init function
 In-Reply-To: <cover.1335874494.git.afzal@ti.com>
 References: <cover.1335874494.git.afzal@ti.com>
-Message-ID: <10220de398d22fad5de783d8f58fc55ebac85338.1335874494.git.afzal@ti.com>
+Message-ID: <91c09cb6a6cb5e87acdcc3f6100a87b4c2a3dd41.1335874494.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards depend on bootloader to update chip select value for NAND.
-It is felt that Kernel should not depend on bootloader to get CS, as
-for a particular board CS is hardwired and is fixed, hence this can
-directly be updated in Kernel. But as CS value for boards that depend
-on this behaviour is not available, educate gpmc driver to acquire
-chip select value for NAND. this ideally should be removed once CS
-for those boards are available.
+Modify board_onenand_init to return platform data. This
+would be required for boards to be able to pass it to
+gpmc driver so that it finally reaches onenand driver.
+
+Also un-static the function so that boards can use it.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c |   32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/board-flash.c |   14 ++++----------
+ arch/arm/mach-omap2/board-flash.h |   12 ++++++++++++
+ 2 files changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 657ce95..ecd3384 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -892,6 +892,30 @@ static int __init gpmc_init(void)
- }
- postcore_initcall(gpmc_init);
+diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
+index 091aaf6..8727c05 100644
+--- a/arch/arm/mach-omap2/board-flash.c
++++ b/arch/arm/mach-omap2/board-flash.c
+@@ -87,22 +87,16 @@ static struct omap_onenand_platform_data board_onenand_data = {
+ 	.dma_channel	= -1,   /* disable DMA in OMAP OneNAND driver */
+ };
  
-+static __devinit int gpmc_acquire_nand_cs(struct gpmc *gpmc,
-+					struct gpmc_device_pdata *gdp)
-+{
-+	int cs = 0;
-+	struct omap_nand_platform_data *nand = gdp->pdata;
-+
-+	if ((nand->cs >= 0) && (nand->cs < GPMC_CS_NUM))
-+		return 0;
-+
-+	while (cs < GPMC_CS_NUM) {
-+		u32 l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
-+
-+		if ((l & GPMC_CONFIG1_DEVICETYPE(~0)) ==
-+				GPMC_CONFIG1_DEVICETYPE_NAND) {
-+			dev_info(gpmc->dev, "found NAND on CS: %d\n", cs);
-+			nand->cs = cs;
-+			gdp->cs_data->cs = cs;
-+			return 0;
-+		}
-+		cs++;
-+	}
-+	return -ENODEV;
-+}
-+
- static __devinit void gpmc_update_nand_reg(struct gpmc *gpmc,
- 				struct omap_nand_platform_data *nand)
+-static void
+-__init board_onenand_init(struct mtd_partition *onenand_parts,
+-				u8 nr_parts, u8 cs)
++struct omap_onenand_platform_data * __init
++board_onenand_init(struct mtd_partition *onenand_parts, u8 nr_parts, u8 cs)
  {
-@@ -1450,8 +1474,14 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
+ 	board_onenand_data.cs		= cs;
+ 	board_onenand_data.parts	= onenand_parts;
+ 	board_onenand_data.nr_parts	= nr_parts;
  
- 	for (i = 0, gdq = gp->device_pdata, gd = gpmc->device;
- 			(i < gp->num_device) && (*gdq); i++, gdq++) {
--		if ((*gdq)->is_nand)
-+		if ((*gdq)->is_nand) {
-+			ret = gpmc_acquire_nand_cs(gpmc, *gdq);
-+			if (IS_ERR_VALUE(ret)) {
-+				dev_err(gpmc->dev, "CS error: %d\n", ret);
-+				continue;
-+			}
- 			gpmc_update_nand_reg(gpmc, (*gdq)->pdata);
-+		}
- 		ret = gpmc_setup_device(gpmc, gd, *gdq);
- 		if (IS_ERR_VALUE(ret))
- 			dev_err(gpmc->dev, "gpmc setup on %s failed\n",
+-	gpmc_onenand_init(&board_onenand_data);
+-}
+-#else
+-static void
+-__init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
+-{
++	return &board_onenand_data;
+ }
+-#endif /* CONFIG_MTD_ONENAND_OMAP2 || CONFIG_MTD_ONENAND_OMAP2_MODULE */
++#endif
+ 
+ #if defined(CONFIG_MTD_NAND_OMAP2) || \
+ 		defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+diff --git a/arch/arm/mach-omap2/board-flash.h b/arch/arm/mach-omap2/board-flash.h
+index 052964c..75ba49f 100644
+--- a/arch/arm/mach-omap2/board-flash.h
++++ b/arch/arm/mach-omap2/board-flash.h
+@@ -52,3 +52,15 @@ board_nand_init(struct mtd_partition *nand_parts,
+ 	return NULL;
+ }
+ #endif
++
++#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
++		defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
++extern struct omap_onenand_platform_data * __init
++board_onenand_init(struct mtd_partition *onenand_parts, u8 nr_parts, u8 cs);
++#else
++static inline struct omap_onenand_platform_data *
++__init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
++{
++	return NULL;
++}
++#endif
 -- 
 1.7.10
