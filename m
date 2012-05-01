@@ -1,57 +1,29 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Tue, 1 May 2012 19:34:29 +0100 (BST)
-Subject: [PATCH 1/1] ARM: kirkwood: Add support for RaidSonic
-In-Reply-To: <20120501172042.GA13233@lunn.ch>
-References: <20120501172042.GA13233@lunn.ch>
-Message-ID: <alpine.DEB.2.00.1205011902150.23719@marmot.wormnet.eu>
+From: guillaume.gardet@free.fr (Guillaume Gardet)
+Date: Tue, 01 May 2012 20:35:21 +0200
+Subject: [PATCH 1/1] Add missing include <plat/cpu.h> in
+ drivers/mfd/omap-usb-host.c
+Message-ID: <4FA02CE9.3090106@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 May 2012, Andrew Lunn wrote:
+Fix compilation error for omap boards (beagleboard, etc.) due to missing include <plat/cpu.h>  in drivers/mfd/omap-usb-host.c leading to build error (unknown cpu_is_omap3430, omap_rev and OMAP3430_REV_ES2_1).
 
-> Hi Simon
->
-> The patch looks good.
->
-> +static void ib62x0_power_off(void)
-> +{
-> +       gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
-> +}
->
-> Seeing this set of a train of thought. I have a feature creep
-> request. Nice to have, i.e. not required to acceptance. This patterns
-> of using a GPIO line to turn the hardware off is seen quite a few
-> times. e.g.
->
-> mach-kirkwood/netspace_v2-setup.c
-> mach-orion5x/mv2120-setup.c
-> mach-kirkwood/d2net_v2-setup.c
-> mach-kirkwood/netspace_v2-setup.c
->
-> and a few more.
->
-> How about writing a gpio-poweroff platform driver? It would take a
-> platform_data structure which lists which GPIO line to use, and if it
-> should be active high/low. The probe function would take control of
-> the GPIO line, set it to inactive state, and output. It would also
-> register a function for pm_power_off(). When that function is called,
-> it toggles the GPIO to turn the power off.
->
-> Then wrap all this up in a DT binding.
+KernelVersion: 3.4-rc5
 
-I've been thinking about this too, would make a lot of sense. Most of the 
-gpio-poweroff driver would be easy, although registering the power_off 
-function wasn't immediately obvious.
+Signed-off-by: Guillaume GARDET<guillaume.gardet@free.fr>
 
-In the process of this though, I stumbled on the gpio-regulator driver and 
-emails suggesting to use this. It seems like it would make sense for the 
-GPIO pins on the DNS-320 that turn on/off SATA drives, and intend to have 
-a go at using this instead. This could possibly be used for power off too, 
-but might be streatching it a bit too far.
+---
+  drivers/mfd/omap-usb-host.c |    1 +
+  1 files changed, 1 insertions(+), 0 deletions(-)
 
->
->     Andrew
->
-
--- 
-Jamie Lentin
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index c8aae66..7e96bb2 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -25,6 +25,7 @@
+  #include<linux/clk.h>
+  #include<linux/dma-mapping.h>
+  #include<linux/spinlock.h>
++#include<plat/cpu.h>
+  #include<plat/usb.h>
+  #include<linux/pm_runtime.h>
