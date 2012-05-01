@@ -1,34 +1,56 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 May 2012 09:10:47 +0530
-Subject: [GIT PULL] ARM: SPEAr13xx support for 3.5
-In-Reply-To: <201204301746.45004.arnd@arndb.de>
-References: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
- <201204301746.45004.arnd@arndb.de>
-Message-ID: <4F9F5B3F.1030502@st.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 1 May 2012 05:49:34 +0200
+Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B7C439@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <1335837363-12376-1-git-send-email-marex@denx.de>
+ <201205010521.14052.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B7C439@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <201205010549.34309.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/30/2012 11:16 PM, Arnd Bergmann wrote:
-> Ok, I missed the compilation dependencies you mentioned here.  So the branch
-> you sent me doesn't actually build by itself, which is not good.
+Dear Chen Peter-B29397,
 
-I thought, i must not add patches from Russell and Mike in my pull request, as they
-haven't made to linux-next till now. i.e. even if this branch doesn't compile by
-itself, it should get compiled when it is merged with your branch, where these
-dependencies must be present already. Isn't this the right approach?
+> > > If the host and device interrupt handler are called by otg interrupt
+> > > handler, then, the interrupt handlers are registered by host/device
+> > 
+> > will
+> > 
+> > > be called twice as they are also registered by host/device themselves.
+> > 
+> > No they won't, I don't register them in ehci-mxs or ci13xxx-mxs anymore.
+> 
+> Have you changed any hcd code? The host interrupt is registered by hcd
+> core code: usb_add_hcd.
 
-> I have now merged both as staging branches, which means it will be in linux-next
-> from now on but can still get rebased in order to work out the dependencies.
+I pass 0 as IRQ, thinking about it, that's not really correct (it's actually 
+very lame mistake).
 
-Ok.
+Well, let's fix it in V8. I suggest we do a stub handler in the ehci-mxs for 
+usb_add_hcd() and call ehci_irq() from the imx-otg's IRQ handler like it's 
+already done in this patchset.
 
-> We can work out something from here once I understand where the dependencies
-> are.
+> 
+> > > Besides, what kinds of function do you want to add at this patchset?
+> > 
+> > Device and Host mode, separate so far, configurable by platform data. I'm
+> > also
+> > looking into the OTG, but let's get this basic stuff right and mainline
+> > first.
+> 
+> Then, the aim for this patchset is only enable OTG port,
+> and device/host function is selected by platform data,
+> no otg function(id switch) will be supported, correct?
 
-These two only:
+Correct.
 
-- Mike's clk-next branch
-- Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ...
+But this patchset also works with the host-only port #1 on mx28 (obviously, you 
+can't enable gadget(device) mode for that port).
 
--- 
-viresh
+> Understanding your scope may help me review your patches.
+> 
+> > Best regards,
+> > Marek Vasut
+
+Best regards,
+Marek Vasut
