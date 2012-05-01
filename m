@@ -1,55 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 1 May 2012 22:14:54 +0800
-Subject: [PATCH 1/2] ARM: imx6q-sabrelite.dts: Add SPI NOR support
-In-Reply-To: <1335310537-11219-1-git-send-email-festevam@gmail.com>
-References: <1335310537-11219-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120501141452.GN2194@S2101-09.ap.freescale.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 01 May 2012 07:15:19 -0700
+Subject: [PATCH v2] arm: omap3: am35x: Don't mark missing features as
+ present
+In-Reply-To: <1335830229-4700-1-git-send-email-mgreer@animalcreek.com> (Mark
+ A. Greer's message of "Mon, 30 Apr 2012 16:57:09 -0700")
+References: <1334861927-1741-1-git-send-email-mgreer@animalcreek.com>
+ <1335830229-4700-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <87pqaohts8.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 08:35:36PM -0300, Fabio Estevam wrote:
-> mx6qsabrelite has a sst25vf016b SPI NOR flash connected to eCSPI1.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+"Mark A. Greer" <mgreer@animalcreek.com> writes:
 
-Applied on my imx/dt branch, thanks.
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+>
+> The Chip Identification register on the am35x family of SoCs
+> has bits 12, 7:5, and 3:2 marked as reserved and are read as
+> zeroes.  Unfortunately, on other omap SoCs, a 0 bit means a
+> feature is "Full Use" so the OMAP3_CHECK_FEATURE() macro
+> called by omap3_check_features() will incorrectly interpret
+> those zeroes to mean that a feature is present even though it
+> isn't.  To fix that, the feature bits that are incorrectly
+> set (namely, OMAP3_HAS_IVA and OMAP3_HAS_ISP) need to be
+> cleared after all of the calls to OMAP3_CHECK_FEATURE() in
+> omap3_check_features() are made.
+>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 
-Regards,
-Shawn
+Looks good, thanks.
+
+I'll queue this one up on top of my AM35x cpu_is cleanups (branch:
+for_3.5/cleanup/am35x-cpu-is)
+
+Kevin
 
 > ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts |   17 +++++++++++++++++
->  1 files changed, 17 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> index 4663a4e..35be687 100644
-> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> @@ -22,6 +22,23 @@
->  	};
+>  arch/arm/mach-omap2/id.c |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index d2913e2..20c95b4 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -247,6 +247,17 @@ void __init omap3xxx_check_features(void)
+>  	omap_features |= OMAP3_HAS_SDRC;
 >  
->  	soc {
-> +		aips-bus at 02000000 { /* AIPS1 */
-> +			spba-bus at 02000000 {
-> +				ecspi at 02008000 { /* eCSPI1 */
-> +					fsl,spi-num-chipselects = <1>;
-> +					cs-gpios = <&gpio3 19 0>;
-> +					status = "okay";
+>  	/*
+> +	 * am35x fixups:
+> +	 * - The am35x Chip ID register has bits 12, 7:5, and 3:2 marked as
+> +	 *   reserved and therefore return 0 when read.  Unfortunately,
+> +	 *   OMAP3_CHECK_FEATURE() will interpret some of those zeroes to
+> +	 *   mean that a feature is present even though it isn't so clear
+> +	 *   the incorrectly set feature bits.
+> +	 */
+> +	if (cpu_is_am35xx())
+> +		omap_features &= ~(OMAP3_HAS_IVA | OMAP3_HAS_ISP);
 > +
-> +					flash: m25p80 at 0 {
-> +						compatible = "sst,sst25vf016b";
-> +						spi-max-frequency = <20000000>;
-> +						reg = <0>;
-> +					};
-> +				};
-> +			};
-> +
-> +		};
-> +
->  		aips-bus at 02100000 { /* AIPS2 */
->  			enet at 02188000 {
->  				phy-mode = "rgmii";
-> -- 
-> 1.7.1
+> +	/*
+>  	 * TODO: Get additional info (where applicable)
+>  	 *       e.g. Size of L2 cache.
+>  	 */
