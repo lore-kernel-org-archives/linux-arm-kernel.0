@@ -1,97 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 1 May 2012 21:44:48 +0800
-Subject: [PATCH 03/11] ASoC: fsl: add sgtl5000 clock support for
- imx-sgtl5000
-In-Reply-To: <1335510185-7906-4-git-send-email-richard.zhao@freescale.com>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-4-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120501134446.GK2194@S2101-09.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 1 May 2012 15:55:48 +0200
+Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B7C53C@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <1335837363-12376-1-git-send-email-marex@denx.de>
+ <201205010549.34309.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B7C53C@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <201205011555.48430.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 03:02:57PM +0800, Richard Zhao wrote:
-> From: Richard Zhao <richard.zhao@linaro.org>
+Dear Chen Peter-B29397,
+
+> > Well, let's fix it in V8. I suggest we do a stub handler in the ehci-mxs
+> > for
+> > usb_add_hcd() and call ehci_irq() from the imx-otg's IRQ handler like
+> > it's
+> > already done in this patchset.
 > 
-> It tries to clk_get the clock. And if it failed, it assumes the clock
-> by default enabled.
+> I have not understood how you would like to do?
+
+Still use IRQF_SHARED for the usb interrupt, but:
+* The IRQ handler in ehci-mxs, that's set in hc_driver.irq would be always 
+returning IRQ_NONE.
+* The IRQ handler in imx-otg would call the callback registered via 
+imx_otg_set_irq_handler() only if the port was actually in host mode
+
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  sound/soc/fsl/imx-sgtl5000.c |   40 ++++++++++++++++++++++++++++++++--------
->  1 files changed, 32 insertions(+), 8 deletions(-)
+> > But this patchset also works with the host-only port #1 on mx28
+> > (obviously, you
+> > can't enable gadget(device) mode for that port).
 > 
-> diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
-> index 73b935e..3a729ca 100644
-> --- a/sound/soc/fsl/imx-sgtl5000.c
-> +++ b/sound/soc/fsl/imx-sgtl5000.c
-> @@ -13,6 +13,8 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/of_i2c.h>
-> +#include <linux/clk.h>
->  #include <sound/soc.h>
->  
->  #include "../codecs/sgtl5000.h"
-> @@ -25,6 +27,7 @@ struct imx_sgtl5000_data {
->  	struct snd_soc_card card;
->  	char codec_dai_name[DAI_NAME_SIZE];
->  	char platform_name[DAI_NAME_SIZE];
-> +	struct clk *codec_clk;
->  	unsigned int clk_frequency;
->  };
->  
-> @@ -58,6 +61,7 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
->  	struct device_node *np = pdev->dev.of_node;
->  	struct device_node *ssi_np, *codec_np;
->  	struct platform_device *ssi_pdev;
-> +	struct i2c_client *codec_dev;
->  	struct imx_sgtl5000_data *data;
->  	int int_port, ext_port;
->  	int ret;
-> @@ -113,6 +117,11 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
->  		ret = -EINVAL;
->  		goto fail;
->  	}
-> +	codec_dev = of_find_i2c_device_by_node(codec_np);
-> +	if (!codec_dev) {
-> +		dev_err(&pdev->dev, "failed to find codec platform device\n");
-> +		return -EINVAL;
-> +	}
+> Currently, there is not generic PHY driver, so only one PHY can be
+> supported at runtime, and only one controller can be enabled if you have
+> used PHY driver.
 
-What if the codec is accessed via SPI bus on some machines?
+Correct
 
->  
->  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
->  	if (!data) {
-> @@ -120,11 +129,20 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
->  		goto fail;
->  	}
->  
-> -	ret = of_property_read_u32(codec_np, "clock-frequency",
-> -				   &data->clk_frequency);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "clock-frequency missing or invalid\n");
-> -		goto fail;
-> +	data->codec_clk = clk_get(&codec_dev->dev, NULL);
+> How can you let otg and host 1 work together with your patchset?
 
-It's a clock of sgtl5000 codec.  I feel it makes more sense to have
-sgtl5000 device driver than machine driver to manage this clock.
+Sorry for not being clear enough, what I mean was that this patchset supports:
+* Port0 in both Device and Host mode (separately, configured via platform data)
+* Port1 in Host mode
+And that Port0 and Port1 can NOT be enabled at the same time, so the above is 
+mutually exclusive.
 
-Regards,
-Shawn
+> > > Understanding your scope may help me review your patches.
+> > > 
+> > > > Best regards,
+> > > > Marek Vasut
+> > 
+> > Best regards,
+> > Marek Vasut
 
-> +	if (IS_ERR(data->codec_clk)) {
-> +		/* assuming clock enabled by default */
-> +		data->codec_clk = NULL;
-> +		ret = of_property_read_u32(codec_np, "clock-frequency",
-> +					&data->clk_frequency);
-> +		if (ret) {
-> +			dev_err(&codec_dev->dev,
-> +				"clock-frequency missing or invalid\n");
-> +			goto fail;
-> +		}
-> +	} else {
-> +		data->clk_frequency = clk_get_rate(data->codec_clk);
-> +		clk_prepare_enable(data->codec_clk);
->  	}
+Best regards,
+Marek Vasut
