@@ -1,98 +1,20 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 1 May 2012 21:17:07 +0800
-Subject: [PATCH] arm/imx6: Add debug UART2
-In-Reply-To: <1335514545-13481-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1335514545-13481-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20120501131705.GH2194@S2101-09.ap.freescale.net>
+Date: Tue, 1 May 2012 21:18:20 +0800
+Subject: [PATCH 05/11] ARM: imx6q: move imx6q_sabrelite specific code to
+ a dedicated function
+In-Reply-To: <1335510185-7906-6-git-send-email-richard.zhao@freescale.com>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-6-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120501131818.GI2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 10:15:45AM +0200, Dirk Behme wrote:
-> To be able to enable early debugging on boards using the UART2 for the
-> console, add the option for early debugging on UART2.
+On Fri, Apr 27, 2012 at 03:02:59PM +0800, Richard Zhao wrote:
+> It'll be easier to add other board specific code.
 > 
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> CC: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
-Applied with subject reworked as below.
+Applied, thanks.
 
-  ARM: imx6: Add UART2 for low-level debug
-
-Please note that arm-soc maintainers require the subject prefix in the
-form of "ARM: <platform>: ..."
-
-Thanks,
+Regards,
 Shawn
-
-> ---
->  arch/arm/Kconfig.debug                       |    8 ++++++++
->  arch/arm/mach-imx/lluart.c                   |    6 ++++++
->  arch/arm/plat-mxc/include/mach/debug-macro.S |    2 ++
->  arch/arm/plat-mxc/include/mach/mx6q.h        |    2 ++
->  4 files changed, 18 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 85348a0..0f876c2 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -180,6 +180,14 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on i.MX50 or i.MX53.
->  
-> +	config DEBUG_IMX6Q_UART2
-> +		bool "i.MX6Q Debug UART2"
-> +		depends on SOC_IMX6Q
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on i.MX6Q UART2. This is correct for e.g. the SabreLite
-> +                  board.
-> +
->  	config DEBUG_IMX6Q_UART4
->  		bool "i.MX6Q Debug UART4"
->  		depends on SOC_IMX6Q
-> diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
-> index 0213f8d..c40a34c 100644
-> --- a/arch/arm/mach-imx/lluart.c
-> +++ b/arch/arm/mach-imx/lluart.c
-> @@ -17,6 +17,12 @@
->  #include <mach/hardware.h>
->  
->  static struct map_desc imx_lluart_desc = {
-> +#ifdef CONFIG_DEBUG_IMX6Q_UART2
-> +	.virtual	= MX6Q_IO_P2V(MX6Q_UART2_BASE_ADDR),
-> +	.pfn		= __phys_to_pfn(MX6Q_UART2_BASE_ADDR),
-> +	.length		= MX6Q_UART2_SIZE,
-> +	.type		= MT_DEVICE,
-> +#endif
->  #ifdef CONFIG_DEBUG_IMX6Q_UART4
->  	.virtual	= MX6Q_IO_P2V(MX6Q_UART4_BASE_ADDR),
->  	.pfn		= __phys_to_pfn(MX6Q_UART4_BASE_ADDR),
-> diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> index 8ddda36..761e45f 100644
-> --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-> +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> @@ -24,6 +24,8 @@
->  #define UART_PADDR	MX51_UART1_BASE_ADDR
->  #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
->  #define UART_PADDR	MX53_UART1_BASE_ADDR
-> +#elif defined (CONFIG_DEBUG_IMX6Q_UART2)
-> +#define UART_PADDR	MX6Q_UART2_BASE_ADDR
->  #elif defined (CONFIG_DEBUG_IMX6Q_UART4)
->  #define UART_PADDR	MX6Q_UART4_BASE_ADDR
->  #endif
-> diff --git a/arch/arm/plat-mxc/include/mach/mx6q.h b/arch/arm/plat-mxc/include/mach/mx6q.h
-> index 254a561..f7e7dba 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx6q.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx6q.h
-> @@ -27,6 +27,8 @@
->  #define MX6Q_CCM_SIZE			0x4000
->  #define MX6Q_ANATOP_BASE_ADDR		0x020c8000
->  #define MX6Q_ANATOP_SIZE		0x1000
-> +#define MX6Q_UART2_BASE_ADDR		0x021e8000
-> +#define MX6Q_UART2_SIZE			0x4000
->  #define MX6Q_UART4_BASE_ADDR		0x021f0000
->  #define MX6Q_UART4_SIZE			0x4000
->  
-> -- 
-> 1.7.0.4
-> 
