@@ -1,78 +1,98 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Tue,  1 May 2012 15:07:43 +0200
-Subject: [PATCH 5/5] ARM: OMAP2+: PM debug: use the power domains registers
- caching API
-In-Reply-To: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
-References: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1335877663-32649-6-git-send-email-j-pihet@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 1 May 2012 21:17:07 +0800
+Subject: [PATCH] arm/imx6: Add debug UART2
+In-Reply-To: <1335514545-13481-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1335514545-13481-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <20120501131705.GH2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On Fri, Apr 27, 2012 at 10:15:45AM +0200, Dirk Behme wrote:
+> To be able to enable early debugging on boards using the UART2 for the
+> console, add the option for early debugging on UART2.
+> 
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+> CC: Shawn Guo <shawn.guo@linaro.org>
 
-Use the caching API instead of using the internal pwrdm->state field
-for PM debug statistics display.
+Applied with subject reworked as below.
 
-Note: some power domains states mismatch messages can be printed out with
-the power domains states statstics, indicating that the power domains are
-not controlled by any driver or that the invalidate API is not correctly
-used.
+  ARM: imx6: Add UART2 for low-level debug
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/pm-debug.c |   16 +++++++++-------
- 1 files changed, 9 insertions(+), 7 deletions(-)
+Please note that arm-soc maintainers require the subject prefix in the
+form of "ARM: <platform>: ..."
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index 13c00fb..ed9846e 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -96,19 +96,20 @@ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
- static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
- {
- 	struct seq_file *s = (struct seq_file *)user;
--	int i;
-+	int i, pwrst;
- 
- 	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
- 		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
- 		strncmp(pwrdm->name, "dpll", 4) == 0)
- 		return 0;
- 
--	if (pwrdm->state != pwrdm_read_func_pwrst(pwrdm))
--		printk(KERN_ERR "pwrdm state mismatch(%s) %d != %d\n",
--		       pwrdm->name, pwrdm->state, pwrdm_read_func_pwrst(pwrdm));
-+	pwrst = pwrdm_read_func_pwrst(pwrdm);
-+	if (pwrdm->state != pwrst)
-+		printk(KERN_ERR "pwrdm state mismatch(%s): last saved %d != current %d\n",
-+		       pwrdm->name, pwrdm->state, pwrst);
- 
- 	seq_printf(s, "%s (%s)", pwrdm->name,
--			pwrdm_state_names[pwrdm->state]);
-+			pwrdm_state_names[pwrst]);
- 	for (i = 0; i < PWRDM_MAX_FUNC_PWRSTS; i++)
- 		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
- 			pwrdm->state_counter[i]);
-@@ -126,7 +127,7 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
- static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
- {
- 	struct seq_file *s = (struct seq_file *)user;
--	int i;
-+	int i, pwrst;
- 
- 	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
- 		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
-@@ -134,9 +135,10 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
- 		return 0;
- 
- 	pwrdm_state_switch(pwrdm);
-+	pwrst = pwrdm_read_func_pwrst(pwrdm);
- 
- 	seq_printf(s, "%s (%s)", pwrdm->name,
--		pwrdm_state_names[pwrdm->state]);
-+		pwrdm_state_names[pwrst]);
- 
- 	for (i = 0; i < PWRDM_MAX_FUNC_PWRSTS; i++)
- 		seq_printf(s, ",%s:%lld", pwrdm_state_names[i],
--- 
-1.7.7.6
+Thanks,
+Shawn
+
+> ---
+>  arch/arm/Kconfig.debug                       |    8 ++++++++
+>  arch/arm/mach-imx/lluart.c                   |    6 ++++++
+>  arch/arm/plat-mxc/include/mach/debug-macro.S |    2 ++
+>  arch/arm/plat-mxc/include/mach/mx6q.h        |    2 ++
+>  4 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 85348a0..0f876c2 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -180,6 +180,14 @@ choice
+>  		  Say Y here if you want kernel low-level debugging support
+>  		  on i.MX50 or i.MX53.
+>  
+> +	config DEBUG_IMX6Q_UART2
+> +		bool "i.MX6Q Debug UART2"
+> +		depends on SOC_IMX6Q
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX6Q UART2. This is correct for e.g. the SabreLite
+> +                  board.
+> +
+>  	config DEBUG_IMX6Q_UART4
+>  		bool "i.MX6Q Debug UART4"
+>  		depends on SOC_IMX6Q
+> diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
+> index 0213f8d..c40a34c 100644
+> --- a/arch/arm/mach-imx/lluart.c
+> +++ b/arch/arm/mach-imx/lluart.c
+> @@ -17,6 +17,12 @@
+>  #include <mach/hardware.h>
+>  
+>  static struct map_desc imx_lluart_desc = {
+> +#ifdef CONFIG_DEBUG_IMX6Q_UART2
+> +	.virtual	= MX6Q_IO_P2V(MX6Q_UART2_BASE_ADDR),
+> +	.pfn		= __phys_to_pfn(MX6Q_UART2_BASE_ADDR),
+> +	.length		= MX6Q_UART2_SIZE,
+> +	.type		= MT_DEVICE,
+> +#endif
+>  #ifdef CONFIG_DEBUG_IMX6Q_UART4
+>  	.virtual	= MX6Q_IO_P2V(MX6Q_UART4_BASE_ADDR),
+>  	.pfn		= __phys_to_pfn(MX6Q_UART4_BASE_ADDR),
+> diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> index 8ddda36..761e45f 100644
+> --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> @@ -24,6 +24,8 @@
+>  #define UART_PADDR	MX51_UART1_BASE_ADDR
+>  #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
+>  #define UART_PADDR	MX53_UART1_BASE_ADDR
+> +#elif defined (CONFIG_DEBUG_IMX6Q_UART2)
+> +#define UART_PADDR	MX6Q_UART2_BASE_ADDR
+>  #elif defined (CONFIG_DEBUG_IMX6Q_UART4)
+>  #define UART_PADDR	MX6Q_UART4_BASE_ADDR
+>  #endif
+> diff --git a/arch/arm/plat-mxc/include/mach/mx6q.h b/arch/arm/plat-mxc/include/mach/mx6q.h
+> index 254a561..f7e7dba 100644
+> --- a/arch/arm/plat-mxc/include/mach/mx6q.h
+> +++ b/arch/arm/plat-mxc/include/mach/mx6q.h
+> @@ -27,6 +27,8 @@
+>  #define MX6Q_CCM_SIZE			0x4000
+>  #define MX6Q_ANATOP_BASE_ADDR		0x020c8000
+>  #define MX6Q_ANATOP_SIZE		0x1000
+> +#define MX6Q_UART2_BASE_ADDR		0x021e8000
+> +#define MX6Q_UART2_SIZE			0x4000
+>  #define MX6Q_UART4_BASE_ADDR		0x021f0000
+>  #define MX6Q_UART4_SIZE			0x4000
+>  
+> -- 
+> 1.7.0.4
+> 
